@@ -1,0 +1,13 @@
+sdk-version: 2.0.0-snapshot.20220126.9029.0.42cf70b1
+name: canton-coin
+source: daml
+version: 0.1.0
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
+  - daml-trigger
+sandbox-options:
+  - --wall-clock-time
+build-options:
+  - --target=1.dev

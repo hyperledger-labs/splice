@@ -1,0 +1,26 @@
+module CC.Main where
+
+import CC.PartyGovernance
+
+-- | CC is the genesis contract of Canton Coin. It serves as the public gateway into the app.
+template CC
+  with
+    supervalidator : Party
+    public : Party
+  where
+    signatory supervalidator
+    observer public
+
+    key supervalidator : Party
+    maintainer key 
+
+    choice TakePublicRead : ()
+      with
+        user : Party
+      controller user
+      do
+        requestCid <- create CreateReadDelegationRequest with
+          from = public
+          to = user
+        exerciseByKey @DecentralizedParty public AcceptRequest with
+          requestCid = toInterfaceContractId requestCid

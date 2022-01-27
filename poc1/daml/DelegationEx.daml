@@ -1,0 +1,84 @@
+module DelegationEx where
+
+import Daml.Script
+
+interface AnyAction where
+  actionAuthorizers : [Party]
+  run : Update ()
+  choice Run : ()
+    with
+      extraAuth : [Party]
+    controller ((actionAuthorizers this) ++ extraAuth)
+    do run this
+
+template CoSigned
+  with
+    a : Party
+    c : Party
+  where
+    signatory [a, c]
+
+template CoSignAction
+  with
+    a : Party
+    b : Party
+    c : Party
+  where
+    signatory c
+
+    implements AnyAction where
+      let actionAuthorizers = [b]
+      let run = do
+          create CoSigned with ..
+          return ()
+
+template WriteDelegation
+  with
+    a : Party
+    b : Party
+  where
+    signatory a
+    observer b
+  
+    nonconsuming choice PerformAction : ()
+      with
+        actionCid : ContractId AnyAction
+      controller b
+      do
+        exercise actionCid Run
+          with extraAuth = [a]
+
+template CoSignDelegation
+  with
+    a : Party
+    b : Party
+    c : Party
+  where
+    signatory b
+    observer c
+
+    nonconsuming choice CoSign : ()
+      with
+        writeDelegationCid : ContractId WriteDelegation
+      controller c
+      do
+        actionCid <- create CoSignAction with ..
+        exercise writeDelegationCid PerformAction with
+          actionCid = toInterfaceContractId actionCid
+
+test : Script ()
+test = do
+  a <- allocateParty "A"
+  b <- allocateParty "B"
+  c <- allocateParty "C"
+
+  writeDelegationCid <- submit a do
+    createCmd WriteDelegation with ..
+
+  coSignDelelegationCid <- submit b do
+    createCmd CoSignDelegation with ..
+
+  submitMulti [c] [b] do
+    exerciseCmd coSignDelelegationCid CoSign with ..
+
+  return ()

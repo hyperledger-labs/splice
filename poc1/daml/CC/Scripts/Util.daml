@@ -1,0 +1,20 @@
+module CC.Scripts.Util where
+
+import Daml.Script
+
+import CC.Main
+import CC.PartyGovernance
+
+-- | Utility function to submit with public read.
+submitCC : Party -> Party -> Commands b -> Script b
+submitCC svs p c = do
+    -- Cheat here to resolve public party
+    Some (_, cc) <- queryContractKey @CC svs svs
+    -- Dirty check that read delegation exists
+    let 
+      rd = ReadDelegation with
+        from = cc.public
+        to = p
+    Some _ <- queryContractKey @ReadDelegation p rd
+    
+    submitMulti [p] [cc.public] c 
