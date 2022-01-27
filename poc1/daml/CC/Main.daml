@@ -19,7 +19,7 @@ template CC
         user : Party
       controller user
       do
-        requestCid <- create CreateReadDelegationRequest with
+        requestCid <- create ReadDelegationRequest with
           from = public
           to = user
         exerciseByKey @DecentralizedParty public AcceptRequest with

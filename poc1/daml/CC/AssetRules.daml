@@ -1,0 +1,129 @@
+module CC.AssetRules where
+
+import DA.Foldable (forA_)
+import DA.List (dedupSort, delete)
+
+import CC.Assets
+
+template CoinRules
+  with
+    sv : Party
+    public : Party
+  where
+    signatory sv
+    observer public
+
+    nonconsuming choice Coin_AddObservers : ContractId Coin
+      with
+        owner : Party
+        coinCid : ContractId Coin
+        newObservers : [Party]
+      controller owner
+      do
+        coin <- fetch coinCid
+        assertMsg "Only the owner of a coin can add observers" (owner == coin.owner)
+        archive coinCid
+        create coin with
+          obs = dedupSort (newObservers ++ coin.obs)
+
+    nonconsuming choice Coin_RemoveObservers : ContractId Coin
+      with
+        owner : Party
+        coinCid : ContractId Coin
+        oldObservers : [Party]
+      controller owner
+      do
+        coin <- fetch coinCid
+        assertMsg "Only the owner of a coin can remove observers" (owner == coin.owner)
+        archive coinCid
+        create coin with
+          obs = foldr delete coin.obs oldObservers
+
+    nonconsuming choice Coin_Transfer : ContractId CoinTransfer
+      with
+        owner : Party
+        receiver : Party
+        coinCid : ContractId Coin
+      controller owner
+      do
+        coin <- fetch coinCid
+        assertMsg "Coin owners do not match" (owner == coin.owner)
+        archive coinCid
+        create CoinTransfer with ..
+
+    nonconsuming choice Coin_BilateralTransfer : ContractId Coin
+      with
+        owner : Party
+        newOwner : Party
+        coinCid : ContractId Coin
+      controller [owner, newOwner]
+      do
+        coin <- fetch coinCid
+        assertMsg "Coin owners do not match" (owner == coin.owner)
+        archive coinCid
+        create coin with owner = newOwner
+
+    nonconsuming choice Coin_Redistribute : [ContractId Coin]
+      with
+        owner : Party
+        coinCids : [ContractId Coin]
+        splitQuantities : [Decimal]
+      controller owner
+      do
+        coins <- forA coinCids fetch
+        forA_ coins (\c -> assertMsg "Coin owners do not match" (owner == c.owner))
+        forA_ coinCids archive
+        let total = sum (map (\c -> c.quantity) coins)
+            totalSplits = sum splitQuantities
+            rem = total - totalSplits
+            obs = []
+        forA (rem :: splitQuantities) (\quantity -> create Coin with ..)
+
+    nonconsuming choice Coin_Lock : ContractId LockedCoin
+      with
+        owner : Party
+        unlockers : [Party]
+        coinCid : ContractId Coin
+      controller owner
+      do
+        coin <- fetch coinCid
+        assertMsg "Coin owners do not match" (owner == coin.owner)
+        archive coinCid
+        create LockedCoin with ..
+
+template CreditRules
+  with
+    sv : Party
+    public : Party
+  where
+    signatory sv
+    observer public
+
+    nonconsuming choice Credit_Redistribute : [ContractId Credit]
+      with
+        owner : Party
+        creditCids : [ContractId Coin]
+        splitQuantities : [Decimal]
+      controller owner
+      do
+        coins <- forA creditCids fetch
+        forA_ coins (\c -> assertMsg "Credit owners do not match" (owner == c.owner))
+        forA_ creditCids archive
+        let total = sum (map (\c -> c.quantity) coins)
+            totalSplits = sum splitQuantities
+            rem = total - totalSplits
+            obs = []
+        forA (rem :: splitQuantities) (\quantity -> create Credit with ..)
+
+    nonconsuming choice Credit_Burn : ContractId BurnedCredit
+      with
+        burner : Party
+        inNameOf : Party
+        payload : Text
+        creditCid : ContractId Credit
+      controller burner
+      do
+        credit <- fetch creditCid
+        assertMsg "Credit owners do not match" (burner == credit.owner)
+        archive creditCid
+        create BurnedCredit with ..

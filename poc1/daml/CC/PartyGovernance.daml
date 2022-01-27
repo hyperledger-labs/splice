@@ -76,7 +76,7 @@ Helpers for actions we need to delegate through PerformAction
 ===============================================================================
 -}
 
-template CreateReadDelegationRequest
+template ReadDelegationRequest
   with
     from : Party
     to : Party
