@@ -70,6 +70,7 @@ template DecentralizedParty
       controller validators
       do
         exercise requestCid Accept
+
 {-
 ===============================================================================
 Helpers for actions we need to delegate through PerformAction

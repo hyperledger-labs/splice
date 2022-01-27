@@ -118,7 +118,8 @@ template CreditRules
     nonconsuming choice Credit_Burn : ContractId BurnedCredit
       with
         burner : Party
-        inNameOf : Party
+        beneficiary : Party
+        validator : Party
         payload : Text
         creditCid : ContractId Credit
       controller burner
@@ -126,4 +127,7 @@ template CreditRules
         credit <- fetch creditCid
         assertMsg "Credit owners do not match" (burner == credit.owner)
         archive creditCid
-        create BurnedCredit with ..
+        burnedAt <- getTime
+        create BurnedCredit with
+          quantity = credit.quantity
+          ..

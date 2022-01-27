@@ -1,0 +1,134 @@
+module CC.Governance where
+
+import DA.Time
+
+import CC.Assets
+
+-- | PriceOracle is a placeholder for some mechanism to work out a price
+template PriceOracle
+  with
+    sv : Party
+    public : Party
+    price : Decimal
+  where
+    signatory sv
+    observer public
+
+-- | IssuanceSchedule will capture the rate of issuance to servive providers
+--   as measured by burned credits, validators, also measured by burned credits
+--   and supervalidators (measuered by supervalidators)
+template IssuanceSchedule
+  with
+    sv : Party
+    public : Party
+    -- Some actual data here...
+  where
+    signatory sv
+    observer public
+
+-- | RoundSchedule will captrure the distribution rules for supervalidators.
+template RoundSchedule
+  with
+    sv : Party
+    public : Party
+    -- Some data to express the rounds
+  where
+    signatory sv
+    observer public
+
+-- | Issuance is a special kind of transfer request with a clawback for the SVs.
+template Issuance
+  with
+    sv : Party
+    public : Party
+    receiver : Party
+    quantity : Decimal
+    clawbackAt : Time
+  where
+    signatory sv
+    observer public
+
+    choice Accept_Issuance : ContractId Coin
+      controller receiver
+      do
+        create Coin with
+          owner = receiver
+          obs = []
+          ..
+
+    choice Clawback_Issuance : ContractId Coin
+      controller sv
+      do
+        now <- getTime
+        assertMsg "Can't clawback before clawbackAt" (now > clawbackAt)
+        -- Issue to sv rather than the constituent parties of sv for now.
+        -- We could do the latter but would have to deal with arithmetic
+        -- errors when dividing. 
+        create Coin with
+          owner = sv
+          obs = []
+          ..
+
+-- | IssuanceEvent is calculated periodically from the IssuanceSchedule
+--   and allows the conversion of burned credit to issuances for a period
+template IssuanceEvent
+  with
+    sv : Party
+    public : Party
+    validFrom : Time
+    validTo : Time
+    validatorIssuancePerCredit : Decimal
+    beneficiaryIssuancePerCredit : Decimal
+    creditClawbackFrom : Time
+    issuanceClawbackPeriod : RelTime
+  where
+    signatory sv
+    observer public
+
+    nonconsuming choice Claim_Issuance : (ContractId Issuance, ContractId Issuance)
+      with
+        actor : Party
+        burnedCreditCid : ContractId BurnedCredit
+      controller actor
+      do
+        burnedCredit <- fetch burnedCreditCid
+        archive burnedCreditCid
+        assertMsg "Burned credit is out of time bounds" (validFrom < burnedCredit.burnedAt && validTo >= burnedCredit.burnedAt)
+        now <- getTime
+        validatorIssuanceCid <- create Issuance with
+          receiver = burnedCredit.validator
+          quantity = burnedCredit.quantity * validatorIssuancePerCredit
+          clawbackAt = addRelTime now issuanceClawbackPeriod
+          ..
+        burnReceiverIssuanceCid <- create Issuance with
+          receiver = burnedCredit.beneficiary
+          quantity = burnedCredit.quantity * validatorIssuancePerCredit
+          clawbackAt = addRelTime now issuanceClawbackPeriod
+
+          ..
+        return (validatorIssuanceCid, burnReceiverIssuanceCid)
+
+    nonconsuming choice Clawback_Credits : ContractId Coin
+      with
+        burnedCreditCid : ContractId BurnedCredit
+      controller sv
+      do
+        burnedCredit <- fetch burnedCreditCid
+        archive burnedCreditCid
+        now <- getTime
+        assertMsg "Burned credit is out of time bounds" (validFrom < burnedCredit.burnedAt && validTo >= burnedCredit.burnedAt)
+        assertMsg "Cannot yet claw back credits" (creditClawbackFrom < now)
+        create Coin with
+          owner = sv
+          obs = []
+          quantity = burnedCredit.quantity * (validatorIssuancePerCredit + beneficiaryIssuancePerCredit)
+          ..
+
+template GovernanceRules
+  with
+    sv : Party
+    public : Party
+  where
+    signatory sv
+    observer public
+

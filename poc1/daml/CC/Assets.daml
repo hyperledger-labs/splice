@@ -73,8 +73,15 @@ template BurnedCredit
   with
     sv : Party
     public : Party
+    quantity : Decimal
+    burnedAt : Time
     burner : Party
-    inNameOf : Party
+    -- | Validator is the party representing the Validator Operator hosting
+    --   user.
+    --   FEATUER NEEDED: We somehow need to get at this instead of relying on
+    --   the honesty of the burner.
+    validator : Party
+    beneficiary : Party
     payload : Text
   where
     signatory sv
