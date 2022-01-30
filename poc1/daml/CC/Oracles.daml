@@ -1,0 +1,40 @@
+module CC.Oracles where
+
+-- | PriceOracle is a placeholder for some mechanism to work out a price.
+-- | It's currently given daily.
+template PriceOracle
+  with
+    sv : Party
+    public : Party
+    date : Date
+    price : Decimal
+  where
+    signatory sv
+    observer public
+
+    key (sv, date) : (Party, Date)
+    maintainer key._1
+
+    -- | Price governance is currently stubbed with the super validator
+    --   consortium setting it.
+    choice Set_Price : ContractId PriceOracle
+      with
+        newPrice : Decimal
+      controller sv
+      do
+        create this with price = newPrice
+
+-- | BurnOracle mocks some secure mechanism by which the super validators can
+--   come to a consensus on how much credit was burned on a day.
+template BurnOracle
+  with
+    sv : Party
+    public : Party
+    date : Date
+    quantity : Decimal
+  where
+    signatory sv
+    observer public
+
+    key (sv, date) : (Party, Date)
+    maintainer key._1

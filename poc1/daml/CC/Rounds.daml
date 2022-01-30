@@ -1,0 +1,12 @@
+module CC.Rounds where
+
+-- | RoundParameters is a configuration contract that holds round parameters
+--   like the the number of super validators to be added/removed/split.
+template RoundParameters
+  with
+    sv : Party
+    public : Party
+    -- 
+  where
+    signatory sv
+    observer public

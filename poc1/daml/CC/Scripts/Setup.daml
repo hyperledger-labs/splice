@@ -5,6 +5,9 @@ import Daml.Script
 import CC.Main
 import CC.PartyGovernance
 
+import CC.Scripts.Parameters
+import CC.Scripts.Util
+
 type CCApp = Party
 type UserParty = Party
 
@@ -12,8 +15,8 @@ type UserParty = Party
 -- representing the set of all supervalidators.
 -- That party is assumed to be dynamically governed by the controlling parties
 -- in its DecentralizedParty contract.
-startCantonCoin : Script CCApp
-startCantonCoin = do
+setupApp : Script (CCApp, Party)
+setupApp = do
   -- Digital Asset spins up a node intended as the first Super Validator and then
   -- allocates a party intended to be the Super Validator Party for that SV. 
   da1 <- allocateParty "DigitalAsset1"
@@ -22,34 +25,30 @@ startCantonCoin = do
   -- of all supervalidators.
   -- FEATURE GAP: We don't have decentralized parties.
   -- We mock this by just allocating a party and co-creating a DecentralizedParty contract
-  svs <- allocateParty "SuperValidators"
-  submitMulti [da1, svs] [] do
+  sv <- allocateParty "SuperValidators"
+  submitMulti [da1, sv] [] do
     createCmd DecentralizedParty with
       validators = [da1]
-      partyId = svs
+      partyId = sv
       obs = []
 
-  -- DigitalAsset uses their control of svs to create a DecentralizedParty used to share
+  -- DigitalAsset uses their control of sv to create a DecentralizedParty used to share
   -- all public information of CC.
   public <- allocateParty "Public"
-  submitMulti [svs, public] [] do
-    createCmd DecentralizedParty with
-      validators = [svs]
+  requestCid <- submitMulti [da1, public] [] do
+    createCmd DecentralizedPartyRequest with
       partyId = public
-      obs = []
+      validators = [sv]
+  submitDP sv da1 do
+    exerciseByKeyCmd @DecentralizedParty sv AcceptRequest with requestCid = toInterfaceContractId requestCid
 
-  -- The supervalidator party makes itself visible to public
-  submit svs do
-    exerciseByKeyCmd @DecentralizedParty svs AddObservers with
-      newObservers = [public]
+  --- DigitalAsset uses their control of sv ot create the app.
+  requestCid <- submit da1 do
+    createCmd CreateAppRequest with actor = da1; ..
+  submit da1 do
+    exerciseByKeyCmd @DecentralizedParty sv AcceptRequest with requestCid = toInterfaceContractId requestCid
 
-  -- The supervalidator party starts an app instance
-  submit svs do
-    createCmd CC with
-      supervalidator = svs
-      public
-
-  return svs
+  return (sv, da1)
 
 -- | onboardUser simply sets up public read for a user party
 onboardUser : UserParty -> CCApp -> Script ()
@@ -62,8 +61,22 @@ onboardUser user app = do
 
 testOnboardUser : Script ()
 testOnboardUser = do
-  app <- startCantonCoin
+  (app, _) <- setupApp
   user <- allocateParty "User"
   onboardUser user app
 
-  
+-- | Runs the bootstrapping given an existing CC contract.
+bootstrapApp : (CCApp, Party) -> Script ()
+bootstrapApp (sv, da1) = do
+  [(cid, cc)] <- queryDP @CC sv da1
+  submitDP cc.sv da1 do
+    exerciseCmd cid BootstrapApp with
+      actor = da1
+      issuanceParams = defaultIssuanceParameters cc
+      roundParams = defaultRoundParameters cc
+  return ()
+
+testBootstrapApp : Script ()
+testBootstrapApp = do
+  (sv, da1) <- setupApp
+  bootstrapApp (sv, da1)

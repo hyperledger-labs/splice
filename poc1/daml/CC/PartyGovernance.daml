@@ -62,14 +62,46 @@ template DecentralizedParty
         create this with
           obs = foldr delete obs oldObservers
 
+    choice AddValidators : ContractId DecentralizedParty
+      with
+        newValidators : [Party]
+      controller partyId
+      do
+        create this with
+          validators = dedupSort (newValidators ++ validators)
+
+    choice RemoveValidators : ContractId DecentralizedParty
+      with
+        oldValidators : [Party]
+      controller partyId
+      do
+        create this with
+          validators = foldr delete validators oldValidators
+
     -- A workaround to be able to mock delegated governance
     -- ie let validators to anything in the name of partyId
-    choice AcceptRequest : ()
+    nonconsuming choice AcceptRequest : ()
       with
         requestCid : ContractId AnyRequest
       controller validators
       do
         exercise requestCid Accept
+
+-- | checkValidator checks whether a party is a Dezentralized Party
+--   validator.
+checkValidator : Party -> Party -> Update Bool
+checkValidator p dp = do
+  (_, dp_args) <- fetchByKey @DecentralizedParty dp
+  return (p `elem` dp_args.validators)
+
+
+-- | assertValidator asserts that a party is a Dezentralized validator.
+-- | assertValidator checks whether a party is a Dezentralized Party
+--   validator.
+assertValidator : Party -> Party -> Update ()
+assertValidator p dp = do
+  is <- checkValidator p dp
+  assertMsg (show p <> " is not a validator of " <> show dp) is
 
 {-
 ===============================================================================
@@ -87,3 +119,15 @@ template ReadDelegationRequest
     implements AnyRequest where
       let requestAuthorizers = [from]
       let accept = void $ create ReadDelegation with ..
+
+template DecentralizedPartyRequest
+  with
+    validators : [Party]
+    partyId : Party
+  where
+    signatory partyId
+    observer validators
+
+    implements AnyRequest where
+      let requestAuthorizers = validators
+      let accept = void $ create DecentralizedParty with obs = []; ..

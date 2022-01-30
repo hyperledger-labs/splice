@@ -2,19 +2,54 @@ module CC.Scripts.Util where
 
 import Daml.Script
 
+import DA.List (dedup)
+
 import CC.Main
 import CC.PartyGovernance
 
--- | Utility function to submit with public read.
-submitCC : Party -> Party -> Commands b -> Script b
-submitCC svs p c = do
-    -- Cheat here to resolve public party
-    Some (_, cc) <- queryContractKey @CC svs svs
-    -- Dirty check that read delegation exists
+-- Derive some instances to be able to use dedup
+deriving instance Ord CC
+
+-- | Utility function to submit with read delegation.
+submitRD : Party -> Party -> Commands b -> Script b
+submitRD rdp p c = do
     let 
       rd = ReadDelegation with
-        from = cc.public
+        from = rdp
         to = p
     Some _ <- queryContractKey @ReadDelegation p rd
     
-    submitMulti [p] [cc.public] c 
+    submitMulti [p] [rdp] c 
+
+-- | Utility function to submit as a member of a decentralized party.
+submitDP : Party -> Party -> Commands b -> Script b
+submitDP dp p c = do
+  Some (_, dp_args) <- queryContractKey @DecentralizedParty p dp
+  assertMsg "Not a validator" (p `elem` dp_args.validators)    
+  submitMulti [p] [dp] c 
+
+-- | Utility function to query with read delegation.
+queryRD : forall t . (Ord t, Template t) => Party ->Party -> Script [(ContractId t, t)]
+queryRD rdp p = do
+    -- Dirty check that read delegation exists
+    let 
+      rd = ReadDelegation with
+        from = rdp
+        to = p
+    Some _ <- queryContractKey @ReadDelegation p rd
+    
+    a <- query @t rdp
+    b <- query @t p
+
+    return (dedup (a ++ b))
+
+-- | Utility function to query with public read.
+queryDP : forall t . (Ord t, Template t) => Party -> Party -> Script [(ContractId t, t)]
+queryDP dp p = do
+  Some (_, dp_args) <- queryContractKey @DecentralizedParty p dp
+  assertMsg "Not a validator" (p `elem` dp_args.validators)    
+
+  a <- query @t dp
+  b <- query @t p
+
+  return (dedup (a ++ b))

@@ -1,20 +1,29 @@
 module CC.Main where
 
+import DA.Action
+import DA.Date
+
+import CC.AssetRules
+import CC.Governance
+import CC.Interfaces
+import CC.Issuance
 import CC.PartyGovernance
+import CC.Rounds
+import CC.Types
 
 -- | CC is the genesis contract of Canton Coin. It serves as the public gateway into the app.
 template CC
   with
-    supervalidator : Party
+    sv : Party
     public : Party
   where
-    signatory supervalidator
+    signatory sv
     observer public
 
-    key supervalidator : Party
+    key sv : CCKey
     maintainer key 
 
-    choice TakePublicRead : ()
+    nonconsuming choice TakePublicRead : ()
       with
         user : Party
       controller user
@@ -24,3 +33,46 @@ template CC
           to = user
         exerciseByKey @DecentralizedParty public AcceptRequest with
           requestCid = toInterfaceContractId requestCid
+
+    nonconsuming choice BootstrapApp : ()
+      with
+        actor : Party
+        issuanceParams : IssuanceParameters
+        roundParams : RoundParameters
+      controller actor
+      do
+        assertValidator actor sv
+
+        today <- toDateUTC <$> getTime
+
+        -- Make sure public can see the supervalidator party.
+        exerciseByKey @DecentralizedParty sv AddObservers with newObservers = [public]
+
+        create CoinRules with ..
+        create CreditRules with ..
+        create issuanceParams
+        create roundParams
+        create GovernanceRules with ..
+        create IssuanceMarker with last_issuance = today; ..
+
+        return ()
+
+
+
+{-
+===============================================================================
+Helpers for actions we need to delegate through PerformAction
+===============================================================================
+-}
+
+template CreateAppRequest
+  with
+    sv : Party
+    public : Party
+    actor : Party
+  where
+    signatory actor
+
+    implements AnyRequest where
+      let requestAuthorizers = [sv]
+      let accept = void $ create CC with ..

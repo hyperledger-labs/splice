@@ -1,0 +1,23 @@
+module CC.Scripts.Parameters where
+
+import DA.Date
+import DA.Time
+
+import CC.Issuance
+import CC.Main
+import CC.Rounds
+
+defaultIssuanceParameters : CC -> IssuanceParameters
+defaultIssuanceParameters app = IssuanceParameters with
+  sv = app.sv
+  public = app.public
+  rates = [(date 9999 Dec 31, 1.0)]
+  creditClawbackPeriod = days 1
+  issuanceClawbackPeriod = days 1
+  servicePercentage = 0.5
+  validatorPercentage = 0.15
+
+defaultRoundParameters : CC -> RoundParameters
+defaultRoundParameters app = RoundParameters with
+  sv = app.sv
+  public = app.public

@@ -1,129 +1,19 @@
 module CC.Governance where
 
+import DA.Action
+import DA.Date
 import DA.Time
 
-import CC.Assets
+import CC.Issuance
+import CC.Oracles
+import CC.PartyGovernance
 
--- | PriceOracle is a placeholder for some mechanism to work out a price
-template PriceOracle
-  with
-    sv : Party
-    public : Party
-    price : Decimal
-  where
-    signatory sv
-    observer public
-
--- | IssuanceSchedule will capture the rate of issuance to servive providers
---   as measured by burned credits, validators, also measured by burned credits
---   and supervalidators (measuered by supervalidators)
-template IssuanceSchedule
-  with
-    sv : Party
-    public : Party
-    -- Some actual data here...
-  where
-    signatory sv
-    observer public
-
--- | RoundSchedule will captrure the distribution rules for supervalidators.
-template RoundSchedule
-  with
-    sv : Party
-    public : Party
-    -- Some data to express the rounds
-  where
-    signatory sv
-    observer public
-
--- | Issuance is a special kind of transfer request with a clawback for the SVs.
-template Issuance
-  with
-    sv : Party
-    public : Party
-    receiver : Party
-    quantity : Decimal
-    clawbackAt : Time
-  where
-    signatory sv
-    observer public
-
-    choice Accept_Issuance : ContractId Coin
-      controller receiver
-      do
-        create Coin with
-          owner = receiver
-          obs = []
-          ..
-
-    choice Clawback_Issuance : ContractId Coin
-      controller sv
-      do
-        now <- getTime
-        assertMsg "Can't clawback before clawbackAt" (now > clawbackAt)
-        -- Issue to sv rather than the constituent parties of sv for now.
-        -- We could do the latter but would have to deal with arithmetic
-        -- errors when dividing. 
-        create Coin with
-          owner = sv
-          obs = []
-          ..
-
--- | IssuanceEvent is calculated periodically from the IssuanceSchedule
---   and allows the conversion of burned credit to issuances for a period
-template IssuanceEvent
-  with
-    sv : Party
-    public : Party
-    validFrom : Time
-    validTo : Time
-    validatorIssuancePerCredit : Decimal
-    beneficiaryIssuancePerCredit : Decimal
-    creditClawbackFrom : Time
-    issuanceClawbackPeriod : RelTime
-  where
-    signatory sv
-    observer public
-
-    nonconsuming choice Claim_Issuance : (ContractId Issuance, ContractId Issuance)
-      with
-        actor : Party
-        burnedCreditCid : ContractId BurnedCredit
-      controller actor
-      do
-        burnedCredit <- fetch burnedCreditCid
-        archive burnedCreditCid
-        assertMsg "Burned credit is out of time bounds" (validFrom < burnedCredit.burnedAt && validTo >= burnedCredit.burnedAt)
-        now <- getTime
-        validatorIssuanceCid <- create Issuance with
-          receiver = burnedCredit.validator
-          quantity = burnedCredit.quantity * validatorIssuancePerCredit
-          clawbackAt = addRelTime now issuanceClawbackPeriod
-          ..
-        burnReceiverIssuanceCid <- create Issuance with
-          receiver = burnedCredit.beneficiary
-          quantity = burnedCredit.quantity * validatorIssuancePerCredit
-          clawbackAt = addRelTime now issuanceClawbackPeriod
-
-          ..
-        return (validatorIssuanceCid, burnReceiverIssuanceCid)
-
-    nonconsuming choice Clawback_Credits : ContractId Coin
-      with
-        burnedCreditCid : ContractId BurnedCredit
-      controller sv
-      do
-        burnedCredit <- fetch burnedCreditCid
-        archive burnedCreditCid
-        now <- getTime
-        assertMsg "Burned credit is out of time bounds" (validFrom < burnedCredit.burnedAt && validTo >= burnedCredit.burnedAt)
-        assertMsg "Cannot yet claw back credits" (creditClawbackFrom < now)
-        create Coin with
-          owner = sv
-          obs = []
-          quantity = burnedCredit.quantity * (validatorIssuancePerCredit + beneficiaryIssuancePerCredit)
-          ..
-
+-- | This is the one contract through which super validators perform
+--   their special role.
+--   No other choices with controller sv should ever be called.
+--   An upgrade to CC governance should be performed by replacing this
+--   contract though a single archive/create pair authorized using external
+--   governance.
 template GovernanceRules
   with
     sv : Party
@@ -132,3 +22,45 @@ template GovernanceRules
     signatory sv
     observer public
 
+    key sv : Party
+    maintainer key
+
+    -- | Any SV consortium member can trigger an issuance.
+    nonconsuming choice Trigger_Issuance : ContractId IssuanceMarker
+      with
+        actor : Party
+      controller actor
+      do
+        assertValidator actor sv
+
+        (markerCid, marker) <- fetchByKey @IssuanceMarker sv
+        now <- getTime
+        let today = toDateUTC now
+        assertMsg "Cannot issue more than once a day" (today > marker.last_issuance)
+        
+        -- Always create Issuance Events for a whole day.
+        let date_to_issue = addDays marker.last_issuance 1
+        (params_cid, params) <- fetchByKey @IssuanceParameters sv
+        (_, priceOracle) <- fetchByKey @PriceOracle (sv, date_to_issue)
+        (_, burnOracle) <- fetchByKey @BurnOracle (sv, date_to_issue)
+
+        let
+          (head_date, rate) :: _ = params.rates
+          creditPercentage = params.servicePercentage + params.validatorPercentage 
+          issuance_per_credit = (min 1.0 (rate * creditPercentage / burnOracle.quantity)) / priceOracle.price
+          validatorIssuancePerCredit = issuance_per_credit * params.validatorPercentage / creditPercentage
+          beneficiaryIssuancePerCredit = issuance_per_credit * params.servicePercentage / creditPercentage
+          creditClawbackFrom = addRelTime now params.creditClawbackPeriod
+
+
+        assertMsg "Unexpected date in head rate" (today <= head_date)
+
+        create IssuanceEvent with
+          validOn = date_to_issue
+          issuanceClawbackPeriod = params.issuanceClawbackPeriod
+          ..
+
+        when (head_date == date_to_issue) (void $ exercise params_cid Truncate_Rates)
+        archive markerCid
+        create marker with last_issuance = date_to_issue
+    
