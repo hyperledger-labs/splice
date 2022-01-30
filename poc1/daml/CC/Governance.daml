@@ -2,6 +2,7 @@ module CC.Governance where
 
 import DA.Action
 import DA.Date
+import DA.Foldable (forA_)
 import DA.Time
 
 import CC.Issuance
@@ -43,15 +44,28 @@ template GovernanceRules
         (params_cid, params) <- fetchByKey @IssuanceParameters sv
         (_, priceOracle) <- fetchByKey @PriceOracle (sv, date_to_issue)
         (_, burnOracle) <- fetchByKey @BurnOracle (sv, date_to_issue)
+        (_, sv_args) <- fetchByKey @DecentralizedParty sv
 
         let
           (head_date, rate) :: _ = params.rates
           creditPercentage = params.servicePercentage + params.validatorPercentage 
-          issuance_per_credit = (min 1.0 (rate * creditPercentage / burnOracle.quantity)) / priceOracle.price
-          validatorIssuancePerCredit = issuance_per_credit * params.validatorPercentage / creditPercentage
-          beneficiaryIssuancePerCredit = issuance_per_credit * params.servicePercentage / creditPercentage
+          issuancePerCredit = if burnOracle.quantity == 0.0
+            then 0.0
+            else (min 1.0 (rate * creditPercentage / burnOracle.quantity)) / priceOracle.price
+          validatorIssuancePerCredit = issuancePerCredit * params.validatorPercentage / creditPercentage
+          beneficiaryIssuancePerCredit = issuancePerCredit * params.servicePercentage / creditPercentage
           creditClawbackFrom = addRelTime now params.creditClawbackPeriod
+          issuerIssuance = rate - issuancePerCredit * burnOracle.quantity
+          issuancePerSupervalidator = issuerIssuance / intToDecimal (length sv_args.validators)
 
+        -- Directly create super validator issuances
+        forA_ sv_args.validators (\p -> create Issuance with 
+            sv
+            public
+            quantity = issuancePerSupervalidator
+            clawbackAt = addRelTime now params.issuanceClawbackPeriod
+            receiver = p
+          )
 
         assertMsg "Unexpected date in head rate" (today <= head_date)
 

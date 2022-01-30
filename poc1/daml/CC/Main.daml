@@ -7,6 +7,7 @@ import CC.AssetRules
 import CC.Governance
 import CC.Interfaces
 import CC.Issuance
+import CC.Oracles
 import CC.PartyGovernance
 import CC.Rounds
 import CC.Types
@@ -39,6 +40,7 @@ template CC
         actor : Party
         issuanceParams : IssuanceParameters
         roundParams : RoundParameters
+        initialPrice : Decimal
       controller actor
       do
         assertValidator actor sv
@@ -53,7 +55,8 @@ template CC
         create issuanceParams
         create roundParams
         create GovernanceRules with ..
-        create IssuanceMarker with last_issuance = today; ..
+        create IssuanceMarker with last_issuance = subtractDays today 1; ..
+        create PriceOracle with price = initialPrice; date = today; ..
 
         return ()
 

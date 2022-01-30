@@ -74,6 +74,7 @@ bootstrapApp (sv, da1) = do
       actor = da1
       issuanceParams = defaultIssuanceParameters cc
       roundParams = defaultRoundParameters cc
+      initialPrice = 1.0
   return ()
 
 testBootstrapApp : Script ()
