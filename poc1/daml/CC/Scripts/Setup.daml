@@ -2,6 +2,9 @@ module CC.Scripts.Setup where
 
 import Daml.Script
 
+import DA.Date
+import DA.Time
+
 import CC.Main
 import CC.PartyGovernance
 
@@ -11,12 +14,17 @@ import CC.Scripts.Util
 type CCApp = Party
 type UserParty = Party
 
+demoTime : Time
+demoTime = time (date 2022 Jan 1) 0 0 0
+
 -- startCantonCoin kicks off the application and returns a special party
 -- representing the set of all supervalidators.
 -- That party is assumed to be dynamically governed by the controlling parties
 -- in its DecentralizedParty contract.
 setupApp : Script (CCApp, Party)
 setupApp = do
+  setTime demoTime
+
   -- Digital Asset spins up a node intended as the first Super Validator and then
   -- allocates a party intended to be the Super Validator Party for that SV. 
   da1 <- allocateParty "DigitalAsset1"
