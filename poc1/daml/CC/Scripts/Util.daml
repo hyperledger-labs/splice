@@ -21,7 +21,7 @@ submitRD rdp p c = do
     
     submitMulti [p] [rdp] c 
 
--- | Utility function to submit as a member of a decentralized party.
+-- | Utility function to submit as a validator of a decentralized party.
 submitDP : Party -> Party -> Commands b -> Script b
 submitDP dp p c = do
   Some (_, dp_args) <- queryContractKey @DecentralizedParty p dp
@@ -43,7 +43,7 @@ queryRD rdp p = do
 
     return (dedup (a ++ b))
 
--- | Utility function to query with public read.
+-- | Utility function to query as a validator of a decentralized party.
 queryDP : forall t . (Ord t, Template t) => Party -> Party -> Script [(ContractId t, t)]
 queryDP dp p = do
   Some (_, dp_args) <- queryContractKey @DecentralizedParty p dp
