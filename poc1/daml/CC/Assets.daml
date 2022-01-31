@@ -58,11 +58,11 @@ template Credit
   with
     -- | The supervalidator
     sv : Party
-    -- | Owner of the coin
+    -- | Owner of the credit
     owner : Party
-    -- | Amount of coin
+    -- | Amount of credit
     quantity : Decimal
-    -- | Observers of the coin. Used to work around explicit disclosure
+    -- | Observers of the credit. Used to work around explicit disclosure
     obs : [Party]
   where
     signatory [sv, owner]
