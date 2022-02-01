@@ -2,10 +2,24 @@ module CC.Scripts.Util where
 
 import Daml.Script
 
+import DA.Date
+import DA.Foldable (forA_, mapA_)
 import DA.List (dedup)
+import DA.Optional
+import DA.Time
 
+import CC.Assets
+import CC.AssetRules
+import CC.Issuance
+import CC.Governance
 import CC.Main
 import CC.PartyGovernance
+
+import CC.Scripts.Oracles
+
+
+-- Decentralized party governance utilities
+-- ========================================
 
 -- Derive some instances to be able to use dedup
 deriving instance Ord CC
@@ -53,3 +67,161 @@ queryDP dp p = do
   b <- query @t p
 
   return (dedup (a ++ b))
+
+
+-- CCApp utilities
+-- ===============
+
+-- | A type to hold the off-ledger information required to interact with CC.
+data CCApp = CCApp with
+    sv : Party  -- TODO: consider removing the need for this, and always enter via the public party
+    public : Party
+  deriving (Eq, Ord, Show)
+
+
+-- CCApp users
+--------------
+
+-- | onboardUser simply sets up public read for a user party
+onboardUser : Party -> CCApp -> Script ()
+onboardUser user app = do
+  -- We assume that the use has somehow learnt of the CC contract
+  -- via some disclusure mechanism.
+  -- FEATURE MISSING: Explicit disclosure
+  submitMulti [user] [app.sv] do
+    exerciseByKeyCmd @CC app.sv TakePublicRead with ..
+
+setupUser : CCApp -> Text -> Script Party
+setupUser app name = do
+  user <- allocateParty name
+  onboardUser user app
+  return user
+
+-- | Internal function for utilities to check that the acting party is a CC user.
+ensureIsUser : CCApp -> Party -> Script ()
+ensureIsUser app p = do
+  optRD <- queryContractKey @ReadDelegation app.public (ReadDelegation with from = app.public; to = p)
+  case optRD of
+    None -> error $ "Party " <> show p <> " is no user of " <> show app
+    Some _ -> return ()
+
+-- | Execute a contract-key query using the CCApp public party.
+queryContractKeyPublic
+  : forall t k.
+    -- TODO: figure out the type synonyms that let us write this signature more compactly
+    (HasFromAnyContractKey t k, HasToAnyContractKey t k, HasMaintainer t k, HasFetchByKey t k, HasLookupByKey t k,
+    HasKey t k, HasFromAnyTemplate t, HasToAnyTemplate t, HasTemplateTypeRep t, HasArchive t, HasFetch t, HasCreate t,
+    HasAgreement t, HasEnsure t, HasObserver t, HasSignatory t
+    ) =>
+    CCApp -> Party -> k -> Script (Optional (ContractId t, t))
+queryContractKeyPublic app user k = do
+  ensureIsUser app user
+  queryContractKey @t (app.public) k
+
+
+-- Issuance handling utilities
+------------------------------
+
+acceptIssuancesFor : Party -> Script [ContractId Coin]
+acceptIssuancesFor receiver = do
+  issuances <- query @Issuance receiver
+  forA issuances $ \(issCid, _) ->
+    submit receiver $ exerciseCmd issCid Accept_Issuance
+
+claimBurnedCreditFor : CCApp -> Party -> Script ()
+claimBurnedCreditFor app actor = do
+  burnedCredits <- query @BurnedCredit actor
+  forA_ burnedCredits $ \(burnedCreditCid, burnedCredit) -> do
+    -- lookup issuance event
+    let burnedAt = toDateUTC burnedCredit.burnedAt
+    Some (issEvCid, _) <- queryContractKeyPublic @IssuanceEvent app actor (app.sv, burnedAt)
+    -- claim issuance
+    submitRD app.public actor $
+        exerciseCmd issEvCid Claim_Issuance with
+        actor
+        burnedCreditCid
+    return ()
+
+
+-- Asset handling utilities
+---------------------------
+
+claimCoins : CCApp -> Party -> Script ()
+claimCoins app user = do
+  claimBurnedCreditFor app user
+  acceptIssuancesFor user
+  return ()
+
+getCoinRules : CCApp -> Party -> Script (ContractId CoinRules)
+getCoinRules app actor = do
+  optCoinRules <- queryContractKeyPublic @CoinRules app actor app.sv
+  return $ fst $ fromSomeNote ("CoinRules contract not found for app party '" <> show app.sv <> "'") optCoinRules
+
+exerciseCoinRule : Choice CoinRules ch r => CCApp -> Party -> ch -> Script r
+exerciseCoinRule app p ch = do
+  coinRulesCid <- getCoinRules app p
+  submitRD app.public p $ exerciseCmd coinRulesCid ch
+
+proposeCoinTransfer : CCApp -> Party -> Party -> ContractId Coin -> Script (ContractId CoinTransfer)
+proposeCoinTransfer sv owner receiver coinCid = exerciseCoinRule sv owner Coin_Transfer with ..
+
+-- | Take a specific amount of coin out of the wallet, failing if there is not enough.
+takeCoin : CCApp -> Party -> Decimal -> Script (ContractId Coin)
+takeCoin app user quantity = do
+  -- retrieve all coins
+  coins <- query @Coin user
+  -- redistribute all of them to extract the desired coin
+  -- TOOD: only grab as few coins as necessary
+  -- TODO: grab them in a way that results in low contention on concurrent execution
+  coinCid :: _ <- exerciseCoinRule app user Coin_Redistribute with
+      owner = user
+      coinCids = map fst coins
+      splitQuantities = [quantity]
+  return coinCid
+
+
+getCreditRules : CCApp -> Party -> Script (ContractId CreditRules)
+getCreditRules app actor = do
+  optCreditRules <- queryContractKeyPublic @CreditRules app actor app.sv
+  return $ fst $ fromSomeNote ("CreditRules contract not found for " <> show app <> "'") optCreditRules
+
+exerciseCreditRule : Choice CreditRules ch r => CCApp -> Party -> ch -> Script r
+exerciseCreditRule app p ch = do
+  creditRulesCid <- getCreditRules app p
+  submitRD app.public p $ exerciseCmd creditRulesCid ch
+
+
+
+-- Scripting the daily actions of all CC stakeholders
+-----------------------------------------------------
+
+-- | Advance the day, issue new coins, and have all SV parties and CC uers claim their coins.
+rollDayFull : CCApp -> Decimal -> Script ()
+rollDayFull app newCreditPrice = do
+  advanceDay app newCreditPrice
+  svps@(svp1 :: _) <- getSVParties app
+  triggerIssuanceAs app svp1
+  users <- getAllUserParties app
+  mapA_ (claimCoins app) (svps ++ users)
+
+advanceDay : CCApp -> Decimal -> Script ()
+advanceDay app newCreditPrice = do
+  passTime (days 1)
+  runOracles app.sv newCreditPrice
+
+triggerIssuanceAs : CCApp -> Party -> Script (ContractId IssuanceMarker)
+triggerIssuanceAs app p = do
+  submitDP app.sv p do
+      exerciseByKeyCmd @GovernanceRules app.sv Trigger_Issuance with
+        actor = p
+
+getSVParties : CCApp -> Script [Party]
+getSVParties app = do
+  Some (_, dp) <- queryContractKey @DecentralizedParty app.public app.sv
+  return dp.validators
+
+getAllUserParties : CCApp -> Script [Party]
+getAllUserParties app = do
+  rds <- queryFilter @ReadDelegation app.public (\rd -> rd.from == app.public)
+  return [rd.to | (_, rd) <- rds]
+

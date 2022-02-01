@@ -74,6 +74,9 @@ template IssuanceEvent
     signatory sv
     observer public
 
+    key (sv, validOn) : (Party, Date)
+    maintainer key._1
+
     nonconsuming choice Claim_Issuance : (ContractId Issuance, ContractId Issuance)
       with
         actor : Party
@@ -125,7 +128,7 @@ template Issuance
     clawbackAt : Time
   where
     signatory sv
-    observer public
+    observer public, receiver
 
     choice Accept_Issuance : ContractId Coin
       controller receiver

@@ -1,9 +1,11 @@
 module CC.AssetRules where
 
+import DA.Date
 import DA.Foldable (forA_)
 import DA.List (dedupSort, delete)
 
 import CC.Assets
+import CC.Oracles
 
 template CoinRules
   with
@@ -12,6 +14,9 @@ template CoinRules
   where
     signatory sv
     observer public
+
+    key sv : Party
+    maintainer key
 
     nonconsuming choice Coin_AddObservers : ContractId Coin
       with
@@ -77,7 +82,7 @@ template CoinRules
             totalSplits = sum splitQuantities
             rem = total - totalSplits
             obs = []
-        forA (rem :: splitQuantities) (\quantity -> create Coin with ..)
+        forA (splitQuantities ++ if rem > 0.0 then [rem] else []) (\quantity -> create Coin with ..)
 
     nonconsuming choice Coin_Lock : ContractId LockedCoin
       with
@@ -91,6 +96,30 @@ template CoinRules
         archive coinCid
         create LockedCoin with ..
 
+    nonconsuming choice Buy_Credit : ContractId Credit
+      with
+        owner : Party
+        -- TODO: support list of coins and only use as many as required for desired
+        -- amount of credit
+        coinCid : ContractId Coin
+      controller owner
+      do
+        -- validate and archive coin
+        coin <- fetch coinCid
+        assertMsg "Coin owners do not match" (owner == coin.owner)
+        archive coinCid
+        -- compute price
+        now <- getTime
+        let today = toDateUTC now
+        (_, priceOracle) <- fetchByKey @PriceOracle (sv, today)
+        -- issue credit
+        create Credit with
+          -- TODO: leave coin for remainder around
+          quantity = coin.quantity / priceOracle.price
+          obs = []
+          ..
+        
+
 template CreditRules
   with
     sv : Party
@@ -98,6 +127,9 @@ template CreditRules
   where
     signatory sv
     observer public
+
+    key sv : Party
+    maintainer key
 
     nonconsuming choice Credit_Redistribute : [ContractId Credit]
       with

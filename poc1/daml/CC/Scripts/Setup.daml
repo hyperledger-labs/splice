@@ -11,7 +11,6 @@ import CC.PartyGovernance
 import CC.Scripts.Parameters
 import CC.Scripts.Util
 
-type CCApp = Party
 type UserParty = Party
 
 demoTime : Time
@@ -50,22 +49,19 @@ setupApp = do
   submitDP sv da1 do
     exerciseByKeyCmd @DecentralizedParty sv AcceptRequest with requestCid = toInterfaceContractId requestCid
 
+  let app = CCApp with sv; public
+
   --- DigitalAsset uses their control of sv ot create the app.
   requestCid <- submit da1 do
     createCmd CreateAppRequest with actor = da1; ..
   submit da1 do
     exerciseByKeyCmd @DecentralizedParty sv AcceptRequest with requestCid = toInterfaceContractId requestCid
 
-  return (sv, da1)
+  -- DigitalAsset's da1 party is also a CC user
+  onboardUser da1 app
 
--- | onboardUser simply sets up public read for a user party
-onboardUser : UserParty -> CCApp -> Script ()
-onboardUser user app = do
-  -- We assume that the use has somehow learnt of the CC contract
-  -- via some disclusure mechanism.
-  -- FEATURE MISSING: Explicit disclosure
-  submitMulti [user] [app] do
-    exerciseByKeyCmd @CC app TakePublicRead with ..
+  return (app, da1)
+
 
 testOnboardUser : Script ()
 testOnboardUser = do
@@ -75,8 +71,8 @@ testOnboardUser = do
 
 -- | Runs the bootstrapping given an existing CC contract.
 bootstrapApp : (CCApp, Party) -> Script ()
-bootstrapApp (sv, da1) = do
-  [(cid, cc)] <- queryDP @CC sv da1
+bootstrapApp (app, da1) = do
+  [(cid, cc)] <- queryDP @CC app.sv da1
   submitDP cc.sv da1 do
     exerciseCmd cid BootstrapApp with
       actor = da1

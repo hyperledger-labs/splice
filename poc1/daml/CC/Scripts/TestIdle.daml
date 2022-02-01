@@ -2,45 +2,24 @@ module CC.Scripts.TestIdle where
 
 import Daml.Script
 
-import DA.Time
-
-import CC.Governance
-
 import CC.Scripts.Setup
-import CC.Scripts.Oracles
 import CC.Scripts.Util
 
 test : Script ()
 test = do
-  (sv, da1) <- setupApp
-  bootstrapApp (sv, da1)
+  -- bootstrap app
+  (app, da1) <- setupApp
+  bootstrapApp (app, da1)
 
-  passTime (days 1)
-  runOracles sv 1.1
-
-  submitDP sv da1 do
-    exerciseByKeyCmd @GovernanceRules sv Trigger_Issuance with
-      actor = da1
-
-  passTime (days 1)
-  runOracles sv 1.2
-
-  submitDP sv da1 do
-    exerciseByKeyCmd @GovernanceRules sv Trigger_Issuance with
-      actor = da1
-
-  passTime (days 1)
-  runOracles sv 1.3
-
-  submitDP sv da1 do
-    exerciseByKeyCmd @GovernanceRules sv Trigger_Issuance with
-      actor = da1
-
-  passTime (days 1)
-  runOracles sv 1.4
-
-  submitDP sv da1 do
-    exerciseByKeyCmd @GovernanceRules sv Trigger_Issuance with
-      actor = da1
+  -- start issuing
+  advanceDay app 1.1
+  triggerIssuanceAs app da1
+  advanceDay app 1.2
+  triggerIssuanceAs app da1
+  advanceDay app 1.3
+  triggerIssuanceAs app da1
+  advanceDay app 1.4
+  triggerIssuanceAs app da1
 
   return ()
+  

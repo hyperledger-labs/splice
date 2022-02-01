@@ -13,7 +13,7 @@ template Coin
     obs : [Party]
   where
     signatory [sv, owner]
-    ensure quantity >= 0.0
+    ensure quantity > 0.0
 
 -- Special States for Canton Coin
 
@@ -85,5 +85,5 @@ template BurnedCredit
     payload : Text
   where
     signatory sv
-    observer public
+    observer public, validator, beneficiary
 
