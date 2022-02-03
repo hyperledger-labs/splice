@@ -6,7 +6,7 @@ module CC.Accounts where
 
 data AccountId = AccountId with
     -- | CC Super Validator party
-    sv : Party
+    svc : Party
     -- | CC public party used by super validator
     public: Party
     -- | Owner of the coins in this account.
@@ -18,10 +18,10 @@ data AccountId = AccountId with
 -- | An account for a user to interact with the CC app.
 --
 -- We'd expect that a user typically has as many account contracts as it is doing
--- concurrent actions on the SV network.
+-- concurrent actions on the svc network.
 --
 -- Users can freely split and merge their accounts. They are though charged fees
--- for these operations that ensure fair usage of SV network resources.
+-- for these operations that ensure fair usage of svc network resources.
 --
 -- The fact that accounts can only be used in a sequential fashion gives a natural way 
 -- to rate limit users, as they cannot act faster than the latency of one commit times
@@ -36,15 +36,15 @@ template UserAccount
     -- | Observers of this account. Used to work around explicit disclosure
     obs : [Party]
   where
-    signatory [id.sv, id.owner]
+    signatory [id.svc, id.owner]
     ensure balance > 0.0
 
     key id : AccountId
-    maintainer key.sv, key.owner
+    maintainer key.svc, key.owner
 
 -- | Account fees denominated in CC coin.
 data AccountFees = AccountFees with
-    -- | Cost to open an account. Set separately from the usageFee, as the SV network
+    -- | Cost to open an account. Set separately from the usageFee, as the svc network
     -- might disincentivize opening accounts in times of congestion.
     openFee : Decimal
     -- | Cost to use an account.

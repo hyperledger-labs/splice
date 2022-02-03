@@ -9,7 +9,7 @@ import CC.Rounds
 
 defaultIssuanceParameters : CC -> IssuanceParameters
 defaultIssuanceParameters app = IssuanceParameters with
-  sv = app.sv
+  svc = app.svc
   public = app.public
   rates = [(date 9999 Dec 31, 1.0)]
   creditClawbackPeriod = days 1
@@ -19,7 +19,7 @@ defaultIssuanceParameters app = IssuanceParameters with
 
 defaultRoundParameters : CC -> [[Party]] -> RoundParameters
 defaultRoundParameters app tiers = RoundParameters with
-  sv = app.sv
+  svc = app.svc
   public = app.public
   tiers
   doublingRoundPeriod = days 183 -- ca every 6 months

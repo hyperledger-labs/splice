@@ -4,7 +4,7 @@ module CC.Assets where
 template Coin
   with
     -- | The supervalidator
-    sv : Party
+    svc : Party
     -- | Owner of the coin
     owner : Party
     -- | Amount of coin
@@ -12,7 +12,7 @@ template Coin
     -- | Observers of the coin. Used to work around explicit disclosure
     obs : [Party]
   where
-    signatory [sv, owner]
+    signatory [svc, owner]
     ensure quantity > 0.0
 
 -- Special States for Canton Coin
@@ -56,7 +56,7 @@ template LockedCoin
 template Credit
   with
     -- | The supervalidator
-    sv : Party
+    svc : Party
     -- | Owner of the credit
     owner : Party
     -- | Amount of credit
@@ -64,13 +64,13 @@ template Credit
     -- | Observers of the credit. Used to work around explicit disclosure
     obs : [Party]
   where
-    signatory [sv, owner]
+    signatory [svc, owner]
     ensure quantity >= 0.0
 
 -- Special state for credits
 template BurnedCredit
   with
-    sv : Party
+    svc : Party
     public : Party
     quantity : Decimal
     burnedAt : Time
@@ -83,6 +83,6 @@ template BurnedCredit
     beneficiary : Party
     payload : Text
   where
-    signatory sv
+    signatory svc
     observer public, validator, beneficiary
 

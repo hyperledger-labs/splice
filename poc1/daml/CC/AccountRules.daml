@@ -14,47 +14,47 @@ getDate = toDateUTC <$> getTime
 
 -- | Get an account with charges applied, and delete the original.
 getAndChargeAccount : Party -> Party -> ContractId UserAccount -> Update UserAccount
-getAndChargeAccount sv owner accCid = do
+getAndChargeAccount svc owner accCid = do
     account <- fetch accCid
     assertMsg "Only the owner of a account can add observers" (owner == account.id.owner)
     archive accCid
     today <- getDate
-    usageFee <- getUsageFee sv today
-    dailyFees <- getDailyFees sv account.lastChargedAt today
+    usageFee <- getUsageFee svc today
+    dailyFees <- getDailyFees svc account.lastChargedAt today
     let newBalance = account.balance - usageFee - dailyFees
     return $ account with
         balance = newBalance 
         lastChargedAt = today
 
 modifyUserAccount : Party -> Party -> ContractId UserAccount -> (UserAccount -> Update UserAccount) -> Update (ContractId UserAccount)
-modifyUserAccount sv owner accCid f = do
-    account <- getAndChargeAccount sv owner accCid
+modifyUserAccount svc owner accCid f = do
+    account <- getAndChargeAccount svc owner accCid
     newAccount <- f account
     create newAccount
 
 getDailyFees : Party -> Date -> Date -> Update Decimal
-getDailyFees sv lastChargedAt t =
+getDailyFees svc lastChargedAt t =
   fmap sum $ forA [1:Int .. subDate t lastChargedAt] $ \d -> do
-    fees <- getAccountFees sv (addDays lastChargedAt d)
+    fees <- getAccountFees svc (addDays lastChargedAt d)
     return fees.dailyFee
 
 getUsageFee : Party -> Date -> Update Decimal
-getUsageFee sv t = (.usageFee) <$> getAccountFees sv t
+getUsageFee svc t = (.usageFee) <$> getAccountFees svc t
 
 getAccountFees : Party -> Date -> Update AccountFees
-getAccountFees sv d = do
-    (_, feePosting) <- fetchByKey @AccountFeesOracle (sv, d)
+getAccountFees svc d = do
+    (_, feePosting) <- fetchByKey @AccountFeesOracle (svc, d)
     return feePosting.fees
 
 template UserAccountRules
   with
-    sv : Party
+    svc : Party
     public : Party
   where
-    signatory sv
+    signatory svc
     observer public
 
-    key sv : Party
+    key svc : Party
     maintainer key
 
     nonconsuming choice UserAccount_AddObservers : ContractId UserAccount
@@ -64,7 +64,7 @@ template UserAccountRules
         newObservers : [Party]
       controller owner
       do
-        modifyUserAccount sv owner accCid $ \account ->
+        modifyUserAccount svc owner accCid $ \account ->
           return $ account with obs = dedupSort (newObservers ++ account.obs)
 
     nonconsuming choice UserAccount_RemoveObservers : ContractId UserAccount
@@ -74,7 +74,7 @@ template UserAccountRules
         oldObservers : [Party]
       controller owner
       do
-        modifyUserAccount sv owner accCid $ \account ->
+        modifyUserAccount svc owner accCid $ \account ->
           return $ account with obs = foldr delete account.obs oldObservers
 {-
     nonconsuming choice UserAccount_Transfer : ContractId UserAccountTransfer
@@ -101,9 +101,9 @@ template UserAccountRules
       controller [sourceOwner, targetOwner]
       do
         assertMsg "Amount must be positive" (amount > 0.0)
-        sourceAccount <- getAndChargeAccount sv sourceOwner sourceAccCid
+        sourceAccount <- getAndChargeAccount svc sourceOwner sourceAccCid
         assertMsg "Source account has insufficient balance" (sourceAccount.balance >= amount)
-        targetAccount <- getAndChargeAccount sv sourceOwner targetAccCid
+        targetAccount <- getAndChargeAccount svc sourceOwner targetAccCid
         create sourceAccount with balance = sourceAccount.balance - amount
         create targetAccount with balance = targetAccount.balance + amount
         return ()
@@ -118,19 +118,19 @@ template UserAccountRules
       controller [owner, newOwner]
       do
         assertMsg "Amount must be positive" (amount > 0.0)
-        account <- getAndChargeAccount sv owner accCid
+        account <- getAndChargeAccount svc owner accCid
         today <- getDate
-        fees <- getAccountFees sv today
+        fees <- getAccountFees svc today
         assertMsg "Source account has insufficient balance" (account.balance >= amount + fees.openFee)
         create account with balance = account.balance - amount - fees.openFee
         create UserAccount with 
-            id = AccountId with sv; public; owner = newOwner; id = 0
+            id = AccountId with svc; public; owner = newOwner; id = 0
             balance = amount
             lastChargedAt = today
             obs = []
         return ()
               
-    -- TODO: allow SV to charge an account with the daily fee
+    -- TODO: allow svc to charge an account with the daily fee
     -- TODO: direct creation of credit burn via oracle query
     -- TODO: change governance to allow receipt of issuance into the existing account for the usageFee or into a new account for the openFee
 
@@ -179,7 +179,7 @@ template UserAccountRules
         -- compute price
         now <- getTime
         let today = toDateUTC now
-        (_, priceOracle) <- fetchByKey @PriceOracle (sv, today)
+        (_, priceOracle) <- fetchByKey @PriceOracle (svc, today)
         -- issue credit
         create Credit with
           -- TODO: leave account for remainder around
@@ -190,13 +190,13 @@ template UserAccountRules
 
 template CreditRules
   with
-    sv : Party
+    svc : Party
     public : Party
   where
-    signatory sv
+    signatory svc
     observer public
 
-    key sv : Party
+    key svc : Party
     maintainer key
 
     nonconsuming choice Credit_Redistribute : [ContractId Credit]

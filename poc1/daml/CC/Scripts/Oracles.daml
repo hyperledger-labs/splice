@@ -14,24 +14,24 @@ import CC.Oracles
 --   It always runs for one day at a time, for the day after the latest existing
 --   price oracle contract, providing the time has advanced.
 runOracles : Party -> Decimal -> Script ()
-runOracles sv price = do
-  Some (_, app) <- queryContractKey @CC sv sv
-  prices <- query @PriceOracle sv
+runOracles svc price = do
+  Some (_, app) <- queryContractKey @CC svc svc
+  prices <- query @PriceOracle svc
   let 
     last = maximum (map (\(_, po) -> po.date) prices)
   today <- toDateUTC <$> getTime
   assertMsg "Can't run oracles for incomplete day." (today > last)
-  burns <- queryFilter @BurnedCredit sv (\bc -> toDateUTC bc.burnedAt == last)
+  burns <- queryFilter @BurnedCredit svc (\bc -> toDateUTC bc.burnedAt == last)
 
-  submit sv do
+  submit svc do
     createCmd BurnOracle with
-      sv
+      svc
       public = app.public
       date = last
       quantity = sum (map (\(_, bc) -> bc.quantity) burns)
-  submit sv do
+  submit svc do
     createCmd PriceOracle with
-      sv
+      svc
       public = app.public
       date = addDays last 1
       price

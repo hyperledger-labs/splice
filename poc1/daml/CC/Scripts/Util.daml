@@ -75,7 +75,7 @@ queryDP dp p = do
 
 -- | A type to hold the off-ledger information required to interact with CC.
 data CCApp = CCApp with
-    sv : Party  -- TODO: consider removing the need for this, and always enter via the public party
+    svc : Party  -- TODO: consider removing the need for this, and always enter via the public party
     public : Party
   deriving (Eq, Ord, Show)
 
@@ -89,8 +89,8 @@ onboardUser user app = do
   -- We assume that the use has somehow learnt of the CC contract
   -- via some disclusure mechanism.
   -- FEATURE MISSING: Explicit disclosure
-  submitMulti [user] [app.sv] do
-    exerciseByKeyCmd @CC app.sv TakePublicRead with ..
+  submitMulti [user] [app.svc] do
+    exerciseByKeyCmd @CC app.svc TakePublicRead with ..
 
 setupUser : CCApp -> Text -> Script Party
 setupUser app name = do
@@ -135,7 +135,7 @@ claimBurnedCreditFor app actor = do
   forA_ burnedCredits $ \(burnedCreditCid, burnedCredit) -> do
     -- lookup issuance event
     let burnedAt = toDateUTC burnedCredit.burnedAt
-    Some (issEvCid, _) <- queryContractKeyPublic @IssuanceEvent app actor (app.sv, burnedAt)
+    Some (issEvCid, _) <- queryContractKeyPublic @IssuanceEvent app actor (app.svc, burnedAt)
     -- claim issuance
     submitRD app.public actor $
         exerciseCmd issEvCid Claim_Issuance with
@@ -155,8 +155,8 @@ claimCoins app user = do
 
 getCoinRules : CCApp -> Party -> Script (ContractId CoinRules)
 getCoinRules app actor = do
-  optCoinRules <- queryContractKeyPublic @CoinRules app actor app.sv
-  return $ fst $ fromSomeNote ("CoinRules contract not found for app party '" <> show app.sv <> "'") optCoinRules
+  optCoinRules <- queryContractKeyPublic @CoinRules app actor app.svc
+  return $ fst $ fromSomeNote ("CoinRules contract not found for app party '" <> show app.svc <> "'") optCoinRules
 
 exerciseCoinRule : Choice CoinRules ch r => CCApp -> Party -> ch -> Script r
 exerciseCoinRule app p ch = do
@@ -164,7 +164,7 @@ exerciseCoinRule app p ch = do
   submitRD app.public p $ exerciseCmd coinRulesCid ch
 
 proposeCoinTransfer : CCApp -> Party -> Party -> ContractId Coin -> Script (ContractId CoinTransfer)
-proposeCoinTransfer sv owner receiver coinCid = exerciseCoinRule sv owner Coin_Transfer with ..
+proposeCoinTransfer svc owner receiver coinCid = exerciseCoinRule svc owner Coin_Transfer with ..
 
 -- | Take a specific amount of coin out of the wallet, failing if there is not enough.
 takeCoin : CCApp -> Party -> Decimal -> Script (ContractId Coin)
@@ -183,7 +183,7 @@ takeCoin app user quantity = do
 
 getCreditRules : CCApp -> Party -> Script (ContractId CreditRules)
 getCreditRules app actor = do
-  optCreditRules <- queryContractKeyPublic @CreditRules app actor app.sv
+  optCreditRules <- queryContractKeyPublic @CreditRules app actor app.svc
   return $ fst $ fromSomeNote ("CreditRules contract not found for " <> show app <> "'") optCreditRules
 
 exerciseCreditRule : Choice CreditRules ch r => CCApp -> Party -> ch -> Script r
@@ -196,7 +196,7 @@ exerciseCreditRule app p ch = do
 -- Scripting the daily actions of all CC stakeholders
 -----------------------------------------------------
 
--- | Advance the day, issue new coins, and have all SV parties and CC uers claim their coins.
+-- | Advance the day, issue new coins, and have all svc parties and CC uers claim their coins.
 rollDayFull : CCApp -> Decimal -> Script ()
 rollDayFull app newCreditPrice = do
   advanceDay app newCreditPrice
@@ -208,17 +208,17 @@ rollDayFull app newCreditPrice = do
 advanceDay : CCApp -> Decimal -> Script ()
 advanceDay app newCreditPrice = do
   passTime (days 1)
-  runOracles app.sv newCreditPrice
+  runOracles app.svc newCreditPrice
 
 triggerIssuanceAs : CCApp -> Party -> Script (ContractId IssuanceMarker)
 triggerIssuanceAs app p = do
-  submitDP app.sv p do
-      exerciseByKeyCmd @GovernanceRules app.sv Trigger_Issuance with
+  submitDP app.svc p do
+      exerciseByKeyCmd @GovernanceRules app.svc Trigger_Issuance with
         actor = p
 
 getSVParties : CCApp -> Script [Party]
 getSVParties app = do
-  Some (_, dp) <- queryContractKey @DecentralizedParty app.public app.sv
+  Some (_, dp) <- queryContractKey @DecentralizedParty app.public app.svc
   return dp.validators
 
 getAllUserParties : CCApp -> Script [Party]
@@ -230,9 +230,9 @@ getAllUserParties app = do
 skipToDate : CCApp -> Date -> Decimal -> Script ()
 skipToDate app to price = do
   setTime (time to 0 0 0)
-  Some (cid, im) <- queryContractKey @IssuanceMarker app.sv app.sv
-  submit app.sv do
+  Some (cid, im) <- queryContractKey @IssuanceMarker app.svc app.svc
+  submit app.svc do
     archiveCmd cid
     createCmd im with last_issuance = to
     return ()
-  runOracles app.sv price
+  runOracles app.svc price

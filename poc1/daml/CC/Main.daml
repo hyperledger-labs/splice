@@ -15,13 +15,13 @@ import CC.Types
 -- | CC is the genesis contract of Canton Coin. It serves as the public gateway into the app.
 template CC
   with
-    sv : Party
+    svc : Party
     public : Party
   where
-    signatory sv
+    signatory svc
     observer public
 
-    key sv : CCKey
+    key svc : CCKey
     maintainer key 
 
     nonconsuming choice TakePublicRead : ()
@@ -43,12 +43,12 @@ template CC
         initialPrice : Decimal
       controller actor
       do
-        assertValidator actor sv
+        assertValidator actor svc
 
         today <- toDateUTC <$> getTime
 
         -- Make sure public can see the supervalidator party.
-        exerciseByKey @DecentralizedParty sv AddObservers with newObservers = [public]
+        exerciseByKey @DecentralizedParty svc AddObservers with newObservers = [public]
 
         create CoinRules with ..
         create CreditRules with ..
@@ -70,12 +70,12 @@ Helpers for actions we need to delegate through PerformAction
 
 template CreateAppRequest
   with
-    sv : Party
+    svc : Party
     public : Party
     actor : Party
   where
     signatory actor
 
     implements AnyRequest where
-      let requestAuthorizers = [sv]
+      let requestAuthorizers = [svc]
       let accept = void $ create CC with ..

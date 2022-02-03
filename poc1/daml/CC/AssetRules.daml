@@ -9,13 +9,13 @@ import CC.Oracles
 
 template CoinRules
   with
-    sv : Party
+    svc : Party
     public : Party
   where
-    signatory sv
+    signatory svc
     observer public
 
-    key sv : Party
+    key svc : Party
     maintainer key
 
     nonconsuming choice Coin_AddObservers : ContractId Coin
@@ -111,7 +111,7 @@ template CoinRules
         -- compute price
         now <- getTime
         let today = toDateUTC now
-        (_, priceOracle) <- fetchByKey @PriceOracle (sv, today)
+        (_, priceOracle) <- fetchByKey @PriceOracle (svc, today)
         -- issue credit
         create Credit with
           -- TODO: leave coin for remainder around
@@ -122,13 +122,13 @@ template CoinRules
 
 template CreditRules
   with
-    sv : Party
+    svc : Party
     public : Party
   where
-    signatory sv
+    signatory svc
     observer public
 
-    key sv : Party
+    key svc : Party
     maintainer key
 
     nonconsuming choice Credit_Redistribute : [ContractId Credit]

@@ -10,7 +10,7 @@ import CC.Assets
 --   like the ratse and clawback parameters.
 template IssuanceParameters
   with
-    sv : Party
+    svc : Party
     public : Party
     -- | A vector of pairs of dates and rate of coins per day. 
     --   Defines a picewise constant function.
@@ -28,18 +28,18 @@ template IssuanceParameters
     -- | The maximum proportion of the spoins that goes to validators.
     validatorPercentage : Decimal
   where
-    signatory sv
+    signatory svc
     observer public
 
-    key sv : Party
+    key svc : Party
     maintainer key
 
     -- | A choice to to truncate the rates schedule so that the head is always
     --   the current.
-    --   Controlled by sv so it can only be called once the issuacnes up to the
+    --   Controlled by svc so it can only be called once the issuacnes up to the
     --   day in the head of rates have been processed.
     choice Truncate_Rates : ContractId IssuanceParameters
-      controller sv
+      controller svc
       do
         today <- fmap toDateUTC getTime
         assertMsg "Cannot truncate rates before the date in head is reached." (today >= (head rates)._1)
@@ -48,22 +48,22 @@ template IssuanceParameters
 -- | IssuanceMarker marks the date of the last processed issuance event.
 template IssuanceMarker
   with
-    sv : Party
+    svc : Party
     public : Party
     -- | The date of the last issuance. Should be a full day.
     last_issuance : Date
   where
-    signatory sv
+    signatory svc
     observer public
 
-    key sv : Party
+    key svc : Party
     maintainer key        
 
 -- | IssuanceEvent is calculated periodically from the IssuanceSchedule
 --   and allows the conversion of burned credit to issuances for a period
 template IssuanceEvent
   with
-    sv : Party
+    svc : Party
     public : Party
     validOn : Date
     validatorIssuancePerCredit : Decimal
@@ -71,10 +71,10 @@ template IssuanceEvent
     creditClawbackFrom : Time
     issuanceClawbackPeriod : RelTime
   where
-    signatory sv
+    signatory svc
     observer public
 
-    key (sv, validOn) : (Party, Date)
+    key (svc, validOn) : (Party, Date)
     maintainer key._1
 
     nonconsuming choice Claim_Issuance : (ContractId Issuance, ContractId Issuance)
@@ -105,7 +105,7 @@ template IssuanceEvent
     nonconsuming choice Clawback_Credits : ContractId Coin
       with
         burnedCreditCid : ContractId BurnedCredit
-      controller sv
+      controller svc
       do
         burnedCredit <- fetch burnedCreditCid
         archive burnedCreditCid
@@ -113,7 +113,7 @@ template IssuanceEvent
         assertMsg "Burned credit is out of time bounds" (validOn == toDateUTC burnedCredit.burnedAt)
         assertMsg "Cannot yet claw back credits" (creditClawbackFrom < now)
         create Coin with
-          owner = sv
+          owner = svc
           obs = []
           quantity = burnedCredit.quantity * (validatorIssuancePerCredit + beneficiaryIssuancePerCredit)
           ..
@@ -121,13 +121,13 @@ template IssuanceEvent
 -- | Issuance is a special kind of transfer request with a clawback for the SVs.
 template Issuance
   with
-    sv : Party
+    svc : Party
     public : Party
     receiver : Party
     quantity : Decimal
     clawbackAt : Time
   where
-    signatory sv
+    signatory svc
     observer public, receiver
 
     choice Accept_Issuance : ContractId Coin
@@ -139,14 +139,14 @@ template Issuance
           ..
 
     choice Clawback_Issuance : ContractId Coin
-      controller sv
+      controller svc
       do
         now <- getTime
         assertMsg "Can't clawback before clawbackAt" (now > clawbackAt)
-        -- Issue to sv rather than the constituent parties of sv for now.
+        -- Issue to svc rather than the constituent parties of svc for now.
         -- We could do the latter but would have to deal with arithmetic
         -- errors when dividing. 
         create Coin with
-          owner = sv
+          owner = svc
           obs = []
           ..

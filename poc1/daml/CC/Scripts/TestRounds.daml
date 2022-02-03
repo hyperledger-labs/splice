@@ -21,15 +21,15 @@ deriving instance Ord DoublingMarker
 
 run_round : CCApp -> Party -> Decimal -> [ContractId SV_Token] -> Script ()
 run_round app da1 price svTokenCids = do
-  [(_, rps)] <- queryDP @RoundParameters app.sv da1
+  [(_, rps)] <- queryDP @RoundParameters app.svc da1
   next_round_date <- case rps.rounds of
     (d, _)::_ -> return d
     [] -> do
-      [(_, dm)] <- queryDP @DoublingMarker app.sv da1
+      [(_, dm)] <- queryDP @DoublingMarker app.svc da1
       return (toDateUTC $ addRelTime (time dm.lastDoubling 0 0 0) rps.doublingRoundPeriod)
   skipToDate app next_round_date price
-  submitDP app.sv da1 do
-    exerciseByKeyCmd @GovernanceRules app.sv Trigger_Round with
+  submitDP app.svc da1 do
+    exerciseByKeyCmd @GovernanceRules app.svc Trigger_Round with
       actor = da1
       svTokenCids
 
@@ -51,7 +51,7 @@ use_sv_tokens app p = do
         newOwner = newValidator
     -- Redeem the token
     submitRD t.public newValidator do
-      exerciseByKeyCmd @GovernanceRules t.sv Redeem_SV_Token with
+      exerciseByKeyCmd @GovernanceRules t.svc Redeem_SV_Token with
         token_owner = newValidator
         newValidator
         tokenCid
@@ -75,7 +75,7 @@ test_rounds = do
   -- Return tokens from previous round
   tokenCids <- forA r3vs (\p -> do
     tokenCid <- submitRD app.public p do
-      exerciseByKeyCmd @GovernanceRules app.sv Give_Up_SV with
+      exerciseByKeyCmd @GovernanceRules app.svc Give_Up_SV with
         oldValidator = p
     submitRD app.public p do
       exerciseCmd tokenCid Transfer_SV_Token with
@@ -97,8 +97,8 @@ test_rounds = do
   -- Run a doubling
   run_round app da1 1.7 []
 
-  Some (_, sv_params) <- queryContractKey @DecentralizedParty app.sv app.sv
-  sv_tokens <- query @SV_Token app.sv
+  Some (_, sv_params) <- queryContractKey @DecentralizedParty app.svc app.svc
+  sv_tokens <- query @SV_Token app.svc
   assertMsg "Incorrect Owners" (sort (map (\(_, t) -> t.owner) sv_tokens) == sort(sv_params.validators))
 
   forA_ (zip [1, 2, 3, 12] tierParties) (\(num, ps) -> do

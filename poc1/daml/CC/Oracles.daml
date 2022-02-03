@@ -6,15 +6,15 @@ import CC.Accounts
 -- | It's currently given daily.
 template PriceOracle
   with
-    sv : Party
+    svc : Party
     public : Party
     date : Date
     price : Decimal
   where
-    signatory sv
+    signatory svc
     observer public
 
-    key (sv, date) : (Party, Date)
+    key (svc, date) : (Party, Date)
     maintainer key._1
 
     -- | Price governance is currently stubbed with the super validator
@@ -22,7 +22,7 @@ template PriceOracle
     choice Set_Price : ContractId PriceOracle
       with
         newPrice : Decimal
-      controller sv
+      controller svc
       do
         create this with price = newPrice
 
@@ -30,15 +30,15 @@ template PriceOracle
 --   come to a consensus on how much credit was burned on a day.
 template BurnOracle
   with
-    sv : Party
+    svc : Party
     public : Party
     date : Date
     quantity : Decimal
   where
-    signatory sv
+    signatory svc
     observer public
 
-    key (sv, date) : (Party, Date)
+    key (svc, date) : (Party, Date)
     maintainer key._1
 
 
@@ -50,13 +50,13 @@ template BurnOracle
 -- also be required to change on demand to manage traffic.
 template AccountFeesOracle
   with
-    sv : Party
+    svc : Party
     public : Party
     date : Date
     fees : AccountFees
   where
-    signatory sv
+    signatory svc
     observer public
 
-    key (sv, date) : (Party, Date)
+    key (svc, date) : (Party, Date)
     maintainer key._1
