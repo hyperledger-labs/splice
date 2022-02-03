@@ -1,3 +1,5 @@
+{-# LANGUAGE ApplicativeDo #-}
+
 module CC.Scripts.Util where
 
 import Daml.Script
@@ -16,7 +18,6 @@ import CC.Main
 import CC.PartyGovernance
 
 import CC.Scripts.Oracles
-
 
 -- Decentralized party governance utilities
 -- ========================================
@@ -225,3 +226,13 @@ getAllUserParties app = do
   rds <- queryFilter @ReadDelegation app.public (\rd -> rd.from == app.public)
   return [rd.to | (_, rd) <- rds]
 
+-- Utility to skip to a date without doing any issuance in between.
+skipToDate : CCApp -> Date -> Decimal -> Script ()
+skipToDate app to price = do
+  setTime (time to 0 0 0)
+  Some (cid, im) <- queryContractKey @IssuanceMarker app.sv app.sv
+  submit app.sv do
+    archiveCmd cid
+    createCmd im with last_issuance = to
+    return ()
+  runOracles app.sv price

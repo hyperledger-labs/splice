@@ -65,7 +65,7 @@ template DecentralizedParty
     choice AddValidators : ContractId DecentralizedParty
       with
         newValidators : [Party]
-      controller partyId
+      controller partyId :: newValidators
       do
         create this with
           validators = dedupSort (newValidators ++ validators)

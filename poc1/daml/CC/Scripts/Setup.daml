@@ -69,19 +69,37 @@ testOnboardUser = do
   user <- allocateParty "User"
   onboardUser user app
 
+-- | tierParties allocates parties for tiers.
+--   highest tier (tier3) goes in head.
+tierParties : CCApp -> [Int] -> Script [[Party]]
+tierParties sv nums = do
+  let tierNums = [(length nums), (length nums)-1..1] 
+  forA (zip tierNums nums)
+    (\(t, num) -> forA [1..num]
+      (\m -> do
+        p <- allocateParty ("Tier " <> show t <> " Party " <> show m)
+        onboardUser p sv
+        return p))
+
+defaultTierParties : CCApp ->  Script [[Party]]
+defaultTierParties sv = tierParties sv [2,2,2]
+
 -- | Runs the bootstrapping given an existing CC contract.
-bootstrapApp : (CCApp, Party) -> Script ()
+bootstrapApp : (CCApp, Party) -> Script [[Party]]
 bootstrapApp (app, da1) = do
+  tiers' <- defaultTierParties app
+  let tiers = tiers' ++ [[da1]]
   [(cid, cc)] <- queryDP @CC app.sv da1
   submitDP cc.sv da1 do
     exerciseCmd cid BootstrapApp with
       actor = da1
       issuanceParams = defaultIssuanceParameters cc
-      roundParams = defaultRoundParameters cc
+      roundParams = defaultRoundParameters cc tiers
       initialPrice = 1.0
-  return ()
+  return tiers
 
 testBootstrapApp : Script ()
 testBootstrapApp = do
   (sv, da1) <- setupApp
   bootstrapApp (sv, da1)
+  return ()

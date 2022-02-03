@@ -3,11 +3,13 @@ module CC.Governance where
 import DA.Action
 import DA.Date
 import DA.Foldable (forA_)
+import DA.List (unique, groupOn)
 import DA.Time
 
 import CC.Issuance
 import CC.Oracles
 import CC.PartyGovernance
+import CC.Rounds
 
 -- | This is the one contract through which super validators perform
 --   their special role.
@@ -77,4 +79,99 @@ template GovernanceRules
         when (head_date == date_to_issue) (void $ exercise params_cid Truncate_Rates)
         archive markerCid
         create marker with last_issuance = date_to_issue
-    
+
+    -- | SV Validator status is transferrable.
+    nonconsuming choice Transfer_SV : ContractId DecentralizedParty
+      with
+        oldValidator : Party
+        newValidator : Party
+      controller [oldValidator, newValidator]
+      do
+        (cid, sv_params) <- fetchByKey @DecentralizedParty sv
+        assertMsg "oldValidator must be a current validator of the supervalidator party"
+          (oldValidator `elem` sv_params.validators)
+        assertMsg "newValidator must not already be a validator of the supervalidator party"
+          (newValidator `notElem` sv_params.validators)
+        cid <- exercise cid AddValidators with newValidators = [newValidator]
+        exercise cid RemoveValidators with oldValidators = [oldValidator]
+
+    -- | Redeem_SV_Token allows new super validators to be onboarded.
+    nonconsuming choice Redeem_SV_Token : ContractId DecentralizedParty
+      with
+        token_owner : Party
+        newValidator : Party
+        tokenCid : ContractId SV_Token
+      controller [token_owner, newValidator]
+      do
+        (cid, sv_params) <- fetchByKey @DecentralizedParty sv
+        assertMsg "newValidator must not already be a validator of the supervalidator party"
+          (newValidator `notElem` sv_params.validators)
+        token <- fetch tokenCid
+        assertMsg "Token owner does not match" (token_owner == token.owner)
+        assertMsg "Token signatory does not match" (sv == token.sv)
+        archive tokenCid
+        exercise cid AddValidators with newValidators = [newValidator]
+
+    -- | Give_Up_SV allows a super validator to give up their status for an SV_Token.
+    nonconsuming choice Give_Up_SV : ContractId SV_Token
+      with
+        oldValidator : Party
+      controller [oldValidator]
+      do
+        (cid, sv_params) <- fetchByKey @DecentralizedParty sv
+        assertMsg "oldValidator must be a validator of the supervalidator party"
+          (oldValidator `elem` sv_params.validators)
+        exercise cid RemoveValidators with oldValidators = [oldValidator]
+        (_, round_params) <- fetchByKey @RoundParameters sv
+        now <- getTime
+        create SV_Token with
+          owner = oldValidator
+          clawbackAt = addRelTime now round_params.svTokenClawbackPeriod
+          ..
+
+    nonconsuming choice Trigger_Round : ()
+      with
+        actor : Party
+        -- | SV_Tokens to be consumed for rounds with negative SV issuances.
+        svTokenCids : [ContractId SV_Token]
+      controller actor
+      do
+        now <- getTime
+        let today = toDateUTC now
+        (roundsCid, rounds_params) <- fetchByKey @RoundParameters sv
+        let
+          clawbackAt = addRelTime now rounds_params.svTokenClawbackPeriod
+        case rounds_params.rounds of
+          (round_date, round_svs)::rs -> do
+            assertMsg "Cannot run round before its date" (today >= round_date)
+            assertMsg "Duplicate SV tokens" (unique svTokenCids)
+            tokens <- zip svTokenCids <$> mapA fetch svTokenCids
+            let grouped_tokens = groupOn (\(_, t) -> t.owner) tokens
+            forA_ (zip round_svs rounds_params.tiers) (\(n, ps) -> do
+              if n >= 0
+                then forA_ ps (\p -> replicateA n (create SV_Token with owner = p;..))
+                else forA_ ps (\p -> do
+                  let Some ptokens = find (\((_, t)::_) -> p == t.owner) grouped_tokens
+                  assertMsg "Wrong number of tokens supplied" (length ptokens == -n)
+                  forA_ ptokens (\(cid, t) -> do
+                    assertMsg "Token signatory does not match" (sv == t.sv)
+                    archive cid)
+                  )
+              )
+            archive roundsCid
+            create rounds_params with rounds = rs
+            when (null rs) do void $ create DoublingMarker with lastDoubling = today; ..
+          [] -> do
+            (markerCid, marker) <- fetchByKey @DoublingMarker sv
+            let nextDoubling = toDateUTC $ addRelTime (time marker.lastDoubling 0 0 0) rounds_params.doublingRoundPeriod
+            assertMsg "Cannot run round before next doubling date" (today >= nextDoubling)
+            archive markerCid
+            create marker with lastDoubling = today
+            (_, sv_params) <- fetchByKey @DecentralizedParty sv
+            forA_ sv_params.validators (\p -> 
+                create SV_Token with
+                  owner = p
+                  ..
+                )
+        return ()
+

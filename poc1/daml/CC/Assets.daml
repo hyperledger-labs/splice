@@ -16,7 +16,6 @@ template Coin
     ensure quantity > 0.0
 
 -- Special States for Canton Coin
-
 template CoinTransfer
   with
     coin : Coin
