@@ -1,5 +1,7 @@
 module CC.Oracles where
 
+import CC.Accounts
+
 -- | PriceOracle is a placeholder for some mechanism to work out a price.
 -- | It's currently given daily.
 template PriceOracle
@@ -32,6 +34,26 @@ template BurnOracle
     public : Party
     date : Date
     quantity : Decimal
+  where
+    signatory sv
+    observer public
+
+    key (sv, date) : (Party, Date)
+    maintainer key._1
+
+
+-- | AccountFeeOracle mocks some secure mechanism by which the super validators can
+--   come to a consensus on what fees to charge for the network today.
+--
+-- TODO: consider introducing separate oracles for the daily fees, which need to be
+-- regularly applied, and the open and usage fees, which are applied on demand; and might
+-- also be required to change on demand to manage traffic.
+template AccountFeesOracle
+  with
+    sv : Party
+    public : Party
+    date : Date
+    fees : AccountFees
   where
     signatory sv
     observer public
