@@ -118,7 +118,7 @@ template CoinRules
           quantity = coin.quantity / priceOracle.price
           obs = []
           ..
-        
+
 
 template CreditRules
   with
@@ -134,7 +134,7 @@ template CreditRules
     nonconsuming choice Credit_Redistribute : [ContractId Credit]
       with
         owner : Party
-        creditCids : [ContractId Coin]
+        creditCids : [ContractId Credit]
         splitQuantities : [Decimal]
       controller owner
       do
