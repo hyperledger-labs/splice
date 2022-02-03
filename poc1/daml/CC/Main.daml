@@ -47,7 +47,7 @@ template CC
 
         today <- toDateUTC <$> getTime
 
-        -- Make sure public can see the supervalidator party.
+        -- Make sure public can see the SV consortium party.
         exerciseByKey @DecentralizedParty svc AddObservers with newObservers = [public]
 
         create CoinRules with ..

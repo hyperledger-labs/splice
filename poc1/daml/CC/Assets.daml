@@ -3,7 +3,7 @@ module CC.Assets where
 -- | CantonCoin
 template Coin
   with
-    -- | The supervalidator
+    -- | The SV consortium
     svc : Party
     -- | Owner of the coin
     owner : Party
@@ -55,7 +55,7 @@ template LockedCoin
 -- | Credits
 template Credit
   with
-    -- | The supervalidator
+    -- | The SV consortium
     svc : Party
     -- | Owner of the credit
     owner : Party

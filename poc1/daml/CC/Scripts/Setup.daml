@@ -17,7 +17,7 @@ demoTime : Time
 demoTime = time (date 2022 Jan 1) 0 0 0
 
 -- startCantonCoin kicks off the application and returns a special party
--- representing the set of all supervalidators.
+-- representing the SV consortium.
 -- That party is assumed to be dynamically governed by the controlling parties
 -- in its DecentralizedParty contract.
 setupApp : Script (CCApp, Party)
@@ -25,14 +25,14 @@ setupApp = do
   setTime demoTime
 
   -- Digital Asset spins up a node intended as the first Super Validator and then
-  -- allocates a party intended to be the Super Validator Party for that svc. 
+  -- allocates the party representing the SV consortium.
   da1 <- allocateParty "DigitalAsset1"
 
-  -- Digital Asset uses da1 to create a new decentralizd Party representing the set
-  -- of all supervalidators.
+  -- Digital Asset uses da1 to create a new decentralized Party representing the
+  -- SV consortium.
   -- FEATURE GAP: We don't have decentralized parties.
   -- We mock this by just allocating a party and co-creating a DecentralizedParty contract
-  svc <- allocateParty "SuperValidators"
+  svc <- allocateParty "SVConsortium"
   submitMulti [da1, svc] [] do
     createCmd DecentralizedParty with
       validators = [da1]
@@ -73,7 +73,7 @@ testOnboardUser = do
 --   highest tier (tier3) goes in head.
 tierParties : CCApp -> [Int] -> Script [[Party]]
 tierParties svc nums = do
-  let tierNums = [(length nums), (length nums)-1..1] 
+  let tierNums = [(length nums), (length nums)-1..1]
   forA (zip tierNums nums)
     (\(t, num) -> forA [1..num]
       (\m -> do

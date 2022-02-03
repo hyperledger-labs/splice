@@ -17,7 +17,7 @@ template PriceOracle
     key (svc, date) : (Party, Date)
     maintainer key._1
 
-    -- | Price governance is currently stubbed with the super validator
+    -- | Price governance is currently stubbed with the SV
     --   consortium setting it.
     choice Set_Price : ContractId PriceOracle
       with
@@ -26,8 +26,8 @@ template PriceOracle
       do
         create this with price = newPrice
 
--- | BurnOracle mocks some secure mechanism by which the super validators can
---   come to a consensus on how much credit was burned on a day.
+-- | BurnOracle mocks some secure mechanism by which the SV consortium
+--   comes to a consensus on how much credit was burned on a day.
 template BurnOracle
   with
     svc : Party
@@ -42,8 +42,8 @@ template BurnOracle
     maintainer key._1
 
 
--- | AccountFeeOracle mocks some secure mechanism by which the super validators can
---   come to a consensus on what fees to charge for the network today.
+-- | AccountFeeOracle mocks some secure mechanism by which the SV consortium
+--   comes to a consensus on what fees to charge for the network today.
 --
 -- TODO: consider introducing separate oracles for the daily fees, which need to be
 -- regularly applied, and the open and usage fees, which are applied on demand; and might

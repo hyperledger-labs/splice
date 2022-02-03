@@ -9,7 +9,7 @@ import CC.Assets
 import CC.Main
 import CC.Oracles
 
--- | runOracles does mocked magic by querying the ledger as the supervalidator
+-- | runOracles does mocked magic by querying the ledger as the SV consortium
 --   and just taking an external price.
 --   It always runs for one day at a time, for the day after the latest existing
 --   price oracle contract, providing the time has advanced.

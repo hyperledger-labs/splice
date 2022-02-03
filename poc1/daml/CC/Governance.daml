@@ -88,9 +88,9 @@ template GovernanceRules
       controller [oldValidator, newValidator]
       do
         (cid, sv_params) <- fetchByKey @DecentralizedParty svc
-        assertMsg "oldValidator must be a current validator of the supervalidator party"
+        assertMsg "oldValidator must be a current validator of the SV consortium party"
           (oldValidator `elem` sv_params.validators)
-        assertMsg "newValidator must not already be a validator of the supervalidator party"
+        assertMsg "newValidator must not already be a validator of the SV consortium party"
           (newValidator `notElem` sv_params.validators)
         cid <- exercise cid AddValidators with newValidators = [newValidator]
         exercise cid RemoveValidators with oldValidators = [oldValidator]
@@ -104,7 +104,7 @@ template GovernanceRules
       controller [token_owner, newValidator]
       do
         (cid, sv_params) <- fetchByKey @DecentralizedParty svc
-        assertMsg "newValidator must not already be a validator of the supervalidator party"
+        assertMsg "newValidator must not already be a validator of the SV consortium party"
           (newValidator `notElem` sv_params.validators)
         token <- fetch tokenCid
         assertMsg "Token owner does not match" (token_owner == token.owner)
@@ -119,7 +119,7 @@ template GovernanceRules
       controller [oldValidator]
       do
         (cid, sv_params) <- fetchByKey @DecentralizedParty svc
-        assertMsg "oldValidator must be a validator of the supervalidator party"
+        assertMsg "oldValidator must be a validator of the SV consortium party"
           (oldValidator `elem` sv_params.validators)
         exercise cid RemoveValidators with oldValidators = [oldValidator]
         (_, round_params) <- fetchByKey @RoundParameters svc

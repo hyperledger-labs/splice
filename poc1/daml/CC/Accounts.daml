@@ -5,9 +5,9 @@ module CC.Accounts where
 -----------
 
 data AccountId = AccountId with
-    -- | CC Super Validator party
+    -- | SV consortium party
     svc : Party
-    -- | CC public party used by super validator
+    -- | The SV consortium's public-read party
     public: Party
     -- | Owner of the coins in this account.
     owner : Party

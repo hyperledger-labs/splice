@@ -18,7 +18,7 @@ template IssuanceParameters
     --   The last entry should be 31st Dec 9999.
     rates : [(Date, Decimal)]
     -- | How much time do beneficiaries or validators have to claim their
-    --   credit before the super validators may claw them back?
+    --   credit before the SV consortium may claw them back?
     creditClawbackPeriod : RelTime
     -- | How much time to parties have to accept their issuances before super
     --   validators may claw them back?
