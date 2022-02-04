@@ -77,7 +77,7 @@ template BurnedCredit
     burner : Party
     -- | Validator is the party representing the Validator Operator hosting
     --   user.
-    --   FEATUER NEEDED: We somehow need to get at this instead of relying on
+    --   FEATURE NEEDED: We somehow need to get at this instead of relying on
     --   the honesty of the burner.
     validator : Party
     beneficiary : Party

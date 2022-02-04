@@ -29,10 +29,10 @@ template ReadDelegation
 --   This is very much a mockup type thing. We have no idea how a decentralized
 --   party will actually be represented yet.
 --   We just assume that from the point of the creation of the contract, all
---   actions of partyId are co-authorized and co-validated by the nodes 
+--   actions of partyId are co-authorized and co-validated by the nodes
 --   represented by the parties in `validators`.
 --   The relationship between partyId and any one of the validators is strictly stronger
---   than that of from to to in a ReadDelegation. Ie there is an implicit read delegation
+--   than that of `from` to `to` in a ReadDelegation. Ie there is an implicit read delegation
 --   from partyId to all validators.
 template DecentralizedParty
   with

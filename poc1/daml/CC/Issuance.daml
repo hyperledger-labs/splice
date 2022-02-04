@@ -7,13 +7,13 @@ import DA.Time
 import CC.Assets
 
 -- | IssuanceParameters is a configuration contract that holds issuance parameters
---   like the ratse and clawback parameters.
+--   like the rates and clawback parameters.
 template IssuanceParameters
   with
     svc : Party
     public : Party
-    -- | A vector of pairs of dates and rate of coins per day. 
-    --   Defines a picewise constant function.
+    -- | A vector of pairs of dates and rate of coins per day.
+    --   Defines a piecewise constant function.
     --   the dates have to be (strictly) increasing.
     --   The last entry should be 31st Dec 9999.
     rates : [(Date, Decimal)]
@@ -86,7 +86,7 @@ template IssuanceEvent
         burnedCredit <- fetch burnedCreditCid
         archive burnedCreditCid
         assertMsg "Burned credit is out of time bounds" (validOn == toDateUTC burnedCredit.burnedAt)
-        assertMsg "Only stakeholders to a burned credit may claim its issuance" 
+        assertMsg "Only stakeholders to a burned credit may claim its issuance"
           (actor `elem` [burnedCredit.beneficiary, burnedCredit.validator])
         now <- getTime
         validatorIssuanceCid <- create Issuance with
@@ -145,7 +145,7 @@ template Issuance
         assertMsg "Can't clawback before clawbackAt" (now > clawbackAt)
         -- Issue to svc rather than the constituent parties of svc for now.
         -- We could do the latter but would have to deal with arithmetic
-        -- errors when dividing. 
+        -- errors when dividing.
         create Coin with
           owner = svc
           obs = []
