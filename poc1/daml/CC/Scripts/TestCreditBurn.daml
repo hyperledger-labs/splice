@@ -17,7 +17,8 @@ test = do
 
   -- bootstrap user and service provider party
   user <- setupUser app "User"
-  provider <- setupUser app "Provider"
+  provider1 <- setupUser app "Provider1"
+  provider2 <- setupUser app "Provider2"
 
   -- start issuing
   rollDayFull app 1.1
@@ -29,16 +30,14 @@ test = do
 
   -- user buys credit
   creditCid <- exerciseCoinRule app user Buy_Credit with
-       coinCid
-       owner = user
+                    owner = user
+                    creditQuantity = 0.2
+                    coinCids = [coinCid]
 
   -- user burns credit, running his own validator
-  exerciseCreditRule app user Credit_Burn with
-       burner = user
-       beneficiary = provider
-       validator = user
-       payload = "Great service!"
-       creditCid
+  pay app user user provider1 0.01 "Great Service"
+  pay app user user provider2 0.01 "Thx"
+  pay app user user provider1 0.01 "Great Service, again"
 
   rollDayFull app 1.2
 

@@ -192,6 +192,19 @@ exerciseCreditRule app p ch = do
   submitRD app.public p $ exerciseCmd creditRulesCid ch
 
 
+pay : CCApp -> Party -> Party -> Party -> Decimal -> Text -> Script (ContractId BurnedCredit)
+pay app sender senderValidator recipient creditQuantity msg = do
+  -- query the senders credits
+  -- TODO: fetch only as many are required, and how to do this such that there is no contention
+  credits <- query @Credit sender
+  exerciseCreditRule app sender Credit_Burn with
+    burner = sender
+    beneficiary = recipient
+    validator = senderValidator
+    payload = msg
+    creditQuantity = creditQuantity
+    creditCids = map fst credits
+
 
 -- Scripting the daily actions of all CC stakeholders
 -----------------------------------------------------
