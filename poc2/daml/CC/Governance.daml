@@ -1,0 +1,177 @@
+module CC.Governance where
+
+import DA.Action
+import DA.Date
+import DA.Foldable (forA_)
+import DA.List (unique, groupOn)
+import DA.Time
+
+import CC.Issuance
+import CC.Oracles
+import CC.PartyGovernance
+import CC.Rounds
+
+-- | This is the one contract through which super validators perform
+--   their special role.
+--   No other choices with controller svc should ever be called.
+--   An upgrade to CC governance should be performed by replacing this
+--   contract though a single archive/create pair authorized using external
+--   governance.
+template GovernanceRules
+  with
+    svc : Party
+    public : Party
+  where
+    signatory svc
+    observer public
+
+    key svc : Party
+    maintainer key
+
+    -- | Any svc consortium member can trigger an issuance.
+    nonconsuming choice Trigger_Issuance : ContractId IssuanceMarker
+      with
+        actor : Party
+      controller actor
+      do
+        assertValidator actor svc
+
+        (markerCid, marker) <- fetchByKey @IssuanceMarker svc
+        now <- getTime
+        let today = toDateUTC now
+        assertMsg "Cannot issue more than once a day" (today > marker.last_issuance)
+        
+        -- Always create Issuance Events for a whole day.
+        let date_to_issue = addDays marker.last_issuance 1
+        (params_cid, params) <- fetchByKey @IssuanceParameters svc
+        (_, priceOracle) <- fetchByKey @PriceOracle (svc, date_to_issue)
+        (_, burnOracle) <- fetchByKey @BurnOracle (svc, date_to_issue)
+        (_, sv_args) <- fetchByKey @DecentralizedParty svc
+
+        let
+          (head_date, rate) :: _ = params.rates
+          creditPercentage = params.servicePercentage + params.validatorPercentage 
+          issuancePerCredit = if burnOracle.quantity == 0.0
+            then 0.0
+            else (min 1.0 (rate * creditPercentage / burnOracle.quantity)) / priceOracle.price
+          validatorIssuancePerCredit = issuancePerCredit * params.validatorPercentage / creditPercentage
+          beneficiaryIssuancePerCredit = issuancePerCredit * params.servicePercentage / creditPercentage
+          creditClawbackFrom = addRelTime now params.creditClawbackPeriod
+          issuerIssuance = rate - issuancePerCredit * burnOracle.quantity
+          issuancePerSupervalidator = issuerIssuance / intToDecimal (length sv_args.validators)
+
+        -- Directly create super validator issuances
+        forA_ sv_args.validators (\p -> create Issuance with 
+            svc
+            public
+            quantity = issuancePerSupervalidator
+            clawbackAt = addRelTime now params.issuanceClawbackPeriod
+            receiver = p
+          )
+
+        assertMsg "Unexpected date in head rate" (today <= head_date)
+
+        create IssuanceEvent with
+          validOn = date_to_issue
+          issuanceClawbackPeriod = params.issuanceClawbackPeriod
+          ..
+
+        when (head_date == date_to_issue) (void $ exercise params_cid Truncate_Rates)
+        archive markerCid
+        create marker with last_issuance = date_to_issue
+
+    -- | svc Validator status is transferrable.
+    nonconsuming choice Transfer_SV : ContractId DecentralizedParty
+      with
+        oldValidator : Party
+        newValidator : Party
+      controller [oldValidator, newValidator]
+      do
+        (cid, sv_params) <- fetchByKey @DecentralizedParty svc
+        assertMsg "oldValidator must be a current validator of the SV consortium party"
+          (oldValidator `elem` sv_params.validators)
+        assertMsg "newValidator must not already be a validator of the SV consortium party"
+          (newValidator `notElem` sv_params.validators)
+        cid <- exercise cid AddValidators with newValidators = [newValidator]
+        exercise cid RemoveValidators with oldValidators = [oldValidator]
+
+    -- | Redeem_SV_Token allows new super validators to be onboarded.
+    nonconsuming choice Redeem_SV_Token : ContractId DecentralizedParty
+      with
+        token_owner : Party
+        newValidator : Party
+        tokenCid : ContractId SV_Token
+      controller [token_owner, newValidator]
+      do
+        (cid, sv_params) <- fetchByKey @DecentralizedParty svc
+        assertMsg "newValidator must not already be a validator of the SV consortium party"
+          (newValidator `notElem` sv_params.validators)
+        token <- fetch tokenCid
+        assertMsg "Token owner does not match" (token_owner == token.owner)
+        assertMsg "Token signatory does not match" (svc == token.svc)
+        archive tokenCid
+        exercise cid AddValidators with newValidators = [newValidator]
+
+    -- | Give_Up_SV allows a super validator to give up their status for an SV_Token.
+    nonconsuming choice Give_Up_SV : ContractId SV_Token
+      with
+        oldValidator : Party
+      controller [oldValidator]
+      do
+        (cid, sv_params) <- fetchByKey @DecentralizedParty svc
+        assertMsg "oldValidator must be a validator of the SV consortium party"
+          (oldValidator `elem` sv_params.validators)
+        exercise cid RemoveValidators with oldValidators = [oldValidator]
+        (_, round_params) <- fetchByKey @RoundParameters svc
+        now <- getTime
+        create SV_Token with
+          owner = oldValidator
+          clawbackAt = addRelTime now round_params.svTokenClawbackPeriod
+          ..
+
+    nonconsuming choice Trigger_Round : ()
+      with
+        actor : Party
+        -- | SV_Tokens to be consumed for rounds with negative svc issuances.
+        svTokenCids : [ContractId SV_Token]
+      controller actor
+      do
+        now <- getTime
+        let today = toDateUTC now
+        (roundsCid, rounds_params) <- fetchByKey @RoundParameters svc
+        let
+          clawbackAt = addRelTime now rounds_params.svTokenClawbackPeriod
+        case rounds_params.rounds of
+          (round_date, round_svs)::rs -> do
+            assertMsg "Cannot run round before its date" (today >= round_date)
+            assertMsg "Duplicate svc tokens" (unique svTokenCids)
+            tokens <- zip svTokenCids <$> mapA fetch svTokenCids
+            let grouped_tokens = groupOn (\(_, t) -> t.owner) tokens
+            forA_ (zip round_svs rounds_params.tiers) (\(n, ps) -> do
+              if n >= 0
+                then forA_ ps (\p -> replicateA n (create SV_Token with owner = p;..))
+                else forA_ ps (\p -> do
+                  let Some ptokens = find (\((_, t)::_) -> p == t.owner) grouped_tokens
+                  assertMsg "Wrong number of tokens supplied" (length ptokens == -n)
+                  forA_ ptokens (\(cid, t) -> do
+                    assertMsg "Token signatory does not match" (svc == t.svc)
+                    archive cid)
+                  )
+              )
+            archive roundsCid
+            create rounds_params with rounds = rs
+            when (null rs) do void $ create DoublingMarker with lastDoubling = today; ..
+          [] -> do
+            (markerCid, marker) <- fetchByKey @DoublingMarker svc
+            let nextDoubling = toDateUTC $ addRelTime (time marker.lastDoubling 0 0 0) rounds_params.doublingRoundPeriod
+            assertMsg "Cannot run round before next doubling date" (today >= nextDoubling)
+            archive markerCid
+            create marker with lastDoubling = today
+            (_, sv_params) <- fetchByKey @DecentralizedParty svc
+            forA_ sv_params.validators (\p -> 
+                create SV_Token with
+                  owner = p
+                  ..
+                )
+        return ()
+

@@ -1,0 +1,147 @@
+module CC.PartyGovernance where
+
+import DA.Action (void)
+import DA.List (dedupSort, delete)
+
+import CC.Interfaces
+import CC.User
+
+-- | ReadDelegation marks that party `to` can read all data that `from` is a
+--   stakeholder on.
+template ReadDelegation
+  with
+    from : Party
+    to : Party
+  where
+    signatory [from, to]
+
+    key this : ReadDelegation
+    maintainer (signatory key)
+
+    choice Cancel_ReadDelegation : ()
+      with
+        actor : Party
+      controller actor
+      do
+        assertMsg "Only the parties involved in a read delegation can cancel it"
+          (actor `elem` [from, to])
+
+
+
+
+-- | DecentralizedParty represents a party governed and validated decentrally.
+--   This is very much a mockup type thing. We have no idea how a decentralized
+--   party will actually be represented yet.
+--   We just assume that from the point of the creation of the contract, all
+--   actions of partyId are co-authorized and co-validated by the nodes
+--   represented by the parties in `validators`.
+--   The relationship between partyId and any one of the validators is strictly stronger
+--   than that of from to to in a ReadDelegation. Ie there is an implicit read delegation
+--   from partyId to all validators.
+template DecentralizedParty
+  with
+    validators : [Party]
+    partyId : Party
+    obs : [Party]
+  where
+    signatory partyId :: validators
+    observer obs
+
+    key partyId : Party
+    maintainer key
+
+    choice AddObservers : ContractId DecentralizedParty
+      with
+        newObservers : [Party]
+      controller partyId
+      do
+        create this with
+          obs = dedupSort (newObservers ++ obs)
+
+    choice RemoveObservers : ContractId DecentralizedParty
+      with
+        oldObservers : [Party]
+      controller partyId
+      do
+        create this with
+          obs = foldr delete obs oldObservers
+
+    choice AddValidators : ContractId DecentralizedParty
+      with
+        newValidators : [Party]
+      controller partyId :: newValidators
+      do
+        create this with
+          validators = dedupSort (newValidators ++ validators)
+
+    choice RemoveValidators : ContractId DecentralizedParty
+      with
+        oldValidators : [Party]
+      controller partyId
+      do
+        create this with
+          validators = foldr delete validators oldValidators
+
+    -- A workaround to be able to mock delegated governance
+    -- ie let validators to anything in the name of partyId
+    nonconsuming choice AcceptRequest : ()
+      with
+        requestCid : ContractId AnyRequest
+      controller validators
+      do
+        exercise requestCid Accept
+
+-- | checkValidator checks whether a party is a Dezentralized Party
+--   validator.
+checkValidator : Party -> Party -> Update Bool
+checkValidator p dp = do
+  (_, dp_args) <- fetchByKey @DecentralizedParty dp
+  return (p `elem` dp_args.validators)
+
+
+-- | assertValidator asserts that a party is a Dezentralized validator.
+-- | assertValidator checks whether a party is a Dezentralized Party
+--   validator.
+assertValidator : Party -> Party -> Update ()
+assertValidator p dp = do
+  is <- checkValidator p dp
+  assertMsg (show p <> " is not a validator of " <> show dp) is
+
+{-
+===============================================================================
+Helpers for actions we need to delegate through PerformAction
+===============================================================================
+-}
+
+template ReadDelegationRequest
+  with
+    from : Party
+    to : Party
+  where
+    signatory to
+
+    implements AnyRequest where
+      let requestAuthorizers = [from]
+      let accept = void $ create ReadDelegation with ..
+
+template DecentralizedPartyRequest
+  with
+    validators : [Party]
+    partyId : Party
+  where
+    signatory partyId
+    observer validators
+
+    implements AnyRequest where
+      let requestAuthorizers = validators
+      let accept = void $ create DecentralizedParty with obs = []; ..
+
+template UserAccountRequest
+  with
+    userAccount : UserAccount
+  where
+    signatory userAccount.owner
+
+    implements AnyRequest where
+      let requestAuthorizers = [userAccount.svc]
+      let accept = void $ create userAccount

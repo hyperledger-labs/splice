@@ -1,0 +1,134 @@
+module CC.Main where
+
+import DA.Action
+import DA.Date
+import DA.Time
+
+import CC.Coin
+import CC.CoinRules
+import CC.CreditRules
+import CC.Governance
+import CC.Interfaces
+import CC.Issuance
+import CC.Oracles
+import CC.PartyGovernance
+import CC.RateLimits
+import CC.Rounds
+import CC.Types
+import CC.User
+import CC.UserRules
+
+-- | CC is the genesis contract of Canton Coin. It serves as the public gateway into the app.
+template CC
+  with
+    svc : Party
+    public : Party
+  where
+    signatory svc
+    observer public
+
+    key svc : CCKey
+    maintainer key
+
+    nonconsuming choice TakePublicRead : ()
+      with
+        user : Party
+      controller user
+      do
+        requestCid <- create ReadDelegationRequest with
+          from = public
+          to = user
+        exerciseByKey @DecentralizedParty public AcceptRequest with
+          requestCid = toInterfaceContractId requestCid
+
+    nonconsuming choice RequestUserAccount : ()
+      with
+        user : Party
+      controller user
+      do
+        (_, config) <- fetchByKey @UserConfigOracle svc
+        limiter <- getInitialUserActionLimiter svc
+        requestCid <- create UserAccountRequest with
+          userAccount = UserAccount with
+            svc
+            owner = user
+            validator = user -- TODO: properly feed validator information
+            numCoins = 0
+            numCredits = 0
+            maxNumAccounts = config.freeTiermaxNumAccounts
+            limiter
+
+        exerciseByKey @DecentralizedParty public AcceptRequest with
+          requestCid = toInterfaceContractId requestCid
+
+
+    nonconsuming choice BootstrapApp : ()
+      with
+        actor : Party
+        issuanceParams : IssuanceParameters
+        roundParams : RoundParameters
+        initialPrice : Decimal
+      controller actor
+      do
+        assertValidator actor svc
+
+        today <- toDateUTC <$> getTime
+
+        -- Make sure public can see the SV consortium party.
+        exerciseByKey @DecentralizedParty svc AddObservers with newObservers = [public]
+
+        create CoinRules with ..
+        create CreditRules with
+          config = CreditRulesConfig with
+            minBurnQuantity = 0.001
+            minLockFee = 0.001
+            maxLockDuration = days 30
+            maxPreSpendDuration = days 365
+          ..
+        create UserRules with
+          svc; public
+          creditConfig = CreditConfig with
+            accountOpenFee = 0.01
+            minBurnPerDay = 0.1
+            actionLimit = RateLimit with
+              actionPrice = 10.0
+              maxBalance = 30.0
+        create issuanceParams
+        create roundParams
+        create GovernanceRules with ..
+        create IssuanceMarker with last_issuance = subtractDays today 1; ..
+        create PriceOracle with price = initialPrice; date = today; ..
+
+        return ()
+
+
+
+{-
+===============================================================================
+Helpers for actions we need to delegate through PerformAction
+===============================================================================
+-}
+
+template CreateAppRequest
+  with
+    svc : Party
+    public : Party
+    actor : Party
+  where
+    signatory actor
+
+    implements AnyRequest where
+      let requestAuthorizers = [svc]
+      let accept = do
+            void $ create CC with ..
+            -- TODO: consider whether we need a UserContract for the CC as well; we probably should to simplify our invariants
+            t <- getTime
+            void $ create Coin with
+              svc
+              owner = svc
+              number = 0
+              quantity = 0.0
+              obs = [] -- TODO: should this be visible to 'public'?
+              limiter = RateLimiter with
+                balance = 0.0    -- we're not going to limit the SVC action rate, so it won't need a non-zero balance
+                refilledAt = t

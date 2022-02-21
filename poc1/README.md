@@ -1,12 +1,18 @@
-POC 1 - README
-==============
+# PoC 1 - Canton Coin Contract Logic
 
-Changes to consider:
-- replace all use of `getTime` by an oracle to avoid `getTime` dependency and difficulties;
-  i.e., trust SVs to correctly couple issuance to wall-clock time
-  - in particular this helps recovering from an attack which made issuance during a particular day impossible.
-- remove race condition for claiming burned credit wrt both validator and beneficiary wanting to
-  claim it; e.g., by separately issuing burnedcredit for validator and beneficiary
-- implement low-contention wallet for coins
-- consider how to rate-limit CC operations issued by users; should they pay using CC?
-- add explicit time-locked choice for archival of IssuanceEvent after clawback period is over
+See https://docs.google.com/document/d/12cagZTzODP4rgEwDQ3lqoolh5ls2chXZ3ctcgH8Hl28/edit#
+for context, and the complete list of PoC milestones.
+
+Assumptions:
+1. Single SV Party trusted to compute off-ledger Coin logic
+2. Single domain
+3. No modularization
+Requirements:
+1. Complete implementation of functional requirements.
+2. Showcased using Daml script (happy path).
+Expected outcomes:
+1. Understand structure of state of Canton Coin.
+2. Have complete overview of all state transitions.
+
+
+We consider the files below `/poc1/` to satisfy these requirements.

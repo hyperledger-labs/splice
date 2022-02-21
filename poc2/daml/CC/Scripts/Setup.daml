@@ -1,0 +1,127 @@
+module CC.Scripts.Setup where
+
+import Daml.Script
+
+import DA.Date
+import DA.Time
+
+import CC.Main
+import CC.Oracles
+import CC.PartyGovernance
+import CC.RateLimits
+import CC.UserRules
+
+import CC.Scripts.Parameters
+import CC.Scripts.Util
+
+type UserParty = Party
+
+demoTime : Time
+demoTime = time (DA.Date.date 2022 Jan 1) 0 0 0
+
+-- startCantonCoin kicks off the application and returns a special party
+-- representing the SV consortium.
+-- That party is assumed to be dynamically governed by the controlling parties
+-- in its DecentralizedParty contract.
+setupApp : Script (CCApp, Party)
+setupApp = do
+  setTime demoTime
+
+  -- Digital Asset spins up a node intended as the first Super Validator and then
+  -- allocates the party representing the SV consortium.
+  da1 <- allocateParty "DigitalAsset1"
+
+  -- Digital Asset uses da1 to create a new decentralized Party representing the
+  -- SV consortium.
+  -- FEATURE GAP: We don't have decentralized parties.
+  -- We mock this by just allocating a party and co-creating a DecentralizedParty contract
+  svc <- allocateParty "SVConsortium"
+  submitMulti [da1, svc] [] do
+    createCmd DecentralizedParty with
+      validators = [da1]
+      partyId = svc
+      obs = []
+
+  -- DigitalAsset uses their control of svc to create a DecentralizedParty used to share
+  -- all public information of CC.
+  public <- allocateParty "Public"
+  requestCid <- submitMulti [da1, public] [] do
+    createCmd DecentralizedPartyRequest with
+      partyId = public
+      validators = [svc]
+  submitDP svc da1 do
+    exerciseByKeyCmd @DecentralizedParty svc AcceptRequest with requestCid = toInterfaceContractId requestCid
+
+  let app = CCApp with svc; public
+
+  --- DigitalAsset uses their control of svc ot create the app.
+  requestCid <- submit da1 do
+    createCmd CreateAppRequest with actor = da1; ..
+  submit da1 do
+    exerciseByKeyCmd @DecentralizedParty svc AcceptRequest with requestCid = toInterfaceContractId requestCid
+
+  -- Setup user config oracle
+  submit svc $ createCmd UserConfigOracle with
+    svc
+    public
+    freeTiermaxNumAccounts = 3
+    userActionLimit = RateLimit with
+      maxBalance = 50.0
+      actionPrice = 10.0
+
+  -- The SVC itself can also act as a CC user
+  onboardUser svc app
+
+  -- DigitalAsset's da1 party is also a CC user
+  onboardUser da1 app
+
+  return (app, da1)
+
+
+testOnboardUser : Script ()
+testOnboardUser = do
+  (app, _) <- setupApp
+  user <- allocateParty "User"
+  onboardUser user app
+
+-- | tierParties allocates parties for tiers.
+--   highest tier (tier3) goes in head.
+tierParties : CCApp -> [Int] -> Script [[Party]]
+tierParties svc nums = do
+  let tierNums = [(length nums), (length nums)-1..1]
+  forA (zip tierNums nums)
+    (\(t, num) -> forA [1..num]
+      (\m -> do
+        p <- allocateParty ("Tier " <> show t <> " Party " <> show m)
+        onboardUser p svc
+        return p))
+
+defaultTierParties : CCApp ->  Script [[Party]]
+defaultTierParties svc = tierParties svc [2,2,2]
+
+-- | Runs the bootstrapping given an existing CC contract.
+bootstrapApp : (CCApp, Party) -> Script [[Party]]
+bootstrapApp (app, da1) = do
+  tiers' <- defaultTierParties app
+  let tiers = tiers' ++ [[da1]]
+  [(cid, cc)] <- queryDP @CC app.svc da1
+  submitDP cc.svc da1 do
+    exerciseCmd cid BootstrapApp with
+      actor = da1
+      issuanceParams = defaultIssuanceParameters cc
+      roundParams = defaultRoundParameters cc tiers
+      initialPrice = 1.0
+
+  -- create initial wallet for da1
+  -- TODO: improve structure and naming around bootstrapping
+  exerciseUserRule app da1 Coin_OpenAccount with
+    owner = da1
+    obs = []
+
+  return tiers
+
+testBootstrapApp : Script ()
+testBootstrapApp = do
+  (svc, da1) <- setupApp
+  bootstrapApp (svc, da1)
+  return ()

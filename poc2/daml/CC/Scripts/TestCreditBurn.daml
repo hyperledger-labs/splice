@@ -1,0 +1,82 @@
+module CC.Scripts.TestCreditBurn where
+
+import DA.Time
+
+import Daml.Script
+
+import CC.Coin
+import CC.CoinRules
+import CC.Credit
+import CC.CreditRules
+import CC.UserRules
+
+import CC.Scripts.Setup
+import CC.Scripts.Util
+
+
+testCreditBurn : Script ()
+testCreditBurn = do
+  -- bootstrap app
+  (app, da1) <- setupApp
+  bootstrapApp (app, da1)
+
+  -- bootstrap user and service provider party
+  user <- setupUser app "User"
+  provider1 <- setupUser app "Provider1"
+  provider2 <- setupUser app "Provider2"
+
+  -- start issuing
+  rollDayFull app 0.11
+
+  -- da1 transfers 0.3 coin as a reward to a Daml forum user
+  coinTransferCid <- proposeCoinTransfer app da1 0 user 0.3
+  submit user $ exerciseCmd coinTransferCid CoinTransfer_Accept with number = 0
+
+  -- user buys credit
+  exerciseCoinRule app user Buy_Credit with
+        owner = user
+        coinNumber = 0
+        creditNumber = 0
+        creditQuantity = 1.0
+
+  -- user open an additional credit account
+  exerciseUserRule app user Credit_OpenAccount with
+    owner = user
+    feeAccountNumber = 0
+
+  rollDayFull app 0.12
+
+  -- check locking functionality
+  -- TODO: refactor into utilities and move into its own test file
+  t <- getTime
+  exerciseCreditRule app user Credit_BurnAndLock with
+        owner = user
+        number = 0
+        fee = 0.015
+        payload = "Lock it!"
+        minLockedQuantity = 0.001
+        lock = TimeLock with
+          holder = user
+          expiresAt = addRelTime t (seconds 10)
+  passTime (seconds 60)
+  submit user $ exerciseByKeyCmd @Credit (app.svc, user, 0) Credit_OwnerExpireLock
+
+  rollDayFull app 0.13
+
+
+  -- user burns credit, running his own validator
+  pay app user provider1 0.01 "Great Service"
+  passTime (seconds 10) -- required, as otherwise rate limit on credit spending is hit
+  pay app user provider2 0.01 "Thx"
+  passTime (seconds 200)
+  pay app user provider2 0.01 "Thx, again"
+  pay app user provider2 0.01 "Thx, again"
+  pay app user provider1 0.01 "Great Service, again"
+
+
+  -- -- TODO: add assertions that validate token handling
+  -- TODO: figure out why the SVC does not get coin for the burnedcredit from the account open
+
+  rollDayFull app 0.14
+
+  return ()

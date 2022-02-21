@@ -1,0 +1,59 @@
+module CC.Rounds where
+
+import DA.Time
+
+-- | RoundParameters is a configuration contract that holds round parameters
+--   like the the number of super validators to be added/removed/split.
+template RoundParameters
+  with
+    svc : Party
+    public : Party
+    -- | Subscriber parties for different tiers with the last tier in head.
+    tiers : [[Party]]
+    -- | Number of svc tokens issued to each tier.
+    rounds : [(Date, [Int])]
+    doublingRoundPeriod : RelTime
+    svTokenClawbackPeriod : RelTime
+  where
+    signatory svc
+    observer public
+
+    key svc : Party
+    maintainer key
+
+template DoublingMarker
+  with
+    svc : Party
+    public : Party
+    lastDoubling : Date
+  where
+    signatory svc
+    observer public
+
+    key svc : Party
+    maintainer key
+
+-- | SV_Token entitles the owner to designate a new super validator.
+template SV_Token
+  with
+    svc : Party
+    public : Party
+    owner : Party
+    clawbackAt : Time
+  where
+    signatory svc
+    observer [owner, public]
+
+    choice Transfer_SV_Token : ContractId SV_Token
+      with
+        newOwner : Party
+      controller owner
+      do
+        create this with owner = newOwner
+
+    choice Clawback_SV_Token : ContractId SV_Token
+      controller svc
+      do
+        now <- getTime
+        assertMsg "Cannot claw back svc Token before clawback time" (now >= clawbackAt)
+        create this with owner = svc

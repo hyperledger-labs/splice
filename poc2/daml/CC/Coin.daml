@@ -1,0 +1,108 @@
+module CC.Coin where
+
+import DA.Action (unless, void)
+
+import CC.RateLimits
+
+-- | A stable identifier for a coin.
+type CoinKey = (Party, Party, Int)
+
+-- | CantonCoin
+
+template Coin
+  with
+    -- | The SV consortium
+    svc : Party
+    -- | Owner of the coin
+    owner : Party
+    -- | Serial number of the coin
+    number : Int
+    -- | Amount of coin
+    quantity : Decimal
+    -- | Observers of the coin. Used to work around explicit disclosure
+    obs : [Party]
+    -- | Rate limiter for modifying this coin.
+    limiter : RateLimiter
+  where
+    signatory svc, owner
+    ensure quantity >= 0.0   -- we allow a zero balance as that essentially corresponds to a suspendd user account
+
+    key (svc, owner, number) : CoinKey
+    maintainer key._1, key._2
+
+
+
+-- Special States for Canton Coin
+template CoinTransfer
+  with
+    coin : Coin
+    receiver : Party
+  where
+    signatory (signatory coin)
+    observer receiver :: observer coin
+
+    choice CoinTransfer_Accept : () with
+        number : Int
+      controller receiver
+      do
+        -- TODO: adjust rules and params to make this work with non-UCK
+        -- We might want to turn this around and work with transfer pre-approvals.
+        addCoinToWallet (coin.svc, receiver, number) coin.quantity
+
+    choice CoinTransfer_Reject : ()
+      controller receiver
+      do addCoinToWallet (key coin) coin.quantity
+
+    choice CoinTransfer_Cancel : ()
+      controller coin.owner
+      do addCoinToWallet (key coin) coin.quantity
+
+template LockedCoin
+  with
+    coin : Coin
+    unlockers : [Party]
+  where
+    signatory (signatory coin)
+    observer unlockers ++ observer coin
+
+    choice LockedCoin_Unlock : ()
+      controller unlockers
+      do addCoinToWallet (key coin) coin.quantity
+
+
+-- Coin helper functions
+------------------------
+
+newCoinRateLimiter : Time -> RateLimiter
+newCoinRateLimiter t = RateLimiter with
+  balance = coinActionLimit.actionPrice  -- allow for one action by default
+  refilledAt = t
+
+coinActionLimit : RateLimit
+coinActionLimit = RateLimit with
+  maxBalance = 30.0
+  actionPrice = 10.0
+
+modifyCoin : CoinKey -> ((Decimal, [Party]) -> (Decimal, [Party])) -> Update ()
+modifyCoin coinKey@(svc, owner, number) f = do
+  (coinCid, coin) <- fetchByKey @Coin coinKey
+  let xOld = (coin.quantity, coin.obs)
+      xNew@(quantity, obs) = f xOld
+  unless (xOld == xNew) $ do
+    limiter <- withActionLimit coinActionLimit coin.limiter
+    -- archive and create the new coin
+    archive coinCid
+    void $ create Coin with ..
+
+modifyCoinQuantity : CoinKey -> (Decimal -> Decimal) -> Update ()
+modifyCoinQuantity k f = modifyCoin k $ \(q, obs) -> (f q, obs)
+
+-- | The 'Coin' contracts can be seen as wallets; and this function adds a new coin.
+--
+-- TODO: adjust terminology once there's agreement wrt how to structure the state of CC users.
+-- TODO: adjust this function and its usage to non-UCK by switching `lookupByKey` to `fetchSomeByKey`,
+-- or passing in the contract reference where possible
+addCoinToWallet : CoinKey -> Decimal -> Update ()
+addCoinToWallet k quantity
+  | quantity < 0.0 = fail "Can only add coins with positive quantity"
+  | otherwise = modifyCoinQuantity k (+ quantity)

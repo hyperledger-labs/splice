@@ -1,0 +1,109 @@
+module CC.Scripts.TestRounds where
+
+import Daml.Script
+
+import DA.Date
+import DA.Foldable (forA_)
+import DA.List (sort)
+import DA.Time
+import DA.Text (isPrefixOf)
+
+import CC.Governance
+import CC.Rounds
+import CC.PartyGovernance
+
+import CC.Scripts.Util
+import CC.Scripts.Setup
+
+-- Derive an Ord instance to be able to use submitDP
+deriving instance Ord RoundParameters
+deriving instance Ord DoublingMarker
+
+run_round : CCApp -> Party -> Decimal -> [ContractId SV_Token] -> Script ()
+run_round app da1 price svTokenCids = do
+  [(_, rps)] <- queryDP @RoundParameters app.svc da1
+  next_round_date <- case rps.rounds of
+    (d, _)::_ -> return d
+    [] -> do
+      [(_, dm)] <- queryDP @DoublingMarker app.svc da1
+      return (toDateUTC $ addRelTime (time dm.lastDoubling 0 0 0) rps.doublingRoundPeriod)
+  skipToDate app next_round_date price
+  submitDP app.svc da1 do
+    exerciseByKeyCmd @GovernanceRules app.svc Trigger_Round with
+      actor = da1
+      svTokenCids
+
+  forA_ (concat rps.tiers) (\p -> do
+    tokens <- query @SV_Token p
+    return ()
+    )
+
+use_sv_tokens : CCApp -> Party -> Script [Party]
+use_sv_tokens app p = do
+  tokens <- query @SV_Token p
+  forA tokens (\(tokenCid, t) -> do
+    -- Onboard a new user party
+    newValidator <- allocateParty (partyToText p <> "_" <> show tokenCid)
+    onboardUser newValidator app
+    -- Transfer the token to the new party
+    tokenCid <- submitRD t.public p do
+      exerciseCmd tokenCid Transfer_SV_Token with
+        newOwner = newValidator
+    -- Redeem the token
+    submitRD t.public newValidator do
+      exerciseByKeyCmd @GovernanceRules t.svc Redeem_SV_Token with
+        token_owner = newValidator
+        newValidator
+        tokenCid
+    return newValidator
+    )
+
+test_rounds : Script ()
+test_rounds = do
+  (app, da1) <- setupApp
+  tierParties <- bootstrapApp (app, da1)
+
+  run_round app da1 1.1 []
+  r1vs <- use_sv_tokens app da1
+
+  run_round app da1 1.2 []
+  r2vs <- use_sv_tokens app da1
+
+  run_round app da1 1.3 []
+  r3vs <- use_sv_tokens app da1
+
+  -- Return tokens from previous round
+  tokenCids <- forA r3vs (\p -> do
+    tokenCid <- submitRD app.public p do
+      exerciseByKeyCmd @GovernanceRules app.svc Give_Up_SV with
+        oldValidator = p
+    submitRD app.public p do
+      exerciseCmd tokenCid Transfer_SV_Token with
+        newOwner = da1
+    )
+  
+  -- Run the round for tier 1
+  run_round app da1 1.4 tokenCids
+  r4vs <- forA_ (concat tierParties) (use_sv_tokens app)
+
+  -- Run the round for tier 2
+  run_round app da1 1.5 []
+  r5vs <- forA_ (concat tierParties) (use_sv_tokens app)
+
+  -- Run the round for tier 3
+  run_round app da1 1.6 []
+  r6vs <- forA_ (concat tierParties) (use_sv_tokens app)
+
+  -- Run a doubling
+  run_round app da1 1.7 []
+
+  Some (_, sv_params) <- queryContractKey @DecentralizedParty app.svc app.svc
+  sv_tokens <- query @SV_Token app.svc
+  assertMsg "Incorrect Owners" (sort (map (\(_, t) -> t.owner) sv_tokens) == sort(sv_params.validators))
+
+  forA_ (zip [1, 2, 3, 12] tierParties) (\(num, ps) -> do
+    forA_ ps (\p -> do
+      let matchingValidators = filter (\v -> partyToText p `isPrefixOf` partyToText v) sv_params.validators
+      assertMsg "Incorrect number of validators" (num == length matchingValidators)
+      )
+    )
