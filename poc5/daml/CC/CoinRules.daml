@@ -1,16 +1,47 @@
 module CC.CoinRules where
 
-import DA.Date
-import DA.List (dedupSort, delete)
+import DA.Action (void)
+import DA.Text
+import DA.Time
 
 import CC.Coin
-import CC.Credit
-import CC.Oracles
+import OpenBusiness.RateLimits
+
+import OpenBusiness.Expiry
+import OpenBusiness.Fees
+
+data CoinRulesConfig = CoinRulesConfig with
+
+    -- | Fee to charge for a transfer.
+    transferFee : FixedPlusVariableRate
+    -- | Fee to hold a coin for longer than its initial free duration.
+    coinHoldingFee : DailyRate
+    -- | Duration for which a coin does not expire after creation.
+    freeCoinHoldingDuration : RelTime
+
+    accountConfig : CoinAccountConfig
+
+    -- | Max duration for a lock
+    maxLockDuration : RelTime
+  deriving (Eq, Ord, Show)
+
+
+newCoinRateLimiter : RateLimit -> Time -> RateLimiter
+newCoinRateLimiter coinActionLimit t = RateLimiter with
+  balance = coinActionLimit.actionPrice  -- allow for one action by default
+  refilledAt = t
+
+
+
+-- CoinRules
+------------
 
 template CoinRules
   with
     svc : Party
     public : Party
+    config : CoinRulesConfig
+    -- TODO: use a schedule with effective dating to make fees predictable to users
   where
     signatory svc
     observer public
@@ -18,96 +49,292 @@ template CoinRules
     key svc : Party
     maintainer key
 
-    nonconsuming choice Coin_AddObservers : ContractId Coin
-      with
-        owner : Party
-        coinCid : ContractId Coin
-        newObservers : [Party]
-      controller owner
-      do
-        coin <- fetch coinCid
-        assertMsg "Only the owner of a coin can add observers" (owner == coin.owner)
-        archive coinCid
-        create coin with
-          obs = dedupSort (newObservers ++ coin.obs)
+    -- nonconsuming choice CoinAccount_Burn : ContractId BurnedCoin
+    --   with
+    --     owner : Party
+    --     number : Int        -- coin account to use
+    --     quantity : Decimal  -- coin quantity to burn
+    --     beneficiary : Party
+    --     payload : Text
+    --   controller owner
+    --   do
+    --     assertMsg "Can only burn positive quantities of coin" (0.0 < quantity)
+    --     assertMsg "The required minimum quantity of coin is burned" (config.minBurnQuantity <= quantity)
+    --     t <- getTime
+    --     -- charge coin
+    --     coin <- modifyCoinAccount (svc, owner, number) $ \(q, optLock, minBurn) ->
+    --       let
+    --         -- TODO: share this code with locking
+    --         (minBurnFee, minBurnNew0) = updateMinSpendState quantity t minBurn
+    --         maxPreSpendTime = addRelTime t config.maxPreSpendDuration
+    --         minBurnNew = minBurnNew0 with
+    --           spendCoveredUntil = min minBurnNew0.spendCoveredUntil maxPreSpendTime
+    --       in
+    --         (q - quantity - minBurnFee, optLock, minBurnNew)
+    --     -- store burned coin as input to the next issuance
+    --     burnedAt <- getTime
+    --     create BurnedCoin with
+    --       burner = owner
+    --       validator = coin.validator
+    --       ..
 
-    nonconsuming choice Coin_RemoveObservers : ContractId Coin
-      with
-        owner : Party
-        coinCid : ContractId Coin
-        oldObservers : [Party]
-      controller owner
-      do
-        coin <- fetch coinCid
-        assertMsg "Only the owner of a coin can remove observers" (owner == coin.owner)
-        archive coinCid
-        create coin with
-          obs = foldr delete coin.obs oldObservers
+    -- | Burn a fee and time-lock the coin.
+    -- This is commonly used to manage open-world offer-and-accept workflows where
+    -- a small fee is due to make an offer and a larger fee is to be paid in case
+    -- the offer is accepted.
+    -- nonconsuming choice CoinAccount_BurnAndLock : () -- ContractId BurnedCoin
+    --   with
+    --     owner : Party
+    --     number : Int
+    --     fee : Decimal     -- fee to be paid to the lock.holder
+    --     lock : TimeLock
+    --     minLockedQuantity : Decimal
+    --     payload : Text
+    --   controller owner, lock.holder
+    --   do
+    --     assertMsg "Minimum locked quantity is positive" (0.0 <= minLockedQuantity )
+    --     t <- getTime
+    --     assertMsg "Lock expires in the future" (t <= lock.expiresAt)
+    --     let lockDuration = subTime lock.expiresAt t
+    --     assertMsg "Lock duration below the maximum" (lockDuration <= config.maxLockDuration)
+    --     assertMsg "The required minimum lock fee is paid" (config.minLockFee <= fee)
+    --     -- charge and lock coin balance
+    --     coin <- modifyCoinAccount (svc, owner, number) $ \(quantity, optLock, minBurn) ->
+    --       case optLock of
+    --         Some _ -> error "Locked coin cannot be locked"
+    --         None ->
+    --           let
+    --             (minBurnFee, minBurnNew0) = updateMinSpendState quantity t minBurn
+    --             maxPreSpendTime = addRelTime t config.maxPreSpendDuration
+    --             minBurnNew = minBurnNew0 with
+    --               spendCoveredUntil = min minBurnNew0.spendCoveredUntil maxPreSpendTime
+    --           in
+    --             (quantity - fee - minBurnFee, Some lock, minBurnNew)
+    --     -- ensure there's enough coin available at lock expiry
+    --     let (minBurnFeeAtExpiry, _) = updateMinSpendState 0.0 lock.expiresAt coin.minBurn
+    --         balanceAfterFees = coin.quantity - minBurnFeeAtExpiry
+    --     assertMsg ("Coin balance after fees " <> show balanceAfterFees <> " lower than mimimum locked quantity")
+    --       (minLockedQuantity <= balanceAfterFees)
+    --     -- store the fact that coin was burned
+    --     -- TODO: create appropriate burned coin
+    --     -- burnedAt <- getTime
+    --     -- create BurnedCoin with
+    --     --   quantity = fee
+    --     --   validator = coin.validator
+    --     --   beneficiary = lock.holder
+    --     --   burner = owner
+    --     --   svc
+    --     --   public
+    --     --   payload
+    --     --   burnedAt
 
-    nonconsuming choice Coin_Transfer : ContractId CoinTransfer
-      with
-        owner : Party
-        coinNumber : Int
-        receiver : Party
-        transferQuantity : Decimal
-      controller owner
-      do
-        (coinCid, coin) <- fetchByKey @Coin (svc, owner, coinNumber)
-        archive coinCid
-        create coin with quantity = coin.quantity - transferQuantity
-        create CoinTransfer with
-          coin = coin with quantity = transferQuantity
-          receiver
 
-    nonconsuming choice Coin_BilateralTransfer : ContractId Coin
+    -- | Lock an account and pay a fee as part of locking.
+    nonconsuming choice CoinAccount_Lock : ContractId Coin
       with
         owner : Party
-        newOwner : Party
-        coinCid : ContractId Coin
-      controller [owner, newOwner]
+        number : Int
+        lockFee : Decimal -- TODO: consider whether we need the ability to have the sender pay both fees to improve the UX
+        lock : TimeLock
+        payload : Text
+      controller owner, lock.holder
       do
-        coin <- fetch coinCid
-        assertMsg "Coin owners do not match" (owner == coin.owner)
-        archive coinCid
-        create coin with owner = newOwner
+        -- TODO: unify this code with transfer
+        assertMsg "Locking fee must be positive" (lockFee > 0.0)
+        assertMsg "Payload length <= 32 characters" (DA.Text.length payload <= 32)
+        let transferFee = chargeFixedPlusVariableRate config.transferFee lockFee
+            senderFee = transferFee / 2.0
+            receiverFee = transferFee - senderFee
+        coin <- modifyCoinAccount config.accountConfig (svc, owner, number) transferFee $ \(quantity, optLock) ->
+          case optLock of
+            Some _ -> error "Locked coin cannot be locked"
+            None -> (quantity - lockFee, Some lock)
 
-    nonconsuming choice Coin_Lock : ContractId LockedCoin
-      with
-        owner : Party
-        unlockers : [Party]
-        coinCid : ContractId Coin
-      controller owner
-      do
-        coin <- fetch coinCid
-        assertMsg "Coin owners do not match" (owner == coin.owner)
-        archive coinCid
-        create LockedCoin with ..
+        -- compute issuance and expiry for burned coins
+        (_, issuanceParams) <- fetchByKey @IssuanceParameters svc
+        (issuanceAt, burnedCoinExpiresAt) <- getIssuanceAtAndExpiresAt issuanceParams
 
-    nonconsuming choice Buy_Credit : ()
-      with
-        owner : Party
-        coinNumber : Int
-        creditQuantity : Decimal
-        creditNumber : Int
-      controller owner
-      do
-        -- compute price
+        -- pay sender fee
+        create BurnedCoin with
+          svc
+          beneficiary = coin.validator
+          kind = BurnedCoinForValidator
+          quantity = senderFee
+          issuanceAt
+          expiresAt = burnedCoinExpiresAt
+        -- pay receiver fee
+        create BurnedCoin with
+          svc
+          beneficiary = lock.holder
+          kind = BurnedCoinForService
+          quantity = receiverFee
+          issuanceAt
+          expiresAt = burnedCoinExpiresAt
+        -- create coin for the receiver to deposit
         now <- getTime
-        let today = toDateUTC now
-        (_, priceOracle) <- fetchByKey @PriceOracle (svc, today)
-        let coinQuantity = creditQuantity * priceOracle.price
-        -- burn the coins
-        burnCoins (svc, owner, coinNumber) coinQuantity
-        -- issue the credit
-        addCreditToWallet (svc, owner, creditNumber) creditQuantity
+        create Coin with
+          svc
+          owner = lock.holder
+          quantity = expiringQuantity
+            config.coinHoldingFee
+            (lockFee - receiverFee)
+            (addRelTime now config.freeCoinHoldingDuration)
+
+
+    -- | Transfer coin to a receipient
+    nonconsuming choice CoinAccount_Transfer : ContractId Coin
+      with
+        owner : Party
+        number : Int
+        quantity : Decimal
+        newOwner : Party
+        payload : Text
+      controller owner, newOwner
+      do
+        assertMsg "Quantity must be positive" (quantity > 0.0)
+        assertMsg "Payload length <= 32 characters" (DA.Text.length payload <= 32)
+        let transferFee = chargeFixedPlusVariableRate config.transferFee quantity
+            senderFee = transferFee / 2.0
+            receiverFee = transferFee - senderFee
+        coin <- modifyCoinAccountQuantity config.accountConfig (svc, owner, number) transferFee (\q -> q - quantity - senderFee)
+
+        -- compute issuance and expiry for burned coins
+        (_, issuanceParams) <- fetchByKey @IssuanceParameters svc
+        (issuanceAt, burnedCoinExpiresAt) <- getIssuanceAtAndExpiresAt issuanceParams
+
+        -- pay sender fee
+        create BurnedCoin with
+          svc
+          beneficiary = coin.validator
+          kind = BurnedCoinForValidator
+          quantity = senderFee
+          issuanceAt
+          expiresAt = burnedCoinExpiresAt
+        -- pay receiver fee
+        create BurnedCoin with
+          svc
+          beneficiary = newOwner
+          kind = BurnedCoinForService
+          quantity = receiverFee
+          issuanceAt
+          expiresAt = burnedCoinExpiresAt
+        -- create coin for the receiver to deposit
+        now <- getTime
+        create Coin with
+          svc
+          owner = newOwner
+          quantity = expiringQuantity
+            config.coinHoldingFee
+            (quantity - receiverFee)
+            (addRelTime now config.freeCoinHoldingDuration)
+
+    -- | Deposit a coin.
+    nonconsuming choice CoinAccount_Deposit : ()
+      with
+        owner : Party
+        number : Int
+        coinCid : ContractId Coin
+      controller owner
+      do
+        -- TODO: unify with BurnedCoin_Deposit and support and incentivize batch mode
+        coin <- fetch coinCid
+        archive coinCid
+        assertNotExpired coin
+        assertMsg "Coin must match account" ((svc, owner) == (coin.svc, coin.owner))
+        now <- getTime
+        void $ modifyCoinAccountQuantity config.accountConfig  (svc, owner, number) 0.0 ( + actualQuantity now coin.quantity)
+
+    nonconsuming choice BurnedCoin_Deposit : ()
+      with
+        owner : Party
+        number : Int
+        coinCid : ContractId BurnedCoin
+        -- TODO: allow for listing multiple coins from multiple issuances
+      controller owner
+      do
+        -- check that coin has not expired
+        coin <- fetch coinCid
+        archive coinCid
+        assertNotExpired coin
+        assertMsg "Coin must match account" ((svc, owner) == (coin.svc, coin.beneficiary))
+        -- grab issuance event
+        (_, issueEv) <- fetchByKey @IssuanceEvent (svc, coin.issuanceAt)
+        -- deposit resulting coin
+        let issuancePerCoin = case coin.kind of
+              BurnedCoinForService -> issueEv.beneficiaryIssuancePerCoin
+              BurnedCoinForValidator -> issueEv.validatorIssuancePerCoin
+
+        void $ modifyCoinAccountQuantity config.accountConfig (svc, owner, number) 0.0 ( + coin.quantity * issuancePerCoin)
+
+
+-- Issuance parameters
+----------------------
+
+-- TODO: move
+
+
+data TimeWindow = TimeWindow with
+    startsAt : Time
+    duration : RelTime
+  deriving (Eq, Ord, Show)
 
 
 
--- Coin helper functions
-------------------------
+getIssuanceAtAndExpiresAt : IssuanceParameters -> Update (Time, Time)
+getIssuanceAtAndExpiresAt params = do
+  burnedAt <- getTime
+  let
+    microsSinceStart = convertRelTimeToMicroseconds (subTime burnedAt params.initialWindow.startsAt)
+    microsWindowDuration = convertRelTimeToMicroseconds params.initialWindow.duration
+    windowsFromStartToIssuance = 2 + microsSinceStart / microsWindowDuration
+    -- TODO: add unit tests to check for off-by-one errors
+    issuanceAt = addRelTime params.initialWindow.startsAt (convertMicrosecondsToRelTime (windowsFromStartToIssuance * microsWindowDuration))
+    expiresAt = addRelTime issuanceAt params.claimDuration
+  return (issuanceAt, expiresAt)
 
--- | Burn a specific quantity of the owner's coins, and return the remaining ones.
-burnCoins : CoinKey -> Decimal -> Update ()
-burnCoins k coinQuantity  = do
-  assertMsg "Can only burn positive quantities of coin" (coinQuantity > 0.0)
-  modifyCoinQuantity k $ \q -> q - coinQuantity
+
+
+-- | IssuanceParameters is a configuration contract that holds issuance parameters.
+template IssuanceParameters
+  with
+    svc : Party
+    public : Party
+    -- | How many coins are issued per issuance window.
+    coinsPerIssuance : Decimal
+    -- | The maximum proportion of the issuance that goes to service providers.
+    servicePercentage : Decimal
+    -- | The maximum proportion of the issuance that goes to validators.
+    validatorPercentage : Decimal
+    -- | The initial issuance window, which is replicated going forwards.
+    initialWindow : TimeWindow
+    -- | For how long a burned coin can be claimed after its issuance event.
+    claimDuration : RelTime
+    -- TODO: use a schedule with effective dating to enable controlled modifications
+    -- of these parameters
+  where
+    signatory svc
+    observer public
+
+    key svc : Party
+    maintainer key
+
+
+
+template IssuanceEvent
+  with
+    svc : Party
+    public : Party
+    issuanceAt : Time
+    validatorIssuancePerCoin : Decimal
+    beneficiaryIssuancePerCoin : Decimal
+    expiresAt : Time
+  where
+    signatory svc
+    observer public
+
+    key (svc, issuanceAt) : (Party, Time)
+    maintainer key._1
+
+    implements ExpiringContract where
+      let contractExpiresAt = expiresAt
+      let expiryManager = svc

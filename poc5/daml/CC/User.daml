@@ -1,6 +1,6 @@
 module CC.User where
 
-import CC.RateLimits
+import OpenBusiness.RateLimits
 
 
 -- | The user account contract governs the state of a CC user as seen by the SVC.
@@ -15,8 +15,6 @@ template UserAccount
     -- exist; and can be fetched by their key (svc, owner, i).
     validator : Party -- TODO: consider whether this is the right place for storing the validator
     numCoins : Int
-    -- | The current number of credit contracts for this (svc, owner) pair.
-    numCredits : Int
     -- | The maximal number of coin contracts that this user is allowed to have.
     -- TODO: add governance functionality to raise this limit
     maxNumAccounts : Int

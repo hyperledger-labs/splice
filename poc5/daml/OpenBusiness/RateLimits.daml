@@ -16,7 +16,7 @@
 --
 -- Applications can change the rate limits dynamically by sharing the action prices and
 -- maximal balances via an oracle contract.
-module CC.RateLimits where
+module OpenBusiness.RateLimits where
 
 import DA.Time
 

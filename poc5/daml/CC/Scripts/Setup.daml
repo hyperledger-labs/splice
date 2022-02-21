@@ -2,20 +2,19 @@ module CC.Scripts.Setup where
 
 import Daml.Script
 
-import DA.Date
 import DA.Time
 
 import CC.Coin
 import CC.SvcRules
-import CC.RateLimits
 
 import CC.Scripts.Parameters
 import CC.Scripts.Util
 
+import OpenBusiness.Fees
+import OpenBusiness.RateLimits
+
 type UserParty = Party
 
-demoTime : Time
-demoTime = time (DA.Date.date 2022 Jan 1) 0 0 0
 
 -- startCantonCoin kicks off the application and returns a special party
 -- representing the SV consortium.
@@ -35,10 +34,9 @@ setupApp = do
   let app = CCApp with svc; public
 
   --- DigitalAsset uses their control of svc ot create the app.
-  today <- toDateUTC <$> getTime
   requestCid <- submit svc do
     createCmd SvcRules with
-      last_issuance = subtractDays today 1
+      lastIssuanceAt = demoTime
       userConfig = UserConfig with
         freeTiermaxNumAccounts = 3
         userActionLimit = RateLimit with
@@ -52,15 +50,17 @@ setupApp = do
 
   -- TODO: move into bootstrapping choices of CC
   t <- getTime
-  submit svc $ createCmd Coin with
+  submit svc $ createCmd CoinAccount with
     svc
     owner = svc
     number = 0
-    quantity = 0.0
+    quantity =  expiringQuantity (DailyRate with rate = 1.0) 0.0 (addRelTime t (days 1))
     obs = [] -- TODO: should this be visible to 'public'?
     limiter = RateLimiter with
-      balance = 0.0    -- we're not going to limit the SVC action rate, so it won't need a non-zero balance
+      balance = 100.0    -- TODO: stop limiting the action rate of the SVC
       refilledAt = t
+    lock = None
+    validator = svc
 
   return app
 
@@ -83,8 +83,9 @@ bootstrapApp app = do
   [(cid, cc)] <- query @SvcRules app.svc
   submit cc.svc do
     exerciseCmd cid BootstrapApp with
-      issuanceParams = defaultIssuanceParameters cc
+      issuanceParams = defaultIssuanceParameters app.svc app.public
       initialPrice = 1.0
+      coinRulesConfig = defaultCoinRulesConfig
 
 testBootstrapApp : Script ()
 testBootstrapApp = do

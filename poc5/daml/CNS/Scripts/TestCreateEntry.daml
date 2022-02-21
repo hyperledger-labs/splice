@@ -4,9 +4,6 @@ import DA.Time
 
 import Daml.Script
 
-import CC.Coin
-import CC.CoinRules
-
 import CC.Scripts.Setup
 import CC.Scripts.Util
 
@@ -17,8 +14,8 @@ import CNS.DirectoryRules
 test : Script ()
 test = do
   -- bootstrap app
-  (app, da1) <- setupApp
-  bootstrapApp (app, da1)
+  app <- setupApp
+  bootstrapApp app
 
   -- bootstrap user and service provider party
   user <- setupUser app "User"
@@ -26,18 +23,11 @@ test = do
   provider2 <- setupUser app "Provider2"
 
   -- start issuing
-  rollDayFull app 1.1
+  runNextIssuance app
 
-  -- da1 transfers 0.3 coin as a reward to a Daml forum user
-  coinTransferCid <- proposeCoinTransfer app da1 0 user 0.3
-  submit user $ exerciseCmd coinTransferCid CoinTransfer_Accept with number = 0
-
-  -- user buys credit
-  exerciseCoinRule app user Buy_Credit with
-        owner = user
-        coinNumber = 0
-        creditNumber = 0
-        creditQuantity = 0.2
+  -- svc transfers 20 coin to user
+  pay app app.svc user 20.0 "starter pack!"
+  runCoinDepositBots app
 
   -- bootstrap CNS on Provider1
   submit provider1 $ createCmd DirectoryRules with
@@ -46,16 +36,16 @@ test = do
     minValidityDuration = minutes 10
     maxValidityDuration = hours (24 * 365)
     maxNameLength = 256
-    requestFee = 0.01
-    dailyLeaseFee = 0.0025
+    requestFee = 0.1
+    dailyLeaseFee = 1.0
     ccSvc = app.svc
 
   -- TODO: package into utility script
   t <- getTime
-  -- NOTE: the readAs constraints are here to read the DirectoryRules and CreditRules,
+  -- NOTE: the readAs constraints are here to read the DirectoryRules and CoinRules,
   --       which we expect to be delivered to the client via off-ledger disclosure.
   reqCid <- submitMulti [user] [provider1, app.public] $ exerciseByKeyCmd @DirectoryRules provider1 DirectoryRules_RequestEntry with
-    creditNumber = 0
+    coinNumber = 0
     entry = Entry with
       provider = provider1
       user
@@ -63,9 +53,15 @@ test = do
       expiresAt = addRelTime t (hours 24)
 
   -- TODO: package into utility script, and auto-accept everything that is not duplicate
-  -- NOTE: the readAs serves to read the CreditRules
+  -- NOTE: the readAs serves to read the CoinRules
   submitMulti [provider1] [app.public] $ exerciseCmd reqCid EntryRequest_Acccept
 
-  rollDayFull app 1.2
+  -- run bots
+  runCoinDepositBots app
+
+  -- run two issuances to recover burned coins
+  runNextIssuance app
+  runNextIssuance app
+
 
   return ()

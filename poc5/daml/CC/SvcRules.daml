@@ -4,14 +4,14 @@ import DA.Action
 import DA.Date
 import DA.Time
 
+import CC.Coin
 import CC.CoinRules
-import CC.CreditRules
-import CC.Issuance
 import CC.Oracles
-import CC.RateLimits
-import CC.Types
+import OpenBusiness.RateLimits
 import CC.User
 import CC.UserRules
+
+import OpenBusiness.Fees
 
 data UserConfig = UserConfig with
     -- | The maximal number of coins for users in the free tier
@@ -25,13 +25,13 @@ template SvcRules
   with
     svc : Party
     public : Party
-    last_issuance : Date
+    lastIssuanceAt : Time
     userConfig : UserConfig
   where
     signatory svc
     observer public
 
-    key svc : CCKey
+    key svc : Party
     maintainer key
 
     nonconsuming choice RequestUserAccount : ()
@@ -45,7 +45,6 @@ template SvcRules
             owner = user
             validator = user -- TODO: properly feed validator information
             numCoins = 0
-            numCredits = 0
             maxNumAccounts = userConfig.freeTiermaxNumAccounts
             limiter
 
@@ -54,22 +53,19 @@ template SvcRules
     nonconsuming choice BootstrapApp : ()
       with
         issuanceParams : IssuanceParameters
+        coinRulesConfig : CoinRulesConfig
         initialPrice : Decimal
       controller svc
       do
         today <- toDateUTC <$> getTime
 
-        create CoinRules with ..
-        create CreditRules with
-          config = CreditRulesConfig with
-            minBurnQuantity = 0.001
-            minLockFee = 0.001
-            maxLockDuration = days 30
-            maxPreSpendDuration = days 365
+        -- create CoinRules with ..
+        create CoinRules with
+          config = coinRulesConfig
           ..
         create UserRules with
           svc; public
-          creditConfig = CreditConfig with
+          coinConfig = CoinConfig with
             accountOpenFee = 0.01
             minBurnPerDay = 0.1
             actionLimit = RateLimit with
@@ -82,49 +78,42 @@ template SvcRules
 
     -- | The SVC triggers the issuance
     choice Trigger_Issuance : ContractId SvcRules
+      with
+        issuanceAt : Time
+        -- TODO: consider computing this; depends on how to continue with issuance if the system is running slow
       controller svc
       do
-        -- (markerCid, marker) <- fetchByKey @IssuanceMarker svc
-        now <- getTime
-        let today = toDateUTC now
-        assertMsg "Cannot issue more than once a day" (today > last_issuance)
-
-        -- Always create Issuance Events for a whole day.
-        let date_to_issue = addDays last_issuance 1
-        (params_cid, params) <- fetchByKey @IssuanceParameters svc
-        (_, priceOracle) <- fetchByKey @PriceOracle (svc, date_to_issue)
-        (_, burnOracle) <- fetchByKey @BurnOracle (svc, date_to_issue)
+        -- ensure issuance moves forward in time
+        assertMsg "Last issuance before new issuance" (lastIssuanceAt < issuanceAt)
+        -- fetch burn oracle and issuance parameters
+        (_, params) <- fetchByKey @IssuanceParameters svc
+        (_, burnOracle) <- fetchByKey @BurnOracle (svc, issuanceAt)
 
         let
-          (head_date, rate) :: _ = params.rates
-          creditPercentage = params.servicePercentage + params.validatorPercentage
-          issuancePerCredit = if burnOracle.quantity == 0.0
+          coinPercentage = params.servicePercentage + params.validatorPercentage
+          issuancePerCoin = if burnOracle.quantity == 0.0
             then 0.0
-            else (min 1.0 (rate * creditPercentage / burnOracle.quantity)) / priceOracle.price
-          validatorIssuancePerCredit = issuancePerCredit * params.validatorPercentage / creditPercentage
-          beneficiaryIssuancePerCredit = issuancePerCredit * params.servicePercentage / creditPercentage
-          creditClawbackFrom = addRelTime now params.creditClawbackPeriod
-          issuerIssuance = rate - issuancePerCredit * burnOracle.quantity
+            else (min 1.0 (params.coinsPerIssuance * coinPercentage / burnOracle.quantity))
+          -- FIXME: ensure that in the capped case both validators and beneficiaries get
+          -- all their burned coins.
+          validatorIssuancePerCoin = issuancePerCoin * params.validatorPercentage / coinPercentage
+          beneficiaryIssuancePerCoin = issuancePerCoin * params.servicePercentage / coinPercentage
+          issuerIssuance = params.coinsPerIssuance - issuancePerCoin * burnOracle.quantity
 
-        -- Directly create SVC issuances
-        create Issuance with
-            svc
-            public
-            quantity = issuerIssuance
-            clawbackAt = addRelTime now params.issuanceClawbackPeriod
-            receiver = svc
-
-        assertMsg "Unexpected date in head rate" (today <= head_date)
+        -- Create SVC issuance as a Coin
+        now <- getTime
+        create Coin with
+          svc
+          owner = svc
+          quantity = expiringQuantity (DailyRate with rate = 1.0) issuerIssuance (addRelTime now (days 1))
 
         create IssuanceEvent with
-          validOn = date_to_issue
-          issuanceClawbackPeriod = params.issuanceClawbackPeriod
+          issuanceAt
+          expiresAt = addRelTime issuanceAt params.claimDuration
           ..
 
-        when (head_date == date_to_issue) (void $ exercise params_cid Truncate_Rates)
-        create this with last_issuance = date_to_issue
-
-
+        create this with
+          lastIssuanceAt = issuanceAt
 
 -- Utilities
 ------------
@@ -136,3 +125,12 @@ getInitialUserActionLimiter config = do
   return RateLimiter with
     balance = config.userActionLimit.actionPrice
     refilledAt
+
+defaultCoinAccountConfig : CoinAccountConfig
+defaultCoinAccountConfig = CoinAccountConfig with
+  modificationFee = FixedFee with fee = 0.01 -- coin
+  holdingFee = DailyRate with rate = 0.1     -- coin / day
+  maxHoldingFeePrepayDuration = days 7
+  actionLimit = RateLimit with
+    maxBalance = 30.0
+    actionPrice = 10.0

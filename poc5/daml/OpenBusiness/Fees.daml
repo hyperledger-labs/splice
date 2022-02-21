@@ -1,0 +1,100 @@
+-- | Utility functions for different kinds of fees.
+module OpenBusiness.Fees where
+
+import DA.Time
+
+
+-- Time utilities
+-----------------
+
+relTimeToMicros : RelTime -> Decimal
+relTimeToMicros dt = intToDecimal (convertRelTimeToMicroseconds dt)
+
+microsPerDay : Decimal
+microsPerDay = relTimeToMicros (days 1)
+
+relTimeToDays : RelTime -> Decimal
+relTimeToDays dt = relTimeToMicros dt / microsPerDay
+
+daysToRelTime : Decimal -> RelTime
+daysToRelTime d = convertMicrosecondsToRelTime $ ceiling $ d * microsPerDay
+
+
+-- Daily rates
+--------------
+
+newtype DailyRate = DailyRate with rate : Decimal
+  deriving (Eq, Ord, Show)
+
+chargeDailyRate : DailyRate -> RelTime -> Decimal
+chargeDailyRate daily dt = daily.rate * relTimeToDays dt
+
+
+-- TODO: replace with DailyRate one
+dailyRateToAmount : Decimal -> RelTime -> Decimal
+dailyRateToAmount r dt = r * relTimeToDays dt
+
+-- | TODO: better name
+spentWithDailyRate : DailyRate -> Decimal -> RelTime
+spentWithDailyRate daily quantity = daysToRelTime (quantity / daily.rate)
+
+-- Fixed and variable rates
+---------------------------
+
+-- | A fixed fee independent of the action being taken.
+-- TODO: check whether this name matches usage in financial terms, it probably isn't. Should it be 'flat-fee', 'constantfee', ... ???
+newtype FixedFee = FixedFee with fee : Decimal
+  deriving (Eq, Ord, Show)
+
+
+data FixedPlusVariableRate = FixedPlusVariableRate with
+    fixed : Decimal
+    variableRate : Decimal
+  deriving (Eq, Ord, Show)
+
+chargeFixedPlusVariableRate : FixedPlusVariableRate -> Decimal -> Decimal
+chargeFixedPlusVariableRate r quantity = r.fixed + r.variableRate * quantity
+
+
+-- Expiring quantities
+----------------------
+
+data ExpiringQuantity = ExpiringQuantity with
+    initialQuantity : Decimal
+    startsExpiringAt : Time
+    expiresAt : Time
+  deriving (Eq, Ord, Show)
+
+validExpiringQuantity : ExpiringQuantity -> Bool
+validExpiringQuantity e = e.initialQuantity >= 0.0 && e.startsExpiringAt <= e.expiresAt
+
+actualQuantity : Time -> ExpiringQuantity -> Decimal
+actualQuantity t e
+  | e.expiresAt <= t = 0.0
+  | t <= e.startsExpiringAt = e.initialQuantity
+  | otherwise =
+      let
+        expiryDuration = subTime e.expiresAt e.startsExpiringAt
+        unexpiredDuration = subTime e.expiresAt t
+        unexpiredRatio = relTimeToMicros unexpiredDuration / relTimeToMicros expiryDuration
+      in
+        e.initialQuantity * unexpiredRatio
+
+shiftExpiringQuantity : RelTime -> ExpiringQuantity -> ExpiringQuantity
+shiftExpiringQuantity dt (ExpiringQuantity with ..) =
+  ExpiringQuantity with
+    initialQuantity
+    startsExpiringAt = addRelTime startsExpiringAt dt
+    expiresAt = addRelTime expiresAt dt
+
+
+-- | Smart constructor for an expiring quantity.
+expiringQuantity : DailyRate -> Decimal -> Time -> ExpiringQuantity
+expiringQuantity rate initialQuantity startsExpiringAt
+  | initialQuantity <= 0.0 =
+      ExpiringQuantity with initialQuantity = 0.0; startsExpiringAt; expiresAt = startsExpiringAt
+  | otherwise =
+      ExpiringQuantity with
+        initialQuantity
+        startsExpiringAt
+        expiresAt = addRelTime startsExpiringAt (spentWithDailyRate rate initialQuantity)

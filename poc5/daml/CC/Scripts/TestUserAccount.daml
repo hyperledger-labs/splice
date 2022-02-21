@@ -18,23 +18,27 @@ test = do
   user <- setupUser app "User"
 
   -- create a new coin account
-  exerciseUserRule app user Coin_CloseAccount with
-    owner = user
-  exerciseUserRule app user Coin_OpenAccount with
-    owner = user
-    obs = []
 
-  -- TODO: figure out with the language team whether this should work
-  -- try do
-  --   exerciseUserRule app user Coin_OpenAccount with
-  --     owner = user
-  --     obs = []
-  --   fail "The above command did not fail!"
-  -- catch
-  --   (e : AccountLimitExceeded) -> return ()
+  -- TODO: rebuild this once we have user setup working with fees and initial balances
+
+  -- exerciseUserRule app user CoinAccount_OpenAccount with
+  --   owner = user
+  --   feeAccountNumber = 0
+
+  -- exerciseUserRule app user CoinAccount_CloseAccount with
+  --   owner = user
+
+  -- -- TODO: figure out with the language team whether this should work
+  -- -- try do
+  -- --   exerciseUserRule app user CoinAccount_OpenAccount with
+  -- --     owner = user
+  -- --     obs = []
+  -- --   fail "The above command did not fail!"
+  -- -- catch
+  -- --   (e : AccountLimitExceeded) -> return ()
 
 
-  exerciseUserRule app user Coin_CloseAccount with
+  exerciseUserRule app user CoinAccount_CloseAccount with
     owner = user
 
   return ()

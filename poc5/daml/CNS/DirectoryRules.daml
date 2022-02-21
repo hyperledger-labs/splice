@@ -3,8 +3,8 @@ module CNS.DirectoryRules where
 import DA.Time
 import DA.Text
 
-import CC.Credit
-import CC.CreditRules
+import CC.Coin
+import CC.CoinRules
 
 import CNS.Directory
 
@@ -32,31 +32,31 @@ template DirectoryRules with
       : ContractId EntryRequest
       with
         entry : Entry
-        creditNumber : Int
+        coinNumber : Int
       controller entry.user
       do
         assertMsg "Entry provider equals provider" (entry.provider == provider)
         t <- getTime
         let expiresAt = addRelTime t requestDuration
             entryFee = dailyLeaseFee -- FIXME: properly scale the lease fee with entry duration
-        exerciseByKey @CreditRules ccSvc Credit_BurnAndLock with
+        exerciseByKey @CoinRules ccSvc CoinAccount_Lock with
           owner = entry.user
-          number = creditNumber
-          fee = requestFee
+          number = coinNumber
+          lockFee = requestFee
           payload = "CNS: entry requested"
           lock = TimeLock with
             holder = provider
             expiresAt
-          minLockedQuantity = entryFee
+          -- TODO: minLockedQuantity = entryFee
         create EntryRequest with
           entry
           expiresAt
           entryFee
-          creditKey = (ccSvc, entry.user, creditNumber)
+          coinKey = (ccSvc, entry.user, coinNumber)
 
     -- user can extend entry
     --    check that entry is not expired
-    --    requires credit contract
+    --    requires coin contract
     --    subject to constraints on entries
     --    pay request fees plus additional lease time
     --
@@ -68,19 +68,19 @@ template EntryRequest with
     entry : Entry
     expiresAt : Time
     entryFee : Decimal
-    creditKey : CreditKey
+    coinKey : CoinAccountKey
   where
     signatory (signatory entry)
     ensure expiresAt <= entry.expiresAt
       && entryFee >= 0.0
 
-    let unlockCreditUnlessExpired : Update ()
-        unlockCreditUnlessExpired = do
+    let unlockCoinUnlessExpired : Update ()
+        unlockCoinUnlessExpired = do
           t <- getTime
           assertMsg "EntryRequest not expired" (t < expiresAt)
-          -- NOTE: we must not unlock the credit if the entry expired, as it could otherwise be
-          -- used to unlock the credit locked to another workflow
-          unlockCredit creditKey
+          -- NOTE: we must not unlock the coin if the entry expired, as it could otherwise be
+          -- used to unlock the coin locked to another workflow
+          unlockCoin coinKey
 
     choice EntryRequest_Expire : ()
       with
@@ -92,18 +92,18 @@ template EntryRequest with
 
     choice EntryRequest_Withdraw : ()
       controller entry.user
-      do unlockCreditUnlessExpired
+      do unlockCoinUnlessExpired
 
     choice EntryRequest_Acccept
       : ContractId Entry
       controller entry.provider
       do
-        unlockCreditUnlessExpired
-        exerciseByKey @CreditRules creditKey._1  Credit_Burn with
+        unlockCoinUnlessExpired
+        exerciseByKey @CoinRules coinKey._1  CoinAccount_Transfer with
           owner = entry.user
-          beneficiary = entry.provider
+          number = coinKey._3
+          newOwner = entry.provider
           payload = "CNS: entry created"
-          number = creditKey._3
           quantity = entryFee
         create entry
 
@@ -112,13 +112,13 @@ template EntryRequest with
         reason : Text
       controller entry.provider
       do
-        unlockCreditUnlessExpired
+        unlockCoinUnlessExpired
         assertMsg "Reason to long" (DA.Text.length reason <= 280)
 
     choice EntryRequest_RejectAlreadyExists : ()
       controller entry.provider
       do
-        unlockCreditUnlessExpired
+        unlockCoinUnlessExpired
         -- prove that the key has already been assigned to a non-expired entry
         (_, entry) <- fetchByKey @Entry (key entry)
         t <- getTime

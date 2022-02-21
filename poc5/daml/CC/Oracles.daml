@@ -25,16 +25,16 @@ template PriceOracle
         create this with price = newPrice
 
 -- | BurnOracle mocks some secure mechanism by which the SV consortium
---   comes to a consensus on how much credit was burned on a day.
+--   comes to a consensus on how much coin was burned on a day.
 template BurnOracle
   with
     svc : Party
     public : Party
-    date : Date
+    issuanceAt : Time
     quantity : Decimal
   where
     signatory svc
     observer public
 
-    key (svc, date) : (Party, Date)
+    key (svc, issuanceAt) : (Party, Time)
     maintainer key._1

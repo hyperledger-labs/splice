@@ -1,108 +1,208 @@
 module CC.Coin where
 
-import DA.Action (unless, void)
+import DA.Action (void)
+import DA.Optional (isNone, optionalToList)
+import DA.Time
 
-import CC.RateLimits
+import OpenBusiness.RateLimits
 
--- | A stable identifier for a coin.
-type CoinKey = (Party, Party, Int)
+import OpenBusiness.Expiry
+import OpenBusiness.Fees
 
--- | CantonCoin
+-- | A stable identifier for a coin account.
+-- TODO: use an explicitly named record to avoid mixups
+type CoinAccountKey = (Party, Party, Int)
 
-template Coin
+data TimeLock = TimeLock with
+    holder: Party
+    expiresAt: Time
+  deriving (Eq, Ord, Show)
+
+
+-- | Coin accounts
+template CoinAccount
   with
-    -- | The SV consortium
     svc : Party
-    -- | Owner of the coin
     owner : Party
-    -- | Serial number of the coin
+    validator : Party
     number : Int
-    -- | Amount of coin
-    quantity : Decimal
-    -- | Observers of the coin. Used to work around explicit disclosure
-    obs : [Party]
-    -- | Rate limiter for modifying this coin.
+    -- TODO: rename to balance
+    quantity : ExpiringQuantity
     limiter : RateLimiter
+    lock : Optional TimeLock
+    obs : [Party]
   where
-    signatory svc, owner
-    ensure quantity >= 0.0   -- we allow a zero balance as that essentially corresponds to a suspendd user account
+    signatory svc, owner, lockHolder lock
+    observer obs
 
-    key (svc, owner, number) : CoinKey
+    ensure validExpiringQuantity quantity
+
+    key (svc, owner, number) : CoinAccountKey
     maintainer key._1, key._2
 
 
+    -- NOTE: none of these choices are rate-limited, as they cannot be repeated.
+    choice CoinAccount_Unlock : ()
+      controller lockHolder lock
+      do -- TODO: test that this choice cannot be called if the coin is not locked
 
--- Special States for Canton Coin
-template CoinTransfer
+         void $ create this with
+          lock = None
+          -- MISSING FEATURE: automatic intra-tx disclosure during a single command interpretation
+          -- would make it such that unlock and burn works
+          obs = optionalToList (lockHolder lock)
+
+    choice CoinAccount_OwnerExpireLock : ()
+      controller owner
+      do tryExpireLock this
+
+    -- NOTE: we intentionally don't combine this choice with CoinAccount_OwnerExpireLock to
+    -- provide a more expressive transaction graph.
+    choice CoinAccount_SvcExpireLock : ()
+      controller svc
+      do tryExpireLock this
+
+
+tryExpireLock : CoinAccount -> Update ()
+tryExpireLock coin = case coin.lock of
+  None -> fail "CoinAccount not locked"
+  Some (TimeLock with expiresAt; holder) -> do
+    t <- getTime
+    assertMsg "Lock not expired" (expiresAt <= t)
+    void $ create coin with lock = None
+
+lockHolder : Optional TimeLock -> Optional Party
+lockHolder lock = (.holder) <$> lock
+
+unlockCoin : CoinAccountKey -> Update ()
+unlockCoin k = exerciseByKey @CoinAccount k CoinAccount_Unlock
+
+
+-- Transfers
+------------
+
+
+-- | A coin that was transferred.
+template Coin
   with
-    coin : Coin
-    receiver : Party
+    svc : Party
+    owner : Party
+    quantity : ExpiringQuantity
   where
-    signatory (signatory coin)
-    observer receiver :: observer coin
+    signatory svc, owner
+    ensure validExpiringQuantity quantity
 
-    choice CoinTransfer_Accept : () with
-        number : Int
-      controller receiver
+    -- TODO: consider whether expiry should create a burned coin for the SVC, or
+    -- change the owner back to the SVC
+    implements ExpiringContract where
+      let contractExpiresAt = quantity.expiresAt
+      let expiryManager = svc
+
+data BurnedCoinKind
+  = BurnedCoinForValidator
+  | BurnedCoinForService
+  deriving (Eq, Ord, Show)
+
+template BurnedCoin
+  with
+    svc : Party
+    beneficiary : Party
+    -- | Kind of the burned coin, which is used during issuance to lookup the approriate rate.
+    kind : BurnedCoinKind
+    quantity : Decimal
+    -- | The time of the issuance round in which this burned coin allows to participate
+    -- NOTE: redemption of issuances will generally lead to spiky traffic, which can though
+    -- be compensated by not merging burnedcoin for some time around issuance.
+    issuanceAt : Time
+    expiresAt : Time
+  where
+    signatory svc, beneficiary
+    ensure quantity > 0.0
+      && issuanceAt < expiresAt
+
+    implements ExpiringContract where
+      let contractExpiresAt = expiresAt
+      let expiryManager = svc
+
+    -- | This choice is used by the SVC to merge all burned coins per validator.
+    -- The expectation is that there is at most one burned coin per validator before
+    -- the issuance event is triggered.
+    choice BurnedCoin_Merge : ContractId BurnedCoin
+      with
+        cids : [ContractId BurnedCoin]
+      controller svc
       do
-        -- TODO: adjust rules and params to make this work with non-UCK
-        -- We might want to turn this around and work with transfer pre-approvals.
-        addCoinToWallet (coin.svc, receiver, number) coin.quantity
+        assertMsg "Merge with at least one burned coin" (not (null cids))
+        quantities <- forA cids $ \cid -> do
+          burnedCoin <- fetch cid
+          assertMsg ("Burned coins must match") (this == burnedCoin with quantity)
+          return burnedCoin.quantity
+        create this with quantity = this.quantity + sum quantities
 
-    choice CoinTransfer_Reject : ()
-      controller receiver
-      do addCoinToWallet (key coin) coin.quantity
-
-    choice CoinTransfer_Cancel : ()
-      controller coin.owner
-      do addCoinToWallet (key coin) coin.quantity
-
-template LockedCoin
-  with
-    coin : Coin
-    unlockers : [Party]
-  where
-    signatory (signatory coin)
-    observer unlockers ++ observer coin
-
-    choice LockedCoin_Unlock : ()
-      controller unlockers
-      do addCoinToWallet (key coin) coin.quantity
 
 
 -- Coin helper functions
-------------------------
+--------------------------
 
-newCoinRateLimiter : Time -> RateLimiter
-newCoinRateLimiter t = RateLimiter with
-  balance = coinActionLimit.actionPrice  -- allow for one action by default
-  refilledAt = t
+data CoinAccountConfig = CoinAccountConfig with
+    -- | A (small) fee burned on every account modification.
+    modificationFee : FixedFee
+    -- | The cost of keeping the account open.
+    holdingFee : DailyRate
+    -- | The maximal amount of time that an account's holding fees can be prepaid
+    -- via the burns attributed to that account.
+    --
+    -- TODO: improve name, as this is how much in advance an account's holding fee
+    -- can be prepaid via associated burns.
+    -- A locked account will be prepaid significantly farther into the future.
+    maxHoldingFeePrepayDuration : RelTime
 
-coinActionLimit : RateLimit
-coinActionLimit = RateLimit with
-  maxBalance = 30.0
-  actionPrice = 10.0
+    -- | The action limit to apply to coin accounts.
+    -- TODO: consider whether we need this given the fees.
+    actionLimit : RateLimit
+  deriving (Eq, Ord, Show)
 
-modifyCoin : CoinKey -> ((Decimal, [Party]) -> (Decimal, [Party])) -> Update ()
-modifyCoin coinKey@(svc, owner, number) f = do
-  (coinCid, coin) <- fetchByKey @Coin coinKey
-  let xOld = (coin.quantity, coin.obs)
-      xNew@(quantity, obs) = f xOld
-  unless (xOld == xNew) $ do
-    limiter <- withActionLimit coinActionLimit coin.limiter
-    -- archive and create the new coin
-    archive coinCid
-    void $ create Coin with ..
 
-modifyCoinQuantity : CoinKey -> (Decimal -> Decimal) -> Update ()
-modifyCoinQuantity k f = modifyCoin k $ \(q, obs) -> (f q, obs)
+modifyCoinAccount : CoinAccountConfig -> CoinAccountKey -> Decimal -> ((Decimal, Optional TimeLock) -> (Decimal, Optional TimeLock)) -> Update CoinAccount
+modifyCoinAccount config coinKey@(svc, owner, number) attributedBurnQuantity f = do
+  (coinCid, coin) <- fetchByKey @CoinAccount coinKey
+  now <- getTime
+  let xOld = (actualQuantity now coin.quantity, coin.lock)
+      xNew@(quantity, lock) = f xOld
+  -- do not charge an action if the coin does not need to be updated
+  if (xOld == xNew)
+    then return coin
+    else do
+      -- TODO: remove rate limit once I'm sure it won't be needed
+      let limiter = coin.limiter
+      -- limiter <- withActionLimit config.actionLimit coin.limiter
+      -- archive and create the new coin
+      archive coinCid
+      let actualModificationFee = min quantity config.modificationFee.fee  -- TODO: charge modification fee outside
+          totalAttributedBurn = attributedBurnQuantity + actualModificationFee
+          paidHoldingDuration = spentWithDailyRate config.holdingFee totalAttributedBurn
+          startsExpiringAt =
+            max coin.quantity.startsExpiringAt $
+            min (addRelTime now config.maxHoldingFeePrepayDuration) $
+            addRelTime coin.quantity.startsExpiringAt paidHoldingDuration
+          newCoin = CoinAccount with
+            -- using explicit fields to get errors when refactoring the field structure
+            svc = coin.svc
+            owner = coin.owner
+            number = coin.number
+            validator = coin.validator
+            obs = coin.obs
+            quantity = expiringQuantity config.holdingFee (quantity - actualModificationFee) startsExpiringAt
+            lock
+            limiter
+      void $ create newCoin
+      return newCoin
 
--- | The 'Coin' contracts can be seen as wallets; and this function adds a new coin.
---
--- TODO: adjust terminology once there's agreement wrt how to structure the state of CC users.
--- TODO: adjust this function and its usage to non-UCK by switching `lookupByKey` to `fetchSomeByKey`,
--- or passing in the contract reference where possible
-addCoinToWallet : CoinKey -> Decimal -> Update ()
-addCoinToWallet k quantity
-  | quantity < 0.0 = fail "Can only add coins with positive quantity"
-  | otherwise = modifyCoinQuantity k (+ quantity)
+
+
+modifyCoinAccountQuantity : CoinAccountConfig -> CoinAccountKey -> Decimal -> (Decimal -> Decimal) -> Update CoinAccount
+modifyCoinAccountQuantity config k attributedBurnQuantity f = do
+  modifyCoinAccount config k attributedBurnQuantity $ \(quantity, optLock) ->
+    if (isNone optLock)
+      then (f quantity, optLock)
+      else error "Cannot modify quantity of locked coin"
