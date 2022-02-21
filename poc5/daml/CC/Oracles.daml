@@ -1,7 +1,5 @@
 module CC.Oracles where
 
-import CC.RateLimits
-
 -- | PriceOracle is a placeholder for some mechanism to work out a price.
 -- | It's currently given daily.
 template PriceOracle
@@ -40,28 +38,3 @@ template BurnOracle
 
     key (svc, date) : (Party, Date)
     maintainer key._1
-
--- TODO: consider whether this is something other than an oracle,
--- as it is not keyed to a date, but mutable state read from many places.
-template UserConfigOracle
-  with
-    svc : Party
-    public : Party
-    -- | The maximal number of coins for users in the free tier
-    freeTiermaxNumAccounts : Int
-    -- | The rate limit for free tier users.
-    userActionLimit : RateLimit
-  where
-    signatory svc
-    observer public
-
-    key svc : Party
-    maintainer key
-
-getInitialUserActionLimiter : Party -> Update RateLimiter
-getInitialUserActionLimiter svc = do
-  refilledAt <- getTime
-  (_, config) <- fetchByKey @UserConfigOracle svc
-  return RateLimiter with
-    balance = config.userActionLimit.actionPrice
-    refilledAt

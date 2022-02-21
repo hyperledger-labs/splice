@@ -1,0 +1,138 @@
+module CC.SvcRules where
+
+import DA.Action
+import DA.Date
+import DA.Time
+
+import CC.CoinRules
+import CC.CreditRules
+import CC.Issuance
+import CC.Oracles
+import CC.RateLimits
+import CC.Types
+import CC.User
+import CC.UserRules
+
+data UserConfig = UserConfig with
+    -- | The maximal number of coins for users in the free tier
+    freeTiermaxNumAccounts : Int
+    -- | The rate limit for free tier users.
+    userActionLimit : RateLimit
+  deriving (Eq, Ord, Show)
+
+-- | SvcRules defines the rules for the SVC, which acts through this contract.
+template SvcRules
+  with
+    svc : Party
+    public : Party
+    last_issuance : Date
+    userConfig : UserConfig
+  where
+    signatory svc
+    observer public
+
+    key svc : CCKey
+    maintainer key
+
+    nonconsuming choice RequestUserAccount : ()
+      with
+        user : Party
+      controller user
+      do
+        limiter <- getInitialUserActionLimiter userConfig
+        void $ create UserAccount with
+            svc
+            owner = user
+            validator = user -- TODO: properly feed validator information
+            numCoins = 0
+            numCredits = 0
+            maxNumAccounts = userConfig.freeTiermaxNumAccounts
+            limiter
+
+
+    -- TODO: move this into a special bootstrap contract and make it consuming
+    nonconsuming choice BootstrapApp : ()
+      with
+        issuanceParams : IssuanceParameters
+        initialPrice : Decimal
+      controller svc
+      do
+        today <- toDateUTC <$> getTime
+
+        create CoinRules with ..
+        create CreditRules with
+          config = CreditRulesConfig with
+            minBurnQuantity = 0.001
+            minLockFee = 0.001
+            maxLockDuration = days 30
+            maxPreSpendDuration = days 365
+          ..
+        create UserRules with
+          svc; public
+          creditConfig = CreditConfig with
+            accountOpenFee = 0.01
+            minBurnPerDay = 0.1
+            actionLimit = RateLimit with
+              actionPrice = 10.0
+              maxBalance = 30.0
+        create issuanceParams
+        create PriceOracle with price = initialPrice; date = today; ..
+
+        return ()
+
+    -- | The SVC triggers the issuance
+    choice Trigger_Issuance : ContractId SvcRules
+      controller svc
+      do
+        -- (markerCid, marker) <- fetchByKey @IssuanceMarker svc
+        now <- getTime
+        let today = toDateUTC now
+        assertMsg "Cannot issue more than once a day" (today > last_issuance)
+
+        -- Always create Issuance Events for a whole day.
+        let date_to_issue = addDays last_issuance 1
+        (params_cid, params) <- fetchByKey @IssuanceParameters svc
+        (_, priceOracle) <- fetchByKey @PriceOracle (svc, date_to_issue)
+        (_, burnOracle) <- fetchByKey @BurnOracle (svc, date_to_issue)
+
+        let
+          (head_date, rate) :: _ = params.rates
+          creditPercentage = params.servicePercentage + params.validatorPercentage
+          issuancePerCredit = if burnOracle.quantity == 0.0
+            then 0.0
+            else (min 1.0 (rate * creditPercentage / burnOracle.quantity)) / priceOracle.price
+          validatorIssuancePerCredit = issuancePerCredit * params.validatorPercentage / creditPercentage
+          beneficiaryIssuancePerCredit = issuancePerCredit * params.servicePercentage / creditPercentage
+          creditClawbackFrom = addRelTime now params.creditClawbackPeriod
+          issuerIssuance = rate - issuancePerCredit * burnOracle.quantity
+
+        -- Directly create SVC issuances
+        create Issuance with
+            svc
+            public
+            quantity = issuerIssuance
+            clawbackAt = addRelTime now params.issuanceClawbackPeriod
+            receiver = svc
+
+        assertMsg "Unexpected date in head rate" (today <= head_date)
+
+        create IssuanceEvent with
+          validOn = date_to_issue
+          issuanceClawbackPeriod = params.issuanceClawbackPeriod
+          ..
+
+        when (head_date == date_to_issue) (void $ exercise params_cid Truncate_Rates)
+        create this with last_issuance = date_to_issue
+
+
+
+-- Utilities
+------------
+
+
+getInitialUserActionLimiter : UserConfig -> Update RateLimiter
+getInitialUserActionLimiter config = do
+  refilledAt <- getTime
+  return RateLimiter with
+    balance = config.userActionLimit.actionPrice
+    refilledAt

@@ -4,9 +4,9 @@ import DA.Date
 import DA.Time
 
 import CC.Issuance
-import CC.Main
+import CC.SvcRules
 
-defaultIssuanceParameters : CC -> IssuanceParameters
+defaultIssuanceParameters : SvcRules -> IssuanceParameters
 defaultIssuanceParameters app = IssuanceParameters with
   svc = app.svc
   public = app.public

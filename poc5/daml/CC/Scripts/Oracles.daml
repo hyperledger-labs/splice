@@ -6,7 +6,7 @@ import DA.Foldable (maximum)
 import Daml.Script
 
 import CC.Credit
-import CC.Main
+import CC.SvcRules
 import CC.Oracles
 
 -- | runOracles does mocked magic by querying the ledger as the SV consortium
@@ -15,7 +15,7 @@ import CC.Oracles
 --   price oracle contract, providing the time has advanced.
 runOracles : Party -> Decimal -> Script ()
 runOracles svc price = do
-  Some (_, app) <- queryContractKey @CC svc svc
+  Some (_, app) <- queryContractKey @SvcRules svc svc
   prices <- query @PriceOracle svc
   let
     last = maximum (map (\(_, po) -> po.date) prices)

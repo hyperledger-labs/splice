@@ -16,8 +16,7 @@ import CC.CoinRules
 import CC.Credit
 import CC.CreditRules
 import CC.Issuance
-import CC.Governance
-import CC.Main
+import CC.SvcRules
 import CC.User
 import CC.UserRules
 
@@ -27,7 +26,7 @@ import CC.Scripts.Oracles
 -- ========================================
 
 -- Derive some instances to be able to use dedup
-deriving instance Ord CC
+deriving instance Ord SvcRules
 
 -- | Utility function to submit with read delegation.
 submitRD : Party -> Party -> Commands b -> Script b
@@ -94,9 +93,9 @@ onboardUser user app = do
   -- via some disclusure mechanism.
   -- FEATURE MISSING: Explicit disclosure
   -- submitMulti [user] [app.svc] do
-  --   exerciseByKeyCmd @CC app.svc TakePublicRead with ..
+  --   exerciseByKeyCmd @SvcRules app.svc TakePublicRead with ..
   submitMulti [user] [app.svc] do
-    exerciseByKeyCmd @CC app.svc RequestUserAccount with ..
+    exerciseByKeyCmd @SvcRules app.svc RequestUserAccount with ..
 
 
 setupUser : CCApp -> Text -> Script Party
@@ -229,10 +228,10 @@ advanceDay app newCreditPrice = do
   passTime (days 1)
   runOracles app.svc newCreditPrice
 
-triggerIssuance : CCApp -> Script (ContractId IssuanceMarker)
+triggerIssuance : CCApp -> Script (ContractId SvcRules)
 triggerIssuance app = do
   submit app.svc do
-      exerciseByKeyCmd @GovernanceRules app.svc Trigger_Issuance
+      exerciseByKeyCmd @SvcRules app.svc Trigger_Issuance
 
 getAllUserParties : CCApp -> Script [Party]
 getAllUserParties app = do
@@ -243,7 +242,7 @@ getAllUserParties app = do
 skipToDate : CCApp -> Date -> Decimal -> Script ()
 skipToDate app to price = do
   setTime (time to 0 0 0)
-  Some (cid, im) <- queryContractKey @IssuanceMarker app.svc app.svc
+  Some (cid, im) <- queryContractKey @SvcRules app.svc app.svc
   submit app.svc do
     archiveCmd cid
     createCmd im with last_issuance = to
