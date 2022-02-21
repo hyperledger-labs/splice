@@ -1,0 +1,58 @@
+-- | A library for enforcing rate limits on actions taken by users.
+--
+-- The rate limits are managed using the Token bucket algorithm
+-- (https://en.wikipedia.org/wiki/Token_bucket):
+--
+-- Rate limiters are refilled with one action token per second up to a maximal balance.
+-- Templates that require rate limiting store the state of a `RateLimiter`
+-- in the contract arguments. They further charge for every action a corresponding
+-- price in action tokens against that `RateLimiter`.
+--
+-- The maximal sustained rate of an action that costs `p` action tokens is limited to
+-- `1/p` actions per second. The maximal number of actions in a single transaction is
+-- limted to `floor (RateLimit.maxBalance / p)`.
+--
+-- The code below issues action tokens at microsecond precision.
+--
+-- Applications can change the rate limits dynamically by sharing the action prices and
+-- maximal balances via an oracle contract.
+module CC.RateLimits where
+
+import DA.Time
+
+-- | A rate limit.
+data RateLimit = RateLimit with
+    maxBalance : Decimal -- TODO: use numeric at microsecond granularity
+    actionPrice : Decimal
+  deriving (Eq, Ord, Show)
+
+-- | The state of a rate limiter.
+data RateLimiter = RateLimiter with
+    -- | The current action token balance
+    balance : Decimal
+    -- | The last time the balance was refilled.
+    refilledAt : Time
+  deriving (Eq, Ord, Show)
+
+-- | Enforce an action rate limit by charging a price in action tokens against
+-- the given rate limiter. Returns the updated state of the rate limiter, which
+-- must be stored and used for subsequent calls.
+withActionLimit : RateLimit -> RateLimiter -> Update RateLimiter
+withActionLimit limit limiter = do
+  t <- getTime
+  let dt = convertRelTimeToMicroseconds $ subTime t limiter.refilledAt
+  assertMsg ("Rate limiter refill time " <> show limiter.refilledAt <> " > now") (dt >= 0)
+  let newTokens = intToNumeric dt / 1e6
+      balance = min limit.maxBalance (newTokens + limiter.balance) - limit.actionPrice
+  assertMsg "Rate limit hit, no change allowed at this time." (balance >= 0.0)
+  return RateLimiter with balance; refilledAt = t
+
+-- | Initiatlize a rate limiter with max balance at the current time.
+initializeFullRateLimiter : RateLimit -> Update RateLimiter
+initializeFullRateLimiter limit = do
+  refilledAt <- getTime
+  return RateLimiter with
+    balance = limit.maxBalance
+    refilledAt
+
+-- TODO: unit tests

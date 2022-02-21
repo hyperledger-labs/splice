@@ -1,0 +1,40 @@
+module CC.Scripts.TestUserAccount where
+
+import Daml.Script
+
+import CC.UserRules
+
+import CC.Scripts.Setup
+import CC.Scripts.Util
+
+
+test : Script ()
+test = do
+  -- bootstrap app
+  app <- setupApp
+  bootstrapApp app
+
+  -- bootstrap user and service provider party
+  user <- setupUser app "User"
+
+  -- create a new coin account
+  exerciseUserRule app user Coin_CloseAccount with
+    owner = user
+  exerciseUserRule app user Coin_OpenAccount with
+    owner = user
+    obs = []
+
+  -- TODO: figure out with the language team whether this should work
+  -- try do
+  --   exerciseUserRule app user Coin_OpenAccount with
+  --     owner = user
+  --     obs = []
+  --   fail "The above command did not fail!"
+  -- catch
+  --   (e : AccountLimitExceeded) -> return ()
+
+
+  exerciseUserRule app user Coin_CloseAccount with
+    owner = user
+
+  return ()

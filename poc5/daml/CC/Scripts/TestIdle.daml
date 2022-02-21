@@ -1,0 +1,24 @@
+module CC.Scripts.TestIdle where
+
+import Daml.Script
+
+import CC.Scripts.Setup
+import CC.Scripts.Util
+
+test : Script ()
+test = do
+  -- bootstrap app
+  app <- setupApp
+  bootstrapApp app
+
+  -- start issuing
+  advanceDay app 1.1
+  triggerIssuance app
+  advanceDay app 1.2
+  triggerIssuance app
+  advanceDay app 1.3
+  triggerIssuance app
+  advanceDay app 1.4
+  triggerIssuance app
+
+  return ()

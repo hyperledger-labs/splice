@@ -1,0 +1,107 @@
+module CC.CreditRules where
+
+import DA.Time
+
+import CC.Credit
+
+data CreditRulesConfig = CreditRulesConfig with
+    -- | Minimum amount that can be burned, which ensures that the processing cost of the burn are covered.
+    minBurnQuantity : Decimal
+    -- | Minimum fee the must be charged when locking an account to cover the cost
+    minLockFee : Decimal
+    -- | Max duration for the lock
+    maxLockDuration : RelTime
+    -- | Max duration up to which an account can be prepaid
+    maxPreSpendDuration : RelTime
+  deriving (Eq, Ord, Show)
+
+template CreditRules
+  with
+    svc : Party
+    public : Party
+    config : CreditRulesConfig
+    -- TODO: use a schedule with effective dating to make fees predictable to users
+  where
+    signatory svc
+    observer public
+
+    key svc : Party
+    maintainer key
+
+    nonconsuming choice Credit_Burn : ContractId BurnedCredit
+      with
+        owner : Party
+        number : Int        -- credit account to use
+        quantity : Decimal  -- credit quantity to burn
+        beneficiary : Party
+        payload : Text
+      controller owner
+      do
+        assertMsg "Can only burn positive quantities of credit" (0.0 < quantity)
+        assertMsg "The required minimum quantity of credit is burned" (config.minBurnQuantity <= quantity)
+        t <- getTime
+        -- charge credit
+        credit <- modifyCredit (svc, owner, number) $ \(q, optLock, minBurn) ->
+          let
+            -- TODO: share this code with locking
+            (minBurnFee, minBurnNew0) = updateMinSpendState quantity t minBurn
+            maxPreSpendTime = addRelTime t config.maxPreSpendDuration
+            minBurnNew = minBurnNew0 with
+              spendCoveredUntil = min minBurnNew0.spendCoveredUntil maxPreSpendTime
+          in
+            (q - quantity - minBurnFee, optLock, minBurnNew)
+        -- store burned credit as input to the next issuance
+        burnedAt <- getTime
+        create BurnedCredit with
+          burner = owner
+          validator = credit.validator
+          ..
+
+    -- | Burn a fee and time-lock the credit.
+    -- This is commonly used to manage open-world offer-and-accept workflows where
+    -- a small fee is due to make an offer and a larger fee is to be paid in case
+    -- the offer is accepted.
+    nonconsuming choice Credit_BurnAndLock : ContractId BurnedCredit
+      with
+        owner : Party
+        number : Int
+        fee : Decimal     -- fee to be paid to the lock.holder
+        payload : Text
+        lock : TimeLock
+        minLockedQuantity : Decimal
+      controller owner, lock.holder
+      do
+        assertMsg "Minimum locked quantity is positive" (0.0 <= minLockedQuantity )
+        t <- getTime
+        assertMsg "Lock expires in the future" (t <= lock.expiresAt)
+        let lockDuration = subTime lock.expiresAt t
+        assertMsg "Lock duration below the maximum" (lockDuration <= config.maxLockDuration)
+        assertMsg "The required minimum lock fee is paid" (config.minLockFee <= fee)
+        -- charge and lock credit balance
+        credit <- modifyCredit (svc, owner, number) $ \(quantity, optLock, minBurn) ->
+          case optLock of
+            Some _ -> error "Locked credit cannot be locked"
+            None ->
+              let
+                (minBurnFee, minBurnNew0) = updateMinSpendState quantity t minBurn
+                maxPreSpendTime = addRelTime t config.maxPreSpendDuration
+                minBurnNew = minBurnNew0 with
+                  spendCoveredUntil = min minBurnNew0.spendCoveredUntil maxPreSpendTime
+              in
+                (quantity - fee - minBurnFee, Some lock, minBurnNew)
+        -- ensure there's enough credit available at lock expiry
+        let (minBurnFeeAtExpiry, _) = updateMinSpendState 0.0 lock.expiresAt credit.minBurn
+            balanceAfterFees = credit.quantity - minBurnFeeAtExpiry
+        assertMsg ("Credit balance after fees " <> show balanceAfterFees <> " lower than mimimum locked quantity")
+          (minLockedQuantity <= balanceAfterFees)
+        -- store the fact that credit was burned
+        burnedAt <- getTime
+        create BurnedCredit with
+          quantity = fee
+          validator = credit.validator
+          beneficiary = lock.holder
+          burner = owner
+          svc
+          public
+          payload
+          burnedAt
