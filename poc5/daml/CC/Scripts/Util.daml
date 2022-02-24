@@ -198,7 +198,7 @@ runNextIssuance app = do
   let issuanceAt = addRelTime svcRules.lastIssuanceAt issuanceParams.initialWindow.duration
 
   -- run burn oracle for issuanceAt
-  bcs <- queryFilter @BurnedCoin app.svc (\bc -> bc.issuanceAt == issuanceAt)
+  bcs <- queryFilter @BurnReceipt app.svc (\bc -> bc.issuanceAt == issuanceAt)
   submit app.svc do
     createCmd BurnOracle with
       svc = app.svc
@@ -211,14 +211,14 @@ runNextIssuance app = do
   submit app.svc $ exerciseByKeyCmd @SvcRules app.svc Trigger_Issuance with issuanceAt
   -- claim all burned coin for issuanceAt against account 0
   users <- getAllUserParties app
-  forA_ users $ \user -> claimBurnedCoinFor2 app user issuanceAt
+  forA_ users $ \user -> claimBurnReceiptFor2 app user issuanceAt
 
 
-claimBurnedCoinFor2 : CCApp -> Party -> Time -> Script ()
-claimBurnedCoinFor2 app user issuanceAt = do
-  bcs <- queryFilter @BurnedCoin user (\bc -> bc.beneficiary == user && bc.issuanceAt == issuanceAt)
+claimBurnReceiptFor2 : CCApp -> Party -> Time -> Script ()
+claimBurnReceiptFor2 app user issuanceAt = do
+  bcs <- queryFilter @BurnReceipt user (\bc -> bc.beneficiary == user && bc.issuanceAt == issuanceAt)
   forA_ bcs $ \(bcCid, _) -> do
-    exerciseCoinRule app user BurnedCoin_Deposit with
+    exerciseCoinRule app user BurnReceipt_Deposit with
       owner = user
       number = 0
       coinCid = bcCid

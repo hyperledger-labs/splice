@@ -56,9 +56,6 @@ setupApp = do
     number = 0
     quantity =  expiringQuantity (DailyRate with rate = 1.0) 0.0 (addRelTime t (days 1))
     obs = [] -- TODO: should this be visible to 'public'?
-    limiter = RateLimiter with
-      balance = 100.0    -- TODO: stop limiting the action rate of the SVC
-      refilledAt = t
     lock = None
     validator = svc
 

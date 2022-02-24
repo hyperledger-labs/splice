@@ -131,6 +131,3 @@ defaultCoinAccountConfig = CoinAccountConfig with
   modificationFee = FixedFee with fee = 0.01 -- coin
   holdingFee = DailyRate with rate = 0.1     -- coin / day
   maxHoldingFeePrepayDuration = days 7
-  actionLimit = RateLimit with
-    maxBalance = 30.0
-    actionPrice = 10.0

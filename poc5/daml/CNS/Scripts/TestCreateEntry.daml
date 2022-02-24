@@ -11,8 +11,8 @@ import CNS.Directory
 import CNS.DirectoryRules
 
 
-test : Script ()
-test = do
+testEntry : Script ()
+testEntry = do
   -- bootstrap app
   app <- setupApp
   bootstrapApp app

@@ -4,8 +4,6 @@ import DA.Action (void)
 import DA.Optional (isNone, optionalToList)
 import DA.Time
 
-import OpenBusiness.RateLimits
-
 import OpenBusiness.Expiry
 import OpenBusiness.Fees
 
@@ -28,7 +26,6 @@ template CoinAccount
     number : Int
     -- TODO: rename to balance
     quantity : ExpiringQuantity
-    limiter : RateLimiter
     lock : Optional TimeLock
     obs : [Party]
   where
@@ -98,17 +95,17 @@ template Coin
       let contractExpiresAt = quantity.expiresAt
       let expiryManager = svc
 
-data BurnedCoinKind
-  = BurnedCoinForValidator
-  | BurnedCoinForService
+data BurnReceiptKind
+  = BurnReceiptForValidator
+  | BurnReceiptForService
   deriving (Eq, Ord, Show)
 
-template BurnedCoin
+template BurnReceipt
   with
     svc : Party
     beneficiary : Party
     -- | Kind of the burned coin, which is used during issuance to lookup the approriate rate.
-    kind : BurnedCoinKind
+    kind : BurnReceiptKind
     quantity : Decimal
     -- | The time of the issuance round in which this burned coin allows to participate
     -- NOTE: redemption of issuances will generally lead to spiky traffic, which can though
@@ -127,9 +124,9 @@ template BurnedCoin
     -- | This choice is used by the SVC to merge all burned coins per validator.
     -- The expectation is that there is at most one burned coin per validator before
     -- the issuance event is triggered.
-    choice BurnedCoin_Merge : ContractId BurnedCoin
+    choice BurnReceipt_Merge : ContractId BurnReceipt
       with
-        cids : [ContractId BurnedCoin]
+        cids : [ContractId BurnReceipt]
       controller svc
       do
         assertMsg "Merge with at least one burned coin" (not (null cids))
@@ -156,10 +153,6 @@ data CoinAccountConfig = CoinAccountConfig with
     -- can be prepaid via associated burns.
     -- A locked account will be prepaid significantly farther into the future.
     maxHoldingFeePrepayDuration : RelTime
-
-    -- | The action limit to apply to coin accounts.
-    -- TODO: consider whether we need this given the fees.
-    actionLimit : RateLimit
   deriving (Eq, Ord, Show)
 
 
@@ -173,14 +166,9 @@ modifyCoinAccount config coinKey@(svc, owner, number) attributedBurnQuantity f =
   if (xOld == xNew)
     then return coin
     else do
-      -- TODO: remove rate limit once I'm sure it won't be needed
-      let limiter = coin.limiter
-      -- limiter <- withActionLimit config.actionLimit coin.limiter
-      -- archive and create the new coin
       archive coinCid
-      let actualModificationFee = min quantity config.modificationFee.fee  -- TODO: charge modification fee outside
-          totalAttributedBurn = attributedBurnQuantity + actualModificationFee
-          paidHoldingDuration = spentWithDailyRate config.holdingFee totalAttributedBurn
+      let modificationFee = max 0.0 (config.modificationFee.fee - attributedBurnQuantity)
+          paidHoldingDuration = spentWithDailyRate config.holdingFee attributedBurnQuantity
           startsExpiringAt =
             max coin.quantity.startsExpiringAt $
             min (addRelTime now config.maxHoldingFeePrepayDuration) $
@@ -192,9 +180,9 @@ modifyCoinAccount config coinKey@(svc, owner, number) attributedBurnQuantity f =
             number = coin.number
             validator = coin.validator
             obs = coin.obs
-            quantity = expiringQuantity config.holdingFee (quantity - actualModificationFee) startsExpiringAt
+            -- TODO: check that the way the modificationFee is charged does not lock up accounts too hard when they are near zero
+            quantity = expiringQuantity config.holdingFee (quantity - modificationFee) startsExpiringAt
             lock
-            limiter
       void $ create newCoin
       return newCoin
 

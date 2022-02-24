@@ -47,6 +47,7 @@ testCoinBurn = do
   -- run two issuances to collect the burned coins created from the above transfer
   runNextIssuance app
   runNextIssuance app
+  runCoinDepositBots app
 
 
   -- -- user open an additional coin account

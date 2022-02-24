@@ -83,6 +83,7 @@ The idea is to implement the burn oracle using on-ledger state, as this
 - the fees paid for actions initiated by an account allow moving the start of the expiry up to a week into the future
 - lock duration needs to be prepaid based on that time-based fee
 
+- account modifications outside of transfers will burn a small modificaiton fee to cover cost of account tracking
 
 
 ## On getTime
