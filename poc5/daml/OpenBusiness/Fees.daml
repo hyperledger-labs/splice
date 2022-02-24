@@ -92,7 +92,7 @@ shiftExpiringQuantity dt (ExpiringQuantity with ..) =
 expiringQuantity : DailyRate -> Decimal -> Time -> ExpiringQuantity
 expiringQuantity rate initialQuantity startsExpiringAt
   | initialQuantity <= 0.0 =
-      ExpiringQuantity with initialQuantity = 0.0; startsExpiringAt; expiresAt = startsExpiringAt
+      ExpiringQuantity with initialQuantity; startsExpiringAt; expiresAt = startsExpiringAt
   | otherwise =
       ExpiringQuantity with
         initialQuantity

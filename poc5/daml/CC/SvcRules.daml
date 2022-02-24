@@ -1,6 +1,6 @@
 module CC.SvcRules where
 
-import DA.Action
+-- import DA.Action
 import DA.Date
 import DA.Time
 
@@ -8,8 +8,6 @@ import CC.Coin
 import CC.CoinRules
 import CC.Oracles
 import OpenBusiness.RateLimits
-import CC.User
-import CC.UserRules
 
 import OpenBusiness.Fees
 
@@ -34,20 +32,6 @@ template SvcRules
     key svc : Party
     maintainer key
 
-    nonconsuming choice RequestUserAccount : ()
-      with
-        user : Party
-      controller user
-      do
-        limiter <- getInitialUserActionLimiter userConfig
-        void $ create UserAccount with
-            svc
-            owner = user
-            validator = user -- TODO: properly feed validator information
-            numCoins = 0
-            maxNumAccounts = userConfig.freeTiermaxNumAccounts
-            limiter
-
 
     -- TODO: move this into a special bootstrap contract and make it consuming
     nonconsuming choice BootstrapApp : ()
@@ -63,14 +47,14 @@ template SvcRules
         create CoinRules with
           config = coinRulesConfig
           ..
-        create UserRules with
-          svc; public
-          coinConfig = CoinConfig with
-            accountOpenFee = 0.01
-            minBurnPerDay = 0.1
-            actionLimit = RateLimit with
-              actionPrice = 10.0
-              maxBalance = 30.0
+        -- create UserRules with
+        --   svc; public
+        --   coinConfig = CoinConfig with
+        --     accountOpenFee = 0.01
+        --     minBurnPerDay = 0.1
+        --     actionLimit = RateLimit with
+        --       actionPrice = 10.0
+        --       maxBalance = 30.0
         create issuanceParams
         create PriceOracle with price = initialPrice; date = today; ..
 
@@ -128,6 +112,7 @@ getInitialUserActionLimiter config = do
 
 defaultCoinAccountConfig : CoinAccountConfig
 defaultCoinAccountConfig = CoinAccountConfig with
+  openingFee = FixedFee with fee = 0.1       -- coin
   modificationFee = FixedFee with fee = 0.01 -- coin
   holdingFee = DailyRate with rate = 0.1     -- coin / day
   maxHoldingFeePrepayDuration = days 7

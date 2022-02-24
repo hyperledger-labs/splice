@@ -30,7 +30,7 @@ template CoinAccount
     obs : [Party]
   where
     signatory svc, owner, lockHolder lock
-    observer obs
+    observer validator, obs
 
     ensure validExpiringQuantity quantity
 
@@ -142,6 +142,8 @@ template BurnReceipt
 --------------------------
 
 data CoinAccountConfig = CoinAccountConfig with
+    -- | Fee to open an account.
+    openingFee : FixedFee
     -- | A (small) fee burned on every account modification.
     modificationFee : FixedFee
     -- | The cost of keeping the account open.

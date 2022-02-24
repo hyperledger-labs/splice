@@ -46,7 +46,7 @@ setupApp = do
 
 
   -- The SVC itself can also act as a CC user
-  onboardUser svc app
+  -- onboardUser svc app
 
   -- TODO: move into bootstrapping choices of CC
   t <- getTime
@@ -69,8 +69,10 @@ setupApp = do
 testOnboardUser : Script ()
 testOnboardUser = do
   app <- setupApp
-  user <- allocateParty "User"
-  onboardUser user app
+  bootstrapApp app
+  runNextIssuance app
+  -- user <- allocateParty "User"
+  -- onboardUser app user
 
 
 

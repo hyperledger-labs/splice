@@ -20,14 +20,15 @@ testCoinBurn = do
   app <- setupApp
   bootstrapApp app
 
+  -- start issuing so the SVC has some coins to invite users
+  runNextIssuance app
+  runCoinDepositBots app
+
   -- bootstrap user and service provider party
   user <- setupUser app "User"
   provider1 <- setupUser app "Provider1"
   provider2 <- setupUser app "Provider2"
 
-  -- start issuing
-  -- rollDayFull app 0.11
-  runNextIssuance app
 
   -- svc transfers 20 coin to user
   pay app app.svc user 20.0 "starter pack!"
@@ -39,7 +40,10 @@ testCoinBurn = do
 
   -- run two issuances to collect the burned coins created from the above transfer
   runNextIssuance app
+  runCoinDepositBots app
+
   runNextIssuance app
+  runCoinDepositBots app
 
   pay app app.svc provider2 90.0 "starter pack!"
   runCoinDepositBots app

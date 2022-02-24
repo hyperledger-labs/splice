@@ -14,8 +14,8 @@ import CC.Coin
 import CC.CoinRules
 import CC.Oracles
 import CC.SvcRules
-import CC.User
-import CC.UserRules
+-- import CC.User
+-- import CC.UserRules
 
 
 demoTime : Time
@@ -86,36 +86,22 @@ data CCApp = CCApp with
 --------------
 
 -- | onboardUser simply sets up public read for a user party
-onboardUser : Party -> CCApp -> Script ()
-onboardUser user app = do
-  -- We assume that the use has somehow learnt of the CC contract
-  -- via some disclusure mechanism.
-  -- FEATURE MISSING: Explicit disclosure
-  -- submitMulti [user] [app.svc] do
-  --   exerciseByKeyCmd @SvcRules app.svc TakePublicRead with ..
-  submitMulti [user] [app.svc] do
-    exerciseByKeyCmd @SvcRules app.svc RequestUserAccount with ..
+onboardUser : CCApp -> Party -> Script ()
+onboardUser app user = do
+  -- TODO: this is a hack! use an actual invite flow, probably via the validator
+  coinCid <- pay app app.svc user 1.0 "Welcome!"
+  exerciseCoinRule app user CoinAccount_OpenWithCoin with
+    owner = user
+    validator = user -- TODO: properly set the validator
+    coinCid
+    targetNumber = 0
 
 
 setupUser : CCApp -> Text -> Script Party
 setupUser app name = do
   user <- allocateParty name
-  onboardUser user app
-  -- void $ exerciseUserRule app user CoinAccount_OpenAccount with
-  --   owner = user
-  --   obs = []
-  submitMulti [user, app.svc] [] do
-    exerciseByKeyCmd @UserRules app.svc CoinAccount_OpenAccount_NoFee with
-      owner = user
+  onboardUser app user
   return user
-
--- | Internal function for utilities to check that the acting party is a CC user.
-ensureIsUser : CCApp -> Party -> Script ()
-ensureIsUser app p = do
-  optRD <- queryContractKey @UserAccount app.svc (app.svc, p)
-  case optRD of
-    None -> error $ "Party " <> show p <> " is no user of " <> show app
-    Some _ -> return ()
 
 -- | Execute a contract-key query using the CCApp public party.
 queryContractKeyPublic
@@ -127,20 +113,8 @@ queryContractKeyPublic
     ) =>
     CCApp -> Party -> k -> Script (Optional (ContractId t, t))
 queryContractKeyPublic app user k = do
-  ensureIsUser app user
+  -- ensureIsUser app user
   queryContractKey @t (app.public) k
-
-getUserRules : CCApp -> Party -> Script (ContractId UserRules)
-getUserRules app actor = do
-  optUserRules <- queryContractKeyPublic @UserRules app actor app.svc
-  return $ fst $ fromSomeNote ("UserRules contract not found for app party '" <> show app.svc <> "'") optUserRules
-
-exerciseUserRule : Choice UserRules ch r => CCApp -> Party -> ch -> Script r
-exerciseUserRule app p ch = do
-  userRulesCid <- getUserRules app p
-  submitRD app.public p $ exerciseCmd userRulesCid ch
-
-
 
 
 -- Asset handling utilities
@@ -185,7 +159,7 @@ runCoinDepositBots app = do
 
 getAllUserParties : CCApp -> Script [Party]
 getAllUserParties app = do
-  accounts <- query @UserAccount app.svc
+  accounts <- query @CoinAccount app.svc
   return [account.owner | (_, account) <- accounts]
 
 

@@ -17,6 +17,10 @@ testEntry = do
   app <- setupApp
   bootstrapApp app
 
+  -- start issuing so invites can be handed out
+  runNextIssuance app
+  runCoinDepositBots app
+
   -- bootstrap user and service provider party
   user <- setupUser app "User"
   provider1 <- setupUser app "Provider1"

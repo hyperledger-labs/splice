@@ -122,6 +122,67 @@ template CoinRules
 
         void $ modifyCoinAccountQuantity config.accountConfig (svc, owner, number) 0.0 ( + coin.quantity * issuancePerCoin)
 
+    -- | Open a coin account paying fees and the initial quantity from the source account.
+    nonconsuming choice CoinAccount_Open : ()
+      with
+        owner : Party
+        sourceNumber : Int
+        targetNumber : Int
+        quantity : Decimal
+      controller owner
+      do
+        assertMsg "Quantity is positive" (quantity >= 0.0)
+        -- subtract account opening fee and targetQuantity
+        let CoinAccountConfig with holdingFee; openingFee; modificationFee; .. = config.accountConfig
+        assertMsg "Account modification fee <= opening fee" (modificationFee.fee <= openingFee.fee)
+        sourceAccount <- modifyCoinAccountQuantity config.accountConfig (svc, owner, sourceNumber) modificationFee.fee \q ->
+          q - quantity - openingFee.fee
+        -- create new account
+        now <- getTime
+        let startsExpiringAt = addRelTime now (spentWithDailyRate holdingFee (openingFee.fee - modificationFee.fee))
+        createBurnReceipt svc BurnReceiptForValidator sourceAccount.validator openingFee.fee
+        void $ create CoinAccount with
+          svc
+          owner
+          validator = sourceAccount.validator
+          quantity = expiringQuantity holdingFee quantity startsExpiringAt
+          number = targetNumber
+          lock = None
+          obs = []
+
+    -- | Open a coin account paying fees and the initial quantity from the source account.
+    nonconsuming choice CoinAccount_OpenWithCoin : ()
+      with
+        owner : Party
+        validator : Party
+        coinCid : ContractId Coin
+        targetNumber : Int
+      controller owner
+      do
+        -- TODO: use contract to check user to validator match
+        -- fetch and archive the coin
+        coin <- fetch coinCid
+        archive coinCid
+        -- check that coin matches
+        assertMsg "Coin must match coin rules" ((svc, owner) == (coin.svc, coin.owner))
+        -- create new account
+        -- TODO: share code with opening from an existing account
+        now <- getTime
+        let CoinAccountConfig with holdingFee; openingFee; .. = config.accountConfig
+            quantity = actualQuantity now coin.quantity - openingFee.fee
+            startsExpiringAt = addRelTime now (spentWithDailyRate holdingFee openingFee.fee)
+        createBurnReceipt svc BurnReceiptForValidator validator openingFee.fee
+        void $ create CoinAccount with
+          svc
+          owner
+          validator = validator
+          quantity = expiringQuantity holdingFee quantity startsExpiringAt
+          number = targetNumber
+          lock = None
+          obs = []
+
+
+
 
 
 transferGeneric : CoinRulesConfig -> CoinAccountKey -> Decimal -> Party -> Optional TimeLock -> Update (ContractId Coin)
@@ -136,27 +197,11 @@ transferGeneric config k@(svc, owner, _) quantity receiver lock = do
       Some _ -> error "Locked coin cannot be transferred or locked"
       None -> (q - quantity - senderFee, lock)
 
-  -- compute issuance and expiry for burned coins
-  (issuanceAt, burnedCoinExpiresAt) <- getIssuanceAtAndExpiresAt svc
-
-  -- pay sender fee
-  now <- getTime
-  create BurnReceipt with
-    svc
-    beneficiary = coin.validator
-    kind = BurnReceiptForValidator
-    quantity = senderFee
-    issuanceAt
-    expiresAt = burnedCoinExpiresAt
-  -- pay receiver fee
-  create BurnReceipt with
-    svc
-    beneficiary = receiver
-    kind = BurnReceiptForService
-    quantity = receiverFee
-    issuanceAt
-    expiresAt = burnedCoinExpiresAt
+  -- create receipts for burned fee
+  createBurnReceipt svc BurnReceiptForValidator coin.validator senderFee
+  createBurnReceipt svc BurnReceiptForService receiver receiverFee
   -- create coin for the receiver to deposit
+  now <- getTime
   create Coin with
     svc
     owner = receiver
@@ -164,6 +209,12 @@ transferGeneric config k@(svc, owner, _) quantity receiver lock = do
       config.coinHoldingFee
       (quantity - receiverFee)
       (addRelTime now config.freeCoinHoldingDuration)
+
+createBurnReceipt : Party -> BurnReceiptKind -> Party -> Decimal -> Update (ContractId BurnReceipt)
+createBurnReceipt svc kind beneficiary quantity = do
+  (issuanceAt, expiresAt) <- getIssuanceAtAndExpiresAt svc
+  create BurnReceipt with ..
+
 
 
 -- Issuance parameters
