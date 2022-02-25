@@ -110,16 +110,22 @@ template CoinRules
       do
         -- check that coin has not expired
         coin <- fetch coinCid
-        archive coinCid
         assertNotExpired coin
-        assertMsg "Coin must match account" ((svc, owner) == (coin.svc, coin.beneficiary))
+        assertMsg "Same SVC" (svc == coin.svc)
         -- grab issuance event
         (_, issueEv) <- fetchByKey @IssuanceEvent (svc, coin.issuanceAt)
-        -- deposit resulting coin
-        let issuancePerCoin = case coin.kind of
-              BurnReceiptForService -> issueEv.beneficiaryIssuancePerCoin
-              BurnReceiptForValidator -> issueEv.validatorIssuancePerCoin
-
+        -- check that owner can claim the receipt and compute issuance per coin
+        issuancePerCoin <- case coin.kind of
+          BurnReceiptForService -> do
+            assertMsg "Burn receipt for service must match account owner" (owner == coin.burner)
+            archive coinCid
+            return issueEv.burnerIssuancePerCoin
+          BurnReceiptForValidator -> do
+            (rightCid, validatorRight) <- fetchByKey @ValidatorRight (svc, coin.burner)
+            assertMsg "Burner validator must match owner" (owner == validatorRight.validator)
+            exercise coinCid BurnReceipt_ArchiveAsValidator with validator = owner; rightCid
+            return issueEv.validatorIssuancePerCoin
+        -- deposit quantity on account
         void $ modifyCoinAccountQuantity config.accountConfig (svc, owner, number) 0.0 ( + coin.quantity * issuancePerCoin)
 
     -- | Open a coin account paying fees and the initial quantity from the source account.
@@ -140,11 +146,10 @@ template CoinRules
         -- create new account
         now <- getTime
         let startsExpiringAt = addRelTime now (spentWithDailyRate holdingFee (openingFee.fee - modificationFee.fee))
-        createBurnReceipt svc BurnReceiptForValidator sourceAccount.validator openingFee.fee
+        createBurnReceipt svc BurnReceiptForValidator owner openingFee.fee
         void $ create CoinAccount with
           svc
           owner
-          validator = sourceAccount.validator
           quantity = expiringQuantity holdingFee quantity startsExpiringAt
           number = targetNumber
           lock = None
@@ -175,7 +180,6 @@ template CoinRules
         void $ create CoinAccount with
           svc
           owner
-          validator = validator
           quantity = expiringQuantity holdingFee quantity startsExpiringAt
           number = targetNumber
           lock = None
@@ -198,7 +202,7 @@ transferGeneric config k@(svc, owner, _) quantity receiver lock = do
       None -> (q - quantity - senderFee, lock)
 
   -- create receipts for burned fee
-  createBurnReceipt svc BurnReceiptForValidator coin.validator senderFee
+  createBurnReceipt svc BurnReceiptForValidator owner senderFee
   createBurnReceipt svc BurnReceiptForService receiver receiverFee
   -- create coin for the receiver to deposit
   now <- getTime
@@ -211,7 +215,7 @@ transferGeneric config k@(svc, owner, _) quantity receiver lock = do
       (addRelTime now config.freeCoinHoldingDuration)
 
 createBurnReceipt : Party -> BurnReceiptKind -> Party -> Decimal -> Update (ContractId BurnReceipt)
-createBurnReceipt svc kind beneficiary quantity = do
+createBurnReceipt svc kind burner quantity = do
   (issuanceAt, expiresAt) <- getIssuanceAtAndExpiresAt svc
   create BurnReceipt with ..
 
@@ -277,7 +281,7 @@ template IssuanceEvent
     public : Party
     issuanceAt : Time
     validatorIssuancePerCoin : Decimal
-    beneficiaryIssuancePerCoin : Decimal
+    burnerIssuancePerCoin : Decimal
     expiresAt : Time
   where
     signatory svc

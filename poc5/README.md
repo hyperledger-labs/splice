@@ -90,3 +90,55 @@ The idea is to implement the burn oracle using on-ledger state, as this
 
 TODO: once the models are complete see whether we can manage time-bound fees based on clock contracts that advance
 at the rate of the issuance cycle.
+
+
+## Onboarding workflows
+
+- any that owns a coin is a user
+- a party can request to be recognized as a user's validator, the SVC checks the mapping, and grants the right
+- a user's validator has the right to claim a user's burn receipts
+
+- CC domain connectivity is handled as a CC app in a prepaid model
+  - anybody can request a participant to be recognized against an initial prepaid cost (paid using locked coin)
+  - the request is accepted if the domain has capacity
+  - a contract is created stating the participant node's balance on the domain
+  - the domain operator regularly bills that contract
+  - the domain operator guarantees to give at least XX hours of heads-up before expiring that contract if the bill is not paid
+
+Next steps:
+- replace validator column in CoinAccount with explicit ValidatorForUser contracts
+- remove public party and do all actions with readAs 'svc'
+- streamline test scripts wrt onboarding
+
+
+### Outdated: Validator onboarding
+
+Assumption: there is a sponsor that has a party whose CoinAccount cointains sufficient funds for an invite.
+
+1. sponsor gets validator's participant node coordinates out of band
+2. sponsor creates a time-limited invite and an untransferred coin
+3. sponsor shares invite + coin + coin rules contract out-of-band with the validator
+4. svc domain picks up that invite and uses it to accept the domain join request of validator participant node
+5. validator uses its validator party to submit the accept of the invite using off-ledger disclosure, which
+   - accepts the coin transfer
+   - creates a coin account from the coin
+   - creates a validator account which expires at the same time the coin account expires
+
+The validator can refresh the expiry timer by paying for its validator account, thereby proving that it is active.
+Validators run a bot that takes care of this.
+
+TODO:
+- push quantity onto invite
+- have svc check that validator is really a participant node, and each participant node is represented only once
+
+
+## Outdated: User to validator mapping management
+
+1. validator uses ValidatorAccount + ValidatorRules to create an InviteUser request together with an untransferred coin
+2. SVC checks that the user is hosted at the validator, and if yes, accepts the request, which
+   - accepts the coin transfer
+   - creates a coin account from the coin
+3. If the user is not hosted on the validator, then the invite is declined
+
+TODO:
+- push quantity into invite

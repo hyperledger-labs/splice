@@ -48,7 +48,7 @@ testEntry = do
   t <- getTime
   -- NOTE: the readAs constraints are here to read the DirectoryRules and CoinRules,
   --       which we expect to be delivered to the client via off-ledger disclosure.
-  reqCid <- submitMulti [user] [provider1, app.public] $ exerciseByKeyCmd @DirectoryRules provider1 DirectoryRules_RequestEntry with
+  reqCid <- submitMulti [user] [provider1, app.svc] $ exerciseByKeyCmd @DirectoryRules provider1 DirectoryRules_RequestEntry with
     coinNumber = 0
     entry = Entry with
       provider = provider1
@@ -58,7 +58,7 @@ testEntry = do
 
   -- TODO: package into utility script, and auto-accept everything that is not duplicate
   -- NOTE: the readAs serves to read the CoinRules
-  submitMulti [provider1] [app.public] $ exerciseCmd reqCid EntryRequest_Acccept
+  submitMulti [provider1] [app.svc] $ exerciseCmd reqCid EntryRequest_Acccept
 
   -- run bots
   runCoinDepositBots app

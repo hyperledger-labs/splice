@@ -4,6 +4,7 @@ module CC.Scripts.Util where
 
 import Daml.Script
 
+import DA.Action (void)
 import DA.Date
 import DA.Foldable (forA_)
 import DA.List (dedup)
@@ -78,7 +79,6 @@ queryDP dp p = do
 -- | A type to hold the off-ledger information required to interact with CC.
 data CCApp = CCApp with
     svc : Party  -- TODO: consider removing the need for this, and always enter via the public party
-    public : Party
   deriving (Eq, Ord, Show)
 
 
@@ -95,6 +95,7 @@ onboardUser app user = do
     validator = user -- TODO: properly set the validator
     coinCid
     targetNumber = 0
+
 
 
 setupUser : CCApp -> Text -> Script Party
@@ -114,7 +115,7 @@ queryContractKeyPublic
     CCApp -> Party -> k -> Script (Optional (ContractId t, t))
 queryContractKeyPublic app user k = do
   -- ensureIsUser app user
-  queryContractKey @t (app.public) k
+  queryContractKey @t (app.svc) k
 
 
 -- Asset handling utilities
@@ -128,7 +129,7 @@ getCoinRules app actor = do
 exerciseCoinRule : Choice CoinRules ch r => CCApp -> Party -> ch -> Script r
 exerciseCoinRule app p ch = do
   coinRulesCid <- getCoinRules app p
-  submitRD app.public p $ exerciseCmd coinRulesCid ch
+  submitRD app.svc p $ exerciseCmd coinRulesCid ch
 
 
 pay : CCApp -> Party -> Party -> Decimal -> Text -> Script (ContractId Coin)
@@ -145,13 +146,15 @@ runCoinDepositBots : CCApp -> Script ()
 runCoinDepositBots app = do
   users <- getAllUserParties app
   forA_ users $ \user -> do
+    -- claim issuances for this user
+    claimIssuancesFor app user
+    -- claim transferred coins
     coins <- queryFilter @Coin user (\coin -> coin.owner == user)
     forA_ coins $ \(coinCid, _) ->
       exerciseCoinRule app user CoinAccount_Deposit with
         owner = user
         number = 0
         coinCid
-
 
 -- Scripting issuance
 -----------------------------------------------------
@@ -160,7 +163,8 @@ runCoinDepositBots app = do
 getAllUserParties : CCApp -> Script [Party]
 getAllUserParties app = do
   accounts <- query @CoinAccount app.svc
-  return [account.owner | (_, account) <- accounts]
+  rights <- query @ValidatorRight app.svc
+  return $ dedup $ [account.owner | (_, account) <- accounts] ++ [ right.validator | (_, right) <- rights]
 
 
 runNextIssuance : CCApp -> Script ()
@@ -176,23 +180,38 @@ runNextIssuance app = do
   submit app.svc do
     createCmd BurnOracle with
       svc = app.svc
-      public = app.public
+      public = app.svc
       issuanceAt
       quantity = sum (map (\(_, bc) -> bc.quantity) bcs)
   -- setTime issuanceAt
   setTime issuanceAt
   -- trigger issuance
-  submit app.svc $ exerciseByKeyCmd @SvcRules app.svc Trigger_Issuance with issuanceAt
-  -- claim all burned coin for issuanceAt against account 0
-  users <- getAllUserParties app
-  forA_ users $ \user -> claimBurnReceiptFor2 app user issuanceAt
+  void $ submit app.svc $ exerciseByKeyCmd @SvcRules app.svc Trigger_Issuance with issuanceAt
 
 
-claimBurnReceiptFor2 : CCApp -> Party -> Time -> Script ()
-claimBurnReceiptFor2 app user issuanceAt = do
-  bcs <- queryFilter @BurnReceipt user (\bc -> bc.beneficiary == user && bc.issuanceAt == issuanceAt)
-  forA_ bcs $ \(bcCid, _) -> do
+
+claimIssuancesFor : CCApp -> Party -> Script ()
+claimIssuancesFor app user = do
+  hostedUsers <- getValidatorUsers user
+  issuances <- getCompletedIssuances app
+  brs <- queryFilter @BurnReceipt app.svc $ \br ->
+    br.issuanceAt `elem` issuances &&
+    case br.kind of
+      BurnReceiptForService -> br.burner == user
+      BurnReceiptForValidator -> br.burner `elem` hostedUsers
+  forA_ brs $ \(brCid, br) -> do
     exerciseCoinRule app user BurnReceipt_Deposit with
       owner = user
       number = 0
-      coinCid = bcCid
+      coinCid = brCid
+
+getCompletedIssuances : CCApp -> Script [Time]
+getCompletedIssuances app = do
+  issEvs <- query @IssuanceEvent app.svc
+  return [ ev.issuanceAt | (_, ev) <- issEvs ]
+
+-- | All users of a specific validator.
+getValidatorUsers : Party -> Script [Party]
+getValidatorUsers validator = do
+  rights <- queryFilter @ValidatorRight validator (\right -> right.validator == validator)
+  return [ right.user | (_, right) <- rights ]

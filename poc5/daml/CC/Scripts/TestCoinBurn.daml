@@ -5,7 +5,7 @@ module CC.Scripts.TestCoinBurn where
 
 import Daml.Script
 
--- import CC.Coin
+import CC.Coin
 -- import CC.CoinRules
 -- import CC.SvcRules
 -- import CC.UserRules
@@ -19,15 +19,35 @@ testCoinBurn = do
   -- bootstrap app
   app <- setupApp
   bootstrapApp app
+  submitMulti [app.svc] [] $
+    createCmd ValidatorRight with svc = app.svc; validator = app.svc; user = app.svc
 
   -- start issuing so the SVC has some coins to invite users
   runNextIssuance app
   runCoinDepositBots app
 
-  -- bootstrap user and service provider party
-  user <- setupUser app "User"
+  -- -- bootstrap user and service provider party
   provider1 <- setupUser app "Provider1"
   provider2 <- setupUser app "Provider2"
+  user <- setupUser app "User"
+  validator1 <- setupUser app "Validator1"
+
+  runNextIssuance app
+  runCoinDepositBots app
+  runNextIssuance app
+  runCoinDepositBots app
+
+  -- -- test declaration of validator rights after the fact
+  submitMulti [app.svc, validator1] [] $
+    createCmd ValidatorRight with svc = app.svc; validator = validator1; user
+  submitMulti [app.svc, validator1] [] $
+    createCmd ValidatorRight with svc = app.svc; validator = validator1; user = validator1
+  submitMulti [app.svc, validator1] [] $
+    createCmd ValidatorRight with svc = app.svc; validator = validator1; user = provider1
+  submitMulti [app.svc, provider2] [] $
+    createCmd ValidatorRight with svc = app.svc; validator = provider2; user = provider2
+
+  runCoinDepositBots app
 
 
   -- svc transfers 20 coin to user

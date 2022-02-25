@@ -22,7 +22,6 @@ template CoinAccount
   with
     svc : Party
     owner : Party
-    validator : Party
     number : Int
     -- TODO: rename to balance
     quantity : ExpiringQuantity
@@ -30,7 +29,7 @@ template CoinAccount
     obs : [Party]
   where
     signatory svc, owner, lockHolder lock
-    observer validator, obs
+    observer obs
 
     ensure validExpiringQuantity quantity
 
@@ -103,8 +102,10 @@ data BurnReceiptKind
 template BurnReceipt
   with
     svc : Party
-    beneficiary : Party
+    burner : Party
     -- | Kind of the burned coin, which is used during issuance to lookup the approriate rate.
+    -- TODO: split the receipts for validators and services, as they are now different enought
+    -- that they should use their own templates.
     kind : BurnReceiptKind
     quantity : Decimal
     -- | The time of the issuance round in which this burned coin allows to participate
@@ -113,7 +114,7 @@ template BurnReceipt
     issuanceAt : Time
     expiresAt : Time
   where
-    signatory svc, beneficiary
+    signatory svc, burner
     ensure quantity > 0.0
       && issuanceAt < expiresAt
 
@@ -136,6 +137,15 @@ template BurnReceipt
           return burnedCoin.quantity
         create this with quantity = this.quantity + sum quantities
 
+    choice BurnReceipt_ArchiveAsValidator : ()
+      with
+        validator : Party
+        rightCid : ContractId ValidatorRight
+      controller svc, validator
+      do
+        right <- fetch rightCid
+        assertMsg "Must be receipt for validator" (kind == BurnReceiptForValidator)
+        assertMsg "Right must match" (right == ValidatorRight with svc; validator, user = burner)
 
 
 -- Coin helper functions
@@ -180,7 +190,6 @@ modifyCoinAccount config coinKey@(svc, owner, number) attributedBurnQuantity f =
             svc = coin.svc
             owner = coin.owner
             number = coin.number
-            validator = coin.validator
             obs = coin.obs
             -- TODO: check that the way the modificationFee is charged does not lock up accounts too hard when they are near zero
             quantity = expiringQuantity config.holdingFee (quantity - modificationFee) startsExpiringAt
@@ -196,3 +205,38 @@ modifyCoinAccountQuantity config k attributedBurnQuantity f = do
     if (isNone optLock)
       then (f quantity, optLock)
       else error "Cannot modify quantity of locked coin"
+
+
+-- Validator state
+------------------
+
+-- | The right to claim coin issuances for a user's burns as their validator.
+template ValidatorRight with
+    svc : Party
+    user : Party
+    validator : Party
+    -- TODO: manage expiry
+  where
+    signatory svc, validator
+
+    key (svc, user) : (Party, Party)
+    maintainer key._1
+
+    -- TODO: cancellation, withdrawal
+
+
+-- TODO: group approval flow into a separate data+rules package
+
+-- | A request to be granted the validator right for a particular user.
+template ValidatorRightRequest with
+    right : ValidatorRight
+    -- TODO: manage expiry
+  where
+    signatory (signatory right)
+
+    choice ValidatorRightRequest_Accept
+      : ContractId ValidatorRight
+      controller right.svc
+      do create right
+
+    -- TODO: rejections

@@ -31,7 +31,7 @@ setupApp = do
   -- all public information of CC.
   public <- allocateParty "Public"
 
-  let app = CCApp with svc; public
+  let app = CCApp with svc
 
   --- DigitalAsset uses their control of svc ot create the app.
   requestCid <- submit svc do
@@ -57,7 +57,6 @@ setupApp = do
     quantity =  expiringQuantity (DailyRate with rate = 1.0) 0.0 (addRelTime t (days 1))
     obs = [] -- TODO: should this be visible to 'public'?
     lock = None
-    validator = svc
 
   return app
 
@@ -82,7 +81,7 @@ bootstrapApp app = do
   [(cid, cc)] <- query @SvcRules app.svc
   submit cc.svc do
     exerciseCmd cid BootstrapApp with
-      issuanceParams = defaultIssuanceParameters app.svc app.public
+      issuanceParams = defaultIssuanceParameters app.svc app.svc
       initialPrice = 1.0
       coinRulesConfig = defaultCoinRulesConfig
 

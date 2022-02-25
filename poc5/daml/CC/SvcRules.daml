@@ -81,7 +81,7 @@ template SvcRules
           -- FIXME: ensure that in the capped case both validators and beneficiaries get
           -- all their burned coins.
           validatorIssuancePerCoin = issuancePerCoin * params.validatorPercentage / coinPercentage
-          beneficiaryIssuancePerCoin = issuancePerCoin * params.servicePercentage / coinPercentage
+          burnerIssuancePerCoin = issuancePerCoin * params.servicePercentage / coinPercentage
           issuerIssuance = params.coinsPerIssuance - issuancePerCoin * burnOracle.quantity
 
         -- Create SVC issuance as a Coin
