@@ -1,0 +1,139 @@
+-- | The contracts used to represent the state of the issuance cycles.
+module CC.Issuance where
+
+import DA.Time
+
+import OpenBusiness.Expiry
+
+-- | The right to claim coin issuances for a user's burns as their validator.
+template ValidatorRight with
+    svc : Party
+    user : Party
+    validator : Party
+    -- TODO: manage expiry
+  where
+    signatory svc, validator
+
+    key (svc, user) : (Party, Party)
+    maintainer key._1
+
+    -- TODO: cancellation, withdrawal
+
+-- | Kind of a coin burn receipt.
+data BurnReceiptKind
+  = BurnReceiptForValidator
+  | BurnReceiptForService
+  deriving (Eq, Ord, Show)
+
+-- | A receipt of a coin burn that can be used to claim part of a coin issuance.
+template BurnReceipt
+  with
+    svc : Party
+    burner : Party
+    -- | Kind of the burned coin, which is used during issuance to lookup the approriate rate.
+    -- TODO: split the receipts for validators and services, as they are now different enought
+    -- that they should use their own templates.
+    kind : BurnReceiptKind
+    quantity : Decimal
+    -- | The time of the issuance round in which this burned coin allows to participate
+    -- NOTE: redemption of issuances will generally lead to spiky traffic, which can though
+    -- be compensated by not merging burnedcoin for some time around issuance.
+    issuanceAt : Time
+    expiresAt : Time
+  where
+    signatory svc, burner
+    ensure quantity > 0.0
+      && issuanceAt < expiresAt
+
+    implements ExpiringContract where
+      let contractExpiresAt = expiresAt
+      let expiryManager = svc
+
+    -- | This choice is used by the SVC to merge all burned coins per validator.
+    -- The expectation is that there is at most one burned coin per validator before
+    -- the issuance event is triggered.
+    choice BurnReceipt_Merge : ContractId BurnReceipt
+      with
+        cids : [ContractId BurnReceipt]
+      controller svc
+      do
+        assertMsg "Merge with at least one burned coin" (not (null cids))
+        quantities <- forA cids $ \cid -> do
+          burnedCoin <- fetch cid
+          assertMsg ("Burned coins must match") (this == burnedCoin with quantity)
+          return burnedCoin.quantity
+        create this with quantity = this.quantity + sum quantities
+
+    -- | This choice is used by validators to archive the burn receipt upon claiming its corresponding issuance.
+    choice BurnReceipt_ArchiveAsValidator : ()
+      with
+        validator : Party
+        rightCid : ContractId ValidatorRight
+      controller svc, validator
+      do
+        right <- fetch rightCid
+        assertMsg "Must be receipt for validator" (kind == BurnReceiptForValidator)
+        assertMsg "Right must match" (right == ValidatorRight with svc; validator, user = burner)
+
+
+-- | BurnOracle records the result of a process to determine the quantity of coin burned
+-- in a specific issuance cycle.
+template BurnOracle
+  with
+    svc : Party
+    issuanceAt : Time
+    quantity : Decimal
+  where
+    signatory svc
+
+    key (svc, issuanceAt) : (Party, Time)
+    maintainer key._1
+
+
+-- | A contract recording that a specific issuance has happened.
+template IssuanceEvent
+  with
+    svc : Party
+    issuanceAt : Time
+    validatorIssuancePerCoin : Decimal
+    burnerIssuancePerCoin : Decimal
+    expiresAt : Time
+  where
+    signatory svc
+
+    key (svc, issuanceAt) : (Party, Time)
+    maintainer key._1
+
+    implements ExpiringContract where
+      let contractExpiresAt = expiresAt
+      let expiryManager = svc
+
+-- | Specialized type to simplify the logic for computing target issuance windows.
+data TimeWindow = TimeWindow with
+    startsAt : Time
+    duration : RelTime
+  deriving (Eq, Ord, Show)
+
+-- | IssuanceParameters is a configuration contract that holds issuance parameters.
+template IssuanceParameters
+  with
+    svc : Party
+    public : Party
+    -- | How many coins are issued per issuance window.
+    coinsPerIssuance : Decimal
+    -- | The maximum proportion of the issuance that goes to service providers.
+    servicePercentage : Decimal
+    -- | The maximum proportion of the issuance that goes to validators.
+    validatorPercentage : Decimal
+    -- | The initial issuance window, which is replicated going forwards.
+    initialWindow : TimeWindow
+    -- | For how long a burned coin can be claimed after its issuance event.
+    claimDuration : RelTime
+    -- TODO: use a schedule with effective dating to enable controlled modifications
+    -- of these parameters
+  where
+    signatory svc
+    observer public
+
+    key svc : Party
+    maintainer key

@@ -53,7 +53,7 @@ data FixedPlusVariableRate = FixedPlusVariableRate with
   deriving (Eq, Ord, Show)
 
 chargeFixedPlusVariableRate : FixedPlusVariableRate -> Decimal -> Decimal
-chargeFixedPlusVariableRate r quantity = r.fixed + r.variableRate * quantity
+chargeFixedPlusVariableRate r quantity = r.fixed + r.variableRate * (max 0.0 (quantity - r.fixed))
 
 
 -- Expiring quantities

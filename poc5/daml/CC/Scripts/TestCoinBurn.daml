@@ -5,28 +5,20 @@ module CC.Scripts.TestCoinBurn where
 
 import Daml.Script
 
-import CC.Coin
--- import CC.CoinRules
--- import CC.SvcRules
--- import CC.UserRules
-
-import CC.Scripts.Setup
 import CC.Scripts.Util
 
-
+-- | Note to readers: try commenting suffixes of this script out to
+-- see the various steps in action.
 testCoinBurn : Script ()
 testCoinBurn = do
   -- bootstrap app
   app <- setupApp
-  bootstrapApp app
-  submitMulti [app.svc] [] $
-    createCmd ValidatorRight with svc = app.svc; validator = app.svc; user = app.svc
 
-  -- start issuing so the SVC has some coins to invite users
+  -- -- start issuing so the SVC has some coins to invite users
   runNextIssuance app
   runCoinDepositBots app
 
-  -- -- bootstrap user and service provider party
+  -- -- -- bootstrap user and service provider party
   provider1 <- setupUser app "Provider1"
   provider2 <- setupUser app "Provider2"
   user <- setupUser app "User"
@@ -38,23 +30,20 @@ testCoinBurn = do
   runCoinDepositBots app
 
   -- -- test declaration of validator rights after the fact
-  submitMulti [app.svc, validator1] [] $
-    createCmd ValidatorRight with svc = app.svc; validator = validator1; user
-  submitMulti [app.svc, validator1] [] $
-    createCmd ValidatorRight with svc = app.svc; validator = validator1; user = validator1
-  submitMulti [app.svc, validator1] [] $
-    createCmd ValidatorRight with svc = app.svc; validator = validator1; user = provider1
-  submitMulti [app.svc, provider2] [] $
-    createCmd ValidatorRight with svc = app.svc; validator = provider2; user = provider2
+  recordValidatorOf app validator1 validator1
+  recordValidatorOf app user validator1
+  recordValidatorOf app provider1 validator1
+  recordValidatorOf app provider2 provider2
 
+  archiveTransferDebugNotes app
   runCoinDepositBots app
-
 
   -- svc transfers 20 coin to user
   pay app app.svc user 20.0 "starter pack!"
+  archiveTransferDebugNotes app
   runCoinDepositBots app
 
-  -- user pays provider 1
+  -- -- user pays provider 1
   pay app user provider1 5.0 "otc"
   runCoinDepositBots app
 
@@ -73,45 +62,6 @@ testCoinBurn = do
   runNextIssuance app
   runCoinDepositBots app
 
-
-  -- -- user open an additional coin account
-  -- exerciseUserRule app user CoinAccount_OpenAccount with
-  --   owner = user
-  --   feeAccountNumber =0
-
-  -- rollDayFull app 0.12
-
-  -- -- check locking functionality
-  -- -- TODO: refactor into utilities and move into its own test file
-  -- t <- getTime
-  -- exerciseCoinRule app user CoinAccount_BurnAndLock with
-  --       owner = user
-  --       number = 0
-  --       fee = 0.015
-  --       payload = "Lock it!"
-  --       minLockedQuantity = 0.001
-  --       lock = TimeLock with
-  --         holder = user
-  --         expiresAt = addRelTime t (seconds 10)
-  -- passTime (seconds 60)
-  -- submit user $ exerciseByKeyCmd @CoinAccount (app.svc, user, 0) CoinAccount_OwnerExpireLock
-
-  -- rollDayFull app 0.13
-
-
-  -- -- user burns coin, running his own validator
-  -- pay app user provider1 0.01 "Great Service"
-  -- passTime (seconds 10) -- required, as otherwise rate limit on coin spending is hit
-  -- pay app user provider2 0.01 "Thx"
-  -- passTime (seconds 200)
-  -- pay app user provider2 0.01 "Thx, again"
-  -- pay app user provider2 0.01 "Thx, again"
-  -- pay app user provider1 0.01 "Great Service, again"
-
-
   -- -- -- TODO: add assertions that validate token handling
-  -- -- TODO: figure out why the SVC does not get coin for the burnedcoin from the account open
-
-  -- rollDayFull app 0.14
 
   return ()

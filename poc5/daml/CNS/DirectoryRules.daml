@@ -32,27 +32,43 @@ template DirectoryRules with
       : ContractId EntryRequest
       with
         entry : Entry
-        coinNumber : Int
+        coinCid : ContractId Coin
       controller entry.user
       do
         assertMsg "Entry provider equals provider" (entry.provider == provider)
         t <- getTime
         let expiresAt = addRelTime t requestDuration
             entryFee = dailyLeaseFee -- FIXME: properly scale the lease fee with entry duration
-        exerciseByKey @CoinRules ccSvc CoinAccount_Lock with
-          owner = entry.user
-          number = coinNumber
-          lockFee = requestFee
-          payload = "CNS: entry requested"
-          lock = TimeLock with
-            holder = provider
-            expiresAt
+        coin <- fetch coinCid
+        assertMsg "Coin SVC and owner must match" ((ccSvc, entry.user) == (coin.svc, coin.owner))
+
+        lockedCoinCid :: _ <- exerciseByKey @CoinRules ccSvc CoinRules_Transfer with
+          transfer = Transfer with
+            sender = entry.user
+            payload = "CNS: entry requested"
+            inputs = [InputCoin coinCid]
+            outputs =
+              [ OutputSenderCoin with
+                  exactQuantity = Some entryFee
+                  exactHoldingTime = Some requestDuration
+                  lock = Some TimeLock with
+                    holder = provider
+                    expiresAt
+              , OutputReceiverCoin with
+                  receiver = provider
+                  quantity = requestFee
+              , OutputSenderCoin with
+                  exactQuantity = None
+                  exactHoldingTime = None
+                  lock = None
+              ]
           -- TODO: minLockedQuantity = entryFee
         create EntryRequest with
+          ccSvc
           entry
           expiresAt
           entryFee
-          coinKey = (ccSvc, entry.user, coinNumber)
+          coinCid = lockedCoinCid
 
     -- user can extend entry
     --    check that entry is not expired
@@ -65,22 +81,23 @@ template DirectoryRules with
 
 -- | Workflow contract representing a request for a directory entry.
 template EntryRequest with
+    ccSvc : Party
     entry : Entry
     expiresAt : Time
     entryFee : Decimal
-    coinKey : CoinAccountKey
+    coinCid : ContractId Coin
   where
     signatory (signatory entry)
     ensure expiresAt <= entry.expiresAt
       && entryFee >= 0.0
 
-    let unlockCoinUnlessExpired : Update ()
+    let unlockCoinUnlessExpired : Update (ContractId Coin)
         unlockCoinUnlessExpired = do
           t <- getTime
           assertMsg "EntryRequest not expired" (t < expiresAt)
           -- NOTE: we must not unlock the coin if the entry expired, as it could otherwise be
           -- used to unlock the coin locked to another workflow
-          unlockCoin coinKey
+          exercise coinCid Coin_Unlock
 
     choice EntryRequest_Expire : ()
       with
@@ -90,7 +107,7 @@ template EntryRequest with
          t <- getTime
          assertMsg "EntryRequest expired" (expiresAt <= t)
 
-    choice EntryRequest_Withdraw : ()
+    choice EntryRequest_Withdraw : ContractId Coin
       controller entry.user
       do unlockCoinUnlessExpired
 
@@ -98,28 +115,32 @@ template EntryRequest with
       : ContractId Entry
       controller entry.provider
       do
-        unlockCoinUnlessExpired
-        exerciseByKey @CoinRules coinKey._1  CoinAccount_Transfer with
-          owner = entry.user
-          number = coinKey._3
-          newOwner = entry.provider
-          payload = "CNS: entry created"
-          quantity = entryFee
+        coinCid <- unlockCoinUnlessExpired
+        exerciseByKey @CoinRules ccSvc CoinRules_Transfer with
+          transfer = Transfer with
+            sender = entry.user
+            payload = "CNS: entry created"
+            inputs = [InputCoin coinCid]
+            outputs =
+              [ OutputReceiverCoin with
+                  receiver = entry.provider
+                  quantity = entryFee
+              ]
         create entry
 
-    choice EntryRequest_RejectExceptional : ()
+    choice EntryRequest_RejectExceptional : ContractId Coin
       with
         reason : Text
       controller entry.provider
       do
-        unlockCoinUnlessExpired
         assertMsg "Reason to long" (DA.Text.length reason <= 280)
+        unlockCoinUnlessExpired
 
-    choice EntryRequest_RejectAlreadyExists : ()
+    choice EntryRequest_RejectAlreadyExists : ContractId Coin
       controller entry.provider
       do
-        unlockCoinUnlessExpired
         -- prove that the key has already been assigned to a non-expired entry
         (_, entry) <- fetchByKey @Entry (key entry)
         t <- getTime
         assertMsg "Existing entry expired" (t < entry.expiresAt)
+        unlockCoinUnlessExpired

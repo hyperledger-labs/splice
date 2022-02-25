@@ -3,8 +3,8 @@ module CC.Scripts.Parameters where
 import DA.Date
 import DA.Time
 
+import CC.Issuance
 import CC.CoinRules
-import CC.SvcRules
 
 import OpenBusiness.Fees
 
@@ -17,7 +17,7 @@ defaultIssuanceParameters svc public = IssuanceParameters with
   public
   coinsPerIssuance = 100.0
   initialWindow = TimeWindow with
-    startsAt = time (DA.Date.date 2022 Jan 1) 0 0 0
+    startsAt = time (DA.Date.date 202 Jan 1) 0 0 0
     duration = minutes 5
   claimDuration = minutes 30
   -- | The maximum proportion of the issuance that goes to service providers.
@@ -26,12 +26,75 @@ defaultIssuanceParameters svc public = IssuanceParameters with
   validatorPercentage = 0.15
 
 
-defaultCoinRulesConfig : CoinRulesConfig
-defaultCoinRulesConfig = CoinRulesConfig with
-  maxLockDuration = days 30
-  transferFee = FixedPlusVariableRate with
-    fixed = 0.05         -- coin
-    variableRate = 0.01  -- coin parts
-  coinHoldingFee = DailyRate with rate = 1.0      -- coin / day
-  freeCoinHoldingDuration = minutes 10
-  accountConfig = defaultCoinAccountConfig
+-- | Default proposal for cost-competitive fees.
+--
+-- TODO: it looks like we need to lower these fees a bit further
+-- to be competitive with ETH and BTC: https://ycharts.com/indicators/ethereum_average_transaction_fee
+defaultCoinConfig : CoinConfig
+defaultCoinConfig = CoinConfig with
+    -- | Fee to create a new coin.
+    -- Set to the fixed part of the transfer fee.
+    createFee = FixedFee 0.1
+
+    -- | Fee to update an existing coin.
+    -- Cost covering and 10x lower than creation to strongly incentivize merging coins.
+    updateFee = FixedFee 0.01
+
+    -- | Fee for locking a coin.
+    -- 2x the create fee
+    lockFee = FixedFee 0.2
+
+    -- | Fee for keeping a coin around.
+    -- Equal to 36.5 dollar per year for an account with NO activity.
+    -- Incentivizes users to actively merge their coins.
+    -- A ledger with 1M coins thus generates at least 100k $ in fees per day.
+    holdingFee = DailyRate 0.1
+
+    -- | The minimal time for which the holding fee of a coin must be covered
+    -- at all times.
+    --
+    -- Set to a time that is high enough to cover 99.999% of the expected duration
+    -- of unavailability to avoid users loosing extra coin due to that unavailability.
+    minHoldingTime = minutes 20
+
+    -- | The maximal time that the holding fee of a coin can be prepaid for.
+    --
+    -- Set to 31 days such that users with monthly rebalancing schedules can also profit
+    -- from not paying any extra holding fees provided they transfer enough coin.
+    maxPrepaidHoldingTime = days 31
+
+    -- | Maximal time a lock can be held.
+    --
+    -- Set to a quarter year. which implies that lock-based workflows need at
+    -- least a quarterly refresher.
+    maxLockDuration = days (366 / 4)
+
+    -- | The minimal quantity of burn for which a receipt is issued.
+    --
+    -- Chosen to cover to be just above the cost of merging two coins.
+    minBurnReceiptQuantity = 0.025
+
+    -- | Fee for transferring some quantity of coin to a new owner. relTimeToDays (holdingTime - out.holdingTime)
+    --
+    -- Chosen to be 66% of credit card fees (Stripe 2.6% + 0.15$), as CC does
+    -- not provide consumer protection
+    --
+    -- TODO: make the variable rate regressive with a curve that is
+    -- cost competitive competitive with blockchain and clearing networks
+    -- for a wide range of transfers.
+    transferFee = FixedPlusVariableRate with
+      fixed = 0.1          -- coin
+      variableRate = 0.017  -- coin parts
+
+    -- | The ratio of the transfer fee attributed to the sender.
+    -- Should probably be equal to the ratio of issuance receipt of
+    -- validator operators to app operators.
+    senderTransferFeeAttributionRatio = 0.3
+
+    -- | These should be large enough to ensure efficient batching, but not too large
+    -- to avoid creating very large transactions.
+    maxNumInputs = 100
+    maxNumOutputs = 100
+
+    -- | Fits a hex-encoded SHA-256 or a UUID
+    maxPayloadLength = 32

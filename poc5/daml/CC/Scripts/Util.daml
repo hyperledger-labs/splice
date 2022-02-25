@@ -4,99 +4,63 @@ module CC.Scripts.Util where
 
 import Daml.Script
 
-import DA.Action (void)
+import DA.Action (void, when)
 import DA.Date
 import DA.Foldable (forA_)
 import DA.List (dedup)
-import DA.Optional
 import DA.Time
 
 import CC.Coin
 import CC.CoinRules
-import CC.Oracles
-import CC.SvcRules
--- import CC.User
--- import CC.UserRules
+import CC.Issuance
+import CC.IssuanceRules
+
+import CC.Scripts.Parameters
+
+
+-- Bootstrapping CC
+-------------------
+
+
+-- | A type to hold the off-ledger information required to interact with CC.
+newtype CCApp = CCApp with
+    svc : Party
+  deriving (Eq, Ord, Show)
 
 
 demoTime : Time
-demoTime = time (DA.Date.date 2022 Jan 1) 0 0 0
+demoTime = time (DA.Date.date 202 Jan 1) 0 0 0
 
--- Decentralized party governance utilities
--- ========================================
+-- | Setup the SVC party and the contracts defining the CC app.
+setupApp : Script CCApp
+setupApp = do
+  -- use a time that is easy to reason about in script outputs
+  setTime demoTime
 
--- Derive some instances to be able to use dedup
-deriving instance Ord SvcRules
+  -- In this model the SV Consortium is not decentralized.
+  svc <- allocateParty "SVC"
+  let app =  CCApp with svc
 
--- | Utility function to submit with read delegation.
-submitRD : Party -> Party -> Commands b -> Script b
-submitRD rdp p c = do
-    -- let
-    --   rd = ReadDelegation with
-    --     from = rdp
-    --     to = p
-    -- Some _ <- queryContractKey @ReadDelegation p rd
+  -- the SVC is its own validator
+  recordValidatorOf app app.svc app.svc
 
-    submitMulti [p] [rdp] c
+  submit svc $ createCmd (defaultIssuanceParameters svc svc)
 
--- | Utility function to submit as a validator of a decentralized party.
-submitDP : Party -> Party -> Commands b -> Script b
-submitDP dp p c = do
-  -- Some (_, dp_args) <- queryContractKey @DecentralizedParty p dp
-  -- assertMsg "Not a validator" (p `elem` dp_args.validators)
-  submitMulti [p] [dp] c
+  -- TOOD: reintroduce the price oracle
 
--- | Utility function to query with read delegation.
-queryRD : forall t . (Ord t, Template t) => Party ->Party -> Script [(ContractId t, t)]
-queryRD rdp p = do
-    -- -- Dirty check that read delegation exists
-    -- let
-    --   rd = ReadDelegation with
-    --     from = rdp
-    --     to = p
-    -- Some _ <- queryContractKey @ReadDelegation p rd
+  submit svc $ createCmd IssuanceRules with
+    lastIssuanceAt = demoTime
+    ..
+  submit svc $ createCmd CoinRules with
+      config = defaultCoinConfig
+      ..
 
-    a <- query @t rdp
-    b <- query @t p
-
-    return (dedup (a ++ b))
-
--- | Utility function to query as a validator of a decentralized party.
-queryDP : forall t . (Ord t, Template t) => Party -> Party -> Script [(ContractId t, t)]
-queryDP dp p = do
-  -- Some (_, dp_args) <- queryContractKey @DecentralizedParty p dp
-  -- assertMsg "Not a validator" (p `elem` dp_args.validators)
-
-  a <- query @t dp
-  b <- query @t p
-
-  return (dedup (a ++ b))
-
-
--- CCApp utilities
--- ===============
-
--- | A type to hold the off-ledger information required to interact with CC.
-data CCApp = CCApp with
-    svc : Party  -- TODO: consider removing the need for this, and always enter via the public party
-  deriving (Eq, Ord, Show)
+  -- return the off-ledger reference to the app for later script steps
+  return app
 
 
 -- CCApp users
 --------------
-
--- | onboardUser simply sets up public read for a user party
-onboardUser : CCApp -> Party -> Script ()
-onboardUser app user = do
-  -- TODO: this is a hack! use an actual invite flow, probably via the validator
-  coinCid <- pay app app.svc user 1.0 "Welcome!"
-  exerciseCoinRule app user CoinAccount_OpenWithCoin with
-    owner = user
-    validator = user -- TODO: properly set the validator
-    coinCid
-    targetNumber = 0
-
-
 
 setupUser : CCApp -> Text -> Script Party
 setupUser app name = do
@@ -104,74 +68,38 @@ setupUser app name = do
   onboardUser app user
   return user
 
--- | Execute a contract-key query using the CCApp public party.
-queryContractKeyPublic
-  : forall t k.
-    -- TODO: figure out the type synonyms that let us write this signature more compactly
-    (HasFromAnyContractKey t k, HasToAnyContractKey t k, HasMaintainer t k, HasFetchByKey t k, HasLookupByKey t k,
-    HasKey t k, HasFromAnyTemplate t, HasToAnyTemplate t, HasTemplateTypeRep t, HasArchive t, HasFetch t, HasCreate t,
-    HasAgreement t, HasEnsure t, HasObserver t, HasSignatory t
-    ) =>
-    CCApp -> Party -> k -> Script (Optional (ContractId t, t))
-queryContractKeyPublic app user k = do
-  -- ensureIsUser app user
-  queryContractKey @t (app.svc) k
-
-
--- Asset handling utilities
----------------------------
-
-getCoinRules : CCApp -> Party -> Script (ContractId CoinRules)
-getCoinRules app actor = do
-  optCoinRules <- queryContractKeyPublic @CoinRules app actor app.svc
-  return $ fst $ fromSomeNote ("CoinRules contract not found for " <> show app <> "'") optCoinRules
-
-exerciseCoinRule : Choice CoinRules ch r => CCApp -> Party -> ch -> Script r
-exerciseCoinRule app p ch = do
-  coinRulesCid <- getCoinRules app p
-  submitRD app.svc p $ exerciseCmd coinRulesCid ch
-
-
-pay : CCApp -> Party -> Party -> Decimal -> Text -> Script (ContractId Coin)
-pay app sender recipient coinQuantity msg = do
-  -- TODO: create payment pre-approval flow and use that here instead of submitMulti
-  submitMulti [sender, recipient] [app.svc] $ exerciseByKeyCmd @CoinRules app.svc CoinAccount_Transfer with
-    owner = sender
-    number = 0 -- default to coin account #0
-    quantity = coinQuantity
-    newOwner = recipient
-    payload = msg
-
-runCoinDepositBots : CCApp -> Script ()
-runCoinDepositBots app = do
-  users <- getAllUserParties app
-  forA_ users $ \user -> do
-    -- claim issuances for this user
-    claimIssuancesFor app user
-    -- claim transferred coins
-    coins <- queryFilter @Coin user (\coin -> coin.owner == user)
-    forA_ coins $ \(coinCid, _) ->
-      exerciseCoinRule app user CoinAccount_Deposit with
-        owner = user
-        number = 0
-        coinCid
-
--- Scripting issuance
------------------------------------------------------
-
+-- | onboardUser simply sets up public read for a user party
+onboardUser : CCApp -> Party -> Script ()
+onboardUser app user = do
+  -- TODO: this is a hack! use an actual invite flow, probably via the validator
+  pay app app.svc user 1.0 "Welcome!"
 
 getAllUserParties : CCApp -> Script [Party]
 getAllUserParties app = do
-  accounts <- query @CoinAccount app.svc
+  accounts <- query @Coin app.svc
   rights <- query @ValidatorRight app.svc
   return $ dedup $ [account.owner | (_, account) <- accounts] ++ [ right.validator | (_, right) <- rights]
 
+recordValidatorOf : CCApp -> Party -> Party -> Script ()
+recordValidatorOf app u v =
+  submitMulti [app.svc, v] [] $
+    void $ createCmd ValidatorRight with svc = app.svc; validator = v; user = u
 
+
+-- Issuance automation
+----------------------
+
+-- | Run the next issuance.
 runNextIssuance : CCApp -> Script ()
 runNextIssuance app = do
   -- invariant: svcRules.lastIssuanceAt <= getTime
+
+  -- TODO: switch away from wall-clock time and just issue in regular cycles;
+  -- thereby enabling proper handling of system downtime without incurring extra holding
+  -- fees to CC users.
+
   -- determine next issuanceAt by fetching svcRules and issuanceParams2
-  Some (_, svcRules) <- queryContractKey @SvcRules app.svc app.svc
+  Some (_, svcRules) <- queryContractKey @IssuanceRules app.svc app.svc
   Some (_, issuanceParams) <- queryContractKey @IssuanceParameters app.svc app.svc
   let issuanceAt = addRelTime svcRules.lastIssuanceAt issuanceParams.initialWindow.duration
 
@@ -180,31 +108,73 @@ runNextIssuance app = do
   submit app.svc do
     createCmd BurnOracle with
       svc = app.svc
-      public = app.svc
       issuanceAt
       quantity = sum (map (\(_, bc) -> bc.quantity) bcs)
   -- setTime issuanceAt
   setTime issuanceAt
   -- trigger issuance
-  void $ submit app.svc $ exerciseByKeyCmd @SvcRules app.svc Trigger_Issuance with issuanceAt
+  void $ submit app.svc $ exerciseByKeyCmd @IssuanceRules app.svc IssuanceRules_Issue with issuanceAt
 
 
+-- Asset handling utilities
+---------------------------
 
-claimIssuancesFor : CCApp -> Party -> Script ()
-claimIssuancesFor app user = do
-  hostedUsers <- getValidatorUsers user
-  issuances <- getCompletedIssuances app
-  brs <- queryFilter @BurnReceipt app.svc $ \br ->
-    br.issuanceAt `elem` issuances &&
-    case br.kind of
-      BurnReceiptForService -> br.burner == user
-      BurnReceiptForValidator -> br.burner `elem` hostedUsers
-  forA_ brs $ \(brCid, br) -> do
-    exerciseCoinRule app user BurnReceipt_Deposit with
-      owner = user
-      number = 0
-      coinCid = brCid
 
+-- | A simple and slightly hacky-way to test payment: it just gathers all coins from
+-- the sender and transfer's the desired quantity off of them to the receiver.
+-- The left-over quantity is kept.
+pay : CCApp -> Party -> Party -> Decimal -> Text -> Script ()
+pay app sender recipient coinQuantity msg = do
+  -- TODO: create payment pre-approval flow and use that here instead of submitMulti
+  coins <- queryFilter @Coin sender (\coin -> coin.owner == sender)
+  let transfer = Transfer with
+        sender
+        payload = msg
+        inputs = [ InputCoin coinCid | (coinCid, _) <- coins ]
+        outputs =
+          [ OutputSenderCoin with
+              exactQuantity = None
+              exactHoldingTime = None
+              lock = None
+          , OutputReceiverCoin with
+              receiver = recipient
+              quantity = coinQuantity
+          ]
+  void $ submitMulti [sender, recipient] [app.svc] $
+    exerciseByKeyCmd @CoinRules app.svc CoinRules_Transfer with transfer
+
+-- | Deposit all coins together with new issuances into a single coin.
+runCoinDepositBots : CCApp -> Script ()
+runCoinDepositBots app = do
+  users <- getAllUserParties app
+  forA_ users $ \user -> do
+    -- get all burns for this user
+    hostedUsers <- getValidatorUsers user
+    issuances <- getCompletedIssuances app
+    brs <- queryFilter @BurnReceipt app.svc $ \br ->
+      br.issuanceAt `elem` issuances &&
+      case br.kind of
+        BurnReceiptForService -> br.burner == user
+        BurnReceiptForValidator -> br.burner `elem` hostedUsers
+    -- get all coins of this user
+    coins <- queryFilter @Coin user (\coin -> coin.owner == user)
+    -- merge multiple of them into a single coin to minimize the holding fees
+    let transfer = Transfer with
+          sender = user
+          payload = "merge all my coins"
+          inputs =
+            [ InputBurnReceipt brCid | (brCid, _) <- brs ] ++
+            [ InputCoin coinCid | (coinCid, _) <- coins ]
+          outputs =
+            [ OutputSenderCoin with
+                exactQuantity = None
+                exactHoldingTime = None
+                lock = None
+            ]
+    when (not (null brs) || length coins > 1) $ void $
+      submitMulti [user] [app.svc] $ exerciseByKeyCmd @CoinRules app.svc CoinRules_Transfer with transfer
+
+-- | Retrieve a list of all issuances that have happened.
 getCompletedIssuances : CCApp -> Script [Time]
 getCompletedIssuances app = do
   issEvs <- query @IssuanceEvent app.svc
@@ -215,3 +185,13 @@ getValidatorUsers : Party -> Script [Party]
 getValidatorUsers validator = do
   rights <- queryFilter @ValidatorRight validator (\right -> right.validator == validator)
   return [ right.user | (_, right) <- rights ]
+
+
+-- Debugging support
+--------------------
+
+archiveTransferDebugNotes : CCApp -> Script ()
+archiveTransferDebugNotes app = do
+  notes <- query @TransferDebugNote app.svc
+  forA_ notes $ \(noteCid, _) ->
+    submit app.svc $ exerciseCmd noteCid Archive

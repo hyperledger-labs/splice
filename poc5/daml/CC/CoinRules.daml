@@ -1,295 +1,460 @@
 module CC.CoinRules where
 
-import DA.Action (void)
+import DA.Action (void, when, foldlA)
+import DA.Foldable (forA_)
+import DA.Map as Map
+import DA.Optional
+import DA.Set as Set
 import DA.Text
 import DA.Time
 
 import CC.Coin
-import OpenBusiness.RateLimits
+import CC.Issuance
 
-import OpenBusiness.Expiry
+
 import OpenBusiness.Fees
 
-data CoinRulesConfig = CoinRulesConfig with
+-- Types
+--------
 
-    -- | Fee to charge for a transfer.
-    transferFee : FixedPlusVariableRate
-    -- | Fee to hold a coin for longer than its initial free duration.
-    coinHoldingFee : DailyRate
-    -- | Duration for which a coin does not expire after creation.
-    freeCoinHoldingDuration : RelTime
 
-    accountConfig : CoinAccountConfig
-
-    -- | Max duration for a lock
+-- | Configuration determining the fees and limits for CC transfers granted by
+-- the CoinRules.
+--
+-- See CC.Scripts.Parameters for concrete values.
+data CoinConfig = CoinConfig with
+    -- | Fee to create a new coin.
+    createFee : FixedFee
+    -- | Fee to update an existing coin.
+    updateFee : FixedFee
+    -- | Fee for locking a coin.
+    lockFee : FixedFee
+    -- | Fee for keeping a coin around.
+    holdingFee : DailyRate
+    -- | The minimal time for which the holding fee of a coin must be covered
+    -- at all times.
+    minHoldingTime : RelTime
+    -- | The maximal time that the holding fee of a coin can be prepaid for.
+    maxPrepaidHoldingTime : RelTime
+    -- | The maximal duration for a lock.
     maxLockDuration : RelTime
+    -- | The minimal quantity of burn for which a receipt is issued.
+    minBurnReceiptQuantity : Decimal
+    -- | Fee for transferring some quantity of coin to a new owner.
+    -- TODO: make the variable part logarithmic in the quantity to make
+    -- large coin transfers cost competitive with blockchain and clearing networks.
+    transferFee : FixedPlusVariableRate
+    -- | The ratio of the transfer fee attributed to the sender.
+    -- Should probably be equal to the ratio of issuance receipt of
+    -- validator operators to app operators.
+    senderTransferFeeAttributionRatio : Decimal
+    -- | Maximum number of batch inputs for a transfer.
+    maxNumInputs : Int
+    -- | Maximum number of batch outputs for a transfer.
+    maxNumOutputs : Int
+    -- | Maximum length of the payload message on a transfer.
+    maxPayloadLength : Int
   deriving (Eq, Ord, Show)
 
 
-newCoinRateLimiter : RateLimit -> Time -> RateLimiter
-newCoinRateLimiter coinActionLimit t = RateLimiter with
-  balance = coinActionLimit.actionPrice  -- allow for one action by default
-  refilledAt = t
-
-
-
--- CoinRules
-------------
-
+-- | The rules governing how CC users can modify the CC state
+-- managed by the SVC.
 template CoinRules
   with
     svc : Party
-    public : Party
-    config : CoinRulesConfig
+    config : CoinConfig
     -- TODO: use a schedule with effective dating to make fees predictable to users
   where
     signatory svc
-    observer public
 
     key svc : Party
     maintainer key
 
-    -- | Lock an account and pay a fee as part of locking.
-    nonconsuming choice CoinAccount_Lock : ContractId Coin
+    -- | Execute a transfer.
+    --
+    -- Transfers support a batch-in batch-out model, which enables CC users
+    -- to optimize their needs for minimizing fees and contention based on their
+    -- business requirements.
+    nonconsuming choice CoinRules_Transfer : [ContractId Coin]
       with
-        owner : Party
-        number : Int
-        lockFee : Decimal -- TODO: consider whether we need the ability to have the sender pay both fees to improve the UX
-        lock : TimeLock
-        payload : Text
-      controller owner, lock.holder
-      do
-        -- validate choice parameters
-        now <- getTime
-        assertMsg "Lock expires in the future" (now <= lock.expiresAt)
-        let lockDuration = subTime lock.expiresAt now
-        assertMsg "Lock duration below the maximum" (lockDuration <= config.maxLockDuration)
-        assertMsg "Payload length <= 32 characters" (DA.Text.length payload <= 32)
-        -- transfer
-        transferGeneric config (svc, owner, number) lockFee lock.holder (Some lock)
+        transfer : Transfer
+      controller transferControllers transfer
+      do executeTransfer config svc transfer
 
+-- | Representation of a batch transfer.
+data Transfer = Transfer with
+    sender : Party
+    inputs : [TransferInput]
+    outputs : [TransferOutput]
+    payload : Text
+  deriving (Eq, Ord, Show)
 
-    -- | Transfer coin to a receipient
-    nonconsuming choice CoinAccount_Transfer : ContractId Coin
-      with
-        owner : Party
-        number : Int
-        quantity : Decimal
-        newOwner : Party
-        payload : Text
-      controller owner, newOwner
-      do
-        -- validate choice parameters
-        assertMsg "Payload length <= 32 characters" (DA.Text.length payload <= 32)
-        -- transfer
-        transferGeneric config (svc, owner, number) quantity newOwner None
+-- | An individual input for a batch transfer.
+data TransferInput
+  = InputBurnReceipt (ContractId BurnReceipt)
+  | InputCoin (ContractId Coin)
+  deriving (Eq, Ord, Show)
 
-    -- | Deposit a coin.
-    nonconsuming choice CoinAccount_Deposit : ()
-      with
-        owner : Party
-        number : Int
-        coinCid : ContractId Coin
-      controller owner
-      do
-        -- TODO: unify with BurnReceipt_Deposit and support and incentivize batch mode
-        coin <- fetch coinCid
-        archive coinCid
-        assertNotExpired coin
-        assertMsg "Coin must match account" ((svc, owner) == (coin.svc, coin.owner))
-        now <- getTime
-        void $ modifyCoinAccountQuantity config.accountConfig  (svc, owner, number) 0.0 ( + actualQuantity now coin.quantity)
-
-    nonconsuming choice BurnReceipt_Deposit : ()
-      with
-        owner : Party
-        number : Int
-        coinCid : ContractId BurnReceipt
-        -- TODO: allow for listing multiple coins from multiple issuances
-      controller owner
-      do
-        -- check that coin has not expired
-        coin <- fetch coinCid
-        assertNotExpired coin
-        assertMsg "Same SVC" (svc == coin.svc)
-        -- grab issuance event
-        (_, issueEv) <- fetchByKey @IssuanceEvent (svc, coin.issuanceAt)
-        -- check that owner can claim the receipt and compute issuance per coin
-        issuancePerCoin <- case coin.kind of
-          BurnReceiptForService -> do
-            assertMsg "Burn receipt for service must match account owner" (owner == coin.burner)
-            archive coinCid
-            return issueEv.burnerIssuancePerCoin
-          BurnReceiptForValidator -> do
-            (rightCid, validatorRight) <- fetchByKey @ValidatorRight (svc, coin.burner)
-            assertMsg "Burner validator must match owner" (owner == validatorRight.validator)
-            exercise coinCid BurnReceipt_ArchiveAsValidator with validator = owner; rightCid
-            return issueEv.validatorIssuancePerCoin
-        -- deposit quantity on account
-        void $ modifyCoinAccountQuantity config.accountConfig (svc, owner, number) 0.0 ( + coin.quantity * issuancePerCoin)
-
-    -- | Open a coin account paying fees and the initial quantity from the source account.
-    nonconsuming choice CoinAccount_Open : ()
-      with
-        owner : Party
-        sourceNumber : Int
-        targetNumber : Int
-        quantity : Decimal
-      controller owner
-      do
-        assertMsg "Quantity is positive" (quantity >= 0.0)
-        -- subtract account opening fee and targetQuantity
-        let CoinAccountConfig with holdingFee; openingFee; modificationFee; .. = config.accountConfig
-        assertMsg "Account modification fee <= opening fee" (modificationFee.fee <= openingFee.fee)
-        sourceAccount <- modifyCoinAccountQuantity config.accountConfig (svc, owner, sourceNumber) modificationFee.fee \q ->
-          q - quantity - openingFee.fee
-        -- create new account
-        now <- getTime
-        let startsExpiringAt = addRelTime now (spentWithDailyRate holdingFee (openingFee.fee - modificationFee.fee))
-        createBurnReceipt svc BurnReceiptForValidator owner openingFee.fee
-        void $ create CoinAccount with
-          svc
-          owner
-          quantity = expiringQuantity holdingFee quantity startsExpiringAt
-          number = targetNumber
-          lock = None
-          obs = []
-
-    -- | Open a coin account paying fees and the initial quantity from the source account.
-    nonconsuming choice CoinAccount_OpenWithCoin : ()
-      with
-        owner : Party
-        validator : Party
-        coinCid : ContractId Coin
-        targetNumber : Int
-      controller owner
-      do
-        -- TODO: use contract to check user to validator match
-        -- fetch and archive the coin
-        coin <- fetch coinCid
-        archive coinCid
-        -- check that coin matches
-        assertMsg "Coin must match coin rules" ((svc, owner) == (coin.svc, coin.owner))
-        -- create new account
-        -- TODO: share code with opening from an existing account
-        now <- getTime
-        let CoinAccountConfig with holdingFee; openingFee; .. = config.accountConfig
-            quantity = actualQuantity now coin.quantity - openingFee.fee
-            startsExpiringAt = addRelTime now (spentWithDailyRate holdingFee openingFee.fee)
-        createBurnReceipt svc BurnReceiptForValidator validator openingFee.fee
-        void $ create CoinAccount with
-          svc
-          owner
-          quantity = expiringQuantity holdingFee quantity startsExpiringAt
-          number = targetNumber
-          lock = None
-          obs = []
-
-
-
-
-
-transferGeneric : CoinRulesConfig -> CoinAccountKey -> Decimal -> Party -> Optional TimeLock -> Update (ContractId Coin)
-transferGeneric config k@(svc, owner, _) quantity receiver lock = do
-  -- charge owner account and lock if required
-  assertMsg "Quantity must be positive" (quantity > 0.0)
-  let transferFee = chargeFixedPlusVariableRate config.transferFee quantity
-      senderFee = transferFee / 2.0
-      receiverFee = transferFee - senderFee
-  coin <- modifyCoinAccount config.accountConfig k transferFee $ \(q, optLock) ->
-    case optLock of
-      Some _ -> error "Locked coin cannot be transferred or locked"
-      None -> (q - quantity - senderFee, lock)
-
-  -- create receipts for burned fee
-  createBurnReceipt svc BurnReceiptForValidator owner senderFee
-  createBurnReceipt svc BurnReceiptForService receiver receiverFee
-  -- create coin for the receiver to deposit
-  now <- getTime
-  create Coin with
-    svc
-    owner = receiver
-    quantity = expiringQuantity
-      config.coinHoldingFee
-      (quantity - receiverFee)
-      (addRelTime now config.freeCoinHoldingDuration)
-
-createBurnReceipt : Party -> BurnReceiptKind -> Party -> Decimal -> Update (ContractId BurnReceipt)
-createBurnReceipt svc kind burner quantity = do
-  (issuanceAt, expiresAt) <- getIssuanceAtAndExpiresAt svc
-  create BurnReceipt with ..
-
-
-
--- Issuance parameters
-----------------------
-
--- TODO: move
-
-
-data TimeWindow = TimeWindow with
-    startsAt : Time
-    duration : RelTime
+-- | An individual output for a batch transfer.
+data TransferOutput
+  = OutputSenderCoin with
+      -- | The quantity desired for this coin. If not set, then it will receive
+      -- a portion of the remainin input quantity.
+      exactQuantity : Optional Decimal
+      -- | The desired holding time for this coin. Set to a low value for coins
+      -- that are intended to be transferred soon to avoid amassing
+      -- and loosing prepaid holding time on them.
+      exactHoldingTime : Optional RelTime
+      -- | The lock to be added.
+      lock : Optional TimeLock
+  | OutputReceiverCoin with
+      receiver : Party
+      quantity : Decimal
   deriving (Eq, Ord, Show)
 
 
-
-getIssuanceAtAndExpiresAt : Party -> Update (Time, Time)
-getIssuanceAtAndExpiresAt svc = do
-  burnedAt <- getTime
-  (_, params) <- fetchByKey @IssuanceParameters svc
-  let
-    microsSinceStart = convertRelTimeToMicroseconds (subTime burnedAt params.initialWindow.startsAt)
-    microsWindowDuration = convertRelTimeToMicroseconds params.initialWindow.duration
-    windowsFromStartToIssuance = 2 + microsSinceStart / microsWindowDuration
-    -- TODO: add unit tests to check for off-by-one errors
-    issuanceAt = addRelTime params.initialWindow.startsAt (convertMicrosecondsToRelTime (windowsFromStartToIssuance * microsWindowDuration))
-    expiresAt = addRelTime issuanceAt params.claimDuration
-  return (issuanceAt, expiresAt)
-
-
-
--- | IssuanceParameters is a configuration contract that holds issuance parameters.
-template IssuanceParameters
-  with
+-- | A way to store some debug info on the ledger.
+--
+-- TODO: replace by automated testing.
+template TransferDebugNote with
     svc : Party
-    public : Party
-    -- | How many coins are issued per issuance window.
-    coinsPerIssuance : Decimal
-    -- | The maximum proportion of the issuance that goes to service providers.
-    servicePercentage : Decimal
-    -- | The maximum proportion of the issuance that goes to validators.
-    validatorPercentage : Decimal
-    -- | The initial issuance window, which is replicated going forwards.
-    initialWindow : TimeWindow
-    -- | For how long a burned coin can be claimed after its issuance event.
-    claimDuration : RelTime
-    -- TODO: use a schedule with effective dating to enable controlled modifications
-    -- of these parameters
+    transfer : Transfer
+    isum : TransferInputsSummary
+    osum : TransferOutputsSummary
+    summary : TransferSummary
   where
     signatory svc
-    observer public
-
-    key svc : Party
-    maintainer key
 
 
 
-template IssuanceEvent
-  with
-    svc : Party
-    public : Party
-    issuanceAt : Time
-    validatorIssuancePerCoin : Decimal
-    burnerIssuancePerCoin : Decimal
-    expiresAt : Time
+-- Transfer logic
+-- ==============
+
+-- | The controllers for a transfer.
+transferControllers : Transfer -> Set Party
+transferControllers t =
+    foldl addOutputController (Set.singleton t.sender) t.outputs
   where
-    signatory svc
-    observer public
+    addOutputController s (OutputSenderCoin with lock; ..) = optional s (`Set.insert` s) (lockHolder lock)
+    addOutputController s (OutputReceiverCoin with receiver; ..) = Set.insert receiver s
 
-    key (svc, issuanceAt) : (Party, Time)
-    maintainer key._1
+-- | Execute a transfer.
+--
+-- The fee logic was chosen to satisfy the following desiderata:
+--
+-- * low friction user onboarding
+-- * charge value-proportional fees for value-added actions (coin splitting, transfer and locking)
+-- * charge cost-covering fees for administrative actions (holding and merging coins)
+-- * reasonably active users do not pay any fees for initating transfers
+-- * users are disincentivized to hold many coin contracts
+-- * app operator's pay lower transfer fees when there is less overall app activity on the network
+-- * very active users are incentivized to run their own participant node
+--
+-- The batched nature of the code complicates these computations,
+-- but is key to keep the cost of operating and using CC low.
+--
+executeTransfer : CoinConfig -> Party -> Transfer -> Update [ContractId Coin]
+executeTransfer config svc t = do
+  -- compute summaries
+  isum <- summarizeAndConsumeInputs svc t.sender t.inputs
+  osum <- preprocessAndSummarizeOutputs config t.sender t.outputs
+  let summary = transferSummary config isum osum
+  -- check that overall transfer constraints are satisfied
+  assertMsg "Less than the maximum number of inputs" (summary.numInputs <= config.maxNumInputs)
+  assertMsg "Less than the maximum number of outputs" (summary.numOutputs <= config.maxNumOutputs)
+  assertMsg "Payload lenght below limit" (DA.Text.length t.payload <= config.maxPayloadLength)
+  assertMsg "Total input quantity covers total output quantity + fees"
+    (summary.quantityBalance >= 0.0)
+  when (summary.quantityBalance /= 0.0) $
+    assertMsg "There is at least one floating sender output coin to receive excess input quantity"
+      (summary.numFloatingSenderCoins > 0)
+  -- record debugging note
+  create TransferDebugNote with transfer = t; ..
+  -- record burns
+  issueBurnReceipts config svc t.sender summary
+  -- record outputs
+  createTransferOutputs config svc summary osum.preprocessedOutputs
 
-    implements ExpiringContract where
-      let contractExpiresAt = expiresAt
-      let expiryManager = svc
+data TransferInputsSummary = TransferInputsSummary with
+    numBurnInputs : Int
+    numCoinInputs : Int
+    totalQuantity : Decimal
+    -- | Unused holding days of coin inputs.
+    totalPaidHoldingDays : Decimal
+  deriving (Eq, Show)
+
+data TransferOutputsSummary = TransferOutputsSummary with
+    numUnlockedSenderCoins : Int
+    numLockedSenderCoins : Int
+    numReceiverCoins : Int
+    -- | Sender coins that do not have a desired exact quantity specified.
+    numFloatingSenderCoins : Int
+    requiredQuantity : Decimal
+    totalTransferFees : Decimal
+    -- | The number of sender coins without an explicit request for holding time.
+    numLongtermSenderCoins : Int
+    requiredSenderHoldingDays : Decimal
+    preprocessedOutputs : [PreprocessedTransferOutput]
+    receiverFees : Map Party Decimal
+  deriving (Eq, Show)
+
+data PreprocessedTransferOutput = PreprocessedTransferOutput with
+    owner : Party
+    quantity : Decimal
+    holdingTime : RelTime
+    lock : Optional TimeLock
+    -- | The how many'th coin this is to receive excess quantity.
+    excessQuantityNumber : Optional Int
+    -- | The how many'th coin this is to receive excesss holding time.
+    excessHoldingTimeNumber : Optional Int
+  deriving (Eq, Show)
+
+data TransferSummary = TransferSummary with
+    numInputs : Int
+    numOutputs : Int
+    excessCoinHoldingDays : Decimal
+    quantityBalance : Decimal
+    numLongtermSenderCoins : Int
+    numFloatingSenderCoins : Int
+    -- | Transfer fees attributed to the sender.
+    senderFeeAttribution : Decimal
+    receiverFees : Map Party Decimal
+  deriving (Eq, Show)
+
+
+summarizeAndConsumeInputs : Party -> Party -> [TransferInput] -> Update TransferInputsSummary
+summarizeAndConsumeInputs svc sender inps = do
+    now <- getTime
+    foldlA (summarizeAndConsumeInput now) initialSummary inps
+  where
+    initialSummary = TransferInputsSummary with
+      numBurnInputs = 0
+      numCoinInputs = 0
+      totalQuantity = 0.0
+      totalPaidHoldingDays = 0.0
+
+    summarizeAndConsumeInput now s (InputCoin coinCid) = do
+      coin <- fetch coinCid
+      archive coinCid
+      assertMsg "SVC matches" (svc == coin.svc)
+      assertMsg "Sender matches owner" (sender == coin.owner)
+      return TransferInputsSummary with
+        numBurnInputs = s.numBurnInputs
+        numCoinInputs = s.numCoinInputs + 1
+        totalQuantity =
+          -- TODO: consider tracking the spent holding fees and recording it
+          -- as a BurnReceiptForValidator
+          s.totalQuantity + actualQuantity now coin.quantity
+        totalPaidHoldingDays =
+          s.totalPaidHoldingDays + max 0.0 (relTimeToDays $ subTime coin.quantity.startsExpiringAt now)
+
+    summarizeAndConsumeInput now s (InputBurnReceipt burnCid) = do
+      burn <- fetch burnCid
+      assertMsg "SVC matches" (svc == burn.svc)
+      quantity <- case burn.kind of
+        BurnReceiptForService -> do
+          assertMsg "Sender matches service owner" (sender == burn.burner)
+          archive burnCid
+          return burn.quantity
+        BurnReceiptForValidator -> do
+            (rightCid, validatorRight) <- fetchByKey @ValidatorRight (svc, burn.burner)
+            assertMsg "Sender matches burner's validator" (sender == validatorRight.validator)
+            exercise burnCid BurnReceipt_ArchiveAsValidator with validator = sender; rightCid
+            (_, issueEv) <- fetchByKey @IssuanceEvent (svc, burn.issuanceAt)
+            return (burn.quantity * issueEv.validatorIssuancePerCoin)
+      return TransferInputsSummary with
+        numBurnInputs = s.numBurnInputs + 1
+        numCoinInputs = s.numCoinInputs
+        totalQuantity = s.totalQuantity + quantity
+        totalPaidHoldingDays = s.totalPaidHoldingDays
+
+
+preprocessAndSummarizeOutputs : CoinConfig -> Party -> [TransferOutput] -> Update TransferOutputsSummary
+preprocessAndSummarizeOutputs config sender outs = do
+    -- NOTE: the preprocessed outputs are produced in reverse order. This is intentional,
+    -- as it simplifies distributing excess quantity and holdingTime in a way that prefers
+    -- the earlier outputs coins wrt non-divisible amounts.
+    foldlA summarizeOutput initialSummary outs
+  where
+    initialSummary = TransferOutputsSummary with
+      numUnlockedSenderCoins = 0
+      numLockedSenderCoins = 0
+      numReceiverCoins = 0
+      requiredQuantity = 0.0
+      totalTransferFees = 0.0
+      numLongtermSenderCoins = 0
+      requiredSenderHoldingDays = 0.0
+      numFloatingSenderCoins = 0
+      preprocessedOutputs = []
+      receiverFees = Map.empty
+
+    summarizeOutput s (OutputSenderCoin with exactQuantity; exactHoldingTime; lock) = do
+      let output = PreprocessedTransferOutput with
+            owner = sender
+            quantity = fromOptional 0.0 exactQuantity
+            holdingTime =
+              -- adjust min and max holding times
+              max config.minHoldingTime $
+              min config.maxPrepaidHoldingTime $
+              fromOptional (days 0) exactHoldingTime
+            lock
+            excessHoldingTimeNumber = if isNone exactHoldingTime then Some (s.numLongtermSenderCoins + 1) else None
+            excessQuantityNumber = if isNone exactQuantity then Some (s.numFloatingSenderCoins + 1) else None
+      forA_ output.lock $ \lock -> do
+        now <- getTime
+        let maxLockExpiry = addRelTime now config.maxLockDuration
+        assertMsg "Lock expires before latest expiry time" (lock.expiresAt <= maxLockExpiry)
+      return TransferOutputsSummary with
+        numUnlockedSenderCoins = s.numUnlockedSenderCoins + (if isSome lock then 0 else 1)
+        numLockedSenderCoins = s.numLockedSenderCoins + (if isSome lock then 1 else 0)
+        numReceiverCoins = s.numReceiverCoins
+        requiredQuantity = s.requiredQuantity + fromOptional 0.0 exactQuantity
+        totalTransferFees = s.totalTransferFees
+        numLongtermSenderCoins = s.numLongtermSenderCoins + (if isSome exactHoldingTime then 0 else 1)
+        requiredSenderHoldingDays = s.requiredSenderHoldingDays + relTimeToDays output.holdingTime
+        numFloatingSenderCoins = s.numFloatingSenderCoins + (if isSome exactQuantity then 0 else 1)
+        preprocessedOutputs = output :: s.preprocessedOutputs
+        receiverFees = s.receiverFees
+
+    summarizeOutput s (OutputReceiverCoin with quantity; receiver) = do
+      let transferFee = chargeFixedPlusVariableRate config.transferFee quantity
+          receiverFee =
+            -- NOTE: only part of the transferFee is attributed to and minable by the receiver
+            -- TODO: check that this does loose fee quantity
+            transferFee * (1.0 - config.senderTransferFeeAttributionRatio)
+          output = PreprocessedTransferOutput with
+            owner = receiver
+            quantity =
+              -- NOTE: the check for non-negative quantity happens as part of coin creation.
+              quantity - transferFee
+            holdingTime =
+              -- NOTE: we assume that the smallest receiverFee is still large enough wrt the
+              -- dailyHoldingFee to pay for the minHoldingTime
+              min config.maxPrepaidHoldingTime (spentWithDailyRate config.holdingFee receiverFee)
+            lock =
+              -- TODO (post-MVP): consider whether we should (and can with good UX) offer locking
+              -- a receivers coin
+              None
+            excessHoldingTimeNumber = None
+            excessQuantityNumber = None
+      return TransferOutputsSummary with
+        numUnlockedSenderCoins = s.numUnlockedSenderCoins
+        numLockedSenderCoins = s.numLockedSenderCoins
+        numReceiverCoins = s.numReceiverCoins + 1
+        requiredQuantity = s.requiredQuantity + quantity
+        totalTransferFees = s.totalTransferFees + transferFee
+        numLongtermSenderCoins = s.numLockedSenderCoins
+        requiredSenderHoldingDays = s.requiredSenderHoldingDays
+        numFloatingSenderCoins = s.numFloatingSenderCoins
+        preprocessedOutputs = output :: s.preprocessedOutputs
+        receiverFees = Map.alter (\old -> Some (receiverFee + fromOptional 0.0 old)) receiver s.receiverFees
+
+
+transferSummary : CoinConfig -> TransferInputsSummary -> TransferOutputsSummary -> TransferSummary
+transferSummary config inp out = TransferSummary with
+    excessCoinHoldingDays = max 0.0 senderHoldingDaysBalance
+    quantityBalance = inp.totalQuantity - out.requiredQuantity - uncoveredSenderActionFees - holdingTimeFees
+    numLongtermSenderCoins = out.numLongtermSenderCoins
+    numFloatingSenderCoins = out.numFloatingSenderCoins
+    senderFeeAttribution = max senderActionFees senderTransferFees + holdingTimeFees
+    receiverFees = out.receiverFees
+    numInputs = inp.numCoinInputs + inp.numBurnInputs
+    numOutputs = out.numUnlockedSenderCoins + out.numLockedSenderCoins + out.numReceiverCoins
+  where
+    -- NOTE: the fee computations follow from the principle that a reasonably active
+    -- user of Canton coin does not pay any other fees than the transfer fees.
+    --
+    -- The non-transfer fees are there to incentivize users to hold few coins, and
+    -- disincentivize unnecessary updates to their state.
+
+    -- compute fees for the sender actions
+    numCoinUpdates = min inp.numCoinInputs out.numUnlockedSenderCoins
+    numCoinCreates = max 0 (out.numUnlockedSenderCoins - numCoinUpdates)
+    coinCreateFees = config.createFee.fee * intToDecimal numCoinCreates
+    coinUpdateFees = config.updateFee.fee * intToDecimal numCoinUpdates
+    coinLockFees = config.lockFee.fee * intToDecimal out.numLockedSenderCoins
+    senderActionFees = coinCreateFees + coinUpdateFees + coinLockFees
+    senderTransferFees = out.totalTransferFees * config.senderTransferFeeAttributionRatio
+    uncoveredSenderActionFees = max 0.0 (senderActionFees - senderTransferFees)
+    -- compute bonus holding time for the sender
+    senderHoldingFeeBonus = max 0.0 (senderTransferFees - senderActionFees)
+    senderHoldingDaysBonus = senderHoldingFeeBonus / config.holdingFee.rate
+    -- compute holding time fees for the sender
+    senderHoldingDaysBalance = inp.totalPaidHoldingDays + senderHoldingDaysBonus - out.requiredSenderHoldingDays
+    missingHoldingDays = max 0.0 (negate senderHoldingDaysBalance)
+    holdingTimeFees = config.holdingFee.rate * missingHoldingDays
+
+
+issueBurnReceipts : CoinConfig -> Party -> Party -> TransferSummary -> Update ()
+issueBurnReceipts config svc sender summary = do
+    -- fetch issuances parameters
+    (issuanceAt, expiresAt) <- getIssuanceAtAndExpiresAt
+    let issueBurnReceipt kind burner quantity =
+          when (config.minBurnReceiptQuantity <= quantity) $ do
+            void $ create BurnReceipt with ..
+    -- issue sender receipt
+    issueBurnReceipt BurnReceiptForValidator sender summary.senderFeeAttribution
+    -- issue receiver receipts
+    forA_ (Map.toList summary.receiverFees) (uncurry $ issueBurnReceipt BurnReceiptForService)
+  where
+    -- TODO: simplify this logic by switching to an explicit issuance-cyle clock
+    getIssuanceAtAndExpiresAt = do
+      burnedAt <- getTime
+      (_, params) <- fetchByKey @IssuanceParameters svc
+      let
+        microsSinceStart = convertRelTimeToMicroseconds (subTime burnedAt params.initialWindow.startsAt)
+        microsWindowDuration = convertRelTimeToMicroseconds params.initialWindow.duration
+        windowsFromStartToIssuance = 2 + microsSinceStart / microsWindowDuration
+        -- TODO: add unit tests to check for off-by-one errors
+        issuanceAt = addRelTime params.initialWindow.startsAt (convertMicrosecondsToRelTime (windowsFromStartToIssuance * microsWindowDuration))
+        expiresAt = addRelTime issuanceAt params.claimDuration
+      return (issuanceAt, expiresAt)
+
+data OutputCreationState = OutputCreationState with
+  remainingExcessQuantity : Decimal
+  remainingExcessHoldingDays : Decimal
+  coinCids : [ContractId Coin]
+
+createTransferOutputs : CoinConfig -> Party -> TransferSummary -> [PreprocessedTransferOutput] -> Update [ContractId Coin]
+createTransferOutputs config svc summary outs = do
+    st <- foldlA createOutput initialState outs
+    return st.coinCids
+  where
+    initialState = OutputCreationState with
+      remainingExcessQuantity = max 0.0 summary.quantityBalance
+      remainingExcessHoldingDays = summary.excessCoinHoldingDays
+      coinCids = []
+
+    perCoinExcessHoldingDays
+      | summary.numLongtermSenderCoins <= 0 = 0.0
+      | otherwise = summary.excessCoinHoldingDays / intToDecimal summary.numLongtermSenderCoins
+    perCoinExcessQuantity
+      | summary.numFloatingSenderCoins <= 0 = 0.0
+      | otherwise = initialState.remainingExcessQuantity / intToDecimal summary.numFloatingSenderCoins
+
+    createOutput st out = do
+      now <- getTime
+      let extraHoldingDays = case out.excessHoldingTimeNumber of
+            None -> 0.0
+            Some n
+              | n < summary.numLongtermSenderCoins -> perCoinExcessHoldingDays
+              | otherwise -> st.remainingExcessHoldingDays
+          holdingTime =
+            min config.maxPrepaidHoldingTime (out.holdingTime + daysToRelTime extraHoldingDays)
+          extraQuantity = case out.excessQuantityNumber of
+            None -> 0.0
+            Some n
+              | n < summary.numFloatingSenderCoins -> perCoinExcessQuantity
+              | otherwise -> st.remainingExcessQuantity
+                -- TODO: consider smearing this remainder excess quantity above perCoinExcessQuantity
+                -- as thinly as possible over the appropriate number of floating coins.
+          quantity = out.quantity + extraQuantity
+      coinCid <- create Coin with
+        svc
+        owner = out.owner
+        quantity = expiringQuantity config.holdingFee quantity (addRelTime now holdingTime)
+        lock = out.lock
+      return OutputCreationState with
+        remainingExcessQuantity = st.remainingExcessQuantity - extraQuantity
+        remainingExcessHoldingDays = st.remainingExcessHoldingDays - relTimeToDays (holdingTime - out.holdingTime)
+        coinCids = coinCid :: st.coinCids

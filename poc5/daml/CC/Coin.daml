@@ -1,242 +1,64 @@
+-- | The contracts representing the long-term state of CC.
 module CC.Coin where
 
-import DA.Action (void)
-import DA.Optional (isNone, optionalToList)
-import DA.Time
+import DA.Optional
 
 import OpenBusiness.Expiry
 import OpenBusiness.Fees
 
--- | A stable identifier for a coin account.
--- TODO: use an explicitly named record to avoid mixups
-type CoinAccountKey = (Party, Party, Int)
 
+-- Lockable, expiring coins
+---------------------------
+
+-- | A lock held by a particular party until its expiry.
 data TimeLock = TimeLock with
     holder: Party
+    -- TODO: consider adding support for groups of lock holders.
     expiresAt: Time
   deriving (Eq, Ord, Show)
 
-
--- | Coin accounts
-template CoinAccount
-  with
-    svc : Party
-    owner : Party
-    number : Int
-    -- TODO: rename to balance
-    quantity : ExpiringQuantity
-    lock : Optional TimeLock
-    obs : [Party]
-  where
-    signatory svc, owner, lockHolder lock
-    observer obs
-
-    ensure validExpiringQuantity quantity
-
-    key (svc, owner, number) : CoinAccountKey
-    maintainer key._1, key._2
-
-
-    -- NOTE: none of these choices are rate-limited, as they cannot be repeated.
-    choice CoinAccount_Unlock : ()
-      controller lockHolder lock
-      do -- TODO: test that this choice cannot be called if the coin is not locked
-
-         void $ create this with
-          lock = None
-          -- MISSING FEATURE: automatic intra-tx disclosure during a single command interpretation
-          -- would make it such that unlock and burn works
-          obs = optionalToList (lockHolder lock)
-
-    choice CoinAccount_OwnerExpireLock : ()
-      controller owner
-      do tryExpireLock this
-
-    -- NOTE: we intentionally don't combine this choice with CoinAccount_OwnerExpireLock to
-    -- provide a more expressive transaction graph.
-    choice CoinAccount_SvcExpireLock : ()
-      controller svc
-      do tryExpireLock this
-
-
-tryExpireLock : CoinAccount -> Update ()
-tryExpireLock coin = case coin.lock of
-  None -> fail "CoinAccount not locked"
-  Some (TimeLock with expiresAt; holder) -> do
-    t <- getTime
-    assertMsg "Lock not expired" (expiresAt <= t)
-    void $ create coin with lock = None
-
-lockHolder : Optional TimeLock -> Optional Party
-lockHolder lock = (.holder) <$> lock
-
-unlockCoin : CoinAccountKey -> Update ()
-unlockCoin k = exerciseByKey @CoinAccount k CoinAccount_Unlock
-
-
--- Transfers
-------------
-
-
--- | A coin that was transferred.
+-- | A Canton Coin, which can be locked and whose quantity expires over time.
+--
+-- The expiry serves to charge an inactivity fee, and thereby ensures that the
+-- SVC can reclaim all coins at some point in the future.
 template Coin
   with
     svc : Party
     owner : Party
     quantity : ExpiringQuantity
+    lock : Optional TimeLock
   where
-    signatory svc, owner
+    signatory svc, owner, lockHolder lock
     ensure validExpiringQuantity quantity
 
-    -- TODO: consider whether expiry should create a burned coin for the SVC, or
-    -- change the owner back to the SVC
     implements ExpiringContract where
       let contractExpiresAt = quantity.expiresAt
       let expiryManager = svc
 
-data BurnReceiptKind
-  = BurnReceiptForValidator
-  | BurnReceiptForService
-  deriving (Eq, Ord, Show)
+    choice Coin_Unlock : ContractId Coin
+      controller lockHolder lock
+      do
+        assertMsg "Coin is locked" (isSome lock)
+        create this with lock = None
 
-template BurnReceipt
-  with
-    svc : Party
-    burner : Party
-    -- | Kind of the burned coin, which is used during issuance to lookup the approriate rate.
-    -- TODO: split the receipts for validators and services, as they are now different enought
-    -- that they should use their own templates.
-    kind : BurnReceiptKind
-    quantity : Decimal
-    -- | The time of the issuance round in which this burned coin allows to participate
-    -- NOTE: redemption of issuances will generally lead to spiky traffic, which can though
-    -- be compensated by not merging burnedcoin for some time around issuance.
-    issuanceAt : Time
-    expiresAt : Time
-  where
-    signatory svc, burner
-    ensure quantity > 0.0
-      && issuanceAt < expiresAt
+    let tryExpireLock : Update (ContractId Coin)
+        tryExpireLock = case this.lock of
+          None -> fail "Coin not locked"
+          Some (TimeLock with expiresAt; holder) -> do
+            t <- getTime
+            assertMsg "Lock not expired" (expiresAt <= t)
+            create this with lock = None
 
-    implements ExpiringContract where
-      let contractExpiresAt = expiresAt
-      let expiryManager = svc
+    choice Coin_OwnerExpireLock : ContractId Coin
+      controller owner
+      do tryExpireLock
 
-    -- | This choice is used by the SVC to merge all burned coins per validator.
-    -- The expectation is that there is at most one burned coin per validator before
-    -- the issuance event is triggered.
-    choice BurnReceipt_Merge : ContractId BurnReceipt
-      with
-        cids : [ContractId BurnReceipt]
+    -- NOTE: we intentionally don't combine this choice with Coin_OwnerExpireLock to
+    -- provide a more expressive transaction graph.
+    choice Coin_SvcExpireLock : ContractId Coin
       controller svc
-      do
-        assertMsg "Merge with at least one burned coin" (not (null cids))
-        quantities <- forA cids $ \cid -> do
-          burnedCoin <- fetch cid
-          assertMsg ("Burned coins must match") (this == burnedCoin with quantity)
-          return burnedCoin.quantity
-        create this with quantity = this.quantity + sum quantities
+      do tryExpireLock
 
-    choice BurnReceipt_ArchiveAsValidator : ()
-      with
-        validator : Party
-        rightCid : ContractId ValidatorRight
-      controller svc, validator
-      do
-        right <- fetch rightCid
-        assertMsg "Must be receipt for validator" (kind == BurnReceiptForValidator)
-        assertMsg "Right must match" (right == ValidatorRight with svc; validator, user = burner)
-
-
--- Coin helper functions
---------------------------
-
-data CoinAccountConfig = CoinAccountConfig with
-    -- | Fee to open an account.
-    openingFee : FixedFee
-    -- | A (small) fee burned on every account modification.
-    modificationFee : FixedFee
-    -- | The cost of keeping the account open.
-    holdingFee : DailyRate
-    -- | The maximal amount of time that an account's holding fees can be prepaid
-    -- via the burns attributed to that account.
-    --
-    -- TODO: improve name, as this is how much in advance an account's holding fee
-    -- can be prepaid via associated burns.
-    -- A locked account will be prepaid significantly farther into the future.
-    maxHoldingFeePrepayDuration : RelTime
-  deriving (Eq, Ord, Show)
-
-
-modifyCoinAccount : CoinAccountConfig -> CoinAccountKey -> Decimal -> ((Decimal, Optional TimeLock) -> (Decimal, Optional TimeLock)) -> Update CoinAccount
-modifyCoinAccount config coinKey@(svc, owner, number) attributedBurnQuantity f = do
-  (coinCid, coin) <- fetchByKey @CoinAccount coinKey
-  now <- getTime
-  let xOld = (actualQuantity now coin.quantity, coin.lock)
-      xNew@(quantity, lock) = f xOld
-  -- do not charge an action if the coin does not need to be updated
-  if (xOld == xNew)
-    then return coin
-    else do
-      archive coinCid
-      let modificationFee = max 0.0 (config.modificationFee.fee - attributedBurnQuantity)
-          paidHoldingDuration = spentWithDailyRate config.holdingFee attributedBurnQuantity
-          startsExpiringAt =
-            max coin.quantity.startsExpiringAt $
-            min (addRelTime now config.maxHoldingFeePrepayDuration) $
-            addRelTime coin.quantity.startsExpiringAt paidHoldingDuration
-          newCoin = CoinAccount with
-            -- using explicit fields to get errors when refactoring the field structure
-            svc = coin.svc
-            owner = coin.owner
-            number = coin.number
-            obs = coin.obs
-            -- TODO: check that the way the modificationFee is charged does not lock up accounts too hard when they are near zero
-            quantity = expiringQuantity config.holdingFee (quantity - modificationFee) startsExpiringAt
-            lock
-      void $ create newCoin
-      return newCoin
-
-
-
-modifyCoinAccountQuantity : CoinAccountConfig -> CoinAccountKey -> Decimal -> (Decimal -> Decimal) -> Update CoinAccount
-modifyCoinAccountQuantity config k attributedBurnQuantity f = do
-  modifyCoinAccount config k attributedBurnQuantity $ \(quantity, optLock) ->
-    if (isNone optLock)
-      then (f quantity, optLock)
-      else error "Cannot modify quantity of locked coin"
-
-
--- Validator state
-------------------
-
--- | The right to claim coin issuances for a user's burns as their validator.
-template ValidatorRight with
-    svc : Party
-    user : Party
-    validator : Party
-    -- TODO: manage expiry
-  where
-    signatory svc, validator
-
-    key (svc, user) : (Party, Party)
-    maintainer key._1
-
-    -- TODO: cancellation, withdrawal
-
-
--- TODO: group approval flow into a separate data+rules package
-
--- | A request to be granted the validator right for a particular user.
-template ValidatorRightRequest with
-    right : ValidatorRight
-    -- TODO: manage expiry
-  where
-    signatory (signatory right)
-
-    choice ValidatorRightRequest_Accept
-      : ContractId ValidatorRight
-      controller right.svc
-      do create right
-
-    -- TODO: rejections
+-- | The holder of an optional timelock.
+lockHolder : Optional TimeLock -> Optional Party
+lockHolder lock = (.holder) <$> lock
