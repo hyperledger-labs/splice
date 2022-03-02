@@ -1,3 +1,5 @@
+-- NOTE: this library is no longer used for CC, but might be useful in other cases.
+
 -- | Contracts that expire, which should be most contracts in an OpenBusiness service.
 module OpenBusiness.Expiry where
 

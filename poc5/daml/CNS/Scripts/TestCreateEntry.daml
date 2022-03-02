@@ -17,7 +17,7 @@ testEntry = do
   app <- setupApp
 
   -- start issuing so invites can be handed out
-  runNextIssuance app
+  runNextIssuance app 1.0
   runCoinDepositBots app
 
   -- bootstrap user and service provider party
@@ -26,7 +26,7 @@ testEntry = do
   provider <- setupUser app "Provider2"
 
   -- start issuing
-  runNextIssuance app
+  runNextIssuance app 1.0
 
   -- svc transfers 20 coin to user
   pay app app.svc user 20.0 "starter pack!"
@@ -64,8 +64,9 @@ testEntry = do
   runCoinDepositBots app
 
   -- -- run two issuances to recover burned coins
-  runNextIssuance app
-  runNextIssuance app
+  runNextIssuance app 1.1
+  runCoinDepositBots app
+  runNextIssuance app 1.2
   runCoinDepositBots app
 
 

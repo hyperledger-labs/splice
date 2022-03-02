@@ -9,7 +9,6 @@ import DA.Text
 import DA.Time
 
 import CC.Coin
-import CC.Issuance
 
 
 import OpenBusiness.Fees
@@ -34,16 +33,17 @@ data CoinConfig = CoinConfig with
     -- | The minimal time for which the holding fee of a coin must be covered
     -- at all times.
     minHoldingTime : RelTime
-    -- | The maximal time that the holding fee of a coin can be prepaid for.
+    -- | The maximal time that the holding fee of a coin can be prepaid for,
+    -- which also limits that maximal lock duration.
     maxPrepaidHoldingTime : RelTime
-    -- | The maximal duration for a lock.
-    maxLockDuration : RelTime
     -- | The minimal quantity of burn for which a receipt is issued.
-    minBurnReceiptQuantity : Decimal
+    minRewardQuantity : Decimal
     -- | Fee for transferring some quantity of coin to a new owner.
     -- TODO: make the variable part logarithmic in the quantity to make
     -- large coin transfers cost competitive with blockchain and clearing networks.
     transferFee : FixedPlusVariableRate
+    coinsIssuedPerCycle : Decimal
+    svcIssuanceRatio : Decimal
     -- | The ratio of the transfer fee attributed to the sender.
     -- Should probably be equal to the ratio of issuance receipt of
     -- validator operators to app operators.
@@ -81,6 +81,96 @@ template CoinRules
       controller transferControllers transfer
       do executeTransfer config svc transfer
 
+    nonconsuming choice CoinRules_MiningCycle_Open
+      : ContractId OpenMiningCycle
+      with
+        coinPrice : Decimal
+      controller svc
+      do
+        -- fetch current state
+        (stCid, st) <- fetchByKey @IssuanceState svc
+        archive stCid
+        let cycle = addToCycle st.currentCycle 1
+        -- create new state and new open cycle
+        create st with currentCycle = cycle
+        create OpenMiningCycle with svc; cycle; coinPrice
+
+    nonconsuming choice CoinRules_MiningCycle_StartClosing
+      : ContractId ClosingMiningCycle
+      with
+        miningCycleCid : ContractId OpenMiningCycle
+      controller svc
+      do
+        -- archive open mining cycle
+        miningCycle <- fetch miningCycleCid
+        archive miningCycleCid
+        assertMsg "SVC matches" (miningCycle.svc == svc)
+        -- create closing cycle
+        create ClosingMiningCycle with
+          svc
+          cycle = miningCycle.cycle
+    nonconsuming choice CoinRules_MiningCycle_StartIssuing
+      : ContractId IssuingMiningCycle
+      with
+        miningCycleCid : ContractId ClosingMiningCycle
+        -- The amount of coin burned in this cycle.
+        totalBurnQuantity : Decimal
+      controller svc
+      do
+        -- archive closing mining cycle
+        miningCycle <- fetch miningCycleCid
+        archive miningCycleCid
+        assertMsg "SVC matches" (miningCycle.svc == svc)
+        assertMsg "Positive total burn quantity" (totalBurnQuantity >= 0.0)
+
+        let svcCoinsPerIssuance = config.coinsIssuedPerCycle * config.svcIssuanceRatio
+            userIssuanceRatio = 1.0 - config.svcIssuanceRatio
+            userCoinsPerIssuance = config.coinsIssuedPerCycle * userIssuanceRatio
+
+        -- issue coin to SVC
+        now <- getTime
+        create Coin with
+          svc
+          owner = svc
+          quantity = expiringQuantity config.holdingFee svcCoinsPerIssuance (addRelTime now config.minHoldingTime)
+          lock = None
+
+        -- create issuing cycle
+        create IssuingMiningCycle with
+          svc
+          cycle = miningCycle.cycle
+          issuancePerCoin =
+            if totalBurnQuantity <= 0.0
+              then 0.0
+              else userIssuanceRatio * min 1.0 (userCoinsPerIssuance / totalBurnQuantity)
+
+    nonconsuming choice CoinRules_MiningCycle_Close
+      : ContractId ClosedMiningCycle
+      with
+        miningCycleCid : ContractId IssuingMiningCycle
+      controller svc
+      do
+        -- archive issuing mining cycle
+        miningCycle <- fetch miningCycleCid
+        archive miningCycleCid
+        assertMsg "SVC matches" (miningCycle.svc == svc)
+        -- create closing cycle
+        create ClosedMiningCycle with
+          svc
+          cycle = miningCycle.cycle
+
+    nonconsuming choice CoinRules_MiningCycle_Archive
+      : ()
+      with
+        miningCycleCid : ContractId ClosedMiningCycle
+      controller svc
+      do
+        -- archive closed mining cycle
+        miningCycle <- fetch miningCycleCid
+        archive miningCycleCid
+        assertMsg "SVC matches" (miningCycle.svc == svc)
+
+
 -- | Representation of a batch transfer.
 data Transfer = Transfer with
     sender : Party
@@ -91,7 +181,8 @@ data Transfer = Transfer with
 
 -- | An individual input for a batch transfer.
 data TransferInput
-  = InputBurnReceipt (ContractId BurnReceipt)
+  = InputAppReward (ContractId AppReward)
+  | InputValidatorReward (ContractId ValidatorReward)
   | InputCoin (ContractId Coin)
   deriving (Eq, Ord, Show)
 
@@ -122,9 +213,9 @@ template TransferDebugNote with
     isum : TransferInputsSummary
     osum : TransferOutputsSummary
     summary : TransferSummary
+    scaledConfig : CoinConfig
   where
     signatory svc
-
 
 
 -- Transfer logic
@@ -140,38 +231,32 @@ transferControllers t =
 
 -- | Execute a transfer.
 --
--- The fee logic was chosen to satisfy the following desiderata:
---
--- * low friction user onboarding
--- * charge value-proportional fees for value-added actions (coin splitting, transfer and locking)
--- * charge cost-covering fees for administrative actions (holding and merging coins)
--- * reasonably active users do not pay any fees for initating transfers
--- * users are disincentivized to hold many coin contracts
--- * app operator's pay lower transfer fees when there is less overall app activity on the network
--- * very active users are incentivized to run their own participant node
---
--- The batched nature of the code complicates these computations,
--- but is key to keep the cost of operating and using CC low.
---
 executeTransfer : CoinConfig -> Party -> Transfer -> Update [ContractId Coin]
-executeTransfer config svc t = do
+executeTransfer config0 svc t = do
+  -- MISSING FEATURE 'fetchByKey + off-ledger disclosure': we do not want to have a dependency on
+  -- the issuance state, as that will lead to contention. We'd expect to just fetch some
+  -- open mining cycle that is disclosed when the command is being interpreted.
+  (_, issuanceState) <- fetchByKey @IssuanceState svc
+  -- check that the current mining cycle is open
+  (_, openCycle) <- fetchByKey @OpenMiningCycle (svc, issuanceState.currentCycle )
+  let config = scaleFees (1.0 / openCycle.coinPrice) config0
   -- compute summaries
   isum <- summarizeAndConsumeInputs svc t.sender t.inputs
   osum <- preprocessAndSummarizeOutputs config t.sender t.outputs
-  let summary = transferSummary config isum osum
+  summary <- summarizeTransfer config isum osum
   -- check that overall transfer constraints are satisfied
   assertMsg "Less than the maximum number of inputs" (summary.numInputs <= config.maxNumInputs)
   assertMsg "Less than the maximum number of outputs" (summary.numOutputs <= config.maxNumOutputs)
   assertMsg "Payload lenght below limit" (DA.Text.length t.payload <= config.maxPayloadLength)
-  assertMsg "Total input quantity covers total output quantity + fees"
+  assertMsg ("Input to output+fee quantity balance " <> show summary.quantityBalance <> " >= 0")
     (summary.quantityBalance >= 0.0)
   when (summary.quantityBalance /= 0.0) $
     assertMsg "There is at least one floating sender output coin to receive excess input quantity"
       (summary.numFloatingSenderCoins > 0)
   -- record debugging note
-  create TransferDebugNote with transfer = t; ..
-  -- record burns
-  issueBurnReceipts config svc t.sender summary
+  create TransferDebugNote with transfer = t; scaledConfig = config; ..
+  -- issue rewards for burns
+  issueRewards config openCycle t.sender summary
   -- record outputs
   createTransferOutputs config svc summary osum.preprocessedOutputs
 
@@ -243,29 +328,34 @@ summarizeAndConsumeInputs svc sender inps = do
         numCoinInputs = s.numCoinInputs + 1
         totalQuantity =
           -- TODO: consider tracking the spent holding fees and recording it
-          -- as a BurnReceiptForValidator
+          -- as a RewardForValidator
           s.totalQuantity + actualQuantity now coin.quantity
         totalPaidHoldingDays =
           s.totalPaidHoldingDays + max 0.0 (relTimeToDays $ subTime coin.quantity.startsExpiringAt now)
 
-    summarizeAndConsumeInput now s (InputBurnReceipt burnCid) = do
-      burn <- fetch burnCid
-      assertMsg "SVC matches" (svc == burn.svc)
-      quantity <- case burn.kind of
-        BurnReceiptForService -> do
-          assertMsg "Sender matches service owner" (sender == burn.burner)
-          archive burnCid
-          return burn.quantity
-        BurnReceiptForValidator -> do
-            (rightCid, validatorRight) <- fetchByKey @ValidatorRight (svc, burn.burner)
-            assertMsg "Sender matches burner's validator" (sender == validatorRight.validator)
-            exercise burnCid BurnReceipt_ArchiveAsValidator with validator = sender; rightCid
-            (_, issueEv) <- fetchByKey @IssuanceEvent (svc, burn.issuanceAt)
-            return (burn.quantity * issueEv.validatorIssuancePerCoin)
+    summarizeAndConsumeInput now s (InputAppReward rewardCid) = do
+      reward <- fetch rewardCid
+      archive rewardCid
+      assertMsg "SVC matches" (svc == reward.svc)
+      (_, miningCycle) <- fetchByKey @IssuingMiningCycle (svc, reward.cycle)
+      assertMsg "Sender matches app owner" (sender == reward.owner)
       return TransferInputsSummary with
         numBurnInputs = s.numBurnInputs + 1
         numCoinInputs = s.numCoinInputs
-        totalQuantity = s.totalQuantity + quantity
+        totalQuantity = s.totalQuantity + reward.quantity * miningCycle.issuancePerCoin
+        totalPaidHoldingDays = s.totalPaidHoldingDays
+
+    summarizeAndConsumeInput now s (InputValidatorReward rewardCid) = do
+      reward <- fetch rewardCid
+      assertMsg "SVC matches" (svc == reward.svc)
+      (_, miningCycle) <- fetchByKey @IssuingMiningCycle (svc, reward.cycle)
+      (rightCid, validatorRight) <- fetchByKey @ValidatorRight (svc, reward.user)
+      assertMsg "Sender matches burner's validator" (sender == validatorRight.validator)
+      exercise rewardCid ValidatorReward_ArchiveAsValidator with validator = sender; rightCid
+      return TransferInputsSummary with
+        numBurnInputs = s.numBurnInputs + 1
+        numCoinInputs = s.numCoinInputs
+        totalQuantity = s.totalQuantity + reward.quantity * miningCycle.issuancePerCoin
         totalPaidHoldingDays = s.totalPaidHoldingDays
 
 
@@ -289,21 +379,24 @@ preprocessAndSummarizeOutputs config sender outs = do
       receiverFees = Map.empty
 
     summarizeOutput s (OutputSenderCoin with exactQuantity; exactHoldingTime; lock) = do
+      -- check validity of locking request
+      now <- getTime
+      let lockDuration = optional (days 0) (\l -> subTime l.expiresAt now) lock
+      assertMsg "Positive lock duration" (days 0 <= lockDuration)
+      assertMsg "Lock duration smaller than maximum prepayable holding time"
+        (lockDuration <= config.maxPrepaidHoldingTime)
+      -- compute output
       let output = PreprocessedTransferOutput with
             owner = sender
             quantity = fromOptional 0.0 exactQuantity
             holdingTime =
-              -- adjust min and max holding times
-              max config.minHoldingTime $
-              min config.maxPrepaidHoldingTime $
+              max config.minHoldingTime $              -- enforce lower bound
+              min config.maxPrepaidHoldingTime $       -- enforce upper bound
+              max lockDuration $                       -- holding time must be prepaid for the whole lock duration
               fromOptional (days 0) exactHoldingTime
             lock
             excessHoldingTimeNumber = if isNone exactHoldingTime then Some (s.numLongtermSenderCoins + 1) else None
             excessQuantityNumber = if isNone exactQuantity then Some (s.numFloatingSenderCoins + 1) else None
-      forA_ output.lock $ \lock -> do
-        now <- getTime
-        let maxLockExpiry = addRelTime now config.maxLockDuration
-        assertMsg "Lock expires before latest expiry time" (lock.expiresAt <= maxLockExpiry)
       return TransferOutputsSummary with
         numUnlockedSenderCoins = s.numUnlockedSenderCoins + (if isSome lock then 0 else 1)
         numLockedSenderCoins = s.numLockedSenderCoins + (if isSome lock then 1 else 0)
@@ -350,16 +443,17 @@ preprocessAndSummarizeOutputs config sender outs = do
         receiverFees = Map.alter (\old -> Some (receiverFee + fromOptional 0.0 old)) receiver s.receiverFees
 
 
-transferSummary : CoinConfig -> TransferInputsSummary -> TransferOutputsSummary -> TransferSummary
-transferSummary config inp out = TransferSummary with
-    excessCoinHoldingDays = max 0.0 senderHoldingDaysBalance
-    quantityBalance = inp.totalQuantity - out.requiredQuantity - uncoveredSenderActionFees - holdingTimeFees
-    numLongtermSenderCoins = out.numLongtermSenderCoins
-    numFloatingSenderCoins = out.numFloatingSenderCoins
-    senderFeeAttribution = max senderActionFees senderTransferFees + holdingTimeFees
-    receiverFees = out.receiverFees
-    numInputs = inp.numCoinInputs + inp.numBurnInputs
-    numOutputs = out.numUnlockedSenderCoins + out.numLockedSenderCoins + out.numReceiverCoins
+summarizeTransfer : CoinConfig -> TransferInputsSummary -> TransferOutputsSummary -> Update TransferSummary
+summarizeTransfer config inp out = do
+    return TransferSummary with
+      excessCoinHoldingDays = max 0.0 senderHoldingDaysBalance
+      quantityBalance = inp.totalQuantity - out.requiredQuantity - uncoveredSenderActionFees - holdingTimeFees
+      numLongtermSenderCoins = out.numLongtermSenderCoins
+      numFloatingSenderCoins = out.numFloatingSenderCoins
+      senderFeeAttribution = max senderActionFees senderTransferFees + holdingTimeFees
+      receiverFees = out.receiverFees
+      numInputs = inp.numCoinInputs + inp.numBurnInputs
+      numOutputs = out.numUnlockedSenderCoins + out.numLockedSenderCoins + out.numReceiverCoins
   where
     -- NOTE: the fee computations follow from the principle that a reasonably active
     -- user of Canton coin does not pay any other fees than the transfer fees.
@@ -385,30 +479,24 @@ transferSummary config inp out = TransferSummary with
     holdingTimeFees = config.holdingFee.rate * missingHoldingDays
 
 
-issueBurnReceipts : CoinConfig -> Party -> Party -> TransferSummary -> Update ()
-issueBurnReceipts config svc sender summary = do
-    -- fetch issuances parameters
-    (issuanceAt, expiresAt) <- getIssuanceAtAndExpiresAt
-    let issueBurnReceipt kind burner quantity =
-          when (config.minBurnReceiptQuantity <= quantity) $ do
-            void $ create BurnReceipt with ..
-    -- issue sender receipt
-    issueBurnReceipt BurnReceiptForValidator sender summary.senderFeeAttribution
+issueRewards : CoinConfig -> OpenMiningCycle -> Party -> TransferSummary -> Update ()
+issueRewards config openCycle sender summary = do
+    -- issue reward for the validator of the sender
+    when (config.minRewardQuantity <= summary.senderFeeAttribution) $
+      void $ create ValidatorReward with
+        svc = openCycle.svc
+        user = sender
+        quantity = summary.senderFeeAttribution
+        cycle = openCycle.cycle
+
     -- issue receiver receipts
-    forA_ (Map.toList summary.receiverFees) (uncurry $ issueBurnReceipt BurnReceiptForService)
-  where
-    -- TODO: simplify this logic by switching to an explicit issuance-cyle clock
-    getIssuanceAtAndExpiresAt = do
-      burnedAt <- getTime
-      (_, params) <- fetchByKey @IssuanceParameters svc
-      let
-        microsSinceStart = convertRelTimeToMicroseconds (subTime burnedAt params.initialWindow.startsAt)
-        microsWindowDuration = convertRelTimeToMicroseconds params.initialWindow.duration
-        windowsFromStartToIssuance = 2 + microsSinceStart / microsWindowDuration
-        -- TODO: add unit tests to check for off-by-one errors
-        issuanceAt = addRelTime params.initialWindow.startsAt (convertMicrosecondsToRelTime (windowsFromStartToIssuance * microsWindowDuration))
-        expiresAt = addRelTime issuanceAt params.claimDuration
-      return (issuanceAt, expiresAt)
+    forA_ (Map.toList summary.receiverFees) $ \(receiver, receiverFee) ->
+      when (config.minRewardQuantity <= receiverFee) $
+        void $ create AppReward with
+          svc = openCycle.svc
+          owner = receiver
+          quantity = receiverFee
+          cycle = openCycle.cycle
 
 data OutputCreationState = OutputCreationState with
   remainingExcessQuantity : Decimal
@@ -458,3 +546,21 @@ createTransferOutputs config svc summary outs = do
         remainingExcessQuantity = st.remainingExcessQuantity - extraQuantity
         remainingExcessHoldingDays = st.remainingExcessHoldingDays - relTimeToDays (holdingTime - out.holdingTime)
         coinCids = coinCid :: st.coinCids
+
+-- | Scale the 'CoinConfig' such that the fees charged are scaled by the same scale factor.
+scaleFees : Decimal -> CoinConfig -> CoinConfig
+scaleFees s c = CoinConfig with
+    createFee = scaleFixedFee s c.createFee
+    updateFee = scaleFixedFee s c.updateFee
+    lockFee = scaleFixedFee s c.lockFee
+    holdingFee = scaleDailyRate s c.holdingFee
+    minHoldingTime = c.minHoldingTime
+    maxPrepaidHoldingTime = c.maxPrepaidHoldingTime
+    minRewardQuantity = s * c.minRewardQuantity
+    transferFee = scaleFixedPlusVariableRate s c.transferFee
+    coinsIssuedPerCycle = c.coinsIssuedPerCycle
+    svcIssuanceRatio = c.svcIssuanceRatio
+    senderTransferFeeAttributionRatio = c.senderTransferFeeAttributionRatio
+    maxNumInputs = c.maxNumInputs
+    maxNumOutputs = c.maxNumOutputs
+    maxPayloadLength = c.maxPayloadLength

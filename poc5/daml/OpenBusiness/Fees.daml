@@ -29,14 +29,17 @@ newtype DailyRate = DailyRate with rate : Decimal
 chargeDailyRate : DailyRate -> RelTime -> Decimal
 chargeDailyRate daily dt = daily.rate * relTimeToDays dt
 
-
--- TODO: replace with DailyRate one
-dailyRateToAmount : Decimal -> RelTime -> Decimal
-dailyRateToAmount r dt = r * relTimeToDays dt
-
 -- | TODO: better name
 spentWithDailyRate : DailyRate -> Decimal -> RelTime
 spentWithDailyRate daily quantity = daysToRelTime (quantity / daily.rate)
+
+-- | Scale a daily rate such that
+--
+-- ALL s r dt. s * chargeDailyRate r dt = chargeDailyRate (s `scaleDailyRate` r) dt
+--
+scaleDailyRate : Decimal -> DailyRate -> DailyRate
+scaleDailyRate s r = DailyRate with rate = s * r.rate
+
 
 -- Fixed and variable rates
 ---------------------------
@@ -46,6 +49,8 @@ spentWithDailyRate daily quantity = daysToRelTime (quantity / daily.rate)
 newtype FixedFee = FixedFee with fee : Decimal
   deriving (Eq, Ord, Show)
 
+scaleFixedFee : Decimal -> FixedFee -> FixedFee
+scaleFixedFee s f = FixedFee with fee = s * f.fee
 
 data FixedPlusVariableRate = FixedPlusVariableRate with
     fixed : Decimal
@@ -53,7 +58,22 @@ data FixedPlusVariableRate = FixedPlusVariableRate with
   deriving (Eq, Ord, Show)
 
 chargeFixedPlusVariableRate : FixedPlusVariableRate -> Decimal -> Decimal
-chargeFixedPlusVariableRate r quantity = r.fixed + r.variableRate * (max 0.0 (quantity - r.fixed))
+chargeFixedPlusVariableRate r quantity =
+  -- NOTE: we use the calculation below instead of r.fixed + quantity * r.variableRate
+  -- to make it such that a payment of size r.fixed can be accepted.
+  r.fixed + max 0.0 (r.variableRate * (quantity - r.fixed))
+
+
+-- | Scale a fixed-plus-variable rate such that
+--
+-- ALL s r q. s * chargeFixedPlusVariableRate r (q/s) = chargeFixedPlusVariableRate (s `scaleFixedPlusVariableRate` r) q
+--
+scaleFixedPlusVariableRate : Decimal -> FixedPlusVariableRate -> FixedPlusVariableRate
+scaleFixedPlusVariableRate s r =
+  FixedPlusVariableRate with
+    fixed = s * r.fixed
+    variableRate = r.variableRate
+
 
 
 -- Expiring quantities

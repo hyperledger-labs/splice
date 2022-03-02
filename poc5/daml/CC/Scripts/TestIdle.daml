@@ -10,8 +10,8 @@ testIdle = do
   app <- setupApp
 
   -- start issuing
-  runNextIssuance app
-  runNextIssuance app
+  runNextIssuance app 1.0
+  runNextIssuance app 1.1
 
 
   return ()

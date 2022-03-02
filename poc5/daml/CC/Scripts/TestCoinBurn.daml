@@ -15,27 +15,16 @@ testCoinBurn = do
   app <- setupApp
 
   -- -- start issuing so the SVC has some coins to invite users
-  runNextIssuance app
+  runNextIssuance app 1.0
   runCoinDepositBots app
 
-  -- -- -- bootstrap user and service provider party
+  -- -- -- -- bootstrap user and service provider party
   provider1 <- setupUser app "Provider1"
   provider2 <- setupUser app "Provider2"
   user <- setupUser app "User"
   validator1 <- setupUser app "Validator1"
 
-  runNextIssuance app
-  runCoinDepositBots app
-  runNextIssuance app
-  runCoinDepositBots app
-
-  -- -- test declaration of validator rights after the fact
-  recordValidatorOf app validator1 validator1
-  recordValidatorOf app user validator1
-  recordValidatorOf app provider1 validator1
-  recordValidatorOf app provider2 provider2
-
-  archiveTransferDebugNotes app
+  runNextIssuance app 1.1
   runCoinDepositBots app
 
   -- svc transfers 20 coin to user
@@ -47,21 +36,39 @@ testCoinBurn = do
   pay app user provider1 5.0 "otc"
   runCoinDepositBots app
 
-  -- run two issuances to collect the burned coins created from the above transfer
-  runNextIssuance app
+  runNextIssuance app 1.2
   runCoinDepositBots app
 
-  runNextIssuance app
+  -- -- test declaration of validator rights after the fact
+  recordValidatorOf app validator1 validator1
+  recordValidatorOf app user validator1
+  recordValidatorOf app provider1 validator1
+  recordValidatorOf app provider2 provider2
+
+  archiveTransferDebugNotes app
+  -- uncomment the following line to see how 'Validator1' can gather his rewards
+  -- after having being declared as validator
   runCoinDepositBots app
 
-  pay app app.svc provider2 90.0 "starter pack!"
+  -- run some more issuances and transfer
+  runNextIssuance app 1.3
   runCoinDepositBots app
 
-  -- run two issuances to collect the burned coins created from the above transfer
-  runNextIssuance app
-  runNextIssuance app
+  -- crash the coin price to burn more coin than is issued
+  runNextIssuance app 0.002
   runCoinDepositBots app
 
-  -- -- -- TODO: add assertions that validate token handling
+  pay app app.svc provider2 75.0 "starter pack!"
+  runCoinDepositBots app
+
+  -- -- the next issuances run with normal prices again
+  runNextIssuance app 1.5
+  runCoinDepositBots app
+
+  runNextIssuance app 1.6
+  runCoinDepositBots app
+
+  -- cleanup transfer notes
+  archiveTransferDebugNotes app
 
   return ()

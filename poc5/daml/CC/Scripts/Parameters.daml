@@ -1,30 +1,12 @@
 module CC.Scripts.Parameters where
 
-import DA.Date
+-- import DA.Date
 import DA.Time
 
-import CC.Issuance
+-- import CC.Issuance
 import CC.CoinRules
 
 import OpenBusiness.Fees
-
--- TODO: move more of the default parameters here
-
-
-defaultIssuanceParameters : Party -> Party -> IssuanceParameters
-defaultIssuanceParameters svc public = IssuanceParameters with
-  svc
-  public
-  coinsPerIssuance = 100.0
-  initialWindow = TimeWindow with
-    startsAt = time (DA.Date.date 202 Jan 1) 0 0 0
-    duration = minutes 5
-  claimDuration = minutes 30
-  -- | The maximum proportion of the issuance that goes to service providers.
-  servicePercentage = 0.5
-  -- | The maximum proportion of the issuance that goes to validators.
-  validatorPercentage = 0.15
-
 
 -- | Default proposal for cost-competitive fees.
 --
@@ -45,10 +27,10 @@ defaultCoinConfig = CoinConfig with
     lockFee = FixedFee 0.2
 
     -- | Fee for keeping a coin around.
-    -- Equal to 36.5 dollar per year for an account with NO activity.
+    -- Equal to 3.65 dollar per year for an account with NO activity.
     -- Incentivizes users to actively merge their coins.
-    -- A ledger with 1M coins thus generates at least 100k $ in fees per day.
-    holdingFee = DailyRate 0.1
+    -- A ledger with 1M coins thus generates at least 10k $ in fees per day.
+    holdingFee = DailyRate 0.01
 
     -- | The minimal time for which the holding fee of a coin must be covered
     -- at all times.
@@ -59,22 +41,16 @@ defaultCoinConfig = CoinConfig with
 
     -- | The maximal time that the holding fee of a coin can be prepaid for.
     --
-    -- Set to 31 days such that users with monthly rebalancing schedules can also profit
-    -- from not paying any extra holding fees provided they transfer enough coin.
-    maxPrepaidHoldingTime = days 31
-
-    -- | Maximal time a lock can be held.
-    --
-    -- Set to a quarter year. which implies that lock-based workflows need at
+    -- Set to a quarter year, which implies that lock-based workflows need at
     -- least a quarterly refresher.
-    maxLockDuration = days (366 / 4)
+    maxPrepaidHoldingTime = days 92
 
     -- | The minimal quantity of burn for which a receipt is issued.
     --
-    -- Chosen to cover to be just above the cost of merging two coins.
-    minBurnReceiptQuantity = 0.025
+    -- Chosen to cover to be just above the cost of updating a single update.
+    minRewardQuantity = 0.011 -- in $
 
-    -- | Fee for transferring some quantity of coin to a new owner. relTimeToDays (holdingTime - out.holdingTime)
+    -- | Fee for transferring some quantity of coin to a new owner.
     --
     -- Chosen to be 66% of credit card fees (Stripe 2.6% + 0.15$), as CC does
     -- not provide consumer protection
@@ -83,13 +59,23 @@ defaultCoinConfig = CoinConfig with
     -- cost competitive competitive with blockchain and clearing networks
     -- for a wide range of transfers.
     transferFee = FixedPlusVariableRate with
-      fixed = 0.1          -- coin
-      variableRate = 0.017  -- coin parts
+      fixed = 0.1          -- $
+      variableRate = 0.017  -- ratio
 
-    -- | The ratio of the transfer fee attributed to the sender.
-    -- Should probably be equal to the ratio of issuance receipt of
-    -- validator operators to app operators.
-    senderTransferFeeAttributionRatio = 0.3
+    -- | Coins issued per mining cycle.
+    --
+    -- Set to 60 coins, which implies a coin price of 1 $ at burn-mint-equilibrium (BME) when the network spends
+    -- 0.1 $/second in discounted transfer fees and a price of 100$ when the network spends 10 $ per second in discounted fees.
+    --
+    coinsIssuedPerCycle = 60.0
+
+    svcIssuanceRatio = 0.35
+
+    -- | The ratio of the transfer fee attributed to the sender, which
+    -- pays for its validator.
+    --
+    -- Chosen such that the app authors get a 50% discount on the transfer fees
+    senderTransferFeeAttributionRatio = 1.0 - 0.5 / (1.0 - 0.35)
 
     -- | These should be large enough to ensure efficient batching, but not too large
     -- to avoid creating very large transactions.
@@ -97,4 +83,6 @@ defaultCoinConfig = CoinConfig with
     maxNumOutputs = 100
 
     -- | Fits a hex-encoded SHA-256 or a UUID
+    --
+    -- TODO: charge per character
     maxPayloadLength = 32

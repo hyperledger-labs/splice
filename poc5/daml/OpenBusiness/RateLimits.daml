@@ -1,4 +1,6 @@
--- | A library for enforcing rate limits on actions taken by users.
+-- | NOTE: this library is no longer required for CC itself, but might prove useful in other cases.
+--
+-- A library for enforcing rate limits on actions taken by users.
 --
 -- The rate limits are managed using the Token bucket algorithm
 -- (https://en.wikipedia.org/wiki/Token_bucket):

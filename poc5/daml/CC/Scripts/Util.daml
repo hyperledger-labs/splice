@@ -12,8 +12,6 @@ import DA.Time
 
 import CC.Coin
 import CC.CoinRules
-import CC.Issuance
-import CC.IssuanceRules
 
 import CC.Scripts.Parameters
 
@@ -29,7 +27,7 @@ newtype CCApp = CCApp with
 
 
 demoTime : Time
-demoTime = time (DA.Date.date 202 Jan 1) 0 0 0
+demoTime = time (DA.Date.date 2022 Jan 1) 0 0 0
 
 -- | Setup the SVC party and the contracts defining the CC app.
 setupApp : Script CCApp
@@ -44,16 +42,18 @@ setupApp = do
   -- the SVC is its own validator
   recordValidatorOf app app.svc app.svc
 
-  submit svc $ createCmd (defaultIssuanceParameters svc svc)
-
   -- TOOD: reintroduce the price oracle
 
-  submit svc $ createCmd IssuanceRules with
-    lastIssuanceAt = demoTime
-    ..
+  submit svc $ createCmd IssuanceState with
+    svc
+    currentCycle = Cycle (-1)
+
   submit svc $ createCmd CoinRules with
-      config = defaultCoinConfig
-      ..
+    config = defaultCoinConfig
+    ..
+
+  submit svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningCycle_Open with
+    coinPrice = 1.0
 
   -- return the off-ledger reference to the app for later script steps
   return app
@@ -71,7 +71,7 @@ setupUser app name = do
 -- | onboardUser simply sets up public read for a user party
 onboardUser : CCApp -> Party -> Script ()
 onboardUser app user = do
-  -- TODO: this is a hack! use an actual invite flow, probably via the validator
+  -- This is a hack - to simplify later merge-bot flows that require a first coin to be present
   pay app app.svc user 1.0 "Welcome!"
 
 getAllUserParties : CCApp -> Script [Party]
@@ -90,30 +90,51 @@ recordValidatorOf app u v =
 ----------------------
 
 -- | Run the next issuance.
-runNextIssuance : CCApp -> Script ()
-runNextIssuance app = do
-  -- invariant: svcRules.lastIssuanceAt <= getTime
+--
+-- TODO: use overlapping issuances so that there are always 2 open issuances, 1 closing issuance,
+-- and 2 issuing issuances
+runNextIssuance : CCApp -> Decimal -> Script ()
+runNextIssuance app coinPrice = do
+    -- expire rewards for closed cycles
+    closedCycles <- query @ClosedMiningCycle app.svc
+    forA_ closedCycles $ \(miningCycleCid, miningCycle) -> do
+      -- app rewards
+      rewards <- queryFilter @AppReward app.svc (\r -> r.cycle == miningCycle.cycle)
+      forA_ rewards $ \(rcid, _) ->
+        submit app.svc $ exerciseCmd rcid AppReward_SvcExpire with miningCycleCid
+      -- validator rewards
+      rewards <- queryFilter @ValidatorReward app.svc (\r -> r.cycle == miningCycle.cycle)
+      forA_ rewards $ \(rcid, _) ->
+        submit app.svc $ exerciseCmd rcid ValidatorReward_SvcExpire with miningCycleCid
+      -- the closed cycle
+      submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningCycle_Archive with
+        miningCycleCid
 
-  -- TODO: switch away from wall-clock time and just issue in regular cycles;
-  -- thereby enabling proper handling of system downtime without incurring extra holding
-  -- fees to CC users.
+    -- close current issuing cycles if there are any
+    imcs <- query @IssuingMiningCycle app.svc
+    forA_ imcs $ \(miningCycleCid, _) ->
+      submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningCycle_Close with
+        miningCycleCid
 
-  -- determine next issuanceAt by fetching svcRules and issuanceParams2
-  Some (_, svcRules) <- queryContractKey @IssuanceRules app.svc app.svc
-  Some (_, issuanceParams) <- queryContractKey @IssuanceParameters app.svc app.svc
-  let issuanceAt = addRelTime svcRules.lastIssuanceAt issuanceParams.initialWindow.duration
+    -- transition current OpenMiningCycle into an IssuingMiningCycle
+    Some (_, st) <- queryContractKey @IssuanceState app.svc app.svc
+    Some (openCycleCid, _) <- queryContractKey @OpenMiningCycle app.svc (app.svc, st.currentCycle)
+    closingCycleCid <- submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningCycle_StartClosing with
+      miningCycleCid = openCycleCid
 
-  -- run burn oracle for issuanceAt
-  bcs <- queryFilter @BurnReceipt app.svc (\bc -> bc.issuanceAt == issuanceAt)
-  submit app.svc do
-    createCmd BurnOracle with
-      svc = app.svc
-      issuanceAt
-      quantity = sum (map (\(_, bc) -> bc.quantity) bcs)
-  -- setTime issuanceAt
-  setTime issuanceAt
-  -- trigger issuance
-  void $ submit app.svc $ exerciseByKeyCmd @IssuanceRules app.svc IssuanceRules_Issue with issuanceAt
+    appRewards <- queryFilter @AppReward app.svc (\bc -> bc.cycle == st.currentCycle)
+    validatorRewards <- queryFilter @ValidatorReward app.svc (\bc -> bc.cycle == st.currentCycle)
+
+    submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningCycle_StartIssuing with
+      miningCycleCid = closingCycleCid
+      totalBurnQuantity =
+        sum [ r.quantity | (_, r) <- appRewards] +
+        sum [ r.quantity | (_, r) <- validatorRewards]
+
+    -- open another cycle
+    void $ submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningCycle_Open with
+      coinPrice
+
 
 
 -- Asset handling utilities
@@ -150,12 +171,13 @@ runCoinDepositBots app = do
   forA_ users $ \user -> do
     -- get all burns for this user
     hostedUsers <- getValidatorUsers user
-    issuances <- getCompletedIssuances app
-    brs <- queryFilter @BurnReceipt app.svc $ \br ->
-      br.issuanceAt `elem` issuances &&
-      case br.kind of
-        BurnReceiptForService -> br.burner == user
-        BurnReceiptForValidator -> br.burner `elem` hostedUsers
+    cycles <- getIssuingCycles app
+    appRewards <- queryFilter @AppReward app.svc $ \r ->
+      r.cycle `elem` cycles && r.owner == user
+
+    validatorRewards <- queryFilter @ValidatorReward app.svc $ \r ->
+      r.cycle `elem` cycles && r.user `elem` hostedUsers
+
     -- get all coins of this user
     coins <- queryFilter @Coin user (\coin -> coin.owner == user)
     -- merge multiple of them into a single coin to minimize the holding fees
@@ -163,22 +185,23 @@ runCoinDepositBots app = do
           sender = user
           payload = "merge all my coins"
           inputs =
-            [ InputBurnReceipt brCid | (brCid, _) <- brs ] ++
-            [ InputCoin coinCid | (coinCid, _) <- coins ]
+              map (InputAppReward . fst) appRewards ++
+              map (InputValidatorReward . fst) validatorRewards ++
+              map (InputCoin . fst) coins
           outputs =
             [ OutputSenderCoin with
                 exactQuantity = None
                 exactHoldingTime = None
                 lock = None
             ]
-    when (not (null brs) || length coins > 1) $ void $
+    when (not (null appRewards) || not (null validatorRewards) || length coins > 1) $ void $
       submitMulti [user] [app.svc] $ exerciseByKeyCmd @CoinRules app.svc CoinRules_Transfer with transfer
 
 -- | Retrieve a list of all issuances that have happened.
-getCompletedIssuances : CCApp -> Script [Time]
-getCompletedIssuances app = do
-  issEvs <- query @IssuanceEvent app.svc
-  return [ ev.issuanceAt | (_, ev) <- issEvs ]
+getIssuingCycles : CCApp -> Script [Cycle]
+getIssuingCycles app = do
+  miningCycles <- query @IssuingMiningCycle app.svc
+  return [ miningCycle.cycle | (_, miningCycle) <- miningCycles ]
 
 -- | All users of a specific validator.
 getValidatorUsers : Party -> Script [Party]
