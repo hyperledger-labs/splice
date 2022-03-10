@@ -1,0 +1,132 @@
+-- | A module exploring the approach of writing the sign-up and login flows
+-- using a rule contract and party-signatures in Daml.
+--
+-- See https://docs.google.com/document/d/1QnaZvNehEt9_dKDix0zdqLsuvX5LUHU6uw1PHySejss/edit#bookmark=id.pa1a3nmqeyp5
+-- for background.
+module AccessRules where
+
+import DA.Time
+
+-- Infrastructure assumed to be in place
+----------------------------------------
+
+
+type Signature = Text -- placehodler
+
+-- | A signed value.
+--
+-- NOTE: the underscore is used due to a nameclash with Prelude.Signed, which deals with signed numbers.
+type Signed_ v = (v, Signature)
+
+sign : Show v => Party -> v -> Update Signature
+sign = undefined
+
+verify : Show v => Party -> v -> Signature -> Update Bool
+verify = undefined
+
+
+-- | An access token for a specific openbusiness service identified by its
+-- user account type.
+--
+-- We'd expected these tokens to be used in 'Authorization: Bearer <token>' headers
+-- of requests to a provider's web api.
+--
+-- TODO: investigate whether what it would take to make a Signed_ AccessToken
+-- be serialized as a proper JWT when read by clients.
+--
+-- NOTE: it's not clear whether we better build the access token issuance and validation in Daml.
+-- See https://docs.google.com/document/d/1QnaZvNehEt9_dKDix0zdqLsuvX5LUHU6uw1PHySejss/edit#bookmark=id.gzg5xv6a2con
+-- for an analysis of the pros and cons.
+data AccessToken account = AccessToken with
+    -- | Tokens are bound to specific contract-ids, which enables revoking them on-ledger
+    -- by archiving the contract.
+    accountCid : ContractId account
+    -- | All tokens are expected to expire reasonably quickly to limit the damage from
+    -- stolen tokens.
+    expiresAt : Time
+  deriving (Eq, Show)
+
+
+-- User accounts
+----------------
+
+-- | Example user account.
+template UserAccount with
+    provider : Party
+    user : Party
+  where
+    signatory provider, user
+
+    -- non-unique contract keys are only used to simplify the Daml code
+    key (provider, user) : (Party, Party)
+    maintainer key._1, key._2
+
+
+
+-- Access rules governing access to a service for the public
+------------------------------------------------------------
+
+
+data AccessRulesConfig = AccessRulesConfig with
+    accessTokenValidityDuration : RelTime
+  deriving (Eq, Show)
+
+-- | The assumption is that the service provider makes exactly one instance of this template
+-- accessible via a public web endpoint.
+template AccessRules with
+    provider : Party  -- service provider
+    config : AccessRulesConfig
+  where
+    signatory provider
+
+    key provider : Party
+    maintainer key
+
+    -- NOTE: We currently expect such an AccessRules template to be defined for every service.
+    -- If there are commonalities between these AccessRules templates, then we'd expect to help
+    -- developers building them by sharing common code using libraries and interfaces.
+    --
+    -- TODO: consider what it would take to codeshare the implemention of these choices
+    -- using interfaces.
+
+    -- We expect this choice to be used by the user's instance of the service UI or client
+    -- by calling ther user's participant node 'SubmitAndWaitForTransaction' in dry-run mode
+    -- with 'actAs user' rights
+    nonconsuming choice AccessRules_IssueToken
+      : Signed_ (AccessToken UserAccount)
+      with
+        user : Party
+      controller user
+      do
+        -- compute token
+        (accountCid, _) <- fetchByKey @UserAccount (provider, user)
+        -- compute expiry
+        now <- getTime
+        let token = AccessToken with
+              accountCid
+              expiresAt = addRelTime now config.accessTokenValidityDuration
+        -- sign
+        signature <- sign user token
+        return (token, signature)
+
+    -- We expect this choice to be used by the provider's API server
+    -- by calling ther provider's participant node 'SubmitAndWaitForTransaction' in dry-run mode
+    -- with 'readAs provider' rights
+    nonconsuming choice AccessRules_ValidateToken
+      : (ContractId UserAccount, UserAccount)
+      with
+        signedToken : Signed_ (AccessToken UserAccount)
+      controller provider
+      do
+        let (token, signature) = signedToken
+        now <- getTime
+        assertMsg "Not expired" (token.expiresAt < now)
+        account <- fetch token.accountCid
+        assertMsg "Account provider matches" (account.provider == provider)
+        success <- verify account.user token signature
+        assertMsg "Signature verification succeeds" success
+        -- TODO: add the further checks that are typically applied to JWT tokens
+        -- e.g., issuanceTime not being too far in the past or the future
+        return (token.accountCid, account)
+
+    -- TODO: add choice to request a UserAccount
