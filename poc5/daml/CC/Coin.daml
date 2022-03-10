@@ -122,6 +122,7 @@ template AppReward
         assertMsg "Merge with at least one burned coin" (not (null cids))
         quantities <- forA cids $ \cid -> do
           burnedCoin <- fetch cid
+          archive cid
           assertMsg ("Burned coins must match") (this == burnedCoin with quantity)
           return burnedCoin.quantity
         create this with quantity = this.quantity + sum quantities
@@ -167,6 +168,7 @@ template ValidatorReward
         assertMsg "Merge with at least one burned coin" (not (null cids))
         quantities <- forA cids $ \cid -> do
           burnedCoin <- fetch cid
+          archive cid
           assertMsg ("Burned coins must match") (this == burnedCoin with quantity)
           return burnedCoin.quantity
         create this with quantity = this.quantity + sum quantities

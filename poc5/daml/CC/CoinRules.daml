@@ -247,7 +247,7 @@ executeTransfer config0 svc t = do
   -- check that overall transfer constraints are satisfied
   assertMsg "Less than the maximum number of inputs" (summary.numInputs <= config.maxNumInputs)
   assertMsg "Less than the maximum number of outputs" (summary.numOutputs <= config.maxNumOutputs)
-  assertMsg "Payload lenght below limit" (DA.Text.length t.payload <= config.maxPayloadLength)
+  assertMsg "Payload length below limit" (DA.Text.length t.payload <= config.maxPayloadLength)
   assertMsg ("Input to output+fee quantity balance " <> show summary.quantityBalance <> " >= 0")
     (summary.quantityBalance >= 0.0)
   when (summary.quantityBalance /= 0.0) $
