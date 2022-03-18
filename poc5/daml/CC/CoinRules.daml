@@ -323,6 +323,9 @@ summarizeAndConsumeInputs svc sender inps = do
       archive coinCid
       assertMsg "SVC matches" (svc == coin.svc)
       assertMsg "Sender matches owner" (sender == coin.owner)
+      -- FIXME: separate the contract templates of a normal coin and a locked coin
+      -- to avoid this kind of confusion happening to our users.
+      assertMsg "Coin not locked" (isNone coin.lock)
       return TransferInputsSummary with
         numBurnInputs = s.numBurnInputs
         numCoinInputs = s.numCoinInputs + 1
