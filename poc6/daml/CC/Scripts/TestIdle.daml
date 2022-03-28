@@ -1,0 +1,17 @@
+module CC.Scripts.TestIdle where
+
+import Daml.Script
+
+import CC.Scripts.Util
+
+testIdle : Script ()
+testIdle = do
+  -- bootstrap app
+  app <- setupApp
+
+  -- start issuing
+  runNextIssuance app 1.0
+  runNextIssuance app 1.1
+
+
+  return ()

@@ -1,0 +1,35 @@
+-- NOTE: this library is no longer used for CC, but might be useful in other cases.
+
+-- | Contracts that expire, which should be most contracts in an OpenBusiness service.
+module OpenBusiness.Expiry where
+
+-- | A contract which expires at some time.
+interface ExpiringContract where
+  -- | The time after which the contract is expired, and can be archived.
+  contractExpiresAt : Time
+
+  -- | The party charged with expiring the contract as soon as it expires.
+  -- Other parties can expire the contract as well, but are expected to wait for some extra time to avoid contention.
+  expiryManager : Party
+
+  choice ExpiringContract_ExpireAsManager : ()
+    controller expiryManager this
+    do
+      now <- getTime
+      assertMsg "Contract expired" (contractExpiresAt this < now)
+
+  choice ExpiringContract_ExpireAsStakeholder : ()
+    with
+      actor : Party
+    controller actor
+    do
+      now <- getTime
+      assertMsg "Contract expired" (contractExpiresAt this < now)
+      assertMsg "Only stakeholders can expire" (actor `elem` stakeholder this)
+
+
+assertNotExpired : HasToInterface c ExpiringContract => c -> Update ()
+assertNotExpired c = do
+  now <- getTime
+  let expiresAt = contractExpiresAt (toInterface @ExpiringContract c)
+  assertMsg ("Now " <> show now <> " <= contract expiry " <> show expiresAt) (now <= expiresAt)

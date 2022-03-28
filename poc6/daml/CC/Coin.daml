@@ -1,0 +1,275 @@
+-- | The contracts representing the long-term state of CC.
+module CC.Coin where
+
+import DA.Optional
+
+import OpenBusiness.Expiry
+import OpenBusiness.Fees
+
+
+-- Lockable, expiring coins
+---------------------------
+
+-- | A lock held by a particular party until its expiry.
+data TimeLock = TimeLock with
+    holder: Party
+    -- TODO: consider adding support for groups of lock holders.
+    expiresAt: Time
+  deriving (Eq, Ord, Show)
+
+-- | A Canton Coin, which can be locked and whose quantity expires over time.
+--
+-- The expiry serves to charge an inactivity fee, and thereby ensures that the
+-- SVC can reclaim all coins at some point in the future.
+template Coin
+  with
+    svc : Party
+    owner : Party
+    quantity : ExpiringQuantity
+    lock : Optional TimeLock
+  where
+    signatory svc, owner, lockHolder lock
+    ensure validExpiringQuantity quantity
+
+    implements ExpiringContract where
+      let contractExpiresAt = quantity.expiresAt
+      let expiryManager = svc
+
+    choice Coin_Unlock : ContractId Coin
+      controller lockHolder lock
+      do
+        assertMsg "Coin is locked" (isSome lock)
+        create this with lock = None
+
+    let tryExpireLock : Update (ContractId Coin)
+        tryExpireLock = case this.lock of
+          None -> fail "Coin not locked"
+          Some (TimeLock with expiresAt; holder) -> do
+            t <- getTime
+            assertMsg "Lock not expired" (expiresAt <= t)
+            create this with lock = None
+
+    choice Coin_OwnerExpireLock : ContractId Coin
+      controller owner
+      do tryExpireLock
+
+    -- NOTE: we intentionally don't combine this choice with Coin_OwnerExpireLock to
+    -- provide a more expressive transaction graph.
+    choice Coin_SvcExpireLock : ContractId Coin
+      controller svc
+      do tryExpireLock
+
+-- | The holder of an optional timelock.
+lockHolder : Optional TimeLock -> Optional Party
+lockHolder lock = (.holder) <$> lock
+
+
+-- Contracts to implement reward issuance
+-- ======================================
+
+
+-- | The right to claim coin issuances for a user's burns as their validator.
+template ValidatorRight with
+    svc : Party
+    user : Party
+    validator : Party
+    -- TODO: manage expiry
+  where
+    signatory svc, validator
+
+    key (svc, user) : (Party, Party)
+    maintainer key._1
+
+    -- TODO: cancellation, withdrawal
+
+
+
+-- | A receipt of a coin burn that can be used to claim part of a coin issuance.
+template AppReward
+  with
+    svc : Party
+    -- | Application owner.
+    owner : Party
+    quantity : Decimal
+    cycle : Cycle
+  where
+    signatory svc, owner
+    ensure quantity > 0.0
+
+    choice AppReward_SvcExpire : ()
+      with
+        miningCycleCid : ContractId ClosedMiningCycle
+      controller svc
+      do miningCycle <- fetch miningCycleCid
+         assertMsg "Mining cycle > expiry cycle" (cycle <= miningCycle.cycle)
+
+    choice AppReward_OwnerExpire : ()
+      with
+        miningCycleCid : ContractId ClosedMiningCycle
+      controller owner
+      do miningCycle <- fetch miningCycleCid
+         assertMsg "Mining cycle > expiry cycle" (cycle <= miningCycle.cycle)
+
+
+    -- | This choice is used by the SVC to merge all burned coins per validator.
+    -- The expectation is that there is at most one burned coin per validator before
+    -- the issuance event is triggered.
+    choice AppReward_Merge : ContractId AppReward
+      with
+        cids : [ContractId AppReward]
+      controller svc
+      do
+        assertMsg "Merge with at least one burned coin" (not (null cids))
+        quantities <- forA cids $ \cid -> do
+          burnedCoin <- fetch cid
+          archive cid
+          assertMsg ("Burned coins must match") (this == burnedCoin with quantity)
+          return burnedCoin.quantity
+        create this with quantity = this.quantity + sum quantities
+
+
+
+-- | A receipt of a coin burn that can be used to claim part of a coin issuance.
+template ValidatorReward
+  with
+    svc : Party
+    user : Party
+    quantity : Decimal
+    cycle : Cycle
+  where
+    signatory svc, user
+    ensure quantity > 0.0
+
+    choice ValidatorReward_SvcExpire : ()
+      with
+        miningCycleCid : ContractId ClosedMiningCycle
+      controller svc
+      do miningCycle <- fetch miningCycleCid
+         assertMsg "Mining cycle > expiry cycle" (cycle <= miningCycle.cycle)
+
+    choice ValidatorReward_UserExpire : ()
+      with
+        miningCycleCid : ContractId ClosedMiningCycle
+      controller user
+      -- TODO: consider whether we should use time-based expiry so that the
+      -- user can expire it unilaterally after let's say 24h
+      do miningCycle <- fetch miningCycleCid
+         assertMsg "Mining cycle > expiry cycle" (cycle <= miningCycle.cycle)
+
+
+    -- | This choice is used by the SVC to merge all burned coins per validator.
+    -- The expectation is that there is at most one burned coin per validator before
+    -- the issuance event is triggered.
+    choice ValidatorReward_Merge : ContractId ValidatorReward
+      with
+        cids : [ContractId ValidatorReward]
+      controller svc
+      do
+        assertMsg "Merge with at least one burned coin" (not (null cids))
+        quantities <- forA cids $ \cid -> do
+          burnedCoin <- fetch cid
+          archive cid
+          assertMsg ("Burned coins must match") (this == burnedCoin with quantity)
+          return burnedCoin.quantity
+        create this with quantity = this.quantity + sum quantities
+
+    -- | This choice is used by validators to archive the burn receipt upon claiming its corresponding issuance.
+    choice ValidatorReward_ArchiveAsValidator : ()
+      with
+        validator : Party
+        rightCid : ContractId ValidatorRight
+      controller svc, validator
+      do
+        right <- fetch rightCid
+        assertMsg "Right must match" (right == ValidatorRight with svc; validator, user)
+
+
+-- | BurnOracle records the result of a process to determine the quantity of coin burned
+-- in a specific issuance cycle.
+template BurnOracle
+  with
+    svc : Party
+    cycle : Cycle
+    quantity : Decimal
+  where
+    signatory svc
+
+    key (svc, cycle) : (Party, Cycle)
+    maintainer key._1
+
+
+
+newtype Cycle = Cycle with number : Int
+  deriving (Eq, Ord, Show)
+
+addToCycle : Cycle -> Int -> Cycle
+addToCycle cycle i = Cycle with number = cycle.number + i
+
+isDefinedCycle : Cycle -> Bool
+isDefinedCycle cycle = cycle.number >= 0
+
+template IssuanceState
+  with
+    svc : Party
+    -- | The most recent open cycle
+    currentCycle : Cycle
+  where
+    signatory svc
+
+    key svc : Party
+    maintainer key
+
+-- | A mining cycle for which new rewards can be registered.
+-- Note that multiple mining cycles can be open at the same time to give some
+-- time for propagating a new open cycle, while still registering rewards
+-- against the previous open cycle.
+template OpenMiningCycle
+  with
+    svc : Party
+    cycle : Cycle
+    coinPrice : Decimal
+  where
+    signatory svc
+    ensure isDefinedCycle cycle
+
+    key (svc, cycle) : (Party, Cycle)
+    maintainer key._1
+
+-- | A mining cycle for which the total sum of registered rewards
+-- is being computed. Rewards can no longer be registered aginst such a cycle.
+template ClosingMiningCycle
+  with
+    svc : Party
+    cycle : Cycle
+  where
+    signatory svc
+    ensure isDefinedCycle cycle
+
+    key (svc, cycle) : (Party, Cycle)
+    maintainer key._1
+
+-- | A mining cycle for whose rewards coins are being issued.
+template IssuingMiningCycle
+  with
+    svc : Party
+    cycle : Cycle
+    issuancePerCoin : Decimal
+  where
+    signatory svc
+    ensure isDefinedCycle cycle
+
+    key (svc, cycle) : (Party, Cycle)
+    maintainer key._1
+
+-- | A record that a specific mining cycle has been closed, which can
+-- be used to archive expired rewards.
+template ClosedMiningCycle
+  with
+    svc : Party
+    cycle : Cycle
+  where
+    signatory svc
+    ensure isDefinedCycle cycle
+
+    key (svc, cycle) : (Party, Cycle)
+    maintainer key._1
