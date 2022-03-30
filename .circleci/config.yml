@@ -10,22 +10,23 @@ env: &env
   USER: circleci
 
 jobs:
-  placeholder:
+  daml_test:
     docker:
-    - image: cimg/base:2021.04
+    - image: digitalasset/daml-sdk:2.0.0
     environment:
       <<: *env
     steps:
       - checkout
       - run:
-         name: hello
+         name: daml test
          command: |
            set -euo pipefail
 
-           echo "hello, world"
+           cd poc6
+           daml test --ghc-option=-Werror
 
 workflows:
   version: 2
   build:
     jobs:
-    - placeholder
+    - daml_test
