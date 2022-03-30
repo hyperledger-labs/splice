@@ -81,40 +81,27 @@ scaleFixedPlusVariableRate s r =
 
 data ExpiringQuantity = ExpiringQuantity with
     initialQuantity : Decimal
-    startsExpiringAt : Time
-    expiresAt : Time
+    createdAt : Time
+    dailyRate : DailyRate
   deriving (Eq, Ord, Show)
 
+-- TODO This does not handle time overflows.
+quantityExpiresAt : ExpiringQuantity -> Time
+quantityExpiresAt e = e.createdAt `addRelTime` spentWithDailyRate e.dailyRate e.initialQuantity
+
 validExpiringQuantity : ExpiringQuantity -> Bool
-validExpiringQuantity e = e.initialQuantity >= 0.0 && e.startsExpiringAt <= e.expiresAt
+validExpiringQuantity e = e.initialQuantity > 0.0
 
 actualQuantity : Time -> ExpiringQuantity -> Decimal
 actualQuantity t e
-  | e.expiresAt <= t = 0.0
-  | t <= e.startsExpiringAt = e.initialQuantity
+  | e.dailyRate.rate <= 0.0 = error $ "Daily rate must be positive: " <> show e.dailyRate.rate
+  | t <= e.createdAt = e.initialQuantity
   | otherwise =
-      let
-        expiryDuration = subTime e.expiresAt e.startsExpiringAt
-        unexpiredDuration = subTime e.expiresAt t
-        unexpiredRatio = relTimeToMicros unexpiredDuration / relTimeToMicros expiryDuration
+      let timePassed = t `subTime` e.createdAt
       in
-        e.initialQuantity * unexpiredRatio
-
-shiftExpiringQuantity : RelTime -> ExpiringQuantity -> ExpiringQuantity
-shiftExpiringQuantity dt (ExpiringQuantity with ..) =
-  ExpiringQuantity with
-    initialQuantity
-    startsExpiringAt = addRelTime startsExpiringAt dt
-    expiresAt = addRelTime expiresAt dt
-
+        max 0.0 (e.initialQuantity - chargeDailyRate e.dailyRate timePassed)
 
 -- | Smart constructor for an expiring quantity.
 expiringQuantity : DailyRate -> Decimal -> Time -> ExpiringQuantity
-expiringQuantity rate initialQuantity startsExpiringAt
-  | initialQuantity <= 0.0 =
-      ExpiringQuantity with initialQuantity; startsExpiringAt; expiresAt = startsExpiringAt
-  | otherwise =
-      ExpiringQuantity with
-        initialQuantity
-        startsExpiringAt
-        expiresAt = addRelTime startsExpiringAt (spentWithDailyRate rate initialQuantity)
+expiringQuantity dailyRate initialQuantity createdAt =
+  ExpiringQuantity with initialQuantity; createdAt; dailyRate

@@ -8,6 +8,7 @@ import DA.Action (void, when)
 import DA.Date
 import DA.Foldable (forA_)
 import DA.List (dedup)
+import DA.Optional
 import DA.Time
 
 import CC.Coin
@@ -140,6 +141,9 @@ runNextIssuance app coinPrice = do
 -- Asset handling utilities
 ---------------------------
 
+unlockedCoins : Party -> Script [ContractId Coin]
+unlockedCoins p = map fst <$> queryFilter @Coin p (\c -> c.owner == p && isNone c.lock)
+
 
 -- | A simple and slightly hacky-way to test payment: it just gathers all coins from
 -- the sender and transfer's the desired quantity off of them to the receiver.
@@ -147,22 +151,50 @@ runNextIssuance app coinPrice = do
 pay : CCApp -> Party -> Party -> Decimal -> Text -> Script ()
 pay app sender recipient coinQuantity msg = do
   -- TODO: create payment pre-approval flow and use that here instead of submitMulti
-  coins <- queryFilter @Coin sender (\coin -> coin.owner == sender)
+  coins <- unlockedCoins sender
   let transfer = Transfer with
         sender
         payload = msg
-        inputs = [ InputCoin coinCid | (coinCid, _) <- coins ]
+        inputs = map InputCoin coins
         outputs =
           [ OutputSenderCoin with
               exactQuantity = None
-              exactHoldingTime = None
               lock = None
           , OutputReceiverCoin with
               receiver = recipient
               quantity = coinQuantity
+              senderTransferFeeRatio = 1.0
           ]
   void $ submitMulti [sender, recipient] [app.svc] $
     exerciseByKeyCmd @CoinRules app.svc CoinRules_Transfer with transfer
+
+-- | Locks a coin of the given quantity to the given lock holder
+-- for the given time starting at the current time
+-- It gathers all coints of the sender as input coins.
+lockTo : CCApp -> Party -> Party -> Decimal -> RelTime -> Text -> Script ()
+lockTo app sender lockHolder coinQuantity lockDuration msg = do
+  now <- getTime
+  -- TODO: create payment pre-approval flow and use that here instead of submitMulti
+  coins <- unlockedCoins sender
+  let transfer = Transfer with
+        sender
+        payload = msg
+        inputs = map InputCoin coins
+        outputs =
+          [ OutputSenderCoin with
+              exactQuantity = None
+              lock = None
+          , OutputSenderCoin with
+              exactQuantity = Some coinQuantity
+              lock = Some TimeLock with
+                holder = lockHolder
+                expiresAt = now `addRelTime` lockDuration
+          ]
+  void $ submitMulti [sender, lockHolder] [app.svc] $
+    exerciseByKeyCmd @CoinRules app.svc CoinRules_Transfer with transfer
+  pure ()
+
+
 
 -- | Deposit all coins together with new issuances into a single coin.
 runCoinDepositBots : CCApp -> Script ()
@@ -191,7 +223,6 @@ runCoinDepositBots app = do
           outputs =
             [ OutputSenderCoin with
                 exactQuantity = None
-                exactHoldingTime = None
                 lock = None
             ]
     when (not (null appRewards) || not (null validatorRewards) || length coins > 1) $ void $

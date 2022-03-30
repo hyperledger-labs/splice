@@ -39,7 +39,7 @@ testEntry = do
     minValidityDuration = minutes 10
     maxValidityDuration = hours (24 * 365)
     maxNameLength = 256
-    requestFee = 0.1
+    requestFee = 1.0
     dailyLeaseFee = 1.0
     ccSvc = app.svc
 
@@ -68,6 +68,5 @@ testEntry = do
   runCoinDepositBots app
   runNextIssuance app 1.2
   runCoinDepositBots app
-
 
   return ()

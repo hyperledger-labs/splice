@@ -49,7 +49,6 @@ testCoinBurn = do
   -- uncomment the following line to see how 'Validator1' can gather his rewards
   -- after having being declared as validator
   runCoinDepositBots app
-
   -- run some more issuances and transfer
   runNextIssuance app 1.3
   runCoinDepositBots app
@@ -58,11 +57,11 @@ testCoinBurn = do
   runNextIssuance app 0.002
   runCoinDepositBots app
 
-  pay app app.svc provider2 75.0 "starter pack!"
-  runCoinDepositBots app
-
   -- -- the next issuances run with normal prices again
   runNextIssuance app 1.5
+  runCoinDepositBots app
+
+  pay app app.svc provider2 75.0 "starter pack!"
   runCoinDepositBots app
 
   runNextIssuance app 1.6
@@ -70,5 +69,6 @@ testCoinBurn = do
 
   -- cleanup transfer notes
   archiveTransferDebugNotes app
+  -- -}
 
   return ()

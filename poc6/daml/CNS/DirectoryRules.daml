@@ -5,6 +5,7 @@ import DA.Text
 
 import CC.Coin
 import CC.CoinRules
+import OpenBusiness.Fees
 
 import CNS.Directory
 
@@ -42,6 +43,8 @@ template DirectoryRules with
         coin <- fetch coinCid
         assertMsg "Coin SVC and owner must match" ((ccSvc, entry.user) == (coin.svc, coin.owner))
 
+        (_, CoinRules{config = coinConfig}) <- exerciseByKey @CoinRules ccSvc (CoinRules_Fetch provider)
+
         lockedCoinCid :: _ <- exerciseByKey @CoinRules ccSvc CoinRules_Transfer with
           transfer = Transfer with
             sender = entry.user
@@ -49,17 +52,25 @@ template DirectoryRules with
             inputs = [InputCoin coinCid]
             outputs =
               [ OutputSenderCoin with
-                  exactQuantity = Some entryFee
-                  exactHoldingTime = Some requestDuration
+                  exactQuantity = Some $
+                    entryFee +
+                    -- transfer requires update fee
+                    coinConfig.updateFee.fee +
+                    -- prepay create so we can push out leftover prepayed fees.
+                    coinConfig.createFee.fee +
+                    -- ensure that we stay above entryFee + updateFee
+                    -- for the request duration.
+                    chargeDailyRate coinConfig.holdingFee requestDuration
                   lock = Some TimeLock with
                     holder = provider
                     expiresAt
               , OutputReceiverCoin with
                   receiver = provider
                   quantity = requestFee
+                  -- Fee includes transfer costs so receiver pays everything
+                  senderTransferFeeRatio = 0.0
               , OutputSenderCoin with
                   exactQuantity = None
-                  exactHoldingTime = None
                   lock = None
               ]
           -- TODO: minLockedQuantity = entryFee
@@ -125,6 +136,11 @@ template EntryRequest with
               [ OutputReceiverCoin with
                   receiver = entry.provider
                   quantity = entryFee
+                  -- Fee includes transfer costs so receiver pays everything.
+                  senderTransferFeeRatio = 0.0
+              , OutputSenderCoin with
+                  exactQuantity = None
+                  lock = None
               ]
         create entry
 

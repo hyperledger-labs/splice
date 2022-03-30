@@ -32,7 +32,7 @@ template Coin
     ensure validExpiringQuantity quantity
 
     implements ExpiringContract where
-      let contractExpiresAt = quantity.expiresAt
+      let contractExpiresAt = quantityExpiresAt quantity
       let expiryManager = svc
 
     choice Coin_Unlock : ContractId Coin

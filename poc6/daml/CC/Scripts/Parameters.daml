@@ -16,21 +16,17 @@ defaultCoinConfig : CoinConfig
 defaultCoinConfig = CoinConfig with
     -- | Fee to create a new coin.
     -- Set to the fixed part of the transfer fee.
-    createFee = FixedFee 0.1
+    createFee = FixedFee 0.09
 
     -- | Fee to update an existing coin.
     -- Cost covering and 10x lower than creation to strongly incentivize merging coins.
     updateFee = FixedFee 0.01
 
-    -- | Fee for locking a coin.
-    -- 2x the create fee
-    lockFee = FixedFee 0.2
-
     -- | Fee for keeping a coin around.
-    -- Equal to 3.65 dollar per year for an account with NO activity.
+    -- Equal to 1$ / 360 days for an account with NO activity.
     -- Incentivizes users to actively merge their coins.
-    -- A ledger with 1M coins thus generates at least 10k $ in fees per day.
-    holdingFee = DailyRate 0.01
+    -- A ledger with 1M coins thus generates at least 2777k $ in fees per day.
+    holdingFee = DailyRate (1.0 / 360.0)
 
     -- | The minimal time for which the holding fee of a coin must be covered
     -- at all times.
@@ -70,12 +66,6 @@ defaultCoinConfig = CoinConfig with
     coinsIssuedPerCycle = 60.0
 
     svcIssuanceRatio = 0.35
-
-    -- | The ratio of the transfer fee attributed to the sender, which
-    -- pays for its validator.
-    --
-    -- Chosen such that the app authors get a 50% discount on the transfer fees
-    senderTransferFeeAttributionRatio = 1.0 - 0.5 / (1.0 - 0.35)
 
     -- | These should be large enough to ensure efficient batching, but not too large
     -- to avoid creating very large transactions.

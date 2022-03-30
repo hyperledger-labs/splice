@@ -1,0 +1,133 @@
+module CC.Scripts.TestDesignExample where
+
+import DA.Assert
+import DA.Action
+import DA.Optional
+import DA.Time
+import Daml.Script
+
+import CC.Coin
+import CC.CoinRules
+import OpenBusiness.Fees
+import CC.Scripts.Util
+
+template Escrow
+  with
+    svc : Party
+    arbiter : Party
+    p : Party
+  where
+    signatory arbiter
+    observer p
+    nonconsuming choice Refresh : ()
+      with
+        lockedCoin : ContractId Coin
+        paymentCoin : ContractId Coin
+      controller p
+      do locked@Coin{lock = Some lock} <- fetch lockedCoin
+         assertMsg "SVC matches locked coin" (locked.svc == this.svc)
+         assertMsg "owner matches locked coin" (locked.owner == this.p)
+         assertMsg "lock holder matches locked coin " (arbiter == lock.holder)
+         payment <- fetch paymentCoin
+         assertMsg "SVC matches payment coin" (payment.svc == this.svc)
+         assertMsg "owner matches payment coin" (payment.owner == this.p)
+         cid <- exercise lockedCoin Coin_Unlock
+         let transfer = Transfer with
+               sender = p
+               payload = "refresh"
+               inputs = [InputCoin cid, InputCoin paymentCoin]
+               outputs =
+                 [ OutputSenderCoin with
+                     exactQuantity = None
+                     lock = None
+                 , OutputSenderCoin with
+                     exactQuantity = Some locked.quantity.initialQuantity
+                     lock = Some TimeLock with
+                       holder = arbiter
+                       expiresAt = lock.expiresAt `addRelTime` days 90
+                 , OutputReceiverCoin with
+                     receiver = arbiter
+                     quantity = 1.0
+                     senderTransferFeeRatio = 0.0
+                 ]
+         exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
+         pure ()
+
+-- | This matches the example in the design doc
+--  https://docs.google.com/document/d/12cagZTzODP4rgEwDQ3lqoolh5ls2chXZ3ctcgH8Hl28/edit#heading=h.hivyhhs3xqs9
+test : Script ()
+test = do
+  -- bootstrap app
+  app <- setupApp
+
+  t0 <- getTime
+
+  -- Run enough issue cycles that the SVC can give Alice 1k
+  replicateA_ 100 $ do
+    runNextIssuance app 1.0
+    runCoinDepositBots app
+
+  alice <- setupUser app "Alice"
+  arbiter <- setupUser app "Arbiter"
+
+  pay app app.svc alice 1500.0 "init"
+
+  escrow <- submit arbiter $ createCmd (Escrow app.svc arbiter alice)
+
+  lockTo app alice arbiter 1000.25 (days 90) "lock"
+
+  [(lockedCoin, _)] <- queryFilter @Coin alice (\c -> isSome c.lock)
+
+  setTime (t0 `addRelTime` days 72)
+
+  pay app alice alice 5.0 "split"
+
+  [(paymentCoin, _)] <- queryFilter @Coin alice (\c -> c.quantity.initialQuantity == 5.0)
+
+  setTime (t0 `addRelTime` days 90)
+
+  archiveTransferDebugNotes app
+
+  prevCoinCids <- map fst <$> query @Coin app.svc
+
+  submitMulti [alice] [app.svc] $ exerciseCmd escrow Refresh with ..
+
+  allCoins <- query @Coin app.svc
+
+  let newCoins = map snd $ filter (\(cid, _) -> cid `notElem` prevCoinCids) allCoins
+
+  length newCoins === 3
+
+  Some (_, CoinRules{config = coinConfig}) <- queryContractKey @CoinRules app.svc app.svc
+
+  let Some newLocked = find (\c -> isSome c.lock) newCoins
+      Some change = find (\c -> isNone c.lock && c.owner == alice) newCoins
+      Some payment = find (\c -> c.owner == arbiter) newCoins
+  newLocked === Coin with
+    svc = app.svc
+    owner = alice
+    quantity = expiringQuantity coinConfig.holdingFee 1000.25 (t0 `addRelTime` days 90)
+    lock = Some TimeLock with
+      holder = arbiter
+      expiresAt = t0 `addRelTime` days 180
+  change === Coin with
+    svc = app.svc
+    owner = alice
+    lock = None
+    quantity =
+      let quantity =
+            5.0
+            - 1.0 -- payment
+            - (chargeDailyRate coinConfig.holdingFee (days 18) + chargeDailyRate coinConfig.holdingFee (days 90)) -- holding fees
+            - 0.01 * 2.0 -- update & locking fee for locked coin
+            - 0.01 -- update fee for transfered coin
+            - 0.09 -- create fee for change
+      in expiringQuantity coinConfig.holdingFee quantity (t0 `addRelTime` days 90)
+  payment === Coin with
+    svc = app.svc
+    owner = arbiter
+    lock = None
+    quantity =
+      let quantity = 1.0 - chargeFixedPlusVariableRate coinConfig.transferFee 1.0
+      in expiringQuantity coinConfig.holdingFee quantity (t0 `addRelTime` days 90)
+  return ()
