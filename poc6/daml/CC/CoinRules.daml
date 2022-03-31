@@ -69,7 +69,7 @@ template CoinRules
     -- Transfers support a batch-in batch-out model, which enables CC users
     -- to optimize their needs for minimizing fees and contention based on their
     -- business requirements.
-    nonconsuming choice CoinRules_Transfer : [ContractId Coin]
+    nonconsuming choice CoinRules_Transfer : [TransferResult]
       with
         transfer : Transfer
       controller transferControllers transfer
@@ -127,7 +127,6 @@ template CoinRules
           svc
           owner = svc
           quantity = expiringQuantity config.holdingFee svcCoinsPerIssuance now
-          lock = None
 
         -- create issuing cycle
         create IssuingMiningCycle with
@@ -204,7 +203,6 @@ data TransferOutput
       senderTransferFeeRatio : Decimal
   deriving (Eq, Ord, Show)
 
-
 -- | A way to store some debug info on the ledger.
 --
 -- TODO: replace by automated testing.
@@ -227,12 +225,19 @@ transferControllers : Transfer -> Set Party
 transferControllers t =
     foldl addOutputController (Set.singleton t.sender) t.outputs
   where
-    addOutputController s (OutputSenderCoin with lock; ..) = optional s (`Set.insert` s) (lockHolder lock)
+    addOutputController s (OutputSenderCoin with lock; ..) = optional s (`Set.insert` s) (holder <$> lock)
     addOutputController s (OutputReceiverCoin with receiver; ..) = Set.insert receiver s
+
+-- | Contracts created during a transfer and
+-- returned as choice results.
+data TransferResult
+  = TransferResultCoin (ContractId Coin)
+  | TransferResultLockedCoin (ContractId LockedCoin)
+  deriving (Show, Eq, Ord)
 
 -- | Execute a transfer.
 --
-executeTransfer : CoinConfig -> Party -> Transfer -> Update [ContractId Coin]
+executeTransfer : CoinConfig -> Party -> Transfer -> Update [TransferResult]
 executeTransfer config0 svc t = do
   -- MISSING FEATURE 'fetchByKey + off-ledger disclosure': we do not want to have a dependency on
   -- the issuance state, as that will lead to contention. We'd expect to just fetch some
@@ -316,9 +321,6 @@ summarizeAndConsumeInputs config svc sender inps = do
       archive coinCid
       assertMsg "SVC matches" (svc == coin.svc)
       assertMsg "Sender matches owner" (sender == coin.owner)
-      -- FIXME: separate the contract templates of a normal coin and a locked coin
-      -- to avoid this kind of confusion happening to our users.
-      assertMsg "Coin not locked" (isNone coin.lock)
       let quantity = actualQuantity now coin.quantity
           holdingFee = coin.quantity.initialQuantity - quantity
       return TransferInputsSummary with
@@ -470,9 +472,9 @@ issueRewards config openCycle sender summary = do
 
 data OutputCreationState = OutputCreationState with
   remainingExcessQuantity : Decimal
-  coinCids : [ContractId Coin]
+  coinCids : [TransferResult]
 
-createTransferOutputs : CoinConfig -> Party -> TransferSummary -> [PreprocessedTransferOutput] -> Update [ContractId Coin]
+createTransferOutputs : CoinConfig -> Party -> TransferSummary -> [PreprocessedTransferOutput] -> Update [TransferResult]
 createTransferOutputs config svc summary outs = do
     st <- foldlA createOutput initialState outs
     return st.coinCids
@@ -495,11 +497,14 @@ createTransferOutputs config svc summary outs = do
                 -- TODO: consider smearing this remainder excess quantity above perCoinExcessQuantity
                 -- as thinly as possible over the appropriate number of floating coins.
           quantity = out.quantity + extraQuantity
-      coinCid <- create Coin with
-        svc
-        owner = out.owner
-        quantity = expiringQuantity config.holdingFee quantity now
-        lock = out.lock
+      coinCid <-
+        let coin = Coin with
+              svc
+              owner = out.owner
+              quantity = expiringQuantity config.holdingFee quantity now
+        in case out.lock of
+             None -> TransferResultCoin <$> create coin
+             Some lock -> TransferResultLockedCoin <$> create LockedCoin with coin; lock
       return OutputCreationState with
         remainingExcessQuantity = st.remainingExcessQuantity - extraQuantity
         coinCids = coinCid :: st.coinCids

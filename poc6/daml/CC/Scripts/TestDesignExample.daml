@@ -2,7 +2,7 @@ module CC.Scripts.TestDesignExample where
 
 import DA.Assert
 import DA.Action
-import DA.Optional
+import DA.List.Total
 import DA.Time
 import Daml.Script
 
@@ -21,10 +21,10 @@ template Escrow
     observer p
     nonconsuming choice Refresh : ()
       with
-        lockedCoin : ContractId Coin
+        lockedCoin : ContractId LockedCoin
         paymentCoin : ContractId Coin
       controller p
-      do locked@Coin{lock = Some lock} <- fetch lockedCoin
+      do LockedCoin{lock,coin=locked} <- fetch lockedCoin
          assertMsg "SVC matches locked coin" (locked.svc == this.svc)
          assertMsg "owner matches locked coin" (locked.owner == this.p)
          assertMsg "lock holder matches locked coin " (arbiter == lock.holder)
@@ -76,7 +76,7 @@ test = do
 
   lockTo app alice arbiter 1000.25 (days 90) "lock"
 
-  [(lockedCoin, _)] <- queryFilter @Coin alice (\c -> isSome c.lock)
+  [(lockedCoin, _)] <- query @LockedCoin alice
 
   setTime (t0 `addRelTime` days 72)
 
@@ -89,31 +89,33 @@ test = do
   archiveTransferDebugNotes app
 
   prevCoinCids <- map fst <$> query @Coin app.svc
+  prevLockedCoinCids <- map fst <$> query @LockedCoin app.svc
 
   submitMulti [alice] [app.svc] $ exerciseCmd escrow Refresh with ..
 
   allCoins <- query @Coin app.svc
-
+  allLockedCoins <- query @LockedCoin app.svc
   let newCoins = map snd $ filter (\(cid, _) -> cid `notElem` prevCoinCids) allCoins
-
-  length newCoins === 3
+      newLockedCoins = map snd $ filter (\(cid, _) -> cid `notElem` prevLockedCoinCids) allLockedCoins
+  length newCoins === 2
+  length newLockedCoins === 1
 
   Some (_, CoinRules{config = coinConfig}) <- queryContractKey @CoinRules app.svc app.svc
 
-  let Some newLocked = find (\c -> isSome c.lock) newCoins
-      Some change = find (\c -> isNone c.lock && c.owner == alice) newCoins
+  let Some newLocked = head newLockedCoins
+      Some change = find (\c -> c.owner == alice) newCoins
       Some payment = find (\c -> c.owner == arbiter) newCoins
-  newLocked === Coin with
-    svc = app.svc
-    owner = alice
-    quantity = expiringQuantity coinConfig.holdingFee 1000.25 (t0 `addRelTime` days 90)
-    lock = Some TimeLock with
+  newLocked === LockedCoin with
+    lock = TimeLock with
       holder = arbiter
       expiresAt = t0 `addRelTime` days 180
+    coin = Coin with
+      svc = app.svc
+      owner = alice
+      quantity = expiringQuantity coinConfig.holdingFee 1000.25 (t0 `addRelTime` days 90)
   change === Coin with
     svc = app.svc
     owner = alice
-    lock = None
     quantity =
       let quantity =
             5.0
@@ -126,7 +128,6 @@ test = do
   payment === Coin with
     svc = app.svc
     owner = arbiter
-    lock = None
     quantity =
       let quantity = 1.0 - chargeFixedPlusVariableRate coinConfig.transferFee 1.0
       in expiringQuantity coinConfig.holdingFee quantity (t0 `addRelTime` days 90)

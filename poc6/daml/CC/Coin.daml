@@ -1,8 +1,6 @@
 -- | The contracts representing the long-term state of CC.
 module CC.Coin where
 
-import DA.Optional
-
 import OpenBusiness.Expiry
 import OpenBusiness.Fees
 
@@ -26,42 +24,46 @@ template Coin
     svc : Party
     owner : Party
     quantity : ExpiringQuantity
-    lock : Optional TimeLock
   where
-    signatory svc, owner, lockHolder lock
+    signatory svc, owner
     ensure validExpiringQuantity quantity
 
     implements ExpiringContract where
       let contractExpiresAt = quantityExpiresAt quantity
       let expiryManager = svc
 
+
+
+template LockedCoin
+  with
+    coin : Coin
+    lock : TimeLock
+  where
+    signatory lock.holder, signatory coin
+
+    implements ExpiringContract where
+      let contractExpiresAt = quantityExpiresAt coin.quantity
+      let expiryManager = coin.svc
+
     choice Coin_Unlock : ContractId Coin
-      controller lockHolder lock
-      do
-        assertMsg "Coin is locked" (isSome lock)
-        create this with lock = None
+      controller lock.holder
+      do create coin
 
     let tryExpireLock : Update (ContractId Coin)
-        tryExpireLock = case this.lock of
-          None -> fail "Coin not locked"
-          Some (TimeLock with expiresAt; holder) -> do
+        tryExpireLock = do
             t <- getTime
-            assertMsg "Lock not expired" (expiresAt <= t)
-            create this with lock = None
+            assertMsg "Lock not expired" (lock.expiresAt <= t)
+            create coin
 
     choice Coin_OwnerExpireLock : ContractId Coin
-      controller owner
+      controller coin.owner
       do tryExpireLock
 
     -- NOTE: we intentionally don't combine this choice with Coin_OwnerExpireLock to
     -- provide a more expressive transaction graph.
     choice Coin_SvcExpireLock : ContractId Coin
-      controller svc
+      controller coin.svc
       do tryExpireLock
-
--- | The holder of an optional timelock.
-lockHolder : Optional TimeLock -> Optional Party
-lockHolder lock = (.holder) <$> lock
 
 
 -- Contracts to implement reward issuance

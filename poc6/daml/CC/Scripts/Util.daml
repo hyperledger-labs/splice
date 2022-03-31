@@ -8,7 +8,6 @@ import DA.Action (void, when)
 import DA.Date
 import DA.Foldable (forA_)
 import DA.List (dedup)
-import DA.Optional
 import DA.Time
 
 import CC.Coin
@@ -142,7 +141,7 @@ runNextIssuance app coinPrice = do
 ---------------------------
 
 unlockedCoins : Party -> Script [ContractId Coin]
-unlockedCoins p = map fst <$> queryFilter @Coin p (\c -> c.owner == p && isNone c.lock)
+unlockedCoins p = map fst <$> queryFilter @Coin p (\c -> c.owner == p)
 
 
 -- | A simple and slightly hacky-way to test payment: it just gathers all coins from

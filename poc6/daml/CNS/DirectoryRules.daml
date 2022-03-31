@@ -45,7 +45,7 @@ template DirectoryRules with
 
         (_, CoinRules{config = coinConfig}) <- exerciseByKey @CoinRules ccSvc (CoinRules_Fetch provider)
 
-        lockedCoinCid :: _ <- exerciseByKey @CoinRules ccSvc CoinRules_Transfer with
+        TransferResultLockedCoin lockedCoinCid :: _ <- exerciseByKey @CoinRules ccSvc CoinRules_Transfer with
           transfer = Transfer with
             sender = entry.user
             payload = "CNS: entry requested"
@@ -96,7 +96,7 @@ template EntryRequest with
     entry : Entry
     expiresAt : Time
     entryFee : Decimal
-    coinCid : ContractId Coin
+    coinCid : ContractId LockedCoin
   where
     signatory (signatory entry)
     ensure expiresAt <= entry.expiresAt
