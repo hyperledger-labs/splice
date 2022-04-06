@@ -48,15 +48,10 @@ defaultCoinConfig = CoinConfig with
 
     -- | Fee for transferring some quantity of coin to a new owner.
     --
-    -- Chosen to be 66% of credit card fees (Stripe 2.6% + 0.15$), as CC does
-    -- not provide consumer protection
-    --
-    -- TODO: make the variable rate regressive with a curve that is
-    -- cost competitive competitive with blockchain and clearing networks
-    -- for a wide range of transfers.
-    transferFee = FixedPlusVariableRate with
-      fixed = 0.1          -- $
-      variableRate = 0.017  -- ratio
+    -- TODO Finetuning required
+    transferFee = SteppedRate with
+      initialRate = 0.01
+      steps = [(100.0, 0.001), (1000.0, 0.0001), (1000000.0, 0.00001)]
 
     -- | Coins issued per mining cycle.
     --

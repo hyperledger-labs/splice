@@ -37,9 +37,7 @@ data CoinConfig = CoinConfig with
     -- | The minimal quantity of burn for which a receipt is issued.
     minRewardQuantity : Decimal
     -- | Fee for transferring some quantity of coin to a new owner.
-    -- TODO: make the variable part logarithmic in the quantity to make
-    -- large coin transfers cost competitive with blockchain and clearing networks.
-    transferFee : FixedPlusVariableRate
+    transferFee : SteppedRate
     coinsIssuedPerCycle : Decimal
     svcIssuanceRatio : Decimal
     -- | Maximum number of batch inputs for a transfer.
@@ -400,7 +398,7 @@ preprocessAndSummarizeOutputs config sender outs = do
     summarizeOutput s (OutputReceiverCoin with quantity; receiver; senderTransferFeeRatio) = do
       assertMsg "Transfer fee ratio must be between 0 and 1" $
         0.0 <= senderTransferFeeRatio && senderTransferFeeRatio <= 1.0
-      let transferFee = chargeFixedPlusVariableRate config.transferFee quantity
+      let transferFee = chargeSteppedRate config.transferFee quantity
           receiverFee =
             -- NOTE: only part of the transferFee is attributed to and minable by the receiver
             -- TODO: check that this does loose fee quantity
@@ -518,7 +516,7 @@ scaleFees s c = CoinConfig with
     minHoldingTime = c.minHoldingTime
     maxPrepaidHoldingTime = c.maxPrepaidHoldingTime
     minRewardQuantity = s * c.minRewardQuantity
-    transferFee = scaleFixedPlusVariableRate s c.transferFee
+    transferFee = scaleSteppedRate s c.transferFee
     coinsIssuedPerCycle = c.coinsIssuedPerCycle
     svcIssuanceRatio = c.svcIssuanceRatio
     maxNumInputs = c.maxNumInputs

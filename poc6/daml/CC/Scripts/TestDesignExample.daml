@@ -129,6 +129,6 @@ test = do
     svc = app.svc
     owner = arbiter
     quantity =
-      let quantity = 1.0 - chargeFixedPlusVariableRate coinConfig.transferFee 1.0
+      let quantity = 1.0 - chargeSteppedRate coinConfig.transferFee 1.0
       in expiringQuantity coinConfig.holdingFee quantity (t0 `addRelTime` days 90)
   return ()
