@@ -23,10 +23,11 @@ defaultCoinConfig = CoinConfig with
     updateFee = FixedFee 0.01
 
     -- | Fee for keeping a coin around.
-    -- Equal to 1$ / 360 days for an account with NO activity.
+    -- This is roughly equivalent to 1$/360 days but expressed as cycles
+    -- with one day corresponding to 24*60/2.5 cycles, i.e., one cycle
+    -- every 2.5 minutes.
     -- Incentivizes users to actively merge their coins.
-    -- A ledger with 1M coins thus generates at least 2777k $ in fees per day.
-    holdingFee = DailyRate (1.0 / 360.0)
+    holdingFee = RatePerRound (1.0 / 360.0 / (24.0*60.0/2.5))
 
     -- | The minimal time for which the holding fee of a coin must be covered
     -- at all times.

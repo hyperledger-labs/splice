@@ -1,8 +1,8 @@
 -- | Utility functions for different kinds of fees.
 module OpenBusiness.Fees where
 
+import CC.Cycle
 import DA.Time
-
 
 -- Time utilities
 -----------------
@@ -20,25 +20,25 @@ daysToRelTime : Decimal -> RelTime
 daysToRelTime d = convertMicrosecondsToRelTime $ ceiling $ d * microsPerDay
 
 
--- Daily rates
---------------
+-- Rates per mining cycle
+-------------------------
 
-newtype DailyRate = DailyRate with rate : Decimal
+newtype RatePerRound = RatePerRound with rate : Decimal
   deriving (Eq, Ord, Show)
 
-chargeDailyRate : DailyRate -> RelTime -> Decimal
-chargeDailyRate daily dt = daily.rate * relTimeToDays dt
+chargeRatePerRound : RatePerRound -> RelCycle -> Decimal
+chargeRatePerRound rate dt = rate.rate * intToDecimal dt.diff
 
 -- | TODO: better name
-spentWithDailyRate : DailyRate -> Decimal -> RelTime
-spentWithDailyRate daily quantity = daysToRelTime (quantity / daily.rate)
+spentWithRatePerRound : RatePerRound -> Decimal -> RelCycle
+spentWithRatePerRound rate quantity =  RelCycle (ceiling $ quantity / rate.rate)
 
--- | Scale a daily rate such that
+-- | Scale a cycle rate such that
 --
--- ALL s r dt. s * chargeDailyRate r dt = chargeDailyRate (s `scaleDailyRate` r) dt
+-- ALL s r dt. s * chargeRatePerRound r dt = chargeRatePerRound (s `scaleRatePerRound` r) dt
 --
-scaleDailyRate : Decimal -> DailyRate -> DailyRate
-scaleDailyRate s r = DailyRate with rate = s * r.rate
+scaleRatePerRound : Decimal -> RatePerRound -> RatePerRound
+scaleRatePerRound s r = RatePerRound with rate = s * r.rate
 
 
 -- Fixed and variable rates
@@ -98,27 +98,27 @@ scaleSteppedRate s r =
 
 data ExpiringQuantity = ExpiringQuantity with
     initialQuantity : Decimal
-    createdAt : Time
-    dailyRate : DailyRate
+    createdAt : Cycle
+    ratePerRound : RatePerRound
   deriving (Eq, Ord, Show)
 
 -- TODO This does not handle time overflows.
-quantityExpiresAt : ExpiringQuantity -> Time
-quantityExpiresAt e = e.createdAt `addRelTime` spentWithDailyRate e.dailyRate e.initialQuantity
+quantityExpiresAt : ExpiringQuantity -> Cycle
+quantityExpiresAt e = e.createdAt `addRelCycle` spentWithRatePerRound e.ratePerRound e.initialQuantity
 
 validExpiringQuantity : ExpiringQuantity -> Bool
 validExpiringQuantity e = e.initialQuantity > 0.0
 
-actualQuantity : Time -> ExpiringQuantity -> Decimal
+actualQuantity : Cycle -> ExpiringQuantity -> Decimal
 actualQuantity t e
-  | e.dailyRate.rate <= 0.0 = error $ "Daily rate must be positive: " <> show e.dailyRate.rate
+  | e.ratePerRound.rate <= 0.0 = error $ "Cycle rate must be positive: " <> show e.ratePerRound.rate
   | t <= e.createdAt = e.initialQuantity
   | otherwise =
-      let timePassed = t `subTime` e.createdAt
+      let cyclesPassed = t `subCycle` e.createdAt
       in
-        max 0.0 (e.initialQuantity - chargeDailyRate e.dailyRate timePassed)
+        max 0.0 (e.initialQuantity - chargeRatePerRound e.ratePerRound cyclesPassed)
 
 -- | Smart constructor for an expiring quantity.
-expiringQuantity : DailyRate -> Decimal -> Time -> ExpiringQuantity
-expiringQuantity dailyRate initialQuantity createdAt =
-  ExpiringQuantity with initialQuantity; createdAt; dailyRate
+expiringQuantity : RatePerRound -> Decimal -> Cycle -> ExpiringQuantity
+expiringQuantity ratePerRound initialQuantity createdAt =
+  ExpiringQuantity with initialQuantity; createdAt; ratePerRound

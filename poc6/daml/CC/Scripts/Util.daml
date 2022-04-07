@@ -12,6 +12,7 @@ import DA.Time
 
 import CC.Coin
 import CC.CoinRules
+import CC.Cycle
 
 import CC.Scripts.Parameters
 
@@ -85,6 +86,11 @@ recordValidatorOf app u v =
   submitMulti [app.svc, v] [] $
     void $ createCmd ValidatorRight with svc = app.svc; validator = v; user = u
 
+activeCycle : CCApp -> Script OpenMiningCycle
+activeCycle app = do
+  Some (_, state) <- queryContractKey @IssuanceState app.svc app.svc
+  Some (_, cycle) <- queryContractKey @OpenMiningCycle app.svc (app.svc, state.currentCycle)
+  pure cycle
 
 -- Issuance automation
 ----------------------

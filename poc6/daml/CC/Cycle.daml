@@ -1,0 +1,74 @@
+module CC.Cycle where
+
+newtype Cycle = Cycle with number : Int
+  deriving (Eq, Ord, Show)
+
+-- | The equivalent of RelTime for cycles, i.e., a delta between
+-- two cycles
+newtype RelCycle = RelCycle with diff : Int
+  deriving (Eq, Ord, Show)
+
+addRelCycle : Cycle -> RelCycle -> Cycle
+addRelCycle cycle i = Cycle with number = cycle.number + i.diff
+
+subCycle : Cycle -> Cycle -> RelCycle
+subCycle (Cycle a) (Cycle b) = RelCycle (a - b)
+
+isDefinedCycle : Cycle -> Bool
+isDefinedCycle cycle = cycle.number >= 0
+
+
+-- | A mining cycle for which new rewards can be registered.
+-- Note that multiple mining cycles can be open at the same time to give some
+-- time for propagating a new open cycle, while still registering rewards
+-- against the previous open cycle.
+template OpenMiningCycle
+  with
+    svc : Party
+    cycle : Cycle
+    coinPrice : Decimal
+  where
+    signatory svc
+    ensure isDefinedCycle cycle
+
+    key (svc, cycle) : (Party, Cycle)
+    maintainer key._1
+
+-- | A mining cycle for which the total sum of registered rewards
+-- is being computed. Rewards can no longer be registered aginst such a cycle.
+template ClosingMiningCycle
+  with
+    svc : Party
+    cycle : Cycle
+  where
+    signatory svc
+    ensure isDefinedCycle cycle
+
+    key (svc, cycle) : (Party, Cycle)
+    maintainer key._1
+
+-- | A mining cycle for whose rewards coins are being issued.
+template IssuingMiningCycle
+  with
+    svc : Party
+    cycle : Cycle
+    issuancePerCoin : Decimal
+  where
+    signatory svc
+    ensure isDefinedCycle cycle
+
+    key (svc, cycle) : (Party, Cycle)
+    maintainer key._1
+
+-- | A record that a specific mining cycle has been closed, which can
+-- be used to archive expired rewards.
+template ClosedMiningCycle
+  with
+    svc : Party
+    cycle : Cycle
+  where
+    signatory svc
+    ensure isDefinedCycle cycle
+
+    key (svc, cycle) : (Party, Cycle)
+    maintainer key._1

@@ -9,6 +9,7 @@ import DA.Text
 import DA.Time
 
 import CC.Coin
+import CC.Cycle
 
 
 import OpenBusiness.Fees
@@ -27,7 +28,7 @@ data CoinConfig = CoinConfig with
     -- | Fee to update an existing coin.
     updateFee : FixedFee
     -- | Fee for keeping a coin around.
-    holdingFee : DailyRate
+    holdingFee : RatePerRound
     -- | The minimal time for which the holding fee of a coin must be covered
     -- at all times.
     minHoldingTime : RelTime
@@ -82,7 +83,7 @@ template CoinRules
         -- fetch current state
         (stCid, st) <- fetchByKey @IssuanceState svc
         archive stCid
-        let cycle = addToCycle st.currentCycle 1
+        let cycle = addRelCycle st.currentCycle (RelCycle 1)
         -- create new state and new open cycle
         create st with currentCycle = cycle
         create OpenMiningCycle with svc; cycle; coinPrice
@@ -120,11 +121,10 @@ template CoinRules
             userCoinsPerIssuance = config.coinsIssuedPerCycle * userIssuanceRatio
 
         -- issue coin to SVC
-        now <- getTime
         create Coin with
           svc
           owner = svc
-          quantity = expiringQuantity config.holdingFee svcCoinsPerIssuance now
+          quantity = expiringQuantity config.holdingFee svcCoinsPerIssuance miningCycle.cycle
 
         -- create issuing cycle
         create IssuingMiningCycle with
@@ -245,7 +245,7 @@ executeTransfer config0 svc t = do
   (_, openCycle) <- fetchByKey @OpenMiningCycle (svc, issuanceState.currentCycle )
   let config = scaleFees (1.0 / openCycle.coinPrice) config0
   -- compute summaries
-  isum <- summarizeAndConsumeInputs config svc t.sender t.inputs
+  isum <- summarizeAndConsumeInputs openCycle.cycle config svc t.sender t.inputs
   osum <- preprocessAndSummarizeOutputs config t.sender t.outputs
   summary <- summarizeTransfer config isum osum
   -- check that overall transfer constraints are satisfied
@@ -262,7 +262,7 @@ executeTransfer config0 svc t = do
   -- issue rewards for burns
   issueRewards config openCycle t.sender summary
   -- record outputs
-  createTransferOutputs config svc summary osum.preprocessedOutputs
+  createTransferOutputs openCycle.cycle config svc summary osum.preprocessedOutputs
 
 data TransferInputsSummary = TransferInputsSummary with
     numBurnInputs : Int
@@ -303,9 +303,8 @@ data TransferSummary = TransferSummary with
   deriving (Eq, Show)
 
 
-summarizeAndConsumeInputs : CoinConfig -> Party -> Party -> [TransferInput] -> Update TransferInputsSummary
-summarizeAndConsumeInputs config svc sender inps = do
-    now <- getTime
+summarizeAndConsumeInputs : Cycle -> CoinConfig -> Party -> Party -> [TransferInput] -> Update TransferInputsSummary
+summarizeAndConsumeInputs now config svc sender inps = do
     foldlA (summarizeAndConsumeInput now) initialSummary inps
   where
     initialSummary = TransferInputsSummary with
@@ -472,8 +471,8 @@ data OutputCreationState = OutputCreationState with
   remainingExcessQuantity : Decimal
   coinCids : [TransferResult]
 
-createTransferOutputs : CoinConfig -> Party -> TransferSummary -> [PreprocessedTransferOutput] -> Update [TransferResult]
-createTransferOutputs config svc summary outs = do
+createTransferOutputs : Cycle -> CoinConfig -> Party -> TransferSummary -> [PreprocessedTransferOutput] -> Update [TransferResult]
+createTransferOutputs now config svc summary outs = do
     st <- foldlA createOutput initialState outs
     return st.coinCids
   where
@@ -486,7 +485,6 @@ createTransferOutputs config svc summary outs = do
       | otherwise = initialState.remainingExcessQuantity / intToDecimal summary.numFloatingSenderCoins
 
     createOutput st out = do
-      now <- getTime
       let extraQuantity = case out.excessQuantityNumber of
             None -> 0.0
             Some n
@@ -512,7 +510,7 @@ scaleFees : Decimal -> CoinConfig -> CoinConfig
 scaleFees s c = CoinConfig with
     createFee = scaleFixedFee s c.createFee
     updateFee = scaleFixedFee s c.updateFee
-    holdingFee = scaleDailyRate s c.holdingFee
+    holdingFee = scaleRatePerRound s c.holdingFee
     minHoldingTime = c.minHoldingTime
     maxPrepaidHoldingTime = c.maxPrepaidHoldingTime
     minRewardQuantity = s * c.minRewardQuantity
