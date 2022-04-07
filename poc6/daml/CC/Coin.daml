@@ -1,7 +1,7 @@
 -- | The contracts representing the long-term state of CC.
 module CC.Coin where
 
-import CC.Cycle
+import CC.Round
 import OpenBusiness.Expiry
 import OpenBusiness.Fees
 
@@ -94,24 +94,24 @@ template AppReward
     -- | Application owner.
     owner : Party
     quantity : Decimal
-    cycle : Cycle
+    round : Round
   where
     signatory svc, owner
     ensure quantity > 0.0
 
     choice AppReward_SvcExpire : ()
       with
-        miningCycleCid : ContractId ClosedMiningCycle
+        miningRoundCid : ContractId ClosedMiningRound
       controller svc
-      do miningCycle <- fetch miningCycleCid
-         assertMsg "Mining cycle > expiry cycle" (cycle <= miningCycle.cycle)
+      do miningRound <- fetch miningRoundCid
+         assertMsg "Mining round > expiry round" (round <= miningRound.round)
 
     choice AppReward_OwnerExpire : ()
       with
-        miningCycleCid : ContractId ClosedMiningCycle
+        miningRoundCid : ContractId ClosedMiningRound
       controller owner
-      do miningCycle <- fetch miningCycleCid
-         assertMsg "Mining cycle > expiry cycle" (cycle <= miningCycle.cycle)
+      do miningRound <- fetch miningRoundCid
+         assertMsg "Mining round > expiry round" (round <= miningRound.round)
 
 
     -- | This choice is used by the SVC to merge all burned coins per validator.
@@ -138,26 +138,26 @@ template ValidatorReward
     svc : Party
     user : Party
     quantity : Decimal
-    cycle : Cycle
+    round : Round
   where
     signatory svc, user
     ensure quantity > 0.0
 
     choice ValidatorReward_SvcExpire : ()
       with
-        miningCycleCid : ContractId ClosedMiningCycle
+        miningRoundCid : ContractId ClosedMiningRound
       controller svc
-      do miningCycle <- fetch miningCycleCid
-         assertMsg "Mining cycle > expiry cycle" (cycle <= miningCycle.cycle)
+      do miningRound <- fetch miningRoundCid
+         assertMsg "Mining round > expiry round" (round <= miningRound.round)
 
     choice ValidatorReward_UserExpire : ()
       with
-        miningCycleCid : ContractId ClosedMiningCycle
+        miningRoundCid : ContractId ClosedMiningRound
       controller user
       -- TODO: consider whether we should use time-based expiry so that the
       -- user can expire it unilaterally after let's say 24h
-      do miningCycle <- fetch miningCycleCid
-         assertMsg "Mining cycle > expiry cycle" (cycle <= miningCycle.cycle)
+      do miningRound <- fetch miningRoundCid
+         assertMsg "Mining round > expiry round" (round <= miningRound.round)
 
 
     -- | This choice is used by the SVC to merge all burned coins per validator.
@@ -188,23 +188,23 @@ template ValidatorReward
 
 
 -- | BurnOracle records the result of a process to determine the quantity of coin burned
--- in a specific issuance cycle.
+-- in a specific issuance round.
 template BurnOracle
   with
     svc : Party
-    cycle : Cycle
+    round : Round
     quantity : Decimal
   where
     signatory svc
 
-    key (svc, cycle) : (Party, Cycle)
+    key (svc, round) : (Party, Round)
     maintainer key._1
 
 template IssuanceState
   with
     svc : Party
-    -- | The most recent open cycle
-    currentCycle : Cycle
+    -- | The most recent open round
+    currentRound : Round
   where
     signatory svc
 

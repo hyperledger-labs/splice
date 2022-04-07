@@ -12,7 +12,7 @@ import DA.Time
 
 import CC.Coin
 import CC.CoinRules
-import CC.Cycle
+import CC.Round
 
 import CC.Scripts.Parameters
 
@@ -47,13 +47,13 @@ setupApp = do
 
   submit svc $ createCmd IssuanceState with
     svc
-    currentCycle = Cycle (-1)
+    currentRound = Round (-1)
 
   submit svc $ createCmd CoinRules with
     config = defaultCoinConfig
     ..
 
-  submit svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningCycle_Open with
+  submit svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningRound_Open with
     coinPrice = 1.0
 
   -- return the off-ledger reference to the app for later script steps
@@ -86,11 +86,11 @@ recordValidatorOf app u v =
   submitMulti [app.svc, v] [] $
     void $ createCmd ValidatorRight with svc = app.svc; validator = v; user = u
 
-activeCycle : CCApp -> Script OpenMiningCycle
-activeCycle app = do
+activeRound : CCApp -> Script OpenMiningRound
+activeRound app = do
   Some (_, state) <- queryContractKey @IssuanceState app.svc app.svc
-  Some (_, cycle) <- queryContractKey @OpenMiningCycle app.svc (app.svc, state.currentCycle)
-  pure cycle
+  Some (_, round) <- queryContractKey @OpenMiningRound app.svc (app.svc, state.currentRound)
+  pure round
 
 -- Issuance automation
 ----------------------
@@ -101,44 +101,44 @@ activeCycle app = do
 -- and 2 issuing issuances
 runNextIssuance : CCApp -> Decimal -> Script ()
 runNextIssuance app coinPrice = do
-    -- expire rewards for closed cycles
-    closedCycles <- query @ClosedMiningCycle app.svc
-    forA_ closedCycles $ \(miningCycleCid, miningCycle) -> do
+    -- expire rewards for closed rounds
+    closedRounds <- query @ClosedMiningRound app.svc
+    forA_ closedRounds $ \(miningRoundCid, miningRound) -> do
       -- app rewards
-      rewards <- queryFilter @AppReward app.svc (\r -> r.cycle == miningCycle.cycle)
+      rewards <- queryFilter @AppReward app.svc (\r -> r.round == miningRound.round)
       forA_ rewards $ \(rcid, _) ->
-        submit app.svc $ exerciseCmd rcid AppReward_SvcExpire with miningCycleCid
+        submit app.svc $ exerciseCmd rcid AppReward_SvcExpire with miningRoundCid
       -- validator rewards
-      rewards <- queryFilter @ValidatorReward app.svc (\r -> r.cycle == miningCycle.cycle)
+      rewards <- queryFilter @ValidatorReward app.svc (\r -> r.round == miningRound.round)
       forA_ rewards $ \(rcid, _) ->
-        submit app.svc $ exerciseCmd rcid ValidatorReward_SvcExpire with miningCycleCid
-      -- the closed cycle
-      submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningCycle_Archive with
-        miningCycleCid
+        submit app.svc $ exerciseCmd rcid ValidatorReward_SvcExpire with miningRoundCid
+      -- the closed round
+      submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningRound_Archive with
+        miningRoundCid
 
-    -- close current issuing cycles if there are any
-    imcs <- query @IssuingMiningCycle app.svc
-    forA_ imcs $ \(miningCycleCid, _) ->
-      submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningCycle_Close with
-        miningCycleCid
+    -- close current issuing rounds if there are any
+    imcs <- query @IssuingMiningRound app.svc
+    forA_ imcs $ \(miningRoundCid, _) ->
+      submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningRound_Close with
+        miningRoundCid
 
-    -- transition current OpenMiningCycle into an IssuingMiningCycle
+    -- transition current OpenMiningRound into an IssuingMiningRound
     Some (_, st) <- queryContractKey @IssuanceState app.svc app.svc
-    Some (openCycleCid, _) <- queryContractKey @OpenMiningCycle app.svc (app.svc, st.currentCycle)
-    closingCycleCid <- submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningCycle_StartClosing with
-      miningCycleCid = openCycleCid
+    Some (openRoundCid, _) <- queryContractKey @OpenMiningRound app.svc (app.svc, st.currentRound)
+    closingRoundCid <- submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningRound_StartClosing with
+      miningRoundCid = openRoundCid
 
-    appRewards <- queryFilter @AppReward app.svc (\bc -> bc.cycle == st.currentCycle)
-    validatorRewards <- queryFilter @ValidatorReward app.svc (\bc -> bc.cycle == st.currentCycle)
+    appRewards <- queryFilter @AppReward app.svc (\bc -> bc.round == st.currentRound)
+    validatorRewards <- queryFilter @ValidatorReward app.svc (\bc -> bc.round == st.currentRound)
 
-    submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningCycle_StartIssuing with
-      miningCycleCid = closingCycleCid
+    submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningRound_StartIssuing with
+      miningRoundCid = closingRoundCid
       totalBurnQuantity =
         sum [ r.quantity | (_, r) <- appRewards] +
         sum [ r.quantity | (_, r) <- validatorRewards]
 
-    -- open another cycle
-    void $ submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningCycle_Open with
+    -- open another round
+    void $ submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningRound_Open with
       coinPrice
 
 
@@ -208,12 +208,12 @@ runCoinDepositBots app = do
   forA_ users $ \user -> do
     -- get all burns for this user
     hostedUsers <- getValidatorUsers user
-    cycles <- getIssuingCycles app
+    rounds <- getIssuingRounds app
     appRewards <- queryFilter @AppReward app.svc $ \r ->
-      r.cycle `elem` cycles && r.owner == user
+      r.round `elem` rounds && r.owner == user
 
     validatorRewards <- queryFilter @ValidatorReward app.svc $ \r ->
-      r.cycle `elem` cycles && r.user `elem` hostedUsers
+      r.round `elem` rounds && r.user `elem` hostedUsers
 
     -- get all coins of this user
     coins <- queryFilter @Coin user (\coin -> coin.owner == user)
@@ -234,10 +234,10 @@ runCoinDepositBots app = do
       submitMulti [user] [app.svc] $ exerciseByKeyCmd @CoinRules app.svc CoinRules_Transfer with transfer
 
 -- | Retrieve a list of all issuances that have happened.
-getIssuingCycles : CCApp -> Script [Cycle]
-getIssuingCycles app = do
-  miningCycles <- query @IssuingMiningCycle app.svc
-  return [ miningCycle.cycle | (_, miningCycle) <- miningCycles ]
+getIssuingRounds : CCApp -> Script [Round]
+getIssuingRounds app = do
+  miningRounds <- query @IssuingMiningRound app.svc
+  return [ miningRound.round | (_, miningRound) <- miningRounds ]
 
 -- | All users of a specific validator.
 getValidatorUsers : Party -> Script [Party]

@@ -5,7 +5,7 @@ import DA.Text
 
 import CC.Coin
 import CC.CoinRules
-import CC.Cycle
+import CC.Round
 import OpenBusiness.Fees
 
 import CNS.Directory
@@ -62,7 +62,7 @@ template DirectoryRules with
                     -- ensure that we stay above entryFee + updateFee
                     -- for the request duration.
                     -- TODO Clean this up as part of #19
-                    chargeRatePerRound coinConfig.holdingFee (RelCycle $ convertRelTimeToMicroseconds requestDuration / convertRelTimeToMicroseconds (minutes 2 + seconds 30))
+                    chargeRatePerRound coinConfig.holdingFee (RelRound $ convertRelTimeToMicroseconds requestDuration / convertRelTimeToMicroseconds (minutes 2 + seconds 30))
                   lock = Some TimeLock with
                     holder = provider
                     expiresAt

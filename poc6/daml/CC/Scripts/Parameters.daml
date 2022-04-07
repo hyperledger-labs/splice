@@ -23,8 +23,8 @@ defaultCoinConfig = CoinConfig with
     updateFee = FixedFee 0.01
 
     -- | Fee for keeping a coin around.
-    -- This is roughly equivalent to 1$/360 days but expressed as cycles
-    -- with one day corresponding to 24*60/2.5 cycles, i.e., one cycle
+    -- This is roughly equivalent to 1$/360 days but expressed as rounds
+    -- with one day corresponding to 24*60/2.5 rounds, i.e., one round
     -- every 2.5 minutes.
     -- Incentivizes users to actively merge their coins.
     holdingFee = RatePerRound (1.0 / 360.0 / (24.0*60.0/2.5))
@@ -54,12 +54,12 @@ defaultCoinConfig = CoinConfig with
       initialRate = 0.01
       steps = [(100.0, 0.001), (1000.0, 0.0001), (1000000.0, 0.00001)]
 
-    -- | Coins issued per mining cycle.
+    -- | Coins issued per mining round.
     --
     -- Set to 60 coins, which implies a coin price of 1 $ at burn-mint-equilibrium (BME) when the network spends
     -- 0.1 $/second in discounted transfer fees and a price of 100$ when the network spends 10 $ per second in discounted fees.
     --
-    coinsIssuedPerCycle = 60.0
+    coinsIssuedPerRound = 60.0
 
     svcIssuanceRatio = 0.35
 

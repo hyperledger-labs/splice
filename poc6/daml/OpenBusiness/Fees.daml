@@ -1,7 +1,7 @@
 -- | Utility functions for different kinds of fees.
 module OpenBusiness.Fees where
 
-import CC.Cycle
+import CC.Round
 import DA.Time
 
 -- Time utilities
@@ -20,20 +20,20 @@ daysToRelTime : Decimal -> RelTime
 daysToRelTime d = convertMicrosecondsToRelTime $ ceiling $ d * microsPerDay
 
 
--- Rates per mining cycle
+-- Rates per mining round
 -------------------------
 
 newtype RatePerRound = RatePerRound with rate : Decimal
   deriving (Eq, Ord, Show)
 
-chargeRatePerRound : RatePerRound -> RelCycle -> Decimal
+chargeRatePerRound : RatePerRound -> RelRound -> Decimal
 chargeRatePerRound rate dt = rate.rate * intToDecimal dt.diff
 
 -- | TODO: better name
-spentWithRatePerRound : RatePerRound -> Decimal -> RelCycle
-spentWithRatePerRound rate quantity =  RelCycle (ceiling $ quantity / rate.rate)
+spentWithRatePerRound : RatePerRound -> Decimal -> RelRound
+spentWithRatePerRound rate quantity =  RelRound (ceiling $ quantity / rate.rate)
 
--- | Scale a cycle rate such that
+-- | Scale a round rate such that
 --
 -- ALL s r dt. s * chargeRatePerRound r dt = chargeRatePerRound (s `scaleRatePerRound` r) dt
 --
@@ -98,27 +98,27 @@ scaleSteppedRate s r =
 
 data ExpiringQuantity = ExpiringQuantity with
     initialQuantity : Decimal
-    createdAt : Cycle
+    createdAt : Round
     ratePerRound : RatePerRound
   deriving (Eq, Ord, Show)
 
 -- TODO This does not handle time overflows.
-quantityExpiresAt : ExpiringQuantity -> Cycle
-quantityExpiresAt e = e.createdAt `addRelCycle` spentWithRatePerRound e.ratePerRound e.initialQuantity
+quantityExpiresAt : ExpiringQuantity -> Round
+quantityExpiresAt e = e.createdAt `addRelRound` spentWithRatePerRound e.ratePerRound e.initialQuantity
 
 validExpiringQuantity : ExpiringQuantity -> Bool
 validExpiringQuantity e = e.initialQuantity > 0.0
 
-actualQuantity : Cycle -> ExpiringQuantity -> Decimal
+actualQuantity : Round -> ExpiringQuantity -> Decimal
 actualQuantity t e
-  | e.ratePerRound.rate <= 0.0 = error $ "Cycle rate must be positive: " <> show e.ratePerRound.rate
+  | e.ratePerRound.rate <= 0.0 = error $ "Round rate must be positive: " <> show e.ratePerRound.rate
   | t <= e.createdAt = e.initialQuantity
   | otherwise =
-      let cyclesPassed = t `subCycle` e.createdAt
+      let roundsPassed = t `subRound` e.createdAt
       in
-        max 0.0 (e.initialQuantity - chargeRatePerRound e.ratePerRound cyclesPassed)
+        max 0.0 (e.initialQuantity - chargeRatePerRound e.ratePerRound roundsPassed)
 
 -- | Smart constructor for an expiring quantity.
-expiringQuantity : RatePerRound -> Decimal -> Cycle -> ExpiringQuantity
+expiringQuantity : RatePerRound -> Decimal -> Round -> ExpiringQuantity
 expiringQuantity ratePerRound initialQuantity createdAt =
   ExpiringQuantity with initialQuantity; createdAt; ratePerRound

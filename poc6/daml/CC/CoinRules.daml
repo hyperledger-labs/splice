@@ -9,7 +9,7 @@ import DA.Text
 import DA.Time
 
 import CC.Coin
-import CC.Cycle
+import CC.Round
 
 
 import OpenBusiness.Fees
@@ -39,7 +39,7 @@ data CoinConfig = CoinConfig with
     minRewardQuantity : Decimal
     -- | Fee for transferring some quantity of coin to a new owner.
     transferFee : SteppedRate
-    coinsIssuedPerCycle : Decimal
+    coinsIssuedPerRound : Decimal
     svcIssuanceRatio : Decimal
     -- | Maximum number of batch inputs for a transfer.
     maxNumInputs : Int
@@ -74,8 +74,8 @@ template CoinRules
       controller transferControllers transfer
       do executeTransfer config svc transfer
 
-    nonconsuming choice CoinRules_MiningCycle_Open
-      : ContractId OpenMiningCycle
+    nonconsuming choice CoinRules_MiningRound_Open
+      : ContractId OpenMiningRound
       with
         coinPrice : Decimal
       controller svc
@@ -83,83 +83,83 @@ template CoinRules
         -- fetch current state
         (stCid, st) <- fetchByKey @IssuanceState svc
         archive stCid
-        let cycle = addRelCycle st.currentCycle (RelCycle 1)
-        -- create new state and new open cycle
-        create st with currentCycle = cycle
-        create OpenMiningCycle with svc; cycle; coinPrice
+        let round = addRelRound st.currentRound (RelRound 1)
+        -- create new state and new open round
+        create st with currentRound = round
+        create OpenMiningRound with svc; round; coinPrice
 
-    nonconsuming choice CoinRules_MiningCycle_StartClosing
-      : ContractId ClosingMiningCycle
+    nonconsuming choice CoinRules_MiningRound_StartClosing
+      : ContractId ClosingMiningRound
       with
-        miningCycleCid : ContractId OpenMiningCycle
+        miningRoundCid : ContractId OpenMiningRound
       controller svc
       do
-        -- archive open mining cycle
-        miningCycle <- fetch miningCycleCid
-        archive miningCycleCid
-        assertMsg "SVC matches" (miningCycle.svc == svc)
-        -- create closing cycle
-        create ClosingMiningCycle with
+        -- archive open mining round
+        miningRound <- fetch miningRoundCid
+        archive miningRoundCid
+        assertMsg "SVC matches" (miningRound.svc == svc)
+        -- create closing round
+        create ClosingMiningRound with
           svc
-          cycle = miningCycle.cycle
-    nonconsuming choice CoinRules_MiningCycle_StartIssuing
-      : ContractId IssuingMiningCycle
+          round = miningRound.round
+    nonconsuming choice CoinRules_MiningRound_StartIssuing
+      : ContractId IssuingMiningRound
       with
-        miningCycleCid : ContractId ClosingMiningCycle
-        -- The amount of coin burned in this cycle.
+        miningRoundCid : ContractId ClosingMiningRound
+        -- The amount of coin burned in this round.
         totalBurnQuantity : Decimal
       controller svc
       do
-        -- archive closing mining cycle
-        miningCycle <- fetch miningCycleCid
-        archive miningCycleCid
-        assertMsg "SVC matches" (miningCycle.svc == svc)
+        -- archive closing mining round
+        miningRound <- fetch miningRoundCid
+        archive miningRoundCid
+        assertMsg "SVC matches" (miningRound.svc == svc)
         assertMsg "Positive total burn quantity" (totalBurnQuantity >= 0.0)
 
-        let svcCoinsPerIssuance = config.coinsIssuedPerCycle * config.svcIssuanceRatio
+        let svcCoinsPerIssuance = config.coinsIssuedPerRound * config.svcIssuanceRatio
             userIssuanceRatio = 1.0 - config.svcIssuanceRatio
-            userCoinsPerIssuance = config.coinsIssuedPerCycle * userIssuanceRatio
+            userCoinsPerIssuance = config.coinsIssuedPerRound * userIssuanceRatio
 
         -- issue coin to SVC
         create Coin with
           svc
           owner = svc
-          quantity = expiringQuantity config.holdingFee svcCoinsPerIssuance miningCycle.cycle
+          quantity = expiringQuantity config.holdingFee svcCoinsPerIssuance miningRound.round
 
-        -- create issuing cycle
-        create IssuingMiningCycle with
+        -- create issuing round
+        create IssuingMiningRound with
           svc
-          cycle = miningCycle.cycle
+          round = miningRound.round
           issuancePerCoin =
             if totalBurnQuantity <= 0.0
               then 0.0
               else userIssuanceRatio * min 1.0 (userCoinsPerIssuance / totalBurnQuantity)
 
-    nonconsuming choice CoinRules_MiningCycle_Close
-      : ContractId ClosedMiningCycle
+    nonconsuming choice CoinRules_MiningRound_Close
+      : ContractId ClosedMiningRound
       with
-        miningCycleCid : ContractId IssuingMiningCycle
+        miningRoundCid : ContractId IssuingMiningRound
       controller svc
       do
-        -- archive issuing mining cycle
-        miningCycle <- fetch miningCycleCid
-        archive miningCycleCid
-        assertMsg "SVC matches" (miningCycle.svc == svc)
-        -- create closing cycle
-        create ClosedMiningCycle with
+        -- archive issuing mining round
+        miningRound <- fetch miningRoundCid
+        archive miningRoundCid
+        assertMsg "SVC matches" (miningRound.svc == svc)
+        -- create closing round
+        create ClosedMiningRound with
           svc
-          cycle = miningCycle.cycle
+          round = miningRound.round
 
-    nonconsuming choice CoinRules_MiningCycle_Archive
+    nonconsuming choice CoinRules_MiningRound_Archive
       : ()
       with
-        miningCycleCid : ContractId ClosedMiningCycle
+        miningRoundCid : ContractId ClosedMiningRound
       controller svc
       do
-        -- archive closed mining cycle
-        miningCycle <- fetch miningCycleCid
-        archive miningCycleCid
-        assertMsg "SVC matches" (miningCycle.svc == svc)
+        -- archive closed mining round
+        miningRound <- fetch miningRoundCid
+        archive miningRoundCid
+        assertMsg "SVC matches" (miningRound.svc == svc)
 
     -- This allows fetchByKey-style fetches if you have readAs
     -- but not actAs claims.
@@ -239,13 +239,13 @@ executeTransfer : CoinConfig -> Party -> Transfer -> Update [TransferResult]
 executeTransfer config0 svc t = do
   -- MISSING FEATURE 'fetchByKey + off-ledger disclosure': we do not want to have a dependency on
   -- the issuance state, as that will lead to contention. We'd expect to just fetch some
-  -- open mining cycle that is disclosed when the command is being interpreted.
+  -- open mining round that is disclosed when the command is being interpreted.
   (_, issuanceState) <- fetchByKey @IssuanceState svc
-  -- check that the current mining cycle is open
-  (_, openCycle) <- fetchByKey @OpenMiningCycle (svc, issuanceState.currentCycle )
-  let config = scaleFees (1.0 / openCycle.coinPrice) config0
+  -- check that the current mining round is open
+  (_, openRound) <- fetchByKey @OpenMiningRound (svc, issuanceState.currentRound )
+  let config = scaleFees (1.0 / openRound.coinPrice) config0
   -- compute summaries
-  isum <- summarizeAndConsumeInputs openCycle.cycle config svc t.sender t.inputs
+  isum <- summarizeAndConsumeInputs openRound.round config svc t.sender t.inputs
   osum <- preprocessAndSummarizeOutputs config t.sender t.outputs
   summary <- summarizeTransfer config isum osum
   -- check that overall transfer constraints are satisfied
@@ -260,9 +260,9 @@ executeTransfer config0 svc t = do
   -- record debugging note
   create TransferDebugNote with transfer = t; scaledConfig = config; ..
   -- issue rewards for burns
-  issueRewards config openCycle t.sender summary
+  issueRewards config openRound t.sender summary
   -- record outputs
-  createTransferOutputs openCycle.cycle config svc summary osum.preprocessedOutputs
+  createTransferOutputs openRound.round config svc summary osum.preprocessedOutputs
 
 data TransferInputsSummary = TransferInputsSummary with
     numBurnInputs : Int
@@ -303,7 +303,7 @@ data TransferSummary = TransferSummary with
   deriving (Eq, Show)
 
 
-summarizeAndConsumeInputs : Cycle -> CoinConfig -> Party -> Party -> [TransferInput] -> Update TransferInputsSummary
+summarizeAndConsumeInputs : Round -> CoinConfig -> Party -> Party -> [TransferInput] -> Update TransferInputsSummary
 summarizeAndConsumeInputs now config svc sender inps = do
     foldlA (summarizeAndConsumeInput now) initialSummary inps
   where
@@ -332,25 +332,25 @@ summarizeAndConsumeInputs now config svc sender inps = do
       reward <- fetch rewardCid
       archive rewardCid
       assertMsg "SVC matches" (svc == reward.svc)
-      (_, miningCycle) <- fetchByKey @IssuingMiningCycle (svc, reward.cycle)
+      (_, miningRound) <- fetchByKey @IssuingMiningRound (svc, reward.round)
       assertMsg "Sender matches app owner" (sender == reward.owner)
       return TransferInputsSummary with
         numBurnInputs = s.numBurnInputs + 1
         numCoinInputs = s.numCoinInputs
-        totalQuantity = s.totalQuantity + reward.quantity * miningCycle.issuancePerCoin
+        totalQuantity = s.totalQuantity + reward.quantity * miningRound.issuancePerCoin
         totalHoldingFees = s.totalHoldingFees
 
     summarizeAndConsumeInput now s (InputValidatorReward rewardCid) = do
       reward <- fetch rewardCid
       assertMsg "SVC matches" (svc == reward.svc)
-      (_, miningCycle) <- fetchByKey @IssuingMiningCycle (svc, reward.cycle)
+      (_, miningRound) <- fetchByKey @IssuingMiningRound (svc, reward.round)
       (rightCid, validatorRight) <- fetchByKey @ValidatorRight (svc, reward.user)
       assertMsg "Sender matches burner's validator" (sender == validatorRight.validator)
       exercise rewardCid ValidatorReward_ArchiveAsValidator with validator = sender; rightCid
       return TransferInputsSummary with
         numBurnInputs = s.numBurnInputs + 1
         numCoinInputs = s.numCoinInputs
-        totalQuantity = s.totalQuantity + reward.quantity * miningCycle.issuancePerCoin
+        totalQuantity = s.totalQuantity + reward.quantity * miningRound.issuancePerCoin
         totalHoldingFees = s.totalHoldingFees
 
 
@@ -447,31 +447,31 @@ summarizeTransfer config inp out = do
     totalTransferFees = out.senderTransferFees + sum (Map.values out.receiverFees)
 
 
-issueRewards : CoinConfig -> OpenMiningCycle -> Party -> TransferSummary -> Update ()
-issueRewards config openCycle sender summary = do
+issueRewards : CoinConfig -> OpenMiningRound -> Party -> TransferSummary -> Update ()
+issueRewards config openRound sender summary = do
     let validatorReward = summary.senderAdminFees + summary.senderHoldingFees + summary.totalTransferFees
     -- issue reward for the validator of the sender
     when (config.minRewardQuantity <= validatorReward) $
       void $ create ValidatorReward with
-        svc = openCycle.svc
+        svc = openRound.svc
         user = sender
         quantity = validatorReward
-        cycle = openCycle.cycle
+        round = openRound.round
 
     -- issue receiver receipts
     forA_ (Map.toList summary.receiverFees) $ \(receiver, receiverFee) ->
       when (config.minRewardQuantity <= receiverFee) $
         void $ create AppReward with
-          svc = openCycle.svc
+          svc = openRound.svc
           owner = receiver
           quantity = receiverFee
-          cycle = openCycle.cycle
+          round = openRound.round
 
 data OutputCreationState = OutputCreationState with
   remainingExcessQuantity : Decimal
   coinCids : [TransferResult]
 
-createTransferOutputs : Cycle -> CoinConfig -> Party -> TransferSummary -> [PreprocessedTransferOutput] -> Update [TransferResult]
+createTransferOutputs : Round -> CoinConfig -> Party -> TransferSummary -> [PreprocessedTransferOutput] -> Update [TransferResult]
 createTransferOutputs now config svc summary outs = do
     st <- foldlA createOutput initialState outs
     return st.coinCids
@@ -515,7 +515,7 @@ scaleFees s c = CoinConfig with
     maxPrepaidHoldingTime = c.maxPrepaidHoldingTime
     minRewardQuantity = s * c.minRewardQuantity
     transferFee = scaleSteppedRate s c.transferFee
-    coinsIssuedPerCycle = c.coinsIssuedPerCycle
+    coinsIssuedPerRound = c.coinsIssuedPerRound
     svcIssuanceRatio = c.svcIssuanceRatio
     maxNumInputs = c.maxNumInputs
     maxNumOutputs = c.maxNumOutputs

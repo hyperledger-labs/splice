@@ -8,7 +8,7 @@ import Daml.Script
 
 import CC.Coin
 import CC.CoinRules
-import CC.Cycle
+import CC.Round
 import OpenBusiness.Fees
 import CC.Scripts.Util
 
@@ -61,7 +61,7 @@ test = do
   -- bootstrap app
   app <- setupApp
 
-  -- Run enough issue cycles that the SVC can give Alice 1k
+  -- Run enough issue rounds that the SVC can give Alice 1k
   replicateA_ 100 $ do
     runNextIssuance app 1.0
     runCoinDepositBots app
@@ -74,13 +74,13 @@ test = do
   escrow <- submit arbiter $ createCmd (Escrow app.svc arbiter alice)
 
   t0 <- getTime
-  c0 <- activeCycle app
+  c0 <- activeRound app
 
   lockTo app alice arbiter 1000.25 (days 90) "lock"
 
   [(lockedCoin, _)] <- query @LockedCoin alice
   runNextIssuance app 1.0
-  c1 <- activeCycle app
+  c1 <- activeRound app
 
   setTime (t0 `addRelTime` days 72)
 
@@ -91,7 +91,7 @@ test = do
 
   runNextIssuance app 1.0
 
-  c2 <- activeCycle app
+  c2 <- activeRound app
 
   setTime (t0 `addRelTime` days 90)
 
@@ -119,7 +119,7 @@ test = do
     coin = Coin with
       svc = app.svc
       owner = alice
-      quantity = expiringQuantity coinConfig.holdingFee 1000.25 c2.cycle
+      quantity = expiringQuantity coinConfig.holdingFee 1000.25 c2.round
   change === Coin with
     svc = app.svc
     owner = alice
@@ -127,15 +127,15 @@ test = do
       let quantity =
             5.0
             - 1.0 -- payment
-            - (chargeRatePerRound coinConfig.holdingFee (c2.cycle `subCycle` c1.cycle) + chargeRatePerRound coinConfig.holdingFee (c2.cycle `subCycle` c0.cycle)) -- holding fees
+            - (chargeRatePerRound coinConfig.holdingFee (c2.round `subRound` c1.round) + chargeRatePerRound coinConfig.holdingFee (c2.round `subRound` c0.round)) -- holding fees
             - 0.01 * 2.0 -- update & locking fee for locked coin
             - 0.01 -- update fee for transfered coin
             - 0.09 -- create fee for change
-      in expiringQuantity coinConfig.holdingFee quantity c2.cycle
+      in expiringQuantity coinConfig.holdingFee quantity c2.round
   payment === Coin with
     svc = app.svc
     owner = arbiter
     quantity =
       let quantity = 1.0 - chargeSteppedRate coinConfig.transferFee 1.0
-      in expiringQuantity coinConfig.holdingFee quantity c2.cycle
+      in expiringQuantity coinConfig.holdingFee quantity c2.round
   return ()

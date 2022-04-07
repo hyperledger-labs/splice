@@ -3,30 +3,30 @@
 -- | Contracts that expire, which should be most contracts in an OpenBusiness service.
 module OpenBusiness.Expiry where
 
-import CC.Cycle
+import CC.Round
 
 -- | A contract which expires at some time.
 interface ExpiringContract where
-  -- | The cycle after which the contract is expired, and can be archived.
-  contractExpiresAt : Cycle
+  -- | The round after which the contract is expired, and can be archived.
+  contractExpiresAt : Round
 
   -- | The party charged with expiring the contract as soon as it expires.
   -- Other parties can expire the contract as well, but are expected to wait for some extra time to avoid contention.
-  -- To prove that the contract is expired an active OpenMiningCycle has to be presented.
+  -- To prove that the contract is expired an active OpenMiningRound has to be presented.
   expiryManager : Party
 
   choice ExpiringContract_ExpireAsManager : ()
     with
-      cycleCid : ContractId OpenMiningCycle
+      roundCid : ContractId OpenMiningRound
     controller expiryManager this
-    do cycle <- fetch cycleCid
-       assertMsg "Contract expired" (contractExpiresAt this < cycle.cycle)
+    do round <- fetch roundCid
+       assertMsg "Contract expired" (contractExpiresAt this < round.round)
 
   choice ExpiringContract_ExpireAsStakeholder : ()
     with
       actor : Party
-      cycleCid : ContractId OpenMiningCycle
+      roundCid : ContractId OpenMiningRound
     controller actor
-    do cycle <- fetch cycleCid
-       assertMsg "Contract expired" (contractExpiresAt this < cycle.cycle)
+    do round <- fetch roundCid
+       assertMsg "Contract expired" (contractExpiresAt this < round.round)
        assertMsg "Only stakeholders can expire" (actor `elem` stakeholder this)
