@@ -169,8 +169,9 @@ pay app sender recipient coinQuantity msg = do
               lock = None
           , OutputReceiverCoin with
               receiver = recipient
-              quantity = coinQuantity
-              senderTransferFeeRatio = 1.0
+              coinType = FixedReceiverCoin with
+                quantity = coinQuantity
+                senderTransferFeeRatio = 1.0
           ]
   void $ submitMulti [sender, recipient] [app.svc] $
     exerciseByKeyCmd @CoinRules app.svc CoinRules_Transfer with transfer

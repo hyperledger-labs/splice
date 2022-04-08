@@ -5,8 +5,6 @@ import DA.Text
 
 import CC.Coin
 import CC.CoinRules
-import CC.Round
-import OpenBusiness.Fees
 
 import CNS.Directory
 
@@ -53,27 +51,19 @@ template DirectoryRules with
             inputs = [InputCoin coinCid]
             outputs =
               [ OutputSenderCoin with
-                  exactQuantity = Some $
-                    entryFee +
-                    -- transfer requires update fee
-                    coinConfig.updateFee.fee +
-                    -- prepay create so we can push out leftover prepayed fees.
-                    coinConfig.createFee.fee +
-                    -- ensure that we stay above entryFee + updateFee
-                    -- for the request duration.
-                    -- TODO Clean this up as part of #19
-                    chargeRatePerRound coinConfig.holdingFee (RelRound $ convertRelTimeToMicroseconds requestDuration / convertRelTimeToMicroseconds (minutes 2 + seconds 30))
+                  exactQuantity = Some entryFee
                   lock = Some TimeLock with
                     holder = provider
                     expiresAt
-              , OutputReceiverCoin with
-                  receiver = provider
-                  quantity = requestFee
-                  -- Fee includes transfer costs so receiver pays everything
-                  senderTransferFeeRatio = 0.0
               , OutputSenderCoin with
                   exactQuantity = None
                   lock = None
+              , OutputReceiverCoin with
+                  receiver = provider
+                  coinType = FixedReceiverCoin with
+                    quantity = requestFee
+                    -- Fee includes transfer costs so receiver pays everything
+                    senderTransferFeeRatio = 0.0
               ]
           -- TODO: minLockedQuantity = entryFee
         create EntryRequest with
@@ -137,12 +127,7 @@ template EntryRequest with
             outputs =
               [ OutputReceiverCoin with
                   receiver = entry.provider
-                  quantity = entryFee
-                  -- Fee includes transfer costs so receiver pays everything.
-                  senderTransferFeeRatio = 0.0
-              , OutputSenderCoin with
-                  exactQuantity = None
-                  lock = None
+                  coinType = FloatingReceiverCoin
               ]
         create entry
 
