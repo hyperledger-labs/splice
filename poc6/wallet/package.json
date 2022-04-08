@@ -1,0 +1,50 @@
+{
+  "name": "wallet",
+  "version": "0.1.0",
+  "private": true,
+  "dependencies": {
+    "@daml.js/canton-coin": "file:daml.js/canton-coin-0.1.0",
+    "@daml/hub-react": "^1.0.0",
+    "@daml/ledger": "2.1.0-snapshot.20220325.9626.0.4a483381",
+    "@daml/react": "2.1.0-snapshot.20220325.9626.0.4a483381",
+    "@daml/types": "2.1.0-snapshot.20220325.9626.0.4a483381",
+    "dotenv": "^8.2.0",
+    "jwt-simple": "^0.5.6",
+    "pretty-ms": "^7.0.1",
+    "react": "^17.0.0",
+    "react-dom": "^17.0.0",
+    "semantic-ui-css": "^2.4.1",
+    "semantic-ui-react": "^2.0.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test --testURL='http://localhost:7575'",
+    "eject": "react-scripts eject",
+    "lint": "eslint --ext .js,.jsx,.ts,.tsx src/"
+  },
+  "eslintConfig": {
+    "extends": "react-app"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "@types/dotenv": "^8.2.0",
+    "@types/jwt-simple": "^0.5.33",
+    "@types/react": "^17.0.0",
+    "@types/react-dom": "^17.0.0",
+    "http-proxy-middleware": "^1.0.4",
+    "react-scripts": "^4.0.3",
+    "typescript": "~3.8.3"
+  }
+}

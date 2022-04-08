@@ -66,8 +66,8 @@ test = do
     runNextIssuance app 1.0
     runCoinDepositBots app
 
-  alice <- setupUser app "Alice"
-  arbiter <- setupUser app "Arbiter"
+  alice <- setupUser app "alice"
+  arbiter <- setupUser app "arbiter"
 
   pay app app.svc alice 1500.0 "init"
 

@@ -19,10 +19,10 @@ testCoinBurn = do
   runCoinDepositBots app
 
   -- -- -- -- bootstrap user and service provider party
-  provider1 <- setupUser app "Provider1"
-  provider2 <- setupUser app "Provider2"
-  user <- setupUser app "User"
-  validator1 <- setupUser app "Validator1"
+  provider1 <- setupUser app "provider1"
+  provider2 <- setupUser app "provider2"
+  user <- setupUser app "user"
+  validator1 <- setupUser app "validator1"
 
   runNextIssuance app 1.1
   runCoinDepositBots app

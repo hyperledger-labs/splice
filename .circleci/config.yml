@@ -9,10 +9,15 @@ env: &env
   CI: "true"
   USER: circleci
 
+parameters:
+  sdk-version:
+    type: string
+    default: "2.1.0-snapshot.20220331.9659.0.4bf0de89"
+
 jobs:
   daml_test:
     docker:
-    - image: digitalasset/daml-sdk:2.0.0
+    - image: digitalasset/daml-sdk:<< pipeline.parameters.sdk-version >>
     environment:
       <<: *env
     steps:
@@ -24,9 +29,44 @@ jobs:
 
            cd poc6
            daml test --ghc-option=-Werror
+  npm_build:
+    docker:
+    - image: eclipse-temurin:11
+    environment:
+      <<: *env
+      SDK_VERSION: << pipeline.parameters.sdk-version >>
+    steps:
+      - run:
+          name: install deps
+          command: |
+            set -eou pipefail
+            curl https://get.daml.com | sh -s $SDK_VERSION
+            printf "auto-install: false\nupdate-check: never\n" >> $HOME/.daml/daml-config.yaml
+            curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
+            apt-get install -y nodejs
+      - checkout
+      - run:
+         name: daml build
+         command: |
+           set -euo pipefail
+           export PATH=$HOME/.daml/bin:$PATH
+
+           cd poc6
+           daml build
+      - run:
+          name: daml codegen & npm build
+          command: |
+            set -eou pipefail
+            export PATH=$HOME/.daml/bin:$PATH
+
+            cd poc6/wallet
+            daml codegen js ../.daml/dist/canton-coin-0.1.0.dar -o daml.js
+            npm install
+            npm run build
 
 workflows:
   version: 2
   build:
     jobs:
     - daml_test
+    - npm_build

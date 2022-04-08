@@ -1,0 +1,22 @@
+module CC.Scripts.WalletInit where
+
+import DA.Action
+import DA.Time
+import Daml.Script
+
+import CC.Scripts.Util
+
+init : Script ()
+init = do
+  app <- setupApp
+
+  replicateA_ 5 $ do
+    runNextIssuance app 1.0
+    runCoinDepositBots app
+
+  alice <- setupUser app "alice"
+
+  pay app app.svc alice 42.0 "welcome"
+
+  lockTo app alice app.svc 23.0 (days 5) "thanks"
+  pure ()

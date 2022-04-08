@@ -1,4 +1,4 @@
-sdk-version: 2.0.0
+sdk-version: 2.1.0-snapshot.20220331.9659.0.4bf0de89
 name: canton-coin
 source: daml
 version: 0.1.0
@@ -7,7 +7,12 @@ dependencies:
   - daml-stdlib
   - daml-script
   - daml-trigger
+start-navigator: false
 sandbox-options:
-  - --wall-clock-time
+  - -c=canton.conf
 build-options:
   - --target=1.dev
+codegen:
+  js:
+    output-directory: wallet/daml.js
+    npm-scope: daml.js

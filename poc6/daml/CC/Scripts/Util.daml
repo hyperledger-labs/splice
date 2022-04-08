@@ -65,7 +65,9 @@ setupApp = do
 
 setupUser : CCApp -> Text -> Script Party
 setupUser app name = do
-  user <- allocateParty name
+  user <- allocatePartyWithHint name (PartyIdHint name)
+  userId <- validateUserId name
+  createUser (User userId (Some user)) [CanActAs user, CanReadAs app.svc]
   onboardUser app user
   return user
 
