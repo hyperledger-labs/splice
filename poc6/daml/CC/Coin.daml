@@ -78,12 +78,19 @@ template ValidatorRight with
     svc : Party
     user : Party
     validator : Party
-    -- TODO: manage expiry
   where
-    signatory svc, validator
+    signatory user, validator
 
-    key (svc, user) : (Party, Party)
-    maintainer key._1
+    key this : ValidatorRight
+    maintainer key.user, key.validator
+
+    choice ValidatorRight_ArchiveAsValidator : ()
+      controller validator
+      do pure ()
+
+    choice ValidatorRight_ArchiveAsUser : ()
+      controller user
+      do pure ()
 
     -- TODO: cancellation, withdrawal
 

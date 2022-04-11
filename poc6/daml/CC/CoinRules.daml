@@ -374,8 +374,7 @@ summarizeAndConsumeInputs now config svc sender inps = do
       reward <- fetch rewardCid
       assertMsg "SVC matches" (svc == reward.svc)
       (_, miningRound) <- fetchByKey @IssuingMiningRound (svc, reward.round)
-      (rightCid, validatorRight) <- fetchByKey @ValidatorRight (svc, reward.user)
-      assertMsg "Sender matches burner's validator" (sender == validatorRight.validator)
+      (rightCid, validatorRight) <- fetchByKey @ValidatorRight (ValidatorRight with svc = svc, validator = sender, user = reward.user)
       exercise rewardCid ValidatorReward_ArchiveAsValidator with validator = sender; rightCid
       return TransferInputsSummary with
         numBurnInputs = s.numBurnInputs + 1

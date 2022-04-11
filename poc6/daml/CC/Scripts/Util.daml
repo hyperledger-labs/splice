@@ -79,13 +79,14 @@ onboardUser app user = do
 
 getAllUserParties : CCApp -> Script [Party]
 getAllUserParties app = do
+  parties <- listKnownParties
   accounts <- query @Coin app.svc
-  rights <- query @ValidatorRight app.svc
+  rights <- query @ValidatorRight (map party parties)
   return $ dedup $ [account.owner | (_, account) <- accounts] ++ [ right.validator | (_, right) <- rights]
 
 recordValidatorOf : CCApp -> Party -> Party -> Script ()
 recordValidatorOf app u v =
-  submitMulti [app.svc, v] [] $
+  submitMulti [u, v] [] $
     void $ createCmd ValidatorRight with svc = app.svc; validator = v; user = u
 
 activeRound : CCApp -> Script OpenMiningRound
