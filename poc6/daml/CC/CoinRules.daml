@@ -29,17 +29,11 @@ data CoinConfig = CoinConfig with
     updateFee : FixedFee
     -- | Fee for keeping a coin around.
     holdingFee : RatePerRound
-    -- | The minimal time for which the holding fee of a coin must be covered
-    -- at all times.
-    minHoldingTime : RelTime
-    -- | The maximal time that the holding fee of a coin can be prepaid for,
-    -- which also limits that maximal lock duration.
-    maxPrepaidHoldingTime : RelTime
-    -- | The minimal quantity of burn for which a receipt is issued.
-    minRewardQuantity : Decimal
     -- | Fee for transferring some quantity of coin to a new owner.
     transferFee : SteppedRate
     coinsIssuedPerRound : Decimal
+        -- | The minimal quantity of burn for which a receipt is issued.
+    minRewardQuantity : Decimal
     svcIssuanceRatio : Decimal
     -- | Maximum number of batch inputs for a transfer.
     maxNumInputs : Int
@@ -405,8 +399,6 @@ preprocessAndSummarizeOutputs config sender outs = do
       now <- getTime
       let lockDuration = optional (days 0) (\l -> subTime l.expiresAt now) lock
       assertMsg "Positive lock duration" (days 0 <= lockDuration)
-      assertMsg "Lock duration smaller than maximum prepayable holding time"
-        (lockDuration <= config.maxPrepaidHoldingTime)
       -- compute output
       let output = PreprocessedTransferOutput with
             owner = sender
@@ -589,8 +581,6 @@ scaleFees s c = CoinConfig with
     createFee = scaleFixedFee s c.createFee
     updateFee = scaleFixedFee s c.updateFee
     holdingFee = scaleRatePerRound s c.holdingFee
-    minHoldingTime = c.minHoldingTime
-    maxPrepaidHoldingTime = c.maxPrepaidHoldingTime
     minRewardQuantity = s * c.minRewardQuantity
     transferFee = scaleSteppedRate s c.transferFee
     coinsIssuedPerRound = c.coinsIssuedPerRound

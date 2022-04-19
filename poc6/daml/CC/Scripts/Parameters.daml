@@ -1,9 +1,5 @@
 module CC.Scripts.Parameters where
 
--- import DA.Date
-import DA.Time
-
--- import CC.Issuance
 import CC.CoinRules
 
 import OpenBusiness.Fees
@@ -28,19 +24,6 @@ defaultCoinConfig = CoinConfig with
     -- every 2.5 minutes.
     -- Incentivizes users to actively merge their coins.
     holdingFee = RatePerRound (1.0 / 360.0 / (24.0*60.0/2.5))
-
-    -- | The minimal time for which the holding fee of a coin must be covered
-    -- at all times.
-    --
-    -- Set to a time that is high enough to cover 99.999% of the expected duration
-    -- of unavailability to avoid users loosing extra coin due to that unavailability.
-    minHoldingTime = minutes 20
-
-    -- | The maximal time that the holding fee of a coin can be prepaid for.
-    --
-    -- Set to a quarter year, which implies that lock-based workflows need at
-    -- least a quarterly refresher.
-    maxPrepaidHoldingTime = days 92
 
     -- | The minimal quantity of burn for which a receipt is issued.
     --
