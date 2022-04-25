@@ -2,7 +2,7 @@
 module CC.Coin where
 
 import CC.Round
--- import OpenBusiness.Expiry
+import OpenBusiness.Expiry
 import OpenBusiness.Fees
 
 
@@ -219,29 +219,3 @@ template IssuanceState
 
     key svc : Party
     maintainer key
-
--- | A contract which expires at some time.
-interface ExpiringContract where
-  -- | The round after which the contract is expired, and can be archived.
-  contractExpiresAt : Round
-
-  -- | The party charged with expiring the contract as soon as it expires.
-  -- Other parties can expire the contract as well, but are expected to wait for some extra time to avoid contention.
-  -- To prove that the contract is expired an active OpenMiningRound has to be presented.
-  expiryManager : Party
-
-  choice ExpiringContract_ExpireAsManager : ()
-    with
-      roundCid : ContractId OpenMiningRound
-    controller expiryManager this
-    do round <- fetch roundCid
-       assertMsg "Contract expired" (contractExpiresAt this < round.round)
-
-  choice ExpiringContract_ExpireAsStakeholder : ()
-    with
-      actor : Party
-      roundCid : ContractId OpenMiningRound
-    controller actor
-    do round <- fetch roundCid
-       assertMsg "Contract expired" (contractExpiresAt this < round.round)
-       assertMsg "Only stakeholders can expire" (actor `elem` stakeholder this)
