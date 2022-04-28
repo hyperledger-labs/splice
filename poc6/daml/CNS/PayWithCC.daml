@@ -1,0 +1,264 @@
+module CNS.PayWithCC where
+
+import CC.Coin
+import CC.CoinRules
+
+import CC.Scripts.Util
+
+import DA.Action
+import DA.Assert
+import DA.Time
+import Daml.Script
+
+-- Defined by CC wallet
+interface PaymentReference
+  where
+    getDescription : Text
+
+-- Defined by CC wallet
+template PaymentRequest
+  with
+    svc : Party
+    provider : Party
+    user : Party
+    quantity : Decimal
+    collectionDuration : RelTime
+    expiresAt : Time
+    reference : ContractId PaymentReference
+  where
+    signatory provider, user
+    ensure (collectionDuration > aunit && quantity > 0.0)
+
+    choice PaymentRequest_Approve : ContractId ApprovedPayment
+      with
+        coin : ContractId Coin
+      controller user
+      do now <- getTime
+         assertMsg "PaymentRequest has not expired" (now < expiresAt)
+         let transfer = Transfer with
+              sender = user
+              inputs = [InputCoin coin]
+              outputs =
+                [ OutputSenderCoin with
+                    exactQuantity = Some quantity
+                    lock = Some TimeLock with
+                      holder = provider
+                      expiresAt = now `addRelTime` collectionDuration
+                ]
+              payload = "lock payment"
+         [TransferResultLockedCoin lockedCoin] <-
+           exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
+         create ApprovedPayment
+           with
+             svc, provider, user, reference, lockedCoin
+
+    choice PaymentRequest_Retract : ()
+      controller provider
+      do pure ()
+
+    choice PaymentRequest_Reject : ()
+      controller user
+      do pure ()
+
+-- Defined by CC wallet
+template ApprovedPayment
+  with
+    svc : Party
+    provider : Party
+    user : Party
+    lockedCoin : ContractId LockedCoin
+    reference : ContractId PaymentReference
+  where
+    signatory provider, user
+
+    choice ApprovedPayment_Pay : ()
+      controller provider, user
+      do coin <- exercise lockedCoin Coin_Unlock
+         let transfer = Transfer with
+               sender = user
+               inputs = [InputCoin coin]
+               outputs =
+                 [ OutputReceiverCoin with
+                     receiver = provider
+                     coinType = FloatingReceiverCoin
+                 ]
+               payload = "transfer locked payment"
+         void $ exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
+
+    choice ApprovedPayment_Expire : ContractId Coin
+      controller user
+      do exercise lockedCoin Coin_OwnerExpireLock
+
+    choice ApprovedPayment_Discard : ContractId Coin
+      controller provider
+      do exercise lockedCoin Coin_Unlock
+
+-- Defined by the directory service
+template DirectoryEntry
+  with
+    user : Party
+    provider : Party
+    payload : Text
+  where
+    signatory user, provider
+
+-- Defined by the directory service
+template DirectoryEntryRequest
+  with
+    entry : DirectoryEntry
+    entryFee : Decimal
+  where
+    signatory signatory entry
+
+    implements PaymentReference where
+      getDescription = "Directory entry request: " <> show entry
+
+    choice Reject : ()
+      controller entry.provider
+      do pure ()
+
+-- Defined by directory service
+template DirectoryRules with
+    provider : Party
+    svc : Party
+    entryFee : Decimal
+    installFee : Decimal
+    collectionDuration : RelTime -- Time provider has to collect approved payment
+    approveDuration : RelTime -- Time user has to approve a payment request
+  where
+    signatory provider
+
+    key provider : Party
+    maintainer key
+
+    nonconsuming choice DirectoryRules_RequestEntry
+      : ContractId DirectoryEntryRequest
+      with
+        entry : DirectoryEntry
+      controller entry.user, provider
+      do
+        assertMsg "Entry provider equals provider" (entry.provider == provider)
+        create DirectoryEntryRequest with
+          entry
+          entryFee
+
+    nonconsuming choice DirectoryRules_Install
+      : ContractId DirectoryServiceAppInstall
+      with
+        user : Party
+        coinCid : ContractId Coin
+      controller user
+      do coin <- fetch coinCid
+         assertMsg "Coin owner & svc match" ((coin.owner, coin.svc) == (user, svc))
+         create DirectoryServiceAppInstall
+           with
+             svc
+             provider
+             user
+
+-- Defined by directory service
+template DirectoryServiceAppInstall
+  with
+    svc : Party
+    provider : Party
+    user : Party
+  where
+    signatory provider, user
+
+    nonconsuming choice DirectoryServiceAppInstall_RequestDirectoryEntry : ContractId DirectoryEntryRequest
+      with
+        entry : DirectoryEntry
+      controller user
+      do exerciseByKey @DirectoryRules provider DirectoryRules_RequestEntry with
+           entry
+
+    nonconsuming choice DirectoryServiceAppInstall_RequestEntryPayment : ContractId PaymentRequest
+      with
+        requestCid : ContractId DirectoryEntryRequest
+      controller provider
+      do request <- fetch requestCid
+         request.entry.provider === provider
+         request.entry.user === user
+         (_, rules) <- fetchByKey @DirectoryRules provider
+         now <- getTime
+         create PaymentRequest with
+           svc = svc
+           provider = provider
+           user = user
+           quantity = request.entryFee
+           reference = toInterfaceContractId requestCid
+           collectionDuration = rules.collectionDuration
+           expiresAt = now `addRelTime` rules.approveDuration
+
+    nonconsuming choice DirectoryServiceAppInstall_CollectEntryPayment : ()
+      with
+        approvedPayment : ContractId ApprovedPayment
+      controller provider
+      do payment <- fetch approvedPayment
+         lockedCoin <- fetch payment.lockedCoin
+         Some (requestId, request) <- fetchFromInterface @DirectoryEntryRequest payment.reference
+         exercise approvedPayment ApprovedPayment_Pay
+         archive requestId
+         create request.entry
+         pure ()
+
+test = script do
+  app <- setupApp
+
+  runNextIssuance app 1.0
+  runCoinDepositBots app
+
+  provider <- setupUser app "provider"
+  user <- setupUser app "user"
+
+  pay app app.svc user 5.0 ""
+
+  -- provider creates directory rules
+  -- how: up to app provider
+  directoryRules <- submit provider $ createCmd DirectoryRules with
+    provider = provider
+    svc = app.svc
+    entryFee = 1.0
+    installFee = 0.1
+    collectionDuration = minutes 5
+    approveDuration = minutes 5
+
+  -- user splits off install price & calls install choice
+  -- how: app manager admin interface as part of approval.
+  --      needs integration with cc wallet for payment.
+  pay app user user 0.1 ""
+  [(installCoin, _)] <- queryFilter @Coin user (\c -> c.quantity.initialQuantity == 0.1)
+  directoryInstall <- submitMulti [user] [provider, app.svc] $ exerciseCmd directoryRules DirectoryRules_Install with
+    user = user
+    coinCid = installCoin
+
+  -- user requests entry via app install
+  -- how: UI of directory service via write-delegation on app manager & call to
+  -- user’s participant.
+  entryRequest <- submitMulti [user] [provider, app.svc] $ exerciseCmd directoryInstall DirectoryServiceAppInstall_RequestDirectoryEntry with
+   entry = DirectoryEntry with
+     user = user
+     provider = provider
+     payload = "my cool directory entry"
+
+  -- provider requests payment for entry via app install
+  -- how: provider on their own participant.
+  paymentRequest <- submit provider $ exerciseCmd directoryInstall DirectoryServiceAppInstall_RequestEntryPayment with
+    requestCid = entryRequest
+
+  -- cc wallet splits off price after user accepted
+  -- how: cc wallet
+  pay app user user 1.02 ""
+  [(coin, _)] <- queryFilter @Coin user (\c -> c.quantity.initialQuantity == 1.02)
+  -- cc wallet approves payment and locks coin to provider
+  -- how: cc wallet
+  approvedPayment <- submitMulti [user] [app.svc] $ exerciseCmd paymentRequest PaymentRequest_Approve with
+    coin = coin
+
+  -- directory providers transactionally unlocks & transfer coins
+  -- and creates directory entry in return.
+  -- how: provider on their own participant
+  submitMulti [provider] [app.svc] $ exerciseCmd directoryInstall DirectoryServiceAppInstall_CollectEntryPayment with
+    approvedPayment = approvedPayment
+
+  pure ()
