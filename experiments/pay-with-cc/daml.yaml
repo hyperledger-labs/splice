@@ -10,7 +10,7 @@ dependencies:
 sandbox-options:
   - -c=../canton.conf
 data-dependencies:
-  - ../.daml/dist/canton-coin-0.1.0.dar
+  - ../../canton-coin/.daml/dist/canton-coin-0.1.0.dar
 build-options:
   - --target=1.dev
 start-navigator: false
