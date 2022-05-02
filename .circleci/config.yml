@@ -54,16 +54,6 @@ jobs:
            cd poc6
            daml build
       - run:
-          name: daml codegen & npm build
-          command: |
-            set -eou pipefail
-            export PATH=$HOME/.daml/bin:$PATH
-
-            cd poc6/wallet
-            daml codegen js ../.daml/dist/canton-coin-0.1.0.dar -o daml.js
-            npm install
-            npm run build
-      - run:
          name: daml build
          command: |
            set -euo pipefail

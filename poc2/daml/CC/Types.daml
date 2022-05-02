@@ -1,6 +1,0 @@
-module CC.Types where
-
--- | A type for the key of a Canton Coin instance.
---   Currently the SV consortium party.
-type CCKey = Party
-
