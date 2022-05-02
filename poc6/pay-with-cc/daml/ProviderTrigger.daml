@@ -1,0 +1,46 @@
+module ProviderTrigger where
+
+import CNS.PayWithCC
+
+import DA.Action
+import DA.Foldable
+import DA.Optional
+import DA.Set (Set)
+import qualified DA.Set as Set
+import Daml.Trigger
+
+queryFilter : forall a m. (ActionTriggerAny m, Functor m, Template a) => (a -> Bool) -> m [(ContractId a, a)]
+queryFilter pred =
+  filter (\(_, c) -> pred c) <$> query
+
+trigger : Trigger ()
+trigger = Trigger with
+  initialize = pure ()
+  updateState = const (pure ())
+  registeredTemplates = AllInDar
+  heartbeat = None
+  rule = \p -> do
+    optRules <- queryContractKey @DirectoryRules p
+    whenSome optRules $ \rules -> do
+
+
+      -- complete payment, note that there are no uniqueness checks on the entries or any other checks.
+      approvedPayments <- queryFilter @ApprovedPayment (\payment -> payment.provider == p)
+      forA_ approvedPayments $ \(approvedPaymentCid, approvedPayment) -> do
+        optInstall <- queryContractKey @DirectoryServiceAppInstall (p, approvedPayment.user)
+        whenSome optInstall $ \(installCid, _) -> do
+          debugRaw $ "Collecting payment for " <> show approvedPaymentCid
+          void $ emitCommands [exerciseCmd installCid (DirectoryServiceAppInstall_CollectEntryPayment approvedPaymentCid)] [toAnyContractId approvedPaymentCid]
+
+      -- request payment for entry requests
+      paymentRequests <- queryFilter @PaymentRequest (\request -> request.provider == p)
+      let pendingPaymentReferences: Set (ContractId ()) = Set.fromList $ [coerceContractId request.reference | (_, request) <- paymentRequests] <> [coerceContractId payment.reference | (_, payment) <- approvedPayments]
+      requests <- queryFilter @DirectoryEntryRequest (\request -> request.entry.provider == p)
+      forA_ requests $ \(requestCid, request) -> do
+        when (coerceContractId requestCid `Set.notMember` pendingPaymentReferences) $ do
+          debugRaw $ "Requesting payment for " <> show requestCid
+          debugRaw $ "Pending requests" <> show pendingPaymentReferences
+          optInstall <- queryContractKey @DirectoryServiceAppInstall (p, request.entry.user)
+          whenSome optInstall $ \(installCid, _) -> do
+            void $ emitCommands [exerciseCmd installCid (DirectoryServiceAppInstall_RequestEntryPayment requestCid)] [toAnyContractId requestCid]
+    pure ()

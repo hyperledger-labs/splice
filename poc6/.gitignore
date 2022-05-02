@@ -3,3 +3,10 @@
 *.dar
 *.log
 .DS_Store
+canton
+node_modules/
+build
+daml.js
+log/
+logfile
+testlog

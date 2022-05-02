@@ -25,6 +25,7 @@ template PaymentRequest
     collectionDuration : RelTime
     expiresAt : Time
     reference : ContractId PaymentReference
+    redirectUri : Text
   where
     signatory provider, user
     ensure (collectionDuration > aunit && quantity > 0.0)
@@ -125,6 +126,7 @@ template DirectoryRules with
     installFee : Decimal
     collectionDuration : RelTime -- Time provider has to collect approved payment
     approveDuration : RelTime -- Time user has to approve a payment request
+    directoryServiceUrl : Text
   where
     signatory provider
 
@@ -147,6 +149,7 @@ template DirectoryRules with
       with
         user : Party
         coinCid : ContractId Coin
+        ccWalletUrl : Text
       controller user
       do coin <- fetch coinCid
          assertMsg "Coin owner & svc match" ((coin.owner, coin.svc) == (user, svc))
@@ -155,6 +158,8 @@ template DirectoryRules with
              svc
              provider
              user
+             directoryServiceUrl
+             ccWalletUrl
 
 -- Defined by directory service
 template DirectoryServiceAppInstall
@@ -162,8 +167,12 @@ template DirectoryServiceAppInstall
     svc : Party
     provider : Party
     user : Party
+    directoryServiceUrl : Text
+    ccWalletUrl : Text
   where
     signatory provider, user
+    key (provider, user) : (Party, Party)
+    maintainer key._1, key._2
 
     nonconsuming choice DirectoryServiceAppInstall_RequestDirectoryEntry : ContractId DirectoryEntryRequest
       with
@@ -189,6 +198,7 @@ template DirectoryServiceAppInstall
            reference = toInterfaceContractId requestCid
            collectionDuration = rules.collectionDuration
            expiresAt = now `addRelTime` rules.approveDuration
+           redirectUri = directoryServiceUrl
 
     nonconsuming choice DirectoryServiceAppInstall_CollectEntryPayment : ()
       with
@@ -222,6 +232,7 @@ test = script do
     installFee = 0.1
     collectionDuration = minutes 5
     approveDuration = minutes 5
+    directoryServiceUrl = "https://directory-service"
 
   -- user splits off install price & calls install choice
   -- how: app manager admin interface as part of approval.
@@ -231,6 +242,7 @@ test = script do
   directoryInstall <- submitMulti [user] [provider, app.svc] $ exerciseCmd directoryRules DirectoryRules_Install with
     user = user
     coinCid = installCoin
+    ccWalletUrl = "https://my-cc-wallet"
 
   -- user requests entry via app install
   -- how: UI of directory service via write-delegation on app manager & call to

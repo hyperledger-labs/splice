@@ -1,0 +1,43 @@
+module Init where
+
+import DA.Time
+import Daml.Script
+
+import CC.Coin
+import CC.Scripts.Util
+import CNS.PayWithCC
+
+setup = script do
+  app <- setupApp
+
+  runNextIssuance app 1.0
+  runCoinDepositBots app
+
+  provider <- setupUser app "provider"
+  user <- setupUser app "user"
+
+  ccWalletId <- validateUserId "cc_wallet"
+  createUser (User ccWalletId (Some user)) [CanActAs user, CanReadAs provider, CanReadAs app.svc]
+
+  directoryUiId <- validateUserId "directory_ui"
+  createUser (User directoryUiId (Some user)) [CanActAs user, CanReadAs provider, CanReadAs app.svc]
+
+  pay app app.svc user 5.0 ""
+
+  directoryRules <- submit provider $ createCmd DirectoryRules with
+    provider = provider
+    svc = app.svc
+    entryFee = 1.0
+    installFee = 0.1
+    collectionDuration = minutes 5
+    approveDuration = minutes 5
+    directoryServiceUrl = "http://localhost:3000"
+
+  pay app user user 0.1 ""
+  [(installCoin, _)] <- queryFilter @Coin user (\c -> c.quantity.initialQuantity == 0.1)
+  directoryInstall <- submitMulti [user] [provider, app.svc] $ exerciseCmd directoryRules DirectoryRules_Install with
+    user = user
+    coinCid = installCoin
+    ccWalletUrl = "http://localhost:3001"
+
+  pure ()

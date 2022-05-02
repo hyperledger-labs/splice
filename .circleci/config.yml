@@ -12,7 +12,7 @@ env: &env
 parameters:
   sdk-version:
     type: string
-    default: "2.2.0-snapshot.20220420.9744.0.e193f421"
+    default: "2.2.0-snapshot.20220425.9780.0.f4d60375"
 
 jobs:
   daml_test:
@@ -61,6 +61,33 @@ jobs:
 
             cd poc6/wallet
             daml codegen js ../.daml/dist/canton-coin-0.1.0.dar -o daml.js
+            npm install
+            npm run build
+      - run:
+         name: daml build
+         command: |
+           set -euo pipefail
+           export PATH=$HOME/.daml/bin:$PATH
+
+           cd poc6/pay-with-cc
+           daml build
+           ./codegen.sh
+      - run:
+          name: "directory service: npm build"
+          command: |
+            set -eou pipefail
+            export PATH=$HOME/.daml/bin:$PATH
+
+            cd poc6/pay-with-cc/directoryservice
+            npm install
+            npm run build
+      - run:
+          name: "ccwallet: npm build"
+          command: |
+            set -eou pipefail
+            export PATH=$HOME/.daml/bin:$PATH
+
+            cd poc6/pay-with-cc/ccwallet
             npm install
             npm run build
 
