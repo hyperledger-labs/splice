@@ -6,7 +6,7 @@ import { Button, Table } from "semantic-ui-react";
 import { QueryResult } from "@daml/react";
 import { CreateEvent } from "@daml/ledger";
 import { shortenContractId } from "../Util";
-import { PaymentRequest } from "@daml.js/canton-coin/lib/CNS/PayWithCC";
+import { PaymentRequest } from "@daml.js/pay-with-cc/lib/PayWithCC";
 
 type Props = {
   requests: QueryResult<PaymentRequest, undefined, typeof PaymentRequest.templateId>;

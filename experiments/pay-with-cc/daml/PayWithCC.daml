@@ -1,4 +1,4 @@
-module CNS.PayWithCC where
+module PayWithCC where
 
 import CC.Coin
 import CC.CoinRules

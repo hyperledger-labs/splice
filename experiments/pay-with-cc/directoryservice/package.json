@@ -4,6 +4,7 @@
   "private": true,
   "dependencies": {
     "@daml.js/canton-coin": "file:daml.js/canton-coin-0.1.0",
+    "@daml.js/pay-with-cc": "file:daml.js/pay-with-cc-0.1.0",
     "@daml/hub-react": "^1.0.0",
     "@daml/ledger": "2.2.0-snapshot.20220425.9780.0.f4d60375",
     "@daml/react": "2.2.0-snapshot.20220425.9780.0.f4d60375",

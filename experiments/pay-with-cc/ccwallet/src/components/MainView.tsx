@@ -6,7 +6,7 @@ import { Container, Divider, Grid, Header } from 'semantic-ui-react';
 import PaymentRequestList from './PaymentRequestList';
 import { Coin } from '@daml.js/canton-coin/lib/CC/Coin';
 import { useLedger, useParty, useStreamQueries } from '@daml/react';
-import { PaymentRequest } from '@daml.js/canton-coin/lib/CNS/PayWithCC';
+import { PaymentRequest } from '@daml.js/pay-with-cc/lib/PayWithCC';
 import { CreateEvent } from '@daml/ledger';
 import { CoinRules, Transfer } from '@daml.js/canton-coin/lib/CC/CoinRules';
 

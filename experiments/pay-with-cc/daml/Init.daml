@@ -5,7 +5,7 @@ import Daml.Script
 
 import CC.Coin
 import CC.Scripts.Util
-import CNS.PayWithCC
+import PayWithCC
 
 setup = script do
   app <- setupApp

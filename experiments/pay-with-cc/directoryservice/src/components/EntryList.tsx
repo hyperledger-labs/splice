@@ -6,7 +6,7 @@ import { Table } from "semantic-ui-react";
 import { QueryResult } from "@daml/react";
 import { CreateEvent } from "@daml/ledger";
 import { shortenContractId } from "../Utils";
-import { DirectoryEntry } from "@daml.js/canton-coin/lib/CNS/PayWithCC";
+import { DirectoryEntry } from "@daml.js/pay-with-cc/lib/PayWithCC";
 
 type Props = {
   entries: QueryResult<DirectoryEntry, undefined, typeof DirectoryEntry.templateId>;

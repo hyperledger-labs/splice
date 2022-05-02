@@ -1,6 +1,6 @@
 module ProviderTrigger where
 
-import CNS.PayWithCC
+import PayWithCC
 
 import DA.Action
 import DA.Foldable

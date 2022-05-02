@@ -5,7 +5,7 @@ import React from 'react';
 import { Container, Divider, Grid, Header } from 'semantic-ui-react';
 import EntryList from './EntryList';
 import { useLedger, useParty, useStreamFetchByKeys, useStreamQueries } from '@daml/react';
-import { DirectoryEntry, DirectoryRules, DirectoryServiceAppInstall } from '@daml.js/canton-coin/lib/CNS/PayWithCC';
+import { DirectoryEntry, DirectoryRules, DirectoryServiceAppInstall } from '@daml.js/pay-with-cc/lib/PayWithCC';
 import { Party } from '@daml/types';
 import EntryForm from './EntryForm';
 
