@@ -49,11 +49,14 @@ setupApp = do
     svc
     currentRound = Round (-1)
 
-  submit svc $ createCmd CoinRules with
+  cid <- submit svc $ createCmd CoinRules with
     config = defaultCoinConfig
     ..
+  submit svc $ createCmd CoinRulesKey with
+    cid = cid
+    svc = svc
 
-  submit svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningRound_Open with
+  submitExerciseCoinRulesByKey app [svc] CoinRules_MiningRound_Open with
     coinPrice = 1.0
 
   -- return the off-ledger reference to the app for later script steps
@@ -116,32 +119,32 @@ runNextIssuance app coinPrice = do
       forA_ rewards $ \(rcid, _) ->
         submit app.svc $ exerciseCmd rcid ValidatorReward_SvcExpire with miningRoundCid
       -- the closed round
-      submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningRound_Archive with
+      submitExerciseCoinRulesByKey app [app.svc] CoinRules_MiningRound_Archive with
         miningRoundCid
 
     -- close current issuing rounds if there are any
     imcs <- query @IssuingMiningRound app.svc
     forA_ imcs $ \(miningRoundCid, _) ->
-      submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningRound_Close with
+      submitExerciseCoinRulesByKey app [app.svc] CoinRules_MiningRound_Close with
         miningRoundCid
 
     -- transition current OpenMiningRound into an IssuingMiningRound
     Some (_, st) <- queryContractKey @IssuanceState app.svc app.svc
     Some (openRoundCid, _) <- queryContractKey @OpenMiningRound app.svc (app.svc, st.currentRound)
-    closingRoundCid <- submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningRound_StartClosing with
+    closingRoundCid <- submitExerciseCoinRulesByKey app [app.svc] CoinRules_MiningRound_StartClosing with
       miningRoundCid = openRoundCid
 
     appRewards <- queryFilter @AppReward app.svc (\bc -> bc.round == st.currentRound)
     validatorRewards <- queryFilter @ValidatorReward app.svc (\bc -> bc.round == st.currentRound)
 
-    submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningRound_StartIssuing with
+    submitExerciseCoinRulesByKey app [app.svc] CoinRules_MiningRound_StartIssuing with
       miningRoundCid = closingRoundCid
       totalBurnQuantity =
         sum [ r.quantity | (_, r) <- appRewards] +
         sum [ r.quantity | (_, r) <- validatorRewards]
 
     -- open another round
-    void $ submit app.svc $ exerciseByKeyCmd @CoinRules app.svc CoinRules_MiningRound_Open with
+    void $ submitExerciseCoinRulesByKey app [app.svc] CoinRules_MiningRound_Open with
       coinPrice
 
 
@@ -152,6 +155,20 @@ runNextIssuance app coinPrice = do
 unlockedCoins : Party -> Script [ContractId Coin]
 unlockedCoins p = map fst <$> queryFilter @Coin p (\c -> c.owner == p)
 
+
+submitExerciseCoinRulesByKey : Choice CoinRules c r => CCApp -> [Party] -> c -> Script r
+submitExerciseCoinRulesByKey app actors arg = do
+  rulesKey <- submitMulti actors [app.svc] $ exerciseByKeyCmd @CoinRulesKey app.svc (CoinRulesKey_Fetch actors)
+  submitMulti actors [app.svc] $
+    exerciseCmd rulesKey.cid arg
+
+queryCoinRulesByKey : Party -> Script (Optional (ContractId CoinRules, CoinRules))
+queryCoinRulesByKey svc =
+  queryContractKey @CoinRulesKey svc svc >>= \case
+    None -> pure None
+    Some (_, rulesKey) -> queryContractId svc rulesKey.cid >>= \case
+      None -> pure None
+      Some rules -> pure (Some (rulesKey.cid, rules))
 
 -- | A simple and slightly hacky-way to test payment: it just gathers all coins from
 -- the sender and transfer's the desired quantity off of them to the receiver.
@@ -174,8 +191,7 @@ pay app sender recipient coinQuantity msg = do
                 quantity = coinQuantity
                 senderTransferFeeRatio = 1.0
           ]
-  void $ submitMulti [sender, recipient] [app.svc] $
-    exerciseByKeyCmd @CoinRules app.svc CoinRules_Transfer with transfer
+  void $ submitExerciseCoinRulesByKey app [sender, recipient] (CoinRules_Transfer with transfer)
 
 -- | Locks a coin of the given quantity to the given lock holder
 -- for the given time starting at the current time
@@ -199,10 +215,7 @@ lockTo app sender lockHolder coinQuantity lockDuration msg = do
                 holder = lockHolder
                 expiresAt = now `addRelTime` lockDuration
           ]
-  void $ submitMulti [sender, lockHolder] [app.svc] $
-    exerciseByKeyCmd @CoinRules app.svc CoinRules_Transfer with transfer
-  pure ()
-
+  void $ submitExerciseCoinRulesByKey app [sender, lockHolder] (CoinRules_Transfer with transfer)
 
 
 -- | Deposit all coins together with new issuances into a single coin.
@@ -235,7 +248,7 @@ runCoinDepositBots app = do
                 lock = None
             ]
     when (not (null appRewards) || not (null validatorRewards) || length coins > 1) $ void $
-      submitMulti [user] [app.svc] $ exerciseByKeyCmd @CoinRules app.svc CoinRules_Transfer with transfer
+      submitExerciseCoinRulesByKey app [user] CoinRules_Transfer with transfer
 
 -- | Retrieve a list of all issuances that have happened.
 getIssuingRounds : CCApp -> Script [Round]

@@ -42,30 +42,30 @@ template DirectoryRules with
         coin <- fetch coinCid
         assertMsg "Coin SVC and owner must match" ((ccSvc, entry.user) == (coin.svc, coin.owner))
 
-        (_, CoinRules{config = coinConfig}) <- exerciseByKey @CoinRules ccSvc (CoinRules_Fetch provider)
+        (_, CoinRules{config = coinConfig}) <- exerciseCoinRulesByKey ccSvc provider (CoinRules_Fetch provider)
 
-        TransferResultLockedCoin lockedCoinCid :: _ <- exerciseByKey @CoinRules ccSvc CoinRules_Transfer with
-          transfer = Transfer with
-            sender = entry.user
-            payload = "CNS: entry requested"
-            inputs = [InputCoin coinCid]
-            outputs =
-              [ OutputSenderCoin with
-                  exactQuantity = Some entryFee
-                  lock = Some TimeLock with
-                    holder = provider
-                    expiresAt
-              , OutputSenderCoin with
-                  exactQuantity = None
-                  lock = None
-              , OutputReceiverCoin with
-                  receiver = provider
-                  coinType = FixedReceiverCoin with
-                    quantity = requestFee
-                    -- Fee includes transfer costs so receiver pays everything
-                    senderTransferFeeRatio = 0.0
-              ]
-          -- TODO: minLockedQuantity = entryFee
+        let transfer = Transfer with
+              sender = entry.user
+              payload = "CNS: entry requested"
+              inputs = [InputCoin coinCid]
+              outputs =
+                [ OutputSenderCoin with
+                    exactQuantity = Some entryFee
+                    lock = Some TimeLock with
+                      holder = provider
+                      expiresAt
+                , OutputSenderCoin with
+                    exactQuantity = None
+                    lock = None
+                , OutputReceiverCoin with
+                    receiver = provider
+                    coinType = FixedReceiverCoin with
+                      quantity = requestFee
+                      -- Fee includes transfer costs so receiver pays everything
+                      senderTransferFeeRatio = 0.0
+                ]
+        TransferResultLockedCoin lockedCoinCid :: _ <- exerciseCoinRulesByKey ccSvc (transferControllers transfer) CoinRules_Transfer
+          with transfer
         create EntryRequest with
           ccSvc
           entry
@@ -119,16 +119,17 @@ template EntryRequest with
       controller entry.provider
       do
         coinCid <- unlockCoinUnlessExpired
-        exerciseByKey @CoinRules ccSvc CoinRules_Transfer with
-          transfer = Transfer with
-            sender = entry.user
-            payload = "CNS: entry created"
-            inputs = [InputCoin coinCid]
-            outputs =
-              [ OutputReceiverCoin with
-                  receiver = entry.provider
-                  coinType = FloatingReceiverCoin
-              ]
+        let transfer = Transfer with
+              sender = entry.user
+              payload = "CNS: entry created"
+              inputs = [InputCoin coinCid]
+              outputs =
+                [ OutputReceiverCoin with
+                    receiver = entry.provider
+                    coinType = FloatingReceiverCoin
+                ]
+        exerciseCoinRulesByKey ccSvc (transferControllers transfer) CoinRules_Transfer with
+          transfer
         create entry
 
     choice EntryRequest_RejectExceptional : ContractId Coin

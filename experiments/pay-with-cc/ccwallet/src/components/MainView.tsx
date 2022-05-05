@@ -6,7 +6,7 @@ import { Container, Divider, Grid, Header } from 'semantic-ui-react';
 import PaymentRequestList from './PaymentRequestList';
 import { Coin } from '@daml.js/canton-coin/lib/CC/Coin';
 import { useLedger, useParty, useStreamQueries } from '@daml/react';
-import { PaymentRequest } from '@daml.js/pay-with-cc/lib/PayWithCC';
+import { PaymentRequest, TransferWrapper } from '@daml.js/pay-with-cc/lib/PayWithCC';
 import { CreateEvent } from '@daml/ledger';
 import { CoinRules, Transfer } from '@daml.js/canton-coin/lib/CC/CoinRules';
 
@@ -31,7 +31,7 @@ const MainView: React.FC = () => {
           ],
           payload: "split",
         };
-        const [[c0]] = await ledger.exerciseByKey(CoinRules.CoinRules_Transfer, rule.svc, {transfer: transfer});
+        const [[c0]] = await ledger.createAndExercise(TransferWrapper.ExerciseTransfer, {p: party, svc: rule.svc}, {transfer: transfer});
         if (c0.tag === 'TransferResultCoin') {
           await ledger.exercise(PaymentRequest.PaymentRequest_Approve, request.contractId, {coin: c0.value});
           window.location.assign(request.payload.redirectUri);
