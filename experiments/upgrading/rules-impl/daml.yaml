@@ -1,0 +1,13 @@
+sdk-version: 2.2.0-snapshot.20220425.9780.0.f4d60375
+name: rules-impl
+source: daml
+version: 0.1.0
+dependencies:
+  - daml-prim
+  - daml-stdlib
+build-options:
+  - --target=1.dev
+data-dependencies:
+  - ../coin-iface/.daml/dist/coin-iface-0.1.0.dar
+  - ../coin-impl/.daml/dist/coin-impl-0.1.0.dar
+  - ../rules-iface/.daml/dist/rules-iface-0.1.0.dar

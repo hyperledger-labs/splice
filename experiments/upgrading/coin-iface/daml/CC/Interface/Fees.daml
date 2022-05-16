@@ -1,0 +1,36 @@
+-- | Utility functions for different kinds of fees.
+module CC.Interface.Fees where
+
+import CC.Interface.Round
+
+-- Rates per mining round
+-------------------------
+
+newtype RatePerRound = RatePerRound with rate : Decimal
+  deriving (Eq, Ord, Show)
+
+-- Fixed and variable rates
+---------------------------
+
+-- | A fixed fee independent of the action being taken.
+newtype FixedFee = FixedFee with fee : Decimal
+  deriving (Eq, Ord, Show)
+
+-- | A rate defined as a piecewise linear function, e.g.,
+-- `SteppedRate 0.01 [(100.0, 0.001), (1000.0, 0.0001), (1000000, 0.00001)]
+-- corresponds to 1% of the first 100, 0.1% of the next 1000 and 0.01% of the next 1000000
+-- and 0.001% for everything above that.
+data SteppedRate = SteppedRate
+  with
+    initialRate : Decimal
+    steps : [(Decimal, Decimal)]
+  deriving (Eq, Ord, Show)
+
+-- ExpiringQuantity
+-------------------
+
+data ExpiringQuantity = ExpiringQuantity with
+    initialQuantity : Decimal
+    createdAt : Round
+    ratePerRound : RatePerRound
+  deriving (Eq, Ord, Show)

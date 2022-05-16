@@ -1,0 +1,57 @@
+module CC.Scripts.Parameters where
+
+import CC.CoinRules
+
+import CC.Interface.Fees
+
+-- | Default proposal for cost-competitive fees.
+--
+-- TODO: it looks like we need to lower these fees a bit further
+-- to be competitive with ETH and BTC: https://ycharts.com/indicators/ethereum_average_transaction_fee
+defaultCoinConfig : CoinConfig
+defaultCoinConfig = CoinConfig with
+    -- | Fee to create a new coin.
+    -- Set to the fixed part of the transfer fee.
+    createFee = FixedFee 0.09
+
+    -- | Fee to update an existing coin.
+    -- Cost covering and 10x lower than creation to strongly incentivize merging coins.
+    updateFee = FixedFee 0.01
+
+    -- | Fee for keeping a coin around.
+    -- This is roughly equivalent to 1$/360 days but expressed as rounds
+    -- with one day corresponding to 24*60/2.5 rounds, i.e., one round
+    -- every 2.5 minutes.
+    -- Incentivizes users to actively merge their coins.
+    holdingFee = RatePerRound (1.0 / 360.0 / (24.0*60.0/2.5))
+
+    -- | The minimal quantity of burn for which a receipt is issued.
+    --
+    -- Chosen to cover to be just above the cost of updating a single update.
+    minRewardQuantity = 0.011 -- in $
+
+    -- | Fee for transferring some quantity of coin to a new owner.
+    --
+    -- TODO Finetuning required
+    transferFee = SteppedRate with
+      initialRate = 0.01
+      steps = [(100.0, 0.001), (1000.0, 0.0001), (1000000.0, 0.00001)]
+
+    -- | Coins issued per mining round.
+    --
+    -- Set to 60 coins, which implies a coin price of 1 $ at burn-mint-equilibrium (BME) when the network spends
+    -- 0.1 $/second in discounted transfer fees and a price of 100$ when the network spends 10 $ per second in discounted fees.
+    --
+    coinsIssuedPerRound = 60.0
+
+    svcIssuanceRatio = 0.35
+
+    -- | These should be large enough to ensure efficient batching, but not too large
+    -- to avoid creating very large transactions.
+    maxNumInputs = 100
+    maxNumOutputs = 100
+
+    -- | Fits a hex-encoded SHA-256 or a UUID
+    --
+    -- TODO: charge per character
+    maxPayloadLength = 32

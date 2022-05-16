@@ -1,0 +1,140 @@
+module CC.Interface.CoinRules where
+
+import DA.Set (Set)
+import qualified DA.Set as Set
+
+import CC.Interface.Coin
+
+template CoinRulesKey
+  with
+    svc : Party
+    cid : ContractId CoinRules
+  where
+    signatory svc
+    key svc : Party
+    maintainer key
+    -- Fetch for non-stakeholders. We accept multiple parties to avoid
+    -- having to make an arbitrary choice for the party that fetches.
+    nonconsuming choice CoinRulesKey_Fetch : CoinRulesKey
+      with
+        ps : [Party]
+      controller ps
+      do pure this
+
+exerciseCoinRulesByKey : (HasExercise CoinRules c r, IsParties p, Show c) => Party -> p -> c -> Update r
+exerciseCoinRulesByKey svc actors c = do
+  rulesKey <- exerciseByKey @CoinRulesKey svc (CoinRulesKey_Fetch (toParties actors))
+  exercise rulesKey.cid c
+
+interface CoinRules
+  where
+    getSvc : Party
+
+    coinRules_Transfer_impl : ContractId CoinRules -> CoinRules_Transfer -> Update [TransferResult]
+
+    coinRules_LockedCoin_Unlock_impl : ContractId LockedCoin -> LockedCoinView -> LockedCoin_Unlock -> Update (ContractId Coin)
+
+    coinRules_ValidatorReward_ArchiveAsValidator_impl : ContractId ValidatorReward -> ValidatorRewardView -> ValidatorReward_ArchiveAsValidator -> Update ()
+    coinRules_ValidatorReward_SvcExpire_impl : ContractId ValidatorReward -> ValidatorRewardView -> ValidatorReward_SvcExpire -> Update ()
+
+    coinRules_AppReward_SvcExpire_impl : ContractId AppReward -> AppRewardView -> AppReward_SvcExpire -> Update ()
+
+    ensure (signatory this == [getSvc this])
+
+    nonconsuming choice CoinRules_Transfer : [TransferResult]
+      with
+        transfer : Transfer
+      controller transferControllers transfer
+      do coinRules_Transfer_impl this self arg
+
+    nonconsuming choice CoinRules_LockedCoin_Unlock : ContractId Coin
+      with
+        cid : ContractId LockedCoin
+        view : LockedCoinView
+        dataArg : LockedCoin_Unlock
+      controller view.coin.owner, view.lock.holder
+      do coinRules_LockedCoin_Unlock_impl this cid view dataArg
+
+    nonconsuming choice CoinRules_ValidatorReward_ArchiveAsValidator : ()
+      with
+        cid : ContractId ValidatorReward
+        view : ValidatorRewardView
+        dataArg : ValidatorReward_ArchiveAsValidator
+      controller view.user, dataArg.validator
+      do coinRules_ValidatorReward_ArchiveAsValidator_impl this cid view dataArg
+
+    nonconsuming choice CoinRules_ValidatorReward_SvcExpire : ()
+      with
+        cid : ContractId ValidatorReward
+        view : ValidatorRewardView
+        dataArg : ValidatorReward_SvcExpire
+      controller view.svc
+      do coinRules_ValidatorReward_SvcExpire_impl this cid view dataArg
+
+    nonconsuming choice CoinRules_AppReward_SvcExpire : ()
+      with
+        cid : ContractId AppReward
+        view : AppRewardView
+        dataArg : AppReward_SvcExpire
+      controller view.svc
+      do coinRules_AppReward_SvcExpire_impl this cid view dataArg
+
+
+
+-- | Representation of a batch transfer.
+data Transfer = Transfer with
+    sender : Party
+    inputs : [TransferInput]
+    outputs : [TransferOutput]
+    payload : Text
+  deriving (Eq, Show)
+
+-- | An individual input for a batch transfer.
+data TransferInput
+  = InputCoin (ContractId Coin)
+  | InputAppReward (ContractId AppReward)
+  | InputValidatorReward (ContractId ValidatorReward)
+  deriving (Eq, Show)
+
+-- | An individual output for a batch transfer.
+data TransferOutput
+  = OutputSenderCoin with
+      -- | The quantity desired for this coin. If not set, then it will receive
+      -- a portion of the remainin input quantity.
+      exactQuantity : Optional Decimal
+      -- | The lock to be added.
+      lock : Optional TimeLock
+  | OutputReceiverCoin with
+      receiver : Party
+      coinType: ReceiverCoinType
+  deriving (Eq, Show)
+
+data ReceiverCoinType
+  = -- | Receiver coin with fixed quantity
+    FixedReceiverCoin with
+      quantity : Decimal
+      -- | The ratio of the transfer fee attributed to the sender. Must be between 0.0 and 1.0.
+      -- 0.0 means the receiver pays the transfer fee, 1.0 means the sender pays it.
+      senderTransferFeeRatio : Decimal
+  | -- | The equivalent of an OutputSenderCoin with exactQuantity = None. All transfer fees
+    -- are payed by the receiver.
+  FloatingReceiverCoin
+  deriving (Eq, Ord, Show)
+
+-- Transfer logic
+-- ==============
+
+-- | The controllers for a transfer.
+transferControllers : Transfer -> Set Party
+transferControllers t =
+    foldl addOutputController (Set.singleton t.sender) t.outputs
+  where
+    addOutputController s (OutputSenderCoin with lock; ..) = optional s (`Set.insert` s) (holder <$> lock)
+    addOutputController s (OutputReceiverCoin with receiver; ..) = Set.insert receiver s
+
+-- | Contracts created during a transfer and
+-- returned as choice results.
+data TransferResult
+  = TransferResultCoin (ContractId Coin)
+  | TransferResultLockedCoin (ContractId LockedCoin)
+  deriving (Show, Eq, Ord)

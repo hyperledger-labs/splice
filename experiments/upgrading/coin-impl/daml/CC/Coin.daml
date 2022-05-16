@@ -1,0 +1,100 @@
+module CC.Coin where
+
+import qualified CC.Interface.Coin as CoinIface
+import qualified CC.Interface.CoinRules as CoinRulesIface
+
+import CC.Interface.Fees (ExpiringQuantity)
+import CC.Interface.Round (Round)
+
+template Coin
+  with
+    svc : Party
+    owner : Party
+    quantity : ExpiringQuantity
+  where
+    signatory svc, owner
+
+    implements CoinIface.Coin where
+      coin_View = CoinIface.CoinView with
+        svc
+        owner
+        quantity
+
+template LockedCoin
+  with
+    coin : Coin
+    lock : CoinIface.TimeLock
+  where
+    signatory signatory coin, lock.holder
+
+    implements CoinIface.LockedCoin where
+      lockedCoin_View = CoinIface.LockedCoinView with
+        coin = CoinIface.coin_View coin
+        lock
+
+      lockedCoin_Unlock_Impl self arg = do
+        CoinRulesIface.exerciseCoinRulesByKey coin.svc (signatory this) (CoinRulesIface.CoinRules_LockedCoin_Unlock self (CoinIface.lockedCoin_View this) arg)
+
+
+-- | The right to claim coin issuances for a user's burns as their validator.
+template ValidatorRight with
+    svc : Party
+    user : Party
+    validator : Party
+  where
+    signatory user, validator
+
+    key this : ValidatorRight
+    maintainer key.user, key.validator
+
+    implements CoinIface.ValidatorRight where
+      validatorRight_View = CoinIface.ValidatorRightView with
+        svc
+        user
+        validator
+
+-- | A receipt of a coin burn that can be used to claim part of a coin issuance.
+template AppReward
+  with
+    svc : Party
+    -- | Application owner.
+    owner : Party
+    quantity : Decimal
+    round : Round
+  where
+    signatory svc, owner
+    ensure quantity > 0.0
+
+    implements CoinIface.AppReward where
+      appReward_View = CoinIface.AppRewardView with
+        svc
+        owner
+        quantity
+        round
+
+      appReward_SvcExpire_Impl self arg =
+        CoinRulesIface.exerciseCoinRulesByKey svc (signatory this) (CoinRulesIface.CoinRules_AppReward_SvcExpire self (CoinIface.appReward_View this) arg)
+
+template ValidatorReward
+  with
+    svc : Party
+    user : Party
+    quantity : Decimal
+    round : Round
+  where
+    signatory svc, user
+    ensure quantity > 0.0
+
+    implements CoinIface.ValidatorReward where
+      validatorReward_View = CoinIface.ValidatorRewardView with
+        svc
+        user
+        quantity
+        round
+
+      validatorReward_ArchiveAsValidator_Impl self arg =
+        CoinRulesIface.exerciseCoinRulesByKey svc (signatory this) (CoinRulesIface.CoinRules_ValidatorReward_ArchiveAsValidator self (CoinIface.validatorReward_View this) arg)
+
+      validatorReward_SvcExpire_Impl self arg =
+        CoinRulesIface.exerciseCoinRulesByKey svc (signatory this) (CoinRulesIface.CoinRules_ValidatorReward_SvcExpire self (CoinIface.validatorReward_View this) arg)
+

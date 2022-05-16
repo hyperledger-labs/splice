@@ -1,0 +1,111 @@
+module CC.Interface.Coin where
+
+import CC.Interface.Fees
+import CC.Interface.Round
+
+data CoinView = CoinView
+  with
+    owner : Party
+    svc : Party
+    quantity : ExpiringQuantity
+  deriving (Eq, Show)
+
+
+interface Coin where
+  coin_View : CoinView
+
+  choice Coin_Archive : ()
+    controller signatory this
+    do pure ()
+
+-- | A lock held by a particular party until its expiry.
+data TimeLock = TimeLock
+  with
+    holder: Party
+    expiresAt: Time
+  deriving (Eq, Show)
+
+
+data LockedCoinView = LockedCoinView
+  with
+    coin : CoinView
+    lock : TimeLock
+  deriving (Eq, Show)
+
+interface LockedCoin where
+  lockedCoin_View : LockedCoinView
+
+  -- TODO Can we move the exerciseByKey to the interface? Would create a circular dep which is a bit meh. On the other hand
+  -- being able to customize this seems somewhat pointless.
+  lockedCoin_Unlock_Impl : ContractId LockedCoin -> LockedCoin_Unlock -> Update (ContractId Coin)
+
+  nonconsuming choice LockedCoin_Unlock : ContractId Coin
+    controller (lockedCoin_View this).lock.holder
+    do lockedCoin_Unlock_Impl this self arg
+
+  choice LockedCoin_Archive : ()
+    controller signatory this
+    do pure ()
+
+data ValidatorRightView = ValidatorRightView
+  with
+    svc : Party
+    user : Party
+    validator : Party
+  deriving (Show, Eq)
+
+interface ValidatorRight where
+  validatorRight_View : ValidatorRightView
+
+data ValidatorRewardView = ValidatorRewardView
+  with
+    svc : Party
+    user : Party
+    quantity : Decimal
+    round : Round
+  deriving (Show, Eq)
+
+interface ValidatorReward where
+  validatorReward_View : ValidatorRewardView
+
+  validatorReward_ArchiveAsValidator_Impl : ContractId ValidatorReward -> ValidatorReward_ArchiveAsValidator -> Update ()
+  validatorReward_SvcExpire_Impl : ContractId ValidatorReward -> ValidatorReward_SvcExpire -> Update ()
+
+  nonconsuming choice ValidatorReward_ArchiveAsValidator : ()
+    with
+      validator : Party
+      rightCid : ContractId ValidatorRight
+    controller validator
+    do validatorReward_ArchiveAsValidator_Impl this self arg
+
+  nonconsuming choice ValidatorReward_SvcExpire: ()
+    with
+      miningRoundCid : ContractId ClosedMiningRound
+    controller (validatorReward_View this).svc
+    do validatorReward_SvcExpire_Impl this self arg
+
+  choice ValidatorReward_Archive : ()
+    controller signatory this
+    do pure ()
+
+data AppRewardView = AppRewardView
+  with
+    svc : Party
+    owner : Party
+    quantity : Decimal
+    round : Round
+  deriving (Show, Eq)
+
+interface AppReward where
+  appReward_View : AppRewardView
+  appReward_SvcExpire_Impl : ContractId AppReward -> AppReward_SvcExpire -> Update ()
+
+  nonconsuming choice AppReward_SvcExpire : ()
+    with
+      miningRoundCid : ContractId ClosedMiningRound
+    controller (appReward_View this).svc
+    do appReward_SvcExpire_Impl this self arg
+
+  choice AppReward_Archive : ()
+    controller signatory this
+    do pure ()
