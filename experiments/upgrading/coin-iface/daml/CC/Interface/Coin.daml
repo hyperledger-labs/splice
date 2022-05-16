@@ -3,6 +3,10 @@ module CC.Interface.Coin where
 import CC.Interface.Fees
 import CC.Interface.Round
 
+class HasController t c where
+  -- TODO No idea why controller is a keyword here.
+  controller' : t -> c -> [Party]
+
 data CoinView = CoinView
   with
     owner : Party
@@ -10,6 +14,8 @@ data CoinView = CoinView
     quantity : ExpiringQuantity
   deriving (Eq, Show)
 
+instance HasSignatory CoinView where
+  signatory view = [view.owner, view.svc]
 
 interface Coin where
   coin_View : CoinView
@@ -32,6 +38,9 @@ data LockedCoinView = LockedCoinView
     lock : TimeLock
   deriving (Eq, Show)
 
+instance HasSignatory LockedCoinView where
+  signatory view = view.lock.holder :: signatory view.coin
+
 interface LockedCoin where
   lockedCoin_View : LockedCoinView
 
@@ -47,12 +56,18 @@ interface LockedCoin where
     controller signatory this
     do pure ()
 
+instance HasController LockedCoinView LockedCoin_Unlock where
+  controller' view _arg = [view.lock.holder]
+
 data ValidatorRightView = ValidatorRightView
   with
     svc : Party
     user : Party
     validator : Party
   deriving (Show, Eq)
+
+instance HasSignatory ValidatorRightView where
+  signatory view = [view.user, view.validator]
 
 interface ValidatorRight where
   validatorRight_View : ValidatorRightView
@@ -64,6 +79,9 @@ data ValidatorRewardView = ValidatorRewardView
     quantity : Decimal
     round : Round
   deriving (Show, Eq)
+
+instance HasSignatory ValidatorRewardView where
+  signatory view = [view.svc, view.user]
 
 interface ValidatorReward where
   validatorReward_View : ValidatorRewardView
@@ -88,6 +106,12 @@ interface ValidatorReward where
     controller signatory this
     do pure ()
 
+instance HasController ValidatorRewardView ValidatorReward_ArchiveAsValidator where
+  controller' view arg = [arg.validator]
+
+instance HasController ValidatorRewardView ValidatorReward_SvcExpire where
+  controller' view _arg = [view.svc]
+
 data AppRewardView = AppRewardView
   with
     svc : Party
@@ -95,6 +119,9 @@ data AppRewardView = AppRewardView
     quantity : Decimal
     round : Round
   deriving (Show, Eq)
+
+instance HasSignatory AppRewardView where
+  signatory view = [view.svc, view.owner]
 
 interface AppReward where
   appReward_View : AppRewardView
@@ -109,3 +136,6 @@ interface AppReward where
   choice AppReward_Archive : ()
     controller signatory this
     do pure ()
+
+instance HasController AppRewardView AppReward_SvcExpire where
+  controller' view _arg = [view.svc]

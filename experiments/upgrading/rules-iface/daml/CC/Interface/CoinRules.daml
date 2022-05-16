@@ -52,7 +52,7 @@ interface CoinRules
         cid : ContractId LockedCoin
         view : LockedCoinView
         dataArg : LockedCoin_Unlock
-      controller view.coin.owner, view.lock.holder
+      controller signatory view, controller' view dataArg
       do coinRules_LockedCoin_Unlock_impl this cid view dataArg
 
     nonconsuming choice CoinRules_ValidatorReward_ArchiveAsValidator : ()
@@ -60,7 +60,7 @@ interface CoinRules
         cid : ContractId ValidatorReward
         view : ValidatorRewardView
         dataArg : ValidatorReward_ArchiveAsValidator
-      controller view.user, dataArg.validator
+      controller signatory view, controller' view dataArg
       do coinRules_ValidatorReward_ArchiveAsValidator_impl this cid view dataArg
 
     nonconsuming choice CoinRules_ValidatorReward_SvcExpire : ()
@@ -68,7 +68,7 @@ interface CoinRules
         cid : ContractId ValidatorReward
         view : ValidatorRewardView
         dataArg : ValidatorReward_SvcExpire
-      controller view.svc
+      controller signatory view, controller' view dataArg
       do coinRules_ValidatorReward_SvcExpire_impl this cid view dataArg
 
     nonconsuming choice CoinRules_AppReward_SvcExpire : ()
@@ -76,7 +76,7 @@ interface CoinRules
         cid : ContractId AppReward
         view : AppRewardView
         dataArg : AppReward_SvcExpire
-      controller view.svc
+      controller signatory view, controller' view dataArg
       do coinRules_AppReward_SvcExpire_impl this cid view dataArg
 
 

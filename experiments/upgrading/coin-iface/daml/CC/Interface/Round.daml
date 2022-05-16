@@ -15,11 +15,17 @@ data OpenMiningRoundView = OpenMiningRoundView
     coinPrice : Decimal
   deriving (Eq, Show)
 
+instance HasSignatory OpenMiningRoundView where
+  signatory view = [view.svc]
+
 data ClosingMiningRoundView = ClosingMiningRoundView
   with
     svc : Party
     round : Round
   deriving (Eq, Show)
+
+instance HasSignatory ClosingMiningRoundView where
+  signatory view = [view.svc]
 
 data IssuingMiningRoundView = IssuingMiningRoundView
   with
@@ -28,12 +34,17 @@ data IssuingMiningRoundView = IssuingMiningRoundView
     issuancePerCoin : Decimal
   deriving (Eq, Show)
 
+instance HasSignatory IssuingMiningRoundView where
+  signatory view = [view.svc]
+
 data ClosedMiningRoundView = ClosedMiningRoundView
   with
     svc : Party
     round : Round
   deriving (Eq, Show)
 
+instance HasSignatory ClosedMiningRoundView where
+  signatory view = [view.svc]
 
 interface OpenMiningRound where
   openMiningRound_View : OpenMiningRoundView
