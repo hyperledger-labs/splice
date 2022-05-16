@@ -35,6 +35,9 @@ template LockedCoin
       lockedCoin_Unlock_Impl self arg = do
         CoinRulesIface.exerciseCoinRulesByKey coin.svc (signatory this) (CoinRulesIface.CoinRules_LockedCoin_Unlock self (CoinIface.lockedCoin_View this) arg)
 
+      lockedCoin_OwnerExpireLock_Impl self arg = do
+        CoinRulesIface.exerciseCoinRulesByKey coin.svc (signatory this) (CoinRulesIface.CoinRules_LockedCoin_OwnerExpireLock self (CoinIface.lockedCoin_View this) arg)
+
 
 -- | The right to claim coin issuances for a user's burns as their validator.
 template ValidatorRight with

@@ -67,6 +67,16 @@ template CoinRules
           Some coin -> toInterfaceContractId <$> create coin.coin
           None -> abort $ "Unsupported coin impl: "  <> show (interfaceTypeRep lockedCoin)
 
+      coinRules_LockedCoin_OwnerExpireLock_impl lockedCoinCid lockedCoinView _arg = do
+        lockedCoin <- fetch lockedCoinCid
+        CoinIface.lockedCoin_View lockedCoin === lockedCoinView
+        case fromInterface @CoinImpl.LockedCoin lockedCoin of
+          Some coin -> do
+            t <- getTime
+            assertMsg "Lock not expired" (lockedCoinView.lock.expiresAt <= t)
+            toInterfaceContractId <$> create coin.coin
+          None -> abort $ "Unsupported coin impl: "  <> show (interfaceTypeRep lockedCoin)
+
       coinRules_ValidatorReward_ArchiveAsValidator_impl rewardCid rewardView (CoinIface.ValidatorReward_ArchiveAsValidator validator rightCid) = do
         reward <- fetch rewardCid
         CoinIface.validatorReward_View reward === rewardView

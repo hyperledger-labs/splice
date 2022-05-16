@@ -3,6 +3,7 @@ coin_impl_dar=coin-impl/.daml/dist/coin-impl-0.1.0.dar
 rules_iface_dar=rules-iface/.daml/dist/rules-iface-0.1.0.dar
 rules_impl_dar=rules-impl/.daml/dist/rules-impl-0.1.0.dar
 tests_dar=tests/.daml/dist/tests-0.1.0.dar
+wallet_dar=wallet/.daml/dist/wallet-0.1.0.dar
 
 $(coin_iface_dar): coin-iface/daml.yaml $(shell find coin-iface -name '*.daml' -type f)
 	DAML_PROJECT=coin-iface daml build --ghc-option=-Werror
@@ -19,13 +20,16 @@ $(rules_impl_dar): rules-impl/daml.yaml $(shell find rules-impl -name '*.daml' -
 $(tests_dar): tests/daml.yaml $(shell find tests -name '*.daml' -type f) $(coin_iface_dar) $(rules_iface_dar) $(coin_impl) $(rules_impl_dar)
 	DAML_PROJECT=tests daml build --ghc-option=-Werror
 
+$(wallet_dar): wallet/daml.yaml $(shell find wallet -name '*.daml' -type f) $(coin_iface_dar) $(rules_iface_dar)
+	DAML_PROJECT=wallet daml build --ghc-option=-Werror
+
 .PHONY: test
 test: $(tests_dar)
 	DAML_PROJECT=tests daml test --ghc-option=-Werror
 
 .PHONY: all
 .DEFAULT_GOAL := all
-all: $(coin_iface_dar) $(rules_iface_dar) $(coin_impl_dar) $(rules_impl_dar) $(tests_dar)
+all: $(coin_iface_dar) $(rules_iface_dar) $(coin_impl_dar) $(rules_impl_dar) $(tests_dar) $(wallet_dar)
 
 .PHONY: coin-iface
 coin-iface: $(coin_iface_dar)

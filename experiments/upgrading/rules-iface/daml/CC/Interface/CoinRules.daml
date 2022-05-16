@@ -33,6 +33,7 @@ interface CoinRules
     coinRules_Transfer_impl : ContractId CoinRules -> CoinRules_Transfer -> Update [TransferResult]
 
     coinRules_LockedCoin_Unlock_impl : ContractId LockedCoin -> LockedCoinView -> LockedCoin_Unlock -> Update (ContractId Coin)
+    coinRules_LockedCoin_OwnerExpireLock_impl : ContractId LockedCoin -> LockedCoinView -> LockedCoin_OwnerExpireLock -> Update (ContractId Coin)
 
     coinRules_ValidatorReward_ArchiveAsValidator_impl : ContractId ValidatorReward -> ValidatorRewardView -> ValidatorReward_ArchiveAsValidator -> Update ()
     coinRules_ValidatorReward_SvcExpire_impl : ContractId ValidatorReward -> ValidatorRewardView -> ValidatorReward_SvcExpire -> Update ()
@@ -54,6 +55,14 @@ interface CoinRules
         dataArg : LockedCoin_Unlock
       controller signatory view, controller' view dataArg
       do coinRules_LockedCoin_Unlock_impl this cid view dataArg
+
+    nonconsuming choice CoinRules_LockedCoin_OwnerExpireLock : ContractId Coin
+      with
+        cid : ContractId LockedCoin
+        view : LockedCoinView
+        dataArg : LockedCoin_OwnerExpireLock
+      controller signatory view, controller' view dataArg
+      do coinRules_LockedCoin_OwnerExpireLock_impl this cid view dataArg
 
     nonconsuming choice CoinRules_ValidatorReward_ArchiveAsValidator : ()
       with

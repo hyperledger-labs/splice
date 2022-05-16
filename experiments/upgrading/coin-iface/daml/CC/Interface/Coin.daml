@@ -47,10 +47,15 @@ interface LockedCoin where
   -- TODO Can we move the exerciseByKey to the interface? Would create a circular dep which is a bit meh. On the other hand
   -- being able to customize this seems somewhat pointless.
   lockedCoin_Unlock_Impl : ContractId LockedCoin -> LockedCoin_Unlock -> Update (ContractId Coin)
+  lockedCoin_OwnerExpireLock_Impl : ContractId LockedCoin -> LockedCoin_OwnerExpireLock -> Update (ContractId Coin)
 
   nonconsuming choice LockedCoin_Unlock : ContractId Coin
     controller (lockedCoin_View this).lock.holder
     do lockedCoin_Unlock_Impl this self arg
+
+  nonconsuming choice LockedCoin_OwnerExpireLock : ContractId Coin
+    controller (lockedCoin_View this).coin.owner
+    do lockedCoin_OwnerExpireLock_Impl this self arg
 
   choice LockedCoin_Archive : ()
     controller signatory this
@@ -58,6 +63,9 @@ interface LockedCoin where
 
 instance HasController LockedCoinView LockedCoin_Unlock where
   controller' view _arg = [view.lock.holder]
+
+instance HasController LockedCoinView LockedCoin_OwnerExpireLock where
+  controller' view _arg = [view.coin.owner]
 
 data ValidatorRightView = ValidatorRightView
   with
