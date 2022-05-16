@@ -9,10 +9,6 @@ import DA.Set (Set)
 import qualified DA.Set as Set
 import Daml.Trigger
 
-queryFilter : forall a m. (ActionTriggerAny m, Functor m, Template a) => (a -> Bool) -> m [(ContractId a, a)]
-queryFilter pred =
-  filter (\(_, c) -> pred c) <$> query
-
 trigger : Trigger ()
 trigger = Trigger with
   initialize = pure ()

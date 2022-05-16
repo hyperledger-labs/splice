@@ -1,4 +1,4 @@
-sdk-version: 2.2.0-snapshot.20220425.9780.0.f4d60375
+sdk-version: 2.3.0-snapshot.20220509.9874.0.0798fe15
 name: rules-impl
 source: daml
 version: 0.1.0
