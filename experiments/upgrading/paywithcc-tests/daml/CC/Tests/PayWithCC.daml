@@ -1,0 +1,74 @@
+module CC.Tests.PayWithCC where
+
+import CC.Coin
+
+import CC.DirectoryService
+import CC.Wallet
+
+import CC.Scripts.Util
+
+import DA.Time
+import Daml.Script
+
+test = script do
+  app <- setupApp
+
+  runNextIssuance app 1.0
+  runCoinDepositBots app
+
+  provider <- setupUser app "provider"
+  user <- setupUser app "user"
+
+  pay app app.svc user 5.0 ""
+
+  -- provider creates directory rules
+  -- how: up to app provider
+  directoryRules <- submit provider $ createCmd DirectoryRules with
+    provider = provider
+    svc = app.svc
+    entryFee = 1.0
+    installFee = 0.1
+    collectionDuration = minutes 5
+    approveDuration = minutes 5
+    directoryServiceUrl = "https://directory-service"
+
+  -- user splits off install price & calls install choice
+  -- how: app manager admin interface as part of approval.
+  --      needs integration with cc wallet for payment.
+  pay app user user 0.1 ""
+  [(installCoin, _)] <- queryFilter @Coin user (\c -> c.quantity.initialQuantity == 0.1)
+  directoryInstall <- submitMulti [user] [provider, app.svc] $ exerciseCmd directoryRules DirectoryRules_Install with
+    user = user
+    coinCid = toInterfaceContractId installCoin
+    ccWalletUrl = "https://my-cc-wallet"
+
+  -- user requests entry via app install
+  -- how: UI of directory service via write-delegation on app manager & call to
+  -- user’s participant.
+  entryRequest <- submitMulti [user] [provider, app.svc] $ exerciseCmd directoryInstall DirectoryServiceAppInstall_RequestDirectoryEntry with
+   entry = DirectoryEntry with
+     user = user
+     provider = provider
+     payload = "my cool directory entry"
+
+  -- provider requests payment for entry via app install
+  -- how: provider on their own participant.
+  paymentRequest <- submit provider $ exerciseCmd directoryInstall DirectoryServiceAppInstall_RequestEntryPayment with
+    requestCid = entryRequest
+
+  -- cc wallet splits off price after user accepted
+  -- how: cc wallet
+  pay app user user 1.02 ""
+  [(coin, _)] <- queryFilter @Coin user (\c -> c.quantity.initialQuantity == 1.02)
+  -- cc wallet approves payment and locks coin to provider
+  -- how: cc wallet
+  approvedPayment <- submitMulti [user] [app.svc] $ exerciseCmd paymentRequest PaymentRequest_Approve with
+    coin = toInterfaceContractId coin
+
+  -- directory providers transactionally unlocks & transfer coins
+  -- and creates directory entry in return.
+  -- how: provider on their own participant
+  submitMulti [provider] [app.svc] $ exerciseCmd directoryInstall DirectoryServiceAppInstall_CollectEntryPayment with
+    approvedPayment = approvedPayment
+
+  pure ()
