@@ -7,9 +7,8 @@ dependencies:
   - daml-stdlib
   - daml-script
 data-dependencies:
-  - ../coin-impl/.daml/dist/coin-impl-0.1.0.dar
   - ../coin-iface/.daml/dist/coin-iface-0.1.0.dar
-  - ../rules-impl/.daml/dist/rules-impl-0.1.0.dar
-  - ../rules-iface/.daml/dist/rules-iface-0.1.0.dar
+  - ../coin-data-impl/.daml/dist/coin-data-impl-0.1.0.dar
+  - ../coin-rules-impl/.daml/dist/coin-rules-impl-0.1.0.dar
 build-options:
   - --target=1.dev

@@ -8,9 +8,8 @@ dependencies:
   - daml-script
 data-dependencies:
   - ../coin-iface/.daml/dist/coin-iface-0.1.0.dar
-  - ../coin-impl/.daml/dist/coin-impl-0.1.0.dar
-  - ../rules-iface/.daml/dist/rules-iface-0.1.0.dar
-  - ../rules-impl/.daml/dist/rules-impl-0.1.0.dar
+  - ../coin-data-impl/.daml/dist/coin-data-impl-0.1.0.dar
+  - ../coin-rules-impl/.daml/dist/coin-rules-impl-0.1.0.dar
   - ../wallet/.daml/dist/wallet-0.1.0.dar
   - ../directoryservice/.daml/dist/directoryservice-0.1.0.dar
   - ../tests/.daml/dist/tests-0.1.0.dar

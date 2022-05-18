@@ -7,7 +7,6 @@ dependencies:
   - daml-stdlib
 data-dependencies:
   - ../coin-iface/.daml/dist/coin-iface-0.1.0.dar
-  - ../rules-iface/.daml/dist/rules-iface-0.1.0.dar
 build-options:
   - --target=1.dev
 start-navigator: false

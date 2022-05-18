@@ -1,5 +1,5 @@
 sdk-version: 2.3.0-snapshot.20220509.9874.0.0798fe15
-name: rules-iface
+name: coin-rules-impl
 source: daml
 version: 0.1.0
 dependencies:
@@ -9,3 +9,4 @@ build-options:
   - --target=1.dev
 data-dependencies:
   - ../coin-iface/.daml/dist/coin-iface-0.1.0.dar
+  - ../coin-data-impl/.daml/dist/coin-data-impl-0.1.0.dar
