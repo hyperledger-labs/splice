@@ -1,0 +1,528 @@
+-- NOTE: this is an experiment with considering templates part of API definitions as well
+module CC.Scratchpad where
+
+import DA.Set (Set)
+import qualified DA.Set as Set
+
+
+
+-----------------------------------------------------------------------------------------------------------------------
+-- Infrastructure shared across all of upgrading
+-----------------------------------------------------------------------------------------------------------------------
+
+
+
+class HasController t c where
+  -- TODO No idea why controller is a keyword here.
+  controller' : t -> c -> [Party]
+
+
+
+
+
+
+
+-----------------------------------------------------------------------------------------------------------------------
+-- Data Templates
+-----------------------------------------------------------------------------------------------------------------------
+
+
+template CoinData
+  with
+    svc : Party
+    owner : Party
+    quantity : ExpiringQuantity
+  where
+    signatory svc, owner
+
+    implements Coin where
+      coin_View = this
+
+
+-- | A lock held by a particular party until its expiry.
+data TimeLock = TimeLock
+  with
+    holder: Party
+    expiresAt: Time
+  deriving (Eq, Show)
+
+template LockedCoinData
+  with
+    coin : CoinData
+    lock : TimeLock
+  where
+    signatory signatory coin, lock.holder
+
+    implements LockedCoin where
+      lockedCoin_View = this
+
+
+
+-- | Configuration determining the fees and limits for CC transfers granted by
+-- the CoinRules.
+--
+-- See CC.Scripts.Parameters for concrete values.
+-- TODO maybe split this out into a pure data template.
+data CoinConfig = CoinConfig with
+    -- | Fee to create a new coin.
+    createFee : FixedFee
+    -- | Fee to update an existing coin.
+    updateFee : FixedFee
+    -- | Fee for keeping a coin around.
+    holdingFee : RatePerRound
+    -- | Fee for transferring some quantity of coin to a new owner.
+    transferFee : SteppedRate
+    coinsIssuedPerRound : Decimal
+        -- | The minimal quantity of burn for which a receipt is issued.
+    minRewardQuantity : Decimal
+    svcIssuanceRatio : Decimal
+    -- | Maximum number of batch inputs for a transfer.
+    maxNumInputs : Int
+    -- | Maximum number of batch outputs for a transfer.
+    maxNumOutputs : Int
+    -- | Maximum length of the payload message on a transfer.
+    maxPayloadLength : Int
+  deriving (Eq, Ord, Show)
+
+template CoinRulesData
+  with
+    svc : Party
+    config : CoinConfig
+  where
+    signatory svc
+
+
+
+-----------------------------------------------------------------------------------------------------------------------
+-- Choices
+-----------------------------------------------------------------------------------------------------------------------
+
+
+
+-- Infrastructure
+-- ==============
+
+-- TODO: interface ApiImplementation
+
+
+-- Coin Rules
+-- ==========
+
+
+-- Interfaces
+-------------
+
+template CoinRulesKey
+  with
+    svc : Party
+    cid : ContractId CoinRules
+  where
+    signatory svc
+    key svc : Party
+    maintainer key
+    -- Fetch for non-stakeholders. We accept multiple parties to avoid
+    -- having to make an arbitrary choice for the party that fetches.
+    nonconsuming choice CoinRulesKey_Fetch : CoinRulesKey
+      with
+        ps : [Party]
+      controller ps
+      do pure this
+
+exerciseCoinRulesByKey : (HasExercise CoinRules c r, IsParties p, Show c) => Party -> p -> c -> Update r
+exerciseCoinRulesByKey svc actors c = do
+  rulesKey <- exerciseByKey @CoinRulesKey svc (CoinRulesKey_Fetch (toParties actors))
+  exercise rulesKey.cid c
+
+interface CoinRules
+  where
+    getSvc : Party
+
+    coinRules_Transfer_impl : ContractId CoinRules -> CoinRules_Transfer -> Update [TransferResult]
+
+    coinRules_LockedCoin_Unlock_impl : ContractId LockedCoin -> LockedCoinData -> LockedCoin_Unlock -> Update (ContractId Coin)
+    coinRules_LockedCoin_OwnerExpireLock_impl : ContractId LockedCoin -> LockedCoinData -> LockedCoin_OwnerExpireLock -> Update (ContractId Coin)
+
+    coinRules_ValidatorReward_ArchiveAsValidator_impl : ContractId ValidatorReward -> ValidatorRewardView -> ValidatorReward_ArchiveAsValidator -> Update ()
+    coinRules_ValidatorReward_SvcExpire_impl : ContractId ValidatorReward -> ValidatorRewardView -> ValidatorReward_SvcExpire -> Update ()
+
+    coinRules_AppReward_SvcExpire_impl : ContractId AppReward -> AppRewardView -> AppReward_SvcExpire -> Update ()
+
+    ensure (signatory this == [getSvc this])
+
+    nonconsuming choice CoinRules_Transfer : [TransferResult]
+      with
+        transfer : Transfer
+      controller transferControllers transfer
+      do coinRules_Transfer_impl this self arg
+
+    nonconsuming choice CoinRules_LockedCoin_Unlock : ContractId Coin
+      with
+        cid : ContractId LockedCoin
+        view : LockedCoinData
+        dataArg : LockedCoin_Unlock
+      controller signatory view, controller' view dataArg
+      do coinRules_LockedCoin_Unlock_impl this cid view dataArg
+
+    nonconsuming choice CoinRules_LockedCoin_OwnerExpireLock : ContractId Coin
+      with
+        cid : ContractId LockedCoin
+        view : LockedCoinData
+        dataArg : LockedCoin_OwnerExpireLock
+      controller signatory view, controller' view dataArg
+      do coinRules_LockedCoin_OwnerExpireLock_impl this cid view dataArg
+
+    nonconsuming choice CoinRules_ValidatorReward_ArchiveAsValidator : ()
+      with
+        cid : ContractId ValidatorReward
+        view : ValidatorRewardView
+        dataArg : ValidatorReward_ArchiveAsValidator
+      controller signatory view, controller' view dataArg
+      do coinRules_ValidatorReward_ArchiveAsValidator_impl this cid view dataArg
+
+    nonconsuming choice CoinRules_ValidatorReward_SvcExpire : ()
+      with
+        cid : ContractId ValidatorReward
+        view : ValidatorRewardView
+        dataArg : ValidatorReward_SvcExpire
+      controller signatory view, controller' view dataArg
+      do coinRules_ValidatorReward_SvcExpire_impl this cid view dataArg
+
+    nonconsuming choice CoinRules_AppReward_SvcExpire : ()
+      with
+        cid : ContractId AppReward
+        view : AppRewardView
+        dataArg : AppReward_SvcExpire
+      controller signatory view, controller' view dataArg
+      do coinRules_AppReward_SvcExpire_impl this cid view dataArg
+
+
+-- Data
+-------
+
+-- | Representation of a batch transfer.
+data Transfer = Transfer with
+    sender : Party
+    inputs : [TransferInput]
+    outputs : [TransferOutput]
+    payload : Text
+  deriving (Eq, Show)
+
+-- | An individual input for a batch transfer.
+data TransferInput
+  = InputCoin (ContractId Coin)
+  | InputAppReward (ContractId AppReward)
+  | InputValidatorReward (ContractId ValidatorReward)
+  deriving (Eq, Show)
+
+-- | An individual output for a batch transfer.
+data TransferOutput
+  = OutputSenderCoin with
+      -- | The quantity desired for this coin. If not set, then it will receive
+      -- a portion of the remainin input quantity.
+      exactQuantity : Optional Decimal
+      -- | The lock to be added.
+      lock : Optional TimeLock
+  | OutputReceiverCoin with
+      receiver : Party
+      coinType: ReceiverCoinType
+  deriving (Eq, Show)
+
+data ReceiverCoinType
+  = -- | Receiver coin with fixed quantity
+    FixedReceiverCoin with
+      quantity : Decimal
+      -- | The ratio of the transfer fee attributed to the sender. Must be between 0.0 and 1.0.
+      -- 0.0 means the receiver pays the transfer fee, 1.0 means the sender pays it.
+      senderTransferFeeRatio : Decimal
+  | -- | The equivalent of an OutputSenderCoin with exactQuantity = None. All transfer fees
+    -- are payed by the receiver.
+  FloatingReceiverCoin
+  deriving (Eq, Ord, Show)
+
+-- Transfer logic
+-- ==============
+
+-- | The controllers for a transfer.
+transferControllers : Transfer -> Set Party
+transferControllers t =
+    foldl addOutputController (Set.singleton t.sender) t.outputs
+  where
+    addOutputController s (OutputSenderCoin with lock; ..) = optional s (`Set.insert` s) (holder <$> lock)
+    addOutputController s (OutputReceiverCoin with receiver; ..) = Set.insert receiver s
+
+-- | Contracts created during a transfer and
+-- returned as choice results.
+data TransferResult
+  = TransferResultCoin (ContractId Coin)
+  | TransferResultLockedCoin (ContractId LockedCoin)
+  deriving (Show, Eq, Ord)
+
+
+-- Coin and Locked Coin contracts
+-- ==============================
+
+
+-- Interfaces
+--------------
+
+interface Coin where
+  coin_View : CoinData
+
+  choice Coin_Archive : ()
+    controller signatory this
+    do pure ()
+
+interface LockedCoin where
+  lockedCoin_View : LockedCoinData
+
+  nonconsuming choice LockedCoin_Unlock : ContractId Coin
+    controller (lockedCoin_View this).lock.holder
+    do
+      exerciseCoinRulesByKey
+        (lockedCoin_View this).coin.svc
+        (signatory this)
+        (CoinRules_LockedCoin_Unlock self (lockedCoin_View this) arg)
+
+  nonconsuming choice LockedCoin_OwnerExpireLock : ContractId Coin
+    controller (lockedCoin_View this).coin.owner
+    do
+      exerciseCoinRulesByKey
+        (lockedCoin_View this).coin.svc
+        (signatory this)
+        (CoinRules_LockedCoin_OwnerExpireLock self (lockedCoin_View this) arg)
+
+  choice LockedCoin_Archive : ()
+    controller signatory this
+    do pure ()
+
+instance HasController LockedCoinData LockedCoin_Unlock where
+  controller' view _arg = [view.lock.holder]
+
+instance HasController LockedCoinData LockedCoin_OwnerExpireLock where
+  controller' view _arg = [view.coin.owner]
+
+
+
+
+
+
+-- Validator Rights
+-- ================
+
+interface ValidatorRight where
+  validatorRight_View : ValidatorRightView
+
+data ValidatorRightView = ValidatorRightView
+  with
+    svc : Party
+    user : Party
+    validator : Party
+  deriving (Show, Eq)
+
+instance HasSignatory ValidatorRightView where
+  signatory view = [view.user, view.validator]
+
+
+-- App Rewards
+-- ===========
+
+interface AppReward where
+  appReward_View : AppRewardView
+
+  nonconsuming choice AppReward_SvcExpire : ()
+    with
+      miningRoundCid : ContractId ClosedMiningRound
+    controller (appReward_View this).svc
+    do
+      exerciseCoinRulesByKey
+        (appReward_View this).svc
+        (signatory this)
+        (CoinRules_AppReward_SvcExpire self (appReward_View this) arg)
+
+
+  choice AppReward_Archive : ()
+    controller signatory this
+    do pure ()
+
+instance HasController AppRewardView AppReward_SvcExpire where
+  controller' view _arg = [view.svc]
+
+
+data AppRewardView = AppRewardView
+  with
+    svc : Party
+    owner : Party
+    quantity : Decimal
+    round : Round
+  deriving (Show, Eq)
+
+instance HasSignatory AppRewardView where
+  signatory view = [view.svc, view.owner]
+
+
+-- Validator Rewards
+-- =================
+
+-- Interfaces
+-------------
+
+interface ValidatorReward where
+  -- REVIEW (SM): should we enforce that the signatories of the view are a subset of the signatories of the template?
+  validatorReward_View : ValidatorRewardView
+
+  nonconsuming choice ValidatorReward_ArchiveAsValidator : ()
+    with
+      validator : Party
+      rightCid : ContractId ValidatorRight
+    controller validator
+    do
+      exerciseCoinRulesByKey
+        (validatorReward_View this).svc
+        (signatory this)
+        (CoinRules_ValidatorReward_ArchiveAsValidator self (validatorReward_View this) arg)
+
+  nonconsuming choice ValidatorReward_SvcExpire: ()
+    with
+      miningRoundCid : ContractId ClosedMiningRound
+    controller (validatorReward_View this).svc
+    do
+      exerciseCoinRulesByKey
+        (validatorReward_View this).svc
+        (signatory this)
+        (CoinRules_ValidatorReward_SvcExpire self (validatorReward_View this) arg)
+
+  -- REVIEW (SM): Food for thought:
+  -- Wat's the argoument for why don't we use an indirection via the coinrules here?
+  -- What are the pros and cons of introducing a shared Archivable interface?
+  choice ValidatorReward_Archive : ()
+    controller signatory this
+    do pure ()
+
+instance HasController ValidatorRewardView ValidatorReward_ArchiveAsValidator where
+  controller' view arg = [arg.validator]
+
+instance HasController ValidatorRewardView ValidatorReward_SvcExpire where
+  controller' view _arg = [view.svc]
+
+
+-- Data
+-------
+
+
+data ValidatorRewardView = ValidatorRewardView
+  with
+    svc : Party
+    user : Party
+    quantity : Decimal
+    round : Round
+  deriving (Show, Eq)
+
+instance HasSignatory ValidatorRewardView where
+  signatory view = [view.svc, view.user]
+
+
+
+
+-- Mining rounds
+-- =============
+
+-- Interfaces
+-------------
+
+-- REVIEW (SM): why is there no archive choice here?
+interface OpenMiningRound where
+  openMiningRound_View : OpenMiningRoundView
+
+interface ClosingMiningRound where
+  closingMiningRound_View : ClosingMiningRoundView
+
+interface IssuingMiningRound where
+  issuingMiningRound_View : IssuingMiningRoundView
+
+interface ClosedMiningRound where
+  closedMiningRound_View : ClosedMiningRoundView
+
+
+-- Data
+-------
+
+
+
+newtype Round = Round with number : Int
+  deriving (Eq, Ord, Show)
+
+-- | The equivalent of RelTime for rounds, i.e., a delta between
+-- two rounds
+newtype RelRound = RelRound with diff : Int
+  deriving (Eq, Ord, Show)
+
+data OpenMiningRoundView = OpenMiningRoundView
+  with
+    svc : Party
+    round : Round
+    coinPrice : Decimal
+  deriving (Eq, Show)
+
+instance HasSignatory OpenMiningRoundView where
+  signatory view = [view.svc]
+
+data ClosingMiningRoundView = ClosingMiningRoundView
+  with
+    svc : Party
+    round : Round
+  deriving (Eq, Show)
+
+instance HasSignatory ClosingMiningRoundView where
+  signatory view = [view.svc]
+
+data IssuingMiningRoundView = IssuingMiningRoundView
+  with
+    svc : Party
+    round : Round
+    issuancePerCoin : Decimal
+  deriving (Eq, Show)
+
+instance HasSignatory IssuingMiningRoundView where
+  signatory view = [view.svc]
+
+data ClosedMiningRoundView = ClosedMiningRoundView
+  with
+    svc : Party
+    round : Round
+  deriving (Eq, Show)
+
+instance HasSignatory ClosedMiningRoundView where
+  signatory view = [view.svc]
+
+
+-- Rates per mining round
+-------------------------
+
+newtype RatePerRound = RatePerRound with rate : Decimal
+  deriving (Eq, Ord, Show)
+
+-- Fixed and variable rates
+---------------------------
+
+-- | A fixed fee independent of the action being taken.
+newtype FixedFee = FixedFee with fee : Decimal
+  deriving (Eq, Ord, Show)
+
+-- | A rate defined as a piecewise linear function, e.g.,
+-- `SteppedRate 0.01 [(100.0, 0.001), (1000.0, 0.0001), (1000000, 0.00001)]
+-- corresponds to 1% of the first 100, 0.1% of the next 1000 and 0.01% of the next 1000000
+-- and 0.001% for everything above that.
+data SteppedRate = SteppedRate
+  with
+    initialRate : Decimal
+    steps : [(Decimal, Decimal)]
+  deriving (Eq, Ord, Show)
+
+-- ExpiringQuantity
+-------------------
+
+data ExpiringQuantity = ExpiringQuantity with
+    initialQuantity : Decimal
+    createdAt : Round
+    ratePerRound : RatePerRound
+  deriving (Eq, Ord, Show)

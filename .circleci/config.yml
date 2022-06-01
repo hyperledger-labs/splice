@@ -50,14 +50,14 @@ jobs:
          command: |
            set -euo pipefail
            export PATH=$HOME/.daml/bin:$PATH
-           cd experiments/upgrading
+           cd experiments/upgrading/approach1
            make all
       - run:
          name: make test
          command: |
            set -euo pipefail
            export PATH=$HOME/.daml/bin:$PATH
-           cd experiments/upgrading
+           cd experiments/upgrading/approach1
            make test
   pay_with_cc:
     docker:

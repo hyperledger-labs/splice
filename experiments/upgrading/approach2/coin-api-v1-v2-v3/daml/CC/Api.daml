@@ -1,0 +1,452 @@
+-- A single module defining three consecutively evolved versions of the CC API.
+--
+-- FEATURE GAP (Retroactive instances): we do not plan to use a single module going forward.
+-- However we currently need to due to a lack of retroactive instances. The module structure
+-- is inlined into the names using V1_, V2_, and V3_ prefixes.
+module CC.Api where
+
+import DA.Assert
+import DA.Set (Set)
+import qualified DA.Set as Set
+
+
+
+-----------------------------------------------------------------------------------------------------------------------
+-- Infrastructure shared across all of upgrading
+-----------------------------------------------------------------------------------------------------------------------
+
+
+
+class HasController t c where
+  -- TODO No idea why controller is a keyword here.
+  controller' : t -> c -> [Party]
+
+
+
+-----------------------------------------------------------------------------------------------------------------------
+-- Implementation pointer for CC.Api
+-----------------------------------------------------------------------------------------------------------------------
+
+interface AnyImplementation where
+
+template ImplementationPointer with
+    provider : Party   -- the party providing the concrete implementation
+    implementation : ContractId AnyImplementation
+  where
+    signatory provider
+
+    key provider : Party
+    maintainer key
+
+    -- Implementation resolution for non-stakeholders. We accept multiple parties to avoid
+    -- having to make an arbitrary choice for the party that fetches.
+    -- We expect the ImplementationPointer to be explicitly disclosed by the implementation provider.
+    nonconsuming choice ImplementationPointer_Resolve : ContractId AnyImplementation
+      with
+        resolvers : [Party]
+      controller resolvers
+      do pure implementation
+
+
+
+-----------------------------------------------------------------------------------------------------------------------
+-- V1: Coins w/o locking, w/o expiry, w/o round management
+-----------------------------------------------------------------------------------------------------------------------
+
+-- Note: we would expect the V1 to be a module name once we have support for retroactive instance and we
+-- can split this module into multiple ones.
+
+-- Coins
+---------
+
+template V1_CoinData
+  with
+    svc : Party
+    owner : Party
+    quantity : Decimal
+  where
+    signatory svc, owner
+
+    implements V1_Coin where
+      getV1_CoinData = this
+
+
+    -- FEATURE GAP: retroactive instances so that this instance could be added
+    -- as part of the V2 API code
+
+    -- A V1_CoinData is like a V2_Coin with no holding fees.
+    implements V2_Coin where
+      getV2_CoinData = V2_CoinData with
+        svc
+        owner
+        quantity = ExpiringQuantity with
+          initialQuantity = quantity
+          createdAt = Round 0
+          ratePerRound = RatePerRound 0.0
+
+      v2_Coin_Expire_impl = error "TODO: implement indirection via V2_Implementation"
+
+
+
+
+interface V1_Coin where
+  getV1_CoinData : V1_CoinData
+
+  -- FEATURE GAP: making all interfaces archivable
+  choice V1_Coin_Archive : ()
+    controller signatory this
+    do pure ()
+
+
+-- Coin rules
+-------------
+
+
+-- | A fixed fee independent of the action being taken.
+newtype FixedFee = FixedFee with fee : Decimal
+  deriving (Eq, Ord, Show)
+
+-- | A rate defined as a piecewise linear function, e.g.,
+-- `SteppedRate 0.01 [(100.0, 0.001), (1000.0, 0.0001), (1000000, 0.00001)]
+-- corresponds to 1% of the first 100, 0.1% of the next 1000 and 0.01% of the next 1000000
+-- and 0.001% for everything above that.
+data SteppedRate = SteppedRate
+  with
+    initialRate : Decimal
+    steps : [(Decimal, Decimal)]
+  deriving (Eq, Ord, Show)
+
+-- | Configuration determining the fees and limits for CC transfers granted by
+-- the CoinRules.
+data V1_CoinConfig = V1_CoinConfig with
+    -- | Fee to create a new coin.
+    createFee : FixedFee
+    -- | Fee to update an existing coin.
+    updateFee : FixedFee
+    -- | Fee for transferring some quantity of coin to a new owner.
+    transferFee : SteppedRate
+    -- | Maximum number of batch inputs for a transfer.
+    maxNumInputs : Int
+    -- | Maximum number of batch outputs for a transfer.
+    maxNumOutputs : Int
+    -- | Maximum length of the payload message on a transfer.
+    maxPayloadLength : Int
+  deriving (Eq, Ord, Show)
+
+template V1_CoinRulesData
+  with
+    svc : Party
+    config : V1_CoinConfig
+  where
+    signatory svc
+
+    implements V1_CoinRules where
+        getV1_CoinRulesData = this
+
+        -- NOTE: this is just a fancy redirection to the Implementation_V1
+        -- contract's actual choice of a body.
+        v1_coinRules_Transfer_impl self choiceArg = do
+          let contract = this
+          let cid = fromInterfaceContractId self
+          callV1_Implementation @V1_CoinRulesData_V1_CoinRules_Transfer
+            this.svc
+            (signatory this)
+            V1_CoinRulesData_V1_CoinRules_Transfer with
+              cid
+              contract
+              choiceArg
+
+    -- FEATURE GAP: retroactive instance to declare this as part of V2
+    implements V2_CoinRules where
+      getV2_CoinRulesData = V2_CoinRulesData with
+        svc
+        config = V2_CoinConfig with
+          v1 = config
+          holdingFee = RatePerRound 0.0
+
+
+-- Transfer specifications
+--------------------------
+
+-- | Representation of a batch transfer.
+data V1_Transfer = V1_Transfer with
+    sender : Party
+    inputs : [V1_TransferInput]
+    outputs : [V1_TransferOutput]
+    payload : Text
+  deriving (Eq, Show)
+
+type V1_TransferInput = ContractId V1_Coin
+
+-- | An individual output for a batch transfer.
+data V1_TransferOutput
+  = V1_OutputSenderCoin with
+      -- | The quantity desired for this coin. If not set, then it will receive
+      -- a portion of the remainin input quantity.
+      exactQuantity : Optional Decimal
+  | V1_OutputReceiverCoin with
+      receiver : Party
+      coinType: V1_ReceiverCoinType
+  deriving (Eq, Show)
+
+data V1_ReceiverCoinType
+  = -- | Receiver coin with fixed quantity
+    V1_FixedReceiverCoin with
+      quantity : Decimal
+  | -- | The equivalent of an OutputSenderCoin with exactQuantity = None. All transfer fees
+    -- are payed by the receiver.
+  V2_FloatingReceiverCoin
+  deriving (Eq, Ord, Show)
+
+-- | The controllers for a transfer.
+v1_transferControllers : V1_Transfer -> Set Party
+v1_transferControllers t =
+    foldl addOutputController (Set.singleton t.sender) t.outputs
+  where
+    addOutputController s (V1_OutputSenderCoin with ..) = s  -- NOTE: no controller
+    addOutputController s (V1_OutputReceiverCoin with receiver; ..) = Set.insert receiver s
+
+-- | Contracts created during a transfer and
+-- returned as choice results.
+type V1_TransferResult = ContractId V1_Coin
+
+interface V1_CoinRules
+  where
+    getV1_CoinRulesData : V1_CoinRulesData
+
+    v1_coinRules_Transfer_impl : ContractId V1_CoinRules -> V1_CoinRules_Transfer -> Update [V1_TransferResult]
+
+    -- FIXME: could we declare this as an 'abstract' choice to inform
+    -- the compiler about the necessary redirections?
+    nonconsuming choice V1_CoinRules_Transfer : [V1_TransferResult]
+      with
+        transfer : V1_Transfer
+      controller v1_transferControllers transfer
+      do v1_coinRules_Transfer_impl this self arg
+
+instance HasController V1_CoinRulesData V1_CoinRules_Transfer where
+  controller' _contract choiceArg = Set.toList $ v1_transferControllers choiceArg.transfer
+
+
+
+-- Api implementation
+---------------------
+
+interface V1_Implementation requires AnyImplementation where
+
+    -- FIXME: do we really want to have these generic creates? The alternative is to always create data
+    -- template instances directly; and exclusively use upgrade-on-read.
+    v1_Create_Coin_impl : V1_CoinData -> Update (ContractId V1_Coin)
+
+    v1_Create_CoinRules_impl : V1_CoinRulesData -> Update (ContractId V1_CoinRules)
+
+    v1_CoinRulesData_V1_CoinRules_Transfer_impl : ContractId V1_CoinRulesData -> V1_CoinRules_Transfer -> Update [V1_TransferResult]
+
+
+    nonconsuming choice V1_Create_Coin : ContractId V1_Coin
+      with
+        coinData : V1_CoinData
+      controller signatory coinData
+      do -- FEATURE GAP: restrict authority to 'signatory coinData' to avoid accidentally leaking
+         -- the authority of the implementation maintainer into the implementation of the method.
+         v1_Create_Coin_impl this coinData
+
+    nonconsuming choice V1_Create_CoinRules : ContractId V1_CoinRules
+      with
+        coinRulesData : V1_CoinRulesData
+      controller signatory coinRulesData
+      do -- FEATURE GAP: restrict authority to 'signatory coinRulesData' to avoid accidentally leaking
+         -- the authority of the implementation maintainer into the implementation of the method.
+         v1_Create_CoinRules_impl this coinRulesData
+
+    nonconsuming choice V1_CoinRulesData_V1_CoinRules_Transfer : [V1_TransferResult]
+      with
+        cid  : ContractId V1_CoinRulesData
+        contract : V1_CoinRulesData
+        choiceArg : V1_CoinRules_Transfer
+      controller signatory contract, controller' contract choiceArg
+      do -- FEATURE GAP: get rid of this wasteful rechecking of contract arguments
+         contract' <- fetch cid
+         contract === contract'
+         v1_CoinRulesData_V1_CoinRules_Transfer_impl this cid choiceArg
+
+
+-- Convenience method to call an implementation provider's actual body of an abstract choice implementation.
+callV1_Implementation : forall c r ps. (HasExercise V1_Implementation c r, IsParties ps, Show c) => Party -> ps -> c -> Update r
+callV1_Implementation implProvider actors c = do
+  implCid0 <- exerciseByKey @ImplementationPointer implProvider (ImplementationPointer_Resolve (toParties actors))
+  let implCid : ContractId V1_Implementation = fromInterfaceContractId implCid0
+  exercise implCid c
+
+
+-----------------------------------------------------------------------------------------------------------------------
+-- V2: add support for round-based holding fees and expiry
+-----------------------------------------------------------------------------------------------------------------------
+
+-- Open mining rounds
+---------------------
+
+newtype Round = Round with number : Int
+  deriving (Eq, Ord, Show)
+
+template V2_OpenMiningRoundData with
+    svc : Party
+    round : Round
+  where
+    signatory svc
+
+    implements V2_OpenMiningRound where
+      getV2_OpenMiningRoundData = this
+
+interface V2_OpenMiningRound where
+  getV2_OpenMiningRoundData : V2_OpenMiningRoundData
+
+
+
+-- Coin
+-------
+
+
+newtype RatePerRound = RatePerRound with rate : Decimal
+  deriving (Eq, Ord, Show)
+
+data ExpiringQuantity = ExpiringQuantity with
+    initialQuantity : Decimal
+    createdAt : Round
+    ratePerRound : RatePerRound
+  deriving (Eq, Ord, Show)
+
+
+template V2_CoinData
+  with
+    svc : Party
+    owner : Party
+    quantity : ExpiringQuantity
+  where
+    signatory svc, owner
+
+    -- Note that the V1_CoinData view is not 100% faithful, as it does
+    -- not not account for the holding fees as of the time that the
+    -- read is executed. We believe this to be the better option compared
+    -- to not supporting V1_Coin reads.
+    implements V1_Coin where
+      getV1_CoinData = V1_CoinData with
+        svc
+        owner
+        quantity = quantity.initialQuantity
+
+    implements V2_Coin where
+      getV2_CoinData = this
+
+      v2_Coin_Expire_impl = error "TODO"
+
+
+interface V2_Coin where
+  getV2_CoinData : V2_CoinData
+
+  v2_Coin_Expire_impl : ContractId V2_Coin -> V2_Coin_Expire -> Update ()
+
+  -- FEATURE GAP: making all interfaces archivable
+  choice V2_Coin_Archive : ()
+    controller signatory this
+    do pure ()
+
+  nonconsuming choice V2_Coin_Expire : ()
+    with
+      actor : Party
+      roundCid : ContractId V2_OpenMiningRound
+    controller actor
+    -- implementation provider (getV2_CoinData this).svc
+    do v2_Coin_Expire_impl this self arg
+
+
+-- Coin rules
+-------------
+
+-- | Configuration determining the fees and limits for CC transfers granted by
+-- the CoinRules.
+data V2_CoinConfig = V2_CoinConfig with
+    -- | Fields from previous config.
+    v1 : V1_CoinConfig
+    -- | Fee for keeping a coin around.
+    holdingFee : RatePerRound
+  deriving (Eq, Ord, Show)
+
+template V2_CoinRulesData
+  with
+    svc : Party
+    config : V2_CoinConfig
+  where
+    signatory svc
+
+    implements V1_CoinRules where
+      getV1_CoinRulesData = V1_CoinRulesData with
+        svc
+        config = config.v1
+
+      -- NOTE: this is just a fancy redirection to the Implementation_V1
+      -- contract's actual choice of a body.
+      v1_coinRules_Transfer_impl self choiceArg = do
+        let contract = this
+        let cid = fromInterfaceContractId self
+        callV2_Implementation @V2_CoinRulesData_V1_CoinRules_Transfer
+          this.svc
+          (signatory this)
+          V2_CoinRulesData_V1_CoinRules_Transfer with
+            cid
+            contract
+            choiceArg
+
+    implements V2_CoinRules where
+      getV2_CoinRulesData = this
+
+interface V2_CoinRules where
+    getV2_CoinRulesData : V2_CoinRulesData
+
+instance HasController V2_CoinRulesData V1_CoinRules_Transfer where
+  controller' _contract choiceArg = Set.toList $ v1_transferControllers choiceArg.transfer
+
+
+-- Api Implementation
+---------------------
+
+interface V2_Implementation requires V1_Implementation, AnyImplementation where
+    v2_CoinRulesData_V1_CoinRules_Transfer_impl : ContractId V2_CoinRulesData -> V1_CoinRules_Transfer -> Update [V1_TransferResult]
+
+    nonconsuming choice V2_CoinRulesData_V1_CoinRules_Transfer : [V1_TransferResult]
+      with
+        cid  : ContractId V2_CoinRulesData
+        contract : V2_CoinRulesData
+        choiceArg : V1_CoinRules_Transfer
+      controller signatory contract, controller' contract choiceArg
+      do -- FEATURE GAP: get rid of this wasteful rechecking of contract arguments
+         contract' <- fetch cid
+         contract === contract'
+         v2_CoinRulesData_V1_CoinRules_Transfer_impl this cid choiceArg
+
+    -- TODO: add choice for V1_CoinData_V2_Coin_Expire
+
+    -- TODO: add choice for V2_CoinData_V2_Coin_Expire
+
+-- Convenience method to call an implementation provider's actual body of an abstract choice implementation.
+callV2_Implementation : forall c r ps. (HasExercise V2_Implementation c r, IsParties ps, Show c) => Party -> ps -> c -> Update r
+callV2_Implementation implProvider actors c = do
+  implCid0 <- exerciseByKey @ImplementationPointer implProvider (ImplementationPointer_Resolve (toParties actors))
+  let implCid : ContractId V2_Implementation = fromInterfaceContractId implCid0
+  exercise implCid c
+
+
+-----------------------------------------------------------------------------------------------------------------------
+-- V3: Add locking support
+-----------------------------------------------------------------------------------------------------------------------
+
+template LockedCoinData
+  with
+    svc : Party
+    owner : Party
+    quantity : ExpiringQuantity
+  where
+    signatory svc, owner
+
+    -- implements Coin where
+      -- coin_View = this

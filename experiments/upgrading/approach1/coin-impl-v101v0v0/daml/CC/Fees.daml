@@ -1,0 +1,102 @@
+-- | Utility functions for different kinds of fees.
+module CC.Fees where
+
+import DA.Time
+
+import CC.Round
+import CC.Api.V2_1
+
+-- Time utilities
+-----------------
+
+relTimeToMicros : RelTime -> Decimal
+relTimeToMicros dt = intToDecimal (convertRelTimeToMicroseconds dt)
+
+microsPerDay : Decimal
+microsPerDay = relTimeToMicros (days 1)
+
+relTimeToDays : RelTime -> Decimal
+relTimeToDays dt = relTimeToMicros dt / microsPerDay
+
+daysToRelTime : Decimal -> RelTime
+daysToRelTime d = convertMicrosecondsToRelTime $ ceiling $ d * microsPerDay
+
+
+-- Rates per mining round
+-------------------------
+
+chargeRatePerRound : RatePerRound -> RelRound -> Decimal
+chargeRatePerRound rate dt = rate.rate * intToDecimal dt.diff
+
+-- | TODO: better name
+spentWithRatePerRound : RatePerRound -> Decimal -> RelRound
+spentWithRatePerRound rate quantity =  RelRound (ceiling $ quantity / rate.rate)
+
+-- | Scale a round rate such that
+--
+-- ALL s r dt. s * chargeRatePerRound r dt = chargeRatePerRound (s `scaleRatePerRound` r) dt
+--
+scaleRatePerRound : Decimal -> RatePerRound -> RatePerRound
+scaleRatePerRound s r = RatePerRound with rate = s * r.rate
+
+
+-- Fixed and variable rates
+---------------------------
+
+scaleFixedFee : Decimal -> FixedFee -> FixedFee
+scaleFixedFee s f = FixedFee with fee = s * f.fee
+
+validSteppedRate : SteppedRate -> Bool
+validSteppedRate SteppedRate{initialRate, steps} =
+  validRate initialRate &&
+  all (\(step, rate) -> 0.0 < step && validRate rate) steps && not (null steps)
+  where
+    validRate : Decimal -> Bool
+    validRate r = 0.0 <= r && r <= 1.0
+
+chargeSteppedRate : SteppedRate -> Decimal -> Decimal
+chargeSteppedRate SteppedRate{initialRate, steps} quantity =
+  goChargeSteppedRate (quantity, initialRate, 0.0) steps
+
+goChargeSteppedRate : (Decimal, Decimal, Decimal) -> [(Decimal, Decimal)] -> Decimal
+goChargeSteppedRate (remainder, currentRate, rate) _
+  | remainder <= 0.0 = rate
+goChargeSteppedRate (remainder, currentRate, rate) [] = rate + remainder * currentRate
+goChargeSteppedRate (remainder, currentRate, rate) ((step, steppedRate) :: steps) =
+  let remainder' = remainder - step
+      rate' = min remainder step * currentRate + rate
+  in goChargeSteppedRate (remainder', steppedRate, rate') steps
+
+-- | Scale a fixed-plus-variable rate such that
+--
+-- ALL s r q. s * chargeSteppedRate r (q/s) = chargeSteppedRate (s `scaleSteppedRate` r) q
+--
+scaleSteppedRate : Decimal -> SteppedRate -> SteppedRate
+scaleSteppedRate s r =
+  SteppedRate with
+    initialRate = r.initialRate * s
+    steps = map (\(step, rate) -> (step, rate * s)) $ r.steps
+
+-- Expiring quantities
+----------------------
+
+-- TODO This does not handle time overflows.
+quantityExpiresAt : ExpiringQuantity -> Round
+quantityExpiresAt e = e.createdAt `addRelRound` spentWithRatePerRound e.ratePerRound e.initialQuantity
+
+validExpiringQuantity : ExpiringQuantity -> Bool
+validExpiringQuantity e = e.initialQuantity > 0.0
+
+actualQuantity : Round -> ExpiringQuantity -> Decimal
+actualQuantity t e
+  | e.ratePerRound.rate <= 0.0 = error $ "Round rate must be positive: " <> show e.ratePerRound.rate
+  | t <= e.createdAt = e.initialQuantity
+  | otherwise =
+      let roundsPassed = t `subRound` e.createdAt
+      in
+        max 0.0 (e.initialQuantity - chargeRatePerRound e.ratePerRound roundsPassed)
+
+-- | Smart constructor for an expiring quantity.
+expiringQuantity : RatePerRound -> Decimal -> Round -> ExpiringQuantity
+expiringQuantity ratePerRound initialQuantity createdAt =
+  ExpiringQuantity with initialQuantity; createdAt; ratePerRound

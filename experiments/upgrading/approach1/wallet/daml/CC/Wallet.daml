@@ -1,0 +1,103 @@
+module CC.Wallet where
+
+import qualified CC.Api.V2_1 as CoinApi
+
+import DA.Action
+import DA.Time
+
+-- wrapper around exercise by key for CoinRules intended to be called via createAndExercise
+template TransferWrapper
+  with
+    p : Party
+    svc : Party
+  where
+    signatory p
+    choice ExerciseTransfer : [CoinApi.TransferResult]
+      with
+        transfer : CoinApi.Transfer
+      controller CoinApi.transferControllers transfer
+      do CoinApi.exerciseCoinRulesByKey svc (CoinApi.transferControllers transfer) (CoinApi.CoinRules_Transfer transfer)
+
+-- Defined by CC wallet
+interface PaymentReference
+  where
+    getDescription : Text
+
+-- Defined by CC wallet
+template PaymentRequest
+  with
+    svc : Party
+    provider : Party
+    user : Party
+    quantity : Decimal
+    collectionDuration : RelTime
+    expiresAt : Time
+    reference : ContractId PaymentReference
+    redirectUri : Text
+  where
+    signatory provider, user
+    ensure (collectionDuration > aunit && quantity > 0.0)
+
+    choice PaymentRequest_Approve : ContractId ApprovedPayment
+      with
+        coin : ContractId CoinApi.Coin
+      controller user
+      do now <- getTime
+         assertMsg "PaymentRequest has not expired" (now < expiresAt)
+         let transfer = CoinApi.Transfer with
+              sender = user
+              inputs = [CoinApi.InputCoin coin]
+              outputs =
+                [ CoinApi.OutputSenderCoin with
+                    exactQuantity = Some quantity
+                    lock = Some CoinApi.TimeLock with
+                      holder = provider
+                      expiresAt = now `addRelTime` collectionDuration
+                ]
+              payload = "lock payment"
+         [CoinApi.TransferResultLockedCoin lockedCoin] <-
+           CoinApi.exerciseCoinRulesByKey svc (CoinApi.transferControllers transfer) (CoinApi.CoinRules_Transfer transfer)
+         create ApprovedPayment
+           with
+             svc, provider, user, reference, lockedCoin
+
+    choice PaymentRequest_Retract : ()
+      controller provider
+      do pure ()
+
+    choice PaymentRequest_Reject : ()
+      controller user
+      do pure ()
+
+-- Defined by CC wallet
+template ApprovedPayment
+  with
+    svc : Party
+    provider : Party
+    user : Party
+    lockedCoin : ContractId CoinApi.LockedCoin
+    reference : ContractId PaymentReference
+  where
+    signatory provider, user
+
+    choice ApprovedPayment_Pay : ()
+      controller provider, user
+      do coin <- exercise lockedCoin CoinApi.LockedCoin_Unlock
+         let transfer = CoinApi.Transfer with
+               sender = user
+               inputs = [CoinApi.InputCoin coin]
+               outputs =
+                 [ CoinApi.OutputReceiverCoin with
+                     receiver = provider
+                     coinType = CoinApi.FloatingReceiverCoin
+                 ]
+               payload = "transfer locked payment"
+         void $ CoinApi.exerciseCoinRulesByKey svc (CoinApi.transferControllers transfer) (CoinApi.CoinRules_Transfer transfer)
+
+    choice ApprovedPayment_Expire : ContractId CoinApi.Coin
+      controller user
+      do exercise lockedCoin CoinApi.LockedCoin_OwnerExpireLock
+
+    choice ApprovedPayment_Discard : ContractId CoinApi.Coin
+      controller provider
+      do exercise lockedCoin CoinApi.LockedCoin_Unlock
