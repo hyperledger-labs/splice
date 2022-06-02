@@ -84,9 +84,14 @@ template V1_CoinData
           createdAt = Round 0
           ratePerRound = RatePerRound 0.0
 
-      v2_Coin_Expire_impl = error "TODO: implement indirection via V2_Implementation"
+      v2_Coin_Expire_impl self choiceArg = 
+        callV2_Implementation svc [owner] V1_CoinData_V2_Coin_Expire with
+          cid = fromInterfaceContractId self
+          contract = this
+          choiceArg
 
-
+instance HasController V1_CoinData V2_Coin_Expire where
+  controller' _ V2_Coin_Expire{actor} = pure actor
 
 
 interface V1_Coin where
@@ -338,8 +343,14 @@ template V2_CoinData
     implements V2_Coin where
       getV2_CoinData = this
 
-      v2_Coin_Expire_impl = error "TODO"
+      v2_Coin_Expire_impl self choiceArg = 
+        callV2_Implementation svc [owner] V2_CoinData_V2_Coin_Expire with
+          cid = fromInterfaceContractId self
+          contract = this
+          choiceArg
 
+instance HasController V2_CoinData V2_Coin_Expire where
+  controller' _ V2_Coin_Expire{actor} = pure actor
 
 interface V2_Coin where
   getV2_CoinData : V2_CoinData
@@ -358,7 +369,6 @@ interface V2_Coin where
     controller actor
     -- implementation provider (getV2_CoinData this).svc
     do v2_Coin_Expire_impl this self arg
-
 
 -- Coin rules
 -------------
@@ -412,6 +422,8 @@ instance HasController V2_CoinRulesData V1_CoinRules_Transfer where
 
 interface V2_Implementation requires V1_Implementation, AnyImplementation where
     v2_CoinRulesData_V1_CoinRules_Transfer_impl : ContractId V2_CoinRulesData -> V1_CoinRules_Transfer -> Update [V1_TransferResult]
+    v1_CoinData_V2_Coin_Expire_impl : ContractId V1_CoinData -> V1_CoinData -> V2_Coin_Expire -> Update ()
+    v2_CoinData_V2_Coin_Expire_impl : ContractId V2_CoinData -> V2_CoinData -> V2_Coin_Expire -> Update ()
 
     nonconsuming choice V2_CoinRulesData_V1_CoinRules_Transfer : [V1_TransferResult]
       with
@@ -424,9 +436,26 @@ interface V2_Implementation requires V1_Implementation, AnyImplementation where
          contract === contract'
          v2_CoinRulesData_V1_CoinRules_Transfer_impl this cid choiceArg
 
-    -- TODO: add choice for V1_CoinData_V2_Coin_Expire
+    nonconsuming choice V1_CoinData_V2_Coin_Expire : ()
+      with
+        cid : ContractId V1_CoinData
+        contract : V1_CoinData
+        choiceArg : V2_Coin_Expire
+      controller signatory contract, controller' contract choiceArg 
+      do contract' <- fetch cid
+         contract === contract'
+         v1_CoinData_V2_Coin_Expire_impl this cid contract choiceArg
 
-    -- TODO: add choice for V2_CoinData_V2_Coin_Expire
+    nonconsuming choice V2_CoinData_V2_Coin_Expire : ()
+      with
+        cid : ContractId V2_CoinData
+        contract : V2_CoinData
+        choiceArg : V2_Coin_Expire
+      controller signatory contract, controller' contract choiceArg
+      do contract' <- fetch cid
+         contract === contract'
+         v2_CoinData_V2_Coin_Expire_impl this cid contract choiceArg
+
 
 -- Convenience method to call an implementation provider's actual body of an abstract choice implementation.
 callV2_Implementation : forall c r ps. (HasExercise V2_Implementation c r, IsParties ps, Show c) => Party -> ps -> c -> Update r
