@@ -469,13 +469,194 @@ callV2_Implementation implProvider actors c = do
 -- V3: Add locking support
 -----------------------------------------------------------------------------------------------------------------------
 
-template LockedCoinData
+-- | A lock held by a particular party until its expiry.
+data TimeLock = TimeLock with
+    holder: Party
+    -- TODO: consider adding support for groups of lock holders.
+    expiresAt: Time
+  deriving (Eq, Ord, Show)
+
+template V3_LockedCoinData
+  with
+    coin : V2_CoinData
+    lock : TimeLock
+  where
+    signatory lock.holder, signatory coin
+
+    implements V3_LockedCoin where
+      getV3_LockedCoinData = this
+
+      v3_LockedCoin_Coin_Unlock_impl self = do
+        let contract = this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_LockedCoinData_Coin_Unlock
+          this.lock.holder -- don't think this is right
+          (signatory this)
+          V3_LockedCoinData_Coin_Unlock with
+            cid
+            contract
+        
+      v3_LockedCoin_Coin_OwnerExpireLock_impl self = do
+        let contract = this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_LockedCoinData_Coin_OwnerExpireLock
+          this.coin.owner
+          (signatory this)
+          V3_LockedCoinData_Coin_OwnerExpireLock with
+            cid
+            contract
+        
+      v3_LockedCoin_Coin_SvcExpireLock_impl self = do
+        let contract = this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_LockedCoinData_Coin_SvcExpireLock
+          this.coin.svc
+          (signatory this)
+          V3_LockedCoinData_Coin_SvcExpireLock with
+            cid
+            contract
+        
+interface V3_LockedCoin where
+  getV3_LockedCoinData : V3_LockedCoinData
+  v3_LockedCoin_Coin_Unlock_impl : ContractId V3_LockedCoin -> Update (ContractId V2_Coin)
+  v3_LockedCoin_Coin_OwnerExpireLock_impl : ContractId V3_LockedCoin -> Update (ContractId V2_Coin)
+  v3_LockedCoin_Coin_SvcExpireLock_impl : ContractId V3_LockedCoin -> Update (ContractId V2_Coin)
+
+  choice V3_LockedCoin_Coin_Unlock : ContractId V2_Coin
+    controller (getV3_LockedCoinData this).lock.holder
+    do
+      v3_LockedCoin_Coin_Unlock_impl this self
+
+  choice V3_LockedCoin_Coin_OwnerExpireLock : ContractId V2_Coin
+    controller (getV3_LockedCoinData this).coin.owner
+    do
+      v3_LockedCoin_Coin_OwnerExpireLock_impl this self
+
+  choice V3_LockedCoin_Coin_SvcExpireLock : ContractId V2_Coin
+    controller (getV3_LockedCoinData this).coin.svc
+    do
+      v3_LockedCoin_Coin_SvcExpireLock_impl this self
+
+-- | This differs from V1 in that outputs may include locks, which are also controllers of the choice.
+data V3_Transfer = V3_Transfer with
+    sender : Party
+    inputs : [V1_TransferInput]
+    outputs : [V3_TransferOutput]
+    payload : Text
+  deriving (Eq, Show)
+
+data V3_TransferResult
+  = V3_TransferResultCoin (ContractId V2_Coin)
+  | V3_TransferResultLockedCoin (ContractId V3_LockedCoin)
+  deriving (Show, Eq, Ord)
+
+-- | An individual output for a batch transfer.
+data V3_TransferOutput
+  = V3_OutputSenderCoin with
+      -- | The quantity desired for this coin. If not set, then it will receive
+      -- a portion of the remainin input quantity.
+      exactQuantity : Optional Decimal
+      -- | The lock to be added.
+      lock : Optional TimeLock
+  | V3_OutputReceiverCoin with
+      receiver : Party
+      coinType: V1_ReceiverCoinType
+  deriving (Eq, Ord, Show)
+
+template V3_CoinRulesData
   with
     svc : Party
-    owner : Party
-    quantity : ExpiringQuantity
+    config : V2_CoinConfig
   where
-    signatory svc, owner
+    signatory svc
 
-    -- implements Coin where
-      -- coin_View = this
+    implements V2_CoinRules where
+      getV2_CoinRulesData = V2_CoinRulesData with svc, config
+
+    implements V3_CoinRules where
+      getV3_CoinRulesData = this
+      v3_CoinRules_Transfer_impl self choiceArg = do
+        let contract = this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_CoinRulesData_V3_CoinRules_Transfer
+          this.svc
+          (signatory this)
+          V3_CoinRulesData_V3_CoinRules_Transfer with
+            cid
+            contract
+            choiceArg
+        
+
+-- | The controllers for a transfer.
+v3_transferControllers : V3_Transfer -> Set Party
+v3_transferControllers t =
+    foldl addOutputController (Set.singleton t.sender) t.outputs
+  where
+    addOutputController s (V3_OutputSenderCoin with lock; ..) = optional s (`Set.insert` s) (holder <$> lock)
+    addOutputController s (V3_OutputReceiverCoin with receiver; ..) = Set.insert receiver s
+
+interface V3_CoinRules where
+  getV3_CoinRulesData : V3_CoinRulesData
+  v3_CoinRules_Transfer_impl : ContractId V3_CoinRules -> V3_CoinRules_Transfer -> Update [V3_TransferResult]
+
+  nonconsuming choice V3_CoinRules_Transfer : [V3_TransferResult]
+    with
+      transfer : V3_Transfer
+    controller v3_transferControllers transfer
+    do
+      v3_CoinRules_Transfer_impl this self arg
+
+interface V3_Implementation requires V2_Implementation, V1_Implementation, AnyImplementation where
+  v3_LockedCoinData_Coin_Unlock_impl : ContractId V3_LockedCoinData -> Update (ContractId V2_Coin)
+  v3_LockedCoinData_Coin_OwnerExpireLock_impl : ContractId V3_LockedCoinData -> Update (ContractId V2_Coin)
+  v3_LockedCoinData_Coin_SvcExpireLock_impl : ContractId V3_LockedCoinData -> Update (ContractId V2_Coin)
+  v3_CoinRulesData_V3_CoinRules_Transfer_impl : ContractId V3_CoinRulesData -> V3_CoinRulesData -> V3_CoinRules_Transfer -> Update [V3_TransferResult]
+
+  nonconsuming choice V3_LockedCoinData_Coin_Unlock :  ContractId V2_Coin 
+    with 
+      cid : ContractId V3_LockedCoinData
+      contract : V3_LockedCoinData
+    controller signatory contract
+    do
+      contract' <- fetch cid
+      contract === contract'
+      v3_LockedCoinData_Coin_Unlock_impl this cid
+
+  nonconsuming choice V3_LockedCoinData_Coin_OwnerExpireLock :  ContractId V2_Coin 
+    with 
+      cid : ContractId V3_LockedCoinData
+      contract : V3_LockedCoinData
+    controller signatory contract
+    do
+      contract' <- fetch cid
+      contract === contract'
+      v3_LockedCoinData_Coin_OwnerExpireLock_impl this cid
+
+  nonconsuming choice V3_LockedCoinData_Coin_SvcExpireLock :  ContractId V2_Coin 
+    with 
+      cid : ContractId V3_LockedCoinData
+      contract : V3_LockedCoinData
+    controller signatory contract
+    do
+      contract' <- fetch cid
+      contract === contract'
+      v3_LockedCoinData_Coin_SvcExpireLock_impl this cid
+
+  nonconsuming choice V3_CoinRulesData_V3_CoinRules_Transfer : [V3_TransferResult]
+    with
+      cid : ContractId V3_CoinRulesData
+      contract : V3_CoinRulesData
+      choiceArg : V3_CoinRules_Transfer
+    controller signatory contract
+    do
+      contract' <- fetch cid
+      contract === contract'
+      v3_CoinRulesData_V3_CoinRules_Transfer_impl this cid contract choiceArg
+      
+
+-- Convenience method to call an implementation provider's actual body of an abstract choice implementation.
+callV3_Implementation : forall c r ps. (HasExercise V3_Implementation c r, IsParties ps, Show c) => Party -> ps -> c -> Update r
+callV3_Implementation implProvider actors c = do
+  implCid0 <- exerciseByKey @ImplementationPointer implProvider (ImplementationPointer_Resolve (toParties actors))
+  let implCid : ContractId V3_Implementation = fromInterfaceContractId implCid0
+  exercise implCid c

@@ -27,7 +27,10 @@ Objectives:
   evolvable CN applications
 
 Package outline:
-- coin-api-v1-v2-v3: a single module containing all three API versions. The reason for the single module is the current lack of retroactive instances.
+- coin-api-v1-v2-v3: a single module containing all three API versions. The reason for the single module is the current lack of retroactive instances. The three API versions correspond to:
+  1. simple coin, without expiry or locking
+  2. coin with expiry
+  3. coin with expiry and locking
 - coin-impl-v100: a proper implementation of the V3 Coin API whose upgrades and bugfixes can be deployed with constant ledger events
 - directoryservice: an implementation of a directory service building on the V3 Coin API
 - wallet: an implementation of a wallet building on the V3 Coin API
@@ -37,10 +40,10 @@ Package outline:
 
 ### TODO
 
-- complete V2 API:
-  - add code for abstract V2_Coin_Expire choice
+- ~~complete V2 API:~~
+  - ~~add code for abstract V2_Coin_Expire choice~~
 - add CI support for approach2 (see approach2/Makefile and /.circle-ci/config.yml)
-- define V3 API
+- ~~define V3 API~~
 - switch to standardized naming scheme
 - port from approach1 using V3 API:
   - CC implementation
@@ -72,6 +75,6 @@ Unstructed notes to process after the experiment is done.
 - could not use coin-api_2-1 as a package name, and thus used the workaround v2v1 for version 2.1
 - what happens on an interface-subscription where the execution of the view code fails? The stream continues, but an error is reported on the contract on which view execution failed.
 - review how to reconcile the version number within the daml files and the package-name version numbers like v101v0v0
-- ensure is not straightforward to make work for retroactive interfaces
-  - the easiest option is to not allow retroactive ensure clauses
-  - alternative: recheck retroactive ensure clauses on all operations except archive
+- ~~ensure is not straightforward to make work for retroactive interfaces~~ (see retroactive instances design doc)
+  - ~~the easiest option is to not allow retroactive ensure clauses~~
+  - ~~alternative: recheck retroactive ensure clauses on all operations except archive~~
