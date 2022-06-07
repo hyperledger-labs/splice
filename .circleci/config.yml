@@ -9,6 +9,44 @@ env: &env
   CI: "true"
   USER: circleci
 
+commands:
+  setup_nix:
+    description: Set up Nix
+    steps:
+    - run:
+        name: make_cache_key
+        command: |
+          set -euo pipefail
+          git log -n1 --format=%H nix shell.nix > /tmp/nix-cache-key
+          sudo mkdir /nix
+          sudo chown $USER /nix
+    - restore_cache:
+        keys:
+        - nix-{{ checksum "/tmp/nix-cache-key" }}
+    - run:
+       name: setup_nix
+       command: |
+         set -euo pipefail
+         if [ -f ~/.config/nix/nix.conf ]; then
+             exit 0
+         fi
+         # Disabling sandbox because:
+         # 1. It doesn't work on CircleCI (sethostname is not allowed)
+         # 2. We don't plan to build anything, so the risk is fairly low
+         mkdir -p ~/.config/nix
+         echo 'sandbox = false' >> ~/.config/nix/nix.conf
+         sh <(curl -fsSL https://nixos.org/nix/install) --no-daemon
+         . /home/circleci/.nix-profile/etc/profile.d/nix.sh
+         nix-shell shell.nix --run 'echo "Done loading all packages."'
+    - save_cache:
+        key: nix-{{ checksum "/tmp/nix-cache-key" }}
+        paths:
+        - /nix
+        - /home/circleci/.nix-profile
+        - /home/circleci/.nix-channels
+        - /home/circleci/.nix-defexpr
+        - /home/circleci/.config/nix
+
 parameters:
   sdk-version:
     type: string
@@ -111,6 +149,28 @@ jobs:
             npm install
             npm run build
 
+  docs:
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - run:
+         name: build
+         command: |
+           set -euo pipefail
+           . /home/circleci/.nix-profile/etc/profile.d/nix.sh
+
+           nix-shell shell.nix \
+             --pure \
+             --run bash \<<'EOF'
+             set -euo pipefail
+             cd docs
+             make html
+           EOF
+
 workflows:
   version: 2
   build:
@@ -118,3 +178,4 @@ workflows:
     - canton_coin
     - pay_with_cc
     - upgrading_coin
+    - docs

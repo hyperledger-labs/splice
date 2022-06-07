@@ -9,3 +9,4 @@ daml.js
 log/
 logfile
 testlog
+_build/
