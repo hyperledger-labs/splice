@@ -17,9 +17,9 @@
 
 # -- Project information -----------------------------------------------------
 
-project = 'canton-network'
-copyright = '2022, Digital Asset'
-author = 'Digital Asset'
+project = u'Canton Network'
+copyright = u'2022, Digital Asset'
+author = u'Digital Asset'
 
 
 # -- General configuration ---------------------------------------------------
@@ -50,3 +50,13 @@ html_theme = 'sphinx_rtd_theme'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 # html_static_path = ['_static']
+
+# Theme options are theme-specific and customize the look and feel of a theme
+# further.  For a list of options available for each theme, see the
+# documentation.
+#
+html_theme_options = {
+    'navigation_depth': -1,
+    'collapse_navigation': False,
+    # 'analytics_id': 'UA-64532708-4'
+}
