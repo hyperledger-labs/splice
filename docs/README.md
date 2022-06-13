@@ -1,5 +1,8 @@
 # Docs
 
+Documentation for all CC functionality. 
+Intended to be published to https://network.canton.global.
+
 ## Live-preview
 
 Running `./live-preview.sh` builds the docs using

@@ -18,8 +18,11 @@ If you encounter issues, try exiting & reentering the directory to reactivate di
 
 ## Directory layout
 
-- `canton-coin`: Core canton coin model
-- `experiments`: wip work & PoCs that might still get thrown away
-    - `pay-with-cc`: Daml model, CC Wallet & Directory service to enable "pay with cc" functionality
-    - `read-delegation`: Daml model for exploring access rules
-Canton Coin PoCs
+See the `README.md` files in the top-level directories for details.
+
+Most top-level directories logically correspond to independent repositories,
+which are currently maintained within this one repository for increased
+delivery velocity using head-based development.
+
+We expect to start splitting off repositories as part of the work to deliver
+M3 - TestNet Launch.
