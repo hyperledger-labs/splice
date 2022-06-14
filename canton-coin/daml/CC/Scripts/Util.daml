@@ -52,9 +52,6 @@ setupApp = do
   cid <- submit svc $ createCmd CoinRules with
     config = defaultCoinConfig
     ..
-  submit svc $ createCmd CoinRulesKey with
-    cid = cid
-    svc = svc
 
   submitExerciseCoinRulesByKey app [svc] CoinRules_MiningRound_Open with
     coinPrice = 1.0
@@ -158,17 +155,11 @@ unlockedCoins p = map fst <$> queryFilter @Coin p (\c -> c.owner == p)
 
 submitExerciseCoinRulesByKey : Choice CoinRules c r => CCApp -> [Party] -> c -> Script r
 submitExerciseCoinRulesByKey app actors arg = do
-  rulesKey <- submitMulti actors [app.svc] $ exerciseByKeyCmd @CoinRulesKey app.svc (CoinRulesKey_Fetch actors)
-  submitMulti actors [app.svc] $
-    exerciseCmd rulesKey.cid arg
+  submitMulti actors [app.svc] $ exerciseByKeyCmd @CoinRules app.svc arg
 
 queryCoinRulesByKey : Party -> Script (Optional (ContractId CoinRules, CoinRules))
 queryCoinRulesByKey svc =
-  queryContractKey @CoinRulesKey svc svc >>= \case
-    None -> pure None
-    Some (_, rulesKey) -> queryContractId svc rulesKey.cid >>= \case
-      None -> pure None
-      Some rules -> pure (Some (rulesKey.cid, rules))
+  queryContractKey @CoinRules svc svc
 
 -- | A simple and slightly hacky-way to test payment: it just gathers all coins from
 -- the sender and transfer's the desired quantity off of them to the receiver.

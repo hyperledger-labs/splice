@@ -43,34 +43,6 @@ data CoinConfig = CoinConfig with
     maxPayloadLength : Int
   deriving (Eq, Ord, Show)
 
-template CoinRulesKey
-  with
-    svc : Party
-    cid : ContractId CoinRules
-  where
-    signatory svc
-    key svc : Party
-    maintainer key
-    nonconsuming choice CoinRulesKey_Fetch : CoinRulesKey
-      with
-        ps : [Party]
-      controller ps
-      do pure this
-
-    choice CoinRulesKey_Swap : ContractId CoinRulesKey
-      with
-        new : CoinRules
-      controller svc
-      do archive cid
-         cid <- create new
-         create this with cid
-
-
-exerciseCoinRulesByKey : (HasExercise CoinRules c r, IsParties p, Show c) => Party -> p -> c -> Update r
-exerciseCoinRulesByKey svc actors c = do
-  rulesKey <- exerciseByKey @CoinRulesKey svc (CoinRulesKey_Fetch (toParties actors))
-  exercise rulesKey.cid c
-
 -- | The rules governing how CC users can modify the CC state
 -- managed by the SVC.
 template CoinRules
@@ -80,6 +52,8 @@ template CoinRules
     -- TODO: use a schedule with effective dating to make fees predictable to users
   where
     signatory svc
+    key svc : Party
+    maintainer key
 
     -- | Execute a transfer.
     --
