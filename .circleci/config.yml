@@ -50,7 +50,7 @@ commands:
 parameters:
   sdk-version:
     type: string
-    default: "2.3.0-snapshot.20220509.9874.0.0798fe15" # sdk-version
+    default: "2.3.0-snapshot.20220606.10031.0.ce98be86" # sdk-version
 
 jobs:
 
