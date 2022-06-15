@@ -4,5 +4,4 @@ let
     url = "https://github.com/${spec.owner}/${spec.repo}/archive/${spec.rev}.tar.gz";
     sha256 = spec.sha256;
   };
-in
-  src
+in import src
