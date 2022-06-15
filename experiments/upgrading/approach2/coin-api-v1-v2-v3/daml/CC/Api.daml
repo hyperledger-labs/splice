@@ -163,11 +163,82 @@ template V1_CoinRulesData
 
     -- FEATURE GAP: retroactive instance to declare this as part of V2
     implements V2_CoinRules where
-      getV2_CoinRulesData = V2_CoinRulesData with
-        svc
-        config = V2_CoinConfig with
-          v1 = config
-          holdingFee = RatePerRound 0.0
+      getV2_CoinRulesData = 
+        let V1_CoinConfig{..} = config
+        in V2_CoinRulesData with
+            svc
+            config = V2_CoinConfig with
+              holdingFee = RatePerRound 0.0
+              ..
+
+    -- FEATURE GAP: retroactive instance to declare this as part of V3
+    implements V3_CoinRules where
+      getV3_CoinRulesData = V3_CoinRulesData with svc, config = v1_to_v3_config config
+        where v1_to_v3_config V1_CoinConfig{..} = V3_CoinConfig with
+                holdingFee = RatePerRound 0.0
+                coinsIssuedPerRound = 1.0
+                svcIssuanceRatio = 1.0
+                ..
+      v3_CoinRules_Transfer_impl self choiceArg = do
+        let contract = getV3_CoinRulesData this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_CoinRulesData_V3_CoinRules_Transfer
+          this.svc
+          (signatory this)
+          V3_CoinRulesData_V3_CoinRules_Transfer with
+            cid
+            contract
+            choiceArg
+      v3_CoinRules_MiningRound_Open_impl self choiceArg = do
+        let contract = getV3_CoinRulesData this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_Open
+          this.svc
+          (signatory this)
+          V3_CoinRulesData_V3_CoinRules_MiningRound_Open with
+            cid
+            contract
+            choiceArg
+      v3_CoinRules_MiningRound_StartIssuing_impl self choiceArg = do
+        let contract = getV3_CoinRulesData this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_StartIssuing
+          this.svc
+          (signatory this)
+          V3_CoinRulesData_V3_CoinRules_MiningRound_StartIssuing with
+            cid
+            contract
+            choiceArg
+      v3_CoinRules_MiningRound_StartClosing_impl self choiceArg = do
+        let contract = getV3_CoinRulesData this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_StartClosing
+          this.svc
+          (signatory this)
+          V3_CoinRulesData_V3_CoinRules_MiningRound_StartClosing with
+            cid
+            contract
+            choiceArg
+      v3_CoinRules_MiningRound_Close_impl self choiceArg = do
+        let contract = getV3_CoinRulesData this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_Close
+          this.svc
+          (signatory this)
+          V3_CoinRulesData_V3_CoinRules_MiningRound_Close with
+            cid
+            contract
+            choiceArg
+      v3_CoinRules_MiningRound_Archive_impl self choiceArg = do
+        let contract = getV3_CoinRulesData this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_Archive
+          this.svc
+          (signatory this)
+          V3_CoinRulesData_V3_CoinRules_MiningRound_Archive with
+            cid
+            contract
+            choiceArg
 
 
 -- Transfer specifications
@@ -198,6 +269,9 @@ data V1_ReceiverCoinType
   = -- | Receiver coin with fixed quantity
     V1_FixedReceiverCoin with
       quantity : Decimal
+      -- | The ratio of the transfer fee attributed to the sender. Must be between 0.0 and 1.0.
+      -- 0.0 means the receiver pays the transfer fee, 1.0 means the sender pays it.
+      senderTransferFeeRatio : Decimal
   | -- | The equivalent of an OutputSenderCoin with exactQuantity = None. All transfer fees
     -- are payed by the receiver.
   V2_FloatingReceiverCoin
@@ -294,11 +368,17 @@ callV1_Implementation implProvider actors c = do
 newtype Round = Round with number : Int
   deriving (Eq, Ord, Show)
 
+isDefinedRound : Round -> Bool
+isDefinedRound round = round.number >= 0
+
 template V2_OpenMiningRoundData with
     svc : Party
     round : Round
   where
     signatory svc
+
+    key (svc, round) : (Party, Round)
+    maintainer key._1
 
     implements V2_OpenMiningRound where
       getV2_OpenMiningRoundData = this
@@ -306,7 +386,83 @@ template V2_OpenMiningRoundData with
 interface V2_OpenMiningRound where
   getV2_OpenMiningRoundData : V2_OpenMiningRoundData
 
+template V3_OpenMiningRoundData with
+    svc : Party
+    round : Round
+    coinPrice : Decimal
+  where
+    signatory svc
 
+    key (svc, round) : (Party, Round)
+    maintainer key._1
+
+    implements V2_OpenMiningRound where
+      getV2_OpenMiningRoundData = V2_OpenMiningRoundData with svc, round
+
+    implements V3_OpenMiningRound where
+      getV3_OpenMiningRoundData = this
+
+
+interface V3_OpenMiningRound where
+  getV3_OpenMiningRoundData : V3_OpenMiningRoundData
+
+-- | A mining round for which the total sum of registered rewards
+-- is being computed. Rewards can no longer be registered aginst such a round.
+template V3_ClosingMiningRoundData
+  with
+    svc : Party
+    round : Round
+  where
+    signatory svc
+    ensure isDefinedRound round
+
+    key (svc, round) : (Party, Round)
+    maintainer key._1
+
+    implements V3_ClosingMiningRound where
+      getV3_ClosingMiningRoundData = this
+
+interface V3_ClosingMiningRound where
+  getV3_ClosingMiningRoundData : V3_ClosingMiningRoundData
+
+-- | A mining round for whose rewards coins are being issued.
+template V3_IssuingMiningRoundData
+  with
+    svc : Party
+    round : Round
+    issuancePerCoin : Decimal
+  where
+    signatory svc
+    ensure isDefinedRound round
+
+    key (svc, round) : (Party, Round)
+    maintainer key._1
+
+    implements V3_IssuingMiningRound where
+      getV3_IssuingMiningRoundData = this
+
+interface V3_IssuingMiningRound where
+  getV3_IssuingMiningRoundData : V3_IssuingMiningRoundData
+
+-- | A record that a specific mining round has been closed, which can
+-- be used to archive expired rewards.
+template V3_ClosedMiningRoundData
+  with
+    svc : Party
+    round : Round
+  where
+    signatory svc
+    ensure isDefinedRound round
+
+    key (svc, round) : (Party, Round)
+    maintainer key._1
+
+    implements V3_ClosedMiningRound where
+      getV3_ClosedMiningRoundData = this
+
+
+interface V3_ClosedMiningRound where
+  getV3_ClosedMiningRoundData : V3_ClosedMiningRoundData
 
 -- Coin
 -------
@@ -370,14 +526,27 @@ interface V2_Coin where
     -- implementation provider (getV2_CoinData this).svc
     do v2_Coin_Expire_impl this self arg
 
+type V3_Coin = V2_Coin
+
+type V3_CoinData = V2_CoinData
 -- Coin rules
 -------------
 
 -- | Configuration determining the fees and limits for CC transfers granted by
 -- the CoinRules.
 data V2_CoinConfig = V2_CoinConfig with
-    -- | Fields from previous config.
-    v1 : V1_CoinConfig
+    -- | Fee to create a new coin.
+    createFee : FixedFee
+    -- | Fee to update an existing coin.
+    updateFee : FixedFee
+    -- | Fee for transferring some quantity of coin to a new owner.
+    transferFee : SteppedRate
+    -- | Maximum number of batch inputs for a transfer.
+    maxNumInputs : Int
+    -- | Maximum number of batch outputs for a transfer.
+    maxNumOutputs : Int
+    -- | Maximum length of the payload message on a transfer.
+    maxPayloadLength : Int
     -- | Fee for keeping a coin around.
     holdingFee : RatePerRound
   deriving (Eq, Ord, Show)
@@ -390,9 +559,11 @@ template V2_CoinRulesData
     signatory svc
 
     implements V1_CoinRules where
-      getV1_CoinRulesData = V1_CoinRulesData with
-        svc
-        config = config.v1
+      getV1_CoinRulesData = 
+        let V2_CoinConfig{..} = config
+        in V1_CoinRulesData with
+              svc
+              config = V1_CoinConfig{..}
 
       -- NOTE: this is just a fancy redirection to the Implementation_V1
       -- contract's actual choice of a body.
@@ -409,6 +580,77 @@ template V2_CoinRulesData
 
     implements V2_CoinRules where
       getV2_CoinRulesData = this
+
+    -- FEATURE GAP: Retroactive instance
+    implements V3_CoinRules where
+      getV3_CoinRulesData = V3_CoinRulesData with svc, config = v2_to_v3_config config
+        where v2_to_v3_config V2_CoinConfig{..} =
+                V3_CoinConfig with
+                  coinsIssuedPerRound = 1.0
+                  svcIssuanceRatio = 1.0
+                  ..
+      v3_CoinRules_Transfer_impl self choiceArg = do
+        let contract = getV3_CoinRulesData this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_CoinRulesData_V3_CoinRules_Transfer
+          this.svc
+          (signatory this)
+          V3_CoinRulesData_V3_CoinRules_Transfer with
+            cid
+            contract
+            choiceArg
+      v3_CoinRules_MiningRound_Open_impl self choiceArg = do
+        let contract = getV3_CoinRulesData this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_Open
+          this.svc
+          (signatory this)
+          V3_CoinRulesData_V3_CoinRules_MiningRound_Open with
+            cid
+            contract
+            choiceArg
+      v3_CoinRules_MiningRound_StartIssuing_impl self choiceArg = do
+        let contract = getV3_CoinRulesData this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_StartIssuing
+          this.svc
+          (signatory this)
+          V3_CoinRulesData_V3_CoinRules_MiningRound_StartIssuing with
+            cid
+            contract
+            choiceArg
+      v3_CoinRules_MiningRound_StartClosing_impl self choiceArg = do
+        let contract = getV3_CoinRulesData this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_StartClosing
+          this.svc
+          (signatory this)
+          V3_CoinRulesData_V3_CoinRules_MiningRound_StartClosing with
+            cid
+            contract
+            choiceArg
+      v3_CoinRules_MiningRound_Close_impl self choiceArg = do
+        let contract = getV3_CoinRulesData this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_Close
+          this.svc
+          (signatory this)
+          V3_CoinRulesData_V3_CoinRules_MiningRound_Close with
+            cid
+            contract
+            choiceArg
+      v3_CoinRules_MiningRound_Archive_impl self choiceArg = do
+        let contract = getV3_CoinRulesData this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_Archive
+          this.svc
+          (signatory this)
+          V3_CoinRulesData_V3_CoinRules_MiningRound_Archive with
+            cid
+            contract
+            choiceArg
+
+
 
 interface V2_CoinRules where
     getV2_CoinRulesData : V2_CoinRulesData
@@ -486,7 +728,7 @@ template V3_LockedCoinData
     implements V3_LockedCoin where
       getV3_LockedCoinData = this
 
-      v3_LockedCoin_Coin_Unlock_impl self = do
+      v3_LockedCoin_Coin_Unlock_impl self choiceArg = do
         let contract = this
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_LockedCoinData_Coin_Unlock
@@ -495,8 +737,9 @@ template V3_LockedCoinData
           V3_LockedCoinData_Coin_Unlock with
             cid
             contract
-        
-      v3_LockedCoin_Coin_OwnerExpireLock_impl self = do
+            choiceArg
+
+      v3_LockedCoin_Coin_OwnerExpireLock_impl self choiceArg = do
         let contract = this
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_LockedCoinData_Coin_OwnerExpireLock
@@ -505,8 +748,9 @@ template V3_LockedCoinData
           V3_LockedCoinData_Coin_OwnerExpireLock with
             cid
             contract
-        
-      v3_LockedCoin_Coin_SvcExpireLock_impl self = do
+            choiceArg
+
+      v3_LockedCoin_Coin_SvcExpireLock_impl self choiceArg = do
         let contract = this
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_LockedCoinData_Coin_SvcExpireLock
@@ -515,42 +759,45 @@ template V3_LockedCoinData
           V3_LockedCoinData_Coin_SvcExpireLock with
             cid
             contract
-        
+            choiceArg
+
 interface V3_LockedCoin where
   getV3_LockedCoinData : V3_LockedCoinData
-  v3_LockedCoin_Coin_Unlock_impl : ContractId V3_LockedCoin -> Update (ContractId V2_Coin)
-  v3_LockedCoin_Coin_OwnerExpireLock_impl : ContractId V3_LockedCoin -> Update (ContractId V2_Coin)
-  v3_LockedCoin_Coin_SvcExpireLock_impl : ContractId V3_LockedCoin -> Update (ContractId V2_Coin)
+  v3_LockedCoin_Coin_Unlock_impl : ContractId V3_LockedCoin -> V3_LockedCoin_Coin_Unlock -> Update (ContractId V2_Coin)
+  v3_LockedCoin_Coin_OwnerExpireLock_impl : ContractId V3_LockedCoin -> V3_LockedCoin_Coin_OwnerExpireLock -> Update (ContractId V2_Coin)
+  v3_LockedCoin_Coin_SvcExpireLock_impl : ContractId V3_LockedCoin -> V3_LockedCoin_Coin_SvcExpireLock -> Update (ContractId V2_Coin)
 
   choice V3_LockedCoin_Coin_Unlock : ContractId V2_Coin
     controller (getV3_LockedCoinData this).lock.holder
     do
-      v3_LockedCoin_Coin_Unlock_impl this self
+      v3_LockedCoin_Coin_Unlock_impl this self arg
 
   choice V3_LockedCoin_Coin_OwnerExpireLock : ContractId V2_Coin
     controller (getV3_LockedCoinData this).coin.owner
     do
-      v3_LockedCoin_Coin_OwnerExpireLock_impl this self
+      v3_LockedCoin_Coin_OwnerExpireLock_impl this self arg
 
   choice V3_LockedCoin_Coin_SvcExpireLock : ContractId V2_Coin
     controller (getV3_LockedCoinData this).coin.svc
     do
-      v3_LockedCoin_Coin_SvcExpireLock_impl this self
+      v3_LockedCoin_Coin_SvcExpireLock_impl this self arg
 
 -- | This differs from V1 in that outputs may include locks, which are also controllers of the choice.
 data V3_Transfer = V3_Transfer with
     sender : Party
-    inputs : [V1_TransferInput]
+    inputs : [V3_TransferInput]
     outputs : [V3_TransferOutput]
     payload : Text
   deriving (Eq, Show)
+
+type V3_TransferInput = ContractId V2_Coin
 
 data V3_TransferResult
   = V3_TransferResultCoin (ContractId V2_Coin)
   | V3_TransferResultLockedCoin (ContractId V3_LockedCoin)
   deriving (Show, Eq, Ord)
 
--- | An individual output for a batch transfer.
+-- Same as V1, but additionally with a lock
 data V3_TransferOutput
   = V3_OutputSenderCoin with
       -- | The quantity desired for this coin. If not set, then it will receive
@@ -560,18 +807,46 @@ data V3_TransferOutput
       lock : Optional TimeLock
   | V3_OutputReceiverCoin with
       receiver : Party
-      coinType: V1_ReceiverCoinType
+      coinType: V3_ReceiverCoinType
+  deriving (Eq, Ord, Show)
+
+type V3_ReceiverCoinType = V1_ReceiverCoinType
+
+-- | Configuration determining the fees and limits for CC transfers granted by
+-- the CoinRules.
+--
+-- See CC.Scripts.Parameters for concrete values.
+data V3_CoinConfig = V3_CoinConfig with
+    -- | Fee to create a new coin.
+    createFee : FixedFee
+    -- | Fee to update an existing coin.
+    updateFee : FixedFee
+    -- | Fee for keeping a coin around.
+    holdingFee : RatePerRound
+    -- | Fee for transferring some quantity of coin to a new owner.
+    transferFee : SteppedRate
+    coinsIssuedPerRound : Decimal
+--  -- | The minimal quantity of burn for which a receipt is issued.
+--  minRewardQuantity : Decimal
+    svcIssuanceRatio : Decimal
+    -- | Maximum number of batch inputs for a transfer.
+    maxNumInputs : Int
+    -- | Maximum number of batch outputs for a transfer.
+    maxNumOutputs : Int
+    -- | Maximum length of the payload message on a transfer.
+    maxPayloadLength : Int
   deriving (Eq, Ord, Show)
 
 template V3_CoinRulesData
   with
     svc : Party
-    config : V2_CoinConfig
+    config : V3_CoinConfig
   where
     signatory svc
 
     implements V2_CoinRules where
-      getV2_CoinRulesData = V2_CoinRulesData with svc, config
+      getV2_CoinRulesData = V2_CoinRulesData with svc, config = v3_to_v2_config config
+        where v3_to_v2_config V3_CoinConfig{..} = V2_CoinConfig with ..
 
     implements V3_CoinRules where
       getV3_CoinRulesData = this
@@ -585,7 +860,56 @@ template V3_CoinRulesData
             cid
             contract
             choiceArg
-        
+      v3_CoinRules_MiningRound_Open_impl self choiceArg = do
+        let contract = getV3_CoinRulesData this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_Open
+          this.svc
+          (signatory this)
+          V3_CoinRulesData_V3_CoinRules_MiningRound_Open with
+            cid
+            contract
+            choiceArg
+      v3_CoinRules_MiningRound_StartIssuing_impl self choiceArg = do
+        let contract = getV3_CoinRulesData this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_StartIssuing
+          this.svc
+          (signatory this)
+          V3_CoinRulesData_V3_CoinRules_MiningRound_StartIssuing with
+            cid
+            contract
+            choiceArg
+      v3_CoinRules_MiningRound_StartClosing_impl self choiceArg = do
+        let contract = getV3_CoinRulesData this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_StartClosing
+          this.svc
+          (signatory this)
+          V3_CoinRulesData_V3_CoinRules_MiningRound_StartClosing with
+            cid
+            contract
+            choiceArg
+      v3_CoinRules_MiningRound_Close_impl self choiceArg = do
+        let contract = getV3_CoinRulesData this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_Close
+          this.svc
+          (signatory this)
+          V3_CoinRulesData_V3_CoinRules_MiningRound_Close with
+            cid
+            contract
+            choiceArg
+      v3_CoinRules_MiningRound_Archive_impl self choiceArg = do
+        let contract = getV3_CoinRulesData this
+        let cid = fromInterfaceContractId self
+        callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_Archive
+          this.svc
+          (signatory this)
+          V3_CoinRulesData_V3_CoinRules_MiningRound_Archive with
+            cid
+            contract
+            choiceArg
 
 -- | The controllers for a transfer.
 v3_transferControllers : V3_Transfer -> Set Party
@@ -598,6 +922,11 @@ v3_transferControllers t =
 interface V3_CoinRules where
   getV3_CoinRulesData : V3_CoinRulesData
   v3_CoinRules_Transfer_impl : ContractId V3_CoinRules -> V3_CoinRules_Transfer -> Update [V3_TransferResult]
+  v3_CoinRules_MiningRound_Open_impl : ContractId V3_CoinRules -> V3_CoinRules_MiningRound_Open -> Update (ContractId V3_OpenMiningRound)
+  v3_CoinRules_MiningRound_StartClosing_impl : ContractId V3_CoinRules -> V3_CoinRules_MiningRound_StartClosing -> Update (ContractId V3_ClosingMiningRound)
+  v3_CoinRules_MiningRound_StartIssuing_impl : ContractId V3_CoinRules -> V3_CoinRules_MiningRound_StartIssuing -> Update (ContractId V3_IssuingMiningRound)
+  v3_CoinRules_MiningRound_Close_impl : ContractId V3_CoinRules -> V3_CoinRules_MiningRound_Close -> Update (ContractId V3_ClosedMiningRound)
+  v3_CoinRules_MiningRound_Archive_impl : ContractId V3_CoinRules -> V3_CoinRules_MiningRound_Archive -> Update ()
 
   nonconsuming choice V3_CoinRules_Transfer : [V3_TransferResult]
     with
@@ -606,27 +935,103 @@ interface V3_CoinRules where
     do
       v3_CoinRules_Transfer_impl this self arg
 
+  nonconsuming choice V3_CoinRules_MiningRound_Open
+    : ContractId V3_OpenMiningRound
+    with
+      coinPrice : Decimal
+    controller (getV3_CoinRulesData this).svc
+    do
+      v3_CoinRules_MiningRound_Open_impl this self arg
+
+  nonconsuming choice  V3_CoinRules_MiningRound_StartClosing
+    : ContractId  V3_ClosingMiningRound
+    with
+      miningRoundCid : ContractId  V3_OpenMiningRound
+    controller (getV3_CoinRulesData this).svc
+    do 
+      v3_CoinRules_MiningRound_StartClosing_impl this self arg
+
+  nonconsuming choice  V3_CoinRules_MiningRound_StartIssuing
+    : ContractId  V3_IssuingMiningRound
+    with
+      miningRoundCid : ContractId  V3_ClosingMiningRound
+      -- The amount of coin burned in this round.
+      totalBurnQuantity : Decimal
+    controller (getV3_CoinRulesData this).svc
+    do 
+      v3_CoinRules_MiningRound_StartIssuing_impl this self arg
+
+  nonconsuming choice  V3_CoinRules_MiningRound_Close
+    : ContractId  V3_ClosedMiningRound
+    with
+      miningRoundCid : ContractId  V3_IssuingMiningRound
+    controller (getV3_CoinRulesData this).svc
+    do
+      v3_CoinRules_MiningRound_Close_impl this self arg
+
+  nonconsuming choice  V3_CoinRules_MiningRound_Archive
+    : ()
+    with
+      miningRoundCid : ContractId  V3_ClosedMiningRound
+    controller (getV3_CoinRulesData this).svc
+    do
+      v3_CoinRules_MiningRound_Archive_impl this self arg
+
+instance HasController V3_LockedCoinData V3_LockedCoin_Coin_Unlock where
+  controller' t _ = pure (getV3_LockedCoinData t).lock.holder
+
+instance HasController V3_LockedCoinData V3_LockedCoin_Coin_OwnerExpireLock where
+  controller' t _ = toParties t.lock.holder
+
+instance HasController V3_LockedCoinData V3_LockedCoin_Coin_SvcExpireLock where
+  controller' t _ = toParties t.lock.holder
+
+instance HasController V3_CoinRulesData V3_CoinRules_Transfer where
+  controller' _ c = toParties $ v3_transferControllers c.transfer
+
+instance HasController V3_CoinRulesData V3_CoinRules_MiningRound_Open where
+  controller' t _ = toParties t.svc
+
+instance HasController V3_CoinRulesData V3_CoinRules_MiningRound_StartClosing where
+  controller' t _ = toParties t.svc
+
+instance HasController V3_CoinRulesData V3_CoinRules_MiningRound_StartIssuing where
+  controller' t _ = toParties t.svc
+
+instance HasController V3_CoinRulesData V3_CoinRules_MiningRound_Close where
+  controller' t _ = toParties t.svc
+
+instance HasController V3_CoinRulesData V3_CoinRules_MiningRound_Archive where
+  controller' t _ = toParties t.svc
+
 interface V3_Implementation requires V2_Implementation, V1_Implementation, AnyImplementation where
   v3_LockedCoinData_Coin_Unlock_impl : ContractId V3_LockedCoinData -> Update (ContractId V2_Coin)
   v3_LockedCoinData_Coin_OwnerExpireLock_impl : ContractId V3_LockedCoinData -> Update (ContractId V2_Coin)
   v3_LockedCoinData_Coin_SvcExpireLock_impl : ContractId V3_LockedCoinData -> Update (ContractId V2_Coin)
   v3_CoinRulesData_V3_CoinRules_Transfer_impl : ContractId V3_CoinRulesData -> V3_CoinRulesData -> V3_CoinRules_Transfer -> Update [V3_TransferResult]
+  v3_CoinRulesData_V3_CoinRules_MiningRound_Open_impl : ContractId V3_CoinRulesData -> V3_CoinRulesData -> V3_CoinRules_MiningRound_Open -> Update (ContractId V3_OpenMiningRound)
+  v3_CoinRulesData_V3_CoinRules_MiningRound_StartClosing_impl : ContractId V3_CoinRulesData -> V3_CoinRulesData -> V3_CoinRules_MiningRound_StartClosing -> Update (ContractId V3_ClosingMiningRound)
+  v3_CoinRulesData_V3_CoinRules_MiningRound_StartIssuing_impl : ContractId V3_CoinRulesData -> V3_CoinRulesData -> V3_CoinRules_MiningRound_StartIssuing -> Update (ContractId V3_IssuingMiningRound)
+  v3_CoinRulesData_V3_CoinRules_MiningRound_Close_impl : ContractId V3_CoinRulesData -> V3_CoinRulesData -> V3_CoinRules_MiningRound_Close -> Update (ContractId V3_ClosedMiningRound)
+  v3_CoinRulesData_V3_CoinRules_MiningRound_Archive_impl : ContractId V3_CoinRulesData -> V3_CoinRulesData -> V3_CoinRules_MiningRound_Archive -> Update ()
 
-  nonconsuming choice V3_LockedCoinData_Coin_Unlock :  ContractId V2_Coin 
-    with 
+  nonconsuming choice V3_LockedCoinData_Coin_Unlock :  ContractId V2_Coin
+    with
       cid : ContractId V3_LockedCoinData
       contract : V3_LockedCoinData
-    controller signatory contract
+      choiceArg : V3_LockedCoin_Coin_Unlock
+    controller signatory contract, controller' contract choiceArg
     do
       contract' <- fetch cid
       contract === contract'
       v3_LockedCoinData_Coin_Unlock_impl this cid
 
-  nonconsuming choice V3_LockedCoinData_Coin_OwnerExpireLock :  ContractId V2_Coin 
-    with 
+  nonconsuming choice V3_LockedCoinData_Coin_OwnerExpireLock :  ContractId V2_Coin
+    with
       cid : ContractId V3_LockedCoinData
       contract : V3_LockedCoinData
-    controller signatory contract
+      choiceArg : V3_LockedCoin_Coin_OwnerExpireLock
+    controller signatory contract, controller' contract choiceArg
     do
       contract' <- fetch cid
       contract === contract'
@@ -636,7 +1041,8 @@ interface V3_Implementation requires V2_Implementation, V1_Implementation, AnyIm
     with 
       cid : ContractId V3_LockedCoinData
       contract : V3_LockedCoinData
-    controller signatory contract
+      choiceArg : V3_LockedCoin_Coin_SvcExpireLock
+    controller signatory contract, controller' contract choiceArg
     do
       contract' <- fetch cid
       contract === contract'
@@ -647,12 +1053,67 @@ interface V3_Implementation requires V2_Implementation, V1_Implementation, AnyIm
       cid : ContractId V3_CoinRulesData
       contract : V3_CoinRulesData
       choiceArg : V3_CoinRules_Transfer
-    controller signatory contract
+    controller signatory contract, controller' contract choiceArg
     do
       contract' <- fetch cid
       contract === contract'
       v3_CoinRulesData_V3_CoinRules_Transfer_impl this cid contract choiceArg
-      
+
+  nonconsuming choice V3_CoinRulesData_V3_CoinRules_MiningRound_Open : ContractId V3_OpenMiningRound
+    with
+      cid : ContractId V3_CoinRulesData
+      contract : V3_CoinRulesData
+      choiceArg : V3_CoinRules_MiningRound_Open
+    controller signatory contract, controller' contract choiceArg
+    do
+      contract' <- fetch cid
+      contract === contract'
+      v3_CoinRulesData_V3_CoinRules_MiningRound_Open_impl this cid contract choiceArg
+
+  nonconsuming choice V3_CoinRulesData_V3_CoinRules_MiningRound_StartClosing : ContractId V3_ClosingMiningRound
+    with
+      cid : ContractId V3_CoinRulesData
+      contract : V3_CoinRulesData
+      choiceArg : V3_CoinRules_MiningRound_StartClosing
+    controller signatory contract, controller' contract choiceArg
+    do
+      contract' <- fetch cid
+      contract === contract'
+      v3_CoinRulesData_V3_CoinRules_MiningRound_StartClosing_impl this cid contract choiceArg
+
+  nonconsuming choice V3_CoinRulesData_V3_CoinRules_MiningRound_StartIssuing : ContractId V3_IssuingMiningRound
+    with
+      cid : ContractId V3_CoinRulesData
+      contract : V3_CoinRulesData
+      choiceArg : V3_CoinRules_MiningRound_StartIssuing
+    controller signatory contract, controller' contract choiceArg
+    do
+      contract' <- fetch cid
+      contract === contract'
+      v3_CoinRulesData_V3_CoinRules_MiningRound_StartIssuing_impl this cid contract choiceArg
+
+  nonconsuming choice V3_CoinRulesData_V3_CoinRules_MiningRound_Close : ContractId V3_ClosedMiningRound
+    with
+      cid : ContractId V3_CoinRulesData
+      contract : V3_CoinRulesData
+      choiceArg : V3_CoinRules_MiningRound_Close
+    controller signatory contract, controller' contract choiceArg
+    do
+      contract' <- fetch cid
+      contract === contract'
+      v3_CoinRulesData_V3_CoinRules_MiningRound_Close_impl this cid contract choiceArg
+
+  nonconsuming choice V3_CoinRulesData_V3_CoinRules_MiningRound_Archive : ()
+    with
+      cid : ContractId V3_CoinRulesData
+      contract : V3_CoinRulesData
+      choiceArg : V3_CoinRules_MiningRound_Archive
+    controller signatory contract, controller' contract choiceArg
+    do
+      contract' <- fetch cid
+      contract === contract'
+      v3_CoinRulesData_V3_CoinRules_MiningRound_Archive_impl this cid contract choiceArg
+
 
 -- Convenience method to call an implementation provider's actual body of an abstract choice implementation.
 callV3_Implementation : forall c r ps. (HasExercise V3_Implementation c r, IsParties ps, Show c) => Party -> ps -> c -> Update r

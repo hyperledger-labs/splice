@@ -97,6 +97,37 @@ jobs:
            export PATH=$HOME/.daml/bin:$PATH
            cd experiments/upgrading/approach1
            make test
+
+  upgrading_coin_2:
+    docker:
+    - image: eclipse-temurin:11
+    environment:
+      <<: *env
+      SDK_VERSION: << pipeline.parameters.sdk-version >>
+    steps:
+      - checkout
+      - run:
+          name: install deps
+          command: |
+            set -eou pipefail
+            curl https://get.daml.com | sh -s $SDK_VERSION
+            printf "auto-install: false\nupdate-check: never\n" >> $HOME/.daml/daml-config.yaml
+            apt-get update && apt-get install -y make
+      - run:
+         name: make all
+         command: |
+           set -euo pipefail
+           export PATH=$HOME/.daml/bin:$PATH
+           cd experiments/upgrading/approach2
+           make all
+      - run:
+         name: make test
+         command: |
+           set -euo pipefail
+           export PATH=$HOME/.daml/bin:$PATH
+           cd experiments/upgrading/approach2
+           make test-cc
+
   pay_with_cc:
     docker:
     - image: eclipse-temurin:11
@@ -178,4 +209,5 @@ workflows:
     - canton_coin
     - pay_with_cc
     - upgrading_coin
+    - upgrading_coin_2
     - docs

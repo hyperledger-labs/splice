@@ -31,23 +31,23 @@ Package outline:
   1. simple coin, without expiry or locking
   2. coin with expiry
   3. coin with expiry and locking
-- coin-impl-v100: a proper implementation of the V3 Coin API whose upgrades and bugfixes can be deployed with constant ledger events
+- coin-impl-v3: a proper implementation of the V3 Coin API whose upgrades and bugfixes can be deployed with constant ledger events
+- test : a script testing coin mining rounds, burn and transfer
 - directoryservice: an implementation of a directory service building on the V3 Coin API
 - wallet: an implementation of a wallet building on the V3 Coin API
 - combined-tests: utility functions for testing the above service and tests themselves
 - paywithcc-tests:
 
-
 ### TODO
 
 - ~~complete V2 API:~~
   - ~~add code for abstract V2_Coin_Expire choice~~
-- add CI support for approach2 (see approach2/Makefile and /.circle-ci/config.yml)
+- ~~add CI support for approach2 (see approach2/Makefile and /.circle-ci/config.yml)~~
 - ~~define V3 API~~
 - switch to standardized naming scheme
-- port from approach1 using V3 API:
-  - CC implementation
-  - CC tests
+- ~~port from approach1 using V3 API:~~
+  - ~~CC implementation~~
+  - ~~CC tests~~
   - directoryservice + tests
   - wallet + tests
   - paywithcc-tests
