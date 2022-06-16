@@ -3,11 +3,21 @@
 # Check https://circleci.com/docs/2.0/sample-config/ for more details
 #
 version: 2.1
+orbs:
+  slack: circleci/slack@4.9.3
 
 env: &env
   TERM: dumb
   CI: "true"
   USER: circleci
+
+notify-fail: &notify-fail
+  context: slack-context
+  post-steps:
+  - slack/notify:
+      branch_pattern: main
+      event: fail
+      template: basic_fail_1
 
 commands:
   setup_nix:
@@ -201,13 +211,17 @@ jobs:
              cd docs
              make html
            EOF
-
 workflows:
   version: 2
   build:
     jobs:
-    - canton_coin
-    - pay_with_cc
-    - upgrading_coin
-    - upgrading_coin_2
-    - docs
+    - canton_coin:
+        <<: *notify-fail
+    - pay_with_cc:
+        <<: *notify-fail
+    - upgrading_coin:
+        <<: *notify-fail
+    - upgrading_coin_2:
+        <<: *notify-fail
+    - docs:
+        <<: *notify-fail
