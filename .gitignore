@@ -10,3 +10,6 @@ log/
 logfile
 testlog
 _build/
+.idea/*
+target
+.bsp
