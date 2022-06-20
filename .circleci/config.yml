@@ -57,12 +57,116 @@ commands:
         - /home/circleci/.nix-defexpr
         - /home/circleci/.config/nix
 
+  # Largely copied from Canton's CI definition
+  execute_sbt_command:
+    description: |
+      A context within which SBT commands can be run correctly for our needs
+    parameters:
+      cmd:
+        # This may contain several commands.
+        # The caller needs to quote commands that contain spaces, e.g. "\"testOnly myTest\"".
+        type: string
+      timeout:
+        type: string
+        default: "25m"
+      succeed_on_error:
+        # Will cause the command to always succeed regardless of the sbt exit code.
+        # The original exit code will be available through the `STATUS` shell variable.
+        type: boolean
+        default: false
+      retry_fetch:
+        # If true, will send a few \r\n to sbt to ensure we download dependencies
+        type: string
+        default: "0"
+      extra_parameters:
+        type: string
+        default: ""
+    steps:
+      - run:
+          name: Executing "sbt << parameters.cmd >>"
+          # In general jobs should be terminated by << parameters.timeout >>. If that does not work for some reason,
+          # use CircleCi's no-output timeout.
+          # We choose a value of 1h, because that is the highest value for << parameters.timeout >> that we currently use.
+          no_output_timeout: 1h
+          command: |
+            on_exit() {
+              local CODE="$?"
+              # Export exit code for usage in subsequent steps
+              echo "export STATUS=$CODE" >> $BASH_ENV
+              # Provide some explanation on exit
+              if [ "$CODE" == 0 ]
+              then
+                echo "The script has terminated successfully."
+              elif [ "$CODE" == 124 ]
+              then
+                echo "sbt has been aborted with the TERM signal after << parameters.timeout >>."
+              elif [ "$CODE" == 137 ]
+              then
+                echo "sbt has been killed because it has allocated too much memory or it has ignored the TERM signal after << parameters.timeout >>."
+              else
+                echo "The script has failed with exit code $CODE."
+              fi
+              <<# parameters.succeed_on_error >>
+              echo "Overriding original exit code $CODE with zero."
+              exit 0
+              <</ parameters.succeed_on_error >>
+            }
+            trap on_exit EXIT
+
+            set -euo pipefail
+            . /home/circleci/.nix-profile/etc/profile.d/nix.sh
+
+            nix-shell shell.nix --pure --run bash \<<'EOF'
+               run_sbt() {
+                 # Define sbt command
+                 SBT_CMD=(sbt -verbose)
+
+
+                 # Add extra parameters
+                 SBT_CMD+=(<< parameters.extra_parameters >>)
+
+                 # Add sbt commands.
+                 # Do not quote this, to allow the caller to pass in several commands.
+                 # The caller needs to take care of quoting, if a command contains spaces.
+                 SBT_CMD+=(<< parameters.cmd >>)
+
+                 # Run command
+                 # also send a few newline characters to sbt to ensure we keep on downloading dependencies
+                 python3 -c "print ('r\n'*<< parameters.retry_fetch >>)" |
+                   timeout --kill-after=30s << parameters.timeout >> "${SBT_CMD[@]}" 2>&1 |
+                   tee sbt_output
+               }
+               run_sbt
+            EOF
+
+          environment:
+            # Necessary for tests of the REPL
+            TERM: dumb
+
+
+
 parameters:
   sdk-version:
     type: string
     default: "2.3.0-snapshot.20220606.10031.0.ce98be86" # sdk-version
 
 jobs:
+
+  test:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - execute_sbt_command:
+          cmd: "test:compile"
+          retry_fetch: "50"
+      - execute_sbt_command:
+          cmd: "test"
+          timeout: "10m"
+
 
   canton_coin:
     docker:
@@ -211,10 +315,13 @@ jobs:
              cd docs
              make html
            EOF
+
+
 workflows:
   version: 2
   build:
     jobs:
+    # CC Daml model
     - canton_coin:
         <<: *notify-fail
     - pay_with_cc:
@@ -223,5 +330,10 @@ workflows:
         <<: *notify-fail
     - upgrading_coin_2:
         <<: *notify-fail
+    # Documentation
     - docs:
         <<: *notify-fail
+    # Scala
+    - test:
+        <<: *notify-fail
+        
