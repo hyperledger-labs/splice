@@ -29,9 +29,27 @@ M3 - TestNet Launch.
 
 ## IntelliJ setup
 
-
-* Open the repository via 'File -> New -> Project from existing sources' (or via 'Project from version control') if you haven't cloned the repository yet
+* Clone the repository first, if you haven't yet
+* Run `which java` and `which sbt` within `the-real-canton-coin` directory to respectively find the JRE/SDK 
+    and sbt versions used by nix. The outputs should roughly look as follows: 
+    ```
+    the-real-canton-coin$ which java
+    /nix/store/rqii97havwmrzan6wk1lbh5nc48w821y-openjdk-11.0.15+10/bin/java
+    the-real-canton-coin$ which sbt
+    /nix/store/9q28hwzz8yy75l317k2v2mdq485hgja0-sbt-1.6.2/bin/sbt
+    ```
+* Add the Java SDK from nix per the instructions [in the Daml repo.](https://github.com/digital-asset/daml/blob/main/BAZEL.md#configuring-the-jdk-in-intellij)
+ In the example above, the JDK would be at `/nix/store/rqii97havwmrzan6wk1lbh5nc48w821y-openjdk-11.0.15+10/lib/openjdk`.
+* Open the repository via 'File -> New -> Project from existing sources' 
 * 'Import project from external model' and select sbt
-* Select a locally installed Java SDK and otherwise choose [these settings](https://i.imgur.com/8Lc8crR.png) (see explanations [here](https://www.jetbrains.com/help/idea/sbt.html))
+* Point IntelliJ to the JRE home and sbt-launch jar. From the example above, these should respectively be
+        `/nix/store/rqii97havwmrzan6wk1lbh5nc48w821y-openjdk-11.0.15+10/` and 
+        `/nix/store/9q28hwzz8yy75l317k2v2mdq485hgja0-sbt-1.6.2/share/sbt/bin/sbt-launch.jar`.
+* Also configure it with the JDK you added above. If the JDK doesn't show up as one of the options, you may need to 
+    choose any other SDK and set up the correct SDK for the project after following the rest of the steps. 
+    In that case, you will need to verify that all usages of the JDK in 'Settings' and 'Project Structure' use the correct
+    SDK.
+* Otherwise choose [these settings in the dialogue](https://i.imgur.com/B3yWCZ9.png) (see sbt explanations [here](https://www.jetbrains.com/help/idea/sbt.html))
 
-You should then a 'sbt shell' window in IntelliJ that allows you to build and test the Scala code.  
+You should then see a 'sbt shell' window in IntelliJ that allows you to build and test the Scala code while using the 
+same package references as nix. If IntelliJ asks you at the end if you want to overwrite any previous `.idea/*` files, say yes.  
