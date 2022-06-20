@@ -6,4 +6,10 @@ object Dependencies {
   lazy val scalatest_version = "3.2.9"
 
   lazy val scalatest = "org.scalatest" %% "scalatest" % scalatest_version
+
+  // Picked up automatically by the scalapb compiler. Contains common dependencies such as protocol buffers like google/protobuf/timestamp.proto
+  lazy val scalapb_runtime =
+    "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf"
+  lazy val scalapb_runtime_grpc =
+    "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
 }

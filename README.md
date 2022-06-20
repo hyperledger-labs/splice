@@ -26,3 +26,12 @@ delivery velocity using head-based development.
 
 We expect to start splitting off repositories as part of the work to deliver
 M3 - TestNet Launch.
+
+## IntelliJ setup
+
+
+* Open the repository via 'File -> New -> Project from existing sources' (or via 'Project from version control') if you haven't cloned the repository yet
+* 'Import project from external model' and select sbt
+* Select a locally installed Java SDK and otherwise choose [these settings](https://i.imgur.com/8Lc8crR.png) (see explanations [here](https://www.jetbrains.com/help/idea/sbt.html))
+
+You should then a 'sbt shell' window in IntelliJ that allows you to build and test the Scala code.  

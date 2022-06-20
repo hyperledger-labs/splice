@@ -1,0 +1,8 @@
+syntax = "proto3";
+package examples;
+
+import "google/protobuf/wrappers.proto";
+
+message SomeMessage {
+  google.protobuf.StringValue hello = 1;
+}
