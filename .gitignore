@@ -2,7 +2,6 @@
 *.dar
 *.log
 .DS_Store
-canton
 node_modules/
 build
 daml.js
@@ -13,3 +12,5 @@ _build/
 .idea/*
 target
 .bsp
+!canton/community/participant/src/test/resources/daml/illformed.dar
+!canton/community/participant/src/main/resources/dar/AdminWorkflows.dar

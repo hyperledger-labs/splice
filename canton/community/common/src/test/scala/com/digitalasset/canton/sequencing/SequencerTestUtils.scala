@@ -1,0 +1,85 @@
+// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
+// SPDX-License-Identifier: Apache-2.0
+
+package com.digitalasset.canton.sequencing
+
+import com.digitalasset.canton.BaseTest
+import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.protocol.TestDomainParameters
+import com.digitalasset.canton.sequencing.protocol.{
+  Batch,
+  ClosedEnvelope,
+  Deliver,
+  MessageId,
+  SequencedEvent,
+  SignedContent,
+}
+import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
+import com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence
+import com.digitalasset.canton.topology.{DefaultTestIdentities, DomainId}
+import com.google.protobuf.ByteString
+
+object SequencerTestUtils extends BaseTest {
+
+  object MockMessageContent {
+    private val bytes = ByteString.copyFromUtf8("serialized-mock-message")
+    def toByteString: ByteString = bytes
+    def fromByteString(
+        bytes: ByteString
+    ): ParsingResult[MockMessageContent.type] =
+      Right(MockMessageContent)
+  }
+
+  def sign[M <: ProtocolVersionedMemoizedEvidence](content: M): SignedContent[M] =
+    SignedContent(content, SymbolicCrypto.emptySignature, None)
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def mockDeliverClosedEnvelope(
+      counter: Long = 0L,
+      timestamp: CantonTimestamp = CantonTimestamp.Epoch,
+      domainId: DomainId = DefaultTestIdentities.domainId,
+      deserializedFrom: Option[ByteString] = None,
+      messageId: Option[MessageId] = Some(MessageId.tryCreate("mock-deliver")),
+  ): Deliver[ClosedEnvelope] = {
+    val batch = Batch.empty(defaultProtocolVersion)
+
+    val deliver = Deliver.create[ClosedEnvelope](
+      counter,
+      timestamp,
+      domainId,
+      messageId,
+      batch,
+      TestDomainParameters.defaultStatic.protocolVersion,
+    )
+
+    deserializedFrom match {
+      case Some(bytes) =>
+        // Somehow ugly way to tweak the `deserializedFrom` attribute of Deliver
+        SequencedEvent
+          .fromProtoWithV0(ClosedEnvelope.fromProtoV0)(deliver.toProtoV0, bytes)
+          .value
+          .asInstanceOf[Deliver[ClosedEnvelope]]
+
+      case None => deliver
+    }
+  }
+
+  def mockDeliver(
+      counter: Long = 0L,
+      timestamp: CantonTimestamp = CantonTimestamp.Epoch,
+      domainId: DomainId = DefaultTestIdentities.domainId,
+      messageId: Option[MessageId] = Some(MessageId.tryCreate("mock-deliver")),
+  ): Deliver[Nothing] = {
+    val batch = Batch.empty(defaultProtocolVersion)
+    Deliver.create[Nothing](
+      counter,
+      timestamp,
+      domainId,
+      messageId,
+      batch,
+      TestDomainParameters.defaultStatic.protocolVersion,
+    )
+  }
+
+}

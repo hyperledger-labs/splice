@@ -130,6 +130,9 @@ commands:
                  # The caller needs to take care of quoting, if a command contains spaces.
                  SBT_CMD+=(<< parameters.cmd >>)
 
+                 # Setup heap size; corresponds to Canton large executors
+                 SBT_CMD+=("-J-Xmx5000M" "-J-Xms5000M")
+
                  # Run command
                  # also send a few newline characters to sbt to ensure we keep on downloading dependencies
                  python3 -c "print ('r\n'*<< parameters.retry_fetch >>)" |

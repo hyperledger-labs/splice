@@ -1,3 +1,4 @@
+import BuildCommon.sharedCantonSettings
 import Dependencies._
 
 /*
@@ -6,19 +7,40 @@ import Dependencies._
 
 BuildCommon.sbtSettings
 
-lazy val sharedSettings: Seq[Def.Setting[_]] = Seq(
-  libraryDependencies += scalatest % Test
-)
+// sbt insists on these redeclarations
+lazy val `canton-community-app` = BuildCommon.`canton-community-app`
+lazy val `canton-community-common` = BuildCommon.`canton-community-common`
+lazy val `canton-community-domain` = BuildCommon.`canton-community-domain`
+lazy val `canton-community-participant` = BuildCommon.`canton-community-participant`
+lazy val `canton-blake2b` = BuildCommon.`canton-blake2b`
+lazy val `canton-functionmeta` = BuildCommon.`canton-functionmeta`
+lazy val `canton-slick-fork` = BuildCommon.`canton-slick-fork`
+lazy val `canton-daml-fork` = BuildCommon.`canton-daml-fork`
+lazy val `canton-wartremover-extension` = BuildCommon.`canton-wartremover-extension`
 
 /*
  * Root project
  */
 lazy val root = (project in file("."))
-  .aggregate(`apps-common`, `apps-validator`)
-  .settings(sharedSettings, scalacOptions += "-Wconf:src=src_managed/.*:silent")
+  .aggregate(`apps-common`,
+    `apps-validator`,
+    `canton-community-common`,
+    `canton-blake2b`,
+    `canton-slick-fork`,
+    `canton-daml-fork`,
+    `canton-functionmeta`,
+    `canton-wartremover-extension`,
+    `canton-community-app`,
+    `canton-community-domain`,
+    `canton-community-participant`
+  )
+  .settings(BuildCommon.sharedSettings, scalacOptions += "-Wconf:src=src_managed/.*:silent")
 
 lazy val `apps-common` =
-  project.in(file("apps/common")).settings(sharedSettings)
+  project.in(file("apps/common"))
+  // make Canton code available to CC repo
+  .dependsOn(`canton-community-common`, `canton-community-app`)
+    .settings(BuildCommon.sharedSettings, BuildCommon.cantonWarts)
 
 lazy val `apps-validator` =
   project
@@ -26,7 +48,8 @@ lazy val `apps-validator` =
     .dependsOn(`apps-common` % "compile->compile;test->test")
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
-      sharedSettings,
+      BuildCommon.sharedSettings,
+      BuildCommon.cantonWarts,
       Compile / PB.targets := Seq(
         scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
       ),
