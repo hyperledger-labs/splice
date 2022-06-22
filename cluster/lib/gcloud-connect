@@ -1,0 +1,5 @@
+### Connect kubectl to the Canton Network cluster
+
+echo "Connecting to cluster ${GCP_PROJECT_NAME}/${GCP_CLUSTER_NAME}"
+
+gcloud container clusters get-credentials ${GCP_CLUSTER_NAME}

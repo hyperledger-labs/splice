@@ -1,0 +1,26 @@
+### Setup the gcloud command line tool so that it is authenticated and
+### connected to the project specified in the variable GCP_PROJECT_NAME
+
+# Check for an authenticated gcloud account
+
+N_ACCOUNTS=$(gcloud auth list --format 'value(account)' | wc -l)
+
+if [ "${N_ACCOUNTS}" -eq "0" ]; then
+    echo "There is not an autheticated gcloud account. You must login."
+    gcloud auth login
+fi
+
+# Check for the expected project.
+
+gcloud config set compute/region us-central1
+
+GCP_PROJECT_ID=$(gcloud projects list --filter "name:${GCP_PROJECT_NAME}" --format 'value(project_id)')
+
+if [ -z "${GCP_PROJECT_ID}" ]; then
+    echo "Cannot find GCP Project with expected name: ${GCP_PROJECT_NAME}"
+    exit 1
+fi
+
+echo "GCP Project ID: ${GCP_PROJECT_ID}"
+
+gcloud config set project ${GCP_PROJECT_ID}

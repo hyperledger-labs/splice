@@ -5,5 +5,3 @@ source config
 
 source lib/gcloud-setup
 source lib/gcloud-connect
-
-source lib/gcloud-apply

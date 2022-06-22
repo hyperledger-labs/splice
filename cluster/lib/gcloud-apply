@@ -1,0 +1,3 @@
+### Apply a configuration to the current cluster
+
+kubectl apply -f canton-network-config.yaml
