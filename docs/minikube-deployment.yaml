@@ -18,8 +18,8 @@ spec:
     spec:
       containers:
       - name: docs
-        image: docs:latest
-        imagePullPolicy: Never
+        image: us-central1-docker.pkg.dev/cn-devnet-353712/cn-devnet-images/docs:latest
+        imagePullPolicy: Always
         ports:
         - containerPort: 80
 ---

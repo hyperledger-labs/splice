@@ -13,6 +13,7 @@ in pkgs.mkShell {
     docker
     kubectl
     minikube
+    google-cloud-sdk
     nodejs
     sbt
     sphinx
@@ -21,7 +22,5 @@ in pkgs.mkShell {
     x86Pkgs.sphinx-autobuild
     python3Packages.sphinx_rtd_theme
     openjdk11
-    google-cloud-sdk
-    kubectl
   ];
 }

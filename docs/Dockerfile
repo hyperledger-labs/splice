@@ -1,2 +1,2 @@
 FROM nginx
-COPY _build/html /usr/share/nginx/html
+COPY target/ /usr/share/nginx/html/

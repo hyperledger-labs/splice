@@ -1,0 +1,20 @@
+#!/bin/sh
+
+TARGET=$1
+if [ "$TARGET" == "" ]; then
+    echo "Usage:\t ./image-push <DIRECTORY>"
+    exit 1
+fi
+
+set -euo pipefail
+
+if [ ! -d "$REPO_ROOT/$TARGET" ]; then
+    echo "Target $TARGET is not a directory."
+    exit 1
+fi
+
+source config
+source lib/gcloud-setup
+source lib/image-prefix
+
+docker push $(get_full_image_name $TARGET)
