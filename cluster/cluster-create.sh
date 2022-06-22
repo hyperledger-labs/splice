@@ -7,9 +7,9 @@ source lib/gcloud-setup
 
 #### Check for existing cluster
 
-N_CLUSTERS=$(gcloud container clusters list --filter "name:${GCP_CLUSTER_NAME}"  --format 'value(name)' | wc -l)
+CLUSTER=$(gcloud container clusters list --filter "name:${GCP_CLUSTER_NAME}"  --format 'value(name)')
 
-if [ "${N_CLUSTERS}" -gt "0" ]; then
+if [ -n "${CLUSTER}" ]; then
     echo "Cluster already exists, ending."
     exit 0
 fi
@@ -20,7 +20,18 @@ echo "Creating cluster: ${GCP_CLUSTER_NAME}"
 
 gcloud container clusters create ${GCP_CLUSTER_NAME}
 
-echo "Cluster created, connecting and applying configuration."
+#### Check for IP
+
+CLUSTER_IP=$(gcloud compute addresses list --global --filter "name:${GCP_IP_NAME}" --format 'value(address)')
+
+if [ -z "${CLUSTER_IP}" ]; then
+    echo "Allocating IP address."
+    gcloud compute addresses create ${GCP_IP_NAME} --global
+fi
+
+CLUSTER_IP=$(gcloud compute addresses list --global --filter "name:${GCP_IP_NAME}" --format 'value(address)')
+
+echo "Cluster created (IP: ${CLUSTER_IP}), applying configuration."
 
 source lib/gcloud-connect
 source lib/gcloud-apply
