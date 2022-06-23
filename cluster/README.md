@@ -7,21 +7,27 @@ deleting the cluster, and updating it with a new configuration.
 All of these scripts must be run from within this directory, and none
 of them take command line arguments of any kind.
 
-* `cluster-create.sh` - Create the cluster and apply a configuration
+* `cluster-create` - Create the cluster and apply a configuration
   if it does not already exist.
-* `cluster-connect.sh` - Connect to a cluster that already exists,
-    allowing `kubectl` commands to be used to inspect and manage state.
-* `cluster-apply.sh` - Apply the configuration from
+* `cluster-connect` - Connect to a cluster that already exists,
+   allowing `kubectl` commands to be used to inspect and manage state.
+* `cluster-apply` - Apply the configuration from
   `canton-network-config.yaml` into the cluster.
-* `cluster-delete.sh` - Ask for interactive confirmation and delete
+* `cluster-delete` - Ask for interactive confirmation and delete
   the cluster if it exists.
 
 ## Configuration Settings
 
-These scripts do not take command line options and are currently
-designed to manage a single instance of a Canton Network cluster, for
-the M1 Devnet.
+These scripts take configuration settings via the environment. The
+following variables are required to be present, and an error will be
+thrown if they are missing.
 
-However, if there is a need to run the scripts against an alternate
-GCP Project or Cluster, both of those configurations are stored in
-[`config`](https://github.com/DACH-NY/the-real-canton-coin/blob/main/cluster/config).
+| Variable Name      | Meaning                                                               |
+| ------------------ | --------------------------------------------------------------------- |
+| `GCP_PROJECT_NAME` | Name of the Google Cloud project in which the cluster is located.     |
+| `GCP_CLUSTER_NAME` | Name of the GKE cluster within the cloud project.                     |
+| `GCP_REPO_NAME`    | Name of the image repository used to manage project container images. |
+| `GCP_IP_NAME`      | Name of the publically exposed IP address assigned to the cluster.    |
+
+
+#!/usr/bin/env bash

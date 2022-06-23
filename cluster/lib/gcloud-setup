@@ -1,7 +1,25 @@
 ### Setup the gcloud command line tool so that it is authenticated and
 ### connected to the project specified in the variable GCP_PROJECT_NAME
 
-# Check for an authenticated gcloud account
+### Look for expected configuration variables
+
+function expect() {
+    if [ -z "$2" ]; then
+        echo "Missing environment variable: $1"
+        exit 1
+    fi
+
+    echo "$1=$2"
+}
+
+set +u
+expect GCP_PROJECT_NAME ${GCP_PROJECT_NAME}
+expect GCP_CLUSTER_NAME ${GCP_CLUSTER_NAME}
+expect GCP_REPO_NAME ${GCP_REPO_NAME}
+expect GCP_IP_NAME ${GCP_IP_NAME}
+set -u
+
+### Check for an authenticated gcloud account
 
 N_ACCOUNTS=$(gcloud auth list --format 'value(account)' | wc -l)
 
