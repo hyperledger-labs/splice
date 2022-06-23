@@ -140,7 +140,7 @@ object CantonDependencies {
   lazy val logback_classic =
     "ch.qos.logback" % "logback-classic" % logback_version excludeAll ExclusionRule(
       organization = "org.slf4j",
-      name = "slf4j-api"
+      name = "slf4j-api",
     )
 
   lazy val logback_core = "ch.qos.logback" % "logback-core" % logback_version

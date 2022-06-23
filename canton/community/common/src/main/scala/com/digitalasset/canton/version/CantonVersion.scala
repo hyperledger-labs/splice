@@ -14,19 +14,12 @@ import com.digitalasset.canton.buildinfo.BuildInfo
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.error.CantonErrorGroups.HandshakeErrorGroup
-import com.digitalasset.canton.logging.{
-  ErrorLoggingContext,
-  NamedLoggerFactory,
-  NamedLogging
-}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.CantonVersion.releaseVersionToProtocolVersions
-import com.digitalasset.canton.version.ProtocolVersion.{
-  InvalidProtocolVersion,
-  UnsupportedVersion
-}
+import com.digitalasset.canton.version.ProtocolVersion.{InvalidProtocolVersion, UnsupportedVersion}
 import com.google.common.annotations.VisibleForTesting
 import pureconfig.error.FailureReason
 import pureconfig.{ConfigReader, ConfigWriter}
@@ -59,29 +52,26 @@ sealed trait CantonVersion extends Ordered[CantonVersion] with PrettyPrinting {
     else if (this.patch != that.patch) this.patch compare that.patch
     else suffixComparison(this.optSuffix, that.optSuffix)
 
-  def suffixComparison(maybeSuffix1: Option[String],
-                       maybeSuffix2: Option[String]): Int = {
+  def suffixComparison(maybeSuffix1: Option[String], maybeSuffix2: Option[String]): Int = {
     (maybeSuffix1, maybeSuffix2) match {
-      case (None, None)    => 0
+      case (None, None) => 0
       case (None, Some(_)) => 1
       case (Some(_), None) => -1
       case (Some(suffix1), Some(suffix2)) =>
         suffixComparisonInternal(
           suffix1.split("\\.").toSeq,
-          suffix2.split("\\.").toSeq
+          suffix2.split("\\.").toSeq,
         )
     }
   }
 
-  private def suffixComparisonInternal(suffixes1: Seq[String],
-                                       suffixes2: Seq[String]): Int = {
+  private def suffixComparisonInternal(suffixes1: Seq[String], suffixes2: Seq[String]): Int = {
     // partially adapted (and generalised) from gist.github.com/huntc/35f6cec0a47ce7ef62c0 (Apache 2 license)
     type PreRelease = Either[String, Int]
     def toPreRelease(s: String): PreRelease =
       Try(Right(s.toInt)).getOrElse(Left(s))
 
-    def comparePreReleases(preRelease: PreRelease,
-                           thatPreRelease: PreRelease): Int =
+    def comparePreReleases(preRelease: PreRelease, thatPreRelease: PreRelease): Int =
       (preRelease, thatPreRelease) match {
         case (Left(str1), Left(str2)) =>
           str1 compare str2
@@ -94,10 +84,11 @@ sealed trait CantonVersion extends Ordered[CantonVersion] with PrettyPrinting {
       }
 
     @tailrec
-    def go(suffix1: Option[String],
-           suffix2: Option[String],
-           tail1: Seq[String],
-           tail2: Seq[String],
+    def go(
+        suffix1: Option[String],
+        suffix2: Option[String],
+        tail1: Seq[String],
+        tail2: Seq[String],
     ): Int = {
       (suffix1, suffix2) match {
         case (None, None) => 0
@@ -117,7 +108,7 @@ sealed trait CantonVersion extends Ordered[CantonVersion] with PrettyPrinting {
       suffixes1.headOption,
       suffixes2.headOption,
       suffixes1.drop(1),
-      suffixes2.drop(1)
+      suffixes2.drop(1),
     )
   }
 }
@@ -128,8 +119,7 @@ object CantonVersion {
   // At some point after Daml 3.0, this Map may diverge for domain and participant because we have
   // different compatibility guarantees for participants and domains and we will need to add separate maps for each
   // don't make `releaseVersionToProtocolVersions` private - it's used in `console-reference.canton`
-  val releaseVersionToProtocolVersions
-    : Map[ReleaseVersion, NonEmpty[List[ProtocolVersion]]] = Map(
+  val releaseVersionToProtocolVersions: Map[ReleaseVersion, NonEmpty[List[ProtocolVersion]]] = Map(
     ReleaseVersion.v2_0_0_snapshot -> List(v2_0_0),
     ReleaseVersion.v2_0_0 -> List(v2_0_0),
     ReleaseVersion.v2_0_1 -> List(v2_0_0),
@@ -151,7 +141,7 @@ object CantonVersion {
 
 sealed trait CompanionTrait {
   protected def createInternal(
-    rawVersion: String
+      rawVersion: String
   ): Either[String, (Int, Int, Int, Option[String])] = {
     val dev = ProtocolVersion.unstable_development.fullVersion
 
@@ -159,8 +149,8 @@ sealed trait CompanionTrait {
     val regex = raw"([0-9]{1,3})\.([0-9]{1,3})\.([0-9]{1,4})(?:-(.*))?".r
     rawVersion match {
       case regex(rawMajor, rawMinor, rawPatch, suffix) =>
-        val parsedDigits = List(rawMajor, rawMinor, rawPatch).traverse(
-          raw => raw.toIntOption.toRight(s"Couldn't parse number $raw")
+        val parsedDigits = List(rawMajor, rawMinor, rawPatch).traverse(raw =>
+          raw.toIntOption.toRight(s"Couldn't parse number $raw")
         )
         parsedDigits.flatMap {
           case List(major, minor, patch) =>
@@ -185,18 +175,18 @@ sealed trait CompanionTrait {
   * Please refer to the [[https://www.canton.io/docs/stable/user-manual/usermanual/versioning.html versioning documentation]]
   * in the user manual for details.
   */
-final case class ReleaseVersion(major: Int,
-                                minor: Int,
-                                patch: Int,
-                                optSuffix: Option[String] = None,
+final case class ReleaseVersion(
+    major: Int,
+    minor: Int,
+    patch: Int,
+    optSuffix: Option[String] = None,
 ) extends CantonVersion
 
 object ReleaseVersion extends CompanionTrait {
 
   def create(rawVersion: String): Either[String, ReleaseVersion] =
-    createInternal(rawVersion).map {
-      case (major, minor, patch, optSuffix) =>
-        new ReleaseVersion(major, minor, patch, optSuffix)
+    createInternal(rawVersion).map { case (major, minor, patch, optSuffix) =>
+      new ReleaseVersion(major, minor, patch, optSuffix)
     }
   def tryCreate(rawVersion: String): ReleaseVersion =
     create(rawVersion).fold(sys.error, identity)
@@ -251,10 +241,11 @@ object ReleaseVersion extends CompanionTrait {
   */
 // Internal only: for the full background, please refer to the following [design doc](https://docs.google.com/document/d/1kDiN-373bZOWploDrtOJ69m_0nKFu_23RNzmEXQOFc8/edit?usp=sharing).
 // or [code walkthrough](https://drive.google.com/file/d/199wHq-P5pVPkitu_AYLR4V3i0fJtYRPg/view?usp=sharing)
-final case class ProtocolVersion(major: Int,
-                                 minor: Int,
-                                 patch: Int,
-                                 optSuffix: Option[String] = None,
+final case class ProtocolVersion(
+    major: Int,
+    minor: Int,
+    patch: Int,
+    optSuffix: Option[String] = None,
 ) extends CantonVersion
 
 object ProtocolVersion extends CompanionTrait {
@@ -272,9 +263,8 @@ object ProtocolVersion extends CompanionTrait {
   val latestForTest: ProtocolVersion = latest
 
   def create(rawVersion: String): Either[String, ProtocolVersion] =
-    createInternal(rawVersion).map {
-      case (major, minor, patch, optSuffix) =>
-        new ProtocolVersion(major, minor, patch, optSuffix)
+    createInternal(rawVersion).map { case (major, minor, patch, optSuffix) =>
+      new ProtocolVersion(major, minor, patch, optSuffix)
     }
 
   def tryCreate(rawVersion: String): ProtocolVersion =
@@ -284,7 +274,7 @@ object ProtocolVersion extends CompanionTrait {
     ProtocolVersion.create(rawVersion).leftMap(StringConversionError)
 
   private def getDevelopmentVersions(
-    includeDevelopmentVersions: Boolean
+      includeDevelopmentVersions: Boolean
   ): List[ProtocolVersion] =
     if (includeDevelopmentVersions)
       List(ProtocolVersion.unstable_development)
@@ -292,9 +282,9 @@ object ProtocolVersion extends CompanionTrait {
 
   /** Returns the protocol versions supported by the participant of the current release.
     */
-  def supportedProtocolsParticipant(release: ReleaseVersion =
-                                      ReleaseVersion.current,
-                                    includeDevelopmentVersions: Boolean,
+  def supportedProtocolsParticipant(
+      release: ReleaseVersion = ReleaseVersion.current,
+      includeDevelopmentVersions: Boolean,
   ): NonEmpty[List[ProtocolVersion]] = {
     releaseVersionToProtocolVersions.getOrElse(
       release,
@@ -306,8 +296,9 @@ object ProtocolVersion extends CompanionTrait {
 
   /** Returns the protocol versions supported by the domain of the current release.
     */
-  def supportedProtocolsDomain(release: ReleaseVersion = ReleaseVersion.current,
-                               includeDevelopmentVersions: Boolean,
+  def supportedProtocolsDomain(
+      release: ReleaseVersion = ReleaseVersion.current,
+      includeDevelopmentVersions: Boolean,
   ): NonEmpty[List[ProtocolVersion]] = {
     releaseVersionToProtocolVersions.getOrElse(
       release,
@@ -319,15 +310,13 @@ object ProtocolVersion extends CompanionTrait {
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def getLatestSupportedProtocolDomain(
-    release: ReleaseVersion
+      release: ReleaseVersion
   ): ProtocolVersion = {
     supportedProtocolsDomain(release, includeDevelopmentVersions = false).max
   }
 
-  final case class InvalidProtocolVersion(override val description: String)
-      extends FailureReason
-  final case class UnsupportedVersion(version: ProtocolVersion,
-                                      supported: Seq[ProtocolVersion])
+  final case class InvalidProtocolVersion(override val description: String) extends FailureReason
+  final case class UnsupportedVersion(version: ProtocolVersion, supported: Seq[ProtocolVersion])
       extends FailureReason {
     override def description: String =
       s"CantonVersion $version is not supported! The supported versions are ${supported.map(_.toString).mkString(", ")}. Please configure one of these protocol versions in the DomainParameters. "
@@ -351,9 +340,9 @@ object ProtocolVersion extends CompanionTrait {
     * node is on the same version.
     */
   def canClientConnectToServer(
-    clientSupportedVersions: Seq[ProtocolVersion],
-    server: ProtocolVersion,
-    clientMinimumProtocolVersion: Option[ProtocolVersion],
+      clientSupportedVersions: Seq[ProtocolVersion],
+      server: ProtocolVersion,
+      clientMinimumProtocolVersion: Option[ProtocolVersion],
   ): Either[HandshakeError, Unit] = {
     val clientSupportsRequiredVersion = clientSupportedVersions.contains(server)
     val clientMinVersionLargerThanReqVersion =
@@ -366,7 +355,7 @@ object ProtocolVersion extends CompanionTrait {
         MinProtocolError(
           server,
           clientMinimumProtocolVersion,
-          clientSupportsRequiredVersion
+          clientSupportsRequiredVersion,
         )
       )
     else if (!clientSupportsRequiredVersion)
@@ -387,25 +376,25 @@ object ProtocolVersion extends CompanionTrait {
 }
 
 /** This class represents a revision of the Sequencer.sol contract. */
-final case class EthereumContractVersion(major: Int,
-                                         minor: Int,
-                                         patch: Int,
-                                         optSuffix: Option[String] = None,
+final case class EthereumContractVersion(
+    major: Int,
+    minor: Int,
+    patch: Int,
+    optSuffix: Option[String] = None,
 ) extends CantonVersion
 
 object EthereumContractVersion extends CompanionTrait {
 
   def create(rawVersion: String): Either[String, EthereumContractVersion] =
-    createInternal(rawVersion).map {
-      case (major, minor, patch, optSuffix) =>
-        new EthereumContractVersion(major, minor, patch, optSuffix)
+    createInternal(rawVersion).map { case (major, minor, patch, optSuffix) =>
+      new EthereumContractVersion(major, minor, patch, optSuffix)
     }
   def tryCreate(rawVersion: String): EthereumContractVersion =
     create(rawVersion).fold(sys.error, identity)
 
   /** Which revisions of the Sequencer.sol contract are supported and can be deployed by a certain release? */
   def tryReleaseVersionToEthereumContractVersions(
-    v: ReleaseVersion
+      v: ReleaseVersion
   ): NonEmpty[List[EthereumContractVersion]] = {
     assert(CantonVersion.releaseVersionToProtocolVersions.contains(v))
     if (v < ReleaseVersion.v2_3_0_snapshot)
@@ -431,9 +420,9 @@ sealed trait HandshakeError {
 }
 
 final case class MinProtocolError(
-  server: ProtocolVersion,
-  clientMinimumProtocolVersion: Option[ProtocolVersion],
-  clientSupportsRequiredVersion: Boolean,
+    server: ProtocolVersion,
+    clientMinimumProtocolVersion: Option[ProtocolVersion],
+    clientSupportsRequiredVersion: Boolean,
 ) extends HandshakeError {
   override def description: String =
     s"The version required by the domain (${server.fullVersion}) is lower than the minimum version configured by the participant (${clientMinimumProtocolVersion
@@ -443,8 +432,8 @@ final case class MinProtocolError(
 }
 
 final case class VersionNotSupportedError(
-  server: ProtocolVersion,
-  clientSupportedVersions: Seq[ProtocolVersion],
+    server: ProtocolVersion,
+    clientSupportedVersions: Seq[ProtocolVersion],
 ) extends HandshakeError {
   override def description: String =
     s"The protocol version required by the server (${server.fullVersion}) is not among the supported protocol versions by the client $clientSupportedVersions. "
@@ -455,25 +444,24 @@ object HandshakeErrors extends HandshakeErrorGroup {
   object UnsafePvVersion2_0_0
       extends ErrorCode(
         "PROTOCOL_VERSION_2_0_0_IS_UNSAFE",
-        MaliciousOrFaultyBehaviour
+        MaliciousOrFaultyBehaviour,
       ) {
-    case class WarnSequencerClient(domainAlias: DomainAlias)(
-      implicit
-      val loggingContext: ErrorLoggingContext
+    case class WarnSequencerClient(domainAlias: DomainAlias)(implicit
+        val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           s"This node is connecting to a sequencer using the unsafe protocol version " +
             s"2.0.0 which should not be used in production. We recommend only connecting to sequencers with a later protocol version (such as 3.0.0)."
         )
-    case class WarnDomain(name: InstanceName)(
-      implicit val loggingContext: ErrorLoggingContext
+    case class WarnDomain(name: InstanceName)(implicit
+        val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           s"This domain node is configured to use the unsafe protocol version " +
             s"2.0.0 which should not be used in production. We recommend migrating to a later protocol version (such as 3.0.0)."
         )
 
     case class WarnParticipant(
-      name: InstanceName,
-      minimumProtocolVersion: Option[ProtocolVersion]
+        name: InstanceName,
+        minimumProtocolVersion: Option[ProtocolVersion],
     )(implicit val loggingContext: ErrorLoggingContext)
         extends CantonError.Impl(
           s"This participant node's configured minimum protocol version does not exclude the unsafe protocol version " +
@@ -492,11 +480,9 @@ final case class DomainProtocolVersion(version: ProtocolVersion) {
   def unwrap: ProtocolVersion = version
 }
 object DomainProtocolVersion {
-  implicit val domainProtocolVersionWriter
-    : ConfigWriter[DomainProtocolVersion] =
+  implicit val domainProtocolVersionWriter: ConfigWriter[DomainProtocolVersion] =
     ConfigWriter.toString(_.version.fullVersion)
-  lazy implicit val domainProtocolVersionReader
-    : ConfigReader[DomainProtocolVersion] = {
+  lazy implicit val domainProtocolVersionReader: ConfigReader[DomainProtocolVersion] = {
     ConfigReader.fromString[DomainProtocolVersion] { str =>
       for {
         version <- ProtocolVersion
@@ -529,11 +515,9 @@ final case class ParticipantProtocolVersion(version: ProtocolVersion) {
   def unwrap: ProtocolVersion = version
 }
 object ParticipantProtocolVersion {
-  implicit val participantProtocolVersionWriter
-    : ConfigWriter[ParticipantProtocolVersion] =
+  implicit val participantProtocolVersionWriter: ConfigWriter[ParticipantProtocolVersion] =
     ConfigWriter.toString(_.version.fullVersion)
-  lazy implicit val participantProtocolVersionReader
-    : ConfigReader[ParticipantProtocolVersion] = {
+  lazy implicit val participantProtocolVersionReader: ConfigReader[ParticipantProtocolVersion] = {
     ConfigReader.fromString[ParticipantProtocolVersion] { str =>
       for {
         version <- ProtocolVersion

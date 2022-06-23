@@ -7,11 +7,7 @@ import com.daml.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.digitalasset.canton.ProtoDeserializationError.ProtoDeserializationFailure
 import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.error.CantonErrorGroups.ProtoDeserializationErrorGroup
-import com.digitalasset.canton.logging.{
-  ErrorLoggingContext,
-  NamedLoggerFactory,
-  NamedLogging
-}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.serialization.DeserializationError
 import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.InvalidProtocolBufferException
@@ -34,7 +30,7 @@ sealed trait ProtoDeserializationError extends Product with Serializable {
     ProtoDeserializationFailure.Wrap(this)
 
   def inField(
-    field: String
+      field: String
   ): ProtoDeserializationError.ValueDeserializationError =
     ProtoDeserializationError.ValueDeserializationError(field, message)
 
@@ -50,42 +46,31 @@ object ProtoDeserializationError extends ProtoDeserializationErrorGroup {
       extends ProtoDeserializationError {
     override val message = error.message
   }
-  final case class TransactionDeserialization(message: String)
-      extends ProtoDeserializationError
+  final case class TransactionDeserialization(message: String) extends ProtoDeserializationError
   final case class ValueDeserializationError(field: String, message: String)
       extends ProtoDeserializationError
-  final case class StringConversionError(message: String)
-      extends ProtoDeserializationError
-  final case class UnrecognizedField(message: String)
-      extends ProtoDeserializationError
-  final case class UnrecognizedEnum(field: String, value: Int)
-      extends ProtoDeserializationError {
+  final case class StringConversionError(message: String) extends ProtoDeserializationError
+  final case class UnrecognizedField(message: String) extends ProtoDeserializationError
+  final case class UnrecognizedEnum(field: String, value: Int) extends ProtoDeserializationError {
     override val message = s"Unrecognized value `$value` in enum field `$field`"
   }
-  final case class FieldNotSet(field: String)
-      extends ProtoDeserializationError {
+  final case class FieldNotSet(field: String) extends ProtoDeserializationError {
     override val message = s"Field `$field` is not set"
   }
-  final case class NotImplementedYet(className: String)
-      extends ProtoDeserializationError {
+  final case class NotImplementedYet(className: String) extends ProtoDeserializationError {
     override val message = className
   }
-  final case class TimestampConversionError(message: String)
-      extends ProtoDeserializationError
-  final case class TimeModelConversionError(message: String)
-      extends ProtoDeserializationError
+  final case class TimestampConversionError(message: String) extends ProtoDeserializationError
+  final case class TimeModelConversionError(message: String) extends ProtoDeserializationError
   final case class ValueConversionError(field: String, error: String)
       extends ProtoDeserializationError {
     override val message = s"Unable to convert field `$field`: $error"
   }
-  final case class SubmissionIdConversionError(message: String)
-      extends ProtoDeserializationError
-  final case class InvariantViolation(error: String)
-      extends ProtoDeserializationError {
+  final case class SubmissionIdConversionError(message: String) extends ProtoDeserializationError
+  final case class InvariantViolation(error: String) extends ProtoDeserializationError {
     override def message = error
   }
-  final case class UnknownGrpcCodeError(error: String)
-      extends ProtoDeserializationError {
+  final case class UnknownGrpcCodeError(error: String) extends ProtoDeserializationError {
     override def message = error
   }
   final case class VersionError(versionedMessage: String, invalidVersion: Int)
@@ -111,9 +96,8 @@ object ProtoDeserializationError extends ProtoDeserializationErrorGroup {
         id = "PROTO_DESERIALIZATION_FAILURE",
         ErrorCategory.InvalidIndependentOfSystemState,
       ) {
-    case class Wrap(reason: ProtoDeserializationError)(
-      implicit
-      val loggingContext: ErrorLoggingContext
+    case class Wrap(reason: ProtoDeserializationError)(implicit
+        val loggingContext: ErrorLoggingContext
     ) extends CantonError.Impl(
           cause = "Deserialization of protobuf message failed"
         )

@@ -18,11 +18,22 @@ lazy val `canton-slick-fork` = BuildCommon.`canton-slick-fork`
 lazy val `canton-daml-fork` = BuildCommon.`canton-daml-fork`
 lazy val `canton-wartremover-extension` = BuildCommon.`canton-wartremover-extension`
 
+inThisBuild(
+  List(
+    semanticdbEnabled := true,
+    semanticdbVersion := scalafixSemanticdb.revision,
+    scalafixDependencies ++= List(
+      "com.github.liancheng" %% "organize-imports" % "0.6.0"
+    ),
+  )
+)
+
 /*
  * Root project
  */
 lazy val root = (project in file("."))
-  .aggregate(`apps-common`,
+  .aggregate(
+    `apps-common`,
     `apps-validator`,
     `canton-community-common`,
     `canton-blake2b`,
@@ -32,14 +43,15 @@ lazy val root = (project in file("."))
     `canton-wartremover-extension`,
     `canton-community-app`,
     `canton-community-domain`,
-    `canton-community-participant`
+    `canton-community-participant`,
   )
   .settings(BuildCommon.sharedSettings, scalacOptions += "-Wconf:src=src_managed/.*:silent")
 
 lazy val `apps-common` =
-  project.in(file("apps/common"))
-  // make Canton code available to CC repo
-  .dependsOn(`canton-community-common`, `canton-community-app`)
+  project
+    .in(file("apps/common"))
+    // make Canton code available to CC repo
+    .dependsOn(`canton-community-common`, `canton-community-app`)
     .settings(BuildCommon.sharedSettings, BuildCommon.cantonWarts)
 
 lazy val `apps-validator` =

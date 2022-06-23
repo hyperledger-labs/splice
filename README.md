@@ -53,3 +53,26 @@ M3 - TestNet Launch.
 
 You should then see a 'sbt shell' window in IntelliJ that allows you to build and test the Scala code while using the 
 same package references as nix. If IntelliJ asks you at the end if you want to overwrite any previous `.idea/*` files, say yes.  
+
+## sbt
+### sbt settings
+Make sure to configure the JVM heap size to at least 4G when using IntelliJ. In particular:
+- In Intellij, under Settings, search for "sbt" and then under JRE add `-Xmx4G -Xms2G` to VM Parameters.
+- In Intellij in the same menu, set the maximum heap size to at least 4000M.
+
+### sbt Commands
+
+This Section gives an overview of common sbt commands.
+More commands can be found in build.sbt and BuildCommon.scala.
+
+- `compile`: compile production code (excluding test code)
+- `test:compile`: compile production and test code
+- `apps-common/compile`: compile production code of the `apps-common` subproject
+- `scalafixAll`: invoke scalafix across all configurations where scalafix is enabled. 
+    It's a linting and rewrite tool we use to organize imports. This may run for a long time as it needs to do a full compile.
+- `format`: apply `scalafmt` to format source files
+
+Test:
+- `testOnly myWildcard`: runs all tests matching wildcard, e.g.,
+  `testOnly com.digitalasset.myPackage.*` runs all tests in package `com.digitalasset.myPackage`.
+- `test`: runs all tests

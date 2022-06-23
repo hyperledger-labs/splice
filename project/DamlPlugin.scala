@@ -206,7 +206,7 @@ object DamlPlugin extends AutoPlugin {
     override def buffer[T](f: => T): T = f
 
     /** Output the buffered content to a String applying an optional line prefix.
-     */
+      */
     def output(linePrefix: String = ""): String =
       buffer.map(l => s"$linePrefix$l").mkString(System.lineSeparator)
   }
@@ -224,13 +224,13 @@ object DamlPlugin extends AutoPlugin {
       inConfig(Test)(baseDamlPluginSettings)
 
   /** Verify that the versions in the daml.yaml file match what is being used in the sbt project.
-   * If a mismatch is found a [[sbt.internal.MessageOnlyException]] will be thrown.
-   */
+    * If a mismatch is found a [[sbt.internal.MessageOnlyException]] will be thrown.
+    */
   private def checkProjectVersions(
-                                    projectVersion: String,
-                                    damlVersion: String,
-                                    damlProjectFile: File,
-                                  ): Unit = {
+      projectVersion: String,
+      damlVersion: String,
+      damlProjectFile: File,
+  ): Unit = {
     require(
       damlProjectFile.exists,
       s"supplied daml.yaml must exist [${damlProjectFile.absolutePath}]",
@@ -254,12 +254,12 @@ object DamlPlugin extends AutoPlugin {
   }
 
   /** Write the project and daml versions of our sbt project to the given daml.yaml project file.
-   */
+    */
   private def updateProjectVersions(
-                                     projectVersion: String,
-                                     damlVersion: String,
-                                     damlProjectFile: File,
-                                   ): Unit = {
+      projectVersion: String,
+      damlVersion: String,
+      damlProjectFile: File,
+  ): Unit = {
     require(
       damlProjectFile.exists,
       s"supplied daml.yaml must exist [${damlProjectFile.absolutePath}]",
@@ -276,13 +276,13 @@ object DamlPlugin extends AutoPlugin {
   }
 
   /** We intentionally take the unusual step of checking in certain DARs to ensure stable package ids across different Daml versions.
-   * This task will take the dynamically built DAR and update the checked in version.
-   */
+    * This task will take the dynamically built DAR and update the checked in version.
+    */
   private def updateFixedDar(
-                              sourceDirectory: File,
-                              destinationDirectory: File,
-                              filename: String,
-                            ): Unit = {
+      sourceDirectory: File,
+      destinationDirectory: File,
+      filename: String,
+  ): Unit = {
     val sourcePath = sourceDirectory / filename
     val destinationPath = destinationDirectory / filename
 
@@ -296,14 +296,14 @@ object DamlPlugin extends AutoPlugin {
   }
 
   private def buildDamlProject(
-                                log: Logger,
-                                sourceDirectory: File,
-                                buildDirectory: File,
-                                outputDirectory: File,
-                                relativeDamlProjectFile: File,
-                                damlVersion: String,
-                                damlLanguageVersions: Seq[String],
-                              ): Seq[File] = {
+      log: Logger,
+      sourceDirectory: File,
+      buildDirectory: File,
+      outputDirectory: File,
+      relativeDamlProjectFile: File,
+      damlVersion: String,
+      damlLanguageVersions: Seq[String],
+  ): Seq[File] = {
 
     val originalDamlProjectFile =
       sourceDirectory.toPath.resolve(relativeDamlProjectFile.toPath).toFile
@@ -379,12 +379,12 @@ object DamlPlugin extends AutoPlugin {
   }
 
   private def ensureArtifactAvailable(
-                                       url: String,
-                                       artifactFilename: String,
-                                       damlVersion: String,
-                                       tarballPath: Seq[String] = Seq.empty,
-                                       localSubdir: Option[String] = None,
-                                     ): File = {
+      url: String,
+      artifactFilename: String,
+      damlVersion: String,
+      tarballPath: Seq[String] = Seq.empty,
+      localSubdir: Option[String] = None,
+  ): File = {
     import better.files.File
 
     val root =
@@ -452,16 +452,16 @@ object DamlPlugin extends AutoPlugin {
   }
 
   /** Calls the Daml Codegen for the provided DAR file (hence, is suitable to use in a sourceGenerator task)
-   */
+    */
   def generateCode(
-                    log: Logger,
-                    damlProjectDirectory: File,
-                    darFile: File,
-                    basePackageName: String,
-                    language: Codegen,
-                    managedSourceDir: File,
-                    damlVersion: String,
-                  ): Seq[File] = {
+      log: Logger,
+      damlProjectDirectory: File,
+      darFile: File,
+      basePackageName: String,
+      language: Codegen,
+      managedSourceDir: File,
+      damlVersion: String,
+  ): Seq[File] = {
     require(
       damlProjectDirectory.exists,
       s"supplied daml project directory must exist [${damlProjectDirectory.absolutePath}]",

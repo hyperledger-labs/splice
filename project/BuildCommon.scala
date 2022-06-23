@@ -17,6 +17,8 @@ object BuildCommon {
   )
 
   lazy val sbtSettings: Seq[Def.Setting[_]] = {
+
+    def alsoTest(taskName: String) = s";$taskName; Test / $taskName"
     val globalSettings = Seq(
       name := "coin",
       // Automatically reload sbt project when sbt build definition files change
@@ -45,13 +47,20 @@ object BuildCommon {
     )
 
     val commandAliases =
-    // cheekily overwriting test task here because we don't want the tests of the copied Canton files to run
-      addCommandAlias("test", "; apps-common/test; apps-validator/test")
+      // cheekily overwriting test task here because we don't want the tests of the copied Canton files to run
+      addCommandAlias("test", "; apps-common/test; apps-validator/test") ++
+        addCommandAlias(
+          "scalafixCheck",
+          s"${alsoTest("scalafix --check")}",
+        ) ++ addCommandAlias(
+          "format",
+          s"; scalafmt ; Test / scalafmt ; scalafmtSbt",
+        )
 
     val buildSettings = inThisBuild(
       Seq(
         organization := "com.daml.network",
-        scalaVersion := scala_version
+        scalaVersion := scala_version,
         // , scalacOptions += "-Ystatistics" // re-enable if you need to debug compile times
       )
     )
@@ -83,12 +92,13 @@ object BuildCommon {
 //        |.*daml-codegen.*
 //      """
 //    ),
-    scalacOptions += "-Wconf:src=src_managed/.*:silent"
+    scalacOptions += "-Wconf:src=src_managed/.*:silent",
   )
 
   lazy val `canton-community-app` = {
     import CantonDependencies._
-    sbt.Project.apply("canton-community-app", file("canton/community/app"))
+    sbt.Project
+      .apply("canton-community-app", file("canton/community/app"))
       .dependsOn(
         `canton-community-common` % "compile->compile;test->test",
         `canton-community-domain`,
@@ -122,7 +132,7 @@ object BuildCommon {
           toxiproxy_java % Test,
           dropwizard_metrics_jvm, // not used at compile time, but required at runtime to report jvm metrics
           dropwizard_metrics_jmx,
-          dropwizard_metrics_graphite
+          dropwizard_metrics_graphite,
         ),
         // commented out from Canton OS repo as settings because they don't apply to us
         // core packaging commands
@@ -145,10 +155,15 @@ object BuildCommon {
   }
   lazy val `canton-community-common` = {
     import CantonDependencies._
-    sbt.Project.apply("canton-community-common", file("canton/community/common"))
-      .enablePlugins(BuildInfoPlugin, DamlPlugin
+    sbt.Project
+      .apply("canton-community-common", file("canton/community/common"))
+      .enablePlugins(BuildInfoPlugin, DamlPlugin)
+      .dependsOn(
+        `canton-blake2b`,
+        `canton-functionmeta`,
+        `canton-slick-fork`,
+        `canton-wartremover-extension`,
       )
-      .dependsOn(`canton-blake2b`, `canton-functionmeta`, `canton-slick-fork`, `canton-wartremover-extension`)
       .settings(
         sharedCantonSettings,
         libraryDependencies ++= Seq(
@@ -267,7 +282,8 @@ object BuildCommon {
 
   lazy val `canton-community-domain` = {
     import CantonDependencies._
-    sbt.Project.apply("canton-community-domain", file("canton/community/domain"))
+    sbt.Project
+      .apply("canton-community-domain", file("canton/community/domain"))
       .dependsOn(`canton-community-common` % "compile->compile;test->test")
       .settings(
         sharedCantonSettings,
@@ -302,7 +318,8 @@ object BuildCommon {
 
   lazy val `canton-community-participant` = {
     import CantonDependencies._
-    sbt.Project.apply("canton-community-participant", file("canton/community/participant"))
+    sbt.Project
+      .apply("canton-community-participant", file("canton/community/participant"))
       .dependsOn(`canton-community-common` % "compile->compile;test->test", `canton-daml-fork`)
       .enablePlugins(DamlPlugin)
       .settings(
@@ -353,7 +370,8 @@ object BuildCommon {
 
   lazy val `canton-blake2b` = {
     import CantonDependencies._
-    sbt.Project.apply("canton-blake2b", file("canton/community/lib/Blake2b"))
+    sbt.Project
+      .apply("canton-blake2b", file("canton/community/lib/Blake2b"))
       .disablePlugins(ScalafmtPlugin, WartRemover)
       .settings(
         sharedSettings,
@@ -366,7 +384,8 @@ object BuildCommon {
 
   lazy val `canton-functionmeta` = {
     import CantonDependencies._
-    sbt.Project.apply("canton-functionmeta", file("canton/community/lib/functionmeta"))
+    sbt.Project
+      .apply("canton-functionmeta", file("canton/community/lib/functionmeta"))
       .disablePlugins(ScalafmtPlugin, WartRemover)
       .settings(
         sharedSettings,
@@ -384,7 +403,8 @@ object BuildCommon {
 
   lazy val `canton-slick-fork` = {
     import CantonDependencies._
-    sbt.Project.apply("canton-slick-fork", file("canton/community/lib/slick"))
+    sbt.Project
+      .apply("canton-slick-fork", file("canton/community/lib/slick"))
       .disablePlugins(ScalafmtPlugin, WartRemover)
       .settings(
         sharedSettings,
@@ -397,7 +417,8 @@ object BuildCommon {
 
   lazy val `canton-wartremover-extension` = {
     import CantonDependencies._
-    sbt.Project.apply("canton-wartremover-extension", file("canton/community/lib/wartremover"))
+    sbt.Project
+      .apply("canton-wartremover-extension", file("canton/community/lib/wartremover"))
       .dependsOn(`canton-slick-fork`)
       .settings(
         sharedSettings,
@@ -417,7 +438,8 @@ object BuildCommon {
 
   lazy val `canton-daml-fork` = {
     import CantonDependencies._
-    sbt.Project.apply("canton-daml-fork", file("canton/community/lib/daml"))
+    sbt.Project
+      .apply("canton-daml-fork", file("canton/community/lib/daml"))
       .disablePlugins(WartRemover) // to accommodate different daml repo coding style
       .settings(
         sharedSettings,
