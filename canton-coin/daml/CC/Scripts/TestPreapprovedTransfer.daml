@@ -1,0 +1,59 @@
+module CC.Scripts.TestPreapprovedTransfer where
+
+import DA.Assert
+import DA.List
+import Daml.Script
+
+import CC.Coin
+import CC.CoinRules
+import CC.Scripts.Util
+
+testPreapprovedTransfer : Script ()
+testPreapprovedTransfer = do
+  app <- setupApp
+
+  runNextIssuance app 1.0
+  runCoinDepositBots app
+
+  alice <- setupUser app "alice"
+  bob <- setupUser app "bob"
+
+
+  runNextIssuance app 1.0
+  runCoinDepositBots app
+
+  archiveTransferDebugNotes app
+
+  preapproved <- submitExerciseCoinRulesByKey app [alice] CoinRules_PreapproveTransfer with
+    sender = bob
+    receiver = alice
+
+
+  pay app app.svc bob 5.0 "setup"
+  pay app app.svc bob 10.0 "setup"
+
+  -- one coin from setup and two for the transfers above
+  [(cid0, coin0), (cid1, coin1), (cid2, coin2)] <- queryFilter @Coin bob (\c -> c.owner == bob)
+
+  aliceCoins0 <- queryFilter @Coin alice (\c -> c.owner == alice)
+
+  submitMulti [bob] [app.svc] $ exerciseCmd preapproved (PreapprovedTransfer_Send cid0)
+
+  aliceCoins1 <- queryFilter @Coin alice (\c -> c.owner == alice)
+
+  let newCoins = map snd $ aliceCoins1 \\ aliceCoins0
+  length newCoins === 1
+
+  submitMulti [bob] [app.svc] $ exerciseCmd preapproved (PreapprovedTransfer_Send cid1)
+
+  aliceCoins2 <- queryFilter @Coin alice (\c -> c.owner == alice)
+
+  let newCoins = map snd $ aliceCoins2 \\ aliceCoins1
+  length newCoins === 1
+
+  submit alice $ exerciseCmd preapproved PreapprovedTransfer_Revoke
+
+  -- fail now that preapproved transfers have been revoked.
+  submitMultiMustFail [bob] [app.svc] $ exerciseCmd preapproved (PreapprovedTransfer_Send cid2)
+
+  return ()

@@ -66,6 +66,13 @@ template CoinRules
       controller transferControllers transfer
       do executeTransfer config svc transfer
 
+    nonconsuming choice CoinRules_PreapproveTransfer : ContractId PreapprovedTransfer
+      with
+        receiver : Party
+        sender : Party
+      controller receiver
+      do create PreapprovedTransfer with ..
+
     nonconsuming choice CoinRules_MiningRound_Open
       : ContractId OpenMiningRound
       with
@@ -586,3 +593,43 @@ scaleFees s c = CoinConfig with
     maxNumInputs = c.maxNumInputs
     maxNumOutputs = c.maxNumOutputs
     maxPayloadLength = c.maxPayloadLength
+
+-- | Preapproved transfer that allows the sender to send
+-- arbitrary coins to the receiver.
+template PreapprovedTransfer
+  with
+    svc : Party
+    receiver : Party -- ^ The party that will receive transfers
+    sender : Party -- ^ The party that can send coins to receiver
+  where
+    signatory svc, receiver
+    key (svc, receiver, sender) : (Party, Party, Party)
+    maintainer key._2
+    observer sender
+
+    -- | Revoke the preapproved transfer stopping the sender
+    -- from sending more coins.
+    choice PreapprovedTransfer_Revoke : ()
+      controller receiver
+      do pure ()
+
+    -- | Send a coin from the sender to the receiver.
+    nonconsuming choice PreapprovedTransfer_Send : ContractId Coin
+      with
+        coinCid : ContractId Coin
+      controller sender
+      do let transfer = Transfer with
+               sender =  sender
+               inputs = [InputCoin coinCid]
+               outputs =
+                 [ OutputReceiverCoin with
+                     receiver = receiver
+                     coinType = FloatingReceiverCoin
+                 ]
+               payload = "preapproved transfer"
+         r <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
+         case r of
+          [TransferResultCoin c] -> pure c
+          _ -> abort ("Unexpected transfer result, expected one coin but got " <> show r)
+
+
