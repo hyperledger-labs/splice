@@ -13,6 +13,8 @@ function expect() {
 }
 
 set +u
+expect GCP_VPN_NETS ${GCP_VPN_NETS}
+expect GCP_REGION ${GCP_REGION}
 expect GCP_PROJECT_NAME ${GCP_PROJECT_NAME}
 expect GCP_CLUSTER_NAME ${GCP_CLUSTER_NAME}
 expect GCP_REPO_NAME ${GCP_REPO_NAME}
@@ -30,7 +32,7 @@ fi
 
 # Check for the expected project.
 
-gcloud config set compute/region us-central1
+gcloud config set compute/region ${GCP_REGION}
 
 GCP_PROJECT_ID=$(gcloud projects list --filter "name:${GCP_PROJECT_NAME}" --format 'value(project_id)')
 

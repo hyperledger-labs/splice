@@ -16,7 +16,18 @@ fi
 
 echo "Creating cluster: ${GCP_CLUSTER_NAME}"
 
-gcloud container clusters create ${GCP_CLUSTER_NAME}
+gcloud container clusters create ${GCP_CLUSTER_NAME} \
+       --create-subnetwork name=${GCP_CLUSTER_NAME}-subnet \
+       --enable-master-authorized-networks \
+       --enable-ip-alias \
+       --enable-private-nodes \
+       --master-ipv4-cidr 172.16.0.32/28
+
+#### Enable Firewall Access
+
+gcloud container clusters update  ${GCP_CLUSTER_NAME} \
+       --enable-master-authorized-networks \
+       --master-authorized-networks ${GCP_VPN_NETS}
 
 #### Check for IP
 
