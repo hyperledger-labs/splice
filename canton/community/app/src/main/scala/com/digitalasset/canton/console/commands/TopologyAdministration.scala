@@ -69,7 +69,7 @@ class TopologyAdministrationGroup(
     idCache.set(None)
   }
 
-  private[console] def idHelper[T](
+  def idHelper[T](
       name: String,
       apply: UniqueIdentifier => T,
   ): T =

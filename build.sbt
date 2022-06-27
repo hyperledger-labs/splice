@@ -35,6 +35,7 @@ lazy val root = (project in file("."))
   .aggregate(
     `apps-common`,
     `apps-validator`,
+    `apps-app`,
     `canton-community-common`,
     `canton-blake2b`,
     `canton-slick-fork`,
@@ -68,3 +69,10 @@ lazy val `apps-validator` =
       Compile / PB.protoSources ++= (Test / PB.protoSources).value,
       scalacOptions += "-Wconf:src=src_managed/.*:silent",
     )
+
+lazy val `apps-app` =
+  project
+    .in(file("apps/app"))
+    // make Canton code available to CC repo
+    .dependsOn(`apps-validator`)
+    .settings(BuildCommon.sharedSettings, BuildCommon.cantonWarts)

@@ -7,4 +7,5 @@ make to the Canton file copies before then,
 to know which and/or what changes we'll need to upstream before the switch.    
 
 # Changes
-* ...
+## Methods or classes with changed visibility
+* `idHelper` made public
