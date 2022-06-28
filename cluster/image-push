@@ -13,7 +13,6 @@ if [ ! -d "$REPO_ROOT/$TARGET" ]; then
     exit 1
 fi
 
-source config
 source lib/gcloud-setup
 source lib/image-prefix
 
