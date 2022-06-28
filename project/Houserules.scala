@@ -27,9 +27,11 @@ object JvmRulesPlugin extends AutoPlugin {
             "-Ywarn-dead-code",
             "-Ywarn-numeric-widen",
             "-Ywarn-value-discard", // Gives a warning for functions declared as returning Unit, but the body returns a value
-            "-Ywarn-unused:imports",
+            // TODO(i87): re-enable
+//            "-Ywarn-unused:imports",
             "-Ywarn-unused:implicits",
-            "-Ywarn-unused:locals",
+            // TODO(i87): re-enable
+//            "-Ywarn-unused:locals",
             "-Vimplicits",
             "-Vtype-diffs",
           )

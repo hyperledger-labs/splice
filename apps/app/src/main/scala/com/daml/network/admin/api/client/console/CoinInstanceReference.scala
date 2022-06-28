@@ -1,6 +1,6 @@
 package com.daml.network.admin.api.client.console
 
-import com.daml.network.admin.api.client.commands.DummyCommands
+import com.daml.network.validator.admin.api.client.commands.DummyCommands
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.console.commands._
 import com.digitalasset.canton.console.{
@@ -39,6 +39,7 @@ abstract class ValidatorReference(
 
   override type Status = ParticipantStatus
 
+  // TODO(Arne): remove/cleanup all the uninteresting console commands.
   @Help.Summary("Health and diagnostic related commands")
   @Help.Group("Health")
   override def health =

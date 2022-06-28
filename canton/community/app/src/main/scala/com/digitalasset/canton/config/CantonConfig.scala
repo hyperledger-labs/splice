@@ -381,9 +381,8 @@ trait CantonConfig {
 
   /** Use `participantNodeParameters`` instead!
     */
-  private[canton] def participantNodeParametersByString(name: String) = participantNodeParameters(
-    InstanceName.tryCreate(name)
-  )
+  private[canton] def participantNodeParametersByString(name: String): ParticipantNodeParameters =
+    participantNodeParameters(InstanceName.tryCreate(name))
 
   protected def nodeParametersFor[A](
       cachedNodeParameters: Map[InstanceName, A],

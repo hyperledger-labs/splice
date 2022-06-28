@@ -34,8 +34,8 @@ import com.digitalasset.canton.util.AkkaUtil
 import com.google.common.annotations.VisibleForTesting
 import io.circe.Encoder
 import org.slf4j.bridge.SLF4JBridgeHandler
-
 import java.util.concurrent.ScheduledExecutorService
+
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.duration._
 import scala.concurrent.{Await, blocking}
