@@ -215,8 +215,10 @@ template IssuanceState
     svc : Party
     -- | The most recent open round
     currentRound : Round
+    obs : Party
   where
     signatory svc
+    observer obs
 
-    key svc : Party
-    maintainer key
+    key (svc, obs) : (Party, Party)
+    maintainer key._1

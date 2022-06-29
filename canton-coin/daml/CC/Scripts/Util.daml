@@ -6,6 +6,7 @@ import Daml.Script
 
 import DA.Action (void, when)
 import DA.Date
+import DA.Exception
 import DA.Foldable (forA_)
 import DA.List (dedup)
 import DA.Time
@@ -42,18 +43,21 @@ setupApp = do
 
   -- the SVC is its own validator
   recordValidatorOf app app.svc app.svc
+  _ <- submit app.svc $ createCmd CCUserHostedAt with user=app.svc; validator=app.svc
 
   -- TOOD: reintroduce the price oracle
 
   submit svc $ createCmd IssuanceState with
     svc
+    obs = svc
     currentRound = Round (-1)
 
   cid <- submit svc $ createCmd CoinRules with
     config = defaultCoinConfig
+    obs = svc
     ..
 
-  submitExerciseCoinRulesByKey app [svc] CoinRules_MiningRound_Open with
+  submitExerciseCoinRulesByKey app [svc] [] svc CoinRules_MiningRound_Open with
     coinPrice = 1.0
 
   -- return the off-ledger reference to the app for later script steps
@@ -63,11 +67,23 @@ setupApp = do
 -- CCApp users
 --------------
 
-setupUser : CCApp -> Text -> Script Party
-setupUser app name = do
+setupValidator : CCApp -> Text -> Script Party
+setupValidator app name = do
   user <- allocatePartyWithHint name (PartyIdHint name)
   userId <- validateUserId name
-  createUser (User userId (Some user)) [CanActAs user, CanReadAs app.svc]
+  createUser (User userId (Some user)) [CanActAs user, CanReadAs user]
+  _ <- submit user $ createCmd CCUserHostedAt with user; validator=user
+  onboardUser app user
+  requestCoinRules app user
+  runCoinRulesAcceptBot app
+  return user
+
+setupUser : CCApp -> Text -> Party -> Script Party
+setupUser app name validator = do
+  user <- allocatePartyWithHint name (PartyIdHint name)
+  userId <- validateUserId name
+  createUser (User userId (Some user)) [CanActAs user, CanReadAs validator] -- TODO(rautenrieth-da): CanReadAs has no effect?
+  _ <- submit user $ createCmd CCUserHostedAt with user; validator
   onboardUser app user
   return user
 
@@ -91,9 +107,66 @@ recordValidatorOf app u v =
 
 activeRound : CCApp -> Script OpenMiningRound
 activeRound app = do
-  Some (_, state) <- queryContractKey @IssuanceState app.svc app.svc
-  Some (_, round) <- queryContractKey @OpenMiningRound app.svc (app.svc, state.currentRound)
+  Some (_, state) <- queryContractKey @IssuanceState app.svc (app.svc, app.svc)
+  Some (_, round) <- queryContractKey @OpenMiningRound app.svc (app.svc, app.svc, state.currentRound)
   pure round
+
+-- Workaround for explicit disclosure
+-------------------------------------
+
+-- For the workaround for explicit disclosure, we need to know at which validator node a user is hosted.
+-- This is so that we can set the correct readAs party for all coin transfer commands submitted by the user.
+-- 
+-- TODO(M1-06): remove workaround for explicit disclosure
+template CCUserHostedAt
+  with
+    user : Party
+    validator : Party
+  where
+    signatory user
+    observer validator
+    key user : Party
+    maintainer key
+
+getHostingValidator : Party -> Script Party
+getHostingValidator user = do
+  maybeResult <- queryContractKey @CCUserHostedAt user user
+  case maybeResult of
+    Some (_, result) -> pure result.validator
+    None -> throw (GeneralError ("No CCUserHostedAt for " <> show user))
+
+-- TODO(M1-06): remove workaround for explicit disclosure
+requestCoinRules : CCApp -> Party -> Script ()
+requestCoinRules app user = do
+  submit user $ createCmd CoinRulesRequest with
+    svc = app.svc
+    user = user
+  pure ()
+
+-- TODO(M1-06): remove workaround for explicit disclosure
+-- Note: this must not run concurrently with commands that modify the mining rounds (e.g., runNextIssuance)
+runCoinRulesAcceptBot : CCApp -> Script ()
+runCoinRulesAcceptBot app = do
+  Some (_, rules) <- queryContractKey @CoinRules app.svc (app.svc, app.svc)
+  Some (_, state) <- queryContractKey @IssuanceState app.svc (app.svc, app.svc)
+  openRounds <- queryFilter @OpenMiningRound app.svc (\r -> r.obs == app.svc) 
+  issuingRounds <- queryFilter @IssuingMiningRound app.svc (\r -> r.obs == app.svc)
+  requests <- query @CoinRulesRequest app.svc
+  forA_ requests $ \(requestCid, request) -> do
+    acceptCoinRulesRequest request rules state (fmap (\x -> x._2) openRounds) (fmap (\x -> x._2) issuingRounds)
+    submit app.svc $ exerciseCmd requestCid Accept
+  pure ()
+
+-- TODO(M1-06): remove workaround for explicit disclosure
+acceptCoinRulesRequest : CoinRulesRequest -> CoinRules -> IssuanceState -> [OpenMiningRound] -> [IssuingMiningRound] -> Script ()
+acceptCoinRulesRequest request rules state openRounds issuingRounds = do
+  _ <- submit request.svc $ createCmd rules with obs = request.user
+  _ <- submit request.svc $ createCmd state with obs = request.user
+  forA_ openRounds $ \round -> do
+    submit request.svc $ createCmd round with obs = request.user
+  forA_ issuingRounds $ \round -> do
+    submit request.svc $ createCmd round with obs = request.user
+  pure ()
 
 -- Issuance automation
 ----------------------
@@ -105,7 +178,7 @@ activeRound app = do
 runNextIssuance : CCApp -> Decimal -> Script ()
 runNextIssuance app coinPrice = do
     -- expire rewards for closed rounds
-    closedRounds <- query @ClosedMiningRound app.svc
+    closedRounds <- queryFilter @ClosedMiningRound app.svc  (\r -> r.obs == app.svc)
     forA_ closedRounds $ \(miningRoundCid, miningRound) -> do
       -- app rewards
       rewards <- queryFilter @AppReward app.svc (\r -> r.round == miningRound.round)
@@ -116,34 +189,69 @@ runNextIssuance app coinPrice = do
       forA_ rewards $ \(rcid, _) ->
         submit app.svc $ exerciseCmd rcid ValidatorReward_SvcExpire with miningRoundCid
       -- the closed round
-      submitExerciseCoinRulesByKey app [app.svc] CoinRules_MiningRound_Archive with
+      submitExerciseCoinRulesByKey app [app.svc] [] app.svc CoinRules_MiningRound_Archive with
         miningRoundCid
 
     -- close current issuing rounds if there are any
-    imcs <- query @IssuingMiningRound app.svc
+    imcs <- queryFilter @IssuingMiningRound app.svc (\r -> r.obs == app.svc)
     forA_ imcs $ \(miningRoundCid, _) ->
-      submitExerciseCoinRulesByKey app [app.svc] CoinRules_MiningRound_Close with
+      submitExerciseCoinRulesByKey app [app.svc] [] app.svc CoinRules_MiningRound_Close with
         miningRoundCid
 
     -- transition current OpenMiningRound into an IssuingMiningRound
-    Some (_, st) <- queryContractKey @IssuanceState app.svc app.svc
-    Some (openRoundCid, _) <- queryContractKey @OpenMiningRound app.svc (app.svc, st.currentRound)
-    closingRoundCid <- submitExerciseCoinRulesByKey app [app.svc] CoinRules_MiningRound_StartClosing with
+    Some (_, st) <- queryContractKey @IssuanceState app.svc (app.svc, app.svc)
+    Some (openRoundCid, _) <- queryContractKey @OpenMiningRound app.svc (app.svc, app.svc, st.currentRound)
+    closingRoundCid <- submitExerciseCoinRulesByKey app [app.svc] [] app.svc CoinRules_MiningRound_StartClosing with
       miningRoundCid = openRoundCid
 
     appRewards <- queryFilter @AppReward app.svc (\bc -> bc.round == st.currentRound)
     validatorRewards <- queryFilter @ValidatorReward app.svc (\bc -> bc.round == st.currentRound)
 
-    submitExerciseCoinRulesByKey app [app.svc] CoinRules_MiningRound_StartIssuing with
+    submitExerciseCoinRulesByKey app [app.svc] [] app.svc CoinRules_MiningRound_StartIssuing with
       miningRoundCid = closingRoundCid
       totalBurnQuantity =
         sum [ r.quantity | (_, r) <- appRewards] +
         sum [ r.quantity | (_, r) <- validatorRewards]
 
     -- open another round
-    void $ submitExerciseCoinRulesByKey app [app.svc] CoinRules_MiningRound_Open with
+    submitExerciseCoinRulesByKey app [app.svc] [] app.svc CoinRules_MiningRound_Open with
       coinPrice
 
+    -- workaround for explicit disclosure
+    updateDisclosedMiningRoundContracts app
+
+-- Each validator has their own copy of IssuanceState, OpenMiningRound, ClosedMiningRound, IssuingMiningRound contracts
+-- This updates all of these copies to match the original contracts owned by the SVC
+-- 
+-- TODO(M1-06): remove workaround for explicit disclosure
+updateDisclosedMiningRoundContracts : CCApp -> Script ()
+updateDisclosedMiningRoundContracts app = do
+  -- Get the list of registered validators (each of them has exactly one CoinRules contract)
+  validatorRules <- queryFilter @CoinRules app.svc (\r -> r.obs /= app.svc)
+  let validators = fmap (\r -> r._2.obs) validatorRules
+
+  -- Get the original versions of all disclosed contracts
+  Some (_, svcIssuanceState) <- queryContractKey @IssuanceState app.svc (app.svc, app.svc)
+  svcOpenRounds <- queryFilter @OpenMiningRound app.svc (\r -> r.obs == app.svc)
+  svcClosedRounds <- queryFilter @ClosedMiningRound app.svc (\r -> r.obs == app.svc)
+  svcIssuingRounds <- queryFilter @IssuingMiningRound app.svc (\r -> r.obs == app.svc)
+
+  -- Archive all duplicates
+  validatorIssuanceStates <- queryFilter @IssuanceState app.svc (\r -> r.obs /= app.svc)
+  validatorOpenRounds <- queryFilter @OpenMiningRound app.svc (\r -> r.obs /= app.svc)
+  validatorClosedRounds <- queryFilter @ClosedMiningRound app.svc (\r -> r.obs /= app.svc)
+  validatorIssuingRounds <- queryFilter @IssuingMiningRound app.svc (\r -> r.obs /= app.svc)
+  forA_ validatorIssuanceStates \(cid, _) -> do submit app.svc $ exerciseCmd cid Archive
+  forA_ validatorOpenRounds \(cid, _) -> do submit app.svc $ exerciseCmd cid Archive
+  forA_ validatorClosedRounds \(cid, _) -> do submit app.svc $ exerciseCmd cid Archive
+  forA_ validatorIssuingRounds \(cid, _) -> do submit app.svc $ exerciseCmd cid Archive
+
+  -- Create new duplicates
+  forA_ validators \validator -> do
+    _ <- submit app.svc $ createCmd svcIssuanceState with obs = validator
+    forA_ svcOpenRounds \(_, c) -> do submit app.svc $ createCmd c with obs = validator
+    forA_ svcClosedRounds \(_, c) -> do submit app.svc $ createCmd c with obs = validator
+    forA_ svcIssuingRounds \(_, c) -> do submit app.svc $ createCmd c with obs = validator
 
 
 -- Asset handling utilities
@@ -153,13 +261,13 @@ unlockedCoins : Party -> Script [ContractId Coin]
 unlockedCoins p = map fst <$> queryFilter @Coin p (\c -> c.owner == p)
 
 
-submitExerciseCoinRulesByKey : Choice CoinRules c r => CCApp -> [Party] -> c -> Script r
-submitExerciseCoinRulesByKey app actors arg = do
-  submitMulti actors [app.svc] $ exerciseByKeyCmd @CoinRules app.svc arg
+submitExerciseCoinRulesByKey : Choice CoinRules c r => CCApp -> [Party] -> [Party] -> Party -> c -> Script r
+submitExerciseCoinRulesByKey app actors readers validator arg = do
+  submitMulti actors readers $ exerciseByKeyCmd @CoinRules (app.svc, validator) arg
 
 queryCoinRulesByKey : Party -> Script (Optional (ContractId CoinRules, CoinRules))
 queryCoinRulesByKey svc =
-  queryContractKey @CoinRules svc svc
+  queryContractKey @CoinRules svc (svc, svc)
 
 -- | A simple and slightly hacky-way to test payment: it just gathers all coins from
 -- the sender and transfer's the desired quantity off of them to the receiver.
@@ -167,6 +275,7 @@ queryCoinRulesByKey svc =
 pay : CCApp -> Party -> Party -> Decimal -> Text -> Script ()
 pay app sender recipient coinQuantity msg = do
   -- TODO: create payment pre-approval flow and use that here instead of submitMulti
+  validator <- getHostingValidator sender
   coins <- unlockedCoins sender
   let transfer = Transfer with
         sender
@@ -182,7 +291,7 @@ pay app sender recipient coinQuantity msg = do
                 quantity = coinQuantity
                 senderTransferFeeRatio = 1.0
           ]
-  void $ submitExerciseCoinRulesByKey app [sender, recipient] (CoinRules_Transfer with transfer)
+  void $ submitExerciseCoinRulesByKey app [sender, recipient] [validator] validator (CoinRules_Transfer with transfer)
 
 -- | Locks a coin of the given quantity to the given lock holder
 -- for the given time starting at the current time
@@ -190,6 +299,7 @@ pay app sender recipient coinQuantity msg = do
 lockTo : CCApp -> Party -> Party -> Decimal -> RelTime -> Text -> Script ()
 lockTo app sender lockHolder coinQuantity lockDuration msg = do
   now <- getTime
+  validator <- getHostingValidator sender
   -- TODO: create payment pre-approval flow and use that here instead of submitMulti
   coins <- unlockedCoins sender
   let transfer = Transfer with
@@ -206,7 +316,7 @@ lockTo app sender lockHolder coinQuantity lockDuration msg = do
                 holder = lockHolder
                 expiresAt = now `addRelTime` lockDuration
           ]
-  void $ submitExerciseCoinRulesByKey app [sender, lockHolder] (CoinRules_Transfer with transfer)
+  void $ submitExerciseCoinRulesByKey app [sender, lockHolder] [validator] validator (CoinRules_Transfer with transfer)
 
 
 -- | Deposit all coins together with new issuances into a single coin.
@@ -238,8 +348,12 @@ runCoinDepositBots app = do
                 exactQuantity = None
                 lock = None
             ]
+    -- Need readAs rights for all hosted users to collect their validator rewards,
+    -- and readAs rights for the validator to see mining round state contracts
+    validator <- getHostingValidator user
+    let readAs = hostedUsers ++ [validator]
     when (not (null appRewards) || not (null validatorRewards) || length coins > 1) $ void $
-      submitExerciseCoinRulesByKey app [user] CoinRules_Transfer with transfer
+      submitExerciseCoinRulesByKey app [user] readAs validator CoinRules_Transfer with transfer
 
 -- | Retrieve a list of all issuances that have happened.
 getIssuingRounds : CCApp -> Script [Round]

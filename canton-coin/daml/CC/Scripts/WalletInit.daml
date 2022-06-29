@@ -14,7 +14,7 @@ init = do
     runNextIssuance app 1.0
     runCoinDepositBots app
 
-  alice <- setupUser app "alice"
+  alice <- setupUser app "alice" app.svc
 
   pay app app.svc alice 42.0 "welcome"
 

@@ -21,9 +21,9 @@ testEntry = do
   runCoinDepositBots app
 
   -- bootstrap user and service provider party
-  user <- setupUser app "user"
-  provider1 <- setupUser app "provider1"
-  provider <- setupUser app "provider2"
+  user <- setupUser app "user" app.svc
+  provider1 <- setupUser app "provider1" app.svc
+  provider <- setupUser app "provider2" app.svc
 
   -- start issuing
   runNextIssuance app 1.0

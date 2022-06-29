@@ -42,7 +42,7 @@ template DirectoryRules with
         coin <- fetch coinCid
         assertMsg "Coin SVC and owner must match" ((ccSvc, entry.user) == (coin.svc, coin.owner))
 
-        (_, CoinRules{config = coinConfig}) <- exerciseByKey @CoinRules ccSvc (CoinRules_Fetch provider)
+        (_, CoinRules{config = coinConfig}) <- exerciseByKey @CoinRules (ccSvc, ccSvc) (CoinRules_Fetch provider)
 
         let transfer = Transfer with
               sender = entry.user
@@ -64,7 +64,7 @@ template DirectoryRules with
                       -- Fee includes transfer costs so receiver pays everything
                       senderTransferFeeRatio = 0.0
                 ]
-        TransferResultLockedCoin lockedCoinCid :: _ <- exerciseByKey @CoinRules ccSvc CoinRules_Transfer
+        TransferResultLockedCoin lockedCoinCid :: _ <- exerciseByKey @CoinRules (ccSvc, ccSvc) CoinRules_Transfer
           with transfer
         create EntryRequest with
           ccSvc
@@ -128,7 +128,7 @@ template EntryRequest with
                     receiver = entry.provider
                     coinType = FloatingReceiverCoin
                 ]
-        exerciseByKey @CoinRules ccSvc CoinRules_Transfer with
+        exerciseByKey @CoinRules (ccSvc, ccSvc) CoinRules_Transfer with
           transfer
         create entry
 

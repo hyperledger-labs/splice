@@ -21,7 +21,7 @@ template TransferWrapper
       with
         transfer : Transfer
       controller transferControllers transfer
-      do exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
+      do exerciseByKey @CoinRules (svc, svc) (CoinRules_Transfer transfer)
 
 -- Defined by CC wallet
 interface PaymentReference
@@ -61,7 +61,7 @@ template PaymentRequest
                 ]
               payload = "lock payment"
          [TransferResultLockedCoin lockedCoin] <-
-           exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
+           exerciseByKey @CoinRules (svc, svc) (CoinRules_Transfer transfer)
          create ApprovedPayment
            with
              svc, provider, user, reference, lockedCoin
@@ -97,7 +97,7 @@ template ApprovedPayment
                      coinType = FloatingReceiverCoin
                  ]
                payload = "transfer locked payment"
-         void $ exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
+         void $ exerciseByKey @CoinRules (svc, svc) (CoinRules_Transfer transfer)
 
     choice ApprovedPayment_Expire : ContractId Coin
       controller user
@@ -231,8 +231,8 @@ test = script do
   runNextIssuance app 1.0
   runCoinDepositBots app
 
-  provider <- setupUser app "provider"
-  user <- setupUser app "user"
+  provider <- setupUser app "provider" app.svc
+  user <- setupUser app "user" app.svc
 
   pay app app.svc user 5.0 ""
 

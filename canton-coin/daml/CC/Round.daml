@@ -27,11 +27,13 @@ template OpenMiningRound
     svc : Party
     round : Round
     coinPrice : Decimal
+    obs : Party -- TODO(M1-06): remove workaround for explicit disclosure
   where
     signatory svc
+    observer obs
     ensure isDefinedRound round
 
-    key (svc, round) : (Party, Round)
+    key (svc, obs, round) : (Party, Party, Round)
     maintainer key._1
 
 -- | A mining round for which the total sum of registered rewards
@@ -53,11 +55,13 @@ template IssuingMiningRound
     svc : Party
     round : Round
     issuancePerCoin : Decimal
+    obs : Party -- TODO(M1-06): remove workaround for explicit disclosure
   where
     signatory svc
+    observer obs
     ensure isDefinedRound round
 
-    key (svc, round) : (Party, Round)
+    key (svc, obs, round) : (Party, Party, Round)
     maintainer key._1
 
 -- | A record that a specific mining round has been closed, which can
@@ -66,9 +70,11 @@ template ClosedMiningRound
   with
     svc : Party
     round : Round
+    obs : Party -- TODO(M1-06): remove workaround for explicit disclosure
   where
     signatory svc
+    observer obs
     ensure isDefinedRound round
 
-    key (svc, round) : (Party, Round)
+    key (svc, obs, round) : (Party, Party, Round)
     maintainer key._1

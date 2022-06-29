@@ -49,11 +49,13 @@ template CoinRules
   with
     svc : Party
     config : CoinConfig
+    obs: Party -- TODO(M1-06): remove workaround for explicit disclosure
     -- TODO: use a schedule with effective dating to make fees predictable to users
   where
     signatory svc
-    key svc : Party
-    maintainer key
+    observer obs -- TODO(M1-06): remove workaround for explicit disclosure
+    key (svc, obs) : (Party, Party)
+    maintainer key._1
 
     -- | Execute a transfer.
     --
@@ -64,7 +66,7 @@ template CoinRules
       with
         transfer : Transfer
       controller transferControllers transfer
-      do executeTransfer config svc transfer
+      do executeTransfer config svc obs transfer
 
     nonconsuming choice CoinRules_PreapproveTransfer : ContractId PreapprovedTransfer
       with
@@ -80,12 +82,12 @@ template CoinRules
       controller svc
       do
         -- fetch current state
-        (stCid, st) <- fetchByKey @IssuanceState svc
+        (stCid, st) <- fetchByKey @IssuanceState (svc, obs)
         archive stCid
         let round = addRelRound st.currentRound (RelRound 1)
         -- create new state and new open round
         create st with currentRound = round
-        create OpenMiningRound with svc; round; coinPrice
+        create OpenMiningRound with svc; obs; round; coinPrice
 
     nonconsuming choice CoinRules_MiningRound_StartClosing
       : ContractId ClosingMiningRound
@@ -128,6 +130,7 @@ template CoinRules
         -- create issuing round
         create IssuingMiningRound with
           svc
+          obs
           round = miningRound.round
           issuancePerCoin =
             if totalBurnQuantity <= 0.0
@@ -147,6 +150,7 @@ template CoinRules
         -- create closing round
         create ClosedMiningRound with
           svc
+          obs
           round = miningRound.round
 
     nonconsuming choice CoinRules_MiningRound_Archive
@@ -168,6 +172,25 @@ template CoinRules
       controller p
       do pure (self, this)
 
+-- | Workaround for missing explicit disclosure.
+--
+-- The validator creates a request contract, the SVC archives the request and creates a CoinRules contract
+-- with the requesting validator as observer. The validator uses a regular transaction stream to learn about
+-- the new CoinRules contracts.
+-- Once explicit disclosure is available, we want to remove the request contracts and use an off-ledger flow
+-- to stream in the latest CoinRules contracts.
+-- TODO(M1-06): remove workaround for explicit disclosure
+template CoinRulesRequest
+  with
+    user : Party
+    svc : Party
+  where
+    signatory user
+    observer svc
+
+    choice Accept : ()
+      controller svc
+      do pure ()
 
 -- | Representation of a batch transfer.
 data Transfer = Transfer with
@@ -219,6 +242,8 @@ template TransferDebugNote with
     osum : TransferOutputsSummary
     summary : TransferSummary
     scaledConfig : CoinConfig
+    round : Round
+    validator : Party
   where
     signatory svc
 
@@ -243,17 +268,17 @@ data TransferResult
 
 -- | Execute a transfer.
 --
-executeTransfer : CoinConfig -> Party -> Transfer -> Update [TransferResult]
-executeTransfer config0 svc t = do
+executeTransfer : CoinConfig -> Party -> Party -> Transfer -> Update [TransferResult]
+executeTransfer config0 svc validator t = do
   -- MISSING FEATURE 'fetchByKey + off-ledger disclosure': we do not want to have a dependency on
   -- the issuance state, as that will lead to contention. We'd expect to just fetch some
   -- open mining round that is disclosed when the command is being interpreted.
-  (_, issuanceState) <- fetchByKey @IssuanceState svc
+  (_, issuanceState) <- fetchByKey @IssuanceState (svc, validator)
   -- check that the current mining round is open
-  (_, openRound) <- fetchByKey @OpenMiningRound (svc, issuanceState.currentRound )
+  (_, openRound) <- fetchByKey @OpenMiningRound (svc, validator, issuanceState.currentRound )
   let config = scaleFees (1.0 / openRound.coinPrice) config0
   -- compute summaries
-  isum <- summarizeAndConsumeInputs openRound.round config svc t.sender t.inputs
+  isum <- summarizeAndConsumeInputs openRound.round config svc t.sender validator t.inputs
   osum <- preprocessAndSummarizeOutputs config t.sender t.outputs
   summary <- summarizeTransfer config isum osum
   -- check that overall transfer constraints are satisfied
@@ -269,7 +294,7 @@ executeTransfer config0 svc t = do
   let distributed = distributeOutputs openRound.round config svc t.sender summary osum.preprocessedOutputs
   summary <- pure $ mergeReceiverFees distributed.receiverFees summary
   -- record debugging note
-  create TransferDebugNote with transfer = t; scaledConfig = config; ..
+  create TransferDebugNote with transfer = t; scaledConfig = config; round = issuanceState.currentRound; ..
   -- issue rewards for burns
   issueRewards config openRound t.sender (mergeReceiverFees distributed.receiverFees summary)
   -- record outputs
@@ -332,8 +357,8 @@ mergeReceiverFees fees summary =
       fees
     totalTransferFees = summary.totalTransferFees + sum (Map.values fees)
 
-summarizeAndConsumeInputs : Round -> CoinConfig -> Party -> Party -> [TransferInput] -> Update TransferInputsSummary
-summarizeAndConsumeInputs now config svc sender inps = do
+summarizeAndConsumeInputs : Round -> CoinConfig -> Party -> Party -> Party -> [TransferInput] -> Update TransferInputsSummary
+summarizeAndConsumeInputs now config svc sender validator inps = do
     foldlA (summarizeAndConsumeInput now) initialSummary inps
   where
     initialSummary = TransferInputsSummary with
@@ -361,7 +386,7 @@ summarizeAndConsumeInputs now config svc sender inps = do
       reward <- fetch rewardCid
       archive rewardCid
       assertMsg "SVC matches" (svc == reward.svc)
-      (_, miningRound) <- fetchByKey @IssuingMiningRound (svc, reward.round)
+      (_, miningRound) <- fetchByKey @IssuingMiningRound (svc, validator, reward.round)
       assertMsg "Sender matches app owner" (sender == reward.owner)
       return TransferInputsSummary with
         numBurnInputs = s.numBurnInputs + 1
@@ -372,7 +397,7 @@ summarizeAndConsumeInputs now config svc sender inps = do
     summarizeAndConsumeInput now s (InputValidatorReward rewardCid) = do
       reward <- fetch rewardCid
       assertMsg "SVC matches" (svc == reward.svc)
-      (_, miningRound) <- fetchByKey @IssuingMiningRound (svc, reward.round)
+      (_, miningRound) <- fetchByKey @IssuingMiningRound (svc, validator, reward.round)
       (rightCid, validatorRight) <- fetchByKey @ValidatorRight (ValidatorRight with svc = svc, validator = sender, user = reward.user)
       exercise rewardCid ValidatorReward_ArchiveAsValidator with validator = sender; rightCid
       return TransferInputsSummary with

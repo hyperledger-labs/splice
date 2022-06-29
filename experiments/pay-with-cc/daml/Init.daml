@@ -13,8 +13,8 @@ setup = script do
   runNextIssuance app 1.0
   runCoinDepositBots app
 
-  provider <- setupUser app "provider"
-  user <- setupUser app "user"
+  provider <- setupUser app "provider" app.svc
+  user <- setupUser app "user" app.svc
 
   ccWalletId <- validateUserId "cc_wallet"
   createUser (User ccWalletId (Some user)) [CanActAs user, CanReadAs provider, CanReadAs app.svc]
