@@ -328,25 +328,19 @@ jobs:
       - setup_remote_docker
       - setup_nix
       - run:
-         name: build
+         name: deploy
          command: |
            set -euo pipefail
            . /home/circleci/.nix-profile/etc/profile.d/nix.sh
 
+           use () {
+              echo "direnv stub..."
+           }
+           . .envrc
+
            nix-shell shell.nix \
              --run bash \<<'EOF'
              set -euo pipefail
-
-             export REPO_ROOT="$(pwd)"
-             export GCP_REGION="us-central1"
-             export GCP_PROJECT_NAME="cn-devnet"
-             export GCP_CLUSTER_NAME="cn-devnet"
-             export GCP_REPO_NAME="cn-devnet-images"
-             export GCP_IP_NAME="cn-devnet-ip"
-
-             GCP_VPN_NETS=35.194.81.56/32
-             GCP_VPN_NETS=${GCP_VPN_NETS},35.198.147.95/32
-             export GCP_VPN_NETS=${GCP_VPN_NETS},35.189.40.124/32
 
              echo $GCLOUD_SERVICE_KEY | gcloud auth activate-service-account --key-file=-
              (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
