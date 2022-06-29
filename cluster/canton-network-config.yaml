@@ -25,22 +25,15 @@ kind: Service
 metadata:
   name: cn-docs-service
 spec:
+  type: LoadBalancer
   selector:
     app: cn-docs
   ports:
   - protocol: TCP
     port: 80
     targetPort: 80
----
-apiVersion: networking.k8s.io/v1
-kind: Ingress
-metadata:
-  name: cn-site-ingress
-  annotations:
-      kubernetes.io/ingress.global-static-ip-name: cn-devnet-ip
-spec:
-  defaultBackend:
-    service:
-      name: cn-docs-service
-      port:
-        number: 80
+  loadBalancerIP: 35.202.15.15
+  loadBalancerSourceRanges:
+  - 35.194.81.56/32
+  - 35.198.147.95/32
+  - 35.189.40.124/32
