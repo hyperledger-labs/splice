@@ -15,8 +15,8 @@ testPreapprovedTransfer = do
   runNextIssuance app 1.0
   runCoinDepositBots app
 
-  alice <- setupUser app "alice"
-  bob <- setupUser app "bob"
+  alice <- setupUser app "alice" app.svc
+  bob <- setupUser app "bob" app.svc
 
 
   runNextIssuance app 1.0
@@ -24,7 +24,7 @@ testPreapprovedTransfer = do
 
   archiveTransferDebugNotes app
 
-  preapproved <- submitExerciseCoinRulesByKey app [alice] CoinRules_PreapproveTransfer with
+  preapproved <- submitExerciseCoinRulesByKey app [alice] [app.svc] app.svc CoinRules_PreapproveTransfer with
     sender = bob
     receiver = alice
 

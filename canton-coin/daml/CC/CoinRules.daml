@@ -626,6 +626,7 @@ template PreapprovedTransfer
     svc : Party
     receiver : Party -- ^ The party that will receive transfers
     sender : Party -- ^ The party that can send coins to receiver
+    obs : Party -- ^ The validator party -- TODO(M1-06): remove workaround for explicit disclosure
   where
     signatory svc, receiver
     key (svc, receiver, sender) : (Party, Party, Party)
@@ -652,7 +653,7 @@ template PreapprovedTransfer
                      coinType = FloatingReceiverCoin
                  ]
                payload = "preapproved transfer"
-         r <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
+         r <- exerciseByKey @CoinRules (svc, obs) (CoinRules_Transfer transfer)
          case r of
           [TransferResultCoin c] -> pure c
           _ -> abort ("Unexpected transfer result, expected one coin but got " <> show r)
