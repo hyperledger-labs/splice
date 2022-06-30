@@ -1,16 +1,25 @@
-#!/bin/sh
+#!/usr/bin/env bash
+set -euo pipefail
 
-kubectl delete deployment/docs-deployment service/docs-service
-kubectl apply -f minikube-deployment.yaml
+source lib/context-switch
+
+set +u
+APP_LABEL=$1
+if [ "$APP_LABEL" == "" ]; then
+    echo "Usage:\t ./app-expose <APP_LABEL>"
+    exit 1
+fi
+set -u
 
 # Max timeout in seconds
 TIMEOUT=10
+POLL_DURATION=0.75
 READY=false
 
 start=$(date +%s)
 while [ $(expr $(date +%s) - $start) -lt $TIMEOUT ]
 do
-    running=$(kubectl get pods --field-selector=status.phase=Running | grep Running)
+    running=$(kubectl get pods -l app=$APP_LABEL --field-selector=status.phase=Running | grep Running)
 
     if [ "$running" == "" ]; then
         echo "Waiting for pod to enter Running phase..."
@@ -18,12 +27,12 @@ do
         READY=true
         break
     fi
-    sleep 0.5
+    sleep $POLL_DURATION
 done
 
 if [ "$READY" == "true" ]; then
     echo "Pod is running! Forwarding port..."
-    kubectl port-forward service/docs-service 7080:80
+    kubectl port-forward service/$APP_LABEL-service 0:80
 else
     echo "Operation timed out! Pod did not become ready within $TIMEOUT seconds."
     exit 1

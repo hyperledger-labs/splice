@@ -1,0 +1,2 @@
+minikube start
+minikube addons enable gcp-auth --refresh # GCP auth still required for pulling images from GCR

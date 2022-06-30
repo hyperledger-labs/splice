@@ -1,7 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source lib/gcloud-setup
-source lib/gcloud-connect
+source lib/context-switch
 
-source lib/gcloud-apply
+if [ "$K8S_CONTEXT" == "gcloud" ]; then
+    source lib/gcloud-setup
+    source lib/gcloud-connect
+fi
+
+source lib/k8s-apply

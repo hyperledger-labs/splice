@@ -1,24 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source lib/gcloud-setup
+source lib/context-switch
 
-#### Check for existing cluster
-
-N_CLUSTERS=$(gcloud container clusters list --filter "name:${GCP_CLUSTER_NAME}"  --format 'value(name)' | wc -l)
-
-if [ "${N_CLUSTERS}" -eq "0" ]; then
-    echo "Cluster does not exist, ending."
-    exit 0
+if [ "$K8S_CONTEXT" == "gcloud" ]; then
+    echo "Deleting gcloud cluster..."
+    source lib/gcloud-setup
+    source lib/gcloud-delete
+elif [ "$K8S_CONTEXT" == "minikube" ];
+    echo "Deleting minikube cluster..."
+    source lib/minikube-delete
 fi
 
-#### Cluster does not already exist, create it and apply our configuration.
-
-echo "Deleting cluster: ${GCP_CLUSTER_NAME}"
-
-gcloud container clusters delete ${GCP_CLUSTER_NAME}
-
 echo "Cluster deleted."
-
-
-

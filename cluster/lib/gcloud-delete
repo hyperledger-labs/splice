@@ -1,0 +1,14 @@
+#### Check for existing cluster
+
+N_CLUSTERS=$(gcloud container clusters list --filter "name:${GCP_CLUSTER_NAME}"  --format 'value(name)' | wc -l)
+
+if [ "${N_CLUSTERS}" -eq "0" ]; then
+    echo "Cluster does not exist, ending."
+    exit 0
+fi
+
+#### Cluster does not already exist, create it and apply our configuration.
+
+echo "Deleting cluster: ${GCP_CLUSTER_NAME}"
+
+gcloud container clusters delete ${GCP_CLUSTER_NAME}

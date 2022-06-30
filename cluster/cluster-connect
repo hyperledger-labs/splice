@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source lib/gcloud-setup
-source lib/gcloud-connect
+source lib/context-switch
+
+if [ "$K8S_CONTEXT" == "gcloud" ]; then
+    source lib/gcloud-setup
+    source lib/gcloud-connect
+elif [ "$K8S_CONTEXT" == "minikube" ]
+    echo "Warning: running in minikube mode: 'cluster-connect' is a no-op."
+fi
