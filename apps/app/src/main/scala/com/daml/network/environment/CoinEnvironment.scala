@@ -1,0 +1,105 @@
+package com.daml.network.environment
+
+import com.daml.network.config.CoinConfig
+import com.daml.network.metrics.CoinMetricsFactory
+import com.daml.network.validator
+import com.daml.network.validator.ValidatorNodeBootstrap
+import com.daml.network.validator.config.{LocalValidatorConfig, ValidatorNodeParameters}
+import com.digitalasset.canton.config.{
+  CantonCommunityConfig,
+  NodeConfig,
+  ProcessingTimeout,
+  TestingConfigInternal,
+}
+import scala.Function.tupled
+
+import com.digitalasset.canton.console.{
+  ConsoleEnvironment,
+  ConsoleGrpcAdminCommandRunner,
+  ConsoleOutput,
+}
+import com.digitalasset.canton.domain.DomainNodeBootstrap
+import com.digitalasset.canton.domain.config.CommunityDomainConfig
+import com.digitalasset.canton.environment._
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.participant.ParticipantNodeBootstrap
+import com.digitalasset.canton.participant.config.CommunityParticipantConfig
+import com.digitalasset.canton.resource.{CommunityDbMigrationsFactory, DbMigrationsFactory}
+import com.digitalasset.canton.tracing.TraceContext
+
+import scala.annotation.nowarn
+import cats.syntax.either._
+
+trait CoinEnvironment extends Environment {
+
+  override type Config = CoinConfig
+  override type Console = CoinConsoleEnvironment
+
+  // TODO(Arne): check that this is used in all of this trait's methods.
+  val coinMetrics = CoinMetricsFactory.forConfig(config.monitoring.metrics)
+
+  protected def createValidator(
+      name: String,
+      validatorConfig: LocalValidatorConfig,
+  ): ValidatorNodeBootstrap =
+    ValidatorNodeBootstrap.ValidatorFactory
+      .create(
+        name,
+        validatorConfig,
+        config.tryValidatorNodeParametersByString(name),
+        createClock(Some(ValidatorNodeBootstrap.LoggerFactoryKeyName -> name)),
+        testingTimeService,
+        coinMetrics.forValidator(name),
+        testingConfig,
+        futureSupervisor,
+        loggerFactory,
+      )
+      .valueOr(err =>
+        throw new RuntimeException(
+          s"Failed to create participant bootstrap: $err"
+        )
+      )
+
+  lazy val validators = ValidatorApps(
+    createValidator,
+    migrationsFactory,
+    timeouts,
+    config.validatorsByString,
+    config.tryValidatorNodeParametersByString,
+    loggerFactory,
+  )
+
+  /** Start all instances described in the configuration
+    */
+  override def startAll(): Either[Seq[StartupError], Unit] = {
+    val errors = validators.startAll.left.getOrElse(Seq.empty)
+    Either.cond(errors.isEmpty, (), errors)
+  }
+}
+
+class CoinEnvironmentImpl(
+    override val config: CoinConfig,
+    override val testingConfig: TestingConfigInternal,
+    override val loggerFactory: NamedLoggerFactory,
+) extends CoinEnvironment {
+  override type Config = CoinConfig
+
+  override def createConsole(
+      consoleOutput: ConsoleOutput,
+      createAdminCommandRunner: ConsoleEnvironment => ConsoleGrpcAdminCommandRunner,
+  ): CoinConsoleEnvironment =
+    new CoinConsoleEnvironment(this, consoleOutput, createAdminCommandRunner)
+
+  override protected val participantNodeFactory
+      : ParticipantNodeBootstrap.Factory[Config#ParticipantConfigType] =
+    ParticipantNodeBootstrap.CommunityParticipantFactory
+
+  override protected val domainFactory: DomainNodeBootstrap.Factory[Config#DomainConfigType] =
+    DomainNodeBootstrap.CommunityDomainFactory
+  override type Console = CoinConsoleEnvironment
+
+  override protected lazy val migrationsFactory: DbMigrationsFactory =
+    new CommunityDbMigrationsFactory(loggerFactory)
+
+  override def isEnterprise: Boolean = false
+}

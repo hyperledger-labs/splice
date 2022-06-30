@@ -151,7 +151,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
     }
   }
 
-  private val testingTimeService = new TestingTimeService(clock, () => simClocks)
+  protected val testingTimeService = new TestingTimeService(clock, () => simClocks)
   // public for buildDocs task to be able to construct a fake participant and domain to document available metrics via reflection
   val metricsFactory = MetricsFactory.forConfig(config.monitoring.metrics)
   private val healthServer =
@@ -165,7 +165,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
       migrationsFactory,
       timeouts,
       config.domainsByString,
-      config.domainNodeParametersByString,
+      config.tryDomainNodeParametersByString,
       loggerFactory,
     )
   lazy val participants =
@@ -174,7 +174,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
       migrationsFactory,
       timeouts,
       config.participantsByString,
-      config.participantNodeParametersByString,
+      config.tryParticipantNodeParametersByString,
       loggerFactory,
     )
 
@@ -322,7 +322,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
       .create(
         name,
         participantConfig,
-        config.participantNodeParametersByString(name),
+        config.tryParticipantNodeParametersByString(name),
         createClock(Some(ParticipantNodeBootstrap.LoggerFactoryKeyName -> name)),
         testingTimeService,
         metricsFactory.forParticipant(name),
@@ -343,7 +343,7 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
         name,
         domainConfig,
         testingConfig,
-        config.domainNodeParametersByString(name),
+        config.tryDomainNodeParametersByString(name),
         createClock(Some(DomainNodeBootstrap.LoggerFactoryKeyName -> name)),
         metricsFactory.forDomain(name),
         futureSupervisor,

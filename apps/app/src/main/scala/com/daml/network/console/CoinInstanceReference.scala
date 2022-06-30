@@ -1,4 +1,4 @@
-package com.daml.network.admin.api.client.console
+package com.daml.network.console
 
 import com.daml.network.validator.admin.api.client.commands.DummyCommands
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand

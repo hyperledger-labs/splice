@@ -18,6 +18,7 @@ import java.io.File
 import java.util.Locale
 import java.util.concurrent.TimeUnit
 import scala.collection.concurrent.TrieMap
+import scala.collection.concurrent
 
 case class MetricsConfig(
     reporters: Seq[MetricsReporterConfig] = Seq.empty,
@@ -84,19 +85,15 @@ object MetricsConfig {
   }
 }
 
-case class MetricsFactory(
-    reporters: Seq[metrics.Reporter],
-    registry: metrics.MetricRegistry,
-    reportJVMMetrics: Boolean,
-) extends AutoCloseable {
+trait MetricsFactoryBase extends AutoCloseable {
+  def reporters: Seq[metrics.Reporter]
+  def registry: metrics.MetricRegistry
+  def reportJVMMetrics: Boolean
 
-  private val participants = TrieMap[String, ParticipantMetrics]()
-  private val domains = TrieMap[String, DomainMetrics]()
-  private val sequencers = TrieMap[String, SequencerMetrics]()
-  private val mediators = TrieMap[String, MediatorNodeMetrics]()
-  private val allNodeMetrics: Seq[TrieMap[String, _]] =
-    Seq(participants, domains, sequencers, mediators)
-  private def nodeMetricsExcept(toExclude: TrieMap[String, _]): Seq[TrieMap[String, _]] =
+  protected def allNodeMetrics: Seq[concurrent.Map[String, _]]
+  protected def nodeMetricsExcept(
+      toExclude: concurrent.Map[String, _]
+  ): Seq[concurrent.Map[String, _]] =
     allNodeMetrics filterNot (_ eq toExclude)
 
   object benchmark extends MetricsGroup(MetricName(MetricsFactory.prefix :+ "benchmark"), registry)
@@ -108,11 +105,39 @@ case class MetricsFactory(
     registry.registerAll(new JvmMetricSet) // register Daml repo JvmMetricSet
   }
 
-  private def newRegistry(prefix: String): metrics.MetricRegistry = {
+  protected def newRegistry(prefix: String): metrics.MetricRegistry = {
     val nested = new metrics.MetricRegistry()
     registry.register(prefix, nested)
     nested
   }
+
+  /** de-duplicate name if there is someone using the same name for another type of node (not sure that will ever happen)
+    */
+  protected def deduplicateName(
+      name: String,
+      nodeType: String,
+      nodesToExclude: TrieMap[String, _],
+  ): String =
+    if (nodeMetricsExcept(nodesToExclude).exists(_.keySet.contains(name)))
+      s"$nodeType-$name"
+    else name
+
+  override def close(): Unit = reporters.foreach(_.close())
+}
+
+case class MetricsFactory(
+    reporters: Seq[metrics.Reporter],
+    registry: metrics.MetricRegistry,
+    reportJVMMetrics: Boolean,
+) extends AutoCloseable
+    with MetricsFactoryBase {
+
+  private val participants = TrieMap[String, ParticipantMetrics]()
+  private val domains = TrieMap[String, DomainMetrics]()
+  private val sequencers = TrieMap[String, SequencerMetrics]()
+  private val mediators = TrieMap[String, MediatorNodeMetrics]()
+  override protected val allNodeMetrics: Seq[TrieMap[String, _]] =
+    Seq(participants, domains, sequencers, mediators)
 
   def forParticipant(name: String): ParticipantMetrics = {
     participants.getOrElseUpdate(
@@ -150,17 +175,6 @@ case class MetricsFactory(
     )
   }
 
-  /** de-duplicate name if there is someone using the same name for another type of node (not sure that will ever happen)
-    */
-  private def deduplicateName(
-      name: String,
-      nodeType: String,
-      nodesToExclude: TrieMap[String, _],
-  ): String =
-    if (nodeMetricsExcept(nodesToExclude).exists(_.keySet.contains(name)))
-      s"$nodeType-$name"
-    else name
-
   /** returns the documented metrics by possibly creating fake participants / domains */
   def metricsDoc(): (Seq[MetricDoc.Item], Seq[MetricDoc.Item]) = {
     def sorted(lst: Seq[MetricDoc.Item]): Seq[MetricDoc.Item] =
@@ -184,9 +198,6 @@ case class MetricsFactory(
     // the fake instances are fine here as we do this anyway only when we build and export the docs
     (sorted(participantItems ++ clientMetrics), sorted(domainMetrics))
   }
-
-  override def close(): Unit = reporters.foreach(_.close())
-
 }
 
 object MetricsFactory extends LazyLogging {
@@ -201,7 +212,7 @@ object MetricsFactory extends LazyLogging {
     new MetricsFactory(reporter, registry, config.reportJvmMetrics)
   }
 
-  private def registerReporter(
+  def registerReporter(
       config: MetricsConfig,
       registry: metrics.MetricRegistry,
   ): Seq[metrics.Reporter] = {

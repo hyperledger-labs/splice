@@ -340,7 +340,7 @@ trait CantonConfig {
 
   /** Use `domainNodeParameters` instead!
     */
-  private[canton] def domainNodeParametersByString(name: String): DomainNodeParameters =
+  def tryDomainNodeParametersByString(name: String): DomainNodeParameters =
     domainNodeParameters(InstanceName.tryCreate(name))
 
   private lazy val participantNodeParameters_ : Map[InstanceName, ParticipantNodeParameters] =
@@ -381,8 +381,10 @@ trait CantonConfig {
 
   /** Use `participantNodeParameters`` instead!
     */
-  private[canton] def participantNodeParametersByString(name: String): ParticipantNodeParameters =
-    participantNodeParameters(InstanceName.tryCreate(name))
+  def tryParticipantNodeParametersByString(name: String): ParticipantNodeParameters =
+    participantNodeParameters(
+      InstanceName.tryCreate(name)
+    )
 
   protected def nodeParametersFor[A](
       cachedNodeParameters: Map[InstanceName, A],

@@ -31,7 +31,7 @@ class CommunityEnvironment(
     override val config: CantonCommunityConfig,
     override val testingConfig: TestingConfigInternal,
     override val loggerFactory: NamedLoggerFactory,
-) extends Environment {
+) extends CantonEnvironment {
 
   override type Config = CantonCommunityConfig
 

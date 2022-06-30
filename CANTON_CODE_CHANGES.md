@@ -8,4 +8,10 @@ to know which and/or what changes we'll need to upstream before the switch.
 
 # Changes
 ## Methods or classes with changed visibility
-* `idHelper` made public
+* `idHelper`, `tryDomainNodeParametersByString`, `tryParticipantNodeParametersByString`, 
+    `MetricsFactory.registerReporter` made public
+* `testingTimeService` made protected
+## Misc
+* Generalization of `Environment`
+* Generalization of `MetricsFactory`
+* Removed a trailing comma in many places because the CC Scala compiler doesn't like it (e.g. `.authorize(op, domain, mediator, side, key.some, )` -> `.authorize(op, domain, mediator, side, key.some)`)
