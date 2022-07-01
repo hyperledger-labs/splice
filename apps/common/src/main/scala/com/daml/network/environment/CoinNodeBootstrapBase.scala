@@ -7,7 +7,8 @@ import cats.data.EitherT
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.{LocalNodeConfig, LocalNodeParameters, ProcessingTimeout}
-import com.digitalasset.canton.environment.CantonNode
+import com.digitalasset.canton.crypto.Crypto
+import com.digitalasset.canton.environment.{CantonNode, CantonNodeBootstrap}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.health.admin.grpc.GrpcStatusService
 import com.digitalasset.canton.health.admin.v0.StatusServiceGrpc
@@ -17,6 +18,7 @@ import com.digitalasset.canton.metrics.MetricHandle.NodeMetrics
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.resource.StorageFactory
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.NodeId
 import com.digitalasset.canton.tracing.{NoTracing, TracerProvider}
 import io.functionmeta.functionFullName
 import io.grpc.protobuf.services.ProtoReflectionService
@@ -28,17 +30,23 @@ import scala.concurrent.{Future, blocking}
   *
   * Modelled after CantonNodeBootstrap
   */
-trait CoinNodeBootstrap[+T <: CantonNode] extends FlagCloseable with NamedLogging {
+trait CoinNodeBootstrap[+T <: CantonNode]
+    extends CantonNodeBootstrap[T] // TODO(Arne): remove the dependence on this trait.
+    {
 
   def name: InstanceName
   def clock: Clock
   def isInitialized: Boolean
-
   def start(): EitherT[Future, String, Unit]
 
   def initialize: EitherT[Future, String, Unit]
 
   def getNode: Option[T]
+
+  // TODO(Arne): following methods are only here because of the CantonNodeBootstrap trait
+  def initializeWithProvidedId(id: NodeId): EitherT[Future, String, Unit] = initialize
+  def getId: Option[NodeId] = None
+  def crypto: Crypto = ???
 
 }
 

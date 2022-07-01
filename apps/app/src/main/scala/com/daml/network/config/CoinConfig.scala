@@ -8,6 +8,7 @@ import com.digitalasset.canton.config.{
   CantonFeatures,
   CantonParameters,
   CommunityConfigValidations,
+  ConfigDefaults,
   MonitoringConfig,
 }
 import com.digitalasset.canton.config.RequireTypes.InstanceName
@@ -19,6 +20,11 @@ import com.digitalasset.canton.participant.config.{
 
 import scala.annotation.nowarn
 import cats.syntax.functor._
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.tracing.TraceContext
+import com.typesafe.config.Config
+import org.slf4j.{Logger, LoggerFactory}
+import pureconfig.ConfigReader
 
 case class CoinConfig(
     validators: Map[InstanceName, LocalValidatorConfig],
@@ -31,7 +37,7 @@ case class CoinConfig(
     parameters: CantonParameters = CantonParameters(),
     features: CantonFeatures = CantonFeatures(),
 ) extends CantonConfig // TODO(Arne): generalize or fork this trait.
-    {
+    with ConfigDefaults[CoinConfig] {
 
   override type DomainConfigType = CommunityDomainConfig
   override type ParticipantConfigType = CommunityParticipantConfig
@@ -76,4 +82,40 @@ case class CoinConfig(
   }
 
   override def dumpString: String = "TODO(Arne): remove or implement."
+
+  override def withDefaults: CoinConfig =
+    this // TODO(Arne): CantonCommunityConfig does more here. Do we want to copy that?
+}
+
+// All this implicit weirdness below is copied analogue from CantonCommunityConfig
+@nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
+object CoinConfig {
+
+  private val logger: Logger = LoggerFactory.getLogger(classOf[CoinConfig])
+  private val elc = ErrorLoggingContext(
+    TracedLogger(logger),
+    NamedLoggerFactory.root.properties,
+    TraceContext.empty,
+  )
+
+  import pureconfig.generic.semiauto._
+  import CantonConfig._
+
+  @nowarn("cat=unused")
+  private lazy implicit val coinConfigReader: ConfigReader[CoinConfig] = {
+    import CantonConfig.ConfigReaders._
+    implicit val validatorNodeParametersReader: ConfigReader[ValidatorNodeParameters] =
+      deriveReader[ValidatorNodeParameters]
+    implicit val validatorConfigReader: ConfigReader[LocalValidatorConfig] =
+      deriveReader[LocalValidatorConfig]
+    implicit val communityDomainConfigReader: ConfigReader[CommunityDomainConfig] =
+      deriveReader[CommunityDomainConfig]
+    implicit val communityParticipantConfigReader: ConfigReader[CommunityParticipantConfig] =
+      deriveReader[CommunityParticipantConfig]
+
+    deriveReader[CoinConfig]
+  }
+
+  def loadOrExit(config: Config)(implicit elc: ErrorLoggingContext = elc): CoinConfig =
+    CantonConfig.loadOrExit[CoinConfig](config)
 }

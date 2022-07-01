@@ -7,23 +7,9 @@ import com.daml.error.{ErrorCategory, ErrorCode, Explanation, Resolution}
 import com.digitalasset.canton.ProtoDeserializationError.ProtoDeserializationFailure
 import com.digitalasset.canton.error.CantonError
 import com.digitalasset.canton.error.CantonErrorGroups.ProtoDeserializationErrorGroup
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.serialization.DeserializationError
-import com.digitalasset.canton.tracing.TraceContext
 import com.google.protobuf.InvalidProtocolBufferException
-
-@SuppressWarnings(Array("org.wartremover.warts.Null"))
-object asdfasdfasdf extends NamedLogging {
-  override protected def loggerFactory: NamedLoggerFactory =
-    NamedLoggerFactory.root
-
-  def main(args: Array[String]): Unit = {
-    println(null)
-
-    println("Hello")
-    logger.warn("This is a log message")(TraceContext.empty)
-  }
-}
 
 sealed trait ProtoDeserializationError extends Product with Serializable {
   def toAdminError(implicit loggingContext: ErrorLoggingContext): CantonError =

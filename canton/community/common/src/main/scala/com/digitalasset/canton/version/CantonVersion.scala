@@ -135,6 +135,7 @@ object CantonVersion {
     ReleaseVersion.v2_3_0_snapshot -> List(v2_0_0, v3_0_0),
     ReleaseVersion.v2_3_0 -> List(v2_0_0, v3_0_0),
     ReleaseVersion.v2_3_1_snapshot -> List(v2_0_0, v3_0_0),
+    ReleaseVersion.tryCreate("2.3.0-snapshot.20220619.10104.0.253b0b18") -> List(v2_0_0, v3_0_0),
   ).map { case (release, pvs) => (release, NonEmptyUtil.fromUnsafe(pvs)) }
 
 }

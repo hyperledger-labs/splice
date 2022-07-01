@@ -1,18 +1,11 @@
 package com.daml.network.environment
 
+import cats.syntax.either._
 import com.daml.network.config.CoinConfig
 import com.daml.network.metrics.CoinMetricsFactory
-import com.daml.network.validator
 import com.daml.network.validator.ValidatorNodeBootstrap
-import com.daml.network.validator.config.{LocalValidatorConfig, ValidatorNodeParameters}
-import com.digitalasset.canton.config.{
-  CantonCommunityConfig,
-  NodeConfig,
-  ProcessingTimeout,
-  TestingConfigInternal,
-}
-import scala.Function.tupled
-
+import com.daml.network.validator.config.LocalValidatorConfig
+import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.console.{
   ConsoleEnvironment,
   ConsoleGrpcAdminCommandRunner,
@@ -28,7 +21,6 @@ import com.digitalasset.canton.resource.{CommunityDbMigrationsFactory, DbMigrati
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.annotation.nowarn
-import cats.syntax.either._
 
 trait CoinEnvironment extends Environment {
 
@@ -75,6 +67,16 @@ trait CoinEnvironment extends Environment {
     val errors = validators.startAll.left.getOrElse(Seq.empty)
     Either.cond(errors.isEmpty, (), errors)
   }
+
+}
+
+object CoinEnvironmentFactory extends EnvironmentFactory[CoinEnvironmentImpl] {
+  override def create(
+      config: CoinConfig,
+      loggerFactory: NamedLoggerFactory,
+      testingConfigInternal: TestingConfigInternal,
+  ): CoinEnvironmentImpl =
+    new CoinEnvironmentImpl(config, testingConfigInternal, loggerFactory)
 }
 
 class CoinEnvironmentImpl(

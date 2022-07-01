@@ -52,7 +52,7 @@ lazy val `apps-common` =
   project
     .in(file("apps/common"))
     // make Canton code available to CC repo
-    .dependsOn(`canton-community-common`, `canton-community-app`)
+    .dependsOn(`canton-community-common`, `canton-community-app` % "compile->compile;test->test")
     .settings(BuildCommon.sharedSettings, BuildCommon.cantonWarts)
 
 lazy val `apps-validator` =
@@ -74,5 +74,5 @@ lazy val `apps-app` =
   project
     .in(file("apps/app"))
     // make Canton code available to CC repo
-    .dependsOn(`apps-validator`)
+    .dependsOn(`apps-validator`, `canton-community-app` % "compile->compile;test->test")
     .settings(BuildCommon.sharedSettings, BuildCommon.cantonWarts)

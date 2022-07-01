@@ -45,7 +45,7 @@ import scala.concurrent.duration._
   * All integration tests must be located in package [[com.digitalasset.canton.integration.tests]] or a subpackage thereof.
   * This is required to correctly compute unit test coverage.
   */
-private[integration] trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
+trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
     extends FixtureAnyWordSpec
     with BaseTest
     with RepeatableTestSuiteTest
@@ -56,9 +56,11 @@ private[integration] trait BaseIntegrationTest[E <: Environment, TCE <: TestCons
 
   override protected def withFixture(test: OneArgTest): Outcome = {
     val integrationTestPackage = "com.digitalasset.canton.integration.tests"
-    getClass.getName should startWith(
-      integrationTestPackage
-    ) withClue s"\nAll integration tests must be located in $integrationTestPackage or a subpackage thereof."
+    val integrationTestPackageCoin = "com.daml.network.integration.tests"
+    getClass.getName should (startWith(integrationTestPackage) or startWith(
+      integrationTestPackageCoin
+    )) withClue (s"\nAll integration tests must be located in $integrationTestPackage or " +
+      s"$integrationTestPackageCoin or a subpackage thereof.")
 
     super[RepeatableTestSuiteTest].withFixture(new TestWithSetup(test))
   }

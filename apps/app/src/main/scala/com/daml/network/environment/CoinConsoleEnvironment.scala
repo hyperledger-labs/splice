@@ -1,5 +1,6 @@
 package com.daml.network.environment
 
+import com.daml.network.console.LocalValidatorReference
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
 import com.digitalasset.canton.console.{
   CantonHealthAdministration,
@@ -11,7 +12,9 @@ import com.digitalasset.canton.console.{
   DomainReference,
   FeatureFlag,
   Help,
+  LocalDomainReference,
   LocalInstanceReference,
+  LocalParticipantReference,
   NodeReferences,
   StandardConsoleOutput,
 }
@@ -29,9 +32,20 @@ class CoinConsoleEnvironment(
   override type DomainRemoteRef = CommunityRemoteDomainReference
   override type Status = CommunityCantonStatus
 
+  lazy val validators: Seq[LocalValidatorReference] =
+    environment.config.validatorsByString.keys.map(createValidatorReference).toSeq
+
+  private def createValidatorReference(name: String): LocalValidatorReference =
+    new LocalValidatorReference(this, name)
+
   override def health: CantonHealthAdministration[CommunityCantonStatus] = ???
 
-  override protected def startupOrderPrecedence(instance: LocalInstanceReference): Int = ???
+  override protected def startupOrderPrecedence(instance: LocalInstanceReference): Int =
+    instance match {
+      case _: LocalDomainReference => 1
+      case _: LocalParticipantReference => 2
+      case _ => 3
+    }
 
   override protected def localDomainHelpItems(
       scope: Set[FeatureFlag],
@@ -64,8 +78,9 @@ class CoinConsoleEnvironment(
       d: CommunityRemoteDomainReference,
   ): TopLevelValue[CommunityRemoteDomainReference] = ???
 
-  override protected def createDomainReference(name: String): CommunityLocalDomainReference = ???
+  override protected def createDomainReference(name: String): CommunityLocalDomainReference =
+    new CommunityLocalDomainReference(this, name)
 
   override protected def createRemoteDomainReference(name: String): CommunityRemoteDomainReference =
-    ???
+    new CommunityRemoteDomainReference(this, name)
 }

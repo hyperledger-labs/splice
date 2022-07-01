@@ -1,6 +1,8 @@
 package com.daml.network.console
 
+import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.validator.admin.api.client.commands.DummyCommands
+import com.daml.network.validator.config.LocalValidatorConfig
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.console.commands._
 import com.digitalasset.canton.console.{
@@ -32,10 +34,10 @@ abstract class ValidatorReference(
 
   override type InstanceId = ParticipantId
 
-  override protected val instanceType = "Participant"
+  override protected val instanceType = "Validator"
 
   override protected val loggerFactory: NamedLoggerFactory =
-    consoleEnvironment.environment.loggerFactory.append("participant", name)
+    consoleEnvironment.environment.loggerFactory.append("validator", name)
 
   override type Status = ParticipantStatus
 
@@ -83,21 +85,21 @@ abstract class ValidatorReference(
   @Help.Group("Parties")
   override def parties: ParticipantPartiesAdministrationGroup
 
-  def config: BaseParticipantConfig
+  def config: LocalValidatorConfig
 
 }
 
 class LocalValidatorReference(
-    override val consoleEnvironment: ConsoleEnvironment,
+    override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
-) extends ParticipantReference(consoleEnvironment, name)
+) extends ValidatorReference(consoleEnvironment, name)
     with LocalInstanceReference
     with BaseInspection[ParticipantNode] {
 
-  protected val nodes = consoleEnvironment.environment.participants
+  protected val nodes = consoleEnvironment.environment.validators
   @Help.Summary("Return participant config")
-  def config: LocalParticipantConfig =
-    consoleEnvironment.environment.config.participantsByString(name)
+  def config: LocalValidatorConfig =
+    consoleEnvironment.environment.config.validatorsByString(name)
 
   def dummy_command(some_string: String, some_number: Int): Int = {
     consoleEnvironment.run {
@@ -136,11 +138,10 @@ class LocalValidatorReference(
   override def runningNode: Option[CantonNodeBootstrap[ParticipantNode]] =
     consoleEnvironment.environment.participants.getRunning(name)
 
+  // TODO(Arne): validators don't expose a ledger api, however, we maybe still want similar methods
+  // to run against a participant's ledger API.
   override def ledgerApiCommand[Result](
       command: GrpcAdminCommand[_, _, Result]
-  ): ConsoleCommandResult[Result] =
-    runCommandIfRunning(
-      consoleEnvironment.grpcAdminCommandRunner
-        .runCommand(name, command, config.clientLedgerApi, adminToken)
-    )
+  ): ConsoleCommandResult[Result] = ???
+
 }
