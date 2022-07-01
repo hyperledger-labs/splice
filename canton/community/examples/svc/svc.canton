@@ -1,0 +1,8 @@
+
+nodes.local.start()
+
+val domainUrl = sys.env.get("DOMAIN_URL").getOrElse("https://canton.global")
+
+supervalidator.domains.connect("canton-network", domainUrl)
+
+supervalidator.health.ping(supervalidator)

@@ -1,0 +1,26 @@
+
+nodes.local.start()
+
+val domainUrl = sys.env.get("DOMAIN_URL").getOrElse("https://canton.global")
+
+validator.domains.connect("canton-network", domainUrl)
+
+val supervalidator = validator
+  .parties
+  .list(filterParty="supervalidator")
+  .headOption
+  .getOrElse(throw new Exception("Supervalidator consortium not found. (Check SVC health?)"))
+
+validator
+  .health
+  .ping(supervalidator
+          .participants
+          .headOption
+          .getOrElse(throw new Exception("Supervalidator participant not reachable."))
+          .participant
+       )
+
+println(
+  "The config for the validator party is below. Please append this to your examples/validator-app/validator-app.conf file:\n" + 
+  s"party : validator::${validator.adminParty.uid.namespace.unwrap}"
+)
