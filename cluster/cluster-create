@@ -11,6 +11,9 @@ if [ "$K8S_CONTEXT" == "gcloud" ]; then
 elif [ "$K8S_CONTEXT" == "minikube" ]; then
     echo "Creating minikube cluster..."
     source lib/minikube-create
+else
+    echo "Unknown cluster type: ${K8S_CONTEXT}"
+    exit 1
 fi
 
 source lib/k8s-apply

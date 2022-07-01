@@ -2,37 +2,33 @@
 
 CLUSTER=$(gcloud container clusters list --filter "name:${GCP_CLUSTER_NAME}"  --format 'value(name)')
 
-if [ -n "${CLUSTER}" ]; then
-    echo "Cluster already exists, ending."
-    exit 0
+if [ -z "${CLUSTER}" ]; then
+    echo "Creating cluster: ${GCP_CLUSTER_NAME}"
+
+    gcloud container clusters create ${GCP_CLUSTER_NAME} \
+           --create-subnetwork name=${GCP_CLUSTER_NAME}-subnet \
+           --enable-master-authorized-networks \
+           --enable-ip-alias \
+           --enable-private-nodes \
+           --master-ipv4-cidr 172.16.0.32/28
+
+    #### Enable Firewall Access
+
+    gcloud container clusters update  ${GCP_CLUSTER_NAME} \
+           --enable-master-authorized-networks \
+           --master-authorized-networks ${GCP_VPN_NETS}
 fi
 
-#### Cluster does not already exist, create it and apply our configuration.
-
-echo "Creating cluster: ${GCP_CLUSTER_NAME}"
-
-gcloud container clusters create ${GCP_CLUSTER_NAME} \
-    --create-subnetwork name=${GCP_CLUSTER_NAME}-subnet \
-    --enable-master-authorized-networks \
-    --enable-ip-alias \
-    --enable-private-nodes \
-    --master-ipv4-cidr 172.16.0.32/28
-
-#### Enable Firewall Access
-
-gcloud container clusters update  ${GCP_CLUSTER_NAME} \
-    --enable-master-authorized-networks \
-    --master-authorized-networks ${GCP_VPN_NETS}
 
 #### Check for IP
 
-CLUSTER_IP=$(gcloud compute addresses list --global --filter "name:${GCP_IP_NAME}" --format 'value(address)')
+CLUSTER_IP=$(gcloud compute addresses list --regions=${GCP_REGION} --filter "name:${GCP_IP_NAME}" --format 'value(address)')
 
 if [ -z "${CLUSTER_IP}" ]; then
     echo "Allocating IP address."
-    gcloud compute addresses create ${GCP_IP_NAME} --global
+    gcloud compute addresses create cn-devnet-ip --region=${GCP_REGION}
 fi
 
-CLUSTER_IP=$(gcloud compute addresses list --global --filter "name:${GCP_IP_NAME}" --format 'value(address)')
+CLUSTER_IP=$(gcloud compute addresses list --regions=${GCP_REGION} --filter "name:${GCP_IP_NAME}" --format 'value(address)')
 
-echo "Cluster created (IP: ${CLUSTER_IP}), applying configuration."
+echo "Cluster at IP ${CLUSTER_IP}, applying configuration."
