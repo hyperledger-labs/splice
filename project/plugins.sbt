@@ -14,3 +14,6 @@ addSbtPlugin("com.eed3si9n" %% "sbt-buildinfo" % "0.9.0")
 libraryDependencies += "com.esotericsoftware.yamlbeans" % "yamlbeans" % "1.13"
 
 libraryDependencies += "com.github.pathikrit" %% "better-files" % "3.8.0"
+
+// Assembly plugin to build fat-jars
+addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.15.0")

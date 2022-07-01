@@ -4,6 +4,7 @@ import com.daml.network.console.LocalValidatorReference
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
 import com.digitalasset.canton.console.{
   CantonHealthAdministration,
+  CommunityCantonHealthAdministration,
   CommunityLocalDomainReference,
   CommunityRemoteDomainReference,
   ConsoleEnvironment,
@@ -38,7 +39,26 @@ class CoinConsoleEnvironment(
   private def createValidatorReference(name: String): LocalValidatorReference =
     new LocalValidatorReference(this, name)
 
-  override def health: CantonHealthAdministration[CommunityCantonStatus] = ???
+  override protected def topLevelValues: Seq[TopLevelValue[_]] = {
+
+    super.topLevelValues ++
+      validators.map(v =>
+        TopLevelValue(v.name, helpText("validator app", v.name), v, Seq("App References"))
+      ) :+ TopLevelValue(
+        "validators",
+        helpText("All validator app instances" + genericNodeReferencesDoc, "Validators"),
+        validators,
+        Seq("App References"),
+      )
+
+  }
+
+  private lazy val health_ = new CommunityCantonHealthAdministration(this)
+
+  @Help.Summary("Environment health inspection")
+  @Help.Group("Health")
+  override def health: CantonHealthAdministration[CommunityCantonStatus] =
+    health_
 
   override protected def startupOrderPrecedence(instance: LocalInstanceReference): Int =
     instance match {
@@ -46,16 +66,6 @@ class CoinConsoleEnvironment(
       case _: LocalParticipantReference => 2
       case _ => 3
     }
-
-  override protected def localDomainHelpItems(
-      scope: Set[FeatureFlag],
-      localDomain: CommunityLocalDomainReference,
-  ): Seq[Help.Item] = ???
-
-  override protected def remoteDomainHelpItems(
-      scope: Set[FeatureFlag],
-      remoteDomain: CommunityRemoteDomainReference,
-  ): Seq[Help.Item] = ???
 
   override protected def domainsTopLevelValue(
       h: TopLevelValue.Partial,
@@ -66,17 +76,32 @@ class CoinConsoleEnvironment(
       ],
   ): TopLevelValue[
     NodeReferences[DomainReference, CommunityRemoteDomainReference, CommunityLocalDomainReference]
-  ] = ???
+  ] =
+    h(domains)
 
   override protected def localDomainTopLevelValue(
       h: TopLevelValue.Partial,
       d: CommunityLocalDomainReference,
-  ): TopLevelValue[CommunityLocalDomainReference] = ???
+  ): TopLevelValue[CommunityLocalDomainReference] =
+    h(d)
 
   override protected def remoteDomainTopLevelValue(
       h: TopLevelValue.Partial,
       d: CommunityRemoteDomainReference,
-  ): TopLevelValue[CommunityRemoteDomainReference] = ???
+  ): TopLevelValue[CommunityRemoteDomainReference] =
+    h(d)
+
+  override protected def localDomainHelpItems(
+      scope: Set[FeatureFlag],
+      localDomain: CommunityLocalDomainReference,
+  ): Seq[Help.Item] =
+    Help.getItems(localDomain, baseTopic = Seq("$domain"), scope = scope)
+
+  override protected def remoteDomainHelpItems(
+      scope: Set[FeatureFlag],
+      remoteDomain: CommunityRemoteDomainReference,
+  ): Seq[Help.Item] =
+    Help.getItems(remoteDomain, baseTopic = Seq("$domain"), scope = scope)
 
   override protected def createDomainReference(name: String): CommunityLocalDomainReference =
     new CommunityLocalDomainReference(this, name)

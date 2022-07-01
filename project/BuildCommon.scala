@@ -9,6 +9,7 @@ import wartremover.WartRemover
 import wartremover.WartRemover.autoImport._
 import sbtprotoc.ProtocPlugin.autoImport.PB
 import DamlPlugin.autoImport._
+import sbt.internal.util.ManagedLogger
 
 object BuildCommon {
 
@@ -94,6 +95,24 @@ object BuildCommon {
 //    ),
     scalacOptions += "-Wconf:src=src_managed/.*:silent",
   )
+
+  /** Utility function to run a (shell) command. */
+  def runCommand(command: String, log: ManagedLogger, optError: Option[String] = None): String = {
+    import scala.sys.process.Process
+    val processLogger = new DamlPlugin.BufferedLogger
+    log.debug(s"Running ${command}")
+    val exitCode = Process(command) ! processLogger
+    val output = processLogger.output()
+    if (exitCode != 0) {
+      val errorMsg = s"A problem occurred when executing command `$command` in `build.sbt`: ${System
+        .lineSeparator()} $output"
+      log.error(errorMsg)
+      if (optError.isDefined) log.error(optError.getOrElse(""))
+      throw new IllegalStateException(errorMsg)
+    }
+    if (output != "") log.info(processLogger.output())
+    output
+  }
 
   lazy val `canton-community-app` = {
     import CantonDependencies._

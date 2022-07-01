@@ -1,5 +1,6 @@
-import BuildCommon.sharedCantonSettings
+import BuildCommon.{runCommand, sharedCantonSettings}
 import Dependencies._
+import sbtassembly.{MergeStrategy, PathList}
 
 /*
  * sbt-settings that will be shared between all CN apps.
@@ -70,9 +71,62 @@ lazy val `apps-validator` =
       scalacOptions += "-Wconf:src=src_managed/.*:silent",
     )
 
+// Copied from Canton. Can probably be removed once we use Canton as a library.
+def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy = {
+  {
+    case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.first
+    case "reflect.properties" => MergeStrategy.first
+    case PathList("org", "checkerframework", _ @_*) => MergeStrategy.first
+    case PathList("google", "protobuf", _*) => MergeStrategy.first
+    case PathList("org", "apache", "logging", _*) => MergeStrategy.first
+    case PathList("ch", "qos", "logback", _*) => MergeStrategy.first
+    case PathList(
+          "META-INF",
+          "org",
+          "apache",
+          "logging",
+          "log4j",
+          "core",
+          "config",
+          "plugins",
+          "Log4j2Plugins.dat",
+        ) =>
+      MergeStrategy.first
+    case "META-INF/versions/9/module-info.class" => MergeStrategy.discard
+    case path if path.contains("module-info.class") => MergeStrategy.discard
+    case PathList("org", "jline", _ @_*) => MergeStrategy.first
+    case x => oldStrategy(x)
+  }
+}
+
+import sbtassembly.AssemblyPlugin.autoImport.assembly
+
+/** Generate a release bundle. Simplified versions of Canton's release bundling (see Canton's code base / issue #147) */
+lazy val bundleTask = {
+  lazy val bundle = taskKey[Unit]("create a release bundle")
+  bundle := {
+    val log = streams.value.log
+    val assemblyJar = assembly.value
+    runCommand(s"bash ./create-bundle.sh $assemblyJar", log)
+  }
+}
+
+lazy val appSettings = Seq(
+  bundleTask,
+  assembly / test := {}, // don't run tests during assembly
+  // when building the fat jar, we need to properly merge our artefacts
+  assembly / assemblyMergeStrategy := mergeStrategy((assembly / assemblyMergeStrategy).value),
+  assembly / mainClass := Some("com.daml.network.CoinApp"),
+  assembly / assemblyJarName := s"coin-${version.value}.jar",
+)
+
 lazy val `apps-app` =
   project
     .in(file("apps/app"))
     // make Canton code available to CC repo
     .dependsOn(`apps-validator`, `canton-community-app` % "compile->compile;test->test")
-    .settings(BuildCommon.sharedSettings, BuildCommon.cantonWarts)
+    .settings(
+      BuildCommon.sharedSettings,
+      BuildCommon.cantonWarts,
+      appSettings,
+    )

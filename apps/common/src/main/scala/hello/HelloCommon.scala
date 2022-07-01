@@ -6,7 +6,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.RateLimiter
 
 @SuppressWarnings(Array("org.wartremover.warts.Null"))
-object Hello extends NamedLogging with App {
+object HelloCommon extends NamedLogging with App {
   override protected def loggerFactory: NamedLoggerFactory =
     NamedLoggerFactory.root
 

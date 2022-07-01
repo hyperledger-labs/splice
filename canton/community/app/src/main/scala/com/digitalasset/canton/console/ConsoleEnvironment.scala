@@ -409,7 +409,6 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
     val binds = topLevelValues.map(_.asBind) :+
       selfAlias() // secretly add a reference to this instance to resolve implicit references within the console within the console
     validateNameUniqueness(binds)
-
     binds
   }
 

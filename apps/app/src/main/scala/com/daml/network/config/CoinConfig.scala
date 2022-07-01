@@ -20,6 +20,7 @@ import com.digitalasset.canton.participant.config.{
 
 import scala.annotation.nowarn
 import cats.syntax.functor._
+import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
 import com.typesafe.config.Config
@@ -115,6 +116,11 @@ object CoinConfig {
 
     deriveReader[CoinConfig]
   }
+
+  def load(config: Config)(implicit
+      elc: ErrorLoggingContext = elc
+  ): Either[CantonConfigError, CoinConfig] =
+    CantonConfig.loadAndValidate[CoinConfig](config)
 
   def loadOrExit(config: Config)(implicit elc: ErrorLoggingContext = elc): CoinConfig =
     CantonConfig.loadOrExit[CoinConfig](config)
