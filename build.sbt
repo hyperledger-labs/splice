@@ -107,7 +107,8 @@ lazy val bundleTask = {
   bundle := {
     val log = streams.value.log
     val assemblyJar = assembly.value
-    runCommand(s"bash ./create-bundle.sh $assemblyJar", log)
+    val examples = Seq("-c", "apps/app/src/pack")
+    runCommand(s"bash ./create-bundle.sh $assemblyJar ${examples.mkString(" ")}", log)
   }
 }
 

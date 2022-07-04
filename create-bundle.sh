@@ -1,6 +1,8 @@
 #!/bin/bash
 
-# Script is a simplified version of Canton's analogue create-bundle.sh script
+# This script is a simplified version of Canton's analogue create-bundle.sh script
+# Usage: `./create-bundle.sh [-c <directory-to-copy-to-release-bundle]* [-r <file-location> <file-name-and-location-in-release-bundle>]*
+# where "-c" stands for "copy" and "-r" stands for "rename"
 
 # The app "binary" is just a shell script that calls the main JAR
 function adjust_shellscript_binary() {
@@ -10,14 +12,14 @@ function adjust_shellscript_binary() {
   REPLACE_JAR="lib\/$JAR"
 #  REPLACE_MAC_ICON_FILE="lib\/canton.ico"
   cp -r "$RELEASE_DIR/../../../src/pack/bin" "$RELEASE_DIR"
-  for file in "bin/coin" # TODO(i147): Canton supports windows. Do we want that too? "bin/coin.bat"
+  for file in "bin/coin" # TODO(i161): Canton supports windows. Do we want that too? "bin/coin.bat"
   do
       cat "$RELEASE_DIR"/$file |
         sed -e "s/REPLACE_VERSION/${REPLACE_VERSION}/" |
         sed -e "s/REPLACE_REVISION/${REPLACE_REVISION}/" |
         sed -e "s/REPLACE_JVM_OPTS/${REPLACE_JVM_OPTS}/" |
         sed -e "s/REPLACE_JAR/${REPLACE_JAR}/" > $RELEASE_DIR/tmp.txt
-        # TODO(i147): Look into this Mac Icon
+        # TODO(i161): Look into this Mac Icon
 #        sed -e "s/REPLACE_MAC_ICON_FILE/${REPLACE_MAC_ICON_FILE}/"
       mv "$RELEASE_DIR"/tmp.txt "$RELEASE_DIR"/$file
       chmod 755 $RELEASE_DIR/$file
@@ -42,7 +44,71 @@ mkdir -p "$RELEASE_DIR"/lib "$RELEASE_DIR"/bin
 
 cp -v "$JARFILE" "$RELEASE_DIR"/lib
 
-# TODO(i147): This is where the respective Canton script has a lot (of very unreadable) bundling logic
+
+shift # shift JARFILE argument out-of-scope
+ARGS=$@ # other command line args, given in form
+
+state="scan"
+
+for arg in $ARGS
+do
+  case $state in
+    "scan")
+      case $arg in
+        "-c")
+          state="copy"
+          ;;
+        "-r")
+          state="rename"
+          ;;
+        *)
+          echo "ERROR, expected -r or -c, found $arg"
+          exit 1
+      esac
+      ;;
+    "copy")
+      if [[ -e $arg ]]; then
+        if [[ -d $arg ]]; then
+          if [[ -z $(ls -A $arg) ]]; then
+            echo "skipping empty $arg"
+          else
+            echo "copying content from $arg"
+            cp -r $arg/* "$RELEASE_DIR"
+          fi
+        else
+          echo "copying file $arg"
+          cp $arg "$RELEASE_DIR"
+        fi
+      else
+        echo "ERROR, no such file $arg for copying"
+        exit 1
+      fi
+      state="scan"
+      ;;
+    "rename")
+      if [[ -e $arg ]]; then
+        rename=$arg
+      else
+        echo "ERROR, no such file $arg for renaming"
+        exit 1
+      fi
+      state="rename-do"
+      ;;
+    "rename-do")
+      target=$RELEASE_DIR/$arg
+      target_dir=$(dirname "$target")
+      if [[ ! -e $target_dir ]]; then
+        mkdir -p "$target_dir"
+      fi
+      # shellcheck disable=SC2086
+      cp -v $rename $target
+      state="scan"
+      ;;
+    *)
+      echo "unexpected state $state"
+      exit 1
+  esac
+done
 
 adjust_shellscript_binary
 
