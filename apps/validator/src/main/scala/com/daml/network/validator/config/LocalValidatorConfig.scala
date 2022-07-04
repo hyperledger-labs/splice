@@ -16,6 +16,7 @@ import com.digitalasset.canton.config.{
 import com.digitalasset.canton.participant.config.{
   LedgerApiServerConfig,
   ParticipantNodeParameterConfig,
+  RemoteParticipantConfig,
   TestingTimeServiceConfig,
 }
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
@@ -31,6 +32,7 @@ case class LocalValidatorConfig(
     parameters: ValidatorNodeParameters = ValidatorNodeParameters(),
     override val sequencerClient: SequencerClientConfig = SequencerClientConfig(),
     override val caching: CachingConfigs = CachingConfigs(),
+    remoteParticipant: RemoteParticipantConfig,
 ) extends LocalNodeConfig {
   override val nodeTypeName: String = "validator"
 

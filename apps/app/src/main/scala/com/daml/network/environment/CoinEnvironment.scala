@@ -12,15 +12,10 @@ import com.digitalasset.canton.console.{
   ConsoleOutput,
 }
 import com.digitalasset.canton.domain.DomainNodeBootstrap
-import com.digitalasset.canton.domain.config.CommunityDomainConfig
 import com.digitalasset.canton.environment._
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.ParticipantNodeBootstrap
-import com.digitalasset.canton.participant.config.CommunityParticipantConfig
 import com.digitalasset.canton.resource.{CommunityDbMigrationsFactory, DbMigrationsFactory}
-import com.digitalasset.canton.tracing.TraceContext
-
-import scala.annotation.nowarn
 
 trait CoinEnvironment extends Environment {
 
@@ -52,7 +47,7 @@ trait CoinEnvironment extends Environment {
         )
       )
 
-  lazy val validators = ValidatorApps(
+  lazy val validators = new ValidatorApps(
     createValidator,
     migrationsFactory,
     timeouts,
@@ -67,6 +62,8 @@ trait CoinEnvironment extends Environment {
     val errors = validators.startAll.left.getOrElse(Seq.empty)
     Either.cond(errors.isEmpty, (), errors)
   }
+
+  override def allNodes = super.allNodes :+ validators
 
 }
 

@@ -8,9 +8,9 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
   IsolatedCoinEnvironments,
 }
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.concurrent.duration._
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironments {
   override def environmentDefinition
@@ -37,20 +37,25 @@ class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironm
     }
   }
 
-  "run dummy command against validator" in { implicit env =>
+  "run commands against validator" in { implicit env =>
     // TODO(Arne): move this into a trait analogue to Canton's `ConsoleEnvironmentTestHelpers`
     def v(name: String): LocalValidatorReference =
       env.validators
         .find(_.name == name)
         .getOrElse(sys.error(s"validator [$name] not configured"))
 
+    val validator1 = v("validator1")
     clue("start validator and run dummy command") {
-      val validator1 = v("validator1")
       validator1.start()
       val res = validator1.dummy_command("Hello. Please increment this number!", 5)
       res shouldBe 6
     }
 
-  }
+    val validatorRemoteParReference = validator1.remoteParticipant
+    clue("connect to domain and run a ping with validator's participant") {
+      validatorRemoteParReference.domains.connect_local(env.da)
+      validatorRemoteParReference.health.ping(validatorRemoteParReference.id)
+    }
 
+  }
 }

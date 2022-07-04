@@ -9,7 +9,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.DbMigrationsFactory
 
 /** Validator app instances. */
-case class ValidatorApps(
+class ValidatorApps(
     create: (String, LocalValidatorConfig) => ValidatorNodeBootstrap,
     migrationsFactory: DbMigrationsFactory,
     _timeouts: ProcessingTimeout,
