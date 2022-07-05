@@ -1,27 +1,25 @@
-# Minimal makefile for Sphinx documentation
-#
+# -*- makefile -*-
+include ../build-common/common.mk
+include ../build-common/docker.mk
 
-# You can set these variables from the command line, and also
-# from the environment for the first two.
-SPHINXOPTS    ?= -W
-SPHINXBUILD   ?= sphinx-build
-SOURCEDIR     = .
-BUILDDIR      = _build
+.PHONY: all
+all: docker-images
 
-# Put it first so that "make" without argument is like "make help".
-.PHONY: help
-help:
-	@$(SPHINXBUILD) -M help "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+src := Dockerfile $(shell find src -type f)
+$(srcdigest): $(src)
 
-target: html
-	mkdir -p target
-	cp -r "$(BUILDDIR)"/html/* target
+.PHONY: build
+build: $(docker-build)
+$(docker-build): html
+
+.PHONY: html
+html: $(src)
+	sphinx-build -M html src target -W
+
+.PHONY: run
+run:
+	sphinx-autobuild src target
 
 .PHONY: clean
 clean:
-	rm -rf build_ target
-
-# Catch-all target: route all unknown targets to Sphinx using the new
-# "make mode" option.  $(O) is meant as a shortcut for $(SPHINXOPTS).
-%: Makefile
-	@$(SPHINXBUILD) -M $@ "$(SOURCEDIR)" "$(BUILDDIR)" $(SPHINXOPTS) $(O)
+	rm -rfv target

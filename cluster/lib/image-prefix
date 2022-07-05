@@ -1,6 +1,0 @@
-PROJECT=$(gcloud config get project)
-REGION=$(gcloud config get compute/region)
-
-get_full_image_name () {
-    echo "$REGION-docker.pkg.dev/$PROJECT/$GCP_REPO_NAME/$1"
-}

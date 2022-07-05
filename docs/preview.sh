@@ -2,5 +2,5 @@
 set -eou pipefail
 
 make html
-cd _build/html
+cd target/html
 python -m http.server 8000 --bind 127.0.0.1
