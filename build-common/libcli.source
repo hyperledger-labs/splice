@@ -155,8 +155,3 @@ function _set_x(){
   $@
   { set +x; } 2>/dev/null
 }
-
-# get the deployment version tag
-function _version_gen(){
-  echo "git-$(git rev-parse HEAD)"
-}

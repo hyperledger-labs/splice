@@ -36,7 +36,7 @@ docker-images: $(docker-images)
 $(docker-images): $(if $(EXTRA_TAGS),FORCE) $(repo_root)/build-common/registries
 	@printf '%s\n' \
 		$(foreach registry,$(call must-shell,cat $(lastword $^)),\
-			$(foreach tag,$(addprefix $(tag-prefix),$(call must-shell, _version_gen) $(EXTRA_TAGS)),\
+			$(foreach tag,$(addprefix $(tag-prefix),$(call must-shell, version-gen) $(EXTRA_TAGS)),\
 				$(registry)/$(app):$(tag)\
 			)\
 		) | tee $@

@@ -328,6 +328,20 @@ jobs:
       - setup_remote_docker
       - setup_nix
       - run:
+         name: build images
+         command: |
+           set -euo pipefail
+           . /home/circleci/.nix-profile/etc/profile.d/nix.sh
+           . .envrc.vars
+
+           nix-shell shell.nix \
+             --run bash \<<'EOF'
+             set -euo pipefail
+
+             make docker-build
+           EOF
+
+      - run:
          name: push images
          command: |
            set -euo pipefail
