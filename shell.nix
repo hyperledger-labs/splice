@@ -14,6 +14,7 @@ in pkgs.mkShell {
     kubectl
     minikube
     google-cloud-sdk
+    jsonnet
     nodejs
     sbt
     sphinx

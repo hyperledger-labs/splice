@@ -23,7 +23,6 @@ else
     # Local builds (which may be on an M1) are explicitly constrained
     # to x86.
     platform_opt := --platform=linux/amd64
-    tag-prefix := ${USER}-
 endif
 
 
@@ -31,9 +30,8 @@ docker-images := target/docker.images
 
 .PHONY: docker-images
 docker-images: $(docker-images)
-
-# if EXTRA_TAGS is present, force this target to be rebuilt
 $(docker-images): $(if $(EXTRA_TAGS),FORCE) $(repo_root)/build-common/registries
+	mkdir -pv $(@D)
 	@printf '%s\n' \
 		$(foreach registry,$(call must-shell,cat $(lastword $^)),\
 			$(foreach tag,$(addprefix $(tag-prefix),$(call must-shell, version-gen) $(EXTRA_TAGS)),\

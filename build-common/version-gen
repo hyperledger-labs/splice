@@ -1,5 +1,8 @@
 #! /usr/bin/env bash
-set -euo pipefail
+
+if [ -z "${CI}" ]; then
+    tag_prefix="${USER}-"
+fi
 
 # get the deployment version tag
-echo "git-$(git rev-parse HEAD)"
+echo "git-${tag_prefix}$(git rev-parse HEAD)"
