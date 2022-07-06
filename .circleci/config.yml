@@ -318,7 +318,7 @@ jobs:
              cd docs
              make html
 
-  docs-deploy:
+  docker-images-push:
     docker:
     - image: cimg/base:2021.04
     environment:
@@ -348,9 +348,7 @@ jobs:
              gcloud --quiet config set project ${GCP_PROJECT_NAME}
              gcloud --quiet config set compute/zone us-central1
 
-             cd cluster
-             ./image-build docs
-             ./image-push docs
+             make docker-push
            EOF
 
 
@@ -370,7 +368,7 @@ workflows:
     # Documentation
     - docs:
         <<: *notify-fail
-    - docs-deploy:
+    - docker-images-push:
         <<: *notify-fail
         filters:
           branches:

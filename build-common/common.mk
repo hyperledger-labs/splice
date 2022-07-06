@@ -24,7 +24,8 @@ check-dirty = $(if $(findstring true,$(CI)),$(if $(findstring dirty,$(git_sha)),
 app  := $(notdir $(abspath .))
 repo_root := $(call must-shell,cd $(dir $(lastword $(MAKEFILE_LIST))).. && pwd)
 
-gcp-project-id = $(eval gcp-project-id := $$(shell gcloud config get project))$(gcp-project-id)
+# CircleCI overrides this to true
+export CI ?= false
 
 ############
 # srcdigest

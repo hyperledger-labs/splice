@@ -18,7 +18,15 @@ $(srcdigest): $(docker-src)
 ## docker images
 #################
 
-tag-prefix := ${USER}-
+ifeq ($(CI),true)
+    # never use the cache in CI on the master branch
+    cache_opt := --no-cache
+else
+    # Local builds (which may be on an M1) are explicitly constrained
+    # to x86.
+    platform_opt := --platform=linux/amd64
+    tag-prefix := ${USER}-
+endif
 
 
 docker-images := target/docker.images
@@ -58,7 +66,7 @@ docker-build: $(docker-build)
 $(docker-build): $(docker-src)
 	mkdir -pv $(@D)
 	@echo docker build triggered because these files changed: $?
-	docker build --platform=linux/amd64 --pull --iidfile $@ $(cache_opt) .
+	docker build $(platform_opt) --pull --iidfile $@ $(cache_opt) .
 
 
 ##############
