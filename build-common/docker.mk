@@ -11,8 +11,6 @@ ifneq ($(_did_docker),true)
 
 docker-compose-files = -f bats/docker-compose.yml$(if $(wildcard docker-compose.override.yml), -f docker-compose.override.yml)
 docker-src := Dockerfile
-$(srcdigest): $(docker-src)
-
 
 #################
 ## docker images
@@ -35,10 +33,10 @@ docker-images := target/docker.images
 docker-images: $(docker-images)
 
 # if EXTRA_TAGS is present, force this target to be rebuilt
-$(docker-images): $(srcdigest) $(if $(EXTRA_TAGS),FORCE) $(repo_root)/build-common/registries
+$(docker-images): $(if $(EXTRA_TAGS),FORCE) $(repo_root)/build-common/registries
 	@printf '%s\n' \
 		$(foreach registry,$(call must-shell,cat $(lastword $^)),\
-			$(foreach tag,$(addprefix $(tag-prefix),$(call must-shell,tail -1 $<) $(EXTRA_TAGS)),\
+			$(foreach tag,$(addprefix $(tag-prefix),$(call must-shell, _version_gen) $(EXTRA_TAGS)),\
 				$(registry)/$(app):$(tag)\
 			)\
 		) | tee $@
@@ -83,7 +81,6 @@ $(docker-push): $(docker-images) $(docker-build)
 	$(check-dirty)
 	docker-push | tee $@
 	$(if $(EXTRA_TAGS),rm -v $<)
-
 
 
 _did_docker := true

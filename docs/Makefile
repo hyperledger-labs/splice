@@ -6,7 +6,6 @@ include ../build-common/docker.mk
 all: docker-images
 
 src := Dockerfile $(shell find src -type f)
-$(srcdigest): $(src)
 
 .PHONY: build
 build: $(docker-build)

@@ -27,23 +27,5 @@ repo_root := $(call must-shell,cd $(dir $(lastword $(MAKEFILE_LIST))).. && pwd)
 # CircleCI overrides this to true
 export CI ?= false
 
-############
-# srcdigest
-############
-
-srcdigest := target/srcdigest
-
-.PHONY: clean-srcdigest
-clean-srcdigest:
-	rm -fv $(srcdigest)
-
-.PHONY: srcdigest
-srcdigest: clean-srcdigest $(srcdigest)
-
-$(srcdigest):
-	@mkdir -p $(@D)
-	@git ls-files -s $^ | tee >(sha256sum | sed -E 's/^(\w*).*$$/M\1/') | tee $@
-
-
 _did_common := true
 endif

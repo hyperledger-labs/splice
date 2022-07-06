@@ -328,15 +328,11 @@ jobs:
       - setup_remote_docker
       - setup_nix
       - run:
-         name: deploy
+         name: push images
          command: |
            set -euo pipefail
            . /home/circleci/.nix-profile/etc/profile.d/nix.sh
-
-           use () {
-              echo "direnv stub..."
-           }
-           . .envrc
+           . .envrc.vars
 
            nix-shell shell.nix \
              --run bash \<<'EOF'
