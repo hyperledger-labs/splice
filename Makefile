@@ -1,16 +1,18 @@
 # -*- makefile -*-
 
+apps := canton-domain canton-participant docs
+
 .PHONY: docker-build
-docker-build:
-	make -C canton-domain docker-build
-	make -C canton-participant docker-build
-	make -C docs docker-build
+docker-build: test
+	for app in $(apps); do \
+	  make -C $${app} docker-build; \
+	done
 
 .PHONY: docker-push
-docker-push:
-	make -C canton-domain docker-push
-	make -C canton-participant docker-push
-	make -C docs docker-push
+docker-push: test
+	for app in $(apps); do \
+	  make -C $${app} docker-push; \
+	done
 
 .PHONY: test
 test:
@@ -18,6 +20,6 @@ test:
 
 .PHONY: clean
 clean:
-	make -C canton-domain clean
-	make -C canton-participant clean
-	make -C docs clean
+	for app in $(apps); do \
+	  make -C $${app} clean; \
+	done
