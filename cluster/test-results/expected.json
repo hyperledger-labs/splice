@@ -6,28 +6,28 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
-               "app": "cn-docs"
+               "app": "docs"
             },
-            "name": "cn-docs-deployment"
+            "name": "docs"
          },
          "spec": {
             "replicas": 1,
             "selector": {
                "matchLabels": {
-                  "app": "cn-docs"
+                  "app": "docs"
                }
             },
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "cn-docs"
+                     "app": "docs"
                   }
                },
                "spec": {
                   "containers": [
                      {
                         "image": "us-central1-docker.pkg.dev/cn-devnet-353712/cn-devnet-images/docs:tag",
-                        "name": "cn-docs",
+                        "name": "docs",
                         "ports": [
                            {
                               "containerPort": 80
@@ -40,10 +40,65 @@
          }
       },
       {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "canton-domain"
+            },
+            "name": "canton-domain"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "canton-domain"
+               }
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "canton-domain"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "image": "us-central1-docker.pkg.dev/cn-devnet-353712/cn-devnet-images/canton-domain:tag",
+                        "livenessProbe": {
+                           "failureThreshold": 5,
+                           "periodSeconds": 10,
+                           "tcpSocket": {
+                              "port": "canton-pub-api"
+                           }
+                        },
+                        "name": "canton-domain",
+                        "ports": [
+                           {
+                              "containerPort": 6018,
+                              "name": "canton-pub-api"
+                           },
+                           {
+                              "containerPort": 6019,
+                              "name": "canton-adm-api"
+                           }
+                        ],
+                        "readinessProbe": {
+                           "tcpSocket": {
+                              "port": "canton-pub-api"
+                           }
+                        }
+                     }
+                  ]
+               }
+            }
+         }
+      },
+      {
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "name": "cn-docs-service"
+            "name": "docs"
          },
          "spec": {
             "loadBalancerIP": "35.202.15.15",
@@ -60,7 +115,40 @@
                }
             ],
             "selector": {
-               "app": "cn-docs"
+               "app": "docs"
+            },
+            "type": "LoadBalancer"
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "name": "canton-domain"
+         },
+         "spec": {
+            "loadBalancerIP": "35.202.15.15",
+            "loadBalancerSourceRanges": [
+               "35.194.81.56/32",
+               "35.198.147.95/32",
+               "35.189.40.124/32"
+            ],
+            "ports": [
+               {
+                  "name": "canton-pub-api",
+                  "port": 6018,
+                  "protocol": "TCP",
+                  "targetPort": 6018
+               },
+               {
+                  "name": "canton-adm-api",
+                  "port": 6019,
+                  "protocol": "TCP",
+                  "targetPort": 6019
+               }
+            ],
+            "selector": {
+               "app": "canton-domain"
             },
             "type": "LoadBalancer"
          }
