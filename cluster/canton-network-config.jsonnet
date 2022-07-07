@@ -96,6 +96,39 @@ function(imageTag) {
       },
     },
     {
+      apiVersion: 'apps/v1',
+      kind: 'Deployment',
+      metadata: {
+        name: 'canton-participant',
+        labels: {
+          app: 'canton-participant',
+        },
+      },
+      spec: {
+        replicas: 1,
+        selector: {
+          matchLabels: {
+            app: 'canton-participant',
+          },
+        },
+        template: {
+          metadata: {
+            labels: {
+              app: 'canton-participant',
+            },
+          },
+          spec: {
+            containers: [
+              {
+                name: 'canton-participant',
+                image: 'us-central1-docker.pkg.dev/cn-devnet-353712/cn-devnet-images/canton-participant:' + imageTag,
+              },
+            ],
+          },
+        },
+      },
+    },
+    {
       apiVersion: 'v1',
       kind: 'Service',
       metadata: {
