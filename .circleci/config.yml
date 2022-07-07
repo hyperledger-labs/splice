@@ -170,6 +170,27 @@ jobs:
           cmd: "test"
           timeout: "10m"
 
+  deployment_test:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - run:
+         name: deployment test
+         command: |
+           set -euo pipefail
+           . /home/circleci/.nix-profile/etc/profile.d/nix.sh
+           . .envrc.vars
+
+           nix-shell shell.nix \
+             --run bash \<<'EOF'
+             set -euo pipefail
+
+             make test
+           EOF
 
   canton_coin:
     docker:
@@ -386,4 +407,7 @@ workflows:
                 - main
     # Scala
     - test:
+        <<: *notify-fail
+    # Deployment
+    - deployment_test:
         <<: *notify-fail

@@ -1,0 +1,70 @@
+{
+   "apiVersion": "apps/v1",
+   "items": [
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "cn-docs"
+            },
+            "name": "cn-docs-deployment"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "cn-docs"
+               }
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "cn-docs"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "image": "us-central1-docker.pkg.dev/cn-devnet-353712/cn-devnet-images/docs:tag",
+                        "name": "cn-docs",
+                        "ports": [
+                           {
+                              "containerPort": 80
+                           }
+                        ]
+                     }
+                  ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "name": "cn-docs-service"
+         },
+         "spec": {
+            "loadBalancerIP": "35.202.15.15",
+            "loadBalancerSourceRanges": [
+               "35.194.81.56/32",
+               "35.198.147.95/32",
+               "35.189.40.124/32"
+            ],
+            "ports": [
+               {
+                  "port": 80,
+                  "protocol": "TCP",
+                  "targetPort": 80
+               }
+            ],
+            "selector": {
+               "app": "cn-docs"
+            },
+            "type": "LoadBalancer"
+         }
+      }
+   ],
+   "kind": "List"
+}
