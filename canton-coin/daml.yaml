@@ -1,3 +1,8 @@
+# NOTE : There are SBT jobs that will compile this project into a dar under
+# the usual .daml/dist output directory and run code-gen to create scala case
+# classes. You should either use `daml build` or `sbt ~compile`, but NOT both
+# at the same time (see #179 for more context).
+
 sdk-version: 2.3.0-snapshot.20220619.10104.0.253b0b18
 name: canton-coin
 source: daml
@@ -6,7 +11,6 @@ dependencies:
   - daml-prim
   - daml-stdlib
   - daml-script
-  - daml-trigger
 start-navigator: false
 sandbox-options:
   - -c=canton.conf

@@ -1,5 +1,6 @@
 import BuildCommon.{runCommand, sharedCantonSettings}
 import Dependencies._
+import DamlPlugin.autoImport._
 import sbtassembly.{MergeStrategy, PathList}
 
 /*
@@ -55,7 +56,24 @@ lazy val `apps-common` =
     .in(file("apps/common"))
     // make Canton code available to CC repo
     .dependsOn(`canton-community-common`, `canton-community-app` % "compile->compile;test->test")
-    .settings(BuildCommon.sharedSettings, BuildCommon.cantonWarts)
+    .enablePlugins(DamlPlugin)
+    .settings(
+        BuildCommon.sharedSettings,
+        BuildCommon.cantonWarts,
+        /* The reason we have to specify these items explicitly is that the DamlPlugin expects a gradle
+         * `src/main/daml` directory structure. Instead we have the classical SDK `./daml` structure.
+         * We output the dar to the usual `.daml/dist` dir because that's where a naive user expects it.
+         */
+        Compile / damlSourceDirectory := file("canton-coin"),
+        Compile / damlDarOutput := file("canton-coin") / ".daml" / "dist",
+        Compile / damlCodeGeneration := Seq(
+          (
+            (Compile / damlSourceDirectory).value / "daml" / "CC",
+            (Compile / damlDarOutput).value / "canton-coin",
+            "com.digitalasset.network"
+          )
+        )
+    )
 
 lazy val `apps-validator` =
   project
