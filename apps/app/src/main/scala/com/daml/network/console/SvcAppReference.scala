@@ -1,9 +1,12 @@
 package com.daml.network.console
 
 import com.daml.network.environment.CoinConsoleEnvironment
+import com.daml.network.svc.admin.api.client.commands.SvcAppCommands
+import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.validator.admin.api.client.commands.DummyCommands
 import com.daml.network.validator.config.LocalValidatorConfig
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
+import com.digitalasset.canton.console.commands._
 import com.digitalasset.canton.console.{
   BaseInspection,
   ConsoleCommandResult,
@@ -14,16 +17,6 @@ import com.digitalasset.canton.console.{
   LedgerApiCommandRunner,
   LocalInstanceReference,
 }
-import com.digitalasset.canton.console.commands.{
-  LedgerApiAdministration,
-  LocalParticipantPruningAdministrationGroup,
-  ParticipantAdministration,
-  ParticipantHealthAdministration,
-  ParticipantPartiesAdministrationGroup,
-  ParticipantPruningAdministrationGroup,
-  ParticipantTestingGroup,
-  TopologyAdministrationGroup,
-}
 import com.digitalasset.canton.environment.CantonNodeBootstrap
 import com.digitalasset.canton.health.admin.data.ParticipantStatus
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -31,7 +24,7 @@ import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.ParticipantId
 
 /** Copy of Canton ParticipantReference */
-abstract class ValidatorReference(
+abstract class SvcAppReference(
     override val consoleEnvironment: ConsoleEnvironment,
     val name: String,
 ) extends InstanceReference
@@ -41,10 +34,10 @@ abstract class ValidatorReference(
 
   override type InstanceId = ParticipantId
 
-  override protected val instanceType = "Validator"
+  override protected val instanceType = "SVC"
 
   override protected val loggerFactory: NamedLoggerFactory =
-    consoleEnvironment.environment.loggerFactory.append("validator", name)
+    consoleEnvironment.environment.loggerFactory.append("SVC", name)
 
   override type Status = ParticipantStatus
 
@@ -92,33 +85,33 @@ abstract class ValidatorReference(
   @Help.Group("Parties")
   override def parties: ParticipantPartiesAdministrationGroup
 
-  def config: LocalValidatorConfig
+  def config: LocalSvcAppConfig
 }
 
-/** Single local validator app reference. Defines the console commands that can be run against a local validator
+/** Single local SVC app reference. Defines the console commands that can be run against a local SVC
   * app reference.
   */
-class LocalValidatorReference(
+class LocalSvcAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
-) extends ValidatorReference(consoleEnvironment, name)
+) extends SvcAppReference(consoleEnvironment, name)
     with LocalInstanceReference
     with BaseInspection[ParticipantNode] {
 
-  protected val nodes = consoleEnvironment.environment.validators
+  protected val nodes = consoleEnvironment.environment.svcs
   @Help.Summary("Return participant config")
-  def config: LocalValidatorConfig =
-    consoleEnvironment.environment.config.validatorsByString(name)
+  def config: LocalSvcAppConfig =
+    consoleEnvironment.environment.config.svcsByString(name)
 
-  def dummy_command(some_string: String, some_number: Int): Int = {
+  def dummy_svc_command(some_string: String, some_number: Int): Int = {
     consoleEnvironment.run {
-      adminCommand(DummyCommands.DummyCommmand(some_string, some_number))
+      adminCommand(SvcAppCommands.DummySvcCommmand(some_string, some_number))
     }
   }
 
-  /** Remote participant this validator app is configured to interact with. */
+  /** Remote participant this SVC app is configured to interact with. */
   val remoteParticipant =
-    new ValidatorAppRemoteParticipantReference(
+    new SvcAppRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name``",
       name,

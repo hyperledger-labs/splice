@@ -3,6 +3,8 @@ package com.daml.network.environment
 import cats.syntax.either._
 import com.daml.network.config.CoinConfig
 import com.daml.network.metrics.CoinMetricsFactory
+import com.daml.network.svc.SvcAppBootstrap
+import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.validator.ValidatorNodeBootstrap
 import com.daml.network.validator.config.LocalValidatorConfig
 import com.digitalasset.canton.config.TestingConfigInternal
@@ -56,14 +58,47 @@ trait CoinEnvironment extends Environment {
     loggerFactory,
   )
 
+  protected def createSvc(
+      name: String,
+      svcConfig: LocalSvcAppConfig,
+  ): SvcAppBootstrap =
+    SvcAppBootstrap.SvcAppFactory
+      .create(
+        name,
+        svcConfig,
+        config.trySvcAppParametersByString(name),
+        createClock(Some(SvcAppBootstrap.LoggerFactoryKeyName -> name)),
+        testingTimeService,
+        coinMetrics.forSvc(name),
+        testingConfig,
+        futureSupervisor,
+        loggerFactory,
+      )
+      .valueOr(err =>
+        throw new RuntimeException(
+          s"Failed to create participant bootstrap: $err"
+        )
+      )
+
+  lazy val svcs = new SvcApps(
+    createSvc,
+    migrationsFactory,
+    timeouts,
+    config.svcsByString,
+    config.trySvcAppParametersByString,
+    loggerFactory,
+  )
+
   /** Start all instances described in the configuration
     */
   override def startAll(): Either[Seq[StartupError], Unit] = {
-    val errors = validators.startAll.left.getOrElse(Seq.empty)
+    val errors =
+      validators.startAll.left.getOrElse(Seq.empty) ++
+        svcs.startAll.left.getOrElse(Seq.empty)
     Either.cond(errors.isEmpty, (), errors)
   }
 
-  override def allNodes = super.allNodes :+ validators
+  override def allNodes = super.allNodes :+ validators :+ svcs
 
 }
 

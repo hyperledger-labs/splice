@@ -1,6 +1,6 @@
 package com.daml.network.environment
 
-import com.daml.network.console.LocalValidatorReference
+import com.daml.network.console.{LocalSvcAppReference, LocalValidatorReference}
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
 import com.digitalasset.canton.console.{
   CantonHealthAdministration,
@@ -36,8 +36,17 @@ class CoinConsoleEnvironment(
   lazy val validators: Seq[LocalValidatorReference] =
     environment.config.validatorsByString.keys.map(createValidatorReference).toSeq
 
+  lazy val svc: LocalSvcAppReference =
+    environment.config.svcsByString.keys
+      .map(createSvcReference)
+      .headOption
+      .getOrElse(throw new RuntimeException("There should be exactly one SVC app"))
+
   private def createValidatorReference(name: String): LocalValidatorReference =
     new LocalValidatorReference(this, name)
+
+  private def createSvcReference(name: String): LocalSvcAppReference =
+    new LocalSvcAppReference(this, name)
 
   override protected def topLevelValues: Seq[TopLevelValue[_]] = {
 
@@ -49,7 +58,7 @@ class CoinConsoleEnvironment(
         helpText("All validator app instances" + genericNodeReferencesDoc, "Validators"),
         validators,
         Seq("App References"),
-      )
+      ) :+ TopLevelValue(svc.name, helpText("SVC app", svc.name), svc, Seq("SVC"))
 
   }
 

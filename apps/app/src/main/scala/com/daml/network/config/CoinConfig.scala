@@ -20,6 +20,7 @@ import com.digitalasset.canton.participant.config.{
 
 import scala.annotation.nowarn
 import cats.syntax.functor._
+import com.daml.network.svc.config.{LocalSvcAppConfig, SvcAppParameters}
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
@@ -29,6 +30,7 @@ import pureconfig.ConfigReader
 
 case class CoinConfig(
     validators: Map[InstanceName, LocalValidatorConfig],
+    svcApp: Option[LocalSvcAppConfig],
     // TODO(Arne): we want to remove all of these.
     domains: Map[InstanceName, CommunityDomainConfig] = Map.empty,
     participants: Map[InstanceName, CommunityParticipantConfig] = Map.empty,
@@ -82,6 +84,47 @@ case class CoinConfig(
     n.unwrap -> c
   }
 
+  // The config contains one optional unnamed SVC app (because in M1, there can only be one)
+  // Since the rest of the code generally expects a map of nodes, we'll create one.
+  private lazy val svcAppInstanceName = InstanceName.tryCreate("svc-app")
+  private lazy val svcApps = svcApp.toList.map(config => svcAppInstanceName -> config).toMap
+
+  private lazy val svcNodeParameters_ : Map[InstanceName, SvcAppParameters] =
+    svcApps.fmap { svcConfig =>
+      val participantParameters = svcConfig.parameters
+      SvcAppParameters(
+        monitoring.tracing,
+        monitoring.delayLoggingThreshold,
+        monitoring.getLoggingConfig,
+        monitoring.logQueryCost,
+        parameters.timeouts.processing,
+        svcConfig.caching,
+        parameters.enableAdditionalConsistencyChecks,
+        features.enablePreviewCommands,
+        parameters.nonStandardConfig,
+        svcConfig.sequencerClient,
+        participantParameters.devVersionSupport,
+      )
+    }
+
+  private[network] def svcNodeParameters(
+      appName: InstanceName
+  ): SvcAppParameters =
+    nodeParametersFor(svcNodeParameters_, "svc-app", appName)
+
+  /** Use `svcNodeParameters` instead!
+    */
+  def trySvcAppParametersByString(name: String): SvcAppParameters =
+    svcNodeParameters(
+      InstanceName.tryCreate(name)
+    )
+
+  /** Use `svcs` instead!
+    */
+  def svcsByString: Map[String, LocalSvcAppConfig] = svcApps.map { case (n, c) =>
+    n.unwrap -> c
+  }
+
   override def dumpString: String = "TODO(Arne): remove or implement."
 
   override def withDefaults: CoinConfig =
@@ -109,6 +152,10 @@ object CoinConfig {
       deriveReader[ValidatorNodeParameters]
     implicit val validatorConfigReader: ConfigReader[LocalValidatorConfig] =
       deriveReader[LocalValidatorConfig]
+    implicit val svcNodeParametersReader: ConfigReader[SvcAppParameters] =
+      deriveReader[SvcAppParameters]
+    implicit val svcConfigReader: ConfigReader[LocalSvcAppConfig] =
+      deriveReader[LocalSvcAppConfig]
     implicit val communityDomainConfigReader: ConfigReader[CommunityDomainConfig] =
       deriveReader[CommunityDomainConfig]
     implicit val communityParticipantConfigReader: ConfigReader[CommunityParticipantConfig] =

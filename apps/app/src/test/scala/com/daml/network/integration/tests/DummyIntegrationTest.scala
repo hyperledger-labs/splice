@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.console.LocalValidatorReference
+import com.daml.network.console.{LocalSvcAppReference, LocalValidatorReference}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -55,6 +55,22 @@ class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironm
     clue("connect to domain and run a ping with validator's participant") {
       validatorRemoteParReference.domains.connect_local(env.da)
       validatorRemoteParReference.health.ping(validatorRemoteParReference.id)
+    }
+
+  }
+
+  "run commands against SVC" in { implicit env =>
+    val svc = env.svc
+    clue("start SVC and run dummy command") {
+      svc.start()
+      val res = svc.dummy_svc_command("Hello. Please decrement this number!", 5)
+      res shouldBe 4
+    }
+
+    val svcRemoteParReference = svc.remoteParticipant
+    clue("connect to domain and run a ping with SVC's participant") {
+      svcRemoteParReference.domains.connect_local(env.da)
+      svcRemoteParReference.health.ping(svcRemoteParReference.id)
     }
 
   }

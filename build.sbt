@@ -36,6 +36,7 @@ lazy val root = (project in file("."))
   .aggregate(
     `apps-common`,
     `apps-validator`,
+    `apps-svc`,
     `apps-app`,
     `canton-community-common`,
     `canton-blake2b`,
@@ -59,6 +60,21 @@ lazy val `apps-common` =
 lazy val `apps-validator` =
   project
     .in(file("apps/validator"))
+    .dependsOn(`apps-common` % "compile->compile;test->test")
+    .settings(
+      libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
+      BuildCommon.sharedSettings,
+      BuildCommon.cantonWarts,
+      Compile / PB.targets := Seq(
+        scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
+      ),
+      Compile / PB.protoSources ++= (Test / PB.protoSources).value,
+      scalacOptions += "-Wconf:src=src_managed/.*:silent",
+    )
+
+lazy val `apps-svc` =
+  project
+    .in(file("apps/svc"))
     .dependsOn(`apps-common` % "compile->compile;test->test")
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
@@ -125,7 +141,11 @@ lazy val `apps-app` =
   project
     .in(file("apps/app"))
     // make Canton code available to CC repo
-    .dependsOn(`apps-validator`, `canton-community-app` % "compile->compile;test->test")
+    .dependsOn(
+      `apps-validator`,
+      `apps-svc`,
+      `canton-community-app` % "compile->compile;test->test",
+    )
     .settings(
       BuildCommon.sharedSettings,
       BuildCommon.cantonWarts,

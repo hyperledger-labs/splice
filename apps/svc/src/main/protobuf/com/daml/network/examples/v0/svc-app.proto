@@ -1,0 +1,17 @@
+syntax = "proto3";
+package com.daml.network.examples.v0;
+
+import "google/protobuf/wrappers.proto";
+
+service SvcAppService {
+  rpc DummySvcFunction (SomeDummySvcRequest) returns (SomeDummySvcResponse);
+}
+
+message SomeDummySvcRequest {
+  google.protobuf.StringValue some_string = 1;
+  int32 some_number = 2;
+}
+
+message SomeDummySvcResponse {
+  int32 some_number = 1;
+}
