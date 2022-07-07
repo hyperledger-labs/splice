@@ -3,7 +3,7 @@
 .PHONY: docker-build
 docker-build:
 	make -C canton-domain docker-build
-	make -C canton-particpiant docker-build
+	make -C canton-participant docker-build
 	make -C docs docker-build
 
 .PHONY: docker-push

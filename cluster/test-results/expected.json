@@ -30,7 +30,8 @@
                         "name": "docs",
                         "ports": [
                            {
-                              "containerPort": 80
+                              "containerPort": 80,
+                              "name": "http"
                            }
                         ]
                      }
@@ -120,7 +121,8 @@
                   "containers": [
                      {
                         "image": "us-central1-docker.pkg.dev/cn-devnet-353712/cn-devnet-images/canton-participant:tag",
-                        "name": "canton-participant"
+                        "name": "canton-participant",
+                        "ports": [ ]
                      }
                   ]
                }
