@@ -29,7 +29,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import pureconfig.ConfigReader
 
 case class CoinConfig(
-    validators: Map[InstanceName, LocalValidatorConfig],
+    validators: Map[InstanceName, LocalValidatorConfig] = Map.empty,
     svcApp: Option[LocalSvcAppConfig],
     // TODO(Arne): we want to remove all of these.
     domains: Map[InstanceName, CommunityDomainConfig] = Map.empty,

@@ -79,7 +79,7 @@ class ValidatorNodeBootstrap(
 object ValidatorNodeBootstrap {
   val LoggerFactoryKeyName: String = "validator"
 
-  trait Factory[PC <: LocalValidatorConfig] {
+  trait Factory {
     def create(
         name: String,
         validatorConfig: LocalValidatorConfig,
@@ -98,7 +98,7 @@ object ValidatorNodeBootstrap {
     ): Either[String, ValidatorNodeBootstrap]
   }
 
-  object ValidatorFactory extends Factory[LocalValidatorConfig] {
+  object ValidatorFactory extends Factory {
 
     override def create(
         name: String,

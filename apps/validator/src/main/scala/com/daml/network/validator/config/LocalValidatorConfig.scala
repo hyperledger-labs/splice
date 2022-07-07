@@ -28,12 +28,13 @@ case class LocalValidatorConfig(
     override val crypto: CryptoConfig = CryptoConfig(),
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
-    // TODO(i87): slightly different in Canton
+    // TODO(i142): slightly different in Canton
     parameters: ValidatorNodeParameters = ValidatorNodeParameters(),
     override val sequencerClient: SequencerClientConfig = SequencerClientConfig(),
     override val caching: CachingConfigs = CachingConfigs(),
     remoteParticipant: RemoteParticipantConfig,
-) extends LocalNodeConfig {
+) extends LocalNodeConfig // TODO(142): fork or generalize this trait.
+    {
   override val nodeTypeName: String = "validator"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig

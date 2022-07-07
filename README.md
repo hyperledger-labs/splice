@@ -78,3 +78,8 @@ Test:
 - `testOnly myWildcard`: runs all tests matching wildcard, e.g.,
   `testOnly com.digitalasset.myPackage.*` runs all tests in package `com.digitalasset.myPackage`.
 - `test`: runs all tests
+
+For more information, especially on metrics, logging, tracing, Scala guidelines, Protobuf guidelines, formatting and git hooks
+please refer to the respective sections in [Canton's README](https://github.com/DACH-NY/canton/blob/main/contributing/README.md).
+We share a lot of tooling with Canton, so to avoid duplication we use the documentation in the Canton repo 
+as "one source of truth". 
