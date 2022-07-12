@@ -6,7 +6,6 @@ include ../build-common/docker.mk
 all: docker-build
 
 src := Dockerfile svc-participant.conf bootstrap.scala
-$(srcdigest): $(src)
 
 .PHONY: build
 build: $(docker-build)

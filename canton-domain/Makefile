@@ -6,7 +6,6 @@ include ../build-common/docker.mk
 all: docker-build
 
 src := Dockerfile svc-domain.conf
-$(srcdigest): $(src)
 
 .PHONY: build
 build: $(docker-build)

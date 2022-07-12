@@ -1,8 +1,8 @@
 #! /usr/bin/env bash
 
 if [ -z "${CI}" ]; then
-    tag_prefix="${USER}-"
+    revision_prefix="${USER}-"
 fi
 
 # get the deployment version tag
-echo "git-${tag_prefix}$(git rev-parse HEAD)"
+echo "${tag_prefix}git-${revision_prefix}$(git rev-parse HEAD)"

@@ -3,16 +3,20 @@ include ../build-common/common.mk
 include ../build-common/docker.mk
 
 .PHONY: all
-all: docker-images
+all: docker-build
 
 src := Dockerfile $(shell find src -type f)
 
+html := target/html/index.html
+
 .PHONY: build
 build: $(docker-build)
-$(docker-build): html
+$(docker-build): $(html) $(src)
 
-.PHONY: html
-html: $(src)
+.PHONT: html
+html: $(html)
+
+$(html):
 	sphinx-build -M html src target -W
 
 .PHONY: run

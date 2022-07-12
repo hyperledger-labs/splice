@@ -45,6 +45,10 @@ function _error(){
   exit $?
 }
 
+# Issue a log message
+function _log() {
+  echo "$@"
+}
 
 # issue a user friendly red error
 function _error_msg(){

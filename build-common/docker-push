@@ -1,18 +1,30 @@
 #! /usr/bin/env bash
-set -euo pipefail
 
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 source "${script_dir}/libcli.source"
 
-[[ -z "${MAKE}" || ! -f 'target/docker.id' && ! -f 'target/docker.images' ]] && _error 'must be ran from make'
+if [ -z "$1" ]; then
+    _error "Usage: $0 <image-tag>"
+else
+    image=$1
+fi
+
+if [ "$2" = "--force" ]; then
+    force=yes
+fi
+
+[[ -z "${MAKE}" || ! -f 'target/docker.id' ]] && _error 'must be run from within from make'
 
 id="$(<target/docker.id)"
 
-while read -r image; do
-  if docker-check "${image}"; then
-    _set_x docker tag "${id}" "${image}"
-    _set_x docker push "${image}"
-  else
+if ! docker-check "${image}"; then
+  if [ -z "${force}" ]; then
     _warning "Cowardly refusing to push, image already exists in repo:\n${image}"
+    exit 0
+  else
+    _warning "Forcing push, image already exists in repo:\n${image}"
   fi
-done < target/docker.images
+fi
+
+_set_x docker tag "${id}" "${image}"
+_set_x docker push "${image}"

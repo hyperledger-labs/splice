@@ -14,6 +14,12 @@ docker-push: test
 	  make -C $${app} docker-push; \
 	done
 
+.PHONY: docker-push-force
+docker-push-force: test
+	for app in $(apps); do \
+	  make -C $${app} docker-push-force; \
+	done
+
 .PHONY: test
 test:
 	make -C cluster test

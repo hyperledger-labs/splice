@@ -1,0 +1,17 @@
+#! /usr/bin/env bash
+
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "${script_dir}/libcli.source"
+
+if [ -z "$1" ]; then
+    _error "Usage: $0 <app-name>"
+else
+    appname=$1
+fi
+
+set -euo pipefail
+
+
+GCP_PROJECT_ID=$(gcloud projects list --filter "name:${GCP_PROJECT_NAME}" --format 'value(project_id)')
+
+echo "${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_REPO_NAME}/${appname}:$(version-gen)"

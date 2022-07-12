@@ -1,68 +1,30 @@
 #!/usr/bin/env bash
-set -eu
 
+script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+source "${script_dir}/libcli.source"
 
-# usage
-function usage() {
-  cat << EOF
-Usage: $(basename "${BASH_SOURCE[0]}") [-h|-?|--help] [-q] [-v] NAME[:TAG|@DIGEST]...
-Check if docker images are not found.
+if [ -z "$1" ]; then
+    _error "Usage: $0 <image-tag>"
+else
+    image=$1
+fi
 
-Options:
- -v    Verbose output
- -q    Quiet output
+# start the check
+_log "Considering image: ${image}"
 
-Return codes:
-  0    An image is not found
- >0    All images are found or an error occurred
-EOF
-exit ${1:-0}
-}
+# check if docker is running
+out="$(docker info 2>&1)" || _error "docker seems to be down:\n${out}"
 
+# check the image exists
+gcloud container images describe "${image}" > /dev/null 2>&1
+IMAGE_CHECK=$?
 
-# logging functions
-function log() {
-  if ! ((q)); then
-    echo -e "\e[33;1m$@\e[0m" >&2
-  fi
-}
-
-function error() {
-  echo -e "\e[1;31mERROR: $@\e[m" >&2
-  exit 1
-}
-
-q=0
-while getopts ":qv" opt; do
-  case ${opt} in
-    q ) q=1;;
-    v ) set -x;;
-    \? ) usage;;
-  esac
-done
-shift $((OPTIND -1))
-
-# check for correct number of parameters
-[ $# -lt 1 ] && usage 1
-
-rc=1
-for image in $@; do
-  # start the check
-  log "Considering image: ${image}"
-
-
-  # check if docker is running
-  out="$(docker info 2>&1)" || error "docker seems to be down:\n${out}"
-
-
-  # check the image exists
-  if _="$( (docker pull "${image}" | grep -m1 'Pulling from') 2>&1)"; then
-    log "Image exists in repo"
-  else
-    log "Image does not exist in repo"
-    rc=0
-  fi
-
-done
+if [ "${IMAGE_CHECK}" -eq 0 ] ; then
+  _log "Image exists in repo"
+  rc=1
+else
+  _log "Image does not exist in repo"
+  rc=0
+fi
 
 exit ${rc}

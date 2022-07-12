@@ -26,28 +26,15 @@ else
 endif
 
 
-docker-images := target/docker.images
-
-.PHONY: docker-images
-docker-images: $(docker-images)
-$(docker-images): $(if $(EXTRA_TAGS),FORCE) $(repo_root)/build-common/registries
-	mkdir -pv $(@D)
-	@printf '%s\n' \
-		$(foreach registry,$(call must-shell,cat $(lastword $^)),\
-			$(foreach tag,$(addprefix $(tag-prefix),$(call must-shell, version-gen) $(EXTRA_TAGS)),\
-				$(registry)/$(app):$(tag)\
-			)\
-		) | tee $@
-
-
 #########################
 # skip and ci targets
 #########################
 
+image-tag = $(eval image-tag := $$(shell image-tag-gen ${app}))$(image-tag)
 
 .PHONY: docker-check
-docker-check: $(docker-images)
-	docker-check $(call must-shell,cat $<)
+docker-check:
+	docker-check $(image-tag)
 
 
 ###############
@@ -74,12 +61,13 @@ docker-push := target/docker.push
 .PHONY: docker-push
 docker-push: $(docker-push)
 
-# delete target/docker.images if EXTRA_TAGS was given to force it to rebuild next time
-$(docker-push): $(docker-images) $(docker-build)
+$(docker-push): $(docker-build)
 	$(check-dirty)
-	docker-push | tee $@
-	$(if $(EXTRA_TAGS),rm -v $<)
+	docker-push ${image-tag} | tee $@
 
+.PHONY: docker-push-force
+docker-push-force: $(docker-build)
+	docker-push ${image-tag} --force | tee $(docker-push)
 
 _did_docker := true
 endif
