@@ -35,7 +35,7 @@ object CoinConfigTransforms {
   ): CoinConfigTransform =
     cantonConfig =>
       cantonConfig
-        .focus(_.validators)
+        .focus(_.validatorApps)
         .modify(_.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) })
 
   def updateAllValidatorConfigs_(

@@ -72,6 +72,16 @@ class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironm
       svcRemoteParReference.domains.connect_local(env.da)
       svcRemoteParReference.health.ping(svcRemoteParReference.id)
     }
+    
+    clue("run initialization") {
+      // Note: Throws because it's not implemented
+      an[CommandFailure] should be thrownBy svc.initialize()
+    }
+
+    clue("open next round") {
+      // Note: Throws because it's not implemented
+      an[CommandFailure] should be thrownBy svc.openNextRound()
+    }
   }
 
   "try to call the list function" in { implicit env =>
@@ -97,16 +107,5 @@ class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironm
   def upload_coin_dar(validator: LocalValidatorReference) = {
     val coinDarPath = "canton-coin/.daml/dist/canton-coin.dar"
     logger.info(s"uploaded dar with hash: ${validator.remoteParticipant.dars.upload(coinDarPath)}")
-
-    clue("run initialization") {
-      // Note: Throws because it's not implemented
-      an[CommandFailure] should be thrownBy svc.initialize()
-    }
-
-    clue("open next round") {
-      // Note: Throws because it's not implemented
-      an[CommandFailure] should be thrownBy svc.openNextRound()
-    }
-
   }
 }

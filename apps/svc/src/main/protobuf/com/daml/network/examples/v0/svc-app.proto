@@ -5,6 +5,15 @@ import "google/protobuf/wrappers.proto";
 import "google/protobuf/empty.proto";
 
 service SvcAppService {
+  // Performs one-time initialization of the application (i.e., when starting the application on a fresh ledger).
+  // This should be called before any other call.
+  // This call is idempotent.
+  // After initialization finishes, the network is ready to perform coin transfers (i.e.,
+  // there are coin rules and there is an open mining round).
+  // PoC implementation: `setupApp` in Util.daml
+  // TODO(M1-90): Replace this manual trigger by automation
+  rpc Initialize (google.protobuf.Empty) returns (google.protobuf.Empty);
+
   // Transitions to the next mining round.
   // This assumes that there is at most one open mining round, and performs the following:
   // - closes the current issuing round (if any)
