@@ -94,6 +94,12 @@ class ValidatorAppBootstrap(
           executionContext,
         )
       )
+      adminServerRegistry.addService(
+        WalletServiceGrpc.bindService(
+          new GrpcWalletService(connection, loggerFactory),
+          executionContext,
+        )
+      )
       new ValidatorAppNode(
         config,
         validatorNodeParameters,
@@ -102,13 +108,6 @@ class ValidatorAppBootstrap(
         clock,
         loggerFactory,
       )
-      adminServerRegistry.addService(
-        WalletServiceGrpc.bindService(
-          new GrpcWalletService(connection, loggerFactory),
-          executionContext,
-        )
-      )
-      new ValidatorAppNode(config, validatorNodeParameters, storage, dummyStore, clock, loggerFactory)
     }
   }
 

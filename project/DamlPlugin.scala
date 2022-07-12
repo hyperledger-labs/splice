@@ -63,7 +63,7 @@ object DamlPlugin extends AutoPlugin {
       sourceGenerators += damlGenerateCode.taskValue,
       resourceGenerators += damlBuild.taskValue,
       damlSourceDirectory := sourceDirectory.value / "daml",
-      damlCompileDirectory := target.value / "daml",   //TODO(i190) Putting the build path under the `damlSourceDirectory` will cause sbt to loop, creating `target/daml/target/daml/target/daml ...`
+      damlCompileDirectory := target.value / "daml", //TODO(i190) Putting the build path under the `damlSourceDirectory` will cause sbt to loop, creating `target/daml/target/daml/target/daml ...`
       damlDarOutput := resourceManaged.value,
       damlScalaCodegenOutput := sourceManaged.value / "daml-codegen-scala",
       damlJavaCodegenOutput := sourceManaged.value / "daml-codegen-java",
@@ -106,7 +106,8 @@ object DamlPlugin extends AutoPlugin {
         // we don't really know dependencies between daml files, so just assume if any change then we need to rebuild all packages
         val cacheDir = streams.value.cacheDirectory
         val allDamlFiles = damlSourceDirectory.value ** "*.daml"
-        val damlProjectFiles = damlSourceDirectory.value ** "daml.yaml"  // TODO(i190) Expecting the `daml.yaml` project file to reside in the source dir is not consistent with SDK paths (daml.yaml at root, source under `./daml`)
+        val damlProjectFiles =
+          damlSourceDirectory.value ** "daml.yaml" // TODO(i190) Expecting the `daml.yaml` project file to reside in the source dir is not consistent with SDK paths (daml.yaml at root, source under `./daml`)
 
         val buildDependencies = damlBuildOrder.value
 
@@ -350,7 +351,7 @@ object DamlPlugin extends AutoPlugin {
     IO.copyDirectory(originalDamlProjectFile.getAbsoluteFile.getParentFile, projectBuildDirectory)
 
     val damlProjectName = readDamlYaml(originalDamlProjectFile).get("name").toString
-    val outputDar = outputDirectory / s"$damlProjectName.dar"  // TODO(i189) suffix project version
+    val outputDar = outputDirectory / s"$damlProjectName.dar" // TODO(i189) suffix project version
     val processLogger = new BufferedLogger
 
     val result = Process(
