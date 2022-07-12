@@ -6,7 +6,7 @@ import com.digitalasset.canton.domain.config.CommunityDomainConfig
 import com.digitalasset.canton.participant.config.CommunityParticipantConfig
 import monocle.macros.syntax.lens._
 import cats.syntax.option._
-import com.daml.network.validator.config.LocalValidatorConfig
+import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.digitalasset.canton.config.TimeoutDuration
 import scala.concurrent.duration._
 
@@ -31,7 +31,7 @@ object CoinConfigTransforms {
   )
 
   def updateAllValidatorConfigs(
-      update: (String, LocalValidatorConfig) => LocalValidatorConfig
+      update: (String, LocalValidatorAppConfig) => LocalValidatorAppConfig
   ): CoinConfigTransform =
     cantonConfig =>
       cantonConfig
@@ -39,7 +39,7 @@ object CoinConfigTransforms {
         .modify(_.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) })
 
   def updateAllValidatorConfigs_(
-      update: LocalValidatorConfig => LocalValidatorConfig
+      update: LocalValidatorAppConfig => LocalValidatorAppConfig
   ): CoinConfigTransform =
     updateAllValidatorConfigs((_, config) => update(config))
 

@@ -5,8 +5,8 @@ import com.daml.network.config.CoinConfig
 import com.daml.network.metrics.CoinMetricsFactory
 import com.daml.network.svc.SvcAppBootstrap
 import com.daml.network.svc.config.LocalSvcAppConfig
-import com.daml.network.validator.ValidatorNodeBootstrap
-import com.daml.network.validator.config.LocalValidatorConfig
+import com.daml.network.validator.ValidatorAppBootstrap
+import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.console.{
   ConsoleEnvironment,
@@ -29,14 +29,14 @@ trait CoinEnvironment extends Environment {
 
   protected def createValidator(
       name: String,
-      validatorConfig: LocalValidatorConfig,
-  ): ValidatorNodeBootstrap =
-    ValidatorNodeBootstrap.ValidatorFactory
+      validatorConfig: LocalValidatorAppConfig,
+  ): ValidatorAppBootstrap =
+    ValidatorAppBootstrap.ValidatorFactory
       .create(
         name,
         validatorConfig,
         config.tryValidatorNodeParametersByString(name),
-        createClock(Some(ValidatorNodeBootstrap.LoggerFactoryKeyName -> name)),
+        createClock(Some(ValidatorAppBootstrap.LoggerFactoryKeyName -> name)),
         testingTimeService,
         coinMetrics.forValidator(name),
         testingConfig,

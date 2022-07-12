@@ -3,8 +3,8 @@ package com.daml.network.console
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.svc.admin.api.client.commands.SvcAppCommands
 import com.daml.network.svc.config.LocalSvcAppConfig
-import com.daml.network.validator.admin.api.client.commands.DummyCommands
-import com.daml.network.validator.config.LocalValidatorConfig
+import com.daml.network.validator.admin.api.client.commands.ValidatorAppCommands
+import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.console.commands._
 import com.digitalasset.canton.console.{

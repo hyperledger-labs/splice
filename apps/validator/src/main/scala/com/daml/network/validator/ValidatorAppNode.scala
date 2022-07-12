@@ -1,7 +1,7 @@
 package com.daml.network.validator
 
-import com.daml.network.validator.config.{LocalValidatorConfig, ValidatorNodeParameters}
-import com.daml.network.validator.store.DummyStore
+import com.daml.network.validator.config.{LocalValidatorAppConfig, ValidatorAppParameters}
+import com.daml.network.validator.store.ValidatorAppStore
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
 import com.digitalasset.canton.lifecycle.Lifecycle
@@ -17,11 +17,11 @@ import scala.concurrent.Future
   *
   * Modelled after Canton's ParticipantNode class.
   */
-class ValidatorNode(
-    val config: LocalValidatorConfig,
-    val validatorNodeParameters: ValidatorNodeParameters,
+class ValidatorAppNode(
+    val config: LocalValidatorAppConfig,
+    val validatorNodeParameters: ValidatorAppParameters,
     storage: Storage,
-    dummyStore: DummyStore,
+    dummyStore: ValidatorAppStore,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
 ) extends CantonNode // TODO(Arne): CantonNode needs to be forked or generalized.

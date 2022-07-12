@@ -9,7 +9,7 @@ import com.digitalasset.canton.metrics.MetricHandle.NodeMetrics
   *
   * This is only a bare-bones implementation so the code compiles so far.
   */
-class ValidatorMetrics(override val prefix: MetricName, override val registry: MetricRegistry)
+class ValidatorAppMetrics(override val prefix: MetricName, override val registry: MetricRegistry)
     extends NodeMetrics {
   object dbStorage extends DbStorageMetrics(prefix, registry)
 }

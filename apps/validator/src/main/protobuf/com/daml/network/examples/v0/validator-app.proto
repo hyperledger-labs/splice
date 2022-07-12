@@ -3,7 +3,7 @@ package com.daml.network.examples.v0;
 
 import "google/protobuf/wrappers.proto";
 
-service DummyService {
+service ValidatorAppService {
   rpc DummyFunction (SomeDummyRequest) returns (SomeDummyResponse);
 }
 

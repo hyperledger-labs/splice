@@ -1,7 +1,7 @@
 package com.daml.network.config
 
 import cats.data.Validated
-import com.daml.network.validator.config.{LocalValidatorConfig, ValidatorNodeParameters}
+import com.daml.network.validator.config.{LocalValidatorAppConfig, ValidatorAppParameters}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.{
   CantonConfig,
@@ -29,7 +29,7 @@ import org.slf4j.{Logger, LoggerFactory}
 import pureconfig.ConfigReader
 
 case class CoinConfig(
-    validators: Map[InstanceName, LocalValidatorConfig] = Map.empty,
+    validatorApps: Map[InstanceName, LocalValidatorAppConfig] = Map.empty,
     svcApp: Option[LocalSvcAppConfig],
     // TODO(Arne): we want to remove all of these.
     domains: Map[InstanceName, CommunityDomainConfig] = Map.empty,
@@ -48,10 +48,10 @@ case class CoinConfig(
 
   // TODO(Arne): Revisit all of the classes/methods pertaining to ValidatorNodeParameters.
   // Can hopefully upstream some improvements.
-  private lazy val validatorNodeParameters_ : Map[InstanceName, ValidatorNodeParameters] =
-    validators.fmap { validatorConfig =>
+  private lazy val validatorNodeParameters_ : Map[InstanceName, ValidatorAppParameters] =
+    validatorApps.fmap { validatorConfig =>
       val participantParameters = validatorConfig.parameters
-      ValidatorNodeParameters(
+      ValidatorAppParameters(
         monitoring.tracing,
         monitoring.delayLoggingThreshold,
         monitoring.getLoggingConfig,
@@ -68,19 +68,19 @@ case class CoinConfig(
 
   private[network] def validatorNodeParameters(
       participant: InstanceName
-  ): ValidatorNodeParameters =
+  ): ValidatorAppParameters =
     nodeParametersFor(validatorNodeParameters_, "participant", participant)
 
   /** Use `validatorNodeParameters`` instead!
     */
-  def tryValidatorNodeParametersByString(name: String): ValidatorNodeParameters =
+  def tryValidatorNodeParametersByString(name: String): ValidatorAppParameters =
     validatorNodeParameters(
       InstanceName.tryCreate(name)
     )
 
   /** Use `validators` instead!
     */
-  def validatorsByString: Map[String, LocalValidatorConfig] = validators.map { case (n, c) =>
+  def validatorsByString: Map[String, LocalValidatorAppConfig] = validatorApps.map { case (n, c) =>
     n.unwrap -> c
   }
 
@@ -148,10 +148,10 @@ object CoinConfig {
   @nowarn("cat=unused")
   private lazy implicit val coinConfigReader: ConfigReader[CoinConfig] = {
     import CantonConfig.ConfigReaders._
-    implicit val validatorNodeParametersReader: ConfigReader[ValidatorNodeParameters] =
-      deriveReader[ValidatorNodeParameters]
-    implicit val validatorConfigReader: ConfigReader[LocalValidatorConfig] =
-      deriveReader[LocalValidatorConfig]
+    implicit val validatorNodeParametersReader: ConfigReader[ValidatorAppParameters] =
+      deriveReader[ValidatorAppParameters]
+    implicit val validatorConfigReader: ConfigReader[LocalValidatorAppConfig] =
+      deriveReader[LocalValidatorAppConfig]
     implicit val svcNodeParametersReader: ConfigReader[SvcAppParameters] =
       deriveReader[SvcAppParameters]
     implicit val svcConfigReader: ConfigReader[LocalSvcAppConfig] =

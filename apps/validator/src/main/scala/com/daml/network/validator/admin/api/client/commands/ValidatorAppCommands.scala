@@ -2,17 +2,17 @@ package com.daml.network.validator.admin.api.client.commands
 
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.daml.network.examples.v0
-import com.daml.network.examples.v0.DummyServiceGrpc.DummyServiceStub
+import com.daml.network.examples.v0.ValidatorAppServiceGrpc.ValidatorAppServiceStub
 import io.grpc.ManagedChannel
 
 import scala.concurrent.Future
 
-object DummyCommands {
+object ValidatorAppCommands {
 
   abstract class BaseCommand[Req, Res, Result] extends GrpcAdminCommand[Req, Res, Result] {
-    override type Svc = DummyServiceStub
-    override def createService(channel: ManagedChannel): DummyServiceStub =
-      v0.DummyServiceGrpc.stub(channel)
+    override type Svc = ValidatorAppServiceStub
+    override def createService(channel: ManagedChannel): ValidatorAppServiceStub =
+      v0.ValidatorAppServiceGrpc.stub(channel)
   }
 
   case class DummyCommmand(some_string: String, some_number: Int)
@@ -27,7 +27,7 @@ object DummyCommands {
       )
 
     override def submitRequest(
-        service: DummyServiceStub,
+        service: ValidatorAppServiceStub,
         request: v0.SomeDummyRequest,
     ): Future[v0.SomeDummyResponse] = service.dummyFunction(request)
 

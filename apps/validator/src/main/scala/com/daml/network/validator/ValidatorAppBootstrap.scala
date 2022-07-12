@@ -8,11 +8,11 @@ import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.client.configuration.CommandClientConfiguration
 import com.daml.network.environment.CoinNodeBootstrapBase
-import com.daml.network.examples.v0.{DummyServiceGrpc, WalletServiceGrpc}
-import com.daml.network.validator.admin.grpc.{GrpcDummyService, GrpcWalletService}
-import com.daml.network.validator.config.{LocalValidatorConfig, ValidatorNodeParameters}
-import com.daml.network.validator.metrics.ValidatorMetrics
-import com.daml.network.validator.store.DummyStore
+import com.daml.network.examples.v0.{ValidatorAppServiceGrpc, WalletServiceGrpc}
+import com.daml.network.validator.admin.grpc.{GrpcValidatorAppService, GrpcWalletService}
+import com.daml.network.validator.config.{LocalValidatorAppConfig, ValidatorAppParameters}
+import com.daml.network.validator.metrics.ValidatorAppMetrics
+import com.daml.network.validator.store.ValidatorAppStore
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -31,13 +31,13 @@ import scala.concurrent.Future
   *
   * Modelled after Canton's ParticipantNodeBootstrap class.
   */
-class ValidatorNodeBootstrap(
+class ValidatorAppBootstrap(
     override val name: InstanceName,
-    val config: LocalValidatorConfig,
-    val validatorNodeParameters: ValidatorNodeParameters,
+    val config: LocalValidatorAppConfig,
+    val validatorNodeParameters: ValidatorAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
-    metrics: ValidatorMetrics,
+    metrics: ValidatorAppMetrics,
     storageFactory: StorageFactory,
     parentLogger: NamedLoggerFactory,
 )(implicit
@@ -48,9 +48,9 @@ class ValidatorNodeBootstrap(
     @nowarn("cat=unused")
     executionSequencerFactory: ExecutionSequencerFactory,
 ) extends CoinNodeBootstrapBase[
-      ValidatorNode,
-      LocalValidatorConfig,
-      ValidatorNodeParameters,
+      ValidatorAppNode,
+      LocalValidatorAppConfig,
+      ValidatorAppParameters,
     ](
       name,
       config,
@@ -58,12 +58,12 @@ class ValidatorNodeBootstrap(
       clock,
       metrics,
       storageFactory,
-      parentLogger.append(ValidatorNodeBootstrap.LoggerFactoryKeyName, name.unwrap),
+      parentLogger.append(ValidatorAppBootstrap.LoggerFactoryKeyName, name.unwrap),
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
     EitherT.rightT[Future, String] {
-      val dummyStore = DummyStore(storage, loggerFactory)
+      val dummyStore = ValidatorAppStore(storage, loggerFactory)
 
       import com.daml.ledger.api.refinements.{ApiTypes => A}
       // configuration mostly copied from Canton
@@ -89,7 +89,18 @@ class ValidatorNodeBootstrap(
       )
 
       adminServerRegistry.addService(
-        DummyServiceGrpc.bindService(new GrpcDummyService(loggerFactory), executionContext)
+        ValidatorAppServiceGrpc.bindService(
+          new GrpcValidatorAppService(loggerFactory),
+          executionContext,
+        )
+      )
+      new ValidatorAppNode(
+        config,
+        validatorNodeParameters,
+        storage,
+        dummyStore,
+        clock,
+        loggerFactory,
       )
       adminServerRegistry.addService(
         WalletServiceGrpc.bindService(
@@ -97,7 +108,7 @@ class ValidatorNodeBootstrap(
           executionContext,
         )
       )
-      new ValidatorNode(config, validatorNodeParameters, storage, dummyStore, clock, loggerFactory)
+      new ValidatorAppNode(config, validatorNodeParameters, storage, dummyStore, clock, loggerFactory)
     }
   }
 
@@ -107,17 +118,17 @@ class ValidatorNodeBootstrap(
 // TODO(Arne): Do we need this factory construction?
 // I think Canton only needs this for being able to generalize a community/enterprise participant with the same method
 // while being able to return an `Either` to signal that the initialization failed
-object ValidatorNodeBootstrap {
+object ValidatorAppBootstrap {
   val LoggerFactoryKeyName: String = "validator"
 
   trait Factory {
     def create(
         name: String,
-        validatorConfig: LocalValidatorConfig,
-        validatorNodeParameters: ValidatorNodeParameters,
+        validatorConfig: LocalValidatorAppConfig,
+        validatorNodeParameters: ValidatorAppParameters,
         clock: Clock,
         testingTimeService: TestingTimeService,
-        validatorMetrics: ValidatorMetrics,
+        validatorMetrics: ValidatorAppMetrics,
         testingConfig: TestingConfigInternal,
         futureSupervisor: FutureSupervisor,
         loggerFactory: NamedLoggerFactory,
@@ -126,18 +137,18 @@ object ValidatorNodeBootstrap {
         scheduler: ScheduledExecutorService,
         actorSystem: ActorSystem,
         executionSequencerFactory: ExecutionSequencerFactory,
-    ): Either[String, ValidatorNodeBootstrap]
+    ): Either[String, ValidatorAppBootstrap]
   }
 
   object ValidatorFactory extends Factory {
 
     override def create(
         name: String,
-        validatorConfig: LocalValidatorConfig,
-        validatorNodeParameters: ValidatorNodeParameters,
+        validatorConfig: LocalValidatorAppConfig,
+        validatorNodeParameters: ValidatorAppParameters,
         clock: Clock,
         testingTimeService: TestingTimeService,
-        validatorMetrics: ValidatorMetrics,
+        validatorMetrics: ValidatorAppMetrics,
         testingConfigInternal: TestingConfigInternal,
         futureSupervisor: FutureSupervisor,
         loggerFactory: NamedLoggerFactory,
@@ -146,11 +157,11 @@ object ValidatorNodeBootstrap {
         scheduler: ScheduledExecutorService,
         actorSystem: ActorSystem,
         executionSequencerFactory: ExecutionSequencerFactory,
-    ): Either[String, ValidatorNodeBootstrap] =
+    ): Either[String, ValidatorAppBootstrap] =
       InstanceName
         .create(name)
         .map(
-          new ValidatorNodeBootstrap(
+          new ValidatorAppBootstrap(
             _,
             validatorConfig,
             validatorNodeParameters,

@@ -1,8 +1,8 @@
 package com.daml.network.console
 
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.validator.admin.api.client.commands.{DummyCommands, WalletCommands}
-import com.daml.network.validator.config.LocalValidatorConfig
+import com.daml.network.validator.admin.api.client.commands.{ValidatorAppCommands, WalletCommands}
+import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.console.commands._
 import com.digitalasset.canton.console.{
@@ -83,7 +83,7 @@ abstract class ValidatorReference(
   @Help.Group("Parties")
   override def parties: ParticipantPartiesAdministrationGroup
 
-  def config: LocalValidatorConfig
+  def config: LocalValidatorAppConfig
 }
 
 /** Single local validator app reference. Defines the console commands that can be run against a local validator
@@ -98,12 +98,12 @@ class LocalValidatorReference(
 
   protected val nodes = consoleEnvironment.environment.validators
   @Help.Summary("Return participant config")
-  def config: LocalValidatorConfig =
+  def config: LocalValidatorAppConfig =
     consoleEnvironment.environment.config.validatorsByString(name)
 
   def dummy_command(some_string: String, some_number: Int): Int = {
     consoleEnvironment.run {
-      adminCommand(DummyCommands.DummyCommmand(some_string, some_number))
+      adminCommand(ValidatorAppCommands.DummyCommmand(some_string, some_number))
     }
   }
   @Help.Summary("List all coins associated with the configured user")

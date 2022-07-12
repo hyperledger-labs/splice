@@ -2,7 +2,7 @@ package com.daml.network.metrics
 
 import com.codahale.metrics
 import com.daml.network.svc.metrics.SvcAppMetrics
-import com.daml.network.validator.metrics.ValidatorMetrics
+import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.digitalasset.canton.metrics.MetricsFactory.registerReporter
 import com.digitalasset.canton.metrics.{MetricsConfig, MetricsFactory, MetricsFactoryBase}
 
@@ -14,16 +14,16 @@ case class CoinMetricsFactory(
     reportJVMMetrics: Boolean,
 ) extends AutoCloseable
     with MetricsFactoryBase {
-  private val validators = TrieMap[String, ValidatorMetrics]()
+  private val validators = TrieMap[String, ValidatorAppMetrics]()
   private val svcs = TrieMap[String, SvcAppMetrics]()
 
   override protected def allNodeMetrics: Seq[TrieMap[String, _]] = Seq(validators)
 
-  def forValidator(name: String): ValidatorMetrics = {
+  def forValidator(name: String): ValidatorAppMetrics = {
     validators.getOrElseUpdate(
       name, {
         val metricName = deduplicateName(name, "validator", validators)
-        new ValidatorMetrics(MetricsFactory.prefix, newRegistry(metricName))
+        new ValidatorAppMetrics(MetricsFactory.prefix, newRegistry(metricName))
       },
     )
   }

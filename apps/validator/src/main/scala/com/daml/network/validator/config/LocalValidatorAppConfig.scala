@@ -23,13 +23,13 @@ import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.tracing.TracingConfig
 
-case class LocalValidatorConfig(
+case class LocalValidatorAppConfig(
     override val init: InitConfig = InitConfig(),
     override val crypto: CryptoConfig = CryptoConfig(),
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     // TODO(i142): slightly different in Canton
-    parameters: ValidatorNodeParameters = ValidatorNodeParameters(),
+    parameters: ValidatorAppParameters = ValidatorAppParameters(),
     override val sequencerClient: SequencerClientConfig = SequencerClientConfig(),
     override val caching: CachingConfigs = CachingConfigs(),
     remoteParticipant: RemoteParticipantConfig,
@@ -41,7 +41,7 @@ case class LocalValidatorConfig(
 
 }
 
-case class ValidatorNodeParameters(
+case class ValidatorAppParameters(
     override val tracing: TracingConfig = TracingConfig(),
     override val delayLoggingThreshold: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(20),
