@@ -2,16 +2,23 @@ syntax = "proto3";
 package com.daml.network.examples.v0;
 
 import "google/protobuf/wrappers.proto";
+import "google/protobuf/empty.proto";
 
 service SvcAppService {
-  rpc DummySvcFunction (SomeDummySvcRequest) returns (SomeDummySvcResponse);
-}
+  // Transitions to the next mining round.
+  // This assumes that there is at most one open mining round, and performs the following:
+  // - closes the current issuing round (if any)
+  // - transitions the current open mining round into an issuing mining round (if any)
+  // - opens a new mining round
+  // PoC implementation: `runNextIssuance` in Util.daml
+  // TODO(M1-90): Replace this manual trigger by automation
+  // TODO(M1-90): Use overlapping mining rounds
+  rpc OpenNextRound (google.protobuf.Empty) returns (google.protobuf.Empty);
 
-message SomeDummySvcRequest {
-  google.protobuf.StringValue some_string = 1;
-  int32 some_number = 2;
-}
-
-message SomeDummySvcResponse {
-  int32 some_number = 1;
+  // Accepts all coin rule requests from validators that want to join the network.
+  // For each request, a copy of all SVC state contracts (e.g., CoinRules) is created for
+  // the requesting validator.
+  // PoC implementation: `runCoinRulesAcceptBot` in Util.daml
+  // TODO(M1-01): Replace this manual trigger by automation
+  rpc AcceptValidators (google.protobuf.Empty) returns (google.protobuf.Empty);
 }

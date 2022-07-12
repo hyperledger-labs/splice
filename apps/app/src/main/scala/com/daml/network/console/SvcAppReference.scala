@@ -103,9 +103,21 @@ class LocalSvcAppReference(
   def config: LocalSvcAppConfig =
     consoleEnvironment.environment.config.svcsByString(name)
 
-  def dummy_svc_command(some_string: String, some_number: Int): Int = {
+  def initialize(): Unit = {
     consoleEnvironment.run {
-      adminCommand(SvcAppCommands.DummySvcCommmand(some_string, some_number))
+      adminCommand(SvcAppCommands.Initialize())
+    }
+  }
+
+  def openNextRound(): Unit = {
+    consoleEnvironment.run {
+      adminCommand(SvcAppCommands.OpenNextRound())
+    }
+  }
+
+  def acceptValidators(): Unit = {
+    consoleEnvironment.run {
+      adminCommand(SvcAppCommands.AcceptValidators())
     }
   }
 

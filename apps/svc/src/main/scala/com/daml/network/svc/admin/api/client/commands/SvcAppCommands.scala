@@ -3,6 +3,7 @@ package com.daml.network.svc.admin.api.client.commands
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.daml.network.examples.v0
 import com.daml.network.examples.v0.SvcAppServiceGrpc.SvcAppServiceStub
+import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
 
 import scala.concurrent.Future
@@ -15,26 +16,26 @@ object SvcAppCommands {
       v0.SvcAppServiceGrpc.stub(channel)
   }
 
-  case class DummySvcCommmand(some_string: String, some_number: Int)
-      extends BaseCommand[v0.SomeDummySvcRequest, v0.SomeDummySvcResponse, Int] {
-
-    override def createRequest(): Either[String, v0.SomeDummySvcRequest] =
-      Right(
-        v0.SomeDummySvcRequest(
-          someString = Some(some_string),
-          someNumber = some_number,
-        )
-      )
-
+  /** A command that takes no input and returns no result (other than an error on failure) */
+  // TODO(Arne): Move this somewhere to Canton codebase?
+  abstract class UnitCommand extends GrpcAdminCommand[Empty, Empty, Unit] {
+    override type Svc = SvcAppServiceStub
+    override def createService(channel: ManagedChannel): SvcAppServiceStub =
+      v0.SvcAppServiceGrpc.stub(channel)
+    override def createRequest(): Either[String, Empty] = Right(Empty())
     override def submitRequest(
         service: SvcAppServiceStub,
-        request: v0.SomeDummySvcRequest,
-    ): Future[v0.SomeDummySvcResponse] = service.dummySvcFunction(request)
-
+        request: Empty,
+    ): Future[Empty] = service.initialize(request)
     override def handleResponse(
-        response: v0.SomeDummySvcResponse
-    ): Either[String, Int] =
-      Right(response.someNumber)
+        response: Empty
+    ): Either[String, Unit] = Right(())
   }
+
+  case class Initialize() extends UnitCommand
+
+  case class OpenNextRound() extends UnitCommand
+
+  case class AcceptValidators() extends UnitCommand
 
 }

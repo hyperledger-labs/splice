@@ -8,6 +8,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
   IsolatedCoinEnvironments,
 }
+import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.util.BinaryFileUtil
 
@@ -62,10 +63,8 @@ class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironm
 
   "run commands against SVC" in { implicit env =>
     val svc = env.svc
-    clue("start SVC and run dummy command") {
+    clue("start SVC") {
       svc.start()
-      val res = svc.dummy_svc_command("Hello. Please decrement this number!", 5)
-      res shouldBe 4
     }
 
     val svcRemoteParReference = svc.remoteParticipant
@@ -98,6 +97,16 @@ class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironm
   def upload_coin_dar(validator: LocalValidatorReference) = {
     val coinDarPath = "canton-coin/.daml/dist/canton-coin.dar"
     logger.info(s"uploaded dar with hash: ${validator.remoteParticipant.dars.upload(coinDarPath)}")
+
+    clue("run initialization") {
+      // Note: Throws because it's not implemented
+      an[CommandFailure] should be thrownBy svc.initialize()
+    }
+
+    clue("open next round") {
+      // Note: Throws because it's not implemented
+      an[CommandFailure] should be thrownBy svc.openNextRound()
+    }
 
   }
 }
