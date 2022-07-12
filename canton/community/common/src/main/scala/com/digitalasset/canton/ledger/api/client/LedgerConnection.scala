@@ -45,9 +45,11 @@ import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
 import org.slf4j.event.Level
 import scalaz.syntax.tag._
-
 import java.util.UUID
-import scala.concurrent.{ExecutionContextExecutor, Future}
+
+import com.daml.ledger.api.domain.UserRight.{CanActAs, CanReadAs}
+
+import scala.concurrent.{Await, ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
 /** Extract from connection for only submitting functionality */
@@ -111,6 +113,8 @@ trait LedgerConnection extends LedgerSubmit {
   )(mapOperator: Flow[TransactionTree, Any, _]): LedgerSubscription
 
   def transactionById(id: String): Future[Option[Transaction]]
+
+  def bootstrapUser(user: String): Future[PartyId]
 
   def allocatePartyViaLedgerApi(hint: Option[String], displayName: Option[String]): Future[PartyId]
 
@@ -345,6 +349,22 @@ object LedgerConnection {
         client.transactionClient.getFlatTransactionById(id, Seq(sender.unwrap), token).map { resp =>
           resp.transaction
         }
+
+      override def bootstrapUser(user: String): Future[PartyId] = {
+        for {
+          party <- allocatePartyViaLedgerApi(Some(user), Some(user))
+          userId = com.daml.lf.data.Ref.UserId.assertFromString(user)
+          userLf = com.daml.ledger.api.domain.User(userId, Some(party.toLf))
+
+          user <- client.userManagementClient
+            .createUser(userLf, List(CanActAs(party.toLf)), token)
+          partyId =
+            PartyId.tryFromLfParty(
+              user.primaryParty
+                .getOrElse(sys.error(s"user $user was allocated without primary party"))
+            )
+        } yield partyId
+      }
 
       override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List[AsyncOrSyncCloseable](
         SyncCloseable("commandSubmitterWithRetry", commandSubmitterWithRetry.close()),

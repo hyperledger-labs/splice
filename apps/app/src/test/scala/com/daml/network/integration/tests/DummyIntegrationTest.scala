@@ -9,6 +9,7 @@ import com.daml.network.integration.tests.CoinTests.{
   IsolatedCoinEnvironments,
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.util.BinaryFileUtil
 
 import scala.concurrent.duration._
 
@@ -72,6 +73,31 @@ class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironm
       svcRemoteParReference.domains.connect_local(env.da)
       svcRemoteParReference.health.ping(svcRemoteParReference.id)
     }
+  }
+
+  "try to call the list function" in { implicit env =>
+    import env._
+    val validator1 = v("validator1")
+    clue("setup") {
+      validator1.start()
+      validator1.remoteParticipant.domains.connect_local(da)
+      upload_coin_dar(validator1)
+    }
+    clue("call list") {
+      val res = validator1.list()
+      // we don't have any parties with coins yet, so we expect no results
+      res should fullyMatch regex "\\(Vector\\(\\),LedgerOffset\\(Absolute\\(.*"
+    }
+  }
+
+  def v(name: String)(implicit env: CoinTestConsoleEnvironment): LocalValidatorReference =
+    env.validators
+      .find(_.name == name)
+      .getOrElse(sys.error(s"validator [$name] not configured"))
+
+  def upload_coin_dar(validator: LocalValidatorReference) = {
+    val coinDarPath = "canton-coin/.daml/dist/canton-coin.dar"
+    logger.info(s"uploaded dar with hash: ${validator.remoteParticipant.dars.upload(coinDarPath)}")
 
   }
 }

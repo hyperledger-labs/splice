@@ -1,0 +1,14 @@
+syntax = "proto3";
+package com.daml.network.examples.v0;
+
+service WalletService {
+  rpc list (ListRequest) returns (ListResponse);
+}
+
+message ListRequest {
+}
+
+// TODO(i206): Improve this
+message ListResponse {
+  string coins = 1;
+}
