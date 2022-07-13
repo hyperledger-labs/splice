@@ -1,15 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source lib/context-switch
+LIB=$REPO_ROOT/cluster/lib
+
+source $LIB/context-switch
 
 set +u
 APP_LABEL=$1
 if [ "$APP_LABEL" == "" ]; then
-    echo "Usage:\t ./app-expose <APP_LABEL>"
+    echo "Usage:\t ./app-expose <APP_LABEL> [PORT:80]"
     exit 1
 fi
 set -u
+
+PORT="${2:-80}"
 
 # Max timeout in seconds
 TIMEOUT=10
@@ -32,7 +36,7 @@ done
 
 if [ "$READY" == "true" ]; then
     echo "Pod is running! Forwarding port..."
-    kubectl port-forward service/$APP_LABEL-service 0:80
+    kubectl port-forward service/$APP_LABEL 0:$PORT
 else
     echo "Operation timed out! Pod did not become ready within $TIMEOUT seconds."
     exit 1

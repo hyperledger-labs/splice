@@ -1,17 +1,19 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+LIB=$REPO_ROOT/cluster/lib
+
 if [ "$K8S_CONTEXT" == "gcloud" ]; then
     echo "Creating gcloud cluster..."
-    source lib/gcloud-setup
-    source lib/gcloud-create
-    source lib/gcloud-connect
+    source $LIB/gcloud-setup
+    source $LIB/gcloud-create
+    source $LIB/gcloud-connect
 elif [ "$K8S_CONTEXT" == "minikube" ]; then
     echo "Creating minikube cluster..."
-    source lib/minikube-create
+    source $LIB/minikube-create
 else
     echo "Unknown cluster type: ${K8S_CONTEXT}"
     exit 1
 fi
 
-source lib/k8s-apply
+source $LIB/k8s-apply

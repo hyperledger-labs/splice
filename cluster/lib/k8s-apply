@@ -1,6 +1,6 @@
 ### Apply a configuration to the current cluster
 
-source "../build-common/libcli.source"
+source "$REPO_ROOT/build-common/libcli.source"
 
 jsonnet --tla-str imageTag=$(version-gen)\
-        canton-network-config.jsonnet | kubectl apply -f -
+        $REPO_ROOT/cluster/canton-network-config.jsonnet | kubectl apply -f -

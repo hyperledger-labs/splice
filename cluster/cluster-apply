@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source lib/context-switch
+LIB=$REPO_ROOT/cluster/lib
+
+source $LIB/context-switch
 
 if [ "$K8S_CONTEXT" == "gcloud" ]; then
-    source lib/gcloud-setup
-    source lib/gcloud-connect
+    source $LIB/gcloud-setup
+    source $LIB/gcloud-connect
 fi
 
-source lib/k8s-apply
+source $LIB/k8s-apply

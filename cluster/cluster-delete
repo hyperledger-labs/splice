@@ -1,15 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source lib/context-switch
+LIB=$REPO_ROOT/cluster/lib
+
+source $LIB/context-switch
 
 if [ "$K8S_CONTEXT" == "gcloud" ]; then
     echo "Deleting gcloud cluster..."
-    source lib/gcloud-setup
-    source lib/gcloud-delete
+    source $LIB/gcloud-setup
+    source $LIB/gcloud-delete
 elif [ "$K8S_CONTEXT" == "minikube" ]; then
     echo "Deleting minikube cluster..."
-    source lib/minikube-delete
+    source $LIB/minikube-delete
 fi
 
 echo "Cluster deleted."
