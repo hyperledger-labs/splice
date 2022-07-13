@@ -11,12 +11,12 @@ html := target/html/index.html
 
 .PHONY: build
 build: $(docker-build)
-$(docker-build): $(html) $(src)
+$(docker-build): $(html)
 
 .PHONT: html
 html: $(html)
 
-$(html):
+$(html): $(src)
 	sphinx-build -M html src target -W
 
 .PHONY: run

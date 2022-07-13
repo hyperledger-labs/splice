@@ -25,6 +25,7 @@ local deployment(imageTag, name, ports, ext={}) = {
           {
             name: name,
             image: 'us-central1-docker.pkg.dev/cn-devnet-353712/cn-devnet-images/' + name + ':' + imageTag,
+            imagePullPolicy: 'Always',
             ports: ports,
           } + ext,
         ],

@@ -7,7 +7,7 @@ if [ "$K8S_CONTEXT" == "gcloud" ]; then
     echo "Deleting gcloud cluster..."
     source lib/gcloud-setup
     source lib/gcloud-delete
-elif [ "$K8S_CONTEXT" == "minikube" ];
+elif [ "$K8S_CONTEXT" == "minikube" ]; then
     echo "Deleting minikube cluster..."
     source lib/minikube-delete
 fi

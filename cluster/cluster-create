@@ -1,8 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-source lib/context-switch
-
 if [ "$K8S_CONTEXT" == "gcloud" ]; then
     echo "Creating gcloud cluster..."
     source lib/gcloud-setup
