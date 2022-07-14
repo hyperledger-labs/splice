@@ -24,7 +24,7 @@ thrown if they are missing.
 
 | Variable Name      | Meaning                                                               |
 | ------------------ | --------------------------------------------------------------------- |
-| `GCP_PROJECT_NAME` | Name of the Google Cloud project in which the cluster is located.     |
+| `GCP_PROJECT_ID` | ID of the Google Cloud project in which the cluster is located.     |
 | `GCP_CLUSTER_NAME` | Name of the GKE cluster within the cloud project.                     |
 | `GCP_REPO_NAME`    | Name of the image repository used to manage project container images. |
 | `GCP_IP_NAME`      | Name of the publically exposed IP address assigned to the cluster.    |

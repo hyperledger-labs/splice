@@ -375,7 +375,7 @@ jobs:
 
              echo $GCLOUD_SERVICE_KEY | gcloud auth activate-service-account --key-file=-
              (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
-
+ 
              gcloud --quiet config set project ${GCP_PROJECT_NAME}
              gcloud --quiet config set compute/zone us-central1
 

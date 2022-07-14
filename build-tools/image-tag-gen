@@ -12,6 +12,4 @@ fi
 set -euo pipefail
 
 
-GCP_PROJECT_ID=$(gcloud projects list --filter "name:${GCP_PROJECT_NAME}" --format 'value(project_id)')
-
 echo "${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_REPO_NAME}/${appname}:$(version-gen)"
