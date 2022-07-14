@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-LIB=$REPO_ROOT/cluster/lib
-
-source $LIB/context-switch
+source ${TOOLS_LIB}/libcli.source
+source ${TOOLS_LIB}/set-k8s-context
 
 set +u
 APP_LABEL=$1

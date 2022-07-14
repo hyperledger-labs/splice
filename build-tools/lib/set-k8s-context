@@ -1,0 +1,13 @@
+case "$K8S_CONTEXT" in
+    gcloud)
+        _confirm "Modify remote gcloud cluster."
+         source ${TOOLS_LIB}/gcloud-connect
+        ;;
+    minikube)
+        kubectl config use-context minikube
+        ;;
+    *)
+        echo "Invalid option for K8S_CONTEXT supplied: $K8S_CONTEXT"
+        exit 1
+        ;;
+esac

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
-source "${script_dir}/libcli.source"
+source "${script_dir}/lib/libcli.source"
 
 if [ -z "$1" ]; then
     _error "Usage: $0 <image-tag>"

@@ -1,6 +1,6 @@
 # -*- makefile -*-
-include ../build-common/common.mk
-include ../build-common/docker.mk
+include ../build-tools/common.mk
+include ../build-tools/docker.mk
 
 .PHONY: all
 all: docker-build
