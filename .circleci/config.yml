@@ -117,6 +117,7 @@ commands:
             . /home/circleci/.nix-profile/etc/profile.d/nix.sh
 
             nix-shell shell.nix --pure --run bash \<<'EOF'
+               set -euo pipefail
                run_sbt() {
                  # Define sbt command
                  SBT_CMD=(sbt -verbose)
@@ -132,7 +133,6 @@ commands:
 
                  # Setup heap size; corresponds to Canton large executors
                  SBT_CMD+=("-J-Xmx5000M" "-J-Xms5000M")
-
                  # Run command
                  # also send a few newline characters to sbt to ensure we keep on downloading dependencies
                  python3 -c "print ('r\n'*<< parameters.retry_fetch >>)" |

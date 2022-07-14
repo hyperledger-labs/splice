@@ -3,14 +3,7 @@ package com.daml.network.console
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.svc.admin.api.client.commands.SvcAppCommands
 import com.daml.network.svc.config.LocalSvcAppConfig
-import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-import com.digitalasset.canton.console.{
-  BaseInspection,
-  ConsoleCommandResult,
-  Help,
-  LocalInstanceReference,
-}
-import com.digitalasset.canton.environment.CantonNodeBootstrap
+import com.digitalasset.canton.console.{BaseInspection, Help, LocalInstanceReference}
 import com.digitalasset.canton.participant.ParticipantNode
 
 /** Single local SVC app reference. Defines the console commands that can be run against a local SVC
