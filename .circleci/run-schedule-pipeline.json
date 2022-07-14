@@ -3,7 +3,7 @@
     "description": "Tests and deploys latest revision docker images into the CN cluster.",
     "attribution-actor": "system",
     "parameters": {
-        "branch": "add-scheduled-deploy-pipeline",
+        "branch": "main",
         "run-schedule": true
     },
     "timetable": {
