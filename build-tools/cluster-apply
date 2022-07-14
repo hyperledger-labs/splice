@@ -6,10 +6,4 @@ source ${TOOLS_LIB}/gcloud.source
 source ${TOOLS_LIB}/k8s.source
 
 set_k8s_context
-
-if [ "$K8S_CONTEXT" == "gcloud" ]; then
-    gcloud_setup
-    gcloud_connect
-fi
-
 k8s_apply

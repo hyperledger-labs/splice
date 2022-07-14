@@ -1,0 +1,14 @@
+{
+    "name": "Nightly deployment",
+    "description": "Tests and deploys latest revision docker images into the CN cluster.",
+    "attribution-actor": "system",
+    "parameters": {
+        "branch": "add-scheduled-deploy-pipeline",
+        "run-schedule": true
+    },
+    "timetable": {
+        "per-hour": 1,
+        "hours-of-day": [6],
+        "days-of-week": ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"]
+    }
+}

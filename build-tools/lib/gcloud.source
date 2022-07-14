@@ -86,7 +86,6 @@ function gcloud_setup() {
   set -u
 
   ### Check for an authenticated gcloud account
-
   N_ACCOUNTS=$(gcloud auth list --format 'value(account)' | wc -l)
 
   if [ "${N_ACCOUNTS}" -eq "0" ]; then
@@ -95,7 +94,6 @@ function gcloud_setup() {
   fi
 
   # Check for the expected project.
-
-  gcloud config set compute/region ${GCP_REGION}
   gcloud config set project ${GCP_PROJECT_ID}
+  gcloud config set compute/region ${GCP_REGION}
 }

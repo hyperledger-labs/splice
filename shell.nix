@@ -19,6 +19,7 @@ in pkgs.mkShell {
     sbt
     sphinx
     python3
+    git
     curl
     x86Pkgs.sphinx-autobuild
     python3Packages.sphinx_rtd_theme

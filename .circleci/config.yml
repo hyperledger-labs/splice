@@ -19,6 +19,12 @@ notify-fail: &notify-fail
       event: fail
       template: basic_fail_1
 
+main-branch-only: &main-branch-only
+  filters:
+    branches:
+      only:
+         - main
+
 commands:
   setup_nix:
     description: Set up Nix
@@ -152,6 +158,9 @@ parameters:
   sdk-version:
     type: string
     default: "2.3.0-snapshot.20220619.10104.0.253b0b18" # sdk-version
+  run-schedule:
+    type: boolean
+    default: false
 
 jobs:
 
@@ -183,14 +192,57 @@ jobs:
          command: |
            set -euo pipefail
            . /home/circleci/.nix-profile/etc/profile.d/nix.sh
-           . .envrc.vars
 
            nix-shell shell.nix \
+             --pure \
              --run bash \<<'EOF'
              set -euo pipefail
+             . .envrc.vars
 
              make test
            EOF
+
+  deploy_cluster:
+    circleci_ip_ranges: true
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - run:
+         name: apply cluster manifest
+         command: |
+           set -euo pipefail
+           . /home/circleci/.nix-profile/etc/profile.d/nix.sh
+
+           nix-shell shell.nix \
+             --pure \
+             --keep CI \
+             --keep GCLOUD_SERVICE_KEY \
+             --run bash \<<'EOF'
+             set -euo pipefail
+             . .envrc.vars
+
+             echo $GCLOUD_SERVICE_KEY | gcloud auth activate-service-account --key-file=-
+             (yes || true) | cluster-apply
+           EOF
+
+  update_pipeline_schedule:
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - run:
+         name: update pipeline schedule
+         command: |
+           set -euo pipefail
+
+           . .envrc.vars
+           .circleci/setup-pipeline.sh
 
   canton_coin:
     docker:
@@ -353,11 +405,18 @@ jobs:
          command: |
            set -euo pipefail
            . /home/circleci/.nix-profile/etc/profile.d/nix.sh
-           . .envrc.vars
 
            nix-shell shell.nix \
+             --pure \
+             --keep CI \
+             --keep DOCKER_CERT_PATH \
+             --keep DOCKER_HOST \
+             --keep DOCKER_MACHINE_NAME \
+             --keep DOCKER_TLS_VERIFY \
+             --keep NO_PROXY \
              --run bash \<<'EOF'
              set -euo pipefail
+             . .envrc.vars
 
              make docker-build
            EOF
@@ -367,17 +426,22 @@ jobs:
          command: |
            set -euo pipefail
            . /home/circleci/.nix-profile/etc/profile.d/nix.sh
-           . .envrc.vars
 
            nix-shell shell.nix \
+             --pure \
+             --keep CI \
+             --keep GCLOUD_SERVICE_KEY \
+             --keep DOCKER_CERT_PATH \
+             --keep DOCKER_HOST \
+             --keep DOCKER_MACHINE_NAME \
+             --keep DOCKER_TLS_VERIFY \
+             --keep NO_PROXY \
              --run bash \<<'EOF'
              set -euo pipefail
+             . .envrc.vars
 
              echo $GCLOUD_SERVICE_KEY | gcloud auth activate-service-account --key-file=-
              (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
- 
-             gcloud --quiet config set project ${GCP_PROJECT_NAME}
-             gcloud --quiet config set compute/zone us-central1
 
              make docker-push
            EOF
@@ -386,6 +450,8 @@ jobs:
 workflows:
   version: 2
   build:
+    when:
+      not: << pipeline.parameters.run-schedule >>
     jobs:
     # CC Daml model
     - canton_coin:
@@ -399,15 +465,26 @@ workflows:
     # Documentation
     - docs:
         <<: *notify-fail
-    - docker-images-push:
-        <<: *notify-fail
-        filters:
-          branches:
-            only:
-                - main
     # Scala
     - test:
         <<: *notify-fail
+    # Ops
+    - update_pipeline_schedule:
+        <<: *notify-fail
+        <<: *main-branch-only
+    - docker-images-push:
+        <<: *notify-fail
+        <<: *main-branch-only
+    - deployment_test:
+        <<: *notify-fail
+
+  deploy:
+    when: << pipeline.parameters.run-schedule >>
+    jobs:
     # Deployment
     - deployment_test:
         <<: *notify-fail
+        <<: *main-branch-only
+    - deploy_cluster:
+        <<: *notify-fail
+        <<: *main-branch-only
