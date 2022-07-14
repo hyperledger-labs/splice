@@ -21,6 +21,7 @@ import com.digitalasset.canton.participant.config.{
 import scala.annotation.nowarn
 import cats.syntax.functor._
 import com.daml.network.svc.config.{LocalSvcAppConfig, SvcAppParameters}
+import com.daml.network.wallet.config.{LocalWalletAppConfig, WalletAppParameters}
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
@@ -30,7 +31,8 @@ import pureconfig.ConfigReader
 
 case class CoinConfig(
     validatorApps: Map[InstanceName, LocalValidatorAppConfig] = Map.empty,
-    svcApp: Option[LocalSvcAppConfig],
+    svcApp: Option[LocalSvcAppConfig] = None,
+    walletApps: Map[InstanceName, LocalWalletAppConfig] = Map.empty,
     // TODO(Arne): we want to remove all of these.
     domains: Map[InstanceName, CommunityDomainConfig] = Map.empty,
     participants: Map[InstanceName, CommunityParticipantConfig] = Map.empty,
@@ -125,6 +127,42 @@ case class CoinConfig(
     n.unwrap -> c
   }
 
+  private lazy val walletNodeParameters_ : Map[InstanceName, WalletAppParameters] =
+    walletApps.fmap { walletConfig =>
+      val participantParameters = walletConfig.parameters
+      WalletAppParameters(
+        monitoring.tracing,
+        monitoring.delayLoggingThreshold,
+        monitoring.getLoggingConfig,
+        monitoring.logQueryCost,
+        parameters.timeouts.processing,
+        walletConfig.caching,
+        parameters.enableAdditionalConsistencyChecks,
+        features.enablePreviewCommands,
+        parameters.nonStandardConfig,
+        walletConfig.sequencerClient,
+        participantParameters.devVersionSupport,
+      )
+    }
+
+  private[network] def walletNodeParameters(
+      appName: InstanceName
+  ): WalletAppParameters =
+    nodeParametersFor(walletNodeParameters_, "wallet-app", appName)
+
+  /** Use `walletNodeParameters` instead!
+    */
+  def tryWalletAppParametersByString(name: String): WalletAppParameters =
+    walletNodeParameters(
+      InstanceName.tryCreate(name)
+    )
+
+  /** Use `wallets` instead!
+    */
+  def walletsByString: Map[String, LocalWalletAppConfig] = walletApps.map { case (n, c) =>
+    n.unwrap -> c
+  }
+
   override def dumpString: String = "TODO(Arne): remove or implement."
 
   override def withDefaults: CoinConfig =
@@ -156,6 +194,10 @@ object CoinConfig {
       deriveReader[SvcAppParameters]
     implicit val svcConfigReader: ConfigReader[LocalSvcAppConfig] =
       deriveReader[LocalSvcAppConfig]
+    implicit val walletNodeParametersReader: ConfigReader[WalletAppParameters] =
+      deriveReader[WalletAppParameters]
+    implicit val walletConfigReader: ConfigReader[LocalWalletAppConfig] =
+      deriveReader[LocalWalletAppConfig]
     implicit val communityDomainConfigReader: ConfigReader[CommunityDomainConfig] =
       deriveReader[CommunityDomainConfig]
     implicit val communityParticipantConfigReader: ConfigReader[CommunityParticipantConfig] =

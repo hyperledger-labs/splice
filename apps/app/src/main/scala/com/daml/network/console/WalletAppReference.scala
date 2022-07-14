@@ -1,8 +1,8 @@
 package com.daml.network.console
 
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.svc.admin.api.client.commands.SvcAppCommands
-import com.daml.network.svc.config.LocalSvcAppConfig
+import com.daml.network.wallet.admin.api.client.commands.WalletCommands
+import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.console.{
   BaseInspection,
@@ -13,42 +13,35 @@ import com.digitalasset.canton.console.{
 import com.digitalasset.canton.environment.CantonNodeBootstrap
 import com.digitalasset.canton.participant.ParticipantNode
 
-/** Single local SVC app reference. Defines the console commands that can be run against a local SVC
+/** Single local Wallet app reference. Defines the console commands that can be run against a local Wallet
   * app reference.
   */
-class LocalSvcAppReference(
+class LocalWalletAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
 ) extends CoinAppReference(consoleEnvironment, name)
     with LocalInstanceReference
     with BaseInspection[ParticipantNode] {
 
-  protected val nodes = consoleEnvironment.environment.svcs
+  protected val nodes = consoleEnvironment.environment.wallets
   @Help.Summary("Return participant config")
-  def config: LocalSvcAppConfig =
-    consoleEnvironment.environment.config.svcsByString(name)
+  def config: LocalWalletAppConfig =
+    consoleEnvironment.environment.config.walletsByString(name)
 
-  def initialize(): Unit = {
+  @Help.Summary("List all coins associated with the configured user")
+  @Help.Description(
+    "Queries the configured remote participant for the Coins owned by the configured user. " +
+      "Returns all found coins."
+  )
+  def list(): String = {
     consoleEnvironment.run {
-      adminCommand(SvcAppCommands.Initialize())
+      adminCommand(WalletCommands.List())
     }
   }
 
-  def openNextRound(): Unit = {
-    consoleEnvironment.run {
-      adminCommand(SvcAppCommands.OpenNextRound())
-    }
-  }
-
-  def acceptValidators(): Unit = {
-    consoleEnvironment.run {
-      adminCommand(SvcAppCommands.AcceptValidators())
-    }
-  }
-
-  /** Remote participant this SVC app is configured to interact with. */
+  /** Remote participant this Wallet app is configured to interact with. */
   val remoteParticipant =
-    new SvcAppRemoteParticipantReference(
+    new WalletAppRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name``",
       name,

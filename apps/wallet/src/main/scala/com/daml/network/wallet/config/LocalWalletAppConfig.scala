@@ -1,4 +1,4 @@
-package com.daml.network.validator.config
+package com.daml.network.wallet.config
 
 import com.daml.network.config.LocalCoinConfig
 import com.digitalasset.canton.config._
@@ -7,21 +7,21 @@ import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.tracing.TracingConfig
 
-case class LocalValidatorAppConfig(
+case class LocalWalletAppConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     // TODO(i142): slightly different in Canton
-    parameters: ValidatorAppParameters = ValidatorAppParameters(),
+    parameters: WalletAppParameters = WalletAppParameters(),
     remoteParticipant: RemoteParticipantConfig,
 ) extends LocalCoinConfig // TODO(142): fork or generalize this trait.
     {
-  override val nodeTypeName: String = "validator"
+  override val nodeTypeName: String = "wallet"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 
 }
 
-case class ValidatorAppParameters(
+case class WalletAppParameters(
     override val tracing: TracingConfig = TracingConfig(),
     override val delayLoggingThreshold: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofSeconds(20),

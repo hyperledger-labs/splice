@@ -1,4 +1,4 @@
-package com.daml.network.validator.admin.grpc
+package com.daml.network.wallet.admin.grpc
 
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.v1.transaction_filter

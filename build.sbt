@@ -39,6 +39,7 @@ lazy val root = (project in file("."))
     `apps-validator`,
     `apps-svc`,
     `apps-app`,
+    `apps-wallet`,
     `canton-community-common`,
     `canton-blake2b`,
     `canton-slick-fork`,
@@ -93,6 +94,21 @@ lazy val `apps-validator` =
 lazy val `apps-svc` =
   project
     .in(file("apps/svc"))
+    .dependsOn(`apps-common` % "compile->compile;test->test")
+    .settings(
+      libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
+      BuildCommon.sharedSettings,
+      BuildCommon.cantonWarts,
+      Compile / PB.targets := Seq(
+        scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
+      ),
+      Compile / PB.protoSources ++= (Test / PB.protoSources).value,
+      scalacOptions += "-Wconf:src=src_managed/.*:silent",
+    )
+
+lazy val `apps-wallet` =
+  project
+    .in(file("apps/wallet"))
     .dependsOn(`apps-common` % "compile->compile;test->test")
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
@@ -162,6 +178,7 @@ lazy val `apps-app` =
     .dependsOn(
       `apps-validator`,
       `apps-svc`,
+      `apps-wallet`,
       `canton-community-app` % "compile->compile;test->test",
     )
     .settings(

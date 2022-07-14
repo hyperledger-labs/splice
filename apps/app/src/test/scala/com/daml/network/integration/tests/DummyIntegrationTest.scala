@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.console.{LocalSvcAppReference, LocalValidatorReference}
+import com.daml.network.console.{LocalValidatorAppReference, LocalWalletAppReference}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -10,7 +10,6 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.util.BinaryFileUtil
 
 import scala.concurrent.duration._
 
@@ -41,7 +40,7 @@ class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironm
 
   "run commands against validator" in { implicit env =>
     // TODO(Arne): move this into a trait analogue to Canton's `ConsoleEnvironmentTestHelpers`
-    def v(name: String): LocalValidatorReference =
+    def v(name: String): LocalValidatorAppReference =
       env.validators
         .find(_.name == name)
         .getOrElse(sys.error(s"validator [$name] not configured"))
@@ -72,7 +71,7 @@ class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironm
       svcRemoteParReference.domains.connect_local(env.da)
       svcRemoteParReference.health.ping(svcRemoteParReference.id)
     }
-    
+
     clue("run initialization") {
       // Note: Throws because it's not implemented
       an[CommandFailure] should be thrownBy svc.initialize()
@@ -86,25 +85,31 @@ class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironm
 
   "try to call the list function" in { implicit env =>
     import env._
-    val validator1 = v("validator1")
+    val wallet1 = w("wallet1")
     clue("setup") {
-      validator1.start()
-      validator1.remoteParticipant.domains.connect_local(da)
-      upload_coin_dar(validator1)
+      wallet1.start()
+      wallet1.remoteParticipant.domains.connect_local(da)
+      upload_coin_dar(wallet1)
     }
     clue("call list") {
-      val res = validator1.list()
+      val res = wallet1.list()
       // we don't have any parties with coins yet, so we expect no results
       res should fullyMatch regex "\\(Vector\\(\\),LedgerOffset\\(Absolute\\(.*"
     }
   }
 
-  def v(name: String)(implicit env: CoinTestConsoleEnvironment): LocalValidatorReference =
+  def w(name: String)(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference =
+    env.wallets
+      .find(_.name == name)
+      .getOrElse(sys.error(s"wallet [$name] not configured"))
+
+  def v(name: String)(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference =
     env.validators
       .find(_.name == name)
       .getOrElse(sys.error(s"validator [$name] not configured"))
 
-  def upload_coin_dar(validator: LocalValidatorReference) = {
+  // TODO(Arne): generalize to any Coin app reference
+  def upload_coin_dar(validator: LocalWalletAppReference) = {
     val coinDarPath = "canton-coin/.daml/dist/canton-coin.dar"
     logger.info(s"uploaded dar with hash: ${validator.remoteParticipant.dars.upload(coinDarPath)}")
   }

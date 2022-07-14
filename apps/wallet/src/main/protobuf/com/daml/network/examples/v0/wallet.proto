@@ -8,7 +8,7 @@ service WalletService {
 message ListRequest {
 }
 
-// TODO(i206): Improve this
 message ListResponse {
+  // TODO(i206): Improve the proto-representation of Coins
   string coins = 1;
 }

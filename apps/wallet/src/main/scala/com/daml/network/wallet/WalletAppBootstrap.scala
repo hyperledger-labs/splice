@@ -1,4 +1,4 @@
-package com.daml.network.validator
+package com.daml.network.wallet
 
 import java.util.concurrent.ScheduledExecutorService
 
@@ -6,18 +6,20 @@ import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.ledger.client.configuration.CommandClientConfiguration
 import com.daml.network.environment.CoinNodeBootstrapBase
-import com.daml.network.examples.v0.ValidatorAppServiceGrpc
-import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
-import com.daml.network.validator.config.{LocalValidatorAppConfig, ValidatorAppParameters}
-import com.daml.network.validator.metrics.ValidatorAppMetrics
-import com.daml.network.validator.store.ValidatorAppStore
+import com.daml.network.examples.v0.{WalletServiceGrpc}
+import com.daml.network.wallet.admin.grpc.{GrpcWalletService}
+import com.daml.network.wallet.config.{LocalWalletAppConfig, WalletAppParameters}
+import com.daml.network.wallet.metrics.WalletAppMetrics
+import com.daml.network.wallet.store.WalletAppStore
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
 }
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.TestingConfigInternal
+import com.digitalasset.canton.ledger.api.client.LedgerConnection
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource._
 import com.digitalasset.canton.time._
@@ -25,17 +27,17 @@ import com.digitalasset.canton.time._
 import scala.annotation.nowarn
 import scala.concurrent.Future
 
-/** Class used to orchester the starting/initialization of Validator node.
+/** Class used to orchester the starting/initialization of Wallet apps.
   *
   * Modelled after Canton's ParticipantNodeBootstrap class.
   */
-class ValidatorAppBootstrap(
+class WalletAppBootstrap(
     override val name: InstanceName,
-    val config: LocalValidatorAppConfig,
-    val validatorNodeParameters: ValidatorAppParameters,
+    val config: LocalWalletAppConfig,
+    val walletNodeParameters: WalletAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
-    metrics: ValidatorAppMetrics,
+    metrics: WalletAppMetrics,
     storageFactory: StorageFactory,
     parentLogger: NamedLoggerFactory,
 )(implicit
@@ -46,32 +48,55 @@ class ValidatorAppBootstrap(
     @nowarn("cat=unused")
     executionSequencerFactory: ExecutionSequencerFactory,
 ) extends CoinNodeBootstrapBase[
-      ValidatorAppNode,
-      LocalValidatorAppConfig,
-      ValidatorAppParameters,
+      WalletApp,
+      LocalWalletAppConfig,
+      WalletAppParameters,
     ](
       name,
       config,
-      validatorNodeParameters,
+      walletNodeParameters,
       clock,
       metrics,
       storageFactory,
-      parentLogger.append(ValidatorAppBootstrap.LoggerFactoryKeyName, name.unwrap),
+      parentLogger.append(WalletAppBootstrap.LoggerFactoryKeyName, name.unwrap),
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
     EitherT.rightT[Future, String] {
-      val dummyStore = ValidatorAppStore(storage, loggerFactory)
+      val dummyStore = WalletAppStore(storage, loggerFactory)
+
+      import com.daml.ledger.api.refinements.{ApiTypes => A}
+      // configuration mostly copied from Canton
+      val connection: LedgerConnection = LedgerConnection(
+        config.remoteParticipant.ledgerApi,
+        A.ApplicationId("applicationId"),
+        10,
+        A.Party("ThisPartyIsCurrentlyNotUsed"),
+        A.WorkflowId("workflowId"),
+        CommandClientConfiguration.default.copy(
+          maxCommandsInFlight = 0, // set this to a silly value, to enforce it is never used
+          maxParallelSubmissions =
+            1000000, // We need a high value to work around https://github.com/digital-asset/daml/issues/8017
+          // This defines the maximum timeout that can be specified on admin workflow services such as the ping command
+          // The parameter name is misleading; it does not affect the deduplication period for the commands.
+          defaultDeduplicationTime = java.time.Duration.ofMinutes(1),
+        ),
+        config.remoteParticipant.token,
+        walletNodeParameters.processingTimeouts,
+        loggerFactory,
+        tracerProvider,
+        _ => true,
+      )
 
       adminServerRegistry.addService(
-        ValidatorAppServiceGrpc.bindService(
-          new GrpcValidatorAppService(loggerFactory),
+        WalletServiceGrpc.bindService(
+          new GrpcWalletService(connection, loggerFactory),
           executionContext,
         )
       )
-      new ValidatorAppNode(
+      new WalletApp(
         config,
-        validatorNodeParameters,
+        walletNodeParameters,
         storage,
         dummyStore,
         clock,
@@ -86,17 +111,17 @@ class ValidatorAppBootstrap(
 // TODO(Arne): Do we need this factory construction?
 // I think Canton only needs this for being able to generalize a community/enterprise participant with the same method
 // while being able to return an `Either` to signal that the initialization failed
-object ValidatorAppBootstrap {
-  val LoggerFactoryKeyName: String = "validator"
+object WalletAppBootstrap {
+  val LoggerFactoryKeyName: String = "wallet"
 
   trait Factory {
     def create(
         name: String,
-        validatorConfig: LocalValidatorAppConfig,
-        validatorNodeParameters: ValidatorAppParameters,
+        walletConfig: LocalWalletAppConfig,
+        walletNodeParameters: WalletAppParameters,
         clock: Clock,
         testingTimeService: TestingTimeService,
-        validatorMetrics: ValidatorAppMetrics,
+        walletMetrics: WalletAppMetrics,
         testingConfig: TestingConfigInternal,
         futureSupervisor: FutureSupervisor,
         loggerFactory: NamedLoggerFactory,
@@ -105,18 +130,18 @@ object ValidatorAppBootstrap {
         scheduler: ScheduledExecutorService,
         actorSystem: ActorSystem,
         executionSequencerFactory: ExecutionSequencerFactory,
-    ): Either[String, ValidatorAppBootstrap]
+    ): Either[String, WalletAppBootstrap]
   }
 
-  object ValidatorFactory extends Factory {
+  object WalletFactory extends Factory {
 
     override def create(
         name: String,
-        validatorConfig: LocalValidatorAppConfig,
-        validatorNodeParameters: ValidatorAppParameters,
+        walletConfig: LocalWalletAppConfig,
+        walletNodeParameters: WalletAppParameters,
         clock: Clock,
         testingTimeService: TestingTimeService,
-        validatorMetrics: ValidatorAppMetrics,
+        walletMetrics: WalletAppMetrics,
         testingConfigInternal: TestingConfigInternal,
         futureSupervisor: FutureSupervisor,
         loggerFactory: NamedLoggerFactory,
@@ -125,18 +150,18 @@ object ValidatorAppBootstrap {
         scheduler: ScheduledExecutorService,
         actorSystem: ActorSystem,
         executionSequencerFactory: ExecutionSequencerFactory,
-    ): Either[String, ValidatorAppBootstrap] =
+    ): Either[String, WalletAppBootstrap] =
       InstanceName
         .create(name)
         .map(
-          new ValidatorAppBootstrap(
+          new WalletAppBootstrap(
             _,
-            validatorConfig,
-            validatorNodeParameters,
+            walletConfig,
+            walletNodeParameters,
             testingConfigInternal,
             clock,
-            validatorMetrics,
-            new CommunityStorageFactory(validatorConfig.storage),
+            walletMetrics,
+            new CommunityStorageFactory(walletConfig.storage),
             loggerFactory,
           )
         )

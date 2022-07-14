@@ -1,6 +1,10 @@
 package com.daml.network.environment
 
-import com.daml.network.console.{LocalSvcAppReference, LocalValidatorReference}
+import com.daml.network.console.{
+  LocalSvcAppReference,
+  LocalValidatorAppReference,
+  LocalWalletAppReference,
+}
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
 import com.digitalasset.canton.console.{
   CantonHealthAdministration,
@@ -33,7 +37,7 @@ class CoinConsoleEnvironment(
   override type DomainRemoteRef = CommunityRemoteDomainReference
   override type Status = CommunityCantonStatus
 
-  lazy val validators: Seq[LocalValidatorReference] =
+  lazy val validators: Seq[LocalValidatorAppReference] =
     environment.config.validatorsByString.keys.map(createValidatorReference).toSeq
 
   lazy val svc: LocalSvcAppReference =
@@ -42,11 +46,17 @@ class CoinConsoleEnvironment(
       .headOption
       .getOrElse(throw new RuntimeException("There should be exactly one SVC app"))
 
-  private def createValidatorReference(name: String): LocalValidatorReference =
-    new LocalValidatorReference(this, name)
+  lazy val wallets: Seq[LocalWalletAppReference] =
+    environment.config.walletsByString.keys.map(createWalletReference).toSeq
+
+  private def createValidatorReference(name: String): LocalValidatorAppReference =
+    new LocalValidatorAppReference(this, name)
 
   private def createSvcReference(name: String): LocalSvcAppReference =
     new LocalSvcAppReference(this, name)
+
+  private def createWalletReference(name: String): LocalWalletAppReference =
+    new LocalWalletAppReference(this, name)
 
   override protected def topLevelValues: Seq[TopLevelValue[_]] = {
 

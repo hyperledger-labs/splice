@@ -7,6 +7,8 @@ import com.daml.network.svc.SvcAppBootstrap
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.validator.ValidatorAppBootstrap
 import com.daml.network.validator.config.LocalValidatorAppConfig
+import com.daml.network.wallet.WalletAppBootstrap
+import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.console.{
   ConsoleEnvironment,
@@ -89,16 +91,52 @@ trait CoinEnvironment extends Environment {
     loggerFactory,
   )
 
+  protected def createWallet(
+      name: String,
+      walletConfig: LocalWalletAppConfig,
+  ): WalletAppBootstrap =
+    WalletAppBootstrap.WalletFactory
+      .create(
+        name,
+        walletConfig,
+        config.tryWalletAppParametersByString(name),
+        createClock(Some(WalletAppBootstrap.LoggerFactoryKeyName -> name)),
+        testingTimeService,
+        coinMetrics.forWallet(name),
+        testingConfig,
+        futureSupervisor,
+        loggerFactory,
+      )
+      .valueOr(err =>
+        throw new RuntimeException(
+          s"Failed to create participant bootstrap: $err"
+        )
+      )
+
+  lazy val wallets = new WalletApps(
+    createWallet,
+    migrationsFactory,
+    timeouts,
+    config.walletsByString,
+    config.tryWalletAppParametersByString,
+    loggerFactory,
+  )
+
   /** Start all instances described in the configuration
     */
   override def startAll(): Either[Seq[StartupError], Unit] = {
     val errors =
       validators.startAll.left.getOrElse(Seq.empty) ++
-        svcs.startAll.left.getOrElse(Seq.empty)
+        svcs.startAll.left.getOrElse(Seq.empty) ++
+        wallets.startAll.left.getOrElse(Seq.empty)
     Either.cond(errors.isEmpty, (), errors)
   }
 
-  override def allNodes = super.allNodes :+ validators :+ svcs
+  def allCoinNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
+    List(validators, svcs, wallets)
+
+  override def allNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
+    super.allNodes ::: allCoinNodes
 
 }
 
