@@ -1,0 +1,20 @@
+function k8s_apply() {
+  jsonnet --tla-str imageTag=$(version-gen)\
+          $REPO_ROOT/cluster/canton-network-config.jsonnet | kubectl apply -f -
+}
+
+function set_k8s_context() {
+  case "$K8S_CONTEXT" in
+      gcloud)
+          _confirm "Modify remote gcloud cluster."
+          gcloud_connect
+          ;;
+      minikube)
+          kubectl config use-context minikube
+          ;;
+      *)
+          echo "Invalid option for K8S_CONTEXT supplied: $K8S_CONTEXT"
+          exit 1
+          ;;
+  esac
+}

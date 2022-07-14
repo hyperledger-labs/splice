@@ -1,0 +1,9 @@
+function minikube_create() {
+  minikube start
+  # GCP auth still required for pulling images from GCR
+  minikube addons enable gcp-auth --refresh
+}
+
+function minikube_delete() {
+  minikube delete
+}

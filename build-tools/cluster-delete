@@ -2,15 +2,19 @@
 set -euo pipefail
 
 source ${TOOLS_LIB}/libcli.source
-source ${TOOLS_LIB}/set-k8s-context
+source ${TOOLS_LIB}/gcloud.source
+source ${TOOLS_LIB}/k8s.source
+source ${TOOLS_LIB}/minikube.source
+
+set_k8s_context
 
 if [ "$K8S_CONTEXT" == "gcloud" ]; then
     echo "Deleting gcloud cluster..."
-    source ${TOOLS_LIB}/gcloud-setup
-    source ${TOOLS_LIB}/gcloud-delete
+    gcloud_setup
+    gcloud_delete
 elif [ "$K8S_CONTEXT" == "minikube" ]; then
     echo "Deleting minikube cluster..."
-    source ${TOOLS_LIB}/minikube-delete
+    minikube_delete
 fi
 
 echo "Cluster deleted."

@@ -2,7 +2,10 @@
 set -euo pipefail
 
 source ${TOOLS_LIB}/libcli.source
-source ${TOOLS_LIB}/set-k8s-context
+source ${TOOLS_LIB}/k8s.source
+
+set_k8s_context
+
 
 set +u
 APP_LABEL=$1
