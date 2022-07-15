@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+
 set -euo pipefail
 
 source ${TOOLS_LIB}/gcloud.source
@@ -7,7 +8,6 @@ source ${TOOLS_LIB}/minikube.source
 
 if [ "$K8S_CONTEXT" == "gcloud" ]; then
     echo "Creating gcloud cluster..."
-    gcloud_setup
     gcloud_create
     gcloud_connect
 elif [ "$K8S_CONTEXT" == "minikube" ]; then

@@ -1,38 +1,9 @@
-### Look for expected configuration variables
-
-function expect() {
-    if [ -z "$2" ]; then
-        echo "Missing environment variable: $1"
-        exit 1
-    fi
-
-    echo "$1=$2"
-}
-
-function gcloud_setup() {
-  ### Setup the gcloud command line tool so that it is authenticated and
-  ### connected to the project specified in the variable GCP_PROJECT_ID
-
-  set +u
-  expect GCP_REGION ${GCP_REGION}
-  expect GCP_PROJECT_ID ${GCP_PROJECT_ID}
-  expect GCP_REPO_NAME ${GCP_REPO_NAME}
-
-  expect GCP_IP_NAME ${GCP_IP_NAME}
-  expect GCP_VPN_NETS ${GCP_VPN_NETS}
-  expect GCP_CLUSTER_NAME ${GCP_CLUSTER_NAME}
-  set -u
-
-  # Check for the expected project.
-
-  gcloud config set compute/region ${GCP_REGION}
-  gcloud config set project ${GCP_PROJECT_ID}
-}
+# -*- shell-script -*-
 
 function gcloud_connect() {
   ### Connect kubectl to the Canton Network cluster
 
-  echo "Connecting to cluster ${GCP_PROJECT_ID}/${GCP_CLUSTER_NAME}"
+  echo "Connecting to cluster ${CLOUDSDK_CORE_PROJECT}/${GCP_CLUSTER_NAME}"
 
   gcloud container clusters get-credentials ${GCP_CLUSTER_NAME}
 }
@@ -63,14 +34,14 @@ function gcloud_create() {
 
   #### Check for IP
 
-  CLUSTER_IP=$(gcloud compute addresses list --regions=${GCP_REGION} --filter "name:${GCP_IP_NAME}" --format 'value(address)')
+  CLUSTER_IP=$(gcloud compute addresses list --region=${CLOUDSDK_COMPUTE_REGION} --filter "name:${GCP_IP_NAME}" --format 'value(address)')
 
   if [ -z "${CLUSTER_IP}" ]; then
       echo "Allocating IP address."
-      gcloud compute addresses create cn-devnet-ip --region=${GCP_REGION}
+      gcloud compute addresses create cn-devnet-ip --region=${CLOUDSDK_COMPUTE_REGION}
   fi
 
-  CLUSTER_IP=$(gcloud compute addresses list --regions=${GCP_REGION} --filter "name:${GCP_IP_NAME}" --format 'value(address)')
+  CLUSTER_IP=$(gcloud compute addresses list --region=${CLOUDSDK_COMPUTE_REGION} --filter "name:${GCP_IP_NAME}" --format 'value(address)')
 
   echo "Cluster at IP ${CLUSTER_IP}, applying configuration."
 }

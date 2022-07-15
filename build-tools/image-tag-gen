@@ -11,5 +11,4 @@ fi
 
 set -euo pipefail
 
-
-echo "${GCP_REGION}-docker.pkg.dev/${GCP_PROJECT_ID}/${GCP_REPO_NAME}/${appname}:$(version-gen)"
+echo "${CLOUDSDK_COMPUTE_REGION}-docker.pkg.dev/${CLOUDSDK_CORE_PROJECT}/${GCP_REPO_NAME}/${appname}:$(version-gen)"

@@ -1,4 +1,5 @@
-# -*- bash -*-
+# -*- shell-script -*-
+
 # common functions for use with bash based clis
 # all functions must be prefixed with _
 

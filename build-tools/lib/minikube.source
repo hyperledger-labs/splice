@@ -1,3 +1,5 @@
+# -*- shell-script -*-
+
 function minikube_create() {
   minikube start
   # GCP auth still required for pulling images from GCR
