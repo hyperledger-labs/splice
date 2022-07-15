@@ -1,3 +1,34 @@
+### Look for expected configuration variables
+
+function expect() {
+    if [ -z "$2" ]; then
+        echo "Missing environment variable: $1"
+        exit 1
+    fi
+
+    echo "$1=$2"
+}
+
+function gcloud_setup() {
+  ### Setup the gcloud command line tool so that it is authenticated and
+  ### connected to the project specified in the variable GCP_PROJECT_ID
+
+  set +u
+  expect GCP_REGION ${GCP_REGION}
+  expect GCP_PROJECT_ID ${GCP_PROJECT_ID}
+  expect GCP_REPO_NAME ${GCP_REPO_NAME}
+
+  expect GCP_IP_NAME ${GCP_IP_NAME}
+  expect GCP_VPN_NETS ${GCP_VPN_NETS}
+  expect GCP_CLUSTER_NAME ${GCP_CLUSTER_NAME}
+  set -u
+
+  # Check for the expected project.
+
+  gcloud config set compute/region ${GCP_REGION}
+  gcloud config set project ${GCP_PROJECT_ID}
+}
+
 function gcloud_connect() {
   ### Connect kubectl to the Canton Network cluster
 
@@ -61,39 +92,3 @@ function gcloud_delete() {
   gcloud container clusters delete ${GCP_CLUSTER_NAME}
 }
 
-### Look for expected configuration variables
-
-function expect() {
-    if [ -z "$2" ]; then
-        echo "Missing environment variable: $1"
-        exit 1
-    fi
-
-    echo "$1=$2"
-}
-
-function gcloud_setup() {
-  ### Setup the gcloud command line tool so that it is authenticated and
-  ### connected to the project specified in the variable GCP_PROJECT_ID
-
-  set +u
-  expect GCP_VPN_NETS ${GCP_VPN_NETS}
-  expect GCP_REGION ${GCP_REGION}
-  expect GCP_PROJECT_ID ${GCP_PROJECT_ID}
-  expect GCP_CLUSTER_NAME ${GCP_CLUSTER_NAME}
-  expect GCP_REPO_NAME ${GCP_REPO_NAME}
-  expect GCP_IP_NAME ${GCP_IP_NAME}
-  set -u
-
-  ### Check for an authenticated gcloud account
-  N_ACCOUNTS=$(gcloud auth list --format 'value(account)' | wc -l)
-
-  if [ "${N_ACCOUNTS}" -eq "0" ]; then
-      echo "There is not an autheticated gcloud account. You must login."
-      gcloud auth login
-  fi
-
-  # Check for the expected project.
-  gcloud config set project ${GCP_PROJECT_ID}
-  gcloud config set compute/region ${GCP_REGION}
-}
