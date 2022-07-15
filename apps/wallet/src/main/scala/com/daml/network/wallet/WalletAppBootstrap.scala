@@ -65,28 +65,8 @@ class WalletAppBootstrap(
     EitherT.rightT[Future, String] {
       val dummyStore = WalletAppStore(storage, loggerFactory)
 
-      import com.daml.ledger.api.refinements.{ApiTypes => A}
-      // configuration mostly copied from Canton
-      val connection: LedgerConnection = LedgerConnection(
-        config.remoteParticipant.ledgerApi,
-        A.ApplicationId("applicationId"),
-        10,
-        A.Party("ThisPartyIsCurrentlyNotUsed"),
-        A.WorkflowId("workflowId"),
-        CommandClientConfiguration.default.copy(
-          maxCommandsInFlight = 0, // set this to a silly value, to enforce it is never used
-          maxParallelSubmissions =
-            1000000, // We need a high value to work around https://github.com/digital-asset/daml/issues/8017
-          // This defines the maximum timeout that can be specified on admin workflow services such as the ping command
-          // The parameter name is misleading; it does not affect the deduplication period for the commands.
-          defaultDeduplicationTime = java.time.Duration.ofMinutes(1),
-        ),
-        config.remoteParticipant.token,
-        walletNodeParameters.processingTimeouts,
-        loggerFactory,
-        tracerProvider,
-        _ => true,
-      )
+      val connection =
+        createLedgerConnection(config.remoteParticipant, walletNodeParameters.processingTimeouts)
 
       adminServerRegistry.addService(
         WalletServiceGrpc.bindService(

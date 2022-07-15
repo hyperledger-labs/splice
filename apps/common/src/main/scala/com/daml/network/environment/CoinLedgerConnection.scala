@@ -1,15 +1,17 @@
-// Copyright (c) 2022 Digital Asset (Switzerland) GmbH and/or its affiliates. All rights reserved.
-// SPDX-License-Identifier: Apache-2.0
-
-package com.digitalasset.canton.ledger.api.client
+package com.daml.network.environment
 
 import akka.actor.ActorSystem
 import akka.stream.KillSwitches
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
+import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.api.refinements.ApiTypes.{ApplicationId, TemplateId, WorkflowId}
-import com.daml.ledger.api.v1.command_submission_service.SubmitRequest
+import com.daml.ledger.api.refinements.ApiTypes.{
+  ApplicationId,
+  TemplateId,
+  TransactionId,
+  WorkflowId,
+}
 import com.daml.ledger.api.v1.commands.Commands.DeduplicationPeriod
 import com.daml.ledger.api.v1.commands.{Command, Commands}
 import com.daml.ledger.api.v1.event.CreatedEvent
@@ -25,7 +27,6 @@ import com.daml.ledger.client.configuration.{
   LedgerClientConfiguration,
   LedgerIdRequirement,
 }
-import com.daml.ledger.client.services.commands.tracker.CompletionResponse
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
@@ -33,41 +34,47 @@ import com.digitalasset.canton.lifecycle.{
   FlagCloseableAsync,
   SyncCloseable,
 }
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
-import com.digitalasset.canton.util.AkkaUtil
+import com.digitalasset.canton.util.{AkkaUtil, retry}
 import com.google.rpc.status.Status
 import io.grpc.StatusRuntimeException
-import io.opentelemetry.api.trace.Tracer
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
 import org.slf4j.event.Level
 import scalaz.syntax.tag._
 
 import java.util.UUID
-import com.daml.ledger.api.domain.UserRight.{CanActAs, CanReadAs}
+import com.daml.ledger.api.domain.UserRight.CanActAs
+import com.daml.ledger.api.v1.command_service.SubmitAndWaitRequest
+import com.digitalasset.canton.error.ErrorCodeUtils
+import com.digitalasset.canton.util.retry.RetryUtil.NoExnRetryable.logThrowable
+import com.digitalasset.canton.util.retry.RetryUtil.{
+  ErrorKind,
+  ExceptionRetryable,
+  FatalErrorKind,
+  NoErrorKind,
+  NoExnRetryable,
+  TransientErrorKind,
+}
 import com.google.protobuf.ByteString
 
-import scala.concurrent.{Await, ExecutionContextExecutor, Future}
-import scala.util.{Failure, Success}
+import scala.concurrent.duration.DurationInt
+import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.util.{Failure, Success, Try}
 
 /** Extract from connection for only submitting functionality */
-trait LedgerSubmit extends FlagCloseableAsync {
+trait CoinLedgerSubmit extends FlagCloseableAsync {
   def submitCommand(
+      actAs: Seq[PartyId],
+      readAs: Seq[PartyId],
       command: Seq[Command],
       commandId: Option[String] = None,
       workflowId: Option[WorkflowId] = None,
       deduplicationTime: Option[NonNegativeFiniteDuration] = None,
-  )(implicit traceContext: TraceContext): Future[CommandSubmitterWithRetry.CommandResult]
-
-  def submitAsync(
-      commands: Seq[Command],
-      commandId: Option[String] = None,
-      workflowId: Option[WorkflowId] = None,
-      deduplicationTime: Option[NonNegativeFiniteDuration] = None,
-  )(implicit traceContext: TraceContext): Future[Unit]
+  )(implicit traceContext: TraceContext): Future[TransactionId]
 }
 
 /** Subscription for reading the ledger */
@@ -75,51 +82,64 @@ trait LedgerSubscription extends FlagCloseableAsync with NamedLogging {
   val completed: Future[Done]
 }
 
-trait LedgerConnection extends LedgerSubmit {
-  def sender: P.Party
+trait CoinLedgerConnection extends CoinLedgerSubmit {
   def ledgerEnd: Future[LedgerOffset]
   def activeContracts(
-      filter: TransactionFilter = LedgerConnection.transactionFilter(sender)
+      filter: TransactionFilter
   ): Future[(Seq[CreatedEvent], LedgerOffset)]
   def subscribe(
       subscriptionName: String,
       offset: LedgerOffset,
-      filter: TransactionFilter = LedgerConnection.transactionFilter(sender),
+      filter: TransactionFilter,
   )(f: Transaction => Unit): LedgerSubscription
   def subscribeAsync(
       subscriptionName: String,
       offset: LedgerOffset,
-      filter: TransactionFilter = LedgerConnection.transactionFilter(sender),
+      filter: TransactionFilter,
   )(f: Transaction => Future[Unit]): LedgerSubscription
   def subscription[T](
       subscriptionName: String,
       offset: LedgerOffset,
-      filter: TransactionFilter = LedgerConnection.transactionFilter(sender),
+      filter: TransactionFilter,
   )(mapOperator: Flow[Transaction, Any, _]): LedgerSubscription
 
   def subscribeTree(
       subscriptionName: String,
       offset: LedgerOffset,
-      filter: Seq[Any] = Seq(sender),
+      filter: Seq[PartyId],
   )(f: TransactionTree => Unit): LedgerSubscription
   def subscribeAsyncTree(
       subscriptionName: String,
       offset: LedgerOffset,
-      filter: Seq[Any] = Seq(sender),
+      filter: Seq[PartyId],
   )(f: TransactionTree => Future[Unit]): LedgerSubscription
   def subscriptionTree[T](
       subscriptionName: String,
       offset: LedgerOffset,
-      filter: Seq[Any] = Seq(sender),
+      filter: Seq[PartyId],
   )(mapOperator: Flow[TransactionTree, Any, _]): LedgerSubscription
 
-  def transactionById(id: String): Future[Option[Transaction]]
+  def transactionById(parties: Seq[PartyId], id: String): Future[Option[Transaction]]
+
+  def getUser(user: String): Future[Option[PartyId]]
+
+  def bootstrapUser(user: String): Future[PartyId]
+
+  def uploadDarFile(packageId: String, darFile: => ByteString)(implicit
+      traceContext: TraceContext
+  ): Future[Unit]
 
   def allocatePartyViaLedgerApi(hint: Option[String], displayName: Option[String]): Future[PartyId]
 
 }
 
-object LedgerConnection {
+// Note: this is copied from the Canton LedgerConnection class
+// Differences:
+// - it uses the command submission client, and not the command client
+// - it does not retry commands on timeout (that was implemented as an akka flow around the command client)
+// - actAs/readAs parties are specified for each submission, instead of being static for the duration of the connection
+// - there are new methods for interacting with the ledger API (e.g., party/package management)
+object CoinLedgerConnection {
   def createLedgerClient(
       applicationId: ApplicationId,
       config: ClientConfig,
@@ -157,33 +177,21 @@ object LedgerConnection {
       clientConfig: ClientConfig,
       applicationId: ApplicationId,
       maxRetries: Int,
-      senderParty: P.Party,
       defaultWorkflowId: WorkflowId,
       commandClientConfiguration: CommandClientConfiguration,
       token: Option[String],
       processingTimeouts: ProcessingTimeout,
-      loggerFactoryForLedgerConnectionOverride: NamedLoggerFactory,
+      loggerFactoryForCoinLedgerConnectionOverride: NamedLoggerFactory,
       tracerProvider: TracerProvider,
-      overrideRetryable: PartialFunction[Status, Boolean] = PartialFunction.empty,
   )(implicit
       ec: ExecutionContextExecutor,
       as: ActorSystem,
-      tracer: Tracer,
       sequencerPool: ExecutionSequencerFactory,
-  ): LedgerConnection with NamedLogging =
-    new LedgerConnection with NamedLogging {
-      protected val loggerFactory: NamedLoggerFactory = loggerFactoryForLedgerConnectionOverride
+  ): CoinLedgerConnection with NamedLogging =
+    new CoinLedgerConnection with NamedLogging {
+      protected val loggerFactory: NamedLoggerFactory = loggerFactoryForCoinLedgerConnectionOverride
 
       override protected def timeouts: ProcessingTimeout = processingTimeouts
-
-      if (commandClientConfiguration.maxParallelSubmissions < 100) {
-        import TraceContext.Implicits.Empty._
-        // We need a high value to work around https://github.com/digital-asset/daml/issues/8017
-        logger.warn(
-          s"Creating command client with maxParallelSubmissions = ${commandClientConfiguration.maxParallelSubmissions}.\n" +
-            "It is recommended to choose a value of at least 100 to avoid deadlocks and performance degradation."
-        )
-      }
 
       private val client = {
         import TraceContext.Implicits.Empty._
@@ -201,32 +209,8 @@ object LedgerConnection {
         )
       }
       private val ledgerId = client.ledgerId
-      private val commandClient = client.commandClient
 
       private val transactionClient = client.transactionClient
-
-      private val commandTracker = {
-        import TraceContext.Implicits.Empty._
-        processingTimeouts.unbounded.await(s"Creation of the command tracker")(
-          commandClient.trackCommandsUnbounded[CommandSubmitterWithRetry.CommandsCtx](
-            Seq(sender.unwrap)
-          )
-        )
-      }.map(
-        // Convert either-based results to completion after upstream api change https://github.com/digital-asset/daml/pull/10503
-        _.map(CompletionResponse.toCompletion)
-      )
-
-      private val commandSubmitterWithRetry =
-        new CommandSubmitterWithRetry(
-          maxRetries,
-          commandTracker,
-          processingTimeouts,
-          loggerFactoryForLedgerConnectionOverride,
-          overrideRetryable,
-        )
-
-      override def sender = senderParty
 
       override def ledgerEnd: Future[LedgerOffset] =
         transactionClient.getLedgerEnd().flatMap(response => toFuture(response.offset))
@@ -250,65 +234,76 @@ object LedgerConnection {
         }
       }
 
+      case object RetryOnRetryableLedgerApiError extends ExceptionRetryable {
+
+        override def retryOK(outcome: Try[_], logger: TracedLogger)(implicit
+            tc: TraceContext
+        ): ErrorKind = outcome match {
+          case Failure(ex @ GrpcException(GrpcStatus(_, Some(description)), _)) =>
+            if (ErrorCodeUtils.errorCategoryFromString(description).exists(_.retryable.nonEmpty)) {
+              logger.info(s"Ledger API call failed with a retryable error", ex)
+              TransientErrorKind
+            } else {
+              logger.info(s"Ledger API call failed with a non-retryable error", ex)
+              FatalErrorKind
+            }
+          case Failure(ex) =>
+            logger.info(s"Ledger API call failed with an unknown exception, not retrying", ex)
+            FatalErrorKind
+          case util.Success(_) =>
+            NoErrorKind
+        }
+      }
+
       override def submitCommand(
+          actAs: Seq[PartyId],
+          readAs: Seq[PartyId],
           command: Seq[Command],
           commandId: Option[String] = None,
           workflowId: Option[WorkflowId] = None,
           deduplicationTime: Option[NonNegativeFiniteDuration] = None,
-      )(implicit traceContext: TraceContext): Future[CommandSubmitterWithRetry.CommandResult] = {
+      )(implicit traceContext: TraceContext): Future[TransactionId] = {
+        // Note: reusing the same command id for all retries
         val fullCommand =
           commandsOf(
-            sender,
+            actAs,
+            readAs,
             commandId,
             workflowId.getOrElse(defaultWorkflowId),
             deduplicationTime,
             command,
           )
+
+        implicit val success = com.digitalasset.canton.util.retry.Success.always
+        retry
+          .Backoff(logger, this, maxRetries, 10.millis, 5.second, "submitCommand")
+          .apply(submitCommandOnce(fullCommand), RetryOnRetryableLedgerApiError)
+      }
+
+      private def submitCommandOnce(
+          fullCommand: Commands
+      )(implicit traceContext: TraceContext): Future[TransactionId] = {
         val commandIdA = fullCommand.commandId
         logger.debug(s"Submitting command [$commandIdA]")
-        val result = commandSubmitterWithRetry.submitCommands(fullCommand)
+        val result = client.commandServiceClient.submitAndWaitForTransactionId(
+          new SubmitAndWaitRequest(Some(fullCommand))
+        )
 
         result onComplete { outcome =>
           outcome.fold(
-            e => logger.error(s"Command failed [$commandIdA] badly due to an exception", e),
-            {
-              case CommandSubmitterWithRetry.Success(completion) =>
-                logger.debug(
-                  s"Command [$commandIdA] succeeded with transaction=${completion.transactionId}"
-                )
-              case CommandSubmitterWithRetry.Failed(completion) =>
-                logger.debug(s"Command [$commandIdA] failed with status=${completion.status}")
-              case CommandSubmitterWithRetry.MaxRetriesReached(completion) =>
-                logger.debug(
-                  s"Command [$commandIdA] reached max-retries with status=${completion.status}"
-                )
-            },
+            e => logger.error(s"Command [$commandIdA] failed due to an exception", e),
+            response =>
+              logger.debug(
+                s"Command [$commandIdA] succeeded with transaction=${response.transactionId}"
+              ),
           )
         }
-        result
-      }
-
-      override def submitAsync(
-          commands: Seq[Command],
-          commandId: Option[String] = None,
-          workflowId: Option[WorkflowId] = None,
-          deduplicationTime: Option[NonNegativeFiniteDuration],
-      )(implicit traceContext: TraceContext): Future[Unit] = {
-        val fullCommand =
-          commandsOf(
-            sender,
-            commandId,
-            workflowId.getOrElse(defaultWorkflowId),
-            deduplicationTime,
-            commands,
-          )
-        val commandIdA = fullCommand.commandId
-        logger.debug(s"Submitting command [$commandIdA] asynchronously")
-        commandClient.submitSingleCommand(SubmitRequest(Some(fullCommand))).map(_ => ())
+        result.map(res => TransactionId(res.transactionId))
       }
 
       def commandsOf(
-          party: P.Party,
+          actAs: Seq[PartyId],
+          readAs: Seq[PartyId],
           commandId: Option[String],
           workflowId: WorkflowId,
           deduplicationTime: Option[NonNegativeFiniteDuration],
@@ -319,7 +314,8 @@ object LedgerConnection {
           workflowId = WorkflowId.unwrap(workflowId),
           applicationId = ApplicationId.unwrap(applicationId),
           commandId = commandId.getOrElse(uniqueId),
-          party = P.Party.unwrap(party),
+          actAs = actAs.map(_.toProtoPrimitive),
+          readAs = readAs.map(_.toProtoPrimitive),
           deduplicationPeriod = deduplicationTime
             .map(dt => DeduplicationPeriod.DeduplicationDuration(dt.toProtoPrimitive))
             .getOrElse(DeduplicationPeriod.Empty),
@@ -329,7 +325,7 @@ object LedgerConnection {
       override def subscribe(
           subscriptionName: String,
           offset: LedgerOffset,
-          filter: TransactionFilter = transactionFilter(sender),
+          filter: TransactionFilter,
       )(f: Transaction => Unit): LedgerSubscription =
         subscription(subscriptionName, offset, filter)({
           Flow[Transaction].map(f)
@@ -338,29 +334,83 @@ object LedgerConnection {
       override def subscribeAsync(
           subscriptionName: String,
           offset: LedgerOffset,
-          filter: TransactionFilter = transactionFilter(sender),
+          filter: TransactionFilter,
       )(f: Transaction => Future[Unit]): LedgerSubscription =
         subscription(subscriptionName, offset, filter)({
           Flow[Transaction].mapAsync(1)(f)
         })
 
-      override def transactionById(id: String): Future[Option[Transaction]] =
-        client.transactionClient.getFlatTransactionById(id, Seq(sender.unwrap), token).map { resp =>
-          resp.transaction
-        }
+      override def transactionById(parties: Seq[PartyId], id: String): Future[Option[Transaction]] =
+        client.transactionClient
+          .getFlatTransactionById(id, parties.map(_.toProtoPrimitive), token)
+          .map { resp =>
+            resp.transaction
+          }
+
+      override def getUser(user: String): Future[Option[PartyId]] = {
+        val userId = com.daml.lf.data.Ref.UserId.assertFromString(user)
+        for {
+          user <- client.userManagementClient
+            .getUser(userId, token)
+            .map(Some(_))
+            .recover {
+              case e: StatusRuntimeException
+                  if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
+                None
+            }
+          partyId = user.map(u =>
+            PartyId.tryFromLfParty(
+              u.primaryParty
+                .getOrElse(sys.error(s"user $user was allocated without primary party"))
+            )
+          )
+        } yield partyId
+      }
+
+      override def bootstrapUser(user: String): Future[PartyId] = {
+        for {
+          party <- allocatePartyViaLedgerApi(Some(user), Some(user))
+          userId = com.daml.lf.data.Ref.UserId.assertFromString(user)
+          userLf = com.daml.ledger.api.domain.User(userId, Some(party.toLf))
+
+          user <- client.userManagementClient
+            .createUser(userLf, List(CanActAs(party.toLf)), token)
+          partyId =
+            PartyId.tryFromLfParty(
+              user.primaryParty
+                .getOrElse(sys.error(s"user $user was allocated without primary party"))
+            )
+        } yield partyId
+      }
+
+      override def uploadDarFile(packageId: String, darFile: => ByteString)(implicit
+          traceContext: TraceContext
+      ): Future[Unit] = {
+        for {
+          known <- client.packageManagementClient.listKnownPackages()
+          _ <- {
+            if (known.map(_.packageId).contains(packageId)) {
+              logger.debug(s"Package of dar $packageId already exists")
+              Future.successful(())
+            } else {
+              logger.debug(s"Uploading dar file ${packageId}")
+              client.packageManagementClient.uploadDarFile(darFile, token)
+            }
+          }
+        } yield ()
+      }
 
       override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List[AsyncOrSyncCloseable](
-        SyncCloseable("commandSubmitterWithRetry", commandSubmitterWithRetry.close()),
-        SyncCloseable("ledgerClient", client.close()),
+        SyncCloseable("ledgerClient", client.close())
       )
 
       override def subscription[T](
           subscriptionName: String,
           offset: LedgerOffset,
-          filter: TransactionFilter = transactionFilter(sender),
+          filter: TransactionFilter,
       )(mapOperator: Flow[Transaction, Any, _]): LedgerSubscription =
         makeSubscription(
-          transactionClient.getTransactions(offset, None, transactionFilter(sender)),
+          transactionClient.getTransactions(offset, None, filter),
           mapOperator,
           subscriptionName,
         )
@@ -368,7 +418,7 @@ object LedgerConnection {
       override def subscribeTree(
           subscriptionName: String,
           offset: LedgerOffset,
-          filterParty: Seq[Any] = Seq(sender),
+          filterParty: Seq[PartyId],
       )(f: TransactionTree => Unit): LedgerSubscription =
         subscriptionTree(subscriptionName, offset, filterParty)({
           Flow[TransactionTree].map(f)
@@ -377,7 +427,7 @@ object LedgerConnection {
       override def subscribeAsyncTree(
           subscriptionName: String,
           offset: LedgerOffset,
-          filterParty: Seq[Any] = Seq(sender),
+          filterParty: Seq[PartyId],
       )(f: TransactionTree => Future[Unit]): LedgerSubscription =
         subscriptionTree(subscriptionName, offset, filterParty)({
           Flow[TransactionTree].mapAsync(1)(f)
@@ -386,10 +436,10 @@ object LedgerConnection {
       override def subscriptionTree[T](
           subscriptionName: String,
           offset: LedgerOffset,
-          filterParty: Seq[Any] = Seq(sender),
+          filterParty: Seq[PartyId],
       )(mapOperator: Flow[TransactionTree, Any, _]): LedgerSubscription =
         makeSubscription(
-          transactionClient.getTransactionTrees(offset, None, transactionFilter(sender)),
+          transactionClient.getTransactionTrees(offset, None, transactionFilter(filterParty: _*)),
           mapOperator,
           subscriptionName,
         )
@@ -415,9 +465,9 @@ object LedgerConnection {
           )
           override val loggerFactory =
             if (subscriptionName.isEmpty)
-              loggerFactoryForLedgerConnectionOverride
+              loggerFactoryForCoinLedgerConnectionOverride
             else
-              loggerFactoryForLedgerConnectionOverride.appendUnnamedKey(
+              loggerFactoryForCoinLedgerConnectionOverride.appendUnnamedKey(
                 "subscription",
                 subscriptionName,
               )
@@ -451,8 +501,8 @@ object LedgerConnection {
         }
     }
 
-  def transactionFilter(ps: P.Party*): TransactionFilter =
-    TransactionFilter(P.Party.unsubst(ps).map((_, Filters.defaultInstance)).toMap)
+  def transactionFilter(ps: PartyId*): TransactionFilter =
+    TransactionFilter(ps.map(p => p.toProtoPrimitive -> Filters.defaultInstance).toMap)
 
   def transactionFilterByParty(filter: Map[PartyId, Seq[TemplateId]]): TransactionFilter =
     TransactionFilter(filter.map {

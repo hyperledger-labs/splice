@@ -74,6 +74,12 @@ lazy val `apps-common` =
           "com.digitalasset.network",
         )
       ),
+      Compile / resourceGenerators += Def.task {
+        val srcFile = (Compile / damlDarOutput).value / "canton-coin.dar"
+        val dstFile = (Compile / resourceDirectory).value / "dar" / "canton-coin.dar"
+        IO.copyFile(srcFile, dstFile)
+        Seq(dstFile)
+      }.taskValue,
     )
 
 lazy val `apps-validator` =

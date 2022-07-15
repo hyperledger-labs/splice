@@ -1,9 +1,11 @@
 package com.daml.network.environment
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
-
 import akka.actor.ActorSystem
 import cats.data.EitherT
+import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.ledger.api.refinements.ApiTypes
+import com.daml.ledger.client.configuration.CommandClientConfiguration
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.{LocalNodeConfig, LocalNodeParameters, ProcessingTimeout}
@@ -12,19 +14,21 @@ import com.digitalasset.canton.environment.{CantonNode, CantonNodeBootstrap}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.health.admin.grpc.GrpcStatusService
 import com.digitalasset.canton.health.admin.v0.StatusServiceGrpc
+import com.digitalasset.canton.ledger.api.client.LedgerConnection
 import com.digitalasset.canton.lifecycle.{FlagCloseable, HasCloseContext, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.MetricHandle.NodeMetrics
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
+import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.resource.StorageFactory
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.NodeId
+import com.digitalasset.canton.topology.{NodeId, PartyId}
 import com.digitalasset.canton.tracing.{NoTracing, TracerProvider}
 import io.functionmeta.functionFullName
 import io.grpc.protobuf.services.ProtoReflectionService
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.{Future, blocking}
+import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
 
 /** TODO(Arne): Potentially completely remove this trait.
   *
@@ -201,4 +205,22 @@ abstract class CoinNodeBootstrapBase[
       }
     }
   }
+
+  // configuration mostly copied from Canton
+  protected def createLedgerConnection(
+      remoteParticipant: RemoteParticipantConfig,
+      processingTimeout: ProcessingTimeout,
+  )(implicit
+      sequencerPool: ExecutionSequencerFactory
+  ): CoinLedgerConnection = CoinLedgerConnection(
+    remoteParticipant.ledgerApi,
+    ApiTypes.ApplicationId(name.unwrap),
+    10,
+    ApiTypes.WorkflowId(name.unwrap),
+    CommandClientConfiguration.default, // We use the command submission client instead of the command client
+    remoteParticipant.token,
+    processingTimeout,
+    loggerFactory,
+    tracerProvider,
+  )
 }

@@ -73,8 +73,9 @@ class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironm
     }
 
     clue("run initialization") {
-      // Note: Throws because it's not implemented
-      an[CommandFailure] should be thrownBy svc.initialize()
+      svc.initialize()
+      val info = svc.getDebugInfo()
+      info.coinRulesCids.length shouldBe 1
     }
 
     clue("open next round") {

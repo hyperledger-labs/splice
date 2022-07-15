@@ -4,6 +4,22 @@ package com.daml.network.examples.v0;
 import "google/protobuf/wrappers.proto";
 import "google/protobuf/empty.proto";
 
+// Contains information useful for debugging a running SVC app.
+// Absolutely no forward or backward compatibility guarantees.
+message GetDebugInfoResponse {
+  // User representing the SVC
+  string svcUser = 1;
+
+  // Party representing the SVC
+  string svcParty = 2;
+
+  // Package containing the canton coin code
+  string coinPackageId = 3;
+
+  // Contract IDs of all active CoinRules contracts created by this app
+  repeated string coinRulesCids = 4;
+}
+
 service SvcAppService {
   // Performs one-time initialization of the application (i.e., when starting the application on a fresh ledger).
   // This should be called before any other call.
@@ -30,4 +46,7 @@ service SvcAppService {
   // PoC implementation: `runCoinRulesAcceptBot` in Util.daml
   // TODO(M1-01): Replace this manual trigger by automation
   rpc AcceptValidators (google.protobuf.Empty) returns (google.protobuf.Empty);
+
+  // Returns some debug info about the running app
+  rpc GetDebugInfo (google.protobuf.Empty) returns (GetDebugInfoResponse);
 }

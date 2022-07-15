@@ -39,6 +39,12 @@ class LocalSvcAppReference(
     }
   }
 
+  def getDebugInfo(): SvcAppCommands.DebugInfo = {
+    consoleEnvironment.run {
+      adminCommand(SvcAppCommands.GetDebugInfo())
+    }
+  }
+
   /** Remote participant this SVC app is configured to interact with. */
   val remoteParticipant =
     new SvcAppRemoteParticipantReference(

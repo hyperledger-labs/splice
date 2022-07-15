@@ -2,7 +2,9 @@ package com.daml.network.svc.admin.api.client.commands
 
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.daml.network.examples.v0
+import com.daml.network.examples.v0.GetDebugInfoResponse
 import com.daml.network.examples.v0.SvcAppServiceGrpc.SvcAppServiceStub
+import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
 
@@ -18,7 +20,8 @@ object SvcAppCommands {
 
   /** A command that takes no input and returns no result (other than an error on failure) */
   // TODO(Arne): Move this somewhere to Canton codebase?
-  abstract class UnitCommand extends GrpcAdminCommand[Empty, Empty, Unit] {
+  abstract class UnitCommand(adminApiCall: SvcAppServiceStub => (Empty => Future[Empty]))
+      extends GrpcAdminCommand[Empty, Empty, Unit] {
     override type Svc = SvcAppServiceStub
     override def createService(channel: ManagedChannel): SvcAppServiceStub =
       v0.SvcAppServiceGrpc.stub(channel)
@@ -26,16 +29,43 @@ object SvcAppCommands {
     override def submitRequest(
         service: SvcAppServiceStub,
         request: Empty,
-    ): Future[Empty] = service.initialize(request)
+    ): Future[Empty] = adminApiCall(service)(request)
     override def handleResponse(
         response: Empty
     ): Either[String, Unit] = Right(())
   }
 
-  case class Initialize() extends UnitCommand
+  case class Initialize() extends UnitCommand(_.initialize)
 
-  case class OpenNextRound() extends UnitCommand
+  case class OpenNextRound() extends UnitCommand(_.openNextRound)
 
-  case class AcceptValidators() extends UnitCommand
+  case class AcceptValidators() extends UnitCommand(_.acceptValidators)
 
+  case class DebugInfo(
+      svcUser: String,
+      svcParty: PartyId,
+      coinPackageId: String,
+      coinRulesCids: Seq[String],
+  )
+
+  case class GetDebugInfo() extends BaseCommand[Empty, GetDebugInfoResponse, DebugInfo] {
+    override type Svc = SvcAppServiceStub
+    override def createService(channel: ManagedChannel): SvcAppServiceStub =
+      v0.SvcAppServiceGrpc.stub(channel)
+    override def createRequest(): Either[String, Empty] = Right(Empty())
+    override def submitRequest(
+        service: SvcAppServiceStub,
+        request: Empty,
+    ): Future[GetDebugInfoResponse] = service.getDebugInfo(request)
+    override def handleResponse(
+        response: GetDebugInfoResponse
+    ): Either[String, DebugInfo] = Right(
+      DebugInfo(
+        svcUser = response.svcUser,
+        svcParty = PartyId.tryFromProtoPrimitive(response.svcParty),
+        coinPackageId = response.coinPackageId,
+        coinRulesCids = response.coinRulesCids,
+      )
+    )
+  }
 }

@@ -1,7 +1,6 @@
 package com.daml.network.svc
 
 import java.util.concurrent.ScheduledExecutorService
-
 import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either._
@@ -63,8 +62,14 @@ class SvcAppBootstrap(
     EitherT.rightT[Future, String] {
       val svcStore = SvcAppStore(storage, loggerFactory)
 
+      val connection =
+        createLedgerConnection(config.remoteParticipant, svcNodeParameters.processingTimeouts)
+
       adminServerRegistry.addService(
-        SvcAppServiceGrpc.bindService(new GrpcSvcAppService(loggerFactory), executionContext)
+        SvcAppServiceGrpc.bindService(
+          new GrpcSvcAppService(connection, loggerFactory),
+          executionContext,
+        )
       )
       new SvcAppNode(config, svcNodeParameters, storage, svcStore, clock, loggerFactory)
     }

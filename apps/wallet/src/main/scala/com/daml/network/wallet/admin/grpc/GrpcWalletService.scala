@@ -5,6 +5,7 @@ import com.daml.ledger.api.v1.transaction_filter
 import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
 import com.daml.ledger.api.v1.value.Identifier
 import com.daml.ledger.client.binding.Primitive
+import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.examples.v0
 import com.daml.network.examples.v0.WalletServiceGrpc
 import com.daml.network.util.CoinUtil
@@ -20,7 +21,7 @@ import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcWalletService(
-    connection: LedgerConnection,
+    connection: CoinLedgerConnection,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     @nowarn("cat=unused")
