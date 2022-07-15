@@ -1,6 +1,7 @@
 package com.daml.network.wallet
 
-import com.daml.network.wallet.config.{LocalWalletAppConfig, WalletAppParameters}
+import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.daml.network.wallet.store.WalletAppStore
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
@@ -19,7 +20,7 @@ import scala.concurrent.Future
   */
 class WalletApp(
     val config: LocalWalletAppConfig,
-    val walletNodeParameters: WalletAppParameters,
+    val coinAppParameters: SharedCoinAppParameters,
     storage: Storage,
     dummyStore: WalletAppStore,
     override protected val clock: Clock,

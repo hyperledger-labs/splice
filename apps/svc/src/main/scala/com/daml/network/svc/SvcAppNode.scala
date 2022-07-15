@@ -1,6 +1,7 @@
 package com.daml.network.svc
 
-import com.daml.network.svc.config.{LocalSvcAppConfig, SvcAppParameters}
+import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.svc.store.SvcAppStore
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
@@ -19,7 +20,7 @@ import scala.concurrent.Future
   */
 class SvcAppNode(
     val config: LocalSvcAppConfig,
-    val svcNodeParameters: SvcAppParameters,
+    val svcAppParameters: SharedCoinAppParameters,
     storage: Storage,
     dummyStore: SvcAppStore,
     override protected val clock: Clock,

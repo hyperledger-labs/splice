@@ -1,6 +1,7 @@
 package com.daml.network.validator
 
-import com.daml.network.validator.config.{LocalValidatorAppConfig, ValidatorAppParameters}
+import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.validator.store.ValidatorAppStore
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
@@ -19,7 +20,7 @@ import scala.concurrent.Future
   */
 class ValidatorAppNode(
     val config: LocalValidatorAppConfig,
-    val validatorNodeParameters: ValidatorAppParameters,
+    val validatorAppParameters: SharedCoinAppParameters,
     storage: Storage,
     dummyStore: ValidatorAppStore,
     override protected val clock: Clock,

@@ -37,7 +37,7 @@ trait CoinEnvironment extends Environment {
       .create(
         name,
         validatorConfig,
-        config.tryValidatorNodeParametersByString(name),
+        config.tryValidatorAppParametersByString(name),
         createClock(Some(ValidatorAppBootstrap.LoggerFactoryKeyName -> name)),
         testingTimeService,
         coinMetrics.forValidator(name),
@@ -56,7 +56,7 @@ trait CoinEnvironment extends Environment {
     migrationsFactory,
     timeouts,
     config.validatorsByString,
-    config.tryValidatorNodeParametersByString,
+    config.tryValidatorAppParametersByString,
     loggerFactory,
   )
 

@@ -1,13 +1,12 @@
 package com.daml.network.config
 
 import cats.data.Validated
-import com.daml.network.validator.config.{LocalValidatorAppConfig, ValidatorAppParameters}
+import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.{
   CantonConfig,
   CantonFeatures,
   CantonParameters,
-  CommunityConfigValidations,
   ConfigDefaults,
   MonitoringConfig,
 }
@@ -20,8 +19,8 @@ import com.digitalasset.canton.participant.config.{
 
 import scala.annotation.nowarn
 import cats.syntax.functor._
-import com.daml.network.svc.config.{LocalSvcAppConfig, SvcAppParameters}
-import com.daml.network.wallet.config.{LocalWalletAppConfig, WalletAppParameters}
+import com.daml.network.svc.config.LocalSvcAppConfig
+import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
@@ -50,10 +49,9 @@ case class CoinConfig(
 
   // TODO(Arne): Revisit all of the classes/methods pertaining to ValidatorNodeParameters.
   // Can hopefully upstream some improvements.
-  private lazy val validatorNodeParameters_ : Map[InstanceName, ValidatorAppParameters] =
+  private lazy val validatorAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
     validatorApps.fmap { validatorConfig =>
-      val participantParameters = validatorConfig.parameters
-      ValidatorAppParameters(
+      SharedCoinAppParameters(
         monitoring.tracing,
         monitoring.delayLoggingThreshold,
         monitoring.getLoggingConfig,
@@ -64,19 +62,19 @@ case class CoinConfig(
         features.enablePreviewCommands,
         parameters.nonStandardConfig,
         validatorConfig.sequencerClient,
-        participantParameters.devVersionSupport,
+        devVersionSupport = false,
       )
     }
 
-  private[network] def validatorNodeParameters(
+  private[network] def validatorAppParameters(
       participant: InstanceName
-  ): ValidatorAppParameters =
-    nodeParametersFor(validatorNodeParameters_, "participant", participant)
+  ): SharedCoinAppParameters =
+    nodeParametersFor(validatorAppParameters_, "participant", participant)
 
-  /** Use `validatorNodeParameters`` instead!
+  /** Use `validatorAppParameters`` instead!
     */
-  def tryValidatorNodeParametersByString(name: String): ValidatorAppParameters =
-    validatorNodeParameters(
+  def tryValidatorAppParametersByString(name: String): SharedCoinAppParameters =
+    validatorAppParameters(
       InstanceName.tryCreate(name)
     )
 
@@ -91,10 +89,9 @@ case class CoinConfig(
   private lazy val svcAppInstanceName = InstanceName.tryCreate("svc-app")
   private lazy val svcApps = svcApp.toList.map(config => svcAppInstanceName -> config).toMap
 
-  private lazy val svcNodeParameters_ : Map[InstanceName, SvcAppParameters] =
+  private lazy val svcAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
     svcApps.fmap { svcConfig =>
-      val participantParameters = svcConfig.parameters
-      SvcAppParameters(
+      SharedCoinAppParameters(
         monitoring.tracing,
         monitoring.delayLoggingThreshold,
         monitoring.getLoggingConfig,
@@ -105,19 +102,19 @@ case class CoinConfig(
         features.enablePreviewCommands,
         parameters.nonStandardConfig,
         svcConfig.sequencerClient,
-        participantParameters.devVersionSupport,
+        devVersionSupport = false,
       )
     }
 
-  private[network] def svcNodeParameters(
+  private[network] def svcAppParameters(
       appName: InstanceName
-  ): SvcAppParameters =
-    nodeParametersFor(svcNodeParameters_, "svc-app", appName)
+  ): SharedCoinAppParameters =
+    nodeParametersFor(svcAppParameters_, "svc-app", appName)
 
-  /** Use `svcNodeParameters` instead!
+  /** Use `svcAppParameters` instead!
     */
-  def trySvcAppParametersByString(name: String): SvcAppParameters =
-    svcNodeParameters(
+  def trySvcAppParametersByString(name: String): SharedCoinAppParameters =
+    svcAppParameters(
       InstanceName.tryCreate(name)
     )
 
@@ -127,10 +124,9 @@ case class CoinConfig(
     n.unwrap -> c
   }
 
-  private lazy val walletNodeParameters_ : Map[InstanceName, WalletAppParameters] =
+  private lazy val walletAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
     walletApps.fmap { walletConfig =>
-      val participantParameters = walletConfig.parameters
-      WalletAppParameters(
+      SharedCoinAppParameters(
         monitoring.tracing,
         monitoring.delayLoggingThreshold,
         monitoring.getLoggingConfig,
@@ -141,19 +137,19 @@ case class CoinConfig(
         features.enablePreviewCommands,
         parameters.nonStandardConfig,
         walletConfig.sequencerClient,
-        participantParameters.devVersionSupport,
+        devVersionSupport = false,
       )
     }
 
-  private[network] def walletNodeParameters(
+  private[network] def walletAppParameters(
       appName: InstanceName
-  ): WalletAppParameters =
-    nodeParametersFor(walletNodeParameters_, "wallet-app", appName)
+  ): SharedCoinAppParameters =
+    nodeParametersFor(walletAppParameters_, "wallet-app", appName)
 
-  /** Use `walletNodeParameters` instead!
+  /** Use `walletAppParameters` instead!
     */
-  def tryWalletAppParametersByString(name: String): WalletAppParameters =
-    walletNodeParameters(
+  def tryWalletAppParametersByString(name: String): SharedCoinAppParameters =
+    walletAppParameters(
       InstanceName.tryCreate(name)
     )
 
@@ -186,16 +182,12 @@ object CoinConfig {
   @nowarn("cat=unused")
   private lazy implicit val coinConfigReader: ConfigReader[CoinConfig] = {
     import CantonConfig.ConfigReaders._
-    implicit val validatorNodeParametersReader: ConfigReader[ValidatorAppParameters] =
-      deriveReader[ValidatorAppParameters]
     implicit val validatorConfigReader: ConfigReader[LocalValidatorAppConfig] =
       deriveReader[LocalValidatorAppConfig]
-    implicit val svcNodeParametersReader: ConfigReader[SvcAppParameters] =
-      deriveReader[SvcAppParameters]
     implicit val svcConfigReader: ConfigReader[LocalSvcAppConfig] =
       deriveReader[LocalSvcAppConfig]
-    implicit val walletNodeParametersReader: ConfigReader[WalletAppParameters] =
-      deriveReader[WalletAppParameters]
+    implicit val coinAppParametersReader: ConfigReader[SharedCoinAppParameters] =
+      deriveReader[SharedCoinAppParameters]
     implicit val walletConfigReader: ConfigReader[LocalWalletAppConfig] =
       deriveReader[LocalWalletAppConfig]
     implicit val communityDomainConfigReader: ConfigReader[CommunityDomainConfig] =

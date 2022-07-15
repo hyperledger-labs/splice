@@ -7,10 +7,11 @@ import cats.data.EitherT
 import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.client.configuration.CommandClientConfiguration
+import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrapBase
-import com.daml.network.examples.v0.{WalletServiceGrpc}
-import com.daml.network.wallet.admin.grpc.{GrpcWalletService}
-import com.daml.network.wallet.config.{LocalWalletAppConfig, WalletAppParameters}
+import com.daml.network.examples.v0.WalletServiceGrpc
+import com.daml.network.wallet.admin.grpc.GrpcWalletService
+import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.daml.network.wallet.metrics.WalletAppMetrics
 import com.daml.network.wallet.store.WalletAppStore
 import com.digitalasset.canton.concurrent.{
@@ -34,7 +35,7 @@ import scala.concurrent.Future
 class WalletAppBootstrap(
     override val name: InstanceName,
     val config: LocalWalletAppConfig,
-    val walletNodeParameters: WalletAppParameters,
+    val walletAppParameters: SharedCoinAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
     metrics: WalletAppMetrics,
@@ -50,11 +51,11 @@ class WalletAppBootstrap(
 ) extends CoinNodeBootstrapBase[
       WalletApp,
       LocalWalletAppConfig,
-      WalletAppParameters,
+      SharedCoinAppParameters,
     ](
       name,
       config,
-      walletNodeParameters,
+      walletAppParameters,
       clock,
       metrics,
       storageFactory,
@@ -66,7 +67,7 @@ class WalletAppBootstrap(
       val dummyStore = WalletAppStore(storage, loggerFactory)
 
       val connection =
-        createLedgerConnection(config.remoteParticipant, walletNodeParameters.processingTimeouts)
+        createLedgerConnection(config.remoteParticipant, walletAppParameters.processingTimeouts)
 
       adminServerRegistry.addService(
         WalletServiceGrpc.bindService(
@@ -76,7 +77,7 @@ class WalletAppBootstrap(
       )
       new WalletApp(
         config,
-        walletNodeParameters,
+        walletAppParameters,
         storage,
         dummyStore,
         clock,
@@ -98,7 +99,7 @@ object WalletAppBootstrap {
     def create(
         name: String,
         walletConfig: LocalWalletAppConfig,
-        walletNodeParameters: WalletAppParameters,
+        coinAppParameters: SharedCoinAppParameters,
         clock: Clock,
         testingTimeService: TestingTimeService,
         walletMetrics: WalletAppMetrics,
@@ -118,7 +119,7 @@ object WalletAppBootstrap {
     override def create(
         name: String,
         walletConfig: LocalWalletAppConfig,
-        walletNodeParameters: WalletAppParameters,
+        coinAppParameters: SharedCoinAppParameters,
         clock: Clock,
         testingTimeService: TestingTimeService,
         walletMetrics: WalletAppMetrics,
@@ -137,7 +138,7 @@ object WalletAppBootstrap {
           new WalletAppBootstrap(
             _,
             walletConfig,
-            walletNodeParameters,
+            coinAppParameters,
             testingConfigInternal,
             clock,
             walletMetrics,

@@ -6,10 +6,11 @@ import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrapBase
 import com.daml.network.examples.v0.ValidatorAppServiceGrpc
 import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
-import com.daml.network.validator.config.{LocalValidatorAppConfig, ValidatorAppParameters}
+import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.daml.network.validator.store.ValidatorAppStore
 import com.digitalasset.canton.concurrent.{
@@ -32,7 +33,7 @@ import scala.concurrent.Future
 class ValidatorAppBootstrap(
     override val name: InstanceName,
     val config: LocalValidatorAppConfig,
-    val validatorNodeParameters: ValidatorAppParameters,
+    val validatorAppParameters: SharedCoinAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
     metrics: ValidatorAppMetrics,
@@ -48,11 +49,11 @@ class ValidatorAppBootstrap(
 ) extends CoinNodeBootstrapBase[
       ValidatorAppNode,
       LocalValidatorAppConfig,
-      ValidatorAppParameters,
+      SharedCoinAppParameters,
     ](
       name,
       config,
-      validatorNodeParameters,
+      validatorAppParameters,
       clock,
       metrics,
       storageFactory,
@@ -71,7 +72,7 @@ class ValidatorAppBootstrap(
       )
       new ValidatorAppNode(
         config,
-        validatorNodeParameters,
+        validatorAppParameters,
         storage,
         dummyStore,
         clock,
@@ -93,7 +94,7 @@ object ValidatorAppBootstrap {
     def create(
         name: String,
         validatorConfig: LocalValidatorAppConfig,
-        validatorNodeParameters: ValidatorAppParameters,
+        validatorAppParameters: SharedCoinAppParameters,
         clock: Clock,
         testingTimeService: TestingTimeService,
         validatorMetrics: ValidatorAppMetrics,
@@ -113,7 +114,7 @@ object ValidatorAppBootstrap {
     override def create(
         name: String,
         validatorConfig: LocalValidatorAppConfig,
-        validatorNodeParameters: ValidatorAppParameters,
+        validatorAppParameters: SharedCoinAppParameters,
         clock: Clock,
         testingTimeService: TestingTimeService,
         validatorMetrics: ValidatorAppMetrics,
@@ -132,7 +133,7 @@ object ValidatorAppBootstrap {
           new ValidatorAppBootstrap(
             _,
             validatorConfig,
-            validatorNodeParameters,
+            validatorAppParameters,
             testingConfigInternal,
             clock,
             validatorMetrics,

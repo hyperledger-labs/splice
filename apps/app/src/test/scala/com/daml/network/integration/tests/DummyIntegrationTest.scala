@@ -39,15 +39,8 @@ class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironm
   }
 
   "run commands against validator" in { implicit env =>
-    // TODO(Arne): move this into a trait analogue to Canton's `ConsoleEnvironmentTestHelpers`
-    def v(name: String): LocalValidatorAppReference =
-      env.validators
-        .find(_.name == name)
-        .getOrElse(sys.error(s"validator [$name] not configured"))
-
     val validator1 = v("validator1")
-    clue("start validator and run dummy command") {
-      validator1.start()
+    clue("run dummy command") {
       val res = validator1.dummy_command("Hello. Please increment this number!", 5)
       res shouldBe 6
     }
@@ -99,6 +92,7 @@ class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironm
     }
   }
 
+  // TODO(Arne): move these into traits analogue to Canton's `ConsoleEnvironmentTestHelpers`
   def w(name: String)(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference =
     env.wallets
       .find(_.name == name)

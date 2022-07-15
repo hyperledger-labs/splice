@@ -5,10 +5,11 @@ import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrapBase
 import com.daml.network.examples.v0.SvcAppServiceGrpc
 import com.daml.network.svc.admin.grpc.GrpcSvcAppService
-import com.daml.network.svc.config.{LocalSvcAppConfig, SvcAppParameters}
+import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.svc.metrics.SvcAppMetrics
 import com.daml.network.svc.store.SvcAppStore
 import com.digitalasset.canton.concurrent.{
@@ -31,7 +32,7 @@ import scala.concurrent.Future
 class SvcAppBootstrap(
     override val name: InstanceName,
     val config: LocalSvcAppConfig,
-    val svcNodeParameters: SvcAppParameters,
+    val svcAppParameters: SharedCoinAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
     metrics: SvcAppMetrics,
@@ -47,11 +48,11 @@ class SvcAppBootstrap(
 ) extends CoinNodeBootstrapBase[
       SvcAppNode,
       LocalSvcAppConfig,
-      SvcAppParameters,
+      SharedCoinAppParameters,
     ](
       name,
       config,
-      svcNodeParameters,
+      svcAppParameters,
       clock,
       metrics,
       storageFactory,
@@ -63,7 +64,7 @@ class SvcAppBootstrap(
       val svcStore = SvcAppStore(storage, loggerFactory)
 
       val connection =
-        createLedgerConnection(config.remoteParticipant, svcNodeParameters.processingTimeouts)
+        createLedgerConnection(config.remoteParticipant, svcAppParameters.processingTimeouts)
 
       adminServerRegistry.addService(
         SvcAppServiceGrpc.bindService(
@@ -71,7 +72,7 @@ class SvcAppBootstrap(
           executionContext,
         )
       )
-      new SvcAppNode(config, svcNodeParameters, storage, svcStore, clock, loggerFactory)
+      new SvcAppNode(config, svcAppParameters, storage, svcStore, clock, loggerFactory)
     }
   }
 
@@ -88,7 +89,7 @@ object SvcAppBootstrap {
     def create(
         name: String,
         svcConfig: LocalSvcAppConfig,
-        svcNodeParameters: SvcAppParameters,
+        svcAppParameters: SharedCoinAppParameters,
         clock: Clock,
         testingTimeService: TestingTimeService,
         svcMetrics: SvcAppMetrics,
@@ -108,7 +109,7 @@ object SvcAppBootstrap {
     override def create(
         name: String,
         svcConfig: LocalSvcAppConfig,
-        svcNodeParameters: SvcAppParameters,
+        svcAppParameters: SharedCoinAppParameters,
         clock: Clock,
         testingTimeService: TestingTimeService,
         svcMetrics: SvcAppMetrics,
@@ -127,7 +128,7 @@ object SvcAppBootstrap {
           new SvcAppBootstrap(
             _,
             svcConfig,
-            svcNodeParameters,
+            svcAppParameters,
             testingConfigInternal,
             clock,
             svcMetrics,

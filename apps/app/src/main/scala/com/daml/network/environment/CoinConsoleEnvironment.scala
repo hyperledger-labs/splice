@@ -37,6 +37,12 @@ class CoinConsoleEnvironment(
   override type DomainRemoteRef = CommunityRemoteDomainReference
   override type Status = CommunityCantonStatus
 
+  override lazy val nodes = NodeReferences(
+    // this override ensures that config options like manualStart also work for CN apps
+    mergeLocalInstances(participants.local, domains.local, validators, Seq(svc), wallets),
+    mergeRemoteInstances(participants.remote, domains.remote),
+  )
+
   lazy val validators: Seq[LocalValidatorAppReference] =
     environment.config.validatorsByString.keys.map(createValidatorReference).toSeq
 
