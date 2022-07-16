@@ -208,6 +208,7 @@ jobs:
     - image: cimg/base:2021.04
     environment:
       <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
     steps:
       - checkout
       - setup_nix
@@ -228,6 +229,9 @@ jobs:
              echo $GCLOUD_SERVICE_KEY | gcloud auth activate-service-account --key-file=-
              (yes || true) | cluster-apply
            EOF
+      - slack/notify:
+          event: pass
+          template: success_tagged_deploy_1
 
   update_pipeline_schedule:
     docker:
@@ -488,3 +492,5 @@ workflows:
     - deploy_cluster:
         <<: *notify-fail
         <<: *main-branch-only
+        requires:
+           - deployment_test
