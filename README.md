@@ -83,3 +83,40 @@ For more information, especially on metrics, logging, tracing, Scala guidelines,
 please refer to the respective sections in [Canton's README](https://github.com/DACH-NY/canton/blob/main/contributing/README.md).
 We share a lot of tooling with Canton, so to avoid duplication we use the documentation in the Canton repo 
 as "one source of truth". 
+
+## Cluster Tooling
+
+This repository also contains tools for managing clusters, hosted both
+locally and in GCE. Local cluster operations are subcommands of
+`cnlocal` and cloud cluster operations are subcommands of
+`cncluster`. Both classes of environments run the same kubernetes
+manifest, as defined in
+[`canton-network-config.jsonnet`](/cluster/canton-network-config.jsonnet).
+
+The cluster management scripts take configuration settings via the
+environment.
+
+| Variable Name             | Meaning                                                               |
+| ------------------        | --------------------------------------------------------------------- |
+| `CLOUDSDK_COMPUTE_REGION` | Google Cloud Region in which resources will be created                |
+| `CLOUDSDK_CORE_PROJECT`   | ID of the Google Cloud project in which the cluster is located.       |
+| `GCP_CLUSTER_NAME`        | Name of the GKE cluster within the cloud project.                     |
+| `GCP_REPO_NAME`           | Name of the image repository used to manage project container images. |
+| `GCP_IP_NAME`             | Name of the publically exposed IP address assigned to the cluster.    |
+
+
+### Local Operations
+
+* `cnlocal start` - Start a local cluster, running in minikube, if it
+  has not already been started.
+* `cnlocal apply` - Apply the cluster configuration to the currently
+  running local cluster.
+* `cnlocal stop` - Stop a local cluster, if it is running.
+
+### GCE Operations
+
+* `cncluster create` - Create a new instance of the CN cluster in GCE,
+  if it does not already exist.
+* `cncluster apply` - Apply the cluster configuration to the currently
+  running CN cluster in GCE.
+* `cncluster delete` - Delete the currently running CN cluster from GCE GCS.

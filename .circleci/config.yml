@@ -227,7 +227,7 @@ jobs:
              . .envrc.vars
 
              echo $GCLOUD_SERVICE_KEY | gcloud auth activate-service-account --key-file=-
-             (yes || true) | cluster-apply
+             (yes || true) | cncluster apply
            EOF
       - slack/notify:
           event: pass

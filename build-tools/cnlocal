@@ -1,0 +1,83 @@
+#!/usr/bin/env bash
+
+SUBCOMMAND_NAME="$1"
+
+set -euo pipefail
+
+source ${TOOLS_LIB}/k8s.source
+source ${TOOLS_LIB}/libcli.source
+
+SCRIPTNAME=${0##*/}
+
+function is_cluster_running() {
+    if minikube profile list > /dev/null 2>&1; then
+        return 0
+    else
+        return 1
+    fi
+}
+
+function local_apply() {
+    if ! is_cluster_running; then
+        _warning "Minikube cluster does not exist... please start with local-start."
+        exit 1
+    fi
+
+    _log "Applying configuration manifest to minikube cluster."
+
+    # GCP auth still required for pulling images from GCR
+    minikube addons enable gcp-auth --refresh
+
+    kubectl config use-context minikube
+
+    k8s_apply
+
+    _log "Configuration manifest applied to minikube cluster."
+}
+
+function local_start() {
+    if is_cluster_running!; then
+        _warning "Minikube cluster already exists... ending."
+        exit 1
+    fi
+
+    _log "Creating minikube cluster..."
+
+    minikube start
+
+    _log "Minikube cluster started."
+
+    local_apply
+}
+
+function local_stop() {
+    if ! is_cluster_running; then
+        _warning "Minikube cluster does not exist and therefore cannot be stopped."
+        exit 1
+    fi
+
+    _log "Deleting minikube cluster..."
+    minikube delete
+
+    _log "Cluster deleted."
+}
+
+
+case "${SUBCOMMAND_NAME}" in
+    start)
+        local_start
+        ;;
+
+    stop)
+        local_stop
+        ;;
+
+    apply)
+        local_apply
+        ;;
+
+    *)
+	    _error "Usage: $SCRIPTNAME {start|stop|apply}" >&2
+	    exit 3
+	    ;;
+esac

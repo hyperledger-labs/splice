@@ -1,0 +1,97 @@
+#!/usr/bin/env bash
+
+SUBCOMMAND_NAME="$1"
+
+set -euo pipefail
+
+source ${TOOLS_LIB}/libcli.source
+source ${TOOLS_LIB}/k8s.source
+
+function cluster_exists() {
+  CLUSTER=$(gcloud container clusters list --filter "name:${GCP_CLUSTER_NAME}"  --format 'value(name)' 2> /dev/null)
+
+  if [ -z "${CLUSTER}" ]; then
+      return 1
+  else
+      return 0
+  fi
+}
+
+function cluster_ip() {
+    gcloud compute addresses list \
+           --regions=${CLOUDSDK_COMPUTE_REGION} \
+           --filter "name:${GCP_IP_NAME}" \
+           --format 'value(address)'
+}
+
+function _cluster_apply() {
+    gcloud container clusters get-credentials ${GCP_CLUSTER_NAME}
+    k8s_apply
+}
+
+function cluster_apply() {
+    _confirm "Apply configuration to GKE Cluster: ${CLOUDSDK_CORE_PROJECT}/${GCP_CLUSTER_NAME}"
+
+    _cluster_apply
+}
+
+function cluster_create() {
+    _confirm "Create GKE Cluster: ${CLOUDSDK_CORE_PROJECT}/${GCP_CLUSTER_NAME}"
+
+    if cluster_exists; then
+        echo "Cluster already exists."
+        exit 1
+    else
+        gcloud container clusters create ${GCP_CLUSTER_NAME} \
+               --create-subnetwork name=${GCP_CLUSTER_NAME}-subnet \
+               --enable-master-authorized-networks \
+               --enable-ip-alias \
+               --enable-private-nodes \
+               --master-ipv4-cidr 172.16.0.32/28 \
+               --node-locations us-central1-a
+
+        #### Enable Firewall Access
+        gcloud container clusters update  ${GCP_CLUSTER_NAME} \
+               --enable-master-authorized-networks \
+               --master-authorized-networks ${GCP_VPN_NETS}
+    fi
+
+    #### Check for IP
+
+    if [ -z $(cluster_ip) ]; then
+        echo "Allocating IP address."
+        gcloud compute addresses create cn-devnet-ip --regions=${CLOUDSDK_COMPUTE_REGION}
+    fi
+
+    echo "Cluster at IP $(cluster_ip), applying configuration."
+
+    cluster_apply
+}
+
+function cluster_delete() {
+    _confirm "Delete GKE Cluster: ${CLOUDSDK_CORE_PROJECT}/${GCP_CLUSTER_NAME}"
+
+    gcloud container clusters delete ${GCP_CLUSTER_NAME}
+
+    echo "Cluster deleted."
+}
+
+
+case "${SUBCOMMAND_NAME}" in
+    create)
+        cluster_create
+        ;;
+
+    delete)
+        cluster_delete
+        ;;
+
+    apply)
+        cluster_apply
+        ;;
+
+    *)
+	    _error "Usage: $SCRIPTNAME {create|delete|apply}" >&2
+	    exit 3
+	    ;;
+esac
