@@ -68,10 +68,24 @@ function cluster_create() {
     cluster_apply
 }
 
+function cluster_ipaddr() {
+    if cluster_exists; then
+        cluster_ip
+    else
+        _error "Cluster does not exist, no IP address."
+        exit 1
+    fi
+}
+
 function cluster_delete() {
     _confirm "Delete GKE Cluster: ${CLOUDSDK_CORE_PROJECT}/${GCP_CLUSTER_NAME}"
 
-    gcloud container clusters delete ${GCP_CLUSTER_NAME}
+    if cluster_exists; then
+        gcloud container clusters delete ${GCP_CLUSTER_NAME}
+    else
+        _error "Cluster does not exist, cannot delete."
+        exit 1
+    fi
 
     echo "Cluster deleted."
 }
@@ -80,6 +94,10 @@ function cluster_delete() {
 case "${SUBCOMMAND_NAME}" in
     create)
         cluster_create
+        ;;
+
+    ipaddr)
+        cluster_ipaddr
         ;;
 
     delete)
