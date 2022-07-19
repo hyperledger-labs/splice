@@ -60,6 +60,7 @@ import com.digitalasset.canton.util.retry.RetryUtil.{
   TransientErrorKind,
 }
 import com.google.protobuf.ByteString
+import com.google.protobuf.empty.Empty
 
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -74,7 +75,7 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       commandId: Option[String] = None,
       workflowId: Option[WorkflowId] = None,
       deduplicationTime: Option[NonNegativeFiniteDuration] = None,
-  )(implicit traceContext: TraceContext): Future[TransactionId]
+  )(implicit traceContext: TraceContext): Future[Unit]
 }
 
 /** Subscription for reading the ledger */
@@ -262,7 +263,7 @@ object CoinLedgerConnection {
           commandId: Option[String] = None,
           workflowId: Option[WorkflowId] = None,
           deduplicationTime: Option[NonNegativeFiniteDuration] = None,
-      )(implicit traceContext: TraceContext): Future[TransactionId] = {
+      )(implicit traceContext: TraceContext): Future[Unit] = {
         // Note: reusing the same command id for all retries
         val fullCommand =
           commandsOf(
@@ -282,10 +283,10 @@ object CoinLedgerConnection {
 
       private def submitCommandOnce(
           fullCommand: Commands
-      )(implicit traceContext: TraceContext): Future[TransactionId] = {
+      )(implicit traceContext: TraceContext): Future[Unit] = {
         val commandIdA = fullCommand.commandId
         logger.debug(s"Submitting command [$commandIdA]")
-        val result = client.commandServiceClient.submitAndWaitForTransactionId(
+        val result = client.commandServiceClient.submitAndWait(
           new SubmitAndWaitRequest(Some(fullCommand))
         )
 
@@ -294,11 +295,11 @@ object CoinLedgerConnection {
             e => logger.error(s"Command [$commandIdA] failed due to an exception", e),
             response =>
               logger.debug(
-                s"Command [$commandIdA] succeeded with transaction=${response.transactionId}"
+                s"Command [$commandIdA] succeeded"
               ),
           )
         }
-        result.map(res => TransactionId(res.transactionId))
+        result.map(_ => ())
       }
 
       def commandsOf(
