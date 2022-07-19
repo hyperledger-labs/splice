@@ -5,6 +5,8 @@ import java.util.concurrent.ScheduledExecutorService
 import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either._
+import com.daml.network.environment.CoinLedgerConnection
+import com.daml.ledger.client.configuration.CommandClientConfiguration
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrapBase
@@ -19,6 +21,7 @@ import com.digitalasset.canton.concurrent.{
 }
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.TestingConfigInternal
+import com.digitalasset.canton.ledger.api.client.LedgerConnection
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource._
 import com.digitalasset.canton.time._
@@ -64,9 +67,12 @@ class ValidatorAppBootstrap(
     EitherT.rightT[Future, String] {
       val dummyStore = ValidatorAppStore(storage, loggerFactory)
 
+      val connection : CoinLedgerConnection =
+        createLedgerConnection(config.remoteParticipant, validatorAppParameters.processingTimeouts)
+
       adminServerRegistry.addService(
         ValidatorAppServiceGrpc.bindService(
-          new GrpcValidatorAppService(loggerFactory),
+          new GrpcValidatorAppService(connection, dummyStore, loggerFactory),
           executionContext,
         )
       )

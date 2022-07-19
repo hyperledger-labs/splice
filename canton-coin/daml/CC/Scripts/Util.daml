@@ -147,25 +147,11 @@ requestCoinRules app user = do
 -- Note: this must not run concurrently with commands that modify the mining rounds (e.g., runNextIssuance)
 runCoinRulesAcceptBot : CCApp -> Script ()
 runCoinRulesAcceptBot app = do
-  Some (_, rules) <- queryContractKey @CoinRules app.svc (app.svc, app.svc)
-  Some (_, state) <- queryContractKey @IssuanceState app.svc (app.svc, app.svc)
   openRounds <- queryFilter @OpenMiningRound app.svc (\r -> r.obs == app.svc) 
   issuingRounds <- queryFilter @IssuingMiningRound app.svc (\r -> r.obs == app.svc)
   requests <- query @CoinRulesRequest app.svc
   forA_ requests $ \(requestCid, request) -> do
-    acceptCoinRulesRequest request rules state (fmap (\x -> x._2) openRounds) (fmap (\x -> x._2) issuingRounds)
-    submit app.svc $ exerciseCmd requestCid Accept
-  pure ()
-
--- TODO(M1-06): remove workaround for explicit disclosure
-acceptCoinRulesRequest : CoinRulesRequest -> CoinRules -> IssuanceState -> [OpenMiningRound] -> [IssuingMiningRound] -> Script ()
-acceptCoinRulesRequest request rules state openRounds issuingRounds = do
-  _ <- submit request.svc $ createCmd rules with obs = request.user
-  _ <- submit request.svc $ createCmd state with obs = request.user
-  forA_ openRounds $ \round -> do
-    submit request.svc $ createCmd round with obs = request.user
-  forA_ issuingRounds $ \round -> do
-    submit request.svc $ createCmd round with obs = request.user
+    submit app.svc $ exerciseCmd requestCid $ Accept (fmap snd openRounds) (fmap snd issuingRounds)
   pure ()
 
 -- Issuance automation

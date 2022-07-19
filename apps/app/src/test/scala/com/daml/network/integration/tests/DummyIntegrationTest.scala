@@ -18,34 +18,22 @@ class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironm
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition.simpleTopology
 
-  // essentially just the `SimplestPingIntegrationTest` from Canton
-  "run a Canton ping" in { implicit env =>
-    import env._
-    clue("start Canton nodes") {
-      env.da.start()
-      participant1.start()
-      participant2.start()
-    }
-    clue("Connect participants connect") {
-      participant1.domains.connect_local(env.da)
-      participant2.domains.connect_local(env.da)
-    }
-    clue("maybe ping") {
-      participant1.health.maybe_ping(
-        participant2,
-        timeout = 30.seconds,
-      ) shouldBe defined
-    }
-  }
-
   "run commands against validator" in { implicit env =>
     val validator1 = v("validator1")
-    clue("run dummy command") {
-      val res = validator1.dummy_command("Hello. Please increment this number!", 5)
-      res shouldBe 6
+    val validatorRemoteParReference = validator1.remoteParticipant
+    val coinDarPath = "canton-coin/.daml/dist/canton-coin.dar"
+
+    clue("start validator and run setup") {
+      val svc  = validator1.remoteParticipant.parties.enable("svc") // TODO(luciano) replace with actual SVC party
+      validator1.start()
+      validator1.remoteParticipant.domains.connect_local(env.da)
+      validator1.remoteParticipant.dars.upload(coinDarPath)
+      val validatorParty = validator1.setupValidator("validator1", svc)
+      validatorParty.uid.id shouldBe "validator1"
+      val userParty = validator1.onboardUser(user = "user1")
+      userParty.uid.id shouldBe "user1"
     }
 
-    val validatorRemoteParReference = validator1.remoteParticipant
     clue("connect to domain and run a ping with validator's participant") {
       validatorRemoteParReference.domains.connect_local(env.da)
       validatorRemoteParReference.health.ping(validatorRemoteParReference.id)

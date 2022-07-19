@@ -1,6 +1,7 @@
 package com.daml.network.validator.admin.api.client.commands
 
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
+import com.digitalasset.canton.topology.PartyId
 import com.daml.network.examples.v0
 import com.daml.network.examples.v0.ValidatorAppServiceGrpc.ValidatorAppServiceStub
 import io.grpc.ManagedChannel
@@ -35,6 +36,46 @@ object ValidatorAppCommands {
         response: v0.SomeDummyResponse
     ): Either[String, Int] =
       Right(response.someNumber)
+  }
+
+  case class SetupValidatorCommand(name : String, svc: PartyId)
+      extends BaseCommand[v0.SetupValidatorRequest, v0.SetupValidatorResponse, PartyId] {
+
+    override def createRequest() : Either[String, v0.SetupValidatorRequest] =
+        Right(v0.SetupValidatorRequest(Some(name), Some(svc.toPrim.toString)))
+
+    override def submitRequest(
+        service : ValidatorAppServiceStub,
+        request : v0.SetupValidatorRequest,
+        ): Future[v0.SetupValidatorResponse] = service.setupValidator(request)
+
+    override def handleResponse(
+        response : v0.SetupValidatorResponse
+        ): Either[String, PartyId] =
+           response.partyId
+             .toRight("Missing mandatory field: party_id")
+             .map(PartyId.tryFromProtoPrimitive) 
+  }
+
+  case class OnboardUserCommand(name : String)
+      extends BaseCommand[v0.OnboardUserRequest, v0.OnboardUserResponse, PartyId] {
+
+    override def createRequest(): Either[String, v0.OnboardUserRequest] =
+      Right(
+        v0.OnboardUserRequest(Some(name))
+      )
+
+    override def submitRequest(
+        service: ValidatorAppServiceStub,
+        request: v0.OnboardUserRequest,
+    ): Future[v0.OnboardUserResponse] = service.onboardUser(request)
+
+    override def handleResponse(
+        response: v0.OnboardUserResponse
+    ): Either[String, PartyId] =
+      response.partyId
+        .toRight("Missing mandatory field: party_id")
+        .map(PartyId.tryFromProtoPrimitive) 
   }
 
 }

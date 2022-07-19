@@ -3,15 +3,15 @@ nodes.local.start()
 
 val domainUrl = sys.env.get("DOMAIN_URL").getOrElse("https://canton.global")
 
-validator.domains.connect("canton-network", domainUrl)
+validator1.domains.connect("canton-network", domainUrl)
 
-val supervalidator = validator
+val supervalidator = validator1
   .parties
   .list(filterParty="supervalidator")
   .headOption
   .getOrElse(throw new Exception("Supervalidator consortium not found. (Check SVC health?)"))
 
-validator
+validator1
   .health
   .ping(supervalidator
           .participants
@@ -22,5 +22,5 @@ validator
 
 println(
   "The config for the validator party is below. Please append this to your examples/validator-app/validator-app.conf file:\n" + 
-  s"party : validator::${validator.adminParty.uid.namespace.unwrap}"
+  s"party : validator1::${validator1.adminParty.uid.namespace.unwrap}"
 )

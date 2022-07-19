@@ -5,6 +5,8 @@ import "google/protobuf/wrappers.proto";
 
 service ValidatorAppService {
   rpc DummyFunction (SomeDummyRequest) returns (SomeDummyResponse);
+  rpc OnboardUser (OnboardUserRequest) returns (OnboardUserResponse);
+  rpc SetupValidator (SetupValidatorRequest) returns (SetupValidatorResponse);
 }
 
 message SomeDummyRequest {
@@ -14,4 +16,21 @@ message SomeDummyRequest {
 
 message SomeDummyResponse {
   int32 some_number = 1;
+}
+
+message SetupValidatorRequest {
+  google.protobuf.StringValue name = 1;
+  google.protobuf.StringValue svc = 2;
+}
+
+message SetupValidatorResponse {
+  google.protobuf.StringValue party_id= 1;
+}
+
+message OnboardUserRequest {
+  google.protobuf.StringValue name = 1;
+}
+
+message OnboardUserResponse {
+  google.protobuf.StringValue party_id = 1;
 }

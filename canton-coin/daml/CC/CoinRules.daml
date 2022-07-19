@@ -188,9 +188,15 @@ template CoinRulesRequest
     signatory user
     observer svc
 
-    choice Accept : ()
+    choice Accept : () with openRounds : [OpenMiningRound], issuingRounds : [IssuingMiningRound]
       controller svc
-      do pure ()
+      do (_, rules) <- fetchByKey @CoinRules (svc, svc)
+         (_, state) <- fetchByKey @IssuanceState (svc, svc)
+         create rules with obs = user
+         create state with obs = user
+         forA_ openRounds \round -> create round with obs = user
+         forA_ issuingRounds \round -> create round with obs = user
+         pure ()
 
 -- | Representation of a batch transfer.
 data Transfer = Transfer with
