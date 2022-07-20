@@ -20,23 +20,44 @@ function cluster_exists() {
 function cluster_ip() {
     gcloud compute addresses list \
            --regions=${CLOUDSDK_COMPUTE_REGION} \
-           --filter "name:${GCP_IP_NAME}" \
+           --filter "name:${GCP_CLUSTER_NAME}-ip" \
            --format 'value(address)'
 }
 
 function _cluster_apply() {
     gcloud container clusters get-credentials ${GCP_CLUSTER_NAME}
-    k8s_apply
+
+    k8s_apply $(cluster_ip)
+}
+
+function ensure_deployment_context() {
+    if [ -z "${GCP_CLUSTER_NAME-}" ]; then
+        _error "GCP_CLUSTER_NAME is undefined, this script must be run in a deployment/ directory."
+        exit 1
+    fi
+}
+
+function cluster_confirm() {
+    ensure_deployment_context
+
+    echo "CLOUDSDK_COMPUTE_REGION : ${CLOUDSDK_COMPUTE_REGION}"
+    echo "CLOUDSDK_CORE_PROJECT   : ${CLOUDSDK_CORE_PROJECT}"
+    echo "GCP_REPO_NAME           : ${GCP_REPO_NAME}"
+
+    echo "GCP_MASTER_IPV4_CIDR    : ${GCP_MASTER_IPV4_CIDR}"
+    echo "GCP_CLUSTER_NAME        : ${GCP_CLUSTER_NAME}"
+
+    _confirm "\nGKE Cluster Operation: $@"
 }
 
 function cluster_apply() {
-    _confirm "Apply configuration to GKE Cluster: ${CLOUDSDK_CORE_PROJECT}/${GCP_CLUSTER_NAME}"
+    cluster_confirm "Apply configuration"
 
     _cluster_apply
 }
 
 function cluster_create() {
-    _confirm "Create GKE Cluster: ${CLOUDSDK_CORE_PROJECT}/${GCP_CLUSTER_NAME}"
+    cluster_confirm "Create cluster"
 
     if cluster_exists; then
         echo "Cluster already exists."
@@ -47,8 +68,8 @@ function cluster_create() {
                --enable-master-authorized-networks \
                --enable-ip-alias \
                --enable-private-nodes \
-               --master-ipv4-cidr 172.16.0.32/28 \
-               --node-locations us-central1-a
+               --master-ipv4-cidr "${GCP_MASTER_IPV4_CIDR}" \
+               --node-locations "${CLOUDSDK_COMPUTE_REGION}-a"
 
         #### Enable Firewall Access
         gcloud container clusters update  ${GCP_CLUSTER_NAME} \
@@ -60,7 +81,7 @@ function cluster_create() {
 
     if [ -z $(cluster_ip) ]; then
         echo "Allocating IP address."
-        gcloud compute addresses create cn-devnet-ip --regions=${CLOUDSDK_COMPUTE_REGION}
+        gcloud compute addresses create "${GCP_CLUSTER_NAME}-ip" --region=${CLOUDSDK_COMPUTE_REGION}
     fi
 
     echo "Cluster at IP $(cluster_ip), applying configuration."
@@ -69,6 +90,8 @@ function cluster_create() {
 }
 
 function cluster_ipaddr() {
+    ensure_deployment_context
+
     if cluster_exists; then
         cluster_ip
     else
@@ -78,7 +101,7 @@ function cluster_ipaddr() {
 }
 
 function cluster_delete() {
-    _confirm "Delete GKE Cluster: ${CLOUDSDK_CORE_PROJECT}/${GCP_CLUSTER_NAME}"
+    cluster_confirm "Delete cluster"
 
     if cluster_exists; then
         gcloud container clusters delete ${GCP_CLUSTER_NAME}

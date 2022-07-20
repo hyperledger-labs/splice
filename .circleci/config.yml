@@ -225,6 +225,7 @@ jobs:
              --run bash \<<'EOF'
              set -euo pipefail
              . .envrc.vars
+             . ./deployments/devnet/.envrc.vars
 
              echo $GCLOUD_SERVICE_KEY | gcloud auth activate-service-account --key-file=-
              (yes || true) | cncluster apply

@@ -34,7 +34,7 @@ local deployment(imageTag, name, ports, ext={}) = {
   },
 };
 
-local externalService(name, ports) = {
+local externalService(name, ipAddr, ports) = {
   apiVersion: 'v1',
   kind: 'Service',
   metadata: {
@@ -46,7 +46,7 @@ local externalService(name, ports) = {
       app: name,
     },
     ports: ports,
-    loadBalancerIP: '35.202.15.15',
+    loadBalancerIP: ipAddr,
     loadBalancerSourceRanges: [
       '35.194.81.56/32',
       '35.198.147.95/32',
@@ -55,7 +55,7 @@ local externalService(name, ports) = {
   },
 };
 
-function(imageTag) {
+function(imageTag, ipAddr) {
   apiVersion: 'apps/v1',
   kind: 'List',
   items: [
@@ -91,7 +91,7 @@ function(imageTag) {
       },
     ),
     deployment(imageTag, 'canton-participant', []),
-    externalService('docs', [
+    externalService('docs', ipAddr, [
       {
         protocol: 'TCP',
         port: 80,
@@ -99,7 +99,9 @@ function(imageTag) {
       },
     ]),
     externalService(
-      'canton-domain', [
+      'canton-domain',
+      ipAddr,
+      [
         {
           name: 'canton-pub-api',
           protocol: 'TCP',

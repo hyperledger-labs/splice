@@ -139,7 +139,7 @@
             "name": "docs"
          },
          "spec": {
-            "loadBalancerIP": "35.202.15.15",
+            "loadBalancerIP": "ipaddr",
             "loadBalancerSourceRanges": [
                "35.194.81.56/32",
                "35.198.147.95/32",
@@ -165,7 +165,7 @@
             "name": "canton-domain"
          },
          "spec": {
-            "loadBalancerIP": "35.202.15.15",
+            "loadBalancerIP": "ipaddr",
             "loadBalancerSourceRanges": [
                "35.194.81.56/32",
                "35.198.147.95/32",

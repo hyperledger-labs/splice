@@ -87,14 +87,67 @@ as "one source of truth".
 ## Cluster Tooling
 
 This repository also contains tools for managing clusters, hosted both
-locally and in GCE. Local cluster operations are subcommands of
-`cnlocal` and cloud cluster operations are subcommands of
-`cncluster`. Both classes of environments run the same kubernetes
-manifest, as defined in
+locally and in GCE. Local clusters are run on your local development
+machine, using minikube. GCE clusters are run in the Google Cloud,
+using Google's GKE implementation of Kubernetes. In both cases, a common
+Kubernetes cluster manifest is used, defined in
 [`canton-network-config.jsonnet`](/cluster/canton-network-config.jsonnet).
 
-The cluster management scripts take configuration settings via the
-environment.
+To avoid the risk of confusing local and GCE cluster operations, two
+separate top level commands are used for each. `cnlocal` is the
+entrypoint for local cluster operations and `cncluster` is the
+entrypoint for GCE cluster operations. 
+
+### Docker image hosting
+
+Docker images for both local and GCE clusters are stored in the Google
+Cloud [Artifact Registry](https://cloud.google.com/artifact-registry).
+The specific registry is identified with the following environment
+variables, which are defined in [`.envrc.vars`](.envrc.vars):
+
+| Variable Name             | Meaning                                                               |
+| ------------------        | --------------------------------------------------------------------- |
+| `CLOUDSDK_COMPUTE_REGION` | Google Cloud Region in which resources will be created                |
+| `CLOUDSDK_CORE_PROJECT`   | ID of the Google Cloud project in which the cluster is located.       |
+| `GCP_REPO_NAME`           | Name of the image repository used to manage project container images. |
+
+The `.envrc` mechanism is also used to ensure that the current user is
+authenticated properly aaginst GCE.
+
+### Local Cluster Operations
+
+The local cluster is managed with the following three subcommands of
+`cnlocal`:
+
+* `cnlocal start` - Start a local cluster if it has not already been
+  started.
+* `cnlocal apply` - Apply the current configuration to the currently
+  running local cluster.
+* `cnlocal stop` - Stop the local cluster, if it is running.
+
+### GCE Operations
+
+Operations against GCE clusters are complicated by the facts that
+there are more than one cluster and GCE clusters are usually shared
+resources. To accomodate this, there is a [`deployments`](deployments)
+directory that is used to manage the configuration of each
+cluster. Each extant cluster has a directory under `deployments` and
+operations against that cluster must be invoked from within that
+directory. This reduces the possibility of operating on the wrong
+cluster, and allows the use of the `.envrc` mechanism to provide
+whatever configuration is necessary to identify a given cluster.
+
+Available operations include:
+
+* `cncluster create` - Create a new instance of the CN cluster in GCE,
+  if it does not already exist.
+* `cncluster ipaddr` - Return the toplevel IP address of the cluster.
+* `cncluster apply` - Apply the cluster configuration to the currently
+  running CN cluster in GCE.
+* `cncluster delete` - Delete the currently running CN cluster from GCE.
+
+Internally, these operations rely on the following environment
+variables. As stated above, these are usually populated via `.envrc`.
 
 | Variable Name             | Meaning                                                               |
 | ------------------        | --------------------------------------------------------------------- |
@@ -102,21 +155,3 @@ environment.
 | `CLOUDSDK_CORE_PROJECT`   | ID of the Google Cloud project in which the cluster is located.       |
 | `GCP_CLUSTER_NAME`        | Name of the GKE cluster within the cloud project.                     |
 | `GCP_REPO_NAME`           | Name of the image repository used to manage project container images. |
-| `GCP_IP_NAME`             | Name of the publically exposed IP address assigned to the cluster.    |
-
-
-### Local Operations
-
-* `cnlocal start` - Start a local cluster, running in minikube, if it
-  has not already been started.
-* `cnlocal apply` - Apply the cluster configuration to the currently
-  running local cluster.
-* `cnlocal stop` - Stop a local cluster, if it is running.
-
-### GCE Operations
-
-* `cncluster create` - Create a new instance of the CN cluster in GCE,
-  if it does not already exist.
-* `cncluster apply` - Apply the cluster configuration to the currently
-  running CN cluster in GCE.
-* `cncluster delete` - Delete the currently running CN cluster from GCE GCS.
