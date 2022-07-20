@@ -225,9 +225,11 @@ jobs:
              --run bash \<<'EOF'
              set -euo pipefail
              . .envrc.vars
-             . ./deployments/devnet/.envrc.vars
+             . $REPO_ROOT/deployment/devnet/.envrc.vars
 
              echo $GCLOUD_SERVICE_KEY | gcloud auth activate-service-account --key-file=-
+
+             cncluster activate
              (yes || true) | cncluster apply
            EOF
       - slack/notify:

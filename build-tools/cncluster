@@ -7,6 +7,8 @@ set -euo pipefail
 source ${TOOLS_LIB}/libcli.source
 source ${TOOLS_LIB}/k8s.source
 
+SCRIPTNAME=${0##*/}
+
 function cluster_exists() {
   CLUSTER=$(gcloud container clusters list --filter "name:${GCP_CLUSTER_NAME}"  --format 'value(name)' 2> /dev/null)
 
@@ -25,8 +27,6 @@ function cluster_ip() {
 }
 
 function _cluster_apply() {
-    gcloud container clusters get-credentials ${GCP_CLUSTER_NAME}
-
     k8s_apply $(cluster_ip)
 }
 
@@ -113,8 +113,21 @@ function cluster_delete() {
     echo "Cluster deleted."
 }
 
+function cluster_activate() {
+    # Sets kubeconfig if cluster exists, else does nothing
+    if cluster_exists; then
+        gcloud container clusters get-credentials ${GCP_CLUSTER_NAME}
+    else
+        _log "Cluster must be created before activation."
+    fi
+}
+
 
 case "${SUBCOMMAND_NAME}" in
+    activate)
+        cluster_activate
+        ;;
+
     create)
         cluster_create
         ;;
@@ -132,7 +145,7 @@ case "${SUBCOMMAND_NAME}" in
         ;;
 
     *)
-	    _error "Usage: $SCRIPTNAME {create|delete|apply}" >&2
+	    _error "Usage: $SCRIPTNAME {activate|create|ipaddr|delete|apply}" >&2
 	    exit 3
 	    ;;
 esac

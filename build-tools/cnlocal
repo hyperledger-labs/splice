@@ -17,6 +17,10 @@ function is_cluster_running() {
     fi
 }
 
+function local_activate() {
+    kubectl config use-context minikube
+}
+
 function local_apply() {
     if ! is_cluster_running; then
         _warning "Minikube cluster does not exist... please start with local-start."
@@ -36,7 +40,7 @@ function local_apply() {
 }
 
 function local_start() {
-    if is_cluster_running!; then
+    if is_cluster_running; then
         _warning "Minikube cluster already exists... ending."
         exit 1
     fi
@@ -64,6 +68,10 @@ function local_stop() {
 
 
 case "${SUBCOMMAND_NAME}" in
+    activate)
+        local_activate
+        ;;
+
     start)
         local_start
         ;;
@@ -77,7 +85,7 @@ case "${SUBCOMMAND_NAME}" in
         ;;
 
     *)
-	    _error "Usage: $SCRIPTNAME {start|stop|apply}" >&2
+	    _error "Usage: $SCRIPTNAME {activate|start|stop|apply}" >&2
 	    exit 3
 	    ;;
 esac
