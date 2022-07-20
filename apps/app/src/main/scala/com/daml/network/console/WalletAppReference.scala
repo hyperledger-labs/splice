@@ -1,6 +1,7 @@
 package com.daml.network.console
 
 import com.daml.network.environment.CoinConsoleEnvironment
+import com.daml.network.wallet.CantonCoin
 import com.daml.network.wallet.admin.api.client.commands.WalletCommands
 import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
@@ -33,7 +34,7 @@ class LocalWalletAppReference(
     "Queries the configured remote participant for the Coins owned by the configured user. " +
       "Returns all found coins."
   )
-  def list(): String = {
+  def list(): Seq[CantonCoin] = {
     consoleEnvironment.run {
       adminCommand(WalletCommands.List())
     }

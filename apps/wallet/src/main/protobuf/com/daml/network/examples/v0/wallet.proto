@@ -1,6 +1,8 @@
 syntax = "proto3";
 package com.daml.network.examples.v0;
 
+import "google/protobuf/wrappers.proto";
+
 service WalletService {
   rpc list (ListRequest) returns (ListResponse);
 }
@@ -10,5 +12,17 @@ message ListRequest {
 
 message ListResponse {
   // TODO(i206): Improve the proto-representation of Coins
-  string coins = 1;
+  repeated Coin coins = 1;
+}
+
+message Coin {
+  google.protobuf.StringValue svc = 1;
+  google.protobuf.StringValue owner = 2;
+  ExpiringQuantity quantity = 3;
+}
+
+message ExpiringQuantity {
+  double initialQuantity = 1;
+  int64 createdAt = 2;
+  double ratePerRound = 3;
 }

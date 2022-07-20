@@ -328,6 +328,9 @@ object PartyId {
     UniqueIdentifier.tryFromProtoPrimitive(str)
   )
 
+  def fromProtoPrimitive(str: String): Either[String, PartyId] =
+    UniqueIdentifier.fromProtoPrimitive_(str).map(PartyId(_))
+
 }
 
 sealed trait DomainMember extends AuthenticatedMember

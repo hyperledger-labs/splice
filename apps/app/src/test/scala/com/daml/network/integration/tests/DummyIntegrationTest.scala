@@ -24,7 +24,9 @@ class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironm
     val coinDarPath = "canton-coin/.daml/dist/canton-coin.dar"
 
     clue("start validator and run setup") {
-      val svc  = validator1.remoteParticipant.parties.enable("svc") // TODO(luciano) replace with actual SVC party
+      val svc = validator1.remoteParticipant.parties.enable(
+        "svc"
+      ) // TODO(luciano) replace with actual SVC party
       validator1.start()
       validator1.remoteParticipant.domains.connect_local(env.da)
       validator1.remoteParticipant.dars.upload(coinDarPath)
@@ -65,27 +67,7 @@ class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironm
     }
   }
 
-  "try to call the list function" in { implicit env =>
-    import env._
-    val wallet1 = w("wallet1")
-    clue("setup") {
-      wallet1.start()
-      wallet1.remoteParticipant.domains.connect_local(da)
-      upload_coin_dar(wallet1)
-    }
-    clue("call list") {
-      val res = wallet1.list()
-      // we don't have any parties with coins yet, so we expect no results
-      res should fullyMatch regex "\\(Vector\\(\\),LedgerOffset\\(Absolute\\(.*"
-    }
-  }
-
   // TODO(Arne): move these into traits analogue to Canton's `ConsoleEnvironmentTestHelpers`
-  def w(name: String)(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference =
-    env.wallets
-      .find(_.name == name)
-      .getOrElse(sys.error(s"wallet [$name] not configured"))
-
   def v(name: String)(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference =
     env.validators
       .find(_.name == name)

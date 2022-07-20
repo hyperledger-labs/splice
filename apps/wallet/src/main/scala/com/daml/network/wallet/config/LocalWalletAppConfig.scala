@@ -7,6 +7,8 @@ import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 case class LocalWalletAppConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
+    // temporary. We likely want only an email here eventually once we are using Oauth2 with wallets
+    damlUser: String = "wallet",
     remoteParticipant: RemoteParticipantConfig,
 ) extends LocalCoinConfig // TODO(142): fork or generalize this trait.
     {

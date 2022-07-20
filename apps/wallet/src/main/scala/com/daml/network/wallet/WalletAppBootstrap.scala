@@ -71,7 +71,7 @@ class WalletAppBootstrap(
 
       adminServerRegistry.addService(
         WalletServiceGrpc.bindService(
-          new GrpcWalletService(connection, loggerFactory),
+          new GrpcWalletService(connection, config.damlUser, loggerFactory),
           executionContext,
         )
       )

@@ -1,8 +1,11 @@
 package com.daml.network.wallet.admin.api.client.commands
 
-import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
+import cats.syntax.either._
+import cats.syntax.traverse._
 import com.daml.network.examples.v0
 import com.daml.network.examples.v0.WalletServiceGrpc.WalletServiceStub
+import com.daml.network.wallet.CantonCoin
+import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import io.grpc.ManagedChannel
 
 import scala.concurrent.Future
@@ -15,7 +18,7 @@ object WalletCommands {
       v0.WalletServiceGrpc.stub(channel)
   }
 
-  case class List() extends BaseCommand[v0.ListRequest, v0.ListResponse, String] {
+  case class List() extends BaseCommand[v0.ListRequest, v0.ListResponse, Seq[CantonCoin]] {
 
     override def createRequest(): Either[String, v0.ListRequest] =
       Right(
@@ -29,8 +32,8 @@ object WalletCommands {
 
     override def handleResponse(
         response: v0.ListResponse
-    ): Either[String, String] =
-      Right(response.coins)
+    ): Either[String, Seq[CantonCoin]] =
+      response.coins.traverse(coin => CantonCoin.fromProto(coin)).leftMap(_.toString)
   }
 
 }
