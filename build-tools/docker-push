@@ -17,14 +17,34 @@ fi
 
 id="$(<target/docker.id)"
 
+# matching tag file (without force) skips build
+
+if [ -f "target/docker.push" ]; then
+
+    tagfileimage="$(<target/docker.push)"
+
+    if [ "${image}" = "${tagfileimage}" ]; then
+        if [ -z "${force}" ]; then
+            _log "Docker image already pushed."
+            exit 0
+        fi
+    else
+        _warning "Docker image already pushed. Adding tag."
+    fi
+fi
+
 if ! docker-check "${image}"; then
   if [ -z "${force}" ]; then
     _warning "Cowardly refusing to push, image already exists in repo:\n${image}"
-    exit 0
+    skippush=yes
   else
     _warning "Forcing push, image already exists in repo:\n${image}"
   fi
 fi
 
-_set_x docker tag "${id}" "${image}"
-_set_x docker push "${image}"
+if [ -z "${skippush}" ]; then
+    _set_x docker tag "${id}" "${image}"
+    _set_x docker push "${image}"
+fi
+
+echo "${image}" > target/docker.push

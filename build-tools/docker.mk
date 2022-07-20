@@ -58,15 +58,13 @@ $(docker-build): $(docker-src)
 docker-push := target/docker.push
 
 .PHONY: docker-push
-docker-push: $(docker-push)
-
-$(docker-push): $(docker-build)
+docker-push: $(docker-build)
 	$(check-dirty)
-	docker-push ${image-tag} | tee $@
+	docker-push ${image-tag}
 
 .PHONY: docker-push-force
 docker-push-force: $(docker-build)
-	docker-push ${image-tag} --force | tee $(docker-push)
+	docker-push ${image-tag} --force
 
 _did_docker := true
 endif
