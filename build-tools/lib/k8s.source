@@ -5,5 +5,12 @@ function k8s_apply() {
 
     jsonnet --tla-str imageTag=$(version-gen)\
             --tla-str ipAddr=${IP_ADDR}\
-            $REPO_ROOT/cluster/canton-network-config.jsonnet | kubectl apply -f -
+            $REPO_ROOT/cluster/canton-network-config.jsonnet \
+        | kubectl apply -f -
+}
+
+function k8s_set_image() {
+    echo "Set Image: $1 $2"
+
+    kubectl set image "deployment/$1" "$1=$2"
 }

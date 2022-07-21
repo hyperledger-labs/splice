@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 
 SUBCOMMAND_NAME="$1"
+shift
 
 set -euo pipefail
 
@@ -50,6 +51,18 @@ function cluster_confirm() {
     _confirm "\nGKE Cluster Operation: $@"
 }
 
+### Commands
+
+function cluster_activate() {
+    # Sets kubeconfig if cluster exists, else does nothing
+    if cluster_exists; then
+        gcloud container clusters get-credentials ${GCP_CLUSTER_NAME}
+    else
+        _log "Cluster must be created before activation."
+    fi
+}
+
+
 function cluster_apply() {
     cluster_confirm "Apply configuration"
 
@@ -89,17 +102,6 @@ function cluster_create() {
     cluster_apply
 }
 
-function cluster_ipaddr() {
-    ensure_deployment_context
-
-    if cluster_exists; then
-        cluster_ip
-    else
-        _error "Cluster does not exist, no IP address."
-        exit 1
-    fi
-}
-
 function cluster_delete() {
     cluster_confirm "Delete cluster"
 
@@ -113,39 +115,71 @@ function cluster_delete() {
     echo "Cluster deleted."
 }
 
-function cluster_activate() {
-    # Sets kubeconfig if cluster exists, else does nothing
+function cluster_ipaddr() {
+    ensure_deployment_context
+
     if cluster_exists; then
-        gcloud container clusters get-credentials ${GCP_CLUSTER_NAME}
+        cluster_ip
     else
-        _log "Cluster must be created before activation."
+        _error "Cluster does not exist, no IP address."
+        exit 1
     fi
 }
 
+function cluster_push() {
+    module=$1
+
+    cluster_confirm "Push module: ${module}"
+
+    if ! cluster_exists; then
+        _error "Cluster does not exist, cannot push."
+        exit 1
+    fi
+
+    if [ ! -d "${REPO_ROOT}/${module}" ]; then
+        _error "Unknown module: $1"
+        exit 1
+    fi
+
+    tagfile="${REPO_ROOT}/${module}/target/docker.push"
+
+    if [ ! -f ${tagfile} ]; then
+        _error "Module not built: $1"
+        exit 1
+    fi
+
+    image=$(<${tagfile})
+
+    k8s_set_image "${module}" "${image}"
+}
 
 case "${SUBCOMMAND_NAME}" in
     activate)
         cluster_activate
         ;;
 
-    create)
-        cluster_create
+    apply)
+        cluster_apply
         ;;
 
-    ipaddr)
-        cluster_ipaddr
+    create)
+        cluster_create
         ;;
 
     delete)
         cluster_delete
         ;;
 
-    apply)
-        cluster_apply
+    ipaddr)
+        cluster_ipaddr
+        ;;
+
+    push)
+        cluster_push $@
         ;;
 
     *)
-	    _error "Usage: $SCRIPTNAME {activate|create|ipaddr|delete|apply}" >&2
+	    _error "Usage: $SCRIPTNAME {activate|apply|create|delete|ipaddr|push}" >&2
 	    exit 3
 	    ;;
 esac
