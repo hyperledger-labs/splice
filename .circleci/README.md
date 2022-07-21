@@ -24,7 +24,7 @@ Additionally, the key itself has no expiry. At a future point, we may want to co
 
 ## Images
 
-We build docker images for all applications as part of the `build` workflow, and push them to Google Artifact Registry. This is covered by the `docker-images-push` job. This job only runs when PRs are merged into the `main` branch.
+We build docker images for all applications as part of the `build` workflow, and push them to Google Artifact Registry. This is covered by the `docker-images-push` job. This job runs nightly as part of the `deploy` workflow.
 
 ## Deployments
 

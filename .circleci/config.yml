@@ -479,9 +479,6 @@ workflows:
     - update_pipeline_schedule:
         <<: *notify-fail
         <<: *main-branch-only
-    - docker-images-push:
-        <<: *notify-fail
-        <<: *main-branch-only
     - deployment_test:
         <<: *notify-fail
 
@@ -489,6 +486,9 @@ workflows:
     when: << pipeline.parameters.run-schedule >>
     jobs:
     # Deployment
+    - docker-images-push:
+        <<: *notify-fail
+        <<: *main-branch-only
     - deployment_test:
         <<: *notify-fail
         <<: *main-branch-only
@@ -497,3 +497,4 @@ workflows:
         <<: *main-branch-only
         requires:
            - deployment_test
+           - docker-images-push
