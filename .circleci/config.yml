@@ -153,6 +153,38 @@ commands:
             TERM: dumb
 
 
+  cleanup_test_job:
+    steps:
+      - upload_test_reports
+      - run: # Pack logfiles to speedup downloads.
+          name: Pack Logfiles
+          when: always
+          command: |
+            if [[ -d log ]]; then
+              gzip -r log/*
+            fi
+      - store_artifacts:
+          name: Store test logs as artifacts (if any)
+          path: log
+          destination: log
+
+
+  upload_test_reports:
+    steps:
+      - run:
+          when: always
+          name: Group test reports by subproject
+          command: |
+            for subproject in `find . -path "*/target/test-reports" | sed -e 's/^\.\///' -e 's/\/target\/test-reports$//'`
+            do
+              mkdir -p test-reports/"$subproject"
+              # Keep going, if there is no test report.
+              cp -v "$subproject"/target/test-reports/TEST-*.xml test-reports/"$subproject" || true
+            done
+      - store_test_results:
+          path: test-reports
+
+
 
 parameters:
   sdk-version:
@@ -178,6 +210,7 @@ jobs:
       - execute_sbt_command:
           cmd: "test"
           timeout: "10m"
+      - cleanup_test_job
 
   deployment_test:
     docker:
