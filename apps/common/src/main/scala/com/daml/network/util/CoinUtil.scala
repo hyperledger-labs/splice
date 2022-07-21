@@ -1,18 +1,21 @@
 package com.daml.network.util
 
 import com.daml.ledger.api.refinements.ApiTypes
+import com.daml.ledger.api.refinements.ApiTypes.TemplateId
+import com.daml.ledger.client.binding
 import com.daml.network.environment.CoinLedgerConnection
+import com.digitalasset.canton.ledger.api.client.{DecodeUtil, LedgerConnection}
+import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.network.{CC, OpenBusiness}
-import com.digitalasset.network.CC.Coin.Coin
 
 import java.io.InputStream
 import scala.concurrent.{ExecutionContext, Future}
 
 object CoinUtil {
   lazy val coinTemplateId: com.daml.ledger.api.v1.value.Identifier =
-    ApiTypes.TemplateId.unwrap(Coin.id)
+    ApiTypes.TemplateId.unwrap(CC.Coin.Coin.id)
   lazy val packageId: String = coinTemplateId.packageId
   lazy val coinModuleName: String = coinTemplateId.moduleName
   lazy val coinEntityName: String = coinTemplateId.entityName
@@ -30,6 +33,9 @@ object CoinUtil {
           s"Failed to load [$coinDarResourceName] from classpath"
         )
     }
+
+  def templateId[T](id: binding.Primitive.TemplateId[T]): TemplateId =
+    TemplateId(ApiTypes.TemplateId.unwrap(id))
 
   /** Creates a contract that gives the given validator the right to claim coin issuances for the given user's burns. */
   def recordValidatorOf(
@@ -100,7 +106,64 @@ object CoinUtil {
     } yield ()
   }
 
-  // TODO(Robert) surely there's a better way to define Daml Numeric values in Scala
+  def acceptCoinRulesRequests(
+      svcPartyId: PartyId,
+      connection: CoinLedgerConnection,
+      logger: TracedLogger,
+  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
+    val coinRulesRequestTid = templateId(CC.CoinRules.CoinRulesRequest.id)
+    val openMiningRoundTid = templateId(CC.Round.OpenMiningRound.id)
+    val issuingMiningRoundTid = templateId(CC.Round.IssuingMiningRound.id)
+
+    for {
+      // Note: a single ACS lookup in order to have a consistent view of data
+      (requestCids, openMiningRounds, issuingMiningRounds) <- connection
+        .activeContracts(
+          LedgerConnection.transactionFilterByParty(
+            Map(svcPartyId -> Seq(coinRulesRequestTid, openMiningRoundTid, issuingMiningRoundTid))
+          )
+        )
+        .map { case (events, _) =>
+          val requestCids = events
+            .flatMap(DecodeUtil.decodeCreated(CC.CoinRules.CoinRulesRequest))
+            .map(_.contractId)
+          val openMiningRounds = events
+            .flatMap(DecodeUtil.decodeCreated(CC.Round.OpenMiningRound))
+            .filter(c => c.value.obs == svcPartyId.toPrim)
+            .map(_.value)
+          val issuingMiningRounds = events
+            .flatMap(DecodeUtil.decodeCreated(CC.Round.IssuingMiningRound))
+            .filter(c => c.value.obs == svcPartyId.toPrim)
+            .map(_.value)
+          (requestCids, openMiningRounds, issuingMiningRounds)
+        }
+      _ <- Future.sequence(
+        requestCids
+          .map(cid =>
+            connection
+              .submitCommand(
+                actAs = Seq(svcPartyId),
+                readAs = Seq.empty,
+                command = Seq(
+                  cid
+                    .exerciseAccept(svcPartyId.toPrim, openMiningRounds, issuingMiningRounds)
+                    .command
+                ),
+              )
+              .recoverWith { case e =>
+                logger.warn(s"Failed to accept coin rules request: $e")
+
+                // Note: we are potentially accepting multiple requests, don't fail the whole call if one of them fails.
+                // No other workflow is using CoinRulesRequest contracts, it is safe to blindly retry
+                // exercising the (consuming) Accept choice until it succeeds.
+                Future.successful(())
+              }
+          )
+      )
+    } yield ()
+  }
+
+  // TODO(M1-90) surely there's a better way to define Daml Numeric values in Scala
   def damlNumeric(x: Double): BigDecimal =
     BigDecimal(x).setScale(10, BigDecimal.RoundingMode.HALF_EVEN)
 

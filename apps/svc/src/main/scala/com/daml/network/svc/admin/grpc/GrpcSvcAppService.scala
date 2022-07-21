@@ -2,10 +2,17 @@ package com.daml.network.svc.admin.grpc
 
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.refinements.ApiTypes.TemplateId
+import com.daml.ledger.api.v1.transaction_filter
+import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.examples.v0.{GetDebugInfoResponse, SvcAppServiceGrpc}
+import com.daml.network.examples.v0.{
+  GetDebugInfoResponse,
+  GetValidatorConfigResponse,
+  SvcAppServiceGrpc,
+}
 import com.daml.network.util.CoinUtil
-import com.digitalasset.canton.ledger.api.client.LedgerConnection
+import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.ledger.api.client.{DecodeUtil, LedgerConnection}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -54,6 +61,9 @@ class GrpcSvcAppService(
         CoinUtil.packageId,
         ByteString.readFrom(CoinUtil.coinDarInputStream()),
       )
+      // TODO(M1-90): The ledger API does not block until the package is vetted.
+      //  Need to wait a bit, or use the Canton admin API to upload the package (that one does block).
+      _ = Threading.sleep(1000)
       _ = logger.info(s"Package ${CoinUtil.packageId} is uploaded")
     } yield ()
   }
@@ -73,9 +83,17 @@ class GrpcSvcAppService(
       Future.failed(new RuntimeException("Not implemented"))
     }
 
+  // TODO(M1-90): This should not run concurrently with `openNextRound`
+  // Both calls are non-atomic read-modify-write operations on the set of open/issuing mining rounds
   override def acceptValidators(request: Empty): Future[Empty] =
-    withSpanFromGrpcContext("GrpcSvcAppService") { _ => _ =>
-      Future.failed(new RuntimeException("Not implemented"))
+    withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
+      for {
+        svcPartyIdO <- connection.getUser(svcUserName)
+        svcPartyId = svcPartyIdO.getOrElse(
+          sys.error(s"User $svcUserName not set up, did you forget to initialize the app?")
+        )
+        _ <- CoinUtil.acceptCoinRulesRequests(svcPartyId, connection, logger)
+      } yield Empty()
     }
 
   override def getDebugInfo(request: Empty): Future[GetDebugInfoResponse] =
@@ -88,8 +106,7 @@ class GrpcSvcAppService(
             )
           )
         case Some(partyId) =>
-          val coinRulesTid: TemplateId =
-            TemplateId(ApiTypes.TemplateId.unwrap(CC.CoinRules.CoinRules.id))
+          val coinRulesTid = CoinUtil.templateId(CC.CoinRules.CoinRules.id)
           for {
             coinRulesCids <- connection
               .activeContracts(
@@ -101,6 +118,20 @@ class GrpcSvcAppService(
             svcParty = partyId.toProtoPrimitive,
             coinPackageId = CoinUtil.packageId,
             coinRulesCids = coinRulesCids,
+          )
+      }
+    }
+
+  override def getValidatorConfig(request: Empty): Future[GetValidatorConfigResponse] =
+    withSpanFromGrpcContext("GrpcSvcAppService") { _ => _ =>
+      connection.getUser(svcUserName).flatMap {
+        case None =>
+          Future.failed(new RuntimeException("SVC app not yet initialized"))
+        case Some(partyId) =>
+          Future.successful(
+            GetValidatorConfigResponse(
+              svcParty = partyId.toProtoPrimitive
+            )
           )
       }
     }

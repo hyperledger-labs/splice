@@ -2,7 +2,7 @@ package com.daml.network.svc.admin.api.client.commands
 
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.daml.network.examples.v0
-import com.daml.network.examples.v0.GetDebugInfoResponse
+import com.daml.network.examples.v0.{GetDebugInfoResponse, GetValidatorConfigResponse}
 import com.daml.network.examples.v0.SvcAppServiceGrpc.SvcAppServiceStub
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.empty.Empty
@@ -65,6 +65,29 @@ object SvcAppCommands {
         svcParty = PartyId.tryFromProtoPrimitive(response.svcParty),
         coinPackageId = response.coinPackageId,
         coinRulesCids = response.coinRulesCids,
+      )
+    )
+  }
+
+  case class ValidatorConfigInfo(
+      svcParty: PartyId
+  )
+
+  case class GetValidatorConfig()
+      extends BaseCommand[Empty, GetValidatorConfigResponse, ValidatorConfigInfo] {
+    override type Svc = SvcAppServiceStub
+    override def createService(channel: ManagedChannel): SvcAppServiceStub =
+      v0.SvcAppServiceGrpc.stub(channel)
+    override def createRequest(): Either[String, Empty] = Right(Empty())
+    override def submitRequest(
+        service: SvcAppServiceStub,
+        request: Empty,
+    ): Future[GetValidatorConfigResponse] = service.getValidatorConfig(request)
+    override def handleResponse(
+        response: GetValidatorConfigResponse
+    ): Either[String, ValidatorConfigInfo] = Right(
+      ValidatorConfigInfo(
+        svcParty = PartyId.tryFromProtoPrimitive(response.svcParty)
       )
     )
   }

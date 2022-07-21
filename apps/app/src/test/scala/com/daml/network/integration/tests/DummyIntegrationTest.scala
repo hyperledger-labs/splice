@@ -8,18 +8,21 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
   IsolatedCoinEnvironments,
 }
+import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.concurrent.duration._
 
-class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironments {
+class DummyIntegrationTest
+    extends CoinIntegrationTest
+    with IsolatedCoinEnvironments
+    with CommonCoinAppInstanceReferences {
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition.simpleTopology
 
   "run commands against validator" in { implicit env =>
-    val validator1 = v("validator1")
     val validatorRemoteParReference = validator1.remoteParticipant
     val coinDarPath = "canton-coin/.daml/dist/canton-coin.dar"
 
@@ -65,17 +68,5 @@ class DummyIntegrationTest extends CoinIntegrationTest with IsolatedCoinEnvironm
       // Note: Throws because it's not implemented
       an[CommandFailure] should be thrownBy svc.openNextRound()
     }
-  }
-
-  // TODO(Arne): move these into traits analogue to Canton's `ConsoleEnvironmentTestHelpers`
-  def v(name: String)(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference =
-    env.validators
-      .find(_.name == name)
-      .getOrElse(sys.error(s"validator [$name] not configured"))
-
-  // TODO(Arne): generalize to any Coin app reference
-  def upload_coin_dar(validator: LocalWalletAppReference) = {
-    val coinDarPath = "canton-coin/.daml/dist/canton-coin.dar"
-    logger.info(s"uploaded dar with hash: ${validator.remoteParticipant.dars.upload(coinDarPath)}")
   }
 }

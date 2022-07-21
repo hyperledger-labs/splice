@@ -11,8 +11,8 @@ import scala.concurrent.{ExecutionContext, Future}
 /** Example for "Store" pattern. */
 trait ValidatorAppStore extends AutoCloseable {
   def increment(int: Int)(implicit tc: TraceContext): Future[Int]
-  def setValidatorParty(partyId : PartyId) : Future[Unit]
-  def getValidatorParty() : Future[Option[PartyId]]                                           
+  def setValidatorParty(partyId: PartyId): Future[Unit]
+  def getValidatorParty(): Future[Option[PartyId]]
 }
 
 object ValidatorAppStore {

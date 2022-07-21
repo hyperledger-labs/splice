@@ -65,6 +65,7 @@ Make sure to configure the JVM heap size to at least 4G when using IntelliJ. In 
 This Section gives an overview of common sbt commands.
 More commands can be found in build.sbt and BuildCommon.scala.
 
+- `clean`: deletes all generated files (in the target directory)
 - `compile`: compile production code (excluding test code)
 - `test:compile`: compile production and test code
 - `apps-common/compile`: compile production code of the `apps-common` subproject

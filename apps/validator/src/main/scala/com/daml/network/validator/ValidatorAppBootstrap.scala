@@ -67,7 +67,7 @@ class ValidatorAppBootstrap(
     EitherT.rightT[Future, String] {
       val dummyStore = ValidatorAppStore(storage, loggerFactory)
 
-      val connection : CoinLedgerConnection =
+      val connection: CoinLedgerConnection =
         createLedgerConnection(config.remoteParticipant, validatorAppParameters.processingTimeouts)
 
       adminServerRegistry.addService(

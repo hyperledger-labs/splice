@@ -45,7 +45,7 @@ class LocalValidatorAppReference(
   @Help.Summary("Set up a new validator")
   @Help.Description("""Create `CoinProposal` and sets up party for the validator.
                       |Return the party set up for the validator""".stripMargin)
-  def setupValidator(name : String, svc : PartyId) : PartyId = {
+  def setupValidator(name: String, svc: PartyId): PartyId = {
     consoleEnvironment.run {
       adminCommand(ValidatorAppCommands.SetupValidatorCommand(name, svc))
     }
@@ -54,7 +54,7 @@ class LocalValidatorAppReference(
   @Help.Summary("Onboard a new user")
   @Help.Description("""Onboard individual canton-coin user for the given validator party.
                       |Return the newly set up partyId.""".stripMargin)
-  def onboardUser(user : String) : PartyId = {
+  def onboardUser(user: String): PartyId = {
     consoleEnvironment.run {
       adminCommand(ValidatorAppCommands.OnboardUserCommand(user))
     }

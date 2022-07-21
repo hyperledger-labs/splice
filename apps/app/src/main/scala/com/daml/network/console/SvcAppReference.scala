@@ -45,6 +45,12 @@ class LocalSvcAppReference(
     }
   }
 
+  def getValidatorConfig: SvcAppCommands.ValidatorConfigInfo = {
+    consoleEnvironment.run {
+      adminCommand(SvcAppCommands.GetValidatorConfig())
+    }
+  }
+
   /** Remote participant this SVC app is configured to interact with. */
   val remoteParticipant =
     new SvcAppRemoteParticipantReference(

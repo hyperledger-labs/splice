@@ -20,13 +20,13 @@ class InMemoryValidatorAppStore(override protected val loggerFactory: NamedLogge
     Future { current.addAndGet(int) }
   }
 
-  private val validatorParty : AtomicReference[Option[PartyId]] = new AtomicReference(None)
+  private val validatorParty: AtomicReference[Option[PartyId]] = new AtomicReference(None)
 
-  override def setValidatorParty(partyId : PartyId) : Future[Unit] = Future {
+  override def setValidatorParty(partyId: PartyId): Future[Unit] = Future {
     validatorParty.set(Some(partyId))
   }
 
-  override def getValidatorParty() : Future[Option[PartyId]] = Future {
+  override def getValidatorParty(): Future[Option[PartyId]] = Future {
     validatorParty.get()
   }
 

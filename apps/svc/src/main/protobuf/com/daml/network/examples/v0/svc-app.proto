@@ -20,6 +20,11 @@ message GetDebugInfoResponse {
   repeated string coinRulesCids = 4;
 }
 
+message GetValidatorConfigResponse {
+  // Party identifier of the SVC party
+  string svcParty = 1;
+}
+
 service SvcAppService {
   // Performs one-time initialization of the application (i.e., when starting the application on a fresh ledger).
   // This should be called before any other call.
@@ -49,4 +54,9 @@ service SvcAppService {
 
   // Returns some debug info about the running app
   rpc GetDebugInfo (google.protobuf.Empty) returns (GetDebugInfoResponse);
+
+  // Returns information required to configure a new validator node
+  // TODO(M1-90): This feels like functionality of the CC-Scan app: take some on-ledger information and
+  //   disclose it through an off-ledger channel
+  rpc GetValidatorConfig (google.protobuf.Empty) returns (GetValidatorConfigResponse);
 }

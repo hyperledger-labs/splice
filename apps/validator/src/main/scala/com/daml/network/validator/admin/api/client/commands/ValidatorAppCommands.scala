@@ -38,26 +38,26 @@ object ValidatorAppCommands {
       Right(response.someNumber)
   }
 
-  case class SetupValidatorCommand(name : String, svc: PartyId)
+  case class SetupValidatorCommand(name: String, svc: PartyId)
       extends BaseCommand[v0.SetupValidatorRequest, v0.SetupValidatorResponse, PartyId] {
 
-    override def createRequest() : Either[String, v0.SetupValidatorRequest] =
-        Right(v0.SetupValidatorRequest(Some(name), Some(svc.toPrim.toString)))
+    override def createRequest(): Either[String, v0.SetupValidatorRequest] =
+      Right(v0.SetupValidatorRequest(Some(name), Some(svc.toPrim.toString)))
 
     override def submitRequest(
-        service : ValidatorAppServiceStub,
-        request : v0.SetupValidatorRequest,
-        ): Future[v0.SetupValidatorResponse] = service.setupValidator(request)
+        service: ValidatorAppServiceStub,
+        request: v0.SetupValidatorRequest,
+    ): Future[v0.SetupValidatorResponse] = service.setupValidator(request)
 
     override def handleResponse(
-        response : v0.SetupValidatorResponse
-        ): Either[String, PartyId] =
-           response.partyId
-             .toRight("Missing mandatory field: party_id")
-             .map(PartyId.tryFromProtoPrimitive) 
+        response: v0.SetupValidatorResponse
+    ): Either[String, PartyId] =
+      response.partyId
+        .toRight("Missing mandatory field: party_id")
+        .map(PartyId.tryFromProtoPrimitive)
   }
 
-  case class OnboardUserCommand(name : String)
+  case class OnboardUserCommand(name: String)
       extends BaseCommand[v0.OnboardUserRequest, v0.OnboardUserResponse, PartyId] {
 
     override def createRequest(): Either[String, v0.OnboardUserRequest] =
@@ -75,7 +75,7 @@ object ValidatorAppCommands {
     ): Either[String, PartyId] =
       response.partyId
         .toRight("Missing mandatory field: party_id")
-        .map(PartyId.tryFromProtoPrimitive) 
+        .map(PartyId.tryFromProtoPrimitive)
   }
 
 }

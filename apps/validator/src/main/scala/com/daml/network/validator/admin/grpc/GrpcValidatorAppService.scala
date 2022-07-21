@@ -12,12 +12,9 @@ import com.daml.network.examples.v0.{
   SetupValidatorRequest,
   SetupValidatorResponse,
   SomeDummyRequest,
-  SomeDummyResponse
+  SomeDummyResponse,
 }
-import com.digitalasset.canton.ledger.api.client.{
-  CommandSubmitterWithRetry,
-  DecodeUtil,
-}
+import com.digitalasset.canton.ledger.api.client.{CommandSubmitterWithRetry, DecodeUtil}
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.validator.store.ValidatorAppStore
 import com.daml.ledger.api.v1.commands.{Command => ScalaCommand}
@@ -29,13 +26,8 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.network.CC.CoinRules.{
-  CoinRules,
-  CoinRulesRequest
-}
-import com.digitalasset.network.CC.Scripts.Util.{
-  CCUserHostedAt
-}
+import com.digitalasset.network.CC.CoinRules.{CoinRules, CoinRulesRequest}
+import com.digitalasset.network.CC.Scripts.Util.{CCUserHostedAt}
 import io.opentelemetry.api.trace.Tracer
 import com.digitalasset.canton.lifecycle.Lifecycle
 
@@ -46,9 +38,10 @@ import scala.util.control.NonFatal
 import com.daml.network.util.CoinUtil
 
 class GrpcValidatorAppService(
-    connection : CoinLedgerConnection,
-    store : ValidatorAppStore,
-    protected val loggerFactory: NamedLoggerFactory)(implicit
+    connection: CoinLedgerConnection,
+    store: ValidatorAppStore,
+    protected val loggerFactory: NamedLoggerFactory,
+)(implicit
     @nowarn("cat=unused")
     ec: ExecutionContext,
     tracer: Tracer,
@@ -65,7 +58,7 @@ class GrpcValidatorAppService(
       Future.successful(SomeDummyResponse(request.someNumber + 1))
     }
 
-  override def setupValidator(request : SetupValidatorRequest) : Future[SetupValidatorResponse] =
+  override def setupValidator(request: SetupValidatorRequest): Future[SetupValidatorResponse] =
     withSpanFromGrpcContext("GrpcValidatorAppService") { implicit traceContext => span =>
       val validatorName = request.name.fold(sys.error("Field missing : name"))(identity)
       val svcParty = request.svc.fold(sys.error("Field missing: svc"))(A.Party(_))
@@ -74,16 +67,22 @@ class GrpcValidatorAppService(
 
       val createValidatorPartyAndUser = connection.bootstrapUser(validatorName)
 
-      def createContracts(validatorParty : PartyId) : Future[Unit] = {
-          val coinRulesReq = CoinRulesRequest(user = validatorParty.toPrim, svc = svcParty)
-          connection.submitCommand(
+      def createContracts(validatorParty: PartyId): Future[Unit] = {
+        val coinRulesReq = CoinRulesRequest(user = validatorParty.toPrim, svc = svcParty)
+        connection
+          .submitCommand(
             actAs = Seq(validatorParty),
             readAs = Seq(validatorParty),
             command = Seq(coinRulesReq.create.command),
-          ).flatMap{ _ =>
-            CoinUtil.ExplicitDisclosureWorkaround.recordUserHostedAt(validatorParty, validatorParty, connection)
+          )
+          .flatMap { _ =>
+            CoinUtil.ExplicitDisclosureWorkaround.recordUserHostedAt(
+              validatorParty,
+              validatorParty,
+              connection,
+            )
           }
-        }
+      }
 
       for {
         validatorParty <- createValidatorPartyAndUser
@@ -100,13 +99,19 @@ class GrpcValidatorAppService(
 
       for {
         validatorPartyIdMaybe <- store.getValidatorParty()
-        validatorPartyId <- validatorPartyIdMaybe.fold[Future[PartyId]]{
-                              Future.failed(new Error("Validator party not set. Did you forget to call `setupValidator`?"))
-                            } {
-                              Future.successful _
-                            }
+        validatorPartyId <- validatorPartyIdMaybe.fold[Future[PartyId]] {
+          Future.failed(
+            new Error("Validator party not set. Did you forget to call `setupValidator`?")
+          )
+        } {
+          Future.successful _
+        }
         userPartyId <- connection.bootstrapUser(name)
-        _ <- CoinUtil.ExplicitDisclosureWorkaround.recordUserHostedAt(userPartyId, validatorPartyId, connection)
+        _ <- CoinUtil.ExplicitDisclosureWorkaround.recordUserHostedAt(
+          userPartyId,
+          validatorPartyId,
+          connection,
+        )
       } yield OnboardUserResponse(Some(userPartyId.toPrim.toString))
     }
 }

@@ -8,14 +8,15 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
   IsolatedCoinEnvironments,
 }
-import com.daml.network.util.CoinCreation
+import com.daml.network.util.{CoinCreation, CommonCoinAppInstanceReferences}
 import com.daml.network.wallet.ExpiringQuantity
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 class WalletIntegrationTest
     extends CoinIntegrationTest
     with IsolatedCoinEnvironments
-    with CoinCreation {
+    with CoinCreation
+    with CommonCoinAppInstanceReferences {
   override val defaultParticipant: String = "participant1"
   // same as damlUser in config
   private val damlUser = "god"
@@ -32,7 +33,6 @@ class WalletIntegrationTest
   "A wallet" should {
     "list coins owned by its damlUser" in { implicit env =>
       import env._
-      val wallet1 = w("wallet1")
 
       clue("setup") {
         wallet1.remoteParticipant.domains.connect_local(da)
@@ -50,10 +50,4 @@ class WalletIntegrationTest
       }
     }
   }
-
-  def w(name: String)(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference =
-    env.wallets
-      .find(_.name == name)
-      .getOrElse(sys.error(s"wallet [$name] not configured"))
-
 }
