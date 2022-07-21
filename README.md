@@ -85,6 +85,23 @@ please refer to the respective sections in [Canton's README](https://github.com/
 We share a lot of tooling with Canton, so to avoid duplication we use the documentation in the Canton repo 
 as "one source of truth". 
 
+## GCE Clusters
+
+The public Canton Network clusters are currently hosted in Google
+Cloud. There are two clusters, both of which are within the DA VPN:
+
+* DevNet - http://dev.network.canton.global
+* ScratchNet - http://scratch.network.canton.global
+
+The DevNet cluster is automatically updated every day at
+[0650 UTC](/.circleci/run-schedule-pipeline.json) via
+[CI/CD](/.circleci/config.yml). It is intended to be a more stable and
+production like enviornment. There are Slack notifications issued when
+these updates complete, either successfully or with a failure.
+
+The ScratchNet cluster is manually managed and intended to be a test
+bed for new code.
+
 ## Cluster Tooling
 
 This repository also contains tools for managing clusters, hosted both
