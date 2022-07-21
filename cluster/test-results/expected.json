@@ -125,7 +125,16 @@
                         "image": "us-central1-docker.pkg.dev/cn-devnet-353712/cn-devnet-images/canton-participant:tag",
                         "imagePullPolicy": "Always",
                         "name": "canton-participant",
-                        "ports": [ ]
+                        "ports": [
+                           {
+                              "containerPort": 6864,
+                              "name": "cp-adm-api"
+                           },
+                           {
+                              "containerPort": 6865,
+                              "name": "cp-ledger-api"
+                           }
+                        ]
                      }
                   ]
                }
@@ -187,6 +196,39 @@
             ],
             "selector": {
                "app": "canton-domain"
+            },
+            "type": "LoadBalancer"
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "name": "canton-participant"
+         },
+         "spec": {
+            "loadBalancerIP": "ipaddr",
+            "loadBalancerSourceRanges": [
+               "35.194.81.56/32",
+               "35.198.147.95/32",
+               "35.189.40.124/32"
+            ],
+            "ports": [
+               {
+                  "name": "cp-adm-api",
+                  "port": 6864,
+                  "protocol": "TCP",
+                  "targetPort": 6864
+               },
+               {
+                  "name": "cp-ledger-api",
+                  "port": 6865,
+                  "protocol": "TCP",
+                  "targetPort": 6865
+               }
+            ],
+            "selector": {
+               "app": "canton-participant"
             },
             "type": "LoadBalancer"
          }

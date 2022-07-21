@@ -90,7 +90,16 @@ function(imageTag, ipAddr) {
         },
       },
     ),
-    deployment(imageTag, 'canton-participant', []),
+    deployment(imageTag, 'canton-participant', [
+      {
+        name: 'cp-adm-api',
+        containerPort: 6864,
+      },
+      {
+        name: 'cp-ledger-api',
+        containerPort: 6865,
+      },
+    ]),
     externalService('docs', ipAddr, [
       {
         protocol: 'TCP',
@@ -113,6 +122,24 @@ function(imageTag, ipAddr) {
           protocol: 'TCP',
           port: 6019,
           targetPort: 6019,
+        },
+      ]
+    ),
+    externalService(
+      'canton-participant',
+      ipAddr,
+      [
+        {
+          name: 'cp-adm-api',
+          protocol: 'TCP',
+          port: 6864,
+          targetPort: 6864,
+        },
+        {
+          name: 'cp-ledger-api',
+          protocol: 'TCP',
+          port: 6865,
+          targetPort: 6865,
         },
       ]
     ),
