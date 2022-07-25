@@ -33,7 +33,7 @@ class DummyIntegrationTest
       validator1.start()
       validator1.remoteParticipant.domains.connect_local(env.da)
       validator1.remoteParticipant.dars.upload(coinDarPath)
-      val validatorParty = validator1.setupValidator("validator1", svc)
+      val validatorParty = validator1.initialize("validator1", svc)
       validatorParty.uid.id shouldBe "validator1"
       val userParty = validator1.onboardUser(user = "user1")
       userParty.uid.id shouldBe "user1"

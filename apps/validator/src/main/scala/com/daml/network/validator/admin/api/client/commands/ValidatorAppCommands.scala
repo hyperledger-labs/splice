@@ -1,9 +1,9 @@
 package com.daml.network.validator.admin.api.client.commands
 
+import com.daml.network.validator.v0
+import com.daml.network.validator.v0.ValidatorAppServiceGrpc.ValidatorAppServiceStub
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
-import com.daml.network.examples.v0
-import com.daml.network.examples.v0.ValidatorAppServiceGrpc.ValidatorAppServiceStub
 import io.grpc.ManagedChannel
 
 import scala.concurrent.Future
@@ -39,18 +39,18 @@ object ValidatorAppCommands {
   }
 
   case class SetupValidatorCommand(name: String, svc: PartyId)
-      extends BaseCommand[v0.SetupValidatorRequest, v0.SetupValidatorResponse, PartyId] {
+      extends BaseCommand[v0.InitializeRequest, v0.InitializeResponse, PartyId] {
 
-    override def createRequest(): Either[String, v0.SetupValidatorRequest] =
-      Right(v0.SetupValidatorRequest(Some(name), Some(svc.toPrim.toString)))
+    override def createRequest(): Either[String, v0.InitializeRequest] =
+      Right(v0.InitializeRequest(Some(name), Some(svc.toPrim.toString)))
 
     override def submitRequest(
         service: ValidatorAppServiceStub,
-        request: v0.SetupValidatorRequest,
-    ): Future[v0.SetupValidatorResponse] = service.setupValidator(request)
+        request: v0.InitializeRequest,
+    ): Future[v0.InitializeResponse] = service.initialize(request)
 
     override def handleResponse(
-        response: v0.SetupValidatorResponse
+        response: v0.InitializeResponse
     ): Either[String, PartyId] =
       response.partyId
         .toRight("Missing mandatory field: party_id")

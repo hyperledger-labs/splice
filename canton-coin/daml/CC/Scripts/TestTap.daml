@@ -1,0 +1,15 @@
+module CC.Scripts.TestTap where
+
+import Daml.Script
+import CC.CoinRules
+import CC.Scripts.Util
+
+testTap: Script ()
+testTap = do 
+    app <- setupApp
+    Some (rulesCid, rules) <- queryContractKey @CoinRules app.svc (app.svc, app.svc)
+    pat <- allocateParty "Pat"
+    cid <- submitMulti [pat] [app.svc] $ exerciseCmd rulesCid Tap with 
+                receiver = pat
+                amount = 100.0
+    return ()

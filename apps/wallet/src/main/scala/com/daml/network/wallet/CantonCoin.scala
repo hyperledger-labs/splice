@@ -1,12 +1,15 @@
 package com.daml.network.wallet
 
 import com.daml.ledger.client.binding.Contract
-import com.daml.network.examples.v0
+import com.daml.network.wallet.v0
 import com.digitalasset.canton.ProtoDeserializationError
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.version.HasProtoV0
 import com.digitalasset.network.CC.Coin.Coin
+import com.daml.lf.data.Numeric
+import cats.syntax.either._
 
 /** Scala-representation of a Coin with utility methods for conversion from/to protobuf. */
 case class CantonCoin(svc: PartyId, owner: PartyId, quantity: ExpiringQuantity)
@@ -39,20 +42,28 @@ object CantonCoin {
       svc,
       owner,
       ExpiringQuantity(
-        quantity.initialQuantity.doubleValue,
+        quantity.initialQuantity,
         quantity.createdAt.number,
-        quantity.ratePerRound.rate.doubleValue,
+        quantity.ratePerRound.rate,
       ),
     )
   }
 }
 
-case class ExpiringQuantity(initialQuantity: Double, createdAt: Long, ratePerRound: Double)
-    extends HasProtoV0[v0.ExpiringQuantity] {
+// TODO(Arne): test that conversion with Daml numeric works as expected and that we don't introduce any numeric errors here
+case class ExpiringQuantity(initialQuantity: BigDecimal, createdAt: Long, ratePerRound: BigDecimal)
+    extends HasProtoV0[v0.ExpiringQuantity]
+    with PrettyPrinting {
   override def toProtoV0: v0.ExpiringQuantity = v0.ExpiringQuantity(
-    initialQuantity,
+    initialQuantity.toString,
     createdAt,
-    ratePerRound,
+    ratePerRound.toString,
+  )
+
+  override def pretty: Pretty[ExpiringQuantity.this.type] = prettyOfClass(
+    param("initialQuantity", _.initialQuantity.toString.singleQuoted),
+    param("createdAt", _.createdAt),
+    param("ratePerRound", _.ratePerRound.toString.singleQuoted),
   )
 }
 
@@ -60,8 +71,13 @@ object ExpiringQuantity {
   def fromProto(
       quantityP: v0.ExpiringQuantity
   ): Either[ProtoDeserializationError, ExpiringQuantity] = {
-    val v0.ExpiringQuantity(initial, createdAt, rate, _) = quantityP
-    Right(ExpiringQuantity(initial, createdAt, rate))
+    val v0.ExpiringQuantity(initialP, createdAt, rateP, _) = quantityP
+    for {
+      initial <- Numeric
+        .fromString(initialP)
+        .leftMap(ProtoDeserializationError.StringConversionError)
+      rate <- Numeric.fromString(rateP).leftMap(ProtoDeserializationError.StringConversionError)
+    } yield ExpiringQuantity(initial, createdAt, rate)
   }
 
 }

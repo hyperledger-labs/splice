@@ -1,41 +1,18 @@
 package com.daml.network.validator.admin.grpc
 
-import com.daml.error.definitions.LedgerApiErrors.ConsistencyErrors.ContractNotFound
-import com.digitalasset.canton.protocol.messages.LocalReject.ConsistencyRejections.{
-  InactiveContracts,
-  LockedContracts,
-}
-import com.daml.network.examples.v0.{
-  ValidatorAppServiceGrpc,
-  OnboardUserRequest,
-  OnboardUserResponse,
-  SetupValidatorRequest,
-  SetupValidatorResponse,
-  SomeDummyRequest,
-  SomeDummyResponse,
-}
-import com.digitalasset.canton.ledger.api.client.{CommandSubmitterWithRetry, DecodeUtil}
+import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionResponse
 import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.validator.v0._
+import com.daml.network.util.CoinUtil
 import com.daml.network.validator.store.ValidatorAppStore
-import com.daml.ledger.api.v1.commands.{Command => ScalaCommand}
-import com.daml.ledger.api.v1.completion.{Completion}
-import com.daml.ledger.api.refinements.{ApiTypes => A}
-import com.daml.ledger.client.binding.{Contract, Primitive => P}
-import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.Spanning
-import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.network.CC.CoinRules.{CoinRules, CoinRulesRequest}
-import com.digitalasset.network.CC.Scripts.Util.{CCUserHostedAt}
+import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.network.CC.CoinRules.CoinRulesRequest
 import io.opentelemetry.api.trace.Tracer
-import com.digitalasset.canton.lifecycle.Lifecycle
 
 import scala.annotation.nowarn
-import scala.concurrent.{ExecutionContext, Future, TimeoutException}
-import scala.util.{Failure, Success}
-import scala.util.control.NonFatal
-import com.daml.network.util.CoinUtil
+import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcValidatorAppService(
     connection: CoinLedgerConnection,
@@ -58,17 +35,18 @@ class GrpcValidatorAppService(
       Future.successful(SomeDummyResponse(request.someNumber + 1))
     }
 
-  override def setupValidator(request: SetupValidatorRequest): Future[SetupValidatorResponse] =
+  override def initialize(request: InitializeRequest): Future[InitializeResponse] =
     withSpanFromGrpcContext("GrpcValidatorAppService") { implicit traceContext => span =>
       val validatorName = request.name.fold(sys.error("Field missing : name"))(identity)
-      val svcParty = request.svc.fold(sys.error("Field missing: svc"))(A.Party(_))
+      val svcParty =
+        request.svc.fold(sys.error("Field missing: svc"))(PartyId.tryFromProtoPrimitive)
 
       span.setAttribute("name", validatorName)
 
-      val createValidatorPartyAndUser = connection.bootstrapUser(validatorName)
-
-      def createContracts(validatorParty: PartyId): Future[Unit] = {
-        val coinRulesReq = CoinRulesRequest(user = validatorParty.toPrim, svc = svcParty)
+      def createRulesRequestAndUserHostedAtContracts(
+          validatorParty: PartyId
+      ): Future[SubmitAndWaitForTransactionResponse] = {
+        val coinRulesReq = CoinRulesRequest(user = validatorParty.toPrim, svc = svcParty.toPrim)
         connection
           .submitCommand(
             actAs = Seq(validatorParty),
@@ -85,10 +63,11 @@ class GrpcValidatorAppService(
       }
 
       for {
-        validatorParty <- createValidatorPartyAndUser
-        _ <- createContracts(validatorParty)
+        validatorParty <- connection.createPartyAndUser(validatorName)
+        _ <- createRulesRequestAndUserHostedAtContracts(validatorParty)
         _ <- store.setValidatorParty(validatorParty)
-      } yield SetupValidatorResponse(Some(validatorParty.toPrim.toString))
+        _ <- store.setSvcParty(svcParty)
+      } yield InitializeResponse(Some(validatorParty.toProtoPrimitive))
     }
 
   override def onboardUser(request: OnboardUserRequest): Future[OnboardUserResponse] =
@@ -103,10 +82,10 @@ class GrpcValidatorAppService(
           Future.failed(
             new Error("Validator party not set. Did you forget to call `setupValidator`?")
           )
-        } {
-          Future.successful _
-        }
-        userPartyId <- connection.bootstrapUser(name)
+        }(Future.successful)
+        userPartyId <- connection.createPartyAndUser(name)
+        svcO <- store.getSvcParty()
+        svc = svcO.getOrElse(sys.error("svc party wasn't allocated"))
         _ <- CoinUtil.ExplicitDisclosureWorkaround.recordUserHostedAt(
           userPartyId,
           validatorPartyId,

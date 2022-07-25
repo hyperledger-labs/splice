@@ -129,7 +129,7 @@ variables, which are defined in [`.envrc.vars`](.envrc.vars):
 | `GCP_REPO_NAME`           | Name of the image repository used to manage project container images. |
 
 The `.envrc` mechanism is also used to ensure that the current user is
-authenticated properly aaginst GCE.
+authenticated properly against GCE.
 
 ### Local Cluster Operations
 
@@ -146,7 +146,7 @@ The local cluster is managed with the following three subcommands of
 
 Operations against GCE clusters are complicated by the facts that
 there are more than one cluster and GCE clusters are usually shared
-resources. To accomodate this, there is a [`deployments`](deployments)
+resources. To accommodate this, there is a [`deployments`](deployments)
 directory that is used to manage the configuration of each
 cluster. Each extant cluster has a directory under `deployments` and
 operations against that cluster must be invoked from within that

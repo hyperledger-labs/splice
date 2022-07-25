@@ -10,7 +10,7 @@ import com.daml.ledger.client.configuration.CommandClientConfiguration
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrapBase
-import com.daml.network.examples.v0.ValidatorAppServiceGrpc
+import com.daml.network.validator.v0.ValidatorAppServiceGrpc
 import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.validator.metrics.ValidatorAppMetrics

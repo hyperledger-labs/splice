@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.console.{LocalValidatorAppReference, LocalWalletAppReference}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -8,46 +7,52 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
   IsolatedCoinEnvironments,
 }
-import com.daml.network.util.{CoinCreation, CommonCoinAppInstanceReferences}
+import com.daml.network.util.{CoinCreation, CoinUtil, CommonCoinAppInstanceReferences}
 import com.daml.network.wallet.ExpiringQuantity
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.network.CC.CoinRules.{CoinRules, CoinRulesRequest}
+
+import scala.concurrent.duration._
 
 class WalletIntegrationTest
     extends CoinIntegrationTest
     with IsolatedCoinEnvironments
-    with CoinCreation
     with CommonCoinAppInstanceReferences {
-  override val defaultParticipant: String = "participant1"
   // same as damlUser in config
-  private val damlUser = "god"
-  private val quantity = 100d
+  private val walletDamlUser = "god"
+  private val quantity = "50.0"
   private val coinDarPath = "canton-coin/.daml/dist/canton-coin.dar"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition.simpleTopology.withSetup(env => {
       import env._
-      participants.all.map(_.dars.upload(coinDarPath))
+      participants.all.foreach(_.dars.upload(coinDarPath))
+      participants.all.foreach(_.domains.connect_local(da))
     })
 
   "A wallet" should {
-    "list coins owned by its damlUser" in { implicit env =>
+    "allow calling tap and then list the created coins" in { implicit env =>
       import env._
+      svc.initialize()
+      val svcParty =
+        svc.remoteParticipant.parties.list(filterParty = "svc").headOption.value.party
+      val validatorParty = validator1.initialize("validator1", svcParty)
+      // TODO(Arne): consider adding synchronization 'wait-for-participant-x' to this command
+      validator1.onboardUser(walletDamlUser)
+      wallet1.initialize(svcParty, validatorParty)
+      svc.acceptValidators()
 
-      clue("setup") {
-        wallet1.remoteParticipant.domains.connect_local(da)
-        val pId = wallet1.remoteParticipant.parties.enable(damlUser, Some(damlUser))
-        wallet1.remoteParticipant.ledger_api.users.create(damlUser, Set(pId.toLf), Some(pId.toLf))
-
-        createCoin(damlUser, quantity, "da", participant1)
-      }
-
-      clue("call list") {
-        val res = wallet1.list().headOption.value
-        res.quantity shouldBe ExpiringQuantity(quantity, round, ratePerRound)
-        res.owner.uid.id shouldBe damlUser
-        res.svc.uid.id shouldBe damlUser
-      }
+      // ensure wallet's participant sees the CoinRules
+      wallet1.remoteParticipant.ledger_api.acs.await(validatorParty, CoinRules)
+      wallet1.tap(quantity)
+      val res = wallet1.list().headOption.value
+      res.quantity shouldBe ExpiringQuantity(
+        BigDecimal(quantity),
+        createdAt = 0,
+        ratePerRound = CoinUtil.defaultHoldingFee.rate.doubleValue,
+      )
+      res.owner.uid.id shouldBe walletDamlUser
     }
   }
 }

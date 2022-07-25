@@ -1,9 +1,9 @@
 package com.daml.network.svc.admin.api.client.commands
 
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-import com.daml.network.examples.v0
-import com.daml.network.examples.v0.{GetDebugInfoResponse, GetValidatorConfigResponse}
-import com.daml.network.examples.v0.SvcAppServiceGrpc.SvcAppServiceStub
+import com.daml.network.svc.v0
+import com.daml.network.svc.v0.{GetDebugInfoResponse, GetValidatorConfigResponse}
+import com.daml.network.svc.v0.SvcAppServiceGrpc.SvcAppServiceStub
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel

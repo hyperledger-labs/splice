@@ -1,12 +1,12 @@
 syntax = "proto3";
-package com.daml.network.examples.v0;
+package com.daml.network.validator.v0;
 
 import "google/protobuf/wrappers.proto";
 
 service ValidatorAppService {
   rpc DummyFunction (SomeDummyRequest) returns (SomeDummyResponse);
   rpc OnboardUser (OnboardUserRequest) returns (OnboardUserResponse);
-  rpc SetupValidator (SetupValidatorRequest) returns (SetupValidatorResponse);
+  rpc Initialize (InitializeRequest) returns (InitializeResponse);
 }
 
 message SomeDummyRequest {
@@ -18,12 +18,12 @@ message SomeDummyResponse {
   int32 some_number = 1;
 }
 
-message SetupValidatorRequest {
+message InitializeRequest {
   google.protobuf.StringValue name = 1;
   google.protobuf.StringValue svc = 2;
 }
 
-message SetupValidatorResponse {
+message InitializeResponse {
   google.protobuf.StringValue party_id= 1;
 }
 

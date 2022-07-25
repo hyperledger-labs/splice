@@ -1,8 +1,9 @@
 package com.daml.network.console
 
+import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.wallet.CantonCoin
-import com.daml.network.wallet.admin.api.client.commands.WalletCommands
+import com.daml.network.wallet.admin.api.client.commands.WalletAppCommands
 import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.console.{
@@ -13,6 +14,8 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.environment.CantonNodeBootstrap
 import com.digitalasset.canton.participant.ParticipantNode
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.network.CC.Coin.Coin
 
 /** Single local Wallet app reference. Defines the console commands that can be run against a local Wallet
   * app reference.
@@ -36,7 +39,24 @@ class LocalWalletAppReference(
   )
   def list(): Seq[CantonCoin] = {
     consoleEnvironment.run {
-      adminCommand(WalletCommands.List())
+      adminCommand(WalletAppCommands.List())
+    }
+  }
+
+  def initialize(svc: PartyId, validator: PartyId): Unit = {
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.Initialize(svc, validator))
+    }
+  }
+
+  @Help.Summary("Credits the requested amount of Canton coin to the wallet's user")
+  @Help.Description(
+    "This function will only be available in the testnet. It allows creating coins for testing purposes." +
+      "Returns the contract ID of the created contract. "
+  )
+  def tap(amount: String = "100"): Primitive.ContractId[Coin] = {
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.Tap(com.daml.lf.data.Numeric.assertFromString(amount)))
     }
   }
 

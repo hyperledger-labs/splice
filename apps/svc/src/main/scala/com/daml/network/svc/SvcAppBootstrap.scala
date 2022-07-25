@@ -7,7 +7,7 @@ import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrapBase
-import com.daml.network.examples.v0.SvcAppServiceGrpc
+import com.daml.network.svc.v0.SvcAppServiceGrpc
 import com.daml.network.svc.admin.grpc.GrpcSvcAppService
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.svc.metrics.SvcAppMetrics

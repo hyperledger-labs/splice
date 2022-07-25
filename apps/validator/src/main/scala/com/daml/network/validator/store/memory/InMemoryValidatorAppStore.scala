@@ -15,12 +15,10 @@ class InMemoryValidatorAppStore(override protected val loggerFactory: NamedLogge
     ec: ExecutionContext
 ) extends ValidatorAppStore
     with NamedLogging {
-  private val current = new AtomicInteger(0)
-  override def increment(int: Int)(implicit tc: TraceContext): Future[Int] = {
-    Future { current.addAndGet(int) }
-  }
 
+  // TODO(i271): Can drop `Option` here once we have mandatory initialization
   private val validatorParty: AtomicReference[Option[PartyId]] = new AtomicReference(None)
+  private val svcParty: AtomicReference[Option[PartyId]] = new AtomicReference(None)
 
   override def setValidatorParty(partyId: PartyId): Future[Unit] = Future {
     validatorParty.set(Some(partyId))
@@ -28,6 +26,14 @@ class InMemoryValidatorAppStore(override protected val loggerFactory: NamedLogge
 
   override def getValidatorParty(): Future[Option[PartyId]] = Future {
     validatorParty.get()
+  }
+
+  override def setSvcParty(partyId: PartyId): Future[Unit] = Future {
+    svcParty.set(Some(partyId))
+  }
+
+  override def getSvcParty(): Future[Option[PartyId]] = Future {
+    svcParty.get()
   }
 
   override def close(): Unit = ()

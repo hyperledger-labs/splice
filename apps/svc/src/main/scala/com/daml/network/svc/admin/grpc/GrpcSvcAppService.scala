@@ -5,11 +5,7 @@ import com.daml.ledger.api.refinements.ApiTypes.TemplateId
 import com.daml.ledger.api.v1.transaction_filter
 import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.examples.v0.{
-  GetDebugInfoResponse,
-  GetValidatorConfigResponse,
-  SvcAppServiceGrpc,
-}
+import com.daml.network.svc.v0.{GetDebugInfoResponse, GetValidatorConfigResponse, SvcAppServiceGrpc}
 import com.daml.network.util.CoinUtil
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.ledger.api.client.{DecodeUtil, LedgerConnection}
@@ -38,20 +34,6 @@ class GrpcSvcAppService(
   // TODO(Robert): move to some config, maybe SvcAppParameters
   private val svcUserName = "svc"
 
-  // TODO(Robert): Factor out user/party allocation and make it robust (current implementation is racy)
-  private def getOrAllocateParty(
-      username: String,
-      connection: CoinLedgerConnection,
-  )(implicit traceContext: TraceContext): Future[PartyId] = {
-    for {
-      existingPartyId <- connection.getUser(username)
-      partyId <- existingPartyId.fold[Future[PartyId]](connection.bootstrapUser(username))(
-        Future.successful
-      )
-      _ = logger.info(s"User $username and party $partyId are allocated")
-    } yield partyId
-  }
-
   // TODO(Robert): Factor out package uploading and make it robust
   private def assertPackageIsUploaded(
       connection: CoinLedgerConnection
@@ -71,7 +53,7 @@ class GrpcSvcAppService(
   override def initialize(request: Empty): Future[Empty] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
-        svcPartyId <- getOrAllocateParty(svcUserName, connection)
+        svcPartyId <- connection.getOrAllocateParty(svcUserName)
         _ <- assertPackageIsUploaded(connection)
         _ <- CoinUtil.setupApp(svcPartyId, connection)
         _ = logger.info(s"App is initialized")

@@ -9,13 +9,22 @@ import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.network.{CC, OpenBusiness}
-
+import com.digitalasset.network.CC.Coin.Coin
 import java.io.InputStream
+
+import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionResponse
+import com.daml.ledger.api.v1.transaction_filter
+import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
+import com.daml.ledger.client.binding.{Contract, Primitive}
+import com.digitalasset.canton.ledger.api.client.DecodeUtil
+import com.digitalasset.network.CC.CoinRules.CoinRules
+
 import scala.concurrent.{ExecutionContext, Future}
 
 object CoinUtil {
   lazy val coinTemplateId: com.daml.ledger.api.v1.value.Identifier =
-    ApiTypes.TemplateId.unwrap(CC.Coin.Coin.id)
+    ApiTypes.TemplateId.unwrap(Coin.id)
+
   lazy val packageId: String = coinTemplateId.packageId
   lazy val coinModuleName: String = coinTemplateId.moduleName
   lazy val coinEntityName: String = coinTemplateId.entityName
@@ -34,6 +43,23 @@ object CoinUtil {
         )
     }
 
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  def tryGetCoinRules(connection: CoinLedgerConnection, validator: PartyId)(implicit
+      ec: ExecutionContext
+  ): Future[Primitive.ContractId[CoinRules]] = {
+    for {
+      rulesAcs <- connection.activeContracts(
+        LedgerConnection.transactionFilterByParty(Map(validator -> Seq(templateId(CoinRules.id))))
+      )
+      createdRules = rulesAcs._1.flatMap(res => DecodeUtil.decodeCreated(CoinRules)(res))
+      _ = require(
+        createdRules.length == 1,
+        s"Expected only one CoinRules instance but found ${createdRules.size} instances: $createdRules",
+      )
+      rule = createdRules.head.contractId
+    } yield rule
+  }
+
   def templateId[T](id: binding.Primitive.TemplateId[T]): TemplateId =
     TemplateId(ApiTypes.TemplateId.unwrap(id))
 
@@ -43,7 +69,7 @@ object CoinUtil {
       validator: PartyId,
       user: PartyId,
       connection: CoinLedgerConnection,
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+  )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionResponse] = {
     val c = CC.Coin.ValidatorRight(
       svc = svc.toPrim,
       validator = validator.toPrim,
@@ -163,6 +189,9 @@ object CoinUtil {
     } yield ()
   }
 
+  lazy val defaultHoldingFee =
+    OpenBusiness.Fees.RatePerRound(damlNumeric(1.0 / 360.0 / (24.0 * 60.0 / 2.5)))
+
   // TODO(M1-90) surely there's a better way to define Daml Numeric values in Scala
   def damlNumeric(x: Double): BigDecimal =
     BigDecimal(x).setScale(10, BigDecimal.RoundingMode.HALF_EVEN)
@@ -181,7 +210,7 @@ object CoinUtil {
     // with one day corresponding to 24*60/2.5 rounds, i.e., one round
     // every 2.5 minutes.
     // Incentivizes users to actively merge their coins.
-    holdingFee = OpenBusiness.Fees.RatePerRound(damlNumeric(1.0 / 360.0 / (24.0 * 60.0 / 2.5))),
+    holdingFee = defaultHoldingFee,
 
     // The minimal quantity of burn for which a receipt is issued.
     // Chosen to cover to be just above the cost of updating a single update.
@@ -228,7 +257,7 @@ object CoinUtil {
         user: PartyId,
         validator: PartyId,
         connection: CoinLedgerConnection,
-    )(implicit traceContext: TraceContext): Future[Unit] = {
+    )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionResponse] = {
       val c = CC.Scripts.Util.CCUserHostedAt(
         user = user.toPrim,
         validator = validator.toPrim,

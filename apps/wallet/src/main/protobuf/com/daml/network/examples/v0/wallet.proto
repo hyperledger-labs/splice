@@ -1,10 +1,20 @@
 syntax = "proto3";
-package com.daml.network.examples.v0;
+package com.daml.network.wallet.v0;
 
 import "google/protobuf/wrappers.proto";
 
 service WalletService {
+  rpc initialize (InitializeRequest) returns (InitializeResponse);
   rpc list (ListRequest) returns (ListResponse);
+  rpc tap (TapRequest) returns (TapResponse);
+}
+
+message InitializeRequest {
+  google.protobuf.StringValue svc = 1;
+  google.protobuf.StringValue validator = 2;
+}
+
+message InitializeResponse {
 }
 
 message ListRequest {
@@ -22,7 +32,16 @@ message Coin {
 }
 
 message ExpiringQuantity {
-  double initialQuantity = 1;
+  string initialQuantity = 1;
   int64 createdAt = 2;
-  double ratePerRound = 3;
+  string ratePerRound = 3;
+}
+
+
+message TapRequest {
+  string amount = 1;
+}
+
+message TapResponse {
+  string contract_id = 1;
 }

@@ -75,6 +75,23 @@ template CoinRules
       controller receiver
       do create PreapprovedTransfer with ..
 
+    nonconsuming choice Tap: ContractId Coin
+      with 
+        receiver: Party
+        amount: Decimal
+      controller receiver
+      do
+        (_, issuanceState) <- fetchByKey @IssuanceState (svc, obs)
+        let expiringQuantity = ExpiringQuantity with
+                        initialQuantity = amount
+                        createdAt = issuanceState.currentRound
+                        ratePerRound = config.holdingFee
+        create Coin with 
+                  owner = receiver
+                  quantity = expiringQuantity
+                  ..
+
+
     nonconsuming choice CoinRules_MiningRound_Open
       : ContractId OpenMiningRound
       with

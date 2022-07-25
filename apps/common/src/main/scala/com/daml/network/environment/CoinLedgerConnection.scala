@@ -45,10 +45,13 @@ import io.grpc.StatusRuntimeException
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
 import org.slf4j.event.Level
 import scalaz.syntax.tag._
-
 import java.util.UUID
+
 import com.daml.ledger.api.domain.UserRight.CanActAs
-import com.daml.ledger.api.v1.command_service.SubmitAndWaitRequest
+import com.daml.ledger.api.v1.command_service.{
+  SubmitAndWaitForTransactionResponse,
+  SubmitAndWaitRequest,
+}
 import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.util.retry.RetryUtil.NoExnRetryable.logThrowable
 import com.digitalasset.canton.util.retry.RetryUtil.{
@@ -75,7 +78,7 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       commandId: Option[String] = None,
       workflowId: Option[WorkflowId] = None,
       deduplicationTime: Option[NonNegativeFiniteDuration] = None,
-  )(implicit traceContext: TraceContext): Future[Unit]
+  )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionResponse]
 }
 
 /** Subscription for reading the ledger */
@@ -124,7 +127,11 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
 
   def getUser(user: String): Future[Option[PartyId]]
 
-  def bootstrapUser(user: String): Future[PartyId]
+  def createPartyAndUser(user: String): Future[PartyId]
+
+  def getOrAllocateParty(
+      username: String
+  )(implicit traceContext: TraceContext): Future[PartyId]
 
   def uploadDarFile(packageId: String, darFile: => ByteString)(implicit
       traceContext: TraceContext
@@ -263,7 +270,7 @@ object CoinLedgerConnection {
           commandId: Option[String] = None,
           workflowId: Option[WorkflowId] = None,
           deduplicationTime: Option[NonNegativeFiniteDuration] = None,
-      )(implicit traceContext: TraceContext): Future[Unit] = {
+      )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionResponse] = {
         // Note: reusing the same command id for all retries
         val fullCommand =
           commandsOf(
@@ -283,10 +290,10 @@ object CoinLedgerConnection {
 
       private def submitCommandOnce(
           fullCommand: Commands
-      )(implicit traceContext: TraceContext): Future[Unit] = {
+      )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionResponse] = {
         val commandIdA = fullCommand.commandId
         logger.debug(s"Submitting command [$commandIdA]")
-        val result = client.commandServiceClient.submitAndWait(
+        val result = client.commandServiceClient.submitAndWaitForTransaction(
           new SubmitAndWaitRequest(Some(fullCommand))
         )
 
@@ -299,7 +306,7 @@ object CoinLedgerConnection {
               ),
           )
         }
-        result.map(_ => ())
+        result
       }
 
       def commandsOf(
@@ -368,7 +375,7 @@ object CoinLedgerConnection {
         } yield partyId
       }
 
-      override def bootstrapUser(user: String): Future[PartyId] = {
+      override def createPartyAndUser(user: String): Future[PartyId] = {
         for {
           party <- allocatePartyViaLedgerApi(Some(user), Some(user))
           userId = com.daml.lf.data.Ref.UserId.assertFromString(user)
@@ -381,6 +388,20 @@ object CoinLedgerConnection {
               user.primaryParty
                 .getOrElse(sys.error(s"user $user was allocated without primary party"))
             )
+        } yield partyId
+      }
+
+      // TODO(Robert): Factor out user/party allocation and make it robust (current implementation is racy)
+      override def getOrAllocateParty(
+          username: String
+      )(implicit traceContext: TraceContext): Future[PartyId] = {
+        for {
+          existingPartyId <- getUser(username)
+          partyId <- existingPartyId.fold[Future[PartyId]](createPartyAndUser(username))(
+            Future.successful
+          )
+          // TODO: Is there some automatic logging of submitted commands already? If not, can we introduce it?
+          _ = logger.info(s"User $username and party $partyId are allocated")
         } yield partyId
       }
 
