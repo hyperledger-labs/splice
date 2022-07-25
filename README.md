@@ -72,8 +72,7 @@ More commands can be found in build.sbt and BuildCommon.scala.
 - `scalafixAll`: invoke scalafix across all configurations where scalafix is enabled. 
     It's a linting and rewrite tool we use to organize imports. This may run for a long time as it needs to do a full compile.
 - `format`: apply `scalafmt` to format source files
-- `bundle`: create a release bundle in `apps/app/target/release/<version>`. Add the path to the release binary
-    (`<path-to-repo>/the-real-canton-coin/apps/app/target/release/coin/bin`) to your PATH to be able to call it with `coin`. 
+- `bundle`: create a release bundle in `apps/app/target/release/<version>`. The release binary is loaded into your PATH automatically via `direnv`. Simply run `coin` to call it. 
 
 Test:
 - `testOnly myWildcard`: runs all tests matching wildcard, e.g.,
