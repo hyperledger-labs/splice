@@ -1,10 +1,10 @@
 package com.daml.network.environment
 
 import com.daml.network.console.{
+  LocalDirectoryProviderAppReference,
   LocalSvcAppReference,
   LocalValidatorAppReference,
   LocalWalletAppReference,
-  LocalDirectoryProviderAppReference,
 }
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
 import com.digitalasset.canton.console.{
@@ -44,7 +44,7 @@ class CoinConsoleEnvironment(
       participants.local,
       domains.local,
       validators,
-      Seq(svc),
+      svcOpt.toList,
       wallets,
       directoryProviders,
     ),
@@ -54,11 +54,10 @@ class CoinConsoleEnvironment(
   lazy val validators: Seq[LocalValidatorAppReference] =
     environment.config.validatorsByString.keys.map(createValidatorReference).toSeq
 
-  lazy val svc: LocalSvcAppReference =
+  lazy val svcOpt: Option[LocalSvcAppReference] =
     environment.config.svcsByString.keys
       .map(createSvcReference)
       .headOption
-      .getOrElse(throw new RuntimeException("There should be exactly one SVC app"))
 
   lazy val wallets: Seq[LocalWalletAppReference] =
     environment.config.walletsByString.keys.map(createWalletReference).toSeq
@@ -88,7 +87,7 @@ class CoinConsoleEnvironment(
         helpText("All validator app instances" + genericNodeReferencesDoc, "Validators"),
         validators,
         Seq("App References"),
-      ) :+ TopLevelValue(svc.name, helpText("SVC app", svc.name), svc, Seq("SVC")) :++
+      ) :++
       wallets.map(w =>
         TopLevelValue(w.name, helpText("wallet app", w.name), w, Seq("App References"))
       ) :+ TopLevelValue(
@@ -107,7 +106,9 @@ class CoinConsoleEnvironment(
         ),
         directoryProviders,
         Seq("App References"),
-      )
+      ) :++ svcOpt
+        .map(svc => TopLevelValue(svc.name, helpText("SVC app", svc.name), svc, Seq("SVC")))
+        .toList
   }
 
   private lazy val health_ = new CommunityCantonHealthAdministration(this)

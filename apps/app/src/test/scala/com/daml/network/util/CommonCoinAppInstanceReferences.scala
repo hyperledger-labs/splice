@@ -1,9 +1,10 @@
 package com.daml.network.util
 
 import com.daml.network.console.{
+  LocalDirectoryProviderAppReference,
+  LocalSvcAppReference,
   LocalValidatorAppReference,
   LocalWalletAppReference,
-  LocalDirectoryProviderAppReference,
 }
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 
@@ -11,6 +12,9 @@ import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 // however, likely only possible once Canton is dependent on like a full library
 trait CommonCoinAppInstanceReferences {
 
+  def svc(implicit env: CoinTestConsoleEnvironment): LocalSvcAppReference = env.svcOpt.getOrElse(
+    sys.error("Tried to access the SVC app but it isn't defined in the test's configuration file")
+  )
   def wallet1(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference = w("wallet1")
   def validator1(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
     "validator1"

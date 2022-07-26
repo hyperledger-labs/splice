@@ -47,7 +47,6 @@ class DummyIntegrationTest
   }
 
   "run commands against SVC" in { implicit env =>
-    val svc = env.svc
     clue("start SVC") {
       svc.start()
     }
