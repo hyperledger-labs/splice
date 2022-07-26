@@ -3,6 +3,7 @@ package com.daml.network.console
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.directory.provider.admin.api.client.commands.DirectoryProviderCommands
 import com.daml.network.directory.provider.config.LocalDirectoryProviderAppConfig
+import com.daml.network.directory.provider.DirectoryInstallRequest
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.console.{
   BaseInspection,
@@ -28,9 +29,9 @@ class LocalDirectoryProviderAppReference(
   def config: LocalDirectoryProviderAppConfig =
     consoleEnvironment.environment.config.directoryProvidersByString(name)
 
-  def hello(): Unit = {
+  def listInstallRequests(): Seq[DirectoryInstallRequest] = {
     consoleEnvironment.run {
-      adminCommand(DirectoryProviderCommands.Hello())
+      adminCommand(DirectoryProviderCommands.ListInstallRequests())
     }
   }
 

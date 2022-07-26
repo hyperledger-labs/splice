@@ -1,15 +1,18 @@
 syntax = "proto3";
-package com.daml.network.examples.v0;
+package com.daml.network.directory_provider.v0;
 
 import "google/protobuf/wrappers.proto";
+import "google/protobuf/empty.proto";
 
 service DirectoryProviderService {
-  // Dummy request for tests until we add proper commands
-  rpc hello (HelloRequest) returns (HelloResponse);
+  rpc ListInstallRequests (google.protobuf.Empty) returns (ListInstallRequestsResponse);
 }
 
-message HelloRequest {
+message ListInstallRequestsResponse {
+  repeated InstallRequest install_requests = 1;
 }
 
-message HelloResponse {
+message InstallRequest {
+  string contract_id = 1;
+  string user = 2;
 }

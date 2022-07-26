@@ -2,9 +2,11 @@ package com.daml.network.directory.provider.admin.api.client.commands
 
 import cats.syntax.either._
 import cats.syntax.traverse._
-import com.daml.network.examples.v0
-import com.daml.network.examples.v0.DirectoryProviderServiceGrpc.DirectoryProviderServiceStub
+import com.daml.network.directory.provider.DirectoryInstallRequest
+import com.daml.network.directory_provider.v0
+import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc.DirectoryProviderServiceStub
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
+import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
 
 import scala.concurrent.Future
@@ -17,21 +19,22 @@ object DirectoryProviderCommands {
       v0.DirectoryProviderServiceGrpc.stub(channel)
   }
 
-  case class Hello() extends BaseCommand[v0.HelloRequest, v0.HelloResponse, Unit] {
+  case class ListInstallRequests()
+      extends BaseCommand[Empty, v0.ListInstallRequestsResponse, Seq[DirectoryInstallRequest]] {
 
-    override def createRequest(): Either[String, v0.HelloRequest] =
-      Right(
-        v0.HelloRequest()
-      )
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
 
     override def submitRequest(
         service: DirectoryProviderServiceStub,
-        request: v0.HelloRequest,
-    ): Future[v0.HelloResponse] = service.hello(request)
+        request: Empty,
+    ): Future[v0.ListInstallRequestsResponse] = service.listInstallRequests(request)
 
     override def handleResponse(
-        response: v0.HelloResponse
-    ): Either[String, Unit] =
-      Right(())
+        response: v0.ListInstallRequestsResponse
+    ): Either[String, Seq[DirectoryInstallRequest]] =
+      response.installRequests
+        .traverse(request => DirectoryInstallRequest.fromProto(request))
+        .leftMap(_.toString)
   }
 }

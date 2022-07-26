@@ -9,7 +9,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.client.configuration.CommandClientConfiguration
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrapBase
-import com.daml.network.examples.v0.DirectoryProviderServiceGrpc
+import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc
 import com.daml.network.directory.provider.admin.grpc.GrpcDirectoryProviderService
 import com.daml.network.directory.provider.config.LocalDirectoryProviderAppConfig
 import com.daml.network.directory.provider.metrics.DirectoryProviderAppMetrics

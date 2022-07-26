@@ -266,10 +266,12 @@ lazy val `apps-app` =
     .in(file("apps/app"))
     // make Canton code available to CC repo
     .dependsOn(
+      // Directory provider needs to come first so that the codegened files
+      // come first in the classpath. Otherwise, you get NoSuchMethod errors at runtime.
+      `apps-directory-provider`,
       `apps-validator`,
       `apps-svc`,
       `apps-wallet`,
-      `apps-directory-provider`,
       `canton-community-app` % "compile->compile;test->test",
     )
     .settings(
