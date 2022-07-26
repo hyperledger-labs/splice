@@ -85,9 +85,19 @@ function cluster_create() {
                --node-locations "${CLOUDSDK_COMPUTE_REGION}-a"
 
         #### Enable Firewall Access
-        gcloud container clusters update  ${GCP_CLUSTER_NAME} \
+        gcloud container clusters update ${GCP_CLUSTER_NAME} \
                --enable-master-authorized-networks \
                --master-authorized-networks ${GCP_VPN_NETS}
+
+        #### Delete default firewall rules, if they exist.
+        if (yes | gcloud compute firewall-rules delete \
+                         default-allow-rdp \
+                         default-allow-icmp \
+                         default-allow-ssh 2> /dev/null); then
+            _warn "Deleted default firewall rules."
+        else
+            _log "Default firewalls already removed and do not need to be deleted."
+        fi
     fi
 
     #### Check for IP
@@ -106,7 +116,7 @@ function cluster_delete() {
     cluster_confirm "Delete cluster"
 
     if cluster_exists; then
-        gcloud container clusters delete ${GCP_CLUSTER_NAME}
+        yes | gcloud container clusters delete ${GCP_CLUSTER_NAME}
     else
         _error "Cluster does not exist, cannot delete."
         exit 1
