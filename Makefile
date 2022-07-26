@@ -1,6 +1,6 @@
 # -*- makefile -*-
 
-apps := canton-domain canton-participant docs
+apps := cn-app canton-domain canton-participant docs
 
 .PHONY: docker-build
 docker-build: test
