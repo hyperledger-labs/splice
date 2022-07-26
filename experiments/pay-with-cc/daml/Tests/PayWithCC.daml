@@ -1,6 +1,7 @@
 module Tests.PayWithCC where
 
 import CC.Coin
+import CC.CoinRules
 
 import CC.Scripts.Util
 
@@ -33,34 +34,28 @@ test = script do
     collectionDuration = minutes 5
     approveDuration = minutes 5
 
-  -- user splits off install price & calls install choice
-  -- how: app manager admin interface as part of approval.
-  --      needs integration with cc wallet for payment.
-  pay app user user 0.1 ""
-  [(installCoin, _)] <- queryFilter @Coin user (\c -> c.quantity.initialQuantity == 0.1)
-
   -- user requests entry via app install
   -- how: UI of directory service via write-delegation on app manager & call to
   -- user’s participant.
   entryRequest <- submitMulti [user] [provider, app.svc] $ exerciseCmd directoryInstall DirectoryInstall_RequestEntry with
-   entry = DirectoryEntry with
-     user = user
-     provider = provider
-     name = "cns.darth.vader"
+    entry = DirectoryEntry with
+      user = user
+      provider = provider
+      name = "cns.darth.vader"
 
   -- provider requests payment for entry via app install
   -- how: provider on their own participant.
   paymentRequest <- submit provider $ exerciseCmd directoryInstall DirectoryInstall_RequestEntryPayment with
     requestCid = entryRequest
 
-  -- cc wallet splits off price after user accepted
+  -- cc wallet selects a large enough coin
   -- how: cc wallet
-  pay app user user 1.02 ""
-  [(coin, _)] <- queryFilter @Coin user (\c -> c.quantity.initialQuantity == 1.02)
+  -- note: privacy is no concern here as coin holdings are public
+  [(coin, _)] <- queryFilter @Coin user (\c -> c.quantity.initialQuantity > 1.02)
   -- cc wallet approves payment and locks coin to provider
   -- how: cc wallet
   approvedPayment <- submitMulti [user] [app.svc] $ exerciseCmd paymentRequest PaymentRequest_Approve with
-    coin = coin
+    inputs = [InputCoin coin]
 
   -- directory providers transactionally unlocks & transfer coins
   -- and creates directory entry in return.

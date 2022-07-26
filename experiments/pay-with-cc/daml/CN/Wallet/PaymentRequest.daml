@@ -15,83 +15,92 @@ interface PaymentReference
 
 template PaymentRequest
   with
+    payer : Party
+    -- ^ The party that should pay.
+    payee : Party
+    -- ^ The party requesting to be paid.
     svc : Party
-    -- ^ The issuer of CC that should be paid.
-    provider : Party
-    -- ^ The party requesting the payment
-    user : Party
-    -- ^ The party from which the payment is requested.
+    -- ^ The issuer of CC that should be used to make the payment.
     quantity : Decimal
     -- ^ The amount of CC to be paid.
     expiresAt : Time
-    -- ^ When the request expires.
+    -- ^ When the payment request expires.
     collectionDuration : RelTime
     -- ^ The time available to the provider to collect a payment.
     reference : ContractId PaymentReference
     -- ^ The reference to the reason / good for which the payment is requested.
   where
-    signatory provider, user
+    signatory payee, payer
     ensure (collectionDuration > aunit && quantity > 0.0)
 
     choice PaymentRequest_Approve : ContractId ApprovedPayment
       with
-        coin : ContractId Coin
-      controller user
+        inputs : [TransferInput]
+      controller payer
       do now <- getTime
          assertMsg "PaymentRequest has not expired" (now < expiresAt)
          let transfer = Transfer with
-              sender = user
-              inputs = [InputCoin coin]
+              sender = payer
+              inputs
               outputs =
                 [ OutputSenderCoin with
                     exactQuantity = Some quantity
                     lock = Some TimeLock with
-                      holder = provider
+                      holder = payee
                       expiresAt = now `addRelTime` collectionDuration
+                , OutputSenderCoin with
+                    exactQuantity = None
+                    lock = None
                 ]
               payload = "lock payment"
-         [TransferResultLockedCoin lockedCoin] <-
-           exerciseByKey @CoinRules (svc, svc) (CoinRules_Transfer transfer)
+         (TransferResultLockedCoin lockedCoin::_) <-
+            exerciseByKey @CoinRules (svc, svc) (CoinRules_Transfer transfer)
          create ApprovedPayment
            with
-             svc, provider, user, reference, lockedCoin
+             svc, payee, payer, reference, lockedCoin
 
-    choice PaymentRequest_Retract : ()
-      controller provider
+    choice PaymentRequest_Withdraw : ()
+      controller payee
       do pure ()
 
     choice PaymentRequest_Reject : ()
-      controller user
+      controller payer
       do pure ()
 
 template ApprovedPayment
   with
+    payer : Party
+    payee : Party
     svc : Party
-    provider : Party
-    user : Party
     lockedCoin : ContractId LockedCoin
     reference : ContractId PaymentReference
   where
-    signatory provider, user
+    signatory payee, payer
 
-    choice ApprovedPayment_Pay : ()
-      controller provider, user
-      do coin <- exercise lockedCoin Coin_Unlock
-         let transfer = Transfer with
-               sender = user
-               inputs = [InputCoin coin]
-               outputs =
-                 [ OutputReceiverCoin with
-                     receiver = provider
-                     coinType = FloatingReceiverCoin
-                 ]
-               payload = "transfer locked payment"
-         void $ exerciseByKey @CoinRules (svc, svc) (CoinRules_Transfer transfer)
-
-    choice ApprovedPayment_Expire : ContractId Coin
-      controller user
-      do exercise lockedCoin Coin_OwnerExpireLock
+    choice ApprovedPayment_Collect : ContractId PaymentReference
+      controller payee, payer
+      do
+        -- unlock coin and transfer the remainder to the payee
+        coin <- exercise lockedCoin Coin_Unlock
+        let transfer = Transfer with
+              sender = payer
+              inputs = [InputCoin coin]
+              outputs =
+                [ OutputReceiverCoin with
+                    receiver = payee
+                    coinType = FloatingReceiverCoin
+                ]
+              payload = "transfer locked payment"
+        void $ exerciseByKey @CoinRules (svc, svc) (CoinRules_Transfer transfer)
+        -- defensive check that the reference is still active
+        void $ fetch reference
+        pure reference
 
     choice ApprovedPayment_Discard : ContractId Coin
-      controller provider
+      controller payee
       do exercise lockedCoin Coin_Unlock
+
+    choice ApprovedPayment_Expire : ContractId Coin
+      controller payer
+      do exercise lockedCoin Coin_OwnerExpireLock
+      

@@ -63,28 +63,25 @@ template DirectoryInstall with
          (_, rules) <- fetchByKey @DirectoryInstall provider
          now <- getTime
          create PaymentRequest with
+           payee = provider
+           payer = user
            svc = svc
-           provider = provider
-           user = user
            quantity = request.entryFee
            reference = toInterfaceContractId requestCid
            collectionDuration = rules.collectionDuration
            expiresAt = now `addRelTime` rules.approveDuration
-          --  redirectUri = directoryServiceUrl
 
     nonconsuming choice DirectoryInstall_CollectEntryPayment : ()
       with
         approvedPayment : ContractId ApprovedPayment
       controller provider
-      do payment <- fetch approvedPayment
-         lockedCoin <- fetch payment.lockedCoin
-         Some (requestId, request) <- fetchFromInterface @DirectoryEntryRequest payment.reference
-         exercise approvedPayment ApprovedPayment_Pay
+      do -- collect approved payment
+         reference <- exercise approvedPayment ApprovedPayment_Collect
+         -- deliver the promised good: the entry referenced in the payment
+         Some (requestId, request) <- fetchFromInterface @DirectoryEntryRequest reference
          archive requestId
          create request.entry
          pure ()
-
-
 
 -- | A request from a user to a directory service provider for an installation.
 -- Used to mock the actuall installation process until we have
