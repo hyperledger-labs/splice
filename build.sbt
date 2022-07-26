@@ -1,7 +1,7 @@
 import BuildCommon.{runCommand, sharedCantonSettings}
 import Dependencies._
 import DamlPlugin.autoImport._
-import sbtassembly.{MergeStrategy, PathList}
+import sbtassembly.{AssemblyUtils, MergeStrategy, PathList}
 
 /*
  * sbt-settings that will be shared between all CN apps.
@@ -168,6 +168,48 @@ lazy val `apps-directory-operator` =
       scalacOptions += "-Wconf:src=src_managed/.*:silent",
     )
 
+val scalaCodegenStrategy = new MergeStrategy {
+  // Copied from SBT because they forgot to make it public
+  // https://github.com/sbt/sbt-assembly/issues/435
+  val PathRE = "([^/]+)/(.*)".r
+  def sourceOfFileForMerge(tempDir: File, f: File): (File, File, String, Boolean) = {
+    val baseURI = tempDir.getCanonicalFile.toURI
+    val otherURI = f.getCanonicalFile.toURI
+    val relative = baseURI.relativize(otherURI)
+    val PathRE(head, tail) = relative.getPath
+    val base = tempDir / head
+
+    if ((tempDir / (head + ".jarName")) exists) {
+      val jarName = IO.read(tempDir / (head + ".jarName"), IO.utf8)
+      (new File(jarName), base, tail, true)
+    } else {
+      val dirName = IO.read(tempDir / (head + ".dir"), IO.utf8)
+      (new File(dirName), base, tail, false)
+    } // if-else
+  }
+  val name = "scala codegen strat"
+  def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] = {
+    val result = files.collectFirst {
+      // Directory operator depends on everything so we can safely
+      // chose that.
+      case f if sourceOfFileForMerge(tempDir, f)._1.getPath().contains("directory-operator") => f
+    }
+    result match {
+      case None => Left(s"None of the codegened files originate from directory-operator: ${files}")
+      case Some(f) => Right(Seq((f, path)))
+    }
+  }
+}
+
+def isScalaCodegenFile(fileName: String): Boolean = {
+  fileName match {
+    // We codegen into com.digitalasset while our source is in com.daml so
+    // we can detect it that way.
+    case PathList("com", "digitalasset", "network", _*) => true
+    case _ => false
+  }
+}
+
 // Copied from Canton. Can probably be removed once we use Canton as a library.
 def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy = {
   {
@@ -192,6 +234,7 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     case "META-INF/versions/9/module-info.class" => MergeStrategy.discard
     case path if path.contains("module-info.class") => MergeStrategy.discard
     case PathList("org", "jline", _ @_*) => MergeStrategy.first
+    case path if isScalaCodegenFile(path) => scalaCodegenStrategy
     case x => oldStrategy(x)
   }
 }
