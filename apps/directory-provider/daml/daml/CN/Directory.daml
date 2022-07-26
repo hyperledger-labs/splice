@@ -5,7 +5,6 @@ import DA.Time
 
 import CN.Wallet.PaymentRequest
 
-
 template DirectoryEntry
   with
     user : Party

@@ -1,10 +1,10 @@
 module CN.Wallet.PaymentRequest where
 
-import CC.Coin
-import CC.CoinRules
-
 import DA.Action
 import DA.Time
+
+import CC.Coin
+import CC.CoinRules
 
 -- | A reference to the reason for a payment.
 -- TODO: better naming
@@ -103,4 +103,3 @@ template ApprovedPayment
     choice ApprovedPayment_Expire : ContractId Coin
       controller payer
       do exercise lockedCoin Coin_OwnerExpireLock
-      

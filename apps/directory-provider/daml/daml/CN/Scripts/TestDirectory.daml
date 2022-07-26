@@ -1,15 +1,14 @@
-module Tests.PayWithCC where
-
-import CC.Coin
-import CC.CoinRules
-
-import CC.Scripts.Util
+module CN.Scripts.TestDirectory where
 
 import DA.Time
 import Daml.Script
 
+import CC.Coin
+import CC.CoinRules
 import CN.Directory
 import CN.Wallet.PaymentRequest
+
+import CC.Scripts.Util
 
 test = script do
   app <- setupApp

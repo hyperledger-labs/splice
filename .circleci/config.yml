@@ -358,39 +358,6 @@ jobs:
            cd experiments/upgrading/approach2
            make test-cc
 
-  pay_with_cc:
-    docker:
-    - image: eclipse-temurin:11
-    environment:
-      <<: *env
-      SDK_VERSION: << pipeline.parameters.sdk-version >>
-    steps:
-      - run:
-          name: install deps
-          command: |
-            set -eou pipefail
-            curl https://get.daml.com | sh -s $SDK_VERSION
-            printf "auto-install: false\nupdate-check: never\n" >> $HOME/.daml/daml-config.yaml
-            curl -fsSL https://deb.nodesource.com/setup_16.x | bash -
-            apt-get install -y nodejs
-      - checkout
-      - run:
-         name: daml build (canton-coin)
-         command: |
-           set -euo pipefail
-           export PATH=$HOME/.daml/bin:$PATH
-
-           cd canton-coin
-           daml build
-      - run:
-         name: daml build (experiments/pay-with-cc)
-         command: |
-           set -euo pipefail
-           export PATH=$HOME/.daml/bin:$PATH
-
-           cd experiments/pay-with-cc
-           daml build
-
   docs:
     docker:
     - image: cimg/base:2021.04
@@ -476,8 +443,6 @@ workflows:
     jobs:
     # CC Daml model
     - canton_coin:
-        <<: *notify-fail
-    - pay_with_cc:
         <<: *notify-fail
     - upgrading_coin:
         <<: *notify-fail
