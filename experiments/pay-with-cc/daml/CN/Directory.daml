@@ -1,23 +1,19 @@
 module CN.Directory where
 
-import CC.Coin
-
 import DA.Assert
 import DA.Time
 
 import CN.Wallet.PaymentRequest
 
 
--- Defined by the directory service
 template DirectoryEntry
   with
     user : Party
     provider : Party
-    payload : Text
+    name : Text
   where
     signatory user, provider
 
--- Defined by the directory service
 template DirectoryEntryRequest
   with
     entry : DirectoryEntry
@@ -32,77 +28,39 @@ template DirectoryEntryRequest
       controller entry.provider
       do pure ()
 
--- Defined by directory service
-template DirectoryRules with
+template DirectoryInstall with
     provider : Party
+    user : Party
     svc : Party
     entryFee : Decimal
-    installFee : Decimal
     collectionDuration : RelTime -- Time provider has to collect approved payment
     approveDuration : RelTime -- Time user has to approve a payment request
-    directoryServiceUrl : Text
   where
-    signatory provider
+    signatory provider, user
 
     key provider : Party
     maintainer key
 
-    nonconsuming choice DirectoryRules_RequestEntry
+    nonconsuming choice DirectoryInstall_RequestEntry
       : ContractId DirectoryEntryRequest
       with
         entry : DirectoryEntry
-      controller entry.user, provider
+      controller user
       do
         assertMsg "Entry provider equals provider" (entry.provider == provider)
+        assertMsg "Entry user equals user" (entry.user == user)
         create DirectoryEntryRequest with
           entry
           entryFee
 
-    nonconsuming choice DirectoryRules_Install
-      : ContractId DirectoryServiceAppInstall
-      with
-        user : Party
-        coinCid : ContractId Coin
-        ccWalletUrl : Text
-      controller user
-      do coin <- fetch coinCid
-         assertMsg "Coin owner & svc match" ((coin.owner, coin.svc) == (user, svc))
-         create DirectoryServiceAppInstall
-           with
-             svc
-             provider
-             user
-             directoryServiceUrl
-             ccWalletUrl
-
--- Defined by directory service
-template DirectoryServiceAppInstall
-  with
-    svc : Party
-    provider : Party
-    user : Party
-    directoryServiceUrl : Text
-    ccWalletUrl : Text
-  where
-    signatory provider, user
-    key (provider, user) : (Party, Party)
-    maintainer key._1, key._2
-
-    nonconsuming choice DirectoryServiceAppInstall_RequestDirectoryEntry : ContractId DirectoryEntryRequest
-      with
-        entry : DirectoryEntry
-      controller user
-      do exerciseByKey @DirectoryRules provider DirectoryRules_RequestEntry with
-           entry
-
-    nonconsuming choice DirectoryServiceAppInstall_RequestEntryPayment : ContractId PaymentRequest
+    nonconsuming choice DirectoryInstall_RequestEntryPayment : ContractId PaymentRequest
       with
         requestCid : ContractId DirectoryEntryRequest
       controller provider
       do request <- fetch requestCid
          request.entry.provider === provider
          request.entry.user === user
-         (_, rules) <- fetchByKey @DirectoryRules provider
+         (_, rules) <- fetchByKey @DirectoryInstall provider
          now <- getTime
          create PaymentRequest with
            svc = svc
@@ -112,9 +70,9 @@ template DirectoryServiceAppInstall
            reference = toInterfaceContractId requestCid
            collectionDuration = rules.collectionDuration
            expiresAt = now `addRelTime` rules.approveDuration
-           redirectUri = directoryServiceUrl
+          --  redirectUri = directoryServiceUrl
 
-    nonconsuming choice DirectoryServiceAppInstall_CollectEntryPayment : ()
+    nonconsuming choice DirectoryInstall_CollectEntryPayment : ()
       with
         approvedPayment : ContractId ApprovedPayment
       controller provider
@@ -125,3 +83,27 @@ template DirectoryServiceAppInstall
          archive requestId
          create request.entry
          pure ()
+
+
+
+-- | A request from a user to a directory service provider for an installation.
+-- Used to mock the actuall installation process until we have
+-- 1. explicit disclosure
+-- 2. app architecture defined
+-- 3. app manager built
+--
+template DirectoryInstallRequest with
+    provider : Party
+    user : Party
+  where
+    signatory user
+    observer provider
+
+    choice DirectoryInstallRequest_Accept : ContractId DirectoryInstall
+      with
+        svc : Party
+        entryFee : Decimal
+        collectionDuration : RelTime -- Time provider has to collect approved payment
+        approveDuration : RelTime -- Time user has to approve a payment request
+      controller provider
+      do create DirectoryInstall with ..

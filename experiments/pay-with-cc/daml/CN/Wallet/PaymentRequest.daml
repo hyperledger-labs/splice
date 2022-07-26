@@ -6,36 +6,29 @@ import CC.CoinRules
 import DA.Action
 import DA.Time
 
-
--- wrapper around exercise by key for CoinRules intended to be called via createAndExercise
-template TransferWrapper
-  with
-    p : Party
-    svc : Party
-  where
-    signatory p
-    choice ExerciseTransfer : [TransferResult]
-      with
-        transfer : Transfer
-      controller transferControllers transfer
-      do exerciseByKey @CoinRules (svc, svc) (CoinRules_Transfer transfer)
-
--- Defined by CC wallet
+-- | A reference to the reason for a payment.
+-- TODO: better naming
 interface PaymentReference
   where
     getDescription : Text
 
--- Defined by CC wallet
+
 template PaymentRequest
   with
     svc : Party
+    -- ^ The issuer of CC that should be paid.
     provider : Party
+    -- ^ The party requesting the payment
     user : Party
+    -- ^ The party from which the payment is requested.
     quantity : Decimal
-    collectionDuration : RelTime
+    -- ^ The amount of CC to be paid.
     expiresAt : Time
+    -- ^ When the request expires.
+    collectionDuration : RelTime
+    -- ^ The time available to the provider to collect a payment.
     reference : ContractId PaymentReference
-    redirectUri : Text
+    -- ^ The reference to the reason / good for which the payment is requested.
   where
     signatory provider, user
     ensure (collectionDuration > aunit && quantity > 0.0)
@@ -71,7 +64,6 @@ template PaymentRequest
       controller user
       do pure ()
 
--- Defined by CC wallet
 template ApprovedPayment
   with
     svc : Party

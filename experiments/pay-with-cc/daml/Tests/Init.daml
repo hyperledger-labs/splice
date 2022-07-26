@@ -25,20 +25,18 @@ setup = script do
 
   pay app app.svc user 5.0 ""
 
-  directoryRules <- submit provider $ createCmd DirectoryRules with
+  -- create one installation per user
+  directoryInstallRequest <- submit user $ createCmd DirectoryInstallRequest with
     provider = provider
+    user = user
+
+  directoryInstall <- submit provider $ exerciseCmd directoryInstallRequest DirectoryInstallRequest_Accept with
     svc = app.svc
     entryFee = 1.0
-    installFee = 0.1
     collectionDuration = minutes 5
     approveDuration = minutes 5
-    directoryServiceUrl = "http://localhost:3000"
 
   pay app user user 0.1 ""
   [(installCoin, _)] <- queryFilter @Coin user (\c -> c.quantity.initialQuantity == 0.1)
-  directoryInstall <- submitMulti [user] [provider, app.svc] $ exerciseCmd directoryRules DirectoryRules_Install with
-    user = user
-    coinCid = installCoin
-    ccWalletUrl = "http://localhost:3001"
 
   pure ()
