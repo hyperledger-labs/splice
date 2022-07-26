@@ -128,3 +128,12 @@ class WalletAppRemoteParticipantReference(
   override def config: RemoteParticipantConfig =
     consoleEnvironment.environment.config.walletsByString(appName).remoteParticipant
 }
+
+class DirectoryProviderAppRemoteParticipantReference(
+    consoleEnvironment: CoinConsoleEnvironment,
+    override val name: String,
+    appName: String,
+) extends RemoteParticipantReference(consoleEnvironment, name) {
+  override def config: RemoteParticipantConfig =
+    consoleEnvironment.environment.config.directoryProvidersByString(appName).remoteParticipant
+}

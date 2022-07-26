@@ -4,6 +4,7 @@ import com.daml.network.console.{
   LocalSvcAppReference,
   LocalValidatorAppReference,
   LocalWalletAppReference,
+  LocalDirectoryProviderAppReference,
 }
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
 import com.digitalasset.canton.console.{
@@ -39,7 +40,14 @@ class CoinConsoleEnvironment(
 
   override lazy val nodes = NodeReferences(
     // this override ensures that config options like manualStart also work for CN apps
-    mergeLocalInstances(participants.local, domains.local, validators, Seq(svc), wallets),
+    mergeLocalInstances(
+      participants.local,
+      domains.local,
+      validators,
+      Seq(svc),
+      wallets,
+      directoryProviders,
+    ),
     mergeRemoteInstances(participants.remote, domains.remote),
   )
 
@@ -55,6 +63,9 @@ class CoinConsoleEnvironment(
   lazy val wallets: Seq[LocalWalletAppReference] =
     environment.config.walletsByString.keys.map(createWalletReference).toSeq
 
+  lazy val directoryProviders: Seq[LocalDirectoryProviderAppReference] =
+    environment.config.directoryProvidersByString.keys.map(createDirectoryProviderReference).toSeq
+
   private def createValidatorReference(name: String): LocalValidatorAppReference =
     new LocalValidatorAppReference(this, name)
 
@@ -63,6 +74,9 @@ class CoinConsoleEnvironment(
 
   private def createWalletReference(name: String): LocalWalletAppReference =
     new LocalWalletAppReference(this, name)
+
+  private def createDirectoryProviderReference(name: String): LocalDirectoryProviderAppReference =
+    new LocalDirectoryProviderAppReference(this, name)
 
   override protected def topLevelValues: Seq[TopLevelValue[_]] = {
 
@@ -74,8 +88,26 @@ class CoinConsoleEnvironment(
         helpText("All validator app instances" + genericNodeReferencesDoc, "Validators"),
         validators,
         Seq("App References"),
-      ) :+ TopLevelValue(svc.name, helpText("SVC app", svc.name), svc, Seq("SVC"))
-
+      ) :+ TopLevelValue(svc.name, helpText("SVC app", svc.name), svc, Seq("SVC")) :++
+      wallets.map(w =>
+        TopLevelValue(w.name, helpText("wallet app", w.name), w, Seq("App References"))
+      ) :+ TopLevelValue(
+        "wallets",
+        helpText("All wallet app instances" + genericNodeReferencesDoc, "Wallets"),
+        wallets,
+        Seq("App References"),
+      ) :++
+      directoryProviders.map(v =>
+        TopLevelValue(v.name, helpText("directory provider app", v.name), v, Seq("App References"))
+      ) :+ TopLevelValue(
+        "directoryProviders",
+        helpText(
+          "All directory provider app instances" + genericNodeReferencesDoc,
+          "Directory providers",
+        ),
+        directoryProviders,
+        Seq("App References"),
+      )
   }
 
   private lazy val health_ = new CommunityCantonHealthAdministration(this)

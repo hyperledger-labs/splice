@@ -1,0 +1,15 @@
+syntax = "proto3";
+package com.daml.network.examples.v0;
+
+import "google/protobuf/wrappers.proto";
+
+service DirectoryProviderService {
+  // Dummy request for tests until we add proper commands
+  rpc hello (HelloRequest) returns (HelloResponse);
+}
+
+message HelloRequest {
+}
+
+message HelloResponse {
+}

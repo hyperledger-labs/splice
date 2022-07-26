@@ -40,7 +40,7 @@ lazy val root = (project in file("."))
     `apps-svc`,
     `apps-app`,
     `apps-wallet`,
-    `apps-directory-operator`,
+    `apps-directory-provider`,
     `canton-community-common`,
     `canton-blake2b`,
     `canton-slick-fork`,
@@ -139,9 +139,9 @@ lazy val `apps-wallet` =
       scalacOptions += "-Wconf:src=src_managed/.*:silent",
     )
 
-lazy val `apps-directory-operator` =
+lazy val `apps-directory-provider` =
   project
-    .in(file("apps/directory-operator"))
+    .in(file("apps/directory-provider"))
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
       `apps-wallet` % "compile->compile;test->test",
@@ -155,8 +155,8 @@ lazy val `apps-directory-operator` =
         scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
       ),
       Compile / damlBuild := ((Compile / damlBuild) dependsOn `apps-wallet` / Compile / damlBuild).value,
-      Compile / damlSourceDirectory := file("apps/directory-operator/daml"),
-      Compile / damlDarOutput := file("apps/directory-operator/daml") / ".daml" / "dist",
+      Compile / damlSourceDirectory := file("apps/directory-provider/daml"),
+      Compile / damlDarOutput := file("apps/directory-provider/daml") / ".daml" / "dist",
       Compile / damlCodeGeneration := Seq(
         (
           (Compile / damlSourceDirectory).value / "daml",
@@ -190,12 +190,12 @@ val scalaCodegenStrategy = new MergeStrategy {
   val name = "scala codegen strat"
   def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] = {
     val result = files.collectFirst {
-      // Directory operator depends on everything so we can safely
+      // Directory provider depends on everything so we can safely
       // chose that.
-      case f if sourceOfFileForMerge(tempDir, f)._1.getPath().contains("directory-operator") => f
+      case f if sourceOfFileForMerge(tempDir, f)._1.getPath().contains("directory-provider") => f
     }
     result match {
-      case None => Left(s"None of the codegened files originate from directory-operator: ${files}")
+      case None => Left(s"None of the codegened files originate from directory-provider: ${files}")
       case Some(f) => Right(Seq((f, path)))
     }
   }
@@ -269,7 +269,7 @@ lazy val `apps-app` =
       `apps-validator`,
       `apps-svc`,
       `apps-wallet`,
-      `apps-directory-operator`,
+      `apps-directory-provider`,
       `canton-community-app` % "compile->compile;test->test",
     )
     .settings(

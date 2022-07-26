@@ -1,6 +1,10 @@
 package com.daml.network.util
 
-import com.daml.network.console.{LocalValidatorAppReference, LocalWalletAppReference}
+import com.daml.network.console.{
+  LocalValidatorAppReference,
+  LocalWalletAppReference,
+  LocalDirectoryProviderAppReference,
+}
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 
 // TODO(Arne): these should eventually be defined analogue to Canton's `participant1` references etc
@@ -10,6 +14,11 @@ trait CommonCoinAppInstanceReferences {
   def wallet1(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference = w("wallet1")
   def validator1(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
     "validator1"
+  )
+  def directoryProvider(implicit
+      env: CoinTestConsoleEnvironment
+  ): LocalDirectoryProviderAppReference = dp(
+    "directoryprovider"
   )
 
   def w(name: String)(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference =
@@ -22,4 +31,10 @@ trait CommonCoinAppInstanceReferences {
       .find(_.name == name)
       .getOrElse(sys.error(s"validator [$name] not configured"))
 
+  def dp(
+      name: String
+  )(implicit env: CoinTestConsoleEnvironment): LocalDirectoryProviderAppReference =
+    env.directoryProviders
+      .find(_.name == name)
+      .getOrElse(sys.error(s"validator [$name] not configured"))
 }
