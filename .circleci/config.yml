@@ -375,7 +375,7 @@ jobs:
             apt-get install -y nodejs
       - checkout
       - run:
-         name: daml build
+         name: daml build (canton-coin)
          command: |
            set -euo pipefail
            export PATH=$HOME/.daml/bin:$PATH
@@ -383,32 +383,13 @@ jobs:
            cd canton-coin
            daml build
       - run:
-         name: daml build & codegen
+         name: daml build (experiments/pay-with-cc)
          command: |
            set -euo pipefail
            export PATH=$HOME/.daml/bin:$PATH
 
            cd experiments/pay-with-cc
            daml build
-           ./codegen.sh
-      - run:
-          name: "directory service: npm build"
-          command: |
-            set -eou pipefail
-            export PATH=$HOME/.daml/bin:$PATH
-
-            cd experiments/pay-with-cc/directoryservice
-            npm install
-            npm run build
-      - run:
-          name: "ccwallet: npm build"
-          command: |
-            set -eou pipefail
-            export PATH=$HOME/.daml/bin:$PATH
-
-            cd experiments/pay-with-cc/ccwallet
-            npm install
-            npm run build
 
   docs:
     docker:

@@ -1,11 +1,12 @@
-module Init where
+module Tests.Init where
 
 import DA.Time
 import Daml.Script
 
 import CC.Coin
 import CC.Scripts.Util
-import PayWithCC
+
+import CN.Directory
 
 setup = script do
   app <- setupApp
