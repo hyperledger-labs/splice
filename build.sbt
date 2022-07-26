@@ -40,6 +40,7 @@ lazy val root = (project in file("."))
     `apps-svc`,
     `apps-app`,
     `apps-wallet`,
+    `apps-directory-operator`,
     `canton-community-common`,
     `canton-blake2b`,
     `canton-slick-fork`,
@@ -116,12 +117,52 @@ lazy val `apps-wallet` =
   project
     .in(file("apps/wallet"))
     .dependsOn(`apps-common` % "compile->compile;test->test")
+    .enablePlugins(DamlPlugin)
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedSettings,
       BuildCommon.cantonWarts,
       Compile / PB.targets := Seq(
         scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
+      ),
+      Compile / damlBuild := ((Compile / damlBuild) dependsOn `apps-common` / Compile / damlBuild).value,
+      Compile / damlSourceDirectory := file("apps/wallet/daml"),
+      Compile / damlDarOutput := file("apps/wallet/daml") / ".daml" / "dist",
+      Compile / damlCodeGeneration := Seq(
+        (
+          (Compile / damlSourceDirectory).value / "daml",
+          (Compile / damlDarOutput).value / "wallet.dar",
+          "com.digitalasset.network",
+        )
+      ),
+      Compile / PB.protoSources ++= (Test / PB.protoSources).value,
+      scalacOptions += "-Wconf:src=src_managed/.*:silent",
+    )
+
+lazy val `apps-directory-operator` =
+  project
+    .in(file("apps/directory-operator"))
+    .dependsOn(
+      `apps-common` % "compile->compile;test->test",
+      `apps-wallet` % "compile->compile;test->test",
+    )
+    .enablePlugins(DamlPlugin)
+    .settings(
+      libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
+      BuildCommon.sharedSettings,
+      BuildCommon.cantonWarts,
+      Compile / PB.targets := Seq(
+        scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
+      ),
+      Compile / damlBuild := ((Compile / damlBuild) dependsOn `apps-wallet` / Compile / damlBuild).value,
+      Compile / damlSourceDirectory := file("apps/directory-operator/daml"),
+      Compile / damlDarOutput := file("apps/directory-operator/daml") / ".daml" / "dist",
+      Compile / damlCodeGeneration := Seq(
+        (
+          (Compile / damlSourceDirectory).value / "daml",
+          (Compile / damlDarOutput).value / "directory-service.dar",
+          "com.digitalasset.network",
+        )
       ),
       Compile / PB.protoSources ++= (Test / PB.protoSources).value,
       scalacOptions += "-Wconf:src=src_managed/.*:silent",
@@ -185,6 +226,7 @@ lazy val `apps-app` =
       `apps-validator`,
       `apps-svc`,
       `apps-wallet`,
+      `apps-directory-operator`,
       `canton-community-app` % "compile->compile;test->test",
     )
     .settings(
