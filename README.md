@@ -16,6 +16,10 @@ project dependencies on its `PATH`.
 
 If you encounter issues, try exiting & reentering the directory to reactivate direnv.
 
+### As a new joiner
+For your first issue, you can take a look at [issues labelled with the `starter` tag](https://github.com/DACH-NY/the-real-canton-coin/issues?q=is%3Aissue+label%3Astarter). Else, please ask your onboarding
+buddy for help with getting started on the code base. 
+
 ## Directory layout
 
 See the `README.md` files in the top-level directories for details.
