@@ -60,7 +60,7 @@ class GrpcDirectoryProviderService(
       for {
         partyId <- getParty()
         activeContracts <- connection.activeContracts(
-          txFilter(partyId, ApiTypes.TemplateId.unwrap(codegen.DirectoryInstallRequest.id))
+          CoinLedgerConnection.transactionFilter(partyId, codegen.DirectoryInstallRequest.id)
         )
         installRequestsLAPI = activeContracts._1.flatMap(event =>
           DecodeUtil.decodeCreated(codegen.DirectoryInstallRequest)(event)
@@ -101,17 +101,5 @@ class GrpcDirectoryProviderService(
         v0.AcceptInstallRequestResponse(installs(0).contractId.toString)
       }
     }
-
-  private def txFilter(partyId: PartyId, tplId: Identifier): TransactionFilter = {
-    transaction_filter.TransactionFilter(
-      Map(
-        partyId.toPrim.toString -> Filters(
-          Some(
-            InclusiveFilters(templateIds = Seq(tplId))
-          )
-        )
-      )
-    )
-  }
 
 }

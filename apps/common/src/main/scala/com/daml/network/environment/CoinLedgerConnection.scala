@@ -526,6 +526,15 @@ object CoinLedgerConnection {
   def transactionFilter(ps: PartyId*): TransactionFilter =
     TransactionFilter(ps.map(p => p.toProtoPrimitive -> Filters.defaultInstance).toMap)
 
+  def transactionFilter(partyId: PartyId, template: P.TemplateId[_]): TransactionFilter =
+    TransactionFilter(
+      Map(
+        partyId.toProtoPrimitive -> Filters(
+          Some(InclusiveFilters(templateIds = Seq(TemplateId.unwrap(template))))
+        )
+      )
+    )
+
   def transactionFilterByParty(filter: Map[PartyId, Seq[TemplateId]]): TransactionFilter =
     TransactionFilter(filter.map {
       case (p, Nil) => p.toPrim.unwrap -> Filters.defaultInstance

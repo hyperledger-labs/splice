@@ -50,7 +50,9 @@ class GrpcWalletService(
         partyIdO <- connection.getUser(walletDamlUser)
         partyId = partyIdO.getOrElse(sys.error(s"Unable to find party for user $walletDamlUser"))
         _ = logger.info(s"received partyid for user testuser: $partyId")
-        activeContractsRes <- connection.activeContracts(construct_list_filter(partyId))
+        activeContractsRes <- connection.activeContracts(
+          CoinLedgerConnection.transactionFilter(partyId, Coin.id)
+        )
         coinsLAPI = activeContractsRes._1.flatMap(event => DecodeUtil.decodeCreated(Coin)(event))
 
       } yield {
@@ -83,18 +85,6 @@ class GrpcWalletService(
         )
       } yield v0.TapResponse(coins(0).contractId.toString)
     }
-
-  private def construct_list_filter(partyId: PartyId): TransactionFilter = {
-    transaction_filter.TransactionFilter(
-      Map(
-        partyId.toPrim.toString -> Filters(
-          Some(
-            InclusiveFilters(templateIds = Seq(CoinUtil.coinTemplateId))
-          )
-        )
-      )
-    )
-  }
 
   override def initialize(request: InitializeRequest): Future[InitializeResponse] = {
     svcParty.set(
