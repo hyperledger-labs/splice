@@ -2,6 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.network.console.{LocalValidatorAppReference, LocalWalletAppReference}
+import com.daml.network.directory.provider.DirectoryEntry
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -10,6 +11,7 @@ import com.daml.network.integration.tests.CoinTests.{
   IsolatedCoinEnvironments,
 }
 import com.daml.network.util.CommonCoinAppInstanceReferences
+import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.network.{CC => coinCodegen}
 import com.digitalasset.network.CN.{Directory => codegen, Wallet => walletCodegen}
@@ -23,6 +25,7 @@ class DirectoryProviderIntegrationTest
   private val damlUser = "provider"
   private val quantity = 100d
   private val directoryDarPath = "apps/directory-provider/daml/.daml/dist/directory-service.dar"
+  private val entryName = "mycoolentry"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
@@ -106,7 +109,7 @@ class DirectoryProviderIntegrationTest
                 codegen.DirectoryEntry(
                   userParty.toPrim,
                   providerParty.toPrim,
-                  "mycoolentry",
+                  entryName,
                 )
               ),
             )
@@ -152,6 +155,11 @@ class DirectoryProviderIntegrationTest
       val entry = directoryProvider.remoteParticipant.ledger_api.acs
         .await(providerParty, codegen.DirectoryEntry)
       entry.contractId shouldBe cid
+      val entryValue = DirectoryEntry(cid, userParty, entryName)
+      directoryProvider.listEntries() shouldBe Seq(entryValue)
+      directoryProvider.lookupEntryByName(entryName) shouldBe entryValue
+      directoryProvider.lookupEntryByParty(userParty) shouldBe entryValue
+      an[CommandFailure] should be thrownBy directoryProvider.lookupEntryByName("nonexistentname")
     }
   }
 }

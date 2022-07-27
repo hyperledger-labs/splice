@@ -4,10 +4,15 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.Primitive
-import com.daml.network.directory.provider.{DirectoryEntryRequest, DirectoryInstallRequest}
+import com.daml.network.directory.provider.{
+  DirectoryEntry,
+  DirectoryEntryRequest,
+  DirectoryInstallRequest,
+}
 import com.daml.network.directory_provider.v0
 import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc.DirectoryProviderServiceStub
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
+import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.network.CN.{Directory => codegen, Wallet => walletCodegen}
 import com.google.protobuf.empty.Empty
@@ -136,5 +141,86 @@ object DirectoryProviderCommands {
         response: v0.CollectEntryPaymentResponse
     ): Either[String, Primitive.ContractId[codegen.DirectoryEntry]] =
       Right(Primitive.ContractId[codegen.DirectoryEntry](response.contractId))
+  }
+
+  case class ListEntries(
+  ) extends BaseCommand[
+        Empty,
+        v0.ListEntriesResponse,
+        Seq[DirectoryEntry],
+      ] {
+
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
+
+    override def submitRequest(
+        service: DirectoryProviderServiceStub,
+        request: Empty,
+    ): Future[v0.ListEntriesResponse] = service.listEntries(request)
+
+    override def handleResponse(
+        response: v0.ListEntriesResponse
+    ): Either[String, Seq[DirectoryEntry]] =
+      response.entries.traverse(entry => DirectoryEntry.fromProto(entry)).leftMap(_.toString)
+  }
+
+  case class LookupEntryByParty(
+      party: PartyId
+  ) extends BaseCommand[
+        v0.LookupEntryByPartyRequest,
+        v0.LookupEntryResponse,
+        DirectoryEntry,
+      ] {
+
+    override def createRequest(): Either[String, v0.LookupEntryByPartyRequest] =
+      Right(
+        v0.LookupEntryByPartyRequest(party.toProtoPrimitive)
+      )
+
+    override def submitRequest(
+        service: DirectoryProviderServiceStub,
+        request: v0.LookupEntryByPartyRequest,
+    ): Future[v0.LookupEntryResponse] = service.lookupEntryByParty(request)
+
+    override def handleResponse(
+        response: v0.LookupEntryResponse
+    ): Either[String, DirectoryEntry] = {
+      val r = for {
+        entryField <- ProtoConverter.required("entry", response.entry)
+        entry <- DirectoryEntry.fromProto(entryField)
+      } yield entry
+      r.leftMap(_.toString)
+
+    }
+  }
+
+  case class LookupEntryByName(
+      name: String
+  ) extends BaseCommand[
+        v0.LookupEntryByNameRequest,
+        v0.LookupEntryResponse,
+        DirectoryEntry,
+      ] {
+
+    override def createRequest(): Either[String, v0.LookupEntryByNameRequest] =
+      Right(
+        v0.LookupEntryByNameRequest(name)
+      )
+
+    override def submitRequest(
+        service: DirectoryProviderServiceStub,
+        request: v0.LookupEntryByNameRequest,
+    ): Future[v0.LookupEntryResponse] = service.lookupEntryByName(request)
+
+    override def handleResponse(
+        response: v0.LookupEntryResponse
+    ): Either[String, DirectoryEntry] = {
+      val r = for {
+        entryField <- ProtoConverter.required("entry", response.entry)
+        entry <- DirectoryEntry.fromProto(entryField)
+      } yield entry
+      r.leftMap(_.toString)
+
+    }
   }
 }

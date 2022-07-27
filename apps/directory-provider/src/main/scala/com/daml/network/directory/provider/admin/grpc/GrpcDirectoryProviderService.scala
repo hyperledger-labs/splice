@@ -6,7 +6,11 @@ import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, Tra
 import com.daml.ledger.api.v1.value.Identifier
 import com.daml.ledger.client.binding.{Contract, Primitive, TemplateCompanion}
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.directory.provider.{DirectoryEntryRequest, DirectoryInstallRequest}
+import com.daml.network.directory.provider.{
+  DirectoryEntry,
+  DirectoryEntryRequest,
+  DirectoryInstallRequest,
+}
 import com.daml.network.directory_provider.v0
 import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc
 import com.daml.network.util.CoinUtil
@@ -16,6 +20,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
 import com.digitalasset.network.CC.Coin.Coin
 import com.google.protobuf.empty.Empty
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import com.digitalasset.network.CN.{Directory => codegen, Wallet => walletCodegen}
@@ -184,6 +189,81 @@ class GrpcDirectoryProviderService(
         v0.CollectEntryPaymentResponse(ApiTypes.ContractId.unwrap(entries(0).contractId))
       }
     }
+
+  @nowarn("cat=unused")
+  override def listEntries(request: Empty): Future[v0.ListEntriesResponse] =
+    withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
+      for {
+        partyId <- getParty()
+        entries <- listEntries(partyId)
+      } yield v0.ListEntriesResponse(entries.map(_.toProtoV0))
+    }
+
+  @nowarn("cat=unused")
+  override def lookupEntryByParty(
+      request: v0.LookupEntryByPartyRequest
+  ): Future[v0.LookupEntryResponse] =
+    withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
+      for {
+        partyId <- getParty()
+        entries <- listEntries(partyId)
+      } yield {
+        entries
+          .collectFirst {
+            case entry if (entry.user: PartyId) == (PartyId.tryFromProtoPrimitive(request.user)) =>
+              entry
+          }
+          .map(_.toProtoV0)
+          .fold(throw new StatusRuntimeException(Status.NOT_FOUND))(e =>
+            v0.LookupEntryResponse(Some(e))
+          )
+      }
+    }
+
+  @nowarn("cat=unused")
+  override def lookupEntryByName(
+      request: v0.LookupEntryByNameRequest
+  ): Future[v0.LookupEntryResponse] =
+    withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
+      for {
+        partyId <- getParty()
+        entries <- listEntries(partyId)
+      } yield entries
+        .collectFirst {
+          case entry if entry.name == request.name =>
+            entry
+        }
+        .map(_.toProtoV0)
+        .fold(throw new StatusRuntimeException(Status.NOT_FOUND))(e =>
+          v0.LookupEntryResponse(Some(e))
+        )
+    }
+
+  private def listEntries(party: PartyId): Future[Seq[DirectoryEntry]] =
+    for {
+      contracts <- connection.activeContracts(
+        txFilter(party, ApiTypes.TemplateId.unwrap(codegen.DirectoryEntry.id))
+      )
+      decoded = contracts._1.flatMap(event =>
+        DecodeUtil.decodeCreated(codegen.DirectoryEntry)(event)
+      )
+    } yield {
+      val filtered =
+        decoded.filter(contract => PartyId.tryFromPrim(contract.value.provider) == party)
+      filtered.map(DirectoryEntry.fromContract)
+    }
+
+  private def txFilter(partyId: PartyId, tplId: Identifier): TransactionFilter = {
+    transaction_filter.TransactionFilter(
+      Map(
+        partyId.toPrim.toString -> Filters(
+          Some(
+            InclusiveFilters(templateIds = Seq(tplId))
+          )
+        )
+      )
+    )
+  }
 
   private def fetchByContractId[T](
       companion: TemplateCompanion[T]

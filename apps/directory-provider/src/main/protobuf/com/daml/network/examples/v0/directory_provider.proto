@@ -9,7 +9,12 @@ service DirectoryProviderService {
 
   rpc ListEntryRequests (google.protobuf.Empty) returns (ListEntryRequestsResponse);
   rpc RequestEntryPayment (RequestEntryPaymentRequest) returns (RequestEntryPaymentResponse);
+
   rpc CollectEntryPayment (CollectEntryPaymentRequest) returns (CollectEntryPaymentResponse);
+
+  rpc ListEntries (google.protobuf.Empty) returns (ListEntriesResponse);
+  rpc LookupEntryByParty (LookupEntryByPartyRequest) returns (LookupEntryResponse);
+  rpc LookupEntryByName (LookupEntryByNameRequest) returns (LookupEntryResponse);
 }
 
 message ListInstallRequestsResponse {
@@ -64,4 +69,26 @@ message CollectEntryPaymentRequest {
 message CollectEntryPaymentResponse {
   // Contract ID of the new DirectoryEntry contract
   string contract_id = 1;
+}
+
+message ListEntriesResponse {
+  repeated Entry entries = 1;
+}
+
+message Entry {
+  string contract_id = 1;
+  string user = 2;
+  string name = 3;
+}
+
+message LookupEntryByPartyRequest {
+  string user = 1;
+}
+
+message LookupEntryByNameRequest {
+  string name = 2;
+}
+
+message LookupEntryResponse {
+  Entry entry = 1;
 }

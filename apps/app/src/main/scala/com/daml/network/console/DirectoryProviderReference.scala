@@ -4,7 +4,11 @@ import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.directory.provider.admin.api.client.commands.DirectoryProviderCommands
 import com.daml.network.directory.provider.config.LocalDirectoryProviderAppConfig
-import com.daml.network.directory.provider.{DirectoryEntryRequest, DirectoryInstallRequest}
+import com.daml.network.directory.provider.{
+  DirectoryEntry,
+  DirectoryEntryRequest,
+  DirectoryInstallRequest,
+}
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.console.{
   BaseInspection,
@@ -73,6 +77,21 @@ class LocalDirectoryProviderAppReference(
       adminCommand(DirectoryProviderCommands.CollectEntryPayment(cid))
     }
   }
+
+  def listEntries(): Seq[DirectoryEntry] =
+    consoleEnvironment.run {
+      adminCommand(DirectoryProviderCommands.ListEntries())
+    }
+
+  def lookupEntryByParty(party: PartyId): DirectoryEntry =
+    consoleEnvironment.run {
+      adminCommand(DirectoryProviderCommands.LookupEntryByParty(party))
+    }
+
+  def lookupEntryByName(name: String): DirectoryEntry =
+    consoleEnvironment.run {
+      adminCommand(DirectoryProviderCommands.LookupEntryByName(name))
+    }
 
   /** Remote participant this Directory Provider app is configured to interact with. */
   val remoteParticipant =
