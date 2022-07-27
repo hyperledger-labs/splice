@@ -50,7 +50,7 @@ class GrpcWalletService(
         partyIdO <- connection.getUser(walletDamlUser)
         partyId = partyIdO.getOrElse(sys.error(s"Unable to find party for user $walletDamlUser"))
         _ = logger.info(s"received partyid for user testuser: $partyId")
-        activeContractsRes <- connection.activeContracts(construct_list_filter(svcParty.get()))
+        activeContractsRes <- connection.activeContracts(construct_list_filter(partyId))
         coinsLAPI = activeContractsRes._1.flatMap(event => DecodeUtil.decodeCreated(Coin)(event))
 
       } yield {
@@ -75,7 +75,7 @@ class GrpcWalletService(
             BigDecimal(request.amount),
           )
           .command
-        tx <- connection.submitCommand(Seq(walletParty), Seq(svcParty.get()), Seq(tapCmd))
+        tx <- connection.submitCommand(Seq(walletParty), Seq(validatorParty.get()), Seq(tapCmd))
         coins = DecodeUtil.decodeAllCreated(Coin)(tx.getTransaction)
         _ = require(
           coins.length == 1,
