@@ -1,5 +1,6 @@
 package com.daml.network.console
 
+import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.directory.provider.admin.api.client.commands.DirectoryProviderCommands
 import com.daml.network.directory.provider.config.LocalDirectoryProviderAppConfig
@@ -13,6 +14,8 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.environment.CantonNodeBootstrap
 import com.digitalasset.canton.participant.ParticipantNode
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.network.CN.{Directory => codegen}
 
 /** Single local Directory Provider app reference. Defines the console commands that can be run against a local Directory Provider
   * app reference.
@@ -29,9 +32,20 @@ class LocalDirectoryProviderAppReference(
   def config: LocalDirectoryProviderAppConfig =
     consoleEnvironment.environment.config.directoryProvidersByString(name)
 
+  @Help.Summary("List all DirectoryInstallRequest contracts")
   def listInstallRequests(): Seq[DirectoryInstallRequest] = {
     consoleEnvironment.run {
       adminCommand(DirectoryProviderCommands.ListInstallRequests())
+    }
+  }
+
+  @Help.Summary("Accept a DirectoryInstallRequest creating a DirectoryInstall")
+  def acceptInstallRequest(
+      cid: Primitive.ContractId[codegen.DirectoryInstallRequest],
+      svc: PartyId,
+  ): Primitive.ContractId[codegen.DirectoryInstall] = {
+    consoleEnvironment.run {
+      adminCommand(DirectoryProviderCommands.AcceptInstallRequest(cid, svc))
     }
   }
 

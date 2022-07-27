@@ -30,13 +30,17 @@ class DirectoryProviderIntegrationTest
     CoinEnvironmentDefinition.simpleTopology.withSetup(env => {
       import env._
       participants.all.map(_.dars.upload(directoryDarPath))
+      participants.all.foreach(_.domains.connect_local(da))
     })
 
   "A directory provider" should {
-    "call listInstallRequests" in { implicit env =>
+    "list and accept install requests" in { implicit env =>
       import env._
 
-      directoryProvider.remoteParticipant.domains.connect_local(da)
+      svc.initialize()
+      val svcParty =
+        svc.remoteParticipant.parties.list(filterParty = "svc").headOption.value.party
+
       val pId = directoryProvider.remoteParticipant.parties.enable(damlUser, Some(damlUser))
       directoryProvider.remoteParticipant.ledger_api.users
         .create(damlUser, Set(pId.toLf), Some(pId.toLf))
@@ -48,22 +52,36 @@ class DirectoryProviderIntegrationTest
         commands = Seq(
           codegen
             .DirectoryInstallRequest(
-              ApiTypes.Party(pId.toProtoPrimitive),
-              ApiTypes.Party(pId.toProtoPrimitive),
+              pId.toPrim,
+              pId.toPrim,
             )
             .create
             .command
         ),
-        // TODO (MK): Without disabling this, the cross-participant synchronization fails because
-        // Canton tries to call GetTransactionById with an empty list of requesting_parties.
-        // I don’t quite understand what fails there.
+        // See https://github.com/DACH-NY/the-real-canton-coin/issues/315
         optTimeout = None,
       )
       directoryProvider.remoteParticipant.ledger_api.acs.await(pId, codegen.DirectoryInstallRequest)
 
-      inside(directoryProvider.listInstallRequests()) { case Seq(request) =>
+      val requests = directoryProvider.listInstallRequests()
+
+      inside(requests) { case Seq(request) =>
         request.user shouldBe pId
       }
+
+      val installsBefore = directoryProvider.remoteParticipant.ledger_api.acs
+        .of_party(pId, filterTemplates = Seq(codegen.DirectoryInstall.id))
+      installsBefore shouldBe empty
+
+      requests.foreach { case request =>
+        directoryProvider.acceptInstallRequest(request.contractId, svcParty)
+      }
+
+      val installsAfter = directoryProvider.remoteParticipant.ledger_api.acs
+        .of_party(pId, filterTemplates = Seq(codegen.DirectoryInstall.id))
+      installsAfter should have length (1)
+
+      directoryProvider.listInstallRequests() shouldBe empty
 
     }
   }

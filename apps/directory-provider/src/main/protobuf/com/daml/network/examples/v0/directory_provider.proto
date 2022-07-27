@@ -6,6 +6,7 @@ import "google/protobuf/empty.proto";
 
 service DirectoryProviderService {
   rpc ListInstallRequests (google.protobuf.Empty) returns (ListInstallRequestsResponse);
+  rpc AcceptInstallRequest (AcceptInstallRequestRequest) returns (AcceptInstallRequestResponse);
 }
 
 message ListInstallRequestsResponse {
@@ -15,4 +16,13 @@ message ListInstallRequestsResponse {
 message InstallRequest {
   string contract_id = 1;
   string user = 2;
+}
+
+message AcceptInstallRequestRequest {
+  string contract_id = 1;
+  string svc = 2;
+}
+
+message AcceptInstallRequestResponse {
+  string contract_id = 1;
 }

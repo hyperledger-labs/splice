@@ -2,10 +2,14 @@ package com.daml.network.directory.provider.admin.api.client.commands
 
 import cats.syntax.either._
 import cats.syntax.traverse._
+import com.daml.ledger.api.refinements.ApiTypes
+import com.daml.ledger.client.binding.Primitive
 import com.daml.network.directory.provider.DirectoryInstallRequest
 import com.daml.network.directory_provider.v0
 import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc.DirectoryProviderServiceStub
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.network.CN.{Directory => codegen}
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
 
@@ -36,5 +40,30 @@ object DirectoryProviderCommands {
       response.installRequests
         .traverse(request => DirectoryInstallRequest.fromProto(request))
         .leftMap(_.toString)
+  }
+
+  case class AcceptInstallRequest(
+      contractId: Primitive.ContractId[codegen.DirectoryInstallRequest],
+      svc: PartyId,
+  ) extends BaseCommand[
+        v0.AcceptInstallRequestRequest,
+        v0.AcceptInstallRequestResponse,
+        Primitive.ContractId[codegen.DirectoryInstall],
+      ] {
+
+    override def createRequest(): Either[String, v0.AcceptInstallRequestRequest] =
+      Right(
+        v0.AcceptInstallRequestRequest(ApiTypes.ContractId.unwrap(contractId), svc.toProtoPrimitive)
+      )
+
+    override def submitRequest(
+        service: DirectoryProviderServiceStub,
+        request: v0.AcceptInstallRequestRequest,
+    ): Future[v0.AcceptInstallRequestResponse] = service.acceptInstallRequest(request)
+
+    override def handleResponse(
+        response: v0.AcceptInstallRequestResponse
+    ): Either[String, Primitive.ContractId[codegen.DirectoryInstall]] =
+      Right(Primitive.ContractId[codegen.DirectoryInstall](response.contractId))
   }
 }

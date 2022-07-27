@@ -4,6 +4,7 @@ import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.v1.transaction_filter
 import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
 import com.daml.ledger.api.v1.value.Identifier
+import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.directory.provider.DirectoryInstallRequest
 import com.daml.network.directory_provider.v0
@@ -18,8 +19,10 @@ import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
 
 import com.digitalasset.network.CN.{Directory => codegen}
+import com.digitalasset.network.DA.Time.Types.RelTime
 
 import scala.annotation.nowarn
+import scala.language.implicitConversions
 import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcDirectoryProviderService(
@@ -34,6 +37,15 @@ class GrpcDirectoryProviderService(
     with Spanning
     with NamedLogging {
 
+  // TODO (MK) Make these parameters configurable
+  private val entryFee: Primitive.Numeric = 1.0
+  private val collectionDuration = RelTime(
+    10_000_000
+  )
+  private val approveDuration = RelTime(
+    60_000_000
+  )
+
   private def getParty() =
     for {
       partyO <- connection.getUser(damlUser)
@@ -44,7 +56,7 @@ class GrpcDirectoryProviderService(
 
   @nowarn("cat=unused")
   override def listInstallRequests(request: Empty): Future[v0.ListInstallRequestsResponse] =
-    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+    withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
         partyId <- getParty()
         activeContracts <- connection.activeContracts(
@@ -55,11 +67,38 @@ class GrpcDirectoryProviderService(
         )
       } yield {
         val filteredRequests = installRequestsLAPI.filter(contract =>
-          PartyId.tryFromProtoPrimitive(ApiTypes.Party.unwrap(contract.value.provider)) == partyId
+          PartyId.tryFromPrim(contract.value.provider) == partyId
         )
         v0.ListInstallRequestsResponse(
           filteredRequests.map(r => DirectoryInstallRequest.fromContract(r).toProtoV0)
         )
+      }
+    }
+
+  override def acceptInstallRequest(
+      request: v0.AcceptInstallRequestRequest
+  ): Future[v0.AcceptInstallRequestResponse] =
+    withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
+      for {
+        partyId <- getParty()
+        arg = codegen.DirectoryInstallRequest_Accept(
+          svc = ApiTypes.Party(request.svc),
+          entryFee = entryFee,
+          collectionDuration = collectionDuration,
+          approveDuration = approveDuration,
+        )
+        acceptCmd = Primitive.ContractId
+          .apply[codegen.DirectoryInstallRequest](request.contractId)
+          .exerciseDirectoryInstallRequest_Accept(partyId.toPrim, arg)
+          .command
+        tx <- connection.submitCommand(Seq(partyId), Seq(), Seq(acceptCmd))
+        installs = DecodeUtil.decodeAllCreated(codegen.DirectoryInstall)(tx.getTransaction)
+        _ = require(
+          installs.length == 1,
+          s"Expected accept to create only one install contract but found ${installs.length} installs $installs",
+        )
+      } yield {
+        v0.AcceptInstallRequestResponse(installs(0).contractId.toString)
       }
     }
 
