@@ -78,11 +78,11 @@
                         "name": "canton-domain",
                         "ports": [
                            {
-                              "containerPort": 6018,
+                              "containerPort": 5008,
                               "name": "canton-pub-api"
                            },
                            {
-                              "containerPort": 6019,
+                              "containerPort": 5009,
                               "name": "canton-adm-api"
                            }
                         ],
@@ -127,11 +127,11 @@
                         "name": "canton-participant",
                         "ports": [
                            {
-                              "containerPort": 6864,
+                              "containerPort": 5002,
                               "name": "cp-adm-api"
                            },
                            {
-                              "containerPort": 6865,
+                              "containerPort": 5001,
                               "name": "cp-ledger-api"
                            }
                         ]
@@ -185,15 +185,15 @@
             "ports": [
                {
                   "name": "canton-pub-api",
-                  "port": 6018,
+                  "port": 5008,
                   "protocol": "TCP",
-                  "targetPort": 6018
+                  "targetPort": 5008
                },
                {
                   "name": "canton-adm-api",
-                  "port": 6019,
+                  "port": 5009,
                   "protocol": "TCP",
-                  "targetPort": 6019
+                  "targetPort": 5009
                }
             ],
             "selector": {
@@ -219,15 +219,15 @@
             "ports": [
                {
                   "name": "cp-adm-api",
-                  "port": 6864,
+                  "port": 5002,
                   "protocol": "TCP",
-                  "targetPort": 6864
+                  "targetPort": 5002
                },
                {
                   "name": "cp-ledger-api",
-                  "port": 6865,
+                  "port": 5001,
                   "protocol": "TCP",
-                  "targetPort": 6865
+                  "targetPort": 5001
                }
             ],
             "selector": {

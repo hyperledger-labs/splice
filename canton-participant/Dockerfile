@@ -1,8 +1,7 @@
 FROM digitalasset/canton-open-source:2.2.0
 
-EXPOSE 6864
-EXPOSE 6865
-EXPOSE 7000
+EXPOSE 5001
+EXPOSE 5002
 
 COPY svc-participant.conf /canton
 COPY bootstrap.scala /canton

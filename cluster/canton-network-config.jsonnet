@@ -70,11 +70,11 @@ function(imageTag, ipAddr) {
       imageTag, 'canton-domain', [
         {
           name: 'canton-pub-api',
-          containerPort: 6018,
+          containerPort: 5008,
         },
         {
           name: 'canton-adm-api',
-          containerPort: 6019,
+          containerPort: 5009,
         },
       ], {
         readinessProbe: {
@@ -94,11 +94,11 @@ function(imageTag, ipAddr) {
     deployment(imageTag, 'canton-participant', [
       {
         name: 'cp-adm-api',
-        containerPort: 6864,
+        containerPort: 5002,
       },
       {
         name: 'cp-ledger-api',
-        containerPort: 6865,
+        containerPort: 5001,
       },
     ]),
     externalService('docs', ipAddr, [
@@ -115,14 +115,14 @@ function(imageTag, ipAddr) {
         {
           name: 'canton-pub-api',
           protocol: 'TCP',
-          port: 6018,
-          targetPort: 6018,
+          port: 5008,
+          targetPort: 5008,
         },
         {
           name: 'canton-adm-api',
           protocol: 'TCP',
-          port: 6019,
-          targetPort: 6019,
+          port: 5009,
+          targetPort: 5009,
         },
       ]
     ),
@@ -133,14 +133,14 @@ function(imageTag, ipAddr) {
         {
           name: 'cp-adm-api',
           protocol: 'TCP',
-          port: 6864,
-          targetPort: 6864,
+          port: 5002,
+          targetPort: 5002,
         },
         {
           name: 'cp-ledger-api',
           protocol: 'TCP',
-          port: 6865,
-          targetPort: 6865,
+          port: 5001,
+          targetPort: 5001,
         },
       ]
     ),

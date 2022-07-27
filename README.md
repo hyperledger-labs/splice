@@ -172,3 +172,7 @@ variables. As stated above, these are usually populated via `.envrc`.
 | `CLOUDSDK_CORE_PROJECT`   | ID of the Google Cloud project in which the cluster is located.       |
 | `GCP_CLUSTER_NAME`        | Name of the GKE cluster within the cloud project.                     |
 | `GCP_REPO_NAME`           | Name of the image repository used to manage project container images. |
+
+### Port allocations
+
+Both our deployment and tests follow the [port allocation scheme](./apps/app/src/test/resources/README.md).

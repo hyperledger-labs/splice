@@ -15,21 +15,22 @@ Consequently, we use the following port allocation scheme when manually allocati
 A port number has five digits and is of the form `<Test Index><Node Index><Kind>`, where:
 
 - `<Test Index>` is between 5 and 31 and uniquely identifies the test suite.
-- `<Node Index>` is between 00 and 99 (always two digits) and uniquely identifies the node within the test suite.
+- `<Node Index>` is between 0 and 9 and uniquely identifies the node within the test suite.
 - `<Kind>` is one of the following:
-  - `1`: Participant, Ledger API
-  - `2`: Participant, Admin API
-  - `3`: Validator, Admin API
-  - `4`: Wallet, Admin API
-  - `5`: SVC, Admin API 
-  - `6`: Domain manager, Admin API
-  - `7`: Mediator, Admin API
-  - `8`: Domain, Public API
-  - `9`: Domain, Admin API
+  - `01`: Participant, Ledger API
+  - `02`: Participant, Admin API
+  - `03`: Validator, Admin API
+  - `04`: Wallet, Admin API
+  - `05`: SVC, Admin API
+  - `06`: Domain manager, Admin API
+  - `07`: Mediator, Admin API
+  - `08`: Domain, Public API
+  - `09`: Domain, Admin API
+  - `10`: Directory provider, Admin API
 
 Example:
-- `5031` is the Ledger API of Participant 3 in Test Suite 5.
-- `17239` is the Admin API of Domain 23 in Test Suite 17. 
+- `5301` is the Ledger API of Participant 3 in Test Suite 5.
+- `17309` is the Admin API of Domain 3 in Test Suite 17.
 
 At time of writing, the following test indices have been used by integration tests running on CI:
 - 4: -
