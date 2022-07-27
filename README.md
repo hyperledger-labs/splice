@@ -101,7 +101,7 @@ these updates complete, either successfully or with a failure.
 The ScratchNet cluster is manually managed and intended to be a test
 bed for new code.
 
-## Cluster Tooling
+### Cluster Tooling
 
 This repository also contains tools for managing clusters, hosted both
 locally and in GCE. Local clusters are run on your local development
@@ -115,7 +115,7 @@ separate top level commands are used for each. `cnlocal` is the
 entrypoint for local cluster operations and `cncluster` is the
 entrypoint for GCE cluster operations. 
 
-### Docker image hosting
+#### Docker image hosting
 
 Docker images for both local and GCE clusters are stored in the Google
 Cloud [Artifact Registry](https://cloud.google.com/artifact-registry).
@@ -131,7 +131,7 @@ variables, which are defined in [`.envrc.vars`](.envrc.vars):
 The `.envrc` mechanism is also used to ensure that the current user is
 authenticated properly against GCE.
 
-### Local Cluster Operations
+#### Local Cluster Operations
 
 The local cluster is managed with the following three subcommands of
 `cnlocal`:
@@ -142,7 +142,7 @@ The local cluster is managed with the following three subcommands of
   running local cluster.
 * `cnlocal stop` - Stop the local cluster, if it is running.
 
-### GCE Operations
+#### GCE Operations
 
 Operations against GCE clusters are complicated by the facts that
 there are more than one cluster and GCE clusters are usually shared
