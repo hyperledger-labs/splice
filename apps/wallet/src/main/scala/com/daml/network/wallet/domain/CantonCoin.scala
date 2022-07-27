@@ -1,6 +1,8 @@
-package com.daml.network.wallet
+package com.daml.network.wallet.domain
 
+import cats.syntax.either._
 import com.daml.ledger.client.binding.Contract
+import com.daml.lf.data.Numeric
 import com.daml.network.wallet.v0
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -8,8 +10,6 @@ import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.version.HasProtoV0
 import com.digitalasset.network.CC.Coin.Coin
-import com.daml.lf.data.Numeric
-import cats.syntax.either._
 
 /** Scala-representation of a Coin with utility methods for conversion from/to protobuf. */
 case class CantonCoin(svc: PartyId, owner: PartyId, quantity: ExpiringQuantity)
@@ -79,5 +79,4 @@ object ExpiringQuantity {
       rate <- Numeric.fromString(rateP).leftMap(ProtoDeserializationError.StringConversionError)
     } yield ExpiringQuantity(initial, createdAt, rate)
   }
-
 }

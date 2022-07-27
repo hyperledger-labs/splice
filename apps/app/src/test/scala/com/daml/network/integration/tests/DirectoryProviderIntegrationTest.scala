@@ -10,7 +10,6 @@ import com.daml.network.integration.tests.CoinTests.{
   IsolatedCoinEnvironments,
 }
 import com.daml.network.util.CommonCoinAppInstanceReferences
-import com.daml.network.wallet.ExpiringQuantity
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.network.{CC => coinCodegen}
 import com.digitalasset.network.CN.{Directory => codegen, Wallet => walletCodegen}

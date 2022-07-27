@@ -3,8 +3,8 @@ package com.daml.network.wallet.admin.api.client.commands
 import cats.syntax.either._
 import cats.syntax.traverse._
 import com.daml.network.wallet.v0
+import com.daml.network.wallet.domain.{CantonCoin, PaymentRequest}
 import com.daml.network.wallet.v0.WalletServiceGrpc.WalletServiceStub
-import com.daml.network.wallet.CantonCoin
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
 import io.grpc.ManagedChannel
@@ -79,4 +79,24 @@ object WalletAppCommands {
       Right(Primitive.ContractId.apply[Coin](response.contractId))
   }
 
+  case class ListPaymentRequests()
+      extends BaseCommand[v0.ListPaymentRequestsRequest, v0.ListPaymentRequestsResponse, Seq[
+        PaymentRequest
+      ]] {
+
+    override def createRequest(): Either[String, v0.ListPaymentRequestsRequest] =
+      Right(
+        v0.ListPaymentRequestsRequest()
+      )
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.ListPaymentRequestsRequest,
+    ): Future[v0.ListPaymentRequestsResponse] = service.listPaymentRequests(request)
+
+    override def handleResponse(
+        response: v0.ListPaymentRequestsResponse
+    ): Either[String, Seq[PaymentRequest]] =
+      response.paymentRequests.traverse(req => PaymentRequest.fromProto(req)).leftMap(_.toString)
+  }
 }

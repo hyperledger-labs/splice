@@ -7,6 +7,7 @@ service WalletService {
   rpc initialize (InitializeRequest) returns (InitializeResponse);
   rpc list (ListRequest) returns (ListResponse);
   rpc tap (TapRequest) returns (TapResponse);
+  rpc listPaymentRequests (ListPaymentRequestsRequest) returns (ListPaymentRequestsResponse);
 }
 
 message InitializeRequest {
@@ -44,4 +45,19 @@ message TapRequest {
 
 message TapResponse {
   string contract_id = 1;
+}
+
+message ListPaymentRequestsRequest {
+}
+
+message ListPaymentRequestsResponse {
+  // TODO(i300): add pagination for payment requests
+  repeated PaymentRequest payment_requests = 1;
+}
+
+message PaymentRequest {
+  string payer = 1;
+  string payee = 2;
+  string svc = 3;
+  string quantity = 4;
 }

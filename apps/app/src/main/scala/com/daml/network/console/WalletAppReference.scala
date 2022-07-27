@@ -2,7 +2,7 @@ package com.daml.network.console
 
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.wallet.CantonCoin
+import com.daml.network.wallet.domain.{CantonCoin, PaymentRequest}
 import com.daml.network.wallet.admin.api.client.commands.WalletAppCommands
 import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
@@ -57,6 +57,17 @@ class LocalWalletAppReference(
   def tap(amount: String = "100"): Primitive.ContractId[Coin] = {
     consoleEnvironment.run {
       adminCommand(WalletAppCommands.Tap(com.daml.lf.data.Numeric.assertFromString(amount)))
+    }
+  }
+
+  @Help.Summary("List all payment requests of the configured user")
+  @Help.Description(
+    "Queries the configured remote participant for the PaymentRequests of the configured user. " +
+      "Returns all found payment requests."
+  )
+  def listPaymentRequests(): Seq[PaymentRequest] = {
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.ListPaymentRequests())
     }
   }
 

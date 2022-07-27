@@ -40,7 +40,10 @@ template PaymentRequest
         inputs : [TransferInput]
       controller payer
       do now <- getTime
+         -- check that the reference is active and implements PaymentReference
+         void $ fetch reference
          assertMsg "PaymentRequest has not expired" (now < expiresAt)
+         -- lock the coin and create an approved payment
          let transfer = Transfer with
               sender = payer
               inputs

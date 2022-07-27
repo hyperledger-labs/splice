@@ -10,9 +10,9 @@ import com.daml.ledger.api.v1.value.Identifier
 import com.daml.ledger.client.binding.{Primitive, Template}
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.wallet.v0
+import com.daml.network.wallet.domain.{CantonCoin, PaymentRequest}
 import com.daml.network.wallet.v0.{InitializeRequest, InitializeResponse, WalletServiceGrpc}
 import com.daml.network.util.CoinUtil
-import com.daml.network.wallet.CantonCoin
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.ledger.api.client.{DecodeUtil, LedgerConnection}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -20,9 +20,11 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
 import com.digitalasset.network.CC.Coin.Coin
 import com.digitalasset.network.CC.CoinRules.CoinRules
+import com.digitalasset.network.CN.Wallet.{PaymentRequest => walletCodegen}
 import com.digitalasset.network.`Package IDs`
 import io.opentelemetry.api.trace.Tracer
 import com.digitalasset.network.DA
+
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -44,14 +46,21 @@ class GrpcWalletService(
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   val validatorParty: AtomicReference[PartyId] = new AtomicReference[PartyId](null)
 
+  private def getWalletParty() =
+    for {
+      partyO <- connection.getUser(walletDamlUser)
+      party = partyO.getOrElse(
+        sys.error(s"Unable to find party for user $walletDamlUser")
+      )
+    } yield party
+
+  @nowarn("cat=unused")
   override def list(request: v0.ListRequest): Future[v0.ListResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
-        partyIdO <- connection.getUser(walletDamlUser)
-        partyId = partyIdO.getOrElse(sys.error(s"Unable to find party for user $walletDamlUser"))
-        _ = logger.info(s"received partyid for user testuser: $partyId")
+        walletParty <- getWalletParty()
         activeContractsRes <- connection.activeContracts(
-          CoinLedgerConnection.transactionFilter(partyId, Coin.id)
+          CoinLedgerConnection.transactionFilter(walletParty, Coin.id)
         )
         coinsLAPI = activeContractsRes._1.flatMap(event => DecodeUtil.decodeCreated(Coin)(event))
 
@@ -62,13 +71,11 @@ class GrpcWalletService(
       }
     }
 
+  @nowarn("cat=unused")
   override def tap(request: v0.TapRequest): Future[v0.TapResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
-        walletPartyO <- connection.getUser(walletDamlUser)
-        walletParty = walletPartyO.getOrElse(
-          sys.error(s"Unable to find party for user $walletDamlUser")
-        )
+        walletParty <- getWalletParty()
         tapCmd = CoinRules
           .key(DA.Types.Tuple2(svcParty.get.toPrim, validatorParty.get.toPrim))
           .exerciseTap(
@@ -84,6 +91,29 @@ class GrpcWalletService(
           s"Expected tap to create only one coin but found ${coins.length} coins: $coins",
         )
       } yield v0.TapResponse(coins(0).contractId.toString)
+    }
+
+  @nowarn("cat=unused")
+  override def listPaymentRequests(
+      request: v0.ListPaymentRequestsRequest
+  ): Future[v0.ListPaymentRequestsResponse] =
+    withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => span =>
+      for {
+        walletParty <- getWalletParty()
+        activeContractsRes <- connection.activeContracts(
+          CoinLedgerConnection.transactionFilter(walletParty, walletCodegen.PaymentRequest.id)
+        )
+        paymentRequestsLAPI = activeContractsRes._1.flatMap(event =>
+          DecodeUtil.decodeCreated(walletCodegen.PaymentRequest)(event)
+        )
+      } yield {
+        val filteredRequests = paymentRequestsLAPI.filter(contract =>
+          PartyId.tryFromPrim(contract.value.payer) == walletParty
+        )
+        v0.ListPaymentRequestsResponse(
+          filteredRequests.map(r => PaymentRequest.fromContract(r.value).toProtoV0)
+        )
+      }
     }
 
   override def initialize(request: InitializeRequest): Future[InitializeResponse] = {
