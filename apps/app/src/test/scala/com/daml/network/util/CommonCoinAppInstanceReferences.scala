@@ -19,6 +19,9 @@ trait CommonCoinAppInstanceReferences {
   def validator1(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
     "validator1"
   )
+  def directoryValidator(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
+    "directoryValidator"
+  )
   def directoryProvider(implicit
       env: CoinTestConsoleEnvironment
   ): LocalDirectoryProviderAppReference = dp(

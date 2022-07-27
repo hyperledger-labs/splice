@@ -6,6 +6,8 @@ import DA.Time
 import CC.Coin
 import CC.CoinRules
 
+import CC.Scripts.Util (CCUserHostedAt(..))
+
 -- | A reference to the reason for a payment.
 -- TODO: better naming
 interface PaymentReference
@@ -53,8 +55,9 @@ template PaymentRequest
                     lock = None
                 ]
               payload = "lock payment"
+         (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt payer
          (TransferResultLockedCoin lockedCoin::_) <-
-            exerciseByKey @CoinRules (svc, svc) (CoinRules_Transfer transfer)
+            exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
          create ApprovedPayment
            with
              svc, payee, payer, reference, lockedCoin
@@ -91,7 +94,8 @@ template ApprovedPayment
                     coinType = FloatingReceiverCoin
                 ]
               payload = "transfer locked payment"
-        void $ exerciseByKey @CoinRules (svc, svc) (CoinRules_Transfer transfer)
+        (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt payee
+        void $ exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
         -- defensive check that the reference is still active
         void $ fetch reference
         pure reference

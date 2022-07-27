@@ -37,8 +37,8 @@ template DirectoryInstall with
   where
     signatory provider, user
 
-    key provider : Party
-    maintainer key
+    key (provider, user) : (Party, Party)
+    maintainer key._1
 
     nonconsuming choice DirectoryInstall_RequestEntry
       : ContractId DirectoryEntryRequest
@@ -59,7 +59,6 @@ template DirectoryInstall with
       do request <- fetch requestCid
          request.entry.provider === provider
          request.entry.user === user
-         (_, rules) <- fetchByKey @DirectoryInstall provider
          now <- getTime
          create PaymentRequest with
            payee = provider
@@ -67,8 +66,8 @@ template DirectoryInstall with
            svc = svc
            quantity = request.entryFee
            reference = toInterfaceContractId requestCid
-           collectionDuration = rules.collectionDuration
-           expiresAt = now `addRelTime` rules.approveDuration
+           collectionDuration = collectionDuration
+           expiresAt = now `addRelTime` approveDuration
 
     nonconsuming choice DirectoryInstall_CollectEntryPayment : ()
       with

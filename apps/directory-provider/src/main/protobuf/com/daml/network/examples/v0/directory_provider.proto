@@ -1,12 +1,15 @@
 syntax = "proto3";
 package com.daml.network.directory_provider.v0;
 
-import "google/protobuf/wrappers.proto";
 import "google/protobuf/empty.proto";
 
 service DirectoryProviderService {
   rpc ListInstallRequests (google.protobuf.Empty) returns (ListInstallRequestsResponse);
   rpc AcceptInstallRequest (AcceptInstallRequestRequest) returns (AcceptInstallRequestResponse);
+
+  rpc ListEntryRequests (google.protobuf.Empty) returns (ListEntryRequestsResponse);
+  rpc RequestEntryPayment (RequestEntryPaymentRequest) returns (RequestEntryPaymentResponse);
+  rpc CollectEntryPayment (CollectEntryPaymentRequest) returns (CollectEntryPaymentResponse);
 }
 
 message ListInstallRequestsResponse {
@@ -14,15 +17,51 @@ message ListInstallRequestsResponse {
 }
 
 message InstallRequest {
+  // Contract ID of the DirectoryInstallRequest contract
   string contract_id = 1;
   string user = 2;
 }
 
 message AcceptInstallRequestRequest {
+  // Contract ID of the DirectoryInstallRequest contract
+  // that should be accepted
   string contract_id = 1;
   string svc = 2;
 }
 
 message AcceptInstallRequestResponse {
+  // Contract ID of the DirectoryInstall contract that has been created
+  string contract_id = 1;
+}
+
+message ListEntryRequestsResponse {
+  repeated EntryRequest entry_requests = 1;
+}
+
+message EntryRequest {
+  // Contract ID of the DirectoryEntryRequest contract
+  string contract_id = 1;
+  string user = 2;
+  string name = 3;
+  string fee = 4;
+}
+
+message RequestEntryPaymentRequest {
+  // Contract ID of the DirectoryEntryRequest contract
+  string contract_id = 1;
+}
+
+message RequestEntryPaymentResponse {
+  // Contract ID of the new PaymentRequest contract
+  string contract_id = 1;
+}
+
+message CollectEntryPaymentRequest {
+  // Contract ID of the ApprovedPayment contract
+  string contract_id = 1;
+}
+
+message CollectEntryPaymentResponse {
+  // Contract ID of the new DirectoryEntry contract
   string contract_id = 1;
 }

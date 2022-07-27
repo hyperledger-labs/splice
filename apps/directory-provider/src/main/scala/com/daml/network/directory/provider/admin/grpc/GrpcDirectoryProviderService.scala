@@ -4,9 +4,9 @@ import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.v1.transaction_filter
 import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
 import com.daml.ledger.api.v1.value.Identifier
-import com.daml.ledger.client.binding.Primitive
+import com.daml.ledger.client.binding.{Contract, Primitive, TemplateCompanion}
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.directory.provider.DirectoryInstallRequest
+import com.daml.network.directory.provider.{DirectoryEntryRequest, DirectoryInstallRequest}
 import com.daml.network.directory_provider.v0
 import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc
 import com.daml.network.util.CoinUtil
@@ -18,7 +18,8 @@ import com.digitalasset.network.CC.Coin.Coin
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
 
-import com.digitalasset.network.CN.{Directory => codegen}
+import com.digitalasset.network.CN.{Directory => codegen, Wallet => walletCodegen}
+import com.digitalasset.network.DA
 import com.digitalasset.network.DA.Time.Types.RelTime
 
 import scala.annotation.nowarn
@@ -101,5 +102,108 @@ class GrpcDirectoryProviderService(
         v0.AcceptInstallRequestResponse(installs(0).contractId.toString)
       }
     }
+
+  @nowarn("cat=unused")
+  override def listEntryRequests(request: Empty): Future[v0.ListEntryRequestsResponse] =
+    withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
+      for {
+        partyId <- getParty()
+        activeContracts <- connection.activeContracts(
+          CoinLedgerConnection.transactionFilter(partyId, codegen.DirectoryEntryRequest.id)
+        )
+        entryRequestsLAPI = activeContracts._1.flatMap(event =>
+          DecodeUtil.decodeCreated(codegen.DirectoryEntryRequest)(event)
+        )
+      } yield {
+        val filteredRequests = entryRequestsLAPI.filter(contract =>
+          PartyId.tryFromPrim(contract.value.entry.provider) == partyId
+        )
+        v0.ListEntryRequestsResponse(
+          filteredRequests.map(r => DirectoryEntryRequest.fromContract(r).toProtoV0)
+        )
+      }
+    }
+
+  override def requestEntryPayment(
+      request: v0.RequestEntryPaymentRequest
+  ): Future[v0.RequestEntryPaymentResponse] =
+    withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
+      for {
+        partyId <- getParty()
+        entryRequest <- fetchByContractId(codegen.DirectoryEntryRequest)(
+          partyId,
+          Primitive.ContractId(request.contractId),
+        )
+        cmd = codegen.DirectoryInstall
+          .key(DA.Types.Tuple2(partyId.toPrim, entryRequest.value.entry.user))
+          .exerciseDirectoryInstall_RequestEntryPayment(
+            partyId.toPrim,
+            codegen.DirectoryInstall_RequestEntryPayment(entryRequest.contractId),
+          )
+          .command
+        tx <- connection.submitCommand(Seq(partyId), Seq(), Seq(cmd))
+        requests = DecodeUtil.decodeAllCreated(walletCodegen.PaymentRequest.PaymentRequest)(
+          tx.getTransaction
+        )
+        _ = require(
+          requests.length == 1,
+          s"Expected requestEntryPayment to create only one payment request contract but found ${requests.length} requests $requests",
+        )
+      } yield {
+        v0.RequestEntryPaymentResponse(ApiTypes.ContractId.unwrap(requests(0).contractId))
+      }
+    }
+
+  override def collectEntryPayment(
+      request: v0.CollectEntryPaymentRequest
+  ): Future[v0.CollectEntryPaymentResponse] =
+    withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
+      for {
+        partyId <- getParty()
+        approvedPayment <- fetchByContractId(walletCodegen.PaymentRequest.ApprovedPayment)(
+          partyId,
+          Primitive.ContractId(request.contractId),
+        )
+        // TODO(i321) Add uniqueness check
+        cmd = codegen.DirectoryInstall
+          .key(DA.Types.Tuple2(partyId.toPrim, approvedPayment.value.payer))
+          .exerciseDirectoryInstall_CollectEntryPayment(
+            partyId.toPrim,
+            codegen.DirectoryInstall_CollectEntryPayment(approvedPayment.contractId),
+          )
+          .command
+        tx <- connection.submitCommand(Seq(partyId), Seq(), Seq(cmd))
+        entries = DecodeUtil.decodeAllCreated(codegen.DirectoryEntry)(
+          tx.getTransaction
+        )
+        _ = require(
+          entries.length == 1,
+          s"Expected collectEntryPayment to create only one entryt contract but found ${entries.length} requests $entries",
+        )
+      } yield {
+        v0.CollectEntryPaymentResponse(ApiTypes.ContractId.unwrap(entries(0).contractId))
+      }
+    }
+
+  private def fetchByContractId[T](
+      companion: TemplateCompanion[T]
+  )(partyId: PartyId, cid: Primitive.ContractId[T]): Future[Contract[T]] = {
+    for {
+      contracts <- connection.activeContracts(
+        CoinLedgerConnection.transactionFilter(partyId, companion.id)
+      )
+      decoded = contracts._1.flatMap(event => DecodeUtil.decodeCreated(companion)(event))
+    } yield {
+      decoded
+        .collectFirst {
+          case contract if contract.contractId == cid => contract
+        }
+        .getOrElse(
+          throw new IllegalStateException(
+            s"No active contract of template ${companion.id} with contract id $cid"
+          )
+        )
+    }
+  }
 
 }
