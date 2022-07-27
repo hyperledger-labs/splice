@@ -1,4 +1,4 @@
-local deployment(imageTag, name, ports, ext={}) = {
+local deployment(gcpRegion, gcpRepoName, imageTag, name, ports, ext={}) = {
   apiVersion: 'apps/v1',
   kind: 'Deployment',
   metadata: {
@@ -24,7 +24,7 @@ local deployment(imageTag, name, ports, ext={}) = {
         containers: [
           {
             name: name,
-            image: 'us-central1-docker.pkg.dev/cn-devnet-353712/cn-devnet-images/' + name + ':' + imageTag,
+            image: gcpRegion + '-docker.pkg.dev/' + gcpRepoName + '/' + name + ':' + imageTag,
             imagePullPolicy: 'Always',
             ports: ports,
           } + ext,
@@ -56,17 +56,17 @@ local externalService(name, ipAddr, ports) = {
   },
 };
 
-function(imageTag, ipAddr) {
+function(gcpRegion, gcpRepoName, imageTag, ipAddr) {
   apiVersion: 'apps/v1',
   kind: 'List',
   items: [
-    deployment(imageTag, 'docs', [
+    deployment(gcpRegion, gcpRepoName, imageTag, 'docs', [
       {
         containerPort: 80,
         name: 'http',
       },
     ]),
-    deployment(
+    deployment(gcpRegion, gcpRepoName,
       imageTag, 'canton-domain', [
         {
           name: 'canton-pub-api',
@@ -91,7 +91,7 @@ function(imageTag, ipAddr) {
         },
       },
     ),
-    deployment(imageTag, 'canton-participant', [
+    deployment(gcpRegion, gcpRepoName, imageTag, 'canton-participant', [
       {
         name: 'cp-adm-api',
         containerPort: 5002,

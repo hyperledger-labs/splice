@@ -3,8 +3,10 @@
 function k8s_apply() {
     IP_ADDR=${1:-127.0.0.1}
 
-    jsonnet --tla-str imageTag=$(version-gen)\
-            --tla-str ipAddr=${IP_ADDR}\
+    jsonnet --tla-str gcpRegion=${CLOUDSDK_COMPUTE_REGION} \
+            --tla-str gcpRepoName=${GCP_REPO_NAME} \
+            --tla-str imageTag=$(version-gen) \
+            --tla-str ipAddr=${IP_ADDR} \
             $REPO_ROOT/cluster/canton-network-config.jsonnet \
         | kubectl apply -f -
 }

@@ -26,7 +26,7 @@
                "spec": {
                   "containers": [
                      {
-                        "image": "us-central1-docker.pkg.dev/cn-devnet-353712/cn-devnet-images/docs:tag",
+                        "image": "region-docker.pkg.dev/project/repo/docs:tag",
                         "imagePullPolicy": "Always",
                         "name": "docs",
                         "ports": [
@@ -66,7 +66,7 @@
                "spec": {
                   "containers": [
                      {
-                        "image": "us-central1-docker.pkg.dev/cn-devnet-353712/cn-devnet-images/canton-domain:tag",
+                        "image": "region-docker.pkg.dev/project/repo/canton-domain:tag",
                         "imagePullPolicy": "Always",
                         "livenessProbe": {
                            "failureThreshold": 5,
@@ -122,7 +122,7 @@
                "spec": {
                   "containers": [
                      {
-                        "image": "us-central1-docker.pkg.dev/cn-devnet-353712/cn-devnet-images/canton-participant:tag",
+                        "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
                         "imagePullPolicy": "Always",
                         "name": "canton-participant",
                         "ports": [

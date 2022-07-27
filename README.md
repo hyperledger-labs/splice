@@ -130,7 +130,7 @@ variables, which are defined in [`.envrc.vars`](.envrc.vars):
 | ------------------        | --------------------------------------------------------------------- |
 | `CLOUDSDK_COMPUTE_REGION` | Google Cloud Region in which resources will be created                |
 | `CLOUDSDK_CORE_PROJECT`   | ID of the Google Cloud project in which the cluster is located.       |
-| `GCP_REPO_NAME`           | Name of the image repository used to manage project container images. |
+| `GCP_REPO_NAME`           | Google Cloud Project/Name of the image repository used to manage project container images. |
 
 The `.envrc` mechanism is also used to ensure that the current user is
 authenticated properly against GCE.
@@ -175,7 +175,7 @@ variables. As stated above, these are usually populated via `.envrc`.
 | `CLOUDSDK_COMPUTE_REGION` | Google Cloud Region in which resources will be created                |
 | `CLOUDSDK_CORE_PROJECT`   | ID of the Google Cloud project in which the cluster is located.       |
 | `GCP_CLUSTER_NAME`        | Name of the GKE cluster within the cloud project.                     |
-| `GCP_REPO_NAME`           | Name of the image repository used to manage project container images. |
+| `GCP_REPO_NAME`           | Google Cloud Project/Name of the image repository used to manage project container images. |
 
 ### Port allocations
 
