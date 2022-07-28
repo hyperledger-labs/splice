@@ -12,4 +12,10 @@ object Dependencies {
     "com.thesamet.scalapb" %% "scalapb-runtime" % scalapb.compiler.Version.scalapbVersion % "protobuf"
   lazy val scalapb_runtime_grpc =
     "com.thesamet.scalapb" %% "scalapb-runtime-grpc" % scalapb.compiler.Version.scalapbVersion
+
+  lazy val daml_ledger_api_scalapb =
+    "com.daml" %% "ledger-api-scalapb" % CantonDependencies.daml_libraries_version
+
+  lazy val daml_ledger_api_proto =
+    "com.daml" % "ledger-api-proto" % CantonDependencies.daml_libraries_version
 }

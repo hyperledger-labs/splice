@@ -4,16 +4,11 @@ import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.v1.transaction_filter
 import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
 import com.daml.ledger.api.v1.value.Identifier
-import com.daml.ledger.client.binding.{Contract, Primitive, TemplateCompanion}
+import com.daml.ledger.client.binding.{Contract => CodegenContract, Primitive, TemplateCompanion}
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.directory.provider.{
-  DirectoryEntry,
-  DirectoryEntryRequest,
-  DirectoryInstallRequest,
-}
 import com.daml.network.directory_provider.v0
 import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc
-import com.daml.network.util.CoinUtil
+import com.daml.network.util.{Contract, CoinUtil}
 import com.digitalasset.canton.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
@@ -76,7 +71,7 @@ class GrpcDirectoryProviderService(
           PartyId.tryFromPrim(contract.value.provider) == partyId
         )
         v0.ListInstallRequestsResponse(
-          filteredRequests.map(r => DirectoryInstallRequest.fromContract(r).toProtoV0)
+          filteredRequests.map(r => Contract.fromCodegenContract(r).toProtoV0)
         )
       }
     }
@@ -124,7 +119,9 @@ class GrpcDirectoryProviderService(
           PartyId.tryFromPrim(contract.value.entry.provider) == partyId
         )
         v0.ListEntryRequestsResponse(
-          filteredRequests.map(r => DirectoryEntryRequest.fromContract(r).toProtoV0)
+          filteredRequests.map(r =>
+            Contract.fromCodegenContract[codegen.DirectoryEntryRequest](r).toProtoV0
+          )
         )
       }
     }
@@ -210,7 +207,7 @@ class GrpcDirectoryProviderService(
       } yield {
         entries
           .collectFirst {
-            case entry if (entry.user: PartyId) == (PartyId.tryFromProtoPrimitive(request.user)) =>
+            case entry if entry.payload.user == ApiTypes.Party(request.user) =>
               entry
           }
           .map(_.toProtoV0)
@@ -230,7 +227,7 @@ class GrpcDirectoryProviderService(
         entries <- listEntries(partyId)
       } yield entries
         .collectFirst {
-          case entry if entry.name == request.name =>
+          case entry if entry.payload.name == request.name =>
             entry
         }
         .map(_.toProtoV0)
@@ -239,7 +236,7 @@ class GrpcDirectoryProviderService(
         )
     }
 
-  private def listEntries(party: PartyId): Future[Seq[DirectoryEntry]] =
+  private def listEntries(party: PartyId): Future[Seq[Contract[codegen.DirectoryEntry]]] =
     for {
       contracts <- connection.activeContracts(
         txFilter(party, ApiTypes.TemplateId.unwrap(codegen.DirectoryEntry.id))
@@ -250,7 +247,7 @@ class GrpcDirectoryProviderService(
     } yield {
       val filtered =
         decoded.filter(contract => PartyId.tryFromPrim(contract.value.provider) == party)
-      filtered.map(DirectoryEntry.fromContract)
+      filtered.map(Contract.fromCodegenContract[codegen.DirectoryEntry](_))
     }
 
   private def txFilter(partyId: PartyId, tplId: Identifier): TransactionFilter = {
@@ -267,7 +264,7 @@ class GrpcDirectoryProviderService(
 
   private def fetchByContractId[T](
       companion: TemplateCompanion[T]
-  )(partyId: PartyId, cid: Primitive.ContractId[T]): Future[Contract[T]] = {
+  )(partyId: PartyId, cid: Primitive.ContractId[T]): Future[CodegenContract[T]] = {
     for {
       contracts <- connection.activeContracts(
         CoinLedgerConnection.transactionFilter(partyId, companion.id)

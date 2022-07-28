@@ -1,6 +1,7 @@
 syntax = "proto3";
 package com.daml.network.directory_provider.v0;
 
+import "com/daml/network/v0/contract.proto";
 import "google/protobuf/empty.proto";
 
 service DirectoryProviderService {
@@ -18,13 +19,7 @@ service DirectoryProviderService {
 }
 
 message ListInstallRequestsResponse {
-  repeated InstallRequest install_requests = 1;
-}
-
-message InstallRequest {
-  // Contract ID of the DirectoryInstallRequest contract
-  string contract_id = 1;
-  string user = 2;
+  repeated com.daml.network.v0.Contract install_requests = 1;
 }
 
 message AcceptInstallRequestRequest {
@@ -40,15 +35,7 @@ message AcceptInstallRequestResponse {
 }
 
 message ListEntryRequestsResponse {
-  repeated EntryRequest entry_requests = 1;
-}
-
-message EntryRequest {
-  // Contract ID of the DirectoryEntryRequest contract
-  string contract_id = 1;
-  string user = 2;
-  string name = 3;
-  string fee = 4;
+  repeated com.daml.network.v0.Contract entry_requests = 1;
 }
 
 message RequestEntryPaymentRequest {
@@ -72,13 +59,7 @@ message CollectEntryPaymentResponse {
 }
 
 message ListEntriesResponse {
-  repeated Entry entries = 1;
-}
-
-message Entry {
-  string contract_id = 1;
-  string user = 2;
-  string name = 3;
+  repeated com.daml.network.v0.Contract entries = 1;
 }
 
 message LookupEntryByPartyRequest {
@@ -90,5 +71,5 @@ message LookupEntryByNameRequest {
 }
 
 message LookupEntryResponse {
-  Entry entry = 1;
+  com.daml.network.v0.Contract entry = 1;
 }

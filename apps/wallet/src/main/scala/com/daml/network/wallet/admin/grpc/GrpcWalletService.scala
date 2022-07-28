@@ -10,9 +10,8 @@ import com.daml.ledger.api.v1.value.Identifier
 import com.daml.ledger.client.binding.{Primitive, Template}
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.wallet.v0
-import com.daml.network.wallet.domain.{CantonCoin, PaymentRequest}
 import com.daml.network.wallet.v0.{InitializeRequest, InitializeResponse, WalletServiceGrpc}
-import com.daml.network.util.CoinUtil
+import com.daml.network.util.{CoinUtil, Contract}
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.ledger.api.client.{DecodeUtil, LedgerConnection}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -66,7 +65,7 @@ class GrpcWalletService(
 
       } yield {
         // TODO(i207): persist response to store
-        val coinsProto = coinsLAPI.map(x => CantonCoin.fromContract(x).toProtoV0)
+        val coinsProto = coinsLAPI.map(x => Contract.fromCodegenContract[Coin](x).toProtoV0)
         v0.ListResponse(coinsProto)
       }
     }
@@ -111,7 +110,9 @@ class GrpcWalletService(
           PartyId.tryFromPrim(contract.value.payer) == walletParty
         )
         v0.ListPaymentRequestsResponse(
-          filteredRequests.map(r => PaymentRequest.fromContract(r.value).toProtoV0)
+          filteredRequests.map(r =>
+            Contract.fromCodegenContract[walletCodegen.PaymentRequest](r).toProtoV0
+          )
         )
       }
     }

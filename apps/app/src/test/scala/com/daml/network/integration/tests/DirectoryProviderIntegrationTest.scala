@@ -2,7 +2,6 @@ package com.daml.network.integration.tests
 
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.network.console.{LocalValidatorAppReference, LocalWalletAppReference}
-import com.daml.network.directory.provider.DirectoryEntry
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -10,7 +9,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
   IsolatedCoinEnvironments,
 }
-import com.daml.network.util.CommonCoinAppInstanceReferences
+import com.daml.network.util.{CommonCoinAppInstanceReferences, Contract}
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.network.{CC => coinCodegen}
@@ -78,7 +77,7 @@ class DirectoryProviderIntegrationTest
       val requests = directoryProvider.listInstallRequests()
 
       inside(requests) { case Seq(request) =>
-        request.user shouldBe userParty
+        request.payload.user shouldBe userParty.toProtoPrimitive
       }
 
       val installsBefore = directoryProvider.remoteParticipant.ledger_api.acs
@@ -155,7 +154,8 @@ class DirectoryProviderIntegrationTest
       val entry = directoryProvider.remoteParticipant.ledger_api.acs
         .await(providerParty, codegen.DirectoryEntry)
       entry.contractId shouldBe cid
-      val entryValue = DirectoryEntry(cid, userParty, entryName)
+      val entryValue =
+        Contract(cid, codegen.DirectoryEntry(userParty.toPrim, providerParty.toPrim, entryName))
       directoryProvider.listEntries() shouldBe Seq(entryValue)
       directoryProvider.lookupEntryByName(entryName) shouldBe entryValue
       directoryProvider.lookupEntryByParty(userParty) shouldBe entryValue

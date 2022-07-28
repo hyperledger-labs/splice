@@ -4,13 +4,9 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.Primitive
-import com.daml.network.directory.provider.{
-  DirectoryEntry,
-  DirectoryEntryRequest,
-  DirectoryInstallRequest,
-}
 import com.daml.network.directory_provider.v0
 import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc.DirectoryProviderServiceStub
+import com.daml.network.util.Contract
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.PartyId
@@ -29,7 +25,9 @@ object DirectoryProviderCommands {
   }
 
   case class ListInstallRequests()
-      extends BaseCommand[Empty, v0.ListInstallRequestsResponse, Seq[DirectoryInstallRequest]] {
+      extends BaseCommand[Empty, v0.ListInstallRequestsResponse, Seq[
+        Contract[codegen.DirectoryInstallRequest]
+      ]] {
 
     override def createRequest(): Either[String, Empty] =
       Right(Empty())
@@ -41,9 +39,9 @@ object DirectoryProviderCommands {
 
     override def handleResponse(
         response: v0.ListInstallRequestsResponse
-    ): Either[String, Seq[DirectoryInstallRequest]] =
+    ): Either[String, Seq[Contract[codegen.DirectoryInstallRequest]]] =
       response.installRequests
-        .traverse(request => DirectoryInstallRequest.fromProto(request))
+        .traverse(request => Contract.fromProto(codegen.DirectoryInstallRequest)(request))
         .leftMap(_.toString)
   }
 
@@ -76,7 +74,7 @@ object DirectoryProviderCommands {
   ) extends BaseCommand[
         Empty,
         v0.ListEntryRequestsResponse,
-        Seq[DirectoryEntryRequest],
+        Seq[Contract[codegen.DirectoryEntryRequest]],
       ] {
 
     override def createRequest(): Either[String, Empty] =
@@ -89,9 +87,9 @@ object DirectoryProviderCommands {
 
     override def handleResponse(
         response: v0.ListEntryRequestsResponse
-    ): Either[String, Seq[DirectoryEntryRequest]] =
+    ): Either[String, Seq[Contract[codegen.DirectoryEntryRequest]]] =
       response.entryRequests
-        .traverse(request => DirectoryEntryRequest.fromProto(request))
+        .traverse(request => Contract.fromProto(codegen.DirectoryEntryRequest)(request))
         .leftMap(_.toString)
   }
 
@@ -147,7 +145,7 @@ object DirectoryProviderCommands {
   ) extends BaseCommand[
         Empty,
         v0.ListEntriesResponse,
-        Seq[DirectoryEntry],
+        Seq[Contract[codegen.DirectoryEntry]],
       ] {
 
     override def createRequest(): Either[String, Empty] =
@@ -160,8 +158,10 @@ object DirectoryProviderCommands {
 
     override def handleResponse(
         response: v0.ListEntriesResponse
-    ): Either[String, Seq[DirectoryEntry]] =
-      response.entries.traverse(entry => DirectoryEntry.fromProto(entry)).leftMap(_.toString)
+    ): Either[String, Seq[Contract[codegen.DirectoryEntry]]] =
+      response.entries
+        .traverse(entry => Contract.fromProto(codegen.DirectoryEntry)(entry))
+        .leftMap(_.toString)
   }
 
   case class LookupEntryByParty(
@@ -169,7 +169,7 @@ object DirectoryProviderCommands {
   ) extends BaseCommand[
         v0.LookupEntryByPartyRequest,
         v0.LookupEntryResponse,
-        DirectoryEntry,
+        Contract[codegen.DirectoryEntry],
       ] {
 
     override def createRequest(): Either[String, v0.LookupEntryByPartyRequest] =
@@ -184,10 +184,10 @@ object DirectoryProviderCommands {
 
     override def handleResponse(
         response: v0.LookupEntryResponse
-    ): Either[String, DirectoryEntry] = {
+    ): Either[String, Contract[codegen.DirectoryEntry]] = {
       val r = for {
         entryField <- ProtoConverter.required("entry", response.entry)
-        entry <- DirectoryEntry.fromProto(entryField)
+        entry <- Contract.fromProto(codegen.DirectoryEntry)(entryField)
       } yield entry
       r.leftMap(_.toString)
 
@@ -199,7 +199,7 @@ object DirectoryProviderCommands {
   ) extends BaseCommand[
         v0.LookupEntryByNameRequest,
         v0.LookupEntryResponse,
-        DirectoryEntry,
+        Contract[codegen.DirectoryEntry],
       ] {
 
     override def createRequest(): Either[String, v0.LookupEntryByNameRequest] =
@@ -214,10 +214,10 @@ object DirectoryProviderCommands {
 
     override def handleResponse(
         response: v0.LookupEntryResponse
-    ): Either[String, DirectoryEntry] = {
+    ): Either[String, Contract[codegen.DirectoryEntry]] = {
       val r = for {
         entryField <- ProtoConverter.required("entry", response.entry)
-        entry <- DirectoryEntry.fromProto(entryField)
+        entry <- Contract.fromProto(codegen.DirectoryEntry)(entryField)
       } yield entry
       r.leftMap(_.toString)
 

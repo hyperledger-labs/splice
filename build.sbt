@@ -60,8 +60,18 @@ lazy val `apps-common` =
     .dependsOn(`canton-community-common`, `canton-community-app` % "compile->compile;test->test")
     .enablePlugins(DamlPlugin)
     .settings(
+      libraryDependencies ++= Seq(
+        scalapb_runtime_grpc,
+        scalapb_runtime,
+        daml_ledger_api_scalapb,
+        daml_ledger_api_proto % "protobuf",
+      ),
       BuildCommon.sharedSettings,
       BuildCommon.cantonWarts,
+      Compile / PB.targets := Seq(
+        scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
+      ),
+      Compile / PB.protoSources ++= (Test / PB.protoSources).value,
       /* The reason we have to specify these items explicitly is that the DamlPlugin expects a gradle
        * `src/main/daml` directory structure. Instead we have the classical SDK `./daml` structure.
        * We output the dar to the usual `.daml/dist` dir because that's where a naive user expects it.

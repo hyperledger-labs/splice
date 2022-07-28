@@ -3,13 +3,14 @@ package com.daml.network.wallet.admin.api.client.commands
 import cats.syntax.either._
 import cats.syntax.traverse._
 import com.daml.network.wallet.v0
-import com.daml.network.wallet.domain.{CantonCoin, PaymentRequest}
 import com.daml.network.wallet.v0.WalletServiceGrpc.WalletServiceStub
+import com.daml.network.util.Contract
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
 import io.grpc.ManagedChannel
 import com.daml.ledger.client.binding.Primitive
-import com.digitalasset.network.CC.Coin.Coin
+import com.digitalasset.network.CC.{Coin => codegen}
+import com.digitalasset.network.CN.{Wallet => walletCodegen}
 
 import scala.concurrent.Future
 
@@ -42,7 +43,8 @@ object WalletAppCommands {
     ): Either[String, Unit] = Right(())
   }
 
-  case class List() extends BaseCommand[v0.ListRequest, v0.ListResponse, Seq[CantonCoin]] {
+  case class List()
+      extends BaseCommand[v0.ListRequest, v0.ListResponse, Seq[Contract[codegen.Coin]]] {
 
     override def createRequest(): Either[String, v0.ListRequest] =
       Right(
@@ -56,12 +58,12 @@ object WalletAppCommands {
 
     override def handleResponse(
         response: v0.ListResponse
-    ): Either[String, Seq[CantonCoin]] =
-      response.coins.traverse(coin => CantonCoin.fromProto(coin)).leftMap(_.toString)
+    ): Either[String, Seq[Contract[codegen.Coin]]] =
+      response.coins.traverse(coin => Contract.fromProto(codegen.Coin)(coin)).leftMap(_.toString)
   }
 
   case class Tap(amount: com.daml.lf.data.Numeric)
-      extends BaseCommand[v0.TapRequest, v0.TapResponse, Primitive.ContractId[Coin]] {
+      extends BaseCommand[v0.TapRequest, v0.TapResponse, Primitive.ContractId[codegen.Coin]] {
 
     override def createRequest(): Either[String, v0.TapRequest] =
       Right(
@@ -75,13 +77,13 @@ object WalletAppCommands {
 
     override def handleResponse(
         response: v0.TapResponse
-    ): Either[String, Primitive.ContractId[Coin]] =
-      Right(Primitive.ContractId.apply[Coin](response.contractId))
+    ): Either[String, Primitive.ContractId[codegen.Coin]] =
+      Right(Primitive.ContractId.apply[codegen.Coin](response.contractId))
   }
 
   case class ListPaymentRequests()
       extends BaseCommand[v0.ListPaymentRequestsRequest, v0.ListPaymentRequestsResponse, Seq[
-        PaymentRequest
+        Contract[walletCodegen.PaymentRequest.PaymentRequest]
       ]] {
 
     override def createRequest(): Either[String, v0.ListPaymentRequestsRequest] =
@@ -96,7 +98,9 @@ object WalletAppCommands {
 
     override def handleResponse(
         response: v0.ListPaymentRequestsResponse
-    ): Either[String, Seq[PaymentRequest]] =
-      response.paymentRequests.traverse(req => PaymentRequest.fromProto(req)).leftMap(_.toString)
+    ): Either[String, Seq[Contract[walletCodegen.PaymentRequest.PaymentRequest]]] =
+      response.paymentRequests
+        .traverse(req => Contract.fromProto(walletCodegen.PaymentRequest.PaymentRequest)(req))
+        .leftMap(_.toString)
   }
 }

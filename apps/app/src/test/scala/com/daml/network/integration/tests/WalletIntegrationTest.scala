@@ -8,11 +8,13 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
   IsolatedCoinEnvironments,
 }
-import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences}
-import com.daml.network.wallet.domain.{ExpiringQuantity, PaymentRequest}
+import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences, Contract}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.network.CC.Round.Round
 import com.digitalasset.network.CC.CoinRules.{CoinRules, CoinRulesRequest}
-import com.digitalasset.network.CN.Wallet
+import com.digitalasset.network.CN.Wallet.PaymentRequest.PaymentRequest
+import com.digitalasset.network.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 import com.digitalasset.network.DA.Time.Types.RelTime
 
 import scala.concurrent.duration._
@@ -50,12 +52,12 @@ class WalletIntegrationTest
       wallet1.remoteParticipant.ledger_api.acs.await(validatorParty, CoinRules)
       wallet1.tap(quantity)
       val res = wallet1.list().headOption.value
-      res.quantity shouldBe ExpiringQuantity(
+      res.payload.quantity shouldBe ExpiringQuantity(
         BigDecimal(quantity),
-        createdAt = 0,
-        ratePerRound = CoinUtil.defaultHoldingFee.rate.doubleValue,
+        createdAt = Round(0),
+        ratePerRound = RatePerRound(CoinUtil.defaultHoldingFee.rate.doubleValue),
       )
-      res.owner.uid.id shouldBe walletDamlUser
+      PartyId.tryFromPrim(res.payload.owner).uid.id shouldBe walletDamlUser
     }
 
     "allow listing a user's payment requests" in { implicit env =>
@@ -78,7 +80,7 @@ class WalletIntegrationTest
       reqs1 shouldBe empty
 
       // Create a payment request to self.
-      val reqC = Wallet.PaymentRequest.PaymentRequest(
+      val reqC = PaymentRequest(
         payer = userParty.toPrim,
         payee = userParty.toPrim,
         svc = svcParty.toPrim,
@@ -98,8 +100,7 @@ class WalletIntegrationTest
       )
       // Check that we can see the created payment request
       val reqFound = wallet1.listPaymentRequests().headOption.value
-      val reqExpected = PaymentRequest.fromContract(reqC)
-      reqFound shouldBe reqExpected
+      reqFound.payload shouldBe reqC
     }
   }
 }

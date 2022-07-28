@@ -2,7 +2,7 @@ package com.daml.network.console
 
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.wallet.domain.{CantonCoin, PaymentRequest}
+import com.daml.network.util.Contract
 import com.daml.network.wallet.admin.api.client.commands.WalletAppCommands
 import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
@@ -16,6 +16,7 @@ import com.digitalasset.canton.environment.CantonNodeBootstrap
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.network.CC.Coin.Coin
+import com.digitalasset.network.CN.Wallet.PaymentRequest.PaymentRequest
 
 /** Single local Wallet app reference. Defines the console commands that can be run against a local Wallet
   * app reference.
@@ -37,7 +38,7 @@ class LocalWalletAppReference(
     "Queries the configured remote participant for the Coins owned by the configured user. " +
       "Returns all found coins."
   )
-  def list(): Seq[CantonCoin] = {
+  def list(): Seq[Contract[Coin]] = {
     consoleEnvironment.run {
       adminCommand(WalletAppCommands.List())
     }
@@ -65,7 +66,7 @@ class LocalWalletAppReference(
     "Queries the configured remote participant for the PaymentRequests of the configured user. " +
       "Returns all found payment requests."
   )
-  def listPaymentRequests(): Seq[PaymentRequest] = {
+  def listPaymentRequests(): Seq[Contract[PaymentRequest]] = {
     consoleEnvironment.run {
       adminCommand(WalletAppCommands.ListPaymentRequests())
     }

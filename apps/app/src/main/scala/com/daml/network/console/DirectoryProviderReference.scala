@@ -4,11 +4,7 @@ import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.directory.provider.admin.api.client.commands.DirectoryProviderCommands
 import com.daml.network.directory.provider.config.LocalDirectoryProviderAppConfig
-import com.daml.network.directory.provider.{
-  DirectoryEntry,
-  DirectoryEntryRequest,
-  DirectoryInstallRequest,
-}
+import com.daml.network.util.Contract
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.console.{
   BaseInspection,
@@ -37,7 +33,7 @@ class LocalDirectoryProviderAppReference(
     consoleEnvironment.environment.config.directoryProvidersByString(name)
 
   @Help.Summary("List all DirectoryInstallRequest contracts")
-  def listInstallRequests(): Seq[DirectoryInstallRequest] = {
+  def listInstallRequests(): Seq[Contract[codegen.DirectoryInstallRequest]] = {
     consoleEnvironment.run {
       adminCommand(DirectoryProviderCommands.ListInstallRequests())
     }
@@ -54,7 +50,7 @@ class LocalDirectoryProviderAppReference(
   }
 
   @Help.Summary("List all DirectoryEntryRequest contracts")
-  def listEntryRequests(): Seq[DirectoryEntryRequest] = {
+  def listEntryRequests(): Seq[Contract[codegen.DirectoryEntryRequest]] = {
     consoleEnvironment.run {
       adminCommand(DirectoryProviderCommands.ListEntryRequests())
     }
@@ -78,17 +74,17 @@ class LocalDirectoryProviderAppReference(
     }
   }
 
-  def listEntries(): Seq[DirectoryEntry] =
+  def listEntries(): Seq[Contract[codegen.DirectoryEntry]] =
     consoleEnvironment.run {
       adminCommand(DirectoryProviderCommands.ListEntries())
     }
 
-  def lookupEntryByParty(party: PartyId): DirectoryEntry =
+  def lookupEntryByParty(party: PartyId): Contract[codegen.DirectoryEntry] =
     consoleEnvironment.run {
       adminCommand(DirectoryProviderCommands.LookupEntryByParty(party))
     }
 
-  def lookupEntryByName(name: String): DirectoryEntry =
+  def lookupEntryByName(name: String): Contract[codegen.DirectoryEntry] =
     consoleEnvironment.run {
       adminCommand(DirectoryProviderCommands.LookupEntryByName(name))
     }

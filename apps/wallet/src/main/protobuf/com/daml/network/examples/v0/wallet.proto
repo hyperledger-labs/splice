@@ -1,6 +1,7 @@
 syntax = "proto3";
 package com.daml.network.wallet.v0;
 
+import "com/daml/network/v0/contract.proto";
 import "google/protobuf/wrappers.proto";
 
 service WalletService {
@@ -22,22 +23,8 @@ message ListRequest {
 }
 
 message ListResponse {
-  // TODO(i206): Improve the proto-representation of Coins
-  repeated Coin coins = 1;
+  repeated com.daml.network.v0.Contract coins = 1;
 }
-
-message Coin {
-  google.protobuf.StringValue svc = 1;
-  google.protobuf.StringValue owner = 2;
-  ExpiringQuantity quantity = 3;
-}
-
-message ExpiringQuantity {
-  string initialQuantity = 1;
-  int64 createdAt = 2;
-  string ratePerRound = 3;
-}
-
 
 message TapRequest {
   string amount = 1;
@@ -52,12 +39,5 @@ message ListPaymentRequestsRequest {
 
 message ListPaymentRequestsResponse {
   // TODO(i300): add pagination for payment requests
-  repeated PaymentRequest payment_requests = 1;
-}
-
-message PaymentRequest {
-  string payer = 1;
-  string payee = 2;
-  string svc = 3;
-  string quantity = 4;
+  repeated com.daml.network.v0.Contract payment_requests = 1;
 }
