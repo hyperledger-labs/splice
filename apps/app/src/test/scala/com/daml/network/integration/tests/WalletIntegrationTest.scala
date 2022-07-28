@@ -26,13 +26,11 @@ class WalletIntegrationTest
   // same as damlUser in config
   private val walletDamlUser = "god"
   private val quantity = "50.0"
-  private val coinDarPath = "apps/wallet/daml/.daml/dist/wallet.dar"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition.simpleTopology.withSetup(env => {
       import env._
-      participants.all.foreach(_.dars.upload(coinDarPath))
       participants.all.foreach(_.domains.connect_local(da))
     })
 

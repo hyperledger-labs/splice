@@ -3,12 +3,14 @@ package com.daml.network.validator.admin.grpc
 import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionResponse
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.validator.v0._
-import com.daml.network.util.CoinUtil
+import com.daml.network.util.{CoinUtil, UploadablePackage}
 import com.daml.network.validator.store.ValidatorAppStore
+import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.network.CC.CoinRules.CoinRulesRequest
+import com.google.protobuf.ByteString
 import io.opentelemetry.api.trace.Tracer
 
 import scala.annotation.nowarn
@@ -54,6 +56,7 @@ class GrpcValidatorAppService(
       }
 
       for {
+        _ <- connection.uploadDarFile(CoinUtil) // TODO(i353) move away from dar upload during init
         validatorParty <- connection.createPartyAndUser(validatorUserName)
         _ <- createRulesRequestAndUserHostedAtContracts(validatorParty)
         _ <- store.setValidatorParty(validatorParty)

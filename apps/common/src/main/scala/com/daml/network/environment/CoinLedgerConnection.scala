@@ -45,13 +45,15 @@ import io.grpc.StatusRuntimeException
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
 import org.slf4j.event.Level
 import scalaz.syntax.tag._
-import java.util.UUID
 
+import java.util.UUID
 import com.daml.ledger.api.domain.UserRight.CanActAs
 import com.daml.ledger.api.v1.command_service.{
   SubmitAndWaitForTransactionResponse,
   SubmitAndWaitRequest,
 }
+import com.daml.network.util.UploadablePackage
+import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.util.retry.RetryUtil.NoExnRetryable.logThrowable
 import com.digitalasset.canton.util.retry.RetryUtil.{
@@ -133,9 +135,7 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
       username: String
   )(implicit traceContext: TraceContext): Future[PartyId]
 
-  def uploadDarFile(packageId: String, darFile: => ByteString)(implicit
-      traceContext: TraceContext
-  ): Future[Unit]
+  def uploadDarFile(pkg: UploadablePackage)(implicit traceContext: TraceContext): Future[Unit]
 
   def allocatePartyViaLedgerApi(hint: Option[String], displayName: Option[String]): Future[PartyId]
 
@@ -405,7 +405,7 @@ object CoinLedgerConnection {
         } yield partyId
       }
 
-      override def uploadDarFile(packageId: String, darFile: => ByteString)(implicit
+      private def uploadDarFileInternal(packageId: String, darFile: => ByteString)(implicit
           traceContext: TraceContext
       ): Future[Unit] = {
         for {
@@ -419,6 +419,21 @@ object CoinLedgerConnection {
               client.packageManagementClient.uploadDarFile(darFile, token)
             }
           }
+        } yield ()
+      }
+
+      override def uploadDarFile(
+          pkg: UploadablePackage
+      )(implicit traceContext: TraceContext): Future[Unit] = {
+        for {
+          _ <- uploadDarFileInternal(
+            pkg.packageId,
+            ByteString.readFrom(pkg.inputStream()),
+          )
+          // TODO(M1-90): The ledger API does not block until the package is vetted.
+          //  Need to wait a bit, or use the Canton admin API to upload the package (that one does block).
+          _ = Threading.sleep(500)
+          _ = logger.info(s"Package ${pkg.packageId} is uploaded")
         } yield ()
       }
 

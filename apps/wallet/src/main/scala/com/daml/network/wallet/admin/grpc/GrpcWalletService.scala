@@ -1,7 +1,6 @@
 package com.daml.network.wallet.admin.grpc
 
 import java.util.concurrent.atomic.AtomicReference
-
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.v1.commands.Command
 import com.daml.ledger.api.v1.transaction_filter
@@ -9,20 +8,23 @@ import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, Tra
 import com.daml.ledger.api.v1.value.Identifier
 import com.daml.ledger.client.binding.{Primitive, Template}
 import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.util.UploadablePackage
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.{InitializeRequest, InitializeResponse, WalletServiceGrpc}
-import com.daml.network.util.{CoinUtil, Contract}
+import com.daml.network.wallet.util.WalletUtil
+import com.daml.network.util.Contract
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.ledger.api.client.{DecodeUtil, LedgerConnection}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.network.CC.Coin.Coin
 import com.digitalasset.network.CC.CoinRules.CoinRules
 import com.digitalasset.network.CN.Wallet.{PaymentRequest => walletCodegen}
 import com.digitalasset.network.`Package IDs`
 import io.opentelemetry.api.trace.Tracer
 import com.digitalasset.network.DA
+import com.google.protobuf.ByteString
 
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
@@ -117,13 +119,21 @@ class GrpcWalletService(
       }
     }
 
-  override def initialize(request: InitializeRequest): Future[InitializeResponse] = {
-    svcParty.set(
-      PartyId.tryFromProtoPrimitive(request.svc.getOrElse(sys.error("svc party not set")))
-    )
-    validatorParty.set(
-      PartyId.tryFromProtoPrimitive(request.validator.getOrElse(sys.error("svc party not set")))
-    )
-    Future.successful(v0.InitializeResponse())
-  }
+  override def initialize(request: InitializeRequest): Future[InitializeResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => _ =>
+      svcParty.set(
+        PartyId.tryFromProtoPrimitive(request.svc.getOrElse(sys.error("svc party not set")))
+      )
+      validatorParty.set(
+        PartyId.tryFromProtoPrimitive(
+          request.validator.getOrElse(sys.error("validator party not set"))
+        )
+      )
+
+      for {
+        _ <- connection.uploadDarFile(
+          WalletUtil
+        ) // TODO(i353) move away from dar upload during init
+      } yield v0.InitializeResponse()
+    }
 }

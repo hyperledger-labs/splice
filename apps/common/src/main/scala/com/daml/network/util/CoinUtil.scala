@@ -10,7 +10,6 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.network.{CC, OpenBusiness}
 import com.digitalasset.network.CC.Coin.Coin
-import java.io.InputStream
 
 import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionResponse
 import com.daml.ledger.api.v1.transaction_filter
@@ -21,7 +20,7 @@ import com.digitalasset.network.CC.CoinRules.CoinRules
 
 import scala.concurrent.{ExecutionContext, Future}
 
-object CoinUtil {
+object CoinUtil extends UploadablePackage {
   lazy val coinTemplateId: com.daml.ledger.api.v1.value.Identifier =
     ApiTypes.TemplateId.unwrap(Coin.id)
 
@@ -30,18 +29,7 @@ object CoinUtil {
   lazy val coinEntityName: String = coinTemplateId.entityName
 
   // See `Compile / damlCodeGeneration` in build.sbt
-  private val coinDarResourceName: String = "dar/canton-coin.dar"
-
-  def coinDarInputStream(): InputStream =
-    Option(
-      getClass.getClassLoader.getResourceAsStream(coinDarResourceName)
-    ) match {
-      case Some(is) => is
-      case None =>
-        throw new IllegalStateException(
-          s"Failed to load [$coinDarResourceName] from classpath"
-        )
-    }
+  lazy val resourcePath: String = "dar/canton-coin.dar"
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def tryGetCoinRules(connection: CoinLedgerConnection, validator: PartyId)(implicit

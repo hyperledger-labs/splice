@@ -86,6 +86,7 @@ lazy val `apps-common` =
         )
       ),
       Compile / resourceGenerators += Def.task {
+        (Compile / damlBuild).value
         val srcFile = (Compile / damlDarOutput).value / "canton-coin.dar"
         val dstFile = (Compile / resourceDirectory).value / "dar" / "canton-coin.dar"
         IO.copyFile(srcFile, dstFile)
@@ -145,6 +146,13 @@ lazy val `apps-wallet` =
           "com.digitalasset.network",
         )
       ),
+      Compile / resourceGenerators += Def.task {
+        (Compile / damlBuild).value
+        val srcFile = (Compile / damlDarOutput).value / "wallet.dar"
+        val dstFile = (Compile / resourceDirectory).value / "dar" / "wallet.dar"
+        IO.copyFile(srcFile, dstFile)
+        Seq(dstFile)
+      }.taskValue,
       Compile / PB.protoSources ++= (Test / PB.protoSources).value,
       scalacOptions += "-Wconf:src=src_managed/.*:silent",
     )

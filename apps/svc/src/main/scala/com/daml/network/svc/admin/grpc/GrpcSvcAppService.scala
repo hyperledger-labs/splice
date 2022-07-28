@@ -6,7 +6,7 @@ import com.daml.ledger.api.v1.transaction_filter
 import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.svc.v0.{GetDebugInfoResponse, GetValidatorConfigResponse, SvcAppServiceGrpc}
-import com.daml.network.util.CoinUtil
+import com.daml.network.util.{CoinUtil, UploadablePackage}
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.ledger.api.client.{DecodeUtil, LedgerConnection}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -32,27 +32,11 @@ class GrpcSvcAppService(
     with Spanning
     with NamedLogging {
 
-  // TODO(Robert): Factor out package uploading and make it robust
-  private def assertPackageIsUploaded(
-      connection: CoinLedgerConnection
-  )(implicit traceContext: TraceContext): Future[Unit] = {
-    for {
-      _ <- connection.uploadDarFile(
-        CoinUtil.packageId,
-        ByteString.readFrom(CoinUtil.coinDarInputStream()),
-      )
-      // TODO(M1-90): The ledger API does not block until the package is vetted.
-      //  Need to wait a bit, or use the Canton admin API to upload the package (that one does block).
-      _ = Threading.sleep(1000)
-      _ = logger.info(s"Package ${CoinUtil.packageId} is uploaded")
-    } yield ()
-  }
-
   override def initialize(request: Empty): Future[Empty] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
         svcPartyId <- connection.getOrAllocateParty(svcUserName)
-        _ <- assertPackageIsUploaded(connection)
+        _ <- connection.uploadDarFile(CoinUtil) // TODO(i353) move away from dar upload during init
         _ <- CoinUtil.setupApp(svcPartyId, connection)
         _ = logger.info(s"App is initialized")
       } yield Empty()
