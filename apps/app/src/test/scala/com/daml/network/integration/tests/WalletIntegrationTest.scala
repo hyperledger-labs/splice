@@ -8,7 +8,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
   IsolatedCoinEnvironments,
 }
-import com.daml.network.util.{CoinCreation, CoinUtil, CommonCoinAppInstanceReferences}
+import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences}
 import com.daml.network.wallet.domain.{ExpiringQuantity, PaymentRequest}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.network.CC.CoinRules.{CoinRules, CoinRulesRequest}
