@@ -43,8 +43,15 @@ if ! docker-check "${image}"; then
 fi
 
 if [ -z "${skippush}" ]; then
-    _set_x docker tag "${id}" "${image}"
-    _set_x docker push "${image}"
+    if ! _set_x docker tag "${id}" "${image}"; then
+        _error "Could not tag image."
+        exit 1
+    fi
+
+    if ! _set_x docker push "${image}"; then
+        _error "Could not push image."
+        exit 1
+    fi
 fi
 
 echo "${image}" > target/docker.push

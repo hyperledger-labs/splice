@@ -157,6 +157,7 @@ function _confirm(){
 # run a command with set -x
 function _set_x(){
   set -x
-  $@
+  $@ ; RC=$?
   { set +x; } 2>/dev/null
+  return $RC
 }

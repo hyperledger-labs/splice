@@ -2,23 +2,25 @@
 
 apps := cn-app canton-domain canton-participant docs
 
+define make_apps
+  for app in $(apps); do \
+    if ! make -C $${app} $(1); then \
+      exit 1; \
+    fi \
+  done
+endef
+
 .PHONY: docker-build
 docker-build: test
-	for app in $(apps); do \
-	  make -C $${app} docker-build; \
-	done
+	$(call make_apps, docker-build)
 
 .PHONY: docker-push
 docker-push: test
-	for app in $(apps); do \
-	  make -C $${app} docker-push; \
-	done
+	$(call make_apps, docker-push)
 
 .PHONY: docker-push-force
 docker-push-force: test
-	for app in $(apps); do \
-	  make -C $${app} docker-push-force; \
-	done
+	$(call make_apps, docker-push-force)
 
 .PHONY: test
 test:
@@ -26,6 +28,4 @@ test:
 
 .PHONY: clean
 clean:
-	for app in $(apps); do \
-	  make -C $${app} clean; \
-	done
+	$(call make_apps, clean)
