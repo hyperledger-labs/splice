@@ -1,4 +1,4 @@
-FROM digitalasset/canton-open-source:2.2.0
+FROM digitalasset/canton-open-source:2.3.2
 
 EXPOSE 5008
 EXPOSE 5009

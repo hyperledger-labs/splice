@@ -1,7 +1,7 @@
 println("Bootstrapping CN participant...")
 
-val domainLabel = "hub"
-val domainConnectAddress = "http://canton-domain:6018"
+val domainLabel = "cnsvc"
+val domainConnectAddress = "http://canton-domain:5008"
 
 if (`svc_participant`.domains.list_connected().isEmpty) {
     println("No registered domains, so connecting to the SVCledger domain for the first time...")
