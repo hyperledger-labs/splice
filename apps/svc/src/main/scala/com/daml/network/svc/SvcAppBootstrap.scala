@@ -79,63 +79,38 @@ class SvcAppBootstrap(
   override def isActive: Boolean = storage.isActive
 }
 
-// TODO(Arne): Do we need this factory construction?
-// I think Canton only needs this for being able to generalize a community/enterprise participant with the same method
-// while being able to return an `Either` to signal that the initialization failed
 object SvcAppBootstrap {
   val LoggerFactoryKeyName: String = "SVC"
 
-  trait Factory[PC <: LocalSvcAppConfig] {
-    def create(
-        name: String,
-        svcConfig: LocalSvcAppConfig,
-        svcAppParameters: SharedCoinAppParameters,
-        clock: Clock,
-        testingTimeService: TestingTimeService,
-        svcMetrics: SvcAppMetrics,
-        testingConfig: TestingConfigInternal,
-        futureSupervisor: FutureSupervisor,
-        loggerFactory: NamedLoggerFactory,
-    )(implicit
-        executionContext: ExecutionContextIdlenessExecutorService,
-        scheduler: ScheduledExecutorService,
-        actorSystem: ActorSystem,
-        executionSequencerFactory: ExecutionSequencerFactory,
-    ): Either[String, SvcAppBootstrap]
-  }
-
-  object SvcAppFactory extends Factory[LocalSvcAppConfig] {
-
-    override def create(
-        name: String,
-        svcConfig: LocalSvcAppConfig,
-        svcAppParameters: SharedCoinAppParameters,
-        clock: Clock,
-        testingTimeService: TestingTimeService,
-        svcMetrics: SvcAppMetrics,
-        testingConfigInternal: TestingConfigInternal,
-        futureSupervisor: FutureSupervisor,
-        loggerFactory: NamedLoggerFactory,
-    )(implicit
-        executionContext: ExecutionContextIdlenessExecutorService,
-        scheduler: ScheduledExecutorService,
-        actorSystem: ActorSystem,
-        executionSequencerFactory: ExecutionSequencerFactory,
-    ): Either[String, SvcAppBootstrap] =
-      InstanceName
-        .create(name)
-        .map(
-          new SvcAppBootstrap(
-            _,
-            svcConfig,
-            svcAppParameters,
-            testingConfigInternal,
-            clock,
-            svcMetrics,
-            new CommunityStorageFactory(svcConfig.storage),
-            loggerFactory,
-          )
+  def apply(
+      name: String,
+      svcConfig: LocalSvcAppConfig,
+      svcAppParameters: SharedCoinAppParameters,
+      clock: Clock,
+      testingTimeService: TestingTimeService,
+      svcMetrics: SvcAppMetrics,
+      testingConfigInternal: TestingConfigInternal,
+      futureSupervisor: FutureSupervisor,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit
+      executionContext: ExecutionContextIdlenessExecutorService,
+      scheduler: ScheduledExecutorService,
+      actorSystem: ActorSystem,
+      executionSequencerFactory: ExecutionSequencerFactory,
+  ): Either[String, SvcAppBootstrap] =
+    InstanceName
+      .create(name)
+      .map(
+        new SvcAppBootstrap(
+          _,
+          svcConfig,
+          svcAppParameters,
+          testingConfigInternal,
+          clock,
+          svcMetrics,
+          new CommunityStorageFactory(svcConfig.storage),
+          loggerFactory,
         )
-        .leftMap(_.toString)
-  }
+      )
+      .leftMap(_.toString)
 }

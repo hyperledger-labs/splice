@@ -2,6 +2,8 @@ package com.daml.network.environment
 
 import cats.syntax.either._
 import com.daml.network.config.CoinConfig
+import com.daml.network.directory.provider.DirectoryProviderAppBootstrap
+import com.daml.network.directory.provider.config.LocalDirectoryProviderAppConfig
 import com.daml.network.metrics.CoinMetricsFactory
 import com.daml.network.svc.SvcAppBootstrap
 import com.daml.network.svc.config.LocalSvcAppConfig
@@ -9,8 +11,6 @@ import com.daml.network.validator.ValidatorAppBootstrap
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.wallet.WalletAppBootstrap
 import com.daml.network.wallet.config.LocalWalletAppConfig
-import com.daml.network.directory.provider.DirectoryProviderAppBootstrap
-import com.daml.network.directory.provider.config.LocalDirectoryProviderAppConfig
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.console.{
   ConsoleEnvironment,
@@ -35,18 +35,17 @@ trait CoinEnvironment extends Environment {
       name: String,
       validatorConfig: LocalValidatorAppConfig,
   ): ValidatorAppBootstrap =
-    ValidatorAppBootstrap.ValidatorFactory
-      .create(
-        name,
-        validatorConfig,
-        config.tryValidatorAppParametersByString(name),
-        createClock(Some(ValidatorAppBootstrap.LoggerFactoryKeyName -> name)),
-        testingTimeService,
-        coinMetrics.forValidator(name),
-        testingConfig,
-        futureSupervisor,
-        loggerFactory,
-      )
+    ValidatorAppBootstrap(
+      name,
+      validatorConfig,
+      config.tryValidatorAppParametersByString(name),
+      createClock(Some(ValidatorAppBootstrap.LoggerFactoryKeyName -> name)),
+      testingTimeService,
+      coinMetrics.forValidator(name),
+      testingConfig,
+      futureSupervisor,
+      loggerFactory,
+    )
       .valueOr(err =>
         throw new RuntimeException(
           s"Failed to create participant bootstrap: $err"
@@ -66,18 +65,17 @@ trait CoinEnvironment extends Environment {
       name: String,
       svcConfig: LocalSvcAppConfig,
   ): SvcAppBootstrap =
-    SvcAppBootstrap.SvcAppFactory
-      .create(
-        name,
-        svcConfig,
-        config.trySvcAppParametersByString(name),
-        createClock(Some(SvcAppBootstrap.LoggerFactoryKeyName -> name)),
-        testingTimeService,
-        coinMetrics.forSvc(name),
-        testingConfig,
-        futureSupervisor,
-        loggerFactory,
-      )
+    SvcAppBootstrap(
+      name,
+      svcConfig,
+      config.trySvcAppParametersByString(name),
+      createClock(Some(SvcAppBootstrap.LoggerFactoryKeyName -> name)),
+      testingTimeService,
+      coinMetrics.forSvc(name),
+      testingConfig,
+      futureSupervisor,
+      loggerFactory,
+    )
       .valueOr(err =>
         throw new RuntimeException(
           s"Failed to create participant bootstrap: $err"
@@ -97,18 +95,17 @@ trait CoinEnvironment extends Environment {
       name: String,
       walletConfig: LocalWalletAppConfig,
   ): WalletAppBootstrap =
-    WalletAppBootstrap.WalletFactory
-      .create(
-        name,
-        walletConfig,
-        config.tryWalletAppParametersByString(name),
-        createClock(Some(WalletAppBootstrap.LoggerFactoryKeyName -> name)),
-        testingTimeService,
-        coinMetrics.forWallet(name),
-        testingConfig,
-        futureSupervisor,
-        loggerFactory,
-      )
+    WalletAppBootstrap(
+      name,
+      walletConfig,
+      config.tryWalletAppParametersByString(name),
+      createClock(Some(WalletAppBootstrap.LoggerFactoryKeyName -> name)),
+      testingTimeService,
+      coinMetrics.forWallet(name),
+      testingConfig,
+      futureSupervisor,
+      loggerFactory,
+    )
       .valueOr(err =>
         throw new RuntimeException(
           s"Failed to create participant bootstrap: $err"
@@ -128,23 +125,21 @@ trait CoinEnvironment extends Environment {
       name: String,
       directoryProviderConfig: LocalDirectoryProviderAppConfig,
   ): DirectoryProviderAppBootstrap =
-    DirectoryProviderAppBootstrap.DirectoryProviderFactory
-      .create(
-        name,
-        directoryProviderConfig,
-        config.tryDirectoryProviderAppParametersByString(name),
-        createClock(Some(DirectoryProviderAppBootstrap.LoggerFactoryKeyName -> name)),
-        testingTimeService,
-        coinMetrics.forDirectoryProvider(name),
-        testingConfig,
-        futureSupervisor,
-        loggerFactory,
+    DirectoryProviderAppBootstrap(
+      name,
+      directoryProviderConfig,
+      config.tryDirectoryProviderAppParametersByString(name),
+      createClock(Some(DirectoryProviderAppBootstrap.LoggerFactoryKeyName -> name)),
+      testingTimeService,
+      coinMetrics.forDirectoryProvider(name),
+      testingConfig,
+      futureSupervisor,
+      loggerFactory,
+    ).valueOr(err =>
+      throw new RuntimeException(
+        s"Failed to create participant bootstrap: $err"
       )
-      .valueOr(err =>
-        throw new RuntimeException(
-          s"Failed to create participant bootstrap: $err"
-        )
-      )
+    )
 
   lazy val directoryProviders = new DirectoryProviderApps(
     createDirectoryProvider,

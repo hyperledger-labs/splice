@@ -1,6 +1,7 @@
 package com.daml.network.environment
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
+
 import akka.actor.ActorSystem
 import cats.data.EitherT
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -14,28 +15,25 @@ import com.digitalasset.canton.environment.{CantonNode, CantonNodeBootstrap}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.health.admin.grpc.GrpcStatusService
 import com.digitalasset.canton.health.admin.v0.StatusServiceGrpc
-import com.digitalasset.canton.ledger.api.client.LedgerConnection
-import com.digitalasset.canton.lifecycle.{FlagCloseable, HasCloseContext, Lifecycle}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.lifecycle.{HasCloseContext, Lifecycle}
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.MetricHandle.NodeMetrics
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.resource.StorageFactory
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology.{NodeId, PartyId}
+import com.digitalasset.canton.topology.NodeId
 import com.digitalasset.canton.tracing.{NoTracing, TracerProvider}
 import io.functionmeta.functionFullName
 import io.grpc.protobuf.services.ProtoReflectionService
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.{ExecutionContextExecutor, Future, blocking}
+import scala.concurrent.{Future, blocking}
 
-/** TODO(Arne): Potentially completely remove this trait.
-  *
-  * Modelled after CantonNodeBootstrap
+/** Modelled after CantonNodeBootstrap
   */
-trait CoinNodeBootstrap[+T <: CantonNode]
-    extends CantonNodeBootstrap[T] // TODO(Arne): remove the dependence on this trait.
+trait CoinNodeBootstrap[+Node <: CantonNode]
+    extends CantonNodeBootstrap[Node] // TODO(Arne): remove the dependence on this trait.
     {
 
   def name: InstanceName
@@ -45,7 +43,7 @@ trait CoinNodeBootstrap[+T <: CantonNode]
 
   def initialize: EitherT[Future, String, Unit]
 
-  def getNode: Option[T]
+  def getNode: Option[Node]
 
   // TODO(Arne): following methods are only here because of the CantonNodeBootstrap trait
   def initializeWithProvidedId(id: NodeId): EitherT[Future, String, Unit] = initialize
