@@ -1,0 +1,14 @@
+// This file is named `validator-bootstrap.canton` instead of just `validator.canton` because of Canton issue 9731:
+// https://github.com/DACH-NY/canton/issues/9731
+
+val coinDarPath = "canton-coin/.daml/dist/canton-coin.dar"
+
+val domainUrl = sys.env.get("DOMAIN_URL").getOrElse("https://canton.global")
+
+validator.domains.connect("canton-network", domainUrl)
+
+validator.dars.upload(coinDarPath)
+
+// To be run manually. Note svcPartyId is printed out by SVC startup script
+// validatorApp.initialize("validator1", PartyId.tryFromProtoPrimitive(svcPartyId))
+// validatorApp.onboardUser("god")
