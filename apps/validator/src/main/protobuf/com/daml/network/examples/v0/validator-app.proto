@@ -4,18 +4,8 @@ package com.daml.network.validator.v0;
 import "google/protobuf/wrappers.proto";
 
 service ValidatorAppService {
-  rpc DummyFunction (SomeDummyRequest) returns (SomeDummyResponse);
   rpc OnboardUser (OnboardUserRequest) returns (OnboardUserResponse);
   rpc Initialize (InitializeRequest) returns (InitializeResponse);
-}
-
-message SomeDummyRequest {
-  google.protobuf.StringValue some_string = 1;
-  int32 some_number = 2;
-}
-
-message SomeDummyResponse {
-  int32 some_number = 1;
 }
 
 message InitializeRequest {

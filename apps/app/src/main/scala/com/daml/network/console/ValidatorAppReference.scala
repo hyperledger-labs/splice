@@ -36,12 +36,6 @@ class LocalValidatorAppReference(
   override def config: LocalValidatorAppConfig =
     consoleEnvironment.environment.config.validatorsByString(name)
 
-  def dummy_command(some_string: String, some_number: Int): Int = {
-    consoleEnvironment.run {
-      adminCommand(ValidatorAppCommands.DummyCommmand(some_string, some_number))
-    }
-  }
-
   @Help.Summary("Set up a new validator")
   @Help.Description("""Create `CoinProposal` and sets up party for the validator.
                       |Return the party set up for the validator""".stripMargin)

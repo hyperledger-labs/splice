@@ -16,28 +16,6 @@ object ValidatorAppCommands {
       v0.ValidatorAppServiceGrpc.stub(channel)
   }
 
-  case class DummyCommmand(some_string: String, some_number: Int)
-      extends BaseCommand[v0.SomeDummyRequest, v0.SomeDummyResponse, Int] {
-
-    override def createRequest(): Either[String, v0.SomeDummyRequest] =
-      Right(
-        v0.SomeDummyRequest(
-          someString = Some(some_string),
-          someNumber = some_number,
-        )
-      )
-
-    override def submitRequest(
-        service: ValidatorAppServiceStub,
-        request: v0.SomeDummyRequest,
-    ): Future[v0.SomeDummyResponse] = service.dummyFunction(request)
-
-    override def handleResponse(
-        response: v0.SomeDummyResponse
-    ): Either[String, Int] =
-      Right(response.someNumber)
-  }
-
   case class SetupValidatorCommand(name: String, svc: PartyId)
       extends BaseCommand[v0.InitializeRequest, v0.InitializeResponse, PartyId] {
 
