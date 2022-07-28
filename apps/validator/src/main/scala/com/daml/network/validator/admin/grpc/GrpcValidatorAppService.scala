@@ -17,6 +17,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class GrpcValidatorAppService(
     connection: CoinLedgerConnection,
     store: ValidatorAppStore,
+    validatorUserName: String,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     @nowarn("cat=unused")
@@ -28,11 +29,10 @@ class GrpcValidatorAppService(
 
   override def initialize(request: InitializeRequest): Future[InitializeResponse] =
     withSpanFromGrpcContext("GrpcValidatorAppService") { implicit traceContext => span =>
-      val validatorName = request.name.fold(sys.error("Field missing : name"))(identity)
       val svcParty =
         request.svc.fold(sys.error("Field missing: svc"))(PartyId.tryFromProtoPrimitive)
 
-      span.setAttribute("name", validatorName)
+      span.setAttribute("username", validatorUserName)
 
       def createRulesRequestAndUserHostedAtContracts(
           validatorParty: PartyId
@@ -54,7 +54,7 @@ class GrpcValidatorAppService(
       }
 
       for {
-        validatorParty <- connection.createPartyAndUser(validatorName)
+        validatorParty <- connection.createPartyAndUser(validatorUserName)
         _ <- createRulesRequestAndUserHostedAtContracts(validatorParty)
         _ <- store.setValidatorParty(validatorParty)
         _ <- store.setSvcParty(svcParty)

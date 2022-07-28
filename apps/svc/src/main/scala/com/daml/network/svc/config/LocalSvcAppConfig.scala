@@ -7,6 +7,7 @@ import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 case class LocalSvcAppConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
+    damlUser: String = "svc",
     remoteParticipant: RemoteParticipantConfig,
 ) extends LocalCoinConfig {
   override val nodeTypeName: String = "SVC"

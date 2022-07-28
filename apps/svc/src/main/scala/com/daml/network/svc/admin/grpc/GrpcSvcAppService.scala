@@ -22,6 +22,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcSvcAppService(
     connection: CoinLedgerConnection,
+    svcUserName: String,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     @nowarn("cat=unused")
@@ -30,9 +31,6 @@ class GrpcSvcAppService(
 ) extends SvcAppServiceGrpc.SvcAppService
     with Spanning
     with NamedLogging {
-
-  // TODO(Robert): move to some config, maybe SvcAppParameters
-  private val svcUserName = "svc"
 
   // TODO(Robert): Factor out package uploading and make it robust
   private def assertPackageIsUploaded(

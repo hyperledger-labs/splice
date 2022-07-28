@@ -20,8 +20,7 @@ class DirectoryProviderIntegrationTest
     extends CoinIntegrationTest
     with IsolatedCoinEnvironments
     with CommonCoinAppInstanceReferences {
-  // same as damlUser in config
-  private val damlUser = "provider"
+
   private val quantity = 100d
   private val directoryDarPath = "apps/directory-provider/daml/.daml/dist/directory-service.dar"
   private val entryName = "mycoolentry"
@@ -42,9 +41,9 @@ class DirectoryProviderIntegrationTest
       val svcParty =
         svc.remoteParticipant.parties.list(filterParty = "svc").headOption.value.party
       // The validator operator of the user of the directory service.
-      val userValidatorParty = validator1.initialize("validator1", svcParty)
+      val userValidatorParty = validator1.initialize(svcParty)
       // The provider of the directory service
-      val providerParty = directoryValidator.initialize(damlUser, svcParty)
+      val providerParty = directoryValidator.initialize(svcParty)
       // The user of the directory service.
       val userParty = validator1.onboardUser("god")
 

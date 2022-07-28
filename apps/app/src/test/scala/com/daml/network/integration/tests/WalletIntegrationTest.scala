@@ -42,7 +42,7 @@ class WalletIntegrationTest
       svc.initialize()
       val svcParty =
         svc.remoteParticipant.parties.list(filterParty = "svc").headOption.value.party
-      val validatorParty = validator1.initialize("validator1", svcParty)
+      val validatorParty = validator1.initialize(svcParty)
       // TODO(Arne): consider adding synchronization 'wait-for-participant-x' to this command
       validator1.onboardUser(walletDamlUser)
       wallet1.initialize(svcParty, validatorParty)
@@ -65,7 +65,7 @@ class WalletIntegrationTest
       svc.initialize()
       val svcParty =
         svc.remoteParticipant.parties.list(filterParty = "svc").headOption.value.party
-      val validatorParty = validator1.initialize("validator1", svcParty)
+      val validatorParty = validator1.initialize(svcParty)
       // TODO(Arne): consider adding synchronization 'wait-for-participant-x' to this command
       val userParty = validator1.onboardUser(walletDamlUser)
       wallet1.initialize(svcParty, validatorParty)

@@ -68,7 +68,7 @@ class SvcAppBootstrap(
 
       adminServerRegistry.addService(
         SvcAppServiceGrpc.bindService(
-          new GrpcSvcAppService(connection, loggerFactory),
+          new GrpcSvcAppService(connection, config.damlUser, loggerFactory),
           executionContext,
         )
       )

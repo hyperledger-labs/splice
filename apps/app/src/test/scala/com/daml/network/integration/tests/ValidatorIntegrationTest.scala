@@ -71,7 +71,7 @@ class ValidatorIntegrationTest
       val coinDarPath = "canton-coin/.daml/dist/canton-coin.dar"
       validatorApp.remoteParticipant.dars.upload(coinDarPath)
 
-      validatorParty.set(validatorApp.initialize("validator1", svcParty.get))
+      validatorParty.set(validatorApp.initialize(svcParty.get))
       validatorParty.get.uid.id shouldBe "validator1"
     }
 

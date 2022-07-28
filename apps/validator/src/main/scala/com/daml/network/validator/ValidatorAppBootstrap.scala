@@ -69,7 +69,7 @@ class ValidatorAppBootstrap(
 
       adminServerRegistry.addService(
         ValidatorAppServiceGrpc.bindService(
-          new GrpcValidatorAppService(connection, dummyStore, loggerFactory),
+          new GrpcValidatorAppService(connection, dummyStore, config.damlUser, loggerFactory),
           executionContext,
         )
       )
