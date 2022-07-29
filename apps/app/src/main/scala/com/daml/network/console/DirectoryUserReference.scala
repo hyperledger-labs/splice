@@ -34,10 +34,11 @@ class LocalDirectoryUserAppReference(
 
   /** Remote participant this Directory User app is configured to interact with. */
   val remoteParticipant =
-    new DirectoryUserAppRemoteParticipantReference(
+    new CoinRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name``",
       name,
+      config.remoteParticipant,
     )
 
   /** secret, not publicly documented way to get the admin token */

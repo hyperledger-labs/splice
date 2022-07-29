@@ -58,10 +58,11 @@ class LocalSvcAppReference(
 
   /** Remote participant this SVC app is configured to interact with. */
   val remoteParticipant =
-    new SvcAppRemoteParticipantReference(
+    new CoinRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name``",
       name,
+      config.remoteParticipant,
     )
 
   /** secret, not publicly documented way to get the admin token */

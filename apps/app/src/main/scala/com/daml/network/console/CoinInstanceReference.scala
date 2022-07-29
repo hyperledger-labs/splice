@@ -102,47 +102,13 @@ abstract class CoinAppReference(
     consoleEnvironment.environment.participants.getRunning(name)
 }
 
-class ValidatorAppRemoteParticipantReference(
+/** Subclass of RemoteParticipant that takes the config as an argument
+  * instead of relying on remoteParticipantsByName.
+  */
+class CoinRemoteParticipantReference(
     consoleEnvironment: CoinConsoleEnvironment,
     override val name: String,
     appName: String,
+    override val config: RemoteParticipantConfig,
 ) extends RemoteParticipantReference(consoleEnvironment, name) {
-  override def config: RemoteParticipantConfig =
-    consoleEnvironment.environment.config.validatorsByString(appName).remoteParticipant
-}
-
-class SvcAppRemoteParticipantReference(
-    consoleEnvironment: CoinConsoleEnvironment,
-    override val name: String,
-    appName: String,
-) extends RemoteParticipantReference(consoleEnvironment, name) {
-  override def config: RemoteParticipantConfig =
-    consoleEnvironment.environment.config.svcsByString(appName).remoteParticipant
-}
-
-class WalletAppRemoteParticipantReference(
-    consoleEnvironment: CoinConsoleEnvironment,
-    override val name: String,
-    appName: String,
-) extends RemoteParticipantReference(consoleEnvironment, name) {
-  override def config: RemoteParticipantConfig =
-    consoleEnvironment.environment.config.walletsByString(appName).remoteParticipant
-}
-
-class DirectoryProviderAppRemoteParticipantReference(
-    consoleEnvironment: CoinConsoleEnvironment,
-    override val name: String,
-    appName: String,
-) extends RemoteParticipantReference(consoleEnvironment, name) {
-  override def config: RemoteParticipantConfig =
-    consoleEnvironment.environment.config.directoryProvidersByString(appName).remoteParticipant
-}
-
-class DirectoryUserAppRemoteParticipantReference(
-    consoleEnvironment: CoinConsoleEnvironment,
-    override val name: String,
-    appName: String,
-) extends RemoteParticipantReference(consoleEnvironment, name) {
-  override def config: RemoteParticipantConfig =
-    consoleEnvironment.environment.config.directoryUsersByString(appName).remoteParticipant
 }
