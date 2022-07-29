@@ -22,6 +22,7 @@ import cats.syntax.functor._
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.daml.network.directory.provider.config.LocalDirectoryProviderAppConfig
+import com.daml.network.directory.user.config.LocalDirectoryUserAppConfig
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
@@ -34,6 +35,7 @@ case class CoinConfig(
     svcApp: Option[LocalSvcAppConfig] = None,
     walletApps: Map[InstanceName, LocalWalletAppConfig] = Map.empty,
     directoryProviderApps: Map[InstanceName, LocalDirectoryProviderAppConfig] = Map.empty,
+    directoryUserApps: Map[InstanceName, LocalDirectoryUserAppConfig] = Map.empty,
     // TODO(Arne): we want to remove all of these.
     domains: Map[InstanceName, CommunityDomainConfig] = Map.empty,
     participants: Map[InstanceName, CommunityParticipantConfig] = Map.empty,
@@ -197,6 +199,42 @@ case class CoinConfig(
       n.unwrap -> c
     }
 
+  private lazy val directoryUserAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
+    directoryUserApps.fmap { directoryUserConfig =>
+      SharedCoinAppParameters(
+        monitoring.tracing,
+        monitoring.delayLoggingThreshold,
+        monitoring.getLoggingConfig,
+        monitoring.logQueryCost,
+        parameters.timeouts.processing,
+        directoryUserConfig.caching,
+        parameters.enableAdditionalConsistencyChecks,
+        features.enablePreviewCommands,
+        parameters.nonStandardConfig,
+        directoryUserConfig.sequencerClient,
+        devVersionSupport = false,
+      )
+    }
+
+  private[network] def directoryUserAppParameters(
+      appName: InstanceName
+  ): SharedCoinAppParameters =
+    nodeParametersFor(directoryUserAppParameters_, "directoryUser-app", appName)
+
+  /** Use `directoryUserAppParameters` instead!
+    */
+  def tryDirectoryUserAppParametersByString(name: String): SharedCoinAppParameters =
+    directoryUserAppParameters(
+      InstanceName.tryCreate(name)
+    )
+
+  /** Use `directoryUsers` instead!
+    */
+  def directoryUsersByString: Map[String, LocalDirectoryUserAppConfig] =
+    directoryUserApps.map { case (n, c) =>
+      n.unwrap -> c
+    }
+
   override def dumpString: String = "TODO(Arne): remove or implement."
 
   override def withDefaults: CoinConfig =
@@ -230,6 +268,8 @@ object CoinConfig {
       deriveReader[LocalWalletAppConfig]
     implicit val directoryProviderConfigReader: ConfigReader[LocalDirectoryProviderAppConfig] =
       deriveReader[LocalDirectoryProviderAppConfig]
+    implicit val directoryUserConfigReader: ConfigReader[LocalDirectoryUserAppConfig] =
+      deriveReader[LocalDirectoryUserAppConfig]
     implicit val communityDomainConfigReader: ConfigReader[CommunityDomainConfig] =
       deriveReader[CommunityDomainConfig]
     implicit val communityParticipantConfigReader: ConfigReader[CommunityParticipantConfig] =

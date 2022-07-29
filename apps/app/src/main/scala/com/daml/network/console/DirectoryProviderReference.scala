@@ -28,7 +28,7 @@ class LocalDirectoryProviderAppReference(
     with BaseInspection[ParticipantNode] {
 
   protected val nodes = consoleEnvironment.environment.directoryProviders
-  @Help.Summary("Return participant config")
+  @Help.Summary("Return directory provider app config")
   def config: LocalDirectoryProviderAppConfig =
     consoleEnvironment.environment.config.directoryProvidersByString(name)
 

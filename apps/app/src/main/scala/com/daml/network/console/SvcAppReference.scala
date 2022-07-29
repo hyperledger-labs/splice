@@ -17,7 +17,7 @@ class LocalSvcAppReference(
     with BaseInspection[ParticipantNode] {
 
   protected val nodes = consoleEnvironment.environment.svcs
-  @Help.Summary("Return participant config")
+  @Help.Summary("Return svc app config")
   def config: LocalSvcAppConfig =
     consoleEnvironment.environment.config.svcsByString(name)
 

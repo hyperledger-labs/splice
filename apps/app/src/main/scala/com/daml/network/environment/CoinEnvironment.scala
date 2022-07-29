@@ -11,6 +11,10 @@ import com.daml.network.validator.ValidatorAppBootstrap
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.wallet.WalletAppBootstrap
 import com.daml.network.wallet.config.LocalWalletAppConfig
+import com.daml.network.directory.provider.DirectoryProviderAppBootstrap
+import com.daml.network.directory.provider.config.LocalDirectoryProviderAppConfig
+import com.daml.network.directory.user.DirectoryUserAppBootstrap
+import com.daml.network.directory.user.config.LocalDirectoryUserAppConfig
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.console.{
   ConsoleEnvironment,
@@ -150,6 +154,36 @@ trait CoinEnvironment extends Environment {
     loggerFactory,
   )
 
+  protected def createDirectoryUser(
+      name: String,
+      directoryUserConfig: LocalDirectoryUserAppConfig,
+  ): DirectoryUserAppBootstrap =
+    DirectoryUserAppBootstrap(
+        name,
+        directoryUserConfig,
+        config.tryDirectoryUserAppParametersByString(name),
+        createClock(Some(DirectoryUserAppBootstrap.LoggerFactoryKeyName -> name)),
+        testingTimeService,
+        coinMetrics.forDirectoryUser(name),
+        testingConfig,
+        futureSupervisor,
+        loggerFactory,
+      )
+      .valueOr(err =>
+        throw new RuntimeException(
+          s"Failed to create participant bootstrap: $err"
+        )
+      )
+
+  lazy val directoryUsers = new DirectoryUserApps(
+    createDirectoryUser,
+    migrationsFactory,
+    timeouts,
+    config.directoryUsersByString,
+    config.tryDirectoryUserAppParametersByString,
+    loggerFactory,
+  )
+
   /** Start all instances described in the configuration
     */
   override def startAll(): Either[Seq[StartupError], Unit] = {
@@ -157,12 +191,13 @@ trait CoinEnvironment extends Environment {
       validators.startAll.left.getOrElse(Seq.empty) ++
         svcs.startAll.left.getOrElse(Seq.empty) ++
         wallets.startAll.left.getOrElse(Seq.empty) ++
-        directoryProviders.startAll.left.getOrElse(Seq.empty)
+        directoryProviders.startAll.left.getOrElse(Seq.empty) ++
+        directoryUsers.startAll.left.getOrElse(Seq.empty)
     Either.cond(errors.isEmpty, (), errors)
   }
 
   def allCoinNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
-    List(validators, svcs, wallets, directoryProviders)
+    List(validators, svcs, wallets, directoryProviders, directoryUsers)
 
   override def allNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
     super.allNodes ::: allCoinNodes

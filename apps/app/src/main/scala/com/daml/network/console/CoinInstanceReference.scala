@@ -137,3 +137,12 @@ class DirectoryProviderAppRemoteParticipantReference(
   override def config: RemoteParticipantConfig =
     consoleEnvironment.environment.config.directoryProvidersByString(appName).remoteParticipant
 }
+
+class DirectoryUserAppRemoteParticipantReference(
+    consoleEnvironment: CoinConsoleEnvironment,
+    override val name: String,
+    appName: String,
+) extends RemoteParticipantReference(consoleEnvironment, name) {
+  override def config: RemoteParticipantConfig =
+    consoleEnvironment.environment.config.directoryUsersByString(appName).remoteParticipant
+}

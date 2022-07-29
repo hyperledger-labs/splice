@@ -2,6 +2,7 @@ package com.daml.network.environment
 
 import com.daml.network.console.{
   LocalDirectoryProviderAppReference,
+  LocalDirectoryUserAppReference,
   LocalSvcAppReference,
   LocalValidatorAppReference,
   LocalWalletAppReference,
@@ -47,6 +48,7 @@ class CoinConsoleEnvironment(
       svcOpt.toList,
       wallets,
       directoryProviders,
+      directoryUsers,
     ),
     mergeRemoteInstances(participants.remote, domains.remote),
   )
@@ -65,6 +67,9 @@ class CoinConsoleEnvironment(
   lazy val directoryProviders: Seq[LocalDirectoryProviderAppReference] =
     environment.config.directoryProvidersByString.keys.map(createDirectoryProviderReference).toSeq
 
+  lazy val directoryUsers: Seq[LocalDirectoryUserAppReference] =
+    environment.config.directoryUsersByString.keys.map(createDirectoryUserReference).toSeq
+
   private def createValidatorReference(name: String): LocalValidatorAppReference =
     new LocalValidatorAppReference(this, name)
 
@@ -76,6 +81,9 @@ class CoinConsoleEnvironment(
 
   private def createDirectoryProviderReference(name: String): LocalDirectoryProviderAppReference =
     new LocalDirectoryProviderAppReference(this, name)
+
+  private def createDirectoryUserReference(name: String): LocalDirectoryUserAppReference =
+    new LocalDirectoryUserAppReference(this, name)
 
   override protected def topLevelValues: Seq[TopLevelValue[_]] = {
 
@@ -105,6 +113,17 @@ class CoinConsoleEnvironment(
           "Directory providers",
         ),
         directoryProviders,
+        Seq("App References"),
+      ) :++
+      directoryUsers.map(v =>
+        TopLevelValue(v.name, helpText("directory user app", v.name), v, Seq("App References"))
+      ) :+ TopLevelValue(
+        "directoryUsers",
+        helpText(
+          "All directory user app instances" + genericNodeReferencesDoc,
+          "Directory users",
+        ),
+        directoryUsers,
         Seq("App References"),
       ) :++ svcOpt
         .map(svc => TopLevelValue(svc.name, helpText("SVC app", svc.name), svc, Seq("SVC")))

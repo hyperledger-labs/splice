@@ -41,6 +41,7 @@ lazy val root = (project in file("."))
     `apps-app`,
     `apps-wallet`,
     `apps-directory-provider`,
+    `apps-directory-user`,
     `canton-community-common`,
     `canton-blake2b`,
     `canton-slick-fork`,
@@ -186,6 +187,24 @@ lazy val `apps-directory-provider` =
       scalacOptions += "-Wconf:src=src_managed/.*:silent",
     )
 
+lazy val `apps-directory-user` =
+  project
+    .in(file("apps/directory-user"))
+    .dependsOn(
+      `apps-common` % "compile->compile;test->test",
+      `apps-directory-provider` % "compile->compile;test->test",
+    )
+    .settings(
+      libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
+      BuildCommon.sharedSettings,
+      BuildCommon.cantonWarts,
+      Compile / PB.targets := Seq(
+        scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
+      ),
+      Compile / PB.protoSources ++= (Test / PB.protoSources).value,
+      scalacOptions += "-Wconf:src=src_managed/.*:silent",
+    )
+
 val scalaCodegenStrategy = new MergeStrategy {
   // Copied from SBT because they forgot to make it public
   // https://github.com/sbt/sbt-assembly/issues/435
@@ -287,6 +306,7 @@ lazy val `apps-app` =
       // Directory provider needs to come first so that the codegened files
       // come first in the classpath. Otherwise, you get NoSuchMethod errors at runtime.
       `apps-directory-provider`,
+      `apps-directory-user`,
       `apps-validator`,
       `apps-svc`,
       `apps-wallet`,

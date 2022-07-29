@@ -2,6 +2,7 @@ package com.daml.network.util
 
 import com.daml.network.console.{
   LocalDirectoryProviderAppReference,
+  LocalDirectoryUserAppReference,
   LocalSvcAppReference,
   LocalValidatorAppReference,
   LocalWalletAppReference,
@@ -28,6 +29,12 @@ trait CommonCoinAppInstanceReferences {
     "directoryprovider"
   )
 
+  def directoryUser(implicit
+      env: CoinTestConsoleEnvironment
+  ): LocalDirectoryUserAppReference = du(
+    "directoryuser"
+  )
+
   def w(name: String)(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference =
     env.wallets
       .find(_.name == name)
@@ -43,5 +50,12 @@ trait CommonCoinAppInstanceReferences {
   )(implicit env: CoinTestConsoleEnvironment): LocalDirectoryProviderAppReference =
     env.directoryProviders
       .find(_.name == name)
-      .getOrElse(sys.error(s"validator [$name] not configured"))
+      .getOrElse(sys.error(s"directory provider [$name] not configured"))
+
+  def du(
+      name: String
+  )(implicit env: CoinTestConsoleEnvironment): LocalDirectoryUserAppReference =
+    env.directoryUsers
+      .find(_.name == name)
+      .getOrElse(sys.error(s"directory user [$name] not configured"))
 }

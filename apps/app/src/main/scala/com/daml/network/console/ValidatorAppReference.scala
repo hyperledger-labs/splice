@@ -32,7 +32,7 @@ class LocalValidatorAppReference(
     with BaseInspection[ParticipantNode] {
 
   protected val nodes = consoleEnvironment.environment.validators
-  @Help.Summary("Return participant config")
+  @Help.Summary("Return validator app config")
   override def config: LocalValidatorAppConfig =
     consoleEnvironment.environment.config.validatorsByString(name)
 

@@ -5,6 +5,7 @@ import com.daml.network.svc.metrics.SvcAppMetrics
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.daml.network.wallet.metrics.WalletAppMetrics
 import com.daml.network.directory.provider.metrics.DirectoryProviderAppMetrics
+import com.daml.network.directory.user.metrics.DirectoryUserAppMetrics
 import com.digitalasset.canton.metrics.MetricsFactory.registerReporter
 import com.digitalasset.canton.metrics.{MetricsConfig, MetricsFactory, MetricsFactoryBase}
 
@@ -20,6 +21,7 @@ case class CoinMetricsFactory(
   private val svcs = TrieMap[String, SvcAppMetrics]()
   private val wallets = TrieMap[String, WalletAppMetrics]()
   private val directoryProviders = TrieMap[String, DirectoryProviderAppMetrics]()
+  private val directoryUsers = TrieMap[String, DirectoryUserAppMetrics]()
 
   override protected def allNodeMetrics: Seq[TrieMap[String, _]] = Seq(validators)
 
@@ -53,8 +55,17 @@ case class CoinMetricsFactory(
   def forDirectoryProvider(name: String): DirectoryProviderAppMetrics = {
     directoryProviders.getOrElseUpdate(
       name, {
-        val metricName = deduplicateName(name, "DirectoryProvider", wallets)
+        val metricName = deduplicateName(name, "DirectoryProvider", directoryProviders)
         new DirectoryProviderAppMetrics(MetricsFactory.prefix, newRegistry(metricName))
+      },
+    )
+  }
+
+  def forDirectoryUser(name: String): DirectoryUserAppMetrics = {
+    directoryUsers.getOrElseUpdate(
+      name, {
+        val metricName = deduplicateName(name, "DirectoryUser", directoryUsers)
+        new DirectoryUserAppMetrics(MetricsFactory.prefix, newRegistry(metricName))
       },
     )
   }

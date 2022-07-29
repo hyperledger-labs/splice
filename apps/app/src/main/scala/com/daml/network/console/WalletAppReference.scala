@@ -29,7 +29,7 @@ class LocalWalletAppReference(
     with BaseInspection[ParticipantNode] {
 
   protected val nodes = consoleEnvironment.environment.wallets
-  @Help.Summary("Return participant config")
+  @Help.Summary("Return wallet app config")
   def config: LocalWalletAppConfig =
     consoleEnvironment.environment.config.walletsByString(name)
 
