@@ -21,7 +21,10 @@ import scala.annotation.nowarn
 import cats.syntax.functor._
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.wallet.config.LocalWalletAppConfig
-import com.daml.network.directory.provider.config.LocalDirectoryProviderAppConfig
+import com.daml.network.directory.provider.config.{
+  LocalDirectoryProviderAppConfig,
+  RemoteDirectoryProviderAppConfig,
+}
 import com.daml.network.directory.user.config.LocalDirectoryUserAppConfig
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
@@ -268,6 +271,9 @@ object CoinConfig {
       deriveReader[LocalWalletAppConfig]
     implicit val directoryProviderConfigReader: ConfigReader[LocalDirectoryProviderAppConfig] =
       deriveReader[LocalDirectoryProviderAppConfig]
+    implicit val remoteDirectoryProviderConfigReader
+        : ConfigReader[RemoteDirectoryProviderAppConfig] =
+      deriveReader[RemoteDirectoryProviderAppConfig]
     implicit val directoryUserConfigReader: ConfigReader[LocalDirectoryUserAppConfig] =
       deriveReader[LocalDirectoryUserAppConfig]
     implicit val communityDomainConfigReader: ConfigReader[CommunityDomainConfig] =

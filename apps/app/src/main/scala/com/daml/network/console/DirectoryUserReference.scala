@@ -32,6 +32,18 @@ class LocalDirectoryUserAppReference(
   def config: LocalDirectoryUserAppConfig =
     consoleEnvironment.environment.config.directoryUsersByString(name)
 
+  @Help.Summary("List all directory entries")
+  def listEntries(): Seq[Contract[codegen.DirectoryEntry]] =
+    remoteDirectoryProvider.listEntries()
+
+  @Help.Summary("Lookup a directory entry by the party that registered it")
+  def lookupEntryByParty(party: PartyId): Contract[codegen.DirectoryEntry] =
+    remoteDirectoryProvider.lookupEntryByParty(party)
+
+  @Help.Summary("Lookup a directory entry by its name")
+  def lookupEntryByName(name: String): Contract[codegen.DirectoryEntry] =
+    remoteDirectoryProvider.lookupEntryByName(name)
+
   /** Remote participant this Directory User app is configured to interact with. */
   val remoteParticipant =
     new CoinRemoteParticipantReference(
@@ -39,6 +51,16 @@ class LocalDirectoryUserAppReference(
       s"remote participant for `$name``",
       name,
       config.remoteParticipant,
+    )
+
+  /** Remote directory provider app user is configured to interact with. We make this
+    * private since we only want to expose a subset of the methods.
+    */
+  private val remoteDirectoryProvider =
+    new RemoteDirectoryProviderAppReference(
+      consoleEnvironment,
+      config.remoteDirectoryProvider,
+      s"remote directory provider for `$name``",
     )
 
   /** secret, not publicly documented way to get the admin token */

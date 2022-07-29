@@ -159,16 +159,16 @@ trait CoinEnvironment extends Environment {
       directoryUserConfig: LocalDirectoryUserAppConfig,
   ): DirectoryUserAppBootstrap =
     DirectoryUserAppBootstrap(
-        name,
-        directoryUserConfig,
-        config.tryDirectoryUserAppParametersByString(name),
-        createClock(Some(DirectoryUserAppBootstrap.LoggerFactoryKeyName -> name)),
-        testingTimeService,
-        coinMetrics.forDirectoryUser(name),
-        testingConfig,
-        futureSupervisor,
-        loggerFactory,
-      )
+      name,
+      directoryUserConfig,
+      config.tryDirectoryUserAppParametersByString(name),
+      createClock(Some(DirectoryUserAppBootstrap.LoggerFactoryKeyName -> name)),
+      testingTimeService,
+      coinMetrics.forDirectoryUser(name),
+      testingConfig,
+      futureSupervisor,
+      loggerFactory,
+    )
       .valueOr(err =>
         throw new RuntimeException(
           s"Failed to create participant bootstrap: $err"

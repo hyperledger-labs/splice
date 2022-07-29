@@ -154,11 +154,22 @@ class DirectoryProviderIntegrationTest
       entry.contractId shouldBe cid
       val entryValue =
         Contract(cid, codegen.DirectoryEntry(userParty.toPrim, providerParty.toPrim, entryName))
+
+      // Read entries from provider
       directoryProvider.listEntries() shouldBe Seq(entryValue)
       directoryProvider.lookupEntryByName(entryName) shouldBe entryValue
       directoryProvider.lookupEntryByParty(userParty) shouldBe entryValue
       assertThrowsAndLogsCommandFailures(
         directoryProvider.lookupEntryByName("nonexistentname"),
+        _.errorMessage should include("nonexistentname"),
+      )
+
+      // Read entries from user
+      directoryUser.listEntries() shouldBe Seq(entryValue)
+      directoryUser.lookupEntryByName(entryName) shouldBe entryValue
+      directoryUser.lookupEntryByParty(userParty) shouldBe entryValue
+      assertThrowsAndLogsCommandFailures(
+        directoryUser.lookupEntryByName("nonexistentname"),
         _.errorMessage should include("nonexistentname"),
       )
     }

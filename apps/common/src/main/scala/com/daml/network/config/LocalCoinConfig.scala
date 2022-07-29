@@ -7,6 +7,7 @@ import com.digitalasset.canton.config.{
   LocalNodeConfig,
   LocalNodeParameters,
   LoggingConfig,
+  NodeConfig,
   ProcessingTimeout,
   QueryCostMonitoringConfig,
 }
@@ -22,6 +23,13 @@ abstract class LocalCoinConfig extends LocalNodeConfig {
   override val crypto: CryptoConfig = CryptoConfig()
   override val sequencerClient: SequencerClientConfig = SequencerClientConfig()
   override val caching: CachingConfigs = CachingConfigs()
+}
+
+/** Abstraction to remove code duplication when implementing Canton traits and specifying parameters we don't use
+  * anyway.
+  */
+abstract class RemoteCoinConfig extends NodeConfig {
+  override val crypto: CryptoConfig = CryptoConfig()
 }
 
 /** This class aggregates binary-level configuration options that are shared between each CN app instance.

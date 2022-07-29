@@ -110,5 +110,4 @@ class CoinRemoteParticipantReference(
     override val name: String,
     appName: String,
     override val config: RemoteParticipantConfig,
-) extends RemoteParticipantReference(consoleEnvironment, name) {
-}
+) extends RemoteParticipantReference(consoleEnvironment, name) {}
