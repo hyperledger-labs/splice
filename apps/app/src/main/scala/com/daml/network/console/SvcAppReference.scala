@@ -33,6 +33,11 @@ class LocalSvcAppReference(
     }
   }
 
+  //
+  @deprecated(
+    "This is now automated in SvcAutomationService. We only still have it in case it may be useful.",
+    since = "since automation was introduced",
+  )
   def acceptValidators(): Unit = {
     consoleEnvironment.run {
       adminCommand(SvcAppCommands.AcceptValidators())

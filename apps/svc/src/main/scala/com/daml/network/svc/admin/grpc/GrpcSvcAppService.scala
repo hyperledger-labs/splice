@@ -5,6 +5,7 @@ import com.daml.ledger.api.refinements.ApiTypes.TemplateId
 import com.daml.ledger.api.v1.transaction_filter
 import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
 import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.svc.admin.SvcAutomationService
 import com.daml.network.svc.v0.{GetDebugInfoResponse, GetValidatorConfigResponse, SvcAppServiceGrpc}
 import com.daml.network.util.{CoinUtil, UploadablePackage}
 import com.digitalasset.canton.concurrent.Threading
@@ -24,6 +25,7 @@ class GrpcSvcAppService(
     connection: CoinLedgerConnection,
     svcUserName: String,
     protected val loggerFactory: NamedLoggerFactory,
+    svcAutomationConstructor: PartyId => SvcAutomationService,
 )(implicit
     @nowarn("cat=unused")
     ec: ExecutionContext,
@@ -32,6 +34,9 @@ class GrpcSvcAppService(
     with Spanning
     with NamedLogging {
 
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
+  var svcAutomation: Option[SvcAutomationService] = None
+
   override def initialize(request: Empty): Future[Empty] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
@@ -39,6 +44,7 @@ class GrpcSvcAppService(
         _ <- connection.uploadDarFile(CoinUtil) // TODO(i353) move away from dar upload during init
         _ <- CoinUtil.setupApp(svcPartyId, connection)
         _ = logger.info(s"App is initialized")
+        _ = svcAutomation = Some(svcAutomationConstructor(svcPartyId))
       } yield Empty()
     }
 

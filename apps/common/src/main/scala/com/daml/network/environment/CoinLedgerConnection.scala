@@ -84,7 +84,7 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
 }
 
 /** Subscription for reading the ledger */
-trait LedgerSubscription extends FlagCloseableAsync with NamedLogging {
+trait CoinLedgerSubscription extends FlagCloseableAsync with NamedLogging {
   val completed: Future[Done]
 }
 
@@ -96,34 +96,34 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
   def subscribe(
       subscriptionName: String,
       offset: LedgerOffset,
-      filter: TransactionFilter,
-  )(f: Transaction => Unit): LedgerSubscription
+      filter: TransactionFilter = TransactionFilter(),
+  )(f: Transaction => Unit): CoinLedgerSubscription
   def subscribeAsync(
       subscriptionName: String,
       offset: LedgerOffset,
       filter: TransactionFilter,
-  )(f: Transaction => Future[Unit]): LedgerSubscription
+  )(f: Transaction => Future[Unit]): CoinLedgerSubscription
   def subscription[T](
       subscriptionName: String,
       offset: LedgerOffset,
       filter: TransactionFilter,
-  )(mapOperator: Flow[Transaction, Any, _]): LedgerSubscription
+  )(mapOperator: Flow[Transaction, Any, _]): CoinLedgerSubscription
 
   def subscribeTree(
       subscriptionName: String,
       offset: LedgerOffset,
       filter: Seq[PartyId],
-  )(f: TransactionTree => Unit): LedgerSubscription
+  )(f: TransactionTree => Unit): CoinLedgerSubscription
   def subscribeAsyncTree(
       subscriptionName: String,
       offset: LedgerOffset,
       filter: Seq[PartyId],
-  )(f: TransactionTree => Future[Unit]): LedgerSubscription
+  )(f: TransactionTree => Future[Unit]): CoinLedgerSubscription
   def subscriptionTree[T](
       subscriptionName: String,
       offset: LedgerOffset,
       filter: Seq[PartyId],
-  )(mapOperator: Flow[TransactionTree, Any, _]): LedgerSubscription
+  )(mapOperator: Flow[TransactionTree, Any, _]): CoinLedgerSubscription
 
   def transactionById(parties: Seq[PartyId], id: String): Future[Option[Transaction]]
 
@@ -334,7 +334,7 @@ object CoinLedgerConnection {
           subscriptionName: String,
           offset: LedgerOffset,
           filter: TransactionFilter,
-      )(f: Transaction => Unit): LedgerSubscription =
+      )(f: Transaction => Unit): CoinLedgerSubscription =
         subscription(subscriptionName, offset, filter)({
           Flow[Transaction].map(f)
         })
@@ -343,7 +343,7 @@ object CoinLedgerConnection {
           subscriptionName: String,
           offset: LedgerOffset,
           filter: TransactionFilter,
-      )(f: Transaction => Future[Unit]): LedgerSubscription =
+      )(f: Transaction => Future[Unit]): CoinLedgerSubscription =
         subscription(subscriptionName, offset, filter)({
           Flow[Transaction].mapAsync(1)(f)
         })
@@ -445,7 +445,7 @@ object CoinLedgerConnection {
           subscriptionName: String,
           offset: LedgerOffset,
           filter: TransactionFilter,
-      )(mapOperator: Flow[Transaction, Any, _]): LedgerSubscription =
+      )(mapOperator: Flow[Transaction, Any, _]): CoinLedgerSubscription =
         makeSubscription(
           transactionClient.getTransactions(offset, None, filter),
           mapOperator,
@@ -456,7 +456,7 @@ object CoinLedgerConnection {
           subscriptionName: String,
           offset: LedgerOffset,
           filterParty: Seq[PartyId],
-      )(f: TransactionTree => Unit): LedgerSubscription =
+      )(f: TransactionTree => Unit): CoinLedgerSubscription =
         subscriptionTree(subscriptionName, offset, filterParty)({
           Flow[TransactionTree].map(f)
         })
@@ -465,7 +465,7 @@ object CoinLedgerConnection {
           subscriptionName: String,
           offset: LedgerOffset,
           filterParty: Seq[PartyId],
-      )(f: TransactionTree => Future[Unit]): LedgerSubscription =
+      )(f: TransactionTree => Future[Unit]): CoinLedgerSubscription =
         subscriptionTree(subscriptionName, offset, filterParty)({
           Flow[TransactionTree].mapAsync(1)(f)
         })
@@ -474,7 +474,7 @@ object CoinLedgerConnection {
           subscriptionName: String,
           offset: LedgerOffset,
           filterParty: Seq[PartyId],
-      )(mapOperator: Flow[TransactionTree, Any, _]): LedgerSubscription =
+      )(mapOperator: Flow[TransactionTree, Any, _]): CoinLedgerSubscription =
         makeSubscription(
           transactionClient.getTransactionTrees(offset, None, transactionFilter(filterParty: _*)),
           mapOperator,
@@ -485,8 +485,8 @@ object CoinLedgerConnection {
           source: Source[S, NotUsed],
           mapOperator: Flow[S, T, _],
           subscriptionName: String,
-      ): LedgerSubscription =
-        new LedgerSubscription {
+      ): CoinLedgerSubscription =
+        new CoinLedgerSubscription {
           override protected def timeouts: ProcessingTimeout = processingTimeouts
           import TraceContext.Implicits.Empty._
           val (killSwitch, completed) = AkkaUtil.runSupervised(

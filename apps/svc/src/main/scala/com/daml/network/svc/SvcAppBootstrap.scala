@@ -1,17 +1,19 @@
 package com.daml.network.svc
 
 import java.util.concurrent.ScheduledExecutorService
+
 import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrapBase
-import com.daml.network.svc.v0.SvcAppServiceGrpc
+import com.daml.network.svc.admin.SvcAutomationService
 import com.daml.network.svc.admin.grpc.GrpcSvcAppService
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.svc.metrics.SvcAppMetrics
 import com.daml.network.svc.store.SvcAppStore
+import com.daml.network.svc.v0.SvcAppServiceGrpc
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -21,6 +23,7 @@ import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource._
 import com.digitalasset.canton.time._
+import com.digitalasset.canton.topology.PartyId
 
 import scala.annotation.nowarn
 import scala.concurrent.Future
@@ -66,12 +69,23 @@ class SvcAppBootstrap(
       val connection =
         createLedgerConnection(config.remoteParticipant, svcAppParameters.processingTimeouts)
 
+      // TODO(Arne): We can only run the SVC automation once we know the SVC PartyID.
+      // This workaround can be removed once we fix #271
+      def createAutomation(svcParty: PartyId) = new SvcAutomationService(
+        svcParty,
+        config.remoteParticipant,
+        loggerFactory,
+        tracerProvider,
+        timeouts,
+      )
+
       adminServerRegistry.addService(
         SvcAppServiceGrpc.bindService(
-          new GrpcSvcAppService(connection, config.damlUser, loggerFactory),
+          new GrpcSvcAppService(connection, config.damlUser, loggerFactory, createAutomation),
           executionContext,
         )
       )
+
       new SvcAppNode(config, svcAppParameters, storage, svcStore, clock, loggerFactory)
     }
   }

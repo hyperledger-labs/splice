@@ -48,7 +48,7 @@ service SvcAppService {
   // For each request, a copy of all SVC state contracts (e.g., CoinRules) is created for
   // the requesting validator.
   // PoC implementation: `runCoinRulesAcceptBot` in Util.daml
-  // TODO(M1-01): Replace this manual trigger by automation
+  // Automated in SvcAutomationService
   rpc AcceptValidators (google.protobuf.Empty) returns (google.protobuf.Empty);
 
   // Returns some debug info about the running app

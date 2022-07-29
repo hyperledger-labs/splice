@@ -1,6 +1,7 @@
 package com.daml.network.svc
 
 import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.svc.admin.SvcAutomationService
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.svc.store.SvcAppStore
 import com.digitalasset.canton.environment.CantonNode

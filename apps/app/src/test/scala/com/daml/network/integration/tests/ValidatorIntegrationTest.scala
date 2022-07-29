@@ -75,22 +75,14 @@ class ValidatorIntegrationTest
       validatorParty.get.uid.id shouldBe "validator1"
     }
 
-    clue("check: SVC sees a request for coin rules, validator doesn't see any CoinRules yet") {
-      svcApp.remoteParticipant.ledger_api.acs.await(svcParty.get, CC.CoinRules.CoinRulesRequest)
-
-      val coinRules = validatorApp.remoteParticipant.ledger_api.acs
-        .of_party(svcParty.get, filterTemplates = Seq(CC.CoinRules.CoinRules.id))
-      coinRules shouldBe empty
-    }
-
-    clue("SVC accepts the coin rules request") {
-      svcApp.acceptValidators()
-    }
-
-    clue("check: request for coin rules is now gone, and the validator app sees CoinRules") {
-      val requests = svcApp.remoteParticipant.ledger_api.acs
-        .of_party(svcParty.get, filterTemplates = Seq(CC.CoinRules.CoinRulesRequest.id))
-      requests shouldBe empty
+    clue("check: request for coin rules is gone, and the validator app sees CoinRules") {
+      // synchronization here as it can take a sec for the automation in `SvcAppAutomation`
+      // to see the CoinRulesRequest and accept it.
+      utils.retry_until_true({
+        val requests = svcApp.remoteParticipant.ledger_api.acs
+          .filter(svcParty.get, CC.CoinRules.CoinRulesRequest)
+        requests == Seq()
+      })
 
       validatorApp.remoteParticipant.ledger_api.acs
         .await(validatorParty.get, CC.CoinRules.CoinRules)

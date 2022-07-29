@@ -44,10 +44,11 @@ class WalletIntegrationTest
       // TODO(Arne): consider adding synchronization 'wait-for-participant-x' to this command
       validator1.onboardUser(walletDamlUser)
       wallet1.initialize(svcParty, validatorParty)
-      svc.acceptValidators()
 
       // ensure wallet's participant sees the CoinRules
       wallet1.remoteParticipant.ledger_api.acs.await(validatorParty, CoinRules)
+      wallet1.list() shouldBe Seq()
+
       wallet1.tap(quantity)
       val res = wallet1.list().headOption.value
       res.payload.quantity shouldBe ExpiringQuantity(
@@ -67,7 +68,6 @@ class WalletIntegrationTest
       // TODO(Arne): consider adding synchronization 'wait-for-participant-x' to this command
       val userParty = validator1.onboardUser(walletDamlUser)
       wallet1.initialize(svcParty, validatorParty)
-      svc.acceptValidators()
 
       // ensure wallet's participant sees the CoinRules
       val coinRulesId =

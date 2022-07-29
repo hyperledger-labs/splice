@@ -48,7 +48,6 @@ class DirectoryProviderIntegrationTest
       val userParty = validator1.onboardUser("god")
 
       wallet1.initialize(svcParty, userValidatorParty)
-      svc.acceptValidators()
       wallet1.remoteParticipant.ledger_api.acs
         .await(userValidatorParty, coinCodegen.CoinRules.CoinRules)
 
