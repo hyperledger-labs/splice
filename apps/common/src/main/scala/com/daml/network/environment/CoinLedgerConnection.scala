@@ -400,8 +400,6 @@ object CoinLedgerConnection {
           partyId <- existingPartyId.fold[Future[PartyId]](createPartyAndUser(username))(
             Future.successful
           )
-          // TODO: Is there some automatic logging of submitted commands already? If not, can we introduce it?
-          _ = logger.info(s"User $username and party $partyId are allocated")
         } yield partyId
       }
 

@@ -58,6 +58,34 @@ M3 - TestNet Launch.
 You should then see a 'sbt shell' window in IntelliJ that allows you to build and test the Scala code while using the 
 same package references as nix. If IntelliJ asks you at the end if you want to overwrite any previous `.idea/*` files, say yes.  
 
+### Running and debugging integration tests
+
+The integration tests are located at [`/apps/app/src/test/scala/com/daml/network/integration/tests/`](/apps/app/src/test/scala/com/daml/network/integration/tests).
+They work by standing up by defining and starting a Canton network topology and running Canton console commands against that topology,
+see for example the [`DirectoryProviderIntegrationTest.scala`](/apps/app/src/test/scala/com/daml/network/integration/tests/DirectoryProviderIntegrationTest.scala).
+Also see the Scaladocs on Canton's [`BaseIntegrationTest.scala`](/canton/community/app/src/test/scala/com/digitalasset/canton/integration/BaseIntegrationTest.scala) for more information about how the test framework is intended to be used.
+
+Many tests use the topology and base configuration defined in [`/apps/app/src/test/resources/simple-topology.conf`](apps/app/src/test/resources/simple-topology.conf), or a variant thereof.
+Adjusting these configurations can sometimes help with debugging. 
+See for example https://docs.daml.com/canton/usermanual/monitoring.html on how to adjust logging and monitoring for Canton nodes.
+
+You can run integration tests from IntelliJ by navigating to the file and clicking the little green "run-triangle" 
+in the gutter at the start of the test definition.
+You can also run them from `sbt` as explained in the section on `sbt` below.
+The logs from test executions are output to `/logs/canton_test.log`.
+Use `lnav` to view these logs for debugging failing test cases.
+No installation of `lnav` is required, as it is provided by default by our `direnv`.
+
+#### Setting up `lnav` to inspect Canton logs
+
+If you have never used `lnav` to inspect Canton logs, then we recommend:
+1. Download the `canton.lnav.json` log format config file from https://github.com/DACH-NY/canton/blob/main/canton.lnav.json
+2. Install the Canton log format using `lnav -i canton.lnav.json`, which will install it in `~/.lnav/formats/installed/canton_log.json` and enable it for auto-detection in future `lnav` sessions.
+3. Type `lnav log/canton_test.log` to inspect the test logs.
+4. Take the time to familiarize yourself with docs for the `lnav` [UI](https://docs.lnav.org/en/latest/ui.html#ui)
+   and [HotKeys](https://docs.lnav.org/en/latest/hotkeys.html), and learn to effectively navigate the test logs.
+
+
 ## sbt
 ### sbt settings
 Make sure to configure the JVM heap size to at least 4G when using IntelliJ. In particular:
@@ -150,7 +178,7 @@ The local cluster is managed with the following three subcommands of
 
 Operations against GCE clusters are complicated by the facts that
 there are more than one cluster and GCE clusters are usually shared
-resources. To accommodate this, there is a [`deployments`](deployments)
+resources. To accommodate this, there is a [`deployment`](/deployment)
 directory that is used to manage the configuration of each
 cluster. Each extant cluster has a directory under `deployments` and
 operations against that cluster must be invoked from within that

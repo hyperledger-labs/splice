@@ -15,6 +15,7 @@ in pkgs.mkShell {
     minikube
     google-cloud-sdk
     jsonnet
+    lnav
     nodejs
     sbt
     sphinx
