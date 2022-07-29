@@ -133,6 +133,103 @@ these updates complete, either successfully or with a failure.
 The ScratchNet cluster is manually managed and intended to be a test
 bed for new code.
 
+### Connecting to a Cluster
+
+The GCE clusters expose both the Canton Domain and Ledger API's to the
+outside world. Provided you are connecting through either the Digital
+Asset VPN or the Canton Network Customer VPN, these APIs are available
+in each environment on the following ports.
+
+| Service            | API        | Port |
+| ------------------ | ---------- | ---- |
+| Canton Domain      | Public API | 5008 |
+| Canton Domain      | [Admin API](https://docs.daml.com/canton/usermanual/administration.html#domain-admin-apis)  | 5009 |
+| Canton Participant | [Ledger API](https://docs.daml.com/app-dev/grpc/proto-docs.html) | 5001 |
+| Canton Participant | [Admin API](https://docs.daml.com/canton/usermanual/administration.html#canton-administration-apis)  | 5002 |
+
+(The port allocation scheme is documented [here](./apps/app/src/test/resources/README.md)
+and is shared between the Canton Network tests and runtime environment.)
+
+It is possible to connect locally hosted Canton components into this
+environment. This includes the REPL, participant nodes, and domain nodes.
+If you don't have Canton, you may install it following
+instructions [here](https://docs.daml.com/canton/usermanual/installation.html).
+
+This is an example of an configuration file that might be used with a
+Canton Network cluster. It connects a local REPL to a (`DevNet`)
+cluster particpant and also creates a locally hosted participant.
+
+```
+canton {
+  remote-participants {
+    remoteParticipant1 {
+      admin-api {
+        port = 5002
+        address = dev.network.canton.global
+      }
+      ledger-api {
+        port = 5001
+        address = dev.network.canton.global
+      }
+    }
+  }
+  participants {
+    localParticipant1 {
+      storage.type = memory
+      admin-api.port = 5012
+      ledger-api.port = 5011
+    }
+ }
+}
+```
+
+This can be used to start a REPL as follows:
+
+```
+$ bin/canton -c cn.conf
+```
+
+Once the REPL is running, it is then possible to interact with the
+cluster via the REPL.
+
+This is an example of a locally requested ping from the remote
+particpant to the remote particpant. This command confirms the ledger API
+connection to the remote participant node:
+
+```
+@ remoteParticipant1.health.ping(remoteParticipant1, timeout = 10.seconds) 
+res0: concurrent.duration.Duration = 2246 milliseconds
+```
+
+The local participant node may connected to the CN domain as follows:
+
+
+```
+@ localParticipant1.domains.connect("test", "http://dev.net.canton.global:5008") 
+res1: DomainConnectionConfig = DomainConnectionConfig(
+  domain = Domain 'test',
+  sequencerConnection = GrpcSequencerConnection(
+    endpoints = http://34.173.2.69:5008,
+    transportSecurity = false,
+    customTrustCertificates = None()
+  ),
+  manualConnect = false,
+  domainId = None(),
+  priority = 0,
+  initialRetryDelay = None(),
+  maxRetryDelay = None()
+)
+```
+
+Once that connection is established, it is possible to conduct ledger
+interactions that span both the CN cluster participant and the locally
+hosted participant:
+
+```
+@ remoteParticipant1.health.ping(localParticipant1, timeout = 10.seconds) 
+res2: concurrent.duration.Duration = 1762 milliseconds
+```
+
 ### Cluster Tooling
 
 This repository also contains tools for managing clusters, hosted both
@@ -174,7 +271,7 @@ The local cluster is managed with the following three subcommands of
   running local cluster.
 * `cnlocal stop` - Stop the local cluster, if it is running.
 
-#### GCE Operations
+#### Cluster Management Operations
 
 Operations against GCE clusters are complicated by the facts that
 there are more than one cluster and GCE clusters are usually shared
@@ -205,6 +302,7 @@ variables. As stated above, these are usually populated via `.envrc`.
 | `GCP_CLUSTER_NAME`        | Name of the GKE cluster within the cloud project.                     |
 | `GCP_REPO_NAME`           | Google Cloud Project/Name of the image repository used to manage project container images. |
 
-### Port allocations
+### Ledger API Port Allocations
 
 Both our deployment and tests follow the [port allocation scheme](./apps/app/src/test/resources/README.md).
+
