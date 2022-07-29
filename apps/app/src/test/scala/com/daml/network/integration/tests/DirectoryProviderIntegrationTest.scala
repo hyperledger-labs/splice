@@ -157,7 +157,10 @@ class DirectoryProviderIntegrationTest
       directoryProvider.listEntries() shouldBe Seq(entryValue)
       directoryProvider.lookupEntryByName(entryName) shouldBe entryValue
       directoryProvider.lookupEntryByParty(userParty) shouldBe entryValue
-      an[CommandFailure] should be thrownBy directoryProvider.lookupEntryByName("nonexistentname")
+      assertThrowsAndLogsCommandFailures(
+        directoryProvider.lookupEntryByName("nonexistentname"),
+        _.errorMessage should include("nonexistentname"),
+      )
     }
   }
 }
