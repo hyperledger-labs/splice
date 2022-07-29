@@ -254,13 +254,13 @@ jobs:
            nix-shell shell.nix \
              --pure \
              --keep CI \
-             --keep GCLOUD_SERVICE_KEY \
+             --keep GCP_DA_CN_DEVNET_KEY \
              --run bash \<<'EOF'
              set -euo pipefail
              . .envrc.vars
              . $REPO_ROOT/deployment/devnet/.envrc.vars
 
-             echo $GCLOUD_SERVICE_KEY | gcloud auth activate-service-account --key-file=-
+             echo $GCP_DA_CN_DEVNET_KEY | gcloud auth activate-service-account --key-file=-
 
              cncluster activate
              (yes || true) | cncluster apply
@@ -380,13 +380,12 @@ jobs:
              make html
 
   docker-images-push:
-    docker:
-    - image: cimg/base:2021.04
+    machine:
+      image: ubuntu-2004:202010-01
     environment:
       <<: *env
     steps:
       - checkout
-      - setup_remote_docker
       - setup_nix
       - run:
          name: build images
@@ -418,7 +417,7 @@ jobs:
            nix-shell shell.nix \
              --pure \
              --keep CI \
-             --keep GCLOUD_SERVICE_KEY \
+             --keep GCP_DA_CN_IMAGES_KEY \
              --keep DOCKER_CERT_PATH \
              --keep DOCKER_HOST \
              --keep DOCKER_MACHINE_NAME \
@@ -428,7 +427,7 @@ jobs:
              set -euo pipefail
              . .envrc.vars
 
-             echo $GCLOUD_SERVICE_KEY | gcloud auth activate-service-account --key-file=-
+             echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
              (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
 
              make docker-push

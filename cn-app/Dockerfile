@@ -2,7 +2,7 @@
 FROM openjdk:11-jdk-slim
 
 # Install screen for running the console in a headless server
-RUN apt-get update && apt-get install -y screen
+RUN apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y screen
 RUN apt-get clean && rm -rf /var/cache/apt/archives
 
 # allow the path we pull the coin tarball from to be overridden
