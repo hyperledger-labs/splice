@@ -136,7 +136,7 @@ lazy val `apps-wallet` =
       Compile / PB.targets := Seq(
         scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
       ),
-      Compile / damlBuild := ((Compile / damlBuild) dependsOn `apps-common` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`apps-common` / Compile / damlBuild).value,
       Compile / damlSourceDirectory := file("apps/wallet/daml"),
       Compile / damlDarOutput := file("apps/wallet/daml") / ".daml" / "dist",
       Compile / damlCodeGeneration := Seq(
@@ -172,7 +172,7 @@ lazy val `apps-directory-provider` =
       Compile / PB.targets := Seq(
         scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
       ),
-      Compile / damlBuild := ((Compile / damlBuild) dependsOn `apps-wallet` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`apps-wallet` / Compile / damlBuild).value,
       Compile / damlSourceDirectory := file("apps/directory-provider/daml"),
       Compile / damlDarOutput := file("apps/directory-provider/daml") / ".daml" / "dist",
       Compile / damlCodeGeneration := Seq(
