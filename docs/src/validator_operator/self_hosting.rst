@@ -42,7 +42,8 @@ Run this now: ::
 
 In the console, initialize the validator ::
 
-  @ validatorApp.initialize("validator", PartyId.tryFromProtoPrimitive(<svcPartyId>))
+  @ val svcParty = PartyId.tryFromProtoPrimitive("<svcPartyId>")
+  @ val validatorParty = validatorApp.initialize(svcParty)
 
 Replace the `<svcPartyId>` with the quoted string representing the party id of the supervalidator consortium.
 
@@ -65,14 +66,14 @@ Tapping some Canton Coin from the Dev Faucet
 
 In order to create some free canton coin to play around with, you'll need to initialize the wallet by passing it the SVC (same as before) and validator parties: ::
 
-@ val svcP = PartyId.tryFromProtoPrimitive(...)
 @ val validatorP = wallet.remoteParticipant.parties.list(filterParty = "validator").head.party
-@ wallet.initialize(svcP, validatorP)
+@ wallet.initialize(svcParty, validatorParty)
   
 We can create free coins like so: ::
 
   @ wallet.tap("1000.0")
   Res2: ContractId Canton.Coin { ... }
+
 
 Listing your Canton Coins
 -------------------------
@@ -89,7 +90,7 @@ You can create coins by tapping the dev faucet as explained in the previous sect
 Transfer Canton Coin
 --------------------
 
-.. TODO(Arne): Still needs to be updated.
+.. TODO(M1-02): Still needs to be updated.
 
 If not already done, start the canton-coin console with a wallet: ::
 

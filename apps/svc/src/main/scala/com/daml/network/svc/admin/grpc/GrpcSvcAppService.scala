@@ -1,20 +1,15 @@
 package com.daml.network.svc.admin.grpc
 
-import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.api.refinements.ApiTypes.TemplateId
-import com.daml.ledger.api.v1.transaction_filter
-import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.svc.admin.SvcAutomationService
-import com.daml.network.svc.v0.{GetDebugInfoResponse, GetValidatorConfigResponse, SvcAppServiceGrpc}
-import com.daml.network.util.{CoinUtil, UploadablePackage}
-import com.digitalasset.canton.concurrent.Threading
-import com.digitalasset.canton.ledger.api.client.{DecodeUtil, LedgerConnection}
+import com.daml.network.svc.v0
+import com.daml.network.svc.v0.SvcAppServiceGrpc
+import com.daml.network.util.CoinUtil
+import com.digitalasset.canton.ledger.api.client.LedgerConnection
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.tracing.Spanning
 import com.digitalasset.network.CC
-import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
 
@@ -37,7 +32,7 @@ class GrpcSvcAppService(
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   var svcAutomation: Option[SvcAutomationService] = None
 
-  override def initialize(request: Empty): Future[Empty] =
+  override def initialize(request: Empty): Future[v0.InitializeResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
         svcPartyId <- connection.getOrAllocateParty(svcUserName)
@@ -45,7 +40,7 @@ class GrpcSvcAppService(
         _ <- CoinUtil.setupApp(svcPartyId, connection)
         _ = logger.info(s"App is initialized")
         _ = svcAutomation = Some(svcAutomationConstructor(svcPartyId))
-      } yield Empty()
+      } yield v0.InitializeResponse(svcPartyId.toProtoPrimitive)
     }
 
   override def openNextRound(request: Empty): Future[Empty] =
@@ -66,12 +61,12 @@ class GrpcSvcAppService(
       } yield Empty()
     }
 
-  override def getDebugInfo(request: Empty): Future[GetDebugInfoResponse] =
+  override def getDebugInfo(request: Empty): Future[v0.GetDebugInfoResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { _ => _ =>
       connection.getUser(svcUserName).flatMap {
         case None =>
           Future.successful(
-            GetDebugInfoResponse(
+            v0.GetDebugInfoResponse(
               svcUser = svcUserName
             )
           )
@@ -83,7 +78,7 @@ class GrpcSvcAppService(
                 LedgerConnection.transactionFilterByParty(Map(partyId -> Seq(coinRulesTid)))
               )
               .map(_._1.map(_.contractId))
-          } yield GetDebugInfoResponse(
+          } yield v0.GetDebugInfoResponse(
             svcUser = svcUserName,
             svcParty = partyId.toProtoPrimitive,
             coinPackageId = CoinUtil.packageId,
@@ -92,14 +87,14 @@ class GrpcSvcAppService(
       }
     }
 
-  override def getValidatorConfig(request: Empty): Future[GetValidatorConfigResponse] =
+  override def getValidatorConfig(request: Empty): Future[v0.GetValidatorConfigResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { _ => _ =>
       connection.getUser(svcUserName).flatMap {
         case None =>
           Future.failed(new RuntimeException("SVC app not yet initialized"))
         case Some(partyId) =>
           Future.successful(
-            GetValidatorConfigResponse(
+            v0.GetValidatorConfigResponse(
               svcParty = partyId.toProtoPrimitive
             )
           )

@@ -35,7 +35,19 @@ object SvcAppCommands {
     ): Either[String, Unit] = Right(())
   }
 
-  case class Initialize() extends UnitCommand(_.initialize)
+  case class Initialize() extends BaseCommand[Empty, v0.InitializeResponse, PartyId] {
+
+    override def createRequest(): Either[String, Empty] = Right(Empty())
+
+    override def submitRequest(
+        service: SvcAppServiceStub,
+        request: Empty,
+    ): Future[v0.InitializeResponse] = service.initialize(request)
+
+    override def handleResponse(response: v0.InitializeResponse): Either[String, PartyId] = Right(
+      PartyId.tryFromProtoPrimitive(response.svcPartyId)
+    )
+  }
 
   case class OpenNextRound() extends UnitCommand(_.openNextRound)
 

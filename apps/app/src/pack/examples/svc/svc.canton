@@ -7,7 +7,8 @@
  * transactions. Run this script as 
  *
  * {{{
- * coin --config apps/app/src/pack/examples/svc/svc.conf --bootstrap apps/app/src/pack/examples/svc/svc.canton
+ * Automatically accepts the service agreement of the domain
+ * (echo "yes" && cat) | coin --config examples/svc/svc.conf --bootstrap examples/svc/svc.canton
  * }}}
  */
 
@@ -15,25 +16,14 @@
 // Connect to the global domain
 nodes.local.start()
 val domainUrl = sys.env.get("DOMAIN_URL").getOrElse("https://canton.global")
-svc.domains.connect("canton-network", domainUrl)
+svcParticipant.domains.connect("canton-network", domainUrl)
 
 // Create parties and set up some initial contracts
-`svc-app`.initialize()
-
-// Find SVC party id
-val svcPartyId = 
-  `svc-app`
-    .remoteParticipant
-    .parties
-    .list()
-    .find(_.party.uid.id == "svc")
-    .fold{
-      sys.error("No party found called 'svc'")
-    }(_.party)
+val svcParty = `svc-app`.initialize()
 
 // Create a mining round (needed for transferring coins)
 // `svc-app`.openNextRound() // TODO(i249) uncomment once this is implemented
 
 // Display the svc party id which is needed by the validator and wallet apps
 println("MAKE NOTE OF THE SVC PARTY ID:\n" +
-    svcPartyId.uid.toLengthLimitedString)
+  svcParty.uid.toLengthLimitedString)

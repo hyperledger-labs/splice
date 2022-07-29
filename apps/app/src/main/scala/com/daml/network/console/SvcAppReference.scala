@@ -5,6 +5,7 @@ import com.daml.network.svc.admin.api.client.commands.SvcAppCommands
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.digitalasset.canton.console.{BaseInspection, Help, LocalInstanceReference}
 import com.digitalasset.canton.participant.ParticipantNode
+import com.digitalasset.canton.topology.PartyId
 
 /** Single local SVC app reference. Defines the console commands that can be run against a local SVC
   * app reference.
@@ -21,7 +22,8 @@ class LocalSvcAppReference(
   def config: LocalSvcAppConfig =
     consoleEnvironment.environment.config.svcsByString(name)
 
-  def initialize(): Unit = {
+  @Help.Summary("Initialize the SVC app. ")
+  def initialize(): PartyId = {
     consoleEnvironment.run {
       adminCommand(SvcAppCommands.Initialize())
     }
