@@ -91,6 +91,12 @@ abstract class DirectoryProviderAppReference(
       adminCommand(DirectoryProviderCommands.LookupEntryByName(name))
     }
 
+  @Help.Summary("Get the party id of the provider operating the directory service")
+  def getProviderPartyId(): PartyId =
+    consoleEnvironment.run {
+      adminCommand(DirectoryProviderCommands.GetProviderPartyId())
+    }
+
   @Help.Summary("Return directory provider app config")
   def config: BaseDirectoryProviderAppConfig
 

@@ -5,4 +5,21 @@ import "com/daml/network/v0/contract.proto";
 import "google/protobuf/empty.proto";
 
 service DirectoryUserService {
+  rpc RequestDirectoryInstall (google.protobuf.Empty) returns (RequestDirectoryInstallResponse);
+
+  rpc RequestDirectoryEntry (RequestDirectoryEntryRequest) returns (RequestDirectoryEntryResponse);
+}
+
+message RequestDirectoryInstallResponse {
+  // Contract id of the install request
+  string contract_id = 1;
+}
+
+message RequestDirectoryEntryRequest {
+  string name = 1;
+}
+
+message RequestDirectoryEntryResponse {
+  // Contract id of the entry request
+  string contract_id = 1;
 }

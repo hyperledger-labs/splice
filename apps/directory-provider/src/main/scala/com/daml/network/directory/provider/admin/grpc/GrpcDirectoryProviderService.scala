@@ -236,6 +236,14 @@ class GrpcDirectoryProviderService(
         )
     }
 
+  @nowarn("cat=unused")
+  override def getProviderPartyId(request: Empty): Future[v0.GetProviderPartyIdResponse] =
+    withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
+      for {
+        partyId <- getParty()
+      } yield v0.GetProviderPartyIdResponse(partyId.toProtoPrimitive)
+    }
+
   private def listEntries(party: PartyId): Future[Seq[Contract[codegen.DirectoryEntry]]] =
     for {
       contracts <- connection.activeContracts(

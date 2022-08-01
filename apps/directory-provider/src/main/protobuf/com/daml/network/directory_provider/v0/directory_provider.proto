@@ -16,6 +16,7 @@ service DirectoryProviderService {
   rpc ListEntries (google.protobuf.Empty) returns (ListEntriesResponse);
   rpc LookupEntryByParty (LookupEntryByPartyRequest) returns (LookupEntryResponse);
   rpc LookupEntryByName (LookupEntryByNameRequest) returns (LookupEntryResponse);
+  rpc GetProviderPartyId (google.protobuf.Empty) returns (GetProviderPartyIdResponse);
 }
 
 message ListInstallRequestsResponse {
@@ -72,4 +73,8 @@ message LookupEntryByNameRequest {
 
 message LookupEntryResponse {
   com.daml.network.v0.Contract entry = 1;
+}
+
+message GetProviderPartyIdResponse {
+  string provider_party_id = 1;
 }

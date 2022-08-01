@@ -223,4 +223,19 @@ object DirectoryProviderCommands {
 
     }
   }
+
+  case class GetProviderPartyId()
+      extends BaseCommand[Empty, v0.GetProviderPartyIdResponse, PartyId] {
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
+
+    override def submitRequest(
+        service: DirectoryProviderServiceStub,
+        request: Empty,
+    ): Future[v0.GetProviderPartyIdResponse] =
+      service.getProviderPartyId(request)
+
+    override def handleResponse(response: v0.GetProviderPartyIdResponse): Either[String, PartyId] =
+      PartyId.fromProtoPrimitive(response.providerPartyId)
+  }
 }

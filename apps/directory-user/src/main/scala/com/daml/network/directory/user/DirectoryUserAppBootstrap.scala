@@ -9,6 +9,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.client.configuration.CommandClientConfiguration
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrapBase
+import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc
 import com.daml.network.directory_user.v0.DirectoryUserServiceGrpc
 import com.daml.network.directory.user.admin.grpc.GrpcDirectoryUserService
 import com.daml.network.directory.user.config.LocalDirectoryUserAppConfig
@@ -22,8 +23,10 @@ import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.ledger.api.client.LedgerConnection
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.resource._
 import com.digitalasset.canton.time._
+import com.digitalasset.canton.tracing.TraceContextGrpc
 
 import scala.annotation.nowarn
 import scala.concurrent.Future
@@ -72,9 +75,17 @@ class DirectoryUserAppBootstrap(
           directoryUserAppParameters.processingTimeouts,
         )
 
+      val providerChannel = ClientChannelBuilder.createChannel(
+        config.remoteDirectoryProvider.clientAdminApi
+      )(executionContext)
+      val providerStub =
+        DirectoryProviderServiceGrpc
+          .stub(providerChannel)
+          .withInterceptors(TraceContextGrpc.clientInterceptor)
+
       adminServerRegistry.addService(
         DirectoryUserServiceGrpc.bindService(
-          new GrpcDirectoryUserService(connection, config.damlUser, loggerFactory),
+          new GrpcDirectoryUserService(connection, providerStub, config.damlUser, loggerFactory),
           executionContext,
         )
       )

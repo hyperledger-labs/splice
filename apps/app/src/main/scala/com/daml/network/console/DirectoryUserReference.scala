@@ -32,6 +32,18 @@ class LocalDirectoryUserAppReference(
   def config: LocalDirectoryUserAppConfig =
     consoleEnvironment.environment.config.directoryUsersByString(name)
 
+  @Help.Summary("Request DirectoryInstall contract")
+  def requestDirectoryInstall(): Primitive.ContractId[codegen.DirectoryInstallRequest] =
+    consoleEnvironment.run {
+      adminCommand(DirectoryUserCommands.RequestDirectoryInstall())
+    }
+
+  @Help.Summary("Request DirectoryEntry with the given name")
+  def requestDirectoryEntry(name: String): Primitive.ContractId[codegen.DirectoryEntryRequest] =
+    consoleEnvironment.run {
+      adminCommand(DirectoryUserCommands.RequestDirectoryEntry(name))
+    }
+
   @Help.Summary("List all directory entries")
   def listEntries(): Seq[Contract[codegen.DirectoryEntry]] =
     remoteDirectoryProvider.listEntries()

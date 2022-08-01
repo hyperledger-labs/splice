@@ -23,4 +23,44 @@ object DirectoryUserCommands {
     override def createService(channel: ManagedChannel): DirectoryUserServiceStub =
       v0.DirectoryUserServiceGrpc.stub(channel)
   }
+
+  final case class RequestDirectoryInstall()
+      extends BaseCommand[Empty, v0.RequestDirectoryInstallResponse, Primitive.ContractId[
+        codegen.DirectoryInstallRequest
+      ]] {
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
+    override def submitRequest(
+        service: DirectoryUserServiceStub,
+        request: Empty,
+    ): Future[v0.RequestDirectoryInstallResponse] =
+      service.requestDirectoryInstall(request)
+
+    override def handleResponse(
+        response: v0.RequestDirectoryInstallResponse
+    ): Either[String, Primitive.ContractId[codegen.DirectoryInstallRequest]] =
+      Right(Primitive.ContractId(response.contractId))
+  }
+
+  final case class RequestDirectoryEntry(name: String)
+      extends BaseCommand[
+        v0.RequestDirectoryEntryRequest,
+        v0.RequestDirectoryEntryResponse,
+        Primitive.ContractId[
+          codegen.DirectoryEntryRequest
+        ],
+      ] {
+    override def createRequest(): Either[String, v0.RequestDirectoryEntryRequest] =
+      Right(v0.RequestDirectoryEntryRequest(name))
+    override def submitRequest(
+        service: DirectoryUserServiceStub,
+        request: v0.RequestDirectoryEntryRequest,
+    ): Future[v0.RequestDirectoryEntryResponse] =
+      service.requestDirectoryEntry(request)
+
+    override def handleResponse(
+        response: v0.RequestDirectoryEntryResponse
+    ): Either[String, Primitive.ContractId[codegen.DirectoryEntryRequest]] =
+      Right(Primitive.ContractId(response.contractId))
+  }
 }

@@ -55,28 +55,14 @@ class DirectoryProviderIntegrationTest
 
       directoryProvider.listInstallRequests() shouldBe Seq()
 
-      wallet1.remoteParticipant.ledger_api.commands.submit_flat(
-        actAs = Seq(userParty),
-        commands = Seq(
-          codegen
-            .DirectoryInstallRequest(
-              providerParty.toPrim,
-              userParty.toPrim,
-            )
-            .create
-            .command
-        ),
-        // See https://github.com/DACH-NY/the-real-canton-coin/issues/315
-        optTimeout = None,
-      )
+      val installRequestCid = directoryUser.requestDirectoryInstall()
+
       directoryProvider.remoteParticipant.ledger_api.acs
         .await(providerParty, codegen.DirectoryInstallRequest)
 
       val requests = directoryProvider.listInstallRequests()
 
-      inside(requests) { case Seq(request) =>
-        request.payload.user shouldBe userParty.toProtoPrimitive
-      }
+      requests.map(_.contractId) shouldBe Seq(installRequestCid)
 
       val installsBefore = directoryProvider.remoteParticipant.ledger_api.acs
         .of_party(providerParty, filterTemplates = Seq(codegen.DirectoryInstall.id))
@@ -94,26 +80,8 @@ class DirectoryProviderIntegrationTest
 
       // Request entry
 
-      wallet1.remoteParticipant.ledger_api.acs.await(userParty, codegen.DirectoryInstall)
-      wallet1.remoteParticipant.ledger_api.commands.submit_flat(
-        actAs = Seq(userParty),
-        commands = Seq(
-          codegen.DirectoryInstall
-            .key(DA.Types.Tuple2(providerParty.toPrim, userParty.toPrim))
-            .exerciseDirectoryInstall_RequestEntry(
-              userParty.toPrim,
-              codegen.DirectoryInstall_RequestEntry(
-                codegen.DirectoryEntry(
-                  userParty.toPrim,
-                  providerParty.toPrim,
-                  entryName,
-                )
-              ),
-            )
-            .command
-        ),
-        optTimeout = None,
-      )
+      directoryUser.remoteParticipant.ledger_api.acs.await(userParty, codegen.DirectoryInstall)
+      directoryUser.requestDirectoryEntry(entryName)
       val entryRequest = directoryProvider.remoteParticipant.ledger_api.acs
         .await(providerParty, codegen.DirectoryEntryRequest)
       val entryRequests = directoryProvider.listEntryRequests()
