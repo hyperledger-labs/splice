@@ -210,6 +210,9 @@ jobs:
       - execute_sbt_command:
           cmd: "test"
           timeout: "10m"
+      - execute_sbt_command:
+          cmd: "damlTest"
+          timeout: "10m"
       - cleanup_test_job
 
   deployment_test:
@@ -283,20 +286,6 @@ jobs:
 
            . .envrc.vars
            .circleci/setup-pipeline.sh
-
-  canton_coin:
-    docker:
-    - image: digitalasset/daml-sdk:<< pipeline.parameters.sdk-version >>
-    environment:
-      <<: *env
-    steps:
-      - checkout
-      - run:
-         name: daml test
-         command: |
-           set -euo pipefail
-           cd canton-coin
-           daml test --ghc-option=-Werror
 
   upgrading_coin:
     docker:
@@ -440,9 +429,6 @@ workflows:
     when:
       not: << pipeline.parameters.run-schedule >>
     jobs:
-    # CC Daml model
-    - canton_coin:
-        <<: *notify-fail
     - upgrading_coin:
         <<: *notify-fail
     - upgrading_coin_2:

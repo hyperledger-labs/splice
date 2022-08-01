@@ -51,6 +51,7 @@ object DamlPlugin extends AutoPlugin {
     val damlGenerateCode = taskKey[Seq[File]]("Generate scala code from Daml")
     val damlDependencies = taskKey[Seq[File]]("Paths to DARs that this project depends on")
     val damlBuild = taskKey[Seq[File]]("Build a Daml Archive from Daml source")
+    val damlTest = taskKey[Unit]("Run daml test")
     val damlStudio = taskKey[Unit]("Open Daml studio for all projects in scope")
     val damlCheckProjectVersions =
       taskKey[Unit]("Ensure that the versions specified in our SBT project match Daml projects")
@@ -199,6 +200,37 @@ object DamlPlugin extends AutoPlugin {
         fixedDars.foreach(updateFixedDar(sourceDirectory, destinationDirectory, _))
       },
     )
+
+    lazy val damlTestSetting =
+      damlTest := {
+        damlBuild.value
+        val sourceDirectory = damlSourceDirectory.value
+        val damlProjectFiles =
+          sourceDirectory ** "daml.yaml"
+        val buildDirectory = damlCompileDirectory.value
+        val log = streams.value.log
+        val damlVersion = damlCompilerVersion.value
+        val damlc = ensureDamlc(damlVersion)
+        // so far canton system dars depend on daml-script, but maybe daml-triggers or others some day?
+        val damlLibsEnv = ensureDamlLibsEnv(damlVersion, damlLanguageVersions.value)
+        damlProjectFiles.get.toList.foreach { projectFile =>
+          val relativeDamlProjectFile = sourceDirectory.toPath.relativize(projectFile.toPath).toFile
+          val projectBuildDirectory =
+            buildDirectory.toPath.resolve(relativeDamlProjectFile.toPath).toAbsolutePath.getParent.toFile
+          val result = Process(
+            command = Seq(damlc.getAbsolutePath, "test", "--project-root", projectBuildDirectory.toString),
+            cwd = projectBuildDirectory,
+            extraEnv = damlLibsEnv: _*,
+          ) ! log
+          if (result != 0) {
+            throw new MessageOnlyException(s"""
+                                              |damlc test failed ${projectBuildDirectory}:
+              """.stripMargin.trim)
+          }
+        }
+      }
+
+
   }
 
   import autoImport._
@@ -226,7 +258,7 @@ object DamlPlugin extends AutoPlugin {
 
   override lazy val projectSettings: Seq[Def.Setting[_]] =
     inConfig(Compile)(baseDamlPluginSettings) ++
-      inConfig(Test)(baseDamlPluginSettings)
+      inConfig(Test)(baseDamlPluginSettings :+ damlTestSetting)
 
   /** Verify that the versions in the daml.yaml file match what is being used in the sbt project.
     * If a mismatch is found a [[sbt.internal.MessageOnlyException]] will be thrown.
@@ -300,6 +332,36 @@ object DamlPlugin extends AutoPlugin {
     IO.copyFile(sourcePath, destinationPath)
   }
 
+  private def artifactoryUrl(damlVersion: String) =
+      s"https://storage.googleapis.com/daml-binaries/split-releases/${damlVersion}/"
+
+  private def ensureDamlc(damlVersion: String) =
+    ensureArtifactAvailable(
+      url = artifactoryUrl(damlVersion),
+      artifactFilename =
+        s"damlc-${damlVersion}-${if (System.getProperty("os.name").toLowerCase.startsWith("mac os x")) "macos"
+        else "linux"}.tar.gz",
+      damlVersion = damlVersion,
+      tarballPath = Seq("damlc", "damlc"),
+    )
+
+  private def ensureDamlLibsEnv(damlVersion: String, damlLanguageVersions: Seq[String]) = {
+    // so far canton system dars depend on daml-script, but maybe daml-triggers or others some day?
+    val damlLibsDependencyTypes = Seq("daml-script")
+    val damlLibsDependencyVersions = damlLanguageVersions.foldLeft(Seq(""))(_ :+ "-" + _)
+    (for {
+      depType <- damlLibsDependencyTypes
+      depVersion <- damlLibsDependencyVersions
+    } yield {
+      ensureArtifactAvailable(
+        url = artifactoryUrl(damlVersion) + s"${depType}/",
+        artifactFilename = s"${depType}${depVersion}.dar",
+        damlVersion = damlVersion,
+        localSubdir = Some("daml-libs"),
+      )
+    }).headOption.map("DAML_SDK" -> _.getParentFile.getParentFile.getAbsolutePath).toSeq
+  }
+
   private def buildDamlProject(
       log: Logger,
       sourceDirectory: File,
@@ -316,31 +378,10 @@ object DamlPlugin extends AutoPlugin {
       originalDamlProjectFile.exists,
       s"supplied daml.yaml must exist [${originalDamlProjectFile.absolutePath}]",
     )
-    val url =
-      s"https://storage.googleapis.com/daml-binaries/split-releases/${damlVersion}/"
-    val damlc = ensureArtifactAvailable(
-      url = url,
-      artifactFilename =
-        s"damlc-${damlVersion}-${if (System.getProperty("os.name").toLowerCase.startsWith("mac os x")) "macos"
-        else "linux"}.tar.gz",
-      damlVersion = damlVersion,
-      tarballPath = Seq("damlc", "damlc"),
-    )
+    val url = artifactoryUrl(damlVersion)
+    val damlc = ensureDamlc(damlVersion)
 
-    // so far canton system dars depend on daml-script, but maybe daml-triggers or others some day?
-    val damlLibsDependencyTypes = Seq("daml-script")
-    val damlLibsDependencyVersions = damlLanguageVersions.foldLeft(Seq(""))(_ :+ "-" + _)
-    val damlLibsEnv = (for {
-      depType <- damlLibsDependencyTypes
-      depVersion <- damlLibsDependencyVersions
-    } yield {
-      ensureArtifactAvailable(
-        url = url + s"${depType}/",
-        artifactFilename = s"${depType}${depVersion}.dar",
-        damlVersion = damlVersion,
-        localSubdir = Some("daml-libs"),
-      )
-    }).headOption.map("DAML_SDK" -> _.getParentFile.getParentFile.getAbsolutePath).toSeq
+    val damlLibsEnv = ensureDamlLibsEnv(damlVersion, damlLanguageVersions)
 
     val projectBuildDirectory =
       buildDirectory.toPath.resolve(relativeDamlProjectFile.toPath).toAbsolutePath.getParent.toFile
