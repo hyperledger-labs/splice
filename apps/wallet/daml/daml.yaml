@@ -6,6 +6,6 @@ dependencies:
   - daml-prim
   - daml-stdlib
 data-dependencies:
-- ../../../../canton-coin/.daml/dist/canton-coin.dar
+- ../../../canton-coin/.daml/dist/canton-coin.dar
 build-options:
   - --target=1.dev

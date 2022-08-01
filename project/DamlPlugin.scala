@@ -1,4 +1,5 @@
 import java.io.{File, FileReader, FileWriter, IOException}
+import java.nio.file.Paths
 import java.util.{Map => JMap}
 
 import com.esotericsoftware.yamlbeans.{YamlReader, YamlWriter}
@@ -351,7 +352,22 @@ object DamlPlugin extends AutoPlugin {
     // copy project directory into target tree
     // the reason for this is that `daml build` caches files in a `.daml` directory of the source tree
     // making sbt to believe that the source code changed
-    IO.copyDirectory(originalDamlProjectFile.getAbsoluteFile.getParentFile, projectBuildDirectory)
+    IO.copyDirectory(originalDamlProjectFile.getAbsoluteFile.getParentFile, projectBuildDirectory, overwrite = true)
+    // Path that we need to prepend to references in data-dependencies. This allows us to have a daml.yaml
+    // that works both for Daml Studio but also for SBT.
+    val pathPrefix = buildDirectory.toPath.relativize(sourceDirectory.toPath.toAbsolutePath)
+    // We shell out to yq rather than using a Scala lib because we cannot rely on dependencies within SBT plugins.
+    val yqProcessLogger = new BufferedLogger
+    val yqResult = Process(
+      command = "yq" :: "-iy" :: s"""setpath(["data-dependencies"]; getpath(["data-dependencies"]) | map("$pathPrefix/" + .))""" :: "daml.yaml" :: Nil,
+      cwd = projectBuildDirectory,
+    ) ! yqProcessLogger
+    if (yqResult != 0) {
+        throw new MessageOnlyException(s"""
+                                          |yq failed [$originalDamlProjectFile]:
+                                          |${yqProcessLogger.output("  ")}
+          """.stripMargin.trim)
+    }
 
     val damlProjectName = readDamlYaml(originalDamlProjectFile).get("name").toString
     val outputDar = outputDirectory / s"$damlProjectName.dar" // TODO(i189) suffix project version

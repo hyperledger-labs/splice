@@ -11,6 +11,7 @@ dependencies:
   - daml-prim
   - daml-stdlib
   - daml-script
+data-dependencies: []
 start-navigator: false
 sandbox-options:
   - -c=canton.conf

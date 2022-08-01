@@ -11,3 +11,4 @@ dependencies:
 - daml-prim
 - daml-stdlib
 - daml-script
+data-dependencies: []
