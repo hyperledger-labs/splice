@@ -38,12 +38,10 @@ class WalletIntegrationTest
     "allow calling tap and then list the created coins" in { implicit env =>
       import env._
       svc.initialize()
-      val svcParty =
-        svc.remoteParticipant.parties.list(filterParty = "svc").headOption.value.party
-      val validatorParty = validator1.initialize(svcParty)
+      val validatorParty = validator1.initialize()
       // TODO(Arne): consider adding synchronization 'wait-for-participant-x' to this command
       validator1.onboardUser(walletDamlUser)
-      wallet1.initialize(svcParty, validatorParty)
+      wallet1.initialize(validatorParty)
 
       // ensure wallet's participant sees the CoinRules
       wallet1.remoteParticipant.ledger_api.acs.await(validatorParty, CoinRules)
@@ -64,10 +62,10 @@ class WalletIntegrationTest
       svc.initialize()
       val svcParty =
         svc.remoteParticipant.parties.list(filterParty = "svc").headOption.value.party
-      val validatorParty = validator1.initialize(svcParty)
+      val validatorParty = validator1.initialize()
       // TODO(Arne): consider adding synchronization 'wait-for-participant-x' to this command
       val userParty = validator1.onboardUser(walletDamlUser)
-      wallet1.initialize(svcParty, validatorParty)
+      wallet1.initialize(validatorParty)
 
       // ensure wallet's participant sees the CoinRules
       val coinRulesId =

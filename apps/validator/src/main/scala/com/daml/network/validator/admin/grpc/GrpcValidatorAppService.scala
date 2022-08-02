@@ -3,6 +3,7 @@ package com.daml.network.validator.admin.grpc
 import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionResponse
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.validator.v0._
+import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.{CoinUtil, UploadablePackage}
 import com.daml.network.validator.store.ValidatorAppStore
 import com.digitalasset.canton.concurrent.Threading
@@ -18,6 +19,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcValidatorAppService(
     connection: CoinLedgerConnection,
+    scanConnection: ScanConnection,
     store: ValidatorAppStore,
     validatorUserName: String,
     protected val loggerFactory: NamedLoggerFactory,
@@ -31,13 +33,11 @@ class GrpcValidatorAppService(
 
   override def initialize(request: InitializeRequest): Future[InitializeResponse] =
     withSpanFromGrpcContext("GrpcValidatorAppService") { implicit traceContext => span =>
-      val svcParty =
-        request.svc.fold(sys.error("Field missing: svc"))(PartyId.tryFromProtoPrimitive)
-
       span.setAttribute("username", validatorUserName)
 
       def createRulesRequestAndUserHostedAtContracts(
-          validatorParty: PartyId
+          svcParty: PartyId,
+          validatorParty: PartyId,
       ): Future[SubmitAndWaitForTransactionResponse] = {
         val coinRulesReq = CoinRulesRequest(user = validatorParty.toPrim, svc = svcParty.toPrim)
         connection
@@ -58,7 +58,8 @@ class GrpcValidatorAppService(
       for {
         _ <- connection.uploadDarFile(CoinUtil) // TODO(i353) move away from dar upload during init
         validatorParty <- connection.createPartyAndUser(validatorUserName)
-        _ <- createRulesRequestAndUserHostedAtContracts(validatorParty)
+        svcParty <- scanConnection.getSvcPartyId()
+        _ <- createRulesRequestAndUserHostedAtContracts(svcParty, validatorParty)
         _ <- store.setValidatorParty(validatorParty)
         _ <- store.setSvcParty(svcParty)
       } yield InitializeResponse(Some(validatorParty.toProtoPrimitive))
@@ -78,8 +79,7 @@ class GrpcValidatorAppService(
           )
         }(Future.successful)
         userPartyId <- connection.createPartyAndUser(name)
-        svcO <- store.getSvcParty()
-        svc = svcO.getOrElse(sys.error("svc party wasn't allocated"))
+        svc <- scanConnection.getSvcPartyId()
         _ <- CoinUtil.ExplicitDisclosureWorkaround.recordUserHostedAt(
           userPartyId,
           validatorPartyId,

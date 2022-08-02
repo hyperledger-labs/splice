@@ -27,7 +27,6 @@ message AcceptInstallRequestRequest {
   // Contract ID of the DirectoryInstallRequest contract
   // that should be accepted
   string contract_id = 1;
-  string svc = 2;
 }
 
 message AcceptInstallRequestResponse {

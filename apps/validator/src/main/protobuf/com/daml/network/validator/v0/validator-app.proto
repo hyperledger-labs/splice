@@ -9,7 +9,6 @@ service ValidatorAppService {
 }
 
 message InitializeRequest {
-  google.protobuf.StringValue svc = 1;
 }
 
 message InitializeResponse {

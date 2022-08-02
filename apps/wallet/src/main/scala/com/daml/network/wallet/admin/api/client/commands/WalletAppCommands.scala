@@ -23,14 +23,13 @@ object WalletAppCommands {
       v0.WalletServiceGrpc.stub(channel)
   }
 
-  case class Initialize(svc: PartyId, validator: PartyId)
+  case class Initialize(validator: PartyId)
       extends BaseCommand[v0.InitializeRequest, v0.InitializeResponse, Unit] {
 
     override def createRequest(): Either[String, v0.InitializeRequest] =
       Right(
         v0.InitializeRequest(
-          svc = Some(svc.toProtoPrimitive),
-          validator = Some(validator.toProtoPrimitive),
+          validator = Some(validator.toProtoPrimitive)
         )
       )
 

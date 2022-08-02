@@ -46,8 +46,7 @@ object DirectoryProviderCommands {
   }
 
   case class AcceptInstallRequest(
-      contractId: Primitive.ContractId[codegen.DirectoryInstallRequest],
-      svc: PartyId,
+      contractId: Primitive.ContractId[codegen.DirectoryInstallRequest]
   ) extends BaseCommand[
         v0.AcceptInstallRequestRequest,
         v0.AcceptInstallRequestResponse,
@@ -56,7 +55,7 @@ object DirectoryProviderCommands {
 
     override def createRequest(): Either[String, v0.AcceptInstallRequestRequest] =
       Right(
-        v0.AcceptInstallRequestRequest(ApiTypes.ContractId.unwrap(contractId), svc.toProtoPrimitive)
+        v0.AcceptInstallRequestRequest(ApiTypes.ContractId.unwrap(contractId))
       )
 
     override def submitRequest(

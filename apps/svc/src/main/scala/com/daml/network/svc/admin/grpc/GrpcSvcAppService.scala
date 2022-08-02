@@ -34,8 +34,8 @@ class GrpcSvcAppService(
     with FlagCloseableAsync {
 
   override def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
-    SyncCloseable("svcAutomation",
-      svcAutomation.foreach(_.close())))
+    SyncCloseable("svcAutomation", svcAutomation.foreach(_.close()))
+  )
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   var svcAutomation: Option[SvcAutomationService] = None

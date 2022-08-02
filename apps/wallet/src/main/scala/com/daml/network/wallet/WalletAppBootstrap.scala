@@ -8,6 +8,7 @@ import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrapBase
+import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.wallet.admin.grpc.GrpcWalletService
 import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.daml.network.wallet.metrics.WalletAppMetrics
@@ -67,9 +68,16 @@ class WalletAppBootstrap(
       val connection =
         createLedgerConnection(config.remoteParticipant, walletAppParameters.processingTimeouts)
 
+      val scanConnection: ScanConnection =
+        ScanConnection.fromClientAdminApi(
+          config.remoteScan.clientAdminApi,
+          walletAppParameters.processingTimeouts,
+          loggerFactory,
+        )
+
       adminServerRegistry.addService(
         WalletServiceGrpc.bindService(
-          new GrpcWalletService(connection, config.damlUser, loggerFactory),
+          new GrpcWalletService(connection, scanConnection, config.damlUser, loggerFactory),
           executionContext,
         )
       )
@@ -78,6 +86,7 @@ class WalletAppBootstrap(
         walletAppParameters,
         storage,
         dummyStore,
+        scanConnection,
         clock,
         loggerFactory,
       )

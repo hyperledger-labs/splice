@@ -16,11 +16,11 @@ object ValidatorAppCommands {
       v0.ValidatorAppServiceGrpc.stub(channel)
   }
 
-  case class SetupValidatorCommand(svc: PartyId)
+  case class SetupValidatorCommand()
       extends BaseCommand[v0.InitializeRequest, v0.InitializeResponse, PartyId] {
 
     override def createRequest(): Either[String, v0.InitializeRequest] =
-      Right(v0.InitializeRequest(Some(svc.toPrim.toString)))
+      Right(v0.InitializeRequest())
 
     override def submitRequest(
         service: ValidatorAppServiceStub,

@@ -58,7 +58,7 @@ class SvcAutomationService(
       Lifecycle.close(
         coinRulesRequestSubscription,
         coinRulesRequestAcceptanceService,
-      )(logger) ,
+      )(logger),
     )
   )
 

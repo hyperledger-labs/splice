@@ -19,7 +19,7 @@ import com.digitalasset.canton.participant.config.{
 
 import scala.annotation.nowarn
 import cats.syntax.functor._
-import com.daml.network.scan.config.LocalScanAppConfig
+import com.daml.network.scan.config.{LocalScanAppConfig, RemoteScanAppConfig}
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.daml.network.directory.provider.config.{
@@ -136,7 +136,8 @@ case class CoinConfig(
   // The config contains one optional unnamed Scan app (because in M1, there can only be one)
   // Since the rest of the code generally expects a map of nodes, we'll create one.
   private lazy val scanAppName = "scan-app"
-  private lazy val scanApps = scanApp.toList.map(config => InstanceName.tryCreate(scanAppName) -> config).toMap
+  private lazy val scanApps =
+    scanApp.toList.map(config => InstanceName.tryCreate(scanAppName) -> config).toMap
 
   private lazy val scanAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
     scanApps.fmap { scanConfig =>
@@ -303,6 +304,8 @@ object CoinConfig {
   @nowarn("cat=unused")
   private lazy implicit val coinConfigReader: ConfigReader[CoinConfig] = {
     import CantonConfig.ConfigReaders._
+    implicit val remoteScanConfigReader: ConfigReader[RemoteScanAppConfig] =
+      deriveReader[RemoteScanAppConfig]
     implicit val validatorConfigReader: ConfigReader[LocalValidatorAppConfig] =
       deriveReader[LocalValidatorAppConfig]
     implicit val scanConfigReader: ConfigReader[LocalScanAppConfig] =

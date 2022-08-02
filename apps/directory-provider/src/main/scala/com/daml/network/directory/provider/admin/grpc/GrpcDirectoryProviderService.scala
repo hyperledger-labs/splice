@@ -8,6 +8,7 @@ import com.daml.ledger.client.binding.{Contract => CodegenContract, Primitive, T
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.directory_provider.v0
 import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc
+import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.{Contract, CoinUtil}
 import com.digitalasset.canton.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -28,6 +29,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcDirectoryProviderService(
     connection: CoinLedgerConnection,
+    scanConnection: ScanConnection,
     damlUser: String,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -82,8 +84,9 @@ class GrpcDirectoryProviderService(
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
         partyId <- getParty()
+        svc <- scanConnection.getSvcPartyId()
         arg = codegen.DirectoryInstallRequest_Accept(
-          svc = ApiTypes.Party(request.svc),
+          svc = svc.toPrim,
           entryFee = entryFee,
           collectionDuration = collectionDuration,
           approveDuration = approveDuration,

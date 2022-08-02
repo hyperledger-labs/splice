@@ -4,6 +4,8 @@ import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.util.Contract
 import com.daml.network.wallet.util.WalletUtil
+import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.util.UploadablePackage
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.{InitializeRequest, InitializeResponse, WalletServiceGrpc}
 import com.digitalasset.canton.ledger.api.client.DecodeUtil
@@ -21,6 +23,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcWalletService(
     connection: CoinLedgerConnection,
+    scanConnection: ScanConnection,
     walletDamlUser: String,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -31,9 +34,6 @@ class GrpcWalletService(
     with Spanning
     with NamedLogging {
 
-  // TODO(Arne): remove once we have a CC Scan app.
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  val svcParty: AtomicReference[PartyId] = new AtomicReference[PartyId](null)
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   val validatorParty: AtomicReference[PartyId] = new AtomicReference[PartyId](null)
 
@@ -69,9 +69,10 @@ class GrpcWalletService(
   override def tap(request: v0.TapRequest): Future[v0.TapResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
+        svcParty <- scanConnection.getSvcPartyId()
         walletParty <- getWalletParty()
         tapCmd = coinRulesCodegen.CoinRules
-          .key(DA.Types.Tuple2(svcParty.get.toPrim, validatorParty.get.toPrim))
+          .key(DA.Types.Tuple2(svcParty.toPrim, validatorParty.get.toPrim))
           .exerciseTap(
             walletParty.toPrim,
             walletParty.toPrim,
@@ -123,7 +124,8 @@ class GrpcWalletService(
         arg = walletCodegen.PaymentRequest_Approve(
           Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
         )
-        approveCommand = Primitive.ContractId[walletCodegen.PaymentRequest](request.requestContractId)
+        approveCommand = Primitive
+          .ContractId[walletCodegen.PaymentRequest](request.requestContractId)
           .exercisePaymentRequest_Approve(walletParty.toPrim, arg)
           .command
         tx <- connection.submitCommand(
@@ -161,9 +163,6 @@ class GrpcWalletService(
 
   override def initialize(request: InitializeRequest): Future[InitializeResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => _ =>
-      svcParty.set(
-        PartyId.tryFromProtoPrimitive(request.svc.getOrElse(sys.error("svc party not set")))
-      )
       validatorParty.set(
         PartyId.tryFromProtoPrimitive(
           request.validator.getOrElse(sys.error("validator party not set"))

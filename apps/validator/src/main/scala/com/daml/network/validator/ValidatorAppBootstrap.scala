@@ -8,6 +8,7 @@ import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerConnection, CoinNodeBootstrapBase}
+import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.validator.metrics.ValidatorAppMetrics
@@ -67,9 +68,22 @@ class ValidatorAppBootstrap(
       val connection: CoinLedgerConnection =
         createLedgerConnection(config.remoteParticipant, validatorAppParameters.processingTimeouts)
 
+      val scanConnection: ScanConnection =
+        ScanConnection.fromClientAdminApi(
+          config.remoteScan.clientAdminApi,
+          validatorAppParameters.processingTimeouts,
+          loggerFactory,
+        )
+
       adminServerRegistry.addService(
         ValidatorAppServiceGrpc.bindService(
-          new GrpcValidatorAppService(connection, dummyStore, config.damlUser, loggerFactory),
+          new GrpcValidatorAppService(
+            connection,
+            scanConnection,
+            dummyStore,
+            config.damlUser,
+            loggerFactory,
+          ),
           executionContext,
         )
       )
@@ -78,6 +92,7 @@ class ValidatorAppBootstrap(
         validatorAppParameters,
         storage,
         dummyStore,
+        scanConnection,
         clock,
         loggerFactory,
       )

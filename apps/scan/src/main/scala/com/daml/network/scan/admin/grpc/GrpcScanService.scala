@@ -34,4 +34,20 @@ class GrpcScanService(
 ) extends ScanServiceGrpc.ScanService
     with Spanning
     with NamedLogging {
+
+  @nowarn("cat=unused")
+  override def getSvcPartyId(request: Empty): Future[v0.GetSvcPartyIdResponse] =
+    withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
+      for {
+        party <- getParty()
+      } yield v0.GetSvcPartyIdResponse(party.toProtoPrimitive)
+    }
+
+  private def getParty() =
+    for {
+      partyO <- connection.getUser(svcUser)
+      party = partyO.getOrElse(
+        sys.error(s"Unable to find party for user $svcUser")
+      )
+    } yield party
 }

@@ -79,7 +79,13 @@ class SvcAppBootstrap(
         timeouts,
       )
 
-      val service = new GrpcSvcAppService(connection, config.damlUser, loggerFactory, createAutomation, svcAppParameters.processingTimeouts)
+      val service = new GrpcSvcAppService(
+        connection,
+        config.damlUser,
+        loggerFactory,
+        createAutomation,
+        svcAppParameters.processingTimeouts,
+      )
 
       adminServerRegistry.addService(
         SvcAppServiceGrpc.bindService(

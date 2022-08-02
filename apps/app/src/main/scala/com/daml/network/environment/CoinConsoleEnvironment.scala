@@ -47,6 +47,7 @@ class CoinConsoleEnvironment(
       domains.local,
       validators,
       svcOpt.toList,
+      scanOpt.toList,
       wallets,
       directoryProviders,
       directoryUsers,
@@ -151,7 +152,8 @@ class CoinConsoleEnvironment(
     instance match {
       case _: LocalDomainReference => 1
       case _: LocalParticipantReference => 2
-      case _ => 3
+      case _: LocalSvcAppReference => 3
+      case _ => 4
     }
 
   override protected def domainsTopLevelValue(

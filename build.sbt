@@ -99,7 +99,10 @@ lazy val `apps-common` =
 lazy val `apps-validator` =
   project
     .in(file("apps/validator"))
-    .dependsOn(`apps-common` % "compile->compile;test->test")
+    .dependsOn(
+      `apps-common` % "compile->compile;test->test",
+      `apps-scan` % "compile->compile;test->test",
+    )
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedSettings,
@@ -144,7 +147,10 @@ lazy val `apps-scan` =
 lazy val `apps-wallet` =
   project
     .in(file("apps/wallet"))
-    .dependsOn(`apps-common` % "compile->compile;test->test")
+    .dependsOn(
+      `apps-common` % "compile->compile;test->test",
+      `apps-scan` % "compile->compile;test->test",
+    )
     .enablePlugins(DamlPlugin)
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),

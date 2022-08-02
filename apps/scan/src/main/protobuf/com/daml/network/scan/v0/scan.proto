@@ -4,4 +4,9 @@ package com.daml.network.scan.v0;
 import "google/protobuf/empty.proto";
 
 service ScanService {
+  rpc GetSvcPartyId (google.protobuf.Empty) returns (GetSvcPartyIdResponse);
+}
+
+message GetSvcPartyIdResponse {
+  string svc_party_id = 1;
 }

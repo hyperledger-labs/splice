@@ -37,9 +37,9 @@ class LocalWalletAppReference(
     }
   }
 
-  def initialize(svc: PartyId, validator: PartyId): Unit = {
+  def initialize(validator: PartyId): Unit = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.Initialize(svc, validator))
+      adminCommand(WalletAppCommands.Initialize(validator))
     }
   }
 

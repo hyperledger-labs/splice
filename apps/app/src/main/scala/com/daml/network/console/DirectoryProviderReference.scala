@@ -40,11 +40,10 @@ abstract class DirectoryProviderAppReference(
 
   @Help.Summary("Accept a DirectoryInstallRequest creating a DirectoryInstall")
   def acceptInstallRequest(
-      cid: Primitive.ContractId[codegen.DirectoryInstallRequest],
-      svc: PartyId,
+      cid: Primitive.ContractId[codegen.DirectoryInstallRequest]
   ): Primitive.ContractId[codegen.DirectoryInstall] = {
     consoleEnvironment.run {
-      adminCommand(DirectoryProviderCommands.AcceptInstallRequest(cid, svc))
+      adminCommand(DirectoryProviderCommands.AcceptInstallRequest(cid))
     }
   }
 

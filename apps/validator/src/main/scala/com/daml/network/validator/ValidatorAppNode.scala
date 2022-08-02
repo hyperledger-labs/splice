@@ -2,6 +2,7 @@ package com.daml.network.validator
 
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.validator.config.LocalValidatorAppConfig
+import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.validator.store.ValidatorAppStore
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
@@ -23,6 +24,7 @@ class ValidatorAppNode(
     val validatorAppParameters: SharedCoinAppParameters,
     storage: Storage,
     dummyStore: ValidatorAppStore,
+    scanConnection: ScanConnection,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
 ) extends CantonNode // TODO(Arne): CantonNode needs to be forked or generalized.
@@ -44,6 +46,6 @@ class ValidatorAppNode(
 
   override def close(): Unit = {
     logger.info("Stopping validator node")
-    Lifecycle.close(storage, dummyStore)(logger)
+    Lifecycle.close(storage, dummyStore, scanConnection)(logger)
   }
 }

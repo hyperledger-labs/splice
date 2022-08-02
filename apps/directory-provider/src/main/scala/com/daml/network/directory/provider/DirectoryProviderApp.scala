@@ -3,6 +3,7 @@ package com.daml.network.directory.provider
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.directory.provider.config.LocalDirectoryProviderAppConfig
 import com.daml.network.directory.provider.store.DirectoryProviderAppStore
+import com.daml.network.scan.admin.api.client.ScanConnection
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
 import com.digitalasset.canton.lifecycle.Lifecycle
@@ -23,6 +24,7 @@ class DirectoryProviderApp(
     val coinAppParameters: SharedCoinAppParameters,
     storage: Storage,
     dummyStore: DirectoryProviderAppStore,
+    scanConnection: ScanConnection,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
 ) extends CantonNode // TODO(Arne): CantonNode needs to be forked or generalized.
@@ -44,6 +46,6 @@ class DirectoryProviderApp(
 
   override def close(): Unit = {
     logger.info("Stopping directory provider node")
-    Lifecycle.close(storage, dummyStore)(logger)
+    Lifecycle.close(storage, dummyStore, scanConnection)(logger)
   }
 }

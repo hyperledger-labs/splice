@@ -45,6 +45,11 @@ class LocalScanAppReference(
       config.remoteParticipant,
     )
 
+  def getSvcPartyId(): PartyId =
+    consoleEnvironment.run {
+      adminCommand(ScanCommands.GetSvcPartyId())
+    }
+
   /** secret, not publicly documented way to get the admin token */
   def adminToken: Option[String] = underlying.map(_.adminToken.secret)
 

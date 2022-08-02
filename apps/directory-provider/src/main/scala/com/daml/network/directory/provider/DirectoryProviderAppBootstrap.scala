@@ -13,6 +13,7 @@ import com.daml.network.directory.provider.metrics.DirectoryProviderAppMetrics
 import com.daml.network.directory.provider.store.DirectoryProviderAppStore
 import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc
 import com.daml.network.environment.CoinNodeBootstrapBase
+import com.daml.network.scan.admin.api.client.ScanConnection
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -70,9 +71,21 @@ class DirectoryProviderAppBootstrap(
           directoryProviderAppParameters.processingTimeouts,
         )
 
+      val scanConnection: ScanConnection =
+        ScanConnection.fromClientAdminApi(
+          config.remoteScan.clientAdminApi,
+          directoryProviderAppParameters.processingTimeouts,
+          loggerFactory,
+        )
+
       adminServerRegistry.addService(
         DirectoryProviderServiceGrpc.bindService(
-          new GrpcDirectoryProviderService(connection, config.damlUser, loggerFactory),
+          new GrpcDirectoryProviderService(
+            connection,
+            scanConnection,
+            config.damlUser,
+            loggerFactory,
+          ),
           executionContext,
         )
       )
@@ -81,6 +94,7 @@ class DirectoryProviderAppBootstrap(
         directoryProviderAppParameters,
         storage,
         dummyStore,
+        scanConnection,
         clock,
         loggerFactory,
       )

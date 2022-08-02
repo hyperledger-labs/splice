@@ -38,18 +38,11 @@ This is also the convention we will use in this document.
 
 Run this now: ::
 
-  coin --config examples/validator/validator.conf --bootstrap examples/validator/validator-bootstrap.canton
+  coin --config examples/validator/validator.conf --bootstrap examples/validator/validator.canton
 
 In the console, initialize the validator ::
 
-  @ val svcParty = PartyId.tryFromProtoPrimitive("<svcPartyId>")
-  @ val validatorParty = validatorApp.initialize(svcParty)
-
-Replace the `<svcPartyId>` with the quoted string representing the party id of the supervalidator consortium.
-
-.. Currently it's printed out from the SVC bootstrap script. But that is only visible during CD deployment. Will this be printed somewhere into the documentation? How do we 'distribute' this? It needs to be done out-of-band.
-
-.. Side-note: At this point, in the SVC console, we should execute `\`svc-app\`.acceptValidator()`.
+  @ val validatorParty = validatorApp.initialize()
 
 In the console, request onboarding a new user called "wallet" to the validator ::
 
@@ -64,10 +57,10 @@ You are now registered as a validator on the canton network. You've also configu
 Tapping some Canton Coin from the Dev Faucet
 --------------------------------------------
 
-In order to create some free canton coin to play around with, you'll need to initialize the wallet by passing it the SVC (same as before) and validator parties: ::
+In order to create some free canton coin to play around with, you'll need to initialize the wallet by passing in the validator party: ::
 
 @ val validatorP = wallet.remoteParticipant.parties.list(filterParty = "validator").head.party
-@ wallet.initialize(svcParty, validatorParty)
+@ wallet.initialize(validatorParty)
   
 We can create free coins like so: ::
 

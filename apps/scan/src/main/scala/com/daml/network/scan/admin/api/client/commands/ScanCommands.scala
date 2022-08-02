@@ -22,4 +22,13 @@ object ScanCommands {
     override def createService(channel: ManagedChannel): ScanServiceStub =
       v0.ScanServiceGrpc.stub(channel)
   }
+
+  final case class GetSvcPartyId() extends BaseCommand[Empty, v0.GetSvcPartyIdResponse, PartyId] {
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
+    override def submitRequest(service: ScanServiceStub, req: Empty): Future[v0.GetSvcPartyIdResponse] =
+      service.getSvcPartyId(req)
+    override def handleResponse(response: v0.GetSvcPartyIdResponse): Either[String, PartyId] =
+      PartyId.fromProtoPrimitive(response.svcPartyId)
+  }
 }

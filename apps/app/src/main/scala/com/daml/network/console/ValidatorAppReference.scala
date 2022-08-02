@@ -39,9 +39,9 @@ class LocalValidatorAppReference(
   @Help.Summary("Set up a new validator")
   @Help.Description("""Create `CoinProposal` and sets up party for the validator.
                       |Return the party set up for the validator""".stripMargin)
-  def initialize(svc: PartyId): PartyId = {
+  def initialize(): PartyId = {
     consoleEnvironment.run {
-      adminCommand(ValidatorAppCommands.SetupValidatorCommand(svc))
+      adminCommand(ValidatorAppCommands.SetupValidatorCommand())
     }
   }
 

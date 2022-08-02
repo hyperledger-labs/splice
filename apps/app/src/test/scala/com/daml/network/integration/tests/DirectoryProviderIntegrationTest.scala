@@ -38,16 +38,14 @@ class DirectoryProviderIntegrationTest
       import env._
 
       svc.initialize()
-      val svcParty =
-        svc.remoteParticipant.parties.list(filterParty = "svc").headOption.value.party
       // The validator operator of the user of the directory service.
-      val userValidatorParty = validator1.initialize(svcParty)
+      val userValidatorParty = validator1.initialize()
       // The provider of the directory service
-      val providerParty = directoryValidator.initialize(svcParty)
+      val providerParty = directoryValidator.initialize()
       // The user of the directory service.
       val userParty = validator1.onboardUser("god")
 
-      wallet1.initialize(svcParty, userValidatorParty)
+      wallet1.initialize(userValidatorParty)
       wallet1.remoteParticipant.ledger_api.acs
         .await(userValidatorParty, coinCodegen.CoinRules.CoinRules)
 
@@ -69,7 +67,7 @@ class DirectoryProviderIntegrationTest
       installsBefore shouldBe empty
 
       requests.foreach { case request =>
-        directoryProvider.acceptInstallRequest(request.contractId, svcParty)
+        directoryProvider.acceptInstallRequest(request.contractId)
       }
 
       val installsAfter = directoryProvider.remoteParticipant.ledger_api.acs

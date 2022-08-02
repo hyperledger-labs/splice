@@ -23,7 +23,3 @@ val svcParty = `svc-app`.initialize()
 
 // Create a mining round (needed for transferring coins)
 // `svc-app`.openNextRound() // TODO(i249) uncomment once this is implemented
-
-// Display the svc party id which is needed by the validator and wallet apps
-println("MAKE NOTE OF THE SVC PARTY ID:\n" +
-  svcParty.uid.toLengthLimitedString)
