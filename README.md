@@ -120,7 +120,8 @@ as "one source of truth".
 ## GCE Clusters
 
 The public Canton Network clusters are currently hosted in Google
-Cloud. There are two clusters, both of which are within the DA VPN:
+Cloud. There are two clusters, both of which are accessible only
+through VPN.
 
 * DevNet - http://dev.network.canton.global
 * ScratchNet - http://scratch.network.canton.global
@@ -132,14 +133,33 @@ production like enviornment. There are Slack notifications issued when
 these updates complete, either successfully or with a failure.
 
 The ScratchNet cluster is manually managed and intended to be a test
-bed for new code.
+bed for new code and deployment process updates. Additional clusters
+can be created without difficulty, although with additional running
+costs.
 
 ### Connecting to a Cluster
 
 The GCE clusters expose both the Canton Domain and Ledger API's to the
-outside world. Provided you are connecting through either the Digital
-Asset VPN or the Canton Network Customer VPN, these APIs are available
-in each environment on the following ports.
+outside world via four [Digital Asset VPN's](https://digitalasset.atlassian.net/wiki/spaces/DEVSECOPS/pages/1076822828/VPN+IP+Whitelist+for+Digital+Asset):
+
+* GCP Virginia Full Tunnel
+* GCP Frankfurt Full Tunnel
+* GCP Sydney Full Tunnel
+* GCP DA Canton DevNet
+
+The Full Tunnel VPN's are available to all internal DA users and allow
+authenticated access to both the Canton Network services and cluster
+adminstration API's. (Only the Canton Network development team has
+administrative authorization to the clusters.)
+
+The "GCP DA Canton DevNet" VPN is the VPN used for customer
+access to the cluster. User accounts can be added through a
+[manual e-mail request to IT](mailto:help@digitalasset.com).
+Connections through this VPN only have access to public cluster
+services and not the administration API's.
+
+Provided you are connecting through one of the listed VPN's, the following
+APIs are available in each environment:
 
 | Service            | API        | Port |
 | ------------------ | ---------- | ---- |
