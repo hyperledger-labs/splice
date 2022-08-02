@@ -5,18 +5,11 @@ import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.util.Contract
 import com.daml.network.wallet.admin.api.client.commands.WalletAppCommands
 import com.daml.network.wallet.config.LocalWalletAppConfig
-import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-import com.digitalasset.canton.console.{
-  BaseInspection,
-  ConsoleCommandResult,
-  Help,
-  LocalInstanceReference,
-}
-import com.digitalasset.canton.environment.CantonNodeBootstrap
+import com.digitalasset.canton.console.{BaseInspection, Help, LocalInstanceReference}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.network.CC.Coin.Coin
-import com.digitalasset.network.CN.Wallet.PaymentRequest.PaymentRequest
+import com.digitalasset.network.CC.{Coin => coinCodegen}
+import com.digitalasset.network.CN.Wallet.{PaymentRequest => walletCodegen}
 
 /** Single local Wallet app reference. Defines the console commands that can be run against a local Wallet
   * app reference.
@@ -38,7 +31,7 @@ class LocalWalletAppReference(
     "Queries the configured remote participant for the Coins owned by the configured user. " +
       "Returns all found coins."
   )
-  def list(): Seq[Contract[Coin]] = {
+  def list(): Seq[Contract[coinCodegen.Coin]] = {
     consoleEnvironment.run {
       adminCommand(WalletAppCommands.List())
     }
@@ -55,7 +48,7 @@ class LocalWalletAppReference(
     "This function will only be available in the testnet. It allows creating coins for testing purposes." +
       "Returns the contract ID of the created contract. "
   )
-  def tap(amount: String = "100"): Primitive.ContractId[Coin] = {
+  def tap(amount: String = "100"): Primitive.ContractId[coinCodegen.Coin] = {
     consoleEnvironment.run {
       adminCommand(WalletAppCommands.Tap(com.daml.lf.data.Numeric.assertFromString(amount)))
     }
@@ -66,9 +59,23 @@ class LocalWalletAppReference(
     "Queries the configured remote participant for the PaymentRequests of the configured user. " +
       "Returns all found payment requests."
   )
-  def listPaymentRequests(): Seq[Contract[PaymentRequest]] = {
+  def listPaymentRequests(): Seq[Contract[walletCodegen.PaymentRequest]] = {
     consoleEnvironment.run {
       adminCommand(WalletAppCommands.ListPaymentRequests())
+    }
+  }
+
+  @Help.Summary("Approve a payment request")
+  @Help.Description(
+    "Approve a payment request and deliver the coin to be locked into the approved payment." +
+      "Returns the contract ID of the approved payment."
+  )
+  def approvePaymentRequest(
+      requestId: Primitive.ContractId[walletCodegen.PaymentRequest],
+      coinId: Primitive.ContractId[coinCodegen.Coin],
+  ): Primitive.ContractId[walletCodegen.ApprovedPayment] = {
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.ApprovePaymentRequest(requestId, coinId))
     }
   }
 

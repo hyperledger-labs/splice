@@ -87,31 +87,20 @@ class DirectoryProviderIntegrationTest
       val entryRequests = directoryProvider.listEntryRequests()
       entryRequests.map(_.contractId) shouldBe Seq(entryRequest.contractId)
 
-      // Request payment for entry
-
+      // Provider: Request payment for entry
       val paymentRequest = directoryProvider.requestEntryPayment(entryRequest.contractId)
-      val _ =
-        wallet1.remoteParticipant.ledger_api.acs
-          .await(userParty, walletCodegen.PaymentRequest.PaymentRequest)
+
+      // User: wait until payment request becomes visible
+      def getPaymentRequest() =
+        wallet1.listPaymentRequests().find(c => c.payload.reference == entryRequest.contractId)
+      utils.retry_until_true { getPaymentRequest().isDefined }
+      val walletPaymentRequest =
+        getPaymentRequest().getOrElse(sys.error("Payment request is unexpectedly not defined."))
+      walletPaymentRequest.contractId shouldBe paymentRequest
 
       // Approve payment
-
       val coin = wallet1.tap("5.0")
-
-      wallet1.remoteParticipant.ledger_api.commands.submit_flat(
-        // We only need readAs for userValidatorParty but the API only supports actAs.
-        actAs = Seq(userParty, userValidatorParty),
-        commands = Seq(
-          paymentRequest
-            .exercisePaymentRequest_Approve(
-              userParty.toPrim,
-              walletCodegen.PaymentRequest
-                .PaymentRequest_Approve(Seq(coinCodegen.CoinRules.TransferInput.InputCoin(coin))),
-            )
-            .command
-        ),
-        optTimeout = None,
-      )
+      val _ = wallet1.approvePaymentRequest(walletPaymentRequest.contractId, coin)
 
       // Collect payment
       val approvedPayment = directoryProvider.remoteParticipant.ledger_api.acs

@@ -10,6 +10,7 @@ logfile
 testlog
 _build/
 .idea/*
+.vscode/*
 target
 .bsp
 !canton/community/participant/src/test/resources/daml/illformed.dar
