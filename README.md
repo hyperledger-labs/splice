@@ -18,7 +18,7 @@ If you encounter issues, try exiting & reentering the directory to reactivate di
 
 ### As a new joiner
 For your first issue, you can take a look at [issues labelled with the `starter` tag](https://github.com/DACH-NY/the-real-canton-coin/issues?q=is%3Aissue+label%3Astarter). Else, please ask your onboarding
-buddy for help with getting started on the code base. 
+buddy for help with getting started on the code base.
 
 ## Directory layout
 
@@ -34,8 +34,8 @@ M3 - TestNet Launch.
 ## IntelliJ setup
 
 * Clone the repository first, if you haven't yet
-* Run `which java` and `which sbt` within `the-real-canton-coin` directory to respectively find the JRE/SDK 
-    and sbt versions used by nix. The outputs should roughly look as follows: 
+* Run `which java` and `which sbt` within `the-real-canton-coin` directory to respectively find the JRE/SDK
+    and sbt versions used by nix. The outputs should roughly look as follows:
     ```
     the-real-canton-coin$ which java
     /nix/store/rqii97havwmrzan6wk1lbh5nc48w821y-openjdk-11.0.15+10/bin/java
@@ -44,19 +44,19 @@ M3 - TestNet Launch.
     ```
 * Add the Java SDK from nix per the instructions [in the Daml repo.](https://github.com/digital-asset/daml/blob/main/BAZEL.md#configuring-the-jdk-in-intellij)
  In the example above, the JDK would be at `/nix/store/rqii97havwmrzan6wk1lbh5nc48w821y-openjdk-11.0.15+10/lib/openjdk`.
-* Open the repository via 'File -> New -> Project from existing sources' 
+* Open the repository via 'File -> New -> Project from existing sources'
 * 'Import project from external model' and select sbt
 * Point IntelliJ to the JRE home and sbt-launch jar. From the example above, these should respectively be
-        `/nix/store/rqii97havwmrzan6wk1lbh5nc48w821y-openjdk-11.0.15+10/` and 
+        `/nix/store/rqii97havwmrzan6wk1lbh5nc48w821y-openjdk-11.0.15+10/` and
         `/nix/store/9q28hwzz8yy75l317k2v2mdq485hgja0-sbt-1.6.2/share/sbt/bin/sbt-launch.jar`.
-* Also configure it with the JDK you added above. If the JDK doesn't show up as one of the options, you may need to 
-    choose any other SDK and set up the correct SDK for the project after following the rest of the steps. 
+* Also configure it with the JDK you added above. If the JDK doesn't show up as one of the options, you may need to
+    choose any other SDK and set up the correct SDK for the project after following the rest of the steps.
     In that case, you will need to verify that all usages of the JDK in 'Settings' and 'Project Structure' use the correct
     SDK.
 * Otherwise choose [these settings in the dialogue](https://i.imgur.com/B3yWCZ9.png) (see sbt explanations [here](https://www.jetbrains.com/help/idea/sbt.html))
 
-You should then see a 'sbt shell' window in IntelliJ that allows you to build and test the Scala code while using the 
-same package references as nix. If IntelliJ asks you at the end if you want to overwrite any previous `.idea/*` files, say yes.  
+You should then see a 'sbt shell' window in IntelliJ that allows you to build and test the Scala code while using the
+same package references as nix. If IntelliJ asks you at the end if you want to overwrite any previous `.idea/*` files, say yes.
 
 ### Running and debugging integration tests
 
@@ -66,10 +66,10 @@ see for example the [`DirectoryProviderIntegrationTest.scala`](/apps/app/src/tes
 Also see the Scaladocs on Canton's [`BaseIntegrationTest.scala`](/canton/community/app/src/test/scala/com/digitalasset/canton/integration/BaseIntegrationTest.scala) for more information about how the test framework is intended to be used.
 
 Many tests use the topology and base configuration defined in [`/apps/app/src/test/resources/simple-topology.conf`](apps/app/src/test/resources/simple-topology.conf), or a variant thereof.
-Adjusting these configurations can sometimes help with debugging. 
+Adjusting these configurations can sometimes help with debugging.
 See for example https://docs.daml.com/canton/usermanual/monitoring.html on how to adjust logging and monitoring for Canton nodes.
 
-You can run integration tests from IntelliJ by navigating to the file and clicking the little green "run-triangle" 
+You can run integration tests from IntelliJ by navigating to the file and clicking the little green "run-triangle"
 in the gutter at the start of the test definition.
 You can also run them from `sbt` as explained in the section on `sbt` below.
 The logs from test executions are output to `/logs/canton_test.log`.
@@ -101,21 +101,47 @@ More commands can be found in build.sbt and BuildCommon.scala.
 - `compile`: compile production code (excluding test code)
 - `Test/compile`: compile production and test code
 - `apps-common/compile`: compile production code of the `apps-common` subproject
-- `scalafixAll`: invoke scalafix across all configurations where scalafix is enabled. 
+- `scalafixAll`: invoke scalafix across all configurations where scalafix is enabled.
     It's a linting and rewrite tool we use to organize imports. This may run for a long time as it needs to do a full compile.
 - `format`: apply `scalafmt` to format source files
-- `bundle`: create a release bundle in `apps/app/target/release/<version>`. The release binary is loaded into your PATH automatically via `direnv`. Simply run `coin` to call it. 
+- `damlBuild`: create `.dar` files for all Daml projects
+- `bundle`: create a release bundle in `apps/app/target/release/<version>`. The release binary is loaded into your PATH automatically via `direnv`. Simply run `coin` to call it.
 
 Test:
 - `testOnly myWildcard`: runs all tests matching wildcard, e.g.,
   `testOnly com.digitalasset.myPackage.*` runs all tests in package `com.digitalasset.myPackage`.
   `testOnly *Wallet* -- -z "allow calling tap"` runs all tests with classname matching `*Wallet*` and test description matching `allow calling tap`.
 - `test`: runs all tests
+- `damlTest`: run the Daml script tests included with the apps' Daml files
 
 For more information, especially on metrics, logging, tracing, Scala guidelines, Protobuf guidelines, formatting and git hooks
 please refer to the respective sections in [Canton's README](https://github.com/DACH-NY/canton/blob/main/contributing/README.md).
-We share a lot of tooling with Canton, so to avoid duplication we use the documentation in the Canton repo 
-as "one source of truth". 
+We share a lot of tooling with Canton, so to avoid duplication we use the documentation in the Canton repo
+as "one source of truth".
+
+## Editing Daml
+
+We use separate Daml projects for separate apps (e.g. CC, the Wallet, and the Directory).
+You can find these projects in the `daml/` subfolders of the respective apps.
+These Daml projects define the on-ledger API used to synchronize different parties in the apps' workflows.
+
+We build and test these projects using the `sbt` commands `damlBuild` and `damlTest`.
+The implementation of the `sbt` plugin can be found in [`/project/DamlPlugin.scala`](/project/DamlPlugin.scala).
+It works, but is not (yet) great, as you can see from the steps below.
+
+To edit the files in a particular Daml project, for example, `/apps/wallet/daml`, proceed as follows.
+
+1. Start `sbt` in the repo root to get access to an `sbt` shell (or use the one in IntelliJ).
+2. Start `damlBuild` in your `sbt` shell to build the .dars for all Daml projects.
+3. Start `daml build` in a shell with working directory `/apps/wallet/daml` to (re)initialize the package database used by `daml studio` (located within `/apps/wallet/daml/.daml/`),
+   see https://github.com/DACH-NY/the-real-canton-coin/issues/403.
+5. Start `daml studio` in the repo root, which starts VS code.
+6. Open and edit the .daml files in `/apps/wallet/daml` in VS code. You should see them being typechecked on the fly.
+7. See `/apps/wallet/daml/daml.yaml` for the .dar dependencies of `/apps/wallet/daml`.
+   If you change any of them, then you can propagate these changes across the .dars as follows:
+   1. redo Step 2
+   2. redo Step 3
+   3. use Ctrl-Shift-P "Developer: Reload Window" in VS code to restart the `daml studio` language server with the updated package dependencies.
 
 ## GCE Clusters
 
@@ -218,7 +244,7 @@ particpant to the remote particpant. This command confirms the ledger API
 connection to the remote participant node:
 
 ```
-@ remoteParticipant1.health.ping(remoteParticipant1, timeout = 10.seconds) 
+@ remoteParticipant1.health.ping(remoteParticipant1, timeout = 10.seconds)
 res0: concurrent.duration.Duration = 2246 milliseconds
 ```
 
@@ -226,7 +252,7 @@ The local participant node may connected to the CN domain as follows:
 
 
 ```
-@ localParticipant1.domains.connect("test", "http://dev.net.canton.global:5008") 
+@ localParticipant1.domains.connect("test", "http://dev.net.canton.global:5008")
 res1: DomainConnectionConfig = DomainConnectionConfig(
   domain = Domain 'test',
   sequencerConnection = GrpcSequencerConnection(
@@ -247,7 +273,7 @@ interactions that span both the CN cluster participant and the locally
 hosted participant:
 
 ```
-@ remoteParticipant1.health.ping(localParticipant1, timeout = 10.seconds) 
+@ remoteParticipant1.health.ping(localParticipant1, timeout = 10.seconds)
 res2: concurrent.duration.Duration = 1762 milliseconds
 ```
 
@@ -263,7 +289,7 @@ Kubernetes cluster manifest is used, defined in
 To avoid the risk of confusing local and GCE cluster operations, two
 separate top level commands are used for each. `cnlocal` is the
 entrypoint for local cluster operations and `cncluster` is the
-entrypoint for GCE cluster operations. 
+entrypoint for GCE cluster operations.
 
 #### Docker image hosting
 
@@ -326,4 +352,3 @@ variables. As stated above, these are usually populated via `.envrc`.
 ### Ledger API Port Allocations
 
 Both our deployment and tests follow the [port allocation scheme](./apps/app/src/test/resources/README.md).
-
