@@ -109,6 +109,7 @@ More commands can be found in build.sbt and BuildCommon.scala.
 Test:
 - `testOnly myWildcard`: runs all tests matching wildcard, e.g.,
   `testOnly com.digitalasset.myPackage.*` runs all tests in package `com.digitalasset.myPackage`.
+  `testOnly *Wallet* -- -z "allow calling tap"` runs all tests with classname matching `*Wallet*` and test description matching `allow calling tap`.
 - `test`: runs all tests
 
 For more information, especially on metrics, logging, tracing, Scala guidelines, Protobuf guidelines, formatting and git hooks
