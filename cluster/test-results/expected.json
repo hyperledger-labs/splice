@@ -46,6 +46,50 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
+               "app": "svc-app"
+            },
+            "name": "svc-app"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "svc-app"
+               }
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "svc-app"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "image": "region-docker.pkg.dev/project/repo/svc-app:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "svc-app",
+                        "ports": [
+                           {
+                              "containerPort": 5015,
+                              "name": "svc-app-adm-api"
+                           },
+                           {
+                              "containerPort": 5013,
+                              "name": "scan-api"
+                           }
+                        ]
+                     }
+                  ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
                "app": "canton-domain"
             },
             "name": "canton-domain"
@@ -164,6 +208,40 @@
             ],
             "selector": {
                "app": "docs"
+            },
+            "type": "LoadBalancer"
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "name": "svc-app"
+         },
+         "spec": {
+            "loadBalancerIP": "ipaddr",
+            "loadBalancerSourceRanges": [
+               "35.194.81.56/32",
+               "35.198.147.95/32",
+               "35.189.40.124/32",
+               "34.132.91.75/32"
+            ],
+            "ports": [
+               {
+                  "name": "svc-app-adm-api",
+                  "port": 5015,
+                  "protocol": "TCP",
+                  "targetPort": 5015
+               },
+               {
+                  "name": "scan-api",
+                  "port": 5013,
+                  "protocol": "TCP",
+                  "targetPort": 5013
+               }
+            ],
+            "selector": {
+               "app": "svc-app"
             },
             "type": "LoadBalancer"
          }

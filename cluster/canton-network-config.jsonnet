@@ -66,8 +66,22 @@ function(gcpRegion, gcpRepoName, imageTag, ipAddr) {
         name: 'http',
       },
     ]),
-    deployment(gcpRegion, gcpRepoName,
-      imageTag, 'canton-domain', [
+    deployment(gcpRegion, gcpRepoName, imageTag, 'svc-app', [
+      {
+        name: 'svc-app-adm-api',
+        containerPort: 5015,
+      },
+      {
+        name: 'scan-api',
+        containerPort: 5013,
+      },
+    ]),
+    deployment(
+      gcpRegion,
+      gcpRepoName,
+      imageTag,
+      'canton-domain',
+      [
         {
           name: 'canton-pub-api',
           containerPort: 5008,
@@ -76,7 +90,8 @@ function(gcpRegion, gcpRepoName, imageTag, ipAddr) {
           name: 'canton-adm-api',
           containerPort: 5009,
         },
-      ], {
+      ],
+      {
         readinessProbe: {
           tcpSocket: {
             port: 'canton-pub-api',
@@ -108,6 +123,24 @@ function(gcpRegion, gcpRepoName, imageTag, ipAddr) {
         targetPort: 80,
       },
     ]),
+    externalService(
+      'svc-app',
+      ipAddr,
+      [
+        {
+          name: 'svc-app-adm-api',
+          protocol: 'TCP',
+          port: 5015,
+          targetPort: 5015,
+        },
+        {
+          name: 'scan-api',
+          protocol: 'TCP',
+          port: 5013,
+          targetPort: 5013,
+        },
+      ]
+    ),
     externalService(
       'canton-domain',
       ipAddr,
