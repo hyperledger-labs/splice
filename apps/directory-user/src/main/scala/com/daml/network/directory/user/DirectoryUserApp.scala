@@ -6,6 +6,7 @@ import com.daml.network.directory.user.store.DirectoryUserAppStore
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
 import com.digitalasset.canton.lifecycle.Lifecycle
+import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.{Clock, HasUptime}
@@ -23,6 +24,7 @@ class DirectoryUserApp(
     val coinAppParameters: SharedCoinAppParameters,
     storage: Storage,
     dummyStore: DirectoryUserAppStore,
+    providerChannel: CloseableChannel,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
 ) extends CantonNode // TODO(Arne): CantonNode needs to be forked or generalized.
@@ -44,6 +46,6 @@ class DirectoryUserApp(
 
   override def close(): Unit = {
     logger.info("Stopping directory user node")
-    Lifecycle.close(storage, dummyStore)(logger)
+    Lifecycle.close(storage, dummyStore, providerChannel)(logger)
   }
 }

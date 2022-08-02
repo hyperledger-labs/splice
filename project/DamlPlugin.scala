@@ -216,9 +216,14 @@ object DamlPlugin extends AutoPlugin {
         damlProjectFiles.get.toList.foreach { projectFile =>
           val relativeDamlProjectFile = sourceDirectory.toPath.relativize(projectFile.toPath).toFile
           val projectBuildDirectory =
-            buildDirectory.toPath.resolve(relativeDamlProjectFile.toPath).toAbsolutePath.getParent.toFile
+            buildDirectory.toPath
+              .resolve(relativeDamlProjectFile.toPath)
+              .toAbsolutePath
+              .getParent
+              .toFile
           val result = Process(
-            command = Seq(damlc.getAbsolutePath, "test", "--project-root", projectBuildDirectory.toString),
+            command =
+              Seq(damlc.getAbsolutePath, "test", "--project-root", projectBuildDirectory.toString),
             cwd = projectBuildDirectory,
             extraEnv = damlLibsEnv: _*,
           ) ! log
@@ -229,7 +234,6 @@ object DamlPlugin extends AutoPlugin {
           }
         }
       }
-
 
   }
 
@@ -333,7 +337,7 @@ object DamlPlugin extends AutoPlugin {
   }
 
   private def artifactoryUrl(damlVersion: String) =
-      s"https://storage.googleapis.com/daml-binaries/split-releases/${damlVersion}/"
+    s"https://storage.googleapis.com/daml-binaries/split-releases/${damlVersion}/"
 
   private def ensureDamlc(damlVersion: String) =
     ensureArtifactAvailable(
@@ -393,18 +397,23 @@ object DamlPlugin extends AutoPlugin {
     // copy project directory into target tree
     // the reason for this is that `daml build` caches files in a `.daml` directory of the source tree
     // making sbt to believe that the source code changed
-    IO.copyDirectory(originalDamlProjectFile.getAbsoluteFile.getParentFile, projectBuildDirectory, overwrite = true)
+    IO.copyDirectory(
+      originalDamlProjectFile.getAbsoluteFile.getParentFile,
+      projectBuildDirectory,
+      overwrite = true,
+    )
     // Path that we need to prepend to references in data-dependencies. This allows us to have a daml.yaml
     // that works both for Daml Studio but also for SBT.
     val pathPrefix = buildDirectory.toPath.relativize(sourceDirectory.toPath.toAbsolutePath)
     // We shell out to yq rather than using a Scala lib because we cannot rely on dependencies within SBT plugins.
     val yqProcessLogger = new BufferedLogger
     val yqResult = Process(
-      command = "yq" :: "-iy" :: s"""setpath(["data-dependencies"]; getpath(["data-dependencies"]) | map("$pathPrefix/" + .))""" :: "daml.yaml" :: Nil,
+      command =
+        "yq" :: "-iy" :: s"""setpath(["data-dependencies"]; getpath(["data-dependencies"]) | map("$pathPrefix/" + .))""" :: "daml.yaml" :: Nil,
       cwd = projectBuildDirectory,
     ) ! yqProcessLogger
     if (yqResult != 0) {
-        throw new MessageOnlyException(s"""
+      throw new MessageOnlyException(s"""
                                           |yq failed [$originalDamlProjectFile]:
                                           |${yqProcessLogger.output("  ")}
           """.stripMargin.trim)

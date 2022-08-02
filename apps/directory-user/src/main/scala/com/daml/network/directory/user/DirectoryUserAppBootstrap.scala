@@ -22,6 +22,7 @@ import com.digitalasset.canton.concurrent.{
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.ledger.api.client.LedgerConnection
+import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.resource._
@@ -75,12 +76,17 @@ class DirectoryUserAppBootstrap(
           directoryUserAppParameters.processingTimeouts,
         )
 
-      val providerChannel = ClientChannelBuilder.createChannel(
-        config.remoteDirectoryProvider.clientAdminApi
-      )(executionContext)
+      // TODO(i390) Switch to proper connection
+      val providerChannel = new CloseableChannel(
+        ClientChannelBuilder.createChannel(
+          config.remoteDirectoryProvider.clientAdminApi
+        )(executionContext),
+        loggerFactory.getTracedLogger(DirectoryUserAppBootstrap.getClass),
+        "DirectoryUserAppBootstrap",
+      )
       val providerStub =
         DirectoryProviderServiceGrpc
-          .stub(providerChannel)
+          .stub(providerChannel.channel)
           .withInterceptors(TraceContextGrpc.clientInterceptor)
 
       adminServerRegistry.addService(
@@ -94,6 +100,7 @@ class DirectoryUserAppBootstrap(
         directoryUserAppParameters,
         storage,
         dummyStore,
+        providerChannel,
         clock,
         loggerFactory,
       )
