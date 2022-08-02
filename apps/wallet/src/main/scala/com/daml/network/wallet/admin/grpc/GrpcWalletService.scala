@@ -139,6 +139,26 @@ class GrpcWalletService(
       } yield v0.ApprovePaymentRequestResponse(payments(0).contractId.toString)
     }
 
+  @nowarn("cat=unused")
+  override def rejectPaymentRequest(
+      request: v0.RejectPaymentRequestRequest
+  ): Future[v0.RejectPaymentRequestResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        walletParty <- getWalletParty()
+        arg = walletCodegen.PaymentRequest_Reject()
+        cmd = Primitive.ContractId
+          .apply[walletCodegen.PaymentRequest](request.requestContractId)
+          .exercisePaymentRequest_Reject(walletParty.toPrim, arg)
+          .command
+        _ <- connection.submitCommand(
+          Seq(walletParty),
+          Seq(),
+          Seq(cmd),
+        )
+      } yield v0.RejectPaymentRequestResponse()
+    }
+
   override def initialize(request: InitializeRequest): Future[InitializeResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => _ =>
       svcParty.set(

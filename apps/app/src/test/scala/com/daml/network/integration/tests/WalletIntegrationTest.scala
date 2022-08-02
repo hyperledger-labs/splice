@@ -59,7 +59,7 @@ class WalletIntegrationTest
       PartyId.tryFromPrim(res.payload.owner).uid.id shouldBe walletDamlUser
     }
 
-    "allow listing a user's payment requests" in { implicit env =>
+    "allow a user to create, list, and reject payment requests" in { implicit env =>
       import env._
       svc.initialize()
       val svcParty =
@@ -74,8 +74,7 @@ class WalletIntegrationTest
         wallet1.remoteParticipant.ledger_api.acs.await(validatorParty, CoinRules).contractId
 
       // Check that no payment requests exist
-      val reqs1 = wallet1.listPaymentRequests()
-      reqs1 shouldBe empty
+      wallet1.listPaymentRequests() shouldBe empty
 
       // Create a payment request to self.
       val reqC = PaymentRequest(
@@ -96,9 +95,17 @@ class WalletIntegrationTest
         optTimeout = None,
         commands = Seq(reqC.create.command),
       )
+
       // Check that we can see the created payment request
       val reqFound = wallet1.listPaymentRequests().headOption.value
       reqFound.payload shouldBe reqC
+
+      // Reject the payment request
+      wallet1.rejectPaymentRequest(reqFound.contractId)
+
+      // Check that there are no more payment requests
+      val requests2 = wallet1.listPaymentRequests()
+      requests2 shouldBe empty
     }
   }
 }

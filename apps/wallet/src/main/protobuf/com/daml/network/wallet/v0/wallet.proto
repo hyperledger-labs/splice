@@ -11,6 +11,7 @@ service WalletService {
 
   rpc ListPaymentRequests (ListPaymentRequestsRequest) returns (ListPaymentRequestsResponse);
   rpc ApprovePaymentRequest (ApprovePaymentRequestRequest) returns (ApprovePaymentRequestResponse);
+  rpc RejectPaymentRequest (RejectPaymentRequestRequest) returns (RejectPaymentRequestResponse);
 }
 
 message InitializeRequest {
@@ -54,4 +55,11 @@ message ApprovePaymentRequestRequest {
 
 message ApprovePaymentRequestResponse {
   string approved_payment_contract_id = 1;
+}
+
+message RejectPaymentRequestRequest {
+  string request_contract_id = 1;
+}
+
+message RejectPaymentRequestResponse {
 }

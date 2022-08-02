@@ -139,4 +139,30 @@ object WalletAppCommands {
       )
   }
 
+  case class RejectPaymentRequest(
+      requestId: Primitive.ContractId[walletCodegen.PaymentRequest]
+  ) extends BaseCommand[
+        v0.RejectPaymentRequestRequest,
+        v0.RejectPaymentRequestResponse,
+        Unit,
+      ] {
+
+    override def createRequest(): Either[String, v0.RejectPaymentRequestRequest] =
+      Right(
+        v0.RejectPaymentRequestRequest(
+          ApiTypes.ContractId.unwrap(requestId)
+        )
+      )
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.RejectPaymentRequestRequest,
+    ): Future[v0.RejectPaymentRequestResponse] = service.rejectPaymentRequest(request)
+
+    override def handleResponse(
+        response: v0.RejectPaymentRequestResponse
+    ): Either[String, Unit] =
+      Right(())
+  }
+
 }

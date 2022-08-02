@@ -79,6 +79,16 @@ class LocalWalletAppReference(
     }
   }
 
+  @Help.Summary("Reject a payment request")
+  @Help.Description(
+    "Reject a payment request."
+  )
+  def rejectPaymentRequest(requestId: Primitive.ContractId[walletCodegen.PaymentRequest]): Unit = {
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.RejectPaymentRequest(requestId))
+    }
+  }
+
   /** Remote participant this Wallet app is configured to interact with. */
   val remoteParticipant =
     new CoinRemoteParticipantReference(
