@@ -30,6 +30,7 @@ endif
 #########################
 
 image-tag = $(eval image-tag := $$(shell image-tag-gen ${app}))$(image-tag)
+local-image-tag = $(shell echo "${app}:$(shell version-gen)")
 
 .PHONY: docker-check
 docker-check:
@@ -48,7 +49,7 @@ docker-build: $(docker-build)
 $(docker-build): $(docker-src)
 	mkdir -pv $(@D)
 	@echo docker build triggered because these files changed: $?
-	docker build $(platform_opt) --pull --iidfile $@ $(cache_opt) .
+	docker build $(platform_opt) --iidfile $@ $(cache_opt) $(build_arg) -t $(local-image-tag) .
 
 
 ##############

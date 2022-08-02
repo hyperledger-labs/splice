@@ -13,17 +13,17 @@ RUN mkdir /cn-app
 WORKDIR /cn-app
 
 # use this config until example configs are fixed
-COPY simple-topology.conf .
+COPY empty.conf .
 
 # move tarball to a static name
 ADD ${APP_PATH} .
 
 # pre-compile ammonite's dynamic scala by launching the REPL with no stdin
 RUN echo "Precompiling canton network console. Please ignore the following output 🙈" \
-  && coin-0.1.0-SNAPSHOT/bin/coin --config simple-topology.conf --no-tty < /dev/null
+  && coin-0.1.0-SNAPSHOT/bin/coin --config empty.conf --no-tty < /dev/null
 
 # point entrypoint to the coin executable
 ENTRYPOINT [ "coin-0.1.0-SNAPSHOT/bin/coin" ]
 
 # default arguments if none are specified by user
-CMD [ "--config", "simple-topology.conf" ]
+CMD ["daemon", "--no-tty", "--log-level-stdout", "INFO" ]
