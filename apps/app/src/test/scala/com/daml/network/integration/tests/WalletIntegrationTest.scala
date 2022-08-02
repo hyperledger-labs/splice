@@ -15,7 +15,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.network.CC.Coin.Coin
 import com.digitalasset.network.CC.Round.Round
 import com.digitalasset.network.CC.CoinRules.{CoinRules, CoinRulesRequest}
-import com.digitalasset.network.CN.Wallet.PaymentRequest.PaymentRequest
+import com.digitalasset.network.CN.Wallet.PaymentRequest
 import com.digitalasset.network.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 import com.digitalasset.network.DA.Time.Types.RelTime
 

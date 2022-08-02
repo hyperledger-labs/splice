@@ -3,7 +3,7 @@ module CN.Directory where
 import DA.Assert
 import DA.Time
 
-import CN.Wallet.PaymentRequest
+import CN.Wallet
 
 template DirectoryEntry
   with

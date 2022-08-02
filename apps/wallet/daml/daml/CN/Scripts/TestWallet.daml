@@ -1,0 +1,44 @@
+module CN.Scripts.TestWallet where
+
+import Daml.Script
+
+import CC.Coin
+import CC.CoinRules
+import CN.Wallet
+
+import CC.Scripts.Util
+
+test = script do
+  app <- setupApp
+
+  runNextIssuance app 1.0
+  runCoinDepositBots app
+
+  sender <- setupUser app "sender" app.svc
+  receiver <- setupUser app "receiver" app.svc
+
+  pay app app.svc sender 5.0 ""
+
+  -- setup payment channel
+  proposalId <- submit sender $ createCmd PaymentChannelProposal with
+    proposer = sender
+    channel = PaymentChannel with
+      sender
+      receiver
+      svc = app.svc
+      allowRequests = True
+      allowOffers = True
+      allowDirectTransfers = True
+      senderTransferFeeRatio = 0.0
+
+  channelId <- submit receiver $ exerciseCmd proposalId PaymentChannelProposal_Accept
+
+  -- send some CC
+  [(coin, _)] <- queryFilter @Coin sender (\c -> c.quantity.initialQuantity > 2.5)
+  submitMulti [sender] [app.svc] $ exerciseByKeyCmd @PaymentChannel (sender, receiver, app.svc)
+    PaymentChannel_ExecuteDirectTransfer with
+      inputs = [InputCoin coin]
+      quantity = 2.0
+      payload = "direct transfer test"
+
+  pure ()

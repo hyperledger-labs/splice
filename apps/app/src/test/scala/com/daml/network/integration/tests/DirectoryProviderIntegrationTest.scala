@@ -102,7 +102,7 @@ class DirectoryProviderIntegrationTest
 
       // Collect payment
       val approvedPayment = directoryProvider.remoteParticipant.ledger_api.acs
-        .await(providerParty, walletCodegen.PaymentRequest.ApprovedPayment)
+        .await(providerParty, walletCodegen.ApprovedPayment)
       val cid = directoryProvider.collectEntryPayment(approvedPayment.contractId)
       val entry = directoryProvider.remoteParticipant.ledger_api.acs
         .await(providerParty, codegen.DirectoryEntry)

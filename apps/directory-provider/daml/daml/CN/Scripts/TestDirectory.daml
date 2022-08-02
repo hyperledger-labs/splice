@@ -6,7 +6,7 @@ import Daml.Script
 import CC.Coin
 import CC.CoinRules
 import CN.Directory
-import CN.Wallet.PaymentRequest
+import CN.Wallet
 
 import CC.Scripts.Util
 

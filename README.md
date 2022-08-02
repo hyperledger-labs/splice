@@ -143,6 +143,9 @@ To edit the files in a particular Daml project, for example, `/apps/wallet/daml`
    2. redo Step 3
    3. use Ctrl-Shift-P "Developer: Reload Window" in VS code to restart the `daml studio` language server with the updated package dependencies.
 
+*Tip:* if `damlBuild` fails with weird errors, then that might be due to stale `damlBuild` outputs.
+Try forcing a clean rebuild by removing the `.daml/` and `target/` subdirectories of the project that `damlBuild` fails on.
+
 ## GCE Clusters
 
 The public Canton Network clusters are currently hosted in Google

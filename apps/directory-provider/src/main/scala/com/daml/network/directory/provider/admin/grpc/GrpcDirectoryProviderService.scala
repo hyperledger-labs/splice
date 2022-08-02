@@ -147,7 +147,7 @@ class GrpcDirectoryProviderService(
           )
           .command
         tx <- connection.submitCommand(Seq(partyId), Seq(), Seq(cmd))
-        requests = DecodeUtil.decodeAllCreated(walletCodegen.PaymentRequest.PaymentRequest)(
+        requests = DecodeUtil.decodeAllCreated(walletCodegen.PaymentRequest)(
           tx.getTransaction
         )
         _ = require(
@@ -165,7 +165,7 @@ class GrpcDirectoryProviderService(
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
         partyId <- getParty()
-        approvedPayment <- fetchByContractId(walletCodegen.PaymentRequest.ApprovedPayment)(
+        approvedPayment <- fetchByContractId(walletCodegen.ApprovedPayment)(
           partyId,
           Primitive.ContractId(request.contractId),
         )

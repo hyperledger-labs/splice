@@ -97,7 +97,7 @@ object DirectoryProviderCommands {
   ) extends BaseCommand[
         v0.RequestEntryPaymentRequest,
         v0.RequestEntryPaymentResponse,
-        Primitive.ContractId[walletCodegen.PaymentRequest.PaymentRequest],
+        Primitive.ContractId[walletCodegen.PaymentRequest],
       ] {
 
     override def createRequest(): Either[String, v0.RequestEntryPaymentRequest] =
@@ -112,12 +112,12 @@ object DirectoryProviderCommands {
 
     override def handleResponse(
         response: v0.RequestEntryPaymentResponse
-    ): Either[String, Primitive.ContractId[walletCodegen.PaymentRequest.PaymentRequest]] =
-      Right(Primitive.ContractId[walletCodegen.PaymentRequest.PaymentRequest](response.contractId))
+    ): Either[String, Primitive.ContractId[walletCodegen.PaymentRequest]] =
+      Right(Primitive.ContractId[walletCodegen.PaymentRequest](response.contractId))
   }
 
   case class CollectEntryPayment(
-      contractId: Primitive.ContractId[walletCodegen.PaymentRequest.ApprovedPayment]
+      contractId: Primitive.ContractId[walletCodegen.ApprovedPayment]
   ) extends BaseCommand[
         v0.CollectEntryPaymentRequest,
         v0.CollectEntryPaymentResponse,

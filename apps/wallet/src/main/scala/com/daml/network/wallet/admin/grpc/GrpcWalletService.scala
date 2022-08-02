@@ -13,7 +13,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
 import com.digitalasset.network.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
-import com.digitalasset.network.CN.Wallet.{PaymentRequest => walletCodegen}
+import com.digitalasset.network.CN.{Wallet => walletCodegen}
 import com.digitalasset.network.DA
 import io.opentelemetry.api.trace.Tracer
 

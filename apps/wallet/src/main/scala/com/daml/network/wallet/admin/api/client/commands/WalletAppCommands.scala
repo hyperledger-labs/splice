@@ -11,7 +11,7 @@ import com.digitalasset.canton.topology.PartyId
 import io.grpc.ManagedChannel
 import com.daml.ledger.client.binding.Primitive
 import com.digitalasset.network.CC.{Coin => coinCodegen}
-import com.digitalasset.network.CN.Wallet.{PaymentRequest => walletCodegen}
+import com.digitalasset.network.CN.{Wallet => walletCodegen}
 
 import scala.concurrent.Future
 
