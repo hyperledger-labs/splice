@@ -6,7 +6,9 @@ import com.daml.network.console.{
   LocalScanAppReference,
   LocalSvcAppReference,
   LocalValidatorAppReference,
+  WalletAppReference,
   LocalWalletAppReference,
+  RemoteWalletAppReference,
 }
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
 import com.digitalasset.canton.console.{
@@ -48,11 +50,15 @@ class CoinConsoleEnvironment(
       validators,
       svcOpt.toList,
       scanOpt.toList,
-      wallets,
+      wallets.local,
       directoryProviders,
       directoryUsers,
     ),
-    mergeRemoteInstances(participants.remote, domains.remote),
+    mergeRemoteInstances(
+      participants.remote,
+      domains.remote,
+      wallets.remote,
+    ),
   )
 
   lazy val validators: Seq[LocalValidatorAppReference] =
@@ -66,8 +72,11 @@ class CoinConsoleEnvironment(
       .map(createSvcReference)
       .headOption
 
-  lazy val wallets: Seq[LocalWalletAppReference] =
-    environment.config.walletsByString.keys.map(createWalletReference).toSeq
+  lazy val wallets: NodeReferences[WalletAppReference, RemoteWalletAppReference, LocalWalletAppReference] =
+    NodeReferences(
+      environment.config.walletsByString.keys.map(createWalletReference).toSeq,
+      environment.config.remoteWalletsByString.keys.map(createRemoteWalletReference).toSeq,
+    )
 
   lazy val directoryProviders: Seq[LocalDirectoryProviderAppReference] =
     environment.config.directoryProvidersByString.keys.map(createDirectoryProviderReference).toSeq
@@ -87,6 +96,9 @@ class CoinConsoleEnvironment(
   private def createWalletReference(name: String): LocalWalletAppReference =
     new LocalWalletAppReference(this, name)
 
+  private def createRemoteWalletReference(name: String): RemoteWalletAppReference =
+    new RemoteWalletAppReference(this, name)
+
   private def createDirectoryProviderReference(name: String): LocalDirectoryProviderAppReference =
     new LocalDirectoryProviderAppReference(this, name)
 
@@ -104,13 +116,21 @@ class CoinConsoleEnvironment(
         validators,
         Seq("App References"),
       ) :++
-      wallets.map(w =>
-        TopLevelValue(w.name, helpText("wallet app", w.name), w, Seq("App References"))
+      wallets.local.map(w =>
+        TopLevelValue(w.name, helpText("local wallet app", w.name), w, Seq("App References"))
       ) :+ TopLevelValue(
         "wallets",
-        helpText("All wallet app instances" + genericNodeReferencesDoc, "Wallets"),
-        wallets,
+        helpText("All local wallet app instances" + genericNodeReferencesDoc, "Wallets"),
+        wallets.local,
         Seq("App References"),
+      ) :++
+      wallets.remote.map(w =>
+        TopLevelValue(w.name, helpText("local wallet app", w.name), w, Seq("App References"))
+      ) :+ TopLevelValue(
+      "remoteWallets",
+      helpText("All remote wallet app instances" + genericNodeReferencesDoc, "Remote Wallets"),
+      wallets.remote,
+      Seq("App References"),
       ) :++
       directoryProviders.map(v =>
         TopLevelValue(v.name, helpText("directory provider app", v.name), v, Seq("App References"))

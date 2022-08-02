@@ -4,27 +4,22 @@ import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.util.Contract
 import com.daml.network.wallet.admin.api.client.commands.WalletAppCommands
-import com.daml.network.wallet.config.LocalWalletAppConfig
-import com.digitalasset.canton.console.{BaseInspection, Help, LocalInstanceReference}
+import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
+import com.digitalasset.canton.console.{
+  BaseInspection,
+  Help,
+  LocalInstanceReference,
+  GrpcRemoteInstanceReference,
+}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.network.CC.{Coin => coinCodegen}
 import com.digitalasset.network.CN.Wallet.{PaymentRequest => walletCodegen}
 
-/** Single local Wallet app reference. Defines the console commands that can be run against a local Wallet
-  * app reference.
-  */
-class LocalWalletAppReference(
+abstract class WalletAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
-) extends CoinAppReference(consoleEnvironment, name)
-    with LocalInstanceReference
-    with BaseInspection[ParticipantNode] {
-
-  protected val nodes = consoleEnvironment.environment.wallets
-  @Help.Summary("Return wallet app config")
-  def config: LocalWalletAppConfig =
-    consoleEnvironment.environment.config.walletsByString(name)
+) extends CoinAppReference(consoleEnvironment, name) {
 
   @Help.Summary("List all coins associated with the configured user")
   @Help.Description(
@@ -88,7 +83,35 @@ class LocalWalletAppReference(
       adminCommand(WalletAppCommands.RejectPaymentRequest(requestId))
     }
   }
+}
 
+class RemoteWalletAppReference(
+    override val consoleEnvironment: CoinConsoleEnvironment,
+    name: String,
+) extends WalletAppReference(consoleEnvironment, name)
+  with GrpcRemoteInstanceReference
+  with BaseInspection[ParticipantNode] {
+
+  @Help.Summary("Return remote wallet config")
+  def config: RemoteWalletAppConfig =
+    consoleEnvironment.environment.config.remoteWalletsByString(name)
+
+}
+
+/** Single local Wallet app reference. Defines the console commands that can be run against a local Wallet
+  * app reference.
+  */
+class LocalWalletAppReference(
+    override val consoleEnvironment: CoinConsoleEnvironment,
+    name: String,
+) extends WalletAppReference(consoleEnvironment, name)
+    with LocalInstanceReference
+    with BaseInspection[ParticipantNode] {
+
+  protected val nodes = consoleEnvironment.environment.wallets
+  @Help.Summary("Return wallet app config")
+  def config: LocalWalletAppConfig =
+    consoleEnvironment.environment.config.walletsByString(name)
   /** Remote participant this Wallet app is configured to interact with. */
   val remoteParticipant =
     new CoinRemoteParticipantReference(

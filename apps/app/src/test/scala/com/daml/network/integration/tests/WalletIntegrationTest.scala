@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.ledger.client.binding
+import com.daml.network.console.WalletAppReference
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -11,6 +12,7 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences, Contract}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.network.CC.Coin.Coin
 import com.digitalasset.network.CC.Round.Round
 import com.digitalasset.network.CC.CoinRules.{CoinRules, CoinRulesRequest}
 import com.digitalasset.network.CN.Wallet.PaymentRequest.PaymentRequest
@@ -35,26 +37,26 @@ class WalletIntegrationTest
     })
 
   "A wallet" should {
-    "allow calling tap and then list the created coins" in { implicit env =>
+    "allow calling tap and then list the created coins - locally and remotely" in { implicit env =>
       import env._
       svc.initialize()
       val validatorParty = validator1.initialize()
       // TODO(Arne): consider adding synchronization 'wait-for-participant-x' to this command
       validator1.onboardUser(walletDamlUser)
       wallet1.initialize(validatorParty)
+      val remoteWallet1 = rw("remoteWallet1")
 
       // ensure wallet's participant sees the CoinRules
       wallet1.remoteParticipant.ledger_api.acs.await(validatorParty, CoinRules)
       wallet1.list() shouldBe Seq()
 
       wallet1.tap(quantity)
-      val res = wallet1.list().headOption.value
-      res.payload.quantity shouldBe ExpiringQuantity(
-        BigDecimal(quantity),
-        createdAt = Round(0),
-        ratePerRound = RatePerRound(CoinUtil.defaultHoldingFee.rate.doubleValue),
-      )
-      PartyId.tryFromPrim(res.payload.owner).uid.id shouldBe walletDamlUser
+      checkWallet(wallet1, 1)
+      checkWallet(remoteWallet1, 1)
+
+      remoteWallet1.tap(quantity)
+      checkWallet(wallet1, 2)
+      checkWallet(remoteWallet1, 2)
     }
 
     "allow a user to create, list, and reject payment requests" in { implicit env =>
@@ -105,5 +107,18 @@ class WalletIntegrationTest
       val requests2 = wallet1.listPaymentRequests()
       requests2 shouldBe empty
     }
+  }
+
+  def checkWallet(wallet: WalletAppReference, expectedCoins: Int) = {
+    val coins = wallet.list()
+    coins.size shouldBe expectedCoins
+    coins.foreach((coin: Contract[Coin]) => {
+      PartyId.tryFromPrim(coin.payload.owner).uid.id shouldBe walletDamlUser
+      coin.payload.quantity shouldBe ExpiringQuantity(
+        BigDecimal(quantity),
+        createdAt = Round(0),
+        ratePerRound = RatePerRound(CoinUtil.defaultHoldingFee.rate.doubleValue),
+      )
+    })
   }
 }

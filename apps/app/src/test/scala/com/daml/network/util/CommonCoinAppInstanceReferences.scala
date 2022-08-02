@@ -7,6 +7,7 @@ import com.daml.network.console.{
   LocalSvcAppReference,
   LocalValidatorAppReference,
   LocalWalletAppReference,
+  RemoteWalletAppReference
 }
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 
@@ -40,7 +41,12 @@ trait CommonCoinAppInstanceReferences {
   )
 
   def w(name: String)(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference =
-    env.wallets
+    env.wallets.local
+      .find(_.name == name)
+      .getOrElse(sys.error(s"wallet [$name] not configured"))
+
+  def rw(name: String)(implicit env: CoinTestConsoleEnvironment): RemoteWalletAppReference =
+    env.wallets.remote
       .find(_.name == name)
       .getOrElse(sys.error(s"wallet [$name] not configured"))
 

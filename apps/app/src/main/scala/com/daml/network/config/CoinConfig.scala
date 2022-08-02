@@ -21,7 +21,7 @@ import scala.annotation.nowarn
 import cats.syntax.functor._
 import com.daml.network.scan.config.{LocalScanAppConfig, RemoteScanAppConfig}
 import com.daml.network.svc.config.LocalSvcAppConfig
-import com.daml.network.wallet.config.LocalWalletAppConfig
+import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
 import com.daml.network.directory.provider.config.{
   LocalDirectoryProviderAppConfig,
   RemoteDirectoryProviderAppConfig,
@@ -39,6 +39,7 @@ case class CoinConfig(
     svcApp: Option[LocalSvcAppConfig] = None,
     scanApp: Option[LocalScanAppConfig] = None,
     walletApps: Map[InstanceName, LocalWalletAppConfig] = Map.empty,
+    remoteWalletApps: Map[InstanceName, RemoteWalletAppConfig] = Map.empty,
     directoryProviderApps: Map[InstanceName, LocalDirectoryProviderAppConfig] = Map.empty,
     directoryUserApps: Map[InstanceName, LocalDirectoryUserAppConfig] = Map.empty,
     // TODO(Arne): we want to remove all of these.
@@ -209,6 +210,10 @@ case class CoinConfig(
     n.unwrap -> c
   }
 
+  def remoteWalletsByString: Map[String, RemoteWalletAppConfig] = remoteWalletApps.map { case (n, c) =>
+    n.unwrap -> c
+  }
+
   private lazy val directoryProviderAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
     directoryProviderApps.fmap { directoryProviderConfig =>
       SharedCoinAppParameters(
@@ -316,6 +321,8 @@ object CoinConfig {
       deriveReader[SharedCoinAppParameters]
     implicit val walletConfigReader: ConfigReader[LocalWalletAppConfig] =
       deriveReader[LocalWalletAppConfig]
+    implicit val remoteWalletConfigReader: ConfigReader[RemoteWalletAppConfig] =
+      deriveReader[RemoteWalletAppConfig]
     implicit val directoryProviderConfigReader: ConfigReader[LocalDirectoryProviderAppConfig] =
       deriveReader[LocalDirectoryProviderAppConfig]
     implicit val remoteDirectoryProviderConfigReader
