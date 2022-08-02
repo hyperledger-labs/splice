@@ -5,7 +5,9 @@ import com.daml.network.svc.admin.SvcAutomationService
 import com.daml.network.svc.v0
 import com.daml.network.svc.v0.SvcAppServiceGrpc
 import com.daml.network.util.CoinUtil
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.ledger.api.client.LedgerConnection
+import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
@@ -21,13 +23,19 @@ class GrpcSvcAppService(
     svcUserName: String,
     protected val loggerFactory: NamedLoggerFactory,
     svcAutomationConstructor: PartyId => SvcAutomationService,
+    override val timeouts: ProcessingTimeout,
 )(implicit
     @nowarn("cat=unused")
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends SvcAppServiceGrpc.SvcAppService
     with Spanning
-    with NamedLogging {
+    with NamedLogging
+    with FlagCloseableAsync {
+
+  override def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
+    SyncCloseable("svcAutomation",
+      svcAutomation.foreach(_.close())))
 
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   var svcAutomation: Option[SvcAutomationService] = None
