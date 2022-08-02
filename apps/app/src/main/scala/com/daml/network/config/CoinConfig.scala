@@ -19,6 +19,7 @@ import com.digitalasset.canton.participant.config.{
 
 import scala.annotation.nowarn
 import cats.syntax.functor._
+import com.daml.network.scan.config.LocalScanAppConfig
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.daml.network.directory.provider.config.{
@@ -36,6 +37,7 @@ import pureconfig.ConfigReader
 case class CoinConfig(
     validatorApps: Map[InstanceName, LocalValidatorAppConfig] = Map.empty,
     svcApp: Option[LocalSvcAppConfig] = None,
+    scanApp: Option[LocalScanAppConfig] = None,
     walletApps: Map[InstanceName, LocalWalletAppConfig] = Map.empty,
     directoryProviderApps: Map[InstanceName, LocalDirectoryProviderAppConfig] = Map.empty,
     directoryUserApps: Map[InstanceName, LocalDirectoryUserAppConfig] = Map.empty,
@@ -128,6 +130,46 @@ case class CoinConfig(
   /** Use `svcs` instead!
     */
   def svcsByString: Map[String, LocalSvcAppConfig] = svcApps.map { case (n, c) =>
+    n.unwrap -> c
+  }
+
+  // The config contains one optional unnamed Scan app (because in M1, there can only be one)
+  // Since the rest of the code generally expects a map of nodes, we'll create one.
+  private lazy val scanAppName = "scan-app"
+  private lazy val scanApps = scanApp.toList.map(config => InstanceName.tryCreate(scanAppName) -> config).toMap
+
+  private lazy val scanAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
+    scanApps.fmap { scanConfig =>
+      SharedCoinAppParameters(
+        monitoring.tracing,
+        monitoring.delayLoggingThreshold,
+        monitoring.getLoggingConfig,
+        monitoring.logQueryCost,
+        parameters.timeouts.processing,
+        scanConfig.caching,
+        parameters.enableAdditionalConsistencyChecks,
+        features.enablePreviewCommands,
+        parameters.nonStandardConfig,
+        scanConfig.sequencerClient,
+        devVersionSupport = false,
+      )
+    }
+
+  private[network] def scanAppParameters(
+      appName: InstanceName
+  ): SharedCoinAppParameters =
+    nodeParametersFor(scanAppParameters_, scanAppName, appName)
+
+  /** Use `scanAppParameters` instead!
+    */
+  def tryScanAppParametersByString(name: String): SharedCoinAppParameters =
+    scanAppParameters(
+      InstanceName.tryCreate(name)
+    )
+
+  /** Use `scans` instead!
+    */
+  def scansByString: Map[String, LocalScanAppConfig] = scanApps.map { case (n, c) =>
     n.unwrap -> c
   }
 
@@ -263,6 +305,8 @@ object CoinConfig {
     import CantonConfig.ConfigReaders._
     implicit val validatorConfigReader: ConfigReader[LocalValidatorAppConfig] =
       deriveReader[LocalValidatorAppConfig]
+    implicit val scanConfigReader: ConfigReader[LocalScanAppConfig] =
+      deriveReader[LocalScanAppConfig]
     implicit val svcConfigReader: ConfigReader[LocalSvcAppConfig] =
       deriveReader[LocalSvcAppConfig]
     implicit val coinAppParametersReader: ConfigReader[SharedCoinAppParameters] =

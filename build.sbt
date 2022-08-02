@@ -126,6 +126,21 @@ lazy val `apps-svc` =
       scalacOptions += "-Wconf:src=src_managed/.*:silent",
     )
 
+lazy val `apps-scan` =
+  project
+    .in(file("apps/scan"))
+    .dependsOn(`apps-common` % "compile->compile;test->test")
+    .settings(
+      libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
+      BuildCommon.sharedSettings,
+      BuildCommon.cantonWarts,
+      Compile / PB.targets := Seq(
+        scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
+      ),
+      Compile / PB.protoSources ++= (Test / PB.protoSources).value,
+      scalacOptions += "-Wconf:src=src_managed/.*:silent",
+    )
+
 lazy val `apps-wallet` =
   project
     .in(file("apps/wallet"))
@@ -312,6 +327,7 @@ lazy val `apps-app` =
       `apps-directory-user`,
       `apps-validator`,
       `apps-svc`,
+      `apps-scan`,
       `apps-wallet`,
       `canton-community-app` % "compile->compile;test->test",
     )

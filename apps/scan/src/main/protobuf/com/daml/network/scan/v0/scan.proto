@@ -1,0 +1,7 @@
+syntax = "proto3";
+package com.daml.network.scan.v0;
+
+import "google/protobuf/empty.proto";
+
+service ScanService {
+}

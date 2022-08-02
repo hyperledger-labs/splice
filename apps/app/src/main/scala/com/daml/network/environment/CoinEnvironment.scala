@@ -5,6 +5,8 @@ import com.daml.network.config.CoinConfig
 import com.daml.network.directory.provider.DirectoryProviderAppBootstrap
 import com.daml.network.directory.provider.config.LocalDirectoryProviderAppConfig
 import com.daml.network.metrics.CoinMetricsFactory
+import com.daml.network.scan.ScanAppBootstrap
+import com.daml.network.scan.config.LocalScanAppConfig
 import com.daml.network.svc.SvcAppBootstrap
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.validator.ValidatorAppBootstrap
@@ -92,6 +94,36 @@ trait CoinEnvironment extends Environment {
     timeouts,
     config.svcsByString,
     config.trySvcAppParametersByString,
+    loggerFactory,
+  )
+
+  protected def createScan(
+      name: String,
+      scanConfig: LocalScanAppConfig,
+  ): ScanAppBootstrap =
+    ScanAppBootstrap(
+      name,
+      scanConfig,
+      config.tryScanAppParametersByString(name),
+      createClock(Some(ScanAppBootstrap.LoggerFactoryKeyName -> name)),
+      testingTimeService,
+      coinMetrics.forScan(name),
+      testingConfig,
+      futureSupervisor,
+      loggerFactory,
+    )
+      .valueOr(err =>
+        throw new RuntimeException(
+          s"Failed to create participant bootstrap: $err"
+        )
+      )
+
+  lazy val scans = new ScanApps(
+    createScan,
+    migrationsFactory,
+    timeouts,
+    config.scansByString,
+    config.tryScanAppParametersByString,
     loggerFactory,
   )
 
@@ -189,6 +221,7 @@ trait CoinEnvironment extends Environment {
   override def startAll(): Either[Seq[StartupError], Unit] = {
     val errors =
       validators.startAll.left.getOrElse(Seq.empty) ++
+        scans.startAll.left.getOrElse(Seq.empty) ++
         svcs.startAll.left.getOrElse(Seq.empty) ++
         wallets.startAll.left.getOrElse(Seq.empty) ++
         directoryProviders.startAll.left.getOrElse(Seq.empty) ++
@@ -197,7 +230,7 @@ trait CoinEnvironment extends Environment {
   }
 
   def allCoinNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
-    List(validators, svcs, wallets, directoryProviders, directoryUsers)
+    List(validators, svcs, scans, wallets, directoryProviders, directoryUsers)
 
   override def allNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
     super.allNodes ::: allCoinNodes

@@ -3,6 +3,7 @@ package com.daml.network.environment
 import com.daml.network.console.{
   LocalDirectoryProviderAppReference,
   LocalDirectoryUserAppReference,
+  LocalScanAppReference,
   LocalSvcAppReference,
   LocalValidatorAppReference,
   LocalWalletAppReference,
@@ -56,6 +57,9 @@ class CoinConsoleEnvironment(
   lazy val validators: Seq[LocalValidatorAppReference] =
     environment.config.validatorsByString.keys.map(createValidatorReference).toSeq
 
+  lazy val scanOpt: Option[LocalScanAppReference] =
+    environment.config.scansByString.keys.map(createScanReference).headOption
+
   lazy val svcOpt: Option[LocalSvcAppReference] =
     environment.config.svcsByString.keys
       .map(createSvcReference)
@@ -72,6 +76,9 @@ class CoinConsoleEnvironment(
 
   private def createValidatorReference(name: String): LocalValidatorAppReference =
     new LocalValidatorAppReference(this, name)
+
+  private def createScanReference(name: String): LocalScanAppReference =
+    new LocalScanAppReference(this, name)
 
   private def createSvcReference(name: String): LocalSvcAppReference =
     new LocalSvcAppReference(this, name)
@@ -127,7 +134,10 @@ class CoinConsoleEnvironment(
         Seq("App References"),
       ) :++ svcOpt
         .map(svc => TopLevelValue(svc.name, helpText("SVC app", svc.name), svc, Seq("SVC")))
+        .toList :++ scanOpt
+        .map(scan => TopLevelValue(scan.name, helpText("Scan app", scan.name), scan, Seq("Scan")))
         .toList
+
   }
 
   private lazy val health_ = new CommunityCantonHealthAdministration(this)

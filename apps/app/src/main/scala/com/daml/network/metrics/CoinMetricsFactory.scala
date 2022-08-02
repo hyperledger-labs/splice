@@ -1,6 +1,7 @@
 package com.daml.network.metrics
 
 import com.codahale.metrics
+import com.daml.network.scan.metrics.ScanAppMetrics
 import com.daml.network.svc.metrics.SvcAppMetrics
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.daml.network.wallet.metrics.WalletAppMetrics
@@ -19,6 +20,7 @@ case class CoinMetricsFactory(
     with MetricsFactoryBase {
   private val validators = TrieMap[String, ValidatorAppMetrics]()
   private val svcs = TrieMap[String, SvcAppMetrics]()
+  private val scans = TrieMap[String, ScanAppMetrics]()
   private val wallets = TrieMap[String, WalletAppMetrics]()
   private val directoryProviders = TrieMap[String, DirectoryProviderAppMetrics]()
   private val directoryUsers = TrieMap[String, DirectoryUserAppMetrics]()
@@ -39,6 +41,15 @@ case class CoinMetricsFactory(
       name, {
         val metricName = deduplicateName(name, "SVC", svcs)
         new SvcAppMetrics(MetricsFactory.prefix, newRegistry(metricName))
+      },
+    )
+  }
+
+  def forScan(name: String): ScanAppMetrics = {
+    scans.getOrElseUpdate(
+      name, {
+        val metricName = deduplicateName(name, "Scan", scans)
+        new ScanAppMetrics(MetricsFactory.prefix, newRegistry(metricName))
       },
     )
   }
