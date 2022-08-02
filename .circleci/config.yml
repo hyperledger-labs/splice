@@ -205,7 +205,7 @@ jobs:
       - checkout
       - setup_nix
       - execute_sbt_command:
-          cmd: "test:compile"
+          cmd: "Test/compile"
           retry_fetch: "50"
       - execute_sbt_command:
           cmd: "test"

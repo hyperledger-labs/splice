@@ -99,7 +99,7 @@ More commands can be found in build.sbt and BuildCommon.scala.
 
 - `clean`: deletes all generated files (in the target directory)
 - `compile`: compile production code (excluding test code)
-- `test:compile`: compile production and test code
+- `Test/compile`: compile production and test code
 - `apps-common/compile`: compile production code of the `apps-common` subproject
 - `scalafixAll`: invoke scalafix across all configurations where scalafix is enabled. 
     It's a linting and rewrite tool we use to organize imports. This may run for a long time as it needs to do a full compile.
