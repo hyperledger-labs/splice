@@ -42,11 +42,12 @@ template ClosingMiningRound
   with
     svc : Party
     round : Round
+    obs : Party -- TODO(M1-06): remove workaround for explicit disclosure
   where
     signatory svc
     ensure isDefinedRound round
 
-    key (svc, round) : (Party, Round)
+    key (svc, obs, round) : (Party, Party, Round)
     maintainer key._1
 
 -- | A mining round for whose rewards coins are being issued.

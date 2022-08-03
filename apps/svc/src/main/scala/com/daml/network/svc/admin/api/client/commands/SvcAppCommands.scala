@@ -1,10 +1,14 @@
 package com.daml.network.svc.admin.api.client.commands
 
-import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
+import cats.implicits._
+import com.daml.ledger.client.binding.Primitive.ContractId
+import com.daml.lf.data.Numeric
 import com.daml.network.svc.v0
 import com.daml.network.svc.v0.{GetDebugInfoResponse, GetValidatorConfigResponse}
 import com.daml.network.svc.v0.SvcAppServiceGrpc.SvcAppServiceStub
+import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.network.CC.{Round => roundCodegen}
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
 
@@ -21,10 +25,7 @@ object SvcAppCommands {
   /** A command that takes no input and returns no result (other than an error on failure) */
   // TODO(Arne): Move this somewhere to Canton codebase?
   abstract class UnitCommand(adminApiCall: SvcAppServiceStub => (Empty => Future[Empty]))
-      extends GrpcAdminCommand[Empty, Empty, Unit] {
-    override type Svc = SvcAppServiceStub
-    override def createService(channel: ManagedChannel): SvcAppServiceStub =
-      v0.SvcAppServiceGrpc.stub(channel)
+      extends BaseCommand[Empty, Empty, Unit] {
     override def createRequest(): Either[String, Empty] = Right(Empty())
     override def submitRequest(
         service: SvcAppServiceStub,
@@ -49,8 +50,6 @@ object SvcAppCommands {
     )
   }
 
-  case class OpenNextRound() extends UnitCommand(_.openNextRound)
-
   case class AcceptValidators() extends UnitCommand(_.acceptValidators)
 
   case class DebugInfo(
@@ -61,9 +60,6 @@ object SvcAppCommands {
   )
 
   case class GetDebugInfo() extends BaseCommand[Empty, GetDebugInfoResponse, DebugInfo] {
-    override type Svc = SvcAppServiceStub
-    override def createService(channel: ManagedChannel): SvcAppServiceStub =
-      v0.SvcAppServiceGrpc.stub(channel)
     override def createRequest(): Either[String, Empty] = Right(Empty())
     override def submitRequest(
         service: SvcAppServiceStub,
@@ -87,9 +83,6 @@ object SvcAppCommands {
 
   case class GetValidatorConfig()
       extends BaseCommand[Empty, GetValidatorConfigResponse, ValidatorConfigInfo] {
-    override type Svc = SvcAppServiceStub
-    override def createService(channel: ManagedChannel): SvcAppServiceStub =
-      v0.SvcAppServiceGrpc.stub(channel)
     override def createRequest(): Either[String, Empty] = Right(Empty())
     override def submitRequest(
         service: SvcAppServiceStub,
@@ -102,5 +95,105 @@ object SvcAppCommands {
         svcParty = PartyId.tryFromProtoPrimitive(response.svcParty)
       )
     )
+  }
+
+  private object RoundCommand {
+    def decodeRoundMap[T](m: Map[String, String]): Either[String, Map[PartyId, ContractId[T]]] =
+      m.toList
+        .traverse { case (k, v) =>
+          for {
+            party <- PartyId.fromProtoPrimitive(k)
+            contractId = ContractId[T](v)
+          } yield party -> contractId
+        }
+        .map(_.toMap)
+  }
+
+  case class OpenRound(coinPrice: BigDecimal)
+      extends BaseCommand[v0.OpenRoundRequest, v0.OpenRoundResponse, Map[PartyId, ContractId[
+        roundCodegen.OpenMiningRound
+      ]]] {
+    override def createRequest(): Either[String, v0.OpenRoundRequest] = Right(
+      v0.OpenRoundRequest(Numeric.toString(coinPrice.bigDecimal))
+    )
+    override def submitRequest(
+        service: SvcAppServiceStub,
+        request: v0.OpenRoundRequest,
+    ): Future[v0.OpenRoundResponse] =
+      service.openRound(request)
+    override def handleResponse(
+        response: v0.OpenRoundResponse
+    ): Either[String, Map[PartyId, ContractId[roundCodegen.OpenMiningRound]]] =
+      RoundCommand.decodeRoundMap(response.openMiningRoundContractIds)
+  }
+
+  case class StartClosingRound(round: Long)
+      extends BaseCommand[
+        v0.StartClosingRoundRequest,
+        v0.StartClosingRoundResponse,
+        Map[PartyId, ContractId[roundCodegen.ClosingMiningRound]],
+      ] {
+    override def createRequest(): Either[String, v0.StartClosingRoundRequest] = Right(
+      v0.StartClosingRoundRequest(round)
+    )
+    override def submitRequest(
+        service: SvcAppServiceStub,
+        request: v0.StartClosingRoundRequest,
+    ): Future[v0.StartClosingRoundResponse] =
+      service.startClosingRound(request)
+    override def handleResponse(
+        response: v0.StartClosingRoundResponse
+    ): Either[String, Map[PartyId, ContractId[roundCodegen.ClosingMiningRound]]] =
+      RoundCommand.decodeRoundMap(response.closingMiningRoundContractIds)
+  }
+
+  case class StartIssuingRound(round: Long, totalBurnQuantity: BigDecimal)
+      extends BaseCommand[
+        v0.StartIssuingRoundRequest,
+        v0.StartIssuingRoundResponse,
+        Map[PartyId, ContractId[roundCodegen.IssuingMiningRound]],
+      ] {
+    override def createRequest(): Either[String, v0.StartIssuingRoundRequest] = Right(
+      v0.StartIssuingRoundRequest(round, Numeric.toString(totalBurnQuantity.bigDecimal))
+    )
+    override def submitRequest(
+        service: SvcAppServiceStub,
+        request: v0.StartIssuingRoundRequest,
+    ): Future[v0.StartIssuingRoundResponse] =
+      service.startIssuingRound(request)
+    override def handleResponse(
+        response: v0.StartIssuingRoundResponse
+    ): Either[String, Map[PartyId, ContractId[roundCodegen.IssuingMiningRound]]] =
+      RoundCommand.decodeRoundMap(response.issuingMiningRoundContractIds)
+  }
+
+  case class CloseRound(round: Long)
+      extends BaseCommand[v0.CloseRoundRequest, v0.CloseRoundResponse, Map[PartyId, ContractId[
+        roundCodegen.ClosedMiningRound
+      ]]] {
+    override def createRequest(): Either[String, v0.CloseRoundRequest] = Right(
+      v0.CloseRoundRequest(round)
+    )
+    override def submitRequest(
+        service: SvcAppServiceStub,
+        request: v0.CloseRoundRequest,
+    ): Future[v0.CloseRoundResponse] =
+      service.closeRound(request)
+    override def handleResponse(
+        response: v0.CloseRoundResponse
+    ): Either[String, Map[PartyId, ContractId[roundCodegen.ClosedMiningRound]]] =
+      RoundCommand.decodeRoundMap(response.closedMiningRoundContractIds)
+  }
+
+  case class ArchiveRound(round: Long) extends BaseCommand[v0.ArchiveRoundRequest, Empty, Unit] {
+    override def createRequest(): Either[String, v0.ArchiveRoundRequest] = Right(
+      v0.ArchiveRoundRequest(round)
+    )
+    override def submitRequest(
+        service: SvcAppServiceStub,
+        request: v0.ArchiveRoundRequest,
+    ): Future[Empty] =
+      service.archiveRound(request)
+    override def handleResponse(response: Empty): Either[String, Unit] = Right(())
   }
 }

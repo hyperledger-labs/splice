@@ -22,8 +22,8 @@ class CoinRulesRequestAcceptanceService(
     extends LedgerAutomationService
     with NamedLogging {
 
-  // TODO(M1-90): This should not run concurrently with `openNextRound`
-  // Both calls are non-atomic read-modify-write operations on the set of open/issuing mining rounds
+  // TODO(M1-90): This should not run concurrently with round management commands.
+  // Both operations are non-atomic read-modify-write operations on the set of mining rounds.
   override private[admin] def processTransaction(tx: Transaction)(implicit
       traceContext: TraceContext
   ): Future[Unit] =

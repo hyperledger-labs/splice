@@ -119,6 +119,7 @@ template CoinRules
         -- create closing round
         create ClosingMiningRound with
           svc
+          obs
           round = miningRound.round
     nonconsuming choice CoinRules_MiningRound_StartIssuing
       : ContractId IssuingMiningRound
