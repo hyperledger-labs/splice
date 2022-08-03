@@ -5,7 +5,7 @@ include ../build-tools/docker.mk
 .PHONY: all
 all: docker-build
 
-src := Dockerfile
+src := Dockerfile empty.conf
 
 app-bundle := ${REPO_ROOT}/apps/app/target/release/coin-0.1.0-SNAPSHOT.tar.gz
 target-bundle := target/coin-0.1.0-SNAPSHOT.tar.gz
