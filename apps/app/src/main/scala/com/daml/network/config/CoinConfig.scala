@@ -210,8 +210,9 @@ case class CoinConfig(
     n.unwrap -> c
   }
 
-  def remoteWalletsByString: Map[String, RemoteWalletAppConfig] = remoteWalletApps.map { case (n, c) =>
-    n.unwrap -> c
+  def remoteWalletsByString: Map[String, RemoteWalletAppConfig] = remoteWalletApps.map {
+    case (n, c) =>
+      n.unwrap -> c
   }
 
   private lazy val directoryProviderAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =

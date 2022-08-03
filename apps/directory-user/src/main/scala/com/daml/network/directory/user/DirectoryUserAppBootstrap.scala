@@ -9,7 +9,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.client.configuration.CommandClientConfiguration
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrapBase
-import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc
+import com.daml.network.directory.provider.admin.api.client.DirectoryProviderConnection
 import com.daml.network.directory_user.v0.DirectoryUserServiceGrpc
 import com.daml.network.directory.user.admin.grpc.GrpcDirectoryUserService
 import com.daml.network.directory.user.config.LocalDirectoryUserAppConfig
@@ -76,22 +76,21 @@ class DirectoryUserAppBootstrap(
           directoryUserAppParameters.processingTimeouts,
         )
 
-      // TODO(i390) Switch to proper connection
-      val providerChannel = new CloseableChannel(
-        ClientChannelBuilder.createChannel(
-          config.remoteDirectoryProvider.clientAdminApi
-        )(executionContext),
-        loggerFactory.getTracedLogger(DirectoryUserAppBootstrap.getClass),
-        "DirectoryUserAppBootstrap",
-      )
-      val providerStub =
-        DirectoryProviderServiceGrpc
-          .stub(providerChannel.channel)
-          .withInterceptors(TraceContextGrpc.clientInterceptor)
+      val providerConnection =
+        new DirectoryProviderConnection(
+          config.remoteDirectoryProvider.clientAdminApi,
+          directoryUserAppParameters.processingTimeouts,
+          loggerFactory,
+        )
 
       adminServerRegistry.addService(
         DirectoryUserServiceGrpc.bindService(
-          new GrpcDirectoryUserService(connection, providerStub, config.damlUser, loggerFactory),
+          new GrpcDirectoryUserService(
+            connection,
+            providerConnection,
+            config.damlUser,
+            loggerFactory,
+          ),
           executionContext,
         )
       )
@@ -100,7 +99,7 @@ class DirectoryUserAppBootstrap(
         directoryUserAppParameters,
         storage,
         dummyStore,
-        providerChannel,
+        providerConnection,
         clock,
         loggerFactory,
       )

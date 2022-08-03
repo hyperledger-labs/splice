@@ -72,7 +72,8 @@ class CoinConsoleEnvironment(
       .map(createSvcReference)
       .headOption
 
-  lazy val wallets: NodeReferences[WalletAppReference, RemoteWalletAppReference, LocalWalletAppReference] =
+  lazy val wallets
+      : NodeReferences[WalletAppReference, RemoteWalletAppReference, LocalWalletAppReference] =
     NodeReferences(
       environment.config.walletsByString.keys.map(createWalletReference).toSeq,
       environment.config.remoteWalletsByString.keys.map(createRemoteWalletReference).toSeq,
@@ -127,10 +128,10 @@ class CoinConsoleEnvironment(
       wallets.remote.map(w =>
         TopLevelValue(w.name, helpText("local wallet app", w.name), w, Seq("App References"))
       ) :+ TopLevelValue(
-      "remoteWallets",
-      helpText("All remote wallet app instances" + genericNodeReferencesDoc, "Remote Wallets"),
-      wallets.remote,
-      Seq("App References"),
+        "remoteWallets",
+        helpText("All remote wallet app instances" + genericNodeReferencesDoc, "Remote Wallets"),
+        wallets.remote,
+        Seq("App References"),
       ) :++
       directoryProviders.map(v =>
         TopLevelValue(v.name, helpText("directory provider app", v.name), v, Seq("App References"))

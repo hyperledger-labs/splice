@@ -69,7 +69,7 @@ class ValidatorAppBootstrap(
         createLedgerConnection(config.remoteParticipant, validatorAppParameters.processingTimeouts)
 
       val scanConnection: ScanConnection =
-        ScanConnection.fromClientAdminApi(
+        new ScanConnection(
           config.remoteScan.clientAdminApi,
           validatorAppParameters.processingTimeouts,
           loggerFactory,

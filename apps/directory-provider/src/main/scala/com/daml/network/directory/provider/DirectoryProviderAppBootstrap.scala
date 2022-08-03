@@ -72,7 +72,7 @@ class DirectoryProviderAppBootstrap(
         )
 
       val scanConnection: ScanConnection =
-        ScanConnection.fromClientAdminApi(
+        new ScanConnection(
           config.remoteScan.clientAdminApi,
           directoryProviderAppParameters.processingTimeouts,
           loggerFactory,

@@ -89,8 +89,8 @@ class RemoteWalletAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
 ) extends WalletAppReference(consoleEnvironment, name)
-  with GrpcRemoteInstanceReference
-  with BaseInspection[ParticipantNode] {
+    with GrpcRemoteInstanceReference
+    with BaseInspection[ParticipantNode] {
 
   @Help.Summary("Return remote wallet config")
   def config: RemoteWalletAppConfig =
@@ -112,6 +112,7 @@ class LocalWalletAppReference(
   @Help.Summary("Return wallet app config")
   def config: LocalWalletAppConfig =
     consoleEnvironment.environment.config.walletsByString(name)
+
   /** Remote participant this Wallet app is configured to interact with. */
   val remoteParticipant =
     new CoinRemoteParticipantReference(

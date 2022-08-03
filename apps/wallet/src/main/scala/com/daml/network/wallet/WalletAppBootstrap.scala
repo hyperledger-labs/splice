@@ -69,7 +69,7 @@ class WalletAppBootstrap(
         createLedgerConnection(config.remoteParticipant, walletAppParameters.processingTimeouts)
 
       val scanConnection: ScanConnection =
-        ScanConnection.fromClientAdminApi(
+        new ScanConnection(
           config.remoteScan.clientAdminApi,
           walletAppParameters.processingTimeouts,
           loggerFactory,

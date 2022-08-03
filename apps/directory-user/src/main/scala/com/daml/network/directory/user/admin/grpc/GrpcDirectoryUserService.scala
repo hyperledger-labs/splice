@@ -7,8 +7,7 @@ import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, Tra
 import com.daml.ledger.api.v1.value.Identifier
 import com.daml.ledger.client.binding.{Contract => CodegenContract, Primitive, TemplateCompanion}
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.directory.provider.admin.api.client.commands.DirectoryProviderCommands
-import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc.DirectoryProviderServiceStub
+import com.daml.network.directory.provider.admin.api.client.DirectoryProviderConnection
 import com.daml.network.directory_user.v0
 import com.daml.network.directory_user.v0.DirectoryUserServiceGrpc
 import com.daml.network.util.{Contract, CoinUtil}
@@ -36,7 +35,7 @@ import scala.concurrent.duration.Duration
 @nowarn("cat=unused")
 class GrpcDirectoryUserService(
     connection: CoinLedgerConnection,
-    providerStub: DirectoryProviderServiceStub,
+    providerConnection: DirectoryProviderConnection,
     damlUser: String,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -52,7 +51,7 @@ class GrpcDirectoryUserService(
     withSpanFromGrpcContext("GrpcDirectoryUserService") { implicit traceContext => span =>
       for {
         userParty <- getParty()
-        providerParty <- getProviderPartyId()
+        providerParty <- providerConnection.getProviderPartyId()
         cmd = codegen
           .DirectoryInstallRequest(user = userParty.toPrim, provider = providerParty.toPrim)
           .create
@@ -72,7 +71,7 @@ class GrpcDirectoryUserService(
     withSpanFromGrpcContext("GrpcDirectoryUserService") { implicit traceContext => span =>
       for {
         userParty <- getParty()
-        providerParty <- getProviderPartyId()
+        providerParty <- providerConnection.getProviderPartyId()
         cmd = codegen.DirectoryInstall
           .key(DA.Types.Tuple2(providerParty.toPrim, userParty.toPrim))
           .exerciseDirectoryInstall_RequestEntry(
@@ -91,33 +90,6 @@ class GrpcDirectoryUserService(
           s"Expected one DirectoryEntryRequest but got ${requests.length} requests $requests",
         )
       } yield v0.RequestDirectoryEntryResponse(requests(0).contractId.toString)
-    }
-
-  private def getProviderPartyId()(implicit traceContext: TraceContext): Future[PartyId] =
-    runProviderCmd(DirectoryProviderCommands.GetProviderPartyId())
-
-  // This adapted from GrpcCtlRunner but keeps the actual grpc exception
-  // instead of turning everything into a String.
-  private def runProviderCmd[Req, Res, Result](
-      cmd: DirectoryProviderCommands.BaseCommand[Req, Res, Result]
-  )(implicit traceContext: TraceContext): Future[Result] =
-    EitherTUtil.toFuture {
-      for {
-        req <- EitherT
-          .fromEither[Future](cmd.createRequest())
-          .leftMap(err => new StatusRuntimeException(Status.INTERNAL.withDescription(err)))
-        response <- CantonGrpcUtil
-          .sendGrpcRequest(providerStub, "directory provider")(
-            send = cmd.submitRequest(_, req),
-            requestDescription = cmd.toString,
-            timeout = grpcTimeout,
-            logger = logger,
-          )
-          .leftMap(err => new StatusRuntimeException(err.status))
-        result <- EitherT
-          .fromEither[Future](cmd.handleResponse(response))
-          .leftMap(err => new StatusRuntimeException(Status.INTERNAL.withDescription(err)))
-      } yield result
     }
 
   private def getParty() =
