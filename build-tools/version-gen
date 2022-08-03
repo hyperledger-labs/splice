@@ -4,5 +4,10 @@ if [ -z "${CI}" ]; then
     revision_prefix="${USER}-"
 fi
 
+if [[ $(git diff --stat) != '' || $(git diff --cached) != '' ]]; then
+  revision_suffix="-dirty"
+fi
+
+
 # get the deployment version tag
-echo "${tag_prefix}git-${revision_prefix}$(git rev-parse HEAD)"
+echo "${tag_prefix}git-${revision_prefix}$(git rev-parse HEAD)${revision_suffix}"
