@@ -1,8 +1,9 @@
 let
   pkgs = import ./nix/default.nix {
     overlays = [(self: super: {
-      sbt = super.sbt.override { jre = super.openjdk11; };}
-    )];
+      sbt = super.sbt.override { jre = super.openjdk11; };
+      lnav = super.callPackage ./nix/lnav.nix {};
+    })];
   };
   # pyopenssl is currently broken on M1 due to
   # https://github.com/NixOS/nixpkgs/issues/174457#issuecomment-1137385758
