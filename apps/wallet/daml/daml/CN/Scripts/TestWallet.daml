@@ -35,10 +35,13 @@ test = script do
 
   -- send some CC
   [(coin, _)] <- queryFilter @Coin sender (\c -> c.quantity.initialQuantity > 2.5)
-  submitMulti [sender] [app.svc] $ exerciseByKeyCmd @PaymentChannel (sender, receiver, app.svc)
-    PaymentChannel_ExecuteDirectTransfer with
-      inputs = [InputCoin coin]
-      quantity = 2.0
-      payload = "direct transfer test"
-
+  let transfer coin =
+        submitMulti [sender] [app.svc] $ exerciseByKeyCmd @PaymentChannel (sender, receiver, app.svc)
+            PaymentChannel_ExecuteDirectTransfer with
+              inputs = [InputCoin coin]
+              quantity = 2.0
+              payload = "direct transfer test"
+  transfer coin
+  [(coin, _)] <- queryFilter @Coin sender (\c -> c.quantity.initialQuantity > 2.5)
+  transfer coin
   pure ()

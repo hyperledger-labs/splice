@@ -32,7 +32,7 @@ template PaymentChannel
     key (sender, receiver, svc) : (Party, Party, Party)
     maintainer key._1, key._2
 
-    choice PaymentChannel_ExecuteDirectTransfer : [TransferResult]
+    nonconsuming choice PaymentChannel_ExecuteDirectTransfer : [TransferResult]
       with
         inputs : [TransferInput]
         quantity : Decimal
