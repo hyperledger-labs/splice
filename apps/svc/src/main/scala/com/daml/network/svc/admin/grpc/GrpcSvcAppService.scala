@@ -1,9 +1,10 @@
 package com.daml.network.svc.admin.grpc
 
 import cats.implicits._
+import com.daml.lf.data.Numeric
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionResponse
-import com.daml.ledger.client.binding.{Primitive, TemplateCompanion}
+import com.daml.ledger.client.binding.{Contract, Primitive, TemplateCompanion}
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.svc.admin.SvcAutomationService
 import com.daml.network.svc.v0
@@ -37,6 +38,8 @@ class GrpcSvcAppService(
     with Spanning
     with NamedLogging
     with FlagCloseableAsync {
+
+  import GrpcSvcAppService._
 
   override def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
     SyncCloseable("svcAutomation", svcAutomation.foreach(_.close()))
@@ -168,13 +171,15 @@ class GrpcSvcAppService(
       for {
         svc <- getParty()
         openRounds <- getRounds(CC.Round.ClosingMiningRound)(_.round, _.obs)(svc, request.round)
+        rewards <- queryRewards(svc, request.round)
+        totalBurn = rewards.totalBurn
         cmds = openRounds.toList.map { case (v, cid) =>
           CC.CoinRules.CoinRules
             .key(DA.Types.Tuple2(svc.toPrim, v))
             .exerciseCoinRules_MiningRound_StartIssuing(
               svc.toPrim,
               CC.CoinRules
-                .CoinRules_MiningRound_StartIssuing(cid, BigDecimal(request.totalBurnQuantity)),
+                .CoinRules_MiningRound_StartIssuing(cid, totalBurn),
             )
             .command
         }
@@ -182,9 +187,10 @@ class GrpcSvcAppService(
           connection.submitCommand(Seq(svc), Seq.empty, Seq(cmd))
         }
       } yield v0.StartIssuingRoundResponse(
+        Numeric.toString(totalBurn.bigDecimal),
         roundResultsToProto(
           decodeRoundResults(CC.Round.IssuingMiningRound)(_.obs)(submitResults)
-        )
+        ),
       )
     }
 
@@ -303,4 +309,42 @@ class GrpcSvcAppService(
       val round = rounds(0)
       getValidator(round.value) -> round.contractId
     }.toMap
+
+  /** Query the open reward contracts for a given round. This should only be used
+    * on a ClosingMiningRound.
+    */
+  private def queryRewards(p: PartyId, round: Long): Future[RoundRewards] = for {
+    activeContracts <- connection.activeContracts(
+      LedgerConnection.transactionFilterByParty(
+        Map(p -> Seq(CC.Coin.AppReward.id, CC.Coin.ValidatorReward.id))
+      )
+    )
+  } yield {
+    val appRewards =
+      activeContracts._1.flatMap(ev => DecodeUtil.decodeCreated(CC.Coin.AppReward)(ev))
+    val validatorRewards =
+      activeContracts._1.flatMap(ev => DecodeUtil.decodeCreated(CC.Coin.ValidatorReward)(ev))
+    RoundRewards(
+      round = round,
+      appRewards = appRewards.filter(c => c.value.round.number === round),
+      validatorRewards = validatorRewards.filter(c => c.value.round.number === round),
+    )
+  }
+}
+
+object GrpcSvcAppService {
+
+  /** The rewards issued for a given round.
+    */
+  private case class RoundRewards(
+      round: Long,
+      appRewards: Seq[Contract[CC.Coin.AppReward]],
+      validatorRewards: Seq[Contract[CC.Coin.ValidatorReward]],
+  ) {
+
+    /** Calculate the total burn for the given round based on the rewards issued in that round.
+      */
+    def totalBurn: BigDecimal =
+      appRewards.map(_.value.quantity).sum + validatorRewards.map(_.value.quantity).sum
+  }
 }

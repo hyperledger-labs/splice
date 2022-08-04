@@ -72,11 +72,10 @@ class LocalSvcAppReference(
 
   @Help.Summary("Open the given mining round for issuance for all validators")
   def startIssuingRound(
-      round: Long,
-      totalBurnQuantity: BigDecimal,
-  ): Map[PartyId, ContractId[roundCodegen.IssuingMiningRound]] =
+      round: Long
+  ): SvcAppCommands.StartIssuingRoundResponse =
     consoleEnvironment.run {
-      adminCommand(SvcAppCommands.StartIssuingRound(round, totalBurnQuantity))
+      adminCommand(SvcAppCommands.StartIssuingRound(round))
     }
 
   @Help.Summary("Close the given mining round for all validators")

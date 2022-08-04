@@ -147,14 +147,19 @@ object SvcAppCommands {
       RoundCommand.decodeRoundMap(response.closingMiningRoundContractIds)
   }
 
-  case class StartIssuingRound(round: Long, totalBurnQuantity: BigDecimal)
+  case class StartIssuingRoundResponse(
+      totalBurnQuantity: BigDecimal,
+      validatorRounds: Map[PartyId, ContractId[roundCodegen.IssuingMiningRound]],
+  )
+
+  case class StartIssuingRound(round: Long)
       extends BaseCommand[
         v0.StartIssuingRoundRequest,
         v0.StartIssuingRoundResponse,
-        Map[PartyId, ContractId[roundCodegen.IssuingMiningRound]],
+        StartIssuingRoundResponse,
       ] {
     override def createRequest(): Either[String, v0.StartIssuingRoundRequest] = Right(
-      v0.StartIssuingRoundRequest(round, Numeric.toString(totalBurnQuantity.bigDecimal))
+      v0.StartIssuingRoundRequest(round)
     )
     override def submitRequest(
         service: SvcAppServiceStub,
@@ -163,8 +168,10 @@ object SvcAppCommands {
       service.startIssuingRound(request)
     override def handleResponse(
         response: v0.StartIssuingRoundResponse
-    ): Either[String, Map[PartyId, ContractId[roundCodegen.IssuingMiningRound]]] =
-      RoundCommand.decodeRoundMap(response.issuingMiningRoundContractIds)
+    ): Either[String, StartIssuingRoundResponse] = for {
+      totalBurnQuantity <- Numeric.fromString(response.totalBurnQuantity).map(BigDecimal(_))
+      validatorRounds <- RoundCommand.decodeRoundMap(response.issuingMiningRoundContractIds)
+    } yield StartIssuingRoundResponse(totalBurnQuantity, validatorRounds)
   }
 
   case class CloseRound(round: Long)

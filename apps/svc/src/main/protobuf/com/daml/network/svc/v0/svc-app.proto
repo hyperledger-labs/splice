@@ -96,11 +96,11 @@ message StartClosingRoundResponse {
 
 message StartIssuingRoundRequest {
   int64 round = 1;
-  string total_burn_quantity = 2;
 }
 
 message StartIssuingRoundResponse {
-  map<string, string> issuing_mining_round_contract_ids = 1; // Map of validator party to contract id for the new issuing mining round for that validator.
+  string total_burn_quantity = 1; // Total burn quantity used to start issuing.
+  map<string, string> issuing_mining_round_contract_ids = 2; // Map of validator party to contract id for the new issuing mining round for that validator.
 }
 
 message CloseRoundRequest {
