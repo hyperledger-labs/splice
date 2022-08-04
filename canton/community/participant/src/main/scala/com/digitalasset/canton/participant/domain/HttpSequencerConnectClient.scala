@@ -21,8 +21,7 @@ import com.digitalasset.canton.sequencing.protocol.{
 }
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.version.HandshakeErrors.UnsafePvVersion2_0_0
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.version.HandshakeErrors.DeprecatedProtocolVersion
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -35,20 +34,18 @@ class HttpSequencerConnectClient(
   def getDomainId(domainAlias: DomainAlias)(implicit
       traceContext: TraceContext
   ): EitherT[Future, SequencerConnectClient.Error, DomainId] =
-    httpSequencerClient.getDomainId()(loggingContext.traceContext).leftMap(toSequencerConnectError)
+    httpSequencerClient.getDomainId().leftMap(toSequencerConnectError)
 
   def getDomainParameters(domainAlias: DomainAlias)(implicit
       traceContext: TraceContext
   ): EitherT[Future, SequencerConnectClient.Error, StaticDomainParameters] =
-    httpSequencerClient
-      .getDomainParameters()(loggingContext.traceContext)
-      .leftMap(toSequencerConnectError)
+    httpSequencerClient.getDomainParameters().leftMap(toSequencerConnectError)
 
   def isActive(participantId: ParticipantId, waitForActive: Boolean)(implicit
       traceContext: TraceContext
   ): EitherT[Future, SequencerConnectClient.Error, Boolean] =
     httpSequencerClient
-      .verifyActive(VerifyActiveRequest())(loggingContext.traceContext)
+      .verifyActive(VerifyActiveRequest())
       .leftMap(toSequencerConnectError)
       .flatMap {
         case VerifyActiveResponse.Success(isActive) =>
@@ -57,14 +54,18 @@ class HttpSequencerConnectClient(
           EitherT.fromEither[Future](Left(SequencerConnectClient.Error.Transport(reason)))
       }
 
-  def handshake(domainAlias: DomainAlias, request: HandshakeRequest)(implicit
+  def handshake(
+      domainAlias: DomainAlias,
+      request: HandshakeRequest,
+      dontWarnOnDeprecatedPV: Boolean,
+  )(implicit
       traceContext: TraceContext
   ): EitherT[Future, SequencerConnectClient.Error, HandshakeResponse] = for {
     res <- httpSequencerClient
-      .handshakeUnauthenticated(request)(loggingContext.traceContext)
+      .handshakeUnauthenticated(request)
       .leftMap(toSequencerConnectError)
-    _ = if (res.serverVersion == ProtocolVersion.v2_0_0)
-      UnsafePvVersion2_0_0.WarnSequencerClient(domainAlias)
+    _ = if (res.serverProtocolVersion.isDeprecated && !dontWarnOnDeprecatedPV)
+      DeprecatedProtocolVersion.WarnSequencerClient(domainAlias, res.serverProtocolVersion)
   } yield res
 
   override def getAgreement(domainId: DomainId)(implicit

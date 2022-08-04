@@ -35,7 +35,7 @@ trait MultiDomainCausalityStore extends AutoCloseable { self: NamedLogging =>
   protected val transferStore: TrieMap[TransferId, Map[LfPartyId, VectorClock]] =
     new TrieMap()
 
-  // Use to synchronize between a transfer's origin domain and target domain on a transferring participant
+  // Use to synchronize between a transfer's source domain and target domain on a transferring participant
   protected val transferOutPromises: TrieMap[TransferId, Promise[Unit]] =
     new TrieMap()
 
@@ -99,7 +99,7 @@ trait MultiDomainCausalityStore extends AutoCloseable { self: NamedLogging =>
         transferIds.sizeCompare(1) == 0,
         s"Received causality messages for several transfers at once." +
           s" The different transfer ids are $transferIds.",
-      )(loggingContext(tc))
+      )
 
       val id = transferIds.headOption.getOrElse(
         ErrorUtil.internalError(new RuntimeException(s"Could not get head of list with length 1"))

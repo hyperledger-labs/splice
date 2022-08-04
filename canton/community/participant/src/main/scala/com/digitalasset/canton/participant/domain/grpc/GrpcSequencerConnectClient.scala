@@ -7,11 +7,11 @@ import cats.data.EitherT
 import cats.syntax.bifunctor._
 import cats.syntax.either._
 import cats.syntax.traverse._
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.common.domain.ServiceAgreement
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.domain.api.v0
 import com.digitalasset.canton.domain.api.v0.GetServiceAgreementRequest
+import com.digitalasset.canton.domain.api.v0.SequencerConnect.GetDomainParameters.Response.Parameters
 import com.digitalasset.canton.domain.api.v0.SequencerConnect.VerifyActive
 import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -21,13 +21,14 @@ import com.digitalasset.canton.participant.domain.SequencerConnectClient.Error
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.sequencing.GrpcSequencerConnection
 import com.digitalasset.canton.sequencing.protocol.{HandshakeRequest, HandshakeResponse}
+import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.{TraceContext, TracingConfig}
 import com.digitalasset.canton.util.retry.RetryUtil.AllExnRetryable
 import com.digitalasset.canton.util.retry.Success
 import com.digitalasset.canton.util.{Thereafter, retry}
-import com.digitalasset.canton.version.HandshakeErrors.UnsafePvVersion2_0_0
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.version.HandshakeErrors.DeprecatedProtocolVersion
+import com.digitalasset.canton.{DomainAlias, ProtoDeserializationError}
 import io.grpc.ClientInterceptors
 
 import scala.concurrent.duration.DurationInt
@@ -60,7 +61,7 @@ class GrpcSequencerConnectClient(
         logger = logger,
         logPolicy = CantonGrpcUtil.silentLogPolicy,
         retryPolicy = CantonGrpcUtil.RetryPolicy.noRetry,
-      )(_.getDomainId(v0.SequencerConnect.GetDomainId.Request()))(loggingContext.traceContext)
+      )(_.getDomainId(v0.SequencerConnect.GetDomainId.Request()))
       .leftMap(err => Error.Transport(err.toString))
 
     domainId = DomainId
@@ -83,45 +84,46 @@ class GrpcSequencerConnectClient(
         logger = logger,
         logPolicy = CantonGrpcUtil.silentLogPolicy,
         retryPolicy = CantonGrpcUtil.RetryPolicy.noRetry,
-      )(_.getDomainParameters(v0.SequencerConnect.GetDomainParameters.Request()))(
-        loggingContext.traceContext
-      )
+      )(_.getDomainParameters(v0.SequencerConnect.GetDomainParameters.Request()))
       .leftMap(err => Error.Transport(err.toString))
 
-    domainParametersP = responseP.parameters
-      .toRight[Error](Error.InvalidResponse("Missing response from GetDomainParameters"))
-    domainParametersE = domainParametersP.flatMap(
-      StaticDomainParameters
-        .fromProtoV0(_)
-        .leftMap(err => Error.DeserializationFailure(err.toString))
-    )
+    domainParametersE = GrpcSequencerConnectClient
+      .toStaticDomainParameters(responseP)
+      .leftMap[Error](err => Error.DeserializationFailure(err.toString))
 
     domainParameters <- EitherT.fromEither[Future](domainParametersE)
 
   } yield domainParameters
 
-  override def handshake(domainAlias: DomainAlias, request: HandshakeRequest)(implicit
+  override def handshake(
+      domainAlias: DomainAlias,
+      request: HandshakeRequest,
+      dontWarnOnDeprecatedPV: Boolean,
+  )(implicit
       traceContext: TraceContext
   ): EitherT[Future, Error, HandshakeResponse] =
     for {
       responseP <- CantonGrpcUtil
         .sendSingleGrpcRequest(
           serverName = domainAlias.unwrap,
-          requestDescription = "get domain parameters",
+          requestDescription = "handshake",
           channel = builder.build(),
           stubFactory = v0.SequencerConnectServiceGrpc.stub,
           timeout = timeouts.network.unwrap,
           logger = logger,
           logPolicy = CantonGrpcUtil.silentLogPolicy,
           retryPolicy = CantonGrpcUtil.RetryPolicy.noRetry,
-        )(_.handshake(request.toProtoV0))(loggingContext.traceContext)
+        )(_.handshake(request.toProtoV0))
         .leftMap(err => Error.Transport(err.toString))
 
       handshakeResponse <- EitherT
         .fromEither[Future](HandshakeResponse.fromProtoV0(responseP))
         .leftMap[Error](err => Error.DeserializationFailure(err.toString))
-      _ = if (handshakeResponse.serverVersion == ProtocolVersion.v2_0_0)
-        UnsafePvVersion2_0_0.WarnSequencerClient(domainAlias)
+      _ = if (handshakeResponse.serverProtocolVersion.isDeprecated && !dontWarnOnDeprecatedPV)
+        DeprecatedProtocolVersion.WarnSequencerClient(
+          domainAlias,
+          handshakeResponse.serverProtocolVersion,
+        )
     } yield handshakeResponse
 
   override def getAgreement(
@@ -137,7 +139,7 @@ class GrpcSequencerConnectClient(
         logger = logger,
         logPolicy = CantonGrpcUtil.silentLogPolicy,
         retryPolicy = CantonGrpcUtil.RetryPolicy.noRetry,
-      )(_.getServiceAgreement(GetServiceAgreementRequest()))(loggingContext.traceContext)
+      )(_.getServiceAgreement(GetServiceAgreementRequest()))
       .leftMap(e => Error.Transport(e.toString))
     optAgreement <- EitherT
       .fromEither[Future](
@@ -182,5 +184,16 @@ class GrpcSequencerConnectClient(
         .Pause(logger, this, maxRetries, interval, "verify active")
         .apply(verifyActive(), AllExnRetryable)
     ).thereafter(_ => closeableChannel.close())
+  }
+}
+
+object GrpcSequencerConnectClient {
+  private def toStaticDomainParameters(
+      response: v0.SequencerConnect.GetDomainParameters.Response
+  ): ParsingResult[StaticDomainParameters] = response.parameters match {
+    case Parameters.Empty =>
+      Left(ProtoDeserializationError.FieldNotSet("GetDomainParameters.parameters"))
+    case Parameters.ParametersV0(parametersV0) => StaticDomainParameters.fromProtoV0(parametersV0)
+    case Parameters.ParametersV1(parametersV1) => StaticDomainParameters.fromProtoV1(parametersV1)
   }
 }

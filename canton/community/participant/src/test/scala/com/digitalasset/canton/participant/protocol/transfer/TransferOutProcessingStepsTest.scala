@@ -25,7 +25,7 @@ import com.digitalasset.canton.participant.protocol.submission.{
 import com.digitalasset.canton.participant.protocol.transfer.TransferOutProcessingSteps.{
   PendingTransferOut,
   PermissionErrors,
-  TargetDomainIsOriginDomain,
+  TargetDomainIsSourceDomain,
 }
 import com.digitalasset.canton.participant.protocol.transfer.TransferProcessingSteps.{
   NoSubmissionPermission,
@@ -55,6 +55,7 @@ import com.digitalasset.canton.topology.transaction.ParticipantPermission.{
   Submission,
 }
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.version.{SourceProtocolVersion, TargetProtocolVersion}
 import com.digitalasset.canton.{BaseTest, HasExecutorService, LfPartyId}
 import com.google.protobuf.ByteString
 import org.scalatest.Assertion
@@ -70,8 +71,8 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
 
   private implicit val ec: ExecutionContext = executorService
 
-  val originDomain = DomainId(UniqueIdentifier.tryFromProtoPrimitive("origin::domain"))
-  val originMediator = MediatorId(UniqueIdentifier.tryFromProtoPrimitive("origin::mediator"))
+  val sourceDomain = DomainId(UniqueIdentifier.tryFromProtoPrimitive("source::domain"))
+  val sourceMediator = MediatorId(UniqueIdentifier.tryFromProtoPrimitive("source::mediator"))
   val targetDomain = DomainId(UniqueIdentifier.tryFromProtoPrimitive("target::domain"))
 
   val submitter: LfPartyId = PartyId(
@@ -91,7 +92,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
   val multiDomainEventLog = mock[MultiDomainEventLog]
   val persistentState =
     new InMemorySyncDomainPersistentState(
-      IndexedDomain.tryCreate(originDomain, 1),
+      IndexedDomain.tryCreate(sourceDomain, 1),
       pureCrypto,
       enableAdditionalConsistencyChecks = true,
       loggerFactory,
@@ -110,7 +111,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
       multiDomainEventLog,
       new SingleDomainCausalTracker(
         globalTracker,
-        new InMemorySingleDomainCausalDependencyStore(originDomain, loggerFactory),
+        new InMemorySingleDomainCausalDependencyStore(sourceDomain, loggerFactory),
         loggerFactory,
       ),
       mock[InFlightSubmissionTracker],
@@ -157,7 +158,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
       .build(loggerFactory)
       .topologySnapshot()
 
-  private val cryptoFactory = TestingTopology(domains = Set(originDomain, targetDomain))
+  private val cryptoFactory = TestingTopology(domains = Set(sourceDomain, targetDomain))
     .withReversedTopology(
       Map(
         submittingParticipant -> Map(
@@ -170,14 +171,14 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
 
   val cryptoSnapshot =
     cryptoFactory
-      .forOwnerAndDomain(submittingParticipant, originDomain)
+      .forOwnerAndDomain(submittingParticipant, sourceDomain)
       .currentSnapshotApproximation
 
   val seedGenerator = new SeedGenerator(pureCrypto)
 
   private val coordination: TransferCoordination =
     TestTransferCoordination(
-      Set(originDomain, targetDomain),
+      Set(sourceDomain, targetDomain),
       CantonTimestamp.Epoch,
       Some(cryptoSnapshot),
       Some(None),
@@ -185,12 +186,12 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
     )(directExecutionContext)
   val outProcessingSteps =
     new TransferOutProcessingSteps(
-      originDomain,
+      sourceDomain,
       submittingParticipant,
       damle,
       coordination,
       seedGenerator,
-      defaultProtocolVersion,
+      SourceProtocolVersion(testedProtocolVersion),
       loggerFactory,
     )(executorService)
 
@@ -226,7 +227,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
 
     def mkTxOutRes(
         stakeholders: Set[LfPartyId],
-        originIps: TopologySnapshot,
+        sourceIps: TopologySnapshot,
         targetIps: TopologySnapshot,
     ) = {
       TransferOutProcessingSteps
@@ -236,10 +237,12 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
           contractId,
           submitter,
           stakeholders,
-          originDomain,
-          originMediator,
+          sourceDomain,
+          SourceProtocolVersion(testedProtocolVersion),
+          sourceMediator,
           targetDomain,
-          originIps,
+          TargetProtocolVersion(testedProtocolVersion),
+          sourceIps,
           targetIps,
           logger,
         )
@@ -278,7 +281,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
     }
 
     "fail if a stakeholder cannot confirm on target domain" in {
-      val ipsConfirmationOnOrigin = generateIps(
+      val ipsConfirmationOnSource = generateIps(
         Map(
           submittingParticipant -> Map(submitter -> Submission),
           participant1 -> Map(party1 -> Confirmation),
@@ -293,7 +296,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
       )
 
       val stakeholders = Set(submitter, party1)
-      val result = mkTxOutRes(stakeholders, ipsConfirmationOnOrigin, ipsNoConfirmationOnTarget)
+      val result = mkTxOutRes(stakeholders, ipsConfirmationOnSource, ipsNoConfirmationOnTarget)
       result should matchPattern { case Left(PermissionErrors(_)) =>
       }
     }
@@ -345,7 +348,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
     }
 
     "work if topology constraints are satisfied" in {
-      val ipsOrigin = generateIps(
+      val ipsSource = generateIps(
         Map(
           submittingParticipant -> Map(adminSubmitter -> Submission, submitter -> Submission),
           participant1 -> Map(adminSubmitter -> Observation, submitter -> Confirmation),
@@ -363,7 +366,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
         )
       )
       val stakeholders = Set(submitter, party1)
-      val result = mkTxOutRes(stakeholders, ipsOrigin, ipsTarget)
+      val result = mkTxOutRes(stakeholders, ipsSource, ipsTarget)
       assert(
         result == Right(
           (
@@ -372,9 +375,11 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
               stakeholders = stakeholders,
               adminParties = Set(adminSubmitter, admin3, admin4),
               contractId = contractId,
-              originDomain = originDomain,
-              originMediator = originMediator,
+              sourceDomain = sourceDomain,
+              sourceProtocolVersion = SourceProtocolVersion(testedProtocolVersion),
+              sourceMediator = sourceMediator,
               targetDomain = targetDomain,
+              targetProtocolVersion = TargetProtocolVersion(testedProtocolVersion),
               targetTimeProof = timeEvent,
             ),
             Set(submittingParticipant, participant1, participant2, participant3, participant4),
@@ -394,9 +399,11 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
               stakeholders = stakeholders,
               adminParties = Set(adminSubmitter, admin1),
               contractId = contractId,
-              originDomain = originDomain,
-              originMediator = originMediator,
+              sourceDomain = sourceDomain,
+              sourceProtocolVersion = SourceProtocolVersion(testedProtocolVersion),
+              sourceMediator = sourceMediator,
               targetDomain = targetDomain,
+              targetProtocolVersion = TargetProtocolVersion(testedProtocolVersion),
               targetTimeProof = timeEvent,
             ),
             Set(submittingParticipant, participant1),
@@ -421,7 +428,12 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
       )
       val transactionId = ExampleTransactionFactory.transactionId(1)
       val submissionParam =
-        TransferOutProcessingSteps.SubmissionParam(party1, contractId, targetDomain)
+        TransferOutProcessingSteps.SubmissionParam(
+          party1,
+          contractId,
+          targetDomain,
+          TargetProtocolVersion(testedProtocolVersion),
+        )
 
       for {
         _ <- state.storedContractManager.addPendingContracts(
@@ -432,7 +444,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
           outProcessingSteps
             .prepareSubmission(
               submissionParam,
-              originMediator,
+              sourceMediator,
               state,
               cryptoSnapshot,
             )
@@ -440,7 +452,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
       } yield succeed
     }
 
-    "check that the target domain is not equal to the origin domain" in {
+    "check that the target domain is not equal to the source domain" in {
       val state = mkState
       val contractId = ExampleTransactionFactory.suffixedId(10, 0)
       val contract = ExampleTransactionFactory.asSerializable(
@@ -448,8 +460,12 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
         contractInstance = ExampleTransactionFactory.contractInstance(),
       )
       val transactionId = ExampleTransactionFactory.transactionId(1)
-      val submissionParam =
-        TransferOutProcessingSteps.SubmissionParam(party1, contractId, originDomain)
+      val submissionParam = TransferOutProcessingSteps.SubmissionParam(
+        party1,
+        contractId,
+        sourceDomain,
+        TargetProtocolVersion(testedProtocolVersion),
+      )
 
       for {
         _ <- state.storedContractManager.addPendingContracts(
@@ -459,13 +475,13 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
         submissionResult <- leftOrFailShutdown(
           outProcessingSteps.prepareSubmission(
             submissionParam,
-            originMediator,
+            sourceMediator,
             state,
             cryptoSnapshot,
           )
         )("prepare submission failed")
       } yield {
-        submissionResult should matchPattern { case TargetDomainIsOriginDomain(_, _) =>
+        submissionResult should matchPattern { case TargetDomainIsSourceDomain(_, _) =>
         }
       }
     }
@@ -478,9 +494,11 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
       Set(party1),
       Set(party1),
       contractId,
-      originDomain,
-      originMediator,
+      sourceDomain,
+      SourceProtocolVersion(testedProtocolVersion),
+      sourceMediator,
       targetDomain,
+      TargetProtocolVersion(testedProtocolVersion),
       timeEvent,
     )
     val outTree = makeFullTransferOutTree(outRequest)
@@ -508,7 +526,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
         envelopes =
           NonEmpty(
             Seq,
-            OpenEnvelope(encryptedOutRequest, RecipientsTest.testInstance, defaultProtocolVersion),
+            OpenEnvelope(encryptedOutRequest, RecipientsTest.testInstance, testedProtocolVersion),
           )
         decrypted <- valueOrFail(outProcessingSteps.decryptViews(envelopes, cryptoSnapshot))(
           "decrypt request failed"
@@ -556,9 +574,11 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
         Set(party1),
         Set(submittingParticipant.adminParty.toLf),
         contractId,
-        originDomain,
-        originMediator,
+        sourceDomain,
+        SourceProtocolVersion(testedProtocolVersion),
+        sourceMediator,
         targetDomain,
+        TargetProtocolVersion(testedProtocolVersion),
         timeEvent,
       )
 
@@ -585,7 +605,7 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
               state.causalityLookup,
               Future.successful(ActivenessResult.success),
               Future.unit,
-              originMediator,
+              sourceMediator,
             )
         )("construction of pending data and response failed")
       } yield succeed
@@ -597,27 +617,32 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
       val state = mkState
       val contractId = ExampleTransactionFactory.suffixedId(10, 0)
       val contractHash = ExampleTransactionFactory.lfHash(0)
-      val transferId = TransferId(originDomain, CantonTimestamp.Epoch)
+      val transferId = TransferId(sourceDomain, CantonTimestamp.Epoch)
       val transferResult =
         TransferResult.create(
           RequestId(CantonTimestamp.Epoch),
           Set(),
-          TransferOutDomainId(originDomain),
+          TransferOutDomainId(sourceDomain),
           Verdict.Approve,
-          defaultProtocolVersion,
+          testedProtocolVersion,
         )
       for {
-        signedResult <- SignedProtocolMessage.tryCreate(transferResult, cryptoSnapshot, pureCrypto)
+        signedResult <- SignedProtocolMessage.tryCreate(
+          transferResult,
+          cryptoSnapshot,
+          pureCrypto,
+          testedProtocolVersion,
+        )
         deliver: Deliver[OpenEnvelope[SignedProtocolMessage[TransferOutResult]]] = {
           val batch: Batch[OpenEnvelope[SignedProtocolMessage[TransferOutResult]]] =
-            Batch.of(defaultProtocolVersion, (signedResult, Recipients.cc(submittingParticipant)))
+            Batch.of(testedProtocolVersion, (signedResult, Recipients.cc(submittingParticipant)))
           Deliver.create(
             0L,
             CantonTimestamp.Epoch,
-            originDomain,
+            sourceDomain,
             Some(MessageId.tryCreate("msg-0")),
             batch,
-            defaultProtocolVersion,
+            testedProtocolVersion,
           )
         }
         signedContent = SignedContent(
@@ -660,14 +685,14 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
       uuid: UUID = new UUID(6L, 7L),
   ): FullTransferOutTree = {
     val seed = seedGenerator.generateSaltSeed()
-    request.toFullTransferOutTree(pureCrypto, pureCrypto, seed, uuid, defaultProtocolVersion)
+    request.toFullTransferOutTree(pureCrypto, pureCrypto, seed, uuid)
   }
 
   def encryptTransferOutTree(
       tree: FullTransferOutTree
   ): Future[EncryptedViewMessage[TransferOutViewType]] =
     EncryptedViewMessageFactory
-      .create(TransferOutViewType)(tree, cryptoSnapshot, defaultProtocolVersion)(
+      .create(TransferOutViewType)(tree, cryptoSnapshot, testedProtocolVersion)(
         implicitly[TraceContext],
         executorService,
       )
@@ -678,8 +703,8 @@ class TransferOutProcessingStepsTest extends AsyncWordSpec with BaseTest with Ha
   ): RootHashMessage[SerializedRootHashMessagePayload] =
     RootHashMessage(
       request.rootHash,
-      originDomain,
-      defaultProtocolVersion,
+      sourceDomain,
+      testedProtocolVersion,
       TransferOutViewType,
       SerializedRootHashMessagePayload.empty,
     )

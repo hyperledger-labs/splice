@@ -104,7 +104,12 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
     sequencerClient = SequencerClientConfig(),
     indexer = IndexerConfig(),
     transferTimeProofFreshnessProportion = NonNegativeInt.tryCreate(3),
-    protocolConfig = ParticipantProtocolConfig(None, false),
+    protocolConfig = ParticipantProtocolConfig(
+      Some(testedProtocolVersion),
+      devVersionSupport = false,
+      dontWarnOnDeprecatedPV = false,
+      initialProtocolVersion = testedProtocolVersion,
+    ),
     uniqueContractKeys = false,
     enableCausalityTracking = true,
     unsafeEnableDamlLfDevVersion = false,
@@ -268,10 +273,10 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
                   ParticipantPermission.Submission,
                 ),
               ),
-            )(defaultProtocolVersion)
+            )(testedProtocolVersion)
           ),
           eqTo(None),
-          eqTo(ProtocolVersion.latestForTest),
+          eqTo(testedProtocolVersion),
           eqTo(false),
           eqTo(false),
         )(anyTraceContext)

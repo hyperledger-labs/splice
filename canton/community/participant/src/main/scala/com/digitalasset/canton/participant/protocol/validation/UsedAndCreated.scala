@@ -3,23 +3,23 @@
 
 package com.digitalasset.canton.participant.protocol.validation
 
+import cats.syntax.functor._
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.data.TransactionViewTree
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.logging.{HasLoggerName, NamedLoggingContext}
 import com.digitalasset.canton.participant.protocol.conflictdetection.{
   ActivenessCheck,
   ActivenessSet,
 }
 import com.digitalasset.canton.participant.store.ContractKeyJournal
-import com.digitalasset.canton.protocol.{
-  LfContractId,
-  LfGlobalKey,
-  SerializableContract,
-  WithContractHash,
-}
+import com.digitalasset.canton.protocol._
+import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.{LfKeyResolver, LfPartyId}
 
+/** @param rootViews The root views of the projected transaction */
 case class UsedAndCreated(
+    rootViews: NonEmpty[Seq[TransactionViewTree]],
     contracts: UsedAndCreatedContracts,
     keys: InputAndUpdatedKeys,
     hostedInformeeStakeholders: Set[LfPartyId],
@@ -52,16 +52,21 @@ case class UsedAndCreatedContracts(
   }
 }
 
-/** @param rootViewsWithContractKeys is a key resolver that is suitable for reinterpreting each root view
-  * @param uckFreeKeysOfHostedMaintainers: keys that must be free before executing the transaction.
-  * @param uckUpdatedKeysOfHostedMaintainers: keys that will be updated by the transaction.
-  *   The value indicates the new status after the transaction.
-  */
-case class InputAndUpdatedKeys(
-    rootViewsWithContractKeys: NonEmpty[Seq[(TransactionViewTree, LfKeyResolver)]],
-    uckFreeKeysOfHostedMaintainers: Set[LfGlobalKey],
-    uckUpdatedKeysOfHostedMaintainers: Map[LfGlobalKey, ContractKeyJournal.Status],
-) extends PrettyPrinting {
+trait InputAndUpdatedKeys extends PrettyPrinting {
+
+  /** A key resolver that is suitable for reinterpreting the given root view. */
+  def keyResolverFor(rootView: TransactionViewTree)(implicit
+      loggingContext: NamedLoggingContext
+  ): LfKeyResolver
+
+  /** Keys that must be free before executing the transaction */
+  def uckFreeKeysOfHostedMaintainers: Set[LfGlobalKey]
+
+  /** Keys that will be updated by the transaction.
+    * The value indicates the new status after the transaction.
+    */
+  def uckUpdatedKeysOfHostedMaintainers: Map[LfGlobalKey, ContractKeyJournal.Status]
+
   def activenessCheck: ActivenessCheck[LfGlobalKey] =
     ActivenessCheck(
       checkFresh = Set.empty,
@@ -69,9 +74,41 @@ case class InputAndUpdatedKeys(
       checkActive = Set.empty,
       lock = uckUpdatedKeysOfHostedMaintainers.keySet,
     )
+}
 
-  override def pretty: Pretty[InputAndUpdatedKeys] = prettyOfClass(
-    param("key resolver", _.rootViewsWithContractKeys.map(_._2)),
+/** @param keyResolvers The key resolvers for the root views with the given hashes */
+case class InputAndUpdatedKeysV2(
+    keyResolvers: Map[ViewHash, LfKeyResolver],
+    override val uckFreeKeysOfHostedMaintainers: Set[LfGlobalKey],
+    override val uckUpdatedKeysOfHostedMaintainers: Map[LfGlobalKey, ContractKeyJournal.Status],
+) extends InputAndUpdatedKeys
+    with HasLoggerName {
+
+  /** @throws java.lang.IllegalArgumentException if the root view is not a root view of the projection */
+  override def keyResolverFor(
+      rootView: TransactionViewTree
+  )(implicit loggingContext: NamedLoggingContext): LfKeyResolver = keyResolvers.getOrElse(
+    rootView.viewHash,
+    ErrorUtil.internalError(new IllegalArgumentException(s"Unknown root view hash $rootView")),
+  )
+
+  override def pretty: Pretty[InputAndUpdatedKeysV2] = prettyOfClass(
+    param("key resolvers", _.keyResolvers.toSeq),
+    paramIfNonEmpty("uck free keys of hosted maintainers", _.uckFreeKeysOfHostedMaintainers),
+    paramIfNonEmpty("uck updated keys of hosted maintainers", _.uckUpdatedKeysOfHostedMaintainers),
+  )
+}
+
+case class InputAndUpdatedKeysV3(
+    override val uckFreeKeysOfHostedMaintainers: Set[LfGlobalKey],
+    override val uckUpdatedKeysOfHostedMaintainers: Map[LfGlobalKey, ContractKeyJournal.Status],
+) extends InputAndUpdatedKeys {
+
+  override def keyResolverFor(rootView: TransactionViewTree)(implicit
+      loggingContext: NamedLoggingContext
+  ): LfKeyResolver = rootView.view.globalKeyInputs.fmap(_.resolution)
+
+  override def pretty: Pretty[InputAndUpdatedKeysV3] = prettyOfClass(
     paramIfNonEmpty("uck free keys of hosted maintainers", _.uckFreeKeysOfHostedMaintainers),
     paramIfNonEmpty("uck updated keys of hosted maintainers", _.uckUpdatedKeysOfHostedMaintainers),
   )

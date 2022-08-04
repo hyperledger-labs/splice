@@ -16,6 +16,7 @@ import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.protocol.{DynamicDomainParameters, v0}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology._
+import com.digitalasset.canton.topology.admin.v0.DomainParametersChangeAuthorization.Parameters
 import com.digitalasset.canton.topology.admin.v0.SignedLegalIdentityClaimGeneration.X509CertificateClaim
 import com.digitalasset.canton.topology.admin.v0._
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
@@ -33,12 +34,11 @@ class GrpcTopologyManagerWriteService[T <: CantonError](
     manager: TopologyManager[T],
     store: TopologyStore[TopologyStoreId.AuthorizedStore],
     cryptoPublicStore: CryptoPublicStore,
+    protocolVersion: ProtocolVersion,
     override val loggerFactory: NamedLoggerFactory,
 )(implicit val ec: ExecutionContext)
     extends TopologyManagerWriteServiceGrpc.TopologyManagerWriteService
     with NamedLogging {
-
-  private val protocolVersion = ProtocolVersion.v2_0_0
 
   import com.digitalasset.canton.networking.grpc.CantonGrpcUtil._
 
@@ -283,10 +283,17 @@ class GrpcTopologyManagerWriteService[T <: CantonError](
     val item = for {
       uid <- UniqueIdentifier
         .fromProtoPrimitive(request.domain, "domain")
-      domainParametersP <- request.parameters
-        .toRight(ProtoDeserializationError.FieldNotSet("domainParameters"))
-      domainParameters <- DynamicDomainParameters.fromProtoV0(domainParametersP)
+
+      domainParameters <- request.parameters match {
+        case Parameters.Empty => Left(ProtoDeserializationError.FieldNotSet("domainParameters"))
+        case Parameters.ParametersV0(parametersV0) =>
+          DynamicDomainParameters.fromProtoV0(parametersV0)
+        case Parameters.ParametersV1(parametersV1) =>
+          DynamicDomainParameters.fromProtoV1(parametersV1)
+      }
+
     } yield DomainParametersChange(DomainId(uid), domainParameters)
+
     process(request.authorization, item.leftMap(ProtoDeserializationFailure.Wrap(_)))
   }
 

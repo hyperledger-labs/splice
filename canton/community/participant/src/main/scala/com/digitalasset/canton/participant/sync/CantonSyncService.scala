@@ -15,7 +15,10 @@ import com.daml.ledger.api.health.HealthStatus
 import com.daml.ledger.configuration._
 import com.daml.ledger.participant.state
 import com.daml.ledger.participant.state.v2._
+import com.daml.lf.command.DisclosedContract
+import com.daml.lf.data.ImmArray
 import com.daml.lf.engine.Engine
+import com.daml.lf.transaction.Versioned
 import com.daml.logging.LoggingContext
 import com.daml.nonempty.NonEmpty
 import com.daml.telemetry.TelemetryContext
@@ -84,7 +87,7 @@ import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.FutureConverters._
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Right, Success}
 
 /** The Canton-based synchronization service.
   *
@@ -235,10 +238,18 @@ class CantonSyncService(
       loggerFactory,
     )(ec, TraceContext.empty)
 
+  val protocolVersionGetter: Traced[DomainId] => Future[Option[ProtocolVersion]] =
+    (tracedDomainId: Traced[DomainId]) =>
+      tracedDomainId.withTraceContext { implicit traceContext => domainId =>
+        syncDomainPersistentStateManager.protocolVersionFor(domainId)
+      }
+
   val transferService: TransferService = new TransferService(
-    aliasManager.domainIdForAlias,
-    readySyncDomainById,
-    domainId => syncDomainPersistentStateManager.get(domainId).map(_.transferStore),
+    domainIdOfAlias = aliasManager.domainIdForAlias,
+    submissionHandles = readySyncDomainById,
+    transferLookups = domainId =>
+      syncDomainPersistentStateManager.get(domainId).map(_.transferStore),
+    protocolVersionFor = protocolVersionGetter,
   )
 
   private val commandDeduplicator = new CommandDeduplicatorImpl(
@@ -318,6 +329,7 @@ class CantonSyncService(
       transaction: LfSubmittedTransaction,
       _estimatedInterpretationCost: Long,
       keyResolver: LfKeyResolver,
+      explicitlyDisclosedContracts: ImmArray[Versioned[DisclosedContract]],
   )(implicit
       _loggingContext: LoggingContext, // not used - contains same properties as canton named logger
       telemetryContext: TelemetryContext,
@@ -374,7 +386,7 @@ class CantonSyncService(
         Right(())
       case Left(LedgerPruningOnlySupportedInEnterpriseEdition(message)) =>
         logger.warn(
-          s"Canton participant pruning not supported in canton-community edition: ${message}"
+          s"Canton participant pruning not supported in canton-open-source edition: ${message}"
         )
         Left(PruningServiceError.PruningNotSupportedInCommunityEdition.Error())
       case Left(err: LedgerPruningOffsetNonCantonFormat) =>
@@ -483,7 +495,6 @@ class CantonSyncService(
   )(implicit loggingContext: LoggingContext): Source[(LedgerSyncOffset, LedgerSyncEvent), NotUsed] =
     TraceContext.withNewTraceContext { implicit traceContext =>
       logger.debug(s"Subscribing to stateUpdates from $beginAfterOffset")
-
       // Plus one since dispatchers use inclusive offsets.
       beginAfterOffset
         .traverse(after => UpstreamOffsetConvert.toGlobalOffset(after).map(_ + 1L))
@@ -513,6 +524,7 @@ class CantonSyncService(
           _recordTime,
           _divulgedContracts,
           _blindingInfo,
+          _contractMetadata,
         ) =>
       ta.copy(optCompletionInfo =
         Some(completionInfo.copy(statistics = Some(LedgerTransactionNodeStatistics(transaction))))
@@ -705,7 +717,6 @@ class CantonSyncService(
   def migrateDomain(
       source: DomainAlias,
       target: DomainConnectionConfig,
-      expectedVersion: ProtocolVersion,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, SyncServiceError, Unit] = {
@@ -741,7 +752,6 @@ class CantonSyncService(
               .migrateDomain(
                 source,
                 target,
-                expectedVersion,
                 targetDomainInfo.domainId,
                 targetDomainInfo.parameters,
               )
@@ -906,23 +916,26 @@ class CantonSyncService(
     */
   def connectDomain(domainAlias: DomainAlias, keepRetrying: Boolean)(implicit
       traceContext: TraceContext
-  ): EitherT[Future, SyncServiceError, Boolean] = {
-    val initial = if (keepRetrying) {
-      // we're remembering that we have been trying to reconnect here
-      attemptReconnect
-        .put(
-          domainAlias,
-          AttemptReconnect(
-            domainAlias,
-            clock.now,
-            parameters.sequencerClient.startupConnectionRetryDelay.toScala,
-            traceContext,
-          ),
-        )
-        .isEmpty
-    } else true
-    attemptDomainConnection(domainAlias, keepRetrying = keepRetrying, initial = initial)
-  }
+  ): EitherT[Future, SyncServiceError, Boolean] =
+    domainConnectionConfigByAlias(domainAlias)
+      .leftMap(_ => SyncServiceError.SyncServiceUnknownDomain.Error(domainAlias))
+      .flatMap { _ =>
+        val initial = if (keepRetrying) {
+          // we're remembering that we have been trying to reconnect here
+          attemptReconnect
+            .put(
+              domainAlias,
+              AttemptReconnect(
+                domainAlias,
+                clock.now,
+                parameters.sequencerClient.startupConnectionRetryDelay.toScala,
+                traceContext,
+              ),
+            )
+            .isEmpty
+        } else true
+        attemptDomainConnection(domainAlias, keepRetrying = keepRetrying, initial = initial)
+      }
 
   private def attemptDomainConnection(
       domainAlias: DomainAlias,
@@ -1239,6 +1252,50 @@ class CantonSyncService(
     val connectedDomains =
       connectedDomainsMap.keys.toList.mapFilter(aliasManager.aliasForDomainId).distinct
     connectedDomains.traverse_(disconnectDomain)
+  }
+
+  /** Checks if a given party has any active contracts. */
+  def partyHasActiveContracts(
+      partyId: PartyId
+  )(implicit traceContext: TraceContext): Future[Boolean] = {
+    val stateInspection = new SyncStateInspection(
+      syncDomainPersistentStateManager,
+      participantNodePersistentState,
+      pruningProcessor,
+      parameters.processingTimeouts,
+      loggerFactory,
+    )
+
+    // checks active contracts for all stores of connected domains
+    syncDomainPersistentStateManager.getAll.toList
+      .findM { case (_, store) =>
+        partyHasActiveContractsInDomain(store, partyId, stateInspection)
+      }
+      .map(_.nonEmpty)
+  }
+
+  /** Checks if a given party has any active contracts for a given domain. */
+  private def partyHasActiveContractsInDomain(
+      domainStore: SyncDomainPersistentState,
+      partyId: PartyId,
+      stateInspection: SyncStateInspection,
+  )(implicit traceContext: TraceContext): Future[Boolean] = {
+    for {
+      acs <- stateInspection.currentAcsSnapshot(domainStore)
+      res <- acs match {
+        case Right(x) =>
+          domainStore.contractStore
+            .hasActiveContracts(
+              partyId,
+              x.keys.toVector,
+            )
+        case Left(err) =>
+          logger.error(
+            s"Error fetching current acs snapshot: $err."
+          )
+          Future.successful(false)
+      }
+    } yield res
   }
 
   /** Participant repair utility for manually adding contracts to a domain in an offline fashion.

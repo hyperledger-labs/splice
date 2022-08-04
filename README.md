@@ -355,3 +355,24 @@ variables. As stated above, these are usually populated via `.envrc`.
 ### Ledger API Port Allocations
 
 Both our deployment and tests follow the [port allocation scheme](./apps/app/src/test/resources/README.md).
+
+### Bumping our Canton fork
+
+1. Check out the [Canton Open Source repo](https://github.com/digital-asset/canton) at the Canton commit listed below.
+2. Create a Canton patch file capturing all our changes relative to that `./scripts/diff-canton.sh path/to/canton-oss/ > canton.patch`
+3. Undo our changes: `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton -R canton.patch`
+   The exclusion is because those files are under a symlink and we don’t want to change them twice.
+4. Create a commit to ease review.
+5. Now check out the commit in the Canton OSS repo that you want to update to and update the current commit below.
+6. Copy the Canton changes: `./scripts-copy-canton.sh path/to/canton-oss`
+7. Create a commit to ease review.
+8. Reapply our changes `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton --reject canton.patch`
+   and resolve any conflicts (if any).
+9. Bump the SDK version in `releaseVersionToProtocolVersion` in `CantonVersion.scala` and bump the version in `CantonDependencies` to match the SDK version declared in
+   https://github.com/digital-asset/canton/blob/main/project/project/DamlVersions.scala for your respective commit.
+10. Bump the sdk version in our own daml.yaml files via `./set-sdk.sh $sdkversion` to the same version.
+11. Create another commit.
+12. Make a PR with your changes.
+You can refer to https://github.com/DACH-NY/the-real-canton-coin/pull/446/commits for an example of how the update PR should look like. 
+
+Current Canton commit: 9e5ec309ad5fe229e53ab668b6b180db67b555bc

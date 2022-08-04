@@ -9,7 +9,6 @@ import com.digitalasset.canton.protobuf.UntypedVersionedMessageTest.{Message, pa
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.version.{
-  HasProtoV0,
   HasVersionedMessageCompanion,
   HasVersionedWrapper,
   ProtocolVersion,
@@ -32,7 +31,7 @@ class UntypedVersionedMessageTest extends AnyWordSpec with BaseTest {
       def test(content: String): Assertion = {
         val message: Message = Message(content)
 
-        val newByteString = message.toProtoVersioned(defaultProtocolVersion).toByteString
+        val newByteString = message.toProtoVersioned(testedProtocolVersion).toByteString
         val oldByteString = VersionedDummyMessage(
           VersionedDummyMessage.Version.V0(DummyMessage(content))
         ).toByteString
@@ -69,14 +68,12 @@ object UntypedVersionedMessageTest {
       .flatMap(fromProtoVersioned)
   }
 
-  case class Message(content: String)
-      extends HasVersionedWrapper[VersionedMessage[Message]]
-      with HasProtoV0[DummyMessage] {
+  case class Message(content: String) extends HasVersionedWrapper[VersionedMessage[Message]] {
     override def toProtoVersioned(
         version: ProtocolVersion
     ): VersionedMessage[Message] = VersionedMessage(toProtoV0.toByteString, 0)
 
-    override def toProtoV0: DummyMessage = DummyMessage(content)
+    def toProtoV0: DummyMessage = DummyMessage(content)
   }
 
   object Message extends HasVersionedMessageCompanion[Message] {

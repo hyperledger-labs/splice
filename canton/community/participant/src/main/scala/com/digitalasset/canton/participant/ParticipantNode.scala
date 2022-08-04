@@ -75,7 +75,6 @@ import com.digitalasset.canton.topology.transaction.{NamespaceDelegation, OwnerT
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil}
-import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.ServerServiceDefinition
 
 import java.util.concurrent.ScheduledExecutorService
@@ -93,7 +92,10 @@ class ParticipantNodeBootstrap(
     cantonSyncServiceFactory: CantonSyncService.Factory[CantonSyncService],
     metrics: ParticipantMetrics,
     storageFactory: StorageFactory,
-    setStartableStoppableIndexer: StartableStoppableIndexer => Unit,
+    setStartableStoppableLedgerApiAndCantonServices: (
+        StartableStoppableLedgerApiServer,
+        StartableStoppableLedgerApiDependentServices,
+    ) => Unit,
     resourceManagementServiceFactory: ParticipantSettingsStore => ResourceManagementService,
     replicationServiceFactory: Storage => ServerServiceDefinition,
     allocateIndexerLockIds: DbConfig => Either[String, Option[IndexerLockIds]],
@@ -140,6 +142,7 @@ class ParticipantNodeBootstrap(
       authorizedTopologyStore,
       crypto,
       cantonParameterConfig.processingTimeouts,
+      config.parameters.initialProtocolVersion.unwrap,
       loggerFactory,
     )
   // add participant node topology manager
@@ -181,7 +184,7 @@ class ParticipantNodeBootstrap(
         }
 
       ledgerApiServer <- CantonLedgerApiServerWrapper
-        .start(
+        .initialize(
           CantonLedgerApiServerWrapper.Config(
             config.ledgerApi,
             cantonParameterConfig.indexer,
@@ -198,8 +201,8 @@ class ParticipantNodeBootstrap(
             tracerProvider,
             metrics.ledgerApiServer,
           ),
-          // start indexer iff participant replica is active
-          startIndexer = sync.isActive(),
+          // start ledger API server iff participant replica is active
+          startLedgerApiServer = sync.isActive(),
         )(executionContext, actorSystem)
         .leftMap { err =>
           // The MigrateOnEmptySchema exception is private, thus match on the expected message
@@ -216,7 +219,7 @@ class ParticipantNodeBootstrap(
 
   override protected def autoInitializeIdentity(): EitherT[Future, String, Unit] =
     withNewTraceContext { implicit traceContext =>
-      val protocolVersion = ProtocolVersion.latest
+      val protocolVersion = config.parameters.initialProtocolVersion.unwrap
 
       for {
         // create keys
@@ -381,6 +384,7 @@ class ParticipantNodeBootstrap(
             syncCrypto,
             cantonParameterConfig.processingTimeouts,
             topologyManager,
+            cantonParameterConfig.initialProtocolVersion,
             loggerFactory,
           ),
           cantonParameterConfig.processingTimeouts,
@@ -502,6 +506,12 @@ class ParticipantNodeBootstrap(
               traceContext: TraceContext
           ): EitherT[Future, PackageId, Set[PackageId]] =
             packageService.packageDependencies(packages)
+
+          override def partyHasActiveContracts(partyId: PartyId)(implicit
+              traceContext: TraceContext
+          ): Future[Boolean] = {
+            sync.partyHasActiveContracts(partyId)
+          }
         })
       }
 
@@ -511,9 +521,8 @@ class ParticipantNodeBootstrap(
         sync = sync,
       )
     } yield {
-      logger.debug("Starting ledger-api dependent canton services")
       val ledgerApiDependentServices =
-        new LedgerApiDependentCantonServices(
+        new StartableStoppableLedgerApiDependentServices(
           config,
           cantonParameterConfig,
           packageService,
@@ -526,7 +535,11 @@ class ParticipantNodeBootstrap(
           loggerFactory,
           tracerProvider,
         )
-      setStartableStoppableIndexer(ledgerApiServer.indexer)
+
+      setStartableStoppableLedgerApiAndCantonServices(
+        ledgerApiServer.startableStoppableLedgerApi,
+        ledgerApiDependentServices,
+      )
 
       val stateService = new DomainConnectivityService(
         sync,
@@ -663,7 +676,7 @@ object ParticipantNodeBootstrap {
             CantonSyncService.DefaultFactory,
             participantMetrics,
             new CommunityStorageFactory(participantConfig.storage),
-            _indexer => (),
+            (_ledgerApi, _ledgerApiDependentServices) => (),
             _ =>
               new ResourceManagementService.CommunityResourceManagementService(
                 participantConfig.parameters.warnIfOverloadedFor
@@ -722,7 +735,7 @@ class ParticipantNode(
     private[canton] val sync: CantonSyncService,
     eventPublisher: ParticipantEventPublisher,
     ledgerApiServer: CantonLedgerApiServerWrapper.LedgerApiServerState,
-    val ledgerApiDependentCantonServices: LedgerApiDependentCantonServices,
+    val ledgerApiDependentCantonServices: StartableStoppableLedgerApiDependentServices,
     val adminToken: CantonAdminToken,
     val recordSequencerInteractions: AtomicReference[Option[RecordingConfig]],
     val replaySequencerConfig: AtomicReference[Option[ReplayConfig]],

@@ -4,22 +4,19 @@
 package com.digitalasset.canton.participant.store
 
 import com.digitalasset.canton.BaseTest
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.protocol.TestDomainParameters
 import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
 import org.scalatest.wordspec.AsyncWordSpec
 
 trait DomainParameterStoreTest { this: AsyncWordSpec with BaseTest =>
 
   val domainId = DomainId(UniqueIdentifier.tryFromProtoPrimitive("domainId::domainId"))
-  val defaultParams = TestDomainParameters.defaultStatic
 
   def domainParameterStore(mk: DomainId => DomainParameterStore): Unit = {
 
     "setParameters" should {
       "store new parameters" in {
         val store = mk(domainId)
-        val params = defaultParams
+        val params = defaultStaticDomainParameters
         for {
           _ <- store.setParameters(params)
           last <- store.lastParameters
@@ -30,7 +27,7 @@ trait DomainParameterStoreTest { this: AsyncWordSpec with BaseTest =>
 
       "be idempotent" in {
         val store = mk(domainId)
-        val params = defaultParams.copy(maxRatePerParticipant = NonNegativeInt.tryCreate(100))
+        val params = BaseTest.defaultStaticDomainParametersWith(maxRatePerParticipant = 100)
         for {
           _ <- store.setParameters(params)
           _ <- store.setParameters(params)
@@ -42,8 +39,10 @@ trait DomainParameterStoreTest { this: AsyncWordSpec with BaseTest =>
 
       "not overwrite changed domain parameters" in {
         val store = mk(domainId)
-        val params = defaultParams
-        val modified = params.copy(maxInboundMessageSize = params.maxInboundMessageSize.tryAdd(1))
+        val params = defaultStaticDomainParameters
+        val modified = BaseTest.defaultStaticDomainParametersWith(maxInboundMessageSize =
+          params.maxInboundMessageSize.unwrap + 1
+        )
         for {
           _ <- store.setParameters(params)
           ex <- store.setParameters(modified).failed

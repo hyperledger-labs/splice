@@ -230,12 +230,13 @@ object TopologyAdminCommands {
         participant: ParticipantId,
         permission: ParticipantPermission,
         replaceExisting: Boolean,
+        force: Boolean,
     ) extends BaseCommand[v0.PartyToParticipantAuthorization] {
 
       override def createRequest(): Either[String, v0.PartyToParticipantAuthorization] =
         Right(
           v0.PartyToParticipantAuthorization(
-            authData(ops, signedBy, replaceExisting = replaceExisting, force = false),
+            authData(ops, signedBy, replaceExisting = replaceExisting, force = force),
             side.toProtoEnum,
             party.uid.toProtoPrimitive,
             participant.toProtoPrimitive,
@@ -362,13 +363,19 @@ object TopologyAdminCommands {
         newParameters: DynamicDomainParameters,
         force: Boolean,
     ) extends BaseCommand[v0.DomainParametersChangeAuthorization] {
-      override def createRequest(): Either[String, v0.DomainParametersChangeAuthorization] =
+      override def createRequest(): Either[String, v0.DomainParametersChangeAuthorization] = {
+        // TODO(#9001) properly choose serialization
+        // Version for the serialization should depend on the internal version
+        val parameters =
+          v0.DomainParametersChangeAuthorization.Parameters.ParametersV1(newParameters.toProtoV1)
+
         v0.DomainParametersChangeAuthorization(
           authorization =
             authData(TopologyChangeOp.Replace, signedBy, replaceExisting = false, force = force),
           domain = domainId.toProtoPrimitive,
-          parameters = Option(newParameters.toProtoV0),
+          parameters = parameters,
         ).asRight
+      }
 
       override def submitRequest(
           service: TopologyManagerWriteServiceStub,

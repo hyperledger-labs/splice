@@ -42,6 +42,7 @@ import com.digitalasset.canton.domain.topology.client.DomainInitializationObserv
 import com.digitalasset.canton.health.admin.data.{SequencerHealthStatus, TopologyQueueStatus}
 import com.digitalasset.canton.lifecycle.{FlagCloseable, HasCloseContext, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.sequencing.client._
@@ -70,6 +71,7 @@ import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.ErrorUtil
+import io.grpc.health.v1.HealthCheckResponse.ServingStatus
 import io.grpc.{ServerInterceptors, ServerServiceDefinition}
 import io.opentelemetry.api.trace.Tracer
 
@@ -107,11 +109,11 @@ class SequencerRuntime(
     topologyClientMember: Member,
     topologyClient: DomainTopologyClientWithInit,
     topologyProcessor: TopologyTransactionProcessor,
-    sharedTopologyProcessor: Boolean,
+    sharedTopologyProcessor: Boolean, // means we are running in embedded mode
     storage: Storage,
     clock: Clock,
     auditLogger: TracedLogger,
-    snapshot: Option[SequencerSnapshot],
+    initialState: Option[SequencerInitialState],
     authenticationConfig: SequencerAuthenticationConfig,
     additionalAdminServiceFactory: Sequencer => Option[ServerServiceDefinition],
     registerSequencerMember: Boolean,
@@ -146,10 +148,12 @@ class SequencerRuntime(
       clock,
       topologyClientMember,
       syncCrypto,
-      snapshot,
+      initialState,
       localNodeParameters,
       staticDomainParameters.protocolVersion,
     )
+
+  private val healthManager = new io.grpc.protobuf.services.HealthStatusManager()
 
   private val keyCheckF =
     syncCrypto
@@ -240,7 +244,7 @@ class SequencerRuntime(
           replayEnabled = false,
           localNodeParameters.loggingConfig,
           loggerFactory,
-          snapshot.flatMap(_.heads.get(sequencerId).map(_ + 1)),
+          initialState.flatMap(_.snapshot.heads.get(sequencerId).map(_ + 1)),
         )
         val timeTracker = DomainTimeTracker(timeTrackerConfig, clock, client, loggerFactory)
 
@@ -268,6 +272,7 @@ class SequencerRuntime(
             domainId,
             topologyClient,
             sequencedTopologyStore,
+            mustHaveActiveMediator = sharedTopologyProcessor,
             localNodeParameters.processingTimeouts,
             loggerFactory,
           )
@@ -288,6 +293,23 @@ class SequencerRuntime(
     staticDomainParameters.maxBatchMessageSize,
     localNodeParameters.processingTimeouts,
     loggerFactory,
+  )
+
+  TraceContext.withNewTraceContext(tc =>
+    sequencer.onHealthChange { (status, traceContext) =>
+      healthManager.setStatus(
+        CantonGrpcUtil.sequencerHealthCheckServiceName,
+        if (status.isActive) ServingStatus.SERVING else ServingStatus.NOT_SERVING,
+      )
+      if (!status.isActive) {
+        logger.warn(
+          s"Sequencer is unhealthy, so disconnecting all members. ${status.details.getOrElse("")}"
+        )(traceContext)
+        sequencerService.disconnectAllMembers()(traceContext)
+      } else {
+        logger.info(s"Sequencer is healthy")(traceContext)
+      }
+    }(tc)
   )
 
   private val sequencerAdministrationService = new GrpcSequencerAdministrationService(sequencer)
@@ -403,10 +425,11 @@ class SequencerRuntime(
   def registerDomainService(
       register: ServerServiceDefinition => Unit
   )(implicit ec: ExecutionContext): Unit = {
-
-    v0.DomainServiceGrpc.bindService(
-      new GrpcDomainService(authenticationConfig.agreementManager, loggerFactory),
-      executionContext,
+    register(
+      v0.DomainServiceGrpc.bindService(
+        new GrpcDomainService(authenticationConfig.agreementManager, loggerFactory),
+        executionContext,
+      )
     )
 
     register(
@@ -455,6 +478,8 @@ class SequencerRuntime(
         interceptors,
       )
     )
+
+    register(healthManager.getHealthService.bindService())
   }
 
   override def onClosed(): Unit =

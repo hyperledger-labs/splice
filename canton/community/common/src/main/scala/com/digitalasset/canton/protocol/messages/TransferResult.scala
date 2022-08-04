@@ -24,7 +24,6 @@ import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.util.NoCopy
 import com.digitalasset.canton.version.{
   HasMemoizedProtocolVersionedWrapperCompanion,
-  HasProtoV0,
   HasProtocolVersionedWrapper,
   ProtobufVersion,
   ProtocolVersion,
@@ -34,12 +33,12 @@ import com.google.protobuf.ByteString
 
 /** Mediator result for a transfer-out request
   *
-  * @param requestId timestamp of the corresponding [[TransferOutRequest]] on the origin domain
+  * @param requestId timestamp of the corresponding [[TransferOutRequest]] on the source domain
   */
 sealed abstract case class TransferResult[+Domain <: TransferDomainId](
     override val requestId: RequestId,
     informees: Set[LfPartyId],
-    domain: Domain, // For transfer-out, this is the origin domain. For transfer-in, this is the target domain.
+    domain: Domain, // For transfer-out, this is the source domain. For transfer-in, this is the target domain.
     override val verdict: Verdict,
 )(
     val representativeProtocolVersion: RepresentativeProtocolVersion[
@@ -48,7 +47,6 @@ sealed abstract case class TransferResult[+Domain <: TransferDomainId](
     override val deserializedFrom: Option[ByteString],
 ) extends RegularMediatorResult
     with HasProtocolVersionedWrapper[TransferResult[TransferDomainId]]
-    with HasProtoV0[v0.TransferResult]
     with NoCopy
     with PrettyPrinting {
 
@@ -66,7 +64,7 @@ sealed abstract case class TransferResult[+Domain <: TransferDomainId](
 
   override def companionObj = TransferResult
 
-  override def toProtoV0: v0.TransferResult = {
+  def toProtoV0: v0.TransferResult = {
     val domainP = (domain: @unchecked) match {
       case TransferOutDomainId(domainId) =>
         v0.TransferResult.Domain.OriginDomain(domainId.toProtoPrimitive)
@@ -149,9 +147,9 @@ object TransferResult
             .flatMap(CantonTimestamp.fromProtoPrimitive)
             .map(RequestId(_))
           domain <- domainP match {
-            case Domain.OriginDomain(originDomain) =>
+            case Domain.OriginDomain(sourceDomain) =>
               DomainId
-                .fromProtoPrimitive(originDomain, "TransferResult.originDomain")
+                .fromProtoPrimitive(sourceDomain, "TransferResult.originDomain")
                 .map(TransferOutDomainId(_))
             case Domain.TargetDomain(targetDomain) =>
               DomainId

@@ -17,11 +17,7 @@ import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.crypto._
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.domain.admin.v0.{
-  DomainServiceGrpc,
-  SequencerInitializationServiceGrpc,
-  SequencerVersionServiceGrpc,
-}
+import com.digitalasset.canton.domain.admin.v0.{DomainServiceGrpc, SequencerVersionServiceGrpc}
 import com.digitalasset.canton.domain.admin.{grpc => admingrpc}
 import com.digitalasset.canton.domain.config._
 import com.digitalasset.canton.domain.governance.ParticipantAuditor
@@ -32,18 +28,8 @@ import com.digitalasset.canton.domain.mediator.{
   MediatorRuntimeFactory,
 }
 import com.digitalasset.canton.domain.metrics.DomainMetrics
-import com.digitalasset.canton.domain.sequencing.admin._
-import com.digitalasset.canton.domain.sequencing.admin.client.SequencerAdminClient
-import com.digitalasset.canton.domain.sequencing.admin.protocol.InitRequest
-import com.digitalasset.canton.domain.sequencing.service.{
-  GrpcSequencerInitializationService,
-  GrpcSequencerVersionService,
-}
-import com.digitalasset.canton.domain.sequencing.{
-  SequencerKeyInitialization,
-  SequencerRuntime,
-  SequencerRuntimeFactory,
-}
+import com.digitalasset.canton.domain.sequencing.service.GrpcSequencerVersionService
+import com.digitalasset.canton.domain.sequencing.{SequencerRuntime, SequencerRuntimeFactory}
 import com.digitalasset.canton.domain.service.ServiceAgreementManager
 import com.digitalasset.canton.domain.topology._
 import com.digitalasset.canton.environment.{CantonNode, CantonNodeBootstrapBase}
@@ -62,13 +48,11 @@ import com.digitalasset.canton.topology.TopologyManagerError.DomainErrorGroup
 import com.digitalasset.canton.topology._
 import com.digitalasset.canton.topology.client._
 import com.digitalasset.canton.topology.processing.TopologyTransactionProcessor
-import com.digitalasset.canton.topology.store.StoredTopologyTransactions
 import com.digitalasset.canton.topology.store.TopologyStoreId.{AuthorizedStore, DomainStore}
 import com.digitalasset.canton.topology.transaction._
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.ErrorUtil
-import com.digitalasset.canton.util.Thereafter.syntax.ThereafterOps
 import com.google.common.annotations.VisibleForTesting
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
@@ -173,53 +157,15 @@ class DomainNodeBootstrap(
       domainId: DomainId,
       topologyManager: DomainTopologyManager,
       namespaceKey: SigningPublicKey,
-  ): EitherT[Future, String, PublicKey] = {
-    def createAdminConnection(): EitherT[Future, String, SequencerAdminClient] =
-      for {
-        adminConnection <- config.adminApi.toSequencerConnectionConfig.toConnection
-          .toEitherT[Future]
-
-        staticDomainParameters <- EitherT.fromEither[Future](staticDomainParameters)
-
-        adminClient <- SequencerAdminClient.create(
-          adminConnection,
-          staticDomainParameters,
-          parameters.processingTimeouts,
-          parameters.tracing.propagation,
-          crypto,
-          loggerFactory,
-        )
-      } yield adminClient
-
-    val adminClientE = createAdminConnection()
-
-    def closeAdminConnections(): Unit =
-      parameters.processingTimeouts.shutdownNetwork
-        .await("Closing the admin client connections")(adminClientE.map(_.close()).value)
-        .valueOr(err => logger.error(s"Failed to close sequencer admin connection: $err"))
-
-    val result = for {
-      adminClient <- adminClientE
-      staticDomainParameters <- EitherT.fromEither[Future](staticDomainParameters)
-      request = InitRequest(domainId, StoredTopologyTransactions.empty, staticDomainParameters)
-      key <- SequencerInitialization
-        .attemptInitialization(
-          name,
-          parameters.sequencerClient,
-          parameters.devVersionSupport,
-          adminClient,
-          authorizeStateUpdate(topologyManager, namespaceKey, _, protocolVersion),
-          crypto.cryptoPublicStore,
-          request,
-          parameters.processingTimeouts,
-          loggerFactory,
-        )
-    } yield key
-
-    result.thereafter { _ =>
-      closeAdminConnections()
-    }
-  }
+  ): EitherT[Future, String, PublicKey] = for {
+    sequencerKey <- getOrCreateSigningKey(s"$name-sequencer-signing")
+    _ <- authorizeStateUpdate(
+      topologyManager,
+      namespaceKey,
+      OwnerToKeyMapping(SequencerId(domainId), sequencerKey),
+      protocolVersion,
+    )
+  } yield sequencerKey
 
   override protected def initializeIdentityManagerAndServices(
       nodeId: NodeId
@@ -230,7 +176,7 @@ class DomainNodeBootstrap(
     logger.debug("Starting domain topology manager")
     staticDomainParameters.map { staticDomainParameters =>
       val manager = new DomainTopologyManager(
-        nodeId.identity,
+        DomainTopologyManagerId(nodeId.identity),
         clock,
         topologyStoreFactory.forId(AuthorizedStore),
         addMemberHook,
@@ -246,23 +192,17 @@ class DomainNodeBootstrap(
 
   }
 
-  /** If we're running a sequencer within the domain node itself, then locally start the sequencer initialization service */
-  private def initializeSequencerServices: EitherT[Future, String, Unit] =
-    for {
-      versionService <- EitherT.rightT[Future, String](
-        new GrpcSequencerVersionService(protocolVersion, loggerFactory)
-      )
-      initializationService = new GrpcSequencerInitializationService(
-        SequencerKeyInitialization.ensureKeyExists(crypto),
-        loggerFactory,
-      )
-      // register with the server
-      _ = adminServerRegistry
-        .addService(
-          SequencerInitializationServiceGrpc.bindService(initializationService, executionContext)
+  /** If we're running a sequencer within the domain node itself, then locally start some core services */
+  private def initializeSequencerServices: EitherT[Future, String, Unit] = {
+    adminServerRegistry
+      .addService(
+        SequencerVersionServiceGrpc.bindService(
+          new GrpcSequencerVersionService(protocolVersion, loggerFactory),
+          executionContext,
         )
-        .addService(SequencerVersionServiceGrpc.bindService(versionService, executionContext))
-    } yield ()
+      )
+    EitherT.pure(())
+  }
 
   override protected def initialize(id: NodeId): EitherT[Future, String, Unit] = {
     val topologyManager = initializeIdentityManagerAndServices(id)
@@ -300,7 +240,7 @@ class DomainNodeBootstrap(
             val managerInitialized =
               initTimeout.await(
                 s"Domain startup waiting for the domain topology manager to be initialised"
-              )(manager.isInitialized)
+              )(manager.isInitialized(mustHaveActiveMediator = true))
             if (managerInitialized) {
               if (attemptedStart.compareAndSet(false, true)) {
                 // we're now the top level error handler of starting a domain so log appropriately
@@ -324,7 +264,7 @@ class DomainNodeBootstrap(
 
     for {
       // if the domain is starting up after previously running its identity will have been stored and will be immediately available
-      alreadyInitialized <- EitherT.right[String](manager.isInitialized)
+      alreadyInitialized <- EitherT.right(manager.isInitialized(mustHaveActiveMediator = true))
       // if not, then create an observer of topology transactions that will check each time whether full identity has been generated
       _ <- if (alreadyInitialized) startDomain(manager) else deferStart
     } yield ()
@@ -334,7 +274,7 @@ class DomainNodeBootstrap(
   private def startDomain(manager: DomainTopologyManager): EitherT[Future, String, Unit] =
     startInstanceUnlessClosing {
       // store with all topology transactions which were timestamped and distributed via sequencer
-      val domainId = DomainId(manager.id)
+      val domainId = manager.id.domainId
       val sequencedTopologyStore = topologyStoreFactory.forId(DomainStore(domainId))
       val publicSequencerConnectionEitherT =
         config.publicApi.toSequencerConnectionConfig.toConnection.toEitherT[Future]
@@ -342,7 +282,7 @@ class DomainNodeBootstrap(
       for {
         publicSequencerConnection <- publicSequencerConnectionEitherT
         managerDiscriminator <- EitherT.right(
-          SequencerClientDiscriminator.fromDomainMember(manager.managerId, indexedStringStore)
+          SequencerClientDiscriminator.fromDomainMember(manager.id, indexedStringStore)
         )
         topologyManagerSequencerCounterTrackerStore = SequencerCounterTrackerStore(
           storage,
@@ -399,7 +339,7 @@ class DomainNodeBootstrap(
         syncCrypto: DomainSyncCryptoClient = {
           ips.add(topologyClient)
           new SyncCryptoApiProvider(
-            manager.managerId,
+            manager.id,
             ips,
             crypto,
             parameters.cachingConfigs,
@@ -431,7 +371,7 @@ class DomainNodeBootstrap(
             crypto,
             sequencedTopologyStore,
             // The sequencer is using the topology manager's topology client
-            manager.managerId,
+            manager.id,
             topologyClient,
             topologyProcessor,
             storage,
@@ -641,7 +581,7 @@ class Domain(
         clients = topologyManagementArtefacts.client.numPendingChanges,
       )
       DomainStatus(
-        domainTopologyManager.id,
+        domainTopologyManager.id.uid,
         uptime(),
         ports,
         participants,

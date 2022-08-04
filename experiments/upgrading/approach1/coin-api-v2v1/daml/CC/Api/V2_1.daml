@@ -52,8 +52,6 @@ interface CoinRules
 
     coinRules_AppReward_SvcExpire_impl : ContractId AppReward -> AppRewardView -> AppReward_SvcExpire -> Update ()
 
-    ensure (signatory this == [getSvc this])
-
     nonconsuming choice CoinRules_Transfer : [TransferResult]
       with
         transfer : Transfer

@@ -4,6 +4,7 @@
 package com.digitalasset.canton.domain.mediator
 
 import cats.data.EitherT
+import cats.syntax.functorFilter._
 import cats.syntax.option._
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton._
@@ -14,18 +15,16 @@ import com.digitalasset.canton.crypto._
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.data.ViewType.TransferInViewType
 import com.digitalasset.canton.data._
-import com.digitalasset.canton.domain.mediator.store.{InMemoryFinalizedResponseStore, MediatorState}
+import com.digitalasset.canton.domain.mediator.store.{
+  InMemoryFinalizedResponseStore,
+  InMemoryMediatorDeduplicationStore,
+  MediatorState,
+}
 import com.digitalasset.canton.domain.metrics.DomainTestMetrics
 import com.digitalasset.canton.logging.LogEntry
 import com.digitalasset.canton.protocol._
 import com.digitalasset.canton.protocol.messages.Verdict.{Approve, MediatorReject, RejectReasons}
 import com.digitalasset.canton.protocol.messages._
-import com.digitalasset.canton.sequencing.client.{
-  SendAsyncClientError,
-  SendCallback,
-  SendType,
-  SequencerClient,
-}
 import com.digitalasset.canton.sequencing.protocol._
 import com.digitalasset.canton.time.{DomainTimeTracker, NonNegativeFiniteDuration}
 import com.digitalasset.canton.topology._
@@ -34,9 +33,7 @@ import com.digitalasset.canton.topology.transaction._
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.MonadUtil.{sequentialTraverse, sequentialTraverse_}
 import com.digitalasset.canton.util.ShowUtil._
-import com.digitalasset.canton.version.ProtocolVersion
 import com.google.protobuf.ByteString
-import org.mockito.ArgumentCaptor
 import org.mockito.ArgumentMatchers.{eq => eqMatch}
 import org.scalatest.Assertion
 import org.scalatest.wordspec.AsyncWordSpec
@@ -46,10 +43,10 @@ import scala.concurrent.Future
 
 @nowarn("msg=match may not be exhaustive")
 class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
-  lazy val domainId = DomainId(UniqueIdentifier.tryFromProtoPrimitive("domain::test"))
+  lazy val domainId: DomainId = DomainId(UniqueIdentifier.tryFromProtoPrimitive("domain::test"))
 
   private val factory = new ExampleTransactionFactory()(domainId = domainId)
-  val mediatorId = factory.mediatorId
+  val mediatorId: MediatorId = factory.mediatorId
   private val fullInformeeTree = factory.MultipleRootsAndViewNestings.fullInformeeTree
   private val participant: ParticipantId = ExampleTransactionFactory.submitterParticipant
 
@@ -57,11 +54,10 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
 
   private val initialDomainParameters = TestDomainParameters.defaultDynamic
 
-  val participantResponseTimeout = NonNegativeFiniteDuration.ofMillis(100L)
+  val participantResponseTimeout: NonNegativeFiniteDuration =
+    NonNegativeFiniteDuration.ofMillis(100L)
 
   "ConfirmationResponseProcessor" should {
-    val partyNoActiveParticipant = LfPartyId.assertFromString("unknown::default")
-
     val submitter = ExampleTransactionFactory.submitter
     val signatory = ExampleTransactionFactory.signatory
     val topology = TestingTopology(
@@ -95,13 +91,15 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
 
     val requestIdTs = CantonTimestamp.Epoch
     val requestId = RequestId(requestIdTs)
+    val decisionTime = requestIdTs.plusSeconds(120)
 
     class Fixture(syncCryptoApi: DomainSyncCryptoClient = domainSyncCryptoApi) {
-      val sequencerClient = mock[SequencerClient]
-      val timeTracker = mock[DomainTimeTracker]
+      val verdictSender: TestVerdictSender = new TestVerdictSender
+      val timeTracker: DomainTimeTracker = mock[DomainTimeTracker]
       val mediatorState =
         new MediatorState(
           new InMemoryFinalizedResponseStore(loggerFactory),
+          new InMemoryMediatorDeduplicationStore(loggerFactory),
           DomainTestMetrics.mediator,
           timeouts,
           loggerFactory,
@@ -109,28 +107,14 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
       val processor = new ConfirmationResponseProcessor(
         domainId,
         mediatorId,
+        verdictSender,
         syncCryptoApi,
-        sequencerClient,
         timeTracker,
         mediatorState,
         new LoggingAlarmStreamer(logger),
-        ProtocolVersion.latestForTest,
+        testedProtocolVersion,
         loggerFactory,
       )
-
-      when(
-        sequencerClient.sendAsync(
-          any[Batch[DefaultOpenEnvelope]],
-          any[SendType],
-          any[Option[CantonTimestamp]],
-          any[CantonTimestamp],
-          any[MessageId],
-          any[SendCallback],
-        )(anyTraceContext)
-      )
-        .thenAnswer[Batch[Envelope[ProtocolMessage]]]((_) =>
-          EitherT.rightT[Future, SendAsyncClientError](())
-        )
     }
 
     object Fixture {
@@ -186,19 +170,20 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
         Some(fullInformeeTree.transactionId.toRootHash),
         confirmers,
         factory.domainId,
-        defaultProtocolVersion,
+        testedProtocolVersion,
       )
       val participantCrypto = identityFactory.forOwner(participant)
       SignedProtocolMessage.tryCreate(
         response,
         participantCrypto.tryForDomain(domainId).currentSnapshotApproximation,
         participantCrypto.pureCrypto,
+        testedProtocolVersion,
       )
     }
 
     "timestamp of mediator request is propagated" in {
       val sut = Fixture()
-      val testMediatorRequest = new InformeeMessage(fullInformeeTree) {
+      val testMediatorRequest = new InformeeMessage(fullInformeeTree)(testedProtocolVersion) {
         override def informeesAndThresholdByView: Map[ViewHash, (Set[Informee], NonNegativeInt)] = {
           super.informeesAndThresholdByView map { case (key, (informee, _)) =>
             (key, (informee, NonNegativeInt.zero))
@@ -208,30 +193,25 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
         override def rootHash: Option[RootHash] = None // don't require root hash messages
       }
       val requestTimestamp = CantonTimestamp.Epoch.plusSeconds(120)
-
       for {
         _ <- sut.processor.processRequest(
           RequestId(requestTimestamp),
           0L,
+          requestTimestamp.plusSeconds(60),
+          requestTimestamp.plusSeconds(120),
           testMediatorRequest,
           List.empty,
         )
-        _ = verify(sut.sequencerClient, times(1))
-          .sendAsync(
-            any[Batch[DefaultOpenEnvelope]],
-            any[SendType],
-            eqMatch[Option[CantonTimestamp]](Some(requestTimestamp)),
-            any[CantonTimestamp],
-            any[MessageId],
-            any[SendCallback],
-          )(anyTraceContext)
 
-      } yield succeed
+      } yield {
+        val sentResult = sut.verdictSender.sentResults.loneElement
+        sentResult.requestId.unwrap shouldBe requestTimestamp
+      }
     }
 
     "request timestamp is propagated to mediator result when response aggregation is performed" should {
       // Send mediator request
-      val informeeMessage = new InformeeMessage(fullInformeeTree) {
+      val informeeMessage = new InformeeMessage(fullInformeeTree)(testedProtocolVersion) {
         override def informeesAndThresholdByView: Map[ViewHash, (Set[Informee], NonNegativeInt)] = {
           val top = super.informeesAndThresholdByView
           top map { case (key, (informee, _)) =>
@@ -289,12 +269,16 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
           _ <- sut.processRequest(
             reqId,
             notSignificantCounter,
+            requestTimestamp.plusSeconds(60),
+            requestTimestamp.plusSeconds(120),
             informeeMessage,
             List.empty,
           )
           _ <- sut.processResponse(
             CantonTimestamp.Epoch,
             notSignificantCounter,
+            requestTimestamp.plusSeconds(60),
+            requestTimestamp.plusSeconds(120),
             response,
           )
         } yield ()
@@ -316,16 +300,10 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
         val sut = new Fixture(mockedSnapshotCrypto)
         for {
           _ <- handleEvents(sut.processor)
-          _ = verify(sut.sequencerClient, timeout(1000).times(1))
-            .sendAsync(
-              any[Batch[DefaultOpenEnvelope]],
-              any[SendType],
-              eqMatch[Option[CantonTimestamp]](Some(requestTimestamp)),
-              any[CantonTimestamp],
-              any[MessageId],
-              any[SendCallback],
-            )(anyTraceContext)
-        } yield succeed
+        } yield {
+          val sentResult = sut.verdictSender.sentResults.loneElement
+          sentResult.requestId.unwrap shouldBe requestTimestamp
+        }
       }
     }
 
@@ -340,11 +318,11 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
       val domainSyncCryptoApi3 = identityFactory3.forOwnerAndDomain(mediatorId, domainId)
       val sut = new Fixture(domainSyncCryptoApi3)
 
-      val mediatorRequest = InformeeMessage(fullInformeeTree, defaultProtocolVersion)
+      val mediatorRequest = InformeeMessage(fullInformeeTree)(testedProtocolVersion)
       val rootHashMessage = RootHashMessage(
         mediatorRequest.rootHash.value,
         domainId,
-        defaultProtocolVersion,
+        testedProtocolVersion,
         mediatorRequest.viewType,
         SerializedRootHashMessagePayload.empty,
       )
@@ -356,23 +334,18 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
         _ <- sut.processor.processRequest(
           RequestId(ts),
           notSignificantCounter,
+          ts.plusSeconds(60),
+          ts.plusSeconds(120),
           mediatorRequest,
           List(
             OpenEnvelope(
               rootHashMessage,
               Recipients.cc(mediatorId, participant),
-              defaultProtocolVersion,
+              testedProtocolVersion,
             )
           ),
         )
-        _ = verify(sut.sequencerClient, never).sendAsync(
-          any[Batch[DefaultOpenEnvelope]],
-          any[SendType],
-          any[Option[CantonTimestamp]],
-          any[CantonTimestamp],
-          any[MessageId],
-          any[SendCallback],
-        )(anyTraceContext)
+        _ = sut.verdictSender.sentResults shouldBe empty
 
         // If it nevertheless gets a response, it will complain about the request not being known
         response <- signedResponse(
@@ -382,7 +355,13 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
           requestId,
         )
         _ <- loggerFactory.assertLogs(
-          sut.processor.processResponse(ts.immediateSuccessor, sc + 1L, response),
+          sut.processor.processResponse(
+            ts.immediateSuccessor,
+            sc + 1L,
+            ts.plusSeconds(60),
+            ts.plusSeconds(120),
+            response,
+          ),
           _.warningMessage should include(show"$requestId no corresponding request"),
         )
       } yield {
@@ -390,67 +369,11 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
       }
     }
 
-    "request rejected when informee not hosted on active participant" in {
-      val sut = Fixture()
-      val informeeMessage = new InformeeMessage(fullInformeeTree) {
-        override def informeesAndThresholdByView: Map[ViewHash, (Set[Informee], NonNegativeInt)] = {
-          val top = super.informeesAndThresholdByView
-          top map { case (key, (informee, _)) =>
-            if (informee == Set(submitter))
-              (key, (Set[Informee](PlainInformee(partyNoActiveParticipant)), NonNegativeInt.one))
-            else (key, (informee, NonNegativeInt.zero))
-          }
-        }
-
-        override def allInformees: Set[LfPartyId] = super.allInformees + partyNoActiveParticipant
-
-        override def rootHash: Option[RootHash] = None // don't require root hash messages
-      }
-
-      val batchCaptor: ArgumentCaptor[Batch[DefaultOpenEnvelope]] =
-        ArgumentCaptor.forClass(classOf[Batch[DefaultOpenEnvelope]])
-
-      for {
-        _ <- sut.processor.processRequest(
-          RequestId(CantonTimestamp.Epoch),
-          notSignificantCounter,
-          informeeMessage,
-          List.empty,
-        )
-        batch = {
-          verify(sut.sequencerClient, times(1))
-            .sendAsync(
-              batchCaptor.capture(),
-              any[SendType],
-              any[Option[CantonTimestamp]],
-              any[CantonTimestamp],
-              any[MessageId],
-              any[SendCallback],
-            )(anyTraceContext)
-          batchCaptor.getValue
-        }
-      } yield {
-        @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-        val envelope =
-          batch
-            .envelopes(0)
-            .asInstanceOf[OpenEnvelope[
-              SignedProtocolMessage[MediatorResult with SignedProtocolMessageContent]
-            ]]
-        envelope.protocolMessage.message.verdict match {
-          case reject: Verdict.MediatorReject =>
-            reject.code shouldBe MediatorReject.Topology.InformeesNotHostedOnActiveParticipants
-          case x =>
-            fail(x.toString)
-        }
-      }
-    }
-
     "accept root hash messages" in {
       val sut = new Fixture(domainSyncCryptoApi2)
       val correctRootHash = RootHash(TestHash.digest("root-hash"))
       // Create a custom informee message with several recipient participants
-      val informeeMessage = new InformeeMessage(fullInformeeTree) {
+      val informeeMessage = new InformeeMessage(fullInformeeTree)(testedProtocolVersion) {
         override val informeesAndThresholdByView: Map[ViewHash, (Set[Informee], NonNegativeInt)] = {
           val submitterI = Informee.tryCreate(submitter, 1)
           val signatoryI = Informee.tryCreate(signatory, 1)
@@ -473,7 +396,7 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
         RootHashMessage(
           correctRootHash,
           domainId,
-          defaultProtocolVersion,
+          testedProtocolVersion,
           correctViewType,
           SerializedRootHashMessagePayload.empty,
         )
@@ -495,14 +418,16 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
         ),
       )
 
-      sequentialTraverse_(tests.zipWithIndex) { case ((testName, recipients), i) =>
+      sequentialTraverse_(tests.zipWithIndex) { case ((_testName, recipients), i) =>
         withClueF("testname") {
           val rootHashMessages =
-            recipients.map(r => OpenEnvelope(rootHashMessage, r, defaultProtocolVersion))
+            recipients.map(r => OpenEnvelope(rootHashMessage, r, testedProtocolVersion))
           val ts = CantonTimestamp.ofEpochSecond(i.toLong)
           sut.processor.processRequest(
             RequestId(ts),
             notSignificantCounter,
+            ts.plusSeconds(60),
+            ts.plusSeconds(120),
             informeeMessage,
             rootHashMessages,
           )
@@ -513,7 +438,7 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
     "send rejections when receiving wrong root hash messages" in {
       val sut = Fixture()
 
-      val informeeMessage = InformeeMessage(fullInformeeTree, defaultProtocolVersion)
+      val informeeMessage = InformeeMessage(fullInformeeTree)(testedProtocolVersion)
       val rootHash = informeeMessage.rootHash.value
       val wrongRootHash =
         RootHash(
@@ -526,7 +451,7 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
         RootHashMessage(
           rootHash,
           domainId,
-          defaultProtocolVersion,
+          testedProtocolVersion,
           correctViewType,
           SerializedRootHashMessagePayload.empty,
         )
@@ -541,7 +466,7 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
         (
           request,
           rootHashMessages.map { case (rootHashMessage, recipients) =>
-            OpenEnvelope(rootHashMessage, recipients, defaultProtocolVersion)
+            OpenEnvelope(rootHashMessage, recipients, testedProtocolVersion)
           }.toList,
         )
       def example(
@@ -583,7 +508,7 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
           .cc(mediatorId, otherMember),
       )
       val requestWithoutExpectedRootHashMessage = exampleForRequest(
-        new InformeeMessage(fullInformeeTree) {
+        new InformeeMessage(fullInformeeTree)(testedProtocolVersion) {
           override def rootHash: Option[RootHash] = None
         },
         correctRootHashMessage -> Recipients.cc(mediatorId, participant),
@@ -637,6 +562,8 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
               sut.processor.processRequest(
                 RequestId(ts),
                 notSignificantCounter,
+                ts.plusSeconds(60),
+                ts.plusSeconds(120),
                 req,
                 rootHashMessages,
               ),
@@ -647,23 +574,9 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
             )
           }
       }.map { _ =>
-        val batchCaptor: ArgumentCaptor[Batch[DefaultOpenEnvelope]] =
-          ArgumentCaptor.forClass(classOf[Batch[DefaultOpenEnvelope]])
         val expectedResultRecipientsAndViewTypes: List[(String, List[(Set[Member], ViewType)])] =
           testCases.map(test => (test._1._2, test._2)).filter(test => test._2.nonEmpty).toList
-        val resultBatches = {
-          import scala.jdk.CollectionConverters._
-          verify(sut.sequencerClient, times(expectedResultRecipientsAndViewTypes.size))
-            .sendAsync(
-              batchCaptor.capture(),
-              any[SendType],
-              any[Option[CantonTimestamp]],
-              any[CantonTimestamp],
-              any[MessageId],
-              any[SendCallback],
-            )(anyTraceContext)
-          batchCaptor.getAllValues.asScala
-        }
+        val resultBatches = sut.verdictSender.sentResults.toList.mapFilter(_.batch)
         resultBatches.size shouldBe expectedResultRecipientsAndViewTypes.size
         forAll(resultBatches.zip(expectedResultRecipientsAndViewTypes)) {
           case (resultBatch, expectedRecipientsAndViewTypes) =>
@@ -698,28 +611,30 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
         new ExampleTransactionFactory()(domainId = domainId, mediatorId = otherMediatorId)
       val fullInformeeTreeOther =
         factoryOtherMediatorId.MultipleRootsAndViewNestings.fullInformeeTree
-      val mediatorRequest = InformeeMessage(fullInformeeTreeOther, defaultProtocolVersion)
+      val mediatorRequest = InformeeMessage(fullInformeeTreeOther)(testedProtocolVersion)
       val rootHashMessage = RootHashMessage(
         mediatorRequest.rootHash.value,
         domainId,
-        defaultProtocolVersion,
+        testedProtocolVersion,
         mediatorRequest.viewType,
         SerializedRootHashMessagePayload.empty,
       )
 
       val sc = 10L
-      val ts = CantonTimestamp.ofEpochSecond(sc.toLong)
+      val ts = CantonTimestamp.ofEpochSecond(sc)
       for {
         _ <- loggerFactory.assertLogs(
           sut.processor.processRequest(
             RequestId(ts),
             notSignificantCounter,
+            ts.plusSeconds(60),
+            ts.plusSeconds(120),
             mediatorRequest,
             List(
               OpenEnvelope(
                 rootHashMessage,
                 Recipients.cc(mediatorId, participant),
-                defaultProtocolVersion,
+                testedProtocolVersion,
               )
             ),
           ),
@@ -735,11 +650,11 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
 
     "correct series of mediator events" in {
       val sut = Fixture()
-      val informeeMessage = InformeeMessage(fullInformeeTree, defaultProtocolVersion)
+      val informeeMessage = InformeeMessage(fullInformeeTree)(testedProtocolVersion)
       val rootHashMessage = RootHashMessage(
         fullInformeeTree.transactionId.toRootHash,
         domainId,
-        defaultProtocolVersion,
+        testedProtocolVersion,
         ViewType.TransactionViewType,
         SerializedRootHashMessagePayload.empty,
       )
@@ -748,12 +663,14 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
         _ <- sut.processor.processRequest(
           requestId,
           notSignificantCounter,
+          requestIdTs.plusSeconds(60),
+          decisionTime,
           informeeMessage,
           List(
             OpenEnvelope(
               rootHashMessage,
               Recipients.cc(mediatorId, participant),
-              defaultProtocolVersion,
+              testedProtocolVersion,
             )
           ),
         )
@@ -776,13 +693,21 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
           signedResponse(Set(submitter), view, LocalApprove, requestId)
         })
         _ <- sequentialTraverse_(approvals)(
-          sut.processor.processResponse(ts1, notSignificantCounter, _)
+          sut.processor.processResponse(
+            ts1,
+            notSignificantCounter,
+            ts1.plusSeconds(60),
+            ts1.plusSeconds(120),
+            _,
+          )
         )
         // records the request
         updatedState <- sut.mediatorState.fetch(requestId).value
         _ = {
           updatedState should matchPattern {
-            case Right(ResponseAggregation(`requestId`, `informeeMessage`, `ts1`, Right(states))) =>
+            case Right(
+                  ResponseAggregation(`requestId`, `informeeMessage`, `ts1`, Right(_states))
+                ) =>
           }
           val ResponseAggregation(`requestId`, `informeeMessage`, `ts1`, Right(states)) =
             updatedState.value
@@ -811,7 +736,13 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
           )
         )(view => signedResponse(Set(signatory), view, LocalApprove, requestId))
         _ <- sequentialTraverse_(approvals)(
-          sut.processor.processResponse(ts2, notSignificantCounter, _)
+          sut.processor.processResponse(
+            ts2,
+            notSignificantCounter,
+            ts2.plusSeconds(60),
+            ts2.plusSeconds(120),
+            _,
+          )
         )
         // records the request
         finalState <- sut.mediatorState.fetch(requestId).value
@@ -829,7 +760,7 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
       val sut = new Fixture(domainSyncCryptoApi2)
 
       // Create a custom informee message with many quorums such that the first Malformed rejection doesn't finalize the request
-      val informeeMessage = new InformeeMessage(fullInformeeTree) {
+      val informeeMessage = new InformeeMessage(fullInformeeTree)(testedProtocolVersion) {
         override val informeesAndThresholdByView: Map[ViewHash, (Set[Informee], NonNegativeInt)] = {
           val submitterI = Informee.tryCreate(submitter, 1)
           val signatoryI = Informee.tryCreate(signatory, 1)
@@ -881,13 +812,14 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
           Some(fullInformeeTree.transactionId.toRootHash),
           Set.empty,
           factory.domainId,
-          defaultProtocolVersion,
+          testedProtocolVersion,
         )
         val participantCrypto = identityFactory2.forOwner(participant)
         SignedProtocolMessage.tryCreate(
           response,
           participantCrypto.tryForDomain(domainId).currentSnapshotApproximation,
           participantCrypto.pureCrypto,
+          testedProtocolVersion,
         )
       }
 
@@ -895,6 +827,8 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
         _ <- sut.processor.processRequest(
           requestId,
           notSignificantCounter,
+          requestIdTs.plusSeconds(60),
+          requestIdTs.plusSeconds(120),
           informeeMessage,
           List.empty,
         )
@@ -923,7 +857,13 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
         // records the request
         _ <- loggerFactory.assertLogs(
           sequentialTraverse_(malformed)(
-            sut.processor.processResponse(ts1, notSignificantCounter, _)
+            sut.processor.processResponse(
+              ts1,
+              notSignificantCounter,
+              ts1.plusSeconds(60),
+              ts1.plusSeconds(120),
+              _,
+            )
           ),
           isMalformedWarn(participant1),
           isMalformedWarn(participant3),
@@ -934,7 +874,7 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
         finalState <- sut.mediatorState.fetch(requestId).value
         _ = inside(finalState) {
           case Right(
-                ResponseAggregation(requestId, request, version, Left(RejectReasons(reasons)))
+                ResponseAggregation(_requestId, _request, _version, Left(RejectReasons(reasons)))
               ) =>
             // TODO(#5337) These are only the rejections for the first view because this view happens to be finalized first.
             reasons.length shouldEqual 2
@@ -951,13 +891,14 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
       val requestTs = CantonTimestamp.Epoch.plusMillis(1)
       val requestId = RequestId(requestTs)
       // response is just too late
-      val responseTs = requestTs.add(participantResponseTimeout.unwrap).addMicros(1)
+      val participantResponseDeadline = requestIdTs.plus(participantResponseTimeout.unwrap)
+      val responseTs = participantResponseDeadline.addMicros(1)
 
-      val informeeMessage = InformeeMessage(fullInformeeTree, defaultProtocolVersion)
+      val informeeMessage = InformeeMessage(fullInformeeTree)(testedProtocolVersion)
       val rootHashMessage = RootHashMessage(
         fullInformeeTree.transactionId.toRootHash,
         domainId,
-        defaultProtocolVersion,
+        testedProtocolVersion,
         ViewType.TransactionViewType,
         SerializedRootHashMessagePayload.empty,
       )
@@ -966,12 +907,14 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
         _ <- sut.processor.processRequest(
           requestId,
           notSignificantCounter,
+          requestIdTs.plus(participantResponseTimeout.unwrap),
+          requestIdTs.plusSeconds(120),
           informeeMessage,
           List(
             OpenEnvelope(
               rootHashMessage,
               Recipients.cc(mediatorId, participant),
-              defaultProtocolVersion,
+              testedProtocolVersion,
             )
           ),
         )
@@ -983,8 +926,14 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
         )
         _ <- loggerFactory.assertLogs(
           sut.processor
-            .processResponse(responseTs, notSignificantCounter + 1, response),
-          _.warningMessage shouldBe s"Response $responseTs is too late as request RequestId($requestTs) has already exceeded the participant response deadline [$participantResponseTimeout]",
+            .processResponse(
+              responseTs,
+              notSignificantCounter + 1,
+              participantResponseDeadline,
+              requestIdTs.plusSeconds(120),
+              response,
+            ),
+          _.warningMessage shouldBe s"Response $responseTs is too late as request RequestId($requestTs) has already exceeded the participant response deadline [$participantResponseDeadline]",
         )
       } yield succeed
     }
@@ -998,18 +947,8 @@ class ConfirmationResponseProcessorTest extends AsyncWordSpec with BaseTest {
 
       // this request is not added to the pending state
       for {
-        _ <- sut.processor.handleTimeout(requestId, timeoutTs)
+        _ <- sut.processor.handleTimeout(requestId, timeoutTs, decisionTime)
       } yield succeed
     }
-
-    "unique transaction id checked" should {
-      //TODO (i749)
-      "accept with empty pending set" in pending
-      "reject the same txid within 2 * max let offset" in pending
-      "accept the same txid within 2 * max let offset if the previous was rejected" in pending
-      "accept the same txid after 2 * max let offset" in pending
-      "accept different txid" in pending
-    }
   }
-
 }

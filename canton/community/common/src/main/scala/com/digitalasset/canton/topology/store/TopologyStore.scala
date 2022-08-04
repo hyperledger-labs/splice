@@ -319,6 +319,10 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit ec: Execution
       traceContext: TraceContext
   ): Future[Option[StoredTopologyTransaction[TopologyChangeOp]]]
 
+  def findStoredNoSignature(transaction: TopologyTransaction[TopologyChangeOp])(implicit
+      traceContext: TraceContext
+  ): Future[Seq[StoredTopologyTransaction[TopologyChangeOp]]]
+
   /** Bootstrap a node state from a topology transaction collection */
   def bootstrap(
       collection: StoredTopologyTransactions[TopologyChangeOp.Positive]
@@ -388,8 +392,8 @@ abstract class TopologyStore[+StoreID <: TopologyStoreId](implicit ec: Execution
       traceContext: TraceContext
   ): Future[PositiveStoredTopologyTransactions]
 
-  /** query interface used by DomainIdentityManager to find the set of initial keys */
-  def findInitialState(uid: UniqueIdentifier)(implicit
+  /** query interface used by DomainTopologyManager to find the set of initial keys */
+  def findInitialState(id: DomainTopologyManagerId)(implicit
       traceContext: TraceContext
   ): Future[Map[KeyOwner, Seq[PublicKey]]]
 

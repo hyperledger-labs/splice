@@ -12,6 +12,7 @@ import com.digitalasset.canton.domain.topology.store.InMemoryRegisterTopologyTra
 import com.digitalasset.canton.protocol.messages.{
   RegisterTopologyTransactionRequest,
   RegisterTopologyTransactionResponse,
+  RegisterTopologyTransactionResponseResult,
 }
 import com.digitalasset.canton.sequencing.client.{SendAsyncClientError, SendCallback, SendResult}
 import com.digitalasset.canton.sequencing.protocol._
@@ -36,7 +37,7 @@ class DomainTopologyManagerEventHandlerTest extends AsyncWordSpec with BaseTest 
         TopologyElementId.tryCreate("submissionId"),
         OwnerToKeyMapping(participantId, SymbolicCrypto.signingPublicKey("keyId")),
       ),
-    )(defaultProtocolVersion),
+    )(testedProtocolVersion),
     SymbolicCrypto.signingPublicKey("keyId"),
     SymbolicCrypto.emptySignature,
   )(signedTransactionProtocolVersionRepresentative, None)
@@ -47,14 +48,15 @@ class DomainTopologyManagerEventHandlerTest extends AsyncWordSpec with BaseTest 
       requestId,
       List(signedIdentityTransaction),
       domainId,
-      defaultProtocolVersion,
+      testedProtocolVersion,
     )
     .headOption
     .value
   private val domainIdentityServiceResult =
-    RegisterTopologyTransactionResponse.Result(
+    RegisterTopologyTransactionResponseResult.create(
       signedIdentityTransaction.uniquePath.toProtoPrimitive,
-      RegisterTopologyTransactionResponse.State.Accepted,
+      RegisterTopologyTransactionResponseResult.State.Accepted,
+      testedProtocolVersion,
     )
   private val response =
     RegisterTopologyTransactionResponse(
@@ -63,9 +65,10 @@ class DomainTopologyManagerEventHandlerTest extends AsyncWordSpec with BaseTest 
       requestId,
       List(domainIdentityServiceResult),
       domainId,
-    )(RegisterTopologyTransactionResponse.protocolVersionRepresentativeFor(defaultProtocolVersion))
+      testedProtocolVersion,
+    )
 
-  "DomainIdentityManagerEventHandler" should {
+  "DomainTopologyManagerEventHandler" should {
     "handle RegisterTopologyTransactionRequests and send resulting RegisterTopologyTransactionResponse back" in {
       val store = new InMemoryRegisterTopologyTransactionResponseStore()
 
@@ -84,30 +87,31 @@ class DomainTopologyManagerEventHandlerTest extends AsyncWordSpec with BaseTest 
 
         val sequencerSendResponse = mock[
           (
-              OpenEnvelope[RegisterTopologyTransactionResponse],
+              OpenEnvelope[RegisterTopologyTransactionResponse.Result],
               SendCallback,
           ) => EitherT[Future, SendAsyncClientError, Unit]
         ]
         when(
           sequencerSendResponse.apply(
             eqTo(
-              OpenEnvelope(response, Recipients.cc(response.requestedBy), defaultProtocolVersion)
+              OpenEnvelope(response, Recipients.cc(response.requestedBy), testedProtocolVersion)
             ),
             any[SendCallback],
           )
         )
           .thenAnswer(
-            (_: OpenEnvelope[RegisterTopologyTransactionResponse], callback: SendCallback) => {
-              callback.apply(SendResult.Success(null))
-              EitherT.rightT[Future, SendAsyncClientError](())
-            }
+            (_: OpenEnvelope[RegisterTopologyTransactionResponse.Result], callback: SendCallback) =>
+              {
+                callback.apply(SendResult.Success(null))
+                EitherT.rightT[Future, SendAsyncClientError](())
+              }
           )
 
         new DomainTopologyManagerEventHandler(
           store,
           requestHandler,
           sequencerSendResponse,
-          defaultProtocolVersion,
+          testedProtocolVersion,
           timeouts,
           loggerFactory,
         )
@@ -120,10 +124,10 @@ class DomainTopologyManagerEventHandlerTest extends AsyncWordSpec with BaseTest 
               OpenEnvelope(
                 request,
                 Recipients.cc(DomainTopologyManagerId(response.domainId)),
-                defaultProtocolVersion,
+                testedProtocolVersion,
               )
             ),
-            defaultProtocolVersion,
+            testedProtocolVersion,
           )
         sut.apply(
           Traced(
@@ -135,7 +139,7 @@ class DomainTopologyManagerEventHandlerTest extends AsyncWordSpec with BaseTest 
                   domainId,
                   Some(MessageId.tryCreate("messageId")),
                   batch,
-                  defaultProtocolVersion,
+                  testedProtocolVersion,
                 )
               )
             )

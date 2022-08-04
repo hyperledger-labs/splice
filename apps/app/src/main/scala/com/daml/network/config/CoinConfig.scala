@@ -30,6 +30,7 @@ import com.daml.network.directory.user.config.LocalDirectoryUserAppConfig
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.version.ProtocolVersion
 import com.typesafe.config.Config
 import org.slf4j.{Logger, LoggerFactory}
 import pureconfig.ConfigReader
@@ -73,6 +74,8 @@ case class CoinConfig(
         parameters.nonStandardConfig,
         validatorConfig.sequencerClient,
         devVersionSupport = false,
+        dontWarnOnDeprecatedPV = false,
+        initialProtocolVersion = ProtocolVersion.latest,
       )
     }
 
@@ -113,6 +116,8 @@ case class CoinConfig(
         parameters.nonStandardConfig,
         svcConfig.sequencerClient,
         devVersionSupport = false,
+        dontWarnOnDeprecatedPV = false,
+        initialProtocolVersion = ProtocolVersion.latest,
       )
     }
 
@@ -154,6 +159,8 @@ case class CoinConfig(
         parameters.nonStandardConfig,
         scanConfig.sequencerClient,
         devVersionSupport = false,
+        dontWarnOnDeprecatedPV = false,
+        initialProtocolVersion = ProtocolVersion.latest,
       )
     }
 
@@ -189,6 +196,8 @@ case class CoinConfig(
         parameters.nonStandardConfig,
         walletConfig.sequencerClient,
         devVersionSupport = false,
+        dontWarnOnDeprecatedPV = false,
+        initialProtocolVersion = ProtocolVersion.latest,
       )
     }
 
@@ -229,6 +238,8 @@ case class CoinConfig(
         parameters.nonStandardConfig,
         directoryProviderConfig.sequencerClient,
         devVersionSupport = false,
+        dontWarnOnDeprecatedPV = false,
+        initialProtocolVersion = ProtocolVersion.latest,
       )
     }
 
@@ -265,6 +276,8 @@ case class CoinConfig(
         parameters.nonStandardConfig,
         directoryUserConfig.sequencerClient,
         devVersionSupport = false,
+        dontWarnOnDeprecatedPV = false,
+        initialProtocolVersion = ProtocolVersion.latest,
       )
     }
 

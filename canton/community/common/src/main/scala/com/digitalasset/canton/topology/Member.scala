@@ -103,7 +103,7 @@ object KeyOwner {
       _ <- Either.cond(
         keyOwner.substring(3, 3 + dlen) == SafeSimpleString.delimiter,
         (),
-        s"Expected delimiter after three letter code of `$keyOwner``",
+        s"Expected delimiter ${SafeSimpleString.delimiter} after three letter code of `$keyOwner`",
       )
       code <- KeyOwnerCode.fromProtoPrimitive_(typ)
       uid <- UniqueIdentifier.fromProtoPrimitive_(uidS.substring(dlen))
@@ -284,9 +284,11 @@ object ParticipantId {
       Predef.identity,
     )
 
-  def tryFromProtoPrimitive(str: String): ParticipantId = ParticipantId(
-    UniqueIdentifier.tryFromProtoPrimitive(str)
-  )
+  def tryFromProtoPrimitive(str: String): ParticipantId =
+    fromProtoPrimitive(str, "").fold(
+      err => throw new IllegalArgumentException(err.message),
+      identity,
+    )
 
   // Instances for slick (db) queries
   implicit val getResultParticipantId: GetResult[ParticipantId] =
@@ -388,7 +390,7 @@ object MediatorId {
   */
 case class DomainTopologyManagerId(uid: UniqueIdentifier) extends DomainMember {
   override def code: AuthenticatedMemberCode = DomainTopologyManagerId.Code
-  def domainId: DomainId = DomainId(uid)
+  lazy val domainId: DomainId = DomainId(uid)
 }
 
 object DomainTopologyManagerId {

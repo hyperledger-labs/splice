@@ -1203,9 +1203,9 @@ trait ParticipantAdministration extends FeatureFlagFilter {
     )
     @Help.Description("""Domains can provide many endpoints to connect to for availability and performance benefits.
         This version of connect allows specifying multiple endpoints for a single domain connection:
-           connect_ha("mydomain", Seq(sequencer1, sequencer2))
+           connect_multi("mydomain", Seq(sequencer1, sequencer2))
            or:
-           connect_ha("mydomain", Seq("https://host1.mydomain.net", "https://host2.mydomain.net", "https://host3.mydomain.net"))
+           connect_multi("mydomain", Seq("https://host1.mydomain.net", "https://host2.mydomain.net", "https://host3.mydomain.net"))
         
         To create a more advanced connection config use domains.toConfig with a single host,
         |then use config.addConnection to add additional connections before connecting:
@@ -1218,7 +1218,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           connections - The sequencer connection definitions (can be an URL) to connect to this domain. I.e. https://url:port
           synchronize - A timeout duration indicating how long to wait for all topology changes to have been effected on all local nodes.           
         """)
-    def connect_ha(
+    def connect_multi(
         domainAlias: DomainAlias,
         connections: Seq[SequencerConnection],
         synchronize: Option[TimeoutDuration] = Some(
@@ -1387,26 +1387,26 @@ trait ParticipantAdministration extends FeatureFlagFilter {
   @Help.Group("Transfer")
   object transfer extends Helpful {
     @Help.Summary(
-      "Transfer-out a contract from the origin domain with destination target domain",
+      "Transfer-out a contract from the source domain with destination target domain",
       FeatureFlag.Preview,
     )
     @Help.Description(
-      """Transfers the given contract out of the origin domain with destination target domain.
+      """Transfers the given contract out of the source domain with destination target domain.
        The command returns the ID of the transfer when the transfer-out has completed successfully.
        The contract is in transit until the transfer-in has completed on the target domain.
        The submitting party must be a stakeholder of the contract and the participant must have submission rights
-       for the submitting party on the origin domain. It must also be connected to the target domain."""
+       for the submitting party on the source domain. It must also be connected to the target domain."""
     )
     def out(
         submittingParty: PartyId,
         contractId: LfContractId,
-        originDomain: DomainAlias,
+        sourceDomain: DomainAlias,
         targetDomain: DomainAlias,
     ): TransferId =
       check(FeatureFlag.Preview)(consoleEnvironment.run {
         adminCommand(
           ParticipantAdminCommands.Transfer
-            .TransferOut(submittingParty, contractId, originDomain, targetDomain)
+            .TransferOut(submittingParty, contractId, sourceDomain, targetDomain)
         )
       })
 
@@ -1430,7 +1430,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
     )
     def search(
         targetDomain: DomainAlias,
-        filterOriginDomain: Option[DomainAlias],
+        filterSourceDomain: Option[DomainAlias],
         filterTimestamp: Option[Instant],
         filterSubmittingParty: Option[PartyId],
         limit: Int = 100,
@@ -1440,7 +1440,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
           ParticipantAdminCommands.Transfer
             .TransferSearch(
               targetDomain,
-              filterOriginDomain,
+              filterSourceDomain,
               filterTimestamp,
               filterSubmittingParty,
               limit,
@@ -1458,10 +1458,10 @@ trait ParticipantAdministration extends FeatureFlagFilter {
     def execute(
         submittingParty: PartyId,
         contractId: LfContractId,
-        originDomain: DomainAlias,
+        sourceDomain: DomainAlias,
         targetDomain: DomainAlias,
     ): Unit = {
-      val transferId = out(submittingParty, contractId, originDomain, targetDomain)
+      val transferId = out(submittingParty, contractId, sourceDomain, targetDomain)
       in(submittingParty, transferId, targetDomain)
     }
 

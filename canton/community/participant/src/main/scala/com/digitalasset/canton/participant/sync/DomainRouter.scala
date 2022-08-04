@@ -46,6 +46,7 @@ import com.digitalasset.canton.topology.transaction.ParticipantPermission.Submis
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ErrorUtil, LfTransactionUtil}
+import com.digitalasset.canton.version.{SourceProtocolVersion, TargetProtocolVersion}
 import com.digitalasset.canton.{DomainAlias, LfKeyResolver, LfPartyId, LfWorkflowId}
 
 import scala.collection.mutable
@@ -425,7 +426,7 @@ class DomainRouter(
     } yield res
   }
 
-  // Includes check that submitting party has a participant with submission rights on origin and target domain
+  // Includes check that submitting party has a participant with submission rights on source and target domain
   private def transfersToDomain(
       contracts: List[ContractData],
       targetDomain: DomainId,
@@ -440,14 +441,14 @@ class DomainRouter(
         if (c.domain == targetDomain) EitherT.fromEither[Future](Right(None))
         else {
           for {
-            originSnapshot <- EitherT.fromEither[Future](
+            sourceSnapshot <- EitherT.fromEither[Future](
               snapshot(c.domain).toRight(s"No snapshot for domain ${c.domain}")
             )
             targetSnapshot <- EitherT.fromEither[Future](
               ts.toRight(s"No snapshot for domain $targetDomain")
             )
             submitter <- findSubmitterThatCanTransferContract(
-              originSnapshot,
+              sourceSnapshot,
               targetSnapshot,
               c,
               submitters,
@@ -459,7 +460,7 @@ class DomainRouter(
   }
 
   private def findSubmitterThatCanTransferContract(
-      originSnapshot: TopologySnapshot,
+      sourceSnapshot: TopologySnapshot,
       targetSnapshot: TopologySnapshot,
       c: ContractData,
       submitters: Set[LfPartyId],
@@ -479,7 +480,7 @@ class DomainRouter(
               participantId,
               submitter,
               c.stakeholders,
-              originSnapshot,
+              sourceSnapshot,
               targetSnapshot,
               logger,
             )
@@ -816,12 +817,12 @@ object DomainRouter {
   private def transfer(connectedDomains: collection.Map[DomainId, SyncDomain])(
       args: TransferArgs
   )(implicit ec: ExecutionContext): EitherT[Future, TransactionRoutingError, Unit] = {
-    val TransferArgs(originDomain, targetDomain, submittingParty, contractId, _traceContext) = args
+    val TransferArgs(sourceDomain, targetDomain, submittingParty, contractId, _traceContext) = args
     implicit val traceContext = _traceContext
 
     val transfer = for {
-      originSyncDomain <- EitherT.fromEither[Future](
-        connectedDomains.get(originDomain).toRight("Not connected to the origin domain")
+      sourceSyncDomain <- EitherT.fromEither[Future](
+        connectedDomains.get(sourceDomain).toRight("Not connected to the source domain")
       )
 
       targetSyncDomain <- EitherT.fromEither[Future](
@@ -829,10 +830,15 @@ object DomainRouter {
       )
 
       _unit <- EitherT
-        .cond[Future](originSyncDomain.ready, (), "The origin domain is not ready for submissions")
+        .cond[Future](sourceSyncDomain.ready, (), "The source domain is not ready for submissions")
 
-      outResult <- originSyncDomain
-        .submitTransferOut(submittingParty, contractId, targetDomain)
+      outResult <- sourceSyncDomain
+        .submitTransferOut(
+          submittingParty,
+          contractId,
+          targetDomain,
+          TargetProtocolVersion(targetSyncDomain.staticDomainParameters.protocolVersion),
+        )
         .leftMap(_.toString)
       outStatus <- EitherT.right[String](outResult.transferOutCompletionF)
       _outApprove <- EitherT.cond[Future](
@@ -845,7 +851,11 @@ object DomainRouter {
         .cond[Future](targetSyncDomain.ready, (), "The target domain is not ready for submission")
 
       inResult <- targetSyncDomain
-        .submitTransferIn(submittingParty, outResult.transferId)
+        .submitTransferIn(
+          submittingParty,
+          outResult.transferId,
+          SourceProtocolVersion(sourceSyncDomain.staticDomainParameters.protocolVersion),
+        )
         .leftMap[String](err => s"Transfer in failed with error ${err}")
 
       inStatus <- EitherT.right[String](inResult.transferInCompletionF)
@@ -878,7 +888,7 @@ object DomainRouter {
   case class ContractData(id: LfContractId, domain: DomainId, stakeholders: Set[LfPartyId])
 
   case class TransferArgs(
-      originDomain: DomainId,
+      sourceDomain: DomainId,
       targetDomain: DomainId,
       submitter: LfPartyId,
       contract: LfContractId,

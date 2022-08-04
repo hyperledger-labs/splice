@@ -44,7 +44,11 @@ import com.digitalasset.canton.participant.protocol.transfer.TransferProcessingS
   TransferProcessorError,
 }
 import com.digitalasset.canton.participant.protocol.transfer._
-import com.digitalasset.canton.participant.pruning.{AcsCommitmentProcessor, PruneObserver}
+import com.digitalasset.canton.participant.pruning.{
+  AcsCommitmentProcessor,
+  PruneObserver,
+  SortedReconciliationIntervalsProvider,
+}
 import com.digitalasset.canton.participant.store.ActiveContractSnapshot.ActiveContractIdsChange
 import com.digitalasset.canton.participant.store.{
   ParticipantNodePersistentState,
@@ -85,6 +89,7 @@ import com.digitalasset.canton.topology.{DomainId, ParticipantId}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.ShowUtil._
 import com.digitalasset.canton.util.{ErrorUtil, FutureUtil, MonadUtil}
+import com.digitalasset.canton.version.{SourceProtocolVersion, TargetProtocolVersion}
 import io.functionmeta.functionFullName
 import io.opentelemetry.api.trace.Tracer
 
@@ -175,7 +180,7 @@ class SyncDomain(
     seedGenerator,
     sequencerClient,
     timeouts,
-    staticDomainParameters.protocolVersion,
+    SourceProtocolVersion(staticDomainParameters.protocolVersion),
     loggerFactory,
   )
 
@@ -191,14 +196,21 @@ class SyncDomain(
     sequencerClient,
     parameters.enableCausalityTracking,
     timeouts,
-    staticDomainParameters.protocolVersion,
+    TargetProtocolVersion(staticDomainParameters.protocolVersion),
+    loggerFactory,
+  )
+
+  private val sortedReconciliationIntervalsProvider = SortedReconciliationIntervalsProvider(
+    staticDomainParameters,
+    topologyClient,
+    futureSupervisor,
     loggerFactory,
   )
 
   private val pruneObserver = new PruneObserver(
     persistent.requestJournalStore,
     persistent.sequencerCounterTrackerStore,
-    staticDomainParameters.reconciliationInterval,
+    sortedReconciliationIntervalsProvider,
     persistent.acsCommitmentStore,
     persistent.activeContractStore,
     persistent.contractKeyJournal,
@@ -216,7 +228,7 @@ class SyncDomain(
       participantId,
       sequencerClient,
       domainCrypto,
-      staticDomainParameters.reconciliationInterval,
+      sortedReconciliationIntervalsProvider,
       persistent.acsCommitmentStore,
       pruneObserver.observer(_, _),
       killSwitch = selfKillSwitch,
@@ -309,19 +321,27 @@ class SyncDomain(
   ): EitherT[Future, SyncDomainInitializationError, Unit] = {
     def liftF[A](f: Future[A]): EitherT[Future, SyncDomainInitializationError, A] = EitherT.liftF(f)
 
-    def withMetadata(cid: LfContractId): Future[StoredContract] = {
-      persistent.contractStore.lookup(cid).value.map {
-        case None =>
-          val errMsg = s"Contract $cid in active contract store but not in the contract store"
-          ErrorUtil.internalError(new IllegalStateException(errMsg))
-        case Some(sc) => sc
-      }
-    }
+    def withMetadataSeq(cids: Seq[LfContractId]): Future[Seq[StoredContract]] =
+      persistent.contractStore
+        .lookupManyUncached(cids)
+        .map(_.zip(cids).map {
+          case (None, cid) =>
+            val errMsg = s"Contract $cid is in active contract store but not in the contract store"
+            ErrorUtil.internalError(new IllegalStateException(errMsg))
+          case (Some(sc), _) => sc
+        })
 
     def lookupChangeMetadata(change: ActiveContractIdsChange): Future[AcsChange] = {
       for {
-        storedActivatedContracts <- change.activations.toList.traverse(withMetadata)
-        storedDeactivatedContracts <- change.deactivations.toList.traverse(withMetadata)
+        // TODO(i9270) extract magic numbers
+        storedActivatedContracts <- MonadUtil.batchedSequentialTraverse(
+          parallelism = 20,
+          batchSize = 500,
+        )(change.activations.toSeq)(withMetadataSeq)
+        storedDeactivatedContracts <- MonadUtil
+          .batchedSequentialTraverse(parallelism = 20, batchSize = 500)(change.deactivations.toSeq)(
+            withMetadataSeq
+          )
       } yield {
         AcsChange(
           activations = storedActivatedContracts
@@ -376,7 +396,7 @@ class SyncDomain(
       })
     }
 
-    def initialiseClientAtCleanHead(): Future[Unit] = {
+    def initializeClientAtCleanHead(): Future[Unit] = {
       // generally, the topology client will be initialised by the topology processor. however,
       // if there is nothing to be replayed, then the topology processor will only be initialised
       // once the first event is dispatched.
@@ -417,7 +437,7 @@ class SyncDomain(
       _ <- EitherT.right(missingKeysAlerter.init())
 
       // Phase 0: Initialise topology client at current clean head
-      _ <- EitherT.right(initialiseClientAtCleanHead())
+      _ <- EitherT.right(initializeClientAtCleanHead())
 
       // Phase 1: publish pending events of the event log up to the prehead clean request
       // Later events may have already been published before the crash
@@ -592,6 +612,7 @@ class SyncDomain(
             registerIdentityTransactionHandle,
             domainHandle.topologyClient,
             domainHandle.topologyStore,
+            domainCrypto.crypto,
           )(initializationTraceContext)
           .onShutdown(Right(()))
           .leftMap[SyncDomainInitializationError](ParticipantTopologyHandshakeError)
@@ -625,7 +646,7 @@ class SyncDomain(
         // TODO(i9500): Here, transfer-ins are completed sequentially. Consider running several in parallel to speed
         // this up. It may be helpful to use the `RateLimiter`
         eithers <- MonadUtil
-          .sequentialTraverse(pendingTransfers)({ data =>
+          .sequentialTraverse(pendingTransfers) { data =>
             logger.debug(s"Complete ${data.transferId} after startup")
             val eitherF = TransferOutProcessingSteps.autoTransferIn(
               data.transferId,
@@ -636,7 +657,7 @@ class SyncDomain(
               data.transferOutRequest.targetTimeProof.timestamp,
             )
             eitherF.value.map(_.left.map(err => data.transferId -> err))
-          })
+          }
 
       } yield {
         // Log any errors, then discard the errors and continue to complete pending transfers
@@ -646,15 +667,15 @@ class SyncDomain(
           case Right(()) => ()
         })
 
-        pendingTransfers.lastOption.map(t => t.transferId.requestTimestamp -> t.originDomain)
+        pendingTransfers.lastOption.map(t => t.transferId.requestTimestamp -> t.sourceDomain)
       }
 
-      resF.map({
+      resF.map {
         // Continue completing transfers that are after the last completed transfer
         case Some(value) => Left(Some(value))
         // We didn't find any uncompleted transfers, so stop
         case None => Right(())
-      })
+      }
     }
 
     logger.debug(s"Wait for replay to complete")
@@ -708,6 +729,7 @@ class SyncDomain(
       submittingParty: LfPartyId,
       contractId: LfContractId,
       targetDomain: DomainId,
+      targetProtocolVersion: TargetProtocolVersion,
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, TransferProcessorError, TransferOutProcessingSteps.SubmissionResult] =
@@ -721,13 +743,18 @@ class SyncDomain(
         )
       transferOutProcessor
         .submit(
-          TransferOutProcessingSteps.SubmissionParam(submittingParty, contractId, targetDomain)
+          TransferOutProcessingSteps
+            .SubmissionParam(submittingParty, contractId, targetDomain, targetProtocolVersion)
         )
         .onShutdown(Left(DomainNotReady(domainId, "The domain is shutting down")))
         .semiflatMap(Predef.identity)
     }
 
-  def submitTransferIn(submittingParty: LfPartyId, transferId: TransferId)(implicit
+  def submitTransferIn(
+      submittingParty: LfPartyId,
+      transferId: TransferId,
+      sourceProtocolVersion: SourceProtocolVersion,
+  )(implicit
       traceContext: TraceContext
   ): EitherT[Future, TransferProcessorError, TransferInProcessingSteps.SubmissionResult] =
     performUnlessClosingEitherT[TransferProcessorError, TransferInProcessingSteps.SubmissionResult](
@@ -740,19 +767,13 @@ class SyncDomain(
           DomainNotReady(domainId, "Cannot submit transfer-out before recovery")
         )
       transferInProcessor
-        .submit(TransferInProcessingSteps.SubmissionParam(submittingParty, transferId))
+        .submit(
+          TransferInProcessingSteps
+            .SubmissionParam(submittingParty, transferId, sourceProtocolVersion)
+        )
         .onShutdown(Left(DomainNotReady(domainId, "The domain is shutting down")))
         .semiflatMap(Predef.identity)
     }
-
-  def searchTransfers(
-      originDomain: Option[DomainId],
-      requestTimestamp: Option[CantonTimestamp],
-      submitter: Option[LfPartyId],
-      limit: Int,
-  )(implicit traceContext: TraceContext): Future[Seq[TransferData]] = {
-    persistent.transferStore.find(originDomain, requestTimestamp, submitter, limit)
-  }
 
   def numberOfDirtyRequests(): Int = ephemeral.requestJournal.numberOfDirtyRequests
 

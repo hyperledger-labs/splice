@@ -14,6 +14,7 @@ import com.digitalasset.canton.config.{
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.tracing.TracingConfig
+import com.digitalasset.canton.version.ProtocolVersion
 
 /** Abstraction to remove code duplication when implementing Canton traits and specifying parameters we don't use
   * anyway.
@@ -57,4 +58,6 @@ case class SharedCoinAppParameters(
     override val nonStandardConfig: Boolean,
     override val sequencerClient: SequencerClientConfig,
     override val devVersionSupport: Boolean,
+    override val dontWarnOnDeprecatedPV: Boolean,
+    override val initialProtocolVersion: ProtocolVersion,
 ) extends LocalNodeParameters

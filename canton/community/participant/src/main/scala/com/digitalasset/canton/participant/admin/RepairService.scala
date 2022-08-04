@@ -29,7 +29,12 @@ import com.digitalasset.canton.crypto.{HashPurpose, SyncCryptoApiProvider}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, HasCloseContext}
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{
+  HasLoggerName,
+  NamedLoggerFactory,
+  NamedLogging,
+  NamedLoggingContext,
+}
 import com.digitalasset.canton.participant.config.ParticipantNodeParameters
 import com.digitalasset.canton.participant.domain.DomainAliasManager
 import com.digitalasset.canton.participant.event.RecordTime
@@ -90,7 +95,7 @@ import scala.concurrent.{ExecutionContext, Future}
   */
 class RepairService(
     participantId: ParticipantId,
-    identityStoreFactory: TopologyStoreFactory,
+    topologyStoreFactory: TopologyStoreFactory,
     syncCrypto: SyncCryptoApiProvider,
     packagesDarsService: PackageService,
     damle: DAMLe,
@@ -676,10 +681,12 @@ class RepairService(
       skipInactive: Boolean,
       batchSize: PositiveInt,
   )(implicit traceContext: TraceContext): EitherT[Future, String, Unit] =
-    cids
-      .grouped(batchSize.value)
-      .toSeq
-      .traverse_(moveContracts(_, repairSource, repairTarget, skipInactive))
+    // TODO(i9270) extract magic numbers
+    MonadUtil
+      .batchedSequentialTraverse(20, batchSize.value)(cids)(
+        moveContracts(_, repairSource, repairTarget, skipInactive).map(_ => Seq[Unit]())
+      )
+      .map(_ => ())
 
   /** Move contract from `repairSource` to `repairTarget`. */
   private def moveContracts(
@@ -985,6 +992,7 @@ class RepairService(
             recordTime = repair.ts.toLf,
             divulgedContracts = List.empty, // create and plain archive don't involve divulgence
             blindingInfo = None,
+            contractMetadata = Map(), // TODO(#9795) wire proper value
           ),
           repair.rc,
           None,
@@ -1110,7 +1118,7 @@ class RepairService(
             ),
           )
       }
-      topologyStore = identityStoreFactory.forId(DomainStore(domainId))
+      topologyStore = topologyStoreFactory.forId(DomainStore(domainId))
       topologySnapshot = new CachingTopologySnapshot(
         new StoreBasedTopologySnapshot(
           tsRepair,
@@ -1297,7 +1305,7 @@ object RepairService {
     override protected def factoryMethodWrapper(str: String255): RepairContext = RepairContext(str)
   }
 
-  object ContractConverter {
+  object ContractConverter extends HasLoggerName {
 
     def contractDataToInstance(
         templateId: Identifier,
@@ -1305,44 +1313,39 @@ object RepairService {
         signatories: Set[String],
         lfContractId: LfContractId,
         ledgerTime: Instant,
-    ): Either[String, SerializableContract] = TraceContext.withNewTraceContext {
-      implicit traceContext =>
-        val logger = NamedLoggerFactory.root.getTracedLogger(ContractConverter.getClass)
-        implicit val loggingContext: ErrorLoggingContext =
-          ErrorLoggingContext.fromTracedLogger(logger)
+    )(implicit namedLoggingContext: NamedLoggingContext): Either[String, SerializableContract] = {
+      for {
+        template <- LedgerApiFieldValidations.validateIdentifier(templateId).leftMap(_.getMessage)
 
-        for {
-          template <- LedgerApiFieldValidations.validateIdentifier(templateId).leftMap(_.getMessage)
+        argsValue <- LedgerApiValueValidator
+          .validateRecord(createArguments)
+          .leftMap(e => s"Failed to validate arguments: ${e}")
 
-          argsValue <- LedgerApiValueValidator
-            .validateRecord(createArguments)
-            .leftMap(e => s"Failed to validate arguments: ${e}")
-
-          argsVersionedValue = CantonOnly.asVersionedValue(
-            argsValue,
-            CantonOnly.DummyTransactionVersion, // Version is ignored by daml engine upon RepairService.addContract
-          )
-
-          lfContractInst = LfContractInst(
-            template = template,
-            arg = argsVersionedValue,
-            agreementText = "",
-          )
-
-          serializableRawContractInst <- SerializableRawContractInstance
-            .create(lfContractInst)
-            .leftMap(_.errorMessage)
-
-          signatoriesAsParties <- signatories.toList.traverse(LfPartyId.fromString).map(_.toSet)
-
-          time <- CantonTimestamp.fromInstant(ledgerTime)
-        } yield SerializableContract(
-          contractId = lfContractId,
-          rawContractInstance = serializableRawContractInst,
-          metadata =
-            checked(ContractMetadata.tryCreate(signatoriesAsParties, signatoriesAsParties, None)),
-          ledgerCreateTime = time,
+        argsVersionedValue = CantonOnly.asVersionedValue(
+          argsValue,
+          CantonOnly.DummyTransactionVersion, // Version is ignored by daml engine upon RepairService.addContract
         )
+
+        lfContractInst = LfContractInst(
+          template = template,
+          arg = argsVersionedValue,
+          agreementText = "",
+        )
+
+        serializableRawContractInst <- SerializableRawContractInstance
+          .create(lfContractInst)
+          .leftMap(_.errorMessage)
+
+        signatoriesAsParties <- signatories.toList.traverse(LfPartyId.fromString).map(_.toSet)
+
+        time <- CantonTimestamp.fromInstant(ledgerTime)
+      } yield SerializableContract(
+        contractId = lfContractId,
+        rawContractInstance = serializableRawContractInst,
+        metadata =
+          checked(ContractMetadata.tryCreate(signatoriesAsParties, signatoriesAsParties, None)),
+        ledgerCreateTime = time,
+      )
     }
 
     def contractInstanceToData(

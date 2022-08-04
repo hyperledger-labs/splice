@@ -112,7 +112,7 @@ class TransactionViewTest extends AnyWordSpec with BaseTest with HasExecutionCon
         actionDescription,
         RollbackContext.empty,
         salt,
-        defaultProtocolVersion,
+        testedProtocolVersion,
       )
     }
 
@@ -229,9 +229,7 @@ class TransactionViewTest extends AnyWordSpec with BaseTest with HasExecutionCon
           archivedInSubviews = Set(otherAbsoluteId),
           resolvedKeys = Map(
             ExampleTransactionFactory.defaultGlobalKey ->
-              AssignedKey(absoluteId, rolledBack = false)(
-                ExampleTransactionFactory.transactionVersion
-              )
+              AssignedKey(absoluteId)(ExampleTransactionFactory.transactionVersion)
           ),
         ).value
 

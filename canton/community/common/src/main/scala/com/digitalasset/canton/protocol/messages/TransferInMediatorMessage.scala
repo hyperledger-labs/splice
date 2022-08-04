@@ -14,11 +14,11 @@ import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.{DomainId, MediatorId}
 import com.digitalasset.canton.util.EitherUtil
 import com.digitalasset.canton.version.{
-  HasProtoV0,
   HasProtocolVersionedWithContextCompanion,
   ProtobufVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
+  TargetProtocolVersion,
 }
 
 import java.util.UUID
@@ -31,8 +31,7 @@ import java.util.UUID
 case class TransferInMediatorMessage(tree: TransferInViewTree)
     extends MediatorRequest
     with ProtocolMessageV0
-    with ProtocolMessageV1
-    with HasProtoV0[v0.TransferInMediatorMessage] {
+    with ProtocolMessageV1 {
 
   require(tree.commonData.isFullyUnblinded, "The transfer-in common data must be unblinded")
   require(tree.view.isBlinded, "The transfer-out view must be blinded")
@@ -40,10 +39,10 @@ case class TransferInMediatorMessage(tree: TransferInViewTree)
   private[this] val commonData = tree.commonData.tryUnwrap
 
   // Align the protocol version with the common data's protocol version
+  lazy val protocolVersion: TargetProtocolVersion = commonData.targetProtocolVersion
+
   lazy val representativeProtocolVersion: RepresentativeProtocolVersion[TransferInMediatorMessage] =
-    TransferInMediatorMessage.protocolVersionRepresentativeFor(
-      commonData.representativeProtocolVersion.unwrap
-    )
+    TransferInMediatorMessage.protocolVersionRepresentativeFor(protocolVersion.v)
 
   override def domainId: DomainId = commonData.targetDomain
 
@@ -74,7 +73,7 @@ case class TransferInMediatorMessage(tree: TransferInViewTree)
       informees,
       TransferInDomainId(domainId),
       verdict,
-      representativeProtocolVersion.unwrap,
+      protocolVersion.v,
     )
   }
 
@@ -90,7 +89,7 @@ case class TransferInMediatorMessage(tree: TransferInViewTree)
         v1.EnvelopeContent.SomeEnvelopeContent.TransferInMediatorMessage(toProtoV0)
     )
 
-  override def toProtoV0: v0.TransferInMediatorMessage =
+  def toProtoV0: v0.TransferInMediatorMessage =
     v0.TransferInMediatorMessage(tree = Some(tree.toProtoV0))
 
   override def rootHash: Option[RootHash] = Some(tree.rootHash)

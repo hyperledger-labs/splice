@@ -1,4 +1,4 @@
-sdk-version: 2.3.0-snapshot.20220619.10104.0.253b0b18
+sdk-version: 2.4.0-snapshot.20220801.10312.0.d2c7be9d
 name: coin-impl-v101v0v0
 source: daml
 version: 0.1.0

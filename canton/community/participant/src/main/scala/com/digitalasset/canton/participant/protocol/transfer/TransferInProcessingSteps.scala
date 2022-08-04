@@ -53,7 +53,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil.condUnitET
 import com.digitalasset.canton.util.EitherUtil.condUnitE
 import com.digitalasset.canton.util.ShowUtil._
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.version.{SourceProtocolVersion, TargetProtocolVersion}
 import com.digitalasset.canton.{LfPartyId, SequencerCounter, checked}
 import com.google.common.annotations.VisibleForTesting
 
@@ -62,14 +62,14 @@ import scala.collection.concurrent
 import scala.collection.immutable.HashMap
 import scala.concurrent.{ExecutionContext, Future}
 
-class TransferInProcessingSteps(
+private[transfer] class TransferInProcessingSteps(
     domainId: DomainId,
     val participantId: ParticipantId,
     val engine: DAMLe,
     transferCoordination: TransferCoordination,
     seedGenerator: SeedGenerator,
     causalityTracking: Boolean,
-    protocolVersion: ProtocolVersion,
+    targetProtocolVersion: TargetProtocolVersion,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit val ec: ExecutionContext)
     extends TransferProcessingSteps[
@@ -111,7 +111,7 @@ class TransferInProcessingSteps(
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, TransferProcessorError, Submission] = {
 
-    val SubmissionParam(submitterLf, transferId) = param
+    val SubmissionParam(submitterLf, transferId, sourceProtocolVersion) = param
     val ipsSnapshot = recentSnapshot.ipsSnapshot
     val pureCrypto = recentSnapshot.pureCrypto
 
@@ -170,7 +170,8 @@ class TransferInProcessingSteps(
         mediatorId,
         transferOutResult,
         transferInUuid,
-        protocolVersion,
+        sourceProtocolVersion,
+        targetProtocolVersion,
       )
       rootHash = fullTree.rootHash
       mediatorMessage = fullTree.mediatorMessage
@@ -187,14 +188,14 @@ class TransferInProcessingSteps(
       )
 
       viewMessage <- EncryptedViewMessageFactory
-        .create(TransferInViewType)(fullTree, recentSnapshot, protocolVersion)
+        .create(TransferInViewType)(fullTree, recentSnapshot, targetProtocolVersion.v)
         .leftMap[TransferProcessorError](EncryptionError)
     } yield {
       val rootHashMessage =
         RootHashMessage(
           rootHash,
           domainId,
-          protocolVersion,
+          targetProtocolVersion.v,
           ViewType.TransferInViewType,
           EmptyRootHashMessagePayload,
         )
@@ -212,7 +213,7 @@ class TransferInProcessingSteps(
         viewMessage -> recipients,
         rootHashMessage -> rootHashRecipients,
       )
-      TransferSubmission(Batch.of(protocolVersion, messages: _*), rootHash)
+      TransferSubmission(Batch.of(targetProtocolVersion.v, messages: _*), rootHash)
     }
 
     result.mapK(FutureUnlessShutdown.outcomeK).widen[Submission]
@@ -243,7 +244,12 @@ class TransferInProcessingSteps(
     FullTransferInTree
   ]] =
     EncryptedViewMessage
-      .decryptFor(snapshot, envelope.protocolMessage, participantId, protocolVersion) { bytes =>
+      .decryptFor(
+        snapshot,
+        envelope.protocolMessage,
+        participantId,
+        targetProtocolVersion.v,
+      ) { bytes =>
         FullTransferInTree
           .fromByteString(snapshot.pureCrypto)(bytes)
           .leftMap(e => DeserializationError(e.toString, bytes))
@@ -410,7 +416,7 @@ class TransferInProcessingSteps(
 
           causalityMessages = {
             recipients.flatMap { case (clock, hostedBy) =>
-              val msg = CausalityMessage(domainId, protocolVersion, transferId, clock)
+              val msg = CausalityMessage(domainId, targetProtocolVersion.v, transferId, clock)
               logger.debug(
                 s"Sending causality message for $transferId with clock $clock to $hostedBy"
               )
@@ -494,7 +500,7 @@ class TransferInProcessingSteps(
                   txInRequest.toBeSigned,
                   validationResult.confirmingParties,
                   domainId,
-                  protocolVersion,
+                  targetProtocolVersion.v,
                 )
                 .leftMap(e => FailedToCreateResponse(e): TransferProcessorError)
             )
@@ -539,21 +545,21 @@ class TransferInProcessingSteps(
 
     transferDataO match {
       case Some(transferData) =>
-        val originDomain = transferData.transferOutRequest.originDomain
+        val sourceDomain = transferData.transferOutRequest.sourceDomain
         val transferOutTimestamp = transferData.transferOutTimestamp
         for {
           _ready <- {
             logger.info(
-              s"Waiting for topology state at ${transferOutTimestamp} on transfer-out domain $originDomain ..."
+              s"Waiting for topology state at ${transferOutTimestamp} on transfer-out domain $sourceDomain ..."
             )
             EitherT(
               transferCoordination
-                .awaitTransferOutTimestamp(originDomain, transferOutTimestamp)
+                .awaitTransferOutTimestamp(sourceDomain, transferOutTimestamp)
                 .sequence
             )
           }
 
-          originCrypto <- transferCoordination.cryptoSnapshot(originDomain, transferOutTimestamp)
+          sourceCrypto <- transferCoordination.cryptoSnapshot(sourceDomain, transferOutTimestamp)
           // TODO(M40): Check the signatures of the mediator and the sequencer
 
           _ <- condUnitET[Future](
@@ -587,7 +593,7 @@ class TransferInProcessingSteps(
           exclusivityLimit = domainParameters.transferExclusivityLimitFor(exclusivityBaseline)
 
           _ <- condUnitET[Future](
-            tsIn > exclusivityLimit
+            tsIn >= exclusivityLimit
               || transferOutSubmitter == transferInRequest.submitter,
             NonInitiatorSubmitsBeforeExclusivityTimeout(
               transferId,
@@ -604,13 +610,13 @@ class TransferInProcessingSteps(
               transferData.creatingTransactionId,
             ): TransferProcessorError,
           )
-          originIps = originCrypto.ipsSnapshot
+          sourceIps = sourceCrypto.ipsSnapshot
           confirmingParties <- EitherT.right(transferInRequest.stakeholders.toList.traverseFilter {
             stakeholder =>
               for {
-                origin <- originIps.canConfirm(participantId, stakeholder)
+                source <- sourceIps.canConfirm(participantId, stakeholder)
                 target <- targetIps.canConfirm(participantId, stakeholder)
-              } yield if (origin && target) Some(stakeholder) else None
+              } yield if (source && target) Some(stakeholder) else None
           })
 
         } yield Some(TransferInValidationResult(confirmingParties.toSet))
@@ -723,7 +729,11 @@ class TransferInProcessingSteps(
 
 object TransferInProcessingSteps {
 
-  case class SubmissionParam(submitterLf: LfPartyId, transferId: TransferId)
+  case class SubmissionParam(
+      submitterLf: LfPartyId,
+      transferId: TransferId,
+      sourceProtocolVersion: SourceProtocolVersion,
+  )
 
   case class SubmissionResult(transferInCompletionF: Future[com.google.rpc.status.Status])
 
@@ -749,7 +759,7 @@ object TransferInProcessingSteps {
     *
     * The transaction has the same ledger time and transaction id as the creation of the contract.
     */
-  def createUpdateForTransferIn(
+  private[transfer] def createUpdateForTransferIn(
       contract: SerializableContract,
       creatingTransactionId: TransactionId,
       recordTime: CantonTimestamp,
@@ -793,10 +803,11 @@ object TransferInProcessingSteps {
       recordTime = recordTime.toLf,
       divulgedContracts = List.empty,
       blindingInfo = None,
+      contractMetadata = Map(), // TODO(#9795) wire proper value
     )
   }
 
-  def makeFullTransferInTree(
+  private[transfer] def makeFullTransferInTree(
       pureCrypto: CryptoPureApi,
       seed: SaltSeed,
       submitter: LfPartyId,
@@ -807,7 +818,8 @@ object TransferInProcessingSteps {
       targetMediator: MediatorId,
       transferOutResult: DeliveredTransferOutResult,
       transferInUuid: UUID,
-      protocolVersion: ProtocolVersion,
+      sourceProtocolVersion: SourceProtocolVersion,
+      targetProtocolVersion: TargetProtocolVersion,
   ): FullTransferInTree = {
     val commonDataSalt = Salt.tryDeriveSalt(seed, 0, pureCrypto)
     val viewSalt = Salt.tryDeriveSalt(seed, 1, pureCrypto)
@@ -817,17 +829,17 @@ object TransferInProcessingSteps {
       targetMediator,
       stakeholders,
       transferInUuid,
-      protocolVersion,
+      targetProtocolVersion,
     )
-    val view =
-      TransferInView.create(pureCrypto)(
-        viewSalt,
-        submitter,
-        contract,
-        creatingTransactionId,
-        transferOutResult,
-        protocolVersion,
-      )
+    val view = TransferInView.create(pureCrypto)(
+      viewSalt,
+      submitter,
+      contract,
+      creatingTransactionId,
+      transferOutResult,
+      sourceProtocolVersion,
+      targetProtocolVersion,
+    )
     val tree = TransferInViewTree(commonData, view)(pureCrypto)
     FullTransferInTree(tree)
   }
@@ -841,7 +853,7 @@ object TransferInProcessingSteps {
       transferringParticipant: Boolean,
   )
 
-  sealed trait TransferInProcessorError extends TransferProcessorError
+  private[transfer] sealed trait TransferInProcessorError extends TransferProcessorError
 
   case class NoTransferData(transferId: TransferId, lookupError: TransferStore.TransferLookupError)
       extends TransferInProcessorError
@@ -873,7 +885,7 @@ object TransferInProcessingSteps {
 
   case class IdentityStateNotAvailable(
       transferId: TransferId,
-      originDomain: DomainId,
+      sourceDomain: DomainId,
       timestamp: CantonTimestamp,
   ) extends TransferInProcessorError
 

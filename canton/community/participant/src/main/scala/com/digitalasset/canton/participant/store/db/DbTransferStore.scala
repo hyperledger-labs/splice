@@ -17,6 +17,7 @@ import com.digitalasset.canton.participant.RequestCounter
 import com.digitalasset.canton.participant.protocol.transfer.TransferData
 import com.digitalasset.canton.participant.store.TransferStore
 import com.digitalasset.canton.participant.store.TransferStore._
+import com.digitalasset.canton.participant.store.db.DbTransferStore.RawDeliveredTransferOutResult
 import com.digitalasset.canton.participant.util.TimeOfChange
 import com.digitalasset.canton.protocol.messages._
 import com.digitalasset.canton.protocol.{SerializableContract, TransactionId, TransferId}
@@ -24,11 +25,17 @@ import com.digitalasset.canton.resource.DbStorage.{DbAction, Profile}
 import com.digitalasset.canton.resource.{DbStorage, DbStore}
 import com.digitalasset.canton.sequencing.protocol.{OpenEnvelope, SequencedEvent, SignedContent}
 import com.digitalasset.canton.serialization.ProtoConverter
+import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{Checked, CheckedT, ErrorUtil}
-import com.digitalasset.canton.version.{ProtocolVersion, UntypedVersionedMessage, VersionedMessage}
+import com.digitalasset.canton.version.{
+  ProtocolVersion,
+  SourceProtocolVersion,
+  UntypedVersionedMessage,
+  VersionedMessage,
+}
 import com.google.protobuf.ByteString
 import io.functionmeta.functionFullName
 import slick.jdbc.TransactionIsolation.Serializable
@@ -62,69 +69,53 @@ class DbTransferStore(
         Predef.identity,
       )
   )
-  implicit val setParameterFullTransferOutTree: SetParameter[FullTransferOutTree] =
+
+  private implicit val setParameterFullTransferOutTree: SetParameter[FullTransferOutTree] =
     (r: FullTransferOutTree, pp: PositionedParameters) =>
       pp >> r.toByteString(protocolVersion).toByteArray
 
   private implicit val setParameterSerializableContract: SetParameter[SerializableContract] =
     SerializableContract.getVersionedSetParameter(protocolVersion)
 
-  private val protoConverterSequencedEventOpenEnvelope =
-    SignedContent.versionedProtoConverter[SequencedEvent[DefaultOpenEnvelope]](
-      "OpenEnvelope[ProtocolMessage]"
+  private implicit val getResultOptionRawDeliveredTransferOutResult
+      : GetResult[Option[RawDeliveredTransferOutResult]] = GetResult { r =>
+    r.nextBytesOption().map { bytes =>
+      RawDeliveredTransferOutResult(bytes, GetResult[ProtocolVersion].apply(r))
+    }
+  }
+
+  private def getResultDeliveredTransferOutResult(
+      sourceProtocolVersion: SourceProtocolVersion
+  ): GetResult[Option[DeliveredTransferOutResult]] =
+    GetResult(r =>
+      r.nextBytesOption().map { bytes =>
+        DbTransferStore.tryCreateDeliveredTransferOutResult(cryptoApi)(bytes, sourceProtocolVersion)
+      }
     )
 
-  private def parseSignedContentProto(
-      signedContentProto: VersionedMessage[SignedContent[SequencedEvent[DefaultOpenEnvelope]]]
-  ) =
-    protoConverterSequencedEventOpenEnvelope.fromProtoVersioned(
-      SequencedEvent.fromByteString(
-        OpenEnvelope.fromProtoV0(
-          EnvelopeContent.messageFromByteString(protocolVersion, cryptoApi),
-          protocolVersion,
-        )
-      )
-    )(signedContentProto)
-
-  implicit val getResultOptionDeliveredTransferOutResult
-      : GetResult[Option[DeliveredTransferOutResult]] = GetResult(
-    _.<<[Option[Array[Byte]]].map(bytes =>
-      (for {
-        signedContentP <- ProtoConverter.protoParserArray(UntypedVersionedMessage.parseFrom)(bytes)
-        signedContent <- parseSignedContentProto(VersionedMessage(signedContentP))
-        result <- DeliveredTransferOutResult
-          .create(signedContent)
-          .leftMap(err => OtherError(err.toString))
-      } yield result)
-        .fold(
-          error =>
-            throw new DbDeserializationException(
-              s"Error deserializing delivered transfer out result $error"
-            ),
-          identity,
-        )
-    )
-  )
-
-  implicit val setParameterDeliveredTransferOutResult: SetParameter[DeliveredTransferOutResult] =
+  private implicit val setParameterDeliveredTransferOutResult
+      : SetParameter[DeliveredTransferOutResult] =
     (r: DeliveredTransferOutResult, pp: PositionedParameters) => pp >> r.result.toByteArray
 
-  implicit val setParameterOptionDeliveredTransferOutResult
+  private implicit val setParameterOptionDeliveredTransferOutResult
       : SetParameter[Option[DeliveredTransferOutResult]] =
     (r: Option[DeliveredTransferOutResult], pp: PositionedParameters) =>
       pp >> r.map(_.result.toByteArray)
 
-  private implicit val getResultTransferData: GetResult[TransferData] = GetResult(r =>
+  private implicit val getResultTransferData: GetResult[TransferData] = GetResult { r =>
+    val sourceProtocolVersion = SourceProtocolVersion(GetResult[ProtocolVersion].apply(r))
+
     TransferData(
-      GetResult[CantonTimestamp].apply(r),
-      r.nextLong(),
-      getResultFullTransferOutTree(r),
-      GetResult[CantonTimestamp].apply(r),
-      GetResult[SerializableContract].apply(r),
-      GetResult[TransactionId].apply(r),
-      getResultOptionDeliveredTransferOutResult(r),
+      sourceProtocolVersion = sourceProtocolVersion,
+      transferOutTimestamp = GetResult[CantonTimestamp].apply(r),
+      transferOutRequestCounter = r.nextLong(),
+      transferOutRequest = getResultFullTransferOutTree(r),
+      transferOutDecisionTime = GetResult[CantonTimestamp].apply(r),
+      contract = GetResult[SerializableContract].apply(r),
+      creatingTransactionId = GetResult[TransactionId].apply(r),
+      getResultDeliveredTransferOutResult(sourceProtocolVersion).apply(r),
     )
-  )
+  }
 
   private implicit val getResultTransferEntry: GetResult[TransferEntry] = GetResult(r =>
     TransferEntry(
@@ -148,10 +139,10 @@ class DbTransferStore(
       import DbStorage.Implicits._
       val insert: DBIO[Int] = sqlu"""
         insert into transfers(target_domain, origin_domain, request_timestamp, transfer_out_timestamp, transfer_out_request_counter,
-        transfer_out_request, transfer_out_decision_time, contract, creating_transaction_id, transfer_out_result, submitter_lf)
+        transfer_out_request, transfer_out_decision_time, contract, creating_transaction_id, transfer_out_result, submitter_lf, source_protocol_version)
         values (
           $domain,
-          ${transferId.originDomain},
+          ${transferId.sourceDomain},
           ${transferId.requestTimestamp},
           ${transferData.transferOutTimestamp},
           ${transferData.transferOutRequestCounter},
@@ -160,7 +151,8 @@ class DbTransferStore(
           ${transferData.contract},
           ${transferData.creatingTransactionId},
           ${transferData.transferOutResult},
-          ${transferData.transferOutRequest.submitter})
+          ${transferData.transferOutRequest.submitter},
+          ${transferData.sourceProtocolVersion})
       """
 
       def insertExisting(
@@ -174,9 +166,10 @@ class DbTransferStore(
           set transfer_out_timestamp=${data.transferOutTimestamp}, transfer_out_request_counter=${data.transferOutRequestCounter},
             transfer_out_request=${data.transferOutRequest}, transfer_out_decision_time=${data.transferOutDecisionTime},
             contract=${data.contract}, creating_transaction_id=${data.creatingTransactionId},
-            transfer_out_result=${data.transferOutResult}, submitter_lf=${data.transferOutRequest.submitter}
+            transfer_out_result=${data.transferOutResult}, submitter_lf=${data.transferOutRequest.submitter},
+            source_protocol_version=${data.sourceProtocolVersion}
        where
-          target_domain=$domain and origin_domain=${id.originDomain} and request_timestamp =${id.requestTimestamp}
+          target_domain=$domain and origin_domain=${id.sourceDomain} and request_timestamp =${id.requestTimestamp}
         """
         }
         existingEntry.mergeWith(newEntry).map(entry => Some(update(entry)))
@@ -205,9 +198,9 @@ class DbTransferStore(
     }
 
   private def entryExists(id: TransferId): DbAction.ReadOnly[Option[TransferEntry]] = sql"""
-     select transfer_out_timestamp, transfer_out_request_counter, transfer_out_request, transfer_out_decision_time,
+     select source_protocol_version, transfer_out_timestamp, transfer_out_request_counter, transfer_out_request, transfer_out_decision_time,
      contract, creating_transaction_id, transfer_out_result, time_of_completion_request_counter, time_of_completion_timestamp
-     from transfers where target_domain = $domain and origin_domain = ${id.originDomain} and request_timestamp =${id.requestTimestamp}
+     from transfers where target_domain = $domain and origin_domain = ${id.sourceDomain} and request_timestamp = ${id.requestTimestamp}
     """.as[TransferEntry].headOption
 
   override def addTransferOutResult(
@@ -216,19 +209,21 @@ class DbTransferStore(
     processingTime.metric.eitherTEvent {
       val transferId = transferOutResult.transferId
 
-      val exists: DbAction.ReadOnly[Option[Option[DeliveredTransferOutResult]]] = sql"""
-       select transfer_out_result
+      val existsRaw: DbAction.ReadOnly[Option[Option[RawDeliveredTransferOutResult]]] = sql"""
+       select transfer_out_result, source_protocol_version
        from transfers
        where
-          target_domain=$domain and origin_domain=${transferId.originDomain} and request_timestamp =${transferId.requestTimestamp}
-        """.as[Option[DeliveredTransferOutResult]].headOption
+          target_domain=$domain and origin_domain=${transferId.sourceDomain} and request_timestamp=${transferId.requestTimestamp}
+        """.as[Option[RawDeliveredTransferOutResult]].headOption
+
+      val exists = existsRaw.map(_.map(_.map(_.tryCreateDeliveredTransferOutResul(cryptoApi))))
 
       def update(previousResult: Option[DeliveredTransferOutResult]) = {
         previousResult
           .fold[Checked[TransferStoreError, Nothing, Option[DBIO[Int]]]](Checked.result(Some(sqlu"""
               update transfers
               set transfer_out_result = ${transferOutResult}
-              where target_domain=$domain and origin_domain=${transferId.originDomain} and request_timestamp=${transferId.requestTimestamp}
+              where target_domain=$domain and origin_domain=${transferId.sourceDomain} and request_timestamp=${transferId.requestTimestamp}
               """)))(previous =>
             if (previous == transferOutResult) Checked.result(None)
             else
@@ -255,7 +250,7 @@ class DbTransferStore(
               update transfers
                 set time_of_completion_request_counter=${timeOfCompletion.rc}, time_of_completion_timestamp=${timeOfCompletion.timestamp}
               where
-                target_domain=$domain and origin_domain=${transferId.originDomain} and request_timestamp=${transferId.requestTimestamp}
+                target_domain=$domain and origin_domain=${transferId.sourceDomain} and request_timestamp=${transferId.requestTimestamp}
                 and (time_of_completion_request_counter is NULL 
                   or (time_of_completion_request_counter = ${timeOfCompletion.rc} and time_of_completion_timestamp = ${timeOfCompletion.timestamp}))
             """
@@ -286,7 +281,7 @@ class DbTransferStore(
     processingTime.metric.event {
       storage.update_(
         sqlu"""delete from transfers
-                where target_domain=$domain and origin_domain=${transferId.originDomain} and request_timestamp=${transferId.requestTimestamp}""",
+                where target_domain=$domain and origin_domain=${transferId.sourceDomain} and request_timestamp=${transferId.requestTimestamp}""",
         functionFullName,
       )
     }
@@ -303,14 +298,14 @@ class DbTransferStore(
   }
 
   private lazy val findPendingBase = sql"""
-     select transfer_out_timestamp, transfer_out_request_counter, transfer_out_request, transfer_out_decision_time,
-     contract, creating_transaction_id, transfer_out_result, time_of_completion_request_counter, time_of_completion_timestamp
+     select source_protocol_version, transfer_out_timestamp, transfer_out_request_counter, transfer_out_request, transfer_out_decision_time,
+     contract, creating_transaction_id, transfer_out_result, source_protocol_version, time_of_completion_request_counter, time_of_completion_timestamp
      from transfers
      where target_domain=$domain and time_of_completion_request_counter is null and time_of_completion_timestamp is null
     """
 
   override def find(
-      filterOrigin: Option[DomainId],
+      filterSource: Option[DomainId],
       filterTimestamp: Option[CantonTimestamp],
       filterSubmitter: Option[LfPartyId],
       limit: Int,
@@ -321,12 +316,12 @@ class DbTransferStore(
           import DbStorage.Implicits.BuilderChain._
           import DbStorage.Implicits._
 
-          val originFilter = filterOrigin.fold(sql"")(domain => sql" and origin_domain=${domain}")
+          val sourceFilter = filterSource.fold(sql"")(domain => sql" and origin_domain=${domain}")
           val timestampFilter = filterTimestamp.fold(sql"")(ts => sql" and request_timestamp=${ts}")
           val submitterFilter =
             filterSubmitter.fold(sql"")(submitter => sql" and submitter_lf=${submitter}")
           val limitSql = storage.limitSql(limit)
-          (findPendingBase ++ originFilter ++ timestampFilter ++ submitterFilter ++ limitSql)
+          (findPendingBase ++ sourceFilter ++ timestampFilter ++ submitterFilter ++ limitSql)
             .as[TransferData]
         },
         functionFullName,
@@ -343,12 +338,12 @@ class DbTransferStore(
           import DbStorage.Implicits.BuilderChain._
 
           val timestampFilter =
-            requestAfter.fold(sql"")({ case (requestTimestamp, originDomain) =>
+            requestAfter.fold(sql"")({ case (requestTimestamp, sourceDomain) =>
               storage.profile match {
                 case Profile.Oracle(_) =>
-                  sql"and (request_timestamp > ${requestTimestamp} or (request_timestamp = ${requestTimestamp} and origin_domain > ${originDomain}))"
+                  sql"and (request_timestamp > ${requestTimestamp} or (request_timestamp = ${requestTimestamp} and origin_domain > ${sourceDomain}))"
                 case _ =>
-                  sql" and (request_timestamp, origin_domain) > (${requestTimestamp}, ${originDomain}) "
+                  sql" and (request_timestamp, origin_domain) > (${requestTimestamp}, ${sourceDomain}) "
               }
             })
           val order = sql" order by request_timestamp, origin_domain "
@@ -400,5 +395,65 @@ class DbTransferStore(
     CheckedT(result.recover[Checked[E, W, Option[R]]] { case NonFatal(x) =>
       Checked.abort(errorHandler(x))
     })
+  }
+}
+
+object DbTransferStore {
+  /*
+    This class is a helper to deserialize DeliveredTransferOutResult because its deserialization
+    depends on the ProtocolVersion of the source domain.
+   */
+  final case class RawDeliveredTransferOutResult(
+      result: Array[Byte],
+      sourceProtocolVersion: ProtocolVersion,
+  ) {
+    def tryCreateDeliveredTransferOutResul(cryptoApi: CryptoPureApi) =
+      tryCreateDeliveredTransferOutResult(cryptoApi)(
+        bytes = result,
+        sourceProtocolVersion = SourceProtocolVersion(sourceProtocolVersion),
+      )
+  }
+
+  private val protoConverterSequencedEventOpenEnvelope =
+    SignedContent.versionedProtoConverter[SequencedEvent[DefaultOpenEnvelope]](
+      "OpenEnvelope[ProtocolMessage]"
+    )
+
+  private def parseSignedContentProto(cryptoApi: CryptoPureApi)(
+      signedContentProto: VersionedMessage[SignedContent[SequencedEvent[DefaultOpenEnvelope]]],
+      sourceProtocolVersion: SourceProtocolVersion,
+  ): ParsingResult[SignedContent[SequencedEvent[DefaultOpenEnvelope]]] =
+    protoConverterSequencedEventOpenEnvelope.fromProtoVersioned(
+      SequencedEvent.fromByteString(
+        OpenEnvelope.fromProtoV0(
+          EnvelopeContent.messageFromByteString(sourceProtocolVersion.v, cryptoApi),
+          sourceProtocolVersion.v,
+        )
+      )
+    )(signedContentProto)
+
+  private def tryCreateDeliveredTransferOutResult(cryptoApi: CryptoPureApi)(
+      bytes: Array[Byte],
+      sourceProtocolVersion: SourceProtocolVersion,
+  ) = {
+    val res: ParsingResult[DeliveredTransferOutResult] = for {
+      signedContentP <- ProtoConverter.protoParserArray(UntypedVersionedMessage.parseFrom)(bytes)
+      signedContent <- parseSignedContentProto(cryptoApi)(
+        VersionedMessage(signedContentP),
+        sourceProtocolVersion,
+      )
+
+      result <- DeliveredTransferOutResult
+        .create(signedContent)
+        .leftMap(err => OtherError(err.toString))
+    } yield result
+
+    res.fold(
+      error =>
+        throw new DbDeserializationException(
+          s"Error deserializing delivered transfer out result $error"
+        ),
+      identity,
+    )
   }
 }

@@ -22,7 +22,6 @@ import com.digitalasset.canton.time.{DomainTimeTrackerConfig, NonNegativeFiniteD
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.util.OptionUtil
 import com.digitalasset.canton.version.{
-  HasProtoV0,
   HasVersionedMessageCompanion,
   HasVersionedWrapper,
   ProtocolVersion,
@@ -32,6 +31,23 @@ import com.google.protobuf.ByteString
 
 import java.net.URI
 
+/** The domain connection configuration object
+  *
+  * @param domain alias to be used internally to refer to this domain connection
+  * @param sequencerConnection the host and port to the sequencer(s).
+  *                            multiple can be given by building the [[com.digitalasset.canton.sequencing.SequencerConnection]] object explicitly.
+  * @param manualConnect if set to true (default false), the domain is not connected automatically on startup.
+  * @param domainId if the domain-id is known, then it can be passed as an argument. during the handshake, the
+  *                 participant will check that the domain-id on the remote port is indeed the one given
+  *                 in the configuration. the domain-id can not be faked by a domain. therefore, this additional
+  *                 check can be used to really ensure that you are talking to the right domain.
+  * @param priority the priority of this domain connection. if there are more than one domain connections, the [[com.digitalasset.canton.participant.sync.DomainRouter]]
+  *                 will pick the domain connection with the highest priority if possible.
+  * @param initialRetryDelay domain connections are "resilient". i.e. if a connection is lost, the system will keep
+  *                          trying to reconnect to a domain.
+  * @param maxRetryDelay control the backoff parameter such that the retry interval does not grow above this value
+  * @param timeTracker the domain time tracker settings. don't change it unless you know what you are doing.
+  */
 case class DomainConnectionConfig(
     domain: DomainAlias,
     sequencerConnection: SequencerConnection,
@@ -42,7 +58,6 @@ case class DomainConnectionConfig(
     maxRetryDelay: Option[NonNegativeFiniteDuration] = None,
     timeTracker: DomainTimeTrackerConfig = DomainTimeTrackerConfig(),
 ) extends HasVersionedWrapper[VersionedMessage[DomainConnectionConfig]]
-    with HasProtoV0[v0.DomainConnectionConfig]
     with PrettyPrinting {
 
   /** Helper methods to avoid having to use NonEmpty[Seq in the console */
@@ -52,10 +67,6 @@ case class DomainConnectionConfig(
     copy(sequencerConnection =
       sequencerConnection
         .addConnection(connection, additionalConnections: _*)
-        .fold(
-          err => throw new IllegalArgumentException(s"invalid connection $connection : $err"),
-          identity[SequencerConnection],
-        )
     )
 
   def certificates: Option[ByteString] = sequencerConnection match {
@@ -93,7 +104,7 @@ case class DomainConnectionConfig(
   ): VersionedMessage[DomainConnectionConfig] =
     VersionedMessage(toProtoV0.toByteString, 0)
 
-  override def toProtoV0: v0.DomainConnectionConfig =
+  def toProtoV0: v0.DomainConnectionConfig =
     v0.DomainConnectionConfig(
       domainAlias = domain.unwrap,
       sequencerConnection = sequencerConnection.toProtoV0.some,

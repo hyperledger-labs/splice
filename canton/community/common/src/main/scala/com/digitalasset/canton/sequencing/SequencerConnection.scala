@@ -18,7 +18,6 @@ import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.tracing.TracingConfig.Propagation
 import com.digitalasset.canton.version.{
-  HasProtoV0,
   HasVersionedMessageCompanion,
   HasVersionedWrapper,
   ProtocolVersion,
@@ -41,28 +40,28 @@ sealed trait SequencerConnection
     extends Product
     with Serializable
     with HasVersionedWrapper[VersionedMessage[SequencerConnection]]
-    with HasProtoV0[v0.SequencerConnection]
     with PrettyPrinting {
   override def toProtoVersioned(version: ProtocolVersion): VersionedMessage[SequencerConnection] =
     VersionedMessage(toProtoV0.toByteString, 0)
 
-  override def toProtoV0: v0.SequencerConnection
+  def toProtoV0: v0.SequencerConnection
 
   def addConnection(
       connection: String,
       additionalConnections: String*
-  ): Either[String, SequencerConnection] =
+  ): SequencerConnection =
     addConnection(new URI(connection), additionalConnections.map(new URI(_)): _*)
 
+  // TODO(i9014) change this to Either
   def addConnection(
       connection: URI,
       additionalConnections: URI*
-  ): Either[String, SequencerConnection]
+  ): SequencerConnection
 
   def addConnection(
       connection: SequencerConnection,
       additionalConnections: SequencerConnection*
-  ): Either[String, SequencerConnection]
+  ): SequencerConnection
 }
 
 case class HttpSequencerConnection(urls: HttpSequencerEndpoints, certificate: X509CertificatePem)
@@ -90,13 +89,13 @@ case class HttpSequencerConnection(urls: HttpSequencerEndpoints, certificate: X5
   override def addConnection(
       connection: URI,
       additionalConnections: URI*
-  ): Either[String, SequencerConnection] =
-    Left("Http sequencer does not support multiple connections")
+  ): SequencerConnection =
+    throw new IllegalArgumentException("Http sequencer does not support multiple connections")
 
   override def addConnection(
       connection: SequencerConnection,
       additionalConnections: SequencerConnection*
-  ): Either[String, SequencerConnection] = Left(
+  ): SequencerConnection = throw new IllegalArgumentException(
     "Http sequencer does not support multiple connections"
   )
 
@@ -134,17 +133,21 @@ final case class GrpcSequencerConnection(
   override def addConnection(
       connection: URI,
       additionalConnections: URI*
-  ): Either[String, SequencerConnection] =
-    for {
+  ): SequencerConnection =
+    (for {
       newEndpoints <- Endpoint
         .fromUris(NonEmpty(Seq, connection, additionalConnections: _*))
-    } yield copy(endpoints = endpoints ++ newEndpoints._1)
+    } yield copy(endpoints = endpoints ++ newEndpoints._1)).valueOr(err =>
+      throw new IllegalArgumentException(err)
+    )
 
   override def addConnection(
       connection: SequencerConnection,
       additionalConnections: SequencerConnection*
-  ): Either[String, SequencerConnection] =
-    SequencerConnection.merge(this +: connection +: additionalConnections)
+  ): SequencerConnection =
+    SequencerConnection
+      .merge(this +: connection +: additionalConnections)
+      .valueOr(err => throw new IllegalArgumentException(err))
 }
 
 object GrpcSequencerConnection {

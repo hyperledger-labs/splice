@@ -6,6 +6,7 @@ package com.digitalasset.canton.domain.mediator
 import cats.data.{EitherT, NonEmptySeq}
 import cats.instances.future._
 import cats.syntax.bifunctor._
+import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.config.{LocalNodeParameters, ProcessingTimeout}
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
 import com.digitalasset.canton.data.CantonTimestamp
@@ -20,13 +21,21 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
-import com.digitalasset.canton.protocol.{DynamicDomainParameters, LoggingAlarmStreamer}
+import com.digitalasset.canton.protocol.{
+  DomainParameters,
+  DynamicDomainParameters,
+  LoggingAlarmStreamer,
+}
 import com.digitalasset.canton.sequencing._
 import com.digitalasset.canton.sequencing.client.SequencerClient
 import com.digitalasset.canton.sequencing.handlers.{DiscardIgnoredEvents, EnvelopeOpener}
 import com.digitalasset.canton.sequencing.protocol.Envelope
 import com.digitalasset.canton.store.SequencedEventStore.OrdinarySequencedEvent
-import com.digitalasset.canton.store.{SequencedEventStore, SequencerCounterTrackerStore}
+import com.digitalasset.canton.store.{
+  CursorPrehead,
+  SequencedEventStore,
+  SequencerCounterTrackerStore,
+}
 import com.digitalasset.canton.time.{Clock, DomainTimeTracker, DomainTimeTrackerConfig}
 import com.digitalasset.canton.topology.client.DomainTopologyClientWithInit
 import com.digitalasset.canton.topology.processing.TopologyTransactionProcessor
@@ -50,7 +59,7 @@ class Mediator(
     topologyTransactionProcessor: TopologyTransactionProcessor,
     timeTrackerConfig: DomainTimeTrackerConfig,
     state: MediatorState,
-    sequencerCounterTrackerStore: SequencerCounterTrackerStore,
+    private[canton] val sequencerCounterTrackerStore: SequencerCounterTrackerStore,
     sequencedEventStore: SequencedEventStore,
     parameters: LocalNodeParameters,
     protocolVersion: ProtocolVersion,
@@ -75,15 +84,25 @@ class Mediator(
 
   val timeTracker = DomainTimeTracker(timeTrackerConfig, clock, sequencerClient, loggerFactory)
 
+  private val verdictSender =
+    VerdictSender(sequencerClient, syncCrypto, protocolVersion, loggerFactory)
+
   private val processor = new ConfirmationResponseProcessor(
     domain,
     mediatorId,
+    verdictSender,
     syncCrypto,
-    sequencerClient,
     timeTracker,
     state,
     new LoggingAlarmStreamer(logger),
     protocolVersion,
+    loggerFactory,
+  )
+
+  private val deduplicator = MediatorEventDeduplicator.create(
+    state.deduplicationStore,
+    verdictSender,
+    syncCrypto.ips,
     loggerFactory,
   )
 
@@ -92,21 +111,35 @@ class Mediator(
     syncCrypto,
     topologyTransactionProcessor.createHandler(domain),
     processor,
+    deduplicator,
     readyCheck,
     loggerFactory,
   )
 
   val stateInspection: MediatorStateInspection = new MediatorStateInspection(state)
 
-  override protected def startAsync(): Future[Unit] = {
+  override protected def startAsync(): Future[Unit] = for {
 
-    sequencerClient.subscribeTracking(
+    preheadO <- sequencerCounterTrackerStore.preheadSequencerCounter
+    nextTs = preheadO.fold(CantonTimestamp.MinValue)(_.timestamp.immediateSuccessor)
+    _ <- state.deduplicationStore.initialize(nextTs)
+
+    _ <- sequencerClient.subscribeTracking(
       sequencerCounterTrackerStore,
       DiscardIgnoredEvents(
         EnvelopeOpener[OrdinaryEnvelopeBox](protocolVersion, syncCrypto.crypto.pureCrypto)(handler)
       ),
       timeTracker,
+      onCleanHandler = onCleanSequencerCounterHandler,
     )
+  } yield ()
+
+  private def onCleanSequencerCounterHandler(
+      newTracedPrehead: Traced[CursorPrehead[SequencerCounter]]
+  ): Future[Unit] = newTracedPrehead.withTraceContext { implicit traceContext => newPrehead =>
+    performUnlessClosingF("prune mediator deduplication store")(
+      state.deduplicationStore.prune(newPrehead.timestamp)
+    ).onShutdown(logger.info("Not pruning the mediator deduplication store due to shutdown"))
   }
 
   /** Prune all unnecessary data from the mediator state and sequenced events store.
@@ -153,7 +186,7 @@ class Mediator(
   private def prune(
       pruneAt: CantonTimestamp,
       cleanTimestamp: CantonTimestamp,
-      domainParametersChanges: NonEmptySeq[DynamicDomainParameters.WithValidity],
+      domainParametersChanges: NonEmptySeq[DomainParameters.WithValidity[DynamicDomainParameters]],
   ): EitherT[Future, PruningError, Unit] = {
     val latestSafePruningTsO = Mediator.latestSafePruningTsBefore(
       domainParametersChanges,
@@ -244,10 +277,10 @@ object Mediator {
   case class SafeUntil(ts: CantonTimestamp) extends PruningSafetyCheck
 
   private[mediator] def checkPruningStatus(
-      domainParameters: DynamicDomainParameters.WithValidity,
+      domainParameters: DomainParameters.WithValidity[DynamicDomainParameters],
       cleanTs: CantonTimestamp,
   ): PruningSafetyCheck = {
-    lazy val timeout = domainParameters.parameters.participantResponseTimeout
+    lazy val timeout = domainParameters.parameter.participantResponseTimeout
     lazy val cappedSafePruningTs =
       CantonTimestamp.max(cleanTs - timeout, domainParameters.validFrom)
 
@@ -265,7 +298,9 @@ object Mediator {
 
   /** Returns the latest safe pruning ts which is <= cleanTs */
   private[mediator] def latestSafePruningTsBefore(
-      allDomainParametersChanges: NonEmptySeq[DynamicDomainParameters.WithValidity],
+      allDomainParametersChanges: NonEmptySeq[
+        DomainParameters.WithValidity[DynamicDomainParameters]
+      ],
       cleanTs: CantonTimestamp,
   ): Option[CantonTimestamp] = allDomainParametersChanges
     .map(checkPruningStatus(_, cleanTs))

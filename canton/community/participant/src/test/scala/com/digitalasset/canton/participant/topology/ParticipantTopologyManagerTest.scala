@@ -4,26 +4,36 @@
 package com.digitalasset.canton.participant.topology
 
 import com.digitalasset.canton.config.DefaultProcessingTimeouts
-import com.digitalasset.canton.topology.{DefaultTestIdentities, TopologyManagerTest}
-
-import scala.concurrent.Future
+import com.digitalasset.canton.topology.{
+  Identifier,
+  Namespace,
+  ParticipantId,
+  TopologyManagerTest,
+  UniqueIdentifier,
+}
 
 class ParticipantTopologyManagerTest extends TopologyManagerTest {
 
   "participant topology state manager" should {
-    behave like topologyManager((clock, store, crypto, factory) =>
-      Future.successful {
+    behave like topologyManager { (clock, store, crypto, factory) =>
+      for {
+        keys <- crypto.cryptoPublicStore.signingKeys.valueOrFail("signing keys")
+      } yield {
+        val id =
+          UniqueIdentifier(Identifier.tryCreate("da"), Namespace(keys.headOption.value.fingerprint))
+
         val mgr = new ParticipantTopologyManager(
           clock,
           store,
           crypto,
           DefaultProcessingTimeouts.testing,
+          testedProtocolVersion,
           factory,
         )
-        mgr.setParticipantId(DefaultTestIdentities.participant1)
+        mgr.setParticipantId(ParticipantId(id))
         mgr
       }
-    )
+    }
 
   }
 

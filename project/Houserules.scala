@@ -40,7 +40,7 @@ object JvmRulesPlugin extends AutoPlugin {
       addCompilerPlugin(
         "org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full
       ),
-      wartremoverErrors ++= {
+      Compile / compile / wartremoverErrors ++= {
         if (System.getProperty("canton-disable-warts") == "true") Seq()
         else
           Seq(
@@ -58,6 +58,22 @@ object JvmRulesPlugin extends AutoPlugin {
             Wart.TraversableOps,
             Wart.TryPartial,
             Wart.Var,
+            Wart.While,
+            ContribWart.UnintendedLaziness,
+          )
+      },
+      Test / compile / wartremoverErrors := {
+        if (System.getProperty("canton-disable-warts") == "true") Seq()
+        else
+          Seq(
+            Wart.EitherProjectionPartial,
+            Wart.Enumeration,
+            Wart.JavaConversions,
+            Wart.Option2Iterable,
+            Wart.OptionPartial,
+            Wart.Product,
+            Wart.Return,
+            Wart.Serializable,
             Wart.While,
             ContribWart.UnintendedLaziness,
           )

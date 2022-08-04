@@ -14,8 +14,8 @@ import com.daml.ledger.api.DeduplicationPeriod
 import com.daml.ledger.participant.state.v2._
 import com.daml.lf.data.ImmArray
 import com.daml.lf.transaction.ContractStateMachine.{KeyInactive, KeyMapping}
+import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances._
-import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.crypto.{
   DomainSnapshotSyncCryptoApi,
   DomainSyncCryptoClient,
@@ -321,7 +321,9 @@ class TransactionProcessingSteps(
                 .toRight(
                   causeWithTemplate(
                     "Incompatible Domain",
-                    MalformedLfTransaction("No confirmation policy applicable"),
+                    MalformedLfTransaction(
+                      s"No confirmation policy applicable (snapshot at ${recentSnapshot.ipsSnapshot.timestamp})"
+                    ),
                   )
                 )
             )
@@ -724,8 +726,7 @@ class TransactionProcessingSteps(
       for {
         _ <- pendingCursor
 
-        rootViewTrees =
-          enrichedTransaction.rootViewsWithUsedAndCreated.keys.rootViewsWithContractKeys.map(_._1)
+        rootViewTrees = enrichedTransaction.rootViewsWithUsedAndCreated.rootViews
         rootViews = rootViewTrees.map(_.view)
         consistencyResult = ContractConsistencyChecker.assertInputContractsInPast(
           rootViews.toList,
@@ -751,7 +752,8 @@ class TransactionProcessingSteps(
 
         conformanceResult <- modelConformanceChecker
           .check(
-            enrichedTransaction.rootViewsWithUsedAndCreated.keys.rootViewsWithContractKeys,
+            enrichedTransaction.rootViewsWithUsedAndCreated.rootViews,
+            enrichedTransaction.rootViewsWithUsedAndCreated.keys.keyResolverFor(_),
             pendingDataAndResponseArgs.rc,
             ipsSnapshot,
             commonData,
@@ -783,8 +785,8 @@ class TransactionProcessingSteps(
     ): TransactionValidationResult = {
       val viewResults = SortedMap.newBuilder[ViewHash, ViewValidationResult]
 
-      enrichedTransaction.rootViewsWithUsedAndCreated.keys.rootViewsWithContractKeys.forgetNE
-        .flatMap(_._1.flatten)
+      enrichedTransaction.rootViewsWithUsedAndCreated.rootViews.forgetNE
+        .flatMap(_.flatten)
         .foreach { view =>
           val viewParticipantData = view.viewParticipantData
           val createdCore = viewParticipantData.createdCore.map(_.contract.contractId).toSet
@@ -814,9 +816,9 @@ class TransactionProcessingSteps(
             }
           val freeResolvedKeysWithMaintainers =
             viewParticipantData.resolvedKeys.to(LazyList).mapFilter {
-              case (key, FreeKey(maintainers, _)) =>
+              case (key, FreeKey(maintainers)) =>
                 Some(LfGlobalKeyWithMaintainers(key, maintainers))
-              case (key, AssignedKey(cid, _)) => None
+              case (key, AssignedKey(cid)) => None
             }
           val createdKeysWithMaintainers =
             viewParticipantData.createdCore
@@ -839,9 +841,9 @@ class TransactionProcessingSteps(
           val lockedKeys = filterKeys(allKeys)(keyResult.alreadyLocked.contains)
 
           val viewActivenessResult = ViewActivenessResult(
-            inactiveContracts = alreadyLocked,
-            alreadyLockedContracts = existing,
-            existingContracts = inactive,
+            inactiveContracts = inactive,
+            alreadyLockedContracts = alreadyLocked,
+            existingContracts = existing,
             duplicateKeys = duplicateKeys,
             inconsistentKeys = inconsistentKeys,
             lockedKeys = lockedKeys,
@@ -1135,6 +1137,7 @@ class TransactionProcessingSteps(
               DivulgedContract(divulgedCid, divulgedContract.contractInstance)
           }.toList,
         blindingInfo = None,
+        contractMetadata = Map(), // TODO(#9795) wire proper value
       )
 
       timestampedEvent = TimestampedEvent(
@@ -1244,6 +1247,7 @@ class TransactionProcessingSteps(
           extractInputAndUpdatedKeysV2(rootViewTrees, partyPrefetch)
 
       UsedAndCreated(
+        rootViews = rootViewTrees,
         contracts = usedAndCreatedContracts,
         keys = inputAndReassignedKeys,
         hostedInformeeStakeholders = hostedInformeeStakeholders,
@@ -1382,8 +1386,7 @@ class TransactionProcessingSteps(
       rootViewTrees: Seq[TransactionViewTree],
       partyPrefetch: PrefetchedParties,
   )(implicit traceContext: TraceContext): InputAndUpdatedKeys = {
-    val perRootViewInputKeysB =
-      List.newBuilder[(TransactionViewTree, LfKeyResolver)]
+    val perRootViewInputKeysB = Map.newBuilder[ViewHash, LfKeyResolver]
     // We had computed `transientSameViewOrEarlier` already in `extractUsedAndCreatedContracts`,
     // but we need to recompute it again for the keys here.
     val transientSameViewOrEarlier = mutable.Set.empty[LfContractId]
@@ -1426,11 +1429,11 @@ class TransactionProcessingSteps(
         viewParticipantData.resolvedKeys.foreach { case (key, resolved) =>
           val _ = resolvedKeysInView.getOrElseUpdate(key, resolved.resolution)
           resolved match {
-            case FreeKey(maintainers, _) =>
+            case FreeKey(maintainers) =>
               if (partyPrefetch.hostsAny(maintainers)) {
                 keyMustBeFree(key)
               }
-            case AssignedKey(_, _) =>
+            case AssignedKey(_) =>
             // AssignedKeys are part of the coreInputs and thus will be dealt with below.
           }
         }
@@ -1502,7 +1505,7 @@ class TransactionProcessingSteps(
           }
         }
       }
-      perRootViewInputKeysB += rootViewTree -> resolvedKeysInView.toMap
+      perRootViewInputKeysB += rootViewTree.viewHash -> resolvedKeysInView.toMap
     }
 
     // Only perform activeness checks for keys on domains with unique contract key semantics
@@ -1526,8 +1529,8 @@ class TransactionProcessingSteps(
       (updatedKeys, freeKeys)
     } else (Map.empty[LfGlobalKey, ContractKeyJournal.Status], Set.empty[LfGlobalKey])
 
-    InputAndUpdatedKeys(
-      rootViewsWithContractKeys = NonEmptyUtil.fromUnsafe(perRootViewInputKeysB.result()),
+    InputAndUpdatedKeysV2(
+      keyResolvers = perRootViewInputKeysB.result(),
       uckFreeKeysOfHostedMaintainers = freeKeys,
       uckUpdatedKeysOfHostedMaintainers = updatedKeys,
     )
@@ -1540,9 +1543,6 @@ class TransactionProcessingSteps(
       rootViewTrees: NonEmpty[Seq[TransactionViewTree]],
       partyPrefetch: PrefetchedParties,
   )(implicit traceContext: TraceContext): InputAndUpdatedKeys = {
-    val rootViewsWithContractKeys = rootViewTrees.map { rootView =>
-      rootView -> rootView.view.globalKeyInputs.fmap(_.resolution)
-    }
     val (updatedKeys, freeKeys) = if (staticDomainParameters.uniqueContractKeys) {
       /* In UCK mode, the globalKeyInputs have been computed with `ContractKeyUniquenessMode.Strict`,
        * i.e., the global key input of each view contain the expected pre-view state of the key.
@@ -1587,9 +1587,7 @@ class TransactionProcessingSteps(
       // This gives the final resolution for the key.
       // TODO(M40,#713) validate internal key consistency
       val mergedKeys = rootViewTrees.foldLeft(Map.empty[LfGlobalKey, KeyMapping]) {
-        (accKeys, rootView) =>
-          val activeLedgerState = rootView.view.activeLedgerState
-          accKeys ++ activeLedgerState.keys
+        (accKeys, rootView) => accKeys ++ rootView.view.updatedKeyValues
       }
 
       val updatedKeys = mergedKeys.collect {
@@ -1603,8 +1601,7 @@ class TransactionProcessingSteps(
       (updatedKeys, freeKeys)
     } else (Map.empty[LfGlobalKey, ContractKeyJournal.Status], Set.empty[LfGlobalKey])
 
-    InputAndUpdatedKeys(
-      rootViewsWithContractKeys = rootViewsWithContractKeys,
+    InputAndUpdatedKeysV3(
       uckFreeKeysOfHostedMaintainers = freeKeys,
       uckUpdatedKeysOfHostedMaintainers = updatedKeys,
     )
@@ -1636,7 +1633,7 @@ class TransactionProcessingSteps(
         val viewParticipantData = subview.viewParticipantData.tryUnwrap
         prefetchParties ++= subview.viewCommonData.tryUnwrap.informees.map(_.party)
         viewParticipantData.resolvedKeys.foreach {
-          case (_, FreeKey(maintainers, _)) => prefetchParties ++= maintainers
+          case (_, FreeKey(maintainers)) => prefetchParties ++= maintainers
           case _ => ()
         }
         viewParticipantData.coreInputs.values.foreach { x =>
@@ -1701,9 +1698,9 @@ object TransactionProcessingSteps {
   ) {
 
     def transactionId: TransactionId =
-      rootViewsWithUsedAndCreated.keys.rootViewsWithContractKeys.head1._1.transactionId
+      rootViewsWithUsedAndCreated.rootViews.head1.transactionId
     def ledgerTime: CantonTimestamp =
-      rootViewsWithUsedAndCreated.keys.rootViewsWithContractKeys.head1._1.ledgerTime
+      rootViewsWithUsedAndCreated.rootViews.head1.ledgerTime
   }
 
   case class ParallelChecksResult(

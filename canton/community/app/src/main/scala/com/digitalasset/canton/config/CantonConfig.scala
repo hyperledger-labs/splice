@@ -332,6 +332,8 @@ trait CantonConfig {
         domainConfig.caching,
         parameters.nonStandardConfig,
         domainConfig.domainParameters.willCorruptYourSystemDevVersionSupport,
+        domainConfig.domainParameters.dontWarnOnDeprecatedPV,
+        domainConfig.domainParameters.protocolVersion.unwrap,
       )
   }
 
@@ -367,6 +369,8 @@ trait CantonConfig {
         ParticipantProtocolConfig(
           minimumProtocolVersion = participantParameters.minimumProtocolVersion.map(_.unwrap),
           devVersionSupport = participantParameters.willCorruptYourSystemDevVersionSupport,
+          dontWarnOnDeprecatedPV = participantParameters.dontWarnOnDeprecatedPV,
+          initialProtocolVersion = participantParameters.initialProtocolVersion.unwrap,
         ),
         participantParameters.uniqueContractKeys,
         participantParameters.enableCausalityTracking,

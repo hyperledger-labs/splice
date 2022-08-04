@@ -33,7 +33,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherUtil
 import com.digitalasset.canton.version.ProtocolVersion
 import io.grpc.Context.CancellableContext
-import io.grpc.{Context, ManagedChannel}
+import io.grpc.{CallOptions, Context, ManagedChannel}
 
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.duration.Duration
@@ -41,6 +41,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcSequencerClientTransport(
     channel: ManagedChannel,
+    callOptions: CallOptions,
     clientAuth: GrpcSequencerClientAuth,
     metrics: SequencerClientMetrics,
     val timeouts: ProcessingTimeout,
@@ -50,7 +51,9 @@ class GrpcSequencerClientTransport(
     with NamedLogging {
 
   private val sequencerConnectServiceClient = new SequencerConnectServiceStub(channel)
-  private val sequencerServiceClient = clientAuth(new SequencerServiceStub(channel))
+  private val sequencerServiceClient = clientAuth(
+    new SequencerServiceStub(channel, options = callOptions)
+  )
   private val noLoggingShutdownErrorsLogPolicy: GrpcError => TracedLogger => TraceContext => Unit =
     err =>
       logger =>
@@ -126,7 +129,7 @@ class GrpcSequencerClientTransport(
       // log that we're swallowing the error
       result.foreach { _ =>
         logger.info(
-          s"Send [${request.messageId}] returned an error however may still be possibility sequenced so we are ignoring the error: $error"
+          s"Send [${request.messageId}] returned an error however may still be possibly sequenced so we are ignoring the error: $error"
         )
       }
 

@@ -15,7 +15,6 @@ import com.digitalasset.canton.store.db.DbSerializationException
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.version.{
   HasMemoizedProtocolVersionedWrapperCompanion,
-  HasProtoV0,
   HasProtocolVersionedWrapper,
   ProtobufVersion,
   ProtocolVersion,
@@ -43,7 +42,6 @@ case class SignedTopologyTransaction[+Op <: TopologyChangeOp](
     ],
     val deserializedFrom: Option[ByteString] = None,
 ) extends HasProtocolVersionedWrapper[SignedTopologyTransaction[TopologyChangeOp]]
-    with HasProtoV0[v0.SignedTopologyTransaction]
     with ProtocolVersionedMemoizedEvidence
     with Product
     with Serializable
@@ -54,7 +52,7 @@ case class SignedTopologyTransaction[+Op <: TopologyChangeOp](
 
   override def companionObj = SignedTopologyTransaction
 
-  override protected def toProtoV0: v0.SignedTopologyTransaction =
+  private def toProtoV0: v0.SignedTopologyTransaction =
     v0.SignedTopologyTransaction(
       transaction = transaction.getCryptographicEvidence,
       key = Some(key.toProtoV0),
@@ -109,6 +107,32 @@ object SignedTopologyTransaction
       representativeProtocolVersion,
       None,
     )
+
+  def asVersion[Op <: TopologyChangeOp](
+      signedTx: SignedTopologyTransaction[Op],
+      protocolVersion: ProtocolVersion,
+  )(
+      crypto: Crypto
+  )(implicit ec: ExecutionContext): EitherT[Future, String, SignedTopologyTransaction[Op]] = {
+    val originTx = signedTx.transaction
+
+    // Convert and resign the transaction if the topology transaction version does not match the expected version
+    if (!originTx.hasEquivalentVersion(protocolVersion)) {
+      val convertedTx = originTx.asVersion(protocolVersion)
+      SignedTopologyTransaction
+        .create(
+          convertedTx,
+          signedTx.key,
+          crypto.pureCrypto,
+          crypto.privateCrypto,
+          protocolVersion,
+        )
+        .leftMap { err =>
+          s"Failed to resign topology transaction $originTx (${originTx.representativeProtocolVersion}) for domain version $protocolVersion: $err"
+        }
+    } else
+      EitherT.rightT(signedTx)
+  }
 
   private def fromProtoV0(transactionP: v0.SignedTopologyTransaction)(
       bytes: ByteString

@@ -71,6 +71,7 @@ object DatabaseSequencer {
       OnlineSequencerCheckConfig(),
       timeouts,
       storage,
+      None,
       clock,
       domainId,
       topologyClientMember,
@@ -90,6 +91,7 @@ class DatabaseSequencer(
     onlineSequencerCheckConfig: OnlineSequencerCheckConfig,
     override protected val timeouts: ProcessingTimeout,
     storage: Storage,
+    health: Option[SequencerHealthConfig],
     clock: Clock,
     domainId: DomainId,
     topologyClientMember: Member,
@@ -97,7 +99,7 @@ class DatabaseSequencer(
     cryptoApi: DomainSyncCryptoClient,
     loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, tracer: Tracer, materializer: Materializer)
-    extends BaseSequencer(DomainTopologyManagerId(domainId), loggerFactory)
+    extends BaseSequencer(DomainTopologyManagerId(domainId), loggerFactory, health, clock)
     with FlagCloseable {
   private val store: SequencerStore =
     SequencerStore(
@@ -236,7 +238,7 @@ class DatabaseSequencer(
   override def pruningStatus(implicit traceContext: TraceContext): Future[SequencerPruningStatus] =
     store.status(clock.now)
 
-  override def health(implicit traceContext: TraceContext): Future[SequencerHealthStatus] =
+  override def healthInternal(implicit traceContext: TraceContext): Future[SequencerHealthStatus] =
     Future.successful(
       SequencerHealthStatus(
         isActive = writer.isActive

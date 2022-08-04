@@ -6,7 +6,7 @@ package com.digitalasset.canton.participant.admin
 import com.daml.ledger.api.v1.transaction.Transaction
 import com.digitalasset.canton.tracing.TraceContext
 
-/** Admin service that connects to the ledger and processes events
+/** Admin service that connects to the ledger and process events
   */
 trait AdminWorkflowService extends AutoCloseable {
 

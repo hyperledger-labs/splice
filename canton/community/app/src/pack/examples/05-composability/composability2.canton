@@ -30,7 +30,7 @@ val Painter = participant3.parties.enable("Painter", waitForDomain = DomainChoic
 
 // enable the house owner on participant 5 and the painter on participant 4
 // as explained in the identity management documentation at
-// https://www.canton.io/docs/stable/user-manual/usermanual/identity_management.html#party-on-two-nodes
+// https://docs.daml.com/canton/usermanual/identity_management.html#party-on-two-nodes
 import com.digitalasset.canton.console.ParticipantReference
 def authorizePartyParticipant(partyId: PartyId, createdAt: ParticipantReference, to: ParticipantReference): Unit = {
   val createdAtP = createdAt.id
@@ -94,7 +94,7 @@ participant3.ledger_api.acs.await_active_contract(Painter, paintOffer.contractId
 val paintOfferTransferId = participant3.transfer.out(
   Painter,                      // Initiator of the transfer
   paintOffer.contractId.toLf,   // Contract to be transferred
-  paintAlias,                   // Origin domain
+  paintAlias,                   // Source domain
   iouAlias                      // Target domain
 )
 // architecture-handbook-entry-end: transfer-out

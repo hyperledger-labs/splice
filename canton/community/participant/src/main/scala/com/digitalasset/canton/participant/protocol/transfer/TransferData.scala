@@ -9,9 +9,11 @@ import com.digitalasset.canton.protocol.messages.DeliveredTransferOutResult
 import com.digitalasset.canton.protocol.{SerializableContract, TransactionId, TransferId}
 import com.digitalasset.canton.topology.{DomainId, MediatorId}
 import com.digitalasset.canton.util.OptionUtil
+import com.digitalasset.canton.version.SourceProtocolVersion
 
-/** Stores the data for a transfer that needs to be passed from the origin domain to the target domain. */
+/** Stores the data for a transfer that needs to be passed from the source domain to the target domain. */
 case class TransferData(
+    sourceProtocolVersion: SourceProtocolVersion,
     transferOutTimestamp: CantonTimestamp,
     transferOutRequestCounter: RequestCounter,
     transferOutRequest: FullTransferOutTree,
@@ -28,11 +30,11 @@ case class TransferData(
 
   def targetDomain: DomainId = transferOutRequest.targetDomain
 
-  def originDomain: DomainId = transferOutRequest.originDomain
+  def sourceDomain: DomainId = transferOutRequest.sourceDomain
 
-  def transferId: TransferId = TransferId(transferOutRequest.originDomain, transferOutTimestamp)
+  def transferId: TransferId = TransferId(transferOutRequest.sourceDomain, transferOutTimestamp)
 
-  def originMediator: MediatorId = transferOutRequest.mediatorId
+  def sourceMediator: MediatorId = transferOutRequest.mediatorId
 
   def addTransferOutResult(result: DeliveredTransferOutResult): Option[TransferData] =
     mergeTransferOutResult(Some(result))
@@ -42,6 +44,7 @@ case class TransferData(
     else
       other match {
         case TransferData(
+              `sourceProtocolVersion`,
               `transferOutTimestamp`,
               `transferOutRequestCounter`,
               `transferOutRequest`,

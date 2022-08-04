@@ -6,13 +6,17 @@ package com.digitalasset.canton.domain.sequencing.sequencer
 import akka.stream.scaladsl.{Keep, Source}
 import akka.stream.{KillSwitches, Materializer}
 import cats.data.EitherT
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.sequencing.sequencer.errors.{
   CreateSubscriptionError,
   RegisterMemberError,
   SequencerWriteError,
 }
+import com.digitalasset.canton.health.admin.data.SequencerHealthStatus
+import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.sequencing.protocol._
+import com.digitalasset.canton.time.SimClock
 import com.digitalasset.canton.topology.DefaultTestIdentities.{
   domainManager,
   participant1,
@@ -32,7 +36,7 @@ class BaseSequencerTest extends AsyncWordSpec with BaseTest {
   def mkBatch(recipients: Set[Member]): Batch[ClosedEnvelope] =
     Batch[ClosedEnvelope](
       ClosedEnvelope(ByteString.EMPTY, Recipients.ofSet(recipients).value) :: Nil,
-      defaultProtocolVersion,
+      testedProtocolVersion,
     )
   def submission(from: Member, to: Set[Member]) =
     SubmissionRequest(
@@ -42,7 +46,7 @@ class BaseSequencerTest extends AsyncWordSpec with BaseTest {
       mkBatch(to),
       CantonTimestamp.MaxValue,
       None,
-      defaultProtocolVersion,
+      testedProtocolVersion,
     )
 
   private implicit val materializer = mock[Materializer] // not used
@@ -51,7 +55,13 @@ class BaseSequencerTest extends AsyncWordSpec with BaseTest {
     UniqueIdentifier.fromProtoPrimitive_("unm1::default").map(new UnauthenticatedMemberId(_)).value
 
   class StubSequencer(existingMembers: Set[Member])
-      extends BaseSequencer(domainManager, loggerFactory) {
+      extends BaseSequencer(
+        domainManager,
+        loggerFactory,
+        None,
+        new SimClock(CantonTimestamp.Epoch, loggerFactory),
+      )
+      with FlagCloseable {
     val newlyRegisteredMembers =
       mutable
         .Set[Member]() // we're using the scalatest serial execution context so don't need a concurrent collection
@@ -91,8 +101,6 @@ class BaseSequencerTest extends AsyncWordSpec with BaseTest {
       ???
     override def disableMember(member: Member)(implicit traceContext: TraceContext): Future[Unit] =
       ???
-    override def close(): Unit = ()
-
     override def isLedgerIdentityRegistered(identity: LedgerIdentity)(implicit
         traceContext: TraceContext
     ): Future[Boolean] = ???
@@ -100,6 +108,17 @@ class BaseSequencerTest extends AsyncWordSpec with BaseTest {
     override def authorizeLedgerIdentity(identity: LedgerIdentity)(implicit
         traceContext: TraceContext
     ): EitherT[Future, String, Unit] = ???
+
+    // making this public on purpose so we can test
+    override def healthChanged(health: SequencerHealthStatus)(implicit
+        traceContext: TraceContext
+    ): Unit = super.healthChanged(health)
+
+    override protected def healthInternal(implicit
+        traceContext: TraceContext
+    ): Future[SequencerHealthStatus] = Future.successful(SequencerHealthStatus(isActive = true))
+
+    override protected def timeouts: ProcessingTimeout = ProcessingTimeout()
   }
 
   "sendAsync" should {
@@ -138,6 +157,32 @@ class BaseSequencerTest extends AsyncWordSpec with BaseTest {
           .read(unauthenticatedMemberId, 0L)
           .value
       } yield sequencer.newlyRegisteredMembers should contain only unauthenticatedMemberId
+    }
+  }
+
+  "health" should {
+    "onHealthChange should register listener and immediately call it with current status" in {
+      val sequencer = new StubSequencer(Set())
+      var status = SequencerHealthStatus(false)
+      sequencer.onHealthChange { (newHealth, _tc) =>
+        status = newHealth
+      }
+
+      status shouldBe SequencerHealthStatus(true)
+    }
+
+    "health status change should trigger registered health listener" in {
+      val sequencer = new StubSequencer(Set())
+      var status = SequencerHealthStatus(true)
+      sequencer.onHealthChange { (newHealth, _tc) =>
+        status = newHealth
+      }
+
+      val badHealth = SequencerHealthStatus(false, Some("something bad happened"))
+      sequencer.healthChanged(badHealth)
+
+      status shouldBe badHealth
+
     }
   }
 }

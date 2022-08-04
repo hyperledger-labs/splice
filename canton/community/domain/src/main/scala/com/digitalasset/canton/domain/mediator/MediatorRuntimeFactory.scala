@@ -9,7 +9,11 @@ import com.digitalasset.canton.config.{LocalNodeParameters, ProcessingTimeout}
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
 import com.digitalasset.canton.domain.admin.v0.EnterpriseMediatorAdministrationServiceGrpc
 import com.digitalasset.canton.domain.api.v0.DomainTimeServiceGrpc
-import com.digitalasset.canton.domain.mediator.store.{FinalizedResponseStore, MediatorState}
+import com.digitalasset.canton.domain.mediator.store.{
+  FinalizedResponseStore,
+  MediatorDeduplicationStore,
+  MediatorState,
+}
 import com.digitalasset.canton.domain.metrics.MediatorMetrics
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -109,15 +113,24 @@ object CommunityMediatorRuntimeFactory extends MediatorRuntimeFactory {
       tracer: Tracer,
       traceContext: TraceContext,
   ): EitherT[Future, String, MediatorRuntime] = {
+    val finalizedResponseStore = FinalizedResponseStore(
+      storage,
+      syncCrypto.pureCrypto,
+      protocolVersion,
+      nodeParameters.processingTimeouts,
+      loggerFactory,
+    )
+    val deduplicationStore =
+      MediatorDeduplicationStore(
+        mediatorId,
+        storage,
+        nodeParameters.processingTimeouts,
+        loggerFactory,
+      )
     val state =
       new MediatorState(
-        FinalizedResponseStore(
-          storage,
-          syncCrypto.pureCrypto,
-          protocolVersion,
-          nodeParameters.processingTimeouts,
-          loggerFactory,
-        ),
+        finalizedResponseStore,
+        deduplicationStore,
         metrics,
         nodeParameters.processingTimeouts,
         loggerFactory,

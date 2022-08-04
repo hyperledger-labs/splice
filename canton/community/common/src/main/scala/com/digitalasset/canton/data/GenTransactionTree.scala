@@ -43,7 +43,6 @@ import com.digitalasset.canton.topology.{
 import com.digitalasset.canton.util.NoCopy
 import com.digitalasset.canton.version.{
   HasMemoizedProtocolVersionedWithContextCompanion,
-  HasProtoV0,
   HasProtocolVersionedWrapper,
   HasVersionedMessageWithContextCompanion,
   HasVersionedWrapper,
@@ -70,8 +69,7 @@ case class GenTransactionTree(
     participantMetadata: MerkleTree[ParticipantMetadata],
     rootViews: MerkleSeq[TransactionView],
 )(hashOps: HashOps)
-    extends MerkleTreeInnerNode[GenTransactionTree](hashOps)
-    with HasProtoV0[v0.GenTransactionTree] {
+    extends MerkleTreeInnerNode[GenTransactionTree](hashOps) {
 
   {
     // Check that every subtree has a unique root hash
@@ -209,7 +207,7 @@ case class GenTransactionTree(
     }
   }
 
-  override def toProtoV0: v0.GenTransactionTree =
+  def toProtoV0: v0.GenTransactionTree =
     v0.GenTransactionTree(
       submitterMetadata = Some(MerkleTree.toBlindableNode(submitterMetadata)),
       commonMetadata = Some(MerkleTree.toBlindableNode(commonMetadata)),
@@ -445,8 +443,7 @@ object TransactionViewTree {
   * @throws InformeeTree$.InvalidInformeeTree if `tree` is not a valid informee tree (i.e. the wrong nodes are blinded)
   */
 case class InformeeTree(tree: GenTransactionTree)
-    extends HasVersionedWrapper[VersionedMessage[InformeeTree]]
-    with HasProtoV0[v0.InformeeTree] {
+    extends HasVersionedWrapper[VersionedMessage[InformeeTree]] {
 
   InformeeTree.checkGlobalMetadata(tree)
 
@@ -472,7 +469,7 @@ case class InformeeTree(tree: GenTransactionTree)
   override def toProtoVersioned(version: ProtocolVersion): VersionedMessage[InformeeTree] =
     VersionedMessage(toProtoV0.toByteString, 0)
 
-  override def toProtoV0: v0.InformeeTree =
+  def toProtoV0: v0.InformeeTree =
     v0.InformeeTree(tree = Some(tree.toProtoV0))
 }
 
@@ -566,7 +563,6 @@ object InformeeTree extends HasVersionedMessageWithContextCompanion[InformeeTree
   */
 case class FullInformeeTree(tree: GenTransactionTree)
     extends HasVersionedWrapper[VersionedMessage[FullInformeeTree]]
-    with HasProtoV0[v0.FullInformeeTree]
     with PrettyPrinting {
 
   InformeeTree.checkGlobalMetadata(tree)
@@ -578,7 +574,6 @@ case class FullInformeeTree(tree: GenTransactionTree)
   private lazy val commonMetadata: CommonMetadata = checked(tree.commonMetadata.tryUnwrap)
   lazy val domainId: DomainId = commonMetadata.domainId
   lazy val mediatorId: MediatorId = commonMetadata.mediatorId
-  lazy val protocolVersion: ProtocolVersion = commonMetadata.representativeProtocolVersion.unwrap
 
   /** Yields the informee tree unblinded for a defined set of parties.
     * If a view common data is already blinded, then it remains blinded even if one of the given parties is a stakeholder.
@@ -624,7 +619,7 @@ case class FullInformeeTree(tree: GenTransactionTree)
   override def toProtoVersioned(version: ProtocolVersion): VersionedMessage[FullInformeeTree] =
     VersionedMessage(toProtoV0.toByteString, 0)
 
-  override def toProtoV0: v0.FullInformeeTree =
+  def toProtoV0: v0.FullInformeeTree =
     v0.FullInformeeTree(tree = Some(tree.toProtoV0))
 
   override def pretty: Pretty[FullInformeeTree] = prettyOfParam(_.tree)
@@ -1023,7 +1018,6 @@ object ParticipantMetadata
   */
 case class LightTransactionViewTree(tree: GenTransactionTree)
     extends ViewTree
-    with HasProtoV0[v0.LightTransactionViewTree]
     with HasVersionedWrapper[VersionedMessage[LightTransactionViewTree]]
     with PrettyPrinting {
 
@@ -1093,7 +1087,7 @@ case class LightTransactionViewTree(tree: GenTransactionTree)
       version: ProtocolVersion
   ): VersionedMessage[LightTransactionViewTree] = VersionedMessage(toProtoV0.toByteString, 0)
 
-  override def toProtoV0: v0.LightTransactionViewTree =
+  def toProtoV0: v0.LightTransactionViewTree =
     v0.LightTransactionViewTree(tree = Some(tree.toProtoV0))
 
   override lazy val toBeSigned: Option[RootHash] =

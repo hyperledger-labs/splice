@@ -15,9 +15,7 @@ sealed trait ProtoDeserializationError extends Product with Serializable {
   def toAdminError(implicit loggingContext: ErrorLoggingContext): CantonError =
     ProtoDeserializationFailure.Wrap(this)
 
-  def inField(
-      field: String
-  ): ProtoDeserializationError.ValueDeserializationError =
+  def inField(field: String): ProtoDeserializationError.ValueDeserializationError =
     ProtoDeserializationError.ValueDeserializationError(field, message)
 
   def message: String

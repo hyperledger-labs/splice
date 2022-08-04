@@ -5,13 +5,11 @@ package com.digitalasset.canton.participant.admin
 
 import cats.data.EitherT
 import cats.implicits.{toFoldableOps, _}
-import cats.instances.future._
-import cats.instances.list._
 import com.daml.lf.data.Ref.PackageId
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.SyncCryptoApiProvider
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.CantonPackageServiceError.PackageRemovalErrorCode.{
   PackageInUse,
   PackageVetted,
@@ -70,6 +68,7 @@ class PackageInspectionOpsImpl(
     syncCryptoApiProvider: SyncCryptoApiProvider,
     timeouts: ProcessingTimeout,
     topologyManager: ParticipantTopologyManager,
+    protocolVersion: ProtocolVersion,
     val loggerFactory: NamedLoggerFactory,
 )(implicit val ec: ExecutionContext)
     extends PackageInspectionOps {
@@ -148,8 +147,6 @@ class PackageInspectionOpsImpl(
   override def packageUnused(packageId: PackageId)(implicit
       tc: TraceContext
   ): EitherT[Future, PackageInUse, Unit] = {
-    implicit val loggingContext: ErrorLoggingContext = ErrorLoggingContext.fromTracedLogger(logger)
-
     stateManager.getAll.toList
       .sortBy(_._1.toProtoPrimitive) // Sort to keep tests deterministic
       .traverse_ { case (id, state) =>
@@ -173,7 +170,7 @@ class PackageInspectionOpsImpl(
       _signedTx <- topologyManager.authorize(
         tx,
         signingKey = None,
-        tx.representativeProtocolVersion.unwrap,
+        protocolVersion,
         force,
       )
     } yield ()
@@ -185,7 +182,7 @@ class PackageInspectionOpsImpl(
     val op = TopologyChangeOp.Remove
     val mapping = VettedPackages(participantId, packages)
     topologyManager
-      .genTransaction(op, mapping, ProtocolVersion.latest) // TODO(#9396)
+      .genTransaction(op, mapping, protocolVersion)
       .leftMap(err =>
         participant.topology.ParticipantTopologyManagerError
           .IdentityManagerParentError(err)

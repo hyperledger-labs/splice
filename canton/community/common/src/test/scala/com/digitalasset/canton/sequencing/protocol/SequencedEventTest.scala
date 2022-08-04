@@ -27,12 +27,13 @@ class SequencedEventTest extends BaseTestWordSpec {
               Set.empty,
               TransferInDomainId(domainId),
               Verdict.Timeout,
-              defaultProtocolVersion,
+              testedProtocolVersion,
             ),
           SymbolicCrypto.emptySignature,
+          testedProtocolVersion,
         )
       val batch = Batch.of(
-        defaultProtocolVersion,
+        testedProtocolVersion,
         (message, Recipients.cc(DefaultTestIdentities.participant1)),
       )
       val deliver: Deliver[DefaultOpenEnvelope] =
@@ -42,7 +43,7 @@ class SequencedEventTest extends BaseTestWordSpec {
           domainId,
           Some(MessageId.tryCreate("some-message-id")),
           batch,
-          defaultProtocolVersion,
+          testedProtocolVersion,
         )
       val deliverEventPV0 = deliver.toProtoV0
       val deliverEventP = deliver.toProtoVersioned
@@ -60,7 +61,7 @@ class SequencedEventTest extends BaseTestWordSpec {
         domainId,
         MessageId.tryCreate("some-message-id"),
         DeliverErrorReason.BatchRefused("no batches here please"),
-        defaultProtocolVersion,
+        testedProtocolVersion,
       )
       val deliverErrorPV0 = deliverError.toProtoV0
       val deserializedEventV0 = deserializeV0(deliverErrorPV0)
@@ -78,8 +79,8 @@ class SequencedEventTest extends BaseTestWordSpec {
       val bytes = eventP.toByteString
       SequencedEvent.fromProtoWithV0(
         OpenEnvelope.fromProtoV0(
-          EnvelopeContent.messageFromByteString(defaultProtocolVersion, cryptoPureApi),
-          defaultProtocolVersion,
+          EnvelopeContent.messageFromByteString(testedProtocolVersion, cryptoPureApi),
+          testedProtocolVersion,
         )
       )(eventP, bytes)
     }
@@ -91,8 +92,8 @@ class SequencedEventTest extends BaseTestWordSpec {
       val bytes = eventP.toByteString
       SequencedEvent.fromProtoWith(
         OpenEnvelope.fromProtoV0(
-          EnvelopeContent.messageFromByteString(defaultProtocolVersion, cryptoPureApi),
-          defaultProtocolVersion,
+          EnvelopeContent.messageFromByteString(testedProtocolVersion, cryptoPureApi),
+          testedProtocolVersion,
         )
       )(eventP, bytes)
     }

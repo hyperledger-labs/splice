@@ -5,11 +5,15 @@ package com.digitalasset.canton
 
 import cats.Functor
 import cats.data.{EitherT, OptionT}
+import cats.syntax.traverse._
 import com.digitalasset.canton.concurrent.{DirectExecutionContext, Threading}
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
+import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCryptoProvider
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLogging, SuppressingLogger}
-import com.digitalasset.canton.protocol.TestDomainParameters
+import com.digitalasset.canton.protocol.StaticDomainParameters
+import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.transaction.{SignedTopologyTransaction, TopologyChangeOp}
 import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext, W3CTraceContext}
 import com.digitalasset.canton.util.CheckedT
@@ -65,12 +69,15 @@ trait BaseTest
 
   protected def timeouts: ProcessingTimeout = DefaultProcessingTimeouts.testing
 
-  protected def defaultProtocolVersion: ProtocolVersion =
-    TestDomainParameters.defaultStatic.protocolVersion
+  protected lazy val testedProtocolVersion: ProtocolVersion = BaseTest.testedProtocolVersion
+  protected lazy val defaultStaticDomainParameters: StaticDomainParameters =
+    BaseTest.defaultStaticDomainParameters
+
+  protected def isTestedProtocolVersionDev: Boolean = BaseTest.isTestedProtocolVersionDev
 
   protected def signedTransactionProtocolVersionRepresentative
       : RepresentativeProtocolVersion[SignedTopologyTransaction[TopologyChangeOp]] =
-    SignedTopologyTransaction.protocolVersionRepresentativeFor(defaultProtocolVersion)
+    SignedTopologyTransaction.protocolVersionRepresentativeFor(testedProtocolVersion)
 
   // default to providing an empty trace context to all tests
   protected implicit def traceContext = TraceContext.empty
@@ -139,7 +146,6 @@ trait BaseTest
     optionTAssertion.getOrElse(fail(s"Unexpected None value"))
 
   /** Keeps evaluating `testCode` until it succeeds or a timeout occurs.
-    * @return the result of successfully evaluating `testCode`
     * @throws org.scalatest.exceptions.TestFailedException if `testCode` keeps throwing such an exception even after `timeout`
     * @throws java.lang.Throwable if `testCode` throws any other throwable
     * @throws java.lang.IllegalArgumentException if `timeUntilSuccess` is negative
@@ -306,6 +312,12 @@ trait BaseTest
       fut.onShutdown(fail(s"Shutdown during $clue"))
   }
 
+  def forEveryParallel[A](inputs: Seq[A])(
+      body: A => Assertion
+  )(implicit executionContext: ExecutionContext): Assertion = forEvery(inputs.traverse { input =>
+    Future(Try(body(input)))
+  }.futureValue)(_.get)
+
   lazy val CantonExamplesPath: String = BaseTest.CantonExamplesPath
   lazy val CantonTestsPath: String = BaseTest.CantonTestsPath
   lazy val PerformanceTestPath: String = BaseTest.PerformanceTestPath
@@ -314,6 +326,37 @@ trait BaseTest
 }
 
 object BaseTest {
+
+  // Uses SymbolicCrypto for the configured crypto schemes
+  lazy val defaultStaticDomainParameters: StaticDomainParameters =
+    defaultStaticDomainParametersWith(
+      protocolVersion = testedProtocolVersion
+    )
+
+  def defaultStaticDomainParametersWith(
+      maxInboundMessageSize: Int = StaticDomainParameters.defaultMaxInboundMessageSize.unwrap,
+      maxRatePerParticipant: Int = StaticDomainParameters.defaultMaxRatePerParticipant.unwrap,
+      reconciliationInterval: PositiveSeconds =
+        StaticDomainParameters.defaultReconciliationInterval,
+      protocolVersion: ProtocolVersion = testedProtocolVersion,
+  ) = StaticDomainParameters.create(
+    reconciliationInterval = reconciliationInterval,
+    maxRatePerParticipant = NonNegativeInt.tryCreate(maxRatePerParticipant),
+    maxInboundMessageSize = NonNegativeInt.tryCreate(maxInboundMessageSize),
+    uniqueContractKeys = false,
+    requiredSigningKeySchemes = SymbolicCryptoProvider.supportedSigningKeySchemes,
+    requiredEncryptionKeySchemes = SymbolicCryptoProvider.supportedEncryptionKeySchemes,
+    requiredSymmetricKeySchemes = SymbolicCryptoProvider.supportedSymmetricKeySchemes,
+    requiredHashAlgorithms = SymbolicCryptoProvider.supportedHashAlgorithms,
+    requiredCryptoKeyFormats = SymbolicCryptoProvider.supportedCryptoKeyFormats,
+    protocolVersion = protocolVersion,
+  )
+
+  lazy val testedProtocolVersion: ProtocolVersion = ProtocolVersion.tryGetOptFromEnv
+    .getOrElse(ProtocolVersion.latest)
+
+  lazy val isTestedProtocolVersionDev: Boolean =
+    testedProtocolVersion == ProtocolVersion.unstable_development
 
   lazy val CantonExamplesPath: String = getResourcePath("CantonExamples.dar")
   lazy val CantonTestsPath: String = getResourcePath("CantonTests.dar")

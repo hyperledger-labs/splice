@@ -13,8 +13,7 @@ import com.digitalasset.canton.config.RequireTypes.{
 import com.digitalasset.canton.crypto._
 import com.digitalasset.canton.logging.pretty.PrettyInstances._
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.protocol.v0
-import com.digitalasset.canton.protocol.v0.TopologyTransaction.Transaction
+import com.digitalasset.canton.protocol.{v0, v1}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence
 import com.digitalasset.canton.topology._
@@ -208,7 +207,6 @@ sealed trait TopologyTransaction[+Op <: TopologyChangeOp]
     extends ProtocolVersionedMemoizedEvidence
     with PrettyPrinting
     with HasProtocolVersionedWrapper[TopologyTransaction[TopologyChangeOp]]
-    with HasProtoV0[v0.TopologyTransaction]
     with Product
     with Serializable {
   def op: Op
@@ -225,6 +223,15 @@ sealed trait TopologyTransaction[+Op <: TopologyChangeOp]
   override def toByteStringUnmemoized: ByteString = super[HasProtocolVersionedWrapper].toByteString
 
   def toProtoV0: v0.TopologyTransaction
+
+  def toProtoV1: v1.TopologyTransaction
+
+  def asVersion(protocolVersion: ProtocolVersion): TopologyTransaction[Op]
+
+  def hasEquivalentVersion(protocolVersion: ProtocolVersion): Boolean =
+    representativeProtocolVersion == TopologyTransaction.protocolVersionRepresentativeFor(
+      protocolVersion
+    )
 }
 
 object TopologyTransaction
@@ -236,7 +243,13 @@ object TopologyTransaction
       ProtocolVersion.v2_0_0,
       supportedProtoVersionMemoized(v0.TopologyTransaction)(fromProtoV0),
       _.toProtoV0.toByteString,
-    )
+    ),
+    // TODO(#9694): Move topology transaction changes to PV4
+    ProtobufVersion(1) -> VersionedProtoConverter(
+      ProtocolVersion.unstable_development,
+      supportedProtoVersionMemoized(v1.TopologyTransaction)(fromProtoV1),
+      _.toProtoV1.toByteString,
+    ),
   )
 
   /** returns true if two transactions are equivalent */
@@ -265,11 +278,23 @@ object TopologyTransaction
   def fromProtoV0(transactionP: v0.TopologyTransaction)(
       bytes: ByteString
   ): ParsingResult[TopologyTransaction[TopologyChangeOp]] = transactionP.transaction match {
-    case Transaction.Empty => Left(FieldNotSet("TopologyTransaction.transaction.version"))
-    case Transaction.StateUpdate(stateUpdate) =>
+    case v0.TopologyTransaction.Transaction.Empty =>
+      Left(FieldNotSet("TopologyTransaction.transaction.version"))
+    case v0.TopologyTransaction.Transaction.StateUpdate(stateUpdate) =>
       TopologyStateUpdate.fromProtoV0(stateUpdate, bytes)
-    case Transaction.DomainGovernance(domainGovernance) =>
+    case v0.TopologyTransaction.Transaction.DomainGovernance(domainGovernance) =>
       DomainGovernanceTransaction.fromProtoV0(domainGovernance, bytes)
+  }
+
+  def fromProtoV1(transactionP: v1.TopologyTransaction)(
+      bytes: ByteString
+  ): ParsingResult[TopologyTransaction[TopologyChangeOp]] = transactionP.transaction match {
+    case v1.TopologyTransaction.Transaction.Empty =>
+      Left(FieldNotSet("TopologyTransaction.transaction.version"))
+    case v1.TopologyTransaction.Transaction.StateUpdate(stateUpdate) =>
+      TopologyStateUpdate.fromProtoV1(stateUpdate, bytes)
+    case v1.TopologyTransaction.Transaction.DomainGovernance(domainGovernance) =>
+      DomainGovernanceTransaction.fromProtoV1(domainGovernance, bytes)
   }
 }
 
@@ -291,7 +316,8 @@ sealed abstract case class TopologyStateUpdate[+Op <: AddRemoveChangeOp](
     ],
     val deserializedFrom: Option[ByteString] = None,
 ) extends TopologyTransaction[Op] {
-  override def toProtoV0: v0.TopologyTransaction = {
+
+  private def toStateUpdateProtoV0: v0.TopologyStateUpdate = {
     val mappingP: v0.TopologyStateUpdate.Mapping = element.mapping match {
       case x: NamespaceDelegation =>
         v0.TopologyStateUpdate.Mapping.NamespaceDelegation(x.toProtoV0)
@@ -309,15 +335,39 @@ sealed abstract case class TopologyStateUpdate[+Op <: AddRemoveChangeOp](
         v0.TopologyStateUpdate.Mapping.MediatorDomainState(x.toProtoV0)
       case x: VettedPackages =>
         v0.TopologyStateUpdate.Mapping.VettedPackages(x.toProtoV0)
-
     }
 
-    val stateUpdate = v0.TopologyTransaction.Transaction.StateUpdate(
-      v0.TopologyStateUpdate(operation = op.toProto, id = element.id.unwrap, mapping = mappingP)
-    )
-
-    v0.TopologyTransaction(stateUpdate)
+    v0.TopologyStateUpdate(operation = op.toProto, id = element.id.unwrap, mapping = mappingP)
   }
+
+  private def toStateUpdateProtoV1: v1.TopologyStateUpdate = {
+    val mappingP: v1.TopologyStateUpdate.Mapping = element.mapping match {
+      case x: NamespaceDelegation =>
+        v1.TopologyStateUpdate.Mapping.NamespaceDelegation(x.toProtoV0)
+      case x: IdentifierDelegation =>
+        v1.TopologyStateUpdate.Mapping.IdentifierDelegation(x.toProtoV0)
+      case x: OwnerToKeyMapping =>
+        v1.TopologyStateUpdate.Mapping.OwnerToKeyMapping(x.toProtoV0)
+      case x: PartyToParticipant =>
+        v1.TopologyStateUpdate.Mapping.PartyToParticipant(x.toProtoV0)
+      case x: SignedLegalIdentityClaim =>
+        v1.TopologyStateUpdate.Mapping.SignedLegalIdentityClaim(x.toProtoV0)
+      case x: ParticipantState =>
+        v1.TopologyStateUpdate.Mapping.ParticipantState(x.toProtoV0)
+      case x: MediatorDomainState =>
+        v1.TopologyStateUpdate.Mapping.MediatorDomainState(x.toProtoV0)
+      case x: VettedPackages =>
+        v1.TopologyStateUpdate.Mapping.VettedPackages(x.toProtoV0)
+    }
+
+    v1.TopologyStateUpdate(operation = op.toProto, id = element.id.unwrap, mapping = mappingP)
+  }
+
+  def toProtoV0: v0.TopologyTransaction =
+    v0.TopologyTransaction(v0.TopologyTransaction.Transaction.StateUpdate(toStateUpdateProtoV0))
+
+  def toProtoV1: v1.TopologyTransaction =
+    v1.TopologyTransaction(v1.TopologyTransaction.Transaction.StateUpdate(toStateUpdateProtoV1))
 
   /** Create reversion of this transaction
     *
@@ -328,14 +378,22 @@ sealed abstract case class TopologyStateUpdate[+Op <: AddRemoveChangeOp](
     import TopologyChangeOp._
 
     (op: AddRemoveChangeOp) match {
-      case Add => TopologyStateUpdate(Remove, element)(representativeProtocolVersion.unwrap)
+      case Add => new TopologyStateUpdate(Remove, element)(representativeProtocolVersion) {}
       case Remove =>
-        TopologyStateUpdate.createAdd(element.mapping, representativeProtocolVersion.unwrap)
+        TopologyStateUpdate.createAdd(element.mapping, representativeProtocolVersion)
     }
   }
 
   override def pretty: Pretty[TopologyStateUpdate.this.type] =
     prettyOfClass(param("op", _.op), param("element", _.element))
+
+  override def asVersion(
+      protocolVersion: ProtocolVersion
+  ): TopologyTransaction[Op] = {
+    new TopologyStateUpdate[Op](op, element)(
+      TopologyTransaction.protocolVersionRepresentativeFor(protocolVersion)
+    ) {}
+  }
 }
 
 object TopologyStateUpdate {
@@ -406,6 +464,50 @@ object TopologyStateUpdate {
     ) {}
   }
 
+  def fromProtoV1(
+      protoTopologyTransaction: v1.TopologyStateUpdate,
+      bytes: ByteString,
+  ): ParsingResult[TopologyStateUpdate[AddRemoveChangeOp]] = {
+    val mappingRes: ParsingResult[TopologyStateUpdateMapping] =
+      protoTopologyTransaction.mapping match {
+
+        case v1.TopologyStateUpdate.Mapping.IdentifierDelegation(idDelegation) =>
+          IdentifierDelegation.fromProtoV0(idDelegation)
+
+        case v1.TopologyStateUpdate.Mapping.NamespaceDelegation(nsDelegation) =>
+          NamespaceDelegation.fromProtoV0(nsDelegation)
+
+        case v1.TopologyStateUpdate.Mapping.OwnerToKeyMapping(owkm) =>
+          OwnerToKeyMapping.fromProtoV0(owkm)
+
+        case v1.TopologyStateUpdate.Mapping.PartyToParticipant(value) =>
+          PartyToParticipant.fromProtoV0(value)
+
+        case v1.TopologyStateUpdate.Mapping.SignedLegalIdentityClaim(value) =>
+          SignedLegalIdentityClaim.fromProtoV0(value)
+
+        case v1.TopologyStateUpdate.Mapping.ParticipantState(value) =>
+          ParticipantState.fromProtoV0(value)
+
+        case v1.TopologyStateUpdate.Mapping.MediatorDomainState(value) =>
+          MediatorDomainState.fromProtoV0(value)
+
+        case v1.TopologyStateUpdate.Mapping.VettedPackages(value) =>
+          VettedPackages.fromProtoV0(value)
+
+        case v1.TopologyStateUpdate.Mapping.Empty =>
+          Left(UnrecognizedField("TopologyStateUpdate.Mapping is empty"))
+      }
+    for {
+      op <- AddRemoveChangeOp.fromProtoV0(protoTopologyTransaction.operation)
+      mapping <- mappingRes
+      id <- TopologyElementId.fromProtoPrimitive(protoTopologyTransaction.id)
+    } yield new TopologyStateUpdate(op, TopologyStateUpdateElement(id, mapping))(
+      TopologyTransaction.protocolVersionRepresentativeFor(ProtobufVersion(1)),
+      Some(bytes),
+    ) {}
+  }
+
   def createAdd(
       mapping: TopologyStateUpdateMapping,
       protocolVersion: ProtocolVersion,
@@ -414,6 +516,15 @@ object TopologyStateUpdate {
       TopologyChangeOp.Add,
       TopologyStateUpdateElement(TopologyElementId.generate(), mapping),
     )(protocolVersion)
+
+  def createAdd(
+      mapping: TopologyStateUpdateMapping,
+      protocolVersion: RepresentativeProtocolVersion[TopologyTransaction[TopologyChangeOp]],
+  ): TopologyStateUpdate[TopologyChangeOp.Add] =
+    new TopologyStateUpdate(
+      TopologyChangeOp.Add,
+      TopologyStateUpdateElement(TopologyElementId.generate(), mapping),
+    )(protocolVersion) {}
 }
 
 sealed abstract case class DomainGovernanceTransaction(
@@ -426,24 +537,48 @@ sealed abstract case class DomainGovernanceTransaction(
 ) extends TopologyTransaction[TopologyChangeOp.Replace] {
   val op = TopologyChangeOp.Replace
 
-  override def toProtoV0: v0.TopologyTransaction = {
+  private def toDomainGovernanceTransactionProtoV0: v0.DomainGovernanceTransaction = {
     val mappingP = element.mapping match {
       case x: DomainParametersChange =>
         v0.DomainGovernanceTransaction.Mapping.DomainParametersChange(x.toProtoV0)
     }
 
+    v0.DomainGovernanceTransaction(mapping = mappingP)
+  }
+
+  private def toDomainGovernanceTransactionProtoV1: v1.DomainGovernanceTransaction = {
+    val mappingP = element.mapping match {
+      case x: DomainParametersChange =>
+        v1.DomainGovernanceTransaction.Mapping.DomainParametersChange(x.toProtoV1)
+    }
+
+    v1.DomainGovernanceTransaction(mapping = mappingP)
+  }
+
+  override def toProtoV0: v0.TopologyTransaction =
     v0.TopologyTransaction(
       v0.TopologyTransaction.Transaction.DomainGovernance(
-        v0.DomainGovernanceTransaction(mapping = mappingP)
+        toDomainGovernanceTransactionProtoV0
       )
     )
-  }
+
+  override def toProtoV1: v1.TopologyTransaction =
+    v1.TopologyTransaction(
+      v1.TopologyTransaction.Transaction.DomainGovernance(
+        toDomainGovernanceTransactionProtoV1
+      )
+    )
 
   override def pretty: Pretty[DomainGovernanceTransaction] = prettyOfClass(
     param("element", _.element)
   )
 
   def reverse: TopologyTransaction[TopologyChangeOp.Replace] = this
+
+  override def asVersion(protocolVersion: ProtocolVersion): DomainGovernanceTransaction =
+    new DomainGovernanceTransaction(element)(
+      TopologyTransaction.protocolVersionRepresentativeFor(protocolVersion)
+    ) {}
 }
 
 object DomainGovernanceTransaction {
@@ -462,7 +597,7 @@ object DomainGovernanceTransaction {
     TopologyTransaction.protocolVersionRepresentativeFor(protocolVersion)
   ) {}
 
-  def fromProtoV0(
+  private[transaction] def fromProtoV0(
       protoTopologyTransaction: v0.DomainGovernanceTransaction,
       bytes: ByteString,
   ): ParsingResult[DomainGovernanceTransaction] = {
@@ -477,6 +612,26 @@ object DomainGovernanceTransaction {
     mapping.map(mapping =>
       new DomainGovernanceTransaction(DomainGovernanceElement(mapping))(
         TopologyTransaction.protocolVersionRepresentativeFor(ProtobufVersion(0)),
+        Some(bytes),
+      ) {}
+    )
+  }
+
+  private[transaction] def fromProtoV1(
+      protoTopologyTransaction: v1.DomainGovernanceTransaction,
+      bytes: ByteString,
+  ): ParsingResult[DomainGovernanceTransaction] = {
+    val mapping: ParsingResult[DomainGovernanceMapping] = protoTopologyTransaction.mapping match {
+      case v1.DomainGovernanceTransaction.Mapping.DomainParametersChange(domainParametersChange) =>
+        DomainParametersChange.fromProtoV1(domainParametersChange)
+
+      case v1.DomainGovernanceTransaction.Mapping.Empty =>
+        Left(UnrecognizedField("DomainGovernanceTransaction.Mapping is empty"))
+    }
+
+    mapping.map(mapping =>
+      new DomainGovernanceTransaction(DomainGovernanceElement(mapping))(
+        TopologyTransaction.protocolVersionRepresentativeFor(ProtobufVersion(1)),
         Some(bytes),
       ) {}
     )

@@ -18,11 +18,16 @@ import com.digitalasset.canton.protocol.ExampleTransactionFactory.{
   transactionId,
 }
 import com.digitalasset.canton.protocol.messages._
-import com.digitalasset.canton.protocol.{RequestId, TestDomainParameters, TransferId}
+import com.digitalasset.canton.protocol.{RequestId, TransferId}
 import com.digitalasset.canton.sequencing.protocol._
 import com.digitalasset.canton.time.TimeProofTestUtil
 import com.digitalasset.canton.topology._
 import com.digitalasset.canton.util.{Checked, FutureUtil}
+import com.digitalasset.canton.version.{
+  ProtocolVersion,
+  SourceProtocolVersion,
+  TargetProtocolVersion,
+}
 import com.digitalasset.canton.{BaseTest, LfPartyId}
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -235,7 +240,7 @@ trait TransferStoreTest {
           transfers <- populate(store)
           List(transfer1, transfer2, transfer3, transfer4) = transfers: @unchecked
           lookup <- store.findAfter(
-            requestAfter = Some(transfer2.transferId.requestTimestamp -> transfer2.originDomain),
+            requestAfter = Some(transfer2.transferId.requestTimestamp -> transfer2.sourceDomain),
             10,
           )
         } yield {
@@ -603,23 +608,35 @@ object TransferStoreTest {
     )
   }
 
-  private val protocolVersion = TestDomainParameters.defaultStatic.protocolVersion
+  private val protocolVersion = BaseTest.testedProtocolVersion
   val seedGenerator = new SeedGenerator(pureCryptoApi)
 
   def mkTransferDataForDomain(
       transferId: TransferId,
-      originMediator: MediatorId,
+      sourceMediator: MediatorId,
       submittingParty: LfPartyId = LfPartyId.assertFromString("submitter"),
       targetDomainId: DomainId,
   ): Future[TransferData] = {
+
+    /*
+      Method TransferOutView.fromProtoV0 set protocol version to v2 (not present in Protobuf v0).
+     */
+    val targetProtocolVersion =
+      if (protocolVersion <= ProtocolVersion.v3_0_0)
+        TargetProtocolVersion(ProtocolVersion.v2_0_0)
+      else
+        TargetProtocolVersion(protocolVersion)
+
     val transferOutRequest = TransferOutRequest(
       submittingParty,
       Set(submittingParty),
       Set.empty,
       coidAbs1,
-      transferId.originDomain,
-      originMediator,
+      transferId.sourceDomain,
+      SourceProtocolVersion(protocolVersion),
+      sourceMediator,
       targetDomainId,
+      targetProtocolVersion,
       TimeProofTestUtil.mkTimeProof(timestamp = CantonTimestamp.Epoch, domainId = targetDomainId),
     )
     val uuid = new UUID(10L, 0L)
@@ -630,10 +647,10 @@ object TransferStoreTest {
         pureCryptoApi,
         seed,
         uuid,
-        TestDomainParameters.defaultStatic.protocolVersion,
       )
     Future.successful(
       TransferData(
+        SourceProtocolVersion(protocolVersion),
         transferId.requestTimestamp,
         0L,
         fullTransferOutViewTree,
@@ -647,10 +664,10 @@ object TransferStoreTest {
 
   private def mkTransferData(
       transferId: TransferId,
-      originMediator: MediatorId,
+      sourceMediator: MediatorId,
       submitter: LfPartyId = LfPartyId.assertFromString("submitter"),
   ) =
-    mkTransferDataForDomain(transferId, originMediator, submitter, targetDomain)
+    mkTransferDataForDomain(transferId, sourceMediator, submitter, targetDomain)
 
   def mkTransferOutResult(transferData: TransferData): DeliveredTransferOutResult =
     DeliveredTransferOutResult {
@@ -662,13 +679,14 @@ object TransferStoreTest {
         Verdict.Approve,
         mediatorMessage.allInformees,
       )
-      val signedResult = SignedProtocolMessage(result, sign("TransferOutResult-mediator"))
+      val signedResult =
+        SignedProtocolMessage(result, sign("TransferOutResult-mediator"), protocolVersion)
       val batch = Batch.of(protocolVersion, signedResult -> RecipientsTest.testInstance)
       val deliver =
         Deliver.create(
           1L,
           CantonTimestamp.ofEpochMilli(10),
-          transferData.originDomain,
+          transferData.sourceDomain,
           Some(MessageId.tryCreate("1")),
           batch,
           protocolVersion,

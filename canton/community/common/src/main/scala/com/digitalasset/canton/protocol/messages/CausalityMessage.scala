@@ -13,7 +13,6 @@ import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.version.{
-  HasProtoV0,
   HasProtocolVersionedCompanion,
   ProtobufVersion,
   ProtocolVersion,
@@ -34,12 +33,11 @@ sealed abstract case class CausalityMessage(
     clock: VectorClock,
 )(val representativeProtocolVersion: RepresentativeProtocolVersion[ProtocolMessage])
     extends ProtocolMessage
-    with HasProtoV0[v0.CausalityMessage]
     with PrettyPrinting
     with ProtocolMessageV0
     with ProtocolMessageV1 {
 
-  override def toProtoV0: v0.CausalityMessage = v0.CausalityMessage(
+  def toProtoV0: v0.CausalityMessage = v0.CausalityMessage(
     targetDomainId = domainId.toProtoPrimitive,
     transferId = Some(transferId.toProtoV0),
     clock = Some(clock.toProtoV0),
@@ -104,30 +102,29 @@ object CausalityMessage extends HasProtocolVersionedCompanion[CausalityMessage] 
 /** A vector clock represents the causal constraints that must be respected for a party at a certain point in time.
   * Vector clocks are maintained per-domain
   *
-  * @param originDomainId The domain of the vector clock
-  * @param localTs The timestamp on `originDomainId` specifying the time at which the causal constraints are valid
+  * @param sourceDomainId The domain of the vector clock
+  * @param localTs The timestamp on `sourceDomainId` specifying the time at which the causal constraints are valid
   * @param partyId The party who has seen the causal information specified by `clock`
   * @param clock The most recent timestamp on each domain that `partyId` has causally observed
   */
 case class VectorClock(
-    originDomainId: DomainId,
+    sourceDomainId: DomainId,
     localTs: CantonTimestamp,
     partyId: LfPartyId,
     clock: Map[DomainId, CantonTimestamp],
-) extends HasProtoV0[v0.VectorClock]
-    with PrettyPrinting {
+) extends PrettyPrinting {
 
   override def pretty: Pretty[VectorClock.this.type] =
     prettyOfClass(
-      param("Domain for constraints ", _.originDomainId),
+      param("Domain for constraints ", _.sourceDomainId),
       param("Most recent timestamps", _.clock),
       param("Local timestamp", _.localTs),
       param("Party", _.partyId),
     )
 
-  override def toProtoV0: v0.VectorClock = {
+  def toProtoV0: v0.VectorClock = {
     v0.VectorClock(
-      originDomainId = originDomainId.toProtoPrimitive,
+      originDomainId = sourceDomainId.toProtoPrimitive,
       localTs = Some(localTs.toProtoPrimitive),
       partyId = partyId,
       clock = clock.map { case (did, cts) => did.toProtoPrimitive -> cts.toProtoPrimitive },

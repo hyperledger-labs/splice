@@ -6,6 +6,7 @@ package com.digitalasset.canton.participant.topology
 import cats.data.EitherT
 import cats.syntax.traverse._
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.health.admin.data.TopologyQueueStatus
 import com.digitalasset.canton.lifecycle.{
@@ -17,7 +18,7 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.domain.DomainRegistryError
-import com.digitalasset.canton.protocol.messages.RegisterTopologyTransactionResponse
+import com.digitalasset.canton.protocol.messages.RegisterTopologyTransactionResponseResult
 import com.digitalasset.canton.topology.client.DomainTopologyClientWithInit
 import com.digitalasset.canton.topology.store.{
   SignedTopologyTransactions,
@@ -49,7 +50,7 @@ sealed trait ParticipantIdentityDispatcherError
 trait RegisterTopologyTransactionHandle extends FlagCloseable {
   def submit(
       transactions: Seq[SignedTopologyTransaction[TopologyChangeOp]]
-  ): FutureUnlessShutdown[Seq[RegisterTopologyTransactionResponse.Result]]
+  ): FutureUnlessShutdown[Seq[RegisterTopologyTransactionResponseResult]]
 }
 
 /** Identity dispatcher, registering identities with a domain
@@ -131,6 +132,7 @@ class ParticipantTopologyDispatcher(
       handle: RegisterTopologyTransactionHandle,
       client: DomainTopologyClientWithInit,
       targetStore: TopologyStore[TopologyStoreId.DomainStore],
+      crypto: Crypto,
   )(implicit
       traceContext: TraceContext
   ): EitherT[FutureUnlessShutdown, DomainRegistryError, Unit] = {
@@ -145,6 +147,7 @@ class ParticipantTopologyDispatcher(
       targetStore,
       timeouts,
       loggerFactory.appendUnnamedKey("domain", domain.unwrap),
+      crypto,
     )
     ErrorUtil.requireState(!domains.contains(domain), s"topology pusher for $domain already exists")
     domains += domain -> outbox
@@ -164,6 +167,7 @@ private class DomainOutbox(
     val targetStore: TopologyStore[TopologyStoreId.DomainStore],
     override protected val timeouts: ProcessingTimeout,
     val loggerFactory: NamedLoggerFactory,
+    override protected val crypto: Crypto,
     // TODO(#9270) clean up how we parameterize our nodes
     batchSize: Int = 100,
 )(implicit val ec: ExecutionContext)
@@ -370,8 +374,12 @@ private class DomainOutbox(
           pendingAndApplicable <- EitherT.right(pendingAndApplicableF)
           (pending, applicable) = pendingAndApplicable
           _ = lastDispatched.set(applicable.result.lastOption)
+          // Try to convert if necessary the topology transactions for the required protocol version of the domain
+          convertedTxs <- performUnlessClosingEitherU(functionFullName) {
+            convertTransactions(applicable)
+          }
           // dispatch to domain
-          responses <- dispatch(domain, handle, transactions = applicable)
+          responses <- dispatch(domain, handle, transactions = convertedTxs)
           // update watermark according to responses
           _ <- EitherT.right[String](updateWatermark(cur, pending, applicable, responses))
         } yield ()
@@ -394,18 +402,13 @@ private class DomainOutbox(
       current: Watermarks,
       found: Seq[StoredTopologyTransaction[TopologyChangeOp]],
       applicable: SignedTopologyTransactions[TopologyChangeOp],
-      responses: Seq[RegisterTopologyTransactionResponse.Result],
+      responses: Seq[RegisterTopologyTransactionResponseResult],
   )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
     val valid = applicable.result.zipWithIndex.zip(responses).foldLeft(true) {
       case (valid, ((item, idx), response)) =>
         val expectedResult =
-          RegisterTopologyTransactionResponse.State.isExpectedState(response.state)
-        if (item.uniquePath.toProtoPrimitive != response.uniquePathProtoPrimitive) {
-          logger.error(
-            s"Error at ${idx}: Invalid response ${response} for transaction ${item.transaction}"
-          )
-          false
-        } else if (!expectedResult) {
+          RegisterTopologyTransactionResponseResult.State.isExpectedState(response.state)
+        if (!expectedResult) {
           logger.warn(
             s"Topology transaction ${item.transaction} got ${response.state}. Will not update watermark."
           )
@@ -448,6 +451,7 @@ private class DomainOnboardingOutbox(
     val targetStore: TopologyStore[TopologyStoreId.DomainStore],
     val timeouts: ProcessingTimeout,
     val loggerFactory: NamedLoggerFactory,
+    override protected val crypto: Crypto,
 ) extends DomainOutboxDispatch {
 
   private def run()(implicit
@@ -460,7 +464,7 @@ private class DomainOnboardingOutbox(
     )
     result <- dispatch(domain, handle, initialTransactions)
   } yield {
-    result.forall(res => RegisterTopologyTransactionResponse.State.isExpectedState(res.state))
+    result.forall(res => RegisterTopologyTransactionResponseResult.State.isExpectedState(res.state))
   }).thereafter { _ =>
     close()
   }
@@ -484,7 +488,11 @@ private class DomainOnboardingOutbox(
       applicable <- EitherT.right(
         performUnlessClosingF(functionFullName)(notAlreadyPresent(applicablePossiblyPresent))
       )
-    } yield applicable
+      // Try to convert if necessary the topology transactions for the required protocol version of the domain
+      convertedTxs <- performUnlessClosingEitherU(functionFullName) {
+        convertTransactions(applicable)
+      }
+    } yield convertedTxs
 
   private def initializedWith(
       initial: SignedTopologyTransactions[TopologyChangeOp]
@@ -515,6 +523,7 @@ object DomainOnboardingOutbox {
       targetStore: TopologyStore[TopologyStoreId.DomainStore],
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
+      crypto: Crypto,
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
@@ -529,6 +538,7 @@ object DomainOnboardingOutbox {
       targetStore,
       timeouts,
       loggerFactory.append("domain", domain.unwrap),
+      crypto,
     )
     outbox.run().transform { res =>
       outbox.close()
@@ -543,9 +553,7 @@ private trait DomainOutboxDispatch extends NamedLogging with FlagCloseable {
   protected def protocolVersion: ProtocolVersion
   protected def targetStore: TopologyStore[TopologyStoreId.DomainStore]
   protected def handle: RegisterTopologyTransactionHandle
-
-  private lazy val signedTxProtocolVersionRepresentative =
-    SignedTopologyTransaction.protocolVersionRepresentativeFor(protocolVersion)
+  protected def crypto: Crypto
 
   // register handle close task
   // this will ensure that the handle is closed before the outbox, aborting any retries
@@ -582,13 +590,21 @@ private trait DomainOutboxDispatch extends NamedLogging with FlagCloseable {
     def domainRestriction(tx: SignedTopologyTransaction[TopologyChangeOp]): Boolean =
       tx.transaction.element.mapping.restrictedToDomain.forall(_ == domainId)
 
-    def protocolVersionRestriction(tx: SignedTopologyTransaction[TopologyChangeOp]): Boolean =
-      tx.representativeProtocolVersion == signedTxProtocolVersionRepresentative
-
     Future.successful(
-      transactions.filter(x => notAlien(x) && domainRestriction(x) && protocolVersionRestriction(x))
+      transactions.filter(x => notAlien(x) && domainRestriction(x))
     )
   }
+
+  protected def convertTransactions(
+      transactions: SignedTopologyTransactions[TopologyChangeOp]
+  )(implicit
+      ec: ExecutionContext
+  ): EitherT[Future, String, SignedTopologyTransactions[TopologyChangeOp]] =
+    transactions.result
+      .traverse(
+        SignedTopologyTransaction.asVersion(_, protocolVersion)(crypto)
+      )
+      .map(SignedTopologyTransactions(_))
 
   protected def dispatch(
       domain: DomainAlias,
@@ -597,7 +613,7 @@ private trait DomainOutboxDispatch extends NamedLogging with FlagCloseable {
   )(implicit
       traceContext: TraceContext,
       executionContext: ExecutionContext,
-  ): EitherT[FutureUnlessShutdown, String, Seq[RegisterTopologyTransactionResponse.Result]] = if (
+  ): EitherT[FutureUnlessShutdown, String, Seq[RegisterTopologyTransactionResponseResult]] = if (
     transactions.isEmpty
   ) EitherT.rightT(Seq.empty)
   else {
@@ -625,13 +641,7 @@ private trait DomainOutboxDispatch extends NamedLogging with FlagCloseable {
         logger.debug(
           s"$domain responded the following for the given topology transactions: $responses"
         )
-        val failedResponses = responses.collect {
-          case failedResponse @ RegisterTopologyTransactionResponse.Result(
-                _,
-                RegisterTopologyTransactionResponse.State.Failed,
-              ) =>
-            failedResponse
-        }
+        val failedResponses = responses.filter(_.isFailed)
 
         Either.cond(
           failedResponses.isEmpty,

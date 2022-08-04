@@ -20,7 +20,6 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.{CommonMockMetrics, SequencerClientMetrics}
-import com.digitalasset.canton.protocol.TestDomainParameters
 import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
 import com.digitalasset.canton.sequencing._
 import com.digitalasset.canton.sequencing.client.SequencedEventValidationError.GapInSequencerCounter
@@ -609,7 +608,7 @@ class SequencerClientTest extends AsyncWordSpec with BaseTest with HasExecutorSe
       for {
         env <- Env.create(useParallelExecutionContext = true)
         _ <- env.changeTransport(secondTransport)
-        _ <- env.sendAsync(Batch.empty(defaultProtocolVersion))
+        _ <- env.sendAsync(Batch.empty(testedProtocolVersion))
       } yield {
         env.transport.lastSend.get() shouldBe None
         secondTransport.lastSend.get() should not be None
@@ -626,7 +625,7 @@ class SequencerClientTest extends AsyncWordSpec with BaseTest with HasExecutorSe
         env <- Env.create(useParallelExecutionContext = true)
         _ <- env.subscribeAfter()
         _ <- env.changeTransport(secondTransport)
-        _ <- env.sendAsync(Batch.empty(defaultProtocolVersion))
+        _ <- env.sendAsync(Batch.empty(testedProtocolVersion))
       } yield {
         env.transport.lastSend.get() shouldBe None
         secondTransport.lastSend.get() should not be None
@@ -787,7 +786,7 @@ class SequencerClientTest extends AsyncWordSpec with BaseTest with HasExecutorSe
           timeouts,
           loggerFactory,
         )
-      val domainParameters = TestDomainParameters.defaultStatic
+      val domainParameters = BaseTest.defaultStaticDomainParameters
 
       val client = new SequencerClient(
         DefaultTestIdentities.domainId,

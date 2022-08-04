@@ -26,8 +26,8 @@ import com.digitalasset.canton.logging.{
 import com.digitalasset.canton.metrics.{DbQueueMetrics, DbStorageMetrics}
 import com.digitalasset.canton.protocol.ContractIdSyntax._
 import com.digitalasset.canton.protocol.{LfContractId, LfGlobalKey, LfHash}
-import com.digitalasset.canton.resource.DbStorage.DbAction
 import com.digitalasset.canton.resource.DbStorage.Profile.{H2, Oracle, Postgres}
+import com.digitalasset.canton.resource.DbStorage.{DbAction, Profile}
 import com.digitalasset.canton.resource.StorageFactory.StorageCreationException
 import com.digitalasset.canton.store.db.{DbDeserializationException, DbSerializationException}
 import com.digitalasset.canton.tracing.TraceContext
@@ -37,7 +37,7 @@ import com.digitalasset.canton.util.retry.RetryEither
 import com.digitalasset.canton.util.retry.RetryUtil.DbExceptionRetryable
 import com.digitalasset.canton.{LfPackageId, LfPartyId}
 import com.google.protobuf.ByteString
-import com.typesafe.config.{Config, ConfigFactory, ConfigValueFactory}
+import com.typesafe.config.{Config, ConfigValueFactory}
 import com.typesafe.scalalogging.Logger
 import com.zaxxer.hikari.pool.HikariPool.PoolInitializationException
 import io.functionmeta.functionFullName
@@ -51,7 +51,7 @@ import slick.jdbc.{ActionBasedSQLInterpolation => _, SQLActionBuilder => _, _}
 import slick.lifted.Aliases
 import slick.util.{AsyncExecutor, AsyncExecutorWithMetrics, ClassLoaderUtil}
 
-import java.sql.{Blob, Driver, SQLException, Statement}
+import java.sql.{Blob, SQLException, Statement}
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
@@ -200,6 +200,26 @@ trait DbStorage extends Storage with FlagCloseable { self: NamedLogging =>
   /** Automatically performs #$ interpolation for a call to `limit` */
   def limitSql(numberOfItems: Int, skipItems: Long = 0L): SQLActionBuilder = {
     sql" #${limit(numberOfItems, skipItems)} "
+  }
+
+  /** Runs the given `query` transactionally with synchronous commit replication if
+    * the database provides the ability to configure synchronous commits per transaction.
+    *
+    * Currently only Postgres supports this.
+    */
+  def withSyncCommitOnPostgres[A, E <: Effect](
+      query: DBIOAction[A, NoStream, E]
+  ): DBIOAction[A, NoStream, Effect.Write with E with Effect.Transactional] = {
+    import profile.DbStorageAPI.jdbcActionExtensionMethods
+    profile match {
+      case _: Profile.Postgres =>
+        val syncCommit = sqlu"set local synchronous_commit=on"
+        syncCommit.andThen(query).transactionally
+      case _: Profile.H2 | _: Profile.Oracle =>
+        // Don't do anything for H2/Oracle. According to our docs it is up to the user to enforce synchronous replication.
+        // Any changes here are on a best-effort basis, but we won't guarantee they will be sufficient.
+        query.transactionally
+    }
   }
 
   def metrics: DbStorageMetrics
@@ -586,16 +606,12 @@ object DbStorage {
     // copy paste from JdbcBackend.forConfig
     import slick.util.ConfigExtensionMethods._
     try {
-      val path = ""
-      val driver: Driver = null
       val classLoader: ClassLoader = ClassLoaderUtil.defaultClassLoader
-      val initializedConfig = if (config eq null) ConfigFactory.load(classLoader) else config
-      val usedConfig = if (path.isEmpty) initializedConfig else initializedConfig.getConfig(path)
-      val source = JdbcDataSource.forConfig(usedConfig, driver, path, classLoader)
-      val poolName = usedConfig.getStringOr("poolName", path)
-      val numThreads = usedConfig.getIntOr("numThreads", 20)
+      val source = JdbcDataSource.forConfig(config, null, "path", classLoader)
+      val poolName = config.getStringOr("poolName", "")
+      val numThreads = config.getIntOr("numThreads", 20)
       val maxConnections = source.maxConnections.getOrElse(numThreads)
-      val registerMbeans = usedConfig.getBooleanOr("registerMbeans", false)
+      val registerMbeans = config.getBooleanOr("registerMbeans", false)
 
       val executor = metrics match {
         // inject our own Canton Async executor with metrics
@@ -604,7 +620,7 @@ object DbStorage {
             poolName,
             numThreads,
             numThreads,
-            queueSize = usedConfig.getIntOr("queueSize", 1000),
+            queueSize = config.getIntOr("queueSize", 1000),
             maxConnections = maxConnections,
             registerMbeans = registerMbeans,
             logQueryCost = logQueryCost,
@@ -616,7 +632,7 @@ object DbStorage {
             poolName,
             numThreads,
             numThreads,
-            queueSize = usedConfig.getIntOr("queueSize", 1000),
+            queueSize = config.getIntOr("queueSize", 1000),
             maxConnections = maxConnections,
             registerMbeans = registerMbeans,
           )

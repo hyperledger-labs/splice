@@ -13,7 +13,6 @@ import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.serialization.ProtoConverter
-import com.digitalasset.canton.version.HasProtoV0
 
 /** A class representing a Daml contract of a specific type (Daml template) with an assigned contract ID.
   *
@@ -24,7 +23,7 @@ import com.digitalasset.canton.version.HasProtoV0
 final case class Contract[+T](
     contractId: Primitive.ContractId[T],
     payload: T with Template[T],
-) extends HasProtoV0[v0.Contract] {
+) {
   def toProtoV0: v0.Contract = v0.Contract(
     templateId = Some(ApiTypes.TemplateId.unwrap(payload.templateId)),
     contractId = ApiTypes.ContractId.unwrap(contractId),

@@ -4,7 +4,6 @@
 package com.digitalasset.canton.participant.admin
 
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
-import com.digitalasset.canton.version.HasProtoV0
 
 /** Encapsulated resource limits for a participant.
   *
@@ -12,10 +11,12 @@ import com.digitalasset.canton.version.HasProtoV0
   *                         This also covers requests submitted by other participants.
   * @param maxRate the maximum rate at which commands may be submitted through the ledger api.
   */
-case class ResourceLimits(maxDirtyRequests: Option[NonNegativeInt], maxRate: Option[NonNegativeInt])
-    extends HasProtoV0[v0.ResourceLimits] {
+case class ResourceLimits(
+    maxDirtyRequests: Option[NonNegativeInt],
+    maxRate: Option[NonNegativeInt],
+) {
 
-  override def toProtoV0: v0.ResourceLimits =
+  def toProtoV0: v0.ResourceLimits =
     v0.ResourceLimits(
       maxDirtyRequests = maxDirtyRequests.fold(-1)(_.unwrap),
       maxRate = maxRate.fold(-1)(_.unwrap),
@@ -34,6 +35,15 @@ object ResourceLimits {
   }
 
   def noLimit: ResourceLimits = ResourceLimits(None, None)
+
+  /** Default resource limits to protect Canton from being overloaded by applications that send excessively many commands.
+    * The default settings allow for processing an average of 100 commands/s with a latency of 5s,
+    * with bursts of up to 200 commands/s.
+    */
+  def default: ResourceLimits = ResourceLimits(
+    maxDirtyRequests = Some(NonNegativeInt.tryCreate(500)),
+    maxRate = Some(NonNegativeInt.tryCreate(200)),
+  )
 
   def community: ResourceLimits = ResourceLimits(Some(NonNegativeInt.tryCreate(100)), None)
 }

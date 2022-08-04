@@ -6,31 +6,34 @@ package com.digitalasset.canton.domain.sequencing.sequencer
 import cats.syntax.traverse._
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.admin.v0
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter.{ParsingResult, parseRequired}
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.{Member, UnauthenticatedMemberId}
-import com.digitalasset.canton.version.HasProtoV0
-
-import scala.Ordering.Implicits._
 
 case class SequencerMemberStatus(
     member: Member,
     registeredAt: CantonTimestamp,
     lastAcknowledged: Option[CantonTimestamp],
     enabled: Boolean = true,
-) extends HasProtoV0[v0.SequencerMemberStatus] {
+) extends PrettyPrinting {
   def safePruningTimestamp: CantonTimestamp =
-    lastAcknowledged.getOrElse(
-      registeredAt
-    )
+    lastAcknowledged.getOrElse(registeredAt)
 
-  override def toProtoV0: v0.SequencerMemberStatus =
+  def toProtoV0: v0.SequencerMemberStatus =
     v0.SequencerMemberStatus(
       member.toProtoPrimitive,
       Some(registeredAt.toProtoPrimitive),
       lastAcknowledged.map(_.toProtoPrimitive),
       enabled,
     )
+
+  override def pretty: Pretty[SequencerMemberStatus] = prettyOfClass(
+    param("member", _.member),
+    param("registered at", _.registeredAt),
+    paramIfDefined("last acknowledged", _.lastAcknowledged),
+    paramIfTrue("enabled", _.enabled),
+  )
 }
 
 /** Structure housing both members and instances of those members. Used to list clients that have been or need to be
@@ -40,34 +43,66 @@ case class SequencerClients(
     members: Set[Member] = Set.empty
 )
 
-/** Pruning status of a Sequencer.
-  * @param lowerBound the earliest timestamp that can be read
-  * @param now the current time of the sequencer clock
-  * @param members details of registered members
-  */
-case class SequencerPruningStatus(
-    lowerBound: CantonTimestamp,
-    now: CantonTimestamp,
-    members: Seq[SequencerMemberStatus],
-) extends HasProtoV0[v0.SequencerPruningStatus] {
+trait AbstractSequencerPruningStatus {
 
-  /** Using the member details, calculate based on their acknowledgements when is the latest point we can
-    * safely prune without losing any data that may still be read.
-    */
-  lazy val safePruningTimestamp: CantonTimestamp = {
-    val earliestMemberTs = members
-      .filter(_.enabled)
-      .map(_.safePruningTimestamp)
-      .reduceLeftOption(_ min _)
+  /** the earliest timestamp that can be read */
+  def lowerBound: CantonTimestamp
 
-    // if there are no members (or they've all been ignored), we can technically prune everything.
-    // as in practice a domain will register a IDM, Sequencer and Mediator, this will most likely never occur.
-    earliestMemberTs.getOrElse(now)
-  }
+  /** details of registered members */
+  def members: Seq[SequencerMemberStatus]
 
   lazy val disabledClients: SequencerClients = SequencerClients(
     members = members.filterNot(_.enabled).map(_.member).toSet
   )
+
+  /** Using the member details, calculate based on their acknowledgements when is the latest point we can
+    * safely prune without losing any data that may still be read.
+    *
+    * @param timestampForNoMembers The timestamp to return if there are no unignored members
+    */
+  def safePruningTimestampFor(timestampForNoMembers: CantonTimestamp): CantonTimestamp = {
+    val earliestMemberTs = members.filter(_.enabled).map(_.safePruningTimestamp).minOption
+    earliestMemberTs.getOrElse(timestampForNoMembers)
+  }
+}
+
+private[canton] case class InternalSequencerPruningStatus(
+    override val lowerBound: CantonTimestamp,
+    override val members: Seq[SequencerMemberStatus],
+) extends AbstractSequencerPruningStatus {
+  def toSequencerPruningStatus(now: CantonTimestamp): SequencerPruningStatus =
+    SequencerPruningStatus(lowerBound, now, members)
+}
+
+private[canton] object InternalSequencerPruningStatus {
+
+  /** Sentinel value to use for Sequencers that don't yet support the status endpoint */
+  val Unimplemented =
+    InternalSequencerPruningStatus(CantonTimestamp.MinValue, members = Seq.empty)
+
+}
+
+/** Pruning status of a Sequencer.
+  *
+  * @param now the current time of the sequencer clock
+  */
+case class SequencerPruningStatus(
+    override val lowerBound: CantonTimestamp,
+    now: CantonTimestamp,
+    override val members: Seq[SequencerMemberStatus],
+) extends AbstractSequencerPruningStatus
+    with PrettyPrinting {
+
+  def toInternal: InternalSequencerPruningStatus =
+    InternalSequencerPruningStatus(lowerBound, members)
+
+  /** Using the member details, calculate based on their acknowledgements when is the latest point we can
+    * safely prune without losing any data that may still be read.
+    *
+    * if there are no members (or they've all been ignored), we can technically prune everything.
+    * as in practice a domain will register a IDM, Sequencer and Mediator, this will most likely never occur.
+    */
+  lazy val safePruningTimestamp: CantonTimestamp = safePruningTimestampFor(now)
 
   def unauthenticatedMembersToDisable(retentionPeriod: NonNegativeFiniteDuration): Set[Member] =
     members.foldLeft(Set.empty[Member]) { (toDisable, memberStatus) =>
@@ -89,12 +124,18 @@ case class SequencerPruningStatus(
       } else disabled
     }
 
-  override def toProtoV0: v0.SequencerPruningStatus =
+  def toProtoV0: v0.SequencerPruningStatus =
     v0.SequencerPruningStatus(
       earliestEventTimestamp = Some(lowerBound.toProtoPrimitive),
       now = Some(now.toProtoPrimitive),
       members = members.map(_.toProtoV0),
     )
+
+  override def pretty: Pretty[SequencerPruningStatus] = prettyOfClass(
+    param("lower bound", _.lowerBound),
+    param("now", _.now),
+    paramIfNonEmpty("members", _.members),
+  )
 }
 
 object SequencerMemberStatus {
