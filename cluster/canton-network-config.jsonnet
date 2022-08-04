@@ -69,11 +69,11 @@ function(gcpRegion, gcpRepoName, imageTag, ipAddr) {
     deployment(gcpRegion, gcpRepoName, imageTag, 'svc-app', [
       {
         name: 'svc-app-adm-api',
-        containerPort: 5015,
+        containerPort: 5005,
       },
       {
         name: 'scan-api',
-        containerPort: 5013,
+        containerPort: 5012,
       },
     ]),
     deployment(
@@ -130,14 +130,14 @@ function(gcpRegion, gcpRepoName, imageTag, ipAddr) {
         {
           name: 'svc-app-adm-api',
           protocol: 'TCP',
-          port: 5015,
-          targetPort: 5015,
+          port: 5005,
+          targetPort: 5005,
         },
         {
           name: 'scan-api',
           protocol: 'TCP',
-          port: 5013,
-          targetPort: 5013,
+          port: 5012,
+          targetPort: 5012,
         },
       ]
     ),

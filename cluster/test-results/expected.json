@@ -71,11 +71,11 @@
                         "name": "svc-app",
                         "ports": [
                            {
-                              "containerPort": 5015,
+                              "containerPort": 5005,
                               "name": "svc-app-adm-api"
                            },
                            {
-                              "containerPort": 5013,
+                              "containerPort": 5012,
                               "name": "scan-api"
                            }
                         ]
@@ -229,15 +229,15 @@
             "ports": [
                {
                   "name": "svc-app-adm-api",
-                  "port": 5015,
+                  "port": 5005,
                   "protocol": "TCP",
-                  "targetPort": 5015
+                  "targetPort": 5005
                },
                {
                   "name": "scan-api",
-                  "port": 5013,
+                  "port": 5012,
                   "protocol": "TCP",
-                  "targetPort": 5013
+                  "targetPort": 5012
                }
             ],
             "selector": {

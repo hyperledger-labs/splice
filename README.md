@@ -226,8 +226,8 @@ canton {
   participants {
     localParticipant1 {
       storage.type = memory
-      admin-api.port = 5012
-      ledger-api.port = 5011
+      admin-api.port = 5002
+      ledger-api.port = 5001
     }
  }
 }
