@@ -147,7 +147,7 @@ class GrpcDirectoryProviderService(
           )
           .command
         tx <- connection.submitCommand(Seq(partyId), Seq(), Seq(cmd))
-        requests = DecodeUtil.decodeAllCreated(walletCodegen.PaymentRequest)(
+        requests = DecodeUtil.decodeAllCreated(walletCodegen.AppPaymentRequest)(
           tx.getTransaction
         )
         _ = require(
@@ -165,16 +165,16 @@ class GrpcDirectoryProviderService(
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
         partyId <- getParty()
-        approvedPayment <- fetchByContractId(walletCodegen.ApprovedPayment)(
+        approvedAppPayment <- fetchByContractId(walletCodegen.ApprovedAppPayment)(
           partyId,
           Primitive.ContractId(request.contractId),
         )
         // TODO(i321) Add uniqueness check
         cmd = codegen.DirectoryInstall
-          .key(DA.Types.Tuple2(partyId.toPrim, approvedPayment.value.payer))
+          .key(DA.Types.Tuple2(partyId.toPrim, approvedAppPayment.value.payer))
           .exerciseDirectoryInstall_CollectEntryPayment(
             partyId.toPrim,
-            codegen.DirectoryInstall_CollectEntryPayment(approvedPayment.contractId),
+            codegen.DirectoryInstall_CollectEntryPayment(approvedAppPayment.contractId),
           )
           .command
         tx <- connection.submitCommand(Seq(partyId), Seq(), Seq(cmd))

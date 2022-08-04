@@ -15,7 +15,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.network.CC.Coin.Coin
 import com.digitalasset.network.CC.Round.Round
 import com.digitalasset.network.CC.CoinRules.{CoinRules, CoinRulesRequest}
-import com.digitalasset.network.CN.Wallet.PaymentRequest
+import com.digitalasset.network.CN.Wallet.AppPaymentRequest
 import com.digitalasset.network.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 import com.digitalasset.network.DA.Time.Types.RelTime
 
@@ -74,10 +74,10 @@ class WalletIntegrationTest
         wallet1.remoteParticipant.ledger_api.acs.await(validatorParty, CoinRules).contractId
 
       // Check that no payment requests exist
-      wallet1.listPaymentRequests() shouldBe empty
+      wallet1.listAppPaymentRequests() shouldBe empty
 
       // Create a payment request to self.
-      val reqC = PaymentRequest(
+      val reqC = AppPaymentRequest(
         payer = userParty.toPrim,
         payee = userParty.toPrim,
         svc = svcParty.toPrim,
@@ -97,14 +97,14 @@ class WalletIntegrationTest
       )
 
       // Check that we can see the created payment request
-      val reqFound = wallet1.listPaymentRequests().headOption.value
+      val reqFound = wallet1.listAppPaymentRequests().headOption.value
       reqFound.payload shouldBe reqC
 
       // Reject the payment request
-      wallet1.rejectPaymentRequest(reqFound.contractId)
+      wallet1.rejectAppPaymentRequest(reqFound.contractId)
 
       // Check that there are no more payment requests
-      val requests2 = wallet1.listPaymentRequests()
+      val requests2 = wallet1.listAppPaymentRequests()
       requests2 shouldBe empty
     }
   }

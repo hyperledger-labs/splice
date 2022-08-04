@@ -83,41 +83,41 @@ object WalletAppCommands {
       Right(Primitive.ContractId.apply[coinCodegen.Coin](response.contractId))
   }
 
-  case class ListPaymentRequests()
-      extends BaseCommand[v0.ListPaymentRequestsRequest, v0.ListPaymentRequestsResponse, Seq[
-        Contract[walletCodegen.PaymentRequest]
+  case class ListAppPaymentRequests()
+      extends BaseCommand[v0.ListAppPaymentRequestsRequest, v0.ListAppPaymentRequestsResponse, Seq[
+        Contract[walletCodegen.AppPaymentRequest]
       ]] {
 
-    override def createRequest(): Either[String, v0.ListPaymentRequestsRequest] =
+    override def createRequest(): Either[String, v0.ListAppPaymentRequestsRequest] =
       Right(
-        v0.ListPaymentRequestsRequest()
+        v0.ListAppPaymentRequestsRequest()
       )
 
     override def submitRequest(
         service: WalletServiceStub,
-        request: v0.ListPaymentRequestsRequest,
-    ): Future[v0.ListPaymentRequestsResponse] = service.listPaymentRequests(request)
+        request: v0.ListAppPaymentRequestsRequest,
+    ): Future[v0.ListAppPaymentRequestsResponse] = service.listAppPaymentRequests(request)
 
     override def handleResponse(
-        response: v0.ListPaymentRequestsResponse
-    ): Either[String, Seq[Contract[walletCodegen.PaymentRequest]]] =
+        response: v0.ListAppPaymentRequestsResponse
+    ): Either[String, Seq[Contract[walletCodegen.AppPaymentRequest]]] =
       response.paymentRequests
-        .traverse(req => Contract.fromProto(walletCodegen.PaymentRequest)(req))
+        .traverse(req => Contract.fromProto(walletCodegen.AppPaymentRequest)(req))
         .leftMap(_.toString)
   }
 
-  case class ApprovePaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.PaymentRequest],
+  case class ApproveAppPaymentRequest(
+      requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest],
       coinId: Primitive.ContractId[coinCodegen.Coin],
   ) extends BaseCommand[
-        v0.ApprovePaymentRequestRequest,
-        v0.ApprovePaymentRequestResponse,
-        Primitive.ContractId[walletCodegen.ApprovedPayment],
+        v0.ApproveAppPaymentRequestRequest,
+        v0.ApproveAppPaymentRequestResponse,
+        Primitive.ContractId[walletCodegen.ApprovedAppPayment],
       ] {
 
-    override def createRequest(): Either[String, v0.ApprovePaymentRequestRequest] =
+    override def createRequest(): Either[String, v0.ApproveAppPaymentRequestRequest] =
       Right(
-        v0.ApprovePaymentRequestRequest(
+        v0.ApproveAppPaymentRequestRequest(
           ApiTypes.ContractId.unwrap(requestId),
           ApiTypes.ContractId.unwrap(coinId),
         )
@@ -125,41 +125,41 @@ object WalletAppCommands {
 
     override def submitRequest(
         service: WalletServiceStub,
-        request: v0.ApprovePaymentRequestRequest,
-    ): Future[v0.ApprovePaymentRequestResponse] = service.approvePaymentRequest(request)
+        request: v0.ApproveAppPaymentRequestRequest,
+    ): Future[v0.ApproveAppPaymentRequestResponse] = service.approveAppPaymentRequest(request)
 
     override def handleResponse(
-        response: v0.ApprovePaymentRequestResponse
-    ): Either[String, Primitive.ContractId[walletCodegen.ApprovedPayment]] =
+        response: v0.ApproveAppPaymentRequestResponse
+    ): Either[String, Primitive.ContractId[walletCodegen.ApprovedAppPayment]] =
       Right(
-        Primitive.ContractId[walletCodegen.ApprovedPayment](
+        Primitive.ContractId[walletCodegen.ApprovedAppPayment](
           response.approvedPaymentContractId
         )
       )
   }
 
-  case class RejectPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.PaymentRequest]
+  case class RejectAppPaymentRequest(
+      requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest]
   ) extends BaseCommand[
-        v0.RejectPaymentRequestRequest,
-        v0.RejectPaymentRequestResponse,
+        v0.RejectAppPaymentRequestRequest,
+        v0.RejectAppPaymentRequestResponse,
         Unit,
       ] {
 
-    override def createRequest(): Either[String, v0.RejectPaymentRequestRequest] =
+    override def createRequest(): Either[String, v0.RejectAppPaymentRequestRequest] =
       Right(
-        v0.RejectPaymentRequestRequest(
+        v0.RejectAppPaymentRequestRequest(
           ApiTypes.ContractId.unwrap(requestId)
         )
       )
 
     override def submitRequest(
         service: WalletServiceStub,
-        request: v0.RejectPaymentRequestRequest,
-    ): Future[v0.RejectPaymentRequestResponse] = service.rejectPaymentRequest(request)
+        request: v0.RejectAppPaymentRequestRequest,
+    ): Future[v0.RejectAppPaymentRequestResponse] = service.rejectAppPaymentRequest(request)
 
     override def handleResponse(
-        response: v0.RejectPaymentRequestResponse
+        response: v0.RejectAppPaymentRequestResponse
     ): Either[String, Unit] =
       Right(())
   }

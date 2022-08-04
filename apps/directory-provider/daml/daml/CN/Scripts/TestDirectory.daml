@@ -44,7 +44,7 @@ test = script do
 
   -- provider requests payment for entry via app install
   -- how: provider on their own participant.
-  paymentRequest <- submit provider $ exerciseCmd directoryInstall DirectoryInstall_RequestEntryPayment with
+  appPaymentRequest <- submit provider $ exerciseCmd directoryInstall DirectoryInstall_RequestEntryPayment with
     requestCid = entryRequest
 
   -- cc wallet selects a large enough coin
@@ -53,13 +53,13 @@ test = script do
   [(coin, _)] <- queryFilter @Coin user (\c -> c.quantity.initialQuantity > 1.02)
   -- cc wallet approves payment and locks coin to provider
   -- how: cc wallet
-  approvedPayment <- submitMulti [user] [app.svc] $ exerciseCmd paymentRequest PaymentRequest_Approve with
+  approvedAppPayment <- submitMulti [user] [app.svc] $ exerciseCmd appPaymentRequest AppPaymentRequest_Approve with
     inputs = [InputCoin coin]
 
   -- directory providers transactionally unlocks & transfer coins
   -- and creates directory entry in return.
   -- how: provider on their own participant
   submitMulti [provider] [app.svc] $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryPayment with
-    approvedPayment = approvedPayment
+    approvedAppPayment = approvedAppPayment
 
   pure ()

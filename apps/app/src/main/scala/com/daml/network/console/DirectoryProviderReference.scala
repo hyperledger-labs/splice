@@ -54,18 +54,18 @@ abstract class DirectoryProviderAppReference(
     }
   }
 
-  @Help.Summary("Create a PaymentRequest for a given DirectoryEntryRequest")
+  @Help.Summary("Create an AppPaymentRequest for a given DirectoryEntryRequest")
   def requestEntryPayment(
       cid: Primitive.ContractId[codegen.DirectoryEntryRequest]
-  ): Primitive.ContractId[walletCodegen.PaymentRequest] = {
+  ): Primitive.ContractId[walletCodegen.AppPaymentRequest] = {
     consoleEnvironment.run {
       adminCommand(DirectoryProviderCommands.RequestEntryPayment(cid))
     }
   }
 
-  @Help.Summary("Collect the ApprovedPayment and create the DirectoryEntry")
+  @Help.Summary("Collect the ApprovedAppPayment and create the DirectoryEntry")
   def collectEntryPayment(
-      cid: Primitive.ContractId[walletCodegen.ApprovedPayment]
+      cid: Primitive.ContractId[walletCodegen.ApprovedAppPayment]
   ): Primitive.ContractId[codegen.DirectoryEntry] = {
     consoleEnvironment.run {
       adminCommand(DirectoryProviderCommands.CollectEntryPayment(cid))

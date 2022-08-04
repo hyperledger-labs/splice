@@ -87,11 +87,12 @@ template PaymentChannelProposal
 
 -- | A reference to the reason for a payment.
 -- TODO: better naming
+-- TODO: need to distinguish between AppPayment and UserPayment here?
 interface PaymentReference
   where
     getDescription : Text
 
-template PaymentRequest
+template AppPaymentRequest
   with
     payer : Party
     -- ^ The party that should pay.
@@ -111,14 +112,14 @@ template PaymentRequest
     signatory payee, payer
     ensure (collectionDuration > aunit && quantity > 0.0)
 
-    choice PaymentRequest_Approve : ContractId ApprovedPayment
+    choice AppPaymentRequest_Approve : ContractId ApprovedAppPayment
       with
         inputs : [TransferInput]
       controller payer
       do now <- getTime
          -- check that the reference is active and implements PaymentReference
          void $ fetch reference
-         assertMsg "PaymentRequest has not expired" (now < expiresAt)
+         assertMsg "AppPaymentRequest has not expired" (now < expiresAt)
          -- lock the coin and create an approved payment
          let transfer = Transfer with
               sender = payer
@@ -137,19 +138,19 @@ template PaymentRequest
          (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt payer
          (TransferResultLockedCoin lockedCoin::_) <-
             exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
-         create ApprovedPayment
+         create ApprovedAppPayment
            with
              svc, payee, payer, reference, lockedCoin
 
-    choice PaymentRequest_Withdraw : ()
+    choice AppPaymentRequest_Withdraw : ()
       controller payee
       do pure ()
 
-    choice PaymentRequest_Reject : ()
+    choice AppPaymentRequest_Reject : ()
       controller payer
       do pure ()
 
-template ApprovedPayment
+template ApprovedAppPayment
   with
     payer : Party
     payee : Party
@@ -159,7 +160,7 @@ template ApprovedPayment
   where
     signatory payee, payer
 
-    choice ApprovedPayment_Collect : ContractId PaymentReference
+    choice ApprovedAppPayment_Collect : ContractId PaymentReference
       controller payee, payer
       do
         -- unlock coin and transfer the remainder to the payee
@@ -179,10 +180,10 @@ template ApprovedPayment
         void $ fetch reference
         pure reference
 
-    choice ApprovedPayment_Discard : ContractId Coin
+    choice ApprovedAppPayment_Discard : ContractId Coin
       controller payee
       do exercise lockedCoin Coin_Unlock
 
-    choice ApprovedPayment_Expire : ContractId Coin
+    choice ApprovedAppPayment_Expire : ContractId Coin
       controller payer
       do exercise lockedCoin Coin_OwnerExpireLock

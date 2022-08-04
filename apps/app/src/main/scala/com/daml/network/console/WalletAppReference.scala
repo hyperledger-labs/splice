@@ -54,9 +54,9 @@ abstract class WalletAppReference(
     "Queries the configured remote participant for the PaymentRequests of the configured user. " +
       "Returns all found payment requests."
   )
-  def listPaymentRequests(): Seq[Contract[walletCodegen.PaymentRequest]] = {
+  def listAppPaymentRequests(): Seq[Contract[walletCodegen.AppPaymentRequest]] = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.ListPaymentRequests())
+      adminCommand(WalletAppCommands.ListAppPaymentRequests())
     }
   }
 
@@ -65,12 +65,12 @@ abstract class WalletAppReference(
     "Approve a payment request and deliver the coin to be locked into the approved payment." +
       "Returns the contract ID of the approved payment."
   )
-  def approvePaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.PaymentRequest],
+  def approveAppPaymentRequest(
+      requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest],
       coinId: Primitive.ContractId[coinCodegen.Coin],
-  ): Primitive.ContractId[walletCodegen.ApprovedPayment] = {
+  ): Primitive.ContractId[walletCodegen.ApprovedAppPayment] = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.ApprovePaymentRequest(requestId, coinId))
+      adminCommand(WalletAppCommands.ApproveAppPaymentRequest(requestId, coinId))
     }
   }
 
@@ -78,9 +78,9 @@ abstract class WalletAppReference(
   @Help.Description(
     "Reject a payment request."
   )
-  def rejectPaymentRequest(requestId: Primitive.ContractId[walletCodegen.PaymentRequest]): Unit = {
+  def rejectAppPaymentRequest(requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest]): Unit = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.RejectPaymentRequest(requestId))
+      adminCommand(WalletAppCommands.RejectAppPaymentRequest(requestId))
     }
   }
 }

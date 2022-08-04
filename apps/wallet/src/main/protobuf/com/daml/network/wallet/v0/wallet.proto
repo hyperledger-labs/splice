@@ -9,9 +9,9 @@ service WalletService {
   rpc list (ListRequest) returns (ListResponse);
   rpc tap (TapRequest) returns (TapResponse);
 
-  rpc ListPaymentRequests (ListPaymentRequestsRequest) returns (ListPaymentRequestsResponse);
-  rpc ApprovePaymentRequest (ApprovePaymentRequestRequest) returns (ApprovePaymentRequestResponse);
-  rpc RejectPaymentRequest (RejectPaymentRequestRequest) returns (RejectPaymentRequestResponse);
+  rpc ListAppPaymentRequests (ListAppPaymentRequestsRequest) returns (ListAppPaymentRequestsResponse);
+  rpc ApproveAppPaymentRequest (ApproveAppPaymentRequestRequest) returns (ApproveAppPaymentRequestResponse);
+  rpc RejectAppPaymentRequest (RejectAppPaymentRequestRequest) returns (RejectAppPaymentRequestResponse);
 }
 
 message InitializeRequest {
@@ -36,15 +36,15 @@ message TapResponse {
   string contract_id = 1;
 }
 
-message ListPaymentRequestsRequest {
+message ListAppPaymentRequestsRequest {
 }
 
-message ListPaymentRequestsResponse {
+message ListAppPaymentRequestsResponse {
   // TODO(i300): add pagination for payment requests
   repeated com.daml.network.v0.Contract payment_requests = 1;
 }
 
-message ApprovePaymentRequestRequest {
+message ApproveAppPaymentRequestRequest {
   string request_contract_id = 1;
 
   // Coin to be used as input to locking amount to be paid.
@@ -52,13 +52,13 @@ message ApprovePaymentRequestRequest {
   string coin_contract_id = 2;
 }
 
-message ApprovePaymentRequestResponse {
+message ApproveAppPaymentRequestResponse {
   string approved_payment_contract_id = 1;
 }
 
-message RejectPaymentRequestRequest {
+message RejectAppPaymentRequestRequest {
   string request_contract_id = 1;
 }
 
-message RejectPaymentRequestResponse {
+message RejectAppPaymentRequestResponse {
 }

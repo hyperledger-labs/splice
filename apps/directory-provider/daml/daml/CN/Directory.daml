@@ -52,7 +52,7 @@ template DirectoryInstall with
           entry
           entryFee
 
-    nonconsuming choice DirectoryInstall_RequestEntryPayment : ContractId PaymentRequest
+    nonconsuming choice DirectoryInstall_RequestEntryPayment : ContractId AppPaymentRequest
       with
         requestCid : ContractId DirectoryEntryRequest
       controller provider
@@ -60,7 +60,7 @@ template DirectoryInstall with
          request.entry.provider === provider
          request.entry.user === user
          now <- getTime
-         create PaymentRequest with
+         create AppPaymentRequest with
            payee = provider
            payer = user
            svc = svc
@@ -71,10 +71,10 @@ template DirectoryInstall with
 
     nonconsuming choice DirectoryInstall_CollectEntryPayment : ()
       with
-        approvedPayment : ContractId ApprovedPayment
+        approvedAppPayment : ContractId ApprovedAppPayment
       controller provider
       do -- collect approved payment
-         reference <- exercise approvedPayment ApprovedPayment_Collect
+         reference <- exercise approvedAppPayment ApprovedAppPayment_Collect
          -- deliver the promised good: the entry referenced in the payment
          Some (requestId, request) <- fetchFromInterface @DirectoryEntryRequest reference
          archive requestId

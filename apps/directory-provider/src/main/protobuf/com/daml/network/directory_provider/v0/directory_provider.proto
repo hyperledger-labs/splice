@@ -44,12 +44,12 @@ message RequestEntryPaymentRequest {
 }
 
 message RequestEntryPaymentResponse {
-  // Contract ID of the new PaymentRequest contract
+  // Contract ID of the new AppPaymentRequest contract
   string contract_id = 1;
 }
 
 message CollectEntryPaymentRequest {
-  // Contract ID of the ApprovedPayment contract
+  // Contract ID of the ApprovedAppPayment contract
   string contract_id = 1;
 }
 

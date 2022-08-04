@@ -90,7 +90,7 @@ class DirectoryProviderIntegrationTest
 
       // User: wait until payment request becomes visible
       def getPaymentRequest() =
-        wallet1.listPaymentRequests().find(c => c.payload.reference == entryRequest.contractId)
+        wallet1.listAppPaymentRequests().find(c => c.payload.reference == entryRequest.contractId)
       utils.retry_until_true { getPaymentRequest().isDefined }
       val walletPaymentRequest =
         getPaymentRequest().getOrElse(sys.error("Payment request is unexpectedly not defined."))
@@ -98,11 +98,11 @@ class DirectoryProviderIntegrationTest
 
       // Approve payment
       val coin = wallet1.tap("5.0")
-      val _ = wallet1.approvePaymentRequest(walletPaymentRequest.contractId, coin)
+      val _ = wallet1.approveAppPaymentRequest(walletPaymentRequest.contractId, coin)
 
       // Collect payment
       val approvedPayment = directoryProvider.remoteParticipant.ledger_api.acs
-        .await(providerParty, walletCodegen.ApprovedPayment)
+        .await(providerParty, walletCodegen.ApprovedAppPayment)
       val cid = directoryProvider.collectEntryPayment(approvedPayment.contractId)
       val entry = directoryProvider.remoteParticipant.ledger_api.acs
         .await(providerParty, codegen.DirectoryEntry)
