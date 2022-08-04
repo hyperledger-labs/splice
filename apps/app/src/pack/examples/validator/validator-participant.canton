@@ -1,0 +1,2 @@
+val domainUrl = sys.env.get("DOMAIN_URL").getOrElse("http://dev.network.canton.global:5008")
+validatorParticipant.domains.connect("canton-network", domainUrl)

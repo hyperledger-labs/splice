@@ -1,3 +1,4 @@
 # Examples
 
-Currently these directories contain config and bootstrap scripts for canton nodes for validator and supervalidator. Refer to the runbook docs for more info.
+Currently, these directories contain the configuration and bootstrap files used in the runbook. 
+Please to refer to the runbook docs for more information.

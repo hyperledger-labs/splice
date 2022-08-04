@@ -6,19 +6,32 @@ These pages give a step-by-step guide how to deploy your own validator node to t
 - *Succinctly: What is a 'validator' node? Link to further doc*
 - *How does it relate to 'canton coin'?*
 
-Local Installation
-------------------
+Prerequisites
+-------------
 
-To run a validator node you will need 
-1) a canton participant node, in order to host:
+To locally start a validator node that connects against the devnet domain, you will need to run
+1) a Canton participant node, in order to host:
 2) the Daml validator app and
 3) the Daml wallet app
 
-The participant node (#1) is part of the canton distribution bundled with each Daml 2.x SDK. Refer to the SDK `Getting Started page <https://docs.daml.com/getting-started/installation.html>`_ for installation instructions.
+Additionally, you also need access and activate one of the following four `Digital Asset VPNs <https://digitalasset.atlassian.net/wiki/spaces/DEVSECOPS/pages/1076822828/VPN+IP+Whitelist+for+Digital+Asset>`_:
 
-Canton coin apps (#2 and #3) are distributed in a single Canton Coin network binary available as part of a release
-bundle from http://dev.network.canton.global/.
-Please now extract the release bundle to a directory and then navigate to that directory.
+* GCP Virginia Full Tunnel
+* GCP Frankfurt Full Tunnel
+* GCP Sydney Full Tunnel
+* GCP DA Canton DevNet
+
+
+To run a participant node, please `download and install Canton version 2.3.2 <https://docs.daml.com/canton/usermanual/downloading.html>`_.
+
+To obtain the Canton Coin network binary (required to run validator and wallet apps), please clone the
+`the-real-canton-coin <https://github.com/DACH-NY/the-real-canton-coin>`_ GitHub repository and follow the setup instructions.
+Then, run `sbt bundle`. This will create a release bundle in ``the-real-canton-coin/apps/app/target/release/coin/``.
+
+Please now navigate to the examples directory in the release bundle: ::
+
+  cd apps/app/target/release/coin/examples
+
 
 Onboarding Validator
 --------------------
@@ -32,41 +45,46 @@ To operate a validator node you will need to:
 
 The Canton participant is responsible for hosting your Daml apps; i.e. interpreting Daml code, securing your data, and talking to the public canton network. It connects to the global canton domain `canton.global`. We provide a bootstrap script to handle these steps for you. You can refer to the `canton tutorial <https://docs.daml.com/canton/tutorials/getting_started.html>`_ for greater detail on what each step does.
 
-We recommend adding the path to the Canton Coin network binary from your release
-bundle (`<release-bundle-dir>/coin/bin/coin`) to your PATH as `coin`.
-This is also the convention we will use in this document.
+We recommend respectively adding the paths to the Canton and Canton Coin network binaries from your release
+bundles (`<release-bundle-dir>/canton/bin/canton` and `<release-bundle-dir>/coin/bin/coin`) to your PATH as `canton` and `coin`.
+This is also the convention we will use in this tutorial.
 
-Run this now: ::
+First off, you will need to start the validator participant and connect it to the devnet domain: ::
 
-  coin --config examples/validator/validator.conf --bootstrap examples/validator/validator.canton
+  canton -c validator/validator-participant.conf --bootstrap validator/validator-participant.canton
+
+
+Next, start a console with the CN apps: ::
+
+  coin --config validator/validator.conf
 
 In the console, initialize the validator ::
 
   @ val validatorParty = validatorApp.initialize()
 
-In the console, request onboarding a new user called "wallet" to the validator ::
+Request onboarding a new user called "wallet" to the validator ::
 
   @ validatorApp.onboardUser("wallet")
 
-.. TODO(i250): Automatic acceptance.
 
 The request should be automatically approved by the supervalidator consortium in this feature preview.
   
-You are now registered as a validator on the canton network. You've also configured a user that can transact through a wallet. Congratulations! 
+You are now registered as a validator on the Canton network. You've also configured a user that can transact through a wallet. Congratulations!
   
 Tapping some Canton Coin from the Dev Faucet
 --------------------------------------------
 
-In order to create some free canton coin to play around with, you'll need to initialize the wallet by passing in the validator party: ::
+In order to create some free canton coin to play around with, you'll need to initialize the wallet by passing in the validator party.
+Reusing the console from the previous section: ::
 
-@ val validatorP = wallet.remoteParticipant.parties.list(filterParty = "validator").head.party
 @ wallet.initialize(validatorParty)
   
-We can create free coins like so: ::
+You can create free coins like so: ::
 
   @ wallet.tap("1000.0")
   Res2: ContractId Canton.Coin { ... }
 
+Creating free coins will only be possible in temporary test- and devnets.
 
 Listing your Canton Coins
 -------------------------
@@ -74,24 +92,10 @@ Listing your Canton Coins
 You can list your balances with the following command:
 
   @ wallet.list()
-  Res1: Seq()
+
   
-Unless you've run through this guide before, you should expect an empty balance, as show above.
-You can create coins by tapping the dev faucet as explained in the previous section. Try that, and then re-run this command.
+If you've followed the previous instructions, you should already see one coin, similar to the output above.
+If not, try calling ``wallet.tap("1000.0")`` and then rerunning this command.
 
 
-Transfer Canton Coin
---------------------
-
-.. TODO(M1-02): Still needs to be updated.
-
-If not already done, start the canton-coin console with a wallet: ::
-
-  coin --config examples/wallet/wallet.conf
-
-Now, let's transfer some of our coins to ourselves: ::
-
-  @ wallet.transfer(validator.adminParty, 300.0)
-  Res4 : ???
-  @ wallet.list()
-  Res5 : Seq(700.0, 300.0)
+.. TODO(M1-02): Add transfer section

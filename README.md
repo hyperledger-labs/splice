@@ -63,7 +63,7 @@ same package references as nix. If IntelliJ asks you at the end if you want to o
 The integration tests are located at [`/apps/app/src/test/scala/com/daml/network/integration/tests/`](/apps/app/src/test/scala/com/daml/network/integration/tests).
 They work by standing up by defining and starting a Canton network topology and running Canton console commands against that topology,
 see for example the [`DirectoryProviderIntegrationTest.scala`](/apps/app/src/test/scala/com/daml/network/integration/tests/DirectoryProviderIntegrationTest.scala).
-Also see the Scaladocs on Canton's [`BaseIntegrationTest.scala`](/canton/community/app/src/test/scala/com/digitalasset/canton/integration/BaseIntegrationTest.scala) for more information about how the test framework is intended to be used.
+Also see the Scaladocs on Canton's [`BaseIntegrationTest.scala`](/canton/community/app/src/test/scala/com/digitalasset/canton/integration/BaseIntegrationTest.scala) for more information about the intended usage of the test framework.
 
 Many tests use the topology and base configuration defined in [`/apps/app/src/test/resources/simple-topology.conf`](apps/app/src/test/resources/simple-topology.conf), or a variant thereof.
 Adjusting these configurations can sometimes help with debugging.
@@ -102,7 +102,7 @@ More commands can be found in build.sbt and BuildCommon.scala.
 - `Test/compile`: compile production and test code
 - `apps-common/compile`: compile production code of the `apps-common` subproject
 - `scalafixAll`: invoke scalafix across all configurations where scalafix is enabled.
-    It's a linting and rewrite tool we use to organize imports. This may run for a long time as it needs to do a full compile.
+    `scalafix` is a linting and rewrite tool we use to organize imports. This may run for a long time as it needs to do a full compile.
 - `format`: apply `scalafmt` to format source files
 - `damlBuild`: create `.dar` files for all Daml projects
 - `bundle`: create a release bundle in `apps/app/target/release/<version>`. The release binary is loaded into your PATH automatically via `direnv`. Simply run `coin` to call it.
@@ -168,26 +168,26 @@ costs.
 
 ### Connecting to a Cluster
 
-The GCE clusters expose both the Canton Domain and Ledger API's to the
-outside world via four [Digital Asset VPN's](https://digitalasset.atlassian.net/wiki/spaces/DEVSECOPS/pages/1076822828/VPN+IP+Whitelist+for+Digital+Asset):
+The GCE clusters expose both the Canton Domain and Ledger APIs to the
+outside world via four [Digital Asset VPNs](https://digitalasset.atlassian.net/wiki/spaces/DEVSECOPS/pages/1076822828/VPN+IP+Whitelist+for+Digital+Asset):
 
 * GCP Virginia Full Tunnel
 * GCP Frankfurt Full Tunnel
 * GCP Sydney Full Tunnel
 * GCP DA Canton DevNet
 
-The Full Tunnel VPN's are available to all internal DA users and allow
+The Full Tunnel VPNs are available to all internal DA users and allow
 authenticated access to both the Canton Network services and cluster
-adminstration API's. (Only the Canton Network development team has
+adminstration APIs. (Only the Canton Network development team has
 administrative authorization to the clusters.)
 
 The "GCP DA Canton DevNet" VPN is the VPN used for customer
 access to the cluster. User accounts can be added through a
 [manual e-mail request to IT](mailto:help@digitalasset.com).
 Connections through this VPN only have access to public cluster
-services and not the administration API's.
+services and not the administration APIs.
 
-Provided you are connecting through one of the listed VPN's, the following
+Provided you are connecting through one of the listed VPNs, the following
 APIs are available in each environment:
 
 | Service            | API        | Port |
@@ -243,7 +243,7 @@ Once the REPL is running, it is then possible to interact with the
 cluster via the REPL.
 
 This is an example of a locally requested ping from the remote
-particpant to the remote particpant. This command confirms the ledger API
+participant to the remote participant. This command confirms the ledger API
 connection to the remote participant node:
 
 ```
@@ -255,7 +255,7 @@ The local participant node may connected to the CN domain as follows:
 
 
 ```
-@ localParticipant1.domains.connect("test", "http://dev.net.canton.global:5008")
+@ localParticipant1.domains.connect("test", "http://dev.network.canton.global:5008")
 res1: DomainConnectionConfig = DomainConnectionConfig(
   domain = Domain 'test',
   sequencerConnection = GrpcSequencerConnection(
