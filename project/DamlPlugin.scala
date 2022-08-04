@@ -27,8 +27,6 @@ object DamlPlugin extends AutoPlugin {
         "List of tuples (Daml project directory, Daml archive file, name of the generated Java package)"
       )
     val damlSourceDirectory = settingKey[File]("Directory containing daml projects")
-    val damlCompileDirectory =
-      settingKey[File]("Directory to put the daml projects in for building")
     val damlBuildOrder =
       settingKey[Seq[String]](
         "List of directory names used to sort the Daml building by order in this list"
@@ -66,7 +64,6 @@ object DamlPlugin extends AutoPlugin {
       sourceGenerators += damlGenerateCode.taskValue,
       resourceGenerators += damlBuild.taskValue,
       damlSourceDirectory := sourceDirectory.value / "daml",
-      damlCompileDirectory := target.value / "daml", //TODO(i190) Putting the build path under the `damlSourceDirectory` will cause sbt to loop, creating `target/daml/target/daml/target/daml ...`
       damlDarOutput := resourceManaged.value,
       damlDependencies := Seq(),
       damlScalaCodegenOutput := sourceManaged.value / "daml-codegen-scala",
@@ -106,11 +103,11 @@ object DamlPlugin extends AutoPlugin {
       damlBuild := {
         val dependencies = damlDependencies.value
         val outputDirectory = damlDarOutput.value
-        val buildDirectory = damlCompileDirectory.value
         val sourceDirectory = damlSourceDirectory.value
         // we don't really know dependencies between daml files, so just assume if any change then we need to rebuild all packages
         val cacheDir = streams.value.cacheDirectory
-        val allDamlFiles = damlSourceDirectory.value ** "*.daml"
+        // All daml files outside of .daml
+        val allDamlFiles = damlSourceDirectory.value ** "*.daml" --- (damlSourceDirectory.value ** ".daml" ** "*.daml")
         val damlProjectFiles =
           damlSourceDirectory.value ** "daml.yaml" // TODO(i190) Expecting the `daml.yaml` project file to reside in the source dir is not consistent with SDK paths (daml.yaml at root, source under `./daml`)
 
@@ -144,7 +141,6 @@ object DamlPlugin extends AutoPlugin {
               buildDamlProject(
                 log,
                 sourceDirectory,
-                buildDirectory,
                 outputDirectory,
                 sourceDirectory.toPath.relativize(projectFile.toPath).toFile,
                 damlCompilerVersion.value,
@@ -207,29 +203,22 @@ object DamlPlugin extends AutoPlugin {
         val sourceDirectory = damlSourceDirectory.value
         val damlProjectFiles =
           sourceDirectory ** "daml.yaml"
-        val buildDirectory = damlCompileDirectory.value
         val log = streams.value.log
         val damlVersion = damlCompilerVersion.value
         val damlc = ensureDamlc(damlVersion)
         // so far canton system dars depend on daml-script, but maybe daml-triggers or others some day?
         val damlLibsEnv = ensureDamlLibsEnv(damlVersion, damlLanguageVersions.value)
         damlProjectFiles.get.toList.foreach { projectFile =>
-          val relativeDamlProjectFile = sourceDirectory.toPath.relativize(projectFile.toPath).toFile
-          val projectBuildDirectory =
-            buildDirectory.toPath
-              .resolve(relativeDamlProjectFile.toPath)
-              .toAbsolutePath
-              .getParent
-              .toFile
+          val projectDirectory = projectFile.toPath.toAbsolutePath.getParent
           val result = Process(
             command =
-              Seq(damlc.getAbsolutePath, "test", "--project-root", projectBuildDirectory.toString),
-            cwd = projectBuildDirectory,
+              Seq(damlc.getAbsolutePath, "test", "--project-root", projectDirectory.toString),
+            cwd = projectDirectory.toFile,
             extraEnv = damlLibsEnv: _*,
           ) ! log
           if (result != 0) {
             throw new MessageOnlyException(s"""
-                                              |damlc test failed ${projectBuildDirectory}:
+                                              |damlc test failed ${projectDirectory}:
               """.stripMargin.trim)
           }
         }
@@ -369,7 +358,6 @@ object DamlPlugin extends AutoPlugin {
   private def buildDamlProject(
       log: Logger,
       sourceDirectory: File,
-      buildDirectory: File,
       outputDirectory: File,
       relativeDamlProjectFile: File,
       damlVersion: String,
@@ -382,42 +370,15 @@ object DamlPlugin extends AutoPlugin {
       originalDamlProjectFile.exists,
       s"supplied daml.yaml must exist [${originalDamlProjectFile.absolutePath}]",
     )
+    val projectDirectory = originalDamlProjectFile.getAbsoluteFile.getParentFile
     val url = artifactoryUrl(damlVersion)
     val damlc = ensureDamlc(damlVersion)
 
     val damlLibsEnv = ensureDamlLibsEnv(damlVersion, damlLanguageVersions)
 
-    val projectBuildDirectory =
-      buildDirectory.toPath.resolve(relativeDamlProjectFile.toPath).toAbsolutePath.getParent.toFile
-
     log.debug(
-      s"building ${originalDamlProjectFile.getAbsoluteFile.getParentFile} in ${projectBuildDirectory}"
+      s"building ${projectDirectory}"
     )
-
-    // copy project directory into target tree
-    // the reason for this is that `daml build` caches files in a `.daml` directory of the source tree
-    // making sbt to believe that the source code changed
-    IO.copyDirectory(
-      originalDamlProjectFile.getAbsoluteFile.getParentFile,
-      projectBuildDirectory,
-      overwrite = true,
-    )
-    // Path that we need to prepend to references in data-dependencies. This allows us to have a daml.yaml
-    // that works both for Daml Studio but also for SBT.
-    val pathPrefix = buildDirectory.toPath.relativize(sourceDirectory.toPath.toAbsolutePath)
-    // We shell out to yq rather than using a Scala lib because we cannot rely on dependencies within SBT plugins.
-    val yqProcessLogger = new BufferedLogger
-    val yqResult = Process(
-      command =
-        "yq" :: "-iy" :: s"""setpath(["data-dependencies"]; getpath(["data-dependencies"]) | map("$pathPrefix/" + .))""" :: "daml.yaml" :: Nil,
-      cwd = projectBuildDirectory,
-    ) ! yqProcessLogger
-    if (yqResult != 0) {
-      throw new MessageOnlyException(s"""
-                                          |yq failed [$originalDamlProjectFile]:
-                                          |${yqProcessLogger.output("  ")}
-          """.stripMargin.trim)
-    }
 
     val damlProjectName = readDamlYaml(originalDamlProjectFile).get("name").toString
     val outputDar = outputDirectory / s"$damlProjectName.dar" // TODO(i189) suffix project version
@@ -425,9 +386,9 @@ object DamlPlugin extends AutoPlugin {
 
     val result = Process(
       command = damlc.getAbsolutePath :: "build" ::
-        "--project-root" :: projectBuildDirectory.toString ::
+        "--project-root" :: projectDirectory.toString ::
         "--output" :: outputDar.getAbsolutePath :: Nil,
-      cwd = projectBuildDirectory,
+      cwd = projectDirectory,
       extraEnv = damlLibsEnv: _*, // env variable set so that damlc finds daml-script dar
     ) ! processLogger
 

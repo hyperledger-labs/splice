@@ -27,7 +27,6 @@ in pkgs.mkShell {
     x86Pkgs.sphinx-autobuild
     python3Packages.sphinx_rtd_theme
     openjdk11
-    x86Pkgs.yq
     jq
   ];
 }

@@ -32,7 +32,6 @@ object BuildCommon {
         .toSeq,
       // copied from the Canton OSS repo
       Global / excludeLintKeys += Compile / damlBuildOrder,
-      Global / excludeLintKeys += `canton-community-app` / Compile / damlCompileDirectory,
       Global / excludeLintKeys += `canton-functionmeta` / wartremoverErrors,
       Global / excludeLintKeys += `canton-daml-fork` / wartremoverErrors,
       Global / excludeLintKeys += `canton-blake2b` / autoAPIMappings,

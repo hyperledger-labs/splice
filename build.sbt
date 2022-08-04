@@ -78,6 +78,7 @@ lazy val `apps-common` =
        * We output the dar to the usual `.daml/dist` dir because that's where a naive user expects it.
        */
       Compile / damlSourceDirectory := file("canton-coin"),
+      cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
       Test / damlSourceDirectory := file("canton-coin"),
       Compile / damlDarOutput := file("canton-coin") / ".daml" / "dist",
       Compile / damlCodeGeneration := Seq(
@@ -161,6 +162,7 @@ lazy val `apps-wallet` =
       ),
       Compile / damlDependencies := (`apps-common` / Compile / damlBuild).value,
       Compile / damlSourceDirectory := file("apps/wallet/daml"),
+      cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
       Test / damlSourceDirectory := file("apps/wallet/daml"),
       Compile / damlDarOutput := file("apps/wallet/daml") / ".daml" / "dist",
       Compile / damlCodeGeneration := Seq(
@@ -198,6 +200,7 @@ lazy val `apps-directory-provider` =
       ),
       Compile / damlDependencies := (`apps-wallet` / Compile / damlBuild).value,
       Compile / damlSourceDirectory := file("apps/directory-provider/daml"),
+      cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
       Test / damlSourceDirectory := (Compile / damlSourceDirectory).value,
       Compile / damlDarOutput := file("apps/directory-provider/daml") / ".daml" / "dist",
       Compile / damlCodeGeneration := Seq(

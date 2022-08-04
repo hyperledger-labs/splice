@@ -127,24 +127,20 @@ These Daml projects define the on-ledger API used to synchronize different parti
 
 We build and test these projects using the `sbt` commands `damlBuild` and `damlTest`.
 The implementation of the `sbt` plugin can be found in [`/project/DamlPlugin.scala`](/project/DamlPlugin.scala).
-It works, but is not (yet) great, as you can see from the steps below.
 
-To edit the files in a particular Daml project, for example, `/apps/wallet/daml`, proceed as follows.
+To edit the files in a particular Daml project, for example, `/apps/wallet/daml`, proceed as follows:
 
 1. Start `sbt` in the repo root to get access to an `sbt` shell (or use the one in IntelliJ).
 2. Start `damlBuild` in your `sbt` shell to build the .dars for all Daml projects.
-3. Start `daml build` in a shell with working directory `/apps/wallet/daml` to (re)initialize the package database used by `daml studio` (located within `/apps/wallet/daml/.daml/`),
-   see https://github.com/DACH-NY/the-real-canton-coin/issues/403.
-5. Start `daml studio` in the repo root, which starts VS code.
-6. Open and edit the .daml files in `/apps/wallet/daml` in VS code. You should see them being typechecked on the fly.
-7. See `/apps/wallet/daml/daml.yaml` for the .dar dependencies of `/apps/wallet/daml`.
+3. Start `daml studio` in the repo root, which starts VS code.
+4. Open and edit the .daml files in `/apps/wallet/daml` in VS code. You should see them being typechecked on the fly.
+5. See `/apps/wallet/daml/daml.yaml` for the .dar dependencies of `/apps/wallet/daml`.
    If you change any of them, then you can propagate these changes across the .dars as follows:
    1. redo Step 2
-   2. redo Step 3
-   3. use Ctrl-Shift-P "Developer: Reload Window" in VS code to restart the `daml studio` language server with the updated package dependencies.
+    3. use Ctrl-Shift-P "Developer: Reload Window" in VS code to restart the `daml studio` language server with the updated package dependencies.
 
 *Tip:* if `damlBuild` fails with weird errors, then that might be due to stale `damlBuild` outputs.
-Try forcing a clean rebuild by removing the `.daml/` and `target/` subdirectories of the project that `damlBuild` fails on.
+Try forcing a clean rebuild by cleaning via SBT, e.g., `apps-common/clean` and similar for the dependent project.
 
 ## GCE Clusters
 
