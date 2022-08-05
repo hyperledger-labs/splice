@@ -216,6 +216,27 @@ jobs:
           timeout: "10m"
       - cleanup_test_job
 
+  bundle:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
+      - execute_sbt_command:
+          cmd: "bundle"
+          retry_fetch: "50"
+      - run:
+          name: copy bundle
+          command: |
+            set -eou pipefail
+            mkdir -p /tmp/artifacts
+            cp apps/app/target/release/*.tar.gz /tmp/artifacts
+      - store_artifacts:
+          path: /tmp/artifacts
+          destination: release-artifacts
+
   deployment_test:
     docker:
       - image: cimg/base:2021.04
@@ -475,6 +496,8 @@ workflows:
         <<: *notify-fail
     # Scala
     - test:
+        <<: *notify-fail
+    - bundle:
         <<: *notify-fail
     # Ops
     - update_pipeline_schedule:
