@@ -1,5 +1,7 @@
 package com.daml.network.wallet.admin.grpc
 
+import com.daml.lf.data.Numeric
+import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.util.Contract
@@ -16,6 +18,7 @@ import com.digitalasset.network.CC.{Coin => coinCodegen, CoinRules => coinRulesC
 import com.digitalasset.network.CN.{Wallet => walletCodegen}
 import com.digitalasset.network.DA
 import io.opentelemetry.api.trace.Tracer
+import ujson.IndexedValue.True
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.nowarn
@@ -70,7 +73,8 @@ class GrpcWalletService(
           .exerciseTap(
             walletParty.toPrim,
             walletParty.toPrim,
-            BigDecimal(request.amount),
+            // TODO(M1-07): report bogus values as INVALID_ARGUMENT instead of an INTERNAL failure
+            Numeric.assertFromString(request.amount),
           )
           .command
         tx <- connection.submitCommand(Seq(walletParty), Seq(validatorParty.get()), Seq(tapCmd))
@@ -79,7 +83,7 @@ class GrpcWalletService(
           coins.length == 1,
           s"Expected tap to create only one coin but found ${coins.length} coins: $coins",
         )
-      } yield v0.TapResponse(coins(0).contractId.toString)
+      } yield v0.TapResponse(ApiTypes.ContractId.unwrap(coins(0).contractId))
     }
 
   @nowarn("cat=unused")
@@ -128,7 +132,9 @@ class GrpcWalletService(
           payments.length == 1,
           s"Expected approve payment to create only one approved payment but found ${payments.length} approved payments: $payments",
         )
-      } yield v0.ApproveAppPaymentRequestResponse(payments(0).contractId.toString)
+      } yield v0.ApproveAppPaymentRequestResponse(
+        ApiTypes.ContractId.unwrap(payments(0).contractId)
+      )
     }
 
   @nowarn("cat=unused")
@@ -139,8 +145,8 @@ class GrpcWalletService(
       for {
         walletParty <- getWalletParty()
         arg = walletCodegen.AppPaymentRequest_Reject()
-        cmd = Primitive.ContractId
-          .apply[walletCodegen.AppPaymentRequest](request.requestContractId)
+        cmd = Primitive
+          .ContractId[walletCodegen.AppPaymentRequest](request.requestContractId)
           .exerciseAppPaymentRequest_Reject(walletParty.toPrim, arg)
           .command
         _ <- connection.submitCommand(
@@ -149,6 +155,105 @@ class GrpcWalletService(
           Seq(cmd),
         )
       } yield v0.RejectAppPaymentRequestResponse()
+    }
+
+  @nowarn("cat=unused")
+  override def proposePaymentChannel(
+      request: v0.ProposePaymentChannelRequest
+  ): Future[v0.ProposePaymentChannelResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        walletParty <- getWalletParty()
+        svcParty <- scanConnection.getSvcPartyId()
+        // TODO(M1-07): guard making the proposal by a check that a like channel does not yet exist
+        cmd = walletCodegen
+          .PaymentChannelProposal(
+            proposer = walletParty.toPrim,
+            channel = walletCodegen.PaymentChannel(
+              sender = walletParty.toPrim,
+              receiver = ApiTypes.Party(request.receiver),
+              svc = svcParty.toPrim,
+              // TODO(M1-07): make channel parameters configurable
+              allowRequests = true,
+              allowOffers = true,
+              allowDirectTransfers = true,
+              senderTransferFeeRatio = 1.0,
+            ),
+          )
+          .create
+          .command
+        tx <- connection.submitCommand(
+          Seq(walletParty),
+          Seq(),
+          Seq(cmd),
+        )
+        proposals = DecodeUtil.decodeAllCreated(walletCodegen.PaymentChannelProposal)(
+          tx.getTransaction
+        )
+        _ = require(
+          proposals.length == 1,
+          s"Expected bare create to create only one proposal, but found ${proposals.length} proposals: $proposals",
+        )
+      } yield v0.ProposePaymentChannelResponse(
+        proposalContractId = ApiTypes.ContractId.unwrap(proposals(0).contractId)
+      )
+    }
+
+  @nowarn("cat=unused")
+  override def acceptPaymentChannelProposal(
+      request: v0.AcceptPaymentChannelProposalRequest
+  ): Future[v0.AcceptPaymentChannelProposalResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        walletParty <- getWalletParty()
+        arg = walletCodegen.PaymentChannelProposal_Accept()
+        // TODO(M3-01): guard accepting the proposal by a check that a channel with the same key does not yet exist
+        cmd = Primitive
+          .ContractId[walletCodegen.PaymentChannelProposal](request.proposalContractId)
+          .exercisePaymentChannelProposal_Accept(walletParty.toPrim, arg)
+          .command
+        tx <- connection.submitCommand(
+          Seq(walletParty),
+          Seq(),
+          Seq(cmd),
+        )
+        channels = DecodeUtil.decodeAllCreated(walletCodegen.PaymentChannel)(
+          tx.getTransaction
+        )
+        _ = require(
+          channels.length == 1,
+          s"Expected accept payment channel proposal to create only one channel, but found ${channels.length} channels: $channels",
+        )
+      } yield v0.AcceptPaymentChannelProposalResponse(
+        channelContractId = ApiTypes.ContractId.unwrap(channels(0).contractId)
+      )
+    }
+
+  @nowarn("cat=unused")
+  override def executeDirectTransfer(
+      request: v0.ExecuteDirectTransferRequest
+  ): Future[v0.ExecuteDirectTransferResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        svcParty <- scanConnection.getSvcPartyId()
+        walletParty <- getWalletParty()
+        coinCid = Primitive.ContractId[coinCodegen.Coin](request.coinContractId)
+        receiverParty = PartyId.tryFromProtoPrimitive(request.receiver)
+        arg = walletCodegen.PaymentChannel_ExecuteDirectTransfer(
+          inputs = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid)),
+          quantity = Numeric.assertFromString(request.quantity),
+          payload = "wallet: execute direct transfer",
+        )
+        cmd = walletCodegen.PaymentChannel
+          .key(DA.Types.Tuple3(walletParty.toPrim, receiverParty.toPrim, svcParty.toPrim))
+          .exercisePaymentChannel_ExecuteDirectTransfer(walletParty.toPrim, arg)
+          .command
+        _ <- connection.submitCommand(
+          Seq(walletParty),
+          Seq(validatorParty.get()),
+          Seq(cmd),
+        )
+      } yield v0.ExecuteDirectTransferResponse()
     }
 
   override def initialize(request: InitializeRequest): Future[InitializeResponse] =

@@ -2,6 +2,7 @@ package com.daml.network.wallet.admin.api.client.commands
 
 import cats.syntax.either._
 import cats.syntax.traverse._
+import com.daml.lf.data.Numeric
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.WalletServiceGrpc.WalletServiceStub
@@ -64,12 +65,12 @@ object WalletAppCommands {
         .leftMap(_.toString)
   }
 
-  case class Tap(amount: com.daml.lf.data.Numeric)
+  case class Tap(amount: BigDecimal)
       extends BaseCommand[v0.TapRequest, v0.TapResponse, Primitive.ContractId[coinCodegen.Coin]] {
 
     override def createRequest(): Either[String, v0.TapRequest] =
       Right(
-        v0.TapRequest(amount = amount.toString)
+        v0.TapRequest(amount = Numeric.toString(amount.bigDecimal))
       )
 
     override def submitRequest(
@@ -162,6 +163,100 @@ object WalletAppCommands {
         response: v0.RejectAppPaymentRequestResponse
     ): Either[String, Unit] =
       Right(())
+  }
+
+  case class ProposePaymentChannel(
+      receiver: PartyId
+  ) extends BaseCommand[
+        v0.ProposePaymentChannelRequest,
+        v0.ProposePaymentChannelResponse,
+        Primitive.ContractId[walletCodegen.PaymentChannelProposal],
+      ] {
+
+    override def createRequest(): Either[String, v0.ProposePaymentChannelRequest] =
+      Right(
+        v0.ProposePaymentChannelRequest(
+          receiver.toProtoPrimitive
+        )
+      )
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.ProposePaymentChannelRequest,
+    ): Future[v0.ProposePaymentChannelResponse] =
+      service.proposePaymentChannel(request)
+
+    override def handleResponse(
+        response: v0.ProposePaymentChannelResponse
+    ): Either[String, Primitive.ContractId[walletCodegen.PaymentChannelProposal]] =
+      Right(
+        Primitive.ContractId[walletCodegen.PaymentChannelProposal](
+          response.proposalContractId
+        )
+      )
+  }
+
+  case class AcceptPaymentChannelProposal(
+      requestId: Primitive.ContractId[walletCodegen.PaymentChannelProposal]
+  ) extends BaseCommand[
+        v0.AcceptPaymentChannelProposalRequest,
+        v0.AcceptPaymentChannelProposalResponse,
+        Primitive.ContractId[walletCodegen.PaymentChannel],
+      ] {
+
+    override def createRequest(): Either[String, v0.AcceptPaymentChannelProposalRequest] =
+      Right(
+        v0.AcceptPaymentChannelProposalRequest(
+          ApiTypes.ContractId.unwrap(requestId)
+        )
+      )
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.AcceptPaymentChannelProposalRequest,
+    ): Future[v0.AcceptPaymentChannelProposalResponse] =
+      service.acceptPaymentChannelProposal(request)
+
+    override def handleResponse(
+        response: v0.AcceptPaymentChannelProposalResponse
+    ): Either[String, Primitive.ContractId[walletCodegen.PaymentChannel]] =
+      Right(
+        Primitive.ContractId[walletCodegen.PaymentChannel](
+          response.channelContractId
+        )
+      )
+  }
+
+  case class ExecuteDirectTransfer(
+      receiver: PartyId,
+      quantity: BigDecimal,
+      coinId: Primitive.ContractId[coinCodegen.Coin],
+  ) extends BaseCommand[
+        v0.ExecuteDirectTransferRequest,
+        v0.ExecuteDirectTransferResponse,
+        Unit,
+      ] {
+
+    override def createRequest(): Either[String, v0.ExecuteDirectTransferRequest] =
+      Right(
+        v0.ExecuteDirectTransferRequest(
+          receiver = receiver.toProtoPrimitive,
+          quantity = Numeric.toString(quantity.bigDecimal),
+          coinContractId = ApiTypes.ContractId.unwrap(coinId),
+        )
+      )
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.ExecuteDirectTransferRequest,
+    ): Future[v0.ExecuteDirectTransferResponse] =
+      service.executeDirectTransfer(request)
+
+    override def handleResponse(
+        response: v0.ExecuteDirectTransferResponse
+    ): Either[String, Unit] =
+      Right(())
+
   }
 
 }

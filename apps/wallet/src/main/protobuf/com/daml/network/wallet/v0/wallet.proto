@@ -12,6 +12,11 @@ service WalletService {
   rpc ListAppPaymentRequests (ListAppPaymentRequestsRequest) returns (ListAppPaymentRequestsResponse);
   rpc ApproveAppPaymentRequest (ApproveAppPaymentRequestRequest) returns (ApproveAppPaymentRequestResponse);
   rpc RejectAppPaymentRequest (RejectAppPaymentRequestRequest) returns (RejectAppPaymentRequestResponse);
+
+  // Note that there is no list proposal function as we assume the contract-id is disclosed off-ledger.
+  rpc ProposePaymentChannel (ProposePaymentChannelRequest) returns (ProposePaymentChannelResponse);
+  rpc AcceptPaymentChannelProposal (AcceptPaymentChannelProposalRequest) returns (AcceptPaymentChannelProposalResponse);
+  rpc ExecuteDirectTransfer (ExecuteDirectTransferRequest) returns (ExecuteDirectTransferResponse);
 }
 
 message InitializeRequest {
@@ -61,4 +66,36 @@ message RejectAppPaymentRequestRequest {
 }
 
 message RejectAppPaymentRequestResponse {
+}
+
+// NOTE: we only support sender-initiated proposals for now.
+message ProposePaymentChannelRequest {
+  // The party of the receiver.
+  string receiver = 1;
+}
+
+message ProposePaymentChannelResponse {
+  string proposal_contract_id = 1;
+}
+
+message AcceptPaymentChannelProposalRequest {
+  string proposal_contract_id = 1;
+}
+
+message AcceptPaymentChannelProposalResponse {
+  string channel_contract_id = 1;
+}
+
+message ExecuteDirectTransferRequest {
+  // Receiver to whom to transfer CC.
+  string receiver = 1;
+
+  // Quantity of CC to transfer.
+  string quantity = 2;
+
+  // TODO(M1-07): auto-select inputs for the transfer
+  string coin_contract_id = 4;
+}
+
+message ExecuteDirectTransferResponse {
 }

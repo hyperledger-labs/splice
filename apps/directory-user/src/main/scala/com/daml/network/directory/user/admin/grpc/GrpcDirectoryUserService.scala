@@ -62,7 +62,7 @@ class GrpcDirectoryUserService(
           requests.length == 1,
           s"Expected one DirectoryInstallRequest but got ${requests.length} requests $requests",
         )
-      } yield v0.RequestDirectoryInstallResponse(requests(0).contractId.toString)
+      } yield v0.RequestDirectoryInstallResponse(ApiTypes.ContractId.unwrap(requests(0).contractId))
     }
 
   override def requestDirectoryEntry(
@@ -89,7 +89,7 @@ class GrpcDirectoryUserService(
           requests.length == 1,
           s"Expected one DirectoryEntryRequest but got ${requests.length} requests $requests",
         )
-      } yield v0.RequestDirectoryEntryResponse(requests(0).contractId.toString)
+      } yield v0.RequestDirectoryEntryResponse(ApiTypes.ContractId.unwrap(requests(0).contractId))
     }
 
   private def getParty() =

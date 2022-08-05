@@ -43,7 +43,7 @@ class DirectoryProviderIntegrationTest
       // The provider of the directory service
       val providerParty = directoryValidator.initialize()
       // The user of the directory service.
-      val userParty = validator1.onboardUser("god")
+      val userParty = validator1.onboardUser("alice")
 
       wallet1.initialize(userValidatorParty)
       wallet1.remoteParticipant.ledger_api.acs
@@ -97,7 +97,7 @@ class DirectoryProviderIntegrationTest
       walletPaymentRequest.contractId shouldBe paymentRequest
 
       // Approve payment
-      val coin = wallet1.tap("5.0")
+      val coin = wallet1.tap(5.0)
       val _ = wallet1.approveAppPaymentRequest(walletPaymentRequest.contractId, coin)
 
       // Collect payment

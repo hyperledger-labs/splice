@@ -98,7 +98,7 @@ class GrpcDirectoryProviderService(
           s"Expected accept to create only one install contract but found ${installs.length} installs $installs",
         )
       } yield {
-        v0.AcceptInstallRequestResponse(installs(0).contractId.toString)
+        v0.AcceptInstallRequestResponse(ApiTypes.ContractId.unwrap(installs(0).contractId))
       }
     }
 

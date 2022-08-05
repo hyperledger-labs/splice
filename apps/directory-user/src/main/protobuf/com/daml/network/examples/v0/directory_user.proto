@@ -1,7 +1,6 @@
 syntax = "proto3";
 package com.daml.network.directory_user.v0;
 
-import "com/daml/network/v0/contract.proto";
 import "google/protobuf/empty.proto";
 
 service DirectoryUserService {

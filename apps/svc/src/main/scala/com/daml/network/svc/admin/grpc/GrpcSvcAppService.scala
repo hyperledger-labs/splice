@@ -80,7 +80,9 @@ class GrpcSvcAppService(
           )
         case Some(partyId) =>
           for {
-            coinRulesCids <- connection.activeContracts(partyId, CC.CoinRules.CoinRules).map(_.map(_.contractId))
+            coinRulesCids <- connection
+              .activeContracts(partyId, CC.CoinRules.CoinRules)
+              .map(_.map(_.contractId))
           } yield v0.GetDebugInfoResponse(
             svcUser = svcUserName,
             svcParty = partyId.toProtoPrimitive,
@@ -109,7 +111,7 @@ class GrpcSvcAppService(
       for {
         svc <- getParty()
         validators <- getValidators(svc)
-        price = BigDecimal(request.coinPrice)
+        price = Numeric.assertFromString(request.coinPrice)
         cmds = validators.toList.map(v =>
           CC.CoinRules.CoinRules
             .key(DA.Types.Tuple2(svc.toPrim, v.toPrim))

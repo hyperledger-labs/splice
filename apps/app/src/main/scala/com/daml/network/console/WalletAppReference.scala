@@ -43,10 +43,8 @@ abstract class WalletAppReference(
     "This function will only be available in the testnet. It allows creating coins for testing purposes." +
       "Returns the contract ID of the created contract. "
   )
-  def tap(amount: String = "100"): Primitive.ContractId[coinCodegen.Coin] = {
-    consoleEnvironment.run {
-      adminCommand(WalletAppCommands.Tap(com.daml.lf.data.Numeric.assertFromString(amount)))
-    }
+  def tap(quantity: BigDecimal): Primitive.ContractId[coinCodegen.Coin] = {
+    consoleEnvironment.run { adminCommand(WalletAppCommands.Tap(quantity)) }
   }
 
   @Help.Summary("List all payment requests of the configured user")
@@ -63,7 +61,7 @@ abstract class WalletAppReference(
   @Help.Summary("Approve a payment request")
   @Help.Description(
     "Approve a payment request and deliver the coin to be locked into the approved payment." +
-      "Returns the contract ID of the approved payment."
+      " Returns the contract ID of the approved payment."
   )
   def approveAppPaymentRequest(
       requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest],
@@ -85,6 +83,46 @@ abstract class WalletAppReference(
       adminCommand(WalletAppCommands.RejectAppPaymentRequest(requestId))
     }
   }
+
+  @Help.Summary("Propose the creation of a payment channel")
+  @Help.Description(
+    "Propose the creation of a uni-directional payment channel with a specific receiver." +
+      " Returns the contract-id of the created proposal."
+  )
+  def proposePaymentChannel(
+      receiver: PartyId
+  ): Primitive.ContractId[walletCodegen.PaymentChannelProposal] = {
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.ProposePaymentChannel(receiver))
+    }
+  }
+
+  @Help.Summary("Accept a payment channel proposal.")
+  @Help.Description(
+    "Accept a specific payment channel proposal."
+  )
+  def acceptPaymentChannelProposal(
+      proposalId: Primitive.ContractId[walletCodegen.PaymentChannelProposal]
+  ): Primitive.ContractId[walletCodegen.PaymentChannel] = {
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.AcceptPaymentChannelProposal(proposalId))
+    }
+  }
+
+  @Help.Summary("Execute a direct transfer over a payment channel")
+  @Help.Description(
+    "Assumes that the payment channel for the given receiver already exists."
+  )
+  def executeDirectTransfer(
+      receiver: PartyId,
+      quantity: BigDecimal,
+      coinId: Primitive.ContractId[coinCodegen.Coin],
+  ): Unit = {
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.ExecuteDirectTransfer(receiver, quantity, coinId))
+    }
+  }
+
 }
 
 class RemoteWalletAppReference(
