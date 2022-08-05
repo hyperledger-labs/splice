@@ -33,7 +33,7 @@ class SvcIntegrationTest
     import env._
     val coinPrice: BigDecimal = 23.0
     val svcParty = svc.initialize()
-    val validatorParty = validator1.initialize()
+    val validatorParty = aliceValidator.initialize()
 
     // Sync with background automation that onboards validator.
     utils.retry_until_true({

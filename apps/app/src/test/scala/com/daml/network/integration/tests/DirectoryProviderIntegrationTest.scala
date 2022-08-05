@@ -39,15 +39,15 @@ class DirectoryProviderIntegrationTest
 
       svc.initialize()
       // The validator operator of the user of the directory service.
-      val userValidatorParty = validator1.initialize()
+      val aliceValidatorParty = aliceValidator.initialize()
       // The provider of the directory service
       val providerParty = directoryValidator.initialize()
       // The user of the directory service.
-      val userParty = validator1.onboardUser("alice")
+      val userParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
 
-      wallet1.initialize(userValidatorParty)
-      wallet1.remoteParticipant.ledger_api.acs
-        .await(userValidatorParty, coinCodegen.CoinRules.CoinRules)
+      aliceWallet.initialize(aliceValidatorParty)
+      aliceWallet.remoteParticipant.ledger_api.acs
+        .await(aliceValidatorParty, coinCodegen.CoinRules.CoinRules)
 
       // Setup DirectoryInstall
 
@@ -90,15 +90,17 @@ class DirectoryProviderIntegrationTest
 
       // User: wait until payment request becomes visible
       def getPaymentRequest() =
-        wallet1.listAppPaymentRequests().find(c => c.payload.reference == entryRequest.contractId)
+        aliceWallet
+          .listAppPaymentRequests()
+          .find(c => c.payload.reference == entryRequest.contractId)
       utils.retry_until_true { getPaymentRequest().isDefined }
       val walletPaymentRequest =
         getPaymentRequest().getOrElse(sys.error("Payment request is unexpectedly not defined."))
       walletPaymentRequest.contractId shouldBe paymentRequest
 
       // Approve payment
-      val coin = wallet1.tap(5.0)
-      val _ = wallet1.approveAppPaymentRequest(walletPaymentRequest.contractId, coin)
+      val coin = aliceWallet.tap(5.0)
+      val _ = aliceWallet.approveAppPaymentRequest(walletPaymentRequest.contractId, coin)
 
       // Collect payment
       val approvedPayment = directoryProvider.remoteParticipant.ledger_api.acs

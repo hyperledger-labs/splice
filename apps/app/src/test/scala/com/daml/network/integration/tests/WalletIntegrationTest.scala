@@ -22,8 +22,6 @@ class WalletIntegrationTest
     extends CoinIntegrationTest
     with IsolatedCoinEnvironments
     with CommonCoinAppInstanceReferences {
-  // same as damlUser in config
-  private val walletDamlUser = "alice"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
@@ -36,49 +34,49 @@ class WalletIntegrationTest
     "allow calling tap and then list the created coins - locally and remotely" in { implicit env =>
       import env._
       svc.initialize()
-      val validatorParty = validator1.initialize()
+      val aliceValidatorParty = aliceValidator.initialize()
       // TODO(Arne): consider adding synchronization 'wait-for-participant-x' to this command
-      val userParty = validator1.onboardUser(walletDamlUser)
-      wallet1.initialize(validatorParty)
-      val remoteWallet1 = rw("remoteWallet1")
+      val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
+      aliceWallet.initialize(aliceValidatorParty)
+      val aliceRemoteWallet = rw("aliceRemoteWallet")
 
       // ensure wallet's participant sees the CoinRules
-      wallet1.remoteParticipant.ledger_api.acs.await(validatorParty, CoinRules)
-      wallet1.list() shouldBe Seq()
+      aliceWallet.remoteParticipant.ledger_api.acs.await(aliceValidatorParty, CoinRules)
+      aliceWallet.list() shouldBe Seq()
 
       val exactly = (x: BigDecimal) => (x, x)
       val ranges1 = Seq(exactly(50))
-      wallet1.tap(50)
-      checkWallet(userParty, wallet1, ranges1)
-      checkWallet(userParty, remoteWallet1, ranges1)
+      aliceWallet.tap(50)
+      checkWallet(aliceUserParty, aliceWallet, ranges1)
+      checkWallet(aliceUserParty, aliceRemoteWallet, ranges1)
 
       val ranges2 = Seq(exactly(50), exactly(60))
-      remoteWallet1.tap(60)
-      checkWallet(userParty, wallet1, ranges2)
-      checkWallet(userParty, remoteWallet1, ranges2)
+      aliceRemoteWallet.tap(60)
+      checkWallet(aliceUserParty, aliceWallet, ranges2)
+      checkWallet(aliceUserParty, aliceRemoteWallet, ranges2)
     }
 
     "allow a user to create, list, and reject payment requests" in { implicit env =>
       import env._
-      svc.initialize()
-      val svcParty =
-        svc.remoteParticipant.parties.list(filterParty = "svc").headOption.value.party
-      val validatorParty = validator1.initialize()
+      val svcParty = svc.initialize()
+      val aliceValidatorParty = aliceValidator.initialize()
       // TODO(Arne): consider adding synchronization 'wait-for-participant-x' to this command
-      val userParty = validator1.onboardUser(walletDamlUser)
-      wallet1.initialize(validatorParty)
+      val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
+      aliceWallet.initialize(aliceValidatorParty)
 
       // ensure wallet's participant sees the CoinRules
       val coinRulesId =
-        wallet1.remoteParticipant.ledger_api.acs.await(validatorParty, CoinRules).contractId
+        aliceWallet.remoteParticipant.ledger_api.acs
+          .await(aliceValidatorParty, CoinRules)
+          .contractId
 
       // Check that no payment requests exist
-      wallet1.listAppPaymentRequests() shouldBe empty
+      aliceWallet.listAppPaymentRequests() shouldBe empty
 
       // Create a payment request to self.
       val reqC = walletCodegen.AppPaymentRequest(
-        payer = userParty.toPrim,
-        payee = userParty.toPrim,
+        payer = aliceUserParty.toPrim,
+        payee = aliceUserParty.toPrim,
         svc = svcParty.toPrim,
         quantity = BigDecimal(10: Int),
         expiresAt = binding.Primitive.Timestamp
@@ -89,21 +87,21 @@ class WalletIntegrationTest
         // the PaymentReference interface only happens on a fetch, and not on the create.
         reference = binding.Primitive.ContractId.apply(coinRulesId.toString),
       )
-      wallet1.remoteParticipant.ledger_api.commands.submit(
-        actAs = Seq(userParty),
+      aliceWallet.remoteParticipant.ledger_api.commands.submit(
+        actAs = Seq(aliceUserParty),
         optTimeout = None,
         commands = Seq(reqC.create.command),
       )
 
       // Check that we can see the created payment request
-      val reqFound = wallet1.listAppPaymentRequests().headOption.value
+      val reqFound = aliceWallet.listAppPaymentRequests().headOption.value
       reqFound.payload shouldBe reqC
 
       // Reject the payment request
-      wallet1.rejectAppPaymentRequest(reqFound.contractId)
+      aliceWallet.rejectAppPaymentRequest(reqFound.contractId)
 
       // Check that there are no more payment requests
-      val requests2 = wallet1.listAppPaymentRequests()
+      val requests2 = aliceWallet.listAppPaymentRequests()
       requests2 shouldBe empty
     }
 
@@ -111,21 +109,15 @@ class WalletIntegrationTest
       import env._
 
       svc.initialize()
-      val svcParty =
-        svc.remoteParticipant.parties.list(filterParty = "svc").headOption.value.party
 
       // Onboard alice on her self-hosted validator
-      val aliceValidatorParty = validator1.initialize()
-      val aliceUserParty = validator1.onboardUser("alice")
-      // TODO(M1-92): improve naming in simple-topology.conf
-      val aliceWallet = wallet1
+      val aliceValidatorParty = aliceValidator.initialize()
+      val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
       aliceWallet.initialize(aliceValidatorParty)
 
       // Onboard bob on his self-hosted validator
-      val bobValidator = v("bobValidator")
       val bobValidatorParty = bobValidator.initialize()
-      val bobUserParty = bobValidator.onboardUser("bob")
-      val bobWallet = w("bobWallet")
+      val bobUserParty = bobValidator.onboardUser(bobWallet.config.damlUser)
       bobWallet.initialize(bobValidatorParty)
 
       // Neither Alice nor Bob see a payment channel proposal

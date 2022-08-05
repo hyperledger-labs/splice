@@ -37,7 +37,7 @@ class GrpcScanService(
 
   @nowarn("cat=unused")
   override def getSvcPartyId(request: Empty): Future[v0.GetSvcPartyIdResponse] =
-    withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
+    withSpanFromGrpcContext("GrpcScanService") { implicit traceContext => span =>
       for {
         party <- connection.getPrimaryParty(svcUser)
       } yield v0.GetSvcPartyIdResponse(party.toProtoPrimitive)

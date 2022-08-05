@@ -1,5 +1,15 @@
 IMPORTANT NOTE: copied and slightly adapted from the respective file from Canton's enterprise repo
 
+Name Allocation
+===============
+
+Our deployment topologies require many servers representing nodes and apps to be deployed simultaneously.
+We use the following prefixes for their names:
+- svc: for the servers operated by the svc
+- directory: for the servers operated by the directory provider
+- alice: for servers operated by alice acting as a self-hosted validator operator
+- bob: for servers operated by bob acting as a self-hosted validator operator
+
 Port Allocation
 ===============
 

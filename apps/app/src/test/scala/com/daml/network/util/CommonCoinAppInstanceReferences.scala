@@ -21,9 +21,17 @@ trait CommonCoinAppInstanceReferences {
   def scan(implicit env: CoinTestConsoleEnvironment): LocalScanAppReference = env.scanOpt.getOrElse(
     sys.error("Tried to access the Scan app but it isn't defined in the test's configuration file")
   )
-  def wallet1(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference = w("wallet1")
-  def validator1(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
-    "validator1"
+  def aliceWallet(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference = w(
+    "aliceWallet"
+  )
+  def aliceValidator(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
+    "aliceValidator"
+  )
+  def bobWallet(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference = w(
+    "bobWallet"
+  )
+  def bobValidator(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
+    "bobValidator"
   )
   def directoryValidator(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
     "directoryValidator"
@@ -31,13 +39,13 @@ trait CommonCoinAppInstanceReferences {
   def directoryProvider(implicit
       env: CoinTestConsoleEnvironment
   ): LocalDirectoryProviderAppReference = dp(
-    "directoryprovider"
+    "directoryProvider"
   )
 
   def directoryUser(implicit
       env: CoinTestConsoleEnvironment
   ): LocalDirectoryUserAppReference = du(
-    "directoryuser"
+    "directoryUser"
   )
 
   def w(name: String)(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference =
