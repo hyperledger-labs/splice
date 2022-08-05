@@ -40,19 +40,11 @@ class GrpcWalletService(
   @SuppressWarnings(Array("org.wartremover.warts.Null"))
   val validatorParty: AtomicReference[PartyId] = new AtomicReference[PartyId](null)
 
-  private def getWalletParty() =
-    for {
-      partyO <- connection.getUser(walletDamlUser)
-      party = partyO.getOrElse(
-        sys.error(s"Unable to find party for user $walletDamlUser")
-      )
-    } yield party
-
   @nowarn("cat=unused")
   override def list(request: v0.ListRequest): Future[v0.ListResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
-        walletParty <- getWalletParty()
+        walletParty <- connection.getPrimaryParty(walletDamlUser)
         coinsLAPI <- connection.activeContracts(walletParty, coinCodegen.Coin)
       } yield {
         // TODO(i207): persist response to store
@@ -67,7 +59,7 @@ class GrpcWalletService(
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         svcParty <- scanConnection.getSvcPartyId()
-        walletParty <- getWalletParty()
+        walletParty <- connection.getPrimaryParty(walletDamlUser)
         tapCmd = coinRulesCodegen.CoinRules
           .key(DA.Types.Tuple2(svcParty.toPrim, validatorParty.get.toPrim))
           .exerciseTap(
@@ -92,7 +84,7 @@ class GrpcWalletService(
   ): Future[v0.ListAppPaymentRequestsResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => span =>
       for {
-        walletParty <- getWalletParty()
+        walletParty <- connection.getPrimaryParty(walletDamlUser)
         paymentRequestsLAPI <- connection
           .activeContracts(walletParty, walletCodegen.AppPaymentRequest)
       } yield {
@@ -113,7 +105,7 @@ class GrpcWalletService(
   ): Future[v0.ApproveAppPaymentRequestResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
-        walletParty <- getWalletParty()
+        walletParty <- connection.getPrimaryParty(walletDamlUser)
         coinCid = Primitive.ContractId[coinCodegen.Coin](request.coinContractId)
         arg = walletCodegen.AppPaymentRequest_Approve(
           Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
@@ -143,7 +135,7 @@ class GrpcWalletService(
   ): Future[v0.RejectAppPaymentRequestResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
-        walletParty <- getWalletParty()
+        walletParty <- connection.getPrimaryParty(walletDamlUser)
         arg = walletCodegen.AppPaymentRequest_Reject()
         cmd = Primitive
           .ContractId[walletCodegen.AppPaymentRequest](request.requestContractId)
@@ -181,7 +173,7 @@ class GrpcWalletService(
   ): Future[v0.ProposePaymentChannelResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
-        walletParty <- getWalletParty()
+        walletParty <- connection.getPrimaryParty(walletDamlUser)
         svcParty <- scanConnection.getSvcPartyId()
         // TODO(M1-07): guard making the proposal by a check that a like channel does not yet exist
         cmd = walletCodegen
@@ -223,7 +215,7 @@ class GrpcWalletService(
   ): Future[v0.AcceptPaymentChannelProposalResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
-        walletParty <- getWalletParty()
+        walletParty <- connection.getPrimaryParty(walletDamlUser)
         arg = walletCodegen.PaymentChannelProposal_Accept()
         // TODO(M3-01): guard accepting the proposal by a check that a channel with the same key does not yet exist
         cmd = Primitive
@@ -254,7 +246,7 @@ class GrpcWalletService(
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         svcParty <- scanConnection.getSvcPartyId()
-        walletParty <- getWalletParty()
+        walletParty <- connection.getPrimaryParty(walletDamlUser)
         coinCid = Primitive.ContractId[coinCodegen.Coin](request.coinContractId)
         receiverParty = PartyId.tryFromProtoPrimitive(request.receiver)
         arg = walletCodegen.PaymentChannel_ExecuteDirectTransfer(

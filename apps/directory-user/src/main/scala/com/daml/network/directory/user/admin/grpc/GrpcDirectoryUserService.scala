@@ -50,7 +50,7 @@ class GrpcDirectoryUserService(
   override def requestDirectoryInstall(request: Empty): Future[v0.RequestDirectoryInstallResponse] =
     withSpanFromGrpcContext("GrpcDirectoryUserService") { implicit traceContext => span =>
       for {
-        userParty <- getParty()
+        userParty <- connection.getPrimaryParty(damlUser)
         providerParty <- providerConnection.getProviderPartyId()
         cmd = codegen
           .DirectoryInstallRequest(user = userParty.toPrim, provider = providerParty.toPrim)
@@ -70,7 +70,7 @@ class GrpcDirectoryUserService(
   ): Future[v0.RequestDirectoryEntryResponse] =
     withSpanFromGrpcContext("GrpcDirectoryUserService") { implicit traceContext => span =>
       for {
-        userParty <- getParty()
+        userParty <- connection.getPrimaryParty(damlUser)
         providerParty <- providerConnection.getProviderPartyId()
         cmd = codegen.DirectoryInstall
           .key(DA.Types.Tuple2(providerParty.toPrim, userParty.toPrim))
@@ -91,12 +91,4 @@ class GrpcDirectoryUserService(
         )
       } yield v0.RequestDirectoryEntryResponse(ApiTypes.ContractId.unwrap(requests(0).contractId))
     }
-
-  private def getParty() =
-    for {
-      partyO <- connection.getUser(damlUser)
-      party = partyO.getOrElse(
-        sys.error(s"Unable to find party for user $damlUser")
-      )
-    } yield party
 }

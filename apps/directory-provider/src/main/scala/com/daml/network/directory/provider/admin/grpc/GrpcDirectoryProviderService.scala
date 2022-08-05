@@ -49,19 +49,11 @@ class GrpcDirectoryProviderService(
     60_000_000
   )
 
-  private def getParty() =
-    for {
-      partyO <- connection.getUser(damlUser)
-      party = partyO.getOrElse(
-        sys.error(s"Unable to find party for user $damlUser")
-      )
-    } yield party
-
   @nowarn("cat=unused")
   override def listInstallRequests(request: Empty): Future[v0.ListInstallRequestsResponse] =
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
-        partyId <- getParty()
+        partyId <- connection.getPrimaryParty(damlUser)
         installRequestsLAPI <- connection
           .activeContracts(partyId, codegen.DirectoryInstallRequest)
       } yield {
@@ -79,7 +71,7 @@ class GrpcDirectoryProviderService(
   ): Future[v0.AcceptInstallRequestResponse] =
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
-        partyId <- getParty()
+        partyId <- connection.getPrimaryParty(damlUser)
         svc <- scanConnection.getSvcPartyId()
         arg = codegen.DirectoryInstallRequest_Accept(
           svc = svc.toPrim,
@@ -106,7 +98,7 @@ class GrpcDirectoryProviderService(
   override def listEntryRequests(request: Empty): Future[v0.ListEntryRequestsResponse] =
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
-        partyId <- getParty()
+        partyId <- connection.getPrimaryParty(damlUser)
         entryRequestsLAPI <- connection
           .activeContracts(partyId, codegen.DirectoryEntryRequest)
       } yield {
@@ -126,7 +118,7 @@ class GrpcDirectoryProviderService(
   ): Future[v0.RequestEntryPaymentResponse] =
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
-        partyId <- getParty()
+        partyId <- connection.getPrimaryParty(damlUser)
         entryRequest <- fetchByContractId(codegen.DirectoryEntryRequest)(
           partyId,
           Primitive.ContractId(request.contractId),
@@ -156,7 +148,7 @@ class GrpcDirectoryProviderService(
   ): Future[v0.CollectEntryPaymentResponse] =
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
-        partyId <- getParty()
+        partyId <- connection.getPrimaryParty(damlUser)
         approvedAppPayment <- fetchByContractId(walletCodegen.ApprovedAppPayment)(
           partyId,
           Primitive.ContractId(request.contractId),
@@ -186,7 +178,7 @@ class GrpcDirectoryProviderService(
   override def listEntries(request: Empty): Future[v0.ListEntriesResponse] =
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
-        partyId <- getParty()
+        partyId <- connection.getPrimaryParty(damlUser)
         entries <- listEntries(partyId)
       } yield v0.ListEntriesResponse(entries.map(_.toProtoV0))
     }
@@ -197,7 +189,7 @@ class GrpcDirectoryProviderService(
   ): Future[v0.LookupEntryResponse] =
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
-        partyId <- getParty()
+        partyId <- connection.getPrimaryParty(damlUser)
         entries <- listEntries(partyId)
       } yield {
         entries
@@ -218,7 +210,7 @@ class GrpcDirectoryProviderService(
   ): Future[v0.LookupEntryResponse] =
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
-        partyId <- getParty()
+        partyId <- connection.getPrimaryParty(damlUser)
         entries <- listEntries(partyId)
       } yield entries
         .collectFirst {
@@ -235,7 +227,7 @@ class GrpcDirectoryProviderService(
   override def getProviderPartyId(request: Empty): Future[v0.GetProviderPartyIdResponse] =
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
-        partyId <- getParty()
+        partyId <- connection.getPrimaryParty(damlUser)
       } yield v0.GetProviderPartyIdResponse(partyId.toProtoPrimitive)
     }
 

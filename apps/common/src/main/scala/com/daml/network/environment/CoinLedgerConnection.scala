@@ -139,7 +139,9 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
 
   def transactionById(parties: Seq[PartyId], id: String): Future[Option[Transaction]]
 
-  def getUser(user: String): Future[Option[PartyId]]
+  def getPrimaryParty(user: String): Future[PartyId]
+
+  def getOptionalPrimaryParty(user: String): Future[Option[PartyId]]
 
   def createPartyAndUser(user: String): Future[PartyId]
 
@@ -388,7 +390,7 @@ object CoinLedgerConnection {
             resp.transaction
           }
 
-      override def getUser(user: String): Future[Option[PartyId]] = {
+      override def getOptionalPrimaryParty(user: String): Future[Option[PartyId]] = {
         val userId = com.daml.lf.data.Ref.UserId.assertFromString(user)
         for {
           user <- client.userManagementClient
@@ -404,6 +406,15 @@ object CoinLedgerConnection {
               u.primaryParty
                 .getOrElse(sys.error(s"user $user was allocated without primary party"))
             )
+          )
+        } yield partyId
+      }
+
+      override def getPrimaryParty(user: String): Future[PartyId] = {
+        for {
+          partyIdO <- getOptionalPrimaryParty(user)
+          partyId = partyIdO.getOrElse(
+            sys.error(s"Unable to find party for user $user")
           )
         } yield partyId
       }
@@ -429,7 +440,7 @@ object CoinLedgerConnection {
           username: String
       )(implicit traceContext: TraceContext): Future[PartyId] = {
         for {
-          existingPartyId <- getUser(username)
+          existingPartyId <- getOptionalPrimaryParty(username)
           partyId <- existingPartyId.fold[Future[PartyId]](createPartyAndUser(username))(
             Future.successful
           )

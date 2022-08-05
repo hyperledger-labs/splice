@@ -64,14 +64,14 @@ class GrpcSvcAppService(
   override def acceptValidators(request: Empty): Future[Empty] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
-        svcPartyId <- getParty()
+        svcPartyId <- connection.getPrimaryParty(svcUserName)
         _ <- CoinUtil.acceptCoinRulesRequests(svcPartyId, connection, logger)
       } yield Empty()
     }
 
   override def getDebugInfo(request: Empty): Future[v0.GetDebugInfoResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { _ => _ =>
-      connection.getUser(svcUserName).flatMap {
+      connection.getOptionalPrimaryParty(svcUserName).flatMap {
         case None =>
           Future.successful(
             v0.GetDebugInfoResponse(
@@ -94,7 +94,7 @@ class GrpcSvcAppService(
 
   override def getValidatorConfig(request: Empty): Future[v0.GetValidatorConfigResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { _ => _ =>
-      connection.getUser(svcUserName).flatMap {
+      connection.getOptionalPrimaryParty(svcUserName).flatMap {
         case None =>
           Future.failed(new RuntimeException("SVC app not yet initialized"))
         case Some(partyId) =>
@@ -109,7 +109,7 @@ class GrpcSvcAppService(
   override def openRound(request: v0.OpenRoundRequest): Future[v0.OpenRoundResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
-        svc <- getParty()
+        svc <- connection.getPrimaryParty(svcUserName)
         validators <- getValidators(svc)
         price = Numeric.assertFromString(request.coinPrice)
         cmds = validators.toList.map(v =>
@@ -140,7 +140,7 @@ class GrpcSvcAppService(
   ): Future[v0.StartClosingRoundResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
-        svc <- getParty()
+        svc <- connection.getPrimaryParty(svcUserName)
         openRounds <- getRounds(CC.Round.OpenMiningRound)(_.round, _.obs)(svc, request.round)
         cmds = openRounds.toList.map { case (v, cid) =>
           CC.CoinRules.CoinRules
@@ -166,7 +166,7 @@ class GrpcSvcAppService(
   ): Future[v0.StartIssuingRoundResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
-        svc <- getParty()
+        svc <- connection.getPrimaryParty(svcUserName)
         openRounds <- getRounds(CC.Round.ClosingMiningRound)(_.round, _.obs)(svc, request.round)
         rewards <- queryRewards(svc, request.round)
         totalBurn = rewards.totalBurn
@@ -194,7 +194,7 @@ class GrpcSvcAppService(
   override def closeRound(request: v0.CloseRoundRequest): Future[v0.CloseRoundResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
-        svc <- getParty()
+        svc <- connection.getPrimaryParty(svcUserName)
         openRounds <- getRounds(CC.Round.IssuingMiningRound)(_.round, _.obs)(svc, request.round)
         cmds = openRounds.toList.map { case (v, cid) =>
           CC.CoinRules.CoinRules
@@ -218,7 +218,7 @@ class GrpcSvcAppService(
   override def archiveRound(request: v0.ArchiveRoundRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
-        svc <- getParty()
+        svc <- connection.getPrimaryParty(svcUserName)
         openRounds <- getRounds(CC.Round.ClosedMiningRound)(_.round, _.obs)(svc, request.round)
         cmds = openRounds.toList.map { case (v, cid) =>
           CC.CoinRules.CoinRules
@@ -268,14 +268,6 @@ class GrpcSvcAppService(
         v -> rs(0).contractId
       }
     }
-
-  private def getParty() =
-    for {
-      partyO <- connection.getUser(svcUserName)
-      party = partyO.getOrElse(
-        sys.error(s"Unable to find party for user $svcUserName")
-      )
-    } yield party
 
   private def roundResultsToProto[T](
       m: Map[Primitive.Party, Primitive.ContractId[T]]
