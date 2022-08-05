@@ -352,6 +352,84 @@ variables. As stated above, these are usually populated via `.envrc`.
 | `GCP_CLUSTER_BASENAME`        | Base of the cluster within the cloud project.  Used to compute the cluster's full name and DNS name.                   |
 | `GCP_REPO_NAME`           | Google Cloud Project/Name of the image repository used to manage project container images. |
 
+#### Recovery from a Failed CI/CD Deployment
+
+If the nightly CI/CD deployment results in an inoperative cluster, the
+CI/CD deployment can be manually run from a development laptop during
+the day. **For this to work, the working directory for the git
+repository must be in a clean state without uncommitted changes.**
+
+First, from the root of the working directory, rebuild the required
+docker images from scratch:
+
+`make clean docker-build`
+
+Secondly, from the same directory, push the docker images to the
+artifact registry with the appropriate tags.
+
+`CI=true make docker-push`
+
+Setting `CI` to `true` requests a CI build. This enforces cleanliness
+of the working copy and generates image tags that do not contain a
+username prefix.
+
+Finally, apply the changes to the cluster. This is an example of
+applying cluster changes to DevNet.  (For this to work, you will
+need to be connected to the VPN.)
+
+`(cd deployment/devnet && CI=true cncluster apply)`
+
+Successful pod deplomyment can then be checked:
+
+`(cd deployment/devnet && kubectl get pods)`
+
+This should produce a list of pods, all in running status:
+
+```
+$ kubectl get pods
+NAME                                  READY   STATUS    RESTARTS   AGE
+canton-domain-5d567849cf-zjnmq        0/1     Running   0          12s
+canton-participant-6668587bb8-cs757   1/1     Running   0          12s
+docs-5544ffb45b-wmgpv                 1/1     Running   0          12s
+svc-app-654d7ddc9c-xqjfb              1/1     Running   0          11s
+```
+
+If Kubernetes is unable to pull the image for a pod, the status might
+look something like this:
+
+```
+$ kubectl get pods
+NAME                                  READY   STATUS             RESTARTS      AGE
+canton-domain-5485476484-7ls9w        1/1     Running            0             108s
+canton-domain-6bfc8d8585-2wj55        0/1     ImagePullBackOff   0             15s
+canton-participant-6685859869-nh9vm   1/1     Running            1 (45s ago)   108s
+canton-participant-7c9674cfd6-8fj7v   0/1     ImagePullBackOff   0             14s
+docs-55f7b8967-67vcw                  1/1     Running            0             108s
+docs-78dddd9c8b-5swzv                 0/1     ImagePullBackOff   0             17s
+svc-app-6654f84564-bnvwq              1/1     Running            2 (64s ago)   108s
+svc-app-84f954fb99-6ccw5              0/1     ImagePullBackOff   0             16s
+```
+
+The `ImagePullBackOff` status indicates that Kubernetes is waiting for
+a timeout to elapse before attemping to pull the image again. There
+can still be pods in `Running` status, due to the fact that we use
+Kubernetes deployment objects that wait for an updated pod to be
+running before stopping the previous pod. You can look for this
+scenario by checking the ages of the running vs. failed pods.
+
+To skip the image pull backoff timeout, you can delete the failed pod,
+which will force an immediate recreate of the pod and attempt to
+repull the image.
+
+```kubectl delete pod ${POD_NAME}```
+
+**Every** pod can be deleted and reset as follows. This can be useful
+for the moment, given that we rebuild the cluster nightly anyway.
+
+```
+kubectl get pods | grep -v NAME | gawk '{print $1}' | xargs kubectl delete pod
+```
+
 ### Ledger API Port Allocations
 
 Both our deployment and tests follow the [port allocation scheme](./apps/app/src/test/resources/README.md).
