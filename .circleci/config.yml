@@ -506,3 +506,11 @@ workflows:
           - deployment_test
           - docker-images-push
           - deploy_cluster
+
+  manual_preflight_check:
+    jobs:
+      - click_to_run_workflow:
+          type: approval
+      - preflight_check:
+          requires:
+            - click_to_run_workflow
