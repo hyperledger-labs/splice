@@ -155,7 +155,7 @@ class GrpcWalletService(
   ): Future[v0.ListPaymentChannelProposalsResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => span =>
       for {
-        walletParty <- getWalletParty()
+        walletParty <- connection.getPrimaryParty(walletDamlUser)
         proposalsLAPI <- connection
           .activeContracts(walletParty, walletCodegen.PaymentChannelProposal)
       } yield {
