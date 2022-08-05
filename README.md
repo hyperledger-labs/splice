@@ -349,7 +349,7 @@ variables. As stated above, these are usually populated via `.envrc`.
 | ------------------        | --------------------------------------------------------------------- |
 | `CLOUDSDK_COMPUTE_REGION` | Google Cloud Region in which resources will be created                |
 | `CLOUDSDK_CORE_PROJECT`   | ID of the Google Cloud project in which the cluster is located.       |
-| `GCP_CLUSTER_NAME`        | Name of the GKE cluster within the cloud project.                     |
+| `GCP_CLUSTER_BASENAME`        | Base of the cluster within the cloud project.  Used to compute the cluster's full name and DNS name.                   |
 | `GCP_REPO_NAME`           | Google Cloud Project/Name of the image repository used to manage project container images. |
 
 ### Ledger API Port Allocations
