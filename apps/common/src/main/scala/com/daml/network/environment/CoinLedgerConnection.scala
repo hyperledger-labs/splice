@@ -174,10 +174,12 @@ object CoinLedgerConnection {
       applicationId: ApplicationId,
       config: ClientConfig,
       commandClientConfiguration: CommandClientConfiguration,
+      logger: TracedLogger,
       tracerProvider: TracerProvider,
       token: Option[String] = None,
   )(implicit
       ec: ExecutionContextExecutor,
+      tc: TraceContext,
       executionSequencerFactory: ExecutionSequencerFactory,
   ): Future[LedgerClient] = {
     val clientConfig = LedgerClientConfiguration(
@@ -200,7 +202,14 @@ object CoinLedgerConnection {
       .intercept(
         GrpcTracing.builder(tracerProvider.openTelemetry).build().newClientInterceptor()
       )
-    LedgerClient.fromBuilder(builder, clientConfig)
+
+    LedgerClient.fromBuilder(builder, clientConfig) recover {
+      case _: StatusRuntimeException => {
+        // TODO(i447) -- eventually we should drop this and replace with a more robust retry solution
+        logger.error("Failed to instantiate ledger client due to connection failure, exiting...")
+        sys.exit(1)
+      }
+    }
   }
 
   def apply(
@@ -233,6 +242,7 @@ object CoinLedgerConnection {
             applicationId,
             clientConfig,
             commandClientConfiguration,
+            logger,
             tracerProvider,
             token,
           )
