@@ -17,7 +17,7 @@ test = script do
   sender <- setupUser app "sender" app.svc
   receiver <- setupUser app "receiver" app.svc
 
-  pay app app.svc sender 5.0 ""
+  pay app app.svc sender 15.0 ""
 
   -- setup payment channel
   proposalId <- submit sender $ createCmd PaymentChannelProposal with
@@ -44,4 +44,34 @@ test = script do
   transfer coin
   [(coin, _)] <- queryFilter @Coin sender (\c -> c.quantity.initialQuantity > 2.5)
   transfer coin
+
+  -- ask for some more CC
+  paymentRequest <- submit receiver $ exerciseByKeyCmd @PaymentChannel (sender, receiver, app.svc)
+    PaymentChannel_CreatePaymentRequest with
+      quantity = 1.5
+      description = "A very good reason to pay me"
+
+  -- approve request
+  [(coin, _)] <- queryFilter @Coin sender (\c -> c.quantity.initialQuantity > 1.5)
+  submitMulti [sender] [app.svc] $ exerciseCmd paymentRequest OnChannelPaymentRequest_Accept with
+    inputs = [InputCoin coin]
+
+  -- ask for more CC, to be rejected
+  paymentRequest <- submit receiver $ exerciseByKeyCmd @PaymentChannel (sender, receiver, app.svc)
+    PaymentChannel_CreatePaymentRequest with
+      quantity = 1500.0
+      description = "Not a good reason to pay"
+
+  submit sender $ exerciseCmd paymentRequest OnChannelPaymentRequest_Reject
+
+  -- ask for more CC, and withdraw
+  paymentRequest <- submit receiver $ exerciseByKeyCmd @PaymentChannel (sender, receiver, app.svc)
+    PaymentChannel_CreatePaymentRequest with
+      quantity = 1500.0
+      description = "Going to withdraw this"
+
+  submit receiver $ exerciseCmd paymentRequest OnChannelPaymentRequest_Withdraw
+
+
+
   pure ()

@@ -58,6 +58,21 @@ template PaymentChannel
         (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt sender
         exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
 
+    nonconsuming choice PaymentChannel_CreatePaymentRequest : ContractId OnChannelPaymentRequest
+      with
+        quantity : Decimal
+        description : Text
+      controller receiver
+      do
+        assertMsg "Payment requests are not allowed in this channel" allowRequests
+        create OnChannelPaymentRequest with
+          payer = sender
+          payee = receiver
+          svc
+          quantity
+          description
+          senderTransferFeeRatio
+
     -- TODO(M1-08): create payment requests, payment offers, allow editing config
 
 
@@ -87,10 +102,59 @@ template PaymentChannelProposal
 
 -- | A reference to the reason for a payment.
 -- TODO: better naming
--- TODO: need to distinguish between AppPayment and UserPayment here?
 interface PaymentReference
   where
     getDescription : Text
+
+template OnChannelPaymentRequest
+  with
+    payer : Party
+    -- ^ The party that should pay.
+    payee : Party
+    -- ^ The party requesting to be paid.
+    svc : Party
+    -- ^ The issuer of the CC that flows on this payment channel.
+    quantity : Decimal
+    -- ^ The amount of CC to be paid.
+    description : Text
+    -- ^ The reference to the reason / good for which the payment is requested.
+    senderTransferFeeRatio : Decimal
+    -- ^ How to split the transfer fee between the sender and the receiver.
+  where
+    signatory payee, payer
+    ensure quantity > 0.0
+
+    choice OnChannelPaymentRequest_Accept : ()
+      with
+        inputs : [TransferInput]
+      controller payer
+      do
+        -- create the transfer
+        let transfer = Transfer with
+              sender = payer
+              inputs = inputs
+              outputs = 
+                [ OutputReceiverCoin with
+                    receiver = payee
+                    coinType = FixedReceiverCoin
+                      quantity
+                      senderTransferFeeRatio
+                , OutputSenderCoin with
+                    exactQuantity = None
+                    lock = None
+                ]
+              payload = "Accepted payment request"
+        (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt payer
+        void $ exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
+        pure ()
+
+    choice OnChannelPaymentRequest_Withdraw : ()
+      controller payee
+      do pure ()
+
+    choice OnChannelPaymentRequest_Reject : ()
+      controller payer
+      do pure ()
 
 template AppPaymentRequest
   with
