@@ -1,7 +1,9 @@
-FROM digitalasset/canton-open-source:2.3.2
+ARG base_version
+
+FROM --platform=linux/amd64 cn-app:${base_version}
 
 EXPOSE 5008
 EXPOSE 5009
 
-COPY svc-domain.conf /canton
+COPY svc-domain.conf .
 CMD [ "daemon", "--no-tty", "--log-level-stdout", "INFO", "--log-level-canton", "INFO", "--log-file-appender", "off", "--config", "svc-domain.conf" ]

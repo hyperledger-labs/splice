@@ -35,7 +35,7 @@ fi
 
 if ! docker-check "${image}"; then
   if [ -z "${force}" ]; then
-    _warning "Cowardly refusing to push, image already exists in repo:\n${image}"
+    _warning "Cowardly refusing to push, image already exists in repo:\n${image}\n You can force push with make docker-push-force"
     skippush=yes
   else
     _warning "Forcing push, image already exists in repo:\n${image}"
