@@ -97,6 +97,16 @@ abstract class WalletAppReference(
     }
   }
 
+  @Help.Summary("List active payment channel proposals")
+  @Help.Description(
+    "Shows both incoming and outgoing payment channel proposals."
+  )
+  def listPaymentChannelProposals(): Seq[Contract[walletCodegen.PaymentChannelProposal]] = {
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.ListPaymentChannelProposals())
+    }
+  }
+
   @Help.Summary("Accept a payment channel proposal.")
   @Help.Description(
     "Accept a specific payment channel proposal."

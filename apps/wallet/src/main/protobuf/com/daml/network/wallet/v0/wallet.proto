@@ -15,6 +15,7 @@ service WalletService {
 
   // Note that there is no list proposal function as we assume the contract-id is disclosed off-ledger.
   rpc ProposePaymentChannel (ProposePaymentChannelRequest) returns (ProposePaymentChannelResponse);
+  rpc ListPaymentChannelProposals (ListPaymentChannelProposalsRequest) returns (ListPaymentChannelProposalsResponse);
   rpc AcceptPaymentChannelProposal (AcceptPaymentChannelProposalRequest) returns (AcceptPaymentChannelProposalResponse);
   rpc ExecuteDirectTransfer (ExecuteDirectTransferRequest) returns (ExecuteDirectTransferResponse);
 }
@@ -76,6 +77,13 @@ message ProposePaymentChannelRequest {
 
 message ProposePaymentChannelResponse {
   string proposal_contract_id = 1;
+}
+
+message ListPaymentChannelProposalsRequest {
+}
+
+message ListPaymentChannelProposalsResponse {
+  repeated com.daml.network.v0.Contract proposals = 1;
 }
 
 message AcceptPaymentChannelProposalRequest {

@@ -12,14 +12,11 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences, Contract}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.network.CC.Coin.Coin
 import com.digitalasset.network.CC.CoinRules.CoinRules
 import com.digitalasset.network.CC.Round.Round
-import com.digitalasset.network.CC.CoinRules.{CoinRules, CoinRulesRequest}
-import com.digitalasset.network.CN.Wallet.AppPaymentRequest
+import com.digitalasset.network.CN.{Wallet => walletCodegen}
 import com.digitalasset.network.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 import com.digitalasset.network.DA.Time.Types.RelTime
-import com.digitalasset.network.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 
 class WalletIntegrationTest
     extends CoinIntegrationTest
@@ -79,7 +76,7 @@ class WalletIntegrationTest
       wallet1.listAppPaymentRequests() shouldBe empty
 
       // Create a payment request to self.
-      val reqC = AppPaymentRequest(
+      val reqC = walletCodegen.AppPaymentRequest(
         payer = userParty.toPrim,
         payee = userParty.toPrim,
         svc = svcParty.toPrim,
@@ -131,9 +128,30 @@ class WalletIntegrationTest
       val bobWallet = w("bobWallet")
       bobWallet.initialize(bobValidatorParty)
 
-      // Alice proposes payment channel to Bob, and Bob accepts
+      // Neither Alice nor Bob see a payment channel proposal
+      aliceWallet.listPaymentChannelProposals() shouldBe empty
+      bobWallet.listPaymentChannelProposals() shouldBe empty
+
+      // Alice proposes payment channel to Bob
       val proposalId = aliceWallet.proposePaymentChannel(bobUserParty)
-      bobWallet.acceptPaymentChannelProposal(proposalId)
+      val aliceProposals = aliceWallet.listPaymentChannelProposals()
+
+      aliceProposals should have size (1)
+      val aliceProposal = aliceProposals(0)
+      val aliceChannel = aliceProposal.payload.channel
+      aliceProposal.contractId shouldBe proposalId
+      aliceChannel.sender shouldBe aliceUserParty.toPrim
+      aliceChannel.receiver shouldBe bobUserParty.toPrim
+
+      // Bob monitors proposals and accepts the one
+      utils.retry_until_true(bobWallet.listPaymentChannelProposals().size == 1)
+      val bobProposals = bobWallet.listPaymentChannelProposals()
+      aliceProposals shouldBe bobProposals
+      bobWallet.acceptPaymentChannelProposal(aliceProposal.contractId)
+
+      // Neither Alice nor Bob see a payment channel proposal
+      aliceWallet.listPaymentChannelProposals() shouldBe empty
+      bobWallet.listPaymentChannelProposals() shouldBe empty
 
       // Alice taps and does a direct transfer to Bob
       val coinCid = aliceWallet.tap(50)

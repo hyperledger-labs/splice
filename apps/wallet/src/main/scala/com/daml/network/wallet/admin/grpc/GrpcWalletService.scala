@@ -158,6 +158,24 @@ class GrpcWalletService(
     }
 
   @nowarn("cat=unused")
+  override def listPaymentChannelProposals(
+      request: v0.ListPaymentChannelProposalsRequest
+  ): Future[v0.ListPaymentChannelProposalsResponse] =
+    withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => span =>
+      for {
+        walletParty <- getWalletParty()
+        proposalsLAPI <- connection
+          .activeContracts(walletParty, walletCodegen.PaymentChannelProposal)
+      } yield {
+        v0.ListPaymentChannelProposalsResponse(
+          proposalsLAPI.map(r =>
+            Contract.fromCodegenContract[walletCodegen.PaymentChannelProposal](r).toProtoV0
+          )
+        )
+      }
+    }
+
+  @nowarn("cat=unused")
   override def proposePaymentChannel(
       request: v0.ProposePaymentChannelRequest
   ): Future[v0.ProposePaymentChannelResponse] =

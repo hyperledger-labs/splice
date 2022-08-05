@@ -196,6 +196,31 @@ object WalletAppCommands {
       )
   }
 
+  case class ListPaymentChannelProposals()
+      extends BaseCommand[
+        v0.ListPaymentChannelProposalsRequest,
+        v0.ListPaymentChannelProposalsResponse,
+        Seq[Contract[walletCodegen.PaymentChannelProposal]],
+      ] {
+
+    override def createRequest(): Either[String, v0.ListPaymentChannelProposalsRequest] =
+      Right(
+        v0.ListPaymentChannelProposalsRequest()
+      )
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.ListPaymentChannelProposalsRequest,
+    ): Future[v0.ListPaymentChannelProposalsResponse] = service.listPaymentChannelProposals(request)
+
+    override def handleResponse(
+        response: v0.ListPaymentChannelProposalsResponse
+    ): Either[String, Seq[Contract[walletCodegen.PaymentChannelProposal]]] =
+      response.proposals
+        .traverse(req => Contract.fromProto(walletCodegen.PaymentChannelProposal)(req))
+        .leftMap(_.toString)
+  }
+
   case class AcceptPaymentChannelProposal(
       requestId: Primitive.ContractId[walletCodegen.PaymentChannelProposal]
   ) extends BaseCommand[
