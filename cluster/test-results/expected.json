@@ -17,6 +17,9 @@
                   "app": "docs"
                }
             },
+            "strategy": {
+               "type": "Recreate"
+            },
             "template": {
                "metadata": {
                   "labels": {
@@ -56,6 +59,9 @@
                "matchLabels": {
                   "app": "svc-app"
                }
+            },
+            "strategy": {
+               "type": "Recreate"
             },
             "template": {
                "metadata": {
@@ -100,6 +106,9 @@
                "matchLabels": {
                   "app": "canton-domain"
                }
+            },
+            "strategy": {
+               "type": "Recreate"
             },
             "template": {
                "metadata": {
@@ -156,6 +165,9 @@
                "matchLabels": {
                   "app": "canton-participant"
                }
+            },
+            "strategy": {
+               "type": "Recreate"
             },
             "template": {
                "metadata": {
