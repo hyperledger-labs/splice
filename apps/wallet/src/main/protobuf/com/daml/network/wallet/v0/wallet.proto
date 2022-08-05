@@ -2,6 +2,7 @@ syntax = "proto3";
 package com.daml.network.wallet.v0;
 
 import "com/daml/network/v0/contract.proto";
+import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
 
 service WalletService {
@@ -18,6 +19,9 @@ service WalletService {
   rpc ListPaymentChannelProposals (ListPaymentChannelProposalsRequest) returns (ListPaymentChannelProposalsResponse);
   rpc AcceptPaymentChannelProposal (AcceptPaymentChannelProposalRequest) returns (AcceptPaymentChannelProposalResponse);
   rpc ExecuteDirectTransfer (ExecuteDirectTransferRequest) returns (ExecuteDirectTransferResponse);
+
+  rpc ListAppRewards (google.protobuf.Empty) returns (ListAppRewardsResponse);
+  rpc ListValidatorRewards (google.protobuf.Empty) returns (ListValidatorRewardsResponse);
 }
 
 message InitializeRequest {
@@ -106,4 +110,12 @@ message ExecuteDirectTransferRequest {
 }
 
 message ExecuteDirectTransferResponse {
+}
+
+message ListAppRewardsResponse {
+  repeated com.daml.network.v0.Contract app_rewards = 1;
+}
+
+message ListValidatorRewardsResponse {
+  repeated com.daml.network.v0.Contract validator_rewards = 1;
 }

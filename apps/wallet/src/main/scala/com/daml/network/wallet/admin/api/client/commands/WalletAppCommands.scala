@@ -13,6 +13,7 @@ import io.grpc.ManagedChannel
 import com.daml.ledger.client.binding.Primitive
 import com.digitalasset.network.CC.{Coin => coinCodegen}
 import com.digitalasset.network.CN.{Wallet => walletCodegen}
+import com.google.protobuf.empty.Empty
 
 import scala.concurrent.Future
 
@@ -284,4 +285,45 @@ object WalletAppCommands {
 
   }
 
+  case class ListAppRewards()
+      extends BaseCommand[Empty, v0.ListAppRewardsResponse, Seq[
+        Contract[coinCodegen.AppReward]
+      ]] {
+
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: Empty,
+    ): Future[v0.ListAppRewardsResponse] = service.listAppRewards(request)
+
+    override def handleResponse(
+        response: v0.ListAppRewardsResponse
+    ): Either[String, Seq[Contract[coinCodegen.AppReward]]] =
+      response.appRewards
+        .traverse(req => Contract.fromProto(coinCodegen.AppReward)(req))
+        .leftMap(_.toString)
+  }
+
+  case class ListValidatorRewards()
+      extends BaseCommand[Empty, v0.ListValidatorRewardsResponse, Seq[
+        Contract[coinCodegen.ValidatorReward]
+      ]] {
+
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: Empty,
+    ): Future[v0.ListValidatorRewardsResponse] = service.listValidatorRewards(request)
+
+    override def handleResponse(
+        response: v0.ListValidatorRewardsResponse
+    ): Either[String, Seq[Contract[coinCodegen.ValidatorReward]]] =
+      response.validatorRewards
+        .traverse(req => Contract.fromProto(coinCodegen.ValidatorReward)(req))
+        .leftMap(_.toString)
+  }
 }

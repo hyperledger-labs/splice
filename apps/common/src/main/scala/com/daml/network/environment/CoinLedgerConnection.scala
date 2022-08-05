@@ -101,8 +101,16 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
       party: PartyId,
       templateCompanion: TemplateCompanion[T],
   ): Future[(Seq[Contract[T]], LedgerOffset)]
+  def activeContractsWithOffset[T](
+      parties: Set[PartyId],
+      templateCompanion: TemplateCompanion[T],
+  ): Future[(Seq[Contract[T]], LedgerOffset)]
   def activeContracts[T](
       party: PartyId,
+      templateCompanion: TemplateCompanion[T],
+  ): Future[Seq[Contract[T]]]
+  def activeContracts[T](
+      party: Set[PartyId],
       templateCompanion: TemplateCompanion[T],
   ): Future[Seq[Contract[T]]]
   def subscribe(
@@ -286,17 +294,30 @@ object CoinLedgerConnection {
           party: PartyId,
           templateCompanion: TemplateCompanion[T],
       ): Future[(Seq[Contract[T]], LedgerOffset)] =
-        activeContractsWithOffset(transactionFilter(party, templateCompanion.id)).map {
-          case (contracts, offset) =>
-            val decoded = contracts.flatMap(ev => DecodeUtil.decodeCreated(templateCompanion)(ev))
-            (decoded, offset)
+        activeContractsWithOffset(Set(party), templateCompanion)
+
+      override def activeContractsWithOffset[T](
+          parties: Set[PartyId],
+          templateCompanion: TemplateCompanion[T],
+      ): Future[(Seq[Contract[T]], LedgerOffset)] =
+        activeContractsWithOffset(
+          transactionFilterByParty(parties.map(p => p -> Seq(templateCompanion.id)).toMap)
+        ).map { case (contracts, offset) =>
+          val decoded = contracts.flatMap(ev => DecodeUtil.decodeCreated(templateCompanion)(ev))
+          (decoded, offset)
         }
 
       override def activeContracts[T](
           party: PartyId,
           templateCompanion: TemplateCompanion[T],
       ): Future[Seq[Contract[T]]] =
-        activeContractsWithOffset(party, templateCompanion).map(_._1)
+        activeContracts(Set(party), templateCompanion)
+
+      override def activeContracts[T](
+          parties: Set[PartyId],
+          templateCompanion: TemplateCompanion[T],
+      ): Future[Seq[Contract[T]]] =
+        activeContractsWithOffset(parties, templateCompanion).map(_._1)
 
       override def submitCommand(
           actAs: Seq[PartyId],

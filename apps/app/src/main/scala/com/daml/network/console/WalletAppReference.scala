@@ -133,6 +133,21 @@ abstract class WalletAppReference(
     }
   }
 
+  @Help.Summary("List app rewards")
+  @Help.Description("List all open app rewards for the configured user")
+  def listAppRewards(): Seq[Contract[coinCodegen.AppReward]] =
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.ListAppRewards())
+    }
+
+  @Help.Summary("List validator rewards")
+  @Help.Description(
+    "List all open validator rewards for the configured user based on the active ValidatorRights"
+  )
+  def listValidatorRewards(): Seq[Contract[coinCodegen.ValidatorReward]] =
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.ListValidatorRewards())
+    }
 }
 
 class RemoteWalletAppReference(

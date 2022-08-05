@@ -17,6 +17,7 @@ import com.digitalasset.canton.tracing.Spanning
 import com.digitalasset.network.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
 import com.digitalasset.network.CN.{Wallet => walletCodegen}
 import com.digitalasset.network.DA
+import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
 import ujson.IndexedValue.True
 
@@ -264,6 +265,43 @@ class GrpcWalletService(
           Seq(cmd),
         )
       } yield v0.ExecuteDirectTransferResponse()
+    }
+
+  @nowarn("cat=unused")
+  override def listAppRewards(request: Empty): Future[v0.ListAppRewardsResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        party <- connection.getPrimaryParty(walletDamlUser)
+        appRewards <- connection.activeContracts(party, coinCodegen.AppReward)
+      } yield {
+        val filtered = appRewards.filter(c => c.value.owner == party.toPrim)
+        v0.ListAppRewardsResponse(
+          filtered.map(c => Contract.fromCodegenContract(c).toProtoV0)
+        )
+      }
+    }
+
+  @nowarn("cat=unused")
+  override def listValidatorRewards(request: Empty): Future[v0.ListValidatorRewardsResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        party <- connection.getPrimaryParty(walletDamlUser)
+        validatorRights <- connection.activeContracts(party, coinCodegen.ValidatorRight)
+        users = validatorRights
+          .filter(c => c.value.validator == party.toPrim)
+          .map(c => PartyId.tryFromPrim(c.value.user))
+          .toSet
+        validatorRewards <-
+          if (users.isEmpty) {
+            Future.successful(Seq.empty)
+          } else {
+            connection.activeContracts(users, coinCodegen.ValidatorReward)
+          }
+      } yield {
+        v0.ListValidatorRewardsResponse(
+          validatorRewards.map(c => Contract.fromCodegenContract(c).toProtoV0)
+        )
+      }
     }
 
   override def initialize(request: InitializeRequest): Future[InitializeResponse] =

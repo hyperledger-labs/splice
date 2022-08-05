@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.ledger.client.binding
-import com.daml.network.console.WalletAppReference
+import com.daml.network.console.{LocalWalletAppReference, WalletAppReference}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -12,7 +12,15 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences, Contract}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.network.CC.CoinRules.CoinRules
+import com.digitalasset.network.DA
+import com.digitalasset.network.CC.Coin.{AppReward, Coin, ValidatorRight}
+import com.digitalasset.network.CC.CoinRules.{
+  CoinRules,
+  ReceiverCoinType,
+  Transfer,
+  TransferInput,
+  TransferOutput,
+}
 import com.digitalasset.network.CC.Round.Round
 import com.digitalasset.network.CN.{Wallet => walletCodegen}
 import com.digitalasset.network.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
@@ -152,7 +160,82 @@ class WalletIntegrationTest
       checkWallet(aliceUserParty, aliceWallet, Seq((39, 40)))
       checkWallet(bobUserParty, bobWallet, Seq((9, 10)))
     }
+
+    "list app & validator rewards" in { implicit env =>
+      import env._
+      val svcParty = svc.initialize()
+
+      // Onboard alice on her self-hosted validator
+      val validatorParty = aliceValidator.initialize()
+      val aliceParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
+      val bobParty = aliceValidator.onboardUser("bob")
+      aliceWallet.initialize(validatorParty)
+
+      val tappedCoin = aliceWallet.tap(50)
+      // Bare transfer so we get control over fee ratio
+      bareTransfer(
+        aliceWallet,
+        senderParty = aliceParty,
+        receiverParty = bobParty,
+        validatorParty = validatorParty,
+        svcParty = svcParty,
+        coin = tappedCoin,
+      )
+      val transferredCoin =
+        aliceWallet.remoteParticipant.ledger_api.acs.await(bobParty, Coin).contractId
+      // Transfer back. Alice is now the receiver so they get an app reward.
+      bareTransfer(
+        aliceWallet,
+        senderParty = bobParty,
+        receiverParty = aliceParty,
+        validatorParty = validatorParty,
+        svcParty = svcParty,
+        coin = transferredCoin,
+      )
+      aliceWallet.listAppRewards() should have size 1
+      aliceWallet.listValidatorRewards() shouldBe empty
+      // TODO(i296) We cannot use the wallet as the validator yet so create a validator right where alice is their own validator.
+      aliceWallet.remoteParticipant.ledger_api.commands.submit(
+        Seq(aliceParty),
+        optTimeout = None,
+        commands =
+          Seq(ValidatorRight(svcParty.toPrim, aliceParty.toPrim, aliceParty.toPrim).create.command),
+      )
+      aliceWallet.listValidatorRewards() should have size 1
+    }
   }
+
+  def bareTransfer(
+      wallet: LocalWalletAppReference,
+      senderParty: PartyId,
+      receiverParty: PartyId,
+      validatorParty: PartyId,
+      svcParty: PartyId,
+      coin: binding.Primitive.ContractId[Coin],
+  ) =
+    wallet.remoteParticipant.ledger_api.commands.submit(
+      Seq(senderParty, receiverParty, validatorParty),
+      optTimeout = None,
+      commands = Seq(
+        CoinRules
+          .key(DA.Types.Tuple2(svcParty.toPrim, validatorParty.toPrim))
+          .exerciseCoinRules_Transfer(
+            senderParty.toPrim,
+            Transfer(
+              sender = senderParty.toPrim,
+              inputs = Seq(TransferInput.InputCoin(coin)),
+              outputs = Seq(
+                TransferOutput.OutputReceiverCoin(
+                  receiver = receiverParty.toPrim,
+                  coinType = ReceiverCoinType.FloatingReceiverCoin(()),
+                )
+              ),
+              payload = "bare transfer",
+            ),
+          )
+          .command
+      ),
+    )
 
   /** @param expectedQuantityRanges: lower and upper bounds for coins sorted by their initial quantity in ascending order. */
   def checkWallet(
