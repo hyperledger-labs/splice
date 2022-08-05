@@ -1,5 +1,7 @@
 package com.daml.network.config
 
+import java.io.File
+
 import cats.data.Validated
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.nonempty.NonEmpty
@@ -356,6 +358,11 @@ object CoinConfig {
       elc: ErrorLoggingContext = elc
   ): Either[CantonConfigError, CoinConfig] =
     CantonConfig.loadAndValidate[CoinConfig](config)
+
+  def parseAndLoadOrExit(files: Seq[File])(implicit
+      elc: ErrorLoggingContext = elc
+  ): CoinConfig =
+    CantonConfig.parseAndLoadOrExit[CoinConfig](files)
 
   def loadOrExit(config: Config)(implicit elc: ErrorLoggingContext = elc): CoinConfig =
     CantonConfig.loadOrExit[CoinConfig](config)

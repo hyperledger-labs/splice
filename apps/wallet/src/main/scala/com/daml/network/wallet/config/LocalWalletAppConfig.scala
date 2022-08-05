@@ -18,4 +18,6 @@ case class LocalWalletAppConfig(
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 
+  def toRemoteConfig: RemoteWalletAppConfig = RemoteWalletAppConfig(adminApi.clientConfig)
+
 }

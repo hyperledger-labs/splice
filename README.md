@@ -154,7 +154,7 @@ through VPN.
 The DevNet cluster is automatically updated every day at
 [0650 UTC](/.circleci/run-schedule-pipeline.json) via
 [CI/CD](/.circleci/config.yml). It is intended to be a more stable and
-production like enviornment. There are Slack notifications issued when
+production like environment. There are Slack notifications issued when
 these updates complete, either successfully or with a failure.
 
 The ScratchNet cluster is manually managed and intended to be a test
@@ -201,9 +201,9 @@ environment. This includes the REPL, participant nodes, and domain nodes.
 If you don't have Canton, you may install it following
 instructions [here](https://docs.daml.com/canton/usermanual/installation.html).
 
-This is an example of an configuration file that might be used with a
+This is an example of a configuration file that might be used with a
 Canton Network cluster. It connects a local REPL to a (`DevNet`)
-cluster particpant and also creates a locally hosted participant.
+cluster participant and creates a locally hosted participant.
 
 ```
 canton {
@@ -275,6 +275,10 @@ hosted participant:
 @ remoteParticipant1.health.ping(localParticipant1, timeout = 10.seconds)
 res2: concurrent.duration.Duration = 1762 milliseconds
 ```
+
+As part of the runbook a participant node is also spun up
+and connects to the DevNet domain. Therefore, the runbook contains
+alternative scripts for connecting a local participant to the DevNet domain. 
 
 ### Cluster Tooling
 

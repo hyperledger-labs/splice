@@ -11,6 +11,7 @@ import com.digitalasset.canton.config.{
   ProcessingTimeout,
   QueryCostMonitoringConfig,
 }
+import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.tracing.TracingConfig
@@ -24,6 +25,7 @@ abstract class LocalCoinConfig extends LocalNodeConfig {
   override val crypto: CryptoConfig = CryptoConfig()
   override val sequencerClient: SequencerClientConfig = SequencerClientConfig()
   override val caching: CachingConfigs = CachingConfigs()
+  def remoteParticipant: RemoteParticipantConfig
 }
 
 /** Abstraction to remove code duplication when implementing Canton traits and specifying parameters we don't use

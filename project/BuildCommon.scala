@@ -48,7 +48,9 @@ object BuildCommon {
 
     val commandAliases =
       // cheekily overwriting test task here because we don't want the tests of the copied Canton files to run
-      addCommandAlias("test", "; apps-common/test; apps-validator/test; apps-app/test") ++
+      // additionally, we don't want LiveDevNetTest tests to run by default either
+      addCommandAlias("test", "; apps-app/testOnly * -- -l LiveDevNetTest") ++
+        addCommandAlias("testOnly", "; apps-app/testOnly") ++
         addCommandAlias(
           "scalafixCheck",
           s"${alsoTest("scalafix --check")}",

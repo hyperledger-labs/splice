@@ -208,7 +208,8 @@ jobs:
           cmd: "Test/compile"
           retry_fetch: "50"
       - execute_sbt_command:
-          cmd: "test"
+          # run all tests except the live cluster ones
+          cmd: "\"testOnly * -- -l LiveDevNetTest\""
           timeout: "10m"
       - execute_sbt_command:
           cmd: "damlTest"
@@ -271,6 +272,42 @@ jobs:
       - slack/notify:
           event: pass
           template: success_tagged_deploy_1
+
+  preflight_check:
+    circleci_ip_ranges: true
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    steps:
+      - checkout
+      - setup_nix
+      - execute_sbt_command:
+          cmd: "Test/compile"
+          retry_fetch: "50"
+      - execute_sbt_command:
+          cmd: "\"testOnly *RunbookIntegrationTest\""
+          timeout: "10m"
+      - slack/notify:
+          event: pass
+          branch_pattern: main
+          custom: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "fields": [
+                    {
+                      "type": "plain_text",
+                      "text": "Pre-flight validator check succeeded! :dart:",
+                      "emoji": true
+                    }
+                  ]
+                }
+              ]
+            }
+      - cleanup_test_job
 
   update_pipeline_schedule:
     docker:
@@ -462,3 +499,10 @@ workflows:
         requires:
            - deployment_test
            - docker-images-push
+    - preflight_check:
+        <<: *notify-fail
+        <<: *main-branch-only
+        requires:
+          - deployment_test
+          - docker-images-push
+          - deploy_cluster

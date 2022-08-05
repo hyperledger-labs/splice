@@ -1,6 +1,6 @@
 package com.daml.network.integration
 
-import better.files.Resource
+import better.files.{File, Resource}
 import com.daml.network.config.CoinConfig
 import com.daml.network.environment.{
   CoinConsoleEnvironment,
@@ -23,7 +23,7 @@ import monocle.macros.syntax.lens._
 /** Analogue to Canton's CommunityEnvironmentDefinition. */
 case class CoinEnvironmentDefinition(
     override val baseConfig: CoinConfig,
-    override val testingConfig: TestingConfigInternal,
+    override val testingConfig: TestingConfigInternal = TestingConfigInternal(),
     override val setup: CoinTestConsoleEnvironment => Unit = _ => (),
     override val teardown: Unit => Unit = _ => (),
     override val configTransforms: Seq[CoinConfig => CoinConfig] = CoinConfigTransforms.defaults,
@@ -69,13 +69,16 @@ object CoinEnvironmentDefinition {
 
   def fromResource(path: String): CoinEnvironmentDefinition =
     CoinEnvironmentDefinition(
-      baseConfig = loadConfigFromResource(path),
-      testingConfig = TestingConfigInternal(),
-      configTransforms = Seq(),
+      baseConfig = loadConfigFromResource(path)
     )
 
   private def loadConfigFromResource(path: String): CoinConfig = {
     val rawConfig = ConfigFactory.parseString(Resource.getAsString(path))
     CoinConfig.loadOrExit(rawConfig)
+  }
+
+  def fromFiles(files: File*): CoinEnvironmentDefinition = {
+    val config = CoinConfig.parseAndLoadOrExit(files.map(_.toJava))
+    CoinEnvironmentDefinition(baseConfig = config)
   }
 }

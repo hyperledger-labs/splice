@@ -13,13 +13,13 @@ import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences, Contrac
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.network.CC.Coin.Coin
+import com.digitalasset.network.CC.CoinRules.CoinRules
 import com.digitalasset.network.CC.Round.Round
 import com.digitalasset.network.CC.CoinRules.{CoinRules, CoinRulesRequest}
 import com.digitalasset.network.CN.Wallet.AppPaymentRequest
 import com.digitalasset.network.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 import com.digitalasset.network.DA.Time.Types.RelTime
-
-import scala.concurrent.duration._
+import com.digitalasset.network.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 
 class WalletIntegrationTest
     extends CoinIntegrationTest

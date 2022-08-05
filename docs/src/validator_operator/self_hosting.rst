@@ -1,10 +1,17 @@
 Self-Hosted Validator (Preview)
 ===============================
 
-These pages give a step-by-step guide how to deploy your own validator node to the Canton network. 
+These pages give a step-by-step guide how to deploy your own validator node to the Canton network.
 
-- *Succinctly: What is a 'validator' node? Link to further doc*
-- *How does it relate to 'canton coin'?*
+Intended audience
+-----------------
+
+At the moment, the intended audience of this guide is technical DA staff that has some background on CC (e.g. through having
+watched the `CC technical overview presentation <https://digitalasset.atlassian.net/wiki/spaces/CN/overview>`_).
+
+..
+   *Succinctly: What is a 'validator' node? Link to further doc*
+   *How does it relate to 'canton coin'?*
 
 Prerequisites
 -------------
@@ -14,13 +21,14 @@ To locally start a validator node that connects against the devnet domain, you w
 2) the Daml validator app and
 3) the Daml wallet app
 
-Additionally, you also need access and activate one of the following four `Digital Asset VPNs <https://digitalasset.atlassian.net/wiki/spaces/DEVSECOPS/pages/1076822828/VPN+IP+Whitelist+for+Digital+Asset>`_:
+Additionally, you'll also need access to one of the following four `Digital Asset VPNs <https://digitalasset.atlassian.net/wiki/spaces/DEVSECOPS/pages/1076822828/VPN+IP+Whitelist+for+Digital+Asset>`_:
 
 * GCP Virginia Full Tunnel
 * GCP Frankfurt Full Tunnel
 * GCP Sydney Full Tunnel
 * GCP DA Canton DevNet
 
+Please activate the VPN now.
 
 To run a participant node, please `download and install Canton version 2.3.2 <https://docs.daml.com/canton/usermanual/downloading.html>`_.
 

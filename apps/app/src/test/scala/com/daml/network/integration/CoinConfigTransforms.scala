@@ -1,13 +1,16 @@
 package com.daml.network.integration
 
-import com.digitalasset.canton.UniquePortGenerator
-import com.digitalasset.canton.config.RequireTypes.Port
+import com.daml.network.directory.provider.config.LocalDirectoryProviderAppConfig
+import com.daml.network.directory.user.config.LocalDirectoryUserAppConfig
+import com.daml.network.scan.config.LocalScanAppConfig
+import com.daml.network.svc.config.LocalSvcAppConfig
+import com.daml.network.validator.config.LocalValidatorAppConfig
+import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
+import com.digitalasset.canton.config.{NodeConfig, TimeoutDuration}
 import com.digitalasset.canton.domain.config.CommunityDomainConfig
 import com.digitalasset.canton.participant.config.CommunityParticipantConfig
 import monocle.macros.syntax.lens._
-import cats.syntax.option._
-import com.daml.network.validator.config.LocalValidatorAppConfig
-import com.digitalasset.canton.config.TimeoutDuration
+
 import scala.concurrent.duration._
 
 object CoinConfigTransforms {
@@ -15,20 +18,72 @@ object CoinConfigTransforms {
   /** Default transforms to apply to tests using a [[CoinEnvironmentDefinition]].
     * Covers the primary ways that distinct concurrent environments may unintentionally collide.
     */
-  lazy val defaults: Seq[CoinConfigTransform] = Seq(globallyUniquePorts) ++ Seq(
-    // make unbounded duration bounded for our test
-    _.focus(_.parameters.timeouts.console.unbounded)
-      .replace(TimeoutDuration.tryFromDuration(2.minutes))
-      .focus(_.parameters.timeouts.processing.unbounded)
-      .replace(TimeoutDuration.tryFromDuration(2.minutes))
-      .focus(_.parameters.timeouts.processing.shutdownProcessing)
-      .replace(TimeoutDuration.tryFromDuration(10.seconds))
-  )
+  lazy val defaults: Seq[CoinConfigTransform] = {
+    Seq(
+      // make unbounded duration bounded for our test
+      _.focus(_.parameters.timeouts.console.unbounded)
+        .replace(TimeoutDuration.tryFromDuration(2.minutes))
+        .focus(_.parameters.timeouts.processing.unbounded)
+        .replace(TimeoutDuration.tryFromDuration(2.minutes))
+        .focus(_.parameters.timeouts.processing.shutdownProcessing)
+        .replace(TimeoutDuration.tryFromDuration(10.seconds))
+    )
+  }
 
-  /** A shared unique port instance to allow every test in a test run to assign unique ports. */
-  val globallyUniquePorts: CoinConfigTransform = uniquePorts(
-    UniquePortGenerator.forIntegrationTests.next
-  )
+  type CnAppConfigTransform[A <: NodeConfig] = A => A
+  type DirectoryUserAppTransform = CnAppConfigTransform[LocalDirectoryUserAppConfig]
+  type DirectoryProviderAppTransform = CnAppConfigTransform[LocalDirectoryProviderAppConfig]
+  type ValidatorAppTransform = CnAppConfigTransform[LocalValidatorAppConfig]
+  type WalletAppTransform = CnAppConfigTransform[LocalWalletAppConfig]
+  type RemoteWalletAppTransform = CnAppConfigTransform[RemoteWalletAppConfig]
+  type SvcAppTransform = CnAppConfigTransform[LocalSvcAppConfig]
+  type ScanAppTransform = CnAppConfigTransform[LocalScanAppConfig]
+
+  def updateAllDirectoryUserAppConfigs_(
+      update: DirectoryUserAppTransform
+  ): CoinConfigTransform =
+    _.focus(_.directoryUserApps).modify(_.map { case (name, config) =>
+      (name, update(config))
+    })
+
+  def updateAllDirectoryProviderAppConfigs_(
+      update: DirectoryProviderAppTransform
+  ): CoinConfigTransform =
+    _.focus(_.directoryProviderApps).modify(_.map { case (name, config) =>
+      (name, update(config))
+    })
+
+  def updateAllWalletAppConfigs_(
+      update: WalletAppTransform
+  ): CoinConfigTransform =
+    _.focus(_.walletApps).modify(_.map { case (name, config) =>
+      (name, update(config))
+    })
+
+  def updateAllAppConfigs_(
+      update: WalletAppTransform
+  ): CoinConfigTransform =
+    _.focus(_.walletApps).modify(_.map { case (name, config) =>
+      (name, update(config))
+    })
+
+  def updateCcScanConfig(update: ScanAppTransform): CoinConfigTransform =
+    cantonConfig =>
+      cantonConfig
+        .focus(_.scanApp)
+        .replace(cantonConfig.scanApp match {
+          case None => None
+          case Some(scan) => Some(update(scan))
+        })
+
+  def updateSvcConfig(update: SvcAppTransform): CoinConfigTransform =
+    cantonConfig =>
+      cantonConfig
+        .focus(_.svcApp)
+        .replace(cantonConfig.svcApp match {
+          case None => None
+          case Some(svcApp) => Some(update(svcApp))
+        })
 
   def updateAllValidatorConfigs(
       update: (String, LocalValidatorAppConfig) => LocalValidatorAppConfig
@@ -68,28 +123,4 @@ object CoinConfigTransforms {
       update: CommunityParticipantConfig => CommunityParticipantConfig
   ): CoinConfigTransform =
     updateAllParticipantConfigs((_, config) => update(config))
-
-  /** Update a canton config to assign port numbers from the given `startingPort` to all domains and participants */
-  def uniquePorts(nextPort: => Port): CoinConfigTransform = {
-    val validatorUpdate = updateAllValidatorConfigs_(
-      _.focus(_.adminApi.internalPort)
-        .replace(nextPort.some)
-    )
-
-    val domainUpdate = updateAllDomainConfigs_(
-      _.focus(_.publicApi.internalPort)
-        .replace(nextPort.some)
-        .focus(_.adminApi.internalPort)
-        .replace(nextPort.some)
-    )
-
-    val participantUpdate = updateAllParticipantConfigs_(
-      _.focus(_.ledgerApi.internalPort)
-        .replace(nextPort.some)
-        .focus(_.adminApi.internalPort)
-        .replace(nextPort.some)
-    )
-
-    domainUpdate compose participantUpdate compose validatorUpdate
-  }
 }
