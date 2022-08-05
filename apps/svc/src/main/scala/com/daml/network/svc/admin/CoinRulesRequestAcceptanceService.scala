@@ -36,7 +36,7 @@ class CoinRulesRequestAcceptanceService(
             Map(svcParty -> Seq(OpenMiningRound.id, IssuingMiningRound.id))
           )
         )
-        .map { case (events, _) =>
+        .map { case events =>
           val openMiningRounds = events
             .flatMap(DecodeUtil.decodeCreated(OpenMiningRound))
             .filter(c => c.value.obs == svcParty.toPrim)

@@ -107,7 +107,8 @@ object DamlPlugin extends AutoPlugin {
         // we don't really know dependencies between daml files, so just assume if any change then we need to rebuild all packages
         val cacheDir = streams.value.cacheDirectory
         // All daml files outside of .daml
-        val allDamlFiles = damlSourceDirectory.value ** "*.daml" --- (damlSourceDirectory.value ** ".daml" ** "*.daml")
+        val allDamlFiles =
+          damlSourceDirectory.value ** "*.daml" --- (damlSourceDirectory.value ** ".daml" ** "*.daml")
         val damlProjectFiles =
           damlSourceDirectory.value ** "daml.yaml" // TODO(i190) Expecting the `daml.yaml` project file to reside in the source dir is not consistent with SDK paths (daml.yaml at root, source under `./daml`)
 

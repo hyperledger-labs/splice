@@ -36,10 +36,7 @@ object CoinUtil extends UploadablePackage {
       ec: ExecutionContext
   ): Future[Primitive.ContractId[CoinRules]] = {
     for {
-      rulesAcs <- connection.activeContracts(
-        LedgerConnection.transactionFilterByParty(Map(validator -> Seq(templateId(CoinRules.id))))
-      )
-      createdRules = rulesAcs._1.flatMap(res => DecodeUtil.decodeCreated(CoinRules)(res))
+      createdRules <- connection.activeContracts(validator, CoinRules)
       _ = require(
         createdRules.length == 1,
         s"Expected only one CoinRules instance but found ${createdRules.size} instances: $createdRules",
@@ -137,7 +134,7 @@ object CoinUtil extends UploadablePackage {
             Map(svcPartyId -> Seq(coinRulesRequestTid, openMiningRoundTid, issuingMiningRoundTid))
           )
         )
-        .map { case (events, _) =>
+        .map { case events =>
           val requestCids = events
             .flatMap(DecodeUtil.decodeCreated(CC.CoinRules.CoinRulesRequest))
             .map(_.contractId)

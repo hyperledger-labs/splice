@@ -79,18 +79,13 @@ class GrpcSvcAppService(
             )
           )
         case Some(partyId) =>
-          val coinRulesTid = CoinUtil.templateId(CC.CoinRules.CoinRules.id)
           for {
-            coinRulesCids <- connection
-              .activeContracts(
-                LedgerConnection.transactionFilterByParty(Map(partyId -> Seq(coinRulesTid)))
-              )
-              .map(_._1.map(_.contractId))
+            coinRulesCids <- connection.activeContracts(partyId, CC.CoinRules.CoinRules).map(_.map(_.contractId))
           } yield v0.GetDebugInfoResponse(
             svcUser = svcUserName,
             svcParty = partyId.toProtoPrimitive,
             coinPackageId = CoinUtil.packageId,
-            coinRulesCids = coinRulesCids,
+            coinRulesCids = ApiTypes.ContractId.unsubst(coinRulesCids: Seq[ApiTypes.ContractId]),
           )
       }
     }
@@ -243,12 +238,7 @@ class GrpcSvcAppService(
   // we accept this for now.
   private def getValidators(svc: PartyId): Future[Set[PartyId]] =
     for {
-      activeContracts <- connection.activeContracts(
-        CoinLedgerConnection.transactionFilter(svc, CC.CoinRules.CoinRules.id)
-      )
-      coinRules = activeContracts._1.flatMap(event =>
-        DecodeUtil.decodeCreated(CC.CoinRules.CoinRules)(event)
-      )
+      coinRules <- connection.activeContracts(svc, CC.CoinRules.CoinRules)
     } yield {
       coinRules.map(c => PartyId.tryFromPrim(c.value.obs)).toSet
     }
@@ -262,12 +252,8 @@ class GrpcSvcAppService(
       getValidator: T => Primitive.Party,
   )(svc: PartyId, round: Long): Future[Map[Primitive.Party, Primitive.ContractId[T]]] =
     for {
-      activeContracts <- connection.activeContracts(
-        CoinLedgerConnection.transactionFilter(svc, companion.id)
-      )
+      allRounds <- connection.activeContracts(svc, companion)
     } yield {
-      val allRounds =
-        activeContracts._1.flatMap(event => DecodeUtil.decodeCreated(companion)(event))
       val filteredRounds = allRounds.filter { case roundContract =>
         val roundId = getRound(roundContract.value)
         roundId.number === round
@@ -321,9 +307,9 @@ class GrpcSvcAppService(
     )
   } yield {
     val appRewards =
-      activeContracts._1.flatMap(ev => DecodeUtil.decodeCreated(CC.Coin.AppReward)(ev))
+      activeContracts.flatMap(ev => DecodeUtil.decodeCreated(CC.Coin.AppReward)(ev))
     val validatorRewards =
-      activeContracts._1.flatMap(ev => DecodeUtil.decodeCreated(CC.Coin.ValidatorReward)(ev))
+      activeContracts.flatMap(ev => DecodeUtil.decodeCreated(CC.Coin.ValidatorReward)(ev))
     RoundRewards(
       round = round,
       appRewards = appRewards.filter(c => c.value.round.number === round),

@@ -20,7 +20,7 @@ import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree}
 import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
 import com.daml.ledger.api.v1.value.Identifier
 import com.daml.ledger.client.LedgerClient
-import com.daml.ledger.client.binding.{Primitive => P}
+import com.daml.ledger.client.binding.{Contract, Primitive => P, TemplateCompanion}
 import com.daml.ledger.client.configuration.{
   CommandClientConfiguration,
   LedgerClientChannelConfiguration,
@@ -28,6 +28,7 @@ import com.daml.ledger.client.configuration.{
   LedgerIdRequirement,
 }
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
+import com.digitalasset.canton.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
@@ -90,9 +91,20 @@ trait CoinLedgerSubscription extends FlagCloseableAsync with NamedLogging {
 
 trait CoinLedgerConnection extends CoinLedgerSubmit {
   def ledgerEnd: Future[LedgerOffset]
-  def activeContracts(
+  def activeContractsWithOffset(
       filter: TransactionFilter
   ): Future[(Seq[CreatedEvent], LedgerOffset)]
+  def activeContracts(
+      filter: TransactionFilter
+  ): Future[Seq[CreatedEvent]]
+  def activeContractsWithOffset[T](
+      party: PartyId,
+      templateCompanion: TemplateCompanion[T],
+  ): Future[(Seq[Contract[T]], LedgerOffset)]
+  def activeContracts[T](
+      party: PartyId,
+      templateCompanion: TemplateCompanion[T],
+  ): Future[Seq[Contract[T]]]
   def subscribe(
       subscriptionName: String,
       offset: LedgerOffset,
@@ -223,7 +235,7 @@ object CoinLedgerConnection {
       override def ledgerEnd: Future[LedgerOffset] =
         transactionClient.getLedgerEnd().flatMap(response => toFuture(response.offset))
 
-      override def activeContracts(
+      override def activeContractsWithOffset(
           filter: TransactionFilter
       ): Future[(Seq[CreatedEvent], LedgerOffset)] = {
         val activeContractsRequest = client.activeContractSetClient.getActiveContracts(filter)
@@ -262,6 +274,27 @@ object CoinLedgerConnection {
             NoErrorKind
         }
       }
+
+      override def activeContracts(
+          filter: TransactionFilter
+      ): Future[Seq[CreatedEvent]] =
+        activeContractsWithOffset(filter).map(_._1)
+
+      override def activeContractsWithOffset[T](
+          party: PartyId,
+          templateCompanion: TemplateCompanion[T],
+      ): Future[(Seq[Contract[T]], LedgerOffset)] =
+        activeContractsWithOffset(transactionFilter(party, templateCompanion.id)).map {
+          case (contracts, offset) =>
+            val decoded = contracts.flatMap(ev => DecodeUtil.decodeCreated(templateCompanion)(ev))
+            (decoded, offset)
+        }
+
+      override def activeContracts[T](
+          party: PartyId,
+          templateCompanion: TemplateCompanion[T],
+      ): Future[Seq[Contract[T]]] =
+        activeContractsWithOffset(party, templateCompanion).map(_._1)
 
       override def submitCommand(
           actAs: Seq[PartyId],

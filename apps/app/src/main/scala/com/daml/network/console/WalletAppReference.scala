@@ -78,7 +78,9 @@ abstract class WalletAppReference(
   @Help.Description(
     "Reject a payment request."
   )
-  def rejectAppPaymentRequest(requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest]): Unit = {
+  def rejectAppPaymentRequest(
+      requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest]
+  ): Unit = {
     consoleEnvironment.run {
       adminCommand(WalletAppCommands.RejectAppPaymentRequest(requestId))
     }

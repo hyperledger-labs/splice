@@ -50,13 +50,7 @@ class GrpcWalletService(
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         walletParty <- getWalletParty()
-        activeContractsRes <- connection.activeContracts(
-          CoinLedgerConnection.transactionFilter(walletParty, coinCodegen.Coin.id)
-        )
-        coinsLAPI = activeContractsRes._1.flatMap(event =>
-          DecodeUtil.decodeCreated(coinCodegen.Coin)(event)
-        )
-
+        coinsLAPI <- connection.activeContracts(walletParty, coinCodegen.Coin)
       } yield {
         // TODO(i207): persist response to store
         val coinsProto =
@@ -95,12 +89,8 @@ class GrpcWalletService(
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => span =>
       for {
         walletParty <- getWalletParty()
-        activeContractsRes <- connection.activeContracts(
-          CoinLedgerConnection.transactionFilter(walletParty, walletCodegen.AppPaymentRequest.id)
-        )
-        paymentRequestsLAPI = activeContractsRes._1.flatMap(event =>
-          DecodeUtil.decodeCreated(walletCodegen.AppPaymentRequest)(event)
-        )
+        paymentRequestsLAPI <- connection
+          .activeContracts(walletParty, walletCodegen.AppPaymentRequest)
       } yield {
         val filteredRequests = paymentRequestsLAPI.filter(contract =>
           PartyId.tryFromPrim(contract.value.payer) == walletParty

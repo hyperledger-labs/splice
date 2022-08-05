@@ -62,12 +62,8 @@ class GrpcDirectoryProviderService(
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
         partyId <- getParty()
-        activeContracts <- connection.activeContracts(
-          CoinLedgerConnection.transactionFilter(partyId, codegen.DirectoryInstallRequest.id)
-        )
-        installRequestsLAPI = activeContracts._1.flatMap(event =>
-          DecodeUtil.decodeCreated(codegen.DirectoryInstallRequest)(event)
-        )
+        installRequestsLAPI <- connection
+          .activeContracts(partyId, codegen.DirectoryInstallRequest)
       } yield {
         val filteredRequests = installRequestsLAPI.filter(contract =>
           PartyId.tryFromPrim(contract.value.provider) == partyId
@@ -111,12 +107,8 @@ class GrpcDirectoryProviderService(
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
         partyId <- getParty()
-        activeContracts <- connection.activeContracts(
-          CoinLedgerConnection.transactionFilter(partyId, codegen.DirectoryEntryRequest.id)
-        )
-        entryRequestsLAPI = activeContracts._1.flatMap(event =>
-          DecodeUtil.decodeCreated(codegen.DirectoryEntryRequest)(event)
-        )
+        entryRequestsLAPI <- connection
+          .activeContracts(partyId, codegen.DirectoryEntryRequest)
       } yield {
         val filteredRequests = entryRequestsLAPI.filter(contract =>
           PartyId.tryFromPrim(contract.value.entry.provider) == partyId
@@ -249,38 +241,18 @@ class GrpcDirectoryProviderService(
 
   private def listEntries(party: PartyId): Future[Seq[Contract[codegen.DirectoryEntry]]] =
     for {
-      contracts <- connection.activeContracts(
-        txFilter(party, ApiTypes.TemplateId.unwrap(codegen.DirectoryEntry.id))
-      )
-      decoded = contracts._1.flatMap(event =>
-        DecodeUtil.decodeCreated(codegen.DirectoryEntry)(event)
-      )
+      decoded <- connection.activeContracts(party, codegen.DirectoryEntry)
     } yield {
       val filtered =
         decoded.filter(contract => PartyId.tryFromPrim(contract.value.provider) == party)
       filtered.map(Contract.fromCodegenContract[codegen.DirectoryEntry](_))
     }
 
-  private def txFilter(partyId: PartyId, tplId: Identifier): TransactionFilter = {
-    transaction_filter.TransactionFilter(
-      Map(
-        partyId.toPrim.toString -> Filters(
-          Some(
-            InclusiveFilters(templateIds = Seq(tplId))
-          )
-        )
-      )
-    )
-  }
-
   private def fetchByContractId[T](
       companion: TemplateCompanion[T]
   )(partyId: PartyId, cid: Primitive.ContractId[T]): Future[CodegenContract[T]] = {
     for {
-      contracts <- connection.activeContracts(
-        CoinLedgerConnection.transactionFilter(partyId, companion.id)
-      )
-      decoded = contracts._1.flatMap(event => DecodeUtil.decodeCreated(companion)(event))
+      decoded <- connection.activeContracts(partyId, companion)
     } yield {
       decoded
         .collectFirst {
