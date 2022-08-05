@@ -1,4 +1,6 @@
-local deployment(gcpRegion, gcpRepoName, imageTag, name, ports, ext={}) = {
+local networkDefaults = import './network-defaults.jsonnet';
+
+local deployment(config, name, ports, ext={}) = {
   apiVersion: 'apps/v1',
   kind: 'Deployment',
   metadata: {
@@ -24,7 +26,7 @@ local deployment(gcpRegion, gcpRepoName, imageTag, name, ports, ext={}) = {
         containers: [
           {
             name: name,
-            image: gcpRegion + '-docker.pkg.dev/' + gcpRepoName + '/' + name + ':' + imageTag,
+            image: config.gcpRegion + '-docker.pkg.dev/' + config.gcpRepoName + '/' + name + ':' + config.imageTag,
             imagePullPolicy: 'Always',
             ports: ports,
           } + ext,
@@ -34,7 +36,7 @@ local deployment(gcpRegion, gcpRepoName, imageTag, name, ports, ext={}) = {
   },
 };
 
-local externalService(name, ipAddr, ports) = {
+local externalService(config, name, ports) = {
   apiVersion: 'v1',
   kind: 'Service',
   metadata: {
@@ -46,27 +48,22 @@ local externalService(name, ipAddr, ports) = {
       app: name,
     },
     ports: ports,
-    loadBalancerIP: ipAddr,
-    loadBalancerSourceRanges: [
-      '35.194.81.56/32',
-      '35.198.147.95/32',
-      '35.189.40.124/32',
-      '34.132.91.75/32',
-    ],
+    loadBalancerIP: config.ipAddr,
+    loadBalancerSourceRanges: config.externalIPRanges,
   },
 };
 
-function(gcpRegion, gcpRepoName, imageTag, ipAddr) {
+local cantonNetwork(config) = {
   apiVersion: 'apps/v1',
   kind: 'List',
   items: [
-    deployment(gcpRegion, gcpRepoName, imageTag, 'docs', [
+    deployment(config, 'docs', [
       {
         containerPort: 80,
         name: 'http',
       },
     ]),
-    deployment(gcpRegion, gcpRepoName, imageTag, 'svc-app', [
+    deployment(config, 'svc-app', [
       {
         name: 'svc-app-adm-api',
         containerPort: 5005,
@@ -77,9 +74,7 @@ function(gcpRegion, gcpRepoName, imageTag, ipAddr) {
       },
     ]),
     deployment(
-      gcpRegion,
-      gcpRepoName,
-      imageTag,
+      config,
       'canton-domain',
       [
         {
@@ -106,7 +101,7 @@ function(gcpRegion, gcpRepoName, imageTag, ipAddr) {
         },
       },
     ),
-    deployment(gcpRegion, gcpRepoName, imageTag, 'canton-participant', [
+    deployment(config, 'canton-participant', [
       {
         name: 'cp-adm-api',
         containerPort: 5002,
@@ -116,7 +111,7 @@ function(gcpRegion, gcpRepoName, imageTag, ipAddr) {
         containerPort: 5001,
       },
     ]),
-    externalService('docs', ipAddr, [
+    externalService(config, 'docs', [
       {
         protocol: 'TCP',
         port: 80,
@@ -124,8 +119,8 @@ function(gcpRegion, gcpRepoName, imageTag, ipAddr) {
       },
     ]),
     externalService(
+      config,
       'svc-app',
-      ipAddr,
       [
         {
           name: 'svc-app-adm-api',
@@ -142,8 +137,8 @@ function(gcpRegion, gcpRepoName, imageTag, ipAddr) {
       ]
     ),
     externalService(
+      config,
       'canton-domain',
-      ipAddr,
       [
         {
           name: 'canton-pub-api',
@@ -160,8 +155,8 @@ function(gcpRegion, gcpRepoName, imageTag, ipAddr) {
       ]
     ),
     externalService(
+      config,
       'canton-participant',
-      ipAddr,
       [
         {
           name: 'cp-adm-api',
@@ -178,4 +173,11 @@ function(gcpRegion, gcpRepoName, imageTag, ipAddr) {
       ]
     ),
   ],
-}
+};
+
+function(gcpRegion, gcpRepoName, imageTag, ipAddr) cantonNetwork(networkDefaults {
+  gcpRegion: gcpRegion,
+  gcpRepoName: gcpRepoName,
+  imageTag: imageTag,
+  ipAddr: ipAddr,
+})
