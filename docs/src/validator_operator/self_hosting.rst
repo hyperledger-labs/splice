@@ -89,7 +89,7 @@ Reusing the console from the previous section: ::
   
 You can create free coins like so: ::
 
-  @ wallet.tap("1000.0")
+  @ wallet.tap(1000.0)
   Res2: ContractId Canton.Coin { ... }
 
 Creating free coins will only be possible in temporary test- and devnets.
@@ -103,7 +103,7 @@ You can list your balances with the following command:
 
   
 If you've followed the previous instructions, you should already see one coin, similar to the output above.
-If not, try calling ``wallet.tap("1000.0")`` and then rerunning this command.
+If not, try calling ``wallet.tap(1000.0)`` and then rerunning this command.
 
 
 .. TODO(M1-02): Add transfer section

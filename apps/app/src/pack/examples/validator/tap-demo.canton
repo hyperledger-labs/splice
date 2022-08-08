@@ -5,5 +5,5 @@ validatorApp.onboardUser("wallet")
 wallet.initialize(validatorParty)
 
 require(wallet.list().length == 0)
-wallet.tap("1000.0")
+wallet.tap(1000.0)
 require(wallet.list().length == 1)
