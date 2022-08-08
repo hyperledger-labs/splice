@@ -70,7 +70,7 @@ class SvcAutomationService(
     val connection = CoinLedgerConnection(
       remoteParticipant.ledgerApi,
       appId,
-      10,
+      maxRetries = 10,
       ApiTypes.WorkflowId(workflowId),
       CommandClientConfiguration.default,
       remoteParticipant.token,

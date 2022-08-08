@@ -29,7 +29,7 @@ class CoinRulesRequestAcceptanceService(
   ): Future[Unit] =
     for {
       requestCids <- Future(DecodeUtil.decodeAllCreated(CoinRulesRequest)(tx).map(_.contractId))
-      // TODO(#359): This will work as intended until we automatically open and close rounds
+      // TODO(i359): This will work as intended until we automatically open and close rounds
       (openMiningRounds, issuingMiningRounds) <- connection
         .activeContracts(filter =
           CoinLedgerConnection.transactionFilterByParty(

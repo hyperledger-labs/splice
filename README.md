@@ -142,6 +142,21 @@ To edit the files in a particular Daml project, for example, `/apps/wallet/daml`
 *Tip:* if `damlBuild` fails with weird errors, then that might be due to stale `damlBuild` outputs.
 Try forcing a clean rebuild by cleaning via SBT, e.g., `apps-common/clean` and similar for the dependent project.
 
+### Daml Numerics
+
+To represent Daml `Numeric`s for any user facing APIs (console commands), we use `scala.math.BigDecimal`s. 
+We use Scala BigDecimals instead of Java BigDecimals (that are used in the Daml repo) because 
+integers, floats etc. are automatically converted 
+to Scala BigDecimals by the Scala compiler unlike Java BigDecimals 
+(`wallet.tap(10)` vs `wallet.tap(new java.math.BigDecimal(10))`). 
+
+To represent Daml Numerics in Protobuf we use `string`s (there is no Protobuf BigDecimal type). Conversions to 
+and from `string`s should occur via `Numeric.toString` and `Numeric.fromString` from `com.daml.lf.data.Numeric`.
+
+When interacting with the Ledger API, we convert the Scala BigDecimals to Java BigDecimals. 
+
+Overall, please refer to the `wallet.tap` command implementation for the canonical handling of Daml Numerics.  
+
 ## GCE Clusters
 
 The public Canton Network clusters are currently hosted in Google
@@ -454,3 +469,4 @@ Both our deployment and tests follow the [port allocation scheme](./apps/app/src
 You can refer to https://github.com/DACH-NY/the-real-canton-coin/pull/446/commits for an example of how the update PR should look like. 
 
 Current Canton commit: 9e5ec309ad5fe229e53ab668b6b180db67b555bc
+
