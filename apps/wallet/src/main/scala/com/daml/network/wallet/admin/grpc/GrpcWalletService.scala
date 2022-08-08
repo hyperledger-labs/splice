@@ -304,6 +304,103 @@ class GrpcWalletService(
       }
     }
 
+  @nowarn("cat=unused")
+  override def createOnChannelPaymentRequest(
+      request: v0.CreateOnChannelPaymentRequestRequest
+  ): Future[v0.CreateOnChannelPaymentRequestResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        svcParty <- scanConnection.getSvcPartyId()
+        walletParty <- connection.getPrimaryParty(walletDamlUser)
+        senderParty = PartyId.tryFromProtoPrimitive(request.sender)
+        arg = walletCodegen.PaymentChannel_CreatePaymentRequest(
+          quantity = Numeric.assertFromString(request.quantity),
+          description = request.description,
+        )
+        cmd = walletCodegen.PaymentChannel
+          .key(DA.Types.Tuple3(senderParty.toPrim, walletParty.toPrim, svcParty.toPrim))
+          .exercisePaymentChannel_CreatePaymentRequest(walletParty.toPrim, arg)
+          .command
+        tx <- connection.submitCommand(
+          Seq(walletParty),
+          Seq(),
+          Seq(cmd),
+        )
+        requests = DecodeUtil.decodeAllCreated(walletCodegen.OnChannelPaymentRequest)(tx.getTransaction)
+        _ = require(
+          requests.length == 1,
+          s"Expected create payment request to create one requests, but found ${requests.length} requests: $requests"
+        )
+      } yield v0.CreateOnChannelPaymentRequestResponse(
+        requestContractId = ApiTypes.ContractId.unwrap(requests(0).contractId)
+      )
+    }
+
+  @nowarn("cat=unused")
+  override def approveOnChannelPaymentRequest(
+      request: v0.ApproveOnChannelPaymentRequestRequest
+  ): Future[v0.ApproveOnChannelPaymentRequestResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        svcParty <- scanConnection.getSvcPartyId()
+        walletParty <- connection.getPrimaryParty(walletDamlUser)
+        coinCid = Primitive.ContractId[coinCodegen.Coin](request.coinContractId)
+        arg = walletCodegen.OnChannelPaymentRequest_Accept(
+          inputs = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
+        )
+        cmd = Primitive
+          .ContractId[walletCodegen.OnChannelPaymentRequest](request.requestContractId)
+          .exerciseOnChannelPaymentRequest_Accept(walletParty.toPrim, arg)
+          .command
+        _ <- connection.submitCommand(
+          Seq(walletParty),
+          Seq(validatorParty.get()),
+          Seq(cmd),
+        )
+      } yield v0.ApproveOnChannelPaymentRequestResponse()
+    }
+
+  @nowarn("cat=unused")
+  override def rejectOnChannelPaymentRequest(
+      request: v0.RejectOnChannelPaymentRequestRequest
+  ): Future[v0.RejectOnChannelPaymentRequestResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        svcParty <- scanConnection.getSvcPartyId()
+        walletParty <- connection.getPrimaryParty(walletDamlUser)
+        arg = walletCodegen.OnChannelPaymentRequest_Reject()
+        cmd = Primitive
+          .ContractId[walletCodegen.OnChannelPaymentRequest](request.requestContractId)
+          .exerciseOnChannelPaymentRequest_Reject(walletParty.toPrim, arg)
+          .command
+        _ <- connection.submitCommand(
+          Seq(walletParty),
+          Seq(),
+          Seq(cmd),
+        )
+      } yield v0.RejectOnChannelPaymentRequestResponse()
+    }
+
+  @nowarn("cat=unused")
+  override def withdrawOnChannelPaymentRequest(
+      request: v0.WithdrawOnChannelPaymentRequestRequest
+  ): Future[v0.WithdrawOnChannelPaymentRequestResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        walletParty <- connection.getPrimaryParty(walletDamlUser)
+        arg = walletCodegen.OnChannelPaymentRequest_Withdraw()
+        cmd = Primitive
+          .ContractId[walletCodegen.OnChannelPaymentRequest](request.requestContractId)
+          .exerciseOnChannelPaymentRequest_Withdraw(walletParty.toPrim, arg)
+          .command
+        _ <- connection.submitCommand(
+          Seq(walletParty),
+          Seq(),
+          Seq(cmd),
+        )
+      } yield v0.WithdrawOnChannelPaymentRequestResponse()
+    }
+
   override def initialize(request: InitializeRequest): Future[InitializeResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => _ =>
       validatorParty.set(

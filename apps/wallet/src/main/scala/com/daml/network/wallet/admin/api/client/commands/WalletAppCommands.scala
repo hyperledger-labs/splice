@@ -285,6 +285,120 @@ object WalletAppCommands {
 
   }
 
+  case class CreateOnChannelPaymentRequest(
+      sender: PartyId,
+      quantity: BigDecimal,
+      description: String,
+  ) extends BaseCommand[
+        v0.CreateOnChannelPaymentRequestRequest,
+        v0.CreateOnChannelPaymentRequestResponse,
+        Primitive.ContractId[walletCodegen.OnChannelPaymentRequest],
+      ] {
+    override def createRequest(): Either[String, v0.CreateOnChannelPaymentRequestRequest] =
+      Right(
+        v0.CreateOnChannelPaymentRequestRequest(
+          sender = sender.toProtoPrimitive,
+          quantity = Numeric.toString(quantity.bigDecimal),
+          description = description,
+        )
+      )
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.CreateOnChannelPaymentRequestRequest,
+    ): Future[v0.CreateOnChannelPaymentRequestResponse] =
+      service.createOnChannelPaymentRequest(request)
+
+    override def handleResponse(
+        response: v0.CreateOnChannelPaymentRequestResponse
+    ): Either[String, Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]] =
+      Right((
+        Primitive.ContractId[walletCodegen.OnChannelPaymentRequest](
+          response.requestContractId
+        )
+      ))
+  }
+
+  case class ApproveOnChannelPaymentRequest(
+      requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest],
+      coinId: Primitive.ContractId[coinCodegen.Coin],
+  ) extends BaseCommand[
+        v0.ApproveOnChannelPaymentRequestRequest,
+        v0.ApproveOnChannelPaymentRequestResponse,
+        Unit,
+      ] {
+    override def createRequest(): Either[String, v0.ApproveOnChannelPaymentRequestRequest] =
+      Right(
+        v0.ApproveOnChannelPaymentRequestRequest(
+          requestContractId = ApiTypes.ContractId.unwrap(requestId),
+          coinContractId = ApiTypes.ContractId.unwrap(coinId),
+        )
+      )
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.ApproveOnChannelPaymentRequestRequest,
+    ): Future[v0.ApproveOnChannelPaymentRequestResponse] =
+      service.approveOnChannelPaymentRequest(request)
+
+    override def handleResponse(
+        response: v0.ApproveOnChannelPaymentRequestResponse
+    ): Either[String, Unit] =
+      Right(())
+  }
+
+  case class RejectOnChannelPaymentRequest(
+      requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]
+  ) extends BaseCommand[
+        v0.RejectOnChannelPaymentRequestRequest,
+        v0.RejectOnChannelPaymentRequestResponse,
+        Unit,
+      ] {
+    override def createRequest(): Either[String, v0.RejectOnChannelPaymentRequestRequest] =
+      Right(
+        v0.RejectOnChannelPaymentRequestRequest(
+          requestContractId = ApiTypes.ContractId.unwrap(requestId)
+        )
+      )
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.RejectOnChannelPaymentRequestRequest,
+    ): Future[v0.RejectOnChannelPaymentRequestResponse] =
+      service.rejectOnChannelPaymentRequest(request)
+
+    override def handleResponse(
+        response: v0.RejectOnChannelPaymentRequestResponse
+    ): Either[String, Unit] =
+      Right(())
+  }
+
+  case class WithdrawOnChannelPaymentRequest(
+      requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]
+  ) extends BaseCommand[
+        v0.WithdrawOnChannelPaymentRequestRequest,
+        v0.WithdrawOnChannelPaymentRequestResponse,
+        Unit,
+      ] {
+    override def createRequest(): Either[String, v0.WithdrawOnChannelPaymentRequestRequest] =
+      Right(
+        v0.WithdrawOnChannelPaymentRequestRequest(
+          requestContractId = ApiTypes.ContractId.unwrap(requestId)
+        )
+      )
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.WithdrawOnChannelPaymentRequestRequest,
+    ): Future[v0.WithdrawOnChannelPaymentRequestResponse] =
+      service.withdrawOnChannelPaymentRequest(request)
+
+    override def handleResponse(
+        response: v0.WithdrawOnChannelPaymentRequestResponse
+    ): Either[String, Unit] =
+      Right(())
+  }
+
   case class ListAppRewards()
       extends BaseCommand[Empty, v0.ListAppRewardsResponse, Seq[
         Contract[coinCodegen.AppReward]

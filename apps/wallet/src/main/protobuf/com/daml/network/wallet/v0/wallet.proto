@@ -19,6 +19,10 @@ service WalletService {
   rpc ListPaymentChannelProposals (ListPaymentChannelProposalsRequest) returns (ListPaymentChannelProposalsResponse);
   rpc AcceptPaymentChannelProposal (AcceptPaymentChannelProposalRequest) returns (AcceptPaymentChannelProposalResponse);
   rpc ExecuteDirectTransfer (ExecuteDirectTransferRequest) returns (ExecuteDirectTransferResponse);
+  rpc CreateOnChannelPaymentRequest (CreateOnChannelPaymentRequestRequest) returns (CreateOnChannelPaymentRequestResponse);
+  rpc ApproveOnChannelPaymentRequest (ApproveOnChannelPaymentRequestRequest) returns (ApproveOnChannelPaymentRequestResponse);
+  rpc RejectOnChannelPaymentRequest (RejectOnChannelPaymentRequestRequest) returns (RejectOnChannelPaymentRequestResponse);
+  rpc WithdrawOnChannelPaymentRequest (WithdrawOnChannelPaymentRequestRequest) returns (WithdrawOnChannelPaymentRequestResponse);
 
   rpc ListAppRewards (google.protobuf.Empty) returns (ListAppRewardsResponse);
   rpc ListValidatorRewards (google.protobuf.Empty) returns (ListValidatorRewardsResponse);
@@ -118,4 +122,47 @@ message ListAppRewardsResponse {
 
 message ListValidatorRewardsResponse {
   repeated com.daml.network.v0.Contract validator_rewards = 1;
+}
+
+message CreateOnChannelPaymentRequestRequest {
+  // Sender who is requested to transfer CC
+  string sender = 1;
+
+  // Quantity of CC requested
+  string quantity = 2;
+
+  // Reason for the request
+  string description = 3;
+}
+
+message CreateOnChannelPaymentRequestResponse {
+  string request_contract_id = 1;
+}
+
+message ApproveOnChannelPaymentRequestRequest {
+  // The request to approve
+  string request_contract_id = 1;
+
+  // Coin to use for the transfer
+  // TODO(M1-07): auto-select inputs for the transfer
+  string coin_contract_id = 2;
+}
+
+message ApproveOnChannelPaymentRequestResponse {
+}
+
+message RejectOnChannelPaymentRequestRequest {
+  // The request to approve
+  string request_contract_id = 1;
+}
+
+message RejectOnChannelPaymentRequestResponse {
+}
+
+message WithdrawOnChannelPaymentRequestRequest {
+  // The request to approve
+  string request_contract_id = 1;
+}
+
+message WithdrawOnChannelPaymentRequestResponse {
 }

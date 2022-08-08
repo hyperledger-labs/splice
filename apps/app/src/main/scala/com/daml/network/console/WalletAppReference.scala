@@ -44,7 +44,9 @@ abstract class WalletAppReference(
       "Returns the contract ID of the created contract. "
   )
   def tap(quantity: BigDecimal): Primitive.ContractId[coinCodegen.Coin] = {
-    consoleEnvironment.run { adminCommand(WalletAppCommands.Tap(quantity)) }
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.Tap(quantity))
+    }
   }
 
   @Help.Summary("List all payment requests of the configured user")
@@ -133,6 +135,57 @@ abstract class WalletAppReference(
     }
   }
 
+  @Help.Summary("Request a payment through a payment channel")
+  @Help.Description(
+    "Assumes that the payment channel for the given sender already exists."
+  )
+  def createOnChannelPaymentRequest(
+      sender: PartyId,
+      quantity: BigDecimal,
+      description: String,
+  ): Primitive.ContractId[walletCodegen.OnChannelPaymentRequest] = {
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.CreateOnChannelPaymentRequest(sender, quantity, description))
+    }
+  }
+
+  @Help.Summary("Approve a request for payment through a payment channel")
+  @Help.Description(
+    "Approves the request using the given coin."
+  )
+  def approveOnChannelPaymentRequest(
+      requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest],
+      coinId: Primitive.ContractId[coinCodegen.Coin],
+  ): Unit = {
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.ApproveOnChannelPaymentRequest(requestId, coinId))
+    }
+  }
+
+  @Help.Summary("Reject a request for payment through a payment channel")
+  @Help.Description(
+    "Rejects the request."
+  )
+  def rejectOnChannelPaymentRequest(
+      requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]
+  ): Unit = {
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.RejectOnChannelPaymentRequest(requestId))
+    }
+  }
+
+  @Help.Summary("Withdraw a request for payment through a payment channel")
+  @Help.Description(
+    "Withdraws the request."
+  )
+  def withdrawOnChannelPaymentRequest(
+      requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]
+  ): Unit = {
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.WithdrawOnChannelPaymentRequest(requestId))
+    }
+  }
+
   @Help.Summary("List app rewards")
   @Help.Description("List all open app rewards for the configured user")
   def listAppRewards(): Seq[Contract[coinCodegen.AppReward]] =
@@ -174,6 +227,7 @@ class LocalWalletAppReference(
     with BaseInspection[ParticipantNode] {
 
   protected val nodes = consoleEnvironment.environment.wallets
+
   @Help.Summary("Return wallet app config")
   def config: LocalWalletAppConfig =
     consoleEnvironment.environment.config.walletsByString(name)

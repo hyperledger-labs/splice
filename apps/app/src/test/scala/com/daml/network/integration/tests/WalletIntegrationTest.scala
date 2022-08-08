@@ -159,6 +159,25 @@ class WalletIntegrationTest
       aliceWallet.executeDirectTransfer(bobUserParty, 10, coinCid)
       checkWallet(aliceUserParty, aliceWallet, Seq((39, 40)))
       checkWallet(bobUserParty, bobWallet, Seq((9, 10)))
+
+      // Bob asks for more coins, alice accepts
+      val request = bobWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please pay")
+      aliceWallet.approveOnChannelPaymentRequest(request, aliceWallet.list().head.contractId)
+      checkWallet(aliceUserParty, aliceWallet, Seq((29, 30)))
+      checkWallet(bobUserParty, bobWallet, Seq((9,10), (9,10)))
+
+      // Bob asks for more coins, alice rejects
+      val request1 = bobWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please reject")
+      aliceWallet.rejectOnChannelPaymentRequest(request1)
+      checkWallet(aliceUserParty, aliceWallet, Seq((29, 30)))
+      checkWallet(bobUserParty, bobWallet, Seq((9, 10), (9, 10)))
+
+      // Bob asks for more coins, then withdraws
+      val request2 = bobWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "will withdraw")
+      bobWallet.withdrawOnChannelPaymentRequest(request2)
+      checkWallet(aliceUserParty, aliceWallet, Seq((29, 30)))
+      checkWallet(bobUserParty, bobWallet, Seq((9, 10), (9, 10)))
+
     }
 
     "list app & validator rewards" in { implicit env =>
