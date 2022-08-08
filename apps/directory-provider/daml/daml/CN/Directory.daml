@@ -32,8 +32,8 @@ template DirectoryInstall with
     user : Party
     svc : Party
     entryFee : Decimal
-    collectionDuration : RelTime -- Time provider has to collect approved payment
-    approveDuration : RelTime -- Time user has to approve a payment request
+    collectionDuration : RelTime -- Time provider has to collect accepted payment
+    acceptDuration : RelTime -- Time user has to accept a payment request
   where
     signatory provider, user
 
@@ -67,14 +67,14 @@ template DirectoryInstall with
            quantity = request.entryFee
            reference = toInterfaceContractId requestCid
            collectionDuration = collectionDuration
-           expiresAt = now `addRelTime` approveDuration
+           expiresAt = now `addRelTime` acceptDuration
 
     nonconsuming choice DirectoryInstall_CollectEntryPayment : ()
       with
-        approvedAppPayment : ContractId ApprovedAppPayment
+        acceptedAppPayment : ContractId AcceptedAppPayment
       controller provider
-      do -- collect approved payment
-         reference <- exercise approvedAppPayment ApprovedAppPayment_Collect
+      do -- collect accepted payment
+         reference <- exercise acceptedAppPayment AcceptedAppPayment_Collect
          -- deliver the promised good: the entry referenced in the payment
          Some (requestId, request) <- fetchFromInterface @DirectoryEntryRequest reference
          archive requestId
@@ -98,7 +98,7 @@ template DirectoryInstallRequest with
       with
         svc : Party
         entryFee : Decimal
-        collectionDuration : RelTime -- Time provider has to collect approved payment
-        approveDuration : RelTime -- Time user has to approve a payment request
+        collectionDuration : RelTime -- Time provider has to collect accepted payment
+        acceptDuration : RelTime -- Time user has to accept a payment request
       controller provider
       do create DirectoryInstall with ..

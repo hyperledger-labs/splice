@@ -61,17 +61,17 @@ abstract class WalletAppReference(
     }
   }
 
-  @Help.Summary("Approve a payment request")
+  @Help.Summary("Accept a payment request")
   @Help.Description(
-    "Approve a payment request and deliver the coin to be locked into the approved payment." +
-      " Returns the contract ID of the approved payment."
+    "Accept a payment request and deliver the coin to be locked into the accepted payment." +
+      " Returns the contract ID of the accepted payment."
   )
-  def approveAppPaymentRequest(
+  def acceptAppPaymentRequest(
       requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest],
       coinId: Primitive.ContractId[coinCodegen.Coin],
-  ): Primitive.ContractId[walletCodegen.ApprovedAppPayment] = {
+  ): Primitive.ContractId[walletCodegen.AcceptedAppPayment] = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.ApproveAppPaymentRequest(requestId, coinId))
+      adminCommand(WalletAppCommands.AcceptAppPaymentRequest(requestId, coinId))
     }
   }
 
@@ -150,16 +150,16 @@ abstract class WalletAppReference(
     }
   }
 
-  @Help.Summary("Approve a request for payment through a payment channel")
+  @Help.Summary("Accept a request for payment through a payment channel")
   @Help.Description(
-    "Approves the request using the given coin."
+    "Accepts the request using the given coin."
   )
-  def approveOnChannelPaymentRequest(
+  def acceptOnChannelPaymentRequest(
       requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest],
       coinId: Primitive.ContractId[coinCodegen.Coin],
   ): Unit = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.ApproveOnChannelPaymentRequest(requestId, coinId))
+      adminCommand(WalletAppCommands.AcceptOnChannelPaymentRequest(requestId, coinId))
     }
   }
 

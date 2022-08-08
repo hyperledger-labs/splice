@@ -45,7 +45,7 @@ class GrpcDirectoryProviderService(
   private val collectionDuration = RelTime(
     10_000_000
   )
-  private val approveDuration = RelTime(
+  private val acceptDuration = RelTime(
     60_000_000
   )
 
@@ -77,7 +77,7 @@ class GrpcDirectoryProviderService(
           svc = svc.toPrim,
           entryFee = entryFee,
           collectionDuration = collectionDuration,
-          approveDuration = approveDuration,
+          acceptDuration = acceptDuration,
         )
         acceptCmd = Primitive.ContractId
           .apply[codegen.DirectoryInstallRequest](request.contractId)
@@ -149,16 +149,16 @@ class GrpcDirectoryProviderService(
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
         partyId <- connection.getPrimaryParty(damlUser)
-        approvedAppPayment <- fetchByContractId(walletCodegen.ApprovedAppPayment)(
+        acceptedAppPayment <- fetchByContractId(walletCodegen.AcceptedAppPayment)(
           partyId,
           Primitive.ContractId(request.contractId),
         )
         // TODO(i321) Add uniqueness check
         cmd = codegen.DirectoryInstall
-          .key(DA.Types.Tuple2(partyId.toPrim, approvedAppPayment.value.payer))
+          .key(DA.Types.Tuple2(partyId.toPrim, acceptedAppPayment.value.payer))
           .exerciseDirectoryInstall_CollectEntryPayment(
             partyId.toPrim,
-            codegen.DirectoryInstall_CollectEntryPayment(approvedAppPayment.contractId),
+            codegen.DirectoryInstall_CollectEntryPayment(acceptedAppPayment.contractId),
           )
           .command
         tx <- connection.submitCommand(Seq(partyId), Seq(), Seq(cmd))

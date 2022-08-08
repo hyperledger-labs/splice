@@ -12,7 +12,7 @@ service WalletService {
   rpc tap (TapRequest) returns (TapResponse);
 
   rpc ListAppPaymentRequests (ListAppPaymentRequestsRequest) returns (ListAppPaymentRequestsResponse);
-  rpc ApproveAppPaymentRequest (ApproveAppPaymentRequestRequest) returns (ApproveAppPaymentRequestResponse);
+  rpc AcceptAppPaymentRequest (AcceptAppPaymentRequestRequest) returns (AcceptAppPaymentRequestResponse);
   rpc RejectAppPaymentRequest (RejectAppPaymentRequestRequest) returns (RejectAppPaymentRequestResponse);
 
   // Note that there is no list proposal function as we assume the contract-id is disclosed off-ledger.
@@ -21,7 +21,7 @@ service WalletService {
   rpc AcceptPaymentChannelProposal (AcceptPaymentChannelProposalRequest) returns (AcceptPaymentChannelProposalResponse);
   rpc ExecuteDirectTransfer (ExecuteDirectTransferRequest) returns (ExecuteDirectTransferResponse);
   rpc CreateOnChannelPaymentRequest (CreateOnChannelPaymentRequestRequest) returns (CreateOnChannelPaymentRequestResponse);
-  rpc ApproveOnChannelPaymentRequest (ApproveOnChannelPaymentRequestRequest) returns (ApproveOnChannelPaymentRequestResponse);
+  rpc AcceptOnChannelPaymentRequest (AcceptOnChannelPaymentRequestRequest) returns (AcceptOnChannelPaymentRequestResponse);
   rpc RejectOnChannelPaymentRequest (RejectOnChannelPaymentRequestRequest) returns (RejectOnChannelPaymentRequestResponse);
   rpc WithdrawOnChannelPaymentRequest (WithdrawOnChannelPaymentRequestRequest) returns (WithdrawOnChannelPaymentRequestResponse);
 
@@ -61,7 +61,7 @@ message ListAppPaymentRequestsResponse {
   repeated com.daml.network.v0.Contract payment_requests = 1;
 }
 
-message ApproveAppPaymentRequestRequest {
+message AcceptAppPaymentRequestRequest {
   string request_contract_id = 1;
 
   // Coin to be used as input to locking amount to be paid.
@@ -69,8 +69,8 @@ message ApproveAppPaymentRequestRequest {
   string coin_contract_id = 2;
 }
 
-message ApproveAppPaymentRequestResponse {
-  string approved_payment_contract_id = 1;
+message AcceptAppPaymentRequestResponse {
+  string accepted_payment_contract_id = 1;
 }
 
 message RejectAppPaymentRequestRequest {
@@ -142,8 +142,8 @@ message CreateOnChannelPaymentRequestResponse {
   string request_contract_id = 1;
 }
 
-message ApproveOnChannelPaymentRequestRequest {
-  // The request to approve
+message AcceptOnChannelPaymentRequestRequest {
+  // The request to accept
   string request_contract_id = 1;
 
   // Coin to use for the transfer
@@ -151,11 +151,11 @@ message ApproveOnChannelPaymentRequestRequest {
   string coin_contract_id = 2;
 }
 
-message ApproveOnChannelPaymentRequestResponse {
+message AcceptOnChannelPaymentRequestResponse {
 }
 
 message RejectOnChannelPaymentRequestRequest {
-  // The request to approve
+  // The request to reject
   string request_contract_id = 1;
 }
 
@@ -163,7 +163,7 @@ message RejectOnChannelPaymentRequestResponse {
 }
 
 message WithdrawOnChannelPaymentRequestRequest {
-  // The request to approve
+  // The request to withdraw
   string request_contract_id = 1;
 }
 

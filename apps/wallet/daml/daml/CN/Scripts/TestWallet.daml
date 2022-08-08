@@ -51,7 +51,7 @@ test = script do
       quantity = 1.5
       description = "A very good reason to pay me"
 
-  -- approve request
+  -- accept request
   [(coin, _)] <- queryFilter @Coin sender (\c -> c.quantity.initialQuantity > 1.5)
   submitMulti [sender] [app.svc] $ exerciseCmd paymentRequest OnChannelPaymentRequest_Accept with
     inputs = [InputCoin coin]

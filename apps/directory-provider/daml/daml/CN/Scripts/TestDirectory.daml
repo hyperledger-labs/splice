@@ -31,7 +31,7 @@ test = script do
     svc = app.svc
     entryFee = 1.0
     collectionDuration = minutes 5
-    approveDuration = minutes 5
+    acceptDuration = minutes 5
 
   -- user requests entry via app install
   -- how: UI of directory service via write-delegation on app manager & call to
@@ -51,15 +51,15 @@ test = script do
   -- how: cc wallet
   -- note: privacy is no concern here as coin holdings are public
   [(coin, _)] <- queryFilter @Coin user (\c -> c.quantity.initialQuantity > 1.02)
-  -- cc wallet approves payment and locks coin to provider
+  -- cc wallet accepts payment and locks coin to provider
   -- how: cc wallet
-  approvedAppPayment <- submitMulti [user] [app.svc] $ exerciseCmd appPaymentRequest AppPaymentRequest_Approve with
+  acceptedAppPayment <- submitMulti [user] [app.svc] $ exerciseCmd appPaymentRequest AppPaymentRequest_Accept with
     inputs = [InputCoin coin]
 
   -- directory providers transactionally unlocks & transfer coins
   -- and creates directory entry in return.
   -- how: provider on their own participant
   submitMulti [provider] [app.svc] $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryPayment with
-    approvedAppPayment = approvedAppPayment
+    acceptedAppPayment = acceptedAppPayment
 
   pure ()

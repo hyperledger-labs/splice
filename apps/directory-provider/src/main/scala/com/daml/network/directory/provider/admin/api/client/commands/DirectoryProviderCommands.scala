@@ -117,7 +117,7 @@ object DirectoryProviderCommands {
   }
 
   case class CollectEntryPayment(
-      contractId: Primitive.ContractId[walletCodegen.ApprovedAppPayment]
+      contractId: Primitive.ContractId[walletCodegen.AcceptedAppPayment]
   ) extends BaseCommand[
         v0.CollectEntryPaymentRequest,
         v0.CollectEntryPaymentResponse,

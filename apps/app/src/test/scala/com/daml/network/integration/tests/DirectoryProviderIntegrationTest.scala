@@ -98,14 +98,14 @@ class DirectoryProviderIntegrationTest
         getPaymentRequest().getOrElse(sys.error("Payment request is unexpectedly not defined."))
       walletPaymentRequest.contractId shouldBe paymentRequest
 
-      // Approve payment
+      // Accept payment request
       val coin = aliceWallet.tap(5.0)
-      val _ = aliceWallet.approveAppPaymentRequest(walletPaymentRequest.contractId, coin)
+      val _ = aliceWallet.acceptAppPaymentRequest(walletPaymentRequest.contractId, coin)
 
       // Collect payment
-      val approvedPayment = directoryProvider.remoteParticipant.ledger_api.acs
-        .await(providerParty, walletCodegen.ApprovedAppPayment)
-      val cid = directoryProvider.collectEntryPayment(approvedPayment.contractId)
+      val acceptedPayment = directoryProvider.remoteParticipant.ledger_api.acs
+        .await(providerParty, walletCodegen.AcceptedAppPayment)
+      val cid = directoryProvider.collectEntryPayment(acceptedPayment.contractId)
       val entry = directoryProvider.remoteParticipant.ledger_api.acs
         .await(providerParty, codegen.DirectoryEntry)
       entry.contractId shouldBe cid

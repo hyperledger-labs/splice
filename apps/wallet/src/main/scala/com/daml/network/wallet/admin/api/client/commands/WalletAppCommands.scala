@@ -108,18 +108,18 @@ object WalletAppCommands {
         .leftMap(_.toString)
   }
 
-  case class ApproveAppPaymentRequest(
+  case class AcceptAppPaymentRequest(
       requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest],
       coinId: Primitive.ContractId[coinCodegen.Coin],
   ) extends BaseCommand[
-        v0.ApproveAppPaymentRequestRequest,
-        v0.ApproveAppPaymentRequestResponse,
-        Primitive.ContractId[walletCodegen.ApprovedAppPayment],
+        v0.AcceptAppPaymentRequestRequest,
+        v0.AcceptAppPaymentRequestResponse,
+        Primitive.ContractId[walletCodegen.AcceptedAppPayment],
       ] {
 
-    override def createRequest(): Either[String, v0.ApproveAppPaymentRequestRequest] =
+    override def createRequest(): Either[String, v0.AcceptAppPaymentRequestRequest] =
       Right(
-        v0.ApproveAppPaymentRequestRequest(
+        v0.AcceptAppPaymentRequestRequest(
           ApiTypes.ContractId.unwrap(requestId),
           ApiTypes.ContractId.unwrap(coinId),
         )
@@ -127,15 +127,15 @@ object WalletAppCommands {
 
     override def submitRequest(
         service: WalletServiceStub,
-        request: v0.ApproveAppPaymentRequestRequest,
-    ): Future[v0.ApproveAppPaymentRequestResponse] = service.approveAppPaymentRequest(request)
+        request: v0.AcceptAppPaymentRequestRequest,
+    ): Future[v0.AcceptAppPaymentRequestResponse] = service.acceptAppPaymentRequest(request)
 
     override def handleResponse(
-        response: v0.ApproveAppPaymentRequestResponse
-    ): Either[String, Primitive.ContractId[walletCodegen.ApprovedAppPayment]] =
+        response: v0.AcceptAppPaymentRequestResponse
+    ): Either[String, Primitive.ContractId[walletCodegen.AcceptedAppPayment]] =
       Right(
-        Primitive.ContractId[walletCodegen.ApprovedAppPayment](
-          response.approvedPaymentContractId
+        Primitive.ContractId[walletCodegen.AcceptedAppPayment](
+          response.acceptedPaymentContractId
         )
       )
   }
@@ -321,17 +321,17 @@ object WalletAppCommands {
       )
   }
 
-  case class ApproveOnChannelPaymentRequest(
+  case class AcceptOnChannelPaymentRequest(
       requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest],
       coinId: Primitive.ContractId[coinCodegen.Coin],
   ) extends BaseCommand[
-        v0.ApproveOnChannelPaymentRequestRequest,
-        v0.ApproveOnChannelPaymentRequestResponse,
+        v0.AcceptOnChannelPaymentRequestRequest,
+        v0.AcceptOnChannelPaymentRequestResponse,
         Unit,
       ] {
-    override def createRequest(): Either[String, v0.ApproveOnChannelPaymentRequestRequest] =
+    override def createRequest(): Either[String, v0.AcceptOnChannelPaymentRequestRequest] =
       Right(
-        v0.ApproveOnChannelPaymentRequestRequest(
+        v0.AcceptOnChannelPaymentRequestRequest(
           requestContractId = ApiTypes.ContractId.unwrap(requestId),
           coinContractId = ApiTypes.ContractId.unwrap(coinId),
         )
@@ -339,12 +339,12 @@ object WalletAppCommands {
 
     override def submitRequest(
         service: WalletServiceStub,
-        request: v0.ApproveOnChannelPaymentRequestRequest,
-    ): Future[v0.ApproveOnChannelPaymentRequestResponse] =
-      service.approveOnChannelPaymentRequest(request)
+        request: v0.AcceptOnChannelPaymentRequestRequest,
+    ): Future[v0.AcceptOnChannelPaymentRequestResponse] =
+      service.acceptOnChannelPaymentRequest(request)
 
     override def handleResponse(
-        response: v0.ApproveOnChannelPaymentRequestResponse
+        response: v0.AcceptOnChannelPaymentRequestResponse
     ): Either[String, Unit] =
       Right(())
   }

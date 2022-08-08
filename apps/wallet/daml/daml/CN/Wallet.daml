@@ -176,7 +176,7 @@ template AppPaymentRequest
     signatory payee, payer
     ensure (collectionDuration > aunit && quantity > 0.0)
 
-    choice AppPaymentRequest_Approve : ContractId ApprovedAppPayment
+    choice AppPaymentRequest_Accept : ContractId AcceptedAppPayment
       with
         inputs : [TransferInput]
       controller payer
@@ -184,7 +184,7 @@ template AppPaymentRequest
          -- check that the reference is active and implements PaymentReference
          void $ fetch reference
          assertMsg "AppPaymentRequest has not expired" (now < expiresAt)
-         -- lock the coin and create an approved payment
+         -- lock the coin and create an accepted payment
          let transfer = Transfer with
               sender = payer
               inputs
@@ -202,7 +202,7 @@ template AppPaymentRequest
          (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt payer
          (TransferResultLockedCoin lockedCoin::_) <-
             exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
-         create ApprovedAppPayment
+         create AcceptedAppPayment
            with
              svc, payee, payer, reference, lockedCoin
 
@@ -214,7 +214,7 @@ template AppPaymentRequest
       controller payer
       do pure ()
 
-template ApprovedAppPayment
+template AcceptedAppPayment
   with
     payer : Party
     payee : Party
@@ -224,7 +224,7 @@ template ApprovedAppPayment
   where
     signatory payee, payer
 
-    choice ApprovedAppPayment_Collect : ContractId PaymentReference
+    choice AcceptedAppPayment_Collect : ContractId PaymentReference
       controller payee, payer
       do
         -- unlock coin and transfer the remainder to the payee
@@ -244,10 +244,10 @@ template ApprovedAppPayment
         void $ fetch reference
         pure reference
 
-    choice ApprovedAppPayment_Discard : ContractId Coin
+    choice AcceptedAppPayment_Discard : ContractId Coin
       controller payee
       do exercise lockedCoin Coin_Unlock
 
-    choice ApprovedAppPayment_Expire : ContractId Coin
+    choice AcceptedAppPayment_Expire : ContractId Coin
       controller payer
       do exercise lockedCoin Coin_OwnerExpireLock

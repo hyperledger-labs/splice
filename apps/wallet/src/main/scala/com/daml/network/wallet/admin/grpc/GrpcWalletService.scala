@@ -102,31 +102,31 @@ class GrpcWalletService(
     }
 
   @nowarn("cat=unused")
-  override def approveAppPaymentRequest(
-      request: v0.ApproveAppPaymentRequestRequest
-  ): Future[v0.ApproveAppPaymentRequestResponse] =
+  override def acceptAppPaymentRequest(
+      request: v0.AcceptAppPaymentRequestRequest
+  ): Future[v0.AcceptAppPaymentRequestResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         walletParty <- connection.getPrimaryParty(walletDamlUser)
         coinCid = Primitive.ContractId[coinCodegen.Coin](request.coinContractId)
-        arg = walletCodegen.AppPaymentRequest_Approve(
+        arg = walletCodegen.AppPaymentRequest_Accept(
           Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
         )
-        approveCommand = Primitive
+        acceptCommand = Primitive
           .ContractId[walletCodegen.AppPaymentRequest](request.requestContractId)
-          .exerciseAppPaymentRequest_Approve(walletParty.toPrim, arg)
+          .exerciseAppPaymentRequest_Accept(walletParty.toPrim, arg)
           .command
         tx <- connection.submitCommand(
           Seq(walletParty),
           Seq(validatorParty.get()),
-          Seq(approveCommand),
+          Seq(acceptCommand),
         )
-        payments = DecodeUtil.decodeAllCreated(walletCodegen.ApprovedAppPayment)(tx.getTransaction)
+        payments = DecodeUtil.decodeAllCreated(walletCodegen.AcceptedAppPayment)(tx.getTransaction)
         _ = require(
           payments.length == 1,
-          s"Expected approve payment to create only one approved payment but found ${payments.length} approved payments: $payments",
+          s"Expected accept payment to create only one accepted payment but found ${payments.length} accepted payments: $payments",
         )
-      } yield v0.ApproveAppPaymentRequestResponse(
+      } yield v0.AcceptAppPaymentRequestResponse(
         ApiTypes.ContractId.unwrap(payments(0).contractId)
       )
     }
@@ -340,9 +340,9 @@ class GrpcWalletService(
     }
 
   @nowarn("cat=unused")
-  override def approveOnChannelPaymentRequest(
-      request: v0.ApproveOnChannelPaymentRequestRequest
-  ): Future[v0.ApproveOnChannelPaymentRequestResponse] =
+  override def acceptOnChannelPaymentRequest(
+      request: v0.AcceptOnChannelPaymentRequestRequest
+  ): Future[v0.AcceptOnChannelPaymentRequestResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         svcParty <- scanConnection.getSvcPartyId()
@@ -360,7 +360,7 @@ class GrpcWalletService(
           Seq(validatorParty.get()),
           Seq(cmd),
         )
-      } yield v0.ApproveOnChannelPaymentRequestResponse()
+      } yield v0.AcceptOnChannelPaymentRequestResponse()
     }
 
   @nowarn("cat=unused")
