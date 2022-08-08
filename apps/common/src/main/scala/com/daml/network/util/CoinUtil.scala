@@ -11,6 +11,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.network.{CC, OpenBusiness}
 import com.digitalasset.network.CC.Coin.Coin
 
+import com.daml.ledger.api.v1.commands.Command
 import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionResponse
 import com.daml.ledger.api.v1.transaction_filter
 import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
@@ -49,72 +50,68 @@ object CoinUtil extends UploadablePackage {
     TemplateId(ApiTypes.TemplateId.unwrap(id))
 
   /** Creates a contract that gives the given validator the right to claim coin issuances for the given user's burns. */
-  def recordValidatorOf(
+  def recordValidatorOfCommand(
       svc: PartyId,
       validator: PartyId,
       user: PartyId,
-      connection: CoinLedgerConnection,
-  )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionResponse] = {
-    val c = CC.Coin.ValidatorRight(
-      svc = svc.toPrim,
-      validator = validator.toPrim,
-      user = user.toPrim,
-    )
-    connection.submitCommand(
-      actAs = Seq(validator, user),
-      readAs = Seq.empty,
-      command = Seq(c.create.command),
-    )
-  }
+  ): Command =
+    CC.Coin
+      .ValidatorRight(
+        svc = svc.toPrim,
+        validator = validator.toPrim,
+        user = user.toPrim,
+      )
+      .create
+      .command
 
   def setupApp(
       svc: PartyId,
       connection: CoinLedgerConnection,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
-    for {
-      // Needed for ED workaround
-      _ <- ExplicitDisclosureWorkaround.recordUserHostedAt(svc, svc, connection)
-      // The SVC is its own validator
-      _ <- recordValidatorOf(svc, svc, svc, connection)
+    // Needed for ED workaround
+    val recordUserHostedAtCmd = ExplicitDisclosureWorkaround.recordUserHostedAtCommand(svc, svc)
+    // The SVC is its own validator
+    val recordValidatorOfCmd = recordValidatorOfCommand(svc, svc, svc)
 
-      // Create an IssuanceState
-      _ <- connection.submitCommand(
+    // Create an IssuanceState
+    val createIssuanceStateCmd =
+      CC.Coin
+        .IssuanceState(
+          svc = svc.toPrim,
+          obs = svc.toPrim,
+          currentRound = CC.Round.Round(-1),
+        )
+        .create
+        .command
+
+    // Create CoinRules and open a first mining round
+    val createCoinRulesCmd =
+      CC.CoinRules
+        .CoinRules(
+          svc = svc.toPrim,
+          obs = svc.toPrim,
+          config = defaultCoinConfig,
+        )
+        .createAnd
+        .exerciseCoinRules_MiningRound_Open(
+          actor = svc.toPrim,
+          choiceArgument = CC.CoinRules.CoinRules_MiningRound_Open(
+            coinPrice = 1.0
+          ),
+        )
+        .command
+    connection
+      .submitCommand(
         actAs = Seq(svc),
         readAs = Seq.empty,
         command = Seq(
-          CC.Coin
-            .IssuanceState(
-              svc = svc.toPrim,
-              obs = svc.toPrim,
-              currentRound = CC.Round.Round(-1),
-            )
-            .create
-            .command
+          recordUserHostedAtCmd,
+          recordValidatorOfCmd,
+          createIssuanceStateCmd,
+          createCoinRulesCmd,
         ),
       )
-
-      // Create CoinRules and open a first mining round
-      _ <- connection.submitCommand(
-        actAs = Seq(svc),
-        readAs = Seq.empty,
-        command = Seq(
-          CC.CoinRules
-            .CoinRules(
-              svc = svc.toPrim,
-              obs = svc.toPrim,
-              config = defaultCoinConfig,
-            )
-            .createAnd
-            .exerciseCoinRules_MiningRound_Open(
-              actor = svc.toPrim,
-              choiceArgument = CC.CoinRules.CoinRules_MiningRound_Open(
-                coinPrice = 1.0
-              ),
-            )
-            .command
-        ),
-      )
-    } yield ()
+      .map(_ => ())
   }
 
   def acceptCoinRulesRequests(
@@ -231,6 +228,20 @@ object CoinUtil extends UploadablePackage {
   // TODO(M1-06): Remove workaround for explicit disclosure
   object ExplicitDisclosureWorkaround {
 
+    /** Like recordUserHostedAt but only builds the command.
+      */
+    def recordUserHostedAtCommand(
+        user: PartyId,
+        validator: PartyId,
+    ): Command =
+      CC.Scripts.Util
+        .CCUserHostedAt(
+          user = user.toPrim,
+          validator = validator.toPrim,
+        )
+        .create
+        .command
+
     /** Records that the given user is hosted at the given validator
       * by creating a CCUserHostedAt contract.
       *
@@ -243,14 +254,10 @@ object CoinUtil extends UploadablePackage {
         validator: PartyId,
         connection: CoinLedgerConnection,
     )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionResponse] = {
-      val c = CC.Scripts.Util.CCUserHostedAt(
-        user = user.toPrim,
-        validator = validator.toPrim,
-      )
       connection.submitCommand(
         actAs = Seq(user),
         readAs = Seq.empty,
-        command = Seq(c.create.command),
+        command = Seq(recordUserHostedAtCommand(user, validator)),
       )
     }
   }
