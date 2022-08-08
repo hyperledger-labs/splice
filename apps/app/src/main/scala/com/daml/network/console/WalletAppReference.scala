@@ -2,18 +2,19 @@ package com.daml.network.console
 
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, Value}
 import com.daml.network.wallet.admin.api.client.commands.WalletAppCommands
 import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
 import com.digitalasset.canton.console.{
   BaseInspection,
+  ConsoleCommandResult,
   Help,
   LocalInstanceReference,
   GrpcRemoteInstanceReference,
 }
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.network.CC.{Coin => coinCodegen}
+import com.digitalasset.network.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
 import com.digitalasset.network.CN.{Wallet => walletCodegen}
 
 abstract class WalletAppReference(
@@ -200,6 +201,41 @@ abstract class WalletAppReference(
   def listValidatorRewards(): Seq[Contract[coinCodegen.ValidatorReward]] =
     consoleEnvironment.run {
       adminCommand(WalletAppCommands.ListValidatorRewards())
+    }
+
+  @Help.Summary("Collect rewards")
+  @Help.Description(
+    "Merge all currently open app and validator rewards for the given round with the given coin"
+  )
+  def collectRewards(
+      coinId: Primitive.ContractId[coinCodegen.Coin],
+      round: Long,
+  ): Primitive.ContractId[coinCodegen.Coin] =
+    consoleEnvironment.run {
+      ConsoleCommandResult.fromEither {
+        for {
+          validatorRewards <- adminCommand(WalletAppCommands.ListValidatorRewards()).toEither
+          validatorRewardInputs = validatorRewards
+            .filter(c => c.payload.round.number == round)
+            .map(c => coinRulesCodegen.TransferInput.InputValidatorReward(c.contractId))
+          appRewards <- adminCommand(WalletAppCommands.ListAppRewards()).toEither
+          appRewardInputs = appRewards
+            .filter(c => c.payload.round.number == round)
+            .map(c => coinRulesCodegen.TransferInput.InputAppReward(c.contractId))
+          inputCoin = coinRulesCodegen.TransferInput.InputCoin(coinId)
+          inputs = (inputCoin +: validatorRewardInputs :++ appRewardInputs).map(Value(_))
+          outputs = Seq(WalletAppCommands.RedistributeOutput(exactQuantity = None))
+          coins <- adminCommand(
+            WalletAppCommands.Redistribute(inputs = inputs, outputs = outputs)
+          ).toEither
+          _ <-
+            if (coins.size == 1) Right(())
+            else
+              Left(
+                s"Expected exactly one coin as a result of Redistribute but got ${coins.size} coins $coins"
+              )
+        } yield coins(0)
+      }
     }
 }
 

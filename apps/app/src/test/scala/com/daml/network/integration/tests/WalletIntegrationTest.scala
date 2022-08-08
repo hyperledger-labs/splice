@@ -164,7 +164,7 @@ class WalletIntegrationTest
       val request = bobWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please pay")
       aliceWallet.approveOnChannelPaymentRequest(request, aliceWallet.list().head.contractId)
       checkWallet(aliceUserParty, aliceWallet, Seq((29, 30)))
-      checkWallet(bobUserParty, bobWallet, Seq((9,10), (9,10)))
+      checkWallet(bobUserParty, bobWallet, Seq((9, 10), (9, 10)))
 
       // Bob asks for more coins, alice rejects
       val request1 = bobWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please reject")
@@ -180,7 +180,7 @@ class WalletIntegrationTest
 
     }
 
-    "list app & validator rewards" in { implicit env =>
+    "list and collect app & validator rewards" in { implicit env =>
       import env._
       val svcParty = svc.initialize()
 
@@ -211,7 +211,8 @@ class WalletIntegrationTest
         svcParty = svcParty,
         coin = transferredCoin,
       )
-      aliceWallet.listAppRewards() should have size 1
+      val appRewards = aliceWallet.listAppRewards()
+      appRewards should have size 1
       aliceWallet.listValidatorRewards() shouldBe empty
       // TODO(i296) We cannot use the wallet as the validator yet so create a validator right where alice is their own validator.
       aliceWallet.remoteParticipant.ledger_api.commands.submit(
@@ -220,7 +221,25 @@ class WalletIntegrationTest
         commands =
           Seq(ValidatorRight(svcParty.toPrim, aliceParty.toPrim, aliceParty.toPrim).create.command),
       )
-      aliceWallet.listValidatorRewards() should have size 1
+      val validatorRewards = aliceWallet.listValidatorRewards()
+      validatorRewards should have size 1
+      val prevCoins = aliceWallet.list()
+      val inputCoin = aliceWallet.tap(42)
+      svc.openRound(1)
+      svc.startClosingRound(0)
+      svc.startIssuingRound(0)
+      aliceWallet.collectRewards(inputCoin, 0)
+      aliceWallet.listAppRewards() shouldBe empty
+      aliceWallet.listValidatorRewards() shouldBe empty
+      // We just check that we have a coin roughly in the right range, in particular higher than the input, rather than trying to repeat the calculation
+      // for rewards.
+      checkWallet(
+        aliceParty,
+        aliceWallet,
+        (prevCoins.map(c =>
+          (c.payload.quantity.initialQuantity, c.payload.quantity.initialQuantity)
+        ) :+ (43, 44): Seq[(BigDecimal, BigDecimal)]).sortBy(_._1),
+      )
     }
   }
 
@@ -270,7 +289,6 @@ class WalletIntegrationTest
         coin.payload.owner shouldBe walletParty.toPrim
         val ExpiringQuantity(initialQuantity, createdAt, ratePerRound) = coin.payload.quantity
         initialQuantity should (be >= quantityLb and be <= quantityUb)
-        createdAt shouldBe Round(0)
         ratePerRound shouldBe RatePerRound(
           CoinUtil.defaultHoldingFee.rate.doubleValue
         )

@@ -1,10 +1,11 @@
 package com.daml.network.wallet.admin.grpc
 
+import cats.implicits._
 import com.daml.lf.data.Numeric
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, Value}
 import com.daml.network.wallet.util.WalletUtil
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.UploadablePackage
@@ -326,10 +327,12 @@ class GrpcWalletService(
           Seq(),
           Seq(cmd),
         )
-        requests = DecodeUtil.decodeAllCreated(walletCodegen.OnChannelPaymentRequest)(tx.getTransaction)
+        requests = DecodeUtil.decodeAllCreated(walletCodegen.OnChannelPaymentRequest)(
+          tx.getTransaction
+        )
         _ = require(
           requests.length == 1,
-          s"Expected create payment request to create one requests, but found ${requests.length} requests: $requests"
+          s"Expected create payment request to create one requests, but found ${requests.length} requests: $requests",
         )
       } yield v0.CreateOnChannelPaymentRequestResponse(
         requestContractId = ApiTypes.ContractId.unwrap(requests(0).contractId)
@@ -400,6 +403,49 @@ class GrpcWalletService(
         )
       } yield v0.WithdrawOnChannelPaymentRequestResponse()
     }
+
+  override def redistribute(request: v0.RedistributeRequest): Future[v0.RedistributeResponse] = {
+    def toOutput(output: v0.RedistributeOutput): coinRulesCodegen.TransferOutput =
+      coinRulesCodegen.TransferOutput.OutputSenderCoin(
+        lock = None,
+        exactQuantity =
+          if (output.quantity.isEmpty) None else Some(Numeric.assertFromString(output.quantity)),
+      )
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        party <- connection.getPrimaryParty(walletDamlUser)
+        svcParty <- scanConnection.getSvcPartyId()
+        inputs = request.inputs
+          .traverse(Value.fromProto[coinRulesCodegen.TransferInput](_).map(_.value))
+          .valueOr(err => throw err.toAdminError.asGrpcError)
+        outputs = request.outputs.map(toOutput)
+        cmd = coinRulesCodegen.CoinRules
+          .key(DA.Types.Tuple2(svcParty.toPrim, validatorParty.get.toPrim))
+          .exerciseCoinRules_Transfer(
+            party.toPrim,
+            coinRulesCodegen.Transfer(
+              sender = party.toPrim,
+              inputs = inputs,
+              outputs = outputs,
+              payload = "redistribute",
+            ),
+          )
+          .command
+        tx <- connection.submitCommand(
+          Seq(party),
+          Seq(validatorParty.get()),
+          Seq(cmd),
+        )
+        coins = DecodeUtil.decodeAllCreated(coinCodegen.Coin)(
+          tx.getTransaction
+        )
+      } yield {
+        v0.RedistributeResponse(
+          coins.map(c => ApiTypes.ContractId.unwrap(c.contractId))
+        )
+      }
+    }
+  }
 
   override def initialize(request: InitializeRequest): Future[InitializeResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => _ =>

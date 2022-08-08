@@ -6,12 +6,12 @@ import com.daml.lf.data.Numeric
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.WalletServiceGrpc.WalletServiceStub
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, Value}
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
 import io.grpc.ManagedChannel
 import com.daml.ledger.client.binding.Primitive
-import com.digitalasset.network.CC.{Coin => coinCodegen}
+import com.digitalasset.network.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
 import com.digitalasset.network.CN.{Wallet => walletCodegen}
 import com.google.protobuf.empty.Empty
 
@@ -312,11 +312,13 @@ object WalletAppCommands {
     override def handleResponse(
         response: v0.CreateOnChannelPaymentRequestResponse
     ): Either[String, Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]] =
-      Right((
-        Primitive.ContractId[walletCodegen.OnChannelPaymentRequest](
-          response.requestContractId
+      Right(
+        (
+          Primitive.ContractId[walletCodegen.OnChannelPaymentRequest](
+            response.requestContractId
+          )
         )
-      ))
+      )
   }
 
   case class ApproveOnChannelPaymentRequest(
@@ -439,5 +441,42 @@ object WalletAppCommands {
       response.validatorRewards
         .traverse(req => Contract.fromProto(coinCodegen.ValidatorReward)(req))
         .leftMap(_.toString)
+  }
+
+  case class RedistributeOutput(
+      exactQuantity: Option[BigDecimal]
+  ) {
+    def toProtoV0: v0.RedistributeOutput =
+      v0.RedistributeOutput(exactQuantity.fold("")(q => Numeric.toString(q.bigDecimal)))
+  }
+
+  /** Redistribute the transfer inputs via a self-transfer. The outputs
+    * declare the number of outputs and for each output the desired quantity or None
+    * if it should be a floating output.
+    */
+  case class Redistribute(
+      inputs: Seq[Value[coinRulesCodegen.TransferInput]],
+      outputs: Seq[RedistributeOutput],
+  ) extends BaseCommand[v0.RedistributeRequest, v0.RedistributeResponse, Seq[
+        Primitive.ContractId[coinCodegen.Coin]
+      ]] {
+
+    override def createRequest(): Either[String, v0.RedistributeRequest] =
+      Right(
+        v0.RedistributeRequest(
+          inputs = inputs.map(_.toProtoV0),
+          outputs = outputs.map(_.toProtoV0),
+        )
+      )
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.RedistributeRequest,
+    ): Future[v0.RedistributeResponse] = service.redistribute(request)
+
+    override def handleResponse(
+        response: v0.RedistributeResponse
+    ): Either[String, Seq[Primitive.ContractId[coinCodegen.Coin]]] =
+      Right(response.coinContractIds.map(Primitive.ContractId[coinCodegen.Coin](_)))
   }
 }

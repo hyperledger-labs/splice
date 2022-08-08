@@ -2,6 +2,7 @@ syntax = "proto3";
 package com.daml.network.wallet.v0;
 
 import "com/daml/network/v0/contract.proto";
+import "com/daml/network/v0/value.proto";
 import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
 
@@ -26,6 +27,8 @@ service WalletService {
 
   rpc ListAppRewards (google.protobuf.Empty) returns (ListAppRewardsResponse);
   rpc ListValidatorRewards (google.protobuf.Empty) returns (ListValidatorRewardsResponse);
+
+  rpc Redistribute (RedistributeRequest) returns (RedistributeResponse);
 }
 
 message InitializeRequest {
@@ -165,4 +168,20 @@ message WithdrawOnChannelPaymentRequestRequest {
 }
 
 message WithdrawOnChannelPaymentRequestResponse {
+}
+
+message RedistributeOutput {
+  string quantity = 1; // Optional, corresponds to exactQuantity in OutputSenderCoin.
+}
+
+message RedistributeRequest {
+  // The TransferInputs to be redistributed
+  repeated com.daml.network.v0.Value inputs = 1;
+  // The outputs to distribute to.
+  repeated RedistributeOutput outputs = 2;
+}
+
+message RedistributeResponse {
+  // The coins resulting from the transfer.
+  repeated string coin_contract_ids = 1;
 }
