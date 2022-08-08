@@ -67,12 +67,7 @@ lazy val `apps-common` =
         daml_ledger_api_scalapb,
         daml_ledger_api_proto % "protobuf",
       ),
-      BuildCommon.sharedSettings,
-      BuildCommon.cantonWarts,
-      Compile / PB.targets := Seq(
-        scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
-      ),
-      Compile / PB.protoSources ++= (Test / PB.protoSources).value,
+      BuildCommon.sharedAppSettings,
       /* The reason we have to specify these items explicitly is that the DamlPlugin expects a gradle
        * `src/main/daml` directory structure. Instead we have the classical SDK `./daml` structure.
        * We output the dar to the usual `.daml/dist` dir because that's where a naive user expects it.
@@ -106,13 +101,7 @@ lazy val `apps-validator` =
     )
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
-      BuildCommon.sharedSettings,
-      BuildCommon.cantonWarts,
-      Compile / PB.targets := Seq(
-        scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
-      ),
-      Compile / PB.protoSources ++= (Test / PB.protoSources).value,
-      scalacOptions += "-Wconf:src=src_managed/.*:silent",
+      BuildCommon.sharedAppSettings,
     )
 
 lazy val `apps-svc` =
@@ -121,13 +110,7 @@ lazy val `apps-svc` =
     .dependsOn(`apps-common` % "compile->compile;test->test")
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
-      BuildCommon.sharedSettings,
-      BuildCommon.cantonWarts,
-      Compile / PB.targets := Seq(
-        scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
-      ),
-      Compile / PB.protoSources ++= (Test / PB.protoSources).value,
-      scalacOptions += "-Wconf:src=src_managed/.*:silent",
+      BuildCommon.sharedAppSettings,
     )
 
 lazy val `apps-scan` =
@@ -136,13 +119,7 @@ lazy val `apps-scan` =
     .dependsOn(`apps-common` % "compile->compile;test->test")
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
-      BuildCommon.sharedSettings,
-      BuildCommon.cantonWarts,
-      Compile / PB.targets := Seq(
-        scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
-      ),
-      Compile / PB.protoSources ++= (Test / PB.protoSources).value,
-      scalacOptions += "-Wconf:src=src_managed/.*:silent",
+      BuildCommon.sharedAppSettings,
     )
 
 lazy val `apps-wallet` =
@@ -155,12 +132,8 @@ lazy val `apps-wallet` =
     .enablePlugins(DamlPlugin)
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
-      BuildCommon.sharedSettings,
-      BuildCommon.cantonWarts,
-      Compile / PB.targets := Seq(
-        scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
-      ),
       Compile / damlDependencies := (`apps-common` / Compile / damlBuild).value,
+      BuildCommon.sharedAppSettings,
       Compile / damlSourceDirectory := file("apps/wallet/daml"),
       cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
       Test / damlSourceDirectory := file("apps/wallet/daml"),
@@ -179,8 +152,6 @@ lazy val `apps-wallet` =
         IO.copyFile(srcFile, dstFile)
         Seq(dstFile)
       }.taskValue,
-      Compile / PB.protoSources ++= (Test / PB.protoSources).value,
-      scalacOptions += "-Wconf:src=src_managed/.*:silent",
     )
 
 lazy val `apps-directory-provider` =
@@ -193,11 +164,7 @@ lazy val `apps-directory-provider` =
     .enablePlugins(DamlPlugin)
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
-      BuildCommon.sharedSettings,
-      BuildCommon.cantonWarts,
-      Compile / PB.targets := Seq(
-        scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
-      ),
+      BuildCommon.sharedAppSettings,
       Compile / damlDependencies := (`apps-wallet` / Compile / damlBuild).value,
       Compile / damlSourceDirectory := file("apps/directory-provider/daml"),
       cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
@@ -210,8 +177,6 @@ lazy val `apps-directory-provider` =
           "com.digitalasset.network",
         )
       ),
-      Compile / PB.protoSources ++= (Test / PB.protoSources).value,
-      scalacOptions += "-Wconf:src=src_managed/.*:silent",
     )
 
 lazy val `apps-directory-user` =
@@ -223,13 +188,7 @@ lazy val `apps-directory-user` =
     )
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
-      BuildCommon.sharedSettings,
-      BuildCommon.cantonWarts,
-      Compile / PB.targets := Seq(
-        scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
-      ),
-      Compile / PB.protoSources ++= (Test / PB.protoSources).value,
-      scalacOptions += "-Wconf:src=src_managed/.*:silent",
+      BuildCommon.sharedAppSettings,
     )
 
 val scalaCodegenStrategy = new MergeStrategy {
@@ -316,15 +275,6 @@ lazy val bundleTask = {
   }
 }
 
-lazy val appSettings = Seq(
-  bundleTask,
-  assembly / test := {}, // don't run tests during assembly
-  // when building the fat jar, we need to properly merge our artefacts
-  assembly / assemblyMergeStrategy := mergeStrategy((assembly / assemblyMergeStrategy).value),
-  assembly / mainClass := Some("com.daml.network.CoinApp"),
-  assembly / assemblyJarName := s"coin-${version.value}.jar",
-)
-
 lazy val `apps-app` =
   project
     .in(file("apps/app"))
@@ -343,5 +293,10 @@ lazy val `apps-app` =
     .settings(
       BuildCommon.sharedSettings,
       BuildCommon.cantonWarts,
-      appSettings,
+      bundleTask,
+      assembly / test := {}, // don't run tests during assembly
+      // when building the fat jar, we need to properly merge our artefacts
+      assembly / assemblyMergeStrategy := mergeStrategy((assembly / assemblyMergeStrategy).value),
+      assembly / mainClass := Some("com.daml.network.CoinApp"),
+      assembly / assemblyJarName := s"coin-${version.value}.jar",
     )

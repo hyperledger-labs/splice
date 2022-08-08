@@ -105,6 +105,7 @@ More commands can be found in build.sbt and BuildCommon.scala.
     `scalafix` is a linting and rewrite tool we use to organize imports. This may run for a long time as it needs to do a full compile.
 - `format`: apply `scalafmt` to format source files
 - `damlBuild`: create `.dar` files for all Daml projects
+- `protobufLint`: to lint our protobuf files using `buf`
 - `bundle`: create a release bundle in `apps/app/target/release/<version>`. The release binary is loaded into your PATH automatically via `direnv`. Simply run `coin` to call it.
 
 Test:

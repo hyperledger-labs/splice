@@ -28,5 +28,6 @@ in pkgs.mkShell {
     python3Packages.sphinx_rtd_theme
     openjdk11
     jq
+    buf
   ];
 }

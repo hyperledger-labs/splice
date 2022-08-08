@@ -17,6 +17,16 @@ object BuildCommon {
     libraryDependencies += scalatest % Test
   )
 
+  lazy val sharedAppSettings: Seq[Def.Setting[_]] =
+    sharedSettings ++ cantonWarts ++ protobufLintSettings ++
+      Seq(
+        Compile / PB.targets := Seq(
+          scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
+        ),
+        Compile / PB.protoSources ++= (Test / PB.protoSources).value,
+        scalacOptions += "-Wconf:src=src_managed/.*:silent",
+      )
+
   lazy val sbtSettings: Seq[Def.Setting[_]] = {
 
     def alsoTest(taskName: String) = s";$taskName; Test / $taskName"
@@ -80,6 +90,48 @@ object BuildCommon {
     ),
   ).flatMap(_.settings)
 
+  lazy val protobufLint = taskKey[Unit](
+    "Lint protobuf sources using the `buf` tool."
+  )
+
+  val protobufLintSettings = List(
+    Compile / PB.includePaths += file("3rdparty/protobuf"),
+    protobufLint := {
+      val targetSourceDir = target.value / "protobuf_merged_sources"
+      val includeDirs = (Compile / PB.includePaths).value
+      // merge all sources *assuming* proto paths are unique, which
+      // should hold as otherwise `protoc` will complain during dependency resolution
+      includeDirs.foreach(includeDir =>
+        IO.copyDirectory(
+          includeDir,
+          targetSourceDir,
+          CopyOptions(overwrite = true, preserveLastModified = true, preserveExecutable = false),
+        )
+      )
+      // create buf file reflecting our policy
+      IO.write(
+        targetSourceDir / "buf.yaml",
+        """
+          |version: v1
+          |lint:
+          |  use:
+          |    # Using DEFAULT as ...
+          |    - DEFAULT
+          |  ignore:
+          |    # Ignoring proto packages with these prefixes as they are external dependencies
+          |    - com/daml/ledger/api/v1
+          |    - google
+          |    - scalapb
+          |    - com/digitalasset/canton
+          |    # TODO(M1-92): ignore also the non-external project dependencies
+          |""".stripMargin,
+      )
+      // call buf tool
+      runCommand(s"buf lint", streams.value.log, optCwd = Some(targetSourceDir))
+      ()
+    },
+  )
+
   // applies to all Canton-based sub-projects (descendants of community-common)
   lazy val sharedCantonSettings = Seq(
     // Enable logging of begin and end of test cases, test suites, and test runs.
@@ -98,20 +150,25 @@ object BuildCommon {
   )
 
   /** Utility function to run a (shell) command. */
-  def runCommand(command: String, log: ManagedLogger, optError: Option[String] = None): String = {
+  def runCommand(
+      command: String,
+      log: ManagedLogger,
+      optError: Option[String] = None,
+      optCwd: Option[File] = None,
+  ): String = {
     import scala.sys.process.Process
     val processLogger = new DamlPlugin.BufferedLogger
-    log.debug(s"Running ${command}")
-    val exitCode = Process(command) ! processLogger
+    val cwdInfo = optCwd.map(cwd => s" in `$cwd`").getOrElse("")
+    log.debug(s"Running $command$cwdInfo")
+    val exitCode = Process(command, optCwd) ! processLogger
     val output = processLogger.output()
     if (exitCode != 0) {
-      val errorMsg = s"A problem occurred when executing command `$command` in `build.sbt`: ${System
-        .lineSeparator()} $output"
-      log.error(errorMsg)
+      val errorMsg =
+        s"Running command `$command`$cwdInfo returned non-zero exit code: $exitCode}"
+      log.error(output)
       if (optError.isDefined) log.error(optError.getOrElse(""))
       throw new IllegalStateException(errorMsg)
-    }
-    if (output != "") log.info(processLogger.output())
+    } else if (output != "") log.info(processLogger.output())
     output
   }
 
