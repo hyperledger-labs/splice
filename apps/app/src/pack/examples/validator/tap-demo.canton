@@ -1,9 +1,0 @@
-// Commands needed to initialize the CN apps and tap some coins. Can be run as a bootstrap script.
-
-val validatorParty = validatorApp.initialize()
-validatorApp.onboardUser("wallet")
-wallet.initialize(validatorParty)
-
-require(wallet.list().length == 0)
-wallet.tap(1000.0)
-require(wallet.list().length == 1)

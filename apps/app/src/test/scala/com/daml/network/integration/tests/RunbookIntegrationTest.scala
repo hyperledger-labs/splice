@@ -31,6 +31,6 @@ class RunbookIntegrationTest
   // when running locally, this test may fail if the DAR deployed to DevNet differs from the latest one on your branch
   "run through runbook" taggedAs LiveDevNetTest in { implicit env =>
     runScript(validatorPath / "validator-participant.canton")(env.environment)
-    runScript(validatorPath / "tap-demo.canton")(env.environment)
+    runScript(validatorPath / "tap-transfer-demo.canton")(env.environment)
   }
 }

@@ -1,0 +1,20 @@
+// Commands needed to initialize the CN apps, tap some coins and make some transfers. Can be run as a bootstrap script.
+
+val validatorParty = validatorApp.initialize()
+validatorApp.onboardUser("alice_wallet")
+aliceWallet.initialize(validatorParty)
+
+require(aliceWallet.list().length == 0)
+val coinId = aliceWallet.tap(1000.0)
+require(aliceWallet.list().length == 1)
+
+val bobParty = validatorApp.onboardUser("bob_wallet")
+bobWallet.initialize(validatorParty)
+require(bobWallet.list().length == 0)
+
+val aliceProposal = aliceWallet.proposePaymentChannel(bobParty)
+require(bobWallet.listPaymentChannelProposals().length == 1)
+val channelId = bobWallet.acceptPaymentChannelProposal(aliceProposal)
+
+aliceWallet.executeDirectTransfer(bobParty, 10, coinId)
+require(bobWallet.list().length == 1 && bobWallet.list().foreach(coin => coin.payload.quantity.initialQuantity == 10))

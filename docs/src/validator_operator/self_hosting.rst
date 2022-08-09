@@ -70,9 +70,9 @@ In the console, initialize the validator ::
 
   @ val validatorParty = validatorApp.initialize()
 
-Request onboarding a new user called "wallet" to the validator ::
+Request onboarding a new user called "alice_wallet" to the validator ::
 
-  @ validatorApp.onboardUser("wallet")
+  @ validatorApp.onboardUser("alice_wallet")
 
 
 The request should be automatically approved by the supervalidator consortium in this feature preview.
@@ -85,25 +85,79 @@ Tapping some Canton Coin from the Dev Faucet
 In order to create some free canton coin to play around with, you'll need to initialize the wallet by passing in the validator party.
 Reusing the console from the previous section: ::
 
-@ wallet.initialize(validatorParty)
+@ aliceWallet.initialize(validatorParty)
   
 You can create free coins like so: ::
 
-  @ wallet.tap(1000.0)
-  Res2: ContractId Canton.Coin { ... }
+  @ val coinId = aliceWallet.tap(100.0)
+  coinId: ContractId Canton.Coin { ... }
 
 Creating free coins will only be possible in temporary test- and devnets.
 
 Listing your Canton Coins
 -------------------------
   
-You can list your balances with the following command:
+You can list your balances with the following command: ::
 
-  @ wallet.list()
+  @ aliceWallet.list()
 
   
 If you've followed the previous instructions, you should already see one coin, similar to the output above.
-If not, try calling ``wallet.tap(1000.0)`` and then rerunning this command.
+If not, try calling ``aliceWallet.tap(1000.0)`` and then rerunning this command.
 
+Preparing for the first transfer
+--------------------------------
 
-.. TODO(M1-02): Add transfer section
+In order to have someone for Alice to transfer some coin to, please first create a second user and wallet for Bob: ::
+
+  @ val bobParty = validatorApp.onboardUser("bob_wallet")
+  @ bobWallet.initialize(validatorParty)
+
+You can double check that Bob has no coins yet. The following should return an empty list: ::
+
+  @ bobWallet.list()
+
+Before Alice can transfer coins to Bob, they first need to initiate a payment channel between them. Alice, being the sender, will initiate the request for the channel: ::
+
+  @ val aliceProposal = aliceWallet.proposePaymentChannel(bobParty)
+
+Bob can then see the request to create the channel: ::
+
+  @ bobWallet.listPaymentChannelProposals()
+
+And accept the request: ::
+
+  @ val channelId = bobWallet.acceptPaymentChannelProposal(aliceProposal)
+
+Transferring coins
+------------------
+
+Payment channels by default allow direct transfers (transfers that do not require the recipient's approval). Alice can therefore simply transfer some coins to Bob now: ::
+
+  @ aliceWallet.executeDirectTransfer(bobParty, 10, coinId)
+
+Check Alice and Bob's wallets to see that Alice now has slightly less than 990 coins (due to transfer fees), and Bob has 10: ::
+
+  @ aliceWallet.list()
+  res12: Seq[...] = Vector(
+    Contract(
+      contractId = ...,
+      payload = Coin(
+        svc = ...,
+        owner = ...,
+        quantity = ExpiringQuantity(initialQuantity = 989.8000000000, ...)
+      )
+    )
+  )
+
+  @ bobWallet.list()
+  res13: Seq[...] = Vector(
+    Contract(
+      contractId = ...,
+      payload = Coin(
+        svc = ...,
+        owner = ...,
+        quantity = ExpiringQuantity(initialQuantity = 10.0000000000, ...)
+      )
+    )
+  )
