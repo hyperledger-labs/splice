@@ -5,7 +5,7 @@ import com.daml.lf.data.Numeric
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.util.{Contract, Value}
+import com.daml.network.util.{Contract, Proto, Value}
 import com.daml.network.wallet.util.WalletUtil
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.UploadablePackage
@@ -62,13 +62,13 @@ class GrpcWalletService(
       for {
         svcParty <- scanConnection.getSvcPartyId()
         walletParty <- connection.getPrimaryParty(walletDamlUser)
+        amount = Proto.tryDecode(Proto.BigDecimal)(request.amount)
         tapCmd = coinRulesCodegen.CoinRules
           .key(DA.Types.Tuple2(svcParty.toPrim, validatorParty.get.toPrim))
           .exerciseTap(
             walletParty.toPrim,
             walletParty.toPrim,
-            // TODO(M1-07): report bogus values as INVALID_ARGUMENT instead of an INTERNAL failure
-            Numeric.assertFromString(request.amount),
+            amount,
           )
           .command
         tx <- connection.submitCommand(Seq(walletParty), Seq(validatorParty.get()), Seq(tapCmd))
@@ -77,7 +77,7 @@ class GrpcWalletService(
           coins.length == 1,
           s"Expected tap to create only one coin but found ${coins.length} coins: $coins",
         )
-      } yield v0.TapResponse(ApiTypes.ContractId.unwrap(coins(0).contractId))
+      } yield v0.TapResponse(Proto.encode(coins(0).contractId))
     }
 
   @nowarn("cat=unused")
@@ -108,12 +108,14 @@ class GrpcWalletService(
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         walletParty <- connection.getPrimaryParty(walletDamlUser)
-        coinCid = Primitive.ContractId[coinCodegen.Coin](request.coinContractId)
+        coinCid = Proto.tryDecodeContractId[coinCodegen.Coin](request.coinContractId)
         arg = walletCodegen.AppPaymentRequest_Accept(
           Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
         )
-        acceptCommand = Primitive
-          .ContractId[walletCodegen.AppPaymentRequest](request.requestContractId)
+        requestCid = Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](
+          request.requestContractId
+        )
+        acceptCommand = requestCid
           .exerciseAppPaymentRequest_Accept(walletParty.toPrim, arg)
           .command
         tx <- connection.submitCommand(
@@ -127,7 +129,7 @@ class GrpcWalletService(
           s"Expected accept payment to create only one accepted payment but found ${payments.length} accepted payments: $payments",
         )
       } yield v0.AcceptAppPaymentRequestResponse(
-        ApiTypes.ContractId.unwrap(payments(0).contractId)
+        Proto.encode(payments(0).contractId)
       )
     }
 
@@ -139,8 +141,10 @@ class GrpcWalletService(
       for {
         walletParty <- connection.getPrimaryParty(walletDamlUser)
         arg = walletCodegen.AppPaymentRequest_Reject()
-        cmd = Primitive
-          .ContractId[walletCodegen.AppPaymentRequest](request.requestContractId)
+        requestCid = Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](
+          request.requestContractId
+        )
+        cmd = requestCid
           .exerciseAppPaymentRequest_Reject(walletParty.toPrim, arg)
           .command
         _ <- connection.submitCommand(
@@ -178,12 +182,13 @@ class GrpcWalletService(
         walletParty <- connection.getPrimaryParty(walletDamlUser)
         svcParty <- scanConnection.getSvcPartyId()
         // TODO(M1-07): guard making the proposal by a check that a like channel does not yet exist
+        receiver = Proto.tryDecode(Proto.Party)(request.receiver)
         cmd = walletCodegen
           .PaymentChannelProposal(
             proposer = walletParty.toPrim,
             channel = walletCodegen.PaymentChannel(
               sender = walletParty.toPrim,
-              receiver = ApiTypes.Party(request.receiver),
+              receiver = receiver.toPrim,
               svc = svcParty.toPrim,
               // TODO(M1-07): make channel parameters configurable
               allowRequests = true,
@@ -207,7 +212,7 @@ class GrpcWalletService(
           s"Expected bare create to create only one proposal, but found ${proposals.length} proposals: $proposals",
         )
       } yield v0.ProposePaymentChannelResponse(
-        proposalContractId = ApiTypes.ContractId.unwrap(proposals(0).contractId)
+        proposalContractId = Proto.encode(proposals(0).contractId)
       )
     }
 
@@ -220,8 +225,10 @@ class GrpcWalletService(
         walletParty <- connection.getPrimaryParty(walletDamlUser)
         arg = walletCodegen.PaymentChannelProposal_Accept()
         // TODO(M3-01): guard accepting the proposal by a check that a channel with the same key does not yet exist
-        cmd = Primitive
-          .ContractId[walletCodegen.PaymentChannelProposal](request.proposalContractId)
+        proposalCid = Proto.tryDecodeContractId[walletCodegen.PaymentChannelProposal](
+          request.proposalContractId
+        )
+        cmd = proposalCid
           .exercisePaymentChannelProposal_Accept(walletParty.toPrim, arg)
           .command
         tx <- connection.submitCommand(
@@ -237,7 +244,7 @@ class GrpcWalletService(
           s"Expected accept payment channel proposal to create only one channel, but found ${channels.length} channels: $channels",
         )
       } yield v0.AcceptPaymentChannelProposalResponse(
-        channelContractId = ApiTypes.ContractId.unwrap(channels(0).contractId)
+        channelContractId = Proto.encode(channels(0).contractId)
       )
     }
 
@@ -249,11 +256,12 @@ class GrpcWalletService(
       for {
         svcParty <- scanConnection.getSvcPartyId()
         walletParty <- connection.getPrimaryParty(walletDamlUser)
-        coinCid = Primitive.ContractId[coinCodegen.Coin](request.coinContractId)
-        receiverParty = PartyId.tryFromProtoPrimitive(request.receiver)
+        coinCid = Proto.tryDecodeContractId[coinCodegen.Coin](request.coinContractId)
+        receiverParty = Proto.tryDecode(Proto.Party)(request.receiver)
+        quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
         arg = walletCodegen.PaymentChannel_ExecuteDirectTransfer(
           inputs = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid)),
-          quantity = Numeric.assertFromString(request.quantity),
+          quantity = quantity,
           payload = "wallet: execute direct transfer",
         )
         cmd = walletCodegen.PaymentChannel
@@ -313,9 +321,10 @@ class GrpcWalletService(
       for {
         svcParty <- scanConnection.getSvcPartyId()
         walletParty <- connection.getPrimaryParty(walletDamlUser)
-        senderParty = PartyId.tryFromProtoPrimitive(request.sender)
+        senderParty = Proto.tryDecode(Proto.Party)(request.sender)
+        quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
         arg = walletCodegen.PaymentChannel_CreatePaymentRequest(
-          quantity = Numeric.assertFromString(request.quantity),
+          quantity = quantity,
           description = request.description,
         )
         cmd = walletCodegen.PaymentChannel
@@ -335,7 +344,7 @@ class GrpcWalletService(
           s"Expected create payment request to create one requests, but found ${requests.length} requests: $requests",
         )
       } yield v0.CreateOnChannelPaymentRequestResponse(
-        requestContractId = ApiTypes.ContractId.unwrap(requests(0).contractId)
+        requestContractId = Proto.encode(requests(0).contractId)
       )
     }
 
@@ -347,12 +356,14 @@ class GrpcWalletService(
       for {
         svcParty <- scanConnection.getSvcPartyId()
         walletParty <- connection.getPrimaryParty(walletDamlUser)
-        coinCid = Primitive.ContractId[coinCodegen.Coin](request.coinContractId)
+        coinCid = Proto.tryDecodeContractId[coinCodegen.Coin](request.coinContractId)
         arg = walletCodegen.OnChannelPaymentRequest_Accept(
           inputs = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
         )
-        cmd = Primitive
-          .ContractId[walletCodegen.OnChannelPaymentRequest](request.requestContractId)
+        requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](
+          request.requestContractId
+        )
+        cmd = requestCid
           .exerciseOnChannelPaymentRequest_Accept(walletParty.toPrim, arg)
           .command
         _ <- connection.submitCommand(
@@ -372,8 +383,10 @@ class GrpcWalletService(
         svcParty <- scanConnection.getSvcPartyId()
         walletParty <- connection.getPrimaryParty(walletDamlUser)
         arg = walletCodegen.OnChannelPaymentRequest_Reject()
-        cmd = Primitive
-          .ContractId[walletCodegen.OnChannelPaymentRequest](request.requestContractId)
+        requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](
+          request.requestContractId
+        )
+        cmd = requestCid
           .exerciseOnChannelPaymentRequest_Reject(walletParty.toPrim, arg)
           .command
         _ <- connection.submitCommand(
@@ -392,8 +405,10 @@ class GrpcWalletService(
       for {
         walletParty <- connection.getPrimaryParty(walletDamlUser)
         arg = walletCodegen.OnChannelPaymentRequest_Withdraw()
-        cmd = Primitive
-          .ContractId[walletCodegen.OnChannelPaymentRequest](request.requestContractId)
+        requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](
+          request.requestContractId
+        )
+        cmd = requestCid
           .exerciseOnChannelPaymentRequest_Withdraw(walletParty.toPrim, arg)
           .command
         _ <- connection.submitCommand(
@@ -441,7 +456,7 @@ class GrpcWalletService(
         )
       } yield {
         v0.RedistributeResponse(
-          coins.map(c => ApiTypes.ContractId.unwrap(c.contractId))
+          coins.map(c => Proto.encode(c.contractId))
         )
       }
     }

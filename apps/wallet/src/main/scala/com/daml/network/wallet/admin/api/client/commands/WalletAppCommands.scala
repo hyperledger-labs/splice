@@ -6,7 +6,7 @@ import com.daml.lf.data.Numeric
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.WalletServiceGrpc.WalletServiceStub
-import com.daml.network.util.{Contract, Value}
+import com.daml.network.util.{Contract, Proto, Value}
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
 import io.grpc.ManagedChannel
@@ -31,7 +31,7 @@ object WalletAppCommands {
     override def createRequest(): Either[String, v0.InitializeRequest] =
       Right(
         v0.InitializeRequest(
-          validator = Some(validator.toProtoPrimitive)
+          validator = Some(Proto.encode(validator))
         )
       )
 
@@ -69,10 +69,11 @@ object WalletAppCommands {
   case class Tap(amount: BigDecimal)
       extends BaseCommand[v0.TapRequest, v0.TapResponse, Primitive.ContractId[coinCodegen.Coin]] {
 
-    override def createRequest(): Either[String, v0.TapRequest] =
+    override def createRequest(): Either[String, v0.TapRequest] = {
       Right(
-        v0.TapRequest(amount = Numeric.toString(amount.bigDecimal))
+        v0.TapRequest(amount = Proto.encode(amount))
       )
+    }
 
     override def submitRequest(
         service: WalletServiceStub,
@@ -82,7 +83,7 @@ object WalletAppCommands {
     override def handleResponse(
         response: v0.TapResponse
     ): Either[String, Primitive.ContractId[coinCodegen.Coin]] =
-      Right(Primitive.ContractId.apply[coinCodegen.Coin](response.contractId))
+      Proto.decodeContractId[coinCodegen.Coin](response.contractId)
   }
 
   case class ListAppPaymentRequests()
@@ -120,8 +121,8 @@ object WalletAppCommands {
     override def createRequest(): Either[String, v0.AcceptAppPaymentRequestRequest] =
       Right(
         v0.AcceptAppPaymentRequestRequest(
-          ApiTypes.ContractId.unwrap(requestId),
-          ApiTypes.ContractId.unwrap(coinId),
+          Proto.encode(requestId),
+          Proto.encode(coinId),
         )
       )
 
@@ -133,10 +134,8 @@ object WalletAppCommands {
     override def handleResponse(
         response: v0.AcceptAppPaymentRequestResponse
     ): Either[String, Primitive.ContractId[walletCodegen.AcceptedAppPayment]] =
-      Right(
-        Primitive.ContractId[walletCodegen.AcceptedAppPayment](
-          response.acceptedPaymentContractId
-        )
+      Proto.decodeContractId[walletCodegen.AcceptedAppPayment](
+        response.acceptedPaymentContractId
       )
   }
 
@@ -151,7 +150,7 @@ object WalletAppCommands {
     override def createRequest(): Either[String, v0.RejectAppPaymentRequestRequest] =
       Right(
         v0.RejectAppPaymentRequestRequest(
-          ApiTypes.ContractId.unwrap(requestId)
+          Proto.encode(requestId)
         )
       )
 
@@ -176,9 +175,7 @@ object WalletAppCommands {
 
     override def createRequest(): Either[String, v0.ProposePaymentChannelRequest] =
       Right(
-        v0.ProposePaymentChannelRequest(
-          receiver.toProtoPrimitive
-        )
+        v0.ProposePaymentChannelRequest(Proto.encode(receiver))
       )
 
     override def submitRequest(
@@ -190,11 +187,7 @@ object WalletAppCommands {
     override def handleResponse(
         response: v0.ProposePaymentChannelResponse
     ): Either[String, Primitive.ContractId[walletCodegen.PaymentChannelProposal]] =
-      Right(
-        Primitive.ContractId[walletCodegen.PaymentChannelProposal](
-          response.proposalContractId
-        )
-      )
+      Proto.decodeContractId[walletCodegen.PaymentChannelProposal](response.proposalContractId)
   }
 
   case class ListPaymentChannelProposals()
@@ -233,7 +226,7 @@ object WalletAppCommands {
     override def createRequest(): Either[String, v0.AcceptPaymentChannelProposalRequest] =
       Right(
         v0.AcceptPaymentChannelProposalRequest(
-          ApiTypes.ContractId.unwrap(requestId)
+          Proto.encode(requestId)
         )
       )
 
@@ -246,11 +239,7 @@ object WalletAppCommands {
     override def handleResponse(
         response: v0.AcceptPaymentChannelProposalResponse
     ): Either[String, Primitive.ContractId[walletCodegen.PaymentChannel]] =
-      Right(
-        Primitive.ContractId[walletCodegen.PaymentChannel](
-          response.channelContractId
-        )
-      )
+      Proto.decodeContractId[walletCodegen.PaymentChannel](response.channelContractId)
   }
 
   case class ExecuteDirectTransfer(
@@ -266,9 +255,9 @@ object WalletAppCommands {
     override def createRequest(): Either[String, v0.ExecuteDirectTransferRequest] =
       Right(
         v0.ExecuteDirectTransferRequest(
-          receiver = receiver.toProtoPrimitive,
-          quantity = Numeric.toString(quantity.bigDecimal),
-          coinContractId = ApiTypes.ContractId.unwrap(coinId),
+          receiver = Proto.encode(receiver),
+          quantity = Proto.encode(quantity),
+          coinContractId = Proto.encode(coinId),
         )
       )
 
@@ -297,8 +286,8 @@ object WalletAppCommands {
     override def createRequest(): Either[String, v0.CreateOnChannelPaymentRequestRequest] =
       Right(
         v0.CreateOnChannelPaymentRequestRequest(
-          sender = sender.toProtoPrimitive,
-          quantity = Numeric.toString(quantity.bigDecimal),
+          sender = Proto.encode(sender),
+          quantity = Proto.encode(quantity),
           description = description,
         )
       )
@@ -312,13 +301,7 @@ object WalletAppCommands {
     override def handleResponse(
         response: v0.CreateOnChannelPaymentRequestResponse
     ): Either[String, Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]] =
-      Right(
-        (
-          Primitive.ContractId[walletCodegen.OnChannelPaymentRequest](
-            response.requestContractId
-          )
-        )
-      )
+      Proto.decodeContractId[walletCodegen.OnChannelPaymentRequest](response.requestContractId)
   }
 
   case class AcceptOnChannelPaymentRequest(
@@ -332,8 +315,8 @@ object WalletAppCommands {
     override def createRequest(): Either[String, v0.AcceptOnChannelPaymentRequestRequest] =
       Right(
         v0.AcceptOnChannelPaymentRequestRequest(
-          requestContractId = ApiTypes.ContractId.unwrap(requestId),
-          coinContractId = ApiTypes.ContractId.unwrap(coinId),
+          requestContractId = Proto.encode(requestId),
+          coinContractId = Proto.encode(coinId),
         )
       )
 
@@ -359,7 +342,7 @@ object WalletAppCommands {
     override def createRequest(): Either[String, v0.RejectOnChannelPaymentRequestRequest] =
       Right(
         v0.RejectOnChannelPaymentRequestRequest(
-          requestContractId = ApiTypes.ContractId.unwrap(requestId)
+          requestContractId = Proto.encode(requestId)
         )
       )
 
@@ -385,7 +368,7 @@ object WalletAppCommands {
     override def createRequest(): Either[String, v0.WithdrawOnChannelPaymentRequestRequest] =
       Right(
         v0.WithdrawOnChannelPaymentRequestRequest(
-          requestContractId = ApiTypes.ContractId.unwrap(requestId)
+          requestContractId = Proto.encode(requestId)
         )
       )
 
@@ -447,7 +430,7 @@ object WalletAppCommands {
       exactQuantity: Option[BigDecimal]
   ) {
     def toProtoV0: v0.RedistributeOutput =
-      v0.RedistributeOutput(exactQuantity.fold("")(q => Numeric.toString(q.bigDecimal)))
+      v0.RedistributeOutput(exactQuantity.fold("")(Proto.encode(_)))
   }
 
   /** Redistribute the transfer inputs via a self-transfer. The outputs
@@ -477,6 +460,6 @@ object WalletAppCommands {
     override def handleResponse(
         response: v0.RedistributeResponse
     ): Either[String, Seq[Primitive.ContractId[coinCodegen.Coin]]] =
-      Right(response.coinContractIds.map(Primitive.ContractId[coinCodegen.Coin](_)))
+      response.coinContractIds.traverse(Proto.decodeContractId[coinCodegen.Coin](_))
   }
 }

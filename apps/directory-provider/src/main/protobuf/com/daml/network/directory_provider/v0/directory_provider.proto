@@ -49,7 +49,7 @@ message RequestEntryPaymentResponse {
 }
 
 message CollectEntryPaymentRequest {
-  // Contract ID of the ApprovedAppPayment contract
+  // Contract ID of the AccepteddAppPayment contract
   string contract_id = 1;
 }
 
