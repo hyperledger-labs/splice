@@ -152,7 +152,7 @@ to Scala BigDecimals by the Scala compiler unlike Java BigDecimals
 (`wallet.tap(10)` vs `wallet.tap(new java.math.BigDecimal(10))`). 
 
 To represent Daml Numerics in Protobuf we use `string`s (there is no Protobuf BigDecimal type). Conversions to 
-and from `string`s should occur via `Numeric.toString` and `Numeric.fromString` from `com.daml.lf.data.Numeric`.
+and from `string`s should occur via `com.daml.network.util.Proto.encode/tryDecode`.
 
 When interacting with the Ledger API, we convert the Scala BigDecimals to Java BigDecimals. 
 
@@ -180,7 +180,7 @@ Below we list additional rules specific to our project:
 * Prefer java/maven like structuring for the package and directory layout
 * Place `.proto` files in `src/main/protobuf`
 * Prefer having a single `.proto` definition per service.
-* Refer to generated Protobuf classes should always be referred to with a package prefix, e.g., `v0.MyMessage` instead of `MyMessage`.
+* Refer to generated Protobuf classes with a package prefix, e.g., `v0.MyMessage` instead of `MyMessage`.
   This avoids name conflicts with our hand-written classes.
 
 ### Domain Specific Naming
