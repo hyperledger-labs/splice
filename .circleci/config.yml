@@ -77,7 +77,6 @@ commands:
         default: "25m"
       succeed_on_error:
         # Will cause the command to always succeed regardless of the sbt exit code.
-        # The original exit code will be available through the `STATUS` shell variable.
         type: boolean
         default: false
       retry_fetch:
@@ -87,22 +86,20 @@ commands:
       extra_parameters:
         type: string
         default: ""
+      with_authentication:
+        type: boolean
+        default: false
     steps:
-      - run:
-          name: Executing "sbt << parameters.cmd >>"
-          # In general jobs should be terminated by << parameters.timeout >>. If that does not work for some reason,
-          # use CircleCi's no-output timeout.
-          # We choose a value of 1h, because that is the highest value for << parameters.timeout >> that we currently use.
-          no_output_timeout: 1h
-          command: |
+      - run_bash_command_in_nix:
+          cmd_name: Executing "sbt << parameters.cmd >>"
+          with_authentication: << parameters.with_authentication >>
+          cmd: |
             on_exit() {
               local CODE="$?"
-              # Export exit code for usage in subsequent steps
-              echo "export STATUS=$CODE" >> $BASH_ENV
               # Provide some explanation on exit
               if [ "$CODE" == 0 ]
               then
-                echo "The script has terminated successfully."
+                echo "sbt terminated successfully."
               elif [ "$CODE" == 124 ]
               then
                 echo "sbt has been aborted with the TERM signal after << parameters.timeout >>."
@@ -110,7 +107,7 @@ commands:
               then
                 echo "sbt has been killed because it has allocated too much memory or it has ignored the TERM signal after << parameters.timeout >>."
               else
-                echo "The script has failed with exit code $CODE."
+                echo "sbt failed with exit code $CODE."
               fi
               <<# parameters.succeed_on_error >>
               echo "Overriding original exit code $CODE with zero."
@@ -120,37 +117,72 @@ commands:
             trap on_exit EXIT
 
             set -euo pipefail
-            . /home/circleci/.nix-profile/etc/profile.d/nix.sh
-
-            nix-shell shell.nix --pure --run bash \<<'EOF'
-               set -euo pipefail
-               run_sbt() {
-                 # Define sbt command
-                 SBT_CMD=(sbt -verbose)
-
-
-                 # Add extra parameters
-                 SBT_CMD+=(<< parameters.extra_parameters >>)
-
-                 # Add sbt commands.
-                 # Do not quote this, to allow the caller to pass in several commands.
-                 # The caller needs to take care of quoting, if a command contains spaces.
-                 SBT_CMD+=(<< parameters.cmd >>)
-
-                 # Setup heap size; corresponds to Canton large executors
-                 SBT_CMD+=("-J-Xmx5000M" "-J-Xms5000M")
-                 # Run command
-                 # also send a few newline characters to sbt to ensure we keep on downloading dependencies
-                 python3 -c "print ('r\n'*<< parameters.retry_fetch >>)" |
-                   timeout --kill-after=30s << parameters.timeout >> "${SBT_CMD[@]}" 2>&1 |
-                   tee sbt_output
-               }
-               run_sbt
-            EOF
-
-          environment:
             # Necessary for tests of the REPL
-            TERM: dumb
+            export TERM=dumb
+
+            run_sbt() {
+               # Define sbt command
+               SBT_CMD=(sbt -verbose)
+
+
+               # Add extra parameters
+               SBT_CMD+=(<< parameters.extra_parameters >>)
+
+               # Add sbt commands.
+               # Do not quote this, to allow the caller to pass in several commands.
+               # The caller needs to take care of quoting, if a command contains spaces.
+               SBT_CMD+=(<< parameters.cmd >>)
+
+               # Setup heap size; corresponds to Canton large executors
+               SBT_CMD+=("-J-Xmx5000M" "-J-Xms5000M")
+               # Run command
+               # also send a few newline characters to sbt to ensure we keep on downloading dependencies
+               python3 -c "print ('r\n'*<< parameters.retry_fetch >>)" |
+                 timeout --kill-after=30s << parameters.timeout >> "${SBT_CMD[@]}" 2>&1 |
+                 tee sbt_output
+            }
+            run_sbt
+
+  run_bash_command_in_nix:
+    parameters:
+      cmd:
+        type: string
+      cmd_name:
+        type: string
+        default: "Executing bash command << parameters.cmd >> in the nix shell"
+      with_authentication:
+        type: boolean
+        default: false
+      additional_nix_args:
+        type: string
+        default: ""
+    steps:
+      - run:
+          name: << parameters.cmd_name >>
+          command: |
+            set -euo pipefail
+            . /home/circleci/.nix-profile/etc/profile.d/nix.sh
+            ADDITIONAL_NIX_ARGS=<< parameters.additional_nix_args >>
+
+            if [[ << parameters.with_authentication >> ]]; then
+              ADDITIONAL_NIX_ARGS+="--keep GCP_DA_CN_DEVNET_KEY"
+            fi
+
+            nix-shell shell.nix \
+              --pure \
+              --keep CI $ADDITIONAL_NIX_ARGS \
+              --run bash \<<'EOF'
+              set -euo pipefail
+              . .envrc.vars
+
+              if [[ << parameters.with_authentication >> ]]; then
+                . $REPO_ROOT/deployment/devnet/.envrc.vars
+                echo $GCP_DA_CN_DEVNET_KEY | gcloud auth activate-service-account --key-file=-
+              fi
+
+              << parameters.cmd >>
+
+            EOF
 
 
   cleanup_test_job:
@@ -249,20 +281,9 @@ jobs:
     steps:
       - checkout
       - setup_nix
-      - run:
-         name: deployment test
-         command: |
-           set -euo pipefail
-           . /home/circleci/.nix-profile/etc/profile.d/nix.sh
-
-           nix-shell shell.nix \
-             --pure \
-             --run bash \<<'EOF'
-             set -euo pipefail
-             . .envrc.vars
-
-             make test
-           EOF
+      - run_bash_command_in_nix:
+         cmd_name: deployment test
+         cmd: make test
 
   deploy_cluster:
     circleci_ip_ranges: true
@@ -274,26 +295,12 @@ jobs:
     steps:
       - checkout
       - setup_nix
-      - run:
-         name: apply cluster manifest
-         command: |
-           set -euo pipefail
-           . /home/circleci/.nix-profile/etc/profile.d/nix.sh
-
-           nix-shell shell.nix \
-             --pure \
-             --keep CI \
-             --keep GCP_DA_CN_DEVNET_KEY \
-             --run bash \<<'EOF'
-             set -euo pipefail
-             . .envrc.vars
-             . $REPO_ROOT/deployment/devnet/.envrc.vars
-
-             echo $GCP_DA_CN_DEVNET_KEY | gcloud auth activate-service-account --key-file=-
-
-             cncluster activate
-             (yes || true) | cncluster apply
-           EOF
+      - run_bash_command_in_nix:
+         cmd_name: apply cluster manifest
+         with_authentication: true
+         cmd: |
+           cncluster activate
+           (yes || true) | cncluster apply
       - slack/notify:
           event: pass
           template: success_tagged_deploy_1
@@ -314,6 +321,7 @@ jobs:
       - execute_sbt_command:
           cmd: "\"testOnly *RunbookIntegrationTest\""
           timeout: "10m"
+          with_authentication: true
       - slack/notify:
           event: pass
           branch_pattern: main
@@ -417,18 +425,11 @@ jobs:
     steps:
       - checkout
       - setup_nix
-      - run:
-         name: build
-         command: |
-           set -euo pipefail
-           . /home/circleci/.nix-profile/etc/profile.d/nix.sh
-
-           nix-shell shell.nix \
-             --pure \
-             --run bash \<<'EOF'
-             set -euo pipefail
-             cd docs
-             make html
+      - run_bash_command_in_nix:
+         cmd_name: build
+         cmd: |
+           cd docs
+           make html
 
   docker-images-push:
     machine:
@@ -438,51 +439,27 @@ jobs:
     steps:
       - checkout
       - setup_nix
-      - run:
-         name: build images
-         command: |
-           set -euo pipefail
-           . /home/circleci/.nix-profile/etc/profile.d/nix.sh
+      - run_bash_command_in_nix:
+         cmd_name: build images
+         additional_nix_args: "--keep DOCKER_CERT_PATH \
+                              --keep DOCKER_HOST \
+                              --keep DOCKER_MACHINE_NAME \
+                              --keep DOCKER_TLS_VERIFY \
+                              --keep NO_PROXY"
+         cmd: make docker-build
 
-           nix-shell shell.nix \
-             --pure \
-             --keep CI \
-             --keep DOCKER_CERT_PATH \
-             --keep DOCKER_HOST \
-             --keep DOCKER_MACHINE_NAME \
-             --keep DOCKER_TLS_VERIFY \
-             --keep NO_PROXY \
-             --run bash \<<'EOF'
-             set -euo pipefail
-             . .envrc.vars
 
-             make docker-build
-           EOF
-
-      - run:
-         name: push images
-         command: |
-           set -euo pipefail
-           . /home/circleci/.nix-profile/etc/profile.d/nix.sh
-
-           nix-shell shell.nix \
-             --pure \
-             --keep CI \
-             --keep GCP_DA_CN_IMAGES_KEY \
-             --keep DOCKER_CERT_PATH \
-             --keep DOCKER_HOST \
-             --keep DOCKER_MACHINE_NAME \
-             --keep DOCKER_TLS_VERIFY \
-             --keep NO_PROXY \
-             --run bash \<<'EOF'
-             set -euo pipefail
-             . .envrc.vars
-
-             echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
-             (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
-
-             make docker-push
-           EOF
+      - run_bash_command_in_nix:
+         cmd_name: push images
+         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
+           --keep DOCKER_CERT_PATH \
+           --keep DOCKER_HOST \
+           --keep DOCKER_MACHINE_NAME \
+           --keep DOCKER_TLS_VERIFY \
+           --keep NO_PROXY"
+         cmd: |
+           (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
+           make docker-push
 
 
 workflows:

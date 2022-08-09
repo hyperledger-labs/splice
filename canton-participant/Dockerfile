@@ -8,4 +8,4 @@ EXPOSE 5002
 COPY svc-participant.conf .
 COPY bootstrap.scala .
 
-CMD [ "daemon", "--no-tty", "--log-level-stdout=INFO", "--log-level-canton=INFO", "--log-file-appender=off", "--config", "svc-participant.conf", "--bootstrap", "bootstrap.scala" ]
+CMD [ "daemon", "--no-tty", "--log-level-stdout=DEBUG", "--log-level-canton=DEBUG", "--log-file-appender=off", "--config", "svc-participant.conf", "--bootstrap", "bootstrap.scala" ]

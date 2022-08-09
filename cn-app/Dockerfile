@@ -20,10 +20,10 @@ ADD ${APP_PATH} .
 
 # pre-compile ammonite's dynamic scala by launching the REPL with no stdin
 RUN echo "Precompiling canton network console. Please ignore the following output 🙈" \
-  && coin-0.1.0-SNAPSHOT/bin/coin --config empty.conf --no-tty < /dev/null
+  && coin-0.1.0-SNAPSHOT/bin/coin --config empty.conf --no-tty < /dev/null && rm -r log
 
 # point entrypoint to the coin executable
 ENTRYPOINT [ "coin-0.1.0-SNAPSHOT/bin/coin" ]
 
 # default arguments if none are specified by user
-CMD ["daemon", "--no-tty", "--log-level-stdout", "INFO" ]
+CMD ["daemon", "--no-tty", "--log-level-stdout", "DEBUG", "--log-level-canton=DEBUG" ]

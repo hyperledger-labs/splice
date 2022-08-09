@@ -6,4 +6,4 @@ COPY svc.conf .
 COPY svc.canton .
 
 # default arguments if none are specified by user
-CMD ["daemon", "--no-tty", "--log-level-stdout", "INFO", "--config", "svc.conf", "--bootstrap", "svc.canton" ]
+CMD ["daemon", "--no-tty", "--log-level-stdout", "DEBUG", "--log-level-canton=DEBUG", "--config", "svc.conf", "--bootstrap", "svc.canton" ]
