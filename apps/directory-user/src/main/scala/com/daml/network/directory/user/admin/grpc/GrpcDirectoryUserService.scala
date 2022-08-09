@@ -10,7 +10,7 @@ import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.directory.provider.admin.api.client.DirectoryProviderConnection
 import com.daml.network.directory_user.v0
 import com.daml.network.directory_user.v0.DirectoryUserServiceGrpc
-import com.daml.network.util.{Contract, CoinUtil}
+import com.daml.network.util.{Contract, CoinUtil, Proto}
 import com.digitalasset.canton.console.CommandErrors.GenericCommandError
 import com.digitalasset.canton.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -62,7 +62,7 @@ class GrpcDirectoryUserService(
           requests.length == 1,
           s"Expected one DirectoryInstallRequest but got ${requests.length} requests $requests",
         )
-      } yield v0.RequestDirectoryInstallResponse(ApiTypes.ContractId.unwrap(requests(0).contractId))
+      } yield v0.RequestDirectoryInstallResponse(Proto.encode(requests(0).contractId))
     }
 
   override def requestDirectoryEntry(
@@ -89,6 +89,6 @@ class GrpcDirectoryUserService(
           requests.length == 1,
           s"Expected one DirectoryEntryRequest but got ${requests.length} requests $requests",
         )
-      } yield v0.RequestDirectoryEntryResponse(ApiTypes.ContractId.unwrap(requests(0).contractId))
+      } yield v0.RequestDirectoryEntryResponse(Proto.encode(requests(0).contractId))
     }
 }

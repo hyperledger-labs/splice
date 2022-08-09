@@ -6,7 +6,7 @@ import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.directory_user.v0
 import com.daml.network.directory_user.v0.DirectoryUserServiceGrpc.DirectoryUserServiceStub
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, Proto}
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.PartyId
@@ -39,7 +39,7 @@ object DirectoryUserCommands {
     override def handleResponse(
         response: v0.RequestDirectoryInstallResponse
     ): Either[String, Primitive.ContractId[codegen.DirectoryInstallRequest]] =
-      Right(Primitive.ContractId(response.contractId))
+      Proto.decodeContractId(response.contractId)
   }
 
   final case class RequestDirectoryEntry(name: String)
@@ -61,6 +61,6 @@ object DirectoryUserCommands {
     override def handleResponse(
         response: v0.RequestDirectoryEntryResponse
     ): Either[String, Primitive.ContractId[codegen.DirectoryEntryRequest]] =
-      Right(Primitive.ContractId(response.contractId))
+      Proto.decodeContractId(response.contractId)
   }
 }

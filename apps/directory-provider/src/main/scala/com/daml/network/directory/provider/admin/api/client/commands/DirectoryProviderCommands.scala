@@ -6,7 +6,7 @@ import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.directory_provider.v0
 import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc.DirectoryProviderServiceStub
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, Proto}
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.PartyId
@@ -55,7 +55,7 @@ object DirectoryProviderCommands {
 
     override def createRequest(): Either[String, v0.AcceptInstallRequestRequest] =
       Right(
-        v0.AcceptInstallRequestRequest(ApiTypes.ContractId.unwrap(contractId))
+        v0.AcceptInstallRequestRequest(Proto.encode(contractId))
       )
 
     override def submitRequest(
@@ -66,7 +66,7 @@ object DirectoryProviderCommands {
     override def handleResponse(
         response: v0.AcceptInstallRequestResponse
     ): Either[String, Primitive.ContractId[codegen.DirectoryInstall]] =
-      Right(Primitive.ContractId[codegen.DirectoryInstall](response.contractId))
+      Proto.decodeContractId[codegen.DirectoryInstall](response.contractId)
   }
 
   case class ListEntryRequests(
@@ -102,7 +102,7 @@ object DirectoryProviderCommands {
 
     override def createRequest(): Either[String, v0.RequestEntryPaymentRequest] =
       Right(
-        v0.RequestEntryPaymentRequest(ApiTypes.ContractId.unwrap(contractId))
+        v0.RequestEntryPaymentRequest(Proto.encode(contractId))
       )
 
     override def submitRequest(
@@ -126,7 +126,7 @@ object DirectoryProviderCommands {
 
     override def createRequest(): Either[String, v0.CollectEntryPaymentRequest] =
       Right(
-        v0.CollectEntryPaymentRequest(ApiTypes.ContractId.unwrap(contractId))
+        v0.CollectEntryPaymentRequest(Proto.encode(contractId))
       )
 
     override def submitRequest(
@@ -137,7 +137,7 @@ object DirectoryProviderCommands {
     override def handleResponse(
         response: v0.CollectEntryPaymentResponse
     ): Either[String, Primitive.ContractId[codegen.DirectoryEntry]] =
-      Right(Primitive.ContractId[codegen.DirectoryEntry](response.contractId))
+      Proto.decodeContractId[codegen.DirectoryEntry](response.contractId)
   }
 
   case class ListEntries(
@@ -235,6 +235,6 @@ object DirectoryProviderCommands {
       service.getProviderPartyId(request)
 
     override def handleResponse(response: v0.GetProviderPartyIdResponse): Either[String, PartyId] =
-      PartyId.fromProtoPrimitive(response.providerPartyId)
+      Proto.decode(Proto.Party)(response.providerPartyId)
   }
 }

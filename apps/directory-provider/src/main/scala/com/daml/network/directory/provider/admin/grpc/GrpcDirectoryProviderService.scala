@@ -9,7 +9,7 @@ import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.directory_provider.v0
 import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.{Contract, CoinUtil}
+import com.daml.network.util.{Contract, CoinUtil, Proto}
 import com.digitalasset.canton.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
@@ -79,10 +79,8 @@ class GrpcDirectoryProviderService(
           collectionDuration = collectionDuration,
           acceptDuration = acceptDuration,
         )
-        acceptCmd = Primitive.ContractId
-          .apply[codegen.DirectoryInstallRequest](request.contractId)
-          .exerciseDirectoryInstallRequest_Accept(partyId.toPrim, arg)
-          .command
+        installCid = Proto.tryDecodeContractId[codegen.DirectoryInstallRequest](request.contractId)
+        acceptCmd = installCid.exerciseDirectoryInstallRequest_Accept(partyId.toPrim, arg).command
         tx <- connection.submitCommand(Seq(partyId), Seq(), Seq(acceptCmd))
         installs = DecodeUtil.decodeAllCreated(codegen.DirectoryInstall)(tx.getTransaction)
         _ = require(
@@ -90,7 +88,7 @@ class GrpcDirectoryProviderService(
           s"Expected accept to create only one install contract but found ${installs.length} installs $installs",
         )
       } yield {
-        v0.AcceptInstallRequestResponse(ApiTypes.ContractId.unwrap(installs(0).contractId))
+        v0.AcceptInstallRequestResponse(Proto.encode(installs(0).contractId))
       }
     }
 
@@ -121,7 +119,7 @@ class GrpcDirectoryProviderService(
         partyId <- connection.getPrimaryParty(damlUser)
         entryRequest <- fetchByContractId(codegen.DirectoryEntryRequest)(
           partyId,
-          Primitive.ContractId(request.contractId),
+          Proto.tryDecodeContractId(request.contractId),
         )
         cmd = codegen.DirectoryInstall
           .key(DA.Types.Tuple2(partyId.toPrim, entryRequest.value.entry.user))
@@ -139,7 +137,7 @@ class GrpcDirectoryProviderService(
           s"Expected requestEntryPayment to create only one payment request contract but found ${requests.length} requests $requests",
         )
       } yield {
-        v0.RequestEntryPaymentResponse(ApiTypes.ContractId.unwrap(requests(0).contractId))
+        v0.RequestEntryPaymentResponse(Proto.encode(requests(0).contractId))
       }
     }
 
@@ -151,7 +149,7 @@ class GrpcDirectoryProviderService(
         partyId <- connection.getPrimaryParty(damlUser)
         acceptedAppPayment <- fetchByContractId(walletCodegen.AcceptedAppPayment)(
           partyId,
-          Primitive.ContractId(request.contractId),
+          Proto.tryDecodeContractId(request.contractId),
         )
         // TODO(i321) Add uniqueness check
         cmd = codegen.DirectoryInstall
@@ -170,7 +168,7 @@ class GrpcDirectoryProviderService(
           s"Expected collectEntryPayment to create only one entryt contract but found ${entries.length} requests $entries",
         )
       } yield {
-        v0.CollectEntryPaymentResponse(ApiTypes.ContractId.unwrap(entries(0).contractId))
+        v0.CollectEntryPaymentResponse(Proto.encode(entries(0).contractId))
       }
     }
 
@@ -228,7 +226,7 @@ class GrpcDirectoryProviderService(
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
         partyId <- connection.getPrimaryParty(damlUser)
-      } yield v0.GetProviderPartyIdResponse(partyId.toProtoPrimitive)
+      } yield v0.GetProviderPartyIdResponse(Proto.encode(partyId))
     }
 
   private def listEntries(party: PartyId): Future[Seq[Contract[codegen.DirectoryEntry]]] =
