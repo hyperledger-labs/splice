@@ -20,6 +20,7 @@ service WalletService {
   rpc AcceptPaymentChannelProposal (AcceptPaymentChannelProposalRequest) returns (AcceptPaymentChannelProposalResponse);
   rpc ExecuteDirectTransfer (ExecuteDirectTransferRequest) returns (google.protobuf.Empty);
   rpc CreateOnChannelPaymentRequest (CreateOnChannelPaymentRequestRequest) returns (CreateOnChannelPaymentRequestResponse);
+  rpc ListOnChannelPaymentRequests (google.protobuf.Empty) returns (ListOnChannelPaymentRequestsResponse);
   rpc AcceptOnChannelPaymentRequest (AcceptOnChannelPaymentRequestRequest) returns (google.protobuf.Empty);
   rpc RejectOnChannelPaymentRequest (RejectOnChannelPaymentRequestRequest) returns (google.protobuf.Empty);
   rpc WithdrawOnChannelPaymentRequest (WithdrawOnChannelPaymentRequestRequest) returns (google.protobuf.Empty);
@@ -121,6 +122,11 @@ message CreateOnChannelPaymentRequestRequest {
 
 message CreateOnChannelPaymentRequestResponse {
   string request_contract_id = 1;
+}
+
+message ListOnChannelPaymentRequestsResponse {
+  // TODO(i300): add pagination for payment requests
+  repeated com.daml.network.v0.Contract payment_requests = 1;
 }
 
 message AcceptOnChannelPaymentRequestRequest {

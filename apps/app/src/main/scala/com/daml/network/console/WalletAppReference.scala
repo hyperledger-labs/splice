@@ -150,6 +150,16 @@ abstract class WalletAppReference(
     }
   }
 
+  @Help.Summary("List all on-channel payment requests of the configured user")
+  @Help.Description(
+    "Shows all incoming and outgoing payment requests over payment channels."
+  )
+  def listOnChannelPaymentRequests(): Seq[Contract[walletCodegen.OnChannelPaymentRequest]] = {
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.ListOnChannelPaymentRequests())
+    }
+  }
+
   @Help.Summary("Accept a request for payment through a payment channel")
   @Help.Description(
     "Accepts the request using the given coin."

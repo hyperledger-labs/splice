@@ -295,6 +295,31 @@ object WalletAppCommands {
       Proto.decodeContractId[walletCodegen.OnChannelPaymentRequest](response.requestContractId)
   }
 
+  case class ListOnChannelPaymentRequests()
+      extends BaseCommand[
+        Empty,
+        v0.ListOnChannelPaymentRequestsResponse,
+        Seq[
+          Contract[walletCodegen.OnChannelPaymentRequest]
+        ],
+      ] {
+
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: Empty,
+    ): Future[v0.ListOnChannelPaymentRequestsResponse] = service.listOnChannelPaymentRequests(request)
+
+    override def handleResponse(
+        response: v0.ListOnChannelPaymentRequestsResponse
+    ): Either[String, Seq[Contract[walletCodegen.OnChannelPaymentRequest]]] =
+      response.paymentRequests
+        .traverse(req => Contract.fromProto(walletCodegen.OnChannelPaymentRequest)(req))
+        .leftMap(_.toString)
+  }
+
   case class AcceptOnChannelPaymentRequest(
       requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest],
       coinId: Primitive.ContractId[coinCodegen.Coin],

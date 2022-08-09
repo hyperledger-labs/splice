@@ -161,7 +161,11 @@ class WalletIntegrationTest
       checkWallet(bobUserParty, bobWallet, Seq((9, 10)))
 
       // Bob asks for more coins, alice accepts
+      aliceWallet.listOnChannelPaymentRequests().size shouldBe 0
       val request = bobWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please pay")
+      utils.retry_until_true(aliceWallet.listOnChannelPaymentRequests().size == 1)
+      aliceWallet.listOnChannelPaymentRequests().headOption.value.contractId shouldBe request
+      bobWallet.listOnChannelPaymentRequests() shouldBe aliceWallet.listOnChannelPaymentRequests()
       aliceWallet.acceptOnChannelPaymentRequest(request, aliceWallet.list().head.contractId)
       checkWallet(aliceUserParty, aliceWallet, Seq((29, 30)))
       checkWallet(bobUserParty, bobWallet, Seq((9, 10), (9, 10)))
