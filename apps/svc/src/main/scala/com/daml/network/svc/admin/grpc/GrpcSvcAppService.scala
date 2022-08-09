@@ -1,7 +1,6 @@
 package com.daml.network.svc.admin.grpc
 
 import cats.implicits._
-import com.daml.lf.data.Numeric
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionResponse
 import com.daml.ledger.client.binding.{Contract, Primitive, TemplateCompanion}
@@ -9,7 +8,7 @@ import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.svc.admin.SvcAutomationService
 import com.daml.network.svc.v0
 import com.daml.network.svc.v0.SvcServiceGrpc
-import com.daml.network.util.CoinUtil
+import com.daml.network.util.{CoinUtil, Proto}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.ledger.api.client.LedgerConnection
@@ -85,10 +84,9 @@ class GrpcSvcAppService(
               .map(_.map(_.contractId))
           } yield v0.GetDebugInfoResponse(
             svcUser = svcUserName,
-            svcPartyId = partyId.toProtoPrimitive,
+            svcPartyId = Proto.encode(partyId),
             coinPackageId = CoinUtil.packageId,
-            coinRulesContractIds =
-              ApiTypes.ContractId.unsubst(coinRulesCids: Seq[ApiTypes.ContractId]),
+            coinRulesContractIds = coinRulesCids.map(Proto.encode(_)),
           )
       }
     }
@@ -101,7 +99,7 @@ class GrpcSvcAppService(
         case Some(partyId) =>
           Future.successful(
             v0.GetValidatorConfigResponse(
-              svcPartyId = partyId.toProtoPrimitive
+              svcPartyId = Proto.encode(partyId)
             )
           )
       }
@@ -112,7 +110,7 @@ class GrpcSvcAppService(
       for {
         svc <- connection.getPrimaryParty(svcUserName)
         validators <- getValidators(svc)
-        price = Numeric.assertFromString(request.coinPrice)
+        price = Proto.tryDecode(Proto.BigDecimal)(request.coinPrice)
         cmds = validators.toList.map(v =>
           CC.CoinRules.CoinRules
             .key(DA.Types.Tuple2(svc.toPrim, v.toPrim))
@@ -185,7 +183,7 @@ class GrpcSvcAppService(
           connection.submitCommand(Seq(svc), Seq.empty, Seq(cmd))
         }
       } yield v0.StartIssuingRoundResponse(
-        Numeric.toString(totalBurn.bigDecimal),
+        Proto.encode(totalBurn),
         roundResultsToProto(
           decodeRoundResults(CC.Round.IssuingMiningRound)(_.obs)(submitResults)
         ),
@@ -273,7 +271,7 @@ class GrpcSvcAppService(
   private def roundResultsToProto[T](
       m: Map[Primitive.Party, Primitive.ContractId[T]]
   ): Map[String, String] =
-    m.map { case (v, cid) => Primitive.Party.unwrap(v) -> ApiTypes.ContractId.unwrap(cid) }
+    m.map { case (v, cid) => Proto.encode(v) -> Proto.encode(cid) }
 
   /** Given a set of submission results, decode them to a map of validator party to
     * contract id of the given T.

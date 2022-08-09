@@ -1,5 +1,6 @@
 package com.daml.network.validator.admin.api.client.commands
 
+import com.daml.network.util.Proto
 import com.daml.network.validator.v0
 import com.daml.network.validator.v0.ValidatorAppServiceGrpc.ValidatorAppServiceStub
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
@@ -30,18 +31,14 @@ object ValidatorAppCommands {
     override def handleResponse(
         response: v0.InitializeResponse
     ): Either[String, PartyId] =
-      response.partyId
-        .toRight("Missing mandatory field: party_id")
-        .map(PartyId.tryFromProtoPrimitive)
+      Proto.decode(Proto.Party)(response.partyId)
   }
 
   case class OnboardUserCommand(name: String)
       extends BaseCommand[v0.OnboardUserRequest, v0.OnboardUserResponse, PartyId] {
 
     override def createRequest(): Either[String, v0.OnboardUserRequest] =
-      Right(
-        v0.OnboardUserRequest(Some(name))
-      )
+      Right(v0.OnboardUserRequest(name))
 
     override def submitRequest(
         service: ValidatorAppServiceStub,
@@ -50,10 +47,7 @@ object ValidatorAppCommands {
 
     override def handleResponse(
         response: v0.OnboardUserResponse
-    ): Either[String, PartyId] =
-      response.partyId
-        .toRight("Missing mandatory field: party_id")
-        .map(PartyId.tryFromProtoPrimitive)
+    ): Either[String, PartyId] = Proto.decode(Proto.Party)(response.partyId)
   }
 
 }

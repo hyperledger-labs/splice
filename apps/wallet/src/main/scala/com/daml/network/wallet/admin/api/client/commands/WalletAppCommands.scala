@@ -2,7 +2,6 @@ package com.daml.network.wallet.admin.api.client.commands
 
 import cats.syntax.either._
 import cats.syntax.traverse._
-import com.daml.lf.data.Numeric
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.WalletServiceGrpc.WalletServiceStub

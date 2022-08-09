@@ -1,7 +1,6 @@
 package com.daml.network.wallet.admin.grpc
 
 import cats.implicits._
-import com.daml.lf.data.Numeric
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinLedgerConnection
@@ -422,7 +421,8 @@ class GrpcWalletService(
       coinRulesCodegen.TransferOutput.OutputSenderCoin(
         lock = None,
         exactQuantity =
-          if (output.quantity.isEmpty) None else Some(Numeric.assertFromString(output.quantity)),
+          if (output.quantity.isEmpty) None
+          else Some(Proto.tryDecode(Proto.BigDecimal)(output.quantity)),
       )
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {

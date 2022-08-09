@@ -2,7 +2,7 @@ package com.daml.network.svc.admin.api.client.commands
 
 import cats.implicits._
 import com.daml.ledger.client.binding.Primitive.ContractId
-import com.daml.lf.data.Numeric
+import com.daml.network.util.Proto
 import com.daml.network.svc.v0
 import com.daml.network.svc.v0.{GetDebugInfoResponse, GetValidatorConfigResponse}
 import com.daml.network.svc.v0.SvcServiceGrpc.SvcServiceStub
@@ -45,9 +45,8 @@ object SvcAppCommands {
         request: Empty,
     ): Future[v0.InitializeResponse] = service.initialize(request)
 
-    override def handleResponse(response: v0.InitializeResponse): Either[String, PartyId] = Right(
-      PartyId.tryFromProtoPrimitive(response.svcPartyId)
-    )
+    override def handleResponse(response: v0.InitializeResponse): Either[String, PartyId] =
+      Proto.decode(Proto.Party)(response.svcPartyId)
   }
 
   case class AcceptValidators() extends UnitCommand(_.acceptValidators)
@@ -67,14 +66,15 @@ object SvcAppCommands {
     ): Future[GetDebugInfoResponse] = service.getDebugInfo(request)
     override def handleResponse(
         response: GetDebugInfoResponse
-    ): Either[String, DebugInfo] = Right(
-      DebugInfo(
-        svcUser = response.svcUser,
-        svcParty = PartyId.tryFromProtoPrimitive(response.svcPartyId),
-        coinPackageId = response.coinPackageId,
-        coinRulesCids = response.coinRulesContractIds,
-      )
-    )
+    ): Either[String, DebugInfo] =
+      Proto.decode(Proto.Party)(response.svcPartyId).map { svc =>
+        DebugInfo(
+          svcUser = response.svcUser,
+          svcParty = svc,
+          coinPackageId = response.coinPackageId,
+          coinRulesCids = response.coinRulesContractIds,
+        )
+      }
   }
 
   case class ValidatorConfigInfo(
@@ -90,11 +90,12 @@ object SvcAppCommands {
     ): Future[GetValidatorConfigResponse] = service.getValidatorConfig(request)
     override def handleResponse(
         response: GetValidatorConfigResponse
-    ): Either[String, ValidatorConfigInfo] = Right(
-      ValidatorConfigInfo(
-        svcParty = PartyId.tryFromProtoPrimitive(response.svcPartyId)
-      )
-    )
+    ): Either[String, ValidatorConfigInfo] =
+      Proto.decode(Proto.Party)(response.svcPartyId).map { svc =>
+        ValidatorConfigInfo(
+          svcParty = svc
+        )
+      }
   }
 
   private object RoundCommand {
@@ -102,8 +103,8 @@ object SvcAppCommands {
       m.toList
         .traverse { case (k, v) =>
           for {
-            party <- PartyId.fromProtoPrimitive(k)
-            contractId = ContractId[T](v)
+            party <- Proto.decode(Proto.Party)(k)
+            contractId <- Proto.decodeContractId[T](v)
           } yield party -> contractId
         }
         .map(_.toMap)
@@ -114,7 +115,7 @@ object SvcAppCommands {
         roundCodegen.OpenMiningRound
       ]]] {
     override def createRequest(): Either[String, v0.OpenRoundRequest] = Right(
-      v0.OpenRoundRequest(Numeric.toString(coinPrice.bigDecimal))
+      v0.OpenRoundRequest(Proto.encode(coinPrice))
     )
     override def submitRequest(
         service: SvcServiceStub,
@@ -169,7 +170,7 @@ object SvcAppCommands {
     override def handleResponse(
         response: v0.StartIssuingRoundResponse
     ): Either[String, StartIssuingRoundResponse] = for {
-      totalBurnQuantity <- Numeric.fromString(response.totalBurnQuantity).map(BigDecimal(_))
+      totalBurnQuantity <- Proto.decode(Proto.BigDecimal)(response.totalBurnQuantity)
       validatorRounds <- RoundCommand.decodeRoundMap(response.issuingMiningRoundContractIds)
     } yield StartIssuingRoundResponse(totalBurnQuantity, validatorRounds)
   }

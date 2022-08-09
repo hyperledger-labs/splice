@@ -57,6 +57,17 @@ object Proto {
     def instance = partyValue
   }
 
+  implicit val codegenPartyValue: Proto[ApiTypes.Party, String] =
+    new Proto[ApiTypes.Party, String] {
+      def encode(d: ApiTypes.Party) = ApiTypes.Party.unwrap(d)
+      def decode(e: String) = Right(ApiTypes.Party(e))
+    }
+
+  object CodegenParty extends ProtoCompanion[ApiTypes.Party] {
+    type Enc = String
+    def instance = codegenPartyValue
+  }
+
   implicit def contractIdValue[T]: Proto[Primitive.ContractId[T], String] =
     new Proto[Primitive.ContractId[T], String] {
       def encode(d: Primitive.ContractId[T]) = ApiTypes.ContractId.unwrap(d)

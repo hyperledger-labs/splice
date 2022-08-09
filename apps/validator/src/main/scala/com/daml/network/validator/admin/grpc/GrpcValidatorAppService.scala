@@ -4,7 +4,7 @@ import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionRespons
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.validator.v0._
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.{CoinUtil, UploadablePackage}
+import com.daml.network.util.{CoinUtil, Proto, UploadablePackage}
 import com.daml.network.validator.store.ValidatorAppStore
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -63,12 +63,12 @@ class GrpcValidatorAppService(
         _ <- createRulesRequestAndUserHostedAtContracts(svcParty, validatorParty)
         _ <- store.setValidatorParty(validatorParty)
         _ <- store.setSvcParty(svcParty)
-      } yield InitializeResponse(Some(validatorParty.toProtoPrimitive))
+      } yield InitializeResponse(Proto.encode(validatorParty))
     }
 
   override def onboardUser(request: OnboardUserRequest): Future[OnboardUserResponse] =
     withSpanFromGrpcContext("GrpcValidatorAppService") { implicit traceContext => span =>
-      val name = request.name.fold(sys.error("field missing: name"))(identity)
+      val name = request.name
 
       span.setAttribute("name", name)
 
@@ -86,6 +86,6 @@ class GrpcValidatorAppService(
           validatorPartyId,
           connection,
         )
-      } yield OnboardUserResponse(Some(userPartyId.toPrim.toString))
+      } yield OnboardUserResponse(Proto.encode(userPartyId))
     }
 }

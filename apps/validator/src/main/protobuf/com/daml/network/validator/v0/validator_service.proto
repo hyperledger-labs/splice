@@ -2,7 +2,6 @@ syntax = "proto3";
 package com.daml.network.validator.v0;
 
 import "google/protobuf/empty.proto";
-import "google/protobuf/wrappers.proto";
 
 service ValidatorAppService {
   rpc OnboardUser (OnboardUserRequest) returns (OnboardUserResponse);
@@ -10,13 +9,13 @@ service ValidatorAppService {
 }
 
 message InitializeResponse {
-  google.protobuf.StringValue party_id= 1;
+  string party_id= 1;
 }
 
 message OnboardUserRequest {
-  google.protobuf.StringValue name = 1;
+  string name = 1;
 }
 
 message OnboardUserResponse {
-  google.protobuf.StringValue party_id = 1;
+  string party_id = 1;
 }
