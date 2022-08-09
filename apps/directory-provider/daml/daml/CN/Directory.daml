@@ -61,8 +61,8 @@ template DirectoryInstall with
          request.entry.user === user
          now <- getTime
          create AppPaymentRequest with
-           payee = provider
-           payer = user
+           receiver = provider
+           sender = user
            svc = svc
            quantity = request.entryFee
            reference = toInterfaceContractId requestCid

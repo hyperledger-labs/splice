@@ -153,7 +153,7 @@ class GrpcDirectoryProviderService(
         )
         // TODO(i321) Add uniqueness check
         cmd = codegen.DirectoryInstall
-          .key(DA.Types.Tuple2(partyId.toPrim, acceptedAppPayment.value.payer))
+          .key(DA.Types.Tuple2(partyId.toPrim, acceptedAppPayment.value.sender))
           .exerciseDirectoryInstall_CollectEntryPayment(
             partyId.toPrim,
             codegen.DirectoryInstall_CollectEntryPayment(acceptedAppPayment.contractId),

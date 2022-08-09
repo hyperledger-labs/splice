@@ -188,6 +188,7 @@ Below we list additional rules specific to our project:
 * Use `listXXX`, `acceptXXX`, `rejectXXX`, `withdrawXXX` for managing proposals, requests etc.
 * [Beware of the differences](https://www.bkacontent.com/gs-commonly-confused-words-amount-number-and-quantity) 
   between `quantity`, `amount` and `number`: **`quantity`**  is usually the right choice
+* Between `sender`/`receiver` and `payer`/`payee`: please use **`sender`/`receiver`**
 
 
 ## GCE Clusters

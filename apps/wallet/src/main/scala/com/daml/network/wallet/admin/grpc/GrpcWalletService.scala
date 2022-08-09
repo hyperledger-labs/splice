@@ -88,7 +88,7 @@ class GrpcWalletService(
           .activeContracts(walletParty, walletCodegen.AppPaymentRequest)
       } yield {
         val filteredRequests = paymentRequestsLAPI.filter(contract =>
-          PartyId.tryFromPrim(contract.value.payer) == walletParty
+          PartyId.tryFromPrim(contract.value.sender) == walletParty
         )
         v0.ListAppPaymentRequestsResponse(
           filteredRequests.map(r =>

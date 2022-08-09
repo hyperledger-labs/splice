@@ -66,8 +66,8 @@ template PaymentChannel
       do
         assertMsg "Payment requests are not allowed in this channel" allowRequests
         create OnChannelPaymentRequest with
-          payer = sender
-          payee = receiver
+          sender
+          receiver
           svc
           quantity
           description
@@ -108,9 +108,9 @@ interface PaymentReference
 
 template OnChannelPaymentRequest
   with
-    payer : Party
+    sender : Party
     -- ^ The party that should pay.
-    payee : Party
+    receiver : Party
     -- ^ The party requesting to be paid.
     svc : Party
     -- ^ The issuer of the CC that flows on this payment channel.
@@ -121,21 +121,21 @@ template OnChannelPaymentRequest
     senderTransferFeeRatio : Decimal
     -- ^ How to split the transfer fee between the sender and the receiver.
   where
-    signatory payee, payer
+    signatory sender, receiver
     ensure quantity > 0.0
 
     choice OnChannelPaymentRequest_Accept : ()
       with
         inputs : [TransferInput]
-      controller payer
+      controller sender
       do
         -- create the transfer
         let transfer = Transfer with
-              sender = payer
+              sender
               inputs = inputs
               outputs = 
                 [ OutputReceiverCoin with
-                    receiver = payee
+                    receiver
                     coinType = FixedReceiverCoin
                       quantity
                       senderTransferFeeRatio
@@ -144,23 +144,23 @@ template OnChannelPaymentRequest
                     lock = None
                 ]
               payload = "Accepted payment request"
-        (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt payer
+        (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt sender
         void $ exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
         pure ()
 
     choice OnChannelPaymentRequest_Withdraw : ()
-      controller payee
+      controller receiver
       do pure ()
 
     choice OnChannelPaymentRequest_Reject : ()
-      controller payer
+      controller sender
       do pure ()
 
 template AppPaymentRequest
   with
-    payer : Party
+    sender : Party
     -- ^ The party that should pay.
-    payee : Party
+    receiver : Party
     -- ^ The party requesting to be paid.
     svc : Party
     -- ^ The issuer of CC that should be used to make the payment.
@@ -173,81 +173,81 @@ template AppPaymentRequest
     reference : ContractId PaymentReference
     -- ^ The reference to the reason / good for which the payment is requested.
   where
-    signatory payee, payer
+    signatory sender, receiver
     ensure (collectionDuration > aunit && quantity > 0.0)
 
     choice AppPaymentRequest_Accept : ContractId AcceptedAppPayment
       with
         inputs : [TransferInput]
-      controller payer
+      controller sender
       do now <- getTime
          -- check that the reference is active and implements PaymentReference
          void $ fetch reference
          assertMsg "AppPaymentRequest has not expired" (now < expiresAt)
          -- lock the coin and create an accepted payment
          let transfer = Transfer with
-              sender = payer
+              sender
               inputs
               outputs =
                 [ OutputSenderCoin with
                     exactQuantity = Some quantity
                     lock = Some TimeLock with
-                      holder = payee
+                      holder = receiver
                       expiresAt = now `addRelTime` collectionDuration
                 , OutputSenderCoin with
                     exactQuantity = None
                     lock = None
                 ]
               payload = "lock payment"
-         (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt payer
+         (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt sender
          (TransferResultLockedCoin lockedCoin::_) <-
             exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
          create AcceptedAppPayment
            with
-             svc, payee, payer, reference, lockedCoin
+             svc, receiver, sender, reference, lockedCoin
 
     choice AppPaymentRequest_Withdraw : ()
-      controller payee
+      controller receiver
       do pure ()
 
     choice AppPaymentRequest_Reject : ()
-      controller payer
+      controller sender
       do pure ()
 
 template AcceptedAppPayment
   with
-    payer : Party
-    payee : Party
+    sender : Party
+    receiver : Party
     svc : Party
     lockedCoin : ContractId LockedCoin
     reference : ContractId PaymentReference
   where
-    signatory payee, payer
+    signatory sender, receiver
 
     choice AcceptedAppPayment_Collect : ContractId PaymentReference
-      controller payee, payer
+      controller sender, receiver
       do
-        -- unlock coin and transfer the remainder to the payee
+        -- unlock coin and transfer the remainder to the receiver
         coin <- exercise lockedCoin Coin_Unlock
         let transfer = Transfer with
-              sender = payer
+              sender
               inputs = [InputCoin coin]
               outputs =
                 [ OutputReceiverCoin with
-                    receiver = payee
+                    receiver
                     coinType = FloatingReceiverCoin
                 ]
               payload = "transfer locked payment"
-        (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt payee
+        (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt receiver
         void $ exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
         -- defensive check that the reference is still active
         void $ fetch reference
         pure reference
 
     choice AcceptedAppPayment_Discard : ContractId Coin
-      controller payee
+      controller receiver
       do exercise lockedCoin Coin_Unlock
 
     choice AcceptedAppPayment_Expire : ContractId Coin
-      controller payer
+      controller sender
       do exercise lockedCoin Coin_OwnerExpireLock

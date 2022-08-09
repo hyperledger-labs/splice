@@ -83,8 +83,8 @@ class WalletIntegrationTest
 
       // Create a payment request to self.
       val reqC = walletCodegen.AppPaymentRequest(
-        payer = aliceUserParty.toPrim,
-        payee = aliceUserParty.toPrim,
+        sender = aliceUserParty.toPrim,
+        receiver = aliceUserParty.toPrim,
         svc = svcParty.toPrim,
         quantity = BigDecimal(10: Int),
         expiresAt = binding.Primitive.Timestamp
