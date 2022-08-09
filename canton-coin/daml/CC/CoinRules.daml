@@ -71,12 +71,12 @@ template CoinRules
     nonconsuming choice Tap: ContractId Coin
       with
         receiver: Party
-        amount: Decimal
+        quantity: Decimal
       controller receiver
       do
         (_, issuanceState) <- fetchByKey @IssuanceState (svc, obs)
         let expiringQuantity = ExpiringQuantity with
-                        initialQuantity = amount
+                        initialQuantity = quantity
                         createdAt = issuanceState.currentRound
                         ratePerRound = config.holdingFee
         create Coin with

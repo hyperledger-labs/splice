@@ -1,14 +1,12 @@
 syntax = "proto3";
 package com.daml.network.validator.v0;
 
+import "google/protobuf/empty.proto";
 import "google/protobuf/wrappers.proto";
 
 service ValidatorAppService {
   rpc OnboardUser (OnboardUserRequest) returns (OnboardUserResponse);
-  rpc Initialize (InitializeRequest) returns (InitializeResponse);
-}
-
-message InitializeRequest {
+  rpc Initialize (google.protobuf.Empty) returns (InitializeResponse);
 }
 
 message InitializeResponse {

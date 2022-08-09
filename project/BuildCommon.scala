@@ -99,6 +99,10 @@ object BuildCommon {
     protobufLint := {
       val targetSourceDir = target.value / "protobuf_merged_sources"
       val includeDirs = (Compile / PB.includePaths).value
+      // trigger PB.generate to ensure includeDirs are populated with external deps
+      val _ = (Compile / PB.generate).value
+      // delete source dir first to avoid problems with renamed files lingering around
+      IO.delete(targetSourceDir)
       // merge all sources *assuming* proto paths are unique, which
       // should hold as otherwise `protoc` will complain during dependency resolution
       includeDirs.foreach(includeDir =>
@@ -117,6 +121,17 @@ object BuildCommon {
           |  use:
           |    # Using DEFAULT as ...
           |    - DEFAULT
+          |    - PACKAGE_NO_IMPORT_CYCLE
+          |    # Disallow as we want to consciously decide whether we want to use streaming endpoints.
+          |    # We'll probably use server-side streaming, but not client-side streaming as it is not
+          |    # supported by grpc-web.
+          |    - RPC_NO_CLIENT_STREAMING
+          |    - RPC_NO_SERVER_STREAMING
+          |  rpc_allow_google_protobuf_empty_requests: true
+          |  rpc_allow_google_protobuf_empty_responses: true
+          |  except:
+          |    # TODO(M1-92): enable this by changing our v0 prefix to v1
+          |    - PACKAGE_VERSION_SUFFIX
           |  ignore:
           |    # Ignoring proto packages with these prefixes as they are external dependencies
           |    - com/daml/ledger/api/v1

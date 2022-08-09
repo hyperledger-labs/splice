@@ -8,9 +8,8 @@ import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.util.{Contract, Proto, Value}
 import com.daml.network.wallet.util.WalletUtil
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.UploadablePackage
 import com.daml.network.wallet.v0
-import com.daml.network.wallet.v0.{InitializeRequest, InitializeResponse, WalletServiceGrpc}
+import com.daml.network.wallet.v0.{InitializeRequest, WalletServiceGrpc}
 import com.digitalasset.canton.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
@@ -20,7 +19,6 @@ import com.digitalasset.network.CN.{Wallet => walletCodegen}
 import com.digitalasset.network.DA
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
-import ujson.IndexedValue.True
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.nowarn
@@ -43,7 +41,7 @@ class GrpcWalletService(
   val validatorParty: AtomicReference[PartyId] = new AtomicReference[PartyId](null)
 
   @nowarn("cat=unused")
-  override def list(request: v0.ListRequest): Future[v0.ListResponse] =
+  override def list(request: Empty): Future[v0.ListResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         walletParty <- connection.getPrimaryParty(walletDamlUser)
@@ -62,13 +60,13 @@ class GrpcWalletService(
       for {
         svcParty <- scanConnection.getSvcPartyId()
         walletParty <- connection.getPrimaryParty(walletDamlUser)
-        amount = Proto.tryDecode(Proto.BigDecimal)(request.amount)
+        quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
         tapCmd = coinRulesCodegen.CoinRules
           .key(DA.Types.Tuple2(svcParty.toPrim, validatorParty.get.toPrim))
           .exerciseTap(
             walletParty.toPrim,
             walletParty.toPrim,
-            amount,
+            quantity,
           )
           .command
         tx <- connection.submitCommand(Seq(walletParty), Seq(validatorParty.get()), Seq(tapCmd))
@@ -82,7 +80,7 @@ class GrpcWalletService(
 
   @nowarn("cat=unused")
   override def listAppPaymentRequests(
-      request: v0.ListAppPaymentRequestsRequest
+      request: Empty
   ): Future[v0.ListAppPaymentRequestsResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => span =>
       for {
@@ -136,7 +134,7 @@ class GrpcWalletService(
   @nowarn("cat=unused")
   override def rejectAppPaymentRequest(
       request: v0.RejectAppPaymentRequestRequest
-  ): Future[v0.RejectAppPaymentRequestResponse] =
+  ): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         walletParty <- connection.getPrimaryParty(walletDamlUser)
@@ -152,12 +150,12 @@ class GrpcWalletService(
           Seq(),
           Seq(cmd),
         )
-      } yield v0.RejectAppPaymentRequestResponse()
+      } yield Empty()
     }
 
   @nowarn("cat=unused")
   override def listPaymentChannelProposals(
-      request: v0.ListPaymentChannelProposalsRequest
+      request: Empty
   ): Future[v0.ListPaymentChannelProposalsResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => span =>
       for {
@@ -182,7 +180,7 @@ class GrpcWalletService(
         walletParty <- connection.getPrimaryParty(walletDamlUser)
         svcParty <- scanConnection.getSvcPartyId()
         // TODO(M1-07): guard making the proposal by a check that a like channel does not yet exist
-        receiver = Proto.tryDecode(Proto.Party)(request.receiver)
+        receiver = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
         cmd = walletCodegen
           .PaymentChannelProposal(
             proposer = walletParty.toPrim,
@@ -251,13 +249,13 @@ class GrpcWalletService(
   @nowarn("cat=unused")
   override def executeDirectTransfer(
       request: v0.ExecuteDirectTransferRequest
-  ): Future[v0.ExecuteDirectTransferResponse] =
+  ): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         svcParty <- scanConnection.getSvcPartyId()
         walletParty <- connection.getPrimaryParty(walletDamlUser)
         coinCid = Proto.tryDecodeContractId[coinCodegen.Coin](request.coinContractId)
-        receiverParty = Proto.tryDecode(Proto.Party)(request.receiver)
+        receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
         quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
         arg = walletCodegen.PaymentChannel_ExecuteDirectTransfer(
           inputs = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid)),
@@ -273,7 +271,7 @@ class GrpcWalletService(
           Seq(validatorParty.get()),
           Seq(cmd),
         )
-      } yield v0.ExecuteDirectTransferResponse()
+      } yield Empty()
     }
 
   @nowarn("cat=unused")
@@ -321,7 +319,7 @@ class GrpcWalletService(
       for {
         svcParty <- scanConnection.getSvcPartyId()
         walletParty <- connection.getPrimaryParty(walletDamlUser)
-        senderParty = Proto.tryDecode(Proto.Party)(request.sender)
+        senderParty = Proto.tryDecode(Proto.Party)(request.senderPartyId)
         quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
         arg = walletCodegen.PaymentChannel_CreatePaymentRequest(
           quantity = quantity,
@@ -351,7 +349,7 @@ class GrpcWalletService(
   @nowarn("cat=unused")
   override def acceptOnChannelPaymentRequest(
       request: v0.AcceptOnChannelPaymentRequestRequest
-  ): Future[v0.AcceptOnChannelPaymentRequestResponse] =
+  ): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         svcParty <- scanConnection.getSvcPartyId()
@@ -371,13 +369,13 @@ class GrpcWalletService(
           Seq(validatorParty.get()),
           Seq(cmd),
         )
-      } yield v0.AcceptOnChannelPaymentRequestResponse()
+      } yield Empty()
     }
 
   @nowarn("cat=unused")
   override def rejectOnChannelPaymentRequest(
       request: v0.RejectOnChannelPaymentRequestRequest
-  ): Future[v0.RejectOnChannelPaymentRequestResponse] =
+  ): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         svcParty <- scanConnection.getSvcPartyId()
@@ -394,13 +392,13 @@ class GrpcWalletService(
           Seq(),
           Seq(cmd),
         )
-      } yield v0.RejectOnChannelPaymentRequestResponse()
+      } yield Empty()
     }
 
   @nowarn("cat=unused")
   override def withdrawOnChannelPaymentRequest(
       request: v0.WithdrawOnChannelPaymentRequestRequest
-  ): Future[v0.WithdrawOnChannelPaymentRequestResponse] =
+  ): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         walletParty <- connection.getPrimaryParty(walletDamlUser)
@@ -416,7 +414,7 @@ class GrpcWalletService(
           Seq(),
           Seq(cmd),
         )
-      } yield v0.WithdrawOnChannelPaymentRequestResponse()
+      } yield Empty()
     }
 
   override def redistribute(request: v0.RedistributeRequest): Future[v0.RedistributeResponse] = {
@@ -462,18 +460,14 @@ class GrpcWalletService(
     }
   }
 
-  override def initialize(request: InitializeRequest): Future[InitializeResponse] =
+  override def initialize(request: InitializeRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => _ =>
-      validatorParty.set(
-        PartyId.tryFromProtoPrimitive(
-          request.validator.getOrElse(sys.error("validator party not set"))
-        )
-      )
+      validatorParty.set(PartyId.tryFromProtoPrimitive(request.validatorPartyId))
 
       for {
         _ <- connection.uploadDarFile(
           WalletUtil
         ) // TODO(i353) move away from dar upload during init
-      } yield v0.InitializeResponse()
+      } yield Empty()
     }
 }

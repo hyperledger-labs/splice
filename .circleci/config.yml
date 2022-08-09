@@ -205,6 +205,10 @@ jobs:
       - checkout
       - setup_nix
       - execute_sbt_command:
+          # Moved to the front to give quick feedback before starting the lengthy compile
+          cmd: "protobufLint"
+          retry_fetch: "50"
+      - execute_sbt_command:
           cmd: "Test/compile"
           retry_fetch: "50"
       - execute_sbt_command:

@@ -158,6 +158,38 @@ When interacting with the Ledger API, we convert the Scala BigDecimals to Java B
 
 Overall, please refer to the `wallet.tap` command implementation for the canonical handling of Daml Numerics.  
 
+## Protobuf & GRPC Guidelines
+
+Generally endeavor to model your [GRPC and Protobuf definitions using Google's guidelines](https://cloud.google.com/apis/design/naming_convention).
+We use [`buf`](https://docs.buf.build/tour/lint-your-api)'s `DEFAULT` linting rules to enforce many of these guidelines in CI using the `protobufLint` `sbt` task.
+See [their documentation](https://docs.buf.build/lint/rules#default) for what these are and why they are beneficial.
+
+Below we list additional rules specific to our project:
+
+### Message Definitions
+
+* All Protobuf definitions should be using [`proto3`](https://developers.google.com/protocol-buffers/docs/proto3)
+* Avoid wrapping primitive types in a message structure unless future extensibility will likely be required
+* Use a plural name for `repeated` fields
+* Use `string` fields with a suffix `contract_id` to store contract ids
+* Use `string` fields with a suffix `party_id` to store party ids
+
+### Code Layout
+
+* Ensure that the generated stubs will be in their own package separate from any implementations
+* Prefer java/maven like structuring for the package and directory layout
+* Place `.proto` files in `src/main/protobuf`
+* Prefer having a single `.proto` definition per service.
+* Refer to generated Protobuf classes should always be referred to with a package prefix, e.g., `v0.MyMessage` instead of `MyMessage`.
+  This avoids name conflicts with our hand-written classes.
+
+### Domain Specific Naming
+
+* Use `listXXX`, `acceptXXX`, `rejectXXX`, `withdrawXXX` for managing proposals, requests etc.
+* [Beware of the differences](https://www.bkacontent.com/gs-commonly-confused-words-amount-number-and-quantity) 
+  between `quantity`, `amount` and `number`: **`quantity`**  is usually the right choice
+
+
 ## GCE Clusters
 
 The public Canton Network clusters are currently hosted in Google

@@ -8,7 +8,7 @@ import com.daml.ledger.client.binding.{Contract, Primitive, TemplateCompanion}
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.svc.admin.SvcAutomationService
 import com.daml.network.svc.v0
-import com.daml.network.svc.v0.SvcAppServiceGrpc
+import com.daml.network.svc.v0.SvcServiceGrpc
 import com.daml.network.util.CoinUtil
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.ledger.api.client.DecodeUtil
@@ -34,7 +34,7 @@ class GrpcSvcAppService(
     @nowarn("cat=unused")
     ec: ExecutionContext,
     tracer: Tracer,
-) extends SvcAppServiceGrpc.SvcAppService
+) extends SvcServiceGrpc.SvcService
     with Spanning
     with NamedLogging
     with FlagCloseableAsync {
@@ -85,9 +85,10 @@ class GrpcSvcAppService(
               .map(_.map(_.contractId))
           } yield v0.GetDebugInfoResponse(
             svcUser = svcUserName,
-            svcParty = partyId.toProtoPrimitive,
+            svcPartyId = partyId.toProtoPrimitive,
             coinPackageId = CoinUtil.packageId,
-            coinRulesCids = ApiTypes.ContractId.unsubst(coinRulesCids: Seq[ApiTypes.ContractId]),
+            coinRulesContractIds =
+              ApiTypes.ContractId.unsubst(coinRulesCids: Seq[ApiTypes.ContractId]),
           )
       }
     }
@@ -100,7 +101,7 @@ class GrpcSvcAppService(
         case Some(partyId) =>
           Future.successful(
             v0.GetValidatorConfigResponse(
-              svcParty = partyId.toProtoPrimitive
+              svcPartyId = partyId.toProtoPrimitive
             )
           )
       }

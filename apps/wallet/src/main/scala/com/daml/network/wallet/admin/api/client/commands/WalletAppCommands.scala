@@ -25,37 +25,32 @@ object WalletAppCommands {
       v0.WalletServiceGrpc.stub(channel)
   }
 
-  case class Initialize(validator: PartyId)
-      extends BaseCommand[v0.InitializeRequest, v0.InitializeResponse, Unit] {
+  case class Initialize(validator: PartyId) extends BaseCommand[v0.InitializeRequest, Empty, Unit] {
 
     override def createRequest(): Either[String, v0.InitializeRequest] =
       Right(
         v0.InitializeRequest(
-          validator = Some(Proto.encode(validator))
+          validatorPartyId = Proto.encode(validator)
         )
       )
 
     override def submitRequest(
         service: WalletServiceStub,
         request: v0.InitializeRequest,
-    ): Future[v0.InitializeResponse] = service.initialize(request)
+    ): Future[Empty] = service.initialize(request)
 
     override def handleResponse(
-        response: v0.InitializeResponse
+        response: Empty
     ): Either[String, Unit] = Right(())
   }
 
-  case class List()
-      extends BaseCommand[v0.ListRequest, v0.ListResponse, Seq[Contract[coinCodegen.Coin]]] {
+  case class List() extends BaseCommand[Empty, v0.ListResponse, Seq[Contract[coinCodegen.Coin]]] {
 
-    override def createRequest(): Either[String, v0.ListRequest] =
-      Right(
-        v0.ListRequest()
-      )
+    override def createRequest(): Either[String, Empty] = Right(Empty())
 
     override def submitRequest(
         service: WalletServiceStub,
-        request: v0.ListRequest,
+        request: Empty,
     ): Future[v0.ListResponse] = service.list(request)
 
     override def handleResponse(
@@ -66,12 +61,12 @@ object WalletAppCommands {
         .leftMap(_.toString)
   }
 
-  case class Tap(amount: BigDecimal)
+  case class Tap(quantity: BigDecimal)
       extends BaseCommand[v0.TapRequest, v0.TapResponse, Primitive.ContractId[coinCodegen.Coin]] {
 
     override def createRequest(): Either[String, v0.TapRequest] = {
       Right(
-        v0.TapRequest(amount = Proto.encode(amount))
+        v0.TapRequest(quantity = Proto.encode(quantity))
       )
     }
 
@@ -87,18 +82,15 @@ object WalletAppCommands {
   }
 
   case class ListAppPaymentRequests()
-      extends BaseCommand[v0.ListAppPaymentRequestsRequest, v0.ListAppPaymentRequestsResponse, Seq[
+      extends BaseCommand[Empty, v0.ListAppPaymentRequestsResponse, Seq[
         Contract[walletCodegen.AppPaymentRequest]
       ]] {
 
-    override def createRequest(): Either[String, v0.ListAppPaymentRequestsRequest] =
-      Right(
-        v0.ListAppPaymentRequestsRequest()
-      )
+    override def createRequest(): Either[String, Empty] = Right(Empty())
 
     override def submitRequest(
         service: WalletServiceStub,
-        request: v0.ListAppPaymentRequestsRequest,
+        request: Empty,
     ): Future[v0.ListAppPaymentRequestsResponse] = service.listAppPaymentRequests(request)
 
     override def handleResponse(
@@ -143,7 +135,7 @@ object WalletAppCommands {
       requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest]
   ) extends BaseCommand[
         v0.RejectAppPaymentRequestRequest,
-        v0.RejectAppPaymentRequestResponse,
+        Empty,
         Unit,
       ] {
 
@@ -157,10 +149,10 @@ object WalletAppCommands {
     override def submitRequest(
         service: WalletServiceStub,
         request: v0.RejectAppPaymentRequestRequest,
-    ): Future[v0.RejectAppPaymentRequestResponse] = service.rejectAppPaymentRequest(request)
+    ): Future[Empty] = service.rejectAppPaymentRequest(request)
 
     override def handleResponse(
-        response: v0.RejectAppPaymentRequestResponse
+        response: Empty
     ): Either[String, Unit] =
       Right(())
   }
@@ -192,19 +184,19 @@ object WalletAppCommands {
 
   case class ListPaymentChannelProposals()
       extends BaseCommand[
-        v0.ListPaymentChannelProposalsRequest,
+        Empty,
         v0.ListPaymentChannelProposalsResponse,
         Seq[Contract[walletCodegen.PaymentChannelProposal]],
       ] {
 
-    override def createRequest(): Either[String, v0.ListPaymentChannelProposalsRequest] =
+    override def createRequest(): Either[String, Empty] =
       Right(
-        v0.ListPaymentChannelProposalsRequest()
+        Empty()
       )
 
     override def submitRequest(
         service: WalletServiceStub,
-        request: v0.ListPaymentChannelProposalsRequest,
+        request: Empty,
     ): Future[v0.ListPaymentChannelProposalsResponse] = service.listPaymentChannelProposals(request)
 
     override def handleResponse(
@@ -248,14 +240,14 @@ object WalletAppCommands {
       coinId: Primitive.ContractId[coinCodegen.Coin],
   ) extends BaseCommand[
         v0.ExecuteDirectTransferRequest,
-        v0.ExecuteDirectTransferResponse,
+        Empty,
         Unit,
       ] {
 
     override def createRequest(): Either[String, v0.ExecuteDirectTransferRequest] =
       Right(
         v0.ExecuteDirectTransferRequest(
-          receiver = Proto.encode(receiver),
+          receiverPartyId = Proto.encode(receiver),
           quantity = Proto.encode(quantity),
           coinContractId = Proto.encode(coinId),
         )
@@ -264,11 +256,11 @@ object WalletAppCommands {
     override def submitRequest(
         service: WalletServiceStub,
         request: v0.ExecuteDirectTransferRequest,
-    ): Future[v0.ExecuteDirectTransferResponse] =
+    ): Future[Empty] =
       service.executeDirectTransfer(request)
 
     override def handleResponse(
-        response: v0.ExecuteDirectTransferResponse
+        response: Empty
     ): Either[String, Unit] =
       Right(())
 
@@ -286,7 +278,7 @@ object WalletAppCommands {
     override def createRequest(): Either[String, v0.CreateOnChannelPaymentRequestRequest] =
       Right(
         v0.CreateOnChannelPaymentRequestRequest(
-          sender = Proto.encode(sender),
+          senderPartyId = Proto.encode(sender),
           quantity = Proto.encode(quantity),
           description = description,
         )
@@ -309,7 +301,7 @@ object WalletAppCommands {
       coinId: Primitive.ContractId[coinCodegen.Coin],
   ) extends BaseCommand[
         v0.AcceptOnChannelPaymentRequestRequest,
-        v0.AcceptOnChannelPaymentRequestResponse,
+        Empty,
         Unit,
       ] {
     override def createRequest(): Either[String, v0.AcceptOnChannelPaymentRequestRequest] =
@@ -323,11 +315,11 @@ object WalletAppCommands {
     override def submitRequest(
         service: WalletServiceStub,
         request: v0.AcceptOnChannelPaymentRequestRequest,
-    ): Future[v0.AcceptOnChannelPaymentRequestResponse] =
+    ): Future[Empty] =
       service.acceptOnChannelPaymentRequest(request)
 
     override def handleResponse(
-        response: v0.AcceptOnChannelPaymentRequestResponse
+        response: Empty
     ): Either[String, Unit] =
       Right(())
   }
@@ -336,7 +328,7 @@ object WalletAppCommands {
       requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]
   ) extends BaseCommand[
         v0.RejectOnChannelPaymentRequestRequest,
-        v0.RejectOnChannelPaymentRequestResponse,
+        Empty,
         Unit,
       ] {
     override def createRequest(): Either[String, v0.RejectOnChannelPaymentRequestRequest] =
@@ -349,11 +341,11 @@ object WalletAppCommands {
     override def submitRequest(
         service: WalletServiceStub,
         request: v0.RejectOnChannelPaymentRequestRequest,
-    ): Future[v0.RejectOnChannelPaymentRequestResponse] =
+    ): Future[Empty] =
       service.rejectOnChannelPaymentRequest(request)
 
     override def handleResponse(
-        response: v0.RejectOnChannelPaymentRequestResponse
+        response: Empty
     ): Either[String, Unit] =
       Right(())
   }
@@ -362,7 +354,7 @@ object WalletAppCommands {
       requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]
   ) extends BaseCommand[
         v0.WithdrawOnChannelPaymentRequestRequest,
-        v0.WithdrawOnChannelPaymentRequestResponse,
+        Empty,
         Unit,
       ] {
     override def createRequest(): Either[String, v0.WithdrawOnChannelPaymentRequestRequest] =
@@ -375,11 +367,11 @@ object WalletAppCommands {
     override def submitRequest(
         service: WalletServiceStub,
         request: v0.WithdrawOnChannelPaymentRequestRequest,
-    ): Future[v0.WithdrawOnChannelPaymentRequestResponse] =
+    ): Future[Empty] =
       service.withdrawOnChannelPaymentRequest(request)
 
     override def handleResponse(
-        response: v0.WithdrawOnChannelPaymentRequestResponse
+        response: Empty
     ): Either[String, Unit] =
       Right(())
   }

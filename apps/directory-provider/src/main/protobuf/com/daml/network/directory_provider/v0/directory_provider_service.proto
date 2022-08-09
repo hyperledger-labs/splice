@@ -14,8 +14,8 @@ service DirectoryProviderService {
   rpc CollectEntryPayment (CollectEntryPaymentRequest) returns (CollectEntryPaymentResponse);
 
   rpc ListEntries (google.protobuf.Empty) returns (ListEntriesResponse);
-  rpc LookupEntryByParty (LookupEntryByPartyRequest) returns (LookupEntryResponse);
-  rpc LookupEntryByName (LookupEntryByNameRequest) returns (LookupEntryResponse);
+  rpc LookupEntryByParty (LookupEntryByPartyRequest) returns (LookupEntryByPartyResponse);
+  rpc LookupEntryByName (LookupEntryByNameRequest) returns (LookupEntryByNameResponse);
   rpc GetProviderPartyId (google.protobuf.Empty) returns (GetProviderPartyIdResponse);
 }
 
@@ -66,11 +66,15 @@ message LookupEntryByPartyRequest {
   string user = 1;
 }
 
+message LookupEntryByPartyResponse {
+  com.daml.network.v0.Contract entry = 1;
+}
+
 message LookupEntryByNameRequest {
   string name = 2;
 }
 
-message LookupEntryResponse {
+message LookupEntryByNameResponse {
   com.daml.network.v0.Contract entry = 1;
 }
 

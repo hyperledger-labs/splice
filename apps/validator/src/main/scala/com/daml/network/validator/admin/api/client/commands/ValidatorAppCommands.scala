@@ -5,6 +5,7 @@ import com.daml.network.validator.v0.ValidatorAppServiceGrpc.ValidatorAppService
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
 import io.grpc.ManagedChannel
+import com.google.protobuf.empty.Empty
 
 import scala.concurrent.Future
 
@@ -16,15 +17,14 @@ object ValidatorAppCommands {
       v0.ValidatorAppServiceGrpc.stub(channel)
   }
 
-  case class SetupValidatorCommand()
-      extends BaseCommand[v0.InitializeRequest, v0.InitializeResponse, PartyId] {
+  case class SetupValidatorCommand() extends BaseCommand[Empty, v0.InitializeResponse, PartyId] {
 
-    override def createRequest(): Either[String, v0.InitializeRequest] =
-      Right(v0.InitializeRequest())
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
 
     override def submitRequest(
         service: ValidatorAppServiceStub,
-        request: v0.InitializeRequest,
+        request: Empty,
     ): Future[v0.InitializeResponse] = service.initialize(request)
 
     override def handleResponse(

@@ -3,33 +3,7 @@ package com.daml.network.svc.v0;
 
 import "google/protobuf/empty.proto";
 
-// Contains information useful for debugging a running SVC app.
-// Absolutely no forward or backward compatibility guarantees.
-message GetDebugInfoResponse {
-  // User representing the SVC
-  string svcUser = 1;
-
-  // Party representing the SVC
-  string svcParty = 2;
-
-  // Package containing the canton coin code
-  string coinPackageId = 3;
-
-  // Contract IDs of all active CoinRules contracts created by this app
-  repeated string coinRulesCids = 4;
-}
-
-message GetValidatorConfigResponse {
-  // Party identifier of the SVC party
-  string svcParty = 1;
-}
-
-message InitializeResponse {
-  // Identifier of the party representing the SVC.
-  string svc_party_id = 1;
-}
-
-service SvcAppService {
+service SvcService {
   // Performs one-time initialization of the application (i.e., when starting the application on a fresh ledger).
   // This should be called before any other call.
   // This call is idempotent.
@@ -54,7 +28,6 @@ service SvcAppService {
   //   disclose it through an off-ledger channel
   rpc GetValidatorConfig (google.protobuf.Empty) returns (GetValidatorConfigResponse);
 
-
   // Open a new mining round for all currently registered validators.
   // TODO(M1-90): Replace this manual trigger by automation
   rpc OpenRound (OpenRoundRequest) returns (OpenRoundResponse);
@@ -75,6 +48,32 @@ service SvcAppService {
   // Archive the given mining round for all validators.
   // TODO(M1-90): Replace this manual trigger by automation
   rpc ArchiveRound (ArchiveRoundRequest) returns (google.protobuf.Empty);
+}
+
+// Contains information useful for debugging a running SVC app.
+// Absolutely no forward or backward compatibility guarantees.
+message GetDebugInfoResponse {
+  // User representing the SVC
+  string svc_user = 1;
+
+  // Party representing the SVC
+  string svc_party_id = 2;
+
+  // Package containing the canton coin code
+  string coin_package_id = 3;
+
+  // Contract IDs of all active CoinRules contracts created by this app
+  repeated string coin_rules_contract_ids = 4;
+}
+
+message GetValidatorConfigResponse {
+  // Party identifier of the SVC party
+  string svc_party_id = 1;
+}
+
+message InitializeResponse {
+  // Identifier of the party representing the SVC.
+  string svc_party_id = 1;
 }
 
 message OpenRoundRequest {

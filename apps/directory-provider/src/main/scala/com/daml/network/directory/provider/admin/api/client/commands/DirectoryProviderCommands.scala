@@ -167,7 +167,7 @@ object DirectoryProviderCommands {
       party: PartyId
   ) extends BaseCommand[
         v0.LookupEntryByPartyRequest,
-        v0.LookupEntryResponse,
+        v0.LookupEntryByPartyResponse,
         Contract[codegen.DirectoryEntry],
       ] {
 
@@ -179,10 +179,10 @@ object DirectoryProviderCommands {
     override def submitRequest(
         service: DirectoryProviderServiceStub,
         request: v0.LookupEntryByPartyRequest,
-    ): Future[v0.LookupEntryResponse] = service.lookupEntryByParty(request)
+    ): Future[v0.LookupEntryByPartyResponse] = service.lookupEntryByParty(request)
 
     override def handleResponse(
-        response: v0.LookupEntryResponse
+        response: v0.LookupEntryByPartyResponse
     ): Either[String, Contract[codegen.DirectoryEntry]] = {
       val r = for {
         entryField <- ProtoConverter.required("entry", response.entry)
@@ -197,7 +197,7 @@ object DirectoryProviderCommands {
       name: String
   ) extends BaseCommand[
         v0.LookupEntryByNameRequest,
-        v0.LookupEntryResponse,
+        v0.LookupEntryByNameResponse,
         Contract[codegen.DirectoryEntry],
       ] {
 
@@ -209,10 +209,10 @@ object DirectoryProviderCommands {
     override def submitRequest(
         service: DirectoryProviderServiceStub,
         request: v0.LookupEntryByNameRequest,
-    ): Future[v0.LookupEntryResponse] = service.lookupEntryByName(request)
+    ): Future[v0.LookupEntryByNameResponse] = service.lookupEntryByName(request)
 
     override def handleResponse(
-        response: v0.LookupEntryResponse
+        response: v0.LookupEntryByNameResponse
     ): Either[String, Contract[codegen.DirectoryEntry]] = {
       val r = for {
         entryField <- ProtoConverter.required("entry", response.entry)

@@ -11,5 +11,5 @@ testTap = do
     pat <- allocateParty "Pat"
     cid <- submitMulti [pat] [app.svc] $ exerciseCmd rulesCid Tap with 
                 receiver = pat
-                amount = 100.0
+                quantity = 100.0
     return ()

@@ -4,26 +4,25 @@ package com.daml.network.wallet.v0;
 import "com/daml/network/v0/contract.proto";
 import "com/daml/network/v0/value.proto";
 import "google/protobuf/empty.proto";
-import "google/protobuf/wrappers.proto";
 
 service WalletService {
-  rpc initialize (InitializeRequest) returns (InitializeResponse);
-  rpc list (ListRequest) returns (ListResponse);
-  rpc tap (TapRequest) returns (TapResponse);
+  rpc Initialize (InitializeRequest) returns (google.protobuf.Empty);
+  rpc List (google.protobuf.Empty) returns (ListResponse);
+  rpc Tap (TapRequest) returns (TapResponse);
 
-  rpc ListAppPaymentRequests (ListAppPaymentRequestsRequest) returns (ListAppPaymentRequestsResponse);
+  rpc ListAppPaymentRequests (google.protobuf.Empty) returns (ListAppPaymentRequestsResponse);
   rpc AcceptAppPaymentRequest (AcceptAppPaymentRequestRequest) returns (AcceptAppPaymentRequestResponse);
-  rpc RejectAppPaymentRequest (RejectAppPaymentRequestRequest) returns (RejectAppPaymentRequestResponse);
+  rpc RejectAppPaymentRequest (RejectAppPaymentRequestRequest) returns (google.protobuf.Empty);
 
   // Note that there is no list proposal function as we assume the contract-id is disclosed off-ledger.
   rpc ProposePaymentChannel (ProposePaymentChannelRequest) returns (ProposePaymentChannelResponse);
-  rpc ListPaymentChannelProposals (ListPaymentChannelProposalsRequest) returns (ListPaymentChannelProposalsResponse);
+  rpc ListPaymentChannelProposals (google.protobuf.Empty) returns (ListPaymentChannelProposalsResponse);
   rpc AcceptPaymentChannelProposal (AcceptPaymentChannelProposalRequest) returns (AcceptPaymentChannelProposalResponse);
-  rpc ExecuteDirectTransfer (ExecuteDirectTransferRequest) returns (ExecuteDirectTransferResponse);
+  rpc ExecuteDirectTransfer (ExecuteDirectTransferRequest) returns (google.protobuf.Empty);
   rpc CreateOnChannelPaymentRequest (CreateOnChannelPaymentRequestRequest) returns (CreateOnChannelPaymentRequestResponse);
-  rpc AcceptOnChannelPaymentRequest (AcceptOnChannelPaymentRequestRequest) returns (AcceptOnChannelPaymentRequestResponse);
-  rpc RejectOnChannelPaymentRequest (RejectOnChannelPaymentRequestRequest) returns (RejectOnChannelPaymentRequestResponse);
-  rpc WithdrawOnChannelPaymentRequest (WithdrawOnChannelPaymentRequestRequest) returns (WithdrawOnChannelPaymentRequestResponse);
+  rpc AcceptOnChannelPaymentRequest (AcceptOnChannelPaymentRequestRequest) returns (google.protobuf.Empty);
+  rpc RejectOnChannelPaymentRequest (RejectOnChannelPaymentRequestRequest) returns (google.protobuf.Empty);
+  rpc WithdrawOnChannelPaymentRequest (WithdrawOnChannelPaymentRequestRequest) returns (google.protobuf.Empty);
 
   rpc ListAppRewards (google.protobuf.Empty) returns (ListAppRewardsResponse);
   rpc ListValidatorRewards (google.protobuf.Empty) returns (ListValidatorRewardsResponse);
@@ -32,13 +31,7 @@ service WalletService {
 }
 
 message InitializeRequest {
-  google.protobuf.StringValue validator = 2;
-}
-
-message InitializeResponse {
-}
-
-message ListRequest {
+  string validator_party_id = 2;
 }
 
 message ListResponse {
@@ -46,14 +39,11 @@ message ListResponse {
 }
 
 message TapRequest {
-  string amount = 1;
+  string quantity = 1;
 }
 
 message TapResponse {
   string contract_id = 1;
-}
-
-message ListAppPaymentRequestsRequest {
 }
 
 message ListAppPaymentRequestsResponse {
@@ -77,20 +67,14 @@ message RejectAppPaymentRequestRequest {
   string request_contract_id = 1;
 }
 
-message RejectAppPaymentRequestResponse {
-}
-
 // NOTE: we only support sender-initiated proposals for now.
 message ProposePaymentChannelRequest {
   // The party of the receiver.
-  string receiver = 1;
+  string receiver_party_id = 1;
 }
 
 message ProposePaymentChannelResponse {
   string proposal_contract_id = 1;
-}
-
-message ListPaymentChannelProposalsRequest {
 }
 
 message ListPaymentChannelProposalsResponse {
@@ -107,16 +91,13 @@ message AcceptPaymentChannelProposalResponse {
 
 message ExecuteDirectTransferRequest {
   // Receiver to whom to transfer CC.
-  string receiver = 1;
+  string receiver_party_id = 1;
 
   // Quantity of CC to transfer.
   string quantity = 2;
 
   // TODO(M1-07): auto-select inputs for the transfer
   string coin_contract_id = 4;
-}
-
-message ExecuteDirectTransferResponse {
 }
 
 message ListAppRewardsResponse {
@@ -129,7 +110,7 @@ message ListValidatorRewardsResponse {
 
 message CreateOnChannelPaymentRequestRequest {
   // Sender who is requested to transfer CC
-  string sender = 1;
+  string sender_party_id = 1;
 
   // Quantity of CC requested
   string quantity = 2;
@@ -151,23 +132,14 @@ message AcceptOnChannelPaymentRequestRequest {
   string coin_contract_id = 2;
 }
 
-message AcceptOnChannelPaymentRequestResponse {
-}
-
 message RejectOnChannelPaymentRequestRequest {
   // The request to reject
   string request_contract_id = 1;
 }
 
-message RejectOnChannelPaymentRequestResponse {
-}
-
 message WithdrawOnChannelPaymentRequestRequest {
   // The request to withdraw
   string request_contract_id = 1;
-}
-
-message WithdrawOnChannelPaymentRequestResponse {
 }
 
 message RedistributeOutput {

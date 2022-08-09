@@ -186,7 +186,7 @@ class GrpcDirectoryProviderService(
   @nowarn("cat=unused")
   override def lookupEntryByParty(
       request: v0.LookupEntryByPartyRequest
-  ): Future[v0.LookupEntryResponse] =
+  ): Future[v0.LookupEntryByPartyResponse] =
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
         partyId <- connection.getPrimaryParty(damlUser)
@@ -199,7 +199,7 @@ class GrpcDirectoryProviderService(
           }
           .map(_.toProtoV0)
           .fold(throw new StatusRuntimeException(Status.NOT_FOUND))(e =>
-            v0.LookupEntryResponse(Some(e))
+            v0.LookupEntryByPartyResponse(Some(e))
           )
       }
     }
@@ -207,7 +207,7 @@ class GrpcDirectoryProviderService(
   @nowarn("cat=unused")
   override def lookupEntryByName(
       request: v0.LookupEntryByNameRequest
-  ): Future[v0.LookupEntryResponse] =
+  ): Future[v0.LookupEntryByNameResponse] =
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
         partyId <- connection.getPrimaryParty(damlUser)
@@ -219,7 +219,7 @@ class GrpcDirectoryProviderService(
         }
         .map(_.toProtoV0)
         .fold(throw new StatusRuntimeException(Status.NOT_FOUND))(e =>
-          v0.LookupEntryResponse(Some(e))
+          v0.LookupEntryByNameResponse(Some(e))
         )
     }
 

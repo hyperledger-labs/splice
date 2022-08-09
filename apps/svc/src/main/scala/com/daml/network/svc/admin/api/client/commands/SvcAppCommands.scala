@@ -5,7 +5,7 @@ import com.daml.ledger.client.binding.Primitive.ContractId
 import com.daml.lf.data.Numeric
 import com.daml.network.svc.v0
 import com.daml.network.svc.v0.{GetDebugInfoResponse, GetValidatorConfigResponse}
-import com.daml.network.svc.v0.SvcAppServiceGrpc.SvcAppServiceStub
+import com.daml.network.svc.v0.SvcServiceGrpc.SvcServiceStub
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.network.CC.{Round => roundCodegen}
@@ -17,18 +17,18 @@ import scala.concurrent.Future
 object SvcAppCommands {
 
   abstract class BaseCommand[Req, Res, Result] extends GrpcAdminCommand[Req, Res, Result] {
-    override type Svc = SvcAppServiceStub
-    override def createService(channel: ManagedChannel): SvcAppServiceStub =
-      v0.SvcAppServiceGrpc.stub(channel)
+    override type Svc = SvcServiceStub
+    override def createService(channel: ManagedChannel): SvcServiceStub =
+      v0.SvcServiceGrpc.stub(channel)
   }
 
   /** A command that takes no input and returns no result (other than an error on failure) */
   // TODO(Arne): Move this somewhere to Canton codebase?
-  abstract class UnitCommand(adminApiCall: SvcAppServiceStub => (Empty => Future[Empty]))
+  abstract class UnitCommand(adminApiCall: SvcServiceStub => (Empty => Future[Empty]))
       extends BaseCommand[Empty, Empty, Unit] {
     override def createRequest(): Either[String, Empty] = Right(Empty())
     override def submitRequest(
-        service: SvcAppServiceStub,
+        service: SvcServiceStub,
         request: Empty,
     ): Future[Empty] = adminApiCall(service)(request)
     override def handleResponse(
@@ -41,7 +41,7 @@ object SvcAppCommands {
     override def createRequest(): Either[String, Empty] = Right(Empty())
 
     override def submitRequest(
-        service: SvcAppServiceStub,
+        service: SvcServiceStub,
         request: Empty,
     ): Future[v0.InitializeResponse] = service.initialize(request)
 
@@ -62,7 +62,7 @@ object SvcAppCommands {
   case class GetDebugInfo() extends BaseCommand[Empty, GetDebugInfoResponse, DebugInfo] {
     override def createRequest(): Either[String, Empty] = Right(Empty())
     override def submitRequest(
-        service: SvcAppServiceStub,
+        service: SvcServiceStub,
         request: Empty,
     ): Future[GetDebugInfoResponse] = service.getDebugInfo(request)
     override def handleResponse(
@@ -70,9 +70,9 @@ object SvcAppCommands {
     ): Either[String, DebugInfo] = Right(
       DebugInfo(
         svcUser = response.svcUser,
-        svcParty = PartyId.tryFromProtoPrimitive(response.svcParty),
+        svcParty = PartyId.tryFromProtoPrimitive(response.svcPartyId),
         coinPackageId = response.coinPackageId,
-        coinRulesCids = response.coinRulesCids,
+        coinRulesCids = response.coinRulesContractIds,
       )
     )
   }
@@ -85,14 +85,14 @@ object SvcAppCommands {
       extends BaseCommand[Empty, GetValidatorConfigResponse, ValidatorConfigInfo] {
     override def createRequest(): Either[String, Empty] = Right(Empty())
     override def submitRequest(
-        service: SvcAppServiceStub,
+        service: SvcServiceStub,
         request: Empty,
     ): Future[GetValidatorConfigResponse] = service.getValidatorConfig(request)
     override def handleResponse(
         response: GetValidatorConfigResponse
     ): Either[String, ValidatorConfigInfo] = Right(
       ValidatorConfigInfo(
-        svcParty = PartyId.tryFromProtoPrimitive(response.svcParty)
+        svcParty = PartyId.tryFromProtoPrimitive(response.svcPartyId)
       )
     )
   }
@@ -117,7 +117,7 @@ object SvcAppCommands {
       v0.OpenRoundRequest(Numeric.toString(coinPrice.bigDecimal))
     )
     override def submitRequest(
-        service: SvcAppServiceStub,
+        service: SvcServiceStub,
         request: v0.OpenRoundRequest,
     ): Future[v0.OpenRoundResponse] =
       service.openRound(request)
@@ -137,7 +137,7 @@ object SvcAppCommands {
       v0.StartClosingRoundRequest(round)
     )
     override def submitRequest(
-        service: SvcAppServiceStub,
+        service: SvcServiceStub,
         request: v0.StartClosingRoundRequest,
     ): Future[v0.StartClosingRoundResponse] =
       service.startClosingRound(request)
@@ -162,7 +162,7 @@ object SvcAppCommands {
       v0.StartIssuingRoundRequest(round)
     )
     override def submitRequest(
-        service: SvcAppServiceStub,
+        service: SvcServiceStub,
         request: v0.StartIssuingRoundRequest,
     ): Future[v0.StartIssuingRoundResponse] =
       service.startIssuingRound(request)
@@ -182,7 +182,7 @@ object SvcAppCommands {
       v0.CloseRoundRequest(round)
     )
     override def submitRequest(
-        service: SvcAppServiceStub,
+        service: SvcServiceStub,
         request: v0.CloseRoundRequest,
     ): Future[v0.CloseRoundResponse] =
       service.closeRound(request)
@@ -197,7 +197,7 @@ object SvcAppCommands {
       v0.ArchiveRoundRequest(round)
     )
     override def submitRequest(
-        service: SvcAppServiceStub,
+        service: SvcServiceStub,
         request: v0.ArchiveRoundRequest,
     ): Future[Empty] =
       service.archiveRound(request)

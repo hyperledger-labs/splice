@@ -13,7 +13,7 @@ import com.daml.network.svc.admin.grpc.GrpcSvcAppService
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.svc.metrics.SvcAppMetrics
 import com.daml.network.svc.store.SvcAppStore
-import com.daml.network.svc.v0.SvcAppServiceGrpc
+import com.daml.network.svc.v0.SvcServiceGrpc
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -88,7 +88,7 @@ class SvcAppBootstrap(
       )
 
       adminServerRegistry.addService(
-        SvcAppServiceGrpc.bindService(
+        SvcServiceGrpc.bindService(
           service,
           executionContext,
         )

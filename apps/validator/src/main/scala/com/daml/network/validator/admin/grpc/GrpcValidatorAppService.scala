@@ -13,6 +13,7 @@ import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.network.CC.CoinRules.CoinRulesRequest
 import com.google.protobuf.ByteString
 import io.opentelemetry.api.trace.Tracer
+import com.google.protobuf.empty.Empty
 
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
@@ -31,7 +32,7 @@ class GrpcValidatorAppService(
     with Spanning
     with NamedLogging {
 
-  override def initialize(request: InitializeRequest): Future[InitializeResponse] =
+  override def initialize(request: Empty): Future[InitializeResponse] =
     withSpanFromGrpcContext("GrpcValidatorAppService") { implicit traceContext => span =>
       span.setAttribute("username", validatorUserName)
 

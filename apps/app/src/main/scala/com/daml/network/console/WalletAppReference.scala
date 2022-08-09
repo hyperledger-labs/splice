@@ -39,7 +39,7 @@ abstract class WalletAppReference(
     }
   }
 
-  @Help.Summary("Credits the requested amount of Canton coin to the wallet's user")
+  @Help.Summary("Credits the requested quantity of Canton coin to the wallet's user")
   @Help.Description(
     "This function will only be available in the testnet. It allows creating coins for testing purposes." +
       "Returns the contract ID of the created contract. "
