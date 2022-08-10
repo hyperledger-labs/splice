@@ -204,7 +204,7 @@ object CoinLedgerConnection {
       )
 
     LedgerClient.fromBuilder(builder, clientConfig) recover {
-      case _: StatusRuntimeException => {
+      case _: StatusRuntimeException | _: java.io.IOException => {
         // TODO(i447) -- eventually we should drop this and replace with a more robust retry solution
         logger.error("Failed to instantiate ledger client due to connection failure, exiting...")
         sys.exit(1)
