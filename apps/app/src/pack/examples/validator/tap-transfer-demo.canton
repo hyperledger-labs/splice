@@ -1,11 +1,11 @@
 // Commands needed to initialize the CN apps, tap some coins and make some transfers. Can be run as a bootstrap script.
 
 val validatorParty = validatorApp.initialize()
-validatorApp.onboardUser("alice_wallet")
+val aliceParty = validatorApp.onboardUser("alice_wallet")
 aliceWallet.initialize(validatorParty)
 
 require(aliceWallet.list().length == 0)
-val coinId = aliceWallet.tap(1000.0)
+val coinId = aliceWallet.tap(100.0)
 require(aliceWallet.list().length == 1)
 
 val bobParty = validatorApp.onboardUser("bob_wallet")
@@ -17,4 +17,13 @@ require(bobWallet.listPaymentChannelProposals().length == 1)
 val channelId = bobWallet.acceptPaymentChannelProposal(aliceProposal)
 
 aliceWallet.executeDirectTransfer(bobParty, 10, coinId)
-require(bobWallet.list().length == 1 && bobWallet.list().foreach(coin => coin.payload.quantity.initialQuantity == 10))
+require(bobWallet.list().length == 1)
+bobWallet.list().foreach(coin => require(coin.payload.quantity.initialQuantity == 10))
+
+val paymentReq = bobWallet.createOnChannelPaymentRequest(aliceParty, 10, "Please transfer coins")
+require(aliceWallet.listOnChannelPaymentRequests().length == 1)
+aliceWallet.acceptOnChannelPaymentRequest(paymentReq, aliceWallet.list().head.contractId)
+require(bobWallet.list().length == 2)
+bobWallet.list().foreach(coin => require(coin.payload.quantity.initialQuantity == 10))
+require(aliceWallet.list().length == 1)
+aliceWallet.list().foreach(coin => require(coin.payload.quantity.initialQuantity < 80 && coin.payload.quantity.initialQuantity > 79.5))

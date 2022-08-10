@@ -72,7 +72,7 @@ In the console, initialize the validator ::
 
 Request onboarding a new user called "alice_wallet" to the validator ::
 
-  @ validatorApp.onboardUser("alice_wallet")
+  @ val aliceParty = validatorApp.onboardUser("alice_wallet")
 
 
 The request should be automatically approved by the supervalidator consortium in this feature preview.
@@ -161,3 +161,21 @@ Check Alice and Bob's wallets to see that Alice now has slightly less than 990 c
       )
     )
   )
+
+Requesting a transfer
+---------------------
+
+Using the same channel as before, Bob can also ask for a payment. First, initiate the request from Bob: ::
+
+  @ val paymentReq = bobWallet.createOnChannelPaymentRequest(aliceParty, 10, "Please transfer coins")
+
+Check Alice's wallet to see the request, and then accept it: ::
+
+  @ aliceWallet.listOnChannelPaymentRequests()
+  @ aliceWallet.acceptOnChannelPaymentRequest(paymentReq, aliceWallet.list().head.contractId)
+
+Note that you did not reuse the same coinCid from before for the transfer - that contract ID has been archived, and replaced with a new one containing the change from her previous transfer.
+You can now check again Bob's and Alice's wallets - Bob received 10 coins again, and Alice's holding were reduced by slightly more than 10 coin again: ::
+
+  @ bobWallet.list()
+  @ aliceWallet.list()
