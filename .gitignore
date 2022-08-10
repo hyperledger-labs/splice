@@ -17,3 +17,6 @@ target
 !canton/community/participant/src/main/resources/dar/AdminWorkflows.dar
 *~
 *#
+canton.pid
+canton.ports
+canton-release

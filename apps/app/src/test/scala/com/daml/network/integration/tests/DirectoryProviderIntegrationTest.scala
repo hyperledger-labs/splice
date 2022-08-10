@@ -27,10 +27,10 @@ class DirectoryProviderIntegrationTest
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition.simpleTopology.withSetup(env => {
+    CoinEnvironmentDefinition.simpleTopology.withSetup(implicit env => {
       import env._
-      participants.all.map(_.dars.upload(directoryDarPath))
-      participants.all.foreach(_.domains.connect_local(da))
+      directoryValidator.remoteParticipant.dars.upload(directoryDarPath)
+      directoryUser.remoteParticipant.dars.upload(directoryDarPath)
     })
 
   "A directory provider" should {

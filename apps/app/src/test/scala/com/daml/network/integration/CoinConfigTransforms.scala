@@ -9,6 +9,7 @@ import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConf
 import com.digitalasset.canton.config.{NodeConfig, TimeoutDuration}
 import com.digitalasset.canton.domain.config.CommunityDomainConfig
 import com.digitalasset.canton.participant.config.CommunityParticipantConfig
+import java.util.UUID
 import monocle.macros.syntax.lens._
 
 import scala.concurrent.duration._
@@ -26,7 +27,17 @@ object CoinConfigTransforms {
         .focus(_.parameters.timeouts.processing.unbounded)
         .replace(TimeoutDuration.tryFromDuration(2.minutes))
         .focus(_.parameters.timeouts.processing.shutdownProcessing)
-        .replace(TimeoutDuration.tryFromDuration(10.seconds))
+        .replace(TimeoutDuration.tryFromDuration(10.seconds)),
+      config0 => {
+        val suffix = UUID.randomUUID()
+        val config1 = updateSvcConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config0)
+        val config2 = updateCcScanConfig(c => c.copy(svcUser = s"${c.svcUser}-$suffix"))(config1)
+        val config3 = updateAllValidatorConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config2)
+        val config4 = updateAllWalletAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config3)
+        val config5 = updateAllDirectoryProviderAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config4)
+        val config6 = updateAllDirectoryUserAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config5)
+        config6
+      },
     )
   }
 

@@ -58,6 +58,20 @@ M3 - TestNet Launch.
 You should then see a 'sbt shell' window in IntelliJ that allows you to build and test the Scala code while using the
 same package references as nix. If IntelliJ asks you at the end if you want to overwrite any previous `.idea/*` files, say yes.
 
+### Managing Canton for Tests
+
+To speed up our tests our tests run against a long-running Canton instance.
+To start the instance run `./start-canton.sh`. It can be stopped via `./stop-canton.sh`.
+
+You should only need to restart it if you change
+`apps/app/src/test/resources/simple-topology-canton.conf`. If you
+encounter an error like the following, there might have been a problem
+with the running Canton instance so try restarting.
+
+```
+ERROR c.d.n.e.CoinLedgerConnection$$anon$1:WalletIntegrationTest/SVC=svc-app - Failed to instantiate ledger client due to connection failure, exiting...
+```
+
 ### Running and debugging integration tests
 
 The integration tests are located at [`/apps/app/src/test/scala/com/daml/network/integration/tests/`](/apps/app/src/test/scala/com/daml/network/integration/tests).
@@ -495,8 +509,10 @@ Both our deployment and tests follow the [port allocation scheme](./apps/app/src
 7. Create a commit to ease review.
 8. Reapply our changes `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton --reject canton.patch`
    and resolve any conflicts (if any).
-9. Bump the SDK version in `releaseVersionToProtocolVersion` in `CantonVersion.scala` and bump the version in `CantonDependencies` to match the SDK version declared in
-   https://github.com/digital-asset/canton/blob/main/project/project/DamlVersions.scala for your respective commit.
+9. Bump the SDK/Canton versions in the following places:
+    1. `releaseVersionToProtocolVersion` in `CantonVersion.scala`
+    2. `version` in `CantonDependencies`
+    3. `SDK_VERSION` and `CANTON_VERSION` in `start-canton.sh`
 10. Bump the sdk version in our own daml.yaml files via `./set-sdk.sh $sdkversion` to the same version.
 11. Create another commit.
 12. Make a PR with your changes.

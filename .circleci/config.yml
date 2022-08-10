@@ -89,6 +89,12 @@ commands:
       with_authentication:
         type: boolean
         default: false
+      pre_sbt_cmd:
+        type: string
+        default: ""
+      post_sbt_cmd:
+        type: string
+        default: ""
     steps:
       - run_bash_command_in_nix:
           cmd_name: Executing "sbt << parameters.cmd >>"
@@ -141,7 +147,9 @@ commands:
                  timeout --kill-after=30s << parameters.timeout >> "${SBT_CMD[@]}" 2>&1 |
                  tee sbt_output
             }
+            << parameters.pre_sbt_cmd >>
             run_sbt
+            << parameters.post_sbt_cmd >>
 
   run_bash_command_in_nix:
     parameters:
@@ -162,9 +170,9 @@ commands:
           command: |
             set -euo pipefail
             . /home/circleci/.nix-profile/etc/profile.d/nix.sh
-            ADDITIONAL_NIX_ARGS=<< parameters.additional_nix_args >>
+            ADDITIONAL_NIX_ARGS="<< parameters.additional_nix_args >>"
 
-            if [[ << parameters.with_authentication >> ]]; then
+            if [[ << parameters.with_authentication >> == true ]]; then
               ADDITIONAL_NIX_ARGS+="--keep GCP_DA_CN_DEVNET_KEY"
             fi
 
@@ -175,7 +183,7 @@ commands:
               set -euo pipefail
               . .envrc.vars
 
-              if [[ << parameters.with_authentication >> ]]; then
+              if [[ << parameters.with_authentication >> == true ]]; then
                 . $REPO_ROOT/deployment/devnet/.envrc.vars
                 echo $GCP_DA_CN_DEVNET_KEY | gcloud auth activate-service-account --key-file=-
               fi
@@ -245,7 +253,9 @@ jobs:
           retry_fetch: "50"
       - execute_sbt_command:
           # run all tests except the live cluster ones
+          pre_sbt_cmd: ./start-canton.sh
           cmd: "\"testOnly * -- -l LiveDevNetTest\""
+          post_sbt_cmd: ./stop-canton.sh
           timeout: "10m"
       - execute_sbt_command:
           cmd: "damlTest"

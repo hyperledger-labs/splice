@@ -25,6 +25,7 @@ import com.digitalasset.network.CC.Round.Round
 import com.digitalasset.network.CN.{Wallet => walletCodegen}
 import com.digitalasset.network.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 import com.digitalasset.network.DA.Time.Types.RelTime
+import java.util.UUID
 
 class WalletIntegrationTest
     extends CoinIntegrationTest
@@ -191,7 +192,8 @@ class WalletIntegrationTest
       // Onboard alice on her self-hosted validator
       val validatorParty = aliceValidator.initialize()
       val aliceParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
-      val bobParty = aliceValidator.onboardUser("bob")
+      // TODO https://github.com/DACH-NY/the-real-canton-coin/issues/519
+      val bobParty = aliceValidator.onboardUser(s"bob-${UUID.randomUUID}")
       aliceWallet.initialize(validatorParty)
 
       val tappedCoin = aliceWallet.tap(50)

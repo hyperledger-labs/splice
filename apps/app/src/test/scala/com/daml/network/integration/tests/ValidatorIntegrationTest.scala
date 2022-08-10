@@ -26,10 +26,6 @@ class ValidatorIntegrationTest
     import env._
 
     // initialize svc
-    // Note: that for this low-level test we manually connect participants to domains,
-    // but for higher-level tests we recommend using a 'withSetup' clause before the test start;
-    // see WalletIntegrationTest
-    svc.remoteParticipant.domains.connect_local(da)
     val svcParty = svc.initialize()
 
     // check that there is exactly one CoinRule and OpenMiningRound
@@ -42,7 +38,6 @@ class ValidatorIntegrationTest
     openRounds.length shouldBe 1
 
     // initialize alice's validator
-    aliceValidator.remoteParticipant.domains.connect_local(da)
     val aliceValidatorParty = aliceValidator.initialize()
 
     // check that no coin rules request is outstanding
