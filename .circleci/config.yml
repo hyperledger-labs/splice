@@ -236,7 +236,8 @@ parameters:
 
 jobs:
 
-  test:
+  # Inspired by Canton, we put the lint-like checks into their own CI job
+  static_tests:
     docker:
       - image: cimg/base:2021.04
     environment:
@@ -245,9 +246,17 @@ jobs:
       - checkout
       - setup_nix
       - execute_sbt_command:
-          # Moved to the front to give quick feedback before starting the lengthy compile
-          cmd: "protobufLint"
+          cmd: "lint"
           retry_fetch: "50"
+
+  test:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_nix
       - execute_sbt_command:
           cmd: "Test/compile"
           retry_fetch: "50"
@@ -485,6 +494,9 @@ workflows:
         <<: *notify-fail
     # Documentation
     - docs:
+        <<: *notify-fail
+    # Linting and formatting
+    - static_tests:
         <<: *notify-fail
     # Scala
     - test:

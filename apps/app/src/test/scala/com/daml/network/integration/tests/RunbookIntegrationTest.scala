@@ -36,21 +36,26 @@ class RunbookIntegrationTest
   // Bump port by 1000 to avoid collisions with the Canton instance started
   // outside of our tests.
   private def portTransform(c: CommunityAdminServerConfig): CommunityAdminServerConfig =
-    c.copy(internalPort = c.internalPort.map(p => p+1000))
+    c.copy(internalPort = c.internalPort.map(p => p + 1000))
   private def portTransform(c: ClientConfig): ClientConfig =
-    c.copy(port = c.port+1000)
+    c.copy(port = c.port + 1000)
   private def portTransform(c: LedgerApiServerConfig): LedgerApiServerConfig =
-    c.copy(internalPort = c.internalPort.map(p => p+1000))
+    c.copy(internalPort = c.internalPort.map(p => p + 1000))
   private def portTransform(c: RemoteParticipantConfig): RemoteParticipantConfig =
     c.focus(_.adminApi).modify(portTransform).focus(_.ledgerApi).modify(portTransform)
 
   private def portTransform(c0: CoinConfig): CoinConfig = {
-    val c1 = CoinConfigTransforms.updateAllParticipantConfigs_(_.focus(_.adminApi).modify(portTransform).focus(_.ledgerApi).modify(portTransform))(c0)
-    val c2 = CoinConfigTransforms.updateAllValidatorConfigs_(_.focus(_.adminApi).modify(portTransform).focus(_.remoteParticipant).modify(portTransform))(c1)
-    val c3 = CoinConfigTransforms.updateAllWalletAppConfigs_(_.focus(_.adminApi).modify(portTransform).focus(_.remoteParticipant).modify(portTransform))(c2)
+    val c1 = CoinConfigTransforms.updateAllParticipantConfigs_(
+      _.focus(_.adminApi).modify(portTransform).focus(_.ledgerApi).modify(portTransform)
+    )(c0)
+    val c2 = CoinConfigTransforms.updateAllValidatorConfigs_(
+      _.focus(_.adminApi).modify(portTransform).focus(_.remoteParticipant).modify(portTransform)
+    )(c1)
+    val c3 = CoinConfigTransforms.updateAllWalletAppConfigs_(
+      _.focus(_.adminApi).modify(portTransform).focus(_.remoteParticipant).modify(portTransform)
+    )(c2)
     c3
   }
-
 
   // when running locally, this test may fail if the DAR deployed to DevNet differs from the latest one on your branch
   "run through runbook" taggedAs LiveDevNetTest in { implicit env =>

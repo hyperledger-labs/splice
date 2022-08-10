@@ -64,11 +64,15 @@ object BuildCommon {
         addCommandAlias(
           "scalafixCheck",
           s"${alsoTest("scalafix --check")}",
-        ) ++ addCommandAlias(
+        ) ++
+        addCommandAlias(
           "format",
           s"; scalafmt ; Test / scalafmt ; scalafmtSbt",
+        ) ++
+        addCommandAlias(
+          "lint",
+          "; protobufLint ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck",
         )
-
     val buildSettings = inThisBuild(
       Seq(
         organization := "com.daml.network",

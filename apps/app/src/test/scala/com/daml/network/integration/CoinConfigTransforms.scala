@@ -32,10 +32,16 @@ object CoinConfigTransforms {
         val suffix = UUID.randomUUID()
         val config1 = updateSvcConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config0)
         val config2 = updateCcScanConfig(c => c.copy(svcUser = s"${c.svcUser}-$suffix"))(config1)
-        val config3 = updateAllValidatorConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config2)
-        val config4 = updateAllWalletAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config3)
-        val config5 = updateAllDirectoryProviderAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config4)
-        val config6 = updateAllDirectoryUserAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config5)
+        val config3 =
+          updateAllValidatorConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config2)
+        val config4 =
+          updateAllWalletAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config3)
+        val config5 = updateAllDirectoryProviderAppConfigs_(c =>
+          c.copy(damlUser = s"${c.damlUser}-$suffix")
+        )(config4)
+        val config6 = updateAllDirectoryUserAppConfigs_(c =>
+          c.copy(damlUser = s"${c.damlUser}-$suffix")
+        )(config5)
         config6
       },
     )
