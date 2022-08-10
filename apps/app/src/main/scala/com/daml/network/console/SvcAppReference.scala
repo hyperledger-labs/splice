@@ -3,27 +3,21 @@ package com.daml.network.console
 import com.daml.ledger.client.binding.Primitive.ContractId
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.svc.admin.api.client.commands.SvcAppCommands
-import com.daml.network.svc.config.LocalSvcAppConfig
-import com.digitalasset.canton.console.{BaseInspection, Help, LocalInstanceReference}
+import com.daml.network.svc.config.{LocalSvcAppConfig, RemoteSvcAppConfig}
+import com.digitalasset.canton.console.{
+  BaseInspection,
+  GrpcRemoteInstanceReference,
+  Help,
+  LocalInstanceReference,
+}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.network.CC.{Round => roundCodegen}
 
-/** Single local SVC app reference. Defines the console commands that can be run against a local SVC
-  * app reference.
-  */
-class LocalSvcAppReference(
+abstract class SvcAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
-) extends CoinAppReference(consoleEnvironment, name)
-    with LocalInstanceReference
-    with BaseInspection[ParticipantNode] {
-
-  protected val nodes = consoleEnvironment.environment.svcs
-  @Help.Summary("Return svc app config")
-  def config: LocalSvcAppConfig =
-    consoleEnvironment.environment.config.svcsByString(name)
-
+) extends CoinAppReference(consoleEnvironment, name) {
   @Help.Summary("Initialize the SVC app. ")
   def initialize(): PartyId = {
     consoleEnvironment.run {
@@ -93,6 +87,35 @@ class LocalSvcAppReference(
     consoleEnvironment.run {
       adminCommand(SvcAppCommands.ArchiveRound(round))
     }
+
+}
+
+class RemoteSvcAppReference(
+    override val consoleEnvironment: CoinConsoleEnvironment,
+    name: String,
+) extends SvcAppReference(consoleEnvironment, name)
+    with GrpcRemoteInstanceReference
+    with BaseInspection[ParticipantNode] {
+  @Help.Summary("return remote svc config")
+  def config: RemoteSvcAppConfig =
+    consoleEnvironment.environment.config.remoteSvcsByString(name)
+}
+
+/** Single local SVC app reference. Defines the console commands that can be run against a local SVC
+  * app reference.
+  */
+class LocalSvcAppReference(
+    override val consoleEnvironment: CoinConsoleEnvironment,
+    name: String,
+) extends SvcAppReference(consoleEnvironment, name)
+    with LocalInstanceReference
+    with BaseInspection[ParticipantNode] {
+
+  protected val nodes = consoleEnvironment.environment.svcs
+
+  @Help.Summary("Return svc app config")
+  def config: LocalSvcAppConfig =
+    consoleEnvironment.environment.config.svcsByString(name)
 
   /** Remote participant this SVC app is configured to interact with. */
   val remoteParticipant =

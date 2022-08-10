@@ -6,9 +6,10 @@ import com.daml.network.console.{
   LocalScanAppReference,
   LocalSvcAppReference,
   LocalValidatorAppReference,
-  WalletAppReference,
   LocalWalletAppReference,
+  RemoteSvcAppReference,
   RemoteWalletAppReference,
+  WalletAppReference,
 }
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
 import com.digitalasset.canton.console.{
@@ -72,6 +73,11 @@ class CoinConsoleEnvironment(
       .map(createSvcReference)
       .headOption
 
+  lazy val remoteSvcOpt: Option[RemoteSvcAppReference] =
+    environment.config.remoteSvcsByString.keys
+      .map(createRemoteSvcReference)
+      .headOption
+
   lazy val wallets
       : NodeReferences[WalletAppReference, RemoteWalletAppReference, LocalWalletAppReference] =
     NodeReferences(
@@ -93,6 +99,9 @@ class CoinConsoleEnvironment(
 
   private def createSvcReference(name: String): LocalSvcAppReference =
     new LocalSvcAppReference(this, name)
+
+  private def createRemoteSvcReference(name: String): RemoteSvcAppReference =
+    new RemoteSvcAppReference(this, name)
 
   private def createWalletReference(name: String): LocalWalletAppReference =
     new LocalWalletAppReference(this, name)

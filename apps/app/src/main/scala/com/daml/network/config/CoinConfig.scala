@@ -22,7 +22,7 @@ import com.digitalasset.canton.participant.config.{
 import scala.annotation.nowarn
 import cats.syntax.functor._
 import com.daml.network.scan.config.{LocalScanAppConfig, RemoteScanAppConfig}
-import com.daml.network.svc.config.LocalSvcAppConfig
+import com.daml.network.svc.config.{LocalSvcAppConfig, RemoteSvcAppConfig}
 import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
 import com.daml.network.directory.provider.config.{
   LocalDirectoryProviderAppConfig,
@@ -40,6 +40,7 @@ import pureconfig.ConfigReader
 case class CoinConfig(
     validatorApps: Map[InstanceName, LocalValidatorAppConfig] = Map.empty,
     svcApp: Option[LocalSvcAppConfig] = None,
+    remoteSvcApp: Option[RemoteSvcAppConfig] = None,
     scanApp: Option[LocalScanAppConfig] = None,
     walletApps: Map[InstanceName, LocalWalletAppConfig] = Map.empty,
     remoteWalletApps: Map[InstanceName, RemoteWalletAppConfig] = Map.empty,
@@ -103,6 +104,9 @@ case class CoinConfig(
   // Since the rest of the code generally expects a map of nodes, we'll create one.
   private lazy val svcAppInstanceName = InstanceName.tryCreate("svc-app")
   private lazy val svcApps = svcApp.toList.map(config => svcAppInstanceName -> config).toMap
+  private lazy val remoteSvcAppInstanceName = InstanceName.tryCreate("remote-svc-app")
+  private lazy val remoteSvcApps =
+    remoteSvcApp.toList.map(config => remoteSvcAppInstanceName -> config).toMap
 
   private lazy val svcAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
     svcApps.fmap { svcConfig =>
@@ -138,6 +142,10 @@ case class CoinConfig(
   /** Use `svcs` instead!
     */
   def svcsByString: Map[String, LocalSvcAppConfig] = svcApps.map { case (n, c) =>
+    n.unwrap -> c
+  }
+
+  def remoteSvcsByString: Map[String, RemoteSvcAppConfig] = remoteSvcApps.map { case (n, c) =>
     n.unwrap -> c
   }
 
@@ -333,6 +341,8 @@ object CoinConfig {
       deriveReader[LocalScanAppConfig]
     implicit val svcConfigReader: ConfigReader[LocalSvcAppConfig] =
       deriveReader[LocalSvcAppConfig]
+    implicit val remoteSvcConfigReader: ConfigReader[RemoteSvcAppConfig] =
+      deriveReader[RemoteSvcAppConfig]
     implicit val coinAppParametersReader: ConfigReader[SharedCoinAppParameters] =
       deriveReader[SharedCoinAppParameters]
     implicit val walletConfigReader: ConfigReader[LocalWalletAppConfig] =

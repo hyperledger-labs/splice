@@ -5,6 +5,7 @@ import com.daml.network.console.{
   LocalDirectoryUserAppReference,
   LocalScanAppReference,
   LocalSvcAppReference,
+  RemoteSvcAppReference,
   LocalValidatorAppReference,
   LocalWalletAppReference,
   RemoteWalletAppReference,
@@ -18,6 +19,12 @@ trait CommonCoinAppInstanceReferences {
   def svc(implicit env: CoinTestConsoleEnvironment): LocalSvcAppReference = env.svcOpt.getOrElse(
     sys.error("Tried to access the SVC app but it isn't defined in the test's configuration file")
   )
+  def remoteSvc(implicit env: CoinTestConsoleEnvironment): RemoteSvcAppReference =
+    env.remoteSvcOpt.getOrElse(
+      sys.error(
+        "Tried to access the remote SVC app but it isn't defined in the test's configuration file"
+      )
+    )
   def scan(implicit env: CoinTestConsoleEnvironment): LocalScanAppReference = env.scanOpt.getOrElse(
     sys.error("Tried to access the Scan app but it isn't defined in the test's configuration file")
   )

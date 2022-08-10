@@ -68,8 +68,9 @@ class SvcIntegrationTest
     svc.archiveRound(0)
     svc.remoteParticipant.ledger_api.acs.filter(svcParty, ClosedMiningRound) shouldBe empty
 
-    svc.openRound(coinPrice)
+    remoteSvc.openRound(coinPrice)
     svc.remoteParticipant.ledger_api.acs.filter(svcParty, OpenMiningRound) should have length 2
+
   }
 
   "total burn calculation" in { implicit env =>
