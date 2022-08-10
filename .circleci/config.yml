@@ -86,7 +86,7 @@ commands:
       extra_parameters:
         type: string
         default: ""
-      with_authentication:
+      with_devnet_authentication:
         type: boolean
         default: false
       pre_sbt_cmd:
@@ -98,7 +98,7 @@ commands:
     steps:
       - run_bash_command_in_nix:
           cmd_name: Executing "sbt << parameters.cmd >>"
-          with_authentication: << parameters.with_authentication >>
+          with_devnet_authentication: << parameters.with_devnet_authentication >>
           cmd: |
             on_exit() {
               local CODE="$?"
@@ -158,7 +158,7 @@ commands:
       cmd_name:
         type: string
         default: "Executing bash command << parameters.cmd >> in the nix shell"
-      with_authentication:
+      with_devnet_authentication:
         type: boolean
         default: false
       additional_nix_args:
@@ -172,8 +172,8 @@ commands:
             . /home/circleci/.nix-profile/etc/profile.d/nix.sh
             ADDITIONAL_NIX_ARGS="<< parameters.additional_nix_args >>"
 
-            if [[ << parameters.with_authentication >> == true ]]; then
-              ADDITIONAL_NIX_ARGS+="--keep GCP_DA_CN_DEVNET_KEY"
+            if [[ << parameters.with_devnet_authentication >> == true ]]; then
+              ADDITIONAL_NIX_ARGS+=" --keep GCP_DA_CN_DEVNET_KEY"
             fi
 
             nix-shell shell.nix \
@@ -183,7 +183,7 @@ commands:
               set -euo pipefail
               . .envrc.vars
 
-              if [[ << parameters.with_authentication >> == true ]]; then
+              if [[ << parameters.with_devnet_authentication >> == true ]]; then
                 . $REPO_ROOT/deployment/devnet/.envrc.vars
                 echo $GCP_DA_CN_DEVNET_KEY | gcloud auth activate-service-account --key-file=-
               fi
@@ -307,7 +307,7 @@ jobs:
       - setup_nix
       - run_bash_command_in_nix:
          cmd_name: apply cluster manifest
-         with_authentication: true
+         with_devnet_authentication: true
          cmd: |
            cncluster activate
            (yes || true) | cncluster apply
@@ -331,7 +331,7 @@ jobs:
       - execute_sbt_command:
           cmd: "\"testOnly *RunbookIntegrationTest\""
           timeout: "10m"
-          with_authentication: true
+          with_devnet_authentication: true
       - slack/notify:
           event: pass
           branch_pattern: main
@@ -468,6 +468,7 @@ jobs:
            --keep DOCKER_TLS_VERIFY \
            --keep NO_PROXY"
          cmd: |
+           echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
            (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
            make docker-push
 

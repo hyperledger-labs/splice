@@ -346,10 +346,10 @@ alternative scripts for connecting a local participant to the DevNet domain.
 ### Cluster Tooling
 
 This repository also contains tools for managing clusters, hosted both
-locally and in GCE. Local clusters are run on your local development
-machine, using minikube. GCE clusters are run in the Google Cloud,
-using Google's GKE implementation of Kubernetes. In both cases, a common
-Kubernetes cluster manifest is used, defined in
+locally and in GCE. Local clusters run on your local development
+machine, using minikube. GCE clusters run in the Google Cloud,
+using Google's GKE implementation of Kubernetes. Both cases use a common
+Kubernetes cluster manifest, defined in
 [`canton-network-config.jsonnet`](/cluster/canton-network-config.jsonnet).
 
 To avoid the risk of confusing local and GCE cluster operations, two
