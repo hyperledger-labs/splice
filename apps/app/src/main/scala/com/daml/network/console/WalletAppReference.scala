@@ -110,6 +110,16 @@ abstract class WalletAppReference(
     }
   }
 
+  @Help.Summary("List payment channels")
+  @Help.Description(
+    "Shows payment channels where the user is either the sender or the receiver"
+  )
+  def listPaymentChannels(): Seq[Contract[walletCodegen.PaymentChannel]] = {
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.ListPaymentChannels())
+    }
+  }
+
   @Help.Summary("Accept a payment channel proposal.")
   @Help.Description(
     "Accept a specific payment channel proposal."

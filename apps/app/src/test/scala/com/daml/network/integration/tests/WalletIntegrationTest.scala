@@ -133,9 +133,17 @@ class WalletIntegrationTest
       aliceWallet.listPaymentChannelProposals() shouldBe empty
       bobWallet.listPaymentChannelProposals() shouldBe empty
 
+      // Neither Alice nor Bob see any payment channels
+      aliceWallet.listPaymentChannels() shouldBe empty
+      bobWallet.listPaymentChannels() shouldBe empty
+
       // Alice proposes payment channel to Bob
       val proposalId = aliceWallet.proposePaymentChannel(bobUserParty)
       val aliceProposals = aliceWallet.listPaymentChannelProposals()
+
+      // Alice and Bob still don't see the payment channel yet
+      aliceWallet.listPaymentChannels() shouldBe empty
+      bobWallet.listPaymentChannels() shouldBe empty
 
       aliceProposals should have size (1)
       val aliceProposal = aliceProposals(0)
@@ -153,6 +161,10 @@ class WalletIntegrationTest
       // Neither Alice nor Bob see a payment channel proposal
       aliceWallet.listPaymentChannelProposals() shouldBe empty
       bobWallet.listPaymentChannelProposals() shouldBe empty
+
+      // But both see the established channel now
+      utils.retry_until_true(aliceWallet.listPaymentChannels().size == 1)
+      aliceWallet.listPaymentChannels() shouldBe bobWallet.listPaymentChannels()
 
       // Alice taps and does a direct transfer to Bob
       val coinCid = aliceWallet.tap(50)

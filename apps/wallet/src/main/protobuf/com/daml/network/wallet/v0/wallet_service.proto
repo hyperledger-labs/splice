@@ -14,9 +14,9 @@ service WalletService {
   rpc AcceptAppPaymentRequest (AcceptAppPaymentRequestRequest) returns (AcceptAppPaymentRequestResponse);
   rpc RejectAppPaymentRequest (RejectAppPaymentRequestRequest) returns (google.protobuf.Empty);
 
-  // Note that there is no list proposal function as we assume the contract-id is disclosed off-ledger.
   rpc ProposePaymentChannel (ProposePaymentChannelRequest) returns (ProposePaymentChannelResponse);
   rpc ListPaymentChannelProposals (google.protobuf.Empty) returns (ListPaymentChannelProposalsResponse);
+  rpc ListPaymentChannels (google.protobuf.Empty) returns (ListPaymentChannelsResponse);
   rpc AcceptPaymentChannelProposal (AcceptPaymentChannelProposalRequest) returns (AcceptPaymentChannelProposalResponse);
   rpc ExecuteDirectTransfer (ExecuteDirectTransferRequest) returns (google.protobuf.Empty);
   rpc CreateOnChannelPaymentRequest (CreateOnChannelPaymentRequestRequest) returns (CreateOnChannelPaymentRequestResponse);
@@ -80,6 +80,10 @@ message ProposePaymentChannelResponse {
 
 message ListPaymentChannelProposalsResponse {
   repeated com.daml.network.v0.Contract proposals = 1;
+}
+
+message ListPaymentChannelsResponse {
+  repeated com.daml.network.v0.Contract channels = 1;
 }
 
 message AcceptPaymentChannelProposalRequest {
