@@ -62,7 +62,7 @@ class GrpcWalletService(
         quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
         tapCmd = coinRulesCodegen.CoinRules
           .key(DA.Types.Tuple2(svcParty.toPrim, validatorParty.get.toPrim))
-          .exerciseTap(
+          .exerciseCoinRules_Tap(
             walletParty.toPrim,
             walletParty.toPrim,
             quantity,

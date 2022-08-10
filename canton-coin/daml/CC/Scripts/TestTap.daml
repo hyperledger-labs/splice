@@ -1,15 +1,19 @@
 module CC.Scripts.TestTap where
 
+import DA.Assert
 import Daml.Script
-import CC.CoinRules
+import CC.Coin
 import CC.Scripts.Util
 
 testTap: Script ()
 testTap = do 
     app <- setupApp
-    Some (rulesCid, rules) <- queryContractKey @CoinRules app.svc (app.svc, app.svc)
-    pat <- allocateParty "Pat"
-    cid <- submitMulti [pat] [app.svc] $ exerciseCmd rulesCid Tap with 
-                receiver = pat
-                quantity = 100.0
+    -- start issuing so the SVC has some coins to invite users
+    runNextIssuance app 1.0
+    runCoinDepositBots app
+    validator <- setupValidator app "validator"
+    pat <- setupUser app "pat" validator
+    cid <- tap app pat 100.0
+    Some coin <- queryContractId @Coin pat cid
+    coin.quantity.initialQuantity === 100.0
     return ()

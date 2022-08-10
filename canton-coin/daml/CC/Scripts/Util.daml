@@ -353,6 +353,13 @@ getValidatorUsers validator = do
   rights <- queryFilter @ValidatorRight validator (\right -> right.validator == validator)
   return [ right.user | (_, right) <- rights ]
 
+tap : CCApp -> Party -> Decimal -> Script (ContractId Coin)
+tap app p quantity = do
+  validator <- getHostingValidator p
+  submitExerciseCoinRulesByKey app [p] [validator] validator CoinRules_Tap with
+    receiver = p
+    quantity = quantity
+
 
 -- Debugging support
 --------------------

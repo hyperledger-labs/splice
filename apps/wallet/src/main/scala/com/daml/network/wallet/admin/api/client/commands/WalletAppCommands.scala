@@ -310,7 +310,8 @@ object WalletAppCommands {
     override def submitRequest(
         service: WalletServiceStub,
         request: Empty,
-    ): Future[v0.ListOnChannelPaymentRequestsResponse] = service.listOnChannelPaymentRequests(request)
+    ): Future[v0.ListOnChannelPaymentRequestsResponse] =
+      service.listOnChannelPaymentRequests(request)
 
     override def handleResponse(
         response: v0.ListOnChannelPaymentRequestsResponse

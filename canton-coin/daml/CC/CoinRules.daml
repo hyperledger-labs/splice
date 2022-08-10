@@ -68,7 +68,7 @@ template CoinRules
       controller transferControllers transfer
       do executeTransfer config svc obs transfer
 
-    nonconsuming choice Tap: ContractId Coin
+    nonconsuming choice CoinRules_Tap: ContractId Coin
       with
         receiver: Party
         quantity: Decimal
