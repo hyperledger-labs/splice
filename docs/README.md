@@ -7,7 +7,7 @@ Intended to be published to https://network.canton.global.
 
 ### Live-preview
 
-Running `make run` builds the docs using `sphinx-autobuild`. Changes
+Running `./livepreview.sh` builds the docs using `sphinx-autobuild`. Changes
 to your docs will be picked up automatically without having to run a
 full build.
 
