@@ -24,7 +24,7 @@ Canton Network Documentation
    :maxdepth: 2
    :caption: Application Developers
 
-   app_dev/app_arch.rst
+   app_dev/index.rst
 
 .. toctree::
    :maxdepth: 2
