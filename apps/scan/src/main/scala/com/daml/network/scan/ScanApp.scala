@@ -2,7 +2,7 @@ package com.daml.network.scan
 
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.scan.config.LocalScanAppConfig
-import com.daml.network.scan.store.ScanAppStore
+import com.daml.network.scan.store.ScanTransferStore
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
 import com.digitalasset.canton.lifecycle.Lifecycle
@@ -22,7 +22,7 @@ class ScanApp(
     val config: LocalScanAppConfig,
     val coinAppParameters: SharedCoinAppParameters,
     storage: Storage,
-    dummyStore: ScanAppStore,
+    dummyStore: ScanTransferStore,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
 ) extends CantonNode // TODO(Arne): CantonNode needs to be forked or generalized.

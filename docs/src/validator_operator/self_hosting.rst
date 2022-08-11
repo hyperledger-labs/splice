@@ -175,7 +175,7 @@ Check Alice's wallet to see the request, and then accept it: ::
   @ aliceWallet.acceptOnChannelPaymentRequest(paymentReq, aliceWallet.list().head.contractId)
 
 Note that you did not reuse the same coinCid from before for the transfer - that contract ID has been archived, and replaced with a new one containing the change from her previous transfer.
-You can now check again Bob's and Alice's wallets - Bob received 10 coins again, and Alice's holding were reduced by slightly more than 10 coin again: ::
+You can now check again Bob's and Alice's wallets - Bob received 10 coins again, and Alice's holdings were reduced by slightly more than 10 coin again: ::
 
   @ bobWallet.list()
   @ aliceWallet.list()

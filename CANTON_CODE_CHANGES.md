@@ -19,6 +19,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Added `class UnitCommand` for admin commands that do not take arguments
 * Adds some more utility methods to `PartyId`
 * Added `com.daml.network.integration.CoinEnvironmentDefinition` to `LogEntry.scala`
+* Added `DecodeUtil.decodeArchivedExercise` 
 ## Build system
 * Added refs to GH issues in project/DamlPlugin.sbt for two bugs
 * Added support for `damlDependencies` in SBT DamlPlugin

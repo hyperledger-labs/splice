@@ -232,7 +232,7 @@ class AdminWorkflowServices(
       tracerProvider,
       noRetryOnPassiveReplica,
     )
-    (parameters.processingTimeouts.unbounded.await()(connection.ledgerEnd), connection)
+    (parameters.processingTimeouts.network.await()(connection.ledgerEnd), connection)
   }
 
   private def createService[S <: AdminWorkflowService](

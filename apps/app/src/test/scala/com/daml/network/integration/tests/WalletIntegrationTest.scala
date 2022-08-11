@@ -71,7 +71,7 @@ class WalletIntegrationTest
       import env._
       val svcParty = svc.initialize()
       val aliceValidatorParty = aliceValidator.initialize()
-      // TODO(Arne): consider adding synchronization 'wait-for-participant-x' to this command
+      // TODO(M1-90 Backlog): consider adding synchronization 'wait-for-participant-x' to this command
       val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
       aliceWallet.initialize(aliceValidatorParty)
 

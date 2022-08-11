@@ -1,4 +1,4 @@
-package com.daml.network.svc.admin
+package com.daml.network.scan.admin
 
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -13,11 +13,9 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContextExecutor
 
-/** Manages background automation that runs on an SVC app.
-  *
-  * Currently, this class only contains the automation that automatically accepts `CoinRulesRequests` of validators.
+/** Manages background automation that runs on a CC Scan app.
   */
-class SvcAutomationService(
+class ScanAutomationService(
     svcParty: PartyId,
     remoteParticipant: RemoteParticipantConfig,
     loggerFactory: NamedLoggerFactory,
@@ -38,17 +36,18 @@ class SvcAutomationService(
 
   override def readAs: PartyId = svcParty
 
-  val (coinRulesRequestSubscription, coinRulesRequestAcceptanceService) =
-    createService("svcAcceptCoinRulesRequestsService") { connection =>
-      new CoinRulesRequestAcceptanceService(svcParty, connection, loggerFactory)
+  val (coinFlatStreamSubscription, readCcTransfersService) =
+    // TODO(Arne): the subscription here should read from ledger start
+    createService("ScanReadCcTransfersService") { connection =>
+      new ReadCcTransfersService(connection, loggerFactory)
     }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq[AsyncOrSyncCloseable](
     SyncCloseable(
       "SVC automation services",
       Lifecycle.close(
-        coinRulesRequestSubscription,
-        coinRulesRequestAcceptanceService,
+        coinFlatStreamSubscription,
+        readCcTransfersService,
       )(logger),
     )
   )

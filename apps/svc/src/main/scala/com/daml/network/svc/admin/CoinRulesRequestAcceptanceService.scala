@@ -1,6 +1,7 @@
 package com.daml.network.svc.admin
 
 import com.daml.ledger.api.v1.transaction.Transaction
+import com.daml.network.admin.LedgerAutomationService
 import com.daml.network.environment.CoinLedgerConnection
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.ledger.api.client.DecodeUtil
@@ -24,7 +25,7 @@ class CoinRulesRequestAcceptanceService(
 
   // TODO(M1-90): This should not run concurrently with round management commands.
   // Both operations are non-atomic read-modify-write operations on the set of mining rounds.
-  override private[admin] def processTransaction(tx: Transaction)(implicit
+  override def processTransaction(tx: Transaction)(implicit
       traceContext: TraceContext
   ): Future[Unit] =
     for {

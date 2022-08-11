@@ -145,6 +145,7 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
       filter: Seq[PartyId],
   )(mapOperator: Flow[TransactionTree, Any, _]): CoinLedgerSubscription
 
+  def transactionTreeById(parties: Seq[PartyId], id: String): Future[Option[TransactionTree]]
   def transactionById(parties: Seq[PartyId], id: String): Future[Option[Transaction]]
 
   def getPrimaryParty(user: String): Future[PartyId]
@@ -413,6 +414,16 @@ object CoinLedgerConnection {
         subscription(subscriptionName, offset, filter)({
           Flow[Transaction].mapAsync(1)(f)
         })
+
+      override def transactionTreeById(
+          parties: Seq[PartyId],
+          id: String,
+      ): Future[Option[TransactionTree]] =
+        client.transactionClient
+          .getTransactionById(id, parties.map(_.toProtoPrimitive), token)
+          .map { resp =>
+            resp.transaction
+          }
 
       override def transactionById(parties: Seq[PartyId], id: String): Future[Option[Transaction]] =
         client.transactionClient

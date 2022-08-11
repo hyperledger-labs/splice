@@ -1,4 +1,4 @@
-package com.daml.network.svc.admin
+package com.daml.network.admin
 
 import com.daml.ledger.api.v1.transaction.Transaction
 import com.digitalasset.canton.tracing.TraceContext
@@ -14,7 +14,7 @@ trait LedgerAutomationService extends AutoCloseable {
     * Long-running computations or blocking calls should be spawned off into an asynchronous computation
     * so that the service itself can synchronize its closing with the spawned-off computation if needed.
     */
-  private[admin] def processTransaction(tx: Transaction)(implicit
+  def processTransaction(tx: Transaction)(implicit
       traceContext: TraceContext
   ): Future[Unit]
 }

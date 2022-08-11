@@ -10,7 +10,7 @@ import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.scan.admin.grpc.GrpcScanService
 import com.daml.network.scan.config.LocalScanAppConfig
 import com.daml.network.scan.metrics.ScanAppMetrics
-import com.daml.network.scan.store.ScanAppStore
+import com.daml.network.scan.store.ScanTransferStore
 import com.daml.network.scan.v0.ScanServiceGrpc
 import com.daml.network.environment.CoinNodeBootstrapBase
 import com.digitalasset.canton.concurrent.{
@@ -62,7 +62,7 @@ class ScanAppBootstrap(
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
     EitherT.rightT[Future, String] {
-      val dummyStore = ScanAppStore(storage, loggerFactory)
+      val dummyStore = ScanTransferStore(storage, loggerFactory)
 
       val connection =
         createLedgerConnection(
