@@ -29,9 +29,13 @@ class RunbookIntegrationTest
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
-      .fromFiles(validatorPath / "validator.conf", validatorPath / "validator-participant.conf")
+      .fromFiles(
+        this.getClass.getSimpleName,
+        validatorPath / "validator.conf",
+        validatorPath / "validator-participant.conf",
+      )
       .clearConfigTransforms()
-      .addConfigTransforms(portTransform)
+      .addConfigTransforms((_, conf) => portTransform(conf))
 
   // Bump port by 1000 to avoid collisions with the Canton instance started
   // outside of our tests.

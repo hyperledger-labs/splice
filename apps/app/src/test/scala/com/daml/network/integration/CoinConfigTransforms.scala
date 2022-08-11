@@ -19,7 +19,7 @@ object CoinConfigTransforms {
   /** Default transforms to apply to tests using a [[CoinEnvironmentDefinition]].
     * Covers the primary ways that distinct concurrent environments may unintentionally collide.
     */
-  lazy val defaults: Seq[CoinConfigTransform] = {
+  def defaults(context: String): Seq[CoinConfigTransform] = {
     Seq(
       // make unbounded duration bounded for our test
       _.focus(_.parameters.timeouts.console.unbounded)
@@ -29,7 +29,7 @@ object CoinConfigTransforms {
         .focus(_.parameters.timeouts.processing.shutdownProcessing)
         .replace(TimeoutDuration.tryFromDuration(10.seconds)),
       config0 => {
-        val suffix = UUID.randomUUID()
+        val suffix = s"${context.toLowerCase}-${UUID.randomUUID()}"
         val config1 = updateSvcConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config0)
         val config2 = updateCcScanConfig(c => c.copy(svcUser = s"${c.svcUser}-$suffix"))(config1)
         val config3 =

@@ -27,11 +27,13 @@ class DirectoryProviderIntegrationTest
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition.simpleTopology.withSetup(implicit env => {
-      import env._
-      directoryValidator.remoteParticipant.dars.upload(directoryDarPath)
-      directoryUser.remoteParticipant.dars.upload(directoryDarPath)
-    })
+    CoinEnvironmentDefinition
+      .simpleTopology(this.getClass.getSimpleName)
+      .withSetup(implicit env => {
+        import env._
+        directoryValidator.remoteParticipant.dars.upload(directoryDarPath)
+        directoryUser.remoteParticipant.dars.upload(directoryDarPath)
+      })
 
   "A directory provider" should {
     "list and accept install requests" in { implicit env =>

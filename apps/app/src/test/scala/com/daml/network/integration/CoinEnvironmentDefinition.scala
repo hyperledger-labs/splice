@@ -26,27 +26,33 @@ case class CoinEnvironmentDefinition(
     override val testingConfig: TestingConfigInternal = TestingConfigInternal(),
     override val setup: CoinTestConsoleEnvironment => Unit = _ => (),
     override val teardown: Unit => Unit = _ => (),
-    override val configTransforms: Seq[CoinConfig => CoinConfig] = CoinConfigTransforms.defaults,
+    val context: String, // String context included in generation of unique names. This could, e.g., be the test suite name
+    val configTransformsWithContext: (String => Seq[CoinConfig => CoinConfig]) =
+      CoinConfigTransforms.defaults(_),
 ) extends BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment](
       baseConfig,
       testingConfig,
       setup,
       teardown,
-      configTransforms,
+      configTransformsWithContext(context),
     ) {
+  override val configTransforms = configTransformsWithContext(context)
   def withManualStart: CoinEnvironmentDefinition =
     copy(baseConfig = baseConfig.focus(_.parameters.manualStart).replace(true))
   def withSetup(setup: CoinTestConsoleEnvironment => Unit): CoinEnvironmentDefinition =
     copy(setup = setup)
-  def clearConfigTransforms(): CoinEnvironmentDefinition = copy(configTransforms = Seq())
+  def clearConfigTransforms(): CoinEnvironmentDefinition =
+    copy(configTransformsWithContext = _ => Seq())
   def addConfigTransforms(
-      transforms: CoinConfig => CoinConfig*
+      transforms: (String, CoinConfig) => CoinConfig*
   ): CoinEnvironmentDefinition =
     transforms.foldLeft(this)((ed, ct) => ed.addConfigTransform(ct))
   def addConfigTransform(
-      transform: CoinConfig => CoinConfig
+      transform: (String, CoinConfig) => CoinConfig
   ): CoinEnvironmentDefinition =
-    copy(configTransforms = this.configTransforms :+ transform)
+    copy(configTransformsWithContext =
+      ctx => this.configTransformsWithContext(ctx) :+ (conf => transform(ctx, conf))
+    )
 
   override lazy val environmentFactory: EnvironmentFactory[CoinEnvironmentImpl] =
     CoinEnvironmentFactory
@@ -64,12 +70,13 @@ case class CoinEnvironmentDefinition(
 }
 
 object CoinEnvironmentDefinition {
-  lazy val simpleTopology: CoinEnvironmentDefinition =
-    fromResource("simple-topology.conf")
+  def simpleTopology(testName: String): CoinEnvironmentDefinition =
+    fromResource("simple-topology.conf", testName)
 
-  def fromResource(path: String): CoinEnvironmentDefinition =
+  def fromResource(path: String, testName: String): CoinEnvironmentDefinition =
     CoinEnvironmentDefinition(
-      baseConfig = loadConfigFromResource(path)
+      baseConfig = loadConfigFromResource(path),
+      context = testName,
     )
 
   private def loadConfigFromResource(path: String): CoinConfig = {
@@ -77,8 +84,8 @@ object CoinEnvironmentDefinition {
     CoinConfig.loadOrExit(rawConfig)
   }
 
-  def fromFiles(files: File*): CoinEnvironmentDefinition = {
+  def fromFiles(testName: String, files: File*): CoinEnvironmentDefinition = {
     val config = CoinConfig.parseAndLoadOrExit(files.map(_.toJava))
-    CoinEnvironmentDefinition(baseConfig = config)
+    CoinEnvironmentDefinition(baseConfig = config, context = testName)
   }
 }

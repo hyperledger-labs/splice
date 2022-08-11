@@ -34,10 +34,12 @@ class WalletIntegrationTest
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition.simpleTopology.withSetup(env => {
-      import env._
-      participants.all.foreach(_.domains.connect_local(da))
-    })
+    CoinEnvironmentDefinition
+      .simpleTopology(this.getClass.getSimpleName)
+      .withSetup(env => {
+        import env._
+        participants.all.foreach(_.domains.connect_local(da))
+      })
 
   "A wallet" should {
     "allow calling tap and then list the created coins - locally and remotely" in { implicit env =>

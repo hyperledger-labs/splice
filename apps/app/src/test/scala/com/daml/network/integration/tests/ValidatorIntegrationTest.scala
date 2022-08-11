@@ -20,7 +20,7 @@ class ValidatorIntegrationTest
     with CommonCoinAppInstanceReferences {
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition.simpleTopology
+    CoinEnvironmentDefinition.simpleTopology(this.getClass.getSimpleName)
 
   "initialize svc and validator apps" in { implicit env =>
     import env._

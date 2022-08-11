@@ -24,10 +24,12 @@ class SvcIntegrationTest
     with CommonCoinAppInstanceReferences {
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition.simpleTopology.withSetup(env => {
-      import env._
-      participants.all.foreach(_.domains.connect_local(da))
-    })
+    CoinEnvironmentDefinition
+      .simpleTopology(this.getClass.getSimpleName)
+      .withSetup(env => {
+        import env._
+        participants.all.foreach(_.domains.connect_local(da))
+      })
 
   "round management" in { implicit env =>
     import env._
