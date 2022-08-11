@@ -16,7 +16,7 @@ watched the `CC technical overview presentation <https://digitalasset.atlassian.
 Prerequisites
 -------------
 
-To locally start a validator node that connects against the devnet domain, you will need to run
+To locally start a validator node that connects against the DevNet domain, you will need to run
 1) a Canton participant node, in order to host:
 2) the Daml validator app and
 3) the Daml wallet app
@@ -30,13 +30,13 @@ Additionally, you'll also need access to one of the following four `Digital Asse
 
 Please activate the VPN now.
 
-To run a participant node, please `download and install Canton version 2.3.2 <https://docs.daml.com/canton/usermanual/downloading.html>`_.
+.. To run a participant node, please `download and install Canton version 2.3.2 <https://docs.daml.com/canton/usermanual/downloading.html>`_.
 
 To obtain the Canton Coin network binary (required to run validator and wallet apps), please clone the
-`the-real-canton-coin <https://github.com/DACH-NY/the-real-canton-coin>`_ GitHub repository and follow the setup instructions.
-Then, run `sbt bundle`. This will create a release bundle in ``the-real-canton-coin/apps/app/target/release/coin/``.
+`the-real-canton-coin <https://github.com/DACH-NY/the-real-canton-coin>`_ repository from GitHub and follow the setup instructions.
+Then, run ``sbt bundle``. This will create a release bundle in ``the-real-canton-coin/apps/app/target/release/coin/``.
 
-Please now navigate to the examples directory in the release bundle: ::
+Please now navigate to the examples directory in your local clone of the `the-real-canton-coin` Git repository: ::
 
   cd apps/app/target/release/coin/examples
 
@@ -53,30 +53,35 @@ To operate a validator node you will need to:
 
 The Canton participant is responsible for hosting your Daml apps; i.e. interpreting Daml code, securing your data, and talking to the public canton network. It connects to the global canton domain `canton.global`. We provide a bootstrap script to handle these steps for you. You can refer to the `canton tutorial <https://docs.daml.com/canton/tutorials/getting_started.html>`_ for greater detail on what each step does.
 
-We recommend respectively adding the paths to the Canton and Canton Coin network binaries from your release
-bundles (`<release-bundle-dir>/canton/bin/canton` and `<release-bundle-dir>/coin/bin/coin`) to your PATH as `canton` and `coin`.
-This is also the convention we will use in this tutorial.
+..
+   We recommend respectively adding the paths to the Canton and Canton Coin network binaries from your release
+   bundles (`<release-bundle-dir>/canton/bin/canton` and `<release-bundle-dir>/coin/bin/coin`) to your PATH as `canton` and `coin`.
+   This is also the convention we will use in this tutorial.
 
 First off, you will need to start the validator participant and connect it to the devnet domain: ::
 
-  canton -c validator/validator-participant.conf --bootstrap validator/validator-participant.canton
+  coin -c validator/validator-participant.conf --bootstrap validator/validator-participant.canton
 
+For convenience, this uses the coin binary at the moment. At a later point, the participant will need to be
+started as usual through Canton (``bin/canton``). Note that in the ``the-real-canton-coin``, we use ``direnv``
+to automatically add the alias ``coin`` for the path to the CC network binary.
 
-Next, start a console with the CN apps: ::
+Next, open a second terminal, navigate to the `examples` directory again, and start a console with the CN apps: ::
 
+  cd apps/app/target/release/coin/examples
   coin --config validator/validator.conf
 
-In the console, initialize the validator ::
+In the console, initialize the validator.  ::
 
   @ val validatorParty = validatorApp.initialize()
 
-Request onboarding a new user called "alice_wallet" to the validator ::
+This exposes a `CoinRules` contract to the validator party through automation running on the SVC node.
+In this feature preview, the SVC automatically accepts any validator onboard requests.
+
+Now, onboard a new user called "alice_wallet" via the validator app: ::
 
   @ val aliceParty = validatorApp.onboardUser("alice_wallet")
 
-
-The request should be automatically approved by the supervalidator consortium in this feature preview.
-  
 You are now registered as a validator on the Canton network. You've also configured a user that can transact through a wallet. Congratulations!
   
 Tapping some Canton Coin from the Dev Faucet
@@ -85,12 +90,11 @@ Tapping some Canton Coin from the Dev Faucet
 In order to create some free canton coin to play around with, you'll need to initialize the wallet by passing in the validator party.
 Reusing the console from the previous section: ::
 
-@ aliceWallet.initialize(validatorParty)
+  @ aliceWallet.initialize(validatorParty)
   
 You can create free coins like so: ::
 
   @ val coinId = aliceWallet.tap(100.0)
-  coinId: ContractId Canton.Coin { ... }
 
 Creating free coins will only be possible in temporary test- and devnets.
 
@@ -100,10 +104,20 @@ Listing your Canton Coins
 You can list your balances with the following command: ::
 
   @ aliceWallet.list()
+  res4: Seq[...] = Vector(
+    Contract(
+      contractId = ...,
+      payload = Coin(
+        svc = ...,
+        owner = ...,
+        quantity = ExpiringQuantity(initialQuantity = 100.00, ...)
+      )
+    )
+  )
 
   
-If you've followed the previous instructions, you should already see one coin, similar to the output above.
-If not, try calling ``aliceWallet.tap(1000.0)`` and then rerunning this command.
+If you've followed the previous instructions, you should already see one coin.
+If not, try calling ``aliceWallet.tap(100.0)`` and then rerunning this command.
 
 Preparing for the first transfer
 --------------------------------
@@ -145,7 +159,7 @@ Check Alice and Bob's wallets to see that Alice now has slightly less than 990 c
       payload = Coin(
         svc = ...,
         owner = ...,
-        quantity = ExpiringQuantity(initialQuantity = 989.8000000000, ...)
+        quantity = ExpiringQuantity(initialQuantity = 89.8000000000, ...)
       )
     )
   )
