@@ -1,6 +1,6 @@
 println("Bootstrapping CN participant...")
 
-val domainLabel = "cnsvc"
+val domainLabel = "svc_domain"
 val domainConnectAddress = "http://canton-domain:5008"
 
 if (`svc_participant`.domains.list_connected().isEmpty) {

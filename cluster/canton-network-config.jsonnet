@@ -1,94 +1,144 @@
 local networkDefaults = import './network-defaults.jsonnet';
 
-local deployment(config, name, ports, ext={}) = {
+local flatten(obj) =
+  if std.isArray(obj)
+  then std.flatMap(flatten, obj)
+  else [obj];
+
+local objects(items) = {
   apiVersion: 'apps/v1',
-  kind: 'Deployment',
-  metadata: {
-    name: name,
-    labels: {
-      app: name,
-    },
+  kind: 'List',
+  items: flatten(items),
+};
+
+local DOCS_PORTS = [
+  {
+    name: 'http',
+    port: 80,
   },
-  spec: {
-    replicas: 1,
-    strategy: {
-      type: 'Recreate',
-    },
-    selector: {
-      matchLabels: {
+];
+
+local SVC_APP_PORTS = [
+  {
+    name: 'svc-app-adm-api',
+    port: 5005,
+  },
+  {
+    name: 'scan-api',
+    port: 5012,
+  },
+];
+
+local CANTON_DOMAIN_PORTS = [
+  {
+    name: 'canton-pub-api',
+    port: 5008,
+  },
+  {
+    name: 'canton-adm-api',
+    port: 5009,
+  },
+];
+
+
+local CANTON_PARTICIPANT_PORTS = [
+  {
+    name: 'cp-adm-api',
+    port: 5002,
+  },
+  {
+    name: 'cp-ledger-api',
+    port: 5001,
+  },
+];
+
+local ALL_PORTS = flatten([
+  DOCS_PORTS,
+  SVC_APP_PORTS,
+  CANTON_DOMAIN_PORTS,
+  CANTON_PARTICIPANT_PORTS,
+]);
+
+local deployment(config, name, ports, ext={}) = [
+  {
+    apiVersion: 'apps/v1',
+    kind: 'Deployment',
+    metadata: {
+      name: name,
+      labels: {
         app: name,
       },
     },
-    template: {
-      metadata: {
-        labels: {
+    spec: {
+      replicas: 1,
+      strategy: {
+        type: 'Recreate',
+      },
+      selector: {
+        matchLabels: {
           app: name,
         },
       },
-      spec: {
-        containers: [
-          {
-            name: name,
-            image: config.gcpRegion + '-docker.pkg.dev/' + config.gcpRepoName + '/' + name + ':' + config.imageTag,
-            imagePullPolicy: 'Always',
-            ports: ports,
-          } + ext,
-        ],
+      template: {
+        metadata: {
+          labels: {
+            app: name,
+            external: 'true',
+          },
+        },
+        spec: {
+          containers: [
+            {
+              name: name,
+              image: config.gcpRegion + '-docker.pkg.dev/' + config.gcpRepoName + '/' + name + ':' + config.imageTag,
+              imagePullPolicy: 'Always',
+              ports: [{ name: p.name, containerPort: p.port } for p in ports],
+            } + ext,
+          ],
+        },
       },
     },
   },
-};
+  {
+    apiVersion: 'v1',
+    kind: 'Service',
+    metadata: {
+      name: name,
+    },
+    spec: {
+      selector: {
+        app: name,
+      },
+      ports: [{ name: p.name, protocol: 'TCP', port: p.port } for p in ports],
+    },
+  },
+];
 
-local externalService(config, name, ports) = {
+local externalService(config, ports) = {
   apiVersion: 'v1',
   kind: 'Service',
   metadata: {
-    name: name,
+    name: 'external',
   },
   spec: {
     type: 'LoadBalancer',
     selector: {
-      app: name,
+      app: 'external-proxy',
     },
-    ports: ports,
+    ports: [{ name: p.name, protocol: 'TCP', port: p.port } for p in ports],
     loadBalancerIP: config.ipAddr,
     loadBalancerSourceRanges: config.externalIPRanges,
   },
 };
 
-local cantonNetwork(config) = {
-  apiVersion: 'apps/v1',
-  kind: 'List',
-  items: [
-    deployment(config, 'docs', [
-      {
-        containerPort: 80,
-        name: 'http',
-      },
-    ]),
-    deployment(config, 'svc-app', [
-      {
-        name: 'svc-app-adm-api',
-        containerPort: 5005,
-      },
-      {
-        name: 'scan-api',
-        containerPort: 5012,
-      },
-    ]),
+local cantonNetwork(config) = objects(
+  [
+    deployment(config, 'docs', DOCS_PORTS),
+    deployment(config, 'svc-app', SVC_APP_PORTS),
     deployment(
       config,
       'canton-domain',
-      [
-        {
-          name: 'canton-pub-api',
-          containerPort: 5008,
-        },
-        {
-          name: 'canton-adm-api',
-          containerPort: 5009,
-        },
-      ],
+      CANTON_DOMAIN_PORTS,
       {
         readinessProbe: {
           tcpSocket: {
@@ -104,79 +154,11 @@ local cantonNetwork(config) = {
         },
       },
     ),
-    deployment(config, 'canton-participant', [
-      {
-        name: 'cp-adm-api',
-        containerPort: 5002,
-      },
-      {
-        name: 'cp-ledger-api',
-        containerPort: 5001,
-      },
-    ]),
-    externalService(config, 'docs', [
-      {
-        protocol: 'TCP',
-        port: 80,
-        targetPort: 80,
-      },
-    ]),
-    externalService(
-      config,
-      'svc-app',
-      [
-        {
-          name: 'svc-app-adm-api',
-          protocol: 'TCP',
-          port: 5005,
-          targetPort: 5005,
-        },
-        {
-          name: 'scan-api',
-          protocol: 'TCP',
-          port: 5012,
-          targetPort: 5012,
-        },
-      ]
-    ),
-    externalService(
-      config,
-      'canton-domain',
-      [
-        {
-          name: 'canton-pub-api',
-          protocol: 'TCP',
-          port: 5008,
-          targetPort: 5008,
-        },
-        {
-          name: 'canton-adm-api',
-          protocol: 'TCP',
-          port: 5009,
-          targetPort: 5009,
-        },
-      ]
-    ),
-    externalService(
-      config,
-      'canton-participant',
-      [
-        {
-          name: 'cp-adm-api',
-          protocol: 'TCP',
-          port: 5002,
-          targetPort: 5002,
-        },
-        {
-          name: 'cp-ledger-api',
-          protocol: 'TCP',
-          port: 5001,
-          targetPort: 5001,
-        },
-      ]
-    ),
+    deployment(config, 'canton-participant', CANTON_PARTICIPANT_PORTS),
+    deployment(config, 'external-proxy', ALL_PORTS),
+    externalService(config, ALL_PORTS),
   ],
-};
+);
 
 function(gcpRegion, gcpRepoName, imageTag, ipAddr) cantonNetwork(networkDefaults {
   gcpRegion: gcpRegion,

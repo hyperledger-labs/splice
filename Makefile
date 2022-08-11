@@ -2,7 +2,13 @@
 
 # svc-app depends on cn-app having been built first.
 # For now, that dependency declaration is given by the order here.
-apps := cn-app svc-app canton-domain canton-participant docs
+apps := \
+	cn-app \
+	svc-app \
+	canton-domain \
+	canton-participant \
+	docs \
+	external-proxy
 
 define make_apps
   for app in $(apps); do \

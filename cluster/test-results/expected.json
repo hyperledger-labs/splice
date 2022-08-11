@@ -23,7 +23,8 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "docs"
+                     "app": "docs",
+                     "external": "true"
                   }
                },
                "spec": {
@@ -41,6 +42,25 @@
                      }
                   ]
                }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "name": "docs"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "http",
+                  "port": 80,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "docs"
             }
          }
       },
@@ -66,7 +86,8 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "svc-app"
+                     "app": "svc-app",
+                     "external": "true"
                   }
                },
                "spec": {
@@ -92,6 +113,30 @@
          }
       },
       {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "name": "svc-app"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "svc-app-adm-api",
+                  "port": 5005,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "scan-api",
+                  "port": 5012,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "svc-app"
+            }
+         }
+      },
+      {
          "apiVersion": "apps/v1",
          "kind": "Deployment",
          "metadata": {
@@ -113,7 +158,8 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "canton-domain"
+                     "app": "canton-domain",
+                     "external": "true"
                   }
                },
                "spec": {
@@ -151,6 +197,30 @@
          }
       },
       {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "name": "canton-domain"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "canton-pub-api",
+                  "port": 5008,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "canton-adm-api",
+                  "port": 5009,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "canton-domain"
+            }
+         }
+      },
+      {
          "apiVersion": "apps/v1",
          "kind": "Deployment",
          "metadata": {
@@ -172,7 +242,8 @@
             "template": {
                "metadata": {
                   "labels": {
-                     "app": "canton-participant"
+                     "app": "canton-participant",
+                     "external": "true"
                   }
                },
                "spec": {
@@ -201,127 +272,196 @@
          "apiVersion": "v1",
          "kind": "Service",
          "metadata": {
-            "name": "docs"
-         },
-         "spec": {
-            "loadBalancerIP": "ipaddr",
-            "loadBalancerSourceRanges": [
-               "35.194.81.56/32",
-               "35.198.147.95/32",
-               "35.189.40.124/32",
-               "34.132.91.75/32"
-            ],
-            "ports": [
-               {
-                  "port": 80,
-                  "protocol": "TCP",
-                  "targetPort": 80
-               }
-            ],
-            "selector": {
-               "app": "docs"
-            },
-            "type": "LoadBalancer"
-         }
-      },
-      {
-         "apiVersion": "v1",
-         "kind": "Service",
-         "metadata": {
-            "name": "svc-app"
-         },
-         "spec": {
-            "loadBalancerIP": "ipaddr",
-            "loadBalancerSourceRanges": [
-               "35.194.81.56/32",
-               "35.198.147.95/32",
-               "35.189.40.124/32",
-               "34.132.91.75/32"
-            ],
-            "ports": [
-               {
-                  "name": "svc-app-adm-api",
-                  "port": 5005,
-                  "protocol": "TCP",
-                  "targetPort": 5005
-               },
-               {
-                  "name": "scan-api",
-                  "port": 5012,
-                  "protocol": "TCP",
-                  "targetPort": 5012
-               }
-            ],
-            "selector": {
-               "app": "svc-app"
-            },
-            "type": "LoadBalancer"
-         }
-      },
-      {
-         "apiVersion": "v1",
-         "kind": "Service",
-         "metadata": {
-            "name": "canton-domain"
-         },
-         "spec": {
-            "loadBalancerIP": "ipaddr",
-            "loadBalancerSourceRanges": [
-               "35.194.81.56/32",
-               "35.198.147.95/32",
-               "35.189.40.124/32",
-               "34.132.91.75/32"
-            ],
-            "ports": [
-               {
-                  "name": "canton-pub-api",
-                  "port": 5008,
-                  "protocol": "TCP",
-                  "targetPort": 5008
-               },
-               {
-                  "name": "canton-adm-api",
-                  "port": 5009,
-                  "protocol": "TCP",
-                  "targetPort": 5009
-               }
-            ],
-            "selector": {
-               "app": "canton-domain"
-            },
-            "type": "LoadBalancer"
-         }
-      },
-      {
-         "apiVersion": "v1",
-         "kind": "Service",
-         "metadata": {
             "name": "canton-participant"
          },
          "spec": {
-            "loadBalancerIP": "ipaddr",
-            "loadBalancerSourceRanges": [
-               "35.194.81.56/32",
-               "35.198.147.95/32",
-               "35.189.40.124/32",
-               "34.132.91.75/32"
-            ],
             "ports": [
                {
                   "name": "cp-adm-api",
                   "port": 5002,
-                  "protocol": "TCP",
-                  "targetPort": 5002
+                  "protocol": "TCP"
                },
                {
                   "name": "cp-ledger-api",
                   "port": 5001,
-                  "protocol": "TCP",
-                  "targetPort": 5001
+                  "protocol": "TCP"
                }
             ],
             "selector": {
                "app": "canton-participant"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "external-proxy"
+            },
+            "name": "external-proxy"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "external-proxy"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "external-proxy",
+                     "external": "true"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "image": "region-docker.pkg.dev/project/repo/external-proxy:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "external-proxy",
+                        "ports": [
+                           {
+                              "containerPort": 80,
+                              "name": "http"
+                           },
+                           {
+                              "containerPort": 5005,
+                              "name": "svc-app-adm-api"
+                           },
+                           {
+                              "containerPort": 5012,
+                              "name": "scan-api"
+                           },
+                           {
+                              "containerPort": 5008,
+                              "name": "canton-pub-api"
+                           },
+                           {
+                              "containerPort": 5009,
+                              "name": "canton-adm-api"
+                           },
+                           {
+                              "containerPort": 5002,
+                              "name": "cp-adm-api"
+                           },
+                           {
+                              "containerPort": 5001,
+                              "name": "cp-ledger-api"
+                           }
+                        ]
+                     }
+                  ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "name": "external-proxy"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "http",
+                  "port": 80,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "svc-app-adm-api",
+                  "port": 5005,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "scan-api",
+                  "port": 5012,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "canton-pub-api",
+                  "port": 5008,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "canton-adm-api",
+                  "port": 5009,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "cp-adm-api",
+                  "port": 5002,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "cp-ledger-api",
+                  "port": 5001,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "external-proxy"
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "name": "external"
+         },
+         "spec": {
+            "loadBalancerIP": "ipaddr",
+            "loadBalancerSourceRanges": [
+               "35.194.81.56/32",
+               "35.198.147.95/32",
+               "35.189.40.124/32",
+               "34.132.91.75/32"
+            ],
+            "ports": [
+               {
+                  "name": "http",
+                  "port": 80,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "svc-app-adm-api",
+                  "port": 5005,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "scan-api",
+                  "port": 5012,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "canton-pub-api",
+                  "port": 5008,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "canton-adm-api",
+                  "port": 5009,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "cp-adm-api",
+                  "port": 5002,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "cp-ledger-api",
+                  "port": 5001,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "external-proxy"
             },
             "type": "LoadBalancer"
          }
