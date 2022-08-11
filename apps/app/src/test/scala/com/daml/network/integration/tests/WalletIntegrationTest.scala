@@ -261,6 +261,17 @@ class WalletIntegrationTest
     }
   }
 
+  "fails with an understandable error when not initialized" in { implicit env =>
+    import env._
+    val svcParty = svc.initialize()
+    val validatorParty = aliceValidator.initialize()
+    val aliceParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
+    assertThrowsAndLogsCommandFailures(
+      aliceWallet.tap(10),
+      _.errorMessage should include("Wallet is not initialized"),
+    )
+  }
+
   def bareTransfer(
       wallet: LocalWalletAppReference,
       senderParty: PartyId,

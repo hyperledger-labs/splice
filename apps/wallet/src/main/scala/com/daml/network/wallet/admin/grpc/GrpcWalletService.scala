@@ -17,6 +17,7 @@ import com.digitalasset.network.CC.{Coin => coinCodegen, CoinRules => coinRulesC
 import com.digitalasset.network.CN.{Wallet => walletCodegen}
 import com.digitalasset.network.DA
 import com.google.protobuf.empty.Empty
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.atomic.AtomicReference
@@ -36,8 +37,16 @@ class GrpcWalletService(
     with Spanning
     with NamedLogging {
 
-  @SuppressWarnings(Array("org.wartremover.warts.Null"))
-  val validatorParty: AtomicReference[PartyId] = new AtomicReference[PartyId](null)
+  val validatorParty: AtomicReference[Option[PartyId]] = new AtomicReference[Option[PartyId]](None)
+
+  def getValidatorParty: PartyId =
+    validatorParty.get.getOrElse(
+      throw new StatusRuntimeException(
+        Status.FAILED_PRECONDITION.withDescription(
+          "Wallet is not initialized, run wallet.initialize(validatorParty) first"
+        )
+      )
+    )
 
   @nowarn("cat=unused")
   override def list(request: Empty): Future[v0.ListResponse] =
@@ -61,14 +70,14 @@ class GrpcWalletService(
         walletParty <- connection.getPrimaryParty(walletDamlUser)
         quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
         tapCmd = coinRulesCodegen.CoinRules
-          .key(DA.Types.Tuple2(svcParty.toPrim, validatorParty.get.toPrim))
+          .key(DA.Types.Tuple2(svcParty.toPrim, getValidatorParty.toPrim))
           .exerciseCoinRules_Tap(
             walletParty.toPrim,
             walletParty.toPrim,
             quantity,
           )
           .command
-        tx <- connection.submitCommand(Seq(walletParty), Seq(validatorParty.get()), Seq(tapCmd))
+        tx <- connection.submitCommand(Seq(walletParty), Seq(getValidatorParty), Seq(tapCmd))
         coins = DecodeUtil.decodeAllCreated(coinCodegen.Coin)(tx.getTransaction)
         _ = require(
           coins.length == 1,
@@ -117,7 +126,7 @@ class GrpcWalletService(
           .command
         tx <- connection.submitCommand(
           Seq(walletParty),
-          Seq(validatorParty.get()),
+          Seq(getValidatorParty),
           Seq(acceptCommand),
         )
         payments = DecodeUtil.decodeAllCreated(walletCodegen.AcceptedAppPayment)(tx.getTransaction)
@@ -285,7 +294,7 @@ class GrpcWalletService(
           .command
         _ <- connection.submitCommand(
           Seq(walletParty),
-          Seq(validatorParty.get()),
+          Seq(getValidatorParty),
           Seq(cmd),
         )
       } yield Empty()
@@ -401,7 +410,7 @@ class GrpcWalletService(
           .command
         _ <- connection.submitCommand(
           Seq(walletParty),
-          Seq(validatorParty.get()),
+          Seq(getValidatorParty),
           Seq(cmd),
         )
       } yield Empty()
@@ -469,7 +478,7 @@ class GrpcWalletService(
           .valueOr(err => throw err.toAdminError.asGrpcError)
         outputs = request.outputs.map(toOutput)
         cmd = coinRulesCodegen.CoinRules
-          .key(DA.Types.Tuple2(svcParty.toPrim, validatorParty.get.toPrim))
+          .key(DA.Types.Tuple2(svcParty.toPrim, getValidatorParty.toPrim))
           .exerciseCoinRules_Transfer(
             party.toPrim,
             coinRulesCodegen.Transfer(
@@ -482,7 +491,7 @@ class GrpcWalletService(
           .command
         tx <- connection.submitCommand(
           Seq(party),
-          Seq(validatorParty.get()),
+          Seq(getValidatorParty),
           Seq(cmd),
         )
         coins = DecodeUtil.decodeAllCreated(coinCodegen.Coin)(
@@ -498,7 +507,7 @@ class GrpcWalletService(
 
   override def initialize(request: InitializeRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => _ =>
-      validatorParty.set(PartyId.tryFromProtoPrimitive(request.validatorPartyId))
+      validatorParty.set(Some(PartyId.tryFromProtoPrimitive(request.validatorPartyId)))
 
       for {
         _ <- connection.uploadDarFile(
