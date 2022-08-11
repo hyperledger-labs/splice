@@ -12,12 +12,5 @@ dependencies:
   - daml-stdlib
   - daml-script
 data-dependencies: []
-start-navigator: false
-sandbox-options:
-  - -c=canton.conf
 build-options:
   - --target=1.dev
-codegen:
-  js:
-    output-directory: wallet/daml.js
-    npm-scope: daml.js

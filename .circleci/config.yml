@@ -436,6 +436,36 @@ jobs:
            cd experiments/upgrading/approach2
            make test-cc
 
+  splitwise:
+    docker:
+    - image: eclipse-temurin:11
+    environment:
+      <<: *env
+      SDK_VERSION: << pipeline.parameters.sdk-version >>
+    steps:
+      - checkout
+      - run:
+          name: install deps
+          command: |
+            set -eou pipefail
+            curl https://get.daml.com | sh -s $SDK_VERSION
+            printf "auto-install: false\nupdate-check: never\n" >> $HOME/.daml/daml-config.yaml
+            apt-get update && apt-get install -y make
+      - run:
+         name: build canton-coin
+         command: |
+           set -euo pipefail
+           export PATH=$HOME/.daml/bin:$PATH
+           cd canton-coin
+           daml build
+      - run:
+         name: build splitwise
+         command: |
+           set -euo pipefail
+           export PATH=$HOME/.daml/bin:$PATH
+           cd experiments/splitwise
+           daml build
+
   docs:
     docker:
     - image: cimg/base:2021.04
@@ -491,6 +521,8 @@ workflows:
     - upgrading_coin:
         <<: *notify-fail
     - upgrading_coin_2:
+        <<: *notify-fail
+    - splitwise:
         <<: *notify-fail
     # Documentation
     - docs:

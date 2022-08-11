@@ -1,0 +1,12 @@
+sdk-version: 2.4.0-snapshot.20220801.10312.0.d2c7be9d
+name: splitwise
+source: daml
+version: 0.1.0
+dependencies:
+  - daml-prim
+  - daml-stdlib
+  - daml-script
+data-dependencies:
+  - ../../canton-coin/.daml/dist/canton-coin-0.1.0.dar
+build-options:
+  - --target=1.dev

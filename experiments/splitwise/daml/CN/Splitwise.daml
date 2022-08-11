@@ -1,0 +1,284 @@
+module CN.Splitwise where
+
+import DA.Action
+import DA.Map (Map)
+import qualified DA.Map as M
+import DA.Assert
+import DA.Foldable (mapA_)
+import Daml.Script
+import CC.Scripts.Util
+import CN.Wallet
+
+data GroupKey = GroupKey
+  with
+    owner : Party
+    id: GroupId
+  deriving (Show, Eq)
+
+-- | Group id unique per owner
+newtype GroupId = GroupId Text
+  deriving (Show, Eq)
+
+-- | A round identified by a a given GroupKey.
+-- The member ship can change over time by people joining the group
+-- (and eventually leaving but that is not yet implemented).
+-- Balance updates only affect the current members of a group and
+-- are shared with them by them being signatories on the corresponding update.
+-- This ensures that every party can see accurate balances between themselves &
+-- other members but if they joined later, they can not see balances between
+-- two other parties because they miss changes from before they joined.
+template Group
+  with
+    owner : Party
+    svc : Party
+    members : [Party]
+    id: GroupId
+  where
+    signatory owner, members
+    key (GroupKey owner id) : GroupKey
+    maintainer key.owner
+
+    -- We do not provide the ability for the invitee to directly join the group via an open choice,
+    -- as that would make it impossible for the owner to share one link on which many invitees can join.
+    choice Group_Join : ContractId Group
+      with
+        invitee : Party
+      controller owner, invitee
+      do assertMsg "Invitee is not a member" (invitee `notElem` (owner :: members))
+         create this with
+           members = invitee :: members
+
+    nonconsuming choice Group_EnterPayment : ContractId BalanceUpdate
+      with
+        payer : Party
+        quantity : Decimal
+        description : Text
+      controller payer
+      do assertMsg "payer is a member" (payer `elem` (owner :: members))
+         create BalanceUpdate with
+           group = this
+           update = ExternalPayment with
+             payer, quantity, description
+
+    nonconsuming choice Group_InitiateTransfer : ContractId TransferRequest
+      with
+        sender : Party
+        receiver : Party
+        quantity : Decimal
+      controller sender
+      do assertMsg "sender is a member" (sender `elem` (owner :: members))
+         assertMsg "receiver is a member" (sender `elem` (owner :: members))
+         reference <- create TransferInProgress
+           with
+             group = this
+             sender, receiver, quantity
+         create TransferRequest with
+           sender, receiver, svc, quantity, reference = toInterfaceContractId reference
+
+    nonconsuming choice Group_CompleteTransfer : ContractId BalanceUpdate
+      with
+        receiptCid : ContractId TransferReceipt
+        sender : Party
+      controller sender
+      do receipt <- fetch receiptCid
+         archive receiptCid
+         receipt.sender === sender
+         Some (refCid, ref) <- fetchFromInterface @TransferInProgress receipt.reference
+         archive refCid
+         let expectedReceipt = TransferReceipt with
+               sender = ref.sender
+               receiver = ref.receiver
+               quantity = ref.quantity
+               reference = receipt.reference
+         receipt === expectedReceipt
+         -- Check that sender and receiver are both still members.
+         assertMsg "Sender is member" (ref.sender `elem` (owner :: members))
+         assertMsg "Receiver is member" (ref.receiver `elem` (owner :: members))
+         -- Check that this belongs to the right group.
+         key ref.group === key this
+         create BalanceUpdate with
+           group = this
+           update = Transfer with
+             sender = receipt.sender
+             receiver = receipt.receiver
+             quantity = receipt.quantity
+
+template TransferInProgress
+  with
+    group : Group
+    sender : Party
+    receiver : Party
+    quantity : Decimal
+  where
+    signatory group.owner, sender, receiver
+    implements TransferRequestReference where
+      getDescription = "Transfer from " <> show sender <> " to " <> show receiver <> " for " <> show quantity
+
+template BalanceUpdate
+  with
+    group : Group -- The group at the time of the update
+    update : BalanceUpdateType
+  where
+    signatory (signatory group)
+
+data BalanceUpdateType
+  -- | External payment from one person to someone outside of the group.
+  -- These are split equally between the members at that point in time.
+  = ExternalPayment with
+      payer : Party
+      description : Text
+      quantity : Decimal -- Quantity in CC
+      -- TODO Support $ and translate to CC. This needs some refactoring,
+      -- we don’t want direct CoinRules access.
+  -- | Transfer from sender to receiver to reduce their debt.
+  -- Note that it is possible to transfer preemptively before a bill has been submitted.
+  | Transfer with
+      sender : Party
+      receiver : Party
+      quantity : Decimal
+  deriving (Eq, Show)
+
+template GroupInvite
+  with
+    group : Group
+      -- We include the whole group to give users an idea of the group they’re likely to join.
+      -- Note that we don’t validate this though because we want to allow for the group to change
+      -- before the invite is accepted (to reduce contention).
+    observers : [Party]
+  where
+    signatory group.owner
+    observer observers -- workaround for lack of explicit disclosure.
+    nonconsuming choice GroupInvite_Accept : ContractId AcceptedGroupInvite
+      with
+        invitee : Party
+      controller invitee
+      do create AcceptedGroupInvite with
+           groupKey = key group
+           invitee = invitee
+
+template AcceptedGroupInvite
+  with
+    groupKey : GroupKey
+    invitee : Party
+  where
+    signatory groupKey.owner, invitee
+    choice AcceptedGroupInvite_Join : ContractId Group
+      controller groupKey.owner
+      do exerciseByKey @Group groupKey (Group_Join invitee)
+
+createGroup : CCApp -> Party -> Text -> Script (ContractId Group)
+createGroup app p id =
+  submit p $ createCmd Group with
+    owner = p
+    members = []
+    id = GroupId id
+    svc = app.svc
+
+createInvite : Party -> ContractId Group -> [Party] -> Script (ContractId GroupInvite)
+createInvite owner groupCid obs = do
+  Some group <- queryContractId owner groupCid
+  submit owner $ createCmd GroupInvite with
+    group = group
+    observers = obs
+
+acceptInvite : Party -> ContractId GroupInvite ->  Script (ContractId AcceptedGroupInvite)
+acceptInvite invitee inviteCid =
+  submit invitee $ exerciseCmd inviteCid (GroupInvite_Accept invitee)
+
+joinAllInvites : Party -> Script ()
+joinAllInvites owner = do
+  acceptedInvites <- queryFilter @AcceptedGroupInvite owner (\c -> c.groupKey.owner == owner)
+  submit owner $
+    mapA_ (\(cid, _) -> exerciseCmd cid AcceptedGroupInvite_Join) acceptedInvites
+
+-- | Query all balances for the current party in the given group.
+-- Returns a map from parties to their balance in relation to the given party.
+-- Positive: They owe you, negative: you owe them.
+queryBalances : Party -> GroupKey -> Script (Map Party Decimal)
+queryBalances p k = do
+    updates <- queryFilter @BalanceUpdate p (\u -> key u.group == k)
+    pure $ foldl f M.empty (map snd updates)
+  where
+    f acc BalanceUpdate{..} = case update of
+      ExternalPayment {..} ->
+        let split = quantity / intToNumeric (length group.members + 1) -- TODO Make sure nothing gets lost here.
+        in if payer == p
+             then let g acc x
+                        | x == payer = acc
+                        | otherwise = insertWith (+) x split acc
+                  in foldl g acc (group.owner :: group.members)
+             else insertWith (+) payer (-split) acc
+      Transfer {..}
+        | p == sender -> insertWith (+) receiver quantity acc
+        | p == receiver -> insertWith (+) sender (- quantity) acc
+        | otherwise -> acc
+
+-- TODO upstream
+insertWith : Ord k => (v -> v -> v) -> k -> v -> Map k v -> Map k v
+insertWith f k v m =
+  case M.lookup k m of
+    None -> M.insert k v m
+    Some v' -> M.insert k (f v v') m
+
+enterPayment : Party -> GroupKey -> Decimal -> Text -> Script ()
+enterPayment payer k quantity description =
+  void $ submit payer $ exerciseByKeyCmd @Group k Group_EnterPayment with ..
+
+initiateTransfer : Party -> GroupKey -> Party -> Decimal -> Script (ContractId TransferRequest)
+initiateTransfer sender k receiver quantity =
+  submit sender $ exerciseByKeyCmd @Group k Group_InitiateTransfer with ..
+
+completeTransfer : Party -> GroupKey -> ContractId TransferReceipt -> Script ()
+completeTransfer sender k receiptCid =
+  void $ submit sender $ exerciseByKeyCmd @Group k Group_CompleteTransfer with ..
+
+-- TODO: Introduce Install contract that UI acts through.
+test = script do
+  app <- setupApp
+  runNextIssuance app 1.0
+  runCoinDepositBots app
+
+  validator <- setupValidator app "validator1"
+  alice <- setupUser app "alice" validator
+  bob <- setupUser app "bob" validator
+
+  groupCid <- createGroup app alice "group0"
+  groupInviteCid <- createInvite alice groupCid [bob]
+  acceptInvite bob groupInviteCid
+
+  joinAllInvites alice
+
+  Some (_, group) <- queryContractKey @Group alice (GroupKey alice (GroupId "group0"))
+  group.members === [bob]
+
+  balance <- queryBalances alice (key group)
+  balance === M.empty
+  balance <- queryBalances bob (key group)
+  balance === M.empty
+
+  enterPayment alice (key group) 42.0 "foo"
+
+  balance <- queryBalances alice (key group)
+  balance === M.fromList [(bob, 21.0)]
+  balance <- queryBalances bob (key group)
+  balance === M.fromList [(alice, -21.0)]
+
+  enterPayment bob (key group) 22.0 "foo"
+  balance <- queryBalances alice (key group)
+  balance === M.fromList [(bob, 10.0)]
+  balance <- queryBalances bob (key group)
+  balance === M.fromList [(alice, -10.0)]
+
+  request <- initiateTransfer alice (key group) bob 8.0
+  coin <- tap app alice 42.0
+  receipt <- acceptTransferRequest app alice request coin
+  completeTransfer alice (key group) receipt
+
+  balance <- queryBalances alice (key group)
+  balance === M.fromList [(bob, 18.0)]
+  balance <- queryBalances bob (key group)
+  balance === M.fromList [(alice, -18.0)]
+
+  pure ()
+
+
