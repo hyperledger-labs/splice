@@ -6,7 +6,7 @@ import CC.Coin
 import CC.Scripts.Util
 
 testTap: Script ()
-testTap = do 
+testTap = do
     app <- setupApp
     -- start issuing so the SVC has some coins to invite users
     runNextIssuance app 1.0
@@ -16,4 +16,14 @@ testTap = do
     cid <- tap app pat 100.0
     Some coin <- queryContractId @Coin pat cid
     coin.quantity.initialQuantity === 100.0
+    Some (_, coinRules) <- queryCoinRulesByKey app.svc
+    coin.quantity.ratePerRound.rate === coinRules.config.holdingFee.rate
+
+    runNextIssuance app 2.0
+    runCoinDepositBots app
+    cid <- tap app pat 100.0
+    Some coin <- queryContractId @Coin pat cid
+    coin.quantity.initialQuantity === 100.0
+    Some (_, coinRules) <- queryCoinRulesByKey app.svc
+    coin.quantity.ratePerRound.rate === coinRules.config.holdingFee.rate / 2.0
     return ()

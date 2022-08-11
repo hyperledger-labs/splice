@@ -75,10 +75,12 @@ template CoinRules
       controller receiver
       do
         (_, issuanceState) <- fetchByKey @IssuanceState (svc, obs)
-        let expiringQuantity = ExpiringQuantity with
+        (_, openRound) <- fetchByKey @OpenMiningRound (svc, obs, issuanceState.currentRound)
+        let scaledConfig = scaleConfig openRound config
+            expiringQuantity = ExpiringQuantity with
                         initialQuantity = quantity
                         createdAt = issuanceState.currentRound
-                        ratePerRound = config.holdingFee
+                        ratePerRound = scaledConfig.holdingFee
         create Coin with
                   owner = receiver
                   quantity = expiringQuantity
@@ -283,6 +285,9 @@ data TransferResult
   | TransferResultLockedCoin (ContractId LockedCoin)
   deriving (Show, Eq, Ord)
 
+scaleConfig : OpenMiningRound -> CoinConfig -> CoinConfig
+scaleConfig openRound config = scaleFees (1.0 / openRound.coinPrice) config
+
 -- | Execute a transfer.
 --
 executeTransfer : CoinConfig -> Party -> Party -> Transfer -> Update [TransferResult]
@@ -293,7 +298,7 @@ executeTransfer config0 svc validator t = do
   (_, issuanceState) <- fetchByKey @IssuanceState (svc, validator)
   -- check that the current mining round is open
   (_, openRound) <- fetchByKey @OpenMiningRound (svc, validator, issuanceState.currentRound )
-  let config = scaleFees (1.0 / openRound.coinPrice) config0
+  let config = scaleConfig openRound config0
   -- compute summaries
   isum <- summarizeAndConsumeInputs openRound.round config svc t.sender validator t.inputs
   osum <- preprocessAndSummarizeOutputs config t.sender t.outputs
