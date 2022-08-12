@@ -225,6 +225,16 @@ commands:
           path: test-reports
 
 
+  install_daml_dependencies:
+    steps:
+      - run:
+          name: install Daml deps
+          command: |
+            set -eoux pipefail
+            apt-get update && apt-get install -y make curl
+            curl https://get.daml.com | sh -s $SDK_VERSION
+            printf "auto-install: false\nupdate-check: never\n" >> $HOME/.daml/daml-config.yaml
+
 
 parameters:
   sdk-version:
@@ -384,13 +394,7 @@ jobs:
       SDK_VERSION: << pipeline.parameters.sdk-version >>
     steps:
       - checkout
-      - run:
-          name: install deps
-          command: |
-            set -eou pipefail
-            curl https://get.daml.com | sh -s $SDK_VERSION
-            printf "auto-install: false\nupdate-check: never\n" >> $HOME/.daml/daml-config.yaml
-            apt-get update && apt-get install -y make
+      - install_daml_dependencies
       - run:
          name: make all
          command: |
@@ -414,13 +418,7 @@ jobs:
       SDK_VERSION: << pipeline.parameters.sdk-version >>
     steps:
       - checkout
-      - run:
-          name: install deps
-          command: |
-            set -eou pipefail
-            curl https://get.daml.com | sh -s $SDK_VERSION
-            printf "auto-install: false\nupdate-check: never\n" >> $HOME/.daml/daml-config.yaml
-            apt-get update && apt-get install -y make
+      - install_daml_dependencies
       - run:
          name: make all
          command: |
@@ -444,13 +442,7 @@ jobs:
       SDK_VERSION: << pipeline.parameters.sdk-version >>
     steps:
       - checkout
-      - run:
-          name: install deps
-          command: |
-            set -eou pipefail
-            curl https://get.daml.com | sh -s $SDK_VERSION
-            printf "auto-install: false\nupdate-check: never\n" >> $HOME/.daml/daml-config.yaml
-            apt-get update && apt-get install -y make
+      - install_daml_dependencies
       - run:
          name: build canton-coin
          command: |
