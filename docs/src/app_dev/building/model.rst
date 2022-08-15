@@ -1,33 +1,96 @@
 Building and Testing Daml Models
 ================================
 
-* Provide a project template to build an installable third-party application
-* How to integrate with CC wallet for payment and locking CC?
-* How to integrate with directory app?
-* How to integrate against a third-party service?
-* How to test your model?
-* What rights does your app require?
-* How to validate your model?
-* sufficiency of install contract for UIs
-* read_as rights
-* act_as rights
-* third-party service consumers API separate from app workflow APIs
-* estimate of peak create-archive event throughput
-* estimate of peak ACS size
-* Common patterns
-* propose-and-accept via explicit disclosure
-* credit-based payment to guard open choices
-* contract expiry: based on time vs. CC mining rounds
+Getting Started Template
+------------------------
+
+.. todo::
+
+   Provide a project template to build an installable third-party application
+
+Payments and integration with CC Wallet
+---------------------------------------
+
+* Never work against CC directly, instead go through Wallet APIs
+* Each CC write (transfer, locking) must require confirmation through wallet
+
+Integration with Directory App
+------------------------------
+
+* No resolution within Daml, resolve names off-ledger via APIs of directory provider
+* Design Daml models to work with parties not human readable names + resolution
+* If needed, check that resolution is still accurate in transaction by
+  passing in cid of entry & fetch it
+
+
+Integration with Third-Party Services
+-------------------------------------
+
+* Work only against interfaces in the public API
+* If templates are needed as escape hatch, raise an issue with the
+  provider
+
+Testing your Model
+------------------
+
+* Write setup Daml scripts that take dependencies on other services as
+  arguments
+* Use the setup scripts provided by your dependencies to set them up
+* Write integration tests, i.e., ``submit`` s for all parts of your model
+* Write unit tests (tests without ``submit``) for individual functions where they’re non-trivial
+
+Providing an API for other services to integrate with
+-----------------------------------------------------
+
+* Provide a self-contained subset of your API in a separate package as
+  a public API. This subset of the API is the one that users interact
+  with on the write side, e.g., by exercising choices on it. However,
+  note that users still have to audit the rest of the API &
+  implementation for vetting purposes and may want to read some of
+  those contracts.
+
+App Rights
+----------
+
+* App rights defined by choices and tx filter on install contract
+* UIs only write through install contract & read through tx filter
+  defined by install contract.
+
+Validating your Model
+---------------------
+
+* Check that rights of the install contract are sufficient for UIs
+* APIs for internal workflows are separated from APIs provided for consumers
+* Peak create/archive event throughput matches network capabilities & hardware
+* Peak ACS requirement matches hardware
+* All transaction are of bounded size
+* Validate that the information flows given by Daml’s privacy rules
+  are sufficient for a UI to provide information to users and allow
+  them to act while not disclosing too much information.
+
+Common patterns
+---------------
+
+* propose-and-accept where propose is signed by proposer & shared via explicit disclosure
+* credit-based payment to guard open choices. This can act as a form of rate limiting and makes sure the service gets compensated even if people try to absue it.
+* contract expiry: round based expiry usually preferred to make sure it syncs up with core CC changes. Keep in mind that there is no monotonicity check though so if that is an issue, you might want to consider time based expiry (similar to coin locking).
 * receipt contracts and workflow references
-* styleguide
+
+
+styleguide
+----------
 * naming conventions like <template>_<choice>
-* batteries-included modules
-* What anti-patterns to avoid?
-* observers
-* contention
-* unexpirable contracts
-* spam from free open choices
-* stale references to contract-ids
+* module structure, e.g., batteries included modules
+
+
+What anti-patterns to avoid?
+----------------------------
+* Avoid observers since they allow for spam, instead distribute initially via explicit disclosure and then rely on signatories afterwards
+* Avoid contention, in particular contract keys contention. Minimal contention is fine and can be solved by retries
+* Avoid unexpirable contracts, any active contract should be time-limited
+* Avoid free open choice since they allow for spam, instead ensure that there is some cost paid by the actor on-ledger when executing an open choice
+* Avoid contracts with contract id references to archived contracts. Instead prefer references via keys or make sure contracts get updated in sync. If a contract does have a contract id reference, validate its activeness before usage.
 * contention on disclosed contract-ids
-* How to make your model evolvable?
-* How to offer a service integration API?
+
+How to make your model evolvable?
+---------------------------------
