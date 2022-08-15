@@ -41,7 +41,7 @@ function ensure_deployment_context() {
     fi
 }
 
-function cluster_confirm() {
+function cluster_show() {
     ensure_deployment_context
 
     echo "CLOUDSDK_COMPUTE_REGION : ${CLOUDSDK_COMPUTE_REGION}"
@@ -53,6 +53,10 @@ function cluster_confirm() {
     echo "GCP_CLUSTER_NAME        : ${GCP_CLUSTER_NAME}"
 
     echo "CLUSTER_DNS_NAME        : ${CLUSTER_DNS_NAME}"
+}
+
+function cluster_confirm() {
+    cluster_show
 
     _confirm "\nGKE Cluster Operation: $@"
 }
@@ -132,6 +136,39 @@ function cluster_create() {
     cluster_apply
 }
 
+function _check_cluster_grpc_port() {
+    PORT=$1
+
+    _log "Checking gRPC API: $2"
+
+    if ! grpcurl -plaintext ${CLUSTER_DNS_NAME}:${PORT} list > /dev/null; then
+        _error "API not reachable"
+    fi
+}
+
+function _check_cluster_ledger() {
+    if ! CLUSTER_ADDR="${CLUSTER_DNS_NAME}" coin \
+         --config ${REPO_ROOT}/build-tools/cluster-test.conf \
+         --bootstrap ${REPO_ROOT}/build-tools/cluster-test.canton; then
+        _error "Cannot run ledger access test."
+    fi
+}
+
+function cluster_check() {
+    cluster_show
+
+    _check_cluster_grpc_port 5008 "Canton Domain Connection"
+    _check_cluster_grpc_port 5009 "Canton Domain Admin"
+
+    _check_cluster_grpc_port 5001 "Ledger Participant API"
+    _check_cluster_grpc_port 5002 "Ledger Participant Admin API"
+
+    _check_cluster_grpc_port 5005 "SVC App API"
+    _check_cluster_grpc_port 5012 "Scan App API"
+
+    _check_cluster_ledger
+}
+
 function cluster_delete() {
     cluster_confirm "Delete cluster"
 
@@ -206,6 +243,10 @@ case "${SUBCOMMAND_NAME}" in
         cluster_create
         ;;
 
+    check)
+        cluster_check
+        ;;
+
     delete)
         cluster_delete
         ;;
@@ -219,7 +260,7 @@ case "${SUBCOMMAND_NAME}" in
         ;;
 
     *)
-	    _error "Usage: $SCRIPTNAME {activate|apply|create|delete|ipaddr|push}" >&2
+	    _error "Usage: $SCRIPTNAME {activate|apply|create|check|delete|ipaddr|push}" >&2
 	    exit 3
 	    ;;
 esac
