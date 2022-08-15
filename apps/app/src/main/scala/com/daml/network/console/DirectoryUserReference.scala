@@ -27,6 +27,8 @@ class LocalDirectoryUserAppReference(
     with LocalInstanceReference
     with BaseInspection[ParticipantNode] {
 
+  override protected val instanceType = "Directory user"
+
   protected val nodes = consoleEnvironment.environment.directoryUsers
   @Help.Summary("Return directory user app config")
   def config: LocalDirectoryUserAppConfig =

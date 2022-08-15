@@ -31,6 +31,8 @@ class LocalScanAppReference(
     with LocalInstanceReference
     with BaseInspection[ParticipantNode] {
 
+  override protected val instanceType = "Scan"
+
   protected val nodes = consoleEnvironment.environment.scans
   @Help.Summary("Return scan app config")
   override def config: LocalScanAppConfig =

@@ -6,28 +6,42 @@ import com.daml.network.scan.config.LocalScanAppConfig
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
-import com.digitalasset.canton.config.{NodeConfig, TimeoutDuration}
-import com.digitalasset.canton.domain.config.CommunityDomainConfig
-import com.digitalasset.canton.participant.config.CommunityParticipantConfig
+import com.digitalasset.canton.config.{
+  ClientConfig,
+  CommunityAdminServerConfig,
+  NodeConfig,
+  TimeoutDuration,
+}
+import com.digitalasset.canton.domain.config.{CommunityDomainConfig, CommunityPublicServerConfig}
+import com.digitalasset.canton.participant.config.{
+  CommunityParticipantConfig,
+  LedgerApiServerConfig,
+  RemoteParticipantConfig,
+}
 import java.util.UUID
+
 import monocle.macros.syntax.lens._
 
 import scala.concurrent.duration._
 
 object CoinConfigTransforms {
 
+  def makeAllTimeoutsBounded: CoinConfigTransform = {
+    // make unbounded duration bounded for our test
+    _.focus(_.parameters.timeouts.console.unbounded)
+      .replace(TimeoutDuration.tryFromDuration(2.minutes))
+      .focus(_.parameters.timeouts.processing.unbounded)
+      .replace(TimeoutDuration.tryFromDuration(2.minutes))
+      .focus(_.parameters.timeouts.processing.shutdownProcessing)
+      .replace(TimeoutDuration.tryFromDuration(10.seconds))
+  }
+
   /** Default transforms to apply to tests using a [[CoinEnvironmentDefinition]].
     * Covers the primary ways that distinct concurrent environments may unintentionally collide.
     */
   def defaults(context: String): Seq[CoinConfigTransform] = {
     Seq(
-      // make unbounded duration bounded for our test
-      _.focus(_.parameters.timeouts.console.unbounded)
-        .replace(TimeoutDuration.tryFromDuration(2.minutes))
-        .focus(_.parameters.timeouts.processing.unbounded)
-        .replace(TimeoutDuration.tryFromDuration(2.minutes))
-        .focus(_.parameters.timeouts.processing.shutdownProcessing)
-        .replace(TimeoutDuration.tryFromDuration(10.seconds)),
+      makeAllTimeoutsBounded,
       config0 => {
         val suffix = s"${context.toLowerCase}-${UUID.randomUUID()}"
         val config1 = updateSvcConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config0)
@@ -39,9 +53,10 @@ object CoinConfigTransforms {
         val config5 = updateAllDirectoryProviderAppConfigs_(c =>
           c.copy(damlUser = s"${c.damlUser}-$suffix")
         )(config4)
-        val config6 = updateAllDirectoryUserAppConfigs_(c =>
-          c.copy(damlUser = s"${c.damlUser}-$suffix")
-        )(config5)
+        val config6 =
+          updateAllDirectoryUserAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
+            config5
+          )
         config6
       },
     )
@@ -140,4 +155,33 @@ object CoinConfigTransforms {
       update: CommunityParticipantConfig => CommunityParticipantConfig
   ): CoinConfigTransform =
     updateAllParticipantConfigs((_, config) => update(config))
+
+  // Bump ports by 1000 to avoid collisions with the Canton instance started
+  // outside of our tests.
+  def bumpCantonPortsBy1000: CoinConfigTransform = {
+    val domain = updateAllDomainConfigs_(
+      _.focus(_.adminApi).modify(portTransform).focus(_.publicApi).modify(portTransform)
+    )
+    val participant = updateAllParticipantConfigs_(
+      _.focus(_.adminApi).modify(portTransform).focus(_.ledgerApi).modify(portTransform)
+    )
+    val validator = updateAllValidatorConfigs_(_.focus(_.remoteParticipant).modify(portTransform))
+    val wallet = updateAllWalletAppConfigs_(_.focus(_.remoteParticipant).modify(portTransform))
+    val svc = updateSvcConfig(_.focus(_.remoteParticipant).modify(portTransform))
+    val scan = updateCcScanConfig(_.focus(_.remoteParticipant).modify(portTransform))
+
+    domain compose participant compose validator compose wallet compose svc compose scan
+  }
+
+  private def portTransform(c: CommunityAdminServerConfig): CommunityAdminServerConfig =
+    c.copy(internalPort = c.internalPort.map(p => p + 1000))
+  private def portTransform(c: CommunityPublicServerConfig): CommunityPublicServerConfig =
+    c.copy(internalPort = c.internalPort.map(p => p + 1000))
+  private def portTransform(c: ClientConfig): ClientConfig =
+    c.copy(port = c.port + 1000)
+  private def portTransform(c: LedgerApiServerConfig): LedgerApiServerConfig =
+    c.copy(internalPort = c.internalPort.map(p => p + 1000))
+  private def portTransform(c: RemoteParticipantConfig): RemoteParticipantConfig =
+    c.focus(_.adminApi).modify(portTransform).focus(_.ledgerApi).modify(portTransform)
+
 }

@@ -348,7 +348,7 @@ jobs:
           cmd: "Test/compile"
           retry_fetch: "50"
       - execute_sbt_command:
-          cmd: "\"testOnly *RunbookIntegrationTest\""
+          cmd: "\"testOnly *PreflightIntegrationTest\""
           timeout: "10m"
           with_devnet_authentication: true
       - slack/notify:
@@ -550,13 +550,14 @@ workflows:
         requires:
            - deployment_test
            - docker-images-push
-    - preflight_check:
-        <<: *notify-fail
-        <<: *main-branch-only
-        requires:
-          - deployment_test
-          - docker-images-push
-          - deploy_cluster
+      # TODO(i554): Re-enable
+#    - preflight_check:
+#        <<: *notify-fail
+#        <<: *main-branch-only
+#        requires:
+#          - deployment_test
+#          - docker-images-push
+#          - deploy_cluster
 
   manual_preflight_check:
     jobs:

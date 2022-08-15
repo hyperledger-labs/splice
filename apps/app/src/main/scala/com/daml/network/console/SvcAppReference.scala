@@ -96,6 +96,9 @@ class RemoteSvcAppReference(
 ) extends SvcAppReference(consoleEnvironment, name)
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
+
+  override protected val instanceType = "Remote SVC"
+
   @Help.Summary("return remote svc config")
   def config: RemoteSvcAppConfig =
     consoleEnvironment.environment.config.remoteSvcsByString(name)
@@ -110,6 +113,8 @@ class LocalSvcAppReference(
 ) extends SvcAppReference(consoleEnvironment, name)
     with LocalInstanceReference
     with BaseInspection[ParticipantNode] {
+
+  override protected val instanceType = "SVC"
 
   protected val nodes = consoleEnvironment.environment.svcs
 

@@ -38,8 +38,6 @@ abstract class CoinAppReference(
 
   override type InstanceId = ParticipantId
 
-  override protected val instanceType = "Wallet"
-
   override protected val loggerFactory: NamedLoggerFactory =
     consoleEnvironment.environment.loggerFactory.append("Wallet", name)
 

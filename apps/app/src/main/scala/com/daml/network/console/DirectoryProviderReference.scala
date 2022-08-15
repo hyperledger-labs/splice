@@ -31,6 +31,8 @@ abstract class DirectoryProviderAppReference(
 ) extends CoinAppReference(consoleEnvironment, name)
     with BaseInspection[ParticipantNode] {
 
+  override protected val instanceType = "Directory provider"
+
   @Help.Summary("List all DirectoryInstallRequest contracts")
   def listInstallRequests(): Seq[Contract[codegen.DirectoryInstallRequest]] = {
     consoleEnvironment.run {

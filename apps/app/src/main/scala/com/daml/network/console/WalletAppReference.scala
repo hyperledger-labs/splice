@@ -266,6 +266,8 @@ class RemoteWalletAppReference(
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
 
+  override protected val instanceType = "Remote wallet"
+
   @Help.Summary("Return remote wallet config")
   def config: RemoteWalletAppConfig =
     consoleEnvironment.environment.config.remoteWalletsByString(name)
@@ -281,6 +283,8 @@ class LocalWalletAppReference(
 ) extends WalletAppReference(consoleEnvironment, name)
     with LocalInstanceReference
     with BaseInspection[ParticipantNode] {
+
+  override protected val instanceType = "Wallet"
 
   protected val nodes = consoleEnvironment.environment.wallets
 
