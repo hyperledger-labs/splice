@@ -69,7 +69,7 @@ template DirectoryInstall with
            collectionDuration = collectionDuration
            expiresAt = now `addRelTime` acceptDuration
 
-    nonconsuming choice DirectoryInstall_CollectEntryPayment : ()
+    nonconsuming choice DirectoryInstall_CollectEntryPayment : ContractId DirectoryEntry
       with
         acceptedAppPayment : ContractId AcceptedAppPayment
       controller provider
@@ -79,7 +79,6 @@ template DirectoryInstall with
          Some (requestId, request) <- fetchFromInterface @DirectoryEntryRequest reference
          archive requestId
          create request.entry
-         pure ()
 
 -- | A request from a user to a directory service provider for an installation.
 -- Used to mock the actuall installation process until we have

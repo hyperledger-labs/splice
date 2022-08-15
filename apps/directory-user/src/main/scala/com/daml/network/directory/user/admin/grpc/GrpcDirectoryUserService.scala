@@ -55,14 +55,8 @@ class GrpcDirectoryUserService(
         cmd = codegen
           .DirectoryInstallRequest(user = userParty.toPrim, provider = providerParty.toPrim)
           .create
-          .command
-        tx <- connection.submitCommand(Seq(userParty), Seq(), Seq(cmd))
-        requests = DecodeUtil.decodeAllCreated(codegen.DirectoryInstallRequest)(tx.getTransaction)
-        _ = require(
-          requests.length == 1,
-          s"Expected one DirectoryInstallRequest but got ${requests.length} requests $requests",
-        )
-      } yield v0.RequestDirectoryInstallResponse(Proto.encode(requests(0).contractId))
+        requestCid <- connection.submitWithResult(Seq(userParty), Seq(), cmd)
+      } yield v0.RequestDirectoryInstallResponse(Proto.encode(requestCid))
     }
 
   override def requestDirectoryEntry(
@@ -82,13 +76,7 @@ class GrpcDirectoryUserService(
               name = request.name,
             ),
           )
-          .command
-        tx <- connection.submitCommand(Seq(userParty), Seq(), Seq(cmd))
-        requests = DecodeUtil.decodeAllCreated(codegen.DirectoryEntryRequest)(tx.getTransaction)
-        _ = require(
-          requests.length == 1,
-          s"Expected one DirectoryEntryRequest but got ${requests.length} requests $requests",
-        )
-      } yield v0.RequestDirectoryEntryResponse(Proto.encode(requests(0).contractId))
+        requestCid <- connection.submitWithResult(Seq(userParty), Seq(), cmd)
+      } yield v0.RequestDirectoryEntryResponse(Proto.encode(requestCid))
     }
 }

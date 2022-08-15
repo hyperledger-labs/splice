@@ -8,6 +8,7 @@ import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.api.refinements.ApiTypes.{
   ApplicationId,
+  ContractId,
   TemplateId,
   TransactionId,
   WorkflowId,
@@ -16,11 +17,17 @@ import com.daml.ledger.api.v1.commands.Commands.DeduplicationPeriod
 import com.daml.ledger.api.v1.commands.{Command, Commands}
 import com.daml.ledger.api.v1.event.CreatedEvent
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
-import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree}
+import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree, TreeEvent}
 import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
-import com.daml.ledger.api.v1.value.Identifier
+import com.daml.ledger.api.v1.value.{Identifier, Value}
 import com.daml.ledger.client.LedgerClient
-import com.daml.ledger.client.binding.{Contract, Primitive => P, TemplateCompanion}
+import com.daml.ledger.client.binding.{
+  Contract,
+  Primitive => P,
+  TemplateCompanion,
+  Value => CodegenValue,
+  ValueDecoder,
+}
 import com.daml.ledger.client.configuration.{
   CommandClientConfiguration,
   LedgerClientChannelConfiguration,
@@ -51,6 +58,7 @@ import java.util.UUID
 import com.daml.ledger.api.domain.UserRight.CanActAs
 import com.daml.ledger.api.v1.command_service.{
   SubmitAndWaitForTransactionResponse,
+  SubmitAndWaitForTransactionTreeResponse,
   SubmitAndWaitRequest,
 }
 import com.daml.network.util.UploadablePackage
@@ -82,6 +90,14 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       workflowId: Option[WorkflowId] = None,
       deduplicationTime: Option[NonNegativeFiniteDuration] = None,
   )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionResponse]
+  def submitWithResult[T](
+      actAs: Seq[PartyId],
+      readAs: Seq[PartyId],
+      update: P.Update[T],
+      commandId: Option[String] = None,
+      workflowId: Option[WorkflowId] = None,
+      deduplicationTime: Option[NonNegativeFiniteDuration] = None,
+  )(implicit traceContext: TraceContext, decoder: ValueDecoder[T]): Future[T]
 }
 
 /** Subscription for reading the ledger */
@@ -355,6 +371,75 @@ object CoinLedgerConnection {
           .apply(submitCommandOnce(fullCommand), RetryOnRetryableLedgerApiError)
       }
 
+      @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+      override def submitWithResult[T](
+          actAs: Seq[PartyId],
+          readAs: Seq[PartyId],
+          update: P.Update[T],
+          commandId: Option[String] = None,
+          workflowId: Option[WorkflowId] = None,
+          deduplicationTime: Option[NonNegativeFiniteDuration] = None,
+      )(implicit traceContext: TraceContext, decoder: ValueDecoder[T]): Future[T] = {
+        // Note: reusing the same command id for all retries
+        val fullCommand =
+          commandsOf(
+            actAs,
+            readAs,
+            commandId,
+            workflowId.getOrElse(defaultWorkflowId),
+            deduplicationTime,
+            Seq(update.command),
+          )
+
+        implicit val success = com.digitalasset.canton.util.retry.Success.always
+        retry
+          .Backoff(logger, this, maxRetries, 10.millis, 5.second, "submitCommandWithResult")
+          .apply(submitCommandOnceTree(fullCommand), RetryOnRetryableLedgerApiError)
+          .map { case result =>
+            val transaction = result.getTransaction
+            // We limit ourselves to non-batched commands here for simplicity.
+            if (transaction.rootEventIds.size == 1) {
+              val event = transaction.eventsById(transaction.rootEventIds(0))
+              event.kind match {
+                case TreeEvent.Kind.Created(created) =>
+                  // We don’t have enough information here to check that T is a contract id.
+                  // We could try to commit some crimes using Scala reflection & TypeTag
+                  // but in the end this cast seems much simpler and the Scala codegen
+                  // makes Update internal so we can rely on people not making up garbage
+                  // Update values.
+                  ContractId(created.contractId).asInstanceOf[T]
+                case TreeEvent.Kind.Exercised(exercised) =>
+                  CodegenValue
+                    .decode[T](exercised.getExerciseResult)
+                    .getOrElse(
+                      throw new IllegalArgumentException(
+                        s"Executing [$update] produced result [$exercised] of unexpected type."
+                      )
+                    )
+                case TreeEvent.Kind.Empty =>
+                  throw new IllegalArgumentException(s"Unknown tree event kind")
+              }
+            } else {
+              throw new IllegalArgumentException(
+                s"Expected exactly one root event id but got ${transaction.rootEventIds.size}"
+              )
+            }
+          }
+      }
+
+      private def logCommandResult[T](commandId: String, result: Future[T])(implicit
+          traceContext: TraceContext
+      ) =
+        result onComplete { outcome =>
+          outcome.fold(
+            e => logger.error(s"Command [$commandId] failed due to an exception", e),
+            response =>
+              logger.debug(
+                s"Command [$commandId] succeeded"
+              ),
+          )
+        }
+
       private def submitCommandOnce(
           fullCommand: Commands
       )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionResponse] = {
@@ -363,16 +448,19 @@ object CoinLedgerConnection {
         val result = client.commandServiceClient.submitAndWaitForTransaction(
           new SubmitAndWaitRequest(Some(fullCommand))
         )
+        logCommandResult(commandIdA, result)
+        result
+      }
 
-        result onComplete { outcome =>
-          outcome.fold(
-            e => logger.error(s"Command [$commandIdA] failed due to an exception", e),
-            response =>
-              logger.debug(
-                s"Command [$commandIdA] succeeded"
-              ),
-          )
-        }
+      private def submitCommandOnceTree(
+          fullCommand: Commands
+      )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionTreeResponse] = {
+        val commandIdA = fullCommand.commandId
+        logger.debug(s"Submitting command [$commandIdA]")
+        val result = client.commandServiceClient.submitAndWaitForTransactionTree(
+          new SubmitAndWaitRequest(Some(fullCommand))
+        )
+        logCommandResult(commandIdA, result)
         result
       }
 

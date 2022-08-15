@@ -80,15 +80,10 @@ class GrpcDirectoryProviderService(
           acceptDuration = acceptDuration,
         )
         installCid = Proto.tryDecodeContractId[codegen.DirectoryInstallRequest](request.contractId)
-        acceptCmd = installCid.exerciseDirectoryInstallRequest_Accept(partyId.toPrim, arg).command
-        tx <- connection.submitCommand(Seq(partyId), Seq(), Seq(acceptCmd))
-        installs = DecodeUtil.decodeAllCreated(codegen.DirectoryInstall)(tx.getTransaction)
-        _ = require(
-          installs.length == 1,
-          s"Expected accept to create only one install contract but found ${installs.length} installs $installs",
-        )
+        acceptCmd = installCid.exerciseDirectoryInstallRequest_Accept(partyId.toPrim, arg)
+        installCid <- connection.submitWithResult(Seq(partyId), Seq(), acceptCmd)
       } yield {
-        v0.AcceptInstallRequestResponse(Proto.encode(installs(0).contractId))
+        v0.AcceptInstallRequestResponse(Proto.encode(installCid))
       }
     }
 
@@ -127,17 +122,9 @@ class GrpcDirectoryProviderService(
             partyId.toPrim,
             codegen.DirectoryInstall_RequestEntryPayment(entryRequest.contractId),
           )
-          .command
-        tx <- connection.submitCommand(Seq(partyId), Seq(), Seq(cmd))
-        requests = DecodeUtil.decodeAllCreated(walletCodegen.AppPaymentRequest)(
-          tx.getTransaction
-        )
-        _ = require(
-          requests.length == 1,
-          s"Expected requestEntryPayment to create only one payment request contract but found ${requests.length} requests $requests",
-        )
+        requestCid <- connection.submitWithResult(Seq(partyId), Seq(), cmd)
       } yield {
-        v0.RequestEntryPaymentResponse(Proto.encode(requests(0).contractId))
+        v0.RequestEntryPaymentResponse(Proto.encode(requestCid))
       }
     }
 
@@ -158,17 +145,9 @@ class GrpcDirectoryProviderService(
             partyId.toPrim,
             codegen.DirectoryInstall_CollectEntryPayment(acceptedAppPayment.contractId),
           )
-          .command
-        tx <- connection.submitCommand(Seq(partyId), Seq(), Seq(cmd))
-        entries = DecodeUtil.decodeAllCreated(codegen.DirectoryEntry)(
-          tx.getTransaction
-        )
-        _ = require(
-          entries.length == 1,
-          s"Expected collectEntryPayment to create only one entryt contract but found ${entries.length} requests $entries",
-        )
+        entryCid <- connection.submitWithResult(Seq(partyId), Seq(), cmd)
       } yield {
-        v0.CollectEntryPaymentResponse(Proto.encode(entries(0).contractId))
+        v0.CollectEntryPaymentResponse(Proto.encode(entryCid))
       }
     }
 

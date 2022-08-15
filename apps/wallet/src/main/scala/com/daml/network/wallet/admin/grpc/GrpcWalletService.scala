@@ -76,14 +76,8 @@ class GrpcWalletService(
             walletParty.toPrim,
             quantity,
           )
-          .command
-        tx <- connection.submitCommand(Seq(walletParty), Seq(getValidatorParty), Seq(tapCmd))
-        coins = DecodeUtil.decodeAllCreated(coinCodegen.Coin)(tx.getTransaction)
-        _ = require(
-          coins.length == 1,
-          s"Expected tap to create only one coin but found ${coins.length} coins: $coins",
-        )
-      } yield v0.TapResponse(Proto.encode(coins(0).contractId))
+        coinCid <- connection.submitWithResult(Seq(walletParty), Seq(getValidatorParty), tapCmd)
+      } yield v0.TapResponse(Proto.encode(coinCid))
     }
 
   @nowarn("cat=unused")
@@ -123,19 +117,13 @@ class GrpcWalletService(
         )
         acceptCommand = requestCid
           .exerciseAppPaymentRequest_Accept(walletParty.toPrim, arg)
-          .command
-        tx <- connection.submitCommand(
+        paymentCid <- connection.submitWithResult(
           Seq(walletParty),
           Seq(getValidatorParty),
-          Seq(acceptCommand),
-        )
-        payments = DecodeUtil.decodeAllCreated(walletCodegen.AcceptedAppPayment)(tx.getTransaction)
-        _ = require(
-          payments.length == 1,
-          s"Expected accept payment to create only one accepted payment but found ${payments.length} accepted payments: $payments",
+          acceptCommand,
         )
       } yield v0.AcceptAppPaymentRequestResponse(
-        Proto.encode(payments(0).contractId)
+        Proto.encode(paymentCid)
       )
     }
 
@@ -222,21 +210,13 @@ class GrpcWalletService(
             ),
           )
           .create
-          .command
-        tx <- connection.submitCommand(
+        proposalCid <- connection.submitWithResult(
           Seq(walletParty),
           Seq(),
-          Seq(cmd),
-        )
-        proposals = DecodeUtil.decodeAllCreated(walletCodegen.PaymentChannelProposal)(
-          tx.getTransaction
-        )
-        _ = require(
-          proposals.length == 1,
-          s"Expected bare create to create only one proposal, but found ${proposals.length} proposals: $proposals",
+          cmd,
         )
       } yield v0.ProposePaymentChannelResponse(
-        proposalContractId = Proto.encode(proposals(0).contractId)
+        proposalContractId = Proto.encode(proposalCid)
       )
     }
 
@@ -254,21 +234,13 @@ class GrpcWalletService(
         )
         cmd = proposalCid
           .exercisePaymentChannelProposal_Accept(walletParty.toPrim, arg)
-          .command
-        tx <- connection.submitCommand(
+        channelCid <- connection.submitWithResult(
           Seq(walletParty),
           Seq(),
-          Seq(cmd),
-        )
-        channels = DecodeUtil.decodeAllCreated(walletCodegen.PaymentChannel)(
-          tx.getTransaction
-        )
-        _ = require(
-          channels.length == 1,
-          s"Expected accept payment channel proposal to create only one channel, but found ${channels.length} channels: $channels",
+          cmd,
         )
       } yield v0.AcceptPaymentChannelProposalResponse(
-        channelContractId = Proto.encode(channels(0).contractId)
+        channelContractId = Proto.encode(channelCid)
       )
     }
 
@@ -354,21 +326,13 @@ class GrpcWalletService(
         cmd = walletCodegen.PaymentChannel
           .key(DA.Types.Tuple3(senderParty.toPrim, walletParty.toPrim, svcParty.toPrim))
           .exercisePaymentChannel_CreatePaymentRequest(walletParty.toPrim, arg)
-          .command
-        tx <- connection.submitCommand(
+        requestCid <- connection.submitWithResult(
           Seq(walletParty),
           Seq(),
-          Seq(cmd),
-        )
-        requests = DecodeUtil.decodeAllCreated(walletCodegen.OnChannelPaymentRequest)(
-          tx.getTransaction
-        )
-        _ = require(
-          requests.length == 1,
-          s"Expected create payment request to create one requests, but found ${requests.length} requests: $requests",
+          cmd,
         )
       } yield v0.CreateOnChannelPaymentRequestResponse(
-        requestContractId = Proto.encode(requests(0).contractId)
+        requestContractId = Proto.encode(requestCid)
       )
     }
 
@@ -488,18 +452,16 @@ class GrpcWalletService(
               payload = "redistribute",
             ),
           )
-          .command
-        tx <- connection.submitCommand(
+        transferResults <- connection.submitWithResult(
           Seq(party),
           Seq(getValidatorParty),
-          Seq(cmd),
-        )
-        coins = DecodeUtil.decodeAllCreated(coinCodegen.Coin)(
-          tx.getTransaction
+          cmd,
         )
       } yield {
         v0.RedistributeResponse(
-          coins.map(c => Proto.encode(c.contractId))
+          transferResults.collect { case coinRulesCodegen.TransferResult.TransferResultCoin(cid) =>
+            Proto.encode(cid)
+          }
         )
       }
     }
