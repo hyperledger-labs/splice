@@ -12,12 +12,104 @@ import CN.Wallet
 data GroupKey = GroupKey
   with
     owner : Party
+    provider : Party
     id: GroupId
   deriving (Show, Eq)
 
 -- | Group id unique per owner
 newtype GroupId = GroupId Text
   deriving (Show, Eq)
+
+groupMembers : Group -> [Party]
+groupMembers Group{..} = owner :: members
+
+template SplitwiseInstallProposal
+  with
+    provider : Party
+    user : Party
+  where
+    signatory user
+    -- Workaround for lack of explicit disclosure.
+    observer provider
+
+    choice SplitwiseInstallProposal_Accept : ContractId SplitwiseInstall
+      controller provider
+      do create SplitwiseInstall with ..
+
+-- Assert that the given party is the owner of the group.
+-- This is used to avoid leaking authorization from the provider.
+-- A `restrictAuthority` primitive in LF would be very helpful here.
+assertOwner : GroupKey -> Party -> Update ()
+assertOwner k p = do
+  (_, Group {..}) <- fetchByKey @Group k
+  owner === p
+
+template SplitwiseInstall
+  with
+    provider : Party -- in non-provider centric model: provider = user
+    user : Party
+  where
+    signatory user, provider
+    key (user, provider) : (Party, Party)
+    maintainer [key._1, key._2]
+
+    nonconsuming choice SplitwiseInstall_CreateGroup : ContractId Group
+      with group : Group
+      controller user
+      do group.provider === provider
+         group.owner === user
+         create group
+
+    nonconsuming choice SplitwiseInstall_CreateInvite : ContractId GroupInvite
+      with
+        groupKey : GroupKey
+        observers : [Party]
+      controller user
+      do assertOwner groupKey user
+         exerciseByKey @Group groupKey Group_CreateInvite with ..
+
+    nonconsuming choice SplitwiseInstall_AcceptInvite : ContractId AcceptedGroupInvite
+      with
+        cid : ContractId GroupInvite
+      controller user
+      do exercise cid (GroupInvite_Accept user)
+
+    nonconsuming choice SplitwiseInstall_Join : ContractId Group
+      with
+        cid : ContractId AcceptedGroupInvite
+      controller user
+      do groupInvite <- fetch cid
+         assertOwner groupInvite.groupKey user
+         exercise cid AcceptedGroupInvite_Join
+
+    nonconsuming choice SplitwiseInstall_EnterPayment : ContractId BalanceUpdate
+      with
+        groupKey : GroupKey
+        quantity : Decimal
+        description : Text
+      controller user
+      do exerciseByKey @Group groupKey Group_EnterPayment with
+           payer = user
+           ..
+
+    nonconsuming choice SplitwiseInstall_InitiateTransfer : ContractId TransferRequest
+      with
+        groupKey : GroupKey
+        receiver : Party
+        quantity : Decimal
+      controller user
+      do exerciseByKey @Group groupKey Group_InitiateTransfer with
+           sender = user
+           ..
+
+    nonconsuming choice SplitwiseInstall_CompleteTransfer : ContractId BalanceUpdate
+      with
+        groupKey : GroupKey
+        receiptCid : ContractId TransferReceipt
+      controller user
+      do exerciseByKey @Group groupKey Group_CompleteTransfer with
+           sender = user
+           ..
 
 -- | A round identified by a a given GroupKey.
 -- The member ship can change over time by people joining the group
@@ -33,10 +125,17 @@ template Group
     svc : Party
     members : [Party]
     id: GroupId
+    provider : Party -- In non-provider centric model: provider = owner
   where
-    signatory owner, members
-    key (GroupKey owner id) : GroupKey
+    signatory provider, owner, members
+    key (GroupKey owner provider id) : GroupKey
     maintainer key.owner
+
+    nonconsuming choice Group_CreateInvite : ContractId GroupInvite
+      with
+        observers : [Party]
+      controller owner
+      do create GroupInvite with group = this, ..
 
     -- We do not provide the ability for the invitee to directly join the group via an open choice,
     -- as that would make it impossible for the owner to share one link on which many invitees can join.
@@ -44,7 +143,7 @@ template Group
       with
         invitee : Party
       controller owner, invitee
-      do assertMsg "Invitee is not a member" (invitee `notElem` (owner :: members))
+      do assertMsg "Invitee is not a member" (invitee `notElem` groupMembers this)
          create this with
            members = invitee :: members
 
@@ -54,7 +153,7 @@ template Group
         quantity : Decimal
         description : Text
       controller payer
-      do assertMsg "payer is a member" (payer `elem` (owner :: members))
+      do assertMsg "payer is a member" (payer `elem` groupMembers this)
          create BalanceUpdate with
            group = this
            update = ExternalPayment with
@@ -66,8 +165,8 @@ template Group
         receiver : Party
         quantity : Decimal
       controller sender
-      do assertMsg "sender is a member" (sender `elem` (owner :: members))
-         assertMsg "receiver is a member" (sender `elem` (owner :: members))
+      do assertMsg "sender is a member" (sender `elem` groupMembers this)
+         assertMsg "receiver is a member" (receiver `elem` groupMembers this)
          reference <- create TransferInProgress
            with
              group = this
@@ -92,8 +191,8 @@ template Group
                reference = receipt.reference
          receipt === expectedReceipt
          -- Check that sender and receiver are both still members.
-         assertMsg "Sender is member" (ref.sender `elem` (owner :: members))
-         assertMsg "Receiver is member" (ref.receiver `elem` (owner :: members))
+         assertMsg "Sender is member" (ref.sender `elem` groupMembers this)
+         assertMsg "Receiver is member" (ref.receiver `elem` groupMembers this)
          -- Check that this belongs to the right group.
          key ref.group === key this
          create BalanceUpdate with
@@ -166,30 +265,33 @@ template AcceptedGroupInvite
       controller groupKey.owner
       do exerciseByKey @Group groupKey (Group_Join invitee)
 
-createGroup : CCApp -> Party -> Text -> Script (ContractId Group)
-createGroup app p id =
-  submit p $ createCmd Group with
+createInstall : CCApp -> Party -> Party -> Script (ContractId SplitwiseInstall)
+createInstall app user provider = do
+  proposal <- submit user $ createCmd SplitwiseInstallProposal with ..
+  submit provider $ exerciseCmd proposal SplitwiseInstallProposal_Accept
+
+createGroup : CCApp -> Party -> Party -> Text -> Script (ContractId Group)
+createGroup app p provider id =
+  submit p $ exerciseByKeyCmd @SplitwiseInstall (p, provider) $ SplitwiseInstall_CreateGroup Group with
     owner = p
+    provider = provider
     members = []
     id = GroupId id
     svc = app.svc
 
-createInvite : Party -> ContractId Group -> [Party] -> Script (ContractId GroupInvite)
-createInvite owner groupCid obs = do
-  Some group <- queryContractId owner groupCid
-  submit owner $ createCmd GroupInvite with
-    group = group
-    observers = obs
+createInvite : Party -> Party -> GroupKey -> [Party] -> Script (ContractId GroupInvite)
+createInvite owner provider groupKey observers = do
+  submit owner $ exerciseByKeyCmd @SplitwiseInstall (owner, provider) SplitwiseInstall_CreateInvite with ..
 
-acceptInvite : Party -> ContractId GroupInvite ->  Script (ContractId AcceptedGroupInvite)
-acceptInvite invitee inviteCid =
-  submit invitee $ exerciseCmd inviteCid (GroupInvite_Accept invitee)
+acceptInvite : Party -> Party -> ContractId GroupInvite ->  Script (ContractId AcceptedGroupInvite)
+acceptInvite invitee provider inviteCid =
+  submit invitee $ exerciseByKeyCmd @SplitwiseInstall (invitee, provider) (SplitwiseInstall_AcceptInvite inviteCid)
 
-joinAllInvites : Party -> Script ()
-joinAllInvites owner = do
+joinAllInvites : Party -> Party -> Script ()
+joinAllInvites owner provider = do
   acceptedInvites <- queryFilter @AcceptedGroupInvite owner (\c -> c.groupKey.owner == owner)
   submit owner $
-    mapA_ (\(cid, _) -> exerciseCmd cid AcceptedGroupInvite_Join) acceptedInvites
+    mapA_ (\(cid, _) -> exerciseByKeyCmd @ SplitwiseInstall (owner, provider) (SplitwiseInstall_Join cid)) acceptedInvites
 
 -- | Query all balances for the current party in the given group.
 -- Returns a map from parties to their balance in relation to the given party.
@@ -220,20 +322,19 @@ insertWith f k v m =
     None -> M.insert k v m
     Some v' -> M.insert k (f v v') m
 
-enterPayment : Party -> GroupKey -> Decimal -> Text -> Script ()
-enterPayment payer k quantity description =
-  void $ submit payer $ exerciseByKeyCmd @Group k Group_EnterPayment with ..
+enterPayment : Party -> Party -> GroupKey -> Decimal -> Text -> Script ()
+enterPayment payer provider groupKey quantity description =
+  void $ submit payer $ exerciseByKeyCmd @SplitwiseInstall (payer, provider) SplitwiseInstall_EnterPayment with ..
 
-initiateTransfer : Party -> GroupKey -> Party -> Decimal -> Script (ContractId TransferRequest)
-initiateTransfer sender k receiver quantity =
-  submit sender $ exerciseByKeyCmd @Group k Group_InitiateTransfer with ..
+initiateTransfer : Party -> Party -> GroupKey -> Party -> Decimal -> Script (ContractId TransferRequest)
+initiateTransfer sender provider groupKey receiver quantity =
+  submit sender $ exerciseByKeyCmd @SplitwiseInstall (sender, provider) SplitwiseInstall_InitiateTransfer with ..
 
-completeTransfer : Party -> GroupKey -> ContractId TransferReceipt -> Script ()
-completeTransfer sender k receiptCid =
-  void $ submit sender $ exerciseByKeyCmd @Group k Group_CompleteTransfer with ..
+completeTransfer : Party -> Party -> GroupKey -> ContractId TransferReceipt -> Script ()
+completeTransfer sender provider groupKey receiptCid =
+  void $ submit sender $ exerciseByKeyCmd @SplitwiseInstall (sender, provider) SplitwiseInstall_CompleteTransfer with ..
 
--- TODO: Introduce Install contract that UI acts through.
-test = script do
+testSelfHosted = script do
   app <- setupApp
   runNextIssuance app 1.0
   runCoinDepositBots app
@@ -241,14 +342,42 @@ test = script do
   validator <- setupValidator app "validator1"
   alice <- setupUser app "alice" validator
   bob <- setupUser app "bob" validator
+  testCase app Parties with
+    getProvider = identity
+    ..
 
-  groupCid <- createGroup app alice "group0"
-  groupInviteCid <- createInvite alice groupCid [bob]
-  acceptInvite bob groupInviteCid
+testProviderHosted = script do
+  app <- setupApp
+  runNextIssuance app 1.0
+  runCoinDepositBots app
 
-  joinAllInvites alice
+  validator <- setupValidator app "validator1"
+  alice <- setupUser app "alice" validator
+  bob <- setupUser app "bob" validator
+  provider <- setupUser app "provider" validator
+  testCase app Parties with
+    getProvider = const provider
+    ..
 
-  Some (_, group) <- queryContractKey @Group alice (GroupKey alice (GroupId "group0"))
+data Parties = Parties
+  with
+    alice : Party
+    bob : Party
+    getProvider : Party -> Party
+
+testCase : CCApp -> Parties -> Script ()
+testCase app Parties{..} = do
+  createInstall app alice (getProvider alice)
+  createInstall app bob (getProvider bob)
+
+  groupCid <- createGroup app alice (getProvider alice) "group0"
+  let groupKey = GroupKey alice (getProvider alice) (GroupId "group0")
+  groupInviteCid <- createInvite alice (getProvider alice) groupKey [bob]
+  acceptInvite bob (getProvider bob) groupInviteCid
+
+  joinAllInvites alice (getProvider alice)
+
+  Some (_, group) <- queryContractKey @Group alice (GroupKey alice (getProvider alice) (GroupId "group0"))
   group.members === [bob]
 
   balance <- queryBalances alice (key group)
@@ -256,23 +385,23 @@ test = script do
   balance <- queryBalances bob (key group)
   balance === M.empty
 
-  enterPayment alice (key group) 42.0 "foo"
+  enterPayment alice (getProvider alice) (key group) 42.0 "foo"
 
   balance <- queryBalances alice (key group)
   balance === M.fromList [(bob, 21.0)]
   balance <- queryBalances bob (key group)
   balance === M.fromList [(alice, -21.0)]
 
-  enterPayment bob (key group) 22.0 "foo"
+  enterPayment bob (getProvider bob) (key group) 22.0 "foo"
   balance <- queryBalances alice (key group)
   balance === M.fromList [(bob, 10.0)]
   balance <- queryBalances bob (key group)
   balance === M.fromList [(alice, -10.0)]
 
-  request <- initiateTransfer alice (key group) bob 8.0
+  request <- initiateTransfer alice (getProvider alice) (key group) bob 8.0
   coin <- tap app alice 42.0
   receipt <- acceptTransferRequest app alice request coin
-  completeTransfer alice (key group) receipt
+  completeTransfer alice (getProvider alice) (key group) receipt
 
   balance <- queryBalances alice (key group)
   balance === M.fromList [(bob, 18.0)]

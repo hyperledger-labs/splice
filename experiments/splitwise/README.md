@@ -12,9 +12,25 @@ Splitwise is useful for a few reasons:
    also how that differs from providing the same functionality in a
    provider-centric way.
 
+## Provider-Centric vs Non Provider-Centric
+
+### Provider-centric
+
+- Daml model extented with provider field
+- UI hosted by provider
+- Provider is implementation provider on all contracts
+- Install contract signed by user & provider
+
+### Non-provider centric
+
+- Impl provider = group owner
+- Users host UI themselves, UI requires no custom backend, talks
+  directly to ledger/JSON API
+- Install contract signed by user
+
 ## TODO
 
-- [ ] Introduce an `Install` contract that is used exclusively for
+- [x] Introduce an `Install` contract that is used exclusively for
       writes from the UI.
 - [ ] Share balances in group. Currently, you can only see your
       balance to another party but not the balance between two members
@@ -23,9 +39,9 @@ Splitwise is useful for a few reasons:
       `Group` and add a sequence number to both `Group` as well as the
       `BalanceUpdate`s.
 - [ ] Consider how upgrading would work.
-- [ ] Explore changes required for provider-centric vs non-provider centric approach
+- [x] Explore changes required for provider-centric vs non-provider centric approach
 - [ ] Support entering payments in $ with conversion. (maybe non-poc)
 - [ ] Build proper apps. (maybe non-poc)
-- [ ] Think through install flows in detail.
+- [x] Think through install flows in detail.
 - [ ] Add netting to validate the model
 - [ ] Support people leaving a group
