@@ -30,7 +30,7 @@ object CoinUtil extends UploadablePackage {
   lazy val coinEntityName: String = coinTemplateId.entityName
 
   // See `Compile / damlCodeGeneration` in build.sbt
-  lazy val resourcePath: String = "dar/canton-coin.dar"
+  lazy val resourcePath: String = "dar/canton-coin-0.1.0.dar"
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   def tryGetCoinRules(connection: CoinLedgerConnection, validator: PartyId)(implicit

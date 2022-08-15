@@ -27,6 +27,25 @@ object BuildCommon {
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
       )
 
+  lazy val damlCodegenSettings: Seq[Def.Setting[_]] =
+    Seq(Compile / damlCodeGeneration := {
+      val Seq(darFile) = (Compile / damlBuild).value
+      Seq(
+        (
+          darFile,
+          "com.digitalasset.network",
+        )
+      )
+    })
+
+  lazy val copyDarResources: Seq[Def.Setting[_]] =
+    Seq(Compile / resourceGenerators += Def.task {
+      val Seq(srcFile) = (Compile / damlBuild).value
+      val dstFile = (Compile / resourceDirectory).value / "dar" / srcFile.getName()
+      IO.copyFile(srcFile, dstFile)
+      Seq(dstFile)
+    }.taskValue)
+
   lazy val sbtSettings: Seq[Def.Setting[_]] = {
 
     def alsoTest(taskName: String) = s";$taskName; Test / $taskName"
@@ -362,13 +381,15 @@ object BuildCommon {
         //        |com\.digitalasset\.canton\.protobuf\..*
         //      """
         //    ),
-        Compile / damlCodeGeneration := Seq(
-          (
-            (Compile / sourceDirectory).value / "daml" / "CantonExamples",
-            (Compile / damlDarOutput).value / "CantonExamples.dar",
-            "com.digitalasset.canton.examples",
+        Compile / damlCodeGeneration := {
+          val Seq(darFile) = (Compile / damlBuild).value
+          Seq(
+            (
+              darFile,
+              "com.digitalasset.canton.examples",
+            )
           )
-        ),
+        },
         // commented out from Canton OS repo as settings don't apply to us (yet)
         //    addProtobufFilesToHeaderCheck(Compile),
         //    addFilesToHeaderCheck("*.daml", "daml", Compile),
@@ -449,13 +470,13 @@ object BuildCommon {
         //          |com\.digitalasset\.canton\.participant\.protocol\.v0\..*
         //      """
         //      ),
-        Compile / damlCodeGeneration := Seq(
-          (
-            (Compile / sourceDirectory).value / "daml",
-            (Compile / resourceDirectory).value / "dar" / "AdminWorkflows.dar",
-            "com.digitalasset.canton.participant.admin.workflows",
-          )
-        ),
+        Compile / damlCodeGeneration :=
+          Seq(
+            (
+              (Compile / resourceDirectory).value / "dar" / "AdminWorkflows.dar",
+              "com.digitalasset.canton.participant.admin.workflows",
+            )
+          ),
         damlFixedDars := Seq("AdminWorkflows.dar"),
         // commented out from Canton OS repo as settings don't apply to us (yet)
         //      addProtobufFilesToHeaderCheck(Compile),

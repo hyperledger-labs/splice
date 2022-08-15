@@ -7,7 +7,7 @@ dependencies:
   - daml-stdlib
   - daml-script
 data-dependencies:
-- ../../../canton-coin/.daml/dist/canton-coin.dar
-- ../../wallet/daml/.daml/dist/wallet.dar
+- ../../../canton-coin/.daml/dist/canton-coin-0.1.0.dar
+- ../../wallet/daml/.daml/dist/wallet-0.1.0.dar
 build-options:
   - --target=1.dev

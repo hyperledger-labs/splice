@@ -11,5 +11,5 @@ object WalletUtil extends UploadablePackage {
   lazy val packageId: String = walletTemplateId.packageId
 
   // See `Compile / resourceGenerators` in build.sbt
-  lazy val resourcePath: String = "dar/wallet.dar"
+  lazy val resourcePath: String = "dar/wallet-0.1.0.dar"
 }

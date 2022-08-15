@@ -23,7 +23,7 @@ object DamlPlugin extends AutoPlugin {
 
   object autoImport {
     val damlCodeGeneration =
-      settingKey[Seq[(File, File, String)]](
+      taskKey[Seq[(File, String)]](
         "List of tuples (Daml project directory, Daml archive file, name of the generated Java package)"
       )
     val damlSourceDirectory = settingKey[File]("Directory containing daml projects")
@@ -83,13 +83,12 @@ object DamlPlugin extends AutoPlugin {
         val cache = FileFunction.cached(cacheDirectory, FileInfo.hash) { input =>
           settings.flatMap {
             // TODO(soren): Derive project directory automatically from DAR file
-            case (damlProjectDirectory, darFile, packageName) =>
+            case (darFile, packageName) =>
               Seq((Codegen.Scala, scalaOutputDirectory))
                 .flatMap { case (codegen, outputDirectory) =>
                   IO.delete(outputDirectory)
                   generateCode(
                     log,
-                    damlProjectDirectory,
                     darFile,
                     packageName,
                     codegen,
@@ -99,7 +98,7 @@ object DamlPlugin extends AutoPlugin {
                 }
           }.toSet
         }
-        cache(settings.map(_._2).toSet).toSeq
+        cache(settings.map(_._1).toSet).toSeq
       },
       damlBuild := {
         val dependencies = damlDependencies.value
@@ -383,7 +382,9 @@ object DamlPlugin extends AutoPlugin {
     )
 
     val damlProjectName = readDamlYaml(originalDamlProjectFile).get("name").toString
-    val outputDar = outputDirectory / s"$damlProjectName.dar" // TODO(i189) suffix project version
+    val damlProjectVersion = readDamlYaml(originalDamlProjectFile).get("version").toString
+    val outputDar =
+      outputDirectory / s"$damlProjectName-$damlProjectVersion.dar"
     val processLogger = new BufferedLogger
 
     val result = Process(
@@ -488,18 +489,12 @@ object DamlPlugin extends AutoPlugin {
     */
   def generateCode(
       log: Logger,
-      damlProjectDirectory: File,
       darFile: File,
       basePackageName: String,
       language: Codegen,
       managedSourceDir: File,
       damlVersion: String,
   ): Seq[File] = {
-    require(
-      damlProjectDirectory.exists,
-      s"supplied daml project directory must exist [${damlProjectDirectory.absolutePath}]",
-    )
-
     if (!darFile.exists())
       throw new MessageOnlyException(
         s"Codegen asked to generate code from nonexistent file: $darFile"
@@ -535,8 +530,7 @@ object DamlPlugin extends AutoPlugin {
     // run the daml process using the working directory of the daml.yaml project file
     val result = Process(
       "java" :: "-jar" :: codegenJarPath :: s"${darFile.getAbsolutePath}=$packageName" ::
-        s"--output-directory=${managedSourceDir.getAbsolutePath}" :: Nil,
-      damlProjectDirectory,
+        s"--output-directory=${managedSourceDir.getAbsolutePath}" :: Nil
     ) ! processLogger
 
     if (result != 0) {

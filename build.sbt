@@ -76,20 +76,8 @@ lazy val `apps-common` =
       cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
       Test / damlSourceDirectory := file("canton-coin"),
       Compile / damlDarOutput := file("canton-coin") / ".daml" / "dist",
-      Compile / damlCodeGeneration := Seq(
-        (
-          (Compile / damlSourceDirectory).value / "daml" / "CC",
-          (Compile / damlDarOutput).value / "canton-coin.dar",
-          "com.digitalasset.network",
-        )
-      ),
-      Compile / resourceGenerators += Def.task {
-        (Compile / damlBuild).value
-        val srcFile = (Compile / damlDarOutput).value / "canton-coin.dar"
-        val dstFile = (Compile / resourceDirectory).value / "dar" / "canton-coin.dar"
-        IO.copyFile(srcFile, dstFile)
-        Seq(dstFile)
-      }.taskValue,
+      BuildCommon.damlCodegenSettings,
+      BuildCommon.copyDarResources,
     )
 
 lazy val `apps-validator` =
@@ -138,20 +126,8 @@ lazy val `apps-wallet` =
       cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
       Test / damlSourceDirectory := file("apps/wallet/daml"),
       Compile / damlDarOutput := file("apps/wallet/daml") / ".daml" / "dist",
-      Compile / damlCodeGeneration := Seq(
-        (
-          (Compile / damlSourceDirectory).value / "daml",
-          (Compile / damlDarOutput).value / "wallet.dar",
-          "com.digitalasset.network",
-        )
-      ),
-      Compile / resourceGenerators += Def.task {
-        (Compile / damlBuild).value
-        val srcFile = (Compile / damlDarOutput).value / "wallet.dar"
-        val dstFile = (Compile / resourceDirectory).value / "dar" / "wallet.dar"
-        IO.copyFile(srcFile, dstFile)
-        Seq(dstFile)
-      }.taskValue,
+      BuildCommon.damlCodegenSettings,
+      BuildCommon.copyDarResources,
     )
 
 lazy val `apps-directory-provider` =
@@ -170,13 +146,7 @@ lazy val `apps-directory-provider` =
       cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
       Test / damlSourceDirectory := (Compile / damlSourceDirectory).value,
       Compile / damlDarOutput := file("apps/directory-provider/daml") / ".daml" / "dist",
-      Compile / damlCodeGeneration := Seq(
-        (
-          (Compile / damlSourceDirectory).value / "daml",
-          (Compile / damlDarOutput).value / "directory-service.dar",
-          "com.digitalasset.network",
-        )
-      ),
+      BuildCommon.damlCodegenSettings,
     )
 
 lazy val `apps-directory-user` =

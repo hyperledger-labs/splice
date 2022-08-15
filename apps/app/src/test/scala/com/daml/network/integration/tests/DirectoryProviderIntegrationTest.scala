@@ -22,7 +22,8 @@ class DirectoryProviderIntegrationTest
     with CommonCoinAppInstanceReferences {
 
   private val quantity = 100d
-  private val directoryDarPath = "apps/directory-provider/daml/.daml/dist/directory-service.dar"
+  private val directoryDarPath =
+    "apps/directory-provider/daml/.daml/dist/directory-service-0.1.0.dar"
   private val entryName = "mycoolentry"
 
   override def environmentDefinition
