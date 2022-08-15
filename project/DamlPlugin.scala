@@ -86,6 +86,7 @@ object DamlPlugin extends AutoPlugin {
             case (damlProjectDirectory, darFile, packageName) =>
               Seq((Codegen.Scala, scalaOutputDirectory))
                 .flatMap { case (codegen, outputDirectory) =>
+                  IO.delete(outputDirectory)
                   generateCode(
                     log,
                     damlProjectDirectory,
