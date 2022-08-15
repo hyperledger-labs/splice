@@ -15,6 +15,7 @@ import com.digitalasset.canton.console.{
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.network.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
+import com.digitalasset.network.CN.Wallet.PaymentChannel
 import com.digitalasset.network.CN.{Wallet => walletCodegen}
 
 abstract class WalletAppReference(
@@ -93,10 +94,24 @@ abstract class WalletAppReference(
       " Returns the contract-id of the created proposal."
   )
   def proposePaymentChannel(
-      receiver: PartyId
+      receiver: PartyId,
+      replacesChannelId: Option[Primitive.ContractId[PaymentChannel]] = None,
+      allowRequests: Boolean = true,
+      allowOffers: Boolean = true,
+      allowDirectTransfers: Boolean = true,
+      senderTransferFeeRatio: Double = 1.0,
   ): Primitive.ContractId[walletCodegen.PaymentChannelProposal] = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.ProposePaymentChannel(receiver))
+      adminCommand(
+        WalletAppCommands.ProposePaymentChannel(
+          receiver,
+          replacesChannelId,
+          allowRequests,
+          allowOffers,
+          allowDirectTransfers,
+          senderTransferFeeRatio,
+        )
+      )
     }
   }
 

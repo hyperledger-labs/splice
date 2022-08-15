@@ -1,7 +1,9 @@
 module CN.Wallet where
 
 import DA.Action
+import DA.Foldable as F
 import DA.Time
+import DA.Assert
 
 import CC.Coin
 import CC.CoinRules
@@ -64,7 +66,7 @@ template PaymentChannel
         description : Text
       controller receiver
       do
-        assertMsg "Payment requests are not allowed in this channel" allowRequests
+        assertMsg "Payment requests are allowed in this channel" allowRequests
         create OnChannelPaymentRequest with
           sender
           receiver
@@ -73,13 +75,15 @@ template PaymentChannel
           description
           senderTransferFeeRatio
 
-    -- TODO(M1-08): create payment requests, payment offers, allow editing config
+    -- TODO(M1-08): create payment offers
 
 
 template PaymentChannelProposal
   with
-    channel : PaymentChannel
     proposer : Party
+    channel : PaymentChannel
+    -- | Optional reference to an existing channel to replace.
+    replacesChannel : Optional (ContractId PaymentChannel)
   where
     ensure (proposer == channel.sender || proposer == channel.receiver)
     signatory proposer
@@ -89,7 +93,13 @@ template PaymentChannelProposal
 
     choice PaymentChannelProposal_Accept : ContractId PaymentChannel
       controller (if proposer == channel.sender then channel.receiver else channel.sender)
-      do create channel
+      do
+        F.forA_ replacesChannel $ \chId -> do
+          ch <- fetch chId
+          archive chId
+          key ch === key this.channel
+
+        create channel
 
     choice PaymentChannelProposal_Reject : ()
       controller (if proposer == channel.sender then channel.receiver else channel.sender)
@@ -133,7 +143,7 @@ template OnChannelPaymentRequest
         let transfer = Transfer with
               sender
               inputs = inputs
-              outputs = 
+              outputs =
                 [ OutputReceiverCoin with
                     receiver
                     coinType = FixedReceiverCoin

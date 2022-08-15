@@ -10,6 +10,7 @@ import com.daml.network.integration.tests.CoinTests.{
   IsolatedCoinEnvironments,
 }
 import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences, Contract}
+import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.network.DA
@@ -197,6 +198,20 @@ class WalletIntegrationTest
       checkWallet(aliceUserParty, aliceWallet, Seq((29, 30)))
       checkWallet(bobUserParty, bobWallet, Seq((9, 10), (9, 10)))
 
+      aliceWallet.proposePaymentChannel(
+        bobUserParty,
+        Some(aliceWallet.listPaymentChannels().head.contractId),
+        allowDirectTransfers = false,
+      )
+      utils.retry_until_true(bobWallet.listPaymentChannelProposals().size == 1)
+      bobWallet.acceptPaymentChannelProposal(
+        bobWallet.listPaymentChannelProposals().head.contractId
+      )
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        aliceWallet.executeDirectTransfer(bobUserParty, 10, aliceWallet.list().head.contractId),
+        _.errorMessage should include("failed due to an exception"),
+        _.errorMessage should include("Direct transfers are allowed"),
+      )
     }
 
     "list and collect app & validator rewards" in { implicit env =>

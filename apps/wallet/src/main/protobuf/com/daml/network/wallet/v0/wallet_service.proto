@@ -72,6 +72,16 @@ message RejectAppPaymentRequestRequest {
 message ProposePaymentChannelRequest {
   // The party of the receiver.
   string receiver_party_id = 1;
+  // For changing the configuration of the channel - provide the ID of the existing channel to be replaced
+  optional string replaces_channel_id = 2;
+  // Whether to allow payment requests
+  bool allow_requests = 3;
+  // Whether to allow payment offers
+  bool allow_offers = 4;
+  // Whether to allow direct transfers
+  bool allow_direct_transfers = 5;
+  // How to split the transfer fee between the sender and the receiver
+  string sender_transfer_fee_ratio = 6;
 }
 
 message ProposePaymentChannelResponse {

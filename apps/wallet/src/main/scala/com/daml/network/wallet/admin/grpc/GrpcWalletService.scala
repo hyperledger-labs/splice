@@ -202,11 +202,14 @@ class GrpcWalletService(
               sender = walletParty.toPrim,
               receiver = receiver.toPrim,
               svc = svcParty.toPrim,
-              // TODO(M1-07): make channel parameters configurable
-              allowRequests = true,
-              allowOffers = true,
-              allowDirectTransfers = true,
-              senderTransferFeeRatio = 1.0,
+              allowRequests = request.allowRequests,
+              allowOffers = request.allowOffers,
+              allowDirectTransfers = request.allowDirectTransfers,
+              senderTransferFeeRatio =
+                Proto.tryDecode(Proto.BigDecimal)(request.senderTransferFeeRatio),
+            ),
+            replacesChannel = request.replacesChannelId.map(
+              Proto.tryDecodeContractId[walletCodegen.PaymentChannel](_)
             ),
           )
           .create

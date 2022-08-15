@@ -157,7 +157,12 @@ object WalletAppCommands {
   }
 
   case class ProposePaymentChannel(
-      receiver: PartyId
+      receiver: PartyId,
+      replacesChannelId: Option[Primitive.ContractId[walletCodegen.PaymentChannel]],
+      allowRequests: Boolean,
+      allowOffers: Boolean,
+      allowDirectTransfers: Boolean,
+      senderTransferFeeRatio: BigDecimal,
   ) extends BaseCommand[
         v0.ProposePaymentChannelRequest,
         v0.ProposePaymentChannelResponse,
@@ -166,7 +171,14 @@ object WalletAppCommands {
 
     override def createRequest(): Either[String, v0.ProposePaymentChannelRequest] =
       Right(
-        v0.ProposePaymentChannelRequest(Proto.encode(receiver))
+        v0.ProposePaymentChannelRequest(
+          Proto.encode(receiver),
+          replacesChannelId = replacesChannelId.map(Proto.encode(_)),
+          allowRequests = allowRequests,
+          allowOffers = allowOffers,
+          allowDirectTransfers = allowDirectTransfers,
+          senderTransferFeeRatio = Proto.encode(senderTransferFeeRatio),
+        )
       )
 
     override def submitRequest(

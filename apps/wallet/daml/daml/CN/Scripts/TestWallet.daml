@@ -22,6 +22,7 @@ test = script do
   -- setup payment channel
   proposalId <- submit sender $ createCmd PaymentChannelProposal with
     proposer = sender
+    replacesChannel = None
     channel = PaymentChannel with
       sender
       receiver
@@ -35,12 +36,14 @@ test = script do
 
   -- send some CC
   [(coin, _)] <- queryFilter @Coin sender (\c -> c.quantity.initialQuantity > 2.5)
-  let transfer coin =
-        submitMulti [sender] [app.svc] $ exerciseByKeyCmd @PaymentChannel (sender, receiver, app.svc)
+  let exerciseTransfer coin = exerciseByKeyCmd @PaymentChannel (sender, receiver, app.svc)
             PaymentChannel_ExecuteDirectTransfer with
               inputs = [InputCoin coin]
               quantity = 2.0
               payload = "direct transfer test"
+  let transfer coin =
+        submitMulti [sender] [app.svc] $ exerciseTransfer coin
+
   transfer coin
   [(coin, _)] <- queryFilter @Coin sender (\c -> c.quantity.initialQuantity > 2.5)
   transfer coin
@@ -73,5 +76,20 @@ test = script do
   submit receiver $ exerciseCmd paymentRequest OnChannelPaymentRequest_Withdraw
 
 
+  -- disallow transfers
+  proposalId <- submit sender $ createCmd PaymentChannelProposal with
+    proposer = sender
+    replacesChannel = Some channelId
+    channel = PaymentChannel with
+      sender
+      receiver
+      svc = app.svc
+      allowRequests = True
+      allowOffers = True
+      allowDirectTransfers = False
+      senderTransferFeeRatio = 0.0
+
+  channelId <- submit receiver $ exerciseCmd proposalId PaymentChannelProposal_Accept
+  submitMultiMustFail [sender] [app.svc] $ exerciseTransfer coin
 
   pure ()
