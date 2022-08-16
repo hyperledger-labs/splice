@@ -4,7 +4,7 @@ import DA.Action
 import DA.Map (Map)
 import qualified DA.Map as M
 import DA.Assert
-import DA.Foldable (mapA_)
+import DA.Foldable (forA_, mapA_)
 import Daml.Script
 import CC.Scripts.Util
 import CN.Wallet
@@ -111,6 +111,15 @@ template SplitwiseInstall
            sender = user
            ..
 
+    nonconsuming choice SplitwiseInstall_Net : ContractId BalanceUpdate
+      with
+        groupKey : GroupKey
+        balanceChanges : Map Party (Map Party Decimal)
+      controller user
+      do assertOwner groupKey user
+         exerciseByKey @Group groupKey Group_Net with
+           ..
+
 -- | A round identified by a a given GroupKey.
 -- The member ship can change over time by people joining the group
 -- (and eventually leaving but that is not yet implemented).
@@ -202,6 +211,23 @@ template Group
              receiver = receipt.receiver
              quantity = receipt.quantity
 
+    nonconsuming choice Group_Net : ContractId BalanceUpdate
+      with
+        balanceChanges : Map Party (Map Party Decimal) -- Map of Party to map of balance changes for each party. The balance changes for each party must add up to zero.
+      controller owner
+      do forA_ (M.toList balanceChanges) $ \(p, balances) -> do
+           assertMsg (show p <> " is a member of group: " <> show (groupMembers this)) (p `elem` groupMembers this)
+           let total = sum (M.values balances)
+           assertMsg ("Balance change for " <> show p <> " must be 0 but was " <> show total) (total == 0.0)
+           forA_ (M.toList balances) $ \(p', change) -> do
+             -- Note that this also covers the membership change for p'
+             case M.lookup p =<< M.lookup p' balanceChanges of
+               None -> abort $ "No symmetric entry for balance change of " <> show (p, p')
+               Some change' -> assertMsg ("Balance change for " <> show (p, p') <> " must be symmetric: " <> show (change, change')) (change == -change')
+         create BalanceUpdate with
+           group = this
+           update = Netting with balanceChanges
+
 template TransferInProgress
   with
     group : Group
@@ -235,6 +261,14 @@ data BalanceUpdateType
       sender : Party
       receiver : Party
       quantity : Decimal
+  | -- Net the balances between the parties. This allows us to emulate [splitwise simplify debt feature](https://www.splitwise.com/l/sdv/FgPQSo3Bsev).
+    -- E.g., if Alice owes Bob 10CC, and Charlie owes Alice 10CC, we can net that to Charlie owing Bob 10CC.
+    -- Note that we do not enforce that the resulting balances are simpler but we do enforce
+    -- that the total balance of each party stays the same.
+    Netting with
+      balanceChanges : Map Party (Map Party Decimal)
+      -- Map of Party to map of balance changes for each party. The balance changes for each party must add up to zero
+      -- and they must be symmetric: If balance for (a,b) goes up by x, balance for (b, a) must go down by x.
   deriving (Eq, Show)
 
 template GroupInvite
@@ -293,13 +327,18 @@ joinAllInvites owner provider = do
   submit owner $
     mapA_ (\(cid, _) -> exerciseByKeyCmd @ SplitwiseInstall (owner, provider) (SplitwiseInstall_Join cid)) acceptedInvites
 
+net : Party -> Party -> GroupKey -> Map Party (Map Party Decimal) -> Script (ContractId BalanceUpdate)
+net owner provider groupKey balanceChanges =
+  submit owner $ exerciseByKeyCmd @SplitwiseInstall (owner, provider) SplitwiseInstall_Net with ..
+
+
 -- | Query all balances for the current party in the given group.
 -- Returns a map from parties to their balance in relation to the given party.
 -- Positive: They owe you, negative: you owe them.
 queryBalances : Party -> GroupKey -> Script (Map Party Decimal)
 queryBalances p k = do
     updates <- queryFilter @BalanceUpdate p (\u -> key u.group == k)
-    pure $ foldl f M.empty (map snd updates)
+    pure $ M.filter (/= 0.0) $ foldl f M.empty (map snd updates)
   where
     f acc BalanceUpdate{..} = case update of
       ExternalPayment {..} ->
@@ -314,8 +353,11 @@ queryBalances p k = do
         | p == sender -> insertWith (+) receiver quantity acc
         | p == receiver -> insertWith (+) sender (- quantity) acc
         | otherwise -> acc
+      Netting {..} -> case M.lookup p balanceChanges of
+        None -> acc
+        Some changes -> foldl (\acc (p', v) -> insertWith (+) p' v acc) acc (M.toList changes)
 
--- TODO upstream
+-- TODO Remove on next SDK upgrade in favor of upstream implementation.
 insertWith : Ord k => (v -> v -> v) -> k -> v -> Map k v -> Map k v
 insertWith f k v m =
   case M.lookup k m of
@@ -342,6 +384,7 @@ testSelfHosted = script do
   validator <- setupValidator app "validator1"
   alice <- setupUser app "alice" validator
   bob <- setupUser app "bob" validator
+  charlie <- setupUser app "charlie" validator
   testCase app Parties with
     getProvider = identity
     ..
@@ -354,30 +397,38 @@ testProviderHosted = script do
   validator <- setupValidator app "validator1"
   alice <- setupUser app "alice" validator
   bob <- setupUser app "bob" validator
+  charlie <- setupUser app "charlie" validator
   provider <- setupUser app "provider" validator
   testCase app Parties with
     getProvider = const provider
     ..
 
+-- | Parties used in the test.
+-- You can run this in a setting where the provider hosts the app UI.
+-- In that case, the provider party points to the party hosting the app UI.
+-- However, you can also self-host the UI. In that case the provider party points
+-- to the user.
 data Parties = Parties
   with
     alice : Party
     bob : Party
+    charlie : Party
     getProvider : Party -> Party
 
 testCase : CCApp -> Parties -> Script ()
 testCase app Parties{..} = do
   createInstall app alice (getProvider alice)
   createInstall app bob (getProvider bob)
+  createInstall app charlie (getProvider charlie)
 
   groupCid <- createGroup app alice (getProvider alice) "group0"
   let groupKey = GroupKey alice (getProvider alice) (GroupId "group0")
-  groupInviteCid <- createInvite alice (getProvider alice) groupKey [bob]
-  acceptInvite bob (getProvider bob) groupInviteCid
+  groupInviteCid <- createInvite alice (getProvider alice) groupKey [bob, charlie]
 
+  acceptInvite bob (getProvider bob) groupInviteCid
   joinAllInvites alice (getProvider alice)
 
-  Some (_, group) <- queryContractKey @Group alice (GroupKey alice (getProvider alice) (GroupId "group0"))
+  Some (_, group) <- queryContractKey @Group alice groupKey
   group.members === [bob]
 
   balance <- queryBalances alice (key group)
@@ -407,6 +458,34 @@ testCase app Parties{..} = do
   balance === M.fromList [(bob, 18.0)]
   balance <- queryBalances bob (key group)
   balance === M.fromList [(alice, -18.0)]
+
+  acceptInvite charlie (getProvider charlie) groupInviteCid
+  joinAllInvites alice (getProvider alice)
+
+  request <- initiateTransfer charlie (getProvider charlie) (key group) alice 18.0
+  coin <- tap app charlie 20.0
+  receipt <- acceptTransferRequest app charlie request coin
+  completeTransfer charlie (getProvider charlie) (key group) receipt
+
+  balance <- queryBalances alice (key group)
+  balance === M.fromList [(bob, 18.0), (charlie, -18.0)]
+  balance <- queryBalances bob (key group)
+  balance === M.fromList [(alice, -18.0)]
+  balance <- queryBalances charlie (key group)
+  balance === M.fromList [(alice, 18.0)]
+
+  net alice (getProvider alice) (key group) $ M.fromList
+    [ (alice, M.fromList [(bob, -18.0), (charlie, 18.0)])
+    , (bob, M.fromList [(alice, 18.0), (charlie, -18.0)])
+    , (charlie, M.fromList [(alice, -18.0), (bob, 18.0)])
+    ]
+
+  balance <- queryBalances alice (key group)
+  balance === M.empty
+  balance <- queryBalances bob (key group)
+  balance === M.fromList [(charlie, -18.0)]
+  balance <- queryBalances charlie (key group)
+  balance === M.fromList [(bob, 18.0)]
 
   pure ()
 

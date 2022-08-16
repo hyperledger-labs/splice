@@ -38,10 +38,10 @@ Splitwise is useful for a few reasons:
       might have joined later. We could write the initial balances in
       `Group` and add a sequence number to both `Group` as well as the
       `BalanceUpdate`s.
-- [ ] Consider how upgrading would work.
+- [x] Consider how upgrading would work.
 - [x] Explore changes required for provider-centric vs non-provider centric approach
 - [ ] Support entering payments in $ with conversion. (maybe non-poc)
 - [ ] Build proper apps. (maybe non-poc)
 - [x] Think through install flows in detail.
-- [ ] Add netting to validate the model
+- [x] Add netting to validate the model
 - [ ] Support people leaving a group
