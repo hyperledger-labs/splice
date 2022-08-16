@@ -40,6 +40,7 @@ class LocalRunbookIntegrationTest
       )
       .clearConfigTransforms()
       .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy1000(conf))
+      .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpSvcParticipantPortsBy1000(conf))
       .addConfigTransform((_, conf) => remoteScanAddressToLocalhost(conf))
       .addConfigTransform((_, conf) => remoteParticipantAddressToLocalhost(conf))
 

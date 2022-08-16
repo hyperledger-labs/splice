@@ -173,6 +173,20 @@ object CoinConfigTransforms {
     domain compose participant compose validator compose wallet compose svc compose scan
   }
 
+  // Our SVC participant is instance 0 usually. However in our runbook
+  // our users are not exposed to that so we also use 0 for their participant. This
+  // rewrites the SVC ports by an extra 1000 to avoid collisions.
+  def bumpSvcParticipantPortsBy1000: CoinConfigTransform = {
+    val participant = updateAllParticipantConfigs { case (name, conf) =>
+      if (name == "svc_participant") {
+        conf.focus(_.adminApi).modify(portTransform).focus(_.ledgerApi).modify(portTransform)
+      } else conf
+    }
+    val svc = updateSvcConfig(_.focus(_.remoteParticipant).modify(portTransform))
+    val scan = updateCcScanConfig(_.focus(_.remoteParticipant).modify(portTransform))
+    participant compose svc compose scan
+  }
+
   private def portTransform(c: CommunityAdminServerConfig): CommunityAdminServerConfig =
     c.copy(internalPort = c.internalPort.map(p => p + 1000))
   private def portTransform(c: CommunityPublicServerConfig): CommunityPublicServerConfig =
