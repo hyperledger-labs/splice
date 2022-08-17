@@ -116,9 +116,11 @@ object BuildCommon {
   lazy val unusedImportsSetting: Seq[Def.Setting[_]] =
     // Unused imports can be annoying during development so we allow
     // turning them into an info summary.
-    if (sys.env.get("CANTON_DISABLE_UNUSED_IMPORTS") == Some("true"))
+    // Using a file, instead of, e.g., an environment variable because it's not possible to set
+    // custom environment variables for the sbt-shell used by IntelliJ (https://youtrack.jetbrains.com/issue/SCL-19025)
+    if (better.files.File(".disable-unused-warnings").exists)
       Seq(
-        scalacOptions += "-Wconf:cat=unused-imports:is,cat=unused-implicits:is,cat=unused-locals:is"
+        scalacOptions += "-Wconf:cat=unused-imports:is,cat=unused-locals:is,cat=unused-params:is"
       )
     else Seq.empty
 
