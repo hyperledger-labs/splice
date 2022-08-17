@@ -15,6 +15,7 @@ import com.daml.network.integration.{
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens._
+import scala.util.Try
 
 /** Runs through runbook but does so while spinning up a local SVC. */
 class LocalRunbookIntegrationTest
@@ -67,11 +68,21 @@ class LocalRunbookIntegrationTest
   }
 
   "run through runbook against local SVC" in { implicit env =>
-    System.setProperty("DOMAIN_URL", "http://localhost:5008")
+    val propName = "DOMAIN_URL"
+    val prevProperty = System.getProperty(propName)
+    val result = Try {
+      System.setProperty(propName, "http://localhost:5008")
 
-    runScript(svcParticipantPath / "bootstrap.scala")(env.environment)
-    runScript(svcAppPath / "svc.canton")(env.environment)
-    runScript(validatorPath / "validator-participant.canton")(env.environment)
-    runScript(validatorPath / "tap-transfer-demo.canton")(env.environment)
+      runScript(svcParticipantPath / "bootstrap.scala")(env.environment)
+      runScript(svcAppPath / "svc.canton")(env.environment)
+      runScript(validatorPath / "validator-participant.canton")(env.environment)
+      runScript(validatorPath / "tap-transfer-demo.canton")(env.environment)
+    }
+    if (prevProperty == null) {
+      System.clearProperty(propName)
+    } else {
+      System.setProperty(propName, prevProperty)
+    }
+    result.get
   }
 }
