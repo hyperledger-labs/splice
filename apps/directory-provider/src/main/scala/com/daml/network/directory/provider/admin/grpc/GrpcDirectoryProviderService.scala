@@ -1,10 +1,10 @@
 package com.daml.network.directory.provider.admin.grpc
 
 import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.client.binding.{Contract => CodegenContract, Primitive, TemplateCompanion}
+import com.daml.ledger.client.binding.{Primitive, TemplateCompanion, Contract => CodegenContract}
+import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.directory_provider.v0
 import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc
-import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.{Contract, Proto}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -21,7 +21,7 @@ import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcDirectoryProviderService(
-    connection: CoinLedgerConnection,
+    ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
     damlUser: String,
     protected val loggerFactory: NamedLoggerFactory,
@@ -31,6 +31,8 @@ class GrpcDirectoryProviderService(
 ) extends DirectoryProviderServiceGrpc.DirectoryProviderService
     with Spanning
     with NamedLogging {
+
+  private val connection = ledgerClient.connection("GrpcDirectoryProviderService")
 
   // TODO (MK) Make these parameters configurable
   private val entryFee: Primitive.Numeric = 1.0

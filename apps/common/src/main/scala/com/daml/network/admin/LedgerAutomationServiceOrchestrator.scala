@@ -1,16 +1,10 @@
 package com.daml.network.admin
 
-import akka.actor.ActorSystem
-import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
-import com.daml.ledger.client.configuration.CommandClientConfiguration
-import com.daml.network.environment.{CoinLedgerConnection, CoinLedgerSubscription}
+import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinLedgerSubscription}
 import com.digitalasset.canton.lifecycle.FlagCloseableAsync
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.{NoTracing, Spanning, TracerProvider}
+import com.digitalasset.canton.tracing.{NoTracing, Spanning}
 import com.digitalasset.network.CC.CoinRules.CoinRulesRequest
 import io.opentelemetry.api.trace.Tracer
 
@@ -25,14 +19,10 @@ import scala.util.{Failure, Success}
   * Modelled after Canton's [[com.digitalasset.canton.participant.admin.AdminWorkflowServices]].
   */
 abstract class LedgerAutomationServiceOrchestrator(
-    remoteParticipant: RemoteParticipantConfig,
-    protected val loggerFactory: NamedLoggerFactory,
-    tracerProvider: TracerProvider,
+    protected val loggerFactory: NamedLoggerFactory
 )(implicit
     ec: ExecutionContextExecutor,
-    actorSystem: ActorSystem,
     tracer: Tracer,
-    executionSequencerFactory: ExecutionSequencerFactory,
 ) extends FlagCloseableAsync
     with NamedLogging
     with NoTracing
@@ -40,36 +30,19 @@ abstract class LedgerAutomationServiceOrchestrator(
 
   def readAs: PartyId
 
-  protected def createConnection(
-      applicationId: String,
-      workflowId: String,
-  ): (LedgerOffset, CoinLedgerConnection) = {
-    val appId = ApiTypes.ApplicationId(applicationId)
-    val connection = CoinLedgerConnection(
-      remoteParticipant.ledgerApi,
-      appId,
-      maxRetries = 10,
-      ApiTypes.WorkflowId(workflowId),
-      CommandClientConfiguration.default,
-      remoteParticipant.token,
-      timeouts,
-      loggerFactory,
-      tracerProvider,
-    )
-    (timeouts.network.await()(connection.ledgerEnd), connection)
-  }
-
   protected def createService[S <: LedgerAutomationService](
-      applicationId: String
+      serviceName: String,
+      ledgerClient: CoinLedgerClient,
   )(createService: CoinLedgerConnection => S): (CoinLedgerSubscription, S) = {
-    val (offset, connection) = createConnection(applicationId, applicationId)
+    val connection = ledgerClient.connection(serviceName)
+    val offset = timeouts.network.await()(connection.ledgerEnd)
     val service = createService(connection)
     val subscription = connection.subscribeAsync(
-      subscriptionName = applicationId,
+      subscriptionName = serviceName,
       offset,
       filter = CoinLedgerConnection.transactionFilter(readAs, CoinRulesRequest.id),
     )(tx =>
-      withSpan(s"$applicationId.processTransaction") { implicit traceContext => _ =>
+      withSpan(s"$serviceName.processTransaction") { implicit traceContext => _ =>
         service.processTransaction(tx)
       }
     )
@@ -77,11 +50,11 @@ abstract class LedgerAutomationServiceOrchestrator(
     subscription.completed onComplete {
       case Success(_) =>
         logger.debug(
-          s"ledger subscription for SVC automation service [$service] has completed normally"
+          s"ledger subscription for $serviceName [$service] has completed normally"
         )
       case Failure(ex) =>
         logger.warn(
-          s"ledger subscription for SVC automation service [$service] has completed with error",
+          s"ledger subscription for $serviceName [$service] has completed with error",
           ex,
         )
     }

@@ -63,14 +63,13 @@ class SvcAppBootstrap(
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
     val svcStore = SvcAppStore(storage, loggerFactory)
 
-    val connection =
-      createLedgerConnection(config.remoteParticipant, svcAppParameters.processingTimeouts)
+    val ledgerClient =
+      createLedgerClient(config.remoteParticipant, svcAppParameters.processingTimeouts)
 
     val service = new GrpcSvcAppService(
-      connection,
+      ledgerClient,
       config.damlUser,
       loggerFactory,
-      svcAppParameters.processingTimeouts,
     )
 
     adminServerRegistry.addService(
@@ -80,6 +79,8 @@ class SvcAppBootstrap(
       )
     )
 
+    val connection = ledgerClient.connection("SvcAppBootstrap")
+
     val svcApp = for {
       svcPartyId <- connection.getOrAllocateParty(config.damlUser)
       _ = logger.info(s"Allocated SVC party $svcPartyId")
@@ -88,9 +89,8 @@ class SvcAppBootstrap(
       _ = logger.info(s"SVC App is initialized")
       automation = new SvcAutomationService(
         svcPartyId,
-        config.remoteParticipant,
+        ledgerClient,
         loggerFactory,
-        tracerProvider,
         timeouts,
       )
     } yield {

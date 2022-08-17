@@ -4,15 +4,8 @@ import akka.actor.ActorSystem
 import akka.stream.KillSwitches
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
-import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.{GrpcException, GrpcStatus}
-import com.daml.ledger.api.domain.UserRight.CanActAs
 import com.daml.ledger.api.refinements.ApiTypes.{ApplicationId, ContractId, TemplateId, WorkflowId}
-import com.daml.ledger.api.v1.command_service.{
-  SubmitAndWaitForTransactionResponse,
-  SubmitAndWaitForTransactionTreeResponse,
-  SubmitAndWaitRequest,
-}
 import com.daml.ledger.api.v1.commands.Commands.DeduplicationPeriod
 import com.daml.ledger.api.v1.commands.{Command, Commands}
 import com.daml.ledger.api.v1.event.CreatedEvent
@@ -20,7 +13,6 @@ import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
 import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree, TreeEvent}
 import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
 import com.daml.ledger.api.v1.value.Identifier
-import com.daml.ledger.client.LedgerClient
 import com.daml.ledger.client.binding.{
   Contract,
   Primitive => P,
@@ -28,15 +20,7 @@ import com.daml.ledger.client.binding.{
   Value => CodegenValue,
   ValueDecoder,
 }
-import com.daml.ledger.client.configuration.{
-  CommandClientConfiguration,
-  LedgerClientChannelConfiguration,
-  LedgerClientConfiguration,
-  LedgerIdRequirement,
-}
-import com.daml.network.util.UploadablePackage
-import com.digitalasset.canton.concurrent.Threading
-import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.lifecycle.{
@@ -46,7 +30,6 @@ import com.digitalasset.canton.lifecycle.{
   SyncCloseable,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
-import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
@@ -58,13 +41,20 @@ import com.digitalasset.canton.util.retry.RetryUtil.{
   TransientErrorKind,
 }
 import com.digitalasset.canton.util.{AkkaUtil, retry}
-import com.google.protobuf.ByteString
 import io.grpc.StatusRuntimeException
-import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
-import org.slf4j.event.Level
 import scalaz.syntax.tag._
 
 import java.util.UUID
+import com.daml.ledger.api.domain.UserRight.CanActAs
+import com.daml.ledger.api.v1.command_service.{
+  SubmitAndWaitForTransactionResponse,
+  SubmitAndWaitForTransactionTreeResponse,
+  SubmitAndWaitRequest,
+}
+import com.daml.network.util.UploadablePackage
+import com.digitalasset.canton.concurrent.Threading
+import com.google.protobuf.ByteString
+
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success, Try}
@@ -76,7 +66,6 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       readAs: Seq[PartyId],
       command: Seq[Command],
       commandId: Option[String] = None,
-      workflowId: Option[WorkflowId] = None,
       deduplicationTime: Option[NonNegativeFiniteDuration] = None,
   )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionResponse]
   def submitWithResult[T](
@@ -84,7 +73,6 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       readAs: Seq[PartyId],
       update: P.Update[T],
       commandId: Option[String] = None,
-      workflowId: Option[WorkflowId] = None,
       deduplicationTime: Option[NonNegativeFiniteDuration] = None,
   )(implicit traceContext: TraceContext, decoder: ValueDecoder[T]): Future[T]
 }
@@ -171,92 +159,29 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
 
 // Note: this is copied from the Canton LedgerConnection class
 // Differences:
+// - the management of the ledger client is factored out to [[CoinLedgerClient]], such that multiple workflows
+//   can share the same physical connection
 // - it uses the command submission client, and not the command client
 // - it does not retry commands on timeout (that was implemented as an akka flow around the command client)
 // - actAs/readAs parties are specified for each submission, instead of being static for the duration of the connection
 // - there are new methods for interacting with the ledger API (e.g., party/package management)
 object CoinLedgerConnection {
-  def createLedgerClient(
-      applicationId: ApplicationId,
-      config: ClientConfig,
-      commandClientConfiguration: CommandClientConfiguration,
-      logger: TracedLogger,
-      tracerProvider: TracerProvider,
-      token: Option[String] = None,
-  )(implicit
-      ec: ExecutionContextExecutor,
-      tc: TraceContext,
-      executionSequencerFactory: ExecutionSequencerFactory,
-  ): Future[LedgerClient] = {
-    val clientConfig = LedgerClientConfiguration(
-      applicationId = ApplicationId.unwrap(applicationId),
-      ledgerIdRequirement = LedgerIdRequirement(None),
-      commandClient = commandClientConfiguration,
-      token = token,
-    )
-    val clientChannelConfig = LedgerClientChannelConfiguration(
-      sslContext = config.tls.map(x => ClientChannelBuilder.sslContext(x)),
-      // Hard-coding the maximum value (= 2GB).
-      // If a limit is needed, because an application can't handle transactions at that size,
-      // the participants should agree on a lower limit and enforce that through domain parameters.
-      maxInboundMessageSize = Int.MaxValue,
-    )
-
-    val builder = clientChannelConfig
-      .builderFor(config.address, config.port.unwrap)
-      .executor(ec)
-      .intercept(
-        GrpcTracing.builder(tracerProvider.openTelemetry).build().newClientInterceptor()
-      )
-
-    LedgerClient.fromBuilder(builder, clientConfig) recover {
-      case _: StatusRuntimeException | _: java.io.IOException => {
-        // TODO(i447) -- eventually we should drop this and replace with a more robust retry solution
-        logger.error("Failed to instantiate ledger client due to connection failure, exiting...")
-        sys.exit(1)
-      }
-    }
-  }
-
   def apply(
-      clientConfig: ClientConfig,
-      applicationId: ApplicationId,
+      coinLedgerClient: CoinLedgerClient,
       maxRetries: Int,
-      defaultWorkflowId: WorkflowId,
-      commandClientConfiguration: CommandClientConfiguration,
-      token: Option[String],
-      processingTimeouts: ProcessingTimeout,
+      workflowId: WorkflowId,
       loggerFactoryForCoinLedgerConnectionOverride: NamedLoggerFactory,
       tracerProvider: TracerProvider,
-  )(implicit
-      ec: ExecutionContextExecutor,
-      as: ActorSystem,
-      sequencerPool: ExecutionSequencerFactory,
   ): CoinLedgerConnection with NamedLogging =
     new CoinLedgerConnection with NamedLogging {
       protected val loggerFactory: NamedLoggerFactory = loggerFactoryForCoinLedgerConnectionOverride
 
-      override protected def timeouts: ProcessingTimeout = processingTimeouts
-
-      private val client = {
-        import TraceContext.Implicits.Empty._
-        processingTimeouts.unbounded.await(
-          s"Creation of the ledger client",
-          logFailing = Some(Level.WARN),
-        )(
-          createLedgerClient(
-            applicationId,
-            clientConfig,
-            commandClientConfiguration,
-            logger,
-            tracerProvider,
-            token,
-          )
-        )
-      }
-      private val ledgerId = client.ledgerId
-
-      private val transactionClient = client.transactionClient
+      override protected def timeouts: ProcessingTimeout = coinLedgerClient.timeouts
+      private def client = coinLedgerClient.client
+      private def ledgerId = coinLedgerClient.ledgerId
+      private def transactionClient = coinLedgerClient.transactionClient
+      implicit private def ec: ExecutionContextExecutor = coinLedgerClient.executionContextExecutor
+      implicit private def as: ActorSystem = coinLedgerClient.actorSystem
 
       override def ledgerEnd: Future[LedgerOffset] =
         transactionClient.getLedgerEnd().flatMap(response => toFuture(response.offset))
@@ -340,7 +265,6 @@ object CoinLedgerConnection {
           readAs: Seq[PartyId],
           command: Seq[Command],
           commandId: Option[String] = None,
-          workflowId: Option[WorkflowId] = None,
           deduplicationTime: Option[NonNegativeFiniteDuration] = None,
       )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionResponse] = {
         // Note: reusing the same command id for all retries
@@ -349,7 +273,7 @@ object CoinLedgerConnection {
             actAs,
             readAs,
             commandId,
-            workflowId.getOrElse(defaultWorkflowId),
+            workflowId,
             deduplicationTime,
             command,
           )
@@ -366,7 +290,6 @@ object CoinLedgerConnection {
           readAs: Seq[PartyId],
           update: P.Update[T],
           commandId: Option[String] = None,
-          workflowId: Option[WorkflowId] = None,
           deduplicationTime: Option[NonNegativeFiniteDuration] = None,
       )(implicit traceContext: TraceContext, decoder: ValueDecoder[T]): Future[T] = {
         // Note: reusing the same command id for all retries
@@ -375,7 +298,7 @@ object CoinLedgerConnection {
             actAs,
             readAs,
             commandId,
-            workflowId.getOrElse(defaultWorkflowId),
+            workflowId,
             deduplicationTime,
             Seq(update.command),
           )
@@ -464,7 +387,7 @@ object CoinLedgerConnection {
         Commands(
           ledgerId = ledgerId.unwrap,
           workflowId = WorkflowId.unwrap(workflowId),
-          applicationId = ApplicationId.unwrap(applicationId),
+          applicationId = ApplicationId.unwrap(coinLedgerClient.applicationId),
           commandId = commandId.getOrElse(uniqueId),
           actAs = actAs.map(_.toProtoPrimitive),
           readAs = readAs.map(_.toProtoPrimitive),
@@ -497,14 +420,14 @@ object CoinLedgerConnection {
           id: String,
       ): Future[Option[TransactionTree]] =
         client.transactionClient
-          .getTransactionById(id, parties.map(_.toProtoPrimitive), token)
+          .getTransactionById(id, parties.map(_.toProtoPrimitive), coinLedgerClient.token)
           .map { resp =>
             resp.transaction
           }
 
       override def transactionById(parties: Seq[PartyId], id: String): Future[Option[Transaction]] =
         client.transactionClient
-          .getFlatTransactionById(id, parties.map(_.toProtoPrimitive), token)
+          .getFlatTransactionById(id, parties.map(_.toProtoPrimitive), coinLedgerClient.token)
           .map { resp =>
             resp.transaction
           }
@@ -513,7 +436,7 @@ object CoinLedgerConnection {
         val userId = com.daml.lf.data.Ref.UserId.assertFromString(user)
         for {
           user <- client.userManagementClient
-            .getUser(userId, token)
+            .getUser(userId, coinLedgerClient.token)
             .map(Some(_))
             .recover {
               case e: StatusRuntimeException
@@ -545,7 +468,7 @@ object CoinLedgerConnection {
           userLf = com.daml.ledger.api.domain.User(userId, Some(party.toLf))
 
           user <- client.userManagementClient
-            .createUser(userLf, List(CanActAs(party.toLf)), token)
+            .createUser(userLf, List(CanActAs(party.toLf)), coinLedgerClient.token)
           partyId =
             PartyId.tryFromLfParty(
               user.primaryParty
@@ -577,7 +500,7 @@ object CoinLedgerConnection {
               Future.successful(())
             } else {
               logger.debug(s"Uploading dar file ${packageId}")
-              client.packageManagementClient.uploadDarFile(darFile, token)
+              client.packageManagementClient.uploadDarFile(darFile, coinLedgerClient.token)
             }
           }
         } yield ()
@@ -648,7 +571,7 @@ object CoinLedgerConnection {
           subscriptionName: String,
       ): CoinLedgerSubscription =
         new CoinLedgerSubscription {
-          override protected def timeouts: ProcessingTimeout = processingTimeouts
+          override protected def timeouts: ProcessingTimeout = coinLedgerClient.timeouts
           import TraceContext.Implicits.Empty._
           val (killSwitch, completed) = AkkaUtil.runSupervised(
             logger.error("Fatally failed to handle transaction", _),
@@ -684,7 +607,7 @@ object CoinLedgerConnection {
                     Success(Done)
                   case Failure(ex) => Failure(ex)
                 },
-                processingTimeouts.shutdownShort.unwrap,
+                coinLedgerClient.timeouts.shutdownShort.unwrap,
               ),
             )
           }
@@ -694,8 +617,9 @@ object CoinLedgerConnection {
           hint: Option[String],
           displayName: Option[String],
       ): Future[PartyId] =
-        client.partyManagementClient.allocateParty(hint, displayName, token).map { details =>
-          PartyId.tryFromLfParty(details.party)
+        client.partyManagementClient.allocateParty(hint, displayName, coinLedgerClient.token).map {
+          details =>
+            PartyId.tryFromLfParty(details.party)
         }
     }
 

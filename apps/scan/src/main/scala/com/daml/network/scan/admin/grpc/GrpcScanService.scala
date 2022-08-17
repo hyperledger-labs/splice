@@ -1,5 +1,6 @@
 package com.daml.network.scan.admin.grpc
-import com.daml.network.environment.CoinLedgerConnection
+
+import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.v0
 import com.daml.network.scan.v0.ScanServiceGrpc
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -11,7 +12,7 @@ import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcScanService(
-    connection: CoinLedgerConnection,
+    ledgerClient: CoinLedgerClient,
     svcUser: String,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -20,6 +21,8 @@ class GrpcScanService(
 ) extends ScanServiceGrpc.ScanService
     with Spanning
     with NamedLogging {
+
+  private val connection = ledgerClient.connection("GrpcScanService")
 
   @nowarn("cat=unused")
   override def getSvcPartyId(request: Empty): Future[v0.GetSvcPartyIdResponse] =

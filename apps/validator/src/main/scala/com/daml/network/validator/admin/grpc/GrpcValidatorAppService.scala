@@ -1,11 +1,11 @@
 package com.daml.network.validator.admin.grpc
 
 import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionResponse
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CoinLedgerClient
+import com.daml.network.validator.v0._
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.{CoinUtil, Proto}
 import com.daml.network.validator.store.ValidatorAppStore
-import com.daml.network.validator.v0._
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
@@ -16,7 +16,7 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcValidatorAppService(
-    connection: CoinLedgerConnection,
+    ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
     store: ValidatorAppStore,
     validatorUserName: String,
@@ -27,6 +27,8 @@ class GrpcValidatorAppService(
 ) extends ValidatorAppServiceGrpc.ValidatorAppService
     with Spanning
     with NamedLogging {
+
+  private val connection = ledgerClient.connection("GrpcValidatorAppService")
 
   override def initialize(request: Empty): Future[InitializeResponse] =
     withSpanFromGrpcContext("GrpcValidatorAppService") { implicit traceContext => span =>

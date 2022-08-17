@@ -63,8 +63,8 @@ class WalletAppBootstrap(
     EitherT.rightT[Future, String] {
       val dummyStore = WalletAppStore(storage, loggerFactory)
 
-      val connection =
-        createLedgerConnection(config.remoteParticipant, walletAppParameters.processingTimeouts)
+      val ledgerClient =
+        createLedgerClient(config.remoteParticipant, walletAppParameters.processingTimeouts)
 
       val scanConnection: ScanConnection =
         new ScanConnection(
@@ -75,7 +75,7 @@ class WalletAppBootstrap(
 
       adminServerRegistry.addService(
         WalletServiceGrpc.bindService(
-          new GrpcWalletService(connection, scanConnection, config.damlUser, loggerFactory),
+          new GrpcWalletService(ledgerClient, scanConnection, config.damlUser, loggerFactory),
           executionContext,
         )
       )

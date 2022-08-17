@@ -1,11 +1,12 @@
 package com.daml.network.validator
 
+import java.util.concurrent.ScheduledExecutorService
 import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerConnection, CoinNodeBootstrapBase}
+import com.daml.network.environment.{CoinLedgerClient, CoinNodeBootstrapBase}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
 import com.daml.network.validator.config.LocalValidatorAppConfig
@@ -22,7 +23,6 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource._
 import com.digitalasset.canton.time._
 
-import java.util.concurrent.ScheduledExecutorService
 import scala.annotation.nowarn
 import scala.concurrent.Future
 
@@ -63,8 +63,8 @@ class ValidatorAppBootstrap(
     EitherT.rightT[Future, String] {
       val dummyStore = ValidatorAppStore(storage, loggerFactory)
 
-      val connection: CoinLedgerConnection =
-        createLedgerConnection(config.remoteParticipant, validatorAppParameters.processingTimeouts)
+      val ledgerClient: CoinLedgerClient =
+        createLedgerClient(config.remoteParticipant, validatorAppParameters.processingTimeouts)
 
       val scanConnection: ScanConnection =
         new ScanConnection(
@@ -76,7 +76,7 @@ class ValidatorAppBootstrap(
       adminServerRegistry.addService(
         ValidatorAppServiceGrpc.bindService(
           new GrpcValidatorAppService(
-            connection,
+            ledgerClient,
             scanConnection,
             dummyStore,
             config.damlUser,

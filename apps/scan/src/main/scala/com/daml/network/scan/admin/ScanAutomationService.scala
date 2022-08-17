@@ -1,15 +1,12 @@
 package com.daml.network.scan.admin
 
-import akka.actor.ActorSystem
-import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.LedgerAutomationServiceOrchestrator
+import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.store.ScanTransferStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContextExecutor
@@ -18,21 +15,16 @@ import scala.concurrent.ExecutionContextExecutor
   */
 class ScanAutomationService(
     svcParty: PartyId,
-    remoteParticipant: RemoteParticipantConfig,
+    ledgerClient: CoinLedgerClient,
     loggerFactory: NamedLoggerFactory,
-    tracerProvider: TracerProvider,
     processingTimeouts: ProcessingTimeout,
     store: ScanTransferStore,
 )(implicit
     ec: ExecutionContextExecutor,
-    actorSystem: ActorSystem,
     tracer: Tracer,
-    executionSequencerFactory: ExecutionSequencerFactory,
-) extends LedgerAutomationServiceOrchestrator(remoteParticipant, loggerFactory, tracerProvider)(
+) extends LedgerAutomationServiceOrchestrator(loggerFactory)(
       ec,
-      actorSystem,
       tracer,
-      executionSequencerFactory,
     ) {
   override protected def timeouts: ProcessingTimeout = processingTimeouts
 
@@ -40,7 +32,7 @@ class ScanAutomationService(
 
   val (coinFlatStreamSubscription, readCcTransfersService) =
     // TODO(Arne): the subscription here should read from ledger start
-    createService("ScanReadCcTransfersService") { connection =>
+    createService("ScanReadCcTransfersService", ledgerClient) { connection =>
       new ReadCcTransfersService(svcParty, connection, store, loggerFactory)
     }
 

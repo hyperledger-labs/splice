@@ -1,7 +1,7 @@
 package com.daml.network.wallet.admin.grpc
 
 import cats.implicits._
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.{Contract, Proto, Value}
 import com.daml.network.wallet.util.WalletUtil
@@ -22,7 +22,7 @@ import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcWalletService(
-    connection: CoinLedgerConnection,
+    ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
     walletDamlUser: String,
     protected val loggerFactory: NamedLoggerFactory,
@@ -32,6 +32,8 @@ class GrpcWalletService(
 ) extends WalletServiceGrpc.WalletService
     with Spanning
     with NamedLogging {
+
+  private val connection = ledgerClient.connection("GrpcWalletService")
 
   val validatorParty: AtomicReference[Option[PartyId]] = new AtomicReference[Option[PartyId]](None)
 

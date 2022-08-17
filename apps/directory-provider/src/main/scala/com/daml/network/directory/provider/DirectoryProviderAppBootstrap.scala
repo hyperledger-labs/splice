@@ -63,8 +63,8 @@ class DirectoryProviderAppBootstrap(
     EitherT.rightT[Future, String] {
       val dummyStore = DirectoryProviderAppStore(storage, loggerFactory)
 
-      val connection =
-        createLedgerConnection(
+      val ledgerClient =
+        createLedgerClient(
           config.remoteParticipant,
           directoryProviderAppParameters.processingTimeouts,
         )
@@ -79,7 +79,7 @@ class DirectoryProviderAppBootstrap(
       adminServerRegistry.addService(
         DirectoryProviderServiceGrpc.bindService(
           new GrpcDirectoryProviderService(
-            connection,
+            ledgerClient,
             scanConnection,
             config.damlUser,
             loggerFactory,

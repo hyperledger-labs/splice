@@ -1,8 +1,9 @@
 package com.daml.network.directory.user.admin.grpc
+
+import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.directory.provider.admin.api.client.DirectoryProviderConnection
 import com.daml.network.directory_user.v0
 import com.daml.network.directory_user.v0.DirectoryUserServiceGrpc
-import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.util.Proto
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
@@ -11,11 +12,11 @@ import com.digitalasset.network.DA
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.duration.Duration
 import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.duration.Duration
 
 class GrpcDirectoryUserService(
-    connection: CoinLedgerConnection,
+    ledgerClient: CoinLedgerClient,
     providerConnection: DirectoryProviderConnection,
     damlUser: String,
     protected val loggerFactory: NamedLoggerFactory,
@@ -25,6 +26,8 @@ class GrpcDirectoryUserService(
 ) extends DirectoryUserServiceGrpc.DirectoryUserService
     with Spanning
     with NamedLogging {
+
+  private val connection = ledgerClient.connection("GrpcDirectoryUserService")
 
   private val grpcTimeout = Duration.Inf
 

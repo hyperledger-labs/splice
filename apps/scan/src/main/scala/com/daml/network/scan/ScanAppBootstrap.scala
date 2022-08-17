@@ -1,7 +1,6 @@
 package com.daml.network.scan
 
 import java.util.concurrent.ScheduledExecutorService
-
 import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either._
@@ -67,13 +66,13 @@ class ScanAppBootstrap(
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
     val transferStore = ScanTransferStore(storage, loggerFactory)
-    val connection =
-      createLedgerConnection(
+    val ledgerClient =
+      createLedgerClient(
         config.remoteParticipant,
         scanAppParameters.processingTimeouts,
       )
 
-    val scanServiceGrpc = new GrpcScanService(connection, config.svcUser, loggerFactory)
+    val scanServiceGrpc = new GrpcScanService(ledgerClient, config.svcUser, loggerFactory)
     adminServerRegistry.addService(
       ScanServiceGrpc.bindService(
         scanServiceGrpc,
@@ -95,9 +94,8 @@ class ScanAppBootstrap(
       )
       scanAutomationService = new ScanAutomationService(
         svcParty,
-        config.remoteParticipant,
+        ledgerClient,
         loggerFactory,
-        tracerProvider,
         timeouts,
         transferStore,
       )

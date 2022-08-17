@@ -208,16 +208,14 @@ abstract class CoinNodeBootstrapBase[
   }
 
   // configuration mostly copied from Canton
-  protected def createLedgerConnection(
+  protected def createLedgerClient(
       remoteParticipant: RemoteParticipantConfig,
       processingTimeout: ProcessingTimeout,
   )(implicit
       sequencerPool: ExecutionSequencerFactory
-  ): CoinLedgerConnection = CoinLedgerConnection(
+  ): CoinLedgerClient = CoinLedgerClient(
     remoteParticipant.ledgerApi,
     ApiTypes.ApplicationId(name.unwrap),
-    10,
-    ApiTypes.WorkflowId(name.unwrap),
     CommandClientConfiguration.default, // We use the command submission client instead of the command client
     remoteParticipant.token,
     processingTimeout,
