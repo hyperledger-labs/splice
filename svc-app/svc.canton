@@ -1,4 +1,0 @@
-// NOTE: adapted from apps/app/src/pack/examples/svc
-
-// Create parties and set up some initial contracts
-val svcParty = `svc-app`.initialize()

@@ -40,6 +40,10 @@ trait CoinNodeBootstrap[+Node <: CantonNode]
   def isInitialized: Boolean
   def start(): EitherT[Future, String, Unit]
 
+  /** This function assumes that all configured remote Canton participants are already initialized
+    * and connected to at least one domain. This is necessary because the initialization of some CN apps needs to
+    * interact with a Ledger API, e.g., to allocate a party or user.
+    */
   def initialize: EitherT[Future, String, Unit]
 
   def getNode: Option[Node]

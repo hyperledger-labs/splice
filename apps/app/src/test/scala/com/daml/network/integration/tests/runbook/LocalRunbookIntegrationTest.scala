@@ -45,6 +45,21 @@ class LocalRunbookIntegrationTest
       .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpSvcParticipantPortsBy1000(conf))
       .addConfigTransform((_, conf) => remoteScanAddressToLocalhost(conf))
       .addConfigTransform((_, conf) => remoteParticipantAddressToLocalhost(conf))
+      .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
+      .withSetup(env => {
+        import env._
+        // It is not possible to start an environment definition that contains Canton components CN components with
+        // automatic start in integration tests
+        // This is because the SVC app `start` call relies on the Canton participants already being connected to a domain
+        // However, when automatic start is enabled it is currently impossible to connect participants to a domain
+        // until all other nodes defined the configuration are already started
+        // For this reason, we (1) first start the Canton nodes...
+        Seq(domains.local, participants.local).flatten.foreach(_.start())
+        // ... (2) connect the SVC participant to the SVC domain...
+        p("svc_participant").domains.connect_local(d("svc_domain"))
+        // ... (3) only then start the rest of the nodes
+        nodes.local.foreach(_.start())
+      })
 
   private def remoteScanAddressToLocalhost: CoinConfigTransform = {
     CoinConfigTransforms.updateAllValidatorConfigs_(
@@ -72,10 +87,9 @@ class LocalRunbookIntegrationTest
     val propName = "DOMAIN_URL"
     val prevProperty = System.getProperty(propName)
     val result = Try {
-      System.setProperty(propName, "http://localhost:5008")
+      System.setProperty(propName, "http://localhost:6008")
 
       runScript(svcParticipantPath / "bootstrap.scala")(env.environment)
-      runScript(svcAppPath / "svc.canton")(env.environment)
       runScript(validatorPath / "validator-participant.canton")(env.environment)
       runScript(validatorPath / "tap-transfer-demo.canton")(env.environment)
     }

@@ -11,10 +11,13 @@ import com.daml.network.console.{
   RemoteWalletAppReference,
 }
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
+import com.digitalasset.canton.topology.PartyId
 
 // TODO(Arne): these should eventually be defined analogue to Canton's `participant1` references etc
 // however, likely only possible once Canton is dependent on like a full library
 trait CommonCoinAppInstanceReferences {
+
+  def svcParty(implicit env: CoinTestConsoleEnvironment): PartyId = scan.getSvcPartyId()
 
   def svc(implicit env: CoinTestConsoleEnvironment): LocalSvcAppReference = env.svcOpt.getOrElse(
     sys.error("Tried to access the SVC app but it isn't defined in the test's configuration file")

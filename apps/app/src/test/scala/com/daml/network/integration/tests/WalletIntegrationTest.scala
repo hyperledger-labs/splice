@@ -44,7 +44,6 @@ class WalletIntegrationTest
 
   "A wallet" should {
     "allow calling tap and then list the created coins - locally and remotely" in { implicit env =>
-      svc.initialize()
       val aliceValidatorParty = aliceValidator.initialize()
       // TODO(Arne): consider adding synchronization 'wait-for-participant-x' to this command
       val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
@@ -68,7 +67,6 @@ class WalletIntegrationTest
     }
 
     "allow a user to create, list, and reject payment requests" in { implicit env =>
-      val svcParty = svc.initialize()
       val aliceValidatorParty = aliceValidator.initialize()
       // TODO(M1-90 Backlog): consider adding synchronization 'wait-for-participant-x' to this command
       val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
@@ -117,8 +115,6 @@ class WalletIntegrationTest
 
     "allow two users to create a payment channel and use it for a transfer" in { implicit env =>
       import env._
-
-      svc.initialize()
 
       // Onboard alice on her self-hosted validator
       val aliceValidatorParty = aliceValidator.initialize()
@@ -213,8 +209,6 @@ class WalletIntegrationTest
     }
 
     "list and collect app & validator rewards" in { implicit env =>
-      val svcParty = svc.initialize()
-
       // Onboard alice on her self-hosted validator
       val validatorParty = aliceValidator.initialize()
       val aliceParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
@@ -276,7 +270,6 @@ class WalletIntegrationTest
   }
 
   "fails with an understandable error when not initialized" in { implicit env =>
-    svc.initialize()
     aliceValidator.initialize()
     aliceValidator.onboardUser(aliceWallet.config.damlUser)
     assertThrowsAndLogsCommandFailures(

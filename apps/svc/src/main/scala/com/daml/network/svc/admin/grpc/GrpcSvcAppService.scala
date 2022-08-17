@@ -4,13 +4,11 @@ import cats.implicits._
 import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionResponse
 import com.daml.ledger.client.binding.{Contract, Primitive, TemplateCompanion}
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.svc.admin.SvcAutomationService
 import com.daml.network.svc.v0
 import com.daml.network.svc.v0.SvcServiceGrpc
 import com.daml.network.util.{CoinUtil, Proto}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.ledger.api.client.{DecodeUtil, LedgerConnection}
-import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
@@ -24,36 +22,15 @@ class GrpcSvcAppService(
     connection: CoinLedgerConnection,
     svcUserName: String,
     protected val loggerFactory: NamedLoggerFactory,
-    svcAutomationConstructor: PartyId => SvcAutomationService,
-    override val timeouts: ProcessingTimeout,
+    timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends SvcServiceGrpc.SvcService
     with Spanning
-    with NamedLogging
-    with FlagCloseableAsync {
+    with NamedLogging {
 
   import GrpcSvcAppService._
-
-  override def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
-    SyncCloseable("svcAutomation", svcAutomation.foreach(_.close()))
-  )
-
-  @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  var svcAutomation: Option[SvcAutomationService] = None
-
-  override def initialize(request: Empty): Future[v0.InitializeResponse] =
-    withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
-      for {
-        svcPartyId <- connection.getOrAllocateParty(svcUserName)
-        _ <- connection.uploadDarFile(CoinUtil) // TODO(i353) move away from dar upload during init
-        _ <- CoinUtil.setupApp(svcPartyId, connection)
-        _ = logger.info(s"App is initialized")
-        _ = svcAutomation = Some(svcAutomationConstructor(svcPartyId))
-      } yield v0.InitializeResponse(svcPartyId.toProtoPrimitive)
-    }
-
   // TODO(M1-90): This should not run concurrently with round management operations.
   // Both are non-atomic read-modify-write operations on the set of mining rounds.
   override def acceptValidators(request: Empty): Future[Empty] =

@@ -5,7 +5,7 @@ include ../build-tools/docker.mk
 .PHONY: all
 all: docker-build
 
-src := Dockerfile svc.canton svc.conf
+src := Dockerfile svc.conf
 build_arg := --build-arg base_version=$(shell version-gen)
 
 .PHONY: build

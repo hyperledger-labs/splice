@@ -27,7 +27,6 @@ class SvcIntegrationTest
   "round management" in { implicit env =>
     import env._
     val coinPrice: BigDecimal = 23.0
-    val svcParty = svc.initialize()
     aliceValidator.initialize()
 
     // Sync with background automation that onboards validator.
@@ -69,7 +68,6 @@ class SvcIntegrationTest
   }
 
   "total burn calculation" in { implicit env =>
-    val svcParty = svc.initialize()
     // 3 app rewards & 3 validator rewards, 2 of each for round 0 and one for round 1
     // to check we sum up but only for the right round.
     val rewards = Seq(

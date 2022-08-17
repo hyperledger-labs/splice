@@ -34,7 +34,6 @@ class DirectoryProviderIntegrationTest
     "list and accept install requests" in { implicit env =>
       import env._
 
-      svc.initialize()
       // The validator operator of the user of the directory service.
       val aliceValidatorParty = aliceValidator.initialize()
       // The provider of the directory service

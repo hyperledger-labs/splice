@@ -3,6 +3,7 @@ package com.daml.network.scan.admin
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.admin.LedgerAutomationServiceOrchestrator
+import com.daml.network.scan.store.ScanTransferStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -21,6 +22,7 @@ class ScanAutomationService(
     loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
     processingTimeouts: ProcessingTimeout,
+    store: ScanTransferStore,
 )(implicit
     ec: ExecutionContextExecutor,
     actorSystem: ActorSystem,
@@ -39,7 +41,7 @@ class ScanAutomationService(
   val (coinFlatStreamSubscription, readCcTransfersService) =
     // TODO(Arne): the subscription here should read from ledger start
     createService("ScanReadCcTransfersService") { connection =>
-      new ReadCcTransfersService(connection, loggerFactory)
+      new ReadCcTransfersService(svcParty, connection, store, loggerFactory)
     }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq[AsyncOrSyncCloseable](

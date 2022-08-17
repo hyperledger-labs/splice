@@ -18,14 +18,7 @@ abstract class SvcAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
 ) extends CoinAppReference(consoleEnvironment, name) {
-  @Help.Summary("Initialize the SVC app. ")
-  def initialize(): PartyId = {
-    consoleEnvironment.run {
-      adminCommand(SvcAppCommands.Initialize())
-    }
-  }
 
-  //
   @deprecated(
     "This is now automated in SvcAutomationService. We only still have it in case it may be useful.",
     since = "since automation was introduced",

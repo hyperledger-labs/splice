@@ -12,6 +12,7 @@ import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.svc.metrics.SvcAppMetrics
 import com.daml.network.svc.store.SvcAppStore
 import com.daml.network.svc.v0.SvcServiceGrpc
+import com.daml.network.util.CoinUtil
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -21,7 +22,6 @@ import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource._
 import com.digitalasset.canton.time._
-import com.digitalasset.canton.topology.PartyId
 
 import java.util.concurrent.ScheduledExecutorService
 import scala.annotation.nowarn
@@ -61,39 +61,59 @@ class SvcAppBootstrap(
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
-    EitherT.rightT[Future, String] {
-      val svcStore = SvcAppStore(storage, loggerFactory)
+    val svcStore = SvcAppStore(storage, loggerFactory)
 
-      val connection =
-        createLedgerConnection(config.remoteParticipant, svcAppParameters.processingTimeouts)
+    val connection =
+      createLedgerConnection(config.remoteParticipant, svcAppParameters.processingTimeouts)
 
-      // TODO(Arne): We can only run the SVC automation once we know the SVC PartyID.
-      // This workaround can be removed once we fix #271
-      def createAutomation(svcParty: PartyId) = new SvcAutomationService(
-        svcParty,
+    val service = new GrpcSvcAppService(
+      connection,
+      config.damlUser,
+      loggerFactory,
+      svcAppParameters.processingTimeouts,
+    )
+
+    adminServerRegistry.addService(
+      SvcServiceGrpc.bindService(
+        service,
+        executionContext,
+      )
+    )
+
+    val svcApp = for {
+      svcPartyId <- connection.getOrAllocateParty(config.damlUser)
+      _ = logger.info(s"Allocated SVC party $svcPartyId")
+      _ <- connection.uploadDarFile(CoinUtil) // TODO(i353) move away from dar upload during init
+      _ <- CoinUtil.setupApp(svcPartyId, connection)
+      _ = logger.info(s"SVC App is initialized")
+      automation = new SvcAutomationService(
+        svcPartyId,
         config.remoteParticipant,
         loggerFactory,
         tracerProvider,
         timeouts,
       )
-
-      val service = new GrpcSvcAppService(
-        connection,
-        config.damlUser,
+    } yield {
+      new SvcAppNode(
+        config,
+        svcAppParameters,
+        storage,
+        automation,
+        svcStore,
+        clock,
         loggerFactory,
-        createAutomation,
-        svcAppParameters.processingTimeouts,
       )
-
-      adminServerRegistry.addService(
-        SvcServiceGrpc.bindService(
-          service,
-          executionContext,
-        )
-      )
-
-      new SvcAppNode(config, svcAppParameters, storage, svcStore, service, clock, loggerFactory)
     }
+
+    // TODO(i447): more robust retry + finding out where exceptions (e.g. io.grpc.StatusRuntimeException) disappear too
+    EitherT(
+      svcApp
+        .recover { err =>
+          logger.error(s"SVC initialization failed with $err")
+          sys.exit(1)
+        }
+        .map(Right(_)): Future[Either[String, SvcAppNode]]
+    )
   }
 
   override def isActive: Boolean = storage.isActive

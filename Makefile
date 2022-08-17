@@ -30,6 +30,12 @@ docker-push: test
 docker-push-force: test
 	$(call make_apps, docker-push-force)
 
+.PHONY: docker-clean-build-push
+docker-clean-build-push: test
+	$(call make_apps, clean)
+	$(call make_apps, docker-build)
+	$(call make_apps, docker-push)
+
 .PHONY: test
 test:
 	make -C cluster test

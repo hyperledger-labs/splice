@@ -20,10 +20,6 @@ class ValidatorIntegrationTest
 
   "initialize svc and validator apps" in { implicit env =>
     import env._
-
-    // initialize svc
-    val svcParty = svc.initialize()
-
     // check that there is exactly one CoinRule and OpenMiningRound
     val coinRules = svc.remoteParticipant.ledger_api.acs
       .of_party(svcParty, filterTemplates = Seq(CC.CoinRules.CoinRules.id))
