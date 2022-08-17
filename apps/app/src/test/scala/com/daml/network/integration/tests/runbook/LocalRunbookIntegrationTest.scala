@@ -15,6 +15,7 @@ import com.daml.network.integration.{
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens._
+
 import scala.util.Try
 
 /** Runs through runbook but does so while spinning up a local SVC. */

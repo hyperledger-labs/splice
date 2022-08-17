@@ -4,6 +4,8 @@ import cats.syntax.either._
 import com.daml.network.config.CoinConfig
 import com.daml.network.directory.provider.DirectoryProviderAppBootstrap
 import com.daml.network.directory.provider.config.LocalDirectoryProviderAppConfig
+import com.daml.network.directory.user.DirectoryUserAppBootstrap
+import com.daml.network.directory.user.config.LocalDirectoryUserAppConfig
 import com.daml.network.metrics.CoinMetricsFactory
 import com.daml.network.scan.ScanAppBootstrap
 import com.daml.network.scan.config.LocalScanAppConfig
@@ -13,10 +15,6 @@ import com.daml.network.validator.ValidatorAppBootstrap
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.wallet.WalletAppBootstrap
 import com.daml.network.wallet.config.LocalWalletAppConfig
-import com.daml.network.directory.provider.DirectoryProviderAppBootstrap
-import com.daml.network.directory.provider.config.LocalDirectoryProviderAppConfig
-import com.daml.network.directory.user.DirectoryUserAppBootstrap
-import com.daml.network.directory.user.config.LocalDirectoryUserAppConfig
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.console.{
   ConsoleEnvironment,

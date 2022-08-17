@@ -9,13 +9,13 @@ import com.daml.network.environment.{
 }
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.config.TestingConfigInternal
+import com.digitalasset.canton.console.TestConsoleOutput
 import com.digitalasset.canton.environment.EnvironmentFactory
 import com.digitalasset.canton.integration.{
   BaseEnvironmentDefinition,
   TestConsoleEnvironment,
   TestEnvironment,
 }
-import com.digitalasset.canton.console.TestConsoleOutput
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.typesafe.config.ConfigFactory
 import monocle.macros.syntax.lens._

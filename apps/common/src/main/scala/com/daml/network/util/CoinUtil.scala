@@ -2,22 +2,18 @@ package com.daml.network.util
 
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.refinements.ApiTypes.TemplateId
+import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionResponse
+import com.daml.ledger.api.v1.commands.Command
 import com.daml.ledger.client.binding
+import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinLedgerConnection
 import com.digitalasset.canton.ledger.api.client.{DecodeUtil, LedgerConnection}
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.network.{CC, OpenBusiness}
 import com.digitalasset.network.CC.Coin.Coin
-
-import com.daml.ledger.api.v1.commands.Command
-import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionResponse
-import com.daml.ledger.api.v1.transaction_filter
-import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
-import com.daml.ledger.client.binding.{Contract, Primitive}
-import com.digitalasset.canton.ledger.api.client.DecodeUtil
 import com.digitalasset.network.CC.CoinRules.CoinRules
+import com.digitalasset.network.{CC, OpenBusiness}
 
 import scala.concurrent.{ExecutionContext, Future}
 

@@ -1,14 +1,7 @@
 package com.daml.network.scan.admin.api.client.commands
-
-import cats.syntax.either._
-import cats.syntax.traverse._
-import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.client.binding.Primitive
 import com.daml.network.scan.v0
 import com.daml.network.scan.v0.ScanServiceGrpc.ScanServiceStub
-import com.daml.network.util.Contract
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel

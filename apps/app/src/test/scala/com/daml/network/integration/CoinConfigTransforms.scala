@@ -18,10 +18,9 @@ import com.digitalasset.canton.participant.config.{
   LedgerApiServerConfig,
   RemoteParticipantConfig,
 }
-import java.util.UUID
-
 import monocle.macros.syntax.lens._
 
+import java.util.UUID
 import scala.concurrent.duration._
 
 object CoinConfigTransforms {

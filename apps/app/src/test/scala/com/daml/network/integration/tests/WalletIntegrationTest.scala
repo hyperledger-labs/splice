@@ -9,12 +9,11 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
   IsolatedCoinEnvironments,
 }
-import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences, Contract}
+import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences}
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.network.DA
-import com.digitalasset.network.CC.Coin.{AppReward, Coin, ValidatorRight}
+import com.digitalasset.network.CC.Coin.{Coin, ValidatorRight}
 import com.digitalasset.network.CC.CoinRules.{
   CoinRules,
   ReceiverCoinType,
@@ -22,10 +21,11 @@ import com.digitalasset.network.CC.CoinRules.{
   TransferInput,
   TransferOutput,
 }
-import com.digitalasset.network.CC.Round.Round
 import com.digitalasset.network.CN.{Wallet => walletCodegen}
-import com.digitalasset.network.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
+import com.digitalasset.network.DA
 import com.digitalasset.network.DA.Time.Types.RelTime
+import com.digitalasset.network.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
+
 import java.util.UUID
 
 class WalletIntegrationTest
@@ -44,7 +44,6 @@ class WalletIntegrationTest
 
   "A wallet" should {
     "allow calling tap and then list the created coins - locally and remotely" in { implicit env =>
-      import env._
       svc.initialize()
       val aliceValidatorParty = aliceValidator.initialize()
       // TODO(Arne): consider adding synchronization 'wait-for-participant-x' to this command
@@ -69,7 +68,6 @@ class WalletIntegrationTest
     }
 
     "allow a user to create, list, and reject payment requests" in { implicit env =>
-      import env._
       val svcParty = svc.initialize()
       val aliceValidatorParty = aliceValidator.initialize()
       // TODO(M1-90 Backlog): consider adding synchronization 'wait-for-participant-x' to this command
@@ -215,7 +213,6 @@ class WalletIntegrationTest
     }
 
     "list and collect app & validator rewards" in { implicit env =>
-      import env._
       val svcParty = svc.initialize()
 
       // Onboard alice on her self-hosted validator
@@ -279,10 +276,9 @@ class WalletIntegrationTest
   }
 
   "fails with an understandable error when not initialized" in { implicit env =>
-    import env._
-    val svcParty = svc.initialize()
-    val validatorParty = aliceValidator.initialize()
-    val aliceParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
+    svc.initialize()
+    aliceValidator.initialize()
+    aliceValidator.onboardUser(aliceWallet.config.damlUser)
     assertThrowsAndLogsCommandFailures(
       aliceWallet.tap(10),
       _.errorMessage should include("Wallet is not initialized"),

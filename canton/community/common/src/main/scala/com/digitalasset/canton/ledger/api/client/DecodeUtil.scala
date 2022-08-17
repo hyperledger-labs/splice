@@ -9,7 +9,7 @@ import com.daml.ledger.api.v1.transaction.TreeEvent.Kind.Exercised
 import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree}
 import com.daml.ledger.api.v1.value.Identifier
 import com.daml.ledger.api.v1.{value => V}
-import com.daml.ledger.client.binding.{Contract, Template, TemplateCompanion, Primitive => P}
+import com.daml.ledger.client.binding.{Contract, Primitive => P, Template, TemplateCompanion}
 
 object DecodeUtil {
   def decodeAllCreated[T](

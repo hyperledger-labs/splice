@@ -103,7 +103,6 @@ package object canton {
 
   /** Evaluate the expression and discard the result. */
   implicit class DiscardOps[A](a: A) {
-    @nowarn("cat=unused")
     def discard[B](implicit ev: A =:= B): Unit = ()
   }
 

@@ -2,18 +2,8 @@ package com.daml.network
 
 import com.daml.network.config.CoinConfig
 import com.daml.network.environment.{CoinEnvironmentFactory, CoinEnvironmentImpl}
-import com.digitalasset.canton.cli.Command
-import com.digitalasset.canton.{
-  CantonAppDriver,
-  CantonScript,
-  CantonScriptFromFile,
-  ConsoleInteractiveRunner,
-  ConsoleScriptRunner,
-  Runner,
-  ServerRunner,
-}
+import com.digitalasset.canton.CantonAppDriver
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
-import com.digitalasset.canton.config.Generate
 import com.digitalasset.canton.environment.EnvironmentFactory
 import com.typesafe.config.Config
 

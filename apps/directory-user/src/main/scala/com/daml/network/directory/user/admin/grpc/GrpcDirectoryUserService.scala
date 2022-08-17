@@ -1,38 +1,19 @@
 package com.daml.network.directory.user.admin.grpc
-
-import cats.data.EitherT
-import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.api.v1.transaction_filter
-import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
-import com.daml.ledger.api.v1.value.Identifier
-import com.daml.ledger.client.binding.{Contract => CodegenContract, Primitive, TemplateCompanion}
-import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.directory.provider.admin.api.client.DirectoryProviderConnection
 import com.daml.network.directory_user.v0
 import com.daml.network.directory_user.v0.DirectoryUserServiceGrpc
-import com.daml.network.util.{Contract, CoinUtil, Proto}
-import com.digitalasset.canton.console.CommandErrors.GenericCommandError
-import com.digitalasset.canton.ledger.api.client.DecodeUtil
+import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.util.Proto
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.networking.grpc.CantonGrpcUtil
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import com.digitalasset.canton.util.EitherTUtil
-import com.digitalasset.network.CC.Coin.Coin
+import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.network.CN.{Directory => codegen}
+import com.digitalasset.network.DA
 import com.google.protobuf.empty.Empty
-import io.grpc.{ManagedChannel, Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
-import com.digitalasset.network.CN.{Directory => codegen, Wallet => walletCodegen}
-import com.digitalasset.network.DA
-import com.digitalasset.network.DA.Time.Types.RelTime
-
-import scala.annotation.nowarn
-import scala.language.implicitConversions
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.Duration
+import scala.concurrent.{ExecutionContext, Future}
 
-@nowarn("cat=unused")
 class GrpcDirectoryUserService(
     connection: CoinLedgerConnection,
     providerConnection: DirectoryProviderConnection,

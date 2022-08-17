@@ -1,15 +1,12 @@
 package com.daml.network.wallet.admin.grpc
 
 import cats.implicits._
-import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.{Contract, Proto, Value}
 import com.daml.network.wallet.util.WalletUtil
-import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.{InitializeRequest, WalletServiceGrpc}
-import com.digitalasset.canton.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
@@ -30,7 +27,6 @@ class GrpcWalletService(
     walletDamlUser: String,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
-    @nowarn("cat=unused")
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends WalletServiceGrpc.WalletService
@@ -62,7 +58,6 @@ class GrpcWalletService(
       }
     }
 
-  @nowarn("cat=unused")
   override def tap(request: v0.TapRequest): Future[v0.TapResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
@@ -101,7 +96,6 @@ class GrpcWalletService(
       }
     }
 
-  @nowarn("cat=unused")
   override def acceptAppPaymentRequest(
       request: v0.AcceptAppPaymentRequestRequest
   ): Future[v0.AcceptAppPaymentRequestResponse] =
@@ -127,7 +121,6 @@ class GrpcWalletService(
       )
     }
 
-  @nowarn("cat=unused")
   override def rejectAppPaymentRequest(
       request: v0.RejectAppPaymentRequestRequest
   ): Future[Empty] =
@@ -185,7 +178,6 @@ class GrpcWalletService(
       }
     }
 
-  @nowarn("cat=unused")
   override def proposePaymentChannel(
       request: v0.ProposePaymentChannelRequest
   ): Future[v0.ProposePaymentChannelResponse] =
@@ -223,7 +215,6 @@ class GrpcWalletService(
       )
     }
 
-  @nowarn("cat=unused")
   override def acceptPaymentChannelProposal(
       request: v0.AcceptPaymentChannelProposalRequest
   ): Future[v0.AcceptPaymentChannelProposalResponse] =
@@ -247,7 +238,6 @@ class GrpcWalletService(
       )
     }
 
-  @nowarn("cat=unused")
   override def executeDirectTransfer(
       request: v0.ExecuteDirectTransferRequest
   ): Future[Empty] =
@@ -312,7 +302,6 @@ class GrpcWalletService(
       }
     }
 
-  @nowarn("cat=unused")
   override def createOnChannelPaymentRequest(
       request: v0.CreateOnChannelPaymentRequestRequest
   ): Future[v0.CreateOnChannelPaymentRequestResponse] =
@@ -357,7 +346,6 @@ class GrpcWalletService(
       }
     }
 
-  @nowarn("cat=unused")
   override def acceptOnChannelPaymentRequest(
       request: v0.AcceptOnChannelPaymentRequestRequest
   ): Future[Empty] =
@@ -383,7 +371,6 @@ class GrpcWalletService(
       } yield Empty()
     }
 
-  @nowarn("cat=unused")
   override def rejectOnChannelPaymentRequest(
       request: v0.RejectOnChannelPaymentRequestRequest
   ): Future[Empty] =
@@ -406,7 +393,6 @@ class GrpcWalletService(
       } yield Empty()
     }
 
-  @nowarn("cat=unused")
   override def withdrawOnChannelPaymentRequest(
       request: v0.WithdrawOnChannelPaymentRequestRequest
   ): Future[Empty] =

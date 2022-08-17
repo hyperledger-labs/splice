@@ -1,15 +1,11 @@
 package com.daml.network.scan.admin
 
+import cats.syntax.traverse._
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.v1.event.ExercisedEvent
 import com.daml.ledger.api.v1.transaction.TreeEvent.Kind.{Created, Empty, Exercised}
 import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree, TreeEvent}
-import com.daml.ledger.client.binding.{
-  Contract,
-  ValueDecoder,
-  Primitive => P,
-  Value => CodegenValue,
-}
+import com.daml.ledger.client.binding.{Contract, Primitive => P, Value => CodegenValue, ValueDecoder}
 import com.daml.network.admin.LedgerAutomationService
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.scan.admin.ReadCcTransfersService._
@@ -30,7 +26,6 @@ import com.digitalasset.network.CC.CoinRules.{
 import scala.annotation.nowarn
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
-import cats.syntax.traverse._
 
 class ReadCcTransfersService(
     connection: CoinLedgerConnection,

@@ -13,11 +13,6 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.crypto.Fingerprint
 import com.digitalasset.canton.topology._
-import com.digitalasset.canton.topology.transaction.{
-  ParticipantPermission,
-  RequestSide,
-  TopologyChangeOp,
-}
 
 /** Additional syntactic sugar for domains, participants, parties, and packages
   * Copied from Canton's enterprise code base.

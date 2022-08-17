@@ -1,30 +1,23 @@
 package com.daml.network.directory.provider.admin.grpc
 
 import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.api.v1.transaction_filter
-import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
-import com.daml.ledger.api.v1.value.Identifier
 import com.daml.ledger.client.binding.{Contract => CodegenContract, Primitive, TemplateCompanion}
-import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.directory_provider.v0
 import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc
+import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.{Contract, CoinUtil, Proto}
-import com.digitalasset.canton.ledger.api.client.DecodeUtil
+import com.daml.network.util.{Contract, Proto}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
-import com.digitalasset.network.CC.Coin.Coin
+import com.digitalasset.network.CN.{Directory => codegen, Wallet => walletCodegen}
+import com.digitalasset.network.DA
+import com.digitalasset.network.DA.Time.Types.RelTime
 import com.google.protobuf.empty.Empty
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
-import com.digitalasset.network.CN.{Directory => codegen, Wallet => walletCodegen}
-import com.digitalasset.network.DA
-import com.digitalasset.network.DA.Time.Types.RelTime
-
 import scala.annotation.nowarn
-import scala.language.implicitConversions
 import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcDirectoryProviderService(
@@ -33,7 +26,6 @@ class GrpcDirectoryProviderService(
     damlUser: String,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
-    @nowarn("cat=unused")
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends DirectoryProviderServiceGrpc.DirectoryProviderService

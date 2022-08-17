@@ -1,34 +1,28 @@
 package com.daml.network.directory.user
 
-import java.util.concurrent.ScheduledExecutorService
-
 import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.client.configuration.CommandClientConfiguration
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.CoinNodeBootstrapBase
 import com.daml.network.directory.provider.admin.api.client.DirectoryProviderConnection
-import com.daml.network.directory_user.v0.DirectoryUserServiceGrpc
 import com.daml.network.directory.user.admin.grpc.GrpcDirectoryUserService
 import com.daml.network.directory.user.config.LocalDirectoryUserAppConfig
 import com.daml.network.directory.user.metrics.DirectoryUserAppMetrics
 import com.daml.network.directory.user.store.DirectoryUserAppStore
+import com.daml.network.directory_user.v0.DirectoryUserServiceGrpc
+import com.daml.network.environment.CoinNodeBootstrapBase
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
 }
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.TestingConfigInternal
-import com.digitalasset.canton.ledger.api.client.LedgerConnection
-import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.resource._
 import com.digitalasset.canton.time._
-import com.digitalasset.canton.tracing.TraceContextGrpc
 
+import java.util.concurrent.ScheduledExecutorService
 import scala.annotation.nowarn
 import scala.concurrent.Future
 
@@ -50,7 +44,6 @@ class DirectoryUserAppBootstrap(
     @nowarn("cat=unused")
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
-    @nowarn("cat=unused")
     executionSequencerFactory: ExecutionSequencerFactory,
 ) extends CoinNodeBootstrapBase[
       DirectoryUserApp,

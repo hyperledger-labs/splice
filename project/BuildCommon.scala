@@ -18,7 +18,7 @@ object BuildCommon {
   )
 
   lazy val sharedAppSettings: Seq[Def.Setting[_]] =
-    sharedSettings ++ cantonWarts ++ protobufLintSettings ++
+    sharedSettings ++ cantonWarts ++ protobufLintSettings ++ unusedImportsSetting ++
       Seq(
         Compile / PB.targets := Seq(
           scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
@@ -112,6 +112,15 @@ object BuildCommon {
       `canton-wartremover-extension`
     ),
   ).flatMap(_.settings)
+
+  lazy val unusedImportsSetting: Seq[Def.Setting[_]] =
+    // Unused imports can be annoying during development so we allow
+    // turning them into an info summary.
+    if (sys.env.get("CANTON_DISABLE_UNUSED_IMPORTS") == Some("true"))
+      Seq(
+        scalacOptions += "-Wconf:cat=unused-imports:is,cat=unused-implicits:is,cat=unused-locals:is"
+      )
+    else Seq.empty
 
   lazy val protobufLint = taskKey[Unit](
     "Lint protobuf sources using the `buf` tool."

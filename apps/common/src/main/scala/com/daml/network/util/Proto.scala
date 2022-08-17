@@ -6,7 +6,6 @@ package com.daml.network.util
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.Primitive
 import com.daml.lf.data.Numeric
-import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.topology.PartyId
 
 /** Trait for values used in our protobuf requests.

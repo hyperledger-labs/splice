@@ -3,12 +3,12 @@ package com.daml.network.scan.admin.api.client
 import com.daml.network.admin.api.client.AppConnection
 import com.daml.network.scan.admin.api.client.commands.ScanCommands
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
-import scala.concurrent.{ExecutionContextExecutor, Future}
 import java.util.concurrent.atomic.AtomicReference
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Connection to the admin API of CC Scan. This is used by other apps
   * to query for the SVC party id.

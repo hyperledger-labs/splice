@@ -2,7 +2,6 @@ package com.daml.network.directory.provider.admin.api.client.commands
 
 import cats.syntax.either._
 import cats.syntax.traverse._
-import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.directory_provider.v0
 import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc.DirectoryProviderServiceStub

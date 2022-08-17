@@ -3,7 +3,6 @@ package com.daml.network.validator.store
 import com.daml.network.validator.store.memory.InMemoryValidatorAppStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.{ExecutionContext, Future}

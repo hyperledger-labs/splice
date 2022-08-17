@@ -1,10 +1,19 @@
 package com.daml.network.config
 
-import java.io.File
-
 import cats.data.Validated
+import cats.syntax.functor._
+import com.daml.network.directory.provider.config.{
+  LocalDirectoryProviderAppConfig,
+  RemoteDirectoryProviderAppConfig,
+}
+import com.daml.network.directory.user.config.LocalDirectoryUserAppConfig
+import com.daml.network.scan.config.{LocalScanAppConfig, RemoteScanAppConfig}
+import com.daml.network.svc.config.{LocalSvcAppConfig, RemoteSvcAppConfig}
 import com.daml.network.validator.config.LocalValidatorAppConfig
+import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
+import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.{
   CantonConfig,
   CantonFeatures,
@@ -12,30 +21,20 @@ import com.digitalasset.canton.config.{
   ConfigDefaults,
   MonitoringConfig,
 }
-import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.domain.config.{CommunityDomainConfig, RemoteDomainConfig}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.participant.config.{
   CommunityParticipantConfig,
   RemoteParticipantConfig,
 }
-
-import scala.annotation.nowarn
-import cats.syntax.functor._
-import com.daml.network.scan.config.{LocalScanAppConfig, RemoteScanAppConfig}
-import com.daml.network.svc.config.{LocalSvcAppConfig, RemoteSvcAppConfig}
-import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
-import com.daml.network.directory.provider.config.{
-  LocalDirectoryProviderAppConfig,
-  RemoteDirectoryProviderAppConfig,
-}
-import com.daml.network.directory.user.config.LocalDirectoryUserAppConfig
-import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import com.typesafe.config.Config
 import org.slf4j.{Logger, LoggerFactory}
 import pureconfig.ConfigReader
+
+import java.io.File
+import scala.annotation.nowarn
 
 case class CoinConfig(
     validatorApps: Map[InstanceName, LocalValidatorAppConfig] = Map.empty,

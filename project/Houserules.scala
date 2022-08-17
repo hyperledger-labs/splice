@@ -27,13 +27,12 @@ object JvmRulesPlugin extends AutoPlugin {
             "-Ywarn-dead-code",
             "-Ywarn-numeric-widen",
             "-Ywarn-value-discard", // Gives a warning for functions declared as returning Unit, but the body returns a value
-            // TODO(i87): re-enable
-//            "-Ywarn-unused:imports",
-            "-Ywarn-unused:implicits",
-            // TODO(i87): re-enable
-//            "-Ywarn-unused:locals",
             "-Vimplicits",
             "-Vtype-diffs",
+            "-Wunused:implicits",
+            "-Wunused:imports",
+            "-Wunused:locals",
+            "-Wunused:nowarn",
           )
       },
       Test / scalacOptions --= Seq("-Ywarn-value-discard"), // disable value discard check on tests

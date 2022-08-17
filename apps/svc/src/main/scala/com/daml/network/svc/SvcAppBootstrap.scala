@@ -1,7 +1,5 @@
 package com.daml.network.svc
 
-import java.util.concurrent.ScheduledExecutorService
-
 import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either._
@@ -25,6 +23,7 @@ import com.digitalasset.canton.resource._
 import com.digitalasset.canton.time._
 import com.digitalasset.canton.topology.PartyId
 
+import java.util.concurrent.ScheduledExecutorService
 import scala.annotation.nowarn
 import scala.concurrent.Future
 
@@ -46,7 +45,6 @@ class SvcAppBootstrap(
     @nowarn("cat=unused")
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
-    @nowarn("cat=unused")
     executionSequencerFactory: ExecutionSequencerFactory,
 ) extends CoinNodeBootstrapBase[
       SvcAppNode,

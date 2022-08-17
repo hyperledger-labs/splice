@@ -7,7 +7,6 @@ import com.daml.network.directory.user.store.DirectoryUserAppStore
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
 import com.digitalasset.canton.lifecycle.Lifecycle
-import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.{Clock, HasUptime}

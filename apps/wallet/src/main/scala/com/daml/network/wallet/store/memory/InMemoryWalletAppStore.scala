@@ -1,11 +1,10 @@
 package com.daml.network.wallet.store.memory
 
-import java.util.concurrent.atomic.AtomicInteger
-
 import com.daml.network.wallet.store.WalletAppStore
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 
+import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Example for in-memory store in the store pattern. */

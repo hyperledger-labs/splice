@@ -1,9 +1,4 @@
 package com.daml.network.integration.tests
-
-import java.util.concurrent.atomic.AtomicReference
-
-import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
-import com.daml.ledger.api.v1.transaction.TreeEvent
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -13,9 +8,7 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.network.CC.Coin._
-import com.digitalasset.network.CC.CoinRules._
 import com.digitalasset.network.CC.Round._
 
 class SvcIntegrationTest
@@ -35,7 +28,7 @@ class SvcIntegrationTest
     import env._
     val coinPrice: BigDecimal = 23.0
     val svcParty = svc.initialize()
-    val validatorParty = aliceValidator.initialize()
+    aliceValidator.initialize()
 
     // Sync with background automation that onboards validator.
     utils.retry_until_true({
@@ -76,7 +69,6 @@ class SvcIntegrationTest
   }
 
   "total burn calculation" in { implicit env =>
-    import env._
     val svcParty = svc.initialize()
     // 3 app rewards & 3 validator rewards, 2 of each for round 0 and one for round 1
     // to check we sum up but only for the right round.

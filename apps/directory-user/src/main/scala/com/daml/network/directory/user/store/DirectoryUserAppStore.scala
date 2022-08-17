@@ -3,9 +3,8 @@ package com.daml.network.directory.user.store
 import com.daml.network.directory.user.store.memory.InMemoryDirectoryUserAppStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
-import com.digitalasset.canton.tracing.TraceContext
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 trait DirectoryUserAppStore extends AutoCloseable {}
 

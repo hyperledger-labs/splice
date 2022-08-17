@@ -1,7 +1,6 @@
 package com.daml.network.svc.admin.grpc
 
 import cats.implicits._
-import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionResponse
 import com.daml.ledger.client.binding.{Contract, Primitive, TemplateCompanion}
 import com.daml.network.environment.CoinLedgerConnection
@@ -10,8 +9,7 @@ import com.daml.network.svc.v0
 import com.daml.network.svc.v0.SvcServiceGrpc
 import com.daml.network.util.{CoinUtil, Proto}
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.ledger.api.client.DecodeUtil
-import com.digitalasset.canton.ledger.api.client.LedgerConnection
+import com.digitalasset.canton.ledger.api.client.{DecodeUtil, LedgerConnection}
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
@@ -20,7 +18,6 @@ import com.digitalasset.network.{CC, DA}
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
 
-import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcSvcAppService(
@@ -30,7 +27,6 @@ class GrpcSvcAppService(
     svcAutomationConstructor: PartyId => SvcAutomationService,
     override val timeouts: ProcessingTimeout,
 )(implicit
-    @nowarn("cat=unused")
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends SvcServiceGrpc.SvcService

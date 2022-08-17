@@ -1,7 +1,5 @@
 package com.daml.network.environment
 
-import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
-
 import akka.actor.ActorSystem
 import cats.data.EitherT
 import com.daml.grpc.adapter.ExecutionSequencerFactory
@@ -28,6 +26,7 @@ import io.functionmeta.functionFullName
 import io.grpc.protobuf.services.ProtoReflectionService
 import io.opentelemetry.api.trace.Tracer
 
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.{Future, blocking}
 
 /** Modelled after CantonNodeBootstrap

@@ -58,6 +58,16 @@ M3 - TestNet Launch.
 You should then see a 'sbt shell' window in IntelliJ that allows you to build and test the Scala code while using the
 same package references as nix. If IntelliJ asks you at the end if you want to overwrite any previous `.idea/*` files, say yes.
 
+## Unused Import Warnings
+
+If you the unused import warnings get in the way during development, you can turn them into
+an info summary that just displays the number of warnings but does not fail the build by
+setting an environment variable:
+
+```
+CANTON_DISABLE_UNUSED_IMPORTS=true sbt
+```
+
 ### Managing Canton for Tests
 
 To speed up our tests our tests run against a long-running Canton instance.

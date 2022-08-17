@@ -70,7 +70,6 @@ trait CantonHealthAdministration[Status <: CantonStatus] extends Helpful {
   def status(): Status
 
   @Help.Summary("Generate and write a dump of Canton's state for a bug report")
-  @nowarn("cat=unused")
   @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
   def dump(): String = {
     import io.circe.generic.auto._

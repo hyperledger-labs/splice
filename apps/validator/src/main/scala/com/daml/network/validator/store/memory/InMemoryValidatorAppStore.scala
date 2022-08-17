@@ -1,14 +1,10 @@
 package com.daml.network.validator.store.memory
-
-import java.util.concurrent.atomic.AtomicInteger
-
 import com.daml.network.validator.store.ValidatorAppStore
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.topology.PartyId
 
-import scala.concurrent.{ExecutionContext, Future}
 import java.util.concurrent.atomic.AtomicReference
+import scala.concurrent.{ExecutionContext, Future}
 
 /** Example for in-memory store in the store pattern. */
 class InMemoryValidatorAppStore(override protected val loggerFactory: NamedLoggerFactory)(implicit

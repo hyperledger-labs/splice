@@ -3,19 +3,15 @@ package com.daml.network.admin.api.client
 import cats.data.EitherT
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
-import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
+import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.{CantonGrpcUtil, ClientChannelBuilder}
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.EitherTUtil
-import io.grpc.{ManagedChannel, Status, StatusRuntimeException}
-import io.grpc.stub.AbstractStub
+import io.grpc.{Status, StatusRuntimeException}
 
-import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
-import scala.concurrent.duration.Duration
-import java.util.concurrent.atomic.AtomicReference
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Base class for connecting and calling the gRPC/Admin API exposed by a CN App.
   */

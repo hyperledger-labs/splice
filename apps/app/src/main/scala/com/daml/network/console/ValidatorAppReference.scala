@@ -3,23 +3,9 @@ package com.daml.network.console
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.validator.admin.api.client.commands.ValidatorAppCommands
 import com.daml.network.validator.config.LocalValidatorAppConfig
-import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-import com.digitalasset.canton.console.commands._
-import com.digitalasset.canton.console.{
-  BaseInspection,
-  ConsoleCommandResult,
-  ConsoleEnvironment,
-  FeatureFlag,
-  Help,
-  InstanceReference,
-  LedgerApiCommandRunner,
-  LocalInstanceReference,
-}
-import com.digitalasset.canton.environment.CantonNodeBootstrap
-import com.digitalasset.canton.health.admin.data.ParticipantStatus
-import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.console.{BaseInspection, Help, LocalInstanceReference}
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.{ParticipantId, PartyId}
+import com.digitalasset.canton.topology.PartyId
 
 /** Single local validator app reference. Defines the console commands that can be run against a local validator
   * app reference.

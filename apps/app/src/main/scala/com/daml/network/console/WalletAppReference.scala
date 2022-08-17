@@ -8,9 +8,9 @@ import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConf
 import com.digitalasset.canton.console.{
   BaseInspection,
   ConsoleCommandResult,
+  GrpcRemoteInstanceReference,
   Help,
   LocalInstanceReference,
-  GrpcRemoteInstanceReference,
 }
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId

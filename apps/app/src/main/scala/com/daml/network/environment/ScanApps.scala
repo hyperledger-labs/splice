@@ -2,7 +2,7 @@ package com.daml.network.environment
 
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.scan.config.LocalScanAppConfig
-import com.daml.network.scan.{ScanAppBootstrap, ScanApp}
+import com.daml.network.scan.{ScanApp, ScanAppBootstrap}
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.environment.ManagedNodes

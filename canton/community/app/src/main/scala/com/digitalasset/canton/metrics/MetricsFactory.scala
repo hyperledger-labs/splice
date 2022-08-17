@@ -17,8 +17,8 @@ import io.prometheus.client.dropwizard.DropwizardExports
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.TimeUnit
-import scala.collection.concurrent.TrieMap
 import scala.collection.concurrent
+import scala.collection.concurrent.TrieMap
 
 case class MetricsConfig(
     reporters: Seq[MetricsReporterConfig] = Seq.empty,

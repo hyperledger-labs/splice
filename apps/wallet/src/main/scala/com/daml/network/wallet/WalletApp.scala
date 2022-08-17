@@ -1,9 +1,9 @@
 package com.daml.network.wallet
 
 import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.daml.network.wallet.store.WalletAppStore
-import com.daml.network.scan.admin.api.client.ScanConnection
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
 import com.digitalasset.canton.lifecycle.Lifecycle

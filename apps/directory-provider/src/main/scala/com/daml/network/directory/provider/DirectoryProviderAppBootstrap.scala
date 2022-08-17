@@ -1,7 +1,5 @@
 package com.daml.network.directory.provider
 
-import java.util.concurrent.ScheduledExecutorService
-
 import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either._
@@ -24,6 +22,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource._
 import com.digitalasset.canton.time._
 
+import java.util.concurrent.ScheduledExecutorService
 import scala.annotation.nowarn
 import scala.concurrent.Future
 
@@ -45,7 +44,6 @@ class DirectoryProviderAppBootstrap(
     @nowarn("cat=unused")
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
-    @nowarn("cat=unused")
     executionSequencerFactory: ExecutionSequencerFactory,
 ) extends CoinNodeBootstrapBase[
       DirectoryProviderApp,

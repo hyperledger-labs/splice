@@ -5,8 +5,8 @@ import com.daml.network.validator.v0
 import com.daml.network.validator.v0.ValidatorAppServiceGrpc.ValidatorAppServiceStub
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
-import io.grpc.ManagedChannel
 import com.google.protobuf.empty.Empty
+import io.grpc.ManagedChannel
 
 import scala.concurrent.Future
 

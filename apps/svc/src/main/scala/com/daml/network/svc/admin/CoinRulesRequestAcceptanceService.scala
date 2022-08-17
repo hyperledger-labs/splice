@@ -3,7 +3,6 @@ package com.daml.network.svc.admin
 import com.daml.ledger.api.v1.transaction.Transaction
 import com.daml.network.admin.LedgerAutomationService
 import com.daml.network.environment.CoinLedgerConnection
-import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}

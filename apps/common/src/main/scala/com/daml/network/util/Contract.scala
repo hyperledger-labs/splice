@@ -3,13 +3,13 @@
 
 package com.daml.network.util
 
+import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.{
   Contract => CodegenContract,
   Primitive,
   Template,
   TemplateCompanion,
 }
-import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.serialization.ProtoConverter

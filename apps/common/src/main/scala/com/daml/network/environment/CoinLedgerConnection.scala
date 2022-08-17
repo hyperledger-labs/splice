@@ -4,14 +4,14 @@ import akka.actor.ActorSystem
 import akka.stream.KillSwitches
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
-import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.api.refinements.ApiTypes.{
-  ApplicationId,
-  ContractId,
-  TemplateId,
-  TransactionId,
-  WorkflowId,
+import com.daml.grpc.{GrpcException, GrpcStatus}
+import com.daml.ledger.api.domain.UserRight.CanActAs
+import com.daml.ledger.api.refinements.ApiTypes.{ApplicationId, ContractId, TemplateId, WorkflowId}
+import com.daml.ledger.api.v1.command_service.{
+  SubmitAndWaitForTransactionResponse,
+  SubmitAndWaitForTransactionTreeResponse,
+  SubmitAndWaitRequest,
 }
 import com.daml.ledger.api.v1.commands.Commands.DeduplicationPeriod
 import com.daml.ledger.api.v1.commands.{Command, Commands}
@@ -19,7 +19,7 @@ import com.daml.ledger.api.v1.event.CreatedEvent
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
 import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree, TreeEvent}
 import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
-import com.daml.ledger.api.v1.value.{Identifier, Value}
+import com.daml.ledger.api.v1.value.Identifier
 import com.daml.ledger.client.LedgerClient
 import com.daml.ledger.client.binding.{
   Contract,
@@ -34,7 +34,10 @@ import com.daml.ledger.client.configuration.{
   LedgerClientConfiguration,
   LedgerIdRequirement,
 }
+import com.daml.network.util.UploadablePackage
+import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
+import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
@@ -47,35 +50,21 @@ import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
+import com.digitalasset.canton.util.retry.RetryUtil.{
+  ErrorKind,
+  ExceptionRetryable,
+  FatalErrorKind,
+  NoErrorKind,
+  TransientErrorKind,
+}
 import com.digitalasset.canton.util.{AkkaUtil, retry}
-import com.google.rpc.status.Status
+import com.google.protobuf.ByteString
 import io.grpc.StatusRuntimeException
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
 import org.slf4j.event.Level
 import scalaz.syntax.tag._
 
 import java.util.UUID
-import com.daml.ledger.api.domain.UserRight.CanActAs
-import com.daml.ledger.api.v1.command_service.{
-  SubmitAndWaitForTransactionResponse,
-  SubmitAndWaitForTransactionTreeResponse,
-  SubmitAndWaitRequest,
-}
-import com.daml.network.util.UploadablePackage
-import com.digitalasset.canton.concurrent.Threading
-import com.digitalasset.canton.error.ErrorCodeUtils
-import com.digitalasset.canton.util.retry.RetryUtil.NoExnRetryable.logThrowable
-import com.digitalasset.canton.util.retry.RetryUtil.{
-  ErrorKind,
-  ExceptionRetryable,
-  FatalErrorKind,
-  NoErrorKind,
-  NoExnRetryable,
-  TransientErrorKind,
-}
-import com.google.protobuf.ByteString
-import com.google.protobuf.empty.Empty
-
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success, Try}

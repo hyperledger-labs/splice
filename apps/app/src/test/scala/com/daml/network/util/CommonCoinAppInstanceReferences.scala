@@ -5,9 +5,9 @@ import com.daml.network.console.{
   LocalDirectoryUserAppReference,
   LocalScanAppReference,
   LocalSvcAppReference,
-  RemoteSvcAppReference,
   LocalValidatorAppReference,
   LocalWalletAppReference,
+  RemoteSvcAppReference,
   RemoteWalletAppReference,
 }
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment

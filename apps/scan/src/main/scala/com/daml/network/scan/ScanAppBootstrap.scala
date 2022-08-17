@@ -1,18 +1,16 @@
 package com.daml.network.scan
 
-import java.util.concurrent.ScheduledExecutorService
-
 import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.environment.CoinNodeBootstrapBase
 import com.daml.network.scan.admin.grpc.GrpcScanService
 import com.daml.network.scan.config.LocalScanAppConfig
 import com.daml.network.scan.metrics.ScanAppMetrics
 import com.daml.network.scan.store.ScanTransferStore
 import com.daml.network.scan.v0.ScanServiceGrpc
-import com.daml.network.environment.CoinNodeBootstrapBase
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -23,6 +21,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource._
 import com.digitalasset.canton.time._
 
+import java.util.concurrent.ScheduledExecutorService
 import scala.annotation.nowarn
 import scala.concurrent.Future
 
@@ -44,7 +43,6 @@ class ScanAppBootstrap(
     @nowarn("cat=unused")
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
-    @nowarn("cat=unused")
     executionSequencerFactory: ExecutionSequencerFactory,
 ) extends CoinNodeBootstrapBase[
       ScanApp,

@@ -1,12 +1,12 @@
 package com.daml.network.metrics
 
 import com.codahale.metrics
+import com.daml.network.directory.provider.metrics.DirectoryProviderAppMetrics
+import com.daml.network.directory.user.metrics.DirectoryUserAppMetrics
 import com.daml.network.scan.metrics.ScanAppMetrics
 import com.daml.network.svc.metrics.SvcAppMetrics
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.daml.network.wallet.metrics.WalletAppMetrics
-import com.daml.network.directory.provider.metrics.DirectoryProviderAppMetrics
-import com.daml.network.directory.user.metrics.DirectoryUserAppMetrics
 import com.digitalasset.canton.metrics.MetricsFactory.registerReporter
 import com.digitalasset.canton.metrics.{MetricsConfig, MetricsFactory, MetricsFactoryBase}
 
