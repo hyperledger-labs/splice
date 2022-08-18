@@ -21,7 +21,7 @@ template DirectoryEntryRequest
     signatory signatory entry
 
     implements PaymentReference where
-      getDescription = "Directory entry request: " <> show entry
+      paymentReference_getDescription = "Directory entry request: " <> show entry
 
     choice Reject : ()
       controller entry.provider

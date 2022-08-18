@@ -114,7 +114,7 @@ template PaymentChannelProposal
 -- TODO: better naming
 interface PaymentReference
   where
-    getDescription : Text
+    paymentReference_getDescription : Text
 
 template OnChannelPaymentRequest
   with
@@ -261,3 +261,62 @@ template AcceptedAppPayment
     choice AcceptedAppPayment_Expire : ContractId Coin
       controller sender
       do exercise lockedCoin Coin_OwnerExpireLock
+
+interface TransferRequestReference where
+  transferRequestReference_getDescription : Text
+
+template TransferReceipt
+  with
+    sender : Party
+    receiver : Party
+    quantity : Decimal -- desired & actual quantity for the receiver (the sender pays all transfer fees)
+    reference : ContractId TransferRequestReference
+  where
+    signatory sender, receiver
+
+-- | Request to the wallet of the sender to transfer the given amount to the receiver.
+-- This is used in place of direct transfers to ensure that the actual request happens
+-- via a trusted UI.
+template TransferRequest
+  with
+    sender : Party
+    receiver : Party
+    svc : Party
+    quantity : Decimal
+    reference : ContractId TransferRequestReference
+    -- TODO: expiry
+  where
+    signatory sender, receiver
+    choice TransferRequest_Accept : ContractId TransferReceipt
+      with
+        inputs : [TransferInput]
+      controller sender
+      do _ <- fetch reference -- check that reference is still active
+         (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt sender
+         results <- exerciseByKey @CoinRules (svc, validator) CoinRules_Transfer with
+           transfer = Transfer with
+             sender = sender
+             inputs = inputs
+             payload = "TransferRequest"
+             outputs =
+               [ OutputReceiverCoin with
+                   receiver = receiver
+                   coinType = FixedReceiverCoin with
+                     quantity = quantity
+                     senderTransferFeeRatio = 1.0
+               , OutputSenderCoin with
+                   exactQuantity = None
+                   lock = None
+               ]
+         outputCid <- case results of
+           [TransferResultCoin cid, TransferResultCoin _] -> pure cid
+           _ -> abort ("Expected one TransferResultCoin but got " <> show results)
+         output <- fetch outputCid
+         -- Assert that the quantity is the same to force us to
+         -- revisit what we return if we change senderTransferFeeRatio.
+         output.quantity.initialQuantity === quantity
+         create TransferReceipt with
+           sender
+           receiver
+           quantity
+           reference

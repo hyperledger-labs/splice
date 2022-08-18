@@ -1,5 +1,6 @@
 module CN.Scripts.TestWallet where
 
+import DA.Assert
 import Daml.Script
 
 import CC.Coin
@@ -92,4 +93,50 @@ test = script do
   channelId <- submit receiver $ exerciseCmd proposalId PaymentChannelProposal_Accept
   submitMultiMustFail [sender] [app.svc] $ exerciseTransfer coin
 
+  pure ()
+
+
+template TestReference
+  with
+    p : Party
+    description : Text
+  where
+    signatory p
+    implements TransferRequestReference where
+      transferRequestReference_getDescription = description
+
+
+acceptTransferRequest : CCApp -> Party -> ContractId TransferRequest -> ContractId Coin -> Script (ContractId TransferReceipt)
+acceptTransferRequest app p transferRequest coin = do
+  validator <- getHostingValidator p
+  submitMulti [p] [validator] $ exerciseCmd transferRequest TransferRequest_Accept with
+    inputs = [InputCoin coin]
+
+testTransferRequest = script do
+  app <- setupApp
+  runNextIssuance app 1.0
+  runCoinDepositBots app
+
+  validator <- setupValidator app "validator1"
+  alice <- setupUser app "alice" validator
+  bob <- setupUser app "bob" validator
+
+  coin <- tap app alice 42.0
+  reference <- submit alice $ createCmd (TestReference alice "mycoolref")
+  -- multi-party submit to simplify test
+  transferRequest <- submitMulti [alice, bob] [] $ createCmd TransferRequest with
+    sender = alice
+    receiver = bob
+    svc = app.svc
+    quantity = 30.0
+    reference = toInterfaceContractId reference
+
+  receiptCid <- acceptTransferRequest app alice transferRequest coin
+
+  Some receipt <- queryContractId alice receiptCid
+  receipt === TransferReceipt with
+    sender = alice
+    receiver = bob
+    quantity = 30.0
+    reference = toInterfaceContractId reference
   pure ()

@@ -444,18 +444,20 @@ jobs:
       - checkout
       - install_daml_dependencies
       - run:
-         name: build canton-coin
+         name: build canton-coin & wallet
          command: |
            set -euo pipefail
            export PATH=$HOME/.daml/bin:$PATH
            cd canton-coin
+           daml build
+           cd ../apps/wallet/daml
            daml build
       - run:
          name: build splitwise
          command: |
            set -euo pipefail
            export PATH=$HOME/.daml/bin:$PATH
-           cd experiments/splitwise
+           cd apps/splitwise/daml
            daml build
 
   docs:
