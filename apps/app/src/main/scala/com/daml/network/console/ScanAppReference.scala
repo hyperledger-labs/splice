@@ -1,6 +1,7 @@
 package com.daml.network.console
 
 import com.daml.network.environment.CoinConsoleEnvironment
+import com.daml.network.history.CoinTransaction
 import com.daml.network.scan.admin.api.client.commands.ScanCommands
 import com.daml.network.scan.config.LocalScanAppConfig
 import com.digitalasset.canton.console.{BaseInspection, Help, LocalInstanceReference}
@@ -36,6 +37,15 @@ class LocalScanAppReference(
   def getSvcPartyId(): PartyId =
     consoleEnvironment.run {
       adminCommand(ScanCommands.GetSvcPartyId())
+    }
+
+  @Help.Summary(
+    "Returns a list of all transactions that included the creation of archive of a Canton coin. "
+  )
+  @Help.Description("Transaction are ordered by transaction offset in ascending order.")
+  def getTxHistory(): Seq[CoinTransaction] =
+    consoleEnvironment.run {
+      adminCommand(ScanCommands.GetHistory())
     }
 
   /** secret, not publicly documented way to get the admin token */

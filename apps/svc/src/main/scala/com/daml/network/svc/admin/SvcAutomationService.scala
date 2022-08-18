@@ -6,6 +6,7 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.network.CC.CoinRules.CoinRulesRequest
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContextExecutor
@@ -31,8 +32,9 @@ class SvcAutomationService(
   override def readAs: PartyId = svcParty
 
   val (coinRulesRequestSubscription, coinRulesRequestAcceptanceService) =
-    createService("svcAcceptCoinRulesRequestsService", ledgerClient) { connection =>
-      new CoinRulesRequestAcceptanceService(svcParty, connection, loggerFactory)
+    createService("svcAcceptCoinRulesRequestsService", ledgerClient, Seq(CoinRulesRequest.id)) {
+      connection =>
+        new CoinRulesRequestAcceptanceService(svcParty, connection, loggerFactory)
     }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq[AsyncOrSyncCloseable](

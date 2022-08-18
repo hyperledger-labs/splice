@@ -261,7 +261,7 @@ lazy val `apps-app` =
       `canton-community-app` % "compile->compile;test->test",
     )
     .settings(
-      BuildCommon.sharedSettings,
+      BuildCommon.sharedAppSettings,
       BuildCommon.cantonWarts,
       bundleTask,
       assembly / test := {}, // don't run tests during assembly

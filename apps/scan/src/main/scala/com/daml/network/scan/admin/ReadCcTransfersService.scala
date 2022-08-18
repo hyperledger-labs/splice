@@ -1,6 +1,5 @@
 package com.daml.network.scan.admin
 
-import cats.syntax.traverse._
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.v1.event.ExercisedEvent
 import com.daml.ledger.api.v1.transaction.TreeEvent.Kind.{Created, Empty, Exercised}
@@ -9,7 +8,8 @@ import com.daml.ledger.client.binding.{ValueDecoder, Value => CodegenValue}
 import com.daml.network.admin.LedgerAutomationService
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history._
-import com.daml.network.scan.store.ScanTransferStore
+import com.daml.network.scan.store.ScanCCHistoryStore
+import com.daml.network.util.Contract
 import com.digitalasset.canton.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -30,7 +30,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class ReadCcTransfersService(
     svcParty: PartyId,
     connection: CoinLedgerConnection,
-    store: ScanTransferStore,
+    store: ScanCCHistoryStore,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, tc: TraceContext)
     extends LedgerAutomationService
@@ -55,40 +55,55 @@ class ReadCcTransfersService(
       )
       events <- traverseForest(tree)
       metadata = TransactionMetadata(tx)
-      _ <- store.addTransaction(CCTransaction(events, metadata))
+      _ <- store.addTransaction(CoinTransaction(events, metadata))
     } yield ()
   }
 
   /** Traverse a TransactionTree via pre-order DFS */
-  private def traverseForest(tree: TransactionTree): Future[Seq[CCEvent]] = {
-    val coinEvents: mutable.Buffer[CCEvent] = mutable.ListBuffer()
-    // TODO(Arne): make this stack-safe
-    def preOrderDfs(node: TreeEvent.Kind, pathToNode: Seq[TreeEvent.Kind]): Future[Unit] = {
-      Future {
+  @SuppressWarnings(Array("org.wartremover.warts.While"))
+  private def traverseForest(tree: TransactionTree): Future[Seq[CoinEvent]] = Future {
+
+    def preorder(
+        stack: mutable.Stack[StackElement],
+        coinEvents: mutable.Buffer[CoinEvent],
+    ): mutable.Buffer[CoinEvent] = {
+      while (stack.nonEmpty) {
+        val (node, pathToNode) = stack.pop()
         node match {
           case Empty =>
           case created: Created =>
             DecodeUtil
               .decodeCreated(Coin)(created.value)
-              .foreach(c =>
-                coinEvents.append(CCEvent(CCCreate(c), parseParentEvent(pathToNode.lastOption)))
-              )
+              .foreach(c => {
+                coinEvents.append(
+                  CoinEvent(
+                    CoinCreate(Contract.fromCodegenContract(c)),
+                    parseParentEvent(pathToNode.lastOption),
+                  )
+                )
+              })
           case exercised: Exercised =>
             val coinContractOpt = DecodeUtil.decodeArchivedExercise(Coin)(exercised)
-            coinContractOpt.foreach(cid =>
-              CCEvent(CCArchive(cid), parseParentEvent(pathToNode.lastOption))
-            )
+            coinContractOpt.foreach(cid => {
+              coinEvents.append(
+                CoinEvent(CoinArchive(cid), parseParentEvent(pathToNode.lastOption))
+              )
+            })
             val children = exercised.value.childEventIds.map(tree.eventsById(_).kind)
-            children.foreach(preOrderDfs(_, pathToNode :+ node))
+            stack.pushAll(children.map((_, pathToNode :+ node)))
         }
       }
+      coinEvents
     }
 
-    for {
-      roots <- Future(tree.rootEventIds.map(id => tree.eventsById(id).kind))
-      _ <- roots.traverse(preOrderDfs(_, Seq()))
-    } yield coinEvents.toSeq
+    // node and path to that node
+    type StackElement = (TreeEvent.Kind, Seq[TreeEvent.Kind])
 
+    val coinEvents: mutable.Buffer[CoinEvent] = mutable.ListBuffer()
+    val roots = tree.rootEventIds.map(id => tree.eventsById(id).kind)
+    val stack: mutable.Stack[StackElement] = mutable.Stack()
+    stack.pushAll(roots.map((_, Seq())))
+    preorder(stack, coinEvents).toSeq
   }
 
   // Some helper methods
@@ -110,28 +125,33 @@ class ReadCcTransfersService(
       case Some(value) => value
     }
 
-  private def parseParentEvent(parent: Option[TreeEvent.Kind]): OriginEvent = {
+  import cats.syntax.option._
+  private def parseParentEvent(parent: Option[TreeEvent.Kind]): Option[AncestorEvent] = {
     parent match {
       case None => // coin create or archival has no parent node
-        BareCreateOrArchival()
+        logger.warn("Ancestor of Coin had no parent node in the transaction tree")
+        None
       case Some(parent) =>
         parent match {
           case exercised: Exercised if isTransfer(exercised.value) =>
-            Transfer(attemptDecode[CoinRules_Transfer](exercised))
+            Transfer(attemptDecode[CoinRules_Transfer](exercised)).some
           case exercised: Exercised if isTap(exercised.value) =>
-            Tap(attemptDecode[CoinRules_Tap](exercised))
+            Tap(attemptDecode[CoinRules_Tap](exercised)).some
           case exercised: Exercised if isStartIssuing(exercised.value) =>
-            StartIssuing(attemptDecode[CoinRules_MiningRound_StartIssuing](exercised))
+            StartIssuing(attemptDecode[CoinRules_MiningRound_StartIssuing](exercised)).some
           case other: Exercised =>
-            logger.info(s"Parent of coin create or archival was not a tap or transfer but $other")
-            UnknownExerciseParent()
+            logger.warn(
+              s"Parent of coin create or archival was not a tap, transfer or start issuing but $other"
+            )
+            None
           case created: Created =>
             ErrorUtil.invalidState(
               "Observed that the parent of a Coin create or archival is a `Created` node" +
                 s"$created. However, a `Created` node should never have any children. "
             )
           case Empty =>
-            BareCreateOrArchival()
+            logger.warn("Ancestor of Coin event in the transaction tree was an empty node")
+            None
         }
     }
   }

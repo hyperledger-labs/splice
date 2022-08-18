@@ -1,6 +1,7 @@
 package com.daml.network.scan
 
 import java.util.concurrent.ScheduledExecutorService
+
 import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either._
@@ -11,7 +12,7 @@ import com.daml.network.scan.admin.ScanAutomationService
 import com.daml.network.scan.admin.grpc.GrpcScanService
 import com.daml.network.scan.config.LocalScanAppConfig
 import com.daml.network.scan.metrics.ScanAppMetrics
-import com.daml.network.scan.store.ScanTransferStore
+import com.daml.network.scan.store.ScanCCHistoryStore
 import com.daml.network.scan.v0.ScanServiceGrpc
 import com.daml.network.util.Proto
 import com.digitalasset.canton.concurrent.{
@@ -65,14 +66,15 @@ class ScanAppBootstrap(
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
-    val transferStore = ScanTransferStore(storage, loggerFactory)
+    val ccTransactionStore = ScanCCHistoryStore(storage, loggerFactory)
     val ledgerClient =
       createLedgerClient(
         config.remoteParticipant,
         scanAppParameters.processingTimeouts,
       )
 
-    val scanServiceGrpc = new GrpcScanService(ledgerClient, config.svcUser, loggerFactory)
+    val scanServiceGrpc =
+      new GrpcScanService(ledgerClient, config.svcUser, ccTransactionStore, loggerFactory)
     adminServerRegistry.addService(
       ScanServiceGrpc.bindService(
         scanServiceGrpc,
@@ -97,14 +99,14 @@ class ScanAppBootstrap(
         ledgerClient,
         loggerFactory,
         timeouts,
-        transferStore,
+        ccTransactionStore,
       )
     } yield new ScanApp(
       config,
       scanAppParameters,
       storage,
       scanAutomationService,
-      transferStore,
+      ccTransactionStore,
       clock,
       loggerFactory,
     )

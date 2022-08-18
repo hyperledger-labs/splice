@@ -1,0 +1,44 @@
+syntax = "proto3";
+package com.daml.network.v0;
+
+import "google/protobuf/timestamp.proto";
+import "com/daml/network/v0/value.proto";
+import "com/daml/network/v0/contract.proto";
+
+message CCTransaction {
+  repeated CCEvent events = 1;
+  TransactionMetadata metadata = 2;
+}
+
+message ExerciseNode {
+  oneof ancestor {
+    com.daml.network.v0.Value tap = 1;
+    com.daml.network.v0.Value transfer = 2;
+    com.daml.network.v0.Value start_issuing = 3;
+  }
+  // TODO(Arne): add exercise result too
+}
+
+message CCEvent {
+  oneof coin {
+    CoinCreate create = 1; // contract
+    CoinArchive archive = 2; // cid
+  }
+  ExerciseNode ancestor = 3;
+}
+
+message CoinCreate {
+  com.daml.network.v0.Contract contract = 1;
+}
+
+message CoinArchive {
+  string contract_id = 1;
+}
+
+message TransactionMetadata {
+  string transaction_id = 1;
+  string command_id = 2;
+  string workflow_id = 3;
+  google.protobuf.Timestamp effective_at = 4;
+  string offset = 5;
+}

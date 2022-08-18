@@ -2,11 +2,12 @@ package com.daml.network.scan.admin
 
 import com.daml.network.admin.LedgerAutomationServiceOrchestrator
 import com.daml.network.environment.CoinLedgerClient
-import com.daml.network.scan.store.ScanTransferStore
+import com.daml.network.scan.store.ScanCCHistoryStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.network.CC.Coin.Coin
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContextExecutor
@@ -18,7 +19,7 @@ class ScanAutomationService(
     ledgerClient: CoinLedgerClient,
     loggerFactory: NamedLoggerFactory,
     processingTimeouts: ProcessingTimeout,
-    store: ScanTransferStore,
+    store: ScanCCHistoryStore,
 )(implicit
     ec: ExecutionContextExecutor,
     tracer: Tracer,
@@ -32,7 +33,7 @@ class ScanAutomationService(
 
   val (coinFlatStreamSubscription, readCcTransfersService) =
     // TODO(Arne): the subscription here should read from ledger start
-    createService("ScanReadCcTransfersService", ledgerClient) { connection =>
+    createService("ScanReadCcTransfersService", ledgerClient, Seq(Coin.id)) { connection =>
       new ReadCcTransfersService(svcParty, connection, store, loggerFactory)
     }
 

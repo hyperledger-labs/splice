@@ -2,11 +2,18 @@ syntax = "proto3";
 package com.daml.network.scan.v0;
 
 import "google/protobuf/empty.proto";
+import "com/daml/network/v0/history.proto";
+
 
 service ScanService {
   rpc GetSvcPartyId (google.protobuf.Empty) returns (GetSvcPartyIdResponse);
+  rpc GetHistory (google.protobuf.Empty) returns (GetHistoryResponse);
 }
 
 message GetSvcPartyIdResponse {
   string svc_party_id = 1;
+}
+
+message GetHistoryResponse {
+  repeated com.daml.network.v0.CCTransaction transactions = 1;
 }

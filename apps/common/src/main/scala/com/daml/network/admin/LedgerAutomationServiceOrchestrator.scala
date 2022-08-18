@@ -1,11 +1,11 @@
 package com.daml.network.admin
 
+import com.daml.ledger.client.binding
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinLedgerSubscription}
 import com.digitalasset.canton.lifecycle.FlagCloseableAsync
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{NoTracing, Spanning}
-import com.digitalasset.network.CC.CoinRules.CoinRulesRequest
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContextExecutor
@@ -33,6 +33,7 @@ abstract class LedgerAutomationServiceOrchestrator(
   protected def createService[S <: LedgerAutomationService](
       serviceName: String,
       ledgerClient: CoinLedgerClient,
+      templateIds: Seq[binding.Primitive.TemplateId[_]],
   )(createService: CoinLedgerConnection => S): (CoinLedgerSubscription, S) = {
     val connection = ledgerClient.connection(serviceName)
     val offset = timeouts.network.await()(connection.ledgerEnd)
@@ -40,7 +41,7 @@ abstract class LedgerAutomationServiceOrchestrator(
     val subscription = connection.subscribeAsync(
       subscriptionName = serviceName,
       offset,
-      filter = CoinLedgerConnection.transactionFilter(readAs, CoinRulesRequest.id),
+      filter = CoinLedgerConnection.transactionFilterByParty(Map(readAs -> templateIds)),
     )(tx =>
       withSpan(s"$serviceName.processTransaction") { implicit traceContext => _ =>
         service.processTransaction(tx)
