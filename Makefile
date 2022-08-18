@@ -23,17 +23,16 @@ docker-build: test
 	$(call make_apps, docker-build)
 
 .PHONY: docker-push
-docker-push: test
+docker-push: docker-build
 	$(call make_apps, docker-push)
 
 .PHONY: docker-push-force
-docker-push-force: test
+docker-push-force: docker-build
 	$(call make_apps, docker-push-force)
 
 .PHONY: docker-clean-build-push
 docker-clean-build-push: test
 	$(call make_apps, clean)
-	$(call make_apps, docker-build)
 	$(call make_apps, docker-push)
 
 .PHONY: test

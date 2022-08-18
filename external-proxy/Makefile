@@ -2,13 +2,8 @@
 include ../build-tools/common.mk
 include ../build-tools/docker.mk
 
-.PHONY: all
 all: docker-build
 
-.PHONY: build
-build: $(docker-build)
-$(docker-build): $(html)
+src := Dockerfile $(shell find conf -name '*.conf' -type f)
 
-.PHONY: clean
-clean:
-	rm -rfv target
+$(docker-build): $(src)

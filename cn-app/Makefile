@@ -2,7 +2,6 @@
 include ../build-tools/common.mk
 include ../build-tools/docker.mk
 
-.PHONY: all
 all: docker-build
 
 src := Dockerfile empty.conf
@@ -10,8 +9,6 @@ src := Dockerfile empty.conf
 app-bundle := ${REPO_ROOT}/apps/app/target/release/coin-0.1.0-SNAPSHOT.tar.gz
 target-bundle := target/coin-0.1.0-SNAPSHOT.tar.gz
 
-.PHONY: build
-build: $(docker-build)
 $(docker-build): $(src) $(target-bundle)
 
 $(target-bundle): $(app-bundle)
@@ -21,6 +18,8 @@ $(target-bundle): $(app-bundle)
 $(app-bundle):
 	cd ${REPO_ROOT} && sbt bundle
 
-.PHONY: clean
-clean:
-	-rm -vfr target
+.PHONY: clean-sbt
+clean: clean-sbt
+
+clean-sbt:
+	cd ${REPO_ROOT} && sbt clean

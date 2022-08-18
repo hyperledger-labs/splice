@@ -27,5 +27,21 @@ repo_root := $(call must-shell,cd $(dir $(lastword $(MAKEFILE_LIST))).. && pwd)
 # CircleCI overrides this to true
 export CI ?= false
 
+#######
+# default build
+#######
+
+.PHONY: all
+all:
+
+#######
+# clean
+#######
+
+.PHONY: clean
+clean:
+	-rm -vfr target
+
+
 _did_common := true
 endif

@@ -7,8 +7,6 @@
 # only load docker once
 ifneq ($(_did_docker),true)
 
-
-docker-compose-files = -f bats/docker-compose.yml$(if $(wildcard docker-compose.override.yml), -f docker-compose.override.yml)
 docker-src := Dockerfile
 
 #################
