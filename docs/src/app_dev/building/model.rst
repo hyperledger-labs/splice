@@ -67,6 +67,11 @@ Validating your Model
 * Validate that the information flows given by Daml’s privacy rules
   are sufficient for a UI to provide information to users and allow
   them to act while not disclosing too much information.
+* Contract payload size is linear in number of signatories
+* Contracts have <= 100 signatories
+* All fields of unbounded size (text, list, maps, …) are bounded via
+  an ensure clause. Fields on choice arguments are bounded via
+  asserts.
 
 Common patterns
 ---------------
@@ -75,6 +80,8 @@ Common patterns
 * credit-based payment to guard open choices. This can act as a form of rate limiting and makes sure the service gets compensated even if people try to absue it.
 * contract expiry: round based expiry usually preferred to make sure it syncs up with core CC changes. Keep in mind that there is no monotonicity check though so if that is an issue, you might want to consider time based expiry (similar to coin locking).
 * receipt contracts and workflow references
+* Batch choices for common operations that accept a list of inputs and
+  perform the same operation on each of them
 
 
 styleguide
