@@ -1,8 +1,42 @@
 Building and Testing App Frontends
 ==================================
 
-* How to use codegen and OpenAPI or grpc-web to transport data?
-* When and how to use JSON API?
-* How to test app frontend?
-* idea for fast test execution: use backend integration test to bring system into a state where frontend testing can commence then test proper rendering and client-side-only state transitions, but intercept write-calls to server to allow parallel test execution
-* use tests where client-side write calls happen sparingly
+
+OpenAPI/graphQL or gRPC-web
+---------------------------
+
+* Define a subset of the APIs exposed by your backend intended for frontend use using OpenAPI, graphQL or gRPC
+* APIs exposed not for frontend are used for other apps to build upon or automation of the app
+* Consider gRPC when you already use that for your backend. [connect-web](https://buf.build/blog/connect-web-protobuf-grpc-in-the-browser) or [grpc-web](https://github.com/grpc/grpc-web)
+* Use OpenAPI or graphQL if you are already familiar with that and invested in that ecosystem.
+
+Use of Codegens
+---------------
+
+* Use codegens to generate client-side types that match your Daml
+  types where your backend exposes them directly
+
+.. todo::
+
+   If we go for grpc-web, consider how we want to handle integration with our TS codegen.
+
+Use of the HTTP JSON API
+------------------------
+
+* Small amount of data that can all be refetched & kept in memory
+* Linear scan is acceptable for payload queries
+* State-driven apps that only depend on the ACS, streaming endpoints
+  as ACS updates rather than transaction streams
+* Interaction with specific templates rather than generic frontends
+  like Navigator
+
+Testing App Frontents
+---------------------
+
+- Follow approach for backend testing to bring up dependencies
+- Use backend integration test APIs to setup initialization to get to
+  the state you want to test
+- Focus on testing client side, consider intercepting write calls to
+  server to speed up tests
+- As for backend tests, rely on user/party ids to isolate tests from
+  each other that need different states
