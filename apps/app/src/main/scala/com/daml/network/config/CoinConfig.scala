@@ -8,6 +8,7 @@ import com.daml.network.directory.provider.config.{
 }
 import com.daml.network.directory.user.config.LocalDirectoryUserAppConfig
 import com.daml.network.scan.config.{LocalScanAppConfig, RemoteScanAppConfig}
+import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
 import com.daml.network.svc.config.{LocalSvcAppConfig, RemoteSvcAppConfig}
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
@@ -45,6 +46,7 @@ case class CoinConfig(
     remoteWalletApps: Map[InstanceName, RemoteWalletAppConfig] = Map.empty,
     directoryProviderApps: Map[InstanceName, LocalDirectoryProviderAppConfig] = Map.empty,
     directoryUserApps: Map[InstanceName, LocalDirectoryUserAppConfig] = Map.empty,
+    splitwiseApps: Map[InstanceName, LocalSplitwiseAppConfig] = Map.empty,
     // TODO(Arne): we want to remove all of these.
     domains: Map[InstanceName, CommunityDomainConfig] = Map.empty,
     participants: Map[InstanceName, CommunityParticipantConfig] = Map.empty,
@@ -309,6 +311,44 @@ case class CoinConfig(
       n.unwrap -> c
     }
 
+  private lazy val splitwiseAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
+    splitwiseApps.fmap { splitwiseConfig =>
+      SharedCoinAppParameters(
+        monitoring.tracing,
+        monitoring.delayLoggingThreshold,
+        monitoring.getLoggingConfig,
+        monitoring.logQueryCost,
+        parameters.timeouts.processing,
+        splitwiseConfig.caching,
+        parameters.enableAdditionalConsistencyChecks,
+        features.enablePreviewCommands,
+        parameters.nonStandardConfig,
+        splitwiseConfig.sequencerClient,
+        devVersionSupport = false,
+        dontWarnOnDeprecatedPV = false,
+        initialProtocolVersion = ProtocolVersion.latest,
+      )
+    }
+
+  private[network] def splitwiseAppParameters(
+      appName: InstanceName
+  ): SharedCoinAppParameters =
+    nodeParametersFor(splitwiseAppParameters_, "splitwise-app", appName)
+
+  /** Use `splitwiseAppParameters` instead!
+    */
+  def trySplitwiseAppParametersByString(name: String): SharedCoinAppParameters =
+    splitwiseAppParameters(
+      InstanceName.tryCreate(name)
+    )
+
+  /** Use `splitwises` instead!
+    */
+  def splitwisesByString: Map[String, LocalSplitwiseAppConfig] =
+    splitwiseApps.map { case (n, c) =>
+      n.unwrap -> c
+    }
+
   override def dumpString: String = "TODO(Arne): remove or implement."
 
   override def withDefaults: CoinConfig =
@@ -355,6 +395,8 @@ object CoinConfig {
       deriveReader[RemoteDirectoryProviderAppConfig]
     implicit val directoryUserConfigReader: ConfigReader[LocalDirectoryUserAppConfig] =
       deriveReader[LocalDirectoryUserAppConfig]
+    implicit val splitwiseConfigReader: ConfigReader[LocalSplitwiseAppConfig] =
+      deriveReader[LocalSplitwiseAppConfig]
     implicit val communityDomainConfigReader: ConfigReader[CommunityDomainConfig] =
       deriveReader[CommunityDomainConfig]
     implicit val communityParticipantConfigReader: ConfigReader[CommunityParticipantConfig] =

@@ -37,6 +37,7 @@ lazy val root = (project in file("."))
   .aggregate(
     `apps-common`,
     `apps-validator`,
+    `apps-splitwise`,
     `apps-svc`,
     `apps-app`,
     `apps-wallet`,
@@ -161,6 +162,25 @@ lazy val `apps-directory-user` =
       BuildCommon.sharedAppSettings,
     )
 
+lazy val `apps-splitwise` =
+  project
+    .in(file("apps/splitwise"))
+    .enablePlugins(DamlPlugin)
+    .dependsOn(
+      `apps-common` % "compile->compile;test->test",
+      `apps-directory-provider` % "compile->compile;test->test",
+    )
+    .settings(
+      libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
+      BuildCommon.sharedAppSettings,
+      Compile / damlDependencies := (`apps-directory-provider` / Compile / damlBuild).value,
+      Compile / damlSourceDirectory := file("apps/splitwise/daml"),
+      cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
+      Test / damlSourceDirectory := (Compile / damlSourceDirectory).value,
+      Compile / damlDarOutput := file("apps/splitwise/daml") / ".daml" / "dist",
+      BuildCommon.damlCodegenSettings,
+    )
+
 val scalaCodegenStrategy = new MergeStrategy {
   // Copied from SBT because they forgot to make it public
   // https://github.com/sbt/sbt-assembly/issues/435
@@ -183,9 +203,9 @@ val scalaCodegenStrategy = new MergeStrategy {
   val name = "scala codegen strat"
   def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] = {
     val result = files.collectFirst {
-      // Directory provider depends on everything so we can safely
+      // Splitwise depends on everything so we can safely
       // chose that.
-      case f if sourceOfFileForMerge(tempDir, f)._1.getPath().contains("directory-provider") => f
+      case f if sourceOfFileForMerge(tempDir, f)._1.getPath().contains("splitwise") => f
     }
     result match {
       case None => Left(s"None of the codegened files originate from directory-provider: ${files}")
@@ -255,6 +275,7 @@ lazy val `apps-app` =
       `apps-directory-provider`,
       `apps-directory-user`,
       `apps-validator`,
+      `apps-splitwise`,
       `apps-svc`,
       `apps-scan`,
       `apps-wallet`,

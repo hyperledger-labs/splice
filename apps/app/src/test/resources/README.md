@@ -39,6 +39,7 @@ A port number has five digits and is of the form `<Test Index><Node Index><Kind>
   - `10`: Directory provider, Admin API
   - `11`: Directory user, Admin API
   - `12`: Scan, Admin API
+  - `13`: Splitwise, Admin API
 
 Example:
 - `5301` is the Ledger API of Participant 3 in Test Suite 5.

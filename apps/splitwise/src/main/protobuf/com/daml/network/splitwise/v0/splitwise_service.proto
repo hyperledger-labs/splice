@@ -1,0 +1,5 @@
+syntax = "proto3";
+package com.daml.network.splitwise.v0;
+
+service SplitwiseService {
+}

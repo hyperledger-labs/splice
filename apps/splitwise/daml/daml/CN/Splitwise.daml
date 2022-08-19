@@ -6,6 +6,12 @@ import DA.Assert
 import DA.Foldable (forA_)
 import CN.Wallet
 
+-- TODO https://github.com/DACH-NY/the-real-canton-coin/issues/592
+-- fake dependency
+import CN.Directory
+_unused : DirectoryEntry -> DirectoryEntry
+_unused = identity
+
 data GroupKey = GroupKey
   with
     owner : Party

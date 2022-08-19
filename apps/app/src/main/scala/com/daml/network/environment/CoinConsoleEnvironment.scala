@@ -4,6 +4,7 @@ import com.daml.network.console.{
   LocalDirectoryProviderAppReference,
   LocalDirectoryUserAppReference,
   LocalScanAppReference,
+  LocalSplitwiseAppReference,
   LocalSvcAppReference,
   LocalValidatorAppReference,
   LocalWalletAppReference,
@@ -54,6 +55,7 @@ class CoinConsoleEnvironment(
       wallets.local,
       directoryProviders,
       directoryUsers,
+      splitwises,
     ),
     mergeRemoteInstances(
       participants.remote,
@@ -91,6 +93,9 @@ class CoinConsoleEnvironment(
   lazy val directoryUsers: Seq[LocalDirectoryUserAppReference] =
     environment.config.directoryUsersByString.keys.map(createDirectoryUserReference).toSeq
 
+  lazy val splitwises: Seq[LocalSplitwiseAppReference] =
+    environment.config.splitwisesByString.keys.map(createSplitwiseReference).toSeq
+
   private def createValidatorReference(name: String): LocalValidatorAppReference =
     new LocalValidatorAppReference(this, name)
 
@@ -114,6 +119,9 @@ class CoinConsoleEnvironment(
 
   private def createDirectoryUserReference(name: String): LocalDirectoryUserAppReference =
     new LocalDirectoryUserAppReference(this, name)
+
+  private def createSplitwiseReference(name: String): LocalSplitwiseAppReference =
+    new LocalSplitwiseAppReference(this, name)
 
   override protected def topLevelValues: Seq[TopLevelValue[_]] = {
 
@@ -160,6 +168,16 @@ class CoinConsoleEnvironment(
         helpText(
           "All directory user app instances" + genericNodeReferencesDoc,
           "Directory users",
+        ),
+        directoryUsers,
+        Seq("App References"),
+      ) :++ splitwises.map(v =>
+        TopLevelValue(v.name, helpText("splitwise app", v.name), v, Seq("App References"))
+      ) :+ TopLevelValue(
+        "splitwises",
+        helpText(
+          "All splitwise instances" + genericNodeReferencesDoc,
+          "Splitwises",
         ),
         directoryUsers,
         Seq("App References"),

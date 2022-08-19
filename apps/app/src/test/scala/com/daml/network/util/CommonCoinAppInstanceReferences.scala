@@ -9,6 +9,7 @@ import com.daml.network.console.{
   LocalWalletAppReference,
   RemoteSvcAppReference,
   RemoteWalletAppReference,
+  LocalSplitwiseAppReference,
 }
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.topology.PartyId
@@ -58,6 +59,18 @@ trait CommonCoinAppInstanceReferences {
     "directoryUser"
   )
 
+  def aliceSplitwise(implicit
+      env: CoinTestConsoleEnvironment
+  ): LocalSplitwiseAppReference = sw(
+    "aliceSplitwise"
+  )
+
+  def bobSplitwise(implicit
+      env: CoinTestConsoleEnvironment
+  ): LocalSplitwiseAppReference = sw(
+    "bobSplitwise"
+  )
+
   def w(name: String)(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference =
     env.wallets.local
       .find(_.name == name)
@@ -86,4 +99,11 @@ trait CommonCoinAppInstanceReferences {
     env.directoryUsers
       .find(_.name == name)
       .getOrElse(sys.error(s"directory user [$name] not configured"))
+
+  def sw(
+      name: String
+  )(implicit env: CoinTestConsoleEnvironment): LocalSplitwiseAppReference =
+    env.splitwises
+      .find(_.name == name)
+      .getOrElse(sys.error(s"splitwise [$name] not configured"))
 }

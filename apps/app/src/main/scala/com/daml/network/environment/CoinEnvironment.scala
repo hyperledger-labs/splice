@@ -9,6 +9,8 @@ import com.daml.network.directory.user.config.LocalDirectoryUserAppConfig
 import com.daml.network.metrics.CoinMetricsFactory
 import com.daml.network.scan.ScanAppBootstrap
 import com.daml.network.scan.config.LocalScanAppConfig
+import com.daml.network.splitwise.SplitwiseAppBootstrap
+import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
 import com.daml.network.svc.SvcAppBootstrap
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.validator.ValidatorAppBootstrap
@@ -214,6 +216,36 @@ trait CoinEnvironment extends Environment {
     loggerFactory,
   )
 
+  protected def createSplitwise(
+      name: String,
+      splitwiseConfig: LocalSplitwiseAppConfig,
+  ): SplitwiseAppBootstrap =
+    SplitwiseAppBootstrap(
+      name,
+      splitwiseConfig,
+      config.trySplitwiseAppParametersByString(name),
+      createClock(Some(SplitwiseAppBootstrap.LoggerFactoryKeyName -> name)),
+      testingTimeService,
+      coinMetrics.forSplitwise(name),
+      testingConfig,
+      futureSupervisor,
+      loggerFactory,
+    )
+      .valueOr(err =>
+        throw new RuntimeException(
+          s"Failed to create participant bootstrap: $err"
+        )
+      )
+
+  lazy val splitwises = new SplitwiseApps(
+    createSplitwise,
+    migrationsFactory,
+    timeouts,
+    config.splitwisesByString,
+    config.trySplitwiseAppParametersByString,
+    loggerFactory,
+  )
+
   /** Start all instances described in the configuration
     */
   override def startAll(): Either[Seq[StartupError], Unit] = {
@@ -223,12 +255,13 @@ trait CoinEnvironment extends Environment {
         svcs.startAll.left.getOrElse(Seq.empty) ++
         wallets.startAll.left.getOrElse(Seq.empty) ++
         directoryProviders.startAll.left.getOrElse(Seq.empty) ++
-        directoryUsers.startAll.left.getOrElse(Seq.empty)
+        directoryUsers.startAll.left.getOrElse(Seq.empty) ++
+        splitwises.startAll.left.getOrElse(Seq.empty)
     Either.cond(errors.isEmpty, (), errors)
   }
 
   def allCoinNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
-    List(validators, svcs, scans, wallets, directoryProviders, directoryUsers)
+    List(validators, svcs, scans, wallets, directoryProviders, directoryUsers, splitwises)
 
   override def allNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
     super.allNodes ::: allCoinNodes
