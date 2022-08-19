@@ -1,0 +1,4 @@
+# Add branches here to ensure that they are fully-recompiled on CI to prevent potentially stale caches being used
+# Unless you are doing some unusual work involving external dependencies, you will very rarely need to touch this file
+main
+

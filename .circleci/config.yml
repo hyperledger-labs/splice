@@ -37,6 +37,7 @@ commands:
           sudo mkdir /nix
           sudo chown $USER /nix
     - restore_cache:
+        name: Restore nix cache
         keys:
         - nix-{{ checksum "/tmp/nix-cache-key" }}
     - run:
@@ -62,6 +63,159 @@ commands:
         - /home/circleci/.nix-channels
         - /home/circleci/.nix-defexpr
         - /home/circleci/.config/nix
+
+
+  # Note: compiled_classes and sbt_cache commands are largely copied from the Canton repo
+  # save compiled target directories to cache (so we don't recompile everything again and again)
+  # uses the target directories in the project (e.g. `the-real-canton-coin/target`) which sbt doesn't cache.
+  # This cache is not shared among CI jobs.
+  save_compiled_classes:
+    steps:
+      - run:
+          name: Creating archive of compiled classes
+          command: |
+            mkdir -p /tmp/classes
+            # Excluding ./track, as its contents may change while the archive is created.
+            # Excluding ./log, as its large and we don't need it.
+            tar -czf /tmp/classes/classes.tar.gz --exclude-vcs --exclude=./track --exclude=./log -H posix .
+      - save_cache:
+          name: Uploading archive with compiled classes to cache
+          # Key components:
+          # - classes: fixed prefix for uniqueness
+          # - branch: to prevent re-usage of classes between branches
+          # - dependencies: to prevent re-usage of classes with mismatching libraries (this can lead to subtle errors)
+          # - rev: to allow for updating the cache when sources have changed
+          key: &compiled_classes_key classes ci-job={{ .Environment.CIRCLE_JOB }} branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }} rev:{{ .Revision }}
+          paths:
+            - /tmp/classes
+      - store_artifacts:
+          name: Storing archive of compiled classes
+          path: /tmp/classes
+          destination: classes
+
+  # restore pre-compiled target directories from cache (so we don't recompile everything again and again)
+  # uses the target directories in the project (e.g. `the-real-canton-coin/target`) which sbt doesn't cache.
+  # This cache is not shared among CI jobs.
+  restore_precompiled_classes:
+    parameters:
+      reset_classes_if_requested:
+        type: boolean
+        default: false
+    steps:
+      - checkout # Also required to compute cache keys in the next step
+      - restore_cache:
+          name: Downloading archive with compiled classes from cache
+          keys:
+            # First, try to download class files from the same revision
+            - *compiled_classes_key
+            # Then, try to download the latest class files produced for the same branch.
+            # Make sure that library versions still match.
+            - classes ci-job={{ .Environment.CIRCLE_JOB }} branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }}
+            # Then, try to download the latest class files produced for the main branch.
+            # Make sure that library versions still match.
+            - classes ci-job={{ .Environment.CIRCLE_JOB }} branch:main buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }}
+      - run:
+          name: Extracting precompiled classes
+          command: |
+            if [[ << parameters.reset_classes_if_requested >> == true ]] &&
+               grep "^$CIRCLE_BRANCH$" .circleci/branches_to_be_fully_recompiled_in_ci.txt > /dev/null
+            then
+              echo "Do not extract precompiled classes, as a full recompilation has been requested."
+              exit 0
+            fi
+
+            if [[ -e /tmp/classes/classes.tar.gz ]]; then
+              tar -zxf /tmp/classes/classes.tar.gz
+
+
+              # For some reason, the reset below may change file modification times stamps, if we don't run `git status`.
+              git status
+
+              # Reset changes to files under version control.
+              git reset --hard
+
+              # Delete untracked files, except for ignored files.
+              git clean -fd
+              echo "Finished restoring the pre-compiled cache files"
+
+            else
+              echo "No precompiled classes found. Skipping..."
+            fi
+
+  save_sbt_cache:
+    steps:
+      - run:
+          name: Make caches readable
+          # On machine executors, some files in the caches may be owned by root.
+          # Make them readable to the cirecleci user.
+          command: |
+            for dir in "$HOME/.ivy2/cache" "$HOME/.cache/coursier/v1" "$HOME/.sbt"; do
+              if [[ -e "$dir" ]]; then
+                # The combination of sudo and `|| true` is a bit of a hack.
+                # The underlying assumption is that chmod is only needed when sudo is available.
+                # Unfortunately, there are jobs where sudo is not available.
+                sudo chmod -R a+r "$dir" || true
+              fi
+            done
+
+      - save_cache:
+          name: Uploading Coursier cache
+          # The cache is stored only when the build definition or dependencies change
+          key: &coursier-cache-key coursier-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}-buildcommon:{{ checksum "project/BuildCommon.scala" }}-configyml={{ checksum ".circleci/config.yml" }}-buildproperties={{ checksum "project/build.properties" }}-houserules={{ checksum "project/Houserules.scala" }}-plugins={{ checksum "project/plugins.sbt" }}-build={{ checksum "build.sbt" }}
+          # Components of the cache key:
+          # - Keyword "coursier" to indicate this stores the coursier cache.
+          # - Name of the job, to avoid interferences between jobs. (Different jobs populate the cached folders differently.)
+          # - Dockerfile to start with a clean state if build tools are updated.
+          # - This file to be on the save side.
+          # - Everything in project that may contain a dependency.
+          # - build.sbt as it may contain a hardcoded dependency.
+          paths:
+            - "~/.cache/coursier/v1/"
+
+      - save_cache:
+          name: Uploading Sbt caches
+          # The cache is stored only when the build definition or dependencies change
+          key: &sbt-cache-key sbt-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}-buildcommon:{{ checksum "project/BuildCommon.scala" }}-configyml={{ checksum ".circleci/config.yml" }}-buildproperties={{ checksum "project/build.properties" }}-houserules={{ checksum "project/Houserules.scala" }}-plugins={{ checksum "project/plugins.sbt" }}-build={{ checksum "build.sbt" }}
+          # Components of the cache key:
+          # - Keyword "sbt" to indicate this stores Sbt caches.
+          # - Otherwise as for the coursier cache key.
+          paths:
+            - "~/.ivy2/cache" # despite sbt 1.3 using coursier it appears a handful of dependencies are placed in the ivy cache (core sbt plugins and coursier itself)
+            - "~/.sbt"
+
+  restore_sbt_cache:
+    # We are saving to / restoring from several caches to keep individual caches below 500MB.
+    # Otherwise, restore_cache may fail for no good reason.
+    # See https://circleci.com/docs/2.0/caching/#cache-size
+    steps:
+      - run:
+          name: Deleting cache directories
+          # Delete the cache directories so that we don't include arbitrary stuff coming from the docker image.
+          command: |
+            for dir in "$HOME/.ivy2/cache" "$HOME/.cache/coursier/v1" "$HOME/.sbt"; do
+              if [[ -e "$dir" ]]; then
+                rm -rfv "$dir"
+              fi
+            done
+
+      - restore_cache:
+          name: Restoring Coursier cache
+          keys:
+            # Restore the cache for the exact same build configuration.
+            - *coursier-cache-key
+            # Previously, a cache matching CIRCLE_JOB and project/Dependencies.scala was also attempted but
+            # unfortunately sbt and/or coursier fail to detect and use credentials to retrieve missing artifacts
+            # from authenticated repos.
+
+      - restore_cache:
+          name: Restoring Sbt caches
+          keys:
+            # First try to restore the cache for the exact same build configuration.
+            - *sbt-cache-key
+            # If this is not possible and Dependencies.scala hasn't changed, populate the cache with slightly outdated data.
+            # This will speed-up compilation, because most libraries are already in the cache.
+            - sbt-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}
+
 
   # Largely copied from Canton's CI definition
   execute_sbt_command:
@@ -193,9 +347,11 @@ commands:
             EOF
 
 
-  cleanup_test_job:
+  cleanup_sbt_test_job:
     steps:
       - upload_test_reports
+      - save_sbt_cache
+      - save_compiled_classes
       - run: # Pack logfiles to speedup downloads.
           name: Pack Logfiles
           when: always
@@ -224,6 +380,12 @@ commands:
       - store_test_results:
           path: test-reports
 
+  setup_sbt_test_job:
+    steps:
+      - checkout
+      - setup_nix
+      - restore_sbt_cache
+      - restore_precompiled_classes
 
   install_daml_dependencies:
     steps:
@@ -253,11 +415,11 @@ jobs:
     environment:
       <<: *env
     steps:
-      - checkout
-      - setup_nix
+      - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "lint"
           retry_fetch: "50"
+      - cleanup_sbt_test_job
 
   test:
     docker:
@@ -265,8 +427,7 @@ jobs:
     environment:
       <<: *env
     steps:
-      - checkout
-      - setup_nix
+      - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "Test/compile"
           retry_fetch: "50"
@@ -279,7 +440,7 @@ jobs:
       - execute_sbt_command:
           cmd: "damlTest"
           timeout: "10m"
-      - cleanup_test_job
+      - cleanup_sbt_test_job
 
   bundle:
     docker:
@@ -287,8 +448,7 @@ jobs:
     environment:
       <<: *env
     steps:
-      - checkout
-      - setup_nix
+      - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "bundle"
           retry_fetch: "50"
@@ -301,6 +461,7 @@ jobs:
       - store_artifacts:
           path: /tmp/artifacts
           destination: release-artifacts
+      - cleanup_sbt_test_job
 
   deployment_test:
     docker:
@@ -342,8 +503,7 @@ jobs:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
     steps:
-      - checkout
-      - setup_nix
+      - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "Test/compile"
           retry_fetch: "50"
@@ -369,7 +529,7 @@ jobs:
                 }
               ]
             }
-      - cleanup_test_job
+      - cleanup_sbt_test_job
 
   update_pipeline_schedule:
     docker:
