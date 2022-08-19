@@ -1,9 +1,26 @@
 Glossary
-=========
+========
 
 .. glossary::
 
-    Canton Network Public Domain
+    CN
+
+      :term:`Canton Network`
+
+    Canton Network
+
+      A network of multi-party business processes operated by
+      business entities in the form of CN applications.
+
+    CN Application
+
+      A set of Canton participant and domain
+      nodes and supporting code operated by a single business entity for the
+      purpose of providing access to a particular multi-party business process
+      to other entities on the Canton network.
+
+
+    CN Public Domain
 
       * public synchronization domain
       * can host small apps directly on domain

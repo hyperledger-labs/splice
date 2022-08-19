@@ -65,6 +65,8 @@ Failure Handling for Ledger API Calls
 * Assume all RPCs (e.g., ledger API calls) can fail and retry on transient failures
 * Only retry up to a maximum and retry with exponential backoff
 * Rely on command dedup for retries
+* Report errors with unique error-ids and include documention with your app mapping
+  error-ids to likely causes and resolutions
 
 Integration with Off-Ledger Services
 ------------------------------------

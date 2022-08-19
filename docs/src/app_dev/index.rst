@@ -11,4 +11,3 @@ These docs serve as a drafting space for this kind of docs.
    building/index
    operating/index
    reference
-   glossary

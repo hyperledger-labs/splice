@@ -1,13 +1,68 @@
 Introduction
 ============
 
+
 * What is the Canton Network?
-* What is a CN application?
-* What use cases are suitable for CN applications, which ones not?
+
+  * The **Canton Network (CN)** is a network of multi-party business processes
+    operated by different business entities in the form of CN applications.
+  * A **CN application** is a set of Canton participant and domain
+    nodes and supporting code operated by a single business entity for the
+    purpose of providing access to a particular multi-party business process
+    to other entities on the Canton network.
+
+* What business processes are well-suited to be provided as a CN applications,
+  which ones not?
+
+  * **well-suited:**
+
+    * business processes whose state and state changes must be captured in
+      full by all participating business entities for compliance reasons
+
+    * concrete examples:
+
+      - trading, issuing, life-cycling financial assets
+      - governance processes for legal entities
+      - billing processes (e.g., in health-care)
+      - KYC, credit rating
+      - trade finance and the tracking of goods in transit
+
+
+  * **less-suited:**
+
+    * business processes where a single business entity can provide
+      the backing DB, UIs, and APIs while satisfying trust assumptions
+
+      - low-latency order-book in an exchange
+      - many web 2.0 retail SaaS
+
+    * business processes with very low latency requirements; e.g., HFT
+
+    * business processes with very high throughput requirements; e.g.,
+      Amazon's shopping cart management (Amazon DynamoDB sacrifices integrity
+      for availability, which is OK for their shopping carts)
+
+    * processes with weak integrity requirements; e.g., recording sensor data
+      from IoT devices (it's OK if some measurements get lost or duplicated)
+
+    * processes completely internal to a business entity (e.g., vacation
+      tracking)
+
+
 * How to build, operate, and evolve a CN app?
+
+  1. Become clear about the multi-party business process you would like the CN
+     app to implement.
+  2. Design the topology of your CN app, see :doc:`design`
+  3. Build your CN app using test-driven development
+  4. Release, deploy, operate your app
+  5. If you offer a third-party API, then also release API definition files.
+  6. Evolve your app by publishing new, backwards compatible APIs.
 
 Getting Started
 ---------------
 
-* What prerequisites do I need to build an application?
-* How do I use the documentation to build an application?
+.. todo::
+
+   * What prerequisites do I need to build an application?
+   * How do I use the documentation to build an application?

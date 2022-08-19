@@ -20,6 +20,7 @@ Objectives:
    #. off-ledger systems to integrate with
    #. who operates what system
    #. who controls choice implementation for daml models
+   #. geographical distribution of participant nodes
 #. help the app dev validate that
 
    #. app won’t hit scalability and throughput boundaries

@@ -82,6 +82,8 @@ Common patterns
 * receipt contracts and workflow references
 * Batch choices for common operations that accept a list of inputs and
   perform the same operation on each of them
+* store reference data as contracts with the provider as the only signatory and an open choice
+  for reading the reference data that is rate limited; use explicit disclosure to distribute the reference data
 
 
 styleguide

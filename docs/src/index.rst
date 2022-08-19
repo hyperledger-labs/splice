@@ -6,6 +6,7 @@ Canton Network Documentation
    :caption: Network Documentation
 
    overview.rst
+   glossary.rst
 
 .. toctree::
    :maxdepth: 2
