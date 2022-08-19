@@ -4,7 +4,7 @@ import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.v1.event.ExercisedEvent
 import com.daml.ledger.api.v1.transaction.TreeEvent.Kind.{Created, Empty, Exercised}
 import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree, TreeEvent}
-import com.daml.ledger.client.binding.{ValueDecoder, Value => CodegenValue}
+import com.daml.ledger.client.binding.{Primitive, ValueDecoder, Value => CodegenValue}
 import com.daml.network.admin.LedgerAutomationService
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history._
@@ -22,12 +22,14 @@ import com.digitalasset.network.CC.CoinRules.{
   CoinRules_MiningRound_StartIssuing,
   CoinRules_Tap,
   CoinRules_Transfer,
+  TransferResult,
 }
+import com.digitalasset.network.CC.Round.IssuingMiningRound
 
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 
-class ReadCcTransfersService(
+class ReadCoinTransactionsService(
     svcParty: PartyId,
     connection: CoinLedgerConnection,
     store: ScanCCHistoryStore,
@@ -116,17 +118,21 @@ class ReadCcTransfersService(
   private def isStartIssuing(event: ExercisedEvent) =
     event.choice == "CoinRules_MiningRound_StartIssuing" && isCoinRules(event)
 
-  private def attemptDecode[A](exercised: Exercised)(implicit A: ValueDecoder[A]) =
-    CodegenValue.decode[A](exercised.value.getChoiceArgument) match {
+  import com.daml.ledger.api.v1
+  private def tryDecode[A](
+      value: v1.value.Value
+  )(implicit A: ValueDecoder[A]): A = {
+    CodegenValue.decode[A](value) match {
       case None =>
         ErrorUtil.invalidState(
-          s"Unexpectedly couldn't decode $exercised to a ${exercised.value.choice}"
+          s"Unexpectedly couldn't decode LF-value $value to $A. Did you specify the wrong type to decode to?"
         )
       case Some(value) => value
     }
+  }
 
   import cats.syntax.option._
-  private def parseParentEvent(parent: Option[TreeEvent.Kind]): Option[AncestorEvent] = {
+  private def parseParentEvent(parent: Option[TreeEvent.Kind]): Option[ParentNode] = {
     parent match {
       case None => // coin create or archival has no parent node
         logger.warn("Ancestor of Coin had no parent node in the transaction tree")
@@ -134,14 +140,23 @@ class ReadCcTransfersService(
       case Some(parent) =>
         parent match {
           case exercised: Exercised if isTransfer(exercised.value) =>
-            Transfer(attemptDecode[CoinRules_Transfer](exercised)).some
+            val argument = tryDecode[CoinRules_Transfer](exercised.value.getChoiceArgument)
+            val result =
+              tryDecode[Primitive.List[TransferResult]](exercised.value.getExerciseResult)
+            Transfer(argument, result).some
           case exercised: Exercised if isTap(exercised.value) =>
-            Tap(attemptDecode[CoinRules_Tap](exercised)).some
+            val argument = tryDecode[CoinRules_Tap](exercised.value.getChoiceArgument)
+            val result = tryDecode[Primitive.ContractId[Coin]](exercised.value.getExerciseResult)
+            Tap(argument, result).some
           case exercised: Exercised if isStartIssuing(exercised.value) =>
-            StartIssuing(attemptDecode[CoinRules_MiningRound_StartIssuing](exercised)).some
+            val argument =
+              tryDecode[CoinRules_MiningRound_StartIssuing](exercised.value.getChoiceArgument)
+            val result =
+              tryDecode[Primitive.ContractId[IssuingMiningRound]](exercised.value.getExerciseResult)
+            StartIssuing(argument, result).some
           case other: Exercised =>
             logger.warn(
-              s"Parent of coin create or archival was not a tap, transfer or start issuing but $other"
+              s"Parent of coin create or archival was not a tap, transfer or start issuing but ${other.getClass} ($other)"
             )
             None
           case created: Created =>
@@ -159,5 +174,3 @@ class ReadCcTransfersService(
   override def close(): Unit = Lifecycle.close(connection)(logger)
 
 }
-
-object ReadCcTransfersService {}

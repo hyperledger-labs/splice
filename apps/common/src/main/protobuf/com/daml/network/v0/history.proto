@@ -11,12 +11,16 @@ message CCTransaction {
 }
 
 message ExerciseNode {
-  oneof ancestor {
-    com.daml.network.v0.Value tap = 1;
-    com.daml.network.v0.Value transfer = 2;
-    com.daml.network.v0.Value start_issuing = 3;
+  com.daml.network.v0.Value argument = 1;
+  com.daml.network.v0.Value result = 2;
+}
+
+message ParentNode {
+  oneof type {
+    ExerciseNode tap = 1;
+    ExerciseNode transfer = 2;
+    ExerciseNode start_issuing = 3;
   }
-  // TODO(Arne): add exercise result too
 }
 
 message CCEvent {
@@ -24,7 +28,7 @@ message CCEvent {
     CoinCreate create = 1; // contract
     CoinArchive archive = 2; // cid
   }
-  ExerciseNode ancestor = 3;
+  ParentNode parent = 3;
 }
 
 message CoinCreate {

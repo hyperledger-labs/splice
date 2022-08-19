@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.history.{CoinArchive, CoinCreate, CoinEvent, Tap}
+import com.daml.network.history._
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
@@ -29,17 +29,17 @@ class ScanIntegrationTest
 
   "see CC transfers" in { implicit env =>
     val (aliceP, bobP) = setup(env)
-    val coinCid = aliceWallet.tap(50)
-    aliceWallet.executeDirectTransfer(bobP, 10, coinCid)
+    val tappedCoinCid = aliceWallet.tap(50)
+    aliceWallet.executeDirectTransfer(bobP, 10, tappedCoinCid)
     import scala.concurrent.duration._
     eventually(5.seconds) {
       val history = scan.getTxHistory()
       history should have length 2
       val tapCreateTx = history(0)
       val tapEvent = tapCreateTx.events(0)
-      inside(tapEvent.ancestorO) { case Some(tap: Tap) =>
-        tap.value.quantity shouldBe 50
-        tap.value.receiver shouldBe aliceP.toPrim
+      inside(tapEvent.parentO) { case Some(tap: Tap) =>
+        tap.argument.quantity shouldBe 50
+        tap.argument.receiver shouldBe aliceP.toPrim
       }
 
       val transferTx = history(1)
@@ -47,13 +47,23 @@ class ScanIntegrationTest
       // Coins in order: alice 40-ish, bob-10, archive 50
       inside(transferEvents) {
         case Seq(
-              CoinEvent(aliceNew, transferAncestor),
-              CoinEvent(bob, transferAncestor2),
-              CoinEvent(aliceOld, transferAncestor3),
+              // alice's new coin after deducting the quantity send to bob
+              CoinEvent(aliceNew, transferParentNode),
+              // bob's new coin
+              CoinEvent(bob, transferParentNode2),
+              // alice's input coin
+              CoinEvent(aliceOld, transferParentNode3),
             ) =>
-          transferAncestor should matchPattern { case Some(transfer) => }
-          transferAncestor shouldBe transferAncestor2
-          transferAncestor2 shouldBe transferAncestor3
+          // all three coin-events created by the transfer should have the transfer node as parent
+          transferParentNode should matchPattern { case Some(transfer) => }
+          transferParentNode shouldBe transferParentNode2
+          transferParentNode2 shouldBe transferParentNode3
+
+          inside(transferParentNode) { case Some(Transfer(argument, results)) =>
+            argument.transfer.sender shouldBe aliceP.toPrim
+            // one transfer result for alice, one for bob
+            results should have length 2
+          }
 
           aliceNew should matchPattern { case CoinCreate(_) => }
           aliceOld should matchPattern { case CoinArchive(_) => }

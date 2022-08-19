@@ -33,8 +33,8 @@ class ScanAutomationService(
 
   val (coinFlatStreamSubscription, readCcTransfersService) =
     // TODO(Arne): the subscription here should read from ledger start
-    createService("ScanReadCcTransfersService", ledgerClient, Seq(Coin.id)) { connection =>
-      new ReadCcTransfersService(svcParty, connection, store, loggerFactory)
+    createService("Scan:ReadCoinTransactionsService", ledgerClient, Seq(Coin.id)) { connection =>
+      new ReadCoinTransactionsService(svcParty, connection, store, loggerFactory)
     }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq[AsyncOrSyncCloseable](

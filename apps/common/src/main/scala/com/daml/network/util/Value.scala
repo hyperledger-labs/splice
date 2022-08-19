@@ -26,7 +26,7 @@ object Value {
       value: v0.Value
   )(implicit dec: ValueDecoder[T]): Either[ProtoDeserializationError, Value[T]] = {
     for {
-      valueP <- ProtoConverter.required("value", value.value)
+      valueP <- ProtoConverter.required("Value.value", value.value)
       value <- CodegenValue
         .decode(valueP)
         .toRight(
