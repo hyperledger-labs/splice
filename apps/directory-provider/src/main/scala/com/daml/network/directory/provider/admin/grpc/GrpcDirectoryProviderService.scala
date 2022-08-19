@@ -1,7 +1,7 @@
 package com.daml.network.directory.provider.admin.grpc
 
 import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.client.binding.{Primitive, TemplateCompanion, Contract => CodegenContract}
+import com.daml.ledger.client.binding.{Primitive}
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.directory_provider.v0
 import com.daml.network.directory_provider.v0.DirectoryProviderServiceGrpc
@@ -106,7 +106,7 @@ class GrpcDirectoryProviderService(
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
         partyId <- connection.getPrimaryParty(damlUser)
-        entryRequest <- fetchByContractId(codegen.DirectoryEntryRequest)(
+        entryRequest <- connection.fetchByContractId(codegen.DirectoryEntryRequest)(
           partyId,
           Proto.tryDecodeContractId(request.contractId),
         )
@@ -128,7 +128,7 @@ class GrpcDirectoryProviderService(
     withSpanFromGrpcContext("GrpcDirectoryProviderService") { implicit traceContext => span =>
       for {
         partyId <- connection.getPrimaryParty(damlUser)
-        acceptedAppPayment <- fetchByContractId(walletCodegen.AcceptedAppPayment)(
+        acceptedAppPayment <- connection.fetchByContractId(walletCodegen.AcceptedAppPayment)(
           partyId,
           Proto.tryDecodeContractId(request.contractId),
         )
@@ -208,25 +208,7 @@ class GrpcDirectoryProviderService(
     } yield {
       val filtered =
         decoded.filter(contract => PartyId.tryFromPrim(contract.value.provider) == party)
-      filtered.map(Contract.fromCodegenContract[codegen.DirectoryEntry](_))
+      filtered.map(Contract.fromCodegenContract[codegen.DirectoryEntry])
     }
-
-  private def fetchByContractId[T](
-      companion: TemplateCompanion[T]
-  )(partyId: PartyId, cid: Primitive.ContractId[T]): Future[CodegenContract[T]] = {
-    for {
-      decoded <- connection.activeContracts(partyId, companion)
-    } yield {
-      decoded
-        .collectFirst {
-          case contract if contract.contractId == cid => contract
-        }
-        .getOrElse(
-          throw new IllegalStateException(
-            s"No active contract of template ${companion.id} with contract id $cid"
-          )
-        )
-    }
-  }
 
 }

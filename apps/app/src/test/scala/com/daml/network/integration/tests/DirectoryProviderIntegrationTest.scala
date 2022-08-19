@@ -16,7 +16,6 @@ class DirectoryProviderIntegrationTest
     with IsolatedCoinEnvironments
     with CommonCoinAppInstanceReferences {
 
-  private val quantity = 100d
   private val directoryDarPath =
     "apps/directory-provider/daml/.daml/dist/directory-service-0.1.0.dar"
   private val entryName = "mycoolentry"
@@ -105,6 +104,7 @@ class DirectoryProviderIntegrationTest
       val entry = directoryProvider.remoteParticipant.ledger_api.acs
         .await(providerParty, codegen.DirectoryEntry)
       entry.contractId shouldBe cid
+
       val entryValue =
         Contract(cid, codegen.DirectoryEntry(userParty.toPrim, providerParty.toPrim, entryName))
 

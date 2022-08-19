@@ -2,11 +2,11 @@ package com.daml.network.history
 
 import cats.syntax.traverse._
 import com.daml.ledger.client.binding.{Primitive => P}
-import com.daml.network.util.{Contract, Proto, Value}
+import com.daml.network.util.{Contract, Value}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.serialization.ProtoConverter
-import com.digitalasset.network.CC.Coin.Coin
+import com.digitalasset.network.CC.Coin.{Coin, Coin_Unlock}
 import com.digitalasset.network.CC.CoinRules.{
   CoinRules_MiningRound_StartIssuing,
   CoinRules_Tap,
@@ -93,22 +93,46 @@ object StartIssuing {
   } yield StartIssuing(argument.value, result.value)
 }
 
+case class CoinUnlock(
+    argument: Coin_Unlock,
+    result: P.ContractId[Coin],
+) extends ParentNode {
+  def toProtoV0: v0.ParentNode =
+    v0.ParentNode(
+      v0.ParentNode.Type.StartIssuing(
+        v0.ExerciseNode(Some(Value(argument).toProtoV0), Some(Value(result).toProtoV0))
+      )
+    )
+}
+
+object CoinUnlock {
+  def fromProtoV0(
+      issuingP: v0.ParentNode.Type.CoinUnlock
+  ): Either[ProtoDeserializationError, CoinUnlock] = for {
+    argumentP <- ProtoConverter
+      .required("StartIssuing.ExerciseNode.argument", issuingP.value.argument)
+    argument <- Value.fromProto[Coin_Unlock](argumentP)
+    resultP <- ProtoConverter
+      .required("StartIssuing.ExerciseNode.result", issuingP.value.result)
+    result <- Value.fromProto[P.ContractId[Coin]](resultP)
+  } yield CoinUnlock(argument.value, result.value)
+}
+
 object ParentNode {
   def fromProtoV0(nodeP: v0.ParentNode): Either[ProtoDeserializationError, ParentNode] = {
     nodeP.`type` match {
       case v0.ParentNode.Type.Empty =>
         Left(ProtoDeserializationError.FieldNotSet("ParentNode.type"))
-      case tap: v0.ParentNode.Type.Tap =>
-        Tap.fromProtoV0(tap)
-      case transfer: v0.ParentNode.Type.Transfer =>
-        Transfer.fromProtoV0(transfer)
-      case issuing: v0.ParentNode.Type.StartIssuing =>
-        StartIssuing.fromProtoV0(issuing)
+      case tap: v0.ParentNode.Type.Tap => Tap.fromProtoV0(tap)
+      case transfer: v0.ParentNode.Type.Transfer => Transfer.fromProtoV0(transfer)
+      case issuing: v0.ParentNode.Type.StartIssuing => StartIssuing.fromProtoV0(issuing)
+      case issuing: v0.ParentNode.Type.CoinUnlock => CoinUnlock.fromProtoV0(issuing)
     }
   }
 }
 
 sealed trait EventTypeAndCoin {
+  def coin: Contract[Coin]
   def isArchive: Boolean
   def isCreate: Boolean = !isArchive
   def toProtoV0: v0.CCEvent.Coin
@@ -118,24 +142,19 @@ object EventTypeAndCoin {
   def fromProtoV0(proto: v0.CCEvent.Coin): Either[ProtoDeserializationError, EventTypeAndCoin] = {
     proto match {
       case v0.CCEvent.Coin.Empty => Left(ProtoDeserializationError.FieldNotSet("CCEvent.coin"))
-      case v0.CCEvent.Coin.Create(create) =>
-        val coinE = ProtoConverter
-          .required("CoinCreate.contract", create.contract)
-          .flatMap(Contract.fromProto[Coin](Coin))
-        coinE.map(CoinCreate)
-      case v0.CCEvent.Coin.Archive(archive) =>
-        Proto.decodeContractIdDeserialization(archive.contractId).map(CoinArchive)
+      case v0.CCEvent.Coin.Create(create) => Contract.fromProto(Coin)(create).map(CoinCreate)
+      case v0.CCEvent.Coin.Archive(archive) => Contract.fromProto(Coin)(archive).map(CoinArchive)
     }
   }
 }
 
 case class CoinCreate(coin: Contract[Coin]) extends EventTypeAndCoin {
   override def isArchive: Boolean = false
-  def toProtoV0: v0.CCEvent.Coin = v0.CCEvent.Coin.Create(v0.CoinCreate(Some(coin.toProtoV0)))
+  def toProtoV0: v0.CCEvent.Coin = v0.CCEvent.Coin.Create(coin.toProtoV0)
 }
-case class CoinArchive(coinCid: P.ContractId[Coin]) extends EventTypeAndCoin {
+case class CoinArchive(coin: Contract[Coin]) extends EventTypeAndCoin {
   override def isArchive: Boolean = true
-  def toProtoV0: v0.CCEvent.Coin = v0.CCEvent.Coin.Archive(v0.CoinArchive(Proto.encode(coinCid)))
+  def toProtoV0: v0.CCEvent.Coin = v0.CCEvent.Coin.Archive(coin.toProtoV0)
 }
 
 case class CoinEvent(

@@ -1,5 +1,6 @@
 package com.daml.network.admin
 
+import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
 import com.daml.ledger.client.binding
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinLedgerSubscription}
 import com.digitalasset.canton.lifecycle.FlagCloseableAsync
@@ -36,7 +37,7 @@ abstract class LedgerAutomationServiceOrchestrator(
       templateIds: Seq[binding.Primitive.TemplateId[_]],
   )(createService: CoinLedgerConnection => S): (CoinLedgerSubscription, S) = {
     val connection = ledgerClient.connection(serviceName)
-    val offset = timeouts.network.await()(connection.ledgerEnd)
+    val offset = LedgerOffset().withBoundary(LedgerOffset.LedgerBoundary.LEDGER_BEGIN)
     val service = createService(connection)
     val subscription = connection.subscribeAsync(
       subscriptionName = serviceName,

@@ -20,23 +20,16 @@ message ParentNode {
     ExerciseNode tap = 1;
     ExerciseNode transfer = 2;
     ExerciseNode start_issuing = 3;
+    ExerciseNode coin_unlock = 4;
   }
 }
 
 message CCEvent {
   oneof coin {
-    CoinCreate create = 1; // contract
-    CoinArchive archive = 2; // cid
+    com.daml.network.v0.Contract create = 1;
+    com.daml.network.v0.Contract archive = 2;
   }
   ParentNode parent = 3;
-}
-
-message CoinCreate {
-  com.daml.network.v0.Contract contract = 1;
-}
-
-message CoinArchive {
-  string contract_id = 1;
 }
 
 message TransactionMetadata {

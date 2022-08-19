@@ -106,6 +106,10 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
       party: Set[PartyId],
       templateCompanion: TemplateCompanion[T],
   ): Future[Seq[Contract[T]]]
+  // TODO(i331): add an index or wait for Ledger API to implement this. This is very poor performance-wise
+  def fetchByContractId[T](
+      companion: TemplateCompanion[T]
+  )(partyId: PartyId, cid: P.ContractId[T]): Future[Contract[T]]
   def subscribe(
       subscriptionName: String,
       offset: LedgerOffset,
@@ -259,6 +263,24 @@ object CoinLedgerConnection {
           templateCompanion: TemplateCompanion[T],
       ): Future[Seq[Contract[T]]] =
         activeContractsWithOffset(parties, templateCompanion).map(_._1)
+
+      override def fetchByContractId[T](
+          companion: TemplateCompanion[T]
+      )(partyId: PartyId, cid: P.ContractId[T]): Future[Contract[T]] = {
+        for {
+          decoded <- activeContracts(partyId, companion)
+        } yield {
+          decoded
+            .collectFirst {
+              case contract if contract.contractId == cid => contract
+            }
+            .getOrElse(
+              throw new IllegalStateException(
+                s"No active contract of template ${companion.id} with contract id $cid"
+              )
+            )
+        }
+      }
 
       override def submitCommand(
           actAs: Seq[PartyId],

@@ -44,15 +44,15 @@ class ScanIntegrationTest
 
       val transferTx = history(1)
       val transferEvents = transferTx.events
-      // Coins in order: alice 40-ish, bob-10, archive 50
+      // Coins in order: archive 50, bob-10, alice 40-ish,
       inside(transferEvents) {
         case Seq(
               // alice's new coin after deducting the quantity send to bob
-              CoinEvent(aliceNew, transferParentNode),
+              CoinEvent(aliceOld, transferParentNode),
               // bob's new coin
               CoinEvent(bob, transferParentNode2),
               // alice's input coin
-              CoinEvent(aliceOld, transferParentNode3),
+              CoinEvent(aliceNew, transferParentNode3),
             ) =>
           // all three coin-events created by the transfer should have the transfer node as parent
           transferParentNode should matchPattern { case Some(transfer) => }
@@ -69,9 +69,7 @@ class ScanIntegrationTest
           aliceOld should matchPattern { case CoinArchive(_) => }
 
           inside(bob) { case CoinCreate(coin) =>
-            // TODO(Arne): without int conversion, I see: `10.0000000000 was not equal to 10` (and same when I compare against `BigDecimal(10)`)
-            //  This seems suspicious
-            coin.payload.quantity.initialQuantity.intValue shouldBe 10
+            coin.payload.quantity.initialQuantity shouldBe BigDecimal(10)
           }
       }
     }

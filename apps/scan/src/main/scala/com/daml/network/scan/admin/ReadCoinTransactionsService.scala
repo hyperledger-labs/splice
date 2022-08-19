@@ -16,7 +16,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
-import com.digitalasset.network.CC.Coin.Coin
+import com.digitalasset.network.CC.Coin.{Coin, Coin_Unlock, LockedCoin}
 import com.digitalasset.network.CC.CoinRules.{
   CoinRules,
   CoinRules_MiningRound_StartIssuing,
@@ -26,8 +26,11 @@ import com.digitalasset.network.CC.CoinRules.{
 }
 import com.digitalasset.network.CC.Round.IssuingMiningRound
 
-import scala.collection.mutable
+import scala.collection.{concurrent, mutable}
 import scala.concurrent.{ExecutionContext, Future}
+import com.daml.ledger.api.v1
+
+import scala.collection.concurrent.TrieMap
 
 class ReadCoinTransactionsService(
     svcParty: PartyId,
@@ -61,6 +64,9 @@ class ReadCoinTransactionsService(
     } yield ()
   }
 
+  private val activeCoins: concurrent.Map[Primitive.ContractId[Coin], Contract[Coin]] =
+    TrieMap[Primitive.ContractId[Coin], Contract[Coin]]()
+
   /** Traverse a TransactionTree via pre-order DFS */
   @SuppressWarnings(Array("org.wartremover.warts.While"))
   private def traverseForest(tree: TransactionTree): Future[Seq[CoinEvent]] = Future {
@@ -77,22 +83,30 @@ class ReadCoinTransactionsService(
             DecodeUtil
               .decodeCreated(Coin)(created.value)
               .foreach(c => {
-                coinEvents.append(
-                  CoinEvent(
-                    CoinCreate(Contract.fromCodegenContract(c)),
-                    parseParentEvent(pathToNode.lastOption),
-                  )
+                val coinContract = Contract.fromCodegenContract(c)
+                activeCoins.addOne((coinContract.contractId, coinContract))
+                val res = CoinEvent(
+                  CoinCreate(coinContract),
+                  parseParentEvent(pathToNode.lastOption),
                 )
+                coinEvents.append(res)
               })
           case exercised: Exercised =>
             val coinContractOpt = DecodeUtil.decodeArchivedExercise(Coin)(exercised)
             coinContractOpt.foreach(cid => {
+              val coinContract = activeCoins
+                .remove(cid)
+                .getOrElse(
+                  ErrorUtil.invalidState(
+                    s"Observed an archive for the coin contract with contract id $cid, but we haven't observed the corresponding create"
+                  )
+                )
               coinEvents.append(
-                CoinEvent(CoinArchive(cid), parseParentEvent(pathToNode.lastOption))
+                CoinEvent(CoinArchive(coinContract), parseParentEvent(pathToNode.lastOption))
               )
             })
             val children = exercised.value.childEventIds.map(tree.eventsById(_).kind)
-            stack.pushAll(children.map((_, pathToNode :+ node)))
+            stack.pushAll(children.map((_, pathToNode :+ node)).reverse)
         }
       }
       coinEvents
@@ -104,21 +118,24 @@ class ReadCoinTransactionsService(
     val coinEvents: mutable.Buffer[CoinEvent] = mutable.ListBuffer()
     val roots = tree.rootEventIds.map(id => tree.eventsById(id).kind)
     val stack: mutable.Stack[StackElement] = mutable.Stack()
-    stack.pushAll(roots.map((_, Seq())))
+    stack.pushAll(roots.map((_, Seq())).reverse)
     preorder(stack, coinEvents).toSeq
   }
 
   // Some helper methods
   private val rulesTemplate = ApiTypes.TemplateId.unwrap(CoinRules.id)
+  private val lockedCoinTemplate = ApiTypes.TemplateId.unwrap(LockedCoin.id)
   private def isCoinRules(event: ExercisedEvent) = event.templateId.contains(rulesTemplate)
+  private def isLockedCoin(event: ExercisedEvent) = event.templateId.contains(lockedCoinTemplate)
 
   private def isTap(event: ExercisedEvent) = event.choice == "CoinRules_Tap" && isCoinRules(event)
+  private def isCoinUnlock(event: ExercisedEvent) =
+    event.choice == "Coin_Unlock" && isLockedCoin(event)
   private def isTransfer(event: ExercisedEvent) =
     event.choice == "CoinRules_Transfer" && isCoinRules(event)
   private def isStartIssuing(event: ExercisedEvent) =
     event.choice == "CoinRules_MiningRound_StartIssuing" && isCoinRules(event)
 
-  import com.daml.ledger.api.v1
   private def tryDecode[A](
       value: v1.value.Value
   )(implicit A: ValueDecoder[A]): A = {
@@ -154,6 +171,12 @@ class ReadCoinTransactionsService(
             val result =
               tryDecode[Primitive.ContractId[IssuingMiningRound]](exercised.value.getExerciseResult)
             StartIssuing(argument, result).some
+          case exercised: Exercised if isCoinUnlock(exercised.value) =>
+            val argument =
+              tryDecode[Coin_Unlock](exercised.value.getChoiceArgument)
+            val result =
+              tryDecode[Primitive.ContractId[Coin]](exercised.value.getExerciseResult)
+            CoinUnlock(argument, result).some
           case other: Exercised =>
             logger.warn(
               s"Parent of coin create or archival was not a tap, transfer or start issuing but ${other.getClass} ($other)"
