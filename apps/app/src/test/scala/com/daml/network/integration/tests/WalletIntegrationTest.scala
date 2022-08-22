@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding
 import com.daml.network.console.WalletAppReference
 import com.daml.network.environment.CoinEnvironmentImpl
@@ -16,6 +17,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.network.CC.Coin.{AppReward, ValidatorRight}
 import com.digitalasset.network.CC.CoinRules.CoinRules
 import com.digitalasset.network.CN.{Wallet => walletCodegen}
+import com.digitalasset.network.CN.Scripts.{TestWallet => testWalletCodegen}
 import com.digitalasset.network.DA.Time.Types.RelTime
 import com.digitalasset.network.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 
@@ -281,6 +283,63 @@ class WalletIntegrationTest
       aliceWallet.tap(10),
       _.errorMessage should include("Wallet is not initialized"),
     )
+  }
+
+  "list and accept transfer requests" in { implicit env =>
+    // Onboard alice on her self-hosted validator
+    val validatorParty = aliceValidator.initialize()
+    val aliceParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
+    // Create transfer request to Alice itself
+    aliceWallet.initialize(validatorParty)
+    aliceWallet.remoteParticipant.ledger_api.commands.submit(
+      Seq(aliceParty),
+      optTimeout = None,
+      commands = Seq(
+        testWalletCodegen
+          .TestReference(
+            p = aliceParty.toPrim,
+            description = "description",
+          )
+          .create
+          .command
+      ),
+    )
+    val referenceId =
+      aliceWallet.remoteParticipant.ledger_api.acs
+        .await(aliceParty, testWalletCodegen.TestReference)
+        .contractId
+    val transferRequest = walletCodegen
+      .TransferRequest(
+        sender = aliceParty.toPrim,
+        receiver = aliceParty.toPrim,
+        svc = svcParty.toPrim,
+        quantity = 42.0,
+        reference = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
+      )
+    aliceWallet.remoteParticipant.ledger_api.commands.submit(
+      Seq(aliceParty),
+      optTimeout = None,
+      commands = Seq(
+        transferRequest.create.command
+      ),
+    )
+    val cid = inside(aliceWallet.listTransferRequests()) { case Seq(r) =>
+      r.payload shouldBe transferRequest
+      r.contractId
+    }
+    val coin = aliceWallet.tap(50)
+    val receiptId = aliceWallet.acceptTransferRequest(cid, coin)
+    aliceWallet.listTransferRequests() shouldBe empty
+    inside(aliceWallet.listTransferReceipts()) { case Seq(r) =>
+      r.contractId shouldBe receiptId
+      r.payload shouldBe walletCodegen.TransferReceipt(
+        sender = aliceParty.toPrim,
+        receiver = aliceParty.toPrim,
+        quantity = 42.0,
+        reference = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
+      )
+    }
+    checkWallet(aliceParty, aliceWallet, Seq((7, 8), (42.0, 42.0)))
   }
 
   /** @param expectedQuantityRanges: lower and upper bounds for coins sorted by their initial quantity in ascending order. */

@@ -29,6 +29,10 @@ service WalletService {
   rpc ListValidatorRewards (google.protobuf.Empty) returns (ListValidatorRewardsResponse);
 
   rpc Redistribute (RedistributeRequest) returns (RedistributeResponse);
+
+  rpc ListTransferRequests (google.protobuf.Empty) returns (ListTransferRequestsResponse);
+  rpc AcceptTransferRequest (AcceptTransferRequestRequest) returns (AcceptTransferRequestResponse);
+  rpc ListTransferReceipts (google.protobuf.Empty) returns (ListTransferReceiptsResponse);
 }
 
 message InitializeRequest {
@@ -176,4 +180,21 @@ message RedistributeRequest {
 message RedistributeResponse {
   // The coins resulting from the transfer.
   repeated string coin_contract_ids = 1;
+}
+
+message ListTransferRequestsResponse {
+  repeated com.daml.network.v0.Contract transfer_requests = 1;
+}
+
+message AcceptTransferRequestRequest {
+  string transfer_request_contract_id = 1;
+  string coin_contract_id = 2;
+}
+
+message AcceptTransferRequestResponse {
+  string receipt_contract_id = 1;
+}
+
+message ListTransferReceiptsResponse {
+  repeated com.daml.network.v0.Contract transfer_receipts = 1;
 }

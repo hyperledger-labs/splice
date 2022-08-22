@@ -458,6 +458,56 @@ class GrpcWalletService(
     }
   }
 
+  @nowarn("cat=unused")
+  override def listTransferRequests(request: Empty): Future[v0.ListTransferRequestsResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        party <- connection.getPrimaryParty(walletDamlUser)
+        transferRequests <- connection.activeContracts(party, walletCodegen.TransferRequest)
+      } yield {
+        val filtered = transferRequests.filter(c => c.value.sender == party.toPrim)
+        v0.ListTransferRequestsResponse(
+          filtered.map(c => Contract.fromCodegenContract(c).toProtoV0)
+        )
+      }
+    }
+
+  override def acceptTransferRequest(
+      request: v0.AcceptTransferRequestRequest
+  ): Future[v0.AcceptTransferRequestResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        party <- connection.getPrimaryParty(walletDamlUser)
+        cid <- connection.submitWithResult(
+          Seq(party),
+          Seq(getValidatorParty),
+          Proto
+            .tryDecodeContractId[walletCodegen.TransferRequest](request.transferRequestContractId)
+            .exerciseTransferRequest_Accept(
+              party.toPrim,
+              Seq(
+                coinRulesCodegen.TransferInput
+                  .InputCoin(Proto.tryDecodeContractId[coinCodegen.Coin](request.coinContractId))
+              ),
+            ),
+        )
+      } yield v0.AcceptTransferRequestResponse(Proto.encode(cid))
+    }
+
+  @nowarn("cat=unused")
+  override def listTransferReceipts(request: Empty): Future[v0.ListTransferReceiptsResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        party <- connection.getPrimaryParty(walletDamlUser)
+        transferRequests <- connection.activeContracts(party, walletCodegen.TransferReceipt)
+      } yield {
+        val filtered = transferRequests.filter(c => c.value.sender == party.toPrim)
+        v0.ListTransferReceiptsResponse(
+          filtered.map(c => Contract.fromCodegenContract(c).toProtoV0)
+        )
+      }
+    }
+
   override def initialize(request: InitializeRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => _ =>
       validatorParty.set(Some(PartyId.tryFromProtoPrimitive(request.validatorPartyId)))

@@ -515,4 +515,76 @@ object WalletAppCommands {
     ): Either[String, Seq[Primitive.ContractId[coinCodegen.Coin]]] =
       response.coinContractIds.traverse(Proto.decodeContractId[coinCodegen.Coin](_))
   }
+
+  case class ListTransferRequests()
+      extends BaseCommand[Empty, v0.ListTransferRequestsResponse, Seq[
+        Contract[walletCodegen.TransferRequest]
+      ]] {
+
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: Empty,
+    ): Future[v0.ListTransferRequestsResponse] = service.listTransferRequests(request)
+
+    override def handleResponse(
+        response: v0.ListTransferRequestsResponse
+    ): Either[String, Seq[Contract[walletCodegen.TransferRequest]]] =
+      response.transferRequests
+        .traverse(req => Contract.fromProto(walletCodegen.TransferRequest)(req))
+        .leftMap(_.toString)
+  }
+
+  case class AcceptTransferRequest(
+      requestId: Primitive.ContractId[walletCodegen.TransferRequest],
+      coinId: Primitive.ContractId[coinCodegen.Coin],
+  ) extends BaseCommand[
+        v0.AcceptTransferRequestRequest,
+        v0.AcceptTransferRequestResponse,
+        Primitive.ContractId[walletCodegen.TransferReceipt],
+      ] {
+
+    override def createRequest(): Either[String, v0.AcceptTransferRequestRequest] =
+      Right(
+        v0.AcceptTransferRequestRequest(
+          transferRequestContractId = Proto.encode(requestId),
+          coinContractId = Proto.encode(coinId),
+        )
+      )
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.AcceptTransferRequestRequest,
+    ): Future[v0.AcceptTransferRequestResponse] =
+      service.acceptTransferRequest(request)
+
+    override def handleResponse(
+        response: v0.AcceptTransferRequestResponse
+    ): Either[String, Primitive.ContractId[walletCodegen.TransferReceipt]] =
+      Proto.decodeContractId[walletCodegen.TransferReceipt](response.receiptContractId)
+  }
+
+  case class ListTransferReceipts()
+      extends BaseCommand[Empty, v0.ListTransferReceiptsResponse, Seq[
+        Contract[walletCodegen.TransferReceipt]
+      ]] {
+
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: Empty,
+    ): Future[v0.ListTransferReceiptsResponse] = service.listTransferReceipts(request)
+
+    override def handleResponse(
+        response: v0.ListTransferReceiptsResponse
+    ): Either[String, Seq[Contract[walletCodegen.TransferReceipt]]] =
+      response.transferReceipts
+        .traverse(req => Contract.fromProto(walletCodegen.TransferReceipt)(req))
+        .leftMap(_.toString)
+  }
+
 }
