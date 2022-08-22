@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.ledger.client.binding
-import com.daml.network.console.{LocalWalletAppReference, WalletAppReference}
+import com.daml.network.console.WalletAppReference
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -13,20 +13,11 @@ import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences}
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.network.CC.Coin.{Coin, ValidatorRight}
-import com.digitalasset.network.CC.CoinRules.{
-  CoinRules,
-  ReceiverCoinType,
-  Transfer,
-  TransferInput,
-  TransferOutput,
-}
+import com.digitalasset.network.CC.Coin.{AppReward, ValidatorRight}
+import com.digitalasset.network.CC.CoinRules.CoinRules
 import com.digitalasset.network.CN.{Wallet => walletCodegen}
-import com.digitalasset.network.DA
 import com.digitalasset.network.DA.Time.Types.RelTime
 import com.digitalasset.network.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
-
-import java.util.UUID
 
 class WalletIntegrationTest
     extends CoinIntegrationTest
@@ -209,48 +200,62 @@ class WalletIntegrationTest
     }
 
     "list and collect app & validator rewards" in { implicit env =>
-      // Onboard alice on her self-hosted validator
-      val validatorParty = aliceValidator.initialize()
-      val aliceParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
-      // TODO https://github.com/DACH-NY/the-real-canton-coin/issues/519
-      val bobParty = aliceValidator.onboardUser(s"bob-${UUID.randomUUID}")
-      aliceWallet.initialize(validatorParty)
+      import env._
 
+      // Onboard alice on her self-hosted validator
+      val aliceValidatorParty = aliceValidator.initialize()
+      val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
+      aliceWallet.initialize(aliceValidatorParty)
+
+      // Onboard bob on his self-hosted validator
+      val bobValidatorParty = bobValidator.initialize()
+      val bobUserParty = bobValidator.onboardUser(bobWallet.config.damlUser)
+      bobWallet.initialize(bobValidatorParty)
+
+      // Setup payment channel between alice and bob
+      val aliceProposalId =
+        aliceWallet.proposePaymentChannel(bobUserParty, senderTransferFeeRatio = 0.5)
+      utils.retry_until_true(bobWallet.listPaymentChannelProposals().size == 1)
+      bobWallet.acceptPaymentChannelProposal(aliceProposalId)
+      utils.retry_until_true(aliceWallet.listPaymentChannels().size == 1)
+
+      // Setup payment channel between bob and alice
+      val bobProposalId =
+        bobWallet.proposePaymentChannel(aliceUserParty, senderTransferFeeRatio = 0.5)
+      utils.retry_until_true(aliceWallet.listPaymentChannelProposals().size == 1)
+      aliceWallet.acceptPaymentChannelProposal(bobProposalId)
+      utils.retry_until_true(bobWallet.listPaymentChannels().size == 2)
+
+      // Tap coin and do a transfer from alice to bob
       val tappedCoin = aliceWallet.tap(50)
-      // Bare transfer so we get control over fee ratio
-      bareTransfer(
-        aliceWallet,
-        senderParty = aliceParty,
-        receiverParty = bobParty,
-        validatorParty = validatorParty,
-        svcParty = svcParty,
-        coin = tappedCoin,
-      )
-      val transferredCoin =
-        aliceWallet.remoteParticipant.ledger_api.acs.await(bobParty, Coin).contractId
-      // Transfer back. Alice is now the receiver so they get an app reward.
-      bareTransfer(
-        aliceWallet,
-        senderParty = bobParty,
-        receiverParty = aliceParty,
-        validatorParty = validatorParty,
-        svcParty = svcParty,
-        coin = transferredCoin,
-      )
+      aliceWallet.executeDirectTransfer(bobUserParty, 40, tappedCoin)
+
+      // Retrieve transferred coin in bob's wallet and transfer part of it back to alice, and get her some app rewards
+      utils.retry_until_true(bobWallet.list().size == 1)
+      val transferredCoin = bobWallet.list()(0).contractId
+      bobWallet.executeDirectTransfer(aliceUserParty, 30, transferredCoin)
+
+      // Wait for app rewards to become visible, and check structure
+      aliceWallet.remoteParticipant.ledger_api.acs.await(aliceUserParty, AppReward).contractId
       val appRewards = aliceWallet.listAppRewards()
       appRewards should have size 1
       aliceWallet.listValidatorRewards() shouldBe empty
       // TODO(i296) We cannot use the wallet as the validator yet so create a validator right where alice is their own validator.
       aliceWallet.remoteParticipant.ledger_api.commands.submit(
-        Seq(aliceParty),
+        Seq(aliceUserParty),
         optTimeout = None,
-        commands =
-          Seq(ValidatorRight(svcParty.toPrim, aliceParty.toPrim, aliceParty.toPrim).create.command),
+        commands = Seq(
+          ValidatorRight(
+            svcParty.toPrim,
+            aliceUserParty.toPrim,
+            aliceUserParty.toPrim,
+          ).create.command
+        ),
       )
       val validatorRewards = aliceWallet.listValidatorRewards()
       validatorRewards should have size 1
       val prevCoins = aliceWallet.list()
-      val inputCoin = aliceWallet.tap(42)
+      val inputCoin = aliceWallet.tap(200)
       svc.openRound(1)
       svc.startClosingRound(0)
       svc.startIssuingRound(0)
@@ -260,11 +265,11 @@ class WalletIntegrationTest
       // We just check that we have a coin roughly in the right range, in particular higher than the input, rather than trying to repeat the calculation
       // for rewards.
       checkWallet(
-        aliceParty,
+        aliceUserParty,
         aliceWallet,
         (prevCoins.map(c =>
           (c.payload.quantity.initialQuantity, c.payload.quantity.initialQuantity)
-        ) :+ (43, 44): Seq[(BigDecimal, BigDecimal)]).sortBy(_._1),
+        ) :+ (200, 202): Seq[(BigDecimal, BigDecimal)]).sortBy(_._1),
       )
     }
   }
@@ -277,38 +282,6 @@ class WalletIntegrationTest
       _.errorMessage should include("Wallet is not initialized"),
     )
   }
-
-  def bareTransfer(
-      wallet: LocalWalletAppReference,
-      senderParty: PartyId,
-      receiverParty: PartyId,
-      validatorParty: PartyId,
-      svcParty: PartyId,
-      coin: binding.Primitive.ContractId[Coin],
-  ) =
-    wallet.remoteParticipant.ledger_api.commands.submit(
-      Seq(senderParty, receiverParty, validatorParty),
-      optTimeout = None,
-      commands = Seq(
-        CoinRules
-          .key(DA.Types.Tuple2(svcParty.toPrim, validatorParty.toPrim))
-          .exerciseCoinRules_Transfer(
-            senderParty.toPrim,
-            Transfer(
-              sender = senderParty.toPrim,
-              inputs = Seq(TransferInput.InputCoin(coin)),
-              outputs = Seq(
-                TransferOutput.OutputReceiverCoin(
-                  receiver = receiverParty.toPrim,
-                  coinType = ReceiverCoinType.FloatingReceiverCoin(()),
-                )
-              ),
-              payload = "bare transfer",
-            ),
-          )
-          .command
-      ),
-    )
 
   /** @param expectedQuantityRanges: lower and upper bounds for coins sorted by their initial quantity in ascending order. */
   def checkWallet(
