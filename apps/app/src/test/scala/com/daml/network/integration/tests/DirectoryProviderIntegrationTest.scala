@@ -8,8 +8,8 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.daml.network.util.{CommonCoinAppInstanceReferences, Contract}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.network.CN.{Directory => codegen, Wallet => walletCodegen}
-import com.digitalasset.network.{CC => coinCodegen}
+import com.daml.network.codegen.CN.{Directory => codegen, Wallet => walletCodegen}
+import com.daml.network.codegen.{CC => coinCodegen}
 
 class DirectoryProviderIntegrationTest
     extends CoinIntegrationTest

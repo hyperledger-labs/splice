@@ -16,15 +16,15 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
-import com.digitalasset.network.CC.Coin.{Coin, Coin_Unlock, LockedCoin}
-import com.digitalasset.network.CC.CoinRules.{
+import com.daml.network.codegen.CC.Coin.{Coin, Coin_Unlock, LockedCoin}
+import com.daml.network.codegen.CC.CoinRules.{
   CoinRules,
   CoinRules_MiningRound_StartIssuing,
   CoinRules_Tap,
   CoinRules_Transfer,
   TransferResult,
 }
-import com.digitalasset.network.CC.Round.IssuingMiningRound
+import com.daml.network.codegen.CC.Round.IssuingMiningRound
 
 import scala.collection.{concurrent, mutable}
 import scala.concurrent.{ExecutionContext, Future}

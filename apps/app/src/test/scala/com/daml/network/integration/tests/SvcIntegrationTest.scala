@@ -8,8 +8,8 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.network.CC.Coin._
-import com.digitalasset.network.CC.Round._
+import com.daml.network.codegen.CC.Coin._
+import com.daml.network.codegen.CC.Round._
 
 class SvcIntegrationTest
     extends CoinIntegrationTest

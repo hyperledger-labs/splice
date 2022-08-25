@@ -10,9 +10,9 @@ import com.daml.network.util.{Contract, Proto}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
-import com.digitalasset.network.CN.{Directory => codegen, Wallet => walletCodegen}
-import com.digitalasset.network.DA
-import com.digitalasset.network.DA.Time.Types.RelTime
+import com.daml.network.codegen.CN.{Directory => codegen, Wallet => walletCodegen}
+import com.daml.network.codegen.DA
+import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.google.protobuf.empty.Empty
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer

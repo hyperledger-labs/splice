@@ -8,7 +8,7 @@ import com.daml.network.svc.v0.{GetDebugInfoResponse, GetValidatorConfigResponse
 import com.daml.network.util.Proto
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.network.CC.{Round => roundCodegen}
+import com.daml.network.codegen.CC.{Round => roundCodegen}
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
 

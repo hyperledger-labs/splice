@@ -9,7 +9,7 @@ import com.daml.network.validator.store.ValidatorAppStore
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
-import com.digitalasset.network.CC.CoinRules.CoinRulesRequest
+import com.daml.network.codegen.CC.CoinRules.CoinRulesRequest
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
 

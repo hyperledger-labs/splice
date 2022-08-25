@@ -7,8 +7,8 @@ import com.daml.network.directory_user.v0.DirectoryUserServiceGrpc
 import com.daml.network.util.Proto
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
-import com.digitalasset.network.CN.{Directory => codegen}
-import com.digitalasset.network.DA
+import com.daml.network.codegen.CN.{Directory => codegen}
+import com.daml.network.codegen.DA
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
 

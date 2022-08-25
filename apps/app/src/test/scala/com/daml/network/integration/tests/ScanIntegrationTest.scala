@@ -11,7 +11,7 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.network.CC.CoinRules.CoinRules
+import com.daml.network.codegen.CC.CoinRules.CoinRules
 
 class ScanIntegrationTest
     extends CoinIntegrationTest

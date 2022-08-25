@@ -6,14 +6,14 @@ import com.daml.network.util.{Contract, Value}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.serialization.ProtoConverter
-import com.digitalasset.network.CC.Coin.{Coin, Coin_Unlock}
-import com.digitalasset.network.CC.CoinRules.{
+import com.daml.network.codegen.CC.Coin.{Coin, Coin_Unlock}
+import com.daml.network.codegen.CC.CoinRules.{
   CoinRules_MiningRound_StartIssuing,
   CoinRules_Tap,
   CoinRules_Transfer,
   TransferResult,
 }
-import com.digitalasset.network.CC.Round.IssuingMiningRound
+import com.daml.network.codegen.CC.Round.IssuingMiningRound
 
 /** Parent node of a Canton coin create or archive within the corresponding transaction tree. */
 sealed trait ParentNode {
@@ -40,7 +40,7 @@ object Transfer {
       resultP <- ProtoConverter
         .required("Transfer.ExerciseNode.result", transferP.value.result)
       result <- Value
-        .fromProto[P.List[com.digitalasset.network.CC.CoinRules.TransferResult]](resultP)
+        .fromProto[P.List[com.daml.network.codegen.CC.CoinRules.TransferResult]](resultP)
     } yield Transfer(argument.value, result.value)
   }
 }

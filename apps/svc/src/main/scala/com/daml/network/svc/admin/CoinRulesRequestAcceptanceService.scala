@@ -8,8 +8,8 @@ import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.network.CC.CoinRules.CoinRulesRequest
-import com.digitalasset.network.CC.Round.{IssuingMiningRound, OpenMiningRound}
+import com.daml.network.codegen.CC.CoinRules.CoinRulesRequest
+import com.daml.network.codegen.CC.Round.{IssuingMiningRound, OpenMiningRound}
 
 import scala.concurrent.{ExecutionContext, Future}
 

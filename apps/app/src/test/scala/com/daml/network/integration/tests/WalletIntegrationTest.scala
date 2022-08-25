@@ -14,12 +14,12 @@ import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences}
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.network.CC.Coin.{AppReward, ValidatorRight}
-import com.digitalasset.network.CC.CoinRules.CoinRules
-import com.digitalasset.network.CN.{Wallet => walletCodegen}
-import com.digitalasset.network.CN.Scripts.{TestWallet => testWalletCodegen}
-import com.digitalasset.network.DA.Time.Types.RelTime
-import com.digitalasset.network.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
+import com.daml.network.codegen.CC.Coin.{AppReward, ValidatorRight}
+import com.daml.network.codegen.CC.CoinRules.CoinRules
+import com.daml.network.codegen.CN.{Wallet => walletCodegen}
+import com.daml.network.codegen.CN.Scripts.{TestWallet => testWalletCodegen}
+import com.daml.network.codegen.DA.Time.Types.RelTime
+import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 
 class WalletIntegrationTest
     extends CoinIntegrationTest

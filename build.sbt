@@ -216,9 +216,7 @@ val scalaCodegenStrategy = new MergeStrategy {
 
 def isScalaCodegenFile(fileName: String): Boolean = {
   fileName match {
-    // We codegen into com.digitalasset while our source is in com.daml so
-    // we can detect it that way.
-    case PathList("com", "digitalasset", "network", _*) => true
+    case PathList("com", "daml", "network", "codegen", _*) => true
     case _ => false
   }
 }

@@ -8,8 +8,8 @@ import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.WalletServiceGrpc.WalletServiceStub
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.network.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
-import com.digitalasset.network.CN.{Wallet => walletCodegen}
+import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
+import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
 

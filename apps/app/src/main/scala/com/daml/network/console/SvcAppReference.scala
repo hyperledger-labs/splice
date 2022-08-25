@@ -12,7 +12,7 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.network.CC.{Round => roundCodegen}
+import com.daml.network.codegen.CC.{Round => roundCodegen}
 
 abstract class SvcAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,

@@ -8,7 +8,7 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.network.CC
+import com.daml.network.codegen.CC
 
 class ValidatorIntegrationTest
     extends CoinIntegrationTest

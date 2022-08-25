@@ -11,9 +11,9 @@ import com.digitalasset.canton.ledger.api.client.{DecodeUtil, LedgerConnection}
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.network.CC.Coin.Coin
-import com.digitalasset.network.CC.CoinRules.CoinRules
-import com.digitalasset.network.{CC, OpenBusiness}
+import com.daml.network.codegen.CC.Coin.Coin
+import com.daml.network.codegen.CC.CoinRules.CoinRules
+import com.daml.network.codegen.{CC, OpenBusiness}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -199,9 +199,9 @@ object CoinUtil extends UploadablePackage {
     transferFee = OpenBusiness.Fees.SteppedRate(
       initialRate = 0.01,
       steps = Seq(
-        com.digitalasset.network.DA.Types.Tuple2(BigDecimal(100.0), BigDecimal(0.001)),
-        com.digitalasset.network.DA.Types.Tuple2(BigDecimal(1000.0), BigDecimal(0.0001)),
-        com.digitalasset.network.DA.Types.Tuple2(BigDecimal(1000000.0), BigDecimal(0.00001)),
+        com.daml.network.codegen.DA.Types.Tuple2(BigDecimal(100.0), BigDecimal(0.001)),
+        com.daml.network.codegen.DA.Types.Tuple2(BigDecimal(1000.0), BigDecimal(0.0001)),
+        com.daml.network.codegen.DA.Types.Tuple2(BigDecimal(1000000.0), BigDecimal(0.00001)),
       ),
     ),
 

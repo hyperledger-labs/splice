@@ -14,9 +14,9 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.network.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
-import com.digitalasset.network.CN.Wallet.PaymentChannel
-import com.digitalasset.network.CN.{Wallet => walletCodegen}
+import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
+import com.daml.network.codegen.CN.Wallet.PaymentChannel
+import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 
 abstract class WalletAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,

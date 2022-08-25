@@ -4,7 +4,7 @@ import com.daml.network.directory_user.v0
 import com.daml.network.directory_user.v0.DirectoryUserServiceGrpc.DirectoryUserServiceStub
 import com.daml.network.util.Proto
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-import com.digitalasset.network.CN.{Directory => codegen}
+import com.daml.network.codegen.CN.{Directory => codegen}
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
 

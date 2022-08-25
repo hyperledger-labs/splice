@@ -2,7 +2,7 @@ package com.daml.network.wallet.util
 
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.network.util.UploadablePackage
-import com.digitalasset.network.CN.Wallet.AppPaymentRequest
+import com.daml.network.codegen.CN.Wallet.AppPaymentRequest
 
 object WalletUtil extends UploadablePackage {
   lazy val walletTemplateId: com.daml.ledger.api.v1.value.Identifier =

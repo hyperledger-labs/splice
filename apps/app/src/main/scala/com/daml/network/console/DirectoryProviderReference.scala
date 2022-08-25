@@ -17,7 +17,7 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.network.CN.{Directory => codegen, Wallet => walletCodegen}
+import com.daml.network.codegen.CN.{Directory => codegen, Wallet => walletCodegen}
 
 /** Single local Directory Provider app reference. Defines the console commands that can be run against a Directory Provider
   * app reference.

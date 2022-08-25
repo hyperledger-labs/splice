@@ -8,7 +8,7 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.console.{BaseInspection, Help, LocalInstanceReference}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.network.CN.{Directory => codegen}
+import com.daml.network.codegen.CN.{Directory => codegen}
 
 /** Single local Directory User app reference. Defines the console commands that can be run against a local Directory User
   * app reference.

@@ -11,7 +11,7 @@ import com.digitalasset.canton.ledger.api.client.{DecodeUtil, LedgerConnection}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
-import com.digitalasset.network.{CC, DA}
+import com.daml.network.codegen.{CC, DA}
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
 

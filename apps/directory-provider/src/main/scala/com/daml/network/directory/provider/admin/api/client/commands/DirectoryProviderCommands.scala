@@ -9,7 +9,7 @@ import com.daml.network.util.{Contract, Proto}
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.network.CN.{Directory => codegen, Wallet => walletCodegen}
+import com.daml.network.codegen.CN.{Directory => codegen, Wallet => walletCodegen}
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
 

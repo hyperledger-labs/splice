@@ -33,7 +33,7 @@ object BuildCommon {
       Seq(
         (
           darFile,
-          "com.digitalasset.network",
+          "com.daml.network.codegen",
         )
       )
     })
