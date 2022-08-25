@@ -4,12 +4,12 @@ import com.daml.network.console.{
   LocalDirectoryProviderAppReference,
   LocalDirectoryUserAppReference,
   LocalScanAppReference,
+  LocalSplitwiseAppReference,
   LocalSvcAppReference,
   LocalValidatorAppReference,
   LocalWalletAppReference,
   RemoteSvcAppReference,
   RemoteWalletAppReference,
-  LocalSplitwiseAppReference,
 }
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.topology.PartyId
@@ -47,6 +47,9 @@ trait CommonCoinAppInstanceReferences {
   def directoryValidator(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
     "directoryValidator"
   )
+  def splitwiseValidator(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
+    "splitwiseValidator"
+  )
   def directoryProvider(implicit
       env: CoinTestConsoleEnvironment
   ): LocalDirectoryProviderAppReference = dp(
@@ -69,6 +72,12 @@ trait CommonCoinAppInstanceReferences {
       env: CoinTestConsoleEnvironment
   ): LocalSplitwiseAppReference = sw(
     "bobSplitwise"
+  )
+
+  def providerSplitwise(implicit
+      env: CoinTestConsoleEnvironment
+  ): LocalSplitwiseAppReference = sw(
+    "providerSplitwise"
   )
 
   def w(name: String)(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference =

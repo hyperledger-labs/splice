@@ -1,6 +1,7 @@
 package com.daml.network.splitwise
 
 import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
 import com.daml.network.splitwise.store.SplitwiseAppStore
 import com.digitalasset.canton.environment.CantonNode
@@ -23,6 +24,7 @@ class SplitwiseApp(
     val coinAppParameters: SharedCoinAppParameters,
     storage: Storage,
     dummyStore: SplitwiseAppStore,
+    scanConnection: ScanConnection,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
 ) extends CantonNode // TODO(Arne): CantonNode needs to be forked or generalized.
@@ -44,6 +46,6 @@ class SplitwiseApp(
 
   override def close(): Unit = {
     logger.info("Stopping splitwise node")
-    Lifecycle.close(storage, dummyStore)(logger)
+    Lifecycle.close(storage, dummyStore, scanConnection)(logger)
   }
 }

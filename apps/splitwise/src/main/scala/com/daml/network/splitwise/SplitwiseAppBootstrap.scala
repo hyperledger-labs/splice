@@ -6,6 +6,7 @@ import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrapBase
+import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.admin.grpc.GrpcSplitwiseService
 import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
 import com.daml.network.splitwise.metrics.SplitwiseAppMetrics
@@ -68,10 +69,18 @@ class SplitwiseAppBootstrap(
           splitwiseAppParameters.processingTimeouts,
         )
 
+      val scanConnection: ScanConnection =
+        new ScanConnection(
+          config.remoteScan.clientAdminApi,
+          splitwiseAppParameters.processingTimeouts,
+          loggerFactory,
+        )
+
       adminServerRegistry.addService(
         SplitwiseServiceGrpc.bindService(
           new GrpcSplitwiseService(
             ledgerClient,
+            scanConnection,
             config.damlUser,
             loggerFactory,
           ),
@@ -83,6 +92,7 @@ class SplitwiseAppBootstrap(
         splitwiseAppParameters,
         storage,
         dummyStore,
+        scanConnection,
         clock,
         loggerFactory,
       )

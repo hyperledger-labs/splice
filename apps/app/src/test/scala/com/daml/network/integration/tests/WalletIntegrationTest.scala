@@ -16,8 +16,8 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import com.daml.network.codegen.CC.Coin.{AppReward, ValidatorRight}
 import com.daml.network.codegen.CC.CoinRules.CoinRules
-import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.codegen.CN.Scripts.{TestWallet => testWalletCodegen}
+import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 
