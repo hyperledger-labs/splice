@@ -2,10 +2,9 @@ package com.daml.network.history
 
 import cats.syntax.traverse._
 import com.daml.ledger.client.binding.{Primitive => P}
-import com.daml.network.util.{Contract, Value}
+import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
-import com.digitalasset.canton.serialization.ProtoConverter
 import com.daml.network.codegen.CC.Coin.{Coin, Coin_Unlock}
 import com.daml.network.codegen.CC.CoinRules.{
   CoinRules_MiningRound_StartIssuing,
@@ -19,103 +18,74 @@ import com.daml.network.codegen.CC.Round.IssuingMiningRound
 sealed trait ParentNode {
   def toProtoV0: v0.ParentNode
 }
-case class Transfer(argument: CoinRules_Transfer, result: P.List[TransferResult])
+case class Transfer(node: ExerciseNode[CoinRules_Transfer, P.List[TransferResult]])
     extends ParentNode {
   def toProtoV0: v0.ParentNode =
-    v0.ParentNode(
-      v0.ParentNode.Type.Transfer(
-        v0.ExerciseNode(Some(Value(argument).toProtoV0), Some(Value(result).toProtoV0))
-      )
-    )
+    v0.ParentNode().withTransfer(node.toProtoV0)
 }
 
-object Transfer {
+object Transfer extends ExerciseNodeCompanion {
+  override type Arg = CoinRules_Transfer
+  override type Res = P.List[TransferResult]
+
   def fromProtoV0(
       transferP: v0.ParentNode.Type.Transfer
   ): Either[ProtoDeserializationError, Transfer] = {
     for {
-      argumentP <- ProtoConverter
-        .required("Transfer.ExerciseNode.argument", transferP.value.argument)
-      argument <- Value.fromProto[CoinRules_Transfer](argumentP)
-      resultP <- ProtoConverter
-        .required("Transfer.ExerciseNode.result", transferP.value.result)
-      result <- Value
-        .fromProto[P.List[com.daml.network.codegen.CC.CoinRules.TransferResult]](resultP)
-    } yield Transfer(argument.value, result.value)
+      node <- ExerciseNode.fromProto(Transfer)(transferP.value)
+    } yield Transfer(node)
   }
 }
 
-case class Tap(argument: CoinRules_Tap, result: P.ContractId[Coin]) extends ParentNode {
+case class Tap(node: ExerciseNode[CoinRules_Tap, P.ContractId[Coin]]) extends ParentNode {
   def toProtoV0: v0.ParentNode =
-    v0.ParentNode(
-      v0.ParentNode.Type.Tap(
-        v0.ExerciseNode(
-          Some(Value(argument).toProtoV0),
-          Some(Value(result).toProtoV0),
-        )
-      )
-    )
+    v0.ParentNode().withTap(node.toProtoV0)
 }
 
-object Tap {
+object Tap extends ExerciseNodeCompanion {
+  override type Arg = CoinRules_Tap
+  override type Res = P.ContractId[Coin]
+
   def fromProtoV0(tapP: v0.ParentNode.Type.Tap): Either[ProtoDeserializationError, Tap] = for {
-    argumentP <- ProtoConverter
-      .required("Tap.ExerciseNode.argument", tapP.value.argument)
-    argument <- Value.fromProto[CoinRules_Tap](argumentP)
-    resultP <- ProtoConverter
-      .required(s"Tap.ExerciseNode.result", tapP.value.result)
-    result <- Value.fromProto[P.ContractId[Coin]](resultP)
-  } yield Tap(argument.value, result.value)
+    node <- ExerciseNode.fromProto(Tap)(tapP.value)
+  } yield Tap(node)
 }
 
 case class StartIssuing(
-    argument: CoinRules_MiningRound_StartIssuing,
-    result: P.ContractId[IssuingMiningRound],
+    node: ExerciseNode[CoinRules_MiningRound_StartIssuing, P.ContractId[IssuingMiningRound]]
 ) extends ParentNode {
   def toProtoV0: v0.ParentNode =
-    v0.ParentNode(
-      v0.ParentNode.Type.StartIssuing(
-        v0.ExerciseNode(Some(Value(argument).toProtoV0), Some(Value(result).toProtoV0))
-      )
-    )
+    v0.ParentNode()
+      .withStartIssuing(node.toProtoV0)
 }
 
-object StartIssuing {
+object StartIssuing extends ExerciseNodeCompanion {
+  override type Arg = CoinRules_MiningRound_StartIssuing
+  override type Res = P.ContractId[IssuingMiningRound]
+
   def fromProtoV0(
       issuingP: v0.ParentNode.Type.StartIssuing
   ): Either[ProtoDeserializationError, StartIssuing] = for {
-    argumentP <- ProtoConverter
-      .required("StartIssuing.ExerciseNode.argument", issuingP.value.argument)
-    argument <- Value.fromProto[CoinRules_MiningRound_StartIssuing](argumentP)
-    resultP <- ProtoConverter
-      .required("StartIssuing.ExerciseNode.result", issuingP.value.result)
-    result <- Value.fromProto[P.ContractId[IssuingMiningRound]](resultP)
-  } yield StartIssuing(argument.value, result.value)
+    node <- ExerciseNode.fromProto(StartIssuing)(issuingP.value)
+  } yield StartIssuing(node)
 }
 
 case class CoinUnlock(
-    argument: Coin_Unlock,
-    result: P.ContractId[Coin],
+    node: ExerciseNode[Coin_Unlock, P.ContractId[Coin]]
 ) extends ParentNode {
   def toProtoV0: v0.ParentNode =
-    v0.ParentNode(
-      v0.ParentNode.Type.StartIssuing(
-        v0.ExerciseNode(Some(Value(argument).toProtoV0), Some(Value(result).toProtoV0))
-      )
-    )
+    v0.ParentNode().withCoinUnlock(node.toProtoV0)
 }
 
-object CoinUnlock {
+object CoinUnlock extends ExerciseNodeCompanion {
+  override type Arg = Coin_Unlock
+  override type Res = P.ContractId[Coin]
+
   def fromProtoV0(
-      issuingP: v0.ParentNode.Type.CoinUnlock
+      unlockP: v0.ParentNode.Type.CoinUnlock
   ): Either[ProtoDeserializationError, CoinUnlock] = for {
-    argumentP <- ProtoConverter
-      .required("StartIssuing.ExerciseNode.argument", issuingP.value.argument)
-    argument <- Value.fromProto[Coin_Unlock](argumentP)
-    resultP <- ProtoConverter
-      .required("StartIssuing.ExerciseNode.result", issuingP.value.result)
-    result <- Value.fromProto[P.ContractId[Coin]](resultP)
-  } yield CoinUnlock(argument.value, result.value)
+    node <- ExerciseNode.fromProto(CoinUnlock)(unlockP.value)
+  } yield CoinUnlock(node)
 }
 
 object ParentNode {

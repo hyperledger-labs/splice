@@ -8,7 +8,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
   IsolatedCoinEnvironments,
 }
-import com.daml.network.util.CommonCoinAppInstanceReferences
+import com.daml.network.util.{CommonCoinAppInstanceReferences, ExerciseNode}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import com.daml.network.codegen.CC.CoinRules.CoinRules
@@ -38,8 +38,8 @@ class ScanIntegrationTest
       val tapCreateTx = history(0)
       val tapEvent = tapCreateTx.events(0)
       inside(tapEvent.parentO) { case Some(tap: Tap) =>
-        tap.argument.quantity shouldBe 50
-        tap.argument.receiver shouldBe aliceP.toPrim
+        tap.node.argument.quantity shouldBe 50
+        tap.node.argument.receiver shouldBe aliceP.toPrim
       }
 
       val transferTx = history(1)
@@ -59,7 +59,7 @@ class ScanIntegrationTest
           transferParentNode shouldBe transferParentNode2
           transferParentNode2 shouldBe transferParentNode3
 
-          inside(transferParentNode) { case Some(Transfer(argument, results)) =>
+          inside(transferParentNode) { case Some(Transfer(ExerciseNode(argument, results))) =>
             argument.transfer.sender shouldBe aliceP.toPrim
             // one transfer result for alice, one for bob
             results should have length 2

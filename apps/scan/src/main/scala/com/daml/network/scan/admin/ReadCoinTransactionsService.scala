@@ -9,22 +9,15 @@ import com.daml.network.admin.LedgerAutomationService
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history._
 import com.daml.network.scan.store.ScanCCHistoryStore
-import com.daml.network.util.Contract
+import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
 import com.digitalasset.canton.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
-import com.daml.network.codegen.CC.Coin.{Coin, Coin_Unlock, LockedCoin}
-import com.daml.network.codegen.CC.CoinRules.{
-  CoinRules,
-  CoinRules_MiningRound_StartIssuing,
-  CoinRules_Tap,
-  CoinRules_Transfer,
-  TransferResult,
-}
-import com.daml.network.codegen.CC.Round.IssuingMiningRound
+import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
+import com.daml.network.codegen.CC.CoinRules.CoinRules
 
 import scala.collection.{concurrent, mutable}
 import scala.concurrent.{ExecutionContext, Future}
@@ -149,6 +142,10 @@ class ReadCoinTransactionsService(
   }
 
   import cats.syntax.option._
+
+  private def tryDecodeEvent(companion: ExerciseNodeCompanion)(exercised: Exercised)(implicit decArg: ValueDecoder[companion.Arg], decRes: ValueDecoder[companion.Res]): ExerciseNode[companion.Arg, companion.Res] =
+    ExerciseNode(tryDecode[companion.Arg](exercised.value.getChoiceArgument), tryDecode[companion.Res](exercised.value.getExerciseResult))
+
   private def parseParentEvent(parent: Option[TreeEvent.Kind]): Option[ParentNode] = {
     parent match {
       case None => // coin create or archival has no parent node
@@ -157,26 +154,13 @@ class ReadCoinTransactionsService(
       case Some(parent) =>
         parent match {
           case exercised: Exercised if isTransfer(exercised.value) =>
-            val argument = tryDecode[CoinRules_Transfer](exercised.value.getChoiceArgument)
-            val result =
-              tryDecode[Primitive.List[TransferResult]](exercised.value.getExerciseResult)
-            Transfer(argument, result).some
+            Transfer(tryDecodeEvent(Transfer)(exercised)).some
           case exercised: Exercised if isTap(exercised.value) =>
-            val argument = tryDecode[CoinRules_Tap](exercised.value.getChoiceArgument)
-            val result = tryDecode[Primitive.ContractId[Coin]](exercised.value.getExerciseResult)
-            Tap(argument, result).some
+            Tap(tryDecodeEvent(Tap)(exercised)).some
           case exercised: Exercised if isStartIssuing(exercised.value) =>
-            val argument =
-              tryDecode[CoinRules_MiningRound_StartIssuing](exercised.value.getChoiceArgument)
-            val result =
-              tryDecode[Primitive.ContractId[IssuingMiningRound]](exercised.value.getExerciseResult)
-            StartIssuing(argument, result).some
+            StartIssuing(tryDecodeEvent(StartIssuing)(exercised)).some
           case exercised: Exercised if isCoinUnlock(exercised.value) =>
-            val argument =
-              tryDecode[Coin_Unlock](exercised.value.getChoiceArgument)
-            val result =
-              tryDecode[Primitive.ContractId[Coin]](exercised.value.getExerciseResult)
-            CoinUnlock(argument, result).some
+            CoinUnlock(tryDecodeEvent(CoinUnlock)(exercised)).some
           case other: Exercised =>
             logger.warn(
               s"Parent of coin create or archival was not a tap, transfer or start issuing but ${other.getClass} ($other)"
