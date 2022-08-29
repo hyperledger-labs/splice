@@ -76,9 +76,9 @@ class SplitwiseIntegrationTest
       aliceUserParty,
       10.0,
     )
-    val receipt = inside(bobWallet.listTransferRequests()) { case Seq(request) =>
+    val acceptedPayment = inside(bobWallet.listAppPaymentRequests()) { case Seq(request) =>
       val coin = bobWallet.tap(20)
-      bobWallet.acceptTransferRequest(
+      bobWallet.acceptAppPaymentRequest(
         request.contractId,
         coin,
       )
@@ -86,7 +86,7 @@ class SplitwiseIntegrationTest
     bobSplitwise.completeTransfer(
       bobProviderParty,
       key,
-      receipt,
+      acceptedPayment,
     )
 
     bobSplitwise.listBalanceUpdates(key) should have size 2
@@ -131,11 +131,13 @@ class SplitwiseIntegrationTest
       val aliceValidatorParty = aliceValidator.initialize()
       val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
       aliceWallet.initialize(aliceValidatorParty)
+      aliceSplitwise.initialize(aliceValidatorParty)
 
       // Onboard bob on his self-hosted validator
       val bobValidatorParty = bobValidator.initialize()
       val bobUserParty = bobValidator.onboardUser(bobWallet.config.damlUser)
       bobWallet.initialize(bobValidatorParty)
+      bobSplitwise.initialize(bobValidatorParty)
 
       // Setup install contracts for self-hosted usage
       val aliceProviderParty = aliceUserParty
@@ -147,6 +149,7 @@ class SplitwiseIntegrationTest
 
       // We reuse the provider as charlie here to avoid setting up another splitwise instance.
       val charlieUserParty = splitwiseValidator.initialize()
+      charlieSplitwise.initialize(charlieUserParty)
       val charlieProviderParty = charlieUserParty
       val charlieInstallProposal = providerSplitwise.createInstallProposal(charlieUserParty)
       providerSplitwise.acceptInstallProposal(charlieInstallProposal)
@@ -165,14 +168,17 @@ class SplitwiseIntegrationTest
       val aliceValidatorParty = aliceValidator.initialize()
       val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
       aliceWallet.initialize(aliceValidatorParty)
+      aliceSplitwise.initialize(aliceValidatorParty)
 
       // Onboard bob on his self-hosted validator
       val bobValidatorParty = bobValidator.initialize()
       val bobUserParty = bobValidator.onboardUser(bobWallet.config.damlUser)
       bobWallet.initialize(bobValidatorParty)
+      bobSplitwise.initialize(bobValidatorParty)
 
       // Setup install contracts for provider-hosted mode usage
       val providerParty = splitwiseValidator.initialize()
+      charlieSplitwise.initialize(providerParty)
       val aliceInstallProposal = aliceSplitwise.createInstallProposal(providerParty)
       providerSplitwise.acceptInstallProposal(aliceInstallProposal)
       val bobInstallProposal = bobSplitwise.createInstallProposal(providerParty)

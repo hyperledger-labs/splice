@@ -13,6 +13,7 @@ service WalletService {
   rpc ListAppPaymentRequests (google.protobuf.Empty) returns (ListAppPaymentRequestsResponse);
   rpc AcceptAppPaymentRequest (AcceptAppPaymentRequestRequest) returns (AcceptAppPaymentRequestResponse);
   rpc RejectAppPaymentRequest (RejectAppPaymentRequestRequest) returns (google.protobuf.Empty);
+  rpc ListAcceptedAppPayments (google.protobuf.Empty) returns (ListAcceptedAppPaymentsResponse);
 
   rpc ProposePaymentChannel (ProposePaymentChannelRequest) returns (ProposePaymentChannelResponse);
   rpc ListPaymentChannelProposals (google.protobuf.Empty) returns (ListPaymentChannelProposalsResponse);
@@ -29,10 +30,6 @@ service WalletService {
   rpc ListValidatorRewards (google.protobuf.Empty) returns (ListValidatorRewardsResponse);
 
   rpc Redistribute (RedistributeRequest) returns (RedistributeResponse);
-
-  rpc ListTransferRequests (google.protobuf.Empty) returns (ListTransferRequestsResponse);
-  rpc AcceptTransferRequest (AcceptTransferRequestRequest) returns (AcceptTransferRequestResponse);
-  rpc ListTransferReceipts (google.protobuf.Empty) returns (ListTransferReceiptsResponse);
 }
 
 message InitializeRequest {
@@ -70,6 +67,10 @@ message AcceptAppPaymentRequestResponse {
 
 message RejectAppPaymentRequestRequest {
   string request_contract_id = 1;
+}
+
+message ListAcceptedAppPaymentsResponse {
+  repeated com.daml.network.v0.Contract accepted_app_payments = 1;
 }
 
 // NOTE: we only support sender-initiated proposals for now.
@@ -180,21 +181,4 @@ message RedistributeRequest {
 message RedistributeResponse {
   // The coins resulting from the transfer.
   repeated string coin_contract_ids = 1;
-}
-
-message ListTransferRequestsResponse {
-  repeated com.daml.network.v0.Contract transfer_requests = 1;
-}
-
-message AcceptTransferRequestRequest {
-  string transfer_request_contract_id = 1;
-  string coin_contract_id = 2;
-}
-
-message AcceptTransferRequestResponse {
-  string receipt_contract_id = 1;
-}
-
-message ListTransferReceiptsResponse {
-  repeated com.daml.network.v0.Contract transfer_receipts = 1;
 }

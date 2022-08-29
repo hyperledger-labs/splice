@@ -20,6 +20,7 @@ import com.daml.network.codegen.CN.Scripts.{TestWallet => testWalletCodegen}
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
+import java.time.temporal.ChronoUnit
 
 class WalletIntegrationTest
     extends CoinIntegrationTest
@@ -59,20 +60,32 @@ class WalletIntegrationTest
       checkWallet(aliceUserParty, aliceRemoteWallet, ranges2)
     }
 
-    "allow a user to create, list, and reject payment requests" in { implicit env =>
+    "allow a user to create, list, and reject app payment requests" in { implicit env =>
       val aliceValidatorParty = aliceValidator.initialize()
       // TODO(M1-90 Backlog): consider adding synchronization 'wait-for-participant-x' to this command
       val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
       aliceWallet.initialize(aliceValidatorParty)
 
-      // ensure wallet's participant sees the CoinRules
-      val coinRulesId =
-        aliceWallet.remoteParticipant.ledger_api.acs
-          .await(aliceValidatorParty, CoinRules)
-          .contractId
-
       // Check that no payment requests exist
       aliceWallet.listAppPaymentRequests() shouldBe empty
+
+      aliceWallet.remoteParticipant.ledger_api.commands.submit(
+        Seq(aliceUserParty),
+        optTimeout = None,
+        commands = Seq(
+          testWalletCodegen
+            .TestReference(
+              p = aliceUserParty.toPrim,
+              description = "description",
+            )
+            .create
+            .command
+        ),
+      )
+      val referenceId =
+        aliceWallet.remoteParticipant.ledger_api.acs
+          .await(aliceUserParty, testWalletCodegen.TestReference)
+          .contractId
 
       // Create a payment request to self.
       val reqC = walletCodegen.AppPaymentRequest(
@@ -81,12 +94,10 @@ class WalletIntegrationTest
         svc = svcParty.toPrim,
         quantity = BigDecimal(10: Int),
         expiresAt = binding.Primitive.Timestamp
-          .discardNanos(java.time.Instant.now())
+          .discardNanos(java.time.Instant.now().plus(1, ChronoUnit.MINUTES))
           .getOrElse(sys.error("Invalid instant")),
-        collectionDuration = RelTime(microseconds = 1000),
-        // Hack: we abuse the coinRulesId here, as the check that it implements
-        // the PaymentReference interface only happens on a fetch, and not on the create.
-        reference = binding.Primitive.ContractId.apply(coinRulesId.toString),
+        collectionDuration = RelTime(microseconds = 60 * 1000000),
+        reference = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
       )
       aliceWallet.remoteParticipant.ledger_api.commands.submit(
         actAs = Seq(aliceUserParty),
@@ -104,6 +115,68 @@ class WalletIntegrationTest
       // Check that there are no more payment requests
       val requests2 = aliceWallet.listAppPaymentRequests()
       requests2 shouldBe empty
+    }
+
+    "allow a user to create, list, and accept app payment requests" in { implicit env =>
+      val aliceValidatorParty = aliceValidator.initialize()
+      // TODO(M1-90 Backlog): consider adding synchronization 'wait-for-participant-x' to this command
+      val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
+      aliceWallet.initialize(aliceValidatorParty)
+
+      aliceWallet.remoteParticipant.ledger_api.commands.submit(
+        Seq(aliceUserParty),
+        optTimeout = None,
+        commands = Seq(
+          testWalletCodegen
+            .TestReference(
+              p = aliceUserParty.toPrim,
+              description = "description",
+            )
+            .create
+            .command
+        ),
+      )
+      val referenceId =
+        aliceWallet.remoteParticipant.ledger_api.acs
+          .await(aliceUserParty, testWalletCodegen.TestReference)
+          .contractId
+
+      // Create a payment request to self.
+      val reqC = walletCodegen.AppPaymentRequest(
+        sender = aliceUserParty.toPrim,
+        receiver = aliceUserParty.toPrim,
+        svc = svcParty.toPrim,
+        quantity = BigDecimal(10: Int),
+        expiresAt = binding.Primitive.Timestamp
+          .discardNanos(java.time.Instant.now().plus(1, ChronoUnit.MINUTES))
+          .getOrElse(sys.error("Invalid instant")),
+        collectionDuration = RelTime(microseconds = 60 * 1000000),
+        reference = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
+      )
+      aliceWallet.remoteParticipant.ledger_api.commands.submit(
+        actAs = Seq(aliceUserParty),
+        optTimeout = None,
+        commands = Seq(reqC.create.command),
+      )
+
+      val cid = inside(aliceWallet.listAppPaymentRequests()) { case Seq(r) =>
+        r.payload shouldBe reqC
+        r.contractId
+      }
+
+      val coin = aliceWallet.tap(50)
+      val acceptedPaymentId = aliceWallet.acceptAppPaymentRequest(cid, coin)
+      aliceWallet.listAppPaymentRequests() shouldBe empty
+      inside(aliceWallet.listAcceptedAppPayments()) { case Seq(r) =>
+        r.contractId shouldBe acceptedPaymentId
+        r.payload shouldBe walletCodegen.AcceptedAppPayment(
+          sender = aliceUserParty.toPrim,
+          receiver = aliceUserParty.toPrim,
+          svc = svcParty.toPrim,
+          lockedCoin = r.payload.lockedCoin,
+          reference = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
+        )
+      }
     }
 
     "allow two users to create a payment channel and use it for a transfer" in { implicit env =>
@@ -283,63 +356,6 @@ class WalletIntegrationTest
       aliceWallet.tap(10),
       _.errorMessage should include("Wallet is not initialized"),
     )
-  }
-
-  "list and accept transfer requests" in { implicit env =>
-    // Onboard alice on her self-hosted validator
-    val validatorParty = aliceValidator.initialize()
-    val aliceParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
-    // Create transfer request to Alice itself
-    aliceWallet.initialize(validatorParty)
-    aliceWallet.remoteParticipant.ledger_api.commands.submit(
-      Seq(aliceParty),
-      optTimeout = None,
-      commands = Seq(
-        testWalletCodegen
-          .TestReference(
-            p = aliceParty.toPrim,
-            description = "description",
-          )
-          .create
-          .command
-      ),
-    )
-    val referenceId =
-      aliceWallet.remoteParticipant.ledger_api.acs
-        .await(aliceParty, testWalletCodegen.TestReference)
-        .contractId
-    val transferRequest = walletCodegen
-      .TransferRequest(
-        sender = aliceParty.toPrim,
-        receiver = aliceParty.toPrim,
-        svc = svcParty.toPrim,
-        quantity = 42.0,
-        reference = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
-      )
-    aliceWallet.remoteParticipant.ledger_api.commands.submit(
-      Seq(aliceParty),
-      optTimeout = None,
-      commands = Seq(
-        transferRequest.create.command
-      ),
-    )
-    val cid = inside(aliceWallet.listTransferRequests()) { case Seq(r) =>
-      r.payload shouldBe transferRequest
-      r.contractId
-    }
-    val coin = aliceWallet.tap(50)
-    val receiptId = aliceWallet.acceptTransferRequest(cid, coin)
-    aliceWallet.listTransferRequests() shouldBe empty
-    inside(aliceWallet.listTransferReceipts()) { case Seq(r) =>
-      r.contractId shouldBe receiptId
-      r.payload shouldBe walletCodegen.TransferReceipt(
-        sender = aliceParty.toPrim,
-        receiver = aliceParty.toPrim,
-        quantity = 42.0,
-        reference = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
-      )
-    }
-    checkWallet(aliceParty, aliceWallet, Seq((7, 8), (42.0, 42.0)))
   }
 
   /** @param expectedQuantityRanges: lower and upper bounds for coins sorted by their initial quantity in ascending order. */

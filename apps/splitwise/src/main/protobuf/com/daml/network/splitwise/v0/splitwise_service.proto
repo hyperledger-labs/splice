@@ -5,6 +5,8 @@ import "com/daml/network/v0/contract.proto";
 import "google/protobuf/empty.proto";
 
 service SplitwiseService {
+  // Init
+  rpc Initialize (InitializeRequest) returns (google.protobuf.Empty);
 
   // Install management
   rpc CreateInstallProposal (CreateInstallProposalRequest) returns (CreateInstallProposalResponse);
@@ -32,7 +34,11 @@ service SplitwiseService {
   rpc ListAcceptedGroupInvites (ListAcceptedGroupInvitesRequest) returns (ListAcceptedGroupInvitesResponse);
   rpc ListBalanceUpdates (ListBalanceUpdatesRequest) returns (ListBalanceUpdatesResponse);
   rpc ListBalances (ListBalancesRequest) returns (ListBalancesResponse);
-  rpc ListTransferReceipts (ListTransferReceiptsRequest) returns (ListTransferReceiptsResponse);
+  rpc ListAcceptedAppPayments (ListAcceptedAppPaymentsRequest) returns (ListAcceptedAppPaymentsResponse);
+}
+
+message InitializeRequest {
+  string validator_party_id = 2;
 }
 
 message CreateInstallProposalRequest {
@@ -121,7 +127,7 @@ message InitiateTransferResponse {
 message CompleteTransferRequest {
   string provider_party_id = 1;
   GroupKey group_key = 2;
-  string receipt_contract_id = 3;
+  string accepted_app_payment_contract_id = 3;
 }
 
 message CompleteTransferResponse {
@@ -177,10 +183,10 @@ message ListBalancesResponse {
   map<string, string> balances = 1;
 }
 
-message ListTransferReceiptsRequest {
+message ListAcceptedAppPaymentsRequest {
   GroupKey group_key = 1;
 }
 
-message ListTransferReceiptsResponse {
-  repeated com.daml.network.v0.Contract transfer_receipts = 1;
+message ListAcceptedAppPaymentsResponse {
+  repeated com.daml.network.v0.Contract accepted_app_payments = 1;
 }

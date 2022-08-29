@@ -8,6 +8,7 @@ import DA.Map (Map)
 import qualified DA.Map as M
 import DA.Assert
 import DA.Foldable (mapA_)
+import DA.Time
 import Daml.Script
 import CC.Scripts.Util
 import CN.Wallet
@@ -26,6 +27,8 @@ createGroup app p provider id =
     members = []
     id = GroupId id
     svc = app.svc
+    collectionDuration = minutes 5
+    acceptDuration = minutes 5
 
 createInvite : Party -> Party -> GroupKey -> [Party] -> Script (ContractId GroupInvite)
 createInvite owner provider groupKey observers = do
@@ -82,13 +85,14 @@ enterPayment : Party -> Party -> GroupKey -> Decimal -> Text -> Script ()
 enterPayment payer provider groupKey quantity description =
   void $ submit payer $ exerciseByKeyCmd @SplitwiseInstall (payer, provider) SplitwiseInstall_EnterPayment with ..
 
-initiateTransfer : Party -> Party -> GroupKey -> Party -> Decimal -> Script (ContractId TransferRequest)
+initiateTransfer : Party -> Party -> GroupKey -> Party -> Decimal -> Script (ContractId AppPaymentRequest)
 initiateTransfer sender provider groupKey receiver quantity =
   submit sender $ exerciseByKeyCmd @SplitwiseInstall (sender, provider) SplitwiseInstall_InitiateTransfer with ..
 
-completeTransfer : Party -> Party -> GroupKey -> ContractId TransferReceipt -> Script ()
-completeTransfer sender provider groupKey receiptCid =
-  void $ submit sender $ exerciseByKeyCmd @SplitwiseInstall (sender, provider) SplitwiseInstall_CompleteTransfer with ..
+completeTransfer : Party -> Party -> GroupKey -> ContractId AcceptedAppPayment -> Script ()
+completeTransfer sender provider groupKey acceptedPaymentCid = do
+  validator <- getHostingValidator sender
+  void $ submitMulti [sender] [validator] $ exerciseByKeyCmd @SplitwiseInstall (sender, provider) SplitwiseInstall_CompleteTransfer with ..
 
 testSelfHosted = script do
   app <- setupApp
@@ -165,7 +169,8 @@ testCase app Parties{..} = do
 
   request <- initiateTransfer alice (getProvider alice) (key group) bob 8.0
   coin <- tap app alice 42.0
-  receipt <- acceptTransferRequest app alice request coin
+  receipt <- acceptPaymentRequest app alice request coin
+
   completeTransfer alice (getProvider alice) (key group) receipt
 
   balance <- queryBalances alice (key group)
@@ -178,7 +183,7 @@ testCase app Parties{..} = do
 
   request <- initiateTransfer charlie (getProvider charlie) (key group) alice 18.0
   coin <- tap app charlie 20.0
-  receipt <- acceptTransferRequest app charlie request coin
+  receipt <- acceptPaymentRequest app charlie request coin
   completeTransfer charlie (getProvider charlie) (key group) receipt
 
   balance <- queryBalances alice (key group)

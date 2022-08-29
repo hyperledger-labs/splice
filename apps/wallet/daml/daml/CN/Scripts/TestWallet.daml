@@ -1,6 +1,7 @@
 module CN.Scripts.TestWallet where
 
 import DA.Assert
+import DA.Time
 import Daml.Script
 
 import CC.Coin
@@ -102,17 +103,17 @@ template TestReference
     description : Text
   where
     signatory p
-    implements TransferRequestReference where
-      transferRequestReference_getDescription = description
+    implements PaymentReference where
+      paymentReference_getDescription = description
 
 
-acceptTransferRequest : CCApp -> Party -> ContractId TransferRequest -> ContractId Coin -> Script (ContractId TransferReceipt)
-acceptTransferRequest app p transferRequest coin = do
+acceptPaymentRequest : CCApp -> Party -> ContractId AppPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppPayment)
+acceptPaymentRequest app p transferRequest coin = do
   validator <- getHostingValidator p
-  submitMulti [p] [validator] $ exerciseCmd transferRequest TransferRequest_Accept with
+  submitMulti [p] [validator] $ exerciseCmd transferRequest AppPaymentRequest_Accept with
     inputs = [InputCoin coin]
 
-testTransferRequest = script do
+testPaymentRequest = script do
   app <- setupApp
   runNextIssuance app 1.0
   runCoinDepositBots app
@@ -124,19 +125,24 @@ testTransferRequest = script do
   coin <- tap app alice 42.0
   reference <- submit alice $ createCmd (TestReference alice "mycoolref")
   -- multi-party submit to simplify test
-  transferRequest <- submitMulti [alice, bob] [] $ createCmd TransferRequest with
+  t <- getTime
+  transferRequest <- submitMulti [alice, bob] [] $ createCmd AppPaymentRequest with
     sender = alice
     receiver = bob
     svc = app.svc
     quantity = 30.0
     reference = toInterfaceContractId reference
+    expiresAt = t `addRelTime` minutes 5
+    collectionDuration = minutes 5
 
-  receiptCid <- acceptTransferRequest app alice transferRequest coin
-
-  Some receipt <- queryContractId alice receiptCid
-  receipt === TransferReceipt with
+  acceptedPaymentCid <- acceptPaymentRequest app alice transferRequest coin
+  Some acceptedPayment <- queryContractId alice acceptedPaymentCid
+  [(lockedCoin, _)] <- query @LockedCoin alice
+  acceptedPayment === AcceptedAppPayment with
     sender = alice
     receiver = bob
-    quantity = 30.0
+    svc = app.svc
+    lockedCoin = lockedCoin
     reference = toInterfaceContractId reference
+
   pure ()

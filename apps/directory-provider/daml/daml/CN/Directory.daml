@@ -74,7 +74,7 @@ template DirectoryInstall with
         acceptedAppPayment : ContractId AcceptedAppPayment
       controller provider
       do -- collect accepted payment
-         reference <- exercise acceptedAppPayment AcceptedAppPayment_Collect
+         reference <- exercise acceptedAppPayment (AcceptedAppPayment_Collect provider)
          -- deliver the promised good: the entry referenced in the payment
          Some (requestId, request) <- fetchFromInterface @DirectoryEntryRequest reference
          archive requestId

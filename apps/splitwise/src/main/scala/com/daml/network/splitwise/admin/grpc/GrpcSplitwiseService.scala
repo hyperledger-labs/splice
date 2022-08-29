@@ -11,9 +11,13 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
 import com.daml.network.codegen.DA
+import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.codegen.CN.{Splitwise => splitCodegen, Wallet => walletCodegen}
+import com.google.protobuf.empty.Empty
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
+import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -31,6 +35,32 @@ class GrpcSplitwiseService(
     with NamedLogging {
 
   private val connection = ledgerClient.connection("GrpcSplitwiseService")
+
+  private val collectionDuration = RelTime(
+    10_000_000
+  )
+  private val acceptDuration = RelTime(
+    60_000_000
+  )
+
+  val validatorParty: AtomicReference[Option[PartyId]] = new AtomicReference[Option[PartyId]](None)
+
+  def getValidatorParty: PartyId =
+    validatorParty.get.getOrElse(
+      throw new StatusRuntimeException(
+        Status.FAILED_PRECONDITION.withDescription(
+          "Wallet is not initialized, run wallet.initialize(validatorParty) first"
+        )
+      )
+    )
+
+  override def initialize(request: v0.InitializeRequest): Future[Empty] =
+    withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => _ =>
+      Future {
+        validatorParty.set(Some(PartyId.tryFromProtoPrimitive(request.validatorPartyId)))
+        Empty()
+      }
+    }
 
   def createInstallProposal(
       request: v0.CreateInstallProposalRequest
@@ -88,6 +118,8 @@ class GrpcSplitwiseService(
               svc = svc.toPrim,
               members = Seq.empty,
               id = splitCodegen.GroupId(request.groupId),
+              collectionDuration = collectionDuration,
+              acceptDuration = acceptDuration,
             ),
           ),
         )
@@ -205,11 +237,13 @@ class GrpcSplitwiseService(
         provider = Proto.tryDecode(Proto.Party)(request.providerPartyId)
         cid <- connection.submitWithResult(
           Seq(party),
-          Seq.empty,
+          Seq(getValidatorParty),
           installKey(provider, party).exerciseSplitwiseInstall_CompleteTransfer(
             party.toPrim,
             groupKey_(request.getGroupKey),
-            Proto.tryDecodeContractId[walletCodegen.TransferReceipt](request.receiptContractId),
+            Proto.tryDecodeContractId[walletCodegen.AcceptedAppPayment](
+              request.acceptedAppPaymentContractId
+            ),
           ),
         )
       } yield v0.CompleteTransferResponse(
@@ -360,14 +394,14 @@ class GrpcSplitwiseService(
       }
     }
 
-  def listTransferReceipts(
-      request: v0.ListTransferReceiptsRequest
-  ): Future[v0.ListTransferReceiptsResponse] =
+  def listAcceptedAppPayments(
+      request: v0.ListAcceptedAppPaymentsRequest
+  ): Future[v0.ListAcceptedAppPaymentsResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       for {
         party <- connection.getPrimaryParty(damlUser)
         transfersInProgress <- connection.activeContracts(party, splitCodegen.TransferInProgress)
-        transferReceipts <- connection.activeContracts(party, walletCodegen.TransferReceipt)
+        acceptedPayments <- connection.activeContracts(party, walletCodegen.AcceptedAppPayment)
       } yield {
         val filteredInProgress: Set[ApiTypes.ContractId] = transfersInProgress
           .filter(c =>
@@ -378,11 +412,11 @@ class GrpcSplitwiseService(
           )
           .map(_.contractId)
           .toSet
-        val filteredReceipts = transferReceipts.filter(receipt =>
-          filteredInProgress.contains(receipt.value.reference: ApiTypes.ContractId)
+        val filteredPayments = acceptedPayments.filter(payment =>
+          filteredInProgress.contains(payment.value.reference: ApiTypes.ContractId)
         )
-        v0.ListTransferReceiptsResponse(
-          filteredReceipts.map(c => Contract.fromCodegenContract(c).toProtoV0)
+        v0.ListAcceptedAppPaymentsResponse(
+          filteredPayments.map(c => Contract.fromCodegenContract(c).toProtoV0)
         )
       }
     }

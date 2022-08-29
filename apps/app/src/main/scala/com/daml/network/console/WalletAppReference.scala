@@ -88,6 +88,12 @@ abstract class WalletAppReference(
     }
   }
 
+  @Help.Summary("List all accepted app payments the user is a sender on")
+  def listAcceptedAppPayments(): Seq[Contract[walletCodegen.AcceptedAppPayment]] =
+    consoleEnvironment.run {
+      adminCommand(WalletAppCommands.ListAcceptedAppPayments())
+    }
+
   @Help.Summary("Propose the creation of a payment channel")
   @Help.Description(
     "Propose the creation of a uni-directional payment channel with a specific receiver." +
@@ -271,27 +277,6 @@ abstract class WalletAppReference(
               )
         } yield coins(0)
       }
-    }
-
-  @Help.Summary("List all transfer requests the user is a sender on")
-  def listTransferRequests(): Seq[Contract[walletCodegen.TransferRequest]] =
-    consoleEnvironment.run {
-      adminCommand(WalletAppCommands.ListTransferRequests())
-    }
-
-  @Help.Summary("Accept the transfer request by transferring the given coin")
-  def acceptTransferRequest(
-      request: Primitive.ContractId[walletCodegen.TransferRequest],
-      coin: Primitive.ContractId[coinCodegen.Coin],
-  ): Primitive.ContractId[walletCodegen.TransferReceipt] =
-    consoleEnvironment.run {
-      adminCommand(WalletAppCommands.AcceptTransferRequest(request, coin))
-    }
-
-  @Help.Summary("List all transfer receipts the user is a sender on")
-  def listTransferReceipts(): Seq[Contract[walletCodegen.TransferReceipt]] =
-    consoleEnvironment.run {
-      adminCommand(WalletAppCommands.ListTransferReceipts())
     }
 }
 

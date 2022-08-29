@@ -4,6 +4,7 @@ import DA.Map (Map)
 import qualified DA.Map as M
 import DA.Assert
 import DA.Foldable (forA_)
+import DA.Time
 import CN.Wallet
 
 -- TODO https://github.com/DACH-NY/the-real-canton-coin/issues/592
@@ -95,7 +96,7 @@ template SplitwiseInstall
            payer = user
            ..
 
-    nonconsuming choice SplitwiseInstall_InitiateTransfer : ContractId TransferRequest
+    nonconsuming choice SplitwiseInstall_InitiateTransfer : ContractId AppPaymentRequest
       with
         groupKey : GroupKey
         receiver : Party
@@ -108,7 +109,7 @@ template SplitwiseInstall
     nonconsuming choice SplitwiseInstall_CompleteTransfer : ContractId BalanceUpdate
       with
         groupKey : GroupKey
-        receiptCid : ContractId TransferReceipt
+        acceptedPaymentCid : ContractId AcceptedAppPayment
       controller user
       do exerciseByKey @Group groupKey Group_CompleteTransfer with
            sender = user
@@ -138,6 +139,8 @@ template Group
     members : [Party]
     id: GroupId
     provider : Party -- In non-provider centric model: provider = owner
+    collectionDuration : RelTime -- Time user has to collect an approved transfer via the group
+    acceptDuration : RelTime -- Time user has to accept a transfer request in their wallet
   where
     signatory provider, owner, members
     key (GroupKey owner provider id) : GroupKey
@@ -171,7 +174,7 @@ template Group
            update = ExternalPayment with
              payer, quantity, description
 
-    nonconsuming choice Group_InitiateTransfer : ContractId TransferRequest
+    nonconsuming choice Group_InitiateTransfer : ContractId AppPaymentRequest
       with
         sender : Party
         receiver : Party
@@ -183,25 +186,30 @@ template Group
            with
              group = this
              sender, receiver, quantity
-         create TransferRequest with
-           sender, receiver, svc, quantity, reference = toInterfaceContractId reference
+         now <- getTime
+         create AppPaymentRequest with
+           sender, receiver, svc, quantity
+           expiresAt = now `addRelTime` acceptDuration
+           collectionDuration = collectionDuration
+           reference = toInterfaceContractId reference
 
     nonconsuming choice Group_CompleteTransfer : ContractId BalanceUpdate
       with
-        receiptCid : ContractId TransferReceipt
+        acceptedPaymentCid : ContractId AcceptedAppPayment
         sender : Party
       controller sender
-      do receipt <- fetch receiptCid
-         archive receiptCid
-         receipt.sender === sender
-         Some (refCid, ref) <- fetchFromInterface @TransferInProgress receipt.reference
+      do acceptedPayment <- fetch acceptedPaymentCid
+         exercise acceptedPaymentCid (AcceptedAppPayment_Collect sender)
+         acceptedPayment.sender === sender
+         Some (refCid, ref) <- fetchFromInterface @TransferInProgress acceptedPayment.reference
          archive refCid
-         let expectedReceipt = TransferReceipt with
+         let expectedAcceptedPayment = AcceptedAppPayment with
                sender = ref.sender
                receiver = ref.receiver
-               quantity = ref.quantity
-               reference = receipt.reference
-         receipt === expectedReceipt
+               svc = svc
+               reference = acceptedPayment.reference
+               lockedCoin = acceptedPayment.lockedCoin
+         acceptedPayment === expectedAcceptedPayment
          -- Check that sender and receiver are both still members.
          assertMsg "Sender is member" (ref.sender `elem` groupMembers this)
          assertMsg "Receiver is member" (ref.receiver `elem` groupMembers this)
@@ -210,9 +218,9 @@ template Group
          create BalanceUpdate with
            group = this
            update = Transfer with
-             sender = receipt.sender
-             receiver = receipt.receiver
-             quantity = receipt.quantity
+             sender = ref.sender
+             receiver = ref.receiver
+             quantity = ref.quantity
 
     nonconsuming choice Group_Net : ContractId BalanceUpdate
       with
@@ -239,8 +247,8 @@ template TransferInProgress
     quantity : Decimal
   where
     signatory group.owner, sender, receiver
-    implements TransferRequestReference where
-      transferRequestReference_getDescription = "Transfer from " <> show sender <> " to " <> show receiver <> " for " <> show quantity
+    implements PaymentReference where
+      paymentReference_getDescription = "Transfer from " <> show sender <> " to " <> show receiver <> " for " <> show quantity
 
 template BalanceUpdate
   with

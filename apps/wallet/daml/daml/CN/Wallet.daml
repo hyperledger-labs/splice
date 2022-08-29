@@ -1,7 +1,7 @@
 module CN.Wallet where
 
 import DA.Action
-import DA.Foldable as F
+import qualified DA.Foldable as F
 import DA.Time
 import DA.Assert
 
@@ -109,13 +109,6 @@ template PaymentChannelProposal
       controller proposer
       do pure ()
 
-
--- | A reference to the reason for a payment.
--- TODO: better naming
-interface PaymentReference
-  where
-    paymentReference_getDescription : Text
-
 template OnChannelPaymentRequest
   with
     sender : Party
@@ -165,6 +158,12 @@ template OnChannelPaymentRequest
     choice OnChannelPaymentRequest_Reject : ()
       controller sender
       do pure ()
+
+-- | A reference to the reason for a payment.
+-- TODO: better naming
+interface PaymentReference
+  where
+    paymentReference_getDescription : Text
 
 template AppPaymentRequest
   with
@@ -235,8 +234,14 @@ template AcceptedAppPayment
     signatory sender, receiver
 
     choice AcceptedAppPayment_Collect : ContractId PaymentReference
+      with
+        submitter : Party
       controller sender, receiver
       do
+        -- To make our workarounds for lack of explicit disclosure work
+        -- we need to fetch the right CCUserHostedAt contract so we
+        -- allow passing in the submitter.
+        assertMsg ("Submitter must be sender or receiver") (submitter `elem` [sender, receiver])
         -- unlock coin and transfer the remainder to the receiver
         coin <- exercise lockedCoin Coin_Unlock
         let transfer = Transfer with
@@ -248,7 +253,7 @@ template AcceptedAppPayment
                     coinType = FloatingReceiverCoin
                 ]
               payload = "transfer locked payment"
-        (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt receiver
+        (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt submitter
         void $ exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
         -- defensive check that the reference is still active
         void $ fetch reference
@@ -261,62 +266,3 @@ template AcceptedAppPayment
     choice AcceptedAppPayment_Expire : ContractId Coin
       controller sender
       do exercise lockedCoin Coin_OwnerExpireLock
-
-interface TransferRequestReference where
-  transferRequestReference_getDescription : Text
-
-template TransferReceipt
-  with
-    sender : Party
-    receiver : Party
-    quantity : Decimal -- desired & actual quantity for the receiver (the sender pays all transfer fees)
-    reference : ContractId TransferRequestReference
-  where
-    signatory sender, receiver
-
--- | Request to the wallet of the sender to transfer the given amount to the receiver.
--- This is used in place of direct transfers to ensure that the actual request happens
--- via a trusted UI.
-template TransferRequest
-  with
-    sender : Party
-    receiver : Party
-    svc : Party
-    quantity : Decimal
-    reference : ContractId TransferRequestReference
-    -- TODO: expiry
-  where
-    signatory sender, receiver
-    choice TransferRequest_Accept : ContractId TransferReceipt
-      with
-        inputs : [TransferInput]
-      controller sender
-      do _ <- fetch reference -- check that reference is still active
-         (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt sender
-         results <- exerciseByKey @CoinRules (svc, validator) CoinRules_Transfer with
-           transfer = Transfer with
-             sender = sender
-             inputs = inputs
-             payload = "TransferRequest"
-             outputs =
-               [ OutputReceiverCoin with
-                   receiver = receiver
-                   coinType = FixedReceiverCoin with
-                     quantity = quantity
-                     senderTransferFeeRatio = 1.0
-               , OutputSenderCoin with
-                   exactQuantity = None
-                   lock = None
-               ]
-         outputCid <- case results of
-           [TransferResultCoin cid, TransferResultCoin _] -> pure cid
-           _ -> abort ("Expected one TransferResultCoin but got " <> show results)
-         output <- fetch outputCid
-         -- Assert that the quantity is the same to force us to
-         -- revisit what we return if we change senderTransferFeeRatio.
-         output.quantity.initialQuantity === quantity
-         create TransferReceipt with
-           sender
-           receiver
-           quantity
-           reference

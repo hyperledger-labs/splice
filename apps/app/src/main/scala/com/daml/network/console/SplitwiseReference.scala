@@ -36,6 +36,13 @@ class LocalSplitwiseAppReference(
       config.remoteParticipant,
     )
 
+  // Commands for init
+  @Help.Summary("Initialize splitwise with the validator party")
+  def initialize(validator: PartyId): Unit =
+    consoleEnvironment.run {
+      adminCommand(SplitwiseCommands.Initialize(validator))
+    }
+
   // Commands for managing installs
 
   @Help.Summary("Create splitwise install proposal for given provider party")
@@ -115,19 +122,21 @@ class LocalSplitwiseAppReference(
       key: SplitwiseCommands.GroupKey,
       receiver: PartyId,
       quantity: BigDecimal,
-  ): Primitive.ContractId[walletCodegen.TransferRequest] =
+  ): Primitive.ContractId[walletCodegen.AppPaymentRequest] =
     consoleEnvironment.run {
       adminCommand(SplitwiseCommands.InitiateTransfer(provider, key, receiver, quantity))
     }
 
-  @Help.Summary("Complete the transfer by archiving the receipt and creating a balance update.")
+  @Help.Summary(
+    "Complete the transfer by actually transferring the coins and creating a balance update."
+  )
   def completeTransfer(
       provider: PartyId,
       key: SplitwiseCommands.GroupKey,
-      receipt: Primitive.ContractId[walletCodegen.TransferReceipt],
+      acceptedPayment: Primitive.ContractId[walletCodegen.AcceptedAppPayment],
   ): Primitive.ContractId[splitCodegen.BalanceUpdate] =
     consoleEnvironment.run {
-      adminCommand(SplitwiseCommands.CompleteTransfer(provider, key, receipt))
+      adminCommand(SplitwiseCommands.CompleteTransfer(provider, key, acceptedPayment))
     }
 
   @Help.Summary("Net balances of the parties in the group.")

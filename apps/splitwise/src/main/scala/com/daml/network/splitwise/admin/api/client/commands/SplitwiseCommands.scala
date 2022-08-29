@@ -21,6 +21,25 @@ object SplitwiseCommands {
       v0.SplitwiseServiceGrpc.stub(channel)
   }
 
+  case class Initialize(validator: PartyId) extends BaseCommand[v0.InitializeRequest, Empty, Unit] {
+
+    override def createRequest(): Either[String, v0.InitializeRequest] =
+      Right(
+        v0.InitializeRequest(
+          validatorPartyId = Proto.encode(validator)
+        )
+      )
+
+    override def submitRequest(
+        service: SplitwiseServiceStub,
+        request: v0.InitializeRequest,
+    ): Future[Empty] = service.initialize(request)
+
+    override def handleResponse(
+        response: Empty
+    ): Either[String, Unit] = Right(())
+  }
+
   case class CreateInstallProposal(provider: PartyId)
       extends BaseCommand[
         v0.CreateInstallProposalRequest,
@@ -194,7 +213,7 @@ object SplitwiseCommands {
         v0.InitiateTransferRequest,
         v0.InitiateTransferResponse,
         Primitive.ContractId[
-          walletCodegen.TransferRequest
+          walletCodegen.AppPaymentRequest
         ],
       ] {
     override def createRequest(): Either[String, v0.InitiateTransferRequest] =
@@ -214,14 +233,14 @@ object SplitwiseCommands {
 
     override def handleResponse(
         response: v0.InitiateTransferResponse
-    ): Either[String, Primitive.ContractId[walletCodegen.TransferRequest]] =
-      Proto.decodeContractId[walletCodegen.TransferRequest](response.transferRequestContractId)
+    ): Either[String, Primitive.ContractId[walletCodegen.AppPaymentRequest]] =
+      Proto.decodeContractId[walletCodegen.AppPaymentRequest](response.transferRequestContractId)
   }
 
   case class CompleteTransfer(
       provider: PartyId,
       key: GroupKey,
-      receipt: Primitive.ContractId[walletCodegen.TransferReceipt],
+      acceptedAppPayment: Primitive.ContractId[walletCodegen.AcceptedAppPayment],
   ) extends BaseCommand[
         v0.CompleteTransferRequest,
         v0.CompleteTransferResponse,
@@ -234,7 +253,7 @@ object SplitwiseCommands {
         v0.CompleteTransferRequest(
           Proto.encode(provider),
           Some(key.toProtoV0),
-          Proto.encode(receipt),
+          Proto.encode(acceptedAppPayment),
         )
       )
 
@@ -392,24 +411,24 @@ object SplitwiseCommands {
         .leftMap(_.toString)
   }
 
-  case class ListTransferReceipts(
+  case class ListAcceptedAppPayments(
       key: GroupKey
-  ) extends BaseCommand[v0.ListTransferReceiptsRequest, v0.ListTransferReceiptsResponse, Seq[
-        Contract[walletCodegen.TransferReceipt]
+  ) extends BaseCommand[v0.ListAcceptedAppPaymentsRequest, v0.ListAcceptedAppPaymentsResponse, Seq[
+        Contract[walletCodegen.AcceptedAppPayment]
       ]] {
-    override def createRequest(): Either[String, v0.ListTransferReceiptsRequest] =
-      Right(v0.ListTransferReceiptsRequest(Some(key.toProtoV0)))
+    override def createRequest(): Either[String, v0.ListAcceptedAppPaymentsRequest] =
+      Right(v0.ListAcceptedAppPaymentsRequest(Some(key.toProtoV0)))
 
     override def submitRequest(
         service: SplitwiseServiceStub,
-        request: v0.ListTransferReceiptsRequest,
-    ): Future[v0.ListTransferReceiptsResponse] = service.listTransferReceipts(request)
+        request: v0.ListAcceptedAppPaymentsRequest,
+    ): Future[v0.ListAcceptedAppPaymentsResponse] = service.listAcceptedAppPayments(request)
 
     override def handleResponse(
-        response: v0.ListTransferReceiptsResponse
-    ): Either[String, Seq[Contract[walletCodegen.TransferReceipt]]] =
-      response.transferReceipts
-        .traverse(Contract.fromProto(walletCodegen.TransferReceipt)(_))
+        response: v0.ListAcceptedAppPaymentsResponse
+    ): Either[String, Seq[Contract[walletCodegen.AcceptedAppPayment]]] =
+      response.acceptedAppPayments
+        .traverse(Contract.fromProto(walletCodegen.AcceptedAppPayment)(_))
         .leftMap(_.toString)
   }
 }
