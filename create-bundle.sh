@@ -1,5 +1,7 @@
 #!/bin/bash
 
+set -eou pipefail
+
 # This script is a simplified version of Canton's analogue create-bundle.sh script
 # Usage: `./create-bundle.sh [-c <directory-to-copy-to-release-bundle]* [-r <file-location> <file-name-and-location-in-release-bundle>]*
 # where "-c" stands for "copy" and "-r" stands for "rename"
