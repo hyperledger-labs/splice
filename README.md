@@ -57,16 +57,51 @@ M3 - TestNet Launch.
 
 You should then see a 'sbt shell' window in IntelliJ that allows you to build and test the Scala code while using the
 same package references as nix. If IntelliJ asks you at the end if you want to overwrite any previous `.idea/*` files, say yes.
+  
+
+## sbt
+### sbt settings
+Make sure to configure the JVM heap size to at least 4G when using IntelliJ. In particular:
+- In Intellij, under Settings, search for "sbt" and then under JRE add `-Xmx4G -Xms2G` to VM Parameters.
+- In Intellij in the same menu, set the maximum heap size to at least 4000M.
+
+### sbt Commands
+
+This Section gives an overview of common sbt commands.
+More commands can be found in build.sbt and BuildCommon.scala.
+
+- `clean`: deletes all generated files (in the target directory)
+- `compile`: compile production code (excluding test code)
+- `Test/compile`: compile production and test code
+- `apps-common/compile`: compile production code of the `apps-common` subproject
+- `scalafixAll`: invoke scalafix across all configurations where scalafix is enabled.
+    `scalafix` is a linting and rewrite tool we use to organize imports. This may run for a long time as it needs to do a full compile.
+- `format`: apply `scalafmt` to format source files
+- `lint`: lint-check. Does not apply any fixes, but checks more things than `format`.
+- `damlBuild`: create `.dar` files for all Daml projects
+- `protobufLint`: to lint our protobuf files using `buf`
+- `bundle`: create a release bundle in `apps/app/target/release/<version>`. The release binary is loaded into your PATH automatically via `direnv`. Simply run `coin` to call it.
+- `checkErrors`: check test log for errors and fail if there is one. Note that if you haven't deleted your local log file in a long time, this may find very old errors. 
+
+Test:
+- `testOnly myWildcard`: runs all tests matching wildcard, e.g.,
+  `testOnly com.digitalasset.myPackage.*` runs all tests in package `com.digitalasset.myPackage`.
+  `testOnly *Wallet* -- -z "allow calling tap"` runs all tests with classname matching `*Wallet*` and test description matching `allow calling tap`.
+- `test`: runs all tests (with the exception of some tests running against the cluster that are excluded on purpose - see the overwrite of `test` in `BuildCommon.scala` for more details)
+- `damlTest`: run the Daml script tests included with the apps' Daml files
+
+For more information, especially on metrics, logging, tracing, Scala guidelines, Protobuf guidelines, formatting and git hooks
+please refer to the respective sections in [Canton's README](https://github.com/DACH-NY/canton/blob/main/contributing/README.md).
+We share a lot of tooling with Canton, so to avoid duplication we use the documentation in the Canton repo
+as "one source of truth".
+
 
 ## Unused Import Warnings
 
-If you the unused import warnings get in the way during development, you can turn them into
-an info summary that just displays the number of warnings but does not fail the build by
-setting an environment variable:
+If the unused import, local variable or implicits warnings get in the way during development, you can locally turn them into
+an info summary that just displays the number of warnings by creating the file `.disable-unused-warnings` and 
+calling `sbt reload`. Note that this requires a partial re-compile. 
 
-```
-CANTON_DISABLE_UNUSED_IMPORTS=true sbt
-```
 
 ### Managing Canton for Tests
 
@@ -107,43 +142,21 @@ If you have never used `lnav` to inspect Canton logs, then we recommend:
 2. Install the Canton log format using `lnav -i canton.lnav.json`, which will install it in `~/.lnav/formats/installed/canton_log.json` and enable it for auto-detection in future `lnav` sessions.
 3. Type `lnav log/canton_test.log` to inspect the test logs.
 4. Take the time to familiarize yourself with docs for the `lnav` [UI](https://docs.lnav.org/en/latest/ui.html#ui)
-   and [HotKeys](https://docs.lnav.org/en/latest/hotkeys.html), and learn to effectively navigate the test logs.
+   and [HotKeys](https://docs.lnav.org/en/latest/hotkeys.html), and learn to effectively navigate the test logs. 
+   The Canton docs also contain a [short tutorial](https://docs.daml.com/canton/usermanual/monitoring.html#viewing-logs) highlighting the most relevant features and hotkeys. 
 
 
-## sbt
-### sbt settings
-Make sure to configure the JVM heap size to at least 4G when using IntelliJ. In particular:
-- In Intellij, under Settings, search for "sbt" and then under JRE add `-Xmx4G -Xms2G` to VM Parameters.
-- In Intellij in the same menu, set the maximum heap size to at least 4000M.
+#### Handling errors in integration tests  
 
-### sbt Commands
+Generally, errors in integration tests should be handled through using Canton's `com.digitalasset.canton.logging.SuppressingLogger`. 
+The suppressing logger allows you to, e.g., specify a warning you expect to see and then ensures that it is isn't emitted
+as a warning to the log. 
+If it would be emitted as a warning to a log, CI would fail as we ensure via `check-logs.sh` (or analogue: `sbt checkErrors`) 
+and `check-sbt-output.sh` that no unexpected warnings or errors that our integration tests log no unexpected warnings
+or errors. 
 
-This Section gives an overview of common sbt commands.
-More commands can be found in build.sbt and BuildCommon.scala.
-
-- `clean`: deletes all generated files (in the target directory)
-- `compile`: compile production code (excluding test code)
-- `Test/compile`: compile production and test code
-- `apps-common/compile`: compile production code of the `apps-common` subproject
-- `scalafixAll`: invoke scalafix across all configurations where scalafix is enabled.
-    `scalafix` is a linting and rewrite tool we use to organize imports. This may run for a long time as it needs to do a full compile.
-- `format`: apply `scalafmt` to format source files
-- `lint`: lint-check. Does not apply any fixes, but checks more things than `format`.
-- `damlBuild`: create `.dar` files for all Daml projects
-- `protobufLint`: to lint our protobuf files using `buf`
-- `bundle`: create a release bundle in `apps/app/target/release/<version>`. The release binary is loaded into your PATH automatically via `direnv`. Simply run `coin` to call it.
-
-Test:
-- `testOnly myWildcard`: runs all tests matching wildcard, e.g.,
-  `testOnly com.digitalasset.myPackage.*` runs all tests in package `com.digitalasset.myPackage`.
-  `testOnly *Wallet* -- -z "allow calling tap"` runs all tests with classname matching `*Wallet*` and test description matching `allow calling tap`.
-- `test`: runs all tests (with the exception of some tests running against the cluster that are excluded on purpose - see the overwrite of `test` in `BuildCommon.scala` for more details)
-- `damlTest`: run the Daml script tests included with the apps' Daml files
-
-For more information, especially on metrics, logging, tracing, Scala guidelines, Protobuf guidelines, formatting and git hooks
-please refer to the respective sections in [Canton's README](https://github.com/DACH-NY/canton/blob/main/contributing/README.md).
-We share a lot of tooling with Canton, so to avoid duplication we use the documentation in the Canton repo
-as "one source of truth".
+The easiest way to how to use `SuppressingLogger` is by looking at existing usages of its methods. 
+If you don't find an usage of a given method within the CN network repo, you can look for usages in the Canton repo.
 
 ## Editing Daml
 

@@ -1,0 +1,62 @@
+# Patterns must be extended regular expressions, i.e., they will be passed to `grep -E -e`.
+# Lines containing only blanks or lines starting with '#' are ignored.
+
+# Unfortunately, very hard to fix. See i398
+There may be incompatibilities among your library dependencies; run 'evicted' to see detailed eviction warnings\.
+
+# We update regularly, but there is no need to always use the most recent version.
+WARNING: Using an outdated version of the DAML SDK in project\.
+
+# sbt test summary line
+Passed: Total .*, Failed 0, Errors 0, Passed .*
+
+# sbt slow poke notification
+Test still running after
+
+# Ignored tests
+!!! IGNORED !!!
+
+# Triggered, if project A depends on project B, project A uses ProtoBuf and B does not.
+# Probably a bug.
+# Not worth addressing.
+src/main/protobuf: warning: directory does not exist\.
+
+# Library name
+com\.google\.errorprone:error_prone_annotations:
+.*error_prone.*
+
+# Name of the sbt command
+^"testOnly .*"
+^checkErrors$
+
+# SBT 1.3.3 gives a warning on possible resource leaks, ignore
+\[warn\].*This is a likely resource leak
+
+# protocGenerate occasionally emits this warning, which is harmless as protoc will retry.
+protoc-jar: caught exception, retrying: java\.io\.IOException: Cannot run program "/tmp/protocjar.*\.exe": error=26, Text file busy
+
+# Command line arguments
+-XX:\+CrashOnOutOfMemoryError
+-XX:ErrorFile=log/hs_err_pid%p.log
+
+# Coursier noise
+.*no longer exists at.*
+
+# grpc "Half-closed without a request" grpc shutdown flake - might be when client hangs up before server response? https://github.com/grpc/grpc-java/issues/4890
+# reported by daml-repo ErrorInterceptor/ErrorListener added with daml 2.0.0-snapshot.20211220
+# Can probably be removed once https://github.com/digital-asset/daml/issues/13413 is fixed.
+io\.grpc\.Status\.asRuntimeException
+c\.d\.p\.a\.e\.ErrorInterceptor
+com\.daml\.platform\.apiserver\.error\.ErrorInterceptor
+c\.d\.p\.a\.e\.ErrorListener
+com\.daml\.platform\.apiserver\.error\.ErrorListener
+
+# sbt 1.4 onwards logs GC warnings
+.*\[.*warn.*\].* of the last .* were spent in garbage collection\.
+
+# During release bundling, the copy of the Canton OS repo emits a bunch of warnings
+.*\[.*warn.*\].*Negative time
+.*\[.*warn.*\].*Ignored unknown package option FixedTimestamp\(Some\([0-9]*\)\)
+
+
+# Make sure to have a trailing newline

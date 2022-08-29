@@ -263,6 +263,20 @@ lazy val bundleTask = {
   }
 }
 
+lazy val checkErrors = taskKey[Unit]("Check test log for errors and fail if there is one")
+checkErrors := {
+  import scala.sys.process._
+  val res =
+    Seq(
+      ".circleci/canton-scripts/check-logs.sh",
+      "log/canton_test.log",
+      "project/errors-in-log-to-ignore.txt",
+    ).!
+  if (res != 0) {
+    sys.error("canton_test.log contains problems.")
+  }
+}
+
 lazy val `apps-app` =
   project
     .in(file("apps/app"))

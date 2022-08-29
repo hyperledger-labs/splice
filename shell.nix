@@ -29,6 +29,7 @@ in pkgs.mkShell {
     openjdk11
     jq
     grpcurl
+    zip
     buf
   ];
 }

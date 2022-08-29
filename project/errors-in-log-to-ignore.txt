@@ -1,0 +1,19 @@
+# Patterns of entries to be ignored when checking log files (sbt checkErrors).
+# As the Canton log appenders emit errors/warnings to stdout, the patterns listed here will also be applied when checking the sbt output.
+# Patterns must be both
+# - PCRE regular expressions (see https://regex101.com) and
+# - extended regular expressions as used by "grep -E -e".
+# Lines containing only blanks or lines starting with '#' are ignored.
+
+# ExecutionContextMonitor
+Task runner .* is .* overloaded
+
+# Reporting aborted test suite
+LogReporter - Aborted test suite
+
+# This may sometimes lead to subsequent errors (e.g. api server fails to startup), but quite often it can simply be ignored.
+Trying to gather entropy from the underlying operating system to initialized the contract ID seeding, but the entropy pool seems empty.
+In CI environments environment consider using the "testing-weak" mode, that may produce insecure contract IDs but does not block on startup.
+
+
+# Make sure to have a trailing newline

@@ -240,6 +240,10 @@ commands:
       extra_parameters:
         type: string
         default: ""
+      fail_on_error_in_output:
+        # Fail if there is an error in the sbt output.
+        default: true
+        type: boolean
       with_devnet_authentication:
         type: boolean
         default: false
@@ -292,6 +296,7 @@ commands:
                # Do not quote this, to allow the caller to pass in several commands.
                # The caller needs to take care of quoting, if a command contains spaces.
                SBT_CMD+=(<< parameters.cmd >>)
+               SBT_CMD+=(checkErrors)
 
                # Setup heap size; corresponds to Canton large executors
                SBT_CMD+=("-J-Xmx5000M" "-J-Xms5000M")
@@ -300,10 +305,18 @@ commands:
                python3 -c "print ('r\n'*<< parameters.retry_fetch >>)" |
                  timeout --kill-after=30s << parameters.timeout >> "${SBT_CMD[@]}" 2>&1 |
                  tee sbt_output
+
+                <<# parameters.fail_on_error_in_output >>
+                # Check and report whether sbt has output errors
+                # Need to also apply ignore rules for the log, as errors in the log are emitted to stdout by default.
+                .circleci/canton-scripts/check-sbt-output.sh "sbt_output" "project/errors-in-sbt-output-to-ignore.txt" "project/errors-in-log-to-ignore.txt"
+                <</ parameters.fail_on_error_in_output >>
             }
             << parameters.pre_sbt_cmd >>
             run_sbt
             << parameters.post_sbt_cmd >>
+
+
 
   run_bash_command_in_nix:
     parameters:
