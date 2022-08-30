@@ -1,3 +1,5 @@
+.. _self_hosted_validator:
+
 Self-Hosted Validator (Preview)
 ===============================
 

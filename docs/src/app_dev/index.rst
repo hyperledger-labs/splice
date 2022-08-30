@@ -10,4 +10,3 @@ These docs serve as a drafting space for this kind of docs.
    topology
    building/index
    operating/index
-   reference

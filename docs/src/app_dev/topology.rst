@@ -54,6 +54,13 @@ Default Application Topology
        (2) serves queries over the provider's data required for the app user
        UI (e.g., a fuzzy search of contracts for an auto-complete box in the UI)
 
+       For small sets of active contracts (< 10k), we recommend keeping all
+       data required for automation in the app backend's memory, and
+       rehydrating from the ledger upon restart. For larger sets, we recommend
+       using a persistent cache updated using the Ledger API's transaction
+       stream. Make sure to only use that DB as a cache and keep storing all
+       essential state on-ledger.
+
   * there are five different APIs in use:
 
     1. The **Domain API** is used by the validator nodes to connect to the CN
@@ -150,9 +157,9 @@ Limitations
   participant nodes, and potentially use different domains. It also pays to
   minimize the number of contracts created and archived per workflow instance.
 
-* **app backends for large for active-contract sets(> 100k contracts)**:
+* **app backends for large for active-contract sets(> 10k contracts)**:
   apps that expect the provider to see more
-  than 100k active contracts should use a persistent cache for the app
+  than 10k active contracts should use a persistent cache for the app
   backend. In many cases, ingesting the relevant contracts into an RDBMS and
   having the backend run queries against that backend is a good option.
 
