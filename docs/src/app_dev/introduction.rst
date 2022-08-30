@@ -49,20 +49,23 @@ Introduction
       tracking)
 
 
+Getting Started
+---------------
+
+* What prerequisites do I need to build an application?
+
+  * install the Daml SDK: https://docs.daml.com/getting-started/installation.html
+  * choose your tech stack for building the app backend (we use Scala and ``sbt`` for :term:`CC`)
+  * choose your tech stack for building the app user UI (we use TypeScript and react for :term:`CC`)
+
 * How to build, operate, and evolve a CN app?
 
   1. Become clear about the multi-party business process you would like the CN
      app to implement.
-  2. Design the topology of your CN app, see :doc:`design`
+  2. Choose the topology of your CN app, see :doc:`topology`
   3. Build your CN app using test-driven development
   4. Release, deploy, operate your app
   5. If you offer a third-party API, then also release API definition files.
   6. Evolve your app by publishing new, backwards compatible APIs.
 
-Getting Started
----------------
 
-.. todo::
-
-   * What prerequisites do I need to build an application?
-   * How do I use the documentation to build an application?

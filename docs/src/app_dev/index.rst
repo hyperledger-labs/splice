@@ -7,7 +7,7 @@ These docs serve as a drafting space for this kind of docs.
 .. toctree::
 
    introduction
-   design
+   topology
    building/index
    operating/index
    reference

@@ -3,6 +3,10 @@ Glossary
 
 .. glossary::
 
+    CC
+
+      :term:`Canton Coin`
+
     CN
 
       :term:`Canton Network`
