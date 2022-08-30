@@ -12,27 +12,30 @@ let
 in pkgs.mkShell {
   SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
   buildInputs = with pkgs; [
+
+    # NOTE: please keep this list sorted for an easy overview and to avoid merge noise.
+
+    ammonite
+    buf
+    curl
     docker
-    kubectl
-    minikube
+    gawk
+    git
     google-cloud-sdk
+    grpcurl
+    hub # Github CLI for todo checker
+    jq
     jsonnet
+    kubectl
     lnav
+    minikube
     nodejs
+    openjdk11
+    python3
+    python3Packages.sphinx_rtd_theme
     sbt
     sphinx
-    python3
-    git
-    curl
     x86Pkgs.sphinx-autobuild
-    python3Packages.sphinx_rtd_theme
-    openjdk11
-    jq
-    grpcurl
     zip
-    buf
-    ammonite
-    gawk
-    hub # Github CLI for todo checker
   ];
 }
