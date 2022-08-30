@@ -359,7 +359,6 @@ commands:
 
             EOF
 
-
   cleanup_sbt_test_job:
     steps:
       - upload_test_reports
@@ -409,7 +408,6 @@ commands:
             apt-get update && apt-get install -y make curl
             curl https://get.daml.com | sh -s $SDK_VERSION
             printf "auto-install: false\nupdate-check: never\n" >> $HOME/.daml/daml-config.yaml
-
 
 parameters:
   sdk-version:

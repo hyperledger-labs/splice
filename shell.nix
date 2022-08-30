@@ -31,5 +31,8 @@ in pkgs.mkShell {
     grpcurl
     zip
     buf
+    ammonite
+    gawk
+    hub # Github CLI for todo checker
   ];
 }

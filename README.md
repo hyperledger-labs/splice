@@ -1,5 +1,13 @@
 # canton-coin
 
+## Contribution Guide
+
+We share a lot of our tooling and processes with Canton.
+We thus use [Canton's Contributing Guide](https://github.com/DACH-NY/canton/blob/main/contributing/README.md)
+as a baseline, and list below only the points where we differ.
+
+Please read the above guide in particular to learn about metrics, logging, tracing, Scala guidelines, Protobuf guidelines, TODO notes, formatting and git hooks.
+
 ## Setup
 
 1. Install [direnv](https://direnv.net/#basic-installation).
@@ -90,18 +98,17 @@ Test:
 - `test`: runs all tests (with the exception of some tests running against the cluster that are excluded on purpose - see the overwrite of `test` in `BuildCommon.scala` for more details)
 - `damlTest`: run the Daml script tests included with the apps' Daml files
 
-For more information, especially on metrics, logging, tracing, Scala guidelines, Protobuf guidelines, formatting and git hooks
-please refer to the respective sections in [Canton's README](https://github.com/DACH-NY/canton/blob/main/contributing/README.md).
-We share a lot of tooling with Canton, so to avoid duplication we use the documentation in the Canton repo
-as "one source of truth".
-
-
 ## Unused Import Warnings
 
 If the unused import, local variable or implicits warnings get in the way during development, you can locally turn them into
 an info summary that just displays the number of warnings by creating the file `.disable-unused-warnings` and 
 calling `sbt reload`. Note that this requires a partial re-compile. 
 
+
+## TODO Comments
+
+Call `./scripts/check-todos.sh` to extract a list of all TODO comments in the project,
+and get a list of TODO comments that do not conform to the [style guidelines](https://github.com/DACH-NY/canton/blob/main/contributing/README.md#todo-comments).
 
 ### Managing Canton for Tests
 
@@ -183,18 +190,18 @@ Try forcing a clean rebuild by cleaning via SBT, e.g., `apps-common/clean` and s
 
 ### Daml Numerics
 
-To represent Daml `Numeric`s for any user facing APIs (console commands), we use `scala.math.BigDecimal`s. 
-We use Scala BigDecimals instead of Java BigDecimals (that are used in the Daml repo) because 
-integers, floats etc. are automatically converted 
-to Scala BigDecimals by the Scala compiler unlike Java BigDecimals 
-(`wallet.tap(10)` vs `wallet.tap(new java.math.BigDecimal(10))`). 
+To represent Daml `Numeric`s for any user facing APIs (console commands), we use `scala.math.BigDecimal`s.
+We use Scala BigDecimals instead of Java BigDecimals (that are used in the Daml repo) because
+integers, floats etc. are automatically converted
+to Scala BigDecimals by the Scala compiler unlike Java BigDecimals
+(`wallet.tap(10)` vs `wallet.tap(new java.math.BigDecimal(10))`).
 
-To represent Daml Numerics in Protobuf we use `string`s (there is no Protobuf BigDecimal type). Conversions to 
+To represent Daml Numerics in Protobuf we use `string`s (there is no Protobuf BigDecimal type). Conversions to
 and from `string`s should occur via `com.daml.network.util.Proto.encode/tryDecode`.
 
-When interacting with the Ledger API, we convert the Scala BigDecimals to Java BigDecimals. 
+When interacting with the Ledger API, we convert the Scala BigDecimals to Java BigDecimals.
 
-Overall, please refer to the `wallet.tap` command implementation for the canonical handling of Daml Numerics.  
+Overall, please refer to the `wallet.tap` command implementation for the canonical handling of Daml Numerics.
 
 ## Protobuf & GRPC Guidelines
 
@@ -224,7 +231,7 @@ Below we list additional rules specific to our project:
 ### Domain Specific Naming
 
 * Use `listXXX`, `acceptXXX`, `rejectXXX`, `withdrawXXX` for managing proposals, requests etc.
-* [Beware of the differences](https://www.bkacontent.com/gs-commonly-confused-words-amount-number-and-quantity) 
+* [Beware of the differences](https://www.bkacontent.com/gs-commonly-confused-words-amount-number-and-quantity)
   between `quantity`, `amount` and `number`: **`quantity`**  is usually the right choice
 * Between `sender`/`receiver` and `payer`/`payee`: please use **`sender`/`receiver`**
 
@@ -365,7 +372,7 @@ res2: concurrent.duration.Duration = 1762 milliseconds
 
 As part of the runbook a participant node is also spun up
 and connects to the DevNet domain. Therefore, the runbook contains
-alternative scripts for connecting a local participant to the DevNet domain. 
+alternative scripts for connecting a local participant to the DevNet domain.
 
 ### Cluster Tooling
 
@@ -540,7 +547,6 @@ Both our deployment and tests follow the [port allocation scheme](./apps/app/src
 10. Bump the sdk version in our own daml.yaml files via `./set-sdk.sh $sdkversion` to the same version.
 11. Create another commit.
 12. Make a PR with your changes.
-You can refer to https://github.com/DACH-NY/the-real-canton-coin/pull/446/commits for an example of how the update PR should look like. 
+You can refer to https://github.com/DACH-NY/the-real-canton-coin/pull/446/commits for an example of how the update PR should look like.
 
 Current Canton commit: 9e5ec309ad5fe229e53ab668b6b180db67b555bc
-
