@@ -180,8 +180,12 @@ class SplitwiseIntegrationTest
       val providerParty = splitwiseValidator.initialize()
       charlieSplitwise.initialize(providerParty)
       val aliceInstallProposal = aliceSplitwise.createInstallProposal(providerParty)
+      providerSplitwise.remoteParticipant.ledger_api.acs
+        .await(providerParty, splitCodegen.SplitwiseInstallProposal)
       providerSplitwise.acceptInstallProposal(aliceInstallProposal)
       val bobInstallProposal = bobSplitwise.createInstallProposal(providerParty)
+      providerSplitwise.remoteParticipant.ledger_api.acs
+        .await(providerParty, splitCodegen.SplitwiseInstallProposal)
       providerSplitwise.acceptInstallProposal(bobInstallProposal)
       // We reuse the provider as charlie to avoid setting up another splitwise instance.
       val charlieUserParty = providerParty

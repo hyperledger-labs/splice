@@ -435,8 +435,17 @@ jobs:
   test:
     docker:
       - image: cimg/base:2021.04
+      - image: postgres:11
+        command: postgres -c max_connections=500
+        environment:
+          POSTGRES_INITDB_ARGS: -A scram-sha-256
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_USER: postgres
     environment:
       <<: *env
+      POSTGRES_HOST: localhost
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_USER: postgres
     steps:
       - setup_sbt_test_job
       - execute_sbt_command:
@@ -444,9 +453,9 @@ jobs:
           retry_fetch: "50"
       - execute_sbt_command:
           # run all tests except the live cluster ones
-          pre_sbt_cmd: ./start-canton.sh
+          pre_sbt_cmd: ./start-canton.sh external
           cmd: "\"testOnly * -- -l LiveDevNetTest\""
-          post_sbt_cmd: ./stop-canton.sh
+          post_sbt_cmd: ./stop-canton.sh external
           timeout: "10m"
       - execute_sbt_command:
           cmd: "damlTest"

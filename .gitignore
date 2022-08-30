@@ -22,3 +22,4 @@ canton.ports
 canton-release
 .disable-unused-warnings
 todo-out
+temp/

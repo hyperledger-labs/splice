@@ -31,6 +31,7 @@ in pkgs.mkShell {
     minikube
     nodejs
     openjdk11
+    postgresql_11
     python3
     python3Packages.sphinx_rtd_theme
     sbt

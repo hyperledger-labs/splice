@@ -14,7 +14,7 @@ import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences}
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
-import com.daml.network.codegen.CC.Coin.{AppReward, ValidatorRight}
+import com.daml.network.codegen.CC.{Coin => coinCodegen}
 import com.daml.network.codegen.CC.CoinRules.CoinRules
 import com.daml.network.codegen.CN.Scripts.{TestWallet => testWalletCodegen}
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
@@ -220,6 +220,7 @@ class WalletIntegrationTest
       val bobProposals = bobWallet.listPaymentChannelProposals()
       aliceProposals shouldBe bobProposals
       bobWallet.acceptPaymentChannelProposal(aliceProposal.contractId)
+      utils.retry_until_true(aliceWallet.listPaymentChannelProposals().isEmpty)
 
       // Neither Alice nor Bob see a payment channel proposal
       aliceWallet.listPaymentChannelProposals() shouldBe empty
@@ -233,6 +234,7 @@ class WalletIntegrationTest
       val coinCid = aliceWallet.tap(50)
       checkWallet(aliceUserParty, aliceWallet, Seq((50, 50)))
       aliceWallet.executeDirectTransfer(bobUserParty, 10, coinCid)
+      bobWallet.remoteParticipant.ledger_api.acs.await(bobUserParty, coinCodegen.Coin)
       checkWallet(aliceUserParty, aliceWallet, Seq((39, 40)))
       checkWallet(bobUserParty, bobWallet, Seq((9, 10)))
 
@@ -311,7 +313,9 @@ class WalletIntegrationTest
       bobWallet.executeDirectTransfer(aliceUserParty, 30, transferredCoin)
 
       // Wait for app rewards to become visible, and check structure
-      aliceWallet.remoteParticipant.ledger_api.acs.await(aliceUserParty, AppReward).contractId
+      aliceWallet.remoteParticipant.ledger_api.acs
+        .await(aliceUserParty, coinCodegen.AppReward)
+        .contractId
       val appRewards = aliceWallet.listAppRewards()
       appRewards should have size 1
       aliceWallet.listValidatorRewards() shouldBe empty
@@ -320,11 +324,14 @@ class WalletIntegrationTest
         Seq(aliceUserParty),
         optTimeout = None,
         commands = Seq(
-          ValidatorRight(
-            svcParty.toPrim,
-            aliceUserParty.toPrim,
-            aliceUserParty.toPrim,
-          ).create.command
+          coinCodegen
+            .ValidatorRight(
+              svcParty.toPrim,
+              aliceUserParty.toPrim,
+              aliceUserParty.toPrim,
+            )
+            .create
+            .command
         ),
       )
       val validatorRewards = aliceWallet.listValidatorRewards()
