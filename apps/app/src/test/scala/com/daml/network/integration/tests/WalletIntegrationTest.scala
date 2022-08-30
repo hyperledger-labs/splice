@@ -245,6 +245,11 @@ class WalletIntegrationTest
       aliceWallet.listOnChannelPaymentRequests().headOption.value.contractId shouldBe request
       bobWallet.listOnChannelPaymentRequests() shouldBe aliceWallet.listOnChannelPaymentRequests()
       aliceWallet.acceptOnChannelPaymentRequest(request, aliceWallet.list().head.contractId)
+      utils.retry_until_true(
+        bobWallet.remoteParticipant.ledger_api.acs
+          .of_party(bobUserParty, None, true, Seq(coinCodegen.Coin.id))
+          .size == 2
+      )
       checkWallet(aliceUserParty, aliceWallet, Seq((29, 30)))
       checkWallet(bobUserParty, bobWallet, Seq((9, 10), (9, 10)))
 
