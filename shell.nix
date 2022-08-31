@@ -1,5 +1,5 @@
 let
-  pkgs = import ./nix/default.nix;
+  pkgs = import ./nix/default.nix {};
   # pyopenssl is currently broken on M1 due to
   # https://github.com/NixOS/nixpkgs/issues/174457#issuecomment-1137385758
   # To work around this we fetch some packages via rosetta.

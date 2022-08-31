@@ -1,10 +1,11 @@
+args:
 let
   spec = builtins.fromJSON (builtins.readFile ./src.json);
   src = builtins.fetchTarball {
     url = "https://github.com/${spec.owner}/${spec.repo}/archive/${spec.rev}.tar.gz";
     sha256 = spec.sha256;
   };
-in (import src) {
+in (import src) ({
   overlays = [(self: super: {
     sbt = super.sbt.override { jre = super.openjdk11; };
     lnav = super.callPackage ./lnav.nix {};
@@ -17,4 +18,4 @@ in (import src) {
       };
     };
   })];
-}
+} // args)
