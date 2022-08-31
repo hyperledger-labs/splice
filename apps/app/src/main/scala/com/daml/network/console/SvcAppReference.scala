@@ -2,7 +2,7 @@ package com.daml.network.console
 
 import com.daml.ledger.client.binding.Primitive.ContractId
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.svc.admin.api.client.commands.SvcAppCommands
+import com.daml.network.svc.admin.api.client.commands.GrpcSvcAppClient
 import com.daml.network.svc.config.{LocalSvcAppConfig, RemoteSvcAppConfig}
 import com.digitalasset.canton.console.{
   BaseInspection,
@@ -25,19 +25,19 @@ abstract class SvcAppReference(
   )
   def acceptValidators(): Unit = {
     consoleEnvironment.run {
-      adminCommand(SvcAppCommands.AcceptValidators())
+      adminCommand(GrpcSvcAppClient.AcceptValidators())
     }
   }
 
-  def getDebugInfo(): SvcAppCommands.DebugInfo = {
+  def getDebugInfo(): GrpcSvcAppClient.DebugInfo = {
     consoleEnvironment.run {
-      adminCommand(SvcAppCommands.GetDebugInfo())
+      adminCommand(GrpcSvcAppClient.GetDebugInfo())
     }
   }
 
-  def getValidatorConfig: SvcAppCommands.ValidatorConfigInfo = {
+  def getValidatorConfig: GrpcSvcAppClient.ValidatorConfigInfo = {
     consoleEnvironment.run {
-      adminCommand(SvcAppCommands.GetValidatorConfig())
+      adminCommand(GrpcSvcAppClient.GetValidatorConfig())
     }
   }
 
@@ -46,7 +46,7 @@ abstract class SvcAppReference(
       coinPrice: BigDecimal
   ): Map[PartyId, ContractId[roundCodegen.OpenMiningRound]] =
     consoleEnvironment.run {
-      adminCommand(SvcAppCommands.OpenRound(coinPrice))
+      adminCommand(GrpcSvcAppClient.OpenRound(coinPrice))
     }
 
   @Help.Summary("Start closing the mining round for all validators")
@@ -54,15 +54,15 @@ abstract class SvcAppReference(
       round: Long
   ): Map[PartyId, ContractId[roundCodegen.ClosingMiningRound]] =
     consoleEnvironment.run {
-      adminCommand(SvcAppCommands.StartClosingRound(round))
+      adminCommand(GrpcSvcAppClient.StartClosingRound(round))
     }
 
   @Help.Summary("Open the given mining round for issuance for all validators")
   def startIssuingRound(
       round: Long
-  ): SvcAppCommands.StartIssuingRoundResponse =
+  ): GrpcSvcAppClient.StartIssuingRoundResponse =
     consoleEnvironment.run {
-      adminCommand(SvcAppCommands.StartIssuingRound(round))
+      adminCommand(GrpcSvcAppClient.StartIssuingRound(round))
     }
 
   @Help.Summary("Close the given mining round for all validators")
@@ -70,7 +70,7 @@ abstract class SvcAppReference(
       round: Long
   ): Map[PartyId, ContractId[roundCodegen.ClosedMiningRound]] =
     consoleEnvironment.run {
-      adminCommand(SvcAppCommands.CloseRound(round))
+      adminCommand(GrpcSvcAppClient.CloseRound(round))
     }
 
   @Help.Summary("Archive the given mining round for all validators")
@@ -78,7 +78,7 @@ abstract class SvcAppReference(
       round: Long
   ): Unit =
     consoleEnvironment.run {
-      adminCommand(SvcAppCommands.ArchiveRound(round))
+      adminCommand(GrpcSvcAppClient.ArchiveRound(round))
     }
 
 }

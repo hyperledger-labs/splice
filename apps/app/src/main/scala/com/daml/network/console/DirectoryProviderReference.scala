@@ -1,7 +1,7 @@
 package com.daml.network.console
 
 import com.daml.ledger.client.binding.Primitive
-import com.daml.network.directory.provider.admin.api.client.commands.DirectoryProviderCommands
+import com.daml.network.directory.provider.admin.api.client.commands.GrpcDirectoryProviderAppClient
 import com.daml.network.directory.provider.config.{
   BaseDirectoryProviderAppConfig,
   LocalDirectoryProviderAppConfig,
@@ -33,7 +33,7 @@ abstract class DirectoryProviderAppReference(
   @Help.Summary("List all DirectoryInstallRequest contracts")
   def listInstallRequests(): Seq[Contract[codegen.DirectoryInstallRequest]] = {
     consoleEnvironment.run {
-      adminCommand(DirectoryProviderCommands.ListInstallRequests())
+      adminCommand(GrpcDirectoryProviderAppClient.ListInstallRequests())
     }
   }
 
@@ -42,14 +42,14 @@ abstract class DirectoryProviderAppReference(
       cid: Primitive.ContractId[codegen.DirectoryInstallRequest]
   ): Primitive.ContractId[codegen.DirectoryInstall] = {
     consoleEnvironment.run {
-      adminCommand(DirectoryProviderCommands.AcceptInstallRequest(cid))
+      adminCommand(GrpcDirectoryProviderAppClient.AcceptInstallRequest(cid))
     }
   }
 
   @Help.Summary("List all DirectoryEntryRequest contracts")
   def listEntryRequests(): Seq[Contract[codegen.DirectoryEntryRequest]] = {
     consoleEnvironment.run {
-      adminCommand(DirectoryProviderCommands.ListEntryRequests())
+      adminCommand(GrpcDirectoryProviderAppClient.ListEntryRequests())
     }
   }
 
@@ -58,7 +58,7 @@ abstract class DirectoryProviderAppReference(
       cid: Primitive.ContractId[codegen.DirectoryEntryRequest]
   ): Primitive.ContractId[walletCodegen.AppPaymentRequest] = {
     consoleEnvironment.run {
-      adminCommand(DirectoryProviderCommands.RequestEntryPayment(cid))
+      adminCommand(GrpcDirectoryProviderAppClient.RequestEntryPayment(cid))
     }
   }
 
@@ -67,32 +67,32 @@ abstract class DirectoryProviderAppReference(
       cid: Primitive.ContractId[walletCodegen.AcceptedAppPayment]
   ): Primitive.ContractId[codegen.DirectoryEntry] = {
     consoleEnvironment.run {
-      adminCommand(DirectoryProviderCommands.CollectEntryPayment(cid))
+      adminCommand(GrpcDirectoryProviderAppClient.CollectEntryPayment(cid))
     }
   }
 
   @Help.Summary("List all directory entries")
   def listEntries(): Seq[Contract[codegen.DirectoryEntry]] =
     consoleEnvironment.run {
-      adminCommand(DirectoryProviderCommands.ListEntries())
+      adminCommand(GrpcDirectoryProviderAppClient.ListEntries())
     }
 
   @Help.Summary("Lookup a directory entry by the party that registered it")
   def lookupEntryByParty(party: PartyId): Contract[codegen.DirectoryEntry] =
     consoleEnvironment.run {
-      adminCommand(DirectoryProviderCommands.LookupEntryByParty(party))
+      adminCommand(GrpcDirectoryProviderAppClient.LookupEntryByParty(party))
     }
 
   @Help.Summary("Lookup a directory entry by its name")
   def lookupEntryByName(name: String): Contract[codegen.DirectoryEntry] =
     consoleEnvironment.run {
-      adminCommand(DirectoryProviderCommands.LookupEntryByName(name))
+      adminCommand(GrpcDirectoryProviderAppClient.LookupEntryByName(name))
     }
 
   @Help.Summary("Get the party id of the provider operating the directory service")
   def getProviderPartyId(): PartyId =
     consoleEnvironment.run {
-      adminCommand(DirectoryProviderCommands.GetProviderPartyId())
+      adminCommand(GrpcDirectoryProviderAppClient.GetProviderPartyId())
     }
 
   @Help.Summary("Return directory provider app config")

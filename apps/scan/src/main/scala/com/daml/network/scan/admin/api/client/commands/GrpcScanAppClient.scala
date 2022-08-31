@@ -11,7 +11,7 @@ import io.grpc.ManagedChannel
 
 import scala.concurrent.Future
 
-object ScanCommands {
+object GrpcScanAppClient {
 
   abstract class BaseCommand[Req, Res, Result] extends GrpcAdminCommand[Req, Res, Result] {
     override type Svc = ScanServiceStub

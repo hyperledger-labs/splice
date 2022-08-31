@@ -6,7 +6,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
   IsolatedCoinEnvironments,
 }
-import com.daml.network.splitwise.admin.api.client.commands.SplitwiseCommands
+import com.daml.network.splitwise.admin.api.client.commands.GrpcSplitwiseAppClient
 import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
@@ -62,7 +62,7 @@ class SplitwiseIntegrationTest
         aliceSplitwise.joinGroup(aliceProviderParty, accepted.contractId)
     }
 
-    val key = SplitwiseCommands.GroupKey(aliceUserParty, aliceProviderParty, "group1")
+    val key = GrpcSplitwiseAppClient.GroupKey(aliceUserParty, aliceProviderParty, "group1")
 
     aliceSplitwise.enterPayment(
       aliceProviderParty,

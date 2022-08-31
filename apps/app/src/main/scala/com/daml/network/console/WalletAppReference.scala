@@ -3,7 +3,7 @@ package com.daml.network.console
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.util.{Contract, Value}
-import com.daml.network.wallet.admin.api.client.commands.WalletAppCommands
+import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
 import com.digitalasset.canton.console.{
   BaseInspection,
@@ -30,13 +30,13 @@ abstract class WalletAppReference(
   )
   def list(): Seq[Contract[coinCodegen.Coin]] = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.List())
+      adminCommand(GrpcWalletAppClient.List())
     }
   }
 
   def initialize(validator: PartyId): Unit = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.Initialize(validator))
+      adminCommand(GrpcWalletAppClient.Initialize(validator))
     }
   }
 
@@ -47,7 +47,7 @@ abstract class WalletAppReference(
   )
   def tap(quantity: BigDecimal): Primitive.ContractId[coinCodegen.Coin] = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.Tap(quantity))
+      adminCommand(GrpcWalletAppClient.Tap(quantity))
     }
   }
 
@@ -58,7 +58,7 @@ abstract class WalletAppReference(
   )
   def listAppPaymentRequests(): Seq[Contract[walletCodegen.AppPaymentRequest]] = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.ListAppPaymentRequests())
+      adminCommand(GrpcWalletAppClient.ListAppPaymentRequests())
     }
   }
 
@@ -72,7 +72,7 @@ abstract class WalletAppReference(
       coinId: Primitive.ContractId[coinCodegen.Coin],
   ): Primitive.ContractId[walletCodegen.AcceptedAppPayment] = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.AcceptAppPaymentRequest(requestId, coinId))
+      adminCommand(GrpcWalletAppClient.AcceptAppPaymentRequest(requestId, coinId))
     }
   }
 
@@ -84,14 +84,14 @@ abstract class WalletAppReference(
       requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest]
   ): Unit = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.RejectAppPaymentRequest(requestId))
+      adminCommand(GrpcWalletAppClient.RejectAppPaymentRequest(requestId))
     }
   }
 
   @Help.Summary("List all accepted app payments the user is a sender on")
   def listAcceptedAppPayments(): Seq[Contract[walletCodegen.AcceptedAppPayment]] =
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.ListAcceptedAppPayments())
+      adminCommand(GrpcWalletAppClient.ListAcceptedAppPayments())
     }
 
   @Help.Summary("Propose the creation of a payment channel")
@@ -109,7 +109,7 @@ abstract class WalletAppReference(
   ): Primitive.ContractId[walletCodegen.PaymentChannelProposal] = {
     consoleEnvironment.run {
       adminCommand(
-        WalletAppCommands.ProposePaymentChannel(
+        GrpcWalletAppClient.ProposePaymentChannel(
           receiver,
           replacesChannelId,
           allowRequests,
@@ -127,7 +127,7 @@ abstract class WalletAppReference(
   )
   def listPaymentChannelProposals(): Seq[Contract[walletCodegen.PaymentChannelProposal]] = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.ListPaymentChannelProposals())
+      adminCommand(GrpcWalletAppClient.ListPaymentChannelProposals())
     }
   }
 
@@ -137,7 +137,7 @@ abstract class WalletAppReference(
   )
   def listPaymentChannels(): Seq[Contract[walletCodegen.PaymentChannel]] = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.ListPaymentChannels())
+      adminCommand(GrpcWalletAppClient.ListPaymentChannels())
     }
   }
 
@@ -149,7 +149,7 @@ abstract class WalletAppReference(
       proposalId: Primitive.ContractId[walletCodegen.PaymentChannelProposal]
   ): Primitive.ContractId[walletCodegen.PaymentChannel] = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.AcceptPaymentChannelProposal(proposalId))
+      adminCommand(GrpcWalletAppClient.AcceptPaymentChannelProposal(proposalId))
     }
   }
 
@@ -163,7 +163,7 @@ abstract class WalletAppReference(
       coinId: Primitive.ContractId[coinCodegen.Coin],
   ): Unit = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.ExecuteDirectTransfer(receiver, quantity, coinId))
+      adminCommand(GrpcWalletAppClient.ExecuteDirectTransfer(receiver, quantity, coinId))
     }
   }
 
@@ -177,7 +177,7 @@ abstract class WalletAppReference(
       description: String,
   ): Primitive.ContractId[walletCodegen.OnChannelPaymentRequest] = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.CreateOnChannelPaymentRequest(sender, quantity, description))
+      adminCommand(GrpcWalletAppClient.CreateOnChannelPaymentRequest(sender, quantity, description))
     }
   }
 
@@ -187,7 +187,7 @@ abstract class WalletAppReference(
   )
   def listOnChannelPaymentRequests(): Seq[Contract[walletCodegen.OnChannelPaymentRequest]] = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.ListOnChannelPaymentRequests())
+      adminCommand(GrpcWalletAppClient.ListOnChannelPaymentRequests())
     }
   }
 
@@ -200,7 +200,7 @@ abstract class WalletAppReference(
       coinId: Primitive.ContractId[coinCodegen.Coin],
   ): Unit = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.AcceptOnChannelPaymentRequest(requestId, coinId))
+      adminCommand(GrpcWalletAppClient.AcceptOnChannelPaymentRequest(requestId, coinId))
     }
   }
 
@@ -212,7 +212,7 @@ abstract class WalletAppReference(
       requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]
   ): Unit = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.RejectOnChannelPaymentRequest(requestId))
+      adminCommand(GrpcWalletAppClient.RejectOnChannelPaymentRequest(requestId))
     }
   }
 
@@ -224,7 +224,7 @@ abstract class WalletAppReference(
       requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]
   ): Unit = {
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.WithdrawOnChannelPaymentRequest(requestId))
+      adminCommand(GrpcWalletAppClient.WithdrawOnChannelPaymentRequest(requestId))
     }
   }
 
@@ -232,7 +232,7 @@ abstract class WalletAppReference(
   @Help.Description("List all open app rewards for the configured user")
   def listAppRewards(): Seq[Contract[coinCodegen.AppReward]] =
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.ListAppRewards())
+      adminCommand(GrpcWalletAppClient.ListAppRewards())
     }
 
   @Help.Summary("List validator rewards")
@@ -241,7 +241,7 @@ abstract class WalletAppReference(
   )
   def listValidatorRewards(): Seq[Contract[coinCodegen.ValidatorReward]] =
     consoleEnvironment.run {
-      adminCommand(WalletAppCommands.ListValidatorRewards())
+      adminCommand(GrpcWalletAppClient.ListValidatorRewards())
     }
 
   @Help.Summary("Collect rewards")
@@ -255,19 +255,19 @@ abstract class WalletAppReference(
     consoleEnvironment.run {
       ConsoleCommandResult.fromEither {
         for {
-          validatorRewards <- adminCommand(WalletAppCommands.ListValidatorRewards()).toEither
+          validatorRewards <- adminCommand(GrpcWalletAppClient.ListValidatorRewards()).toEither
           validatorRewardInputs = validatorRewards
             .filter(c => c.payload.round.number == round)
             .map(c => coinRulesCodegen.TransferInput.InputValidatorReward(c.contractId))
-          appRewards <- adminCommand(WalletAppCommands.ListAppRewards()).toEither
+          appRewards <- adminCommand(GrpcWalletAppClient.ListAppRewards()).toEither
           appRewardInputs = appRewards
             .filter(c => c.payload.round.number == round)
             .map(c => coinRulesCodegen.TransferInput.InputAppReward(c.contractId))
           inputCoin = coinRulesCodegen.TransferInput.InputCoin(coinId)
           inputs = (inputCoin +: validatorRewardInputs :++ appRewardInputs).map(Value(_))
-          outputs = Seq(WalletAppCommands.RedistributeOutput(exactQuantity = None))
+          outputs = Seq(GrpcWalletAppClient.RedistributeOutput(exactQuantity = None))
           coins <- adminCommand(
-            WalletAppCommands.Redistribute(inputs = inputs, outputs = outputs)
+            GrpcWalletAppClient.Redistribute(inputs = inputs, outputs = outputs)
           ).toEither
           _ <-
             if (coins.size == 1) Right(())

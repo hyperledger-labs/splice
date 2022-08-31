@@ -1,7 +1,7 @@
 package com.daml.network.console
 
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.validator.admin.api.client.commands.ValidatorAppCommands
+import com.daml.network.validator.admin.api.client.commands.GrpcValidatorAppClient
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.digitalasset.canton.console.{BaseInspection, Help, LocalInstanceReference}
 import com.digitalasset.canton.participant.ParticipantNode
@@ -29,7 +29,7 @@ class LocalValidatorAppReference(
                       |Return the party set up for the validator""".stripMargin)
   def initialize(): PartyId = {
     consoleEnvironment.run {
-      adminCommand(ValidatorAppCommands.SetupValidatorCommand())
+      adminCommand(GrpcValidatorAppClient.SetupValidatorCommand())
     }
   }
 
@@ -38,7 +38,7 @@ class LocalValidatorAppReference(
                       |Return the newly set up partyId.""".stripMargin)
   def onboardUser(user: String): PartyId = {
     consoleEnvironment.run {
-      adminCommand(ValidatorAppCommands.OnboardUserCommand(user))
+      adminCommand(GrpcValidatorAppClient.OnboardUserCommand(user))
     }
   }
 

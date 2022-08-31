@@ -1,7 +1,7 @@
 package com.daml.network.scan.admin.api.client
 
 import com.daml.network.admin.api.client.AppConnection
-import com.daml.network.scan.admin.api.client.commands.ScanCommands
+import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
@@ -33,7 +33,7 @@ final class ScanConnection (
       case Some(partyId) => Future.successful(partyId)
       case None =>
         for {
-          partyId <- runCmd(ScanCommands.GetSvcPartyId())
+          partyId <- runCmd(GrpcScanAppClient.GetSvcPartyId())
         } yield {
           // The party id never changes so we don’t need to worry about concurrent setters writing different values.
           svcRef.set(Some(partyId))

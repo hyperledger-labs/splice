@@ -10,7 +10,7 @@ import io.grpc.ManagedChannel
 
 import scala.concurrent.Future
 
-object ValidatorAppCommands {
+object GrpcValidatorAppClient {
 
   abstract class BaseCommand[Req, Res, Result] extends GrpcAdminCommand[Req, Res, Result] {
     override type Svc = ValidatorAppServiceStub

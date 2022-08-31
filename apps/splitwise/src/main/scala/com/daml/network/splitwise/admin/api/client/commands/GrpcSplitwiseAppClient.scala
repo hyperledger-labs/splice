@@ -13,7 +13,7 @@ import io.grpc.ManagedChannel
 
 import scala.concurrent.Future
 
-object SplitwiseCommands {
+object GrpcSplitwiseAppClient {
 
   abstract class BaseCommand[Req, Res, Result] extends GrpcAdminCommand[Req, Res, Result] {
     override type Svc = SplitwiseServiceStub

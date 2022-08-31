@@ -1,7 +1,7 @@
 package com.daml.network.console
 
 import com.daml.ledger.client.binding.Primitive
-import com.daml.network.directory.user.admin.api.client.commands.DirectoryUserCommands
+import com.daml.network.directory.user.admin.api.client.commands.GrpcDirectoryUserAppClient
 import com.daml.network.directory.user.config.LocalDirectoryUserAppConfig
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.util.Contract
@@ -30,13 +30,13 @@ class LocalDirectoryUserAppReference(
   @Help.Summary("Request DirectoryInstall contract")
   def requestDirectoryInstall(): Primitive.ContractId[codegen.DirectoryInstallRequest] =
     consoleEnvironment.run {
-      adminCommand(DirectoryUserCommands.RequestDirectoryInstall())
+      adminCommand(GrpcDirectoryUserAppClient.RequestDirectoryInstall())
     }
 
   @Help.Summary("Request DirectoryEntry with the given name")
   def requestDirectoryEntry(name: String): Primitive.ContractId[codegen.DirectoryEntryRequest] =
     consoleEnvironment.run {
-      adminCommand(DirectoryUserCommands.RequestDirectoryEntry(name))
+      adminCommand(GrpcDirectoryUserAppClient.RequestDirectoryEntry(name))
     }
 
   @Help.Summary("List all directory entries")

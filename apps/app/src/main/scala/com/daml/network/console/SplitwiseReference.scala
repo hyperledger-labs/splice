@@ -2,7 +2,7 @@ package com.daml.network.console
 
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.splitwise.admin.api.client.commands.SplitwiseCommands
+import com.daml.network.splitwise.admin.api.client.commands.GrpcSplitwiseAppClient
 import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
 import com.daml.network.util.Contract
 import com.digitalasset.canton.console.{BaseInspection, Help, LocalInstanceReference}
@@ -40,7 +40,7 @@ class LocalSplitwiseAppReference(
   @Help.Summary("Initialize splitwise with the validator party")
   def initialize(validator: PartyId): Unit =
     consoleEnvironment.run {
-      adminCommand(SplitwiseCommands.Initialize(validator))
+      adminCommand(GrpcSplitwiseAppClient.Initialize(validator))
     }
 
   // Commands for managing installs
@@ -50,7 +50,7 @@ class LocalSplitwiseAppReference(
       provider: PartyId
   ): Primitive.ContractId[splitCodegen.SplitwiseInstallProposal] =
     consoleEnvironment.run {
-      adminCommand(SplitwiseCommands.CreateInstallProposal(provider))
+      adminCommand(GrpcSplitwiseAppClient.CreateInstallProposal(provider))
     }
 
   @Help.Summary("Accept splitwise install proposal")
@@ -58,7 +58,7 @@ class LocalSplitwiseAppReference(
       proposal: Primitive.ContractId[splitCodegen.SplitwiseInstallProposal]
   ): Primitive.ContractId[splitCodegen.SplitwiseInstall] =
     consoleEnvironment.run {
-      adminCommand(SplitwiseCommands.AcceptInstallProposal(proposal))
+      adminCommand(GrpcSplitwiseAppClient.AcceptInstallProposal(proposal))
     }
 
   // Commands for the group owner
@@ -66,7 +66,7 @@ class LocalSplitwiseAppReference(
   @Help.Summary("Create group with the given id")
   def createGroup(provider: PartyId, id: String): Primitive.ContractId[splitCodegen.Group] =
     consoleEnvironment.run {
-      adminCommand(SplitwiseCommands.CreateGroup(provider, id))
+      adminCommand(GrpcSplitwiseAppClient.CreateGroup(provider, id))
     }
 
   @Help.Summary(
@@ -78,7 +78,7 @@ class LocalSplitwiseAppReference(
       observers: Seq[PartyId],
   ): Primitive.ContractId[splitCodegen.GroupInvite] =
     consoleEnvironment.run {
-      adminCommand(SplitwiseCommands.CreateGroupInvite(provider, id, observers))
+      adminCommand(GrpcSplitwiseAppClient.CreateGroupInvite(provider, id, observers))
     }
 
   @Help.Summary("Add the invitee on the accepted group invite to the group")
@@ -87,7 +87,7 @@ class LocalSplitwiseAppReference(
       acceptedGroupInvite: Primitive.ContractId[splitCodegen.AcceptedGroupInvite],
   ): Primitive.ContractId[splitCodegen.Group] =
     consoleEnvironment.run {
-      adminCommand(SplitwiseCommands.JoinGroup(provider, acceptedGroupInvite))
+      adminCommand(GrpcSplitwiseAppClient.JoinGroup(provider, acceptedGroupInvite))
     }
 
   // Member invite
@@ -98,7 +98,7 @@ class LocalSplitwiseAppReference(
       groupInvite: Primitive.ContractId[splitCodegen.GroupInvite],
   ): Primitive.ContractId[splitCodegen.AcceptedGroupInvite] =
     consoleEnvironment.run {
-      adminCommand(SplitwiseCommands.AcceptInvite(provider, groupInvite))
+      adminCommand(GrpcSplitwiseAppClient.AcceptInvite(provider, groupInvite))
     }
 
   // Member operations
@@ -108,23 +108,23 @@ class LocalSplitwiseAppReference(
   )
   def enterPayment(
       provider: PartyId,
-      key: SplitwiseCommands.GroupKey,
+      key: GrpcSplitwiseAppClient.GroupKey,
       quantity: BigDecimal,
       description: String,
   ): Primitive.ContractId[splitCodegen.BalanceUpdate] =
     consoleEnvironment.run {
-      adminCommand(SplitwiseCommands.EnterPayment(provider, key, quantity, description))
+      adminCommand(GrpcSplitwiseAppClient.EnterPayment(provider, key, quantity, description))
     }
 
   @Help.Summary("Initiate a transfer to the receiver. Must be confirmed in the wallet.")
   def initiateTransfer(
       provider: PartyId,
-      key: SplitwiseCommands.GroupKey,
+      key: GrpcSplitwiseAppClient.GroupKey,
       receiver: PartyId,
       quantity: BigDecimal,
   ): Primitive.ContractId[walletCodegen.AppPaymentRequest] =
     consoleEnvironment.run {
-      adminCommand(SplitwiseCommands.InitiateTransfer(provider, key, receiver, quantity))
+      adminCommand(GrpcSplitwiseAppClient.InitiateTransfer(provider, key, receiver, quantity))
     }
 
   @Help.Summary(
@@ -132,11 +132,11 @@ class LocalSplitwiseAppReference(
   )
   def completeTransfer(
       provider: PartyId,
-      key: SplitwiseCommands.GroupKey,
+      key: GrpcSplitwiseAppClient.GroupKey,
       acceptedPayment: Primitive.ContractId[walletCodegen.AcceptedAppPayment],
   ): Primitive.ContractId[splitCodegen.BalanceUpdate] =
     consoleEnvironment.run {
-      adminCommand(SplitwiseCommands.CompleteTransfer(provider, key, acceptedPayment))
+      adminCommand(GrpcSplitwiseAppClient.CompleteTransfer(provider, key, acceptedPayment))
     }
 
   @Help.Summary("Net balances of the parties in the group.")
@@ -149,11 +149,11 @@ class LocalSplitwiseAppReference(
   )
   def net(
       provider: PartyId,
-      key: SplitwiseCommands.GroupKey,
+      key: GrpcSplitwiseAppClient.GroupKey,
       balanceChanges: Map[PartyId, Map[PartyId, BigDecimal]],
   ): Primitive.ContractId[splitCodegen.BalanceUpdate] =
     consoleEnvironment.run {
-      adminCommand(SplitwiseCommands.Net(provider, key, balanceChanges))
+      adminCommand(GrpcSplitwiseAppClient.Net(provider, key, balanceChanges))
     }
 
   // Read operations
@@ -161,13 +161,13 @@ class LocalSplitwiseAppReference(
   @Help.Summary("List all groups")
   def listGroups(): Seq[Contract[splitCodegen.Group]] =
     consoleEnvironment.run {
-      adminCommand(SplitwiseCommands.ListGroups())
+      adminCommand(GrpcSplitwiseAppClient.ListGroups())
     }
 
   @Help.Summary("List all group invites that you have not already accepted")
   def listGroupInvites(): Seq[Contract[splitCodegen.GroupInvite]] =
     consoleEnvironment.run {
-      adminCommand(SplitwiseCommands.ListGroupInvites())
+      adminCommand(GrpcSplitwiseAppClient.ListGroupInvites())
     }
 
   @Help.Summary("List accepted group invites for the given group that can be used in joinGroup")
@@ -176,23 +176,23 @@ class LocalSplitwiseAppReference(
       id: String,
   ): Seq[Contract[splitCodegen.AcceptedGroupInvite]] =
     consoleEnvironment.run {
-      adminCommand(SplitwiseCommands.ListAcceptedGroupInvites(provider, id))
+      adminCommand(GrpcSplitwiseAppClient.ListAcceptedGroupInvites(provider, id))
     }
 
   @Help.Summary("List balance updates for the given group")
-  def listBalanceUpdates(key: SplitwiseCommands.GroupKey): Seq[
+  def listBalanceUpdates(key: GrpcSplitwiseAppClient.GroupKey): Seq[
     Contract[splitCodegen.BalanceUpdate]
   ] =
     consoleEnvironment.run {
-      adminCommand(SplitwiseCommands.ListBalanceUpdates(key))
+      adminCommand(GrpcSplitwiseAppClient.ListBalanceUpdates(key))
     }
 
   @Help.Summary(
     "List balances for the given group. Positive balance means that party owes you, negative balance means you owe that party."
   )
-  def listBalances(key: SplitwiseCommands.GroupKey): Map[PartyId, BigDecimal] =
+  def listBalances(key: GrpcSplitwiseAppClient.GroupKey): Map[PartyId, BigDecimal] =
     consoleEnvironment.run {
-      adminCommand(SplitwiseCommands.ListBalances(key))
+      adminCommand(GrpcSplitwiseAppClient.ListBalances(key))
     }
 
   /** secret, not publicly documented way to get the admin token */

@@ -1,7 +1,7 @@
 package com.daml.network.directory.provider.admin.api.client
 
 import com.daml.network.admin.api.client.AppConnection
-import com.daml.network.directory.provider.admin.api.client.commands.DirectoryProviderCommands
+import com.daml.network.directory.provider.admin.api.client.commands.GrpcDirectoryProviderAppClient
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
@@ -31,7 +31,7 @@ final class DirectoryProviderConnection(
       case Some(partyId) => Future.successful(partyId)
       case None =>
         for {
-          partyId <- runCmd(DirectoryProviderCommands.GetProviderPartyId())
+          partyId <- runCmd(GrpcDirectoryProviderAppClient.GetProviderPartyId())
         } yield {
           // The party id never changes so we don’t need to worry about concurrent setters writing different values.
           providerRef.set(Some(partyId))

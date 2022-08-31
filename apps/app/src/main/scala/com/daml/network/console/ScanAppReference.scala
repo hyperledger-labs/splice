@@ -2,7 +2,7 @@ package com.daml.network.console
 
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.history.CoinTransaction
-import com.daml.network.scan.admin.api.client.commands.ScanCommands
+import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
 import com.daml.network.scan.config.LocalScanAppConfig
 import com.digitalasset.canton.console.{BaseInspection, Help, LocalInstanceReference}
 import com.digitalasset.canton.participant.ParticipantNode
@@ -36,7 +36,7 @@ class LocalScanAppReference(
 
   def getSvcPartyId(): PartyId =
     consoleEnvironment.run {
-      adminCommand(ScanCommands.GetSvcPartyId())
+      adminCommand(GrpcScanAppClient.GetSvcPartyId())
     }
 
   @Help.Summary(
@@ -45,7 +45,7 @@ class LocalScanAppReference(
   @Help.Description("Transaction are ordered by transaction offset in ascending order.")
   def getTxHistory(): Seq[CoinTransaction] =
     consoleEnvironment.run {
-      adminCommand(ScanCommands.GetHistory())
+      adminCommand(GrpcScanAppClient.GetHistory())
     }
 
   /** secret, not publicly documented way to get the admin token */

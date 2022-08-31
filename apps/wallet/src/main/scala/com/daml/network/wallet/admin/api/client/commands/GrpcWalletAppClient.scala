@@ -15,7 +15,7 @@ import io.grpc.ManagedChannel
 
 import scala.concurrent.Future
 
-object WalletAppCommands {
+object GrpcWalletAppClient {
 
   abstract class BaseCommand[Req, Res, Result] extends GrpcAdminCommand[Req, Res, Result] {
     override type Svc = WalletServiceStub

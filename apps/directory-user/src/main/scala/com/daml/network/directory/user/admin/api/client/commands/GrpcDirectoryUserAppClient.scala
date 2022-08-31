@@ -10,7 +10,7 @@ import io.grpc.ManagedChannel
 
 import scala.concurrent.Future
 
-object DirectoryUserCommands {
+object GrpcDirectoryUserAppClient {
 
   abstract class BaseCommand[Req, Res, Result] extends GrpcAdminCommand[Req, Res, Result] {
     override type Svc = DirectoryUserServiceStub
