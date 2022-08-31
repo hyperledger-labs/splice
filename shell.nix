@@ -1,10 +1,5 @@
 let
-  pkgs = import ./nix/default.nix {
-    overlays = [(self: super: {
-      sbt = super.sbt.override { jre = super.openjdk11; };
-      lnav = super.callPackage ./nix/lnav.nix {};
-    })];
-  };
+  pkgs = import ./nix/default.nix;
   # pyopenssl is currently broken on M1 due to
   # https://github.com/NixOS/nixpkgs/issues/174457#issuecomment-1137385758
   # To work around this we fetch some packages via rosetta.
@@ -17,12 +12,14 @@ in pkgs.mkShell {
 
     ammonite
     buf
+    cabal2nix
     curl
     docker
     gawk
     git
     google-cloud-sdk
     grpcurl
+    haskellPackages.daml2ts
     hub # Github CLI for todo checker
     jq
     jsonnet
