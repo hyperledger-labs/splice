@@ -254,6 +254,24 @@ class GrpcWalletService(
       )
     }
 
+  override def cancelPaymentChannel(request: v0.CancelPaymentChannelRequest): Future[Empty] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        svcParty <- scanConnection.getSvcPartyId()
+        walletParty <- connection.getPrimaryParty(walletDamlUser)
+        senderParty = Proto.tryDecode(Proto.Party)(request.senderPartyId)
+        cmd = walletCodegen.PaymentChannel
+          .key(DA.Types.Tuple3(senderParty.toPrim, walletParty.toPrim, svcParty.toPrim))
+          .exercisePaymentChannel_Cancel(senderParty.toPrim)
+          .command
+        _ <- connection.submitCommand(
+          Seq(walletParty),
+          Seq(getValidatorParty),
+          Seq(cmd),
+        )
+      } yield Empty()
+    }
+
   override def executeDirectTransfer(
       request: v0.ExecuteDirectTransferRequest
   ): Future[Empty] =

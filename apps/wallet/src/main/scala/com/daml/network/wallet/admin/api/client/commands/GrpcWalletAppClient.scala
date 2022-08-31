@@ -129,6 +129,23 @@ object GrpcWalletAppClient {
       )
   }
 
+  case class CancelPaymentChannel(senderPartyId: PartyId)
+      extends BaseCommand[
+        v0.CancelPaymentChannelRequest,
+        Empty,
+        Unit,
+      ] {
+    override def createRequest(): Either[String, v0.CancelPaymentChannelRequest] =
+      Right(v0.CancelPaymentChannelRequest(Proto.encode(senderPartyId)))
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.CancelPaymentChannelRequest,
+    ): Future[Empty] = service.cancelPaymentChannel(request)
+
+    override def handleResponse(response: Empty): Either[String, Unit] = Right(())
+  }
+
   case class RejectAppPaymentRequest(
       requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest]
   ) extends BaseCommand[

@@ -153,6 +153,16 @@ abstract class WalletAppReference(
     }
   }
 
+  @Help.Summary("Cancel an existing payment channel.")
+  @Help.Description(
+    "Cancel an existing payment channel associated with a sender." +
+      "Prevents subsequent use of that channel."
+  )
+  def cancelPaymentChannel(senderPartyId: PartyId): Unit =
+    consoleEnvironment.run {
+      adminCommand(GrpcWalletAppClient.CancelPaymentChannel(senderPartyId))
+    }
+
   @Help.Summary("Execute a direct transfer over a payment channel")
   @Help.Description(
     "Assumes that the payment channel for the given receiver already exists."
