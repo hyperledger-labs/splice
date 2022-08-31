@@ -1,7 +1,9 @@
 // Commands needed to initialize the CN apps, tap some coins and make some transfers. Can be run as a bootstrap script.
+import com.daml.network.codegen.CC.CoinRules.CoinRules
 
 val validatorParty = validatorApp.initialize()
 val aliceParty = validatorApp.onboardUser("alice_wallet")
+aliceWallet.remoteParticipant.ledger_api.acs.await(validatorParty, CoinRules)
 aliceWallet.initialize(validatorParty)
 
 require(aliceWallet.list().length == 0)

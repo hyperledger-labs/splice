@@ -516,21 +516,77 @@ jobs:
           template: success_tagged_deploy_1
 
   preflight_check:
-    circleci_ip_ranges: true
-    docker:
-      - image: cimg/base:2021.04
+    machine:
+      image: ubuntu-2004:202010-01
     environment:
       <<: *env
-      CIRCLE_TAG: git-<< pipeline.git.revision >>
+      VPN_HOST_NAME: vpn-cn-devnet.da-int.net
+      VPN_HOST_IP: 34.132.91.75
     steps:
       - setup_sbt_test_job
+      - run:
+          name: download canton
+          command: ./download-canton.sh
       - execute_sbt_command:
           cmd: "Test/compile"
           retry_fetch: "50"
+      - run:
+          name: install vpn client
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y expect charon-cmd
+      - run:
+          name: start vpn client
+          # the charon-cmd process must remain running throughout the whole job,
+          # so run this step in the background to allow subsequent steps to continue
+          background: true
+          # we use an "expect" script to spawn charon-cmd, and supply credentials,
+          # because the interactive password prompt reads directly from
+          # /dev/tty rather than stdin, and simple IO piping doesn't work
+          command: |
+            cat \<<EOF >route
+            #!/usr/bin/expect -f
+            set timeout -1
+            
+            set VPN_HOST_NAME [lindex \$argv 0]
+            set VPN_USER [lindex \$argv 1]
+            set VPN_PASSWORD [lindex \$argv 2]
+
+            spawn echo \$VPN_USER \$VPN_PASSWORD
+            spawn sudo charon-cmd --host \$VPN_HOST_NAME --identity \$VPN_USER --eap-identity \$VPN_USER --profile ikev2-eap --cert /etc/ssl/certs/ISRG_Root_X1.pem            
+            expect "EAP password: "
+
+            send "\$VPN_PASSWORD\r"
+            expect eof        
+            EOF
+            
+            chmod +x route
+            ./route $VPN_HOST_NAME $VPN_USER $VPN_PASSWORD
+      - run:
+          name: verify vpn connection
+          command: |
+            set +e
+            
+            echo "Checking IP"
+            
+            count=0
+            success=42
+            while [ ${count} -lt 10 ]; do
+              if [ "$(curl checkip.amazonaws.com)" == "$VPN_HOST_IP" ]; then
+                echo "Check IP passed"
+                success=0
+                break
+              else
+                echo "Current IP is not desired VPN server IP. Retry count $count"
+                (( count++ ))
+                sleep 1
+              fi
+            done
+            
+            exit $success
       - execute_sbt_command:
           cmd: "\"testOnly *PreflightIntegrationTest\""
           timeout: "10m"
-          with_devnet_authentication: true
       - slack/notify:
           event: pass
           branch_pattern: main
@@ -705,13 +761,16 @@ workflows:
            - deployment_test
            - docker-images-push
       # TODO(i554): Re-enable
-#    - preflight_check:
-#        <<: *notify-fail
-#        <<: *main-branch-only
-#        requires:
-#          - deployment_test
-#          - docker-images-push
-#          - deploy_cluster
+    - preflight_check:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - canton-network-vpn
+          - slack-context
+        requires:
+          - deployment_test
+          - docker-images-push
+          - deploy_cluster
 
   manual_preflight_check:
     jobs:
