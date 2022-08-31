@@ -305,6 +305,7 @@ class WalletIntegrationTest
 
       // Bob then immediately cancels the channel
       bobWallet.cancelPaymentChannel(aliceUserParty)
+      utils.retry_until_true(aliceWallet.listPaymentChannelProposals().isEmpty)
 
       // Neither sees the payment channel anymore
       aliceWallet.listPaymentChannels() shouldBe empty
