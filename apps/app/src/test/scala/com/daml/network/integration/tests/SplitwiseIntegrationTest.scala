@@ -201,5 +201,12 @@ class SplitwiseIntegrationTest
         providerParty,
       )
     }
+
+    "return the primary party of the user" in { implicit env =>
+      val aliceValidatorParty = aliceValidator.initialize()
+      val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
+      aliceSplitwise.initialize(aliceValidatorParty)
+      aliceSplitwise.getPartyId() shouldBe aliceUserParty
+    }
   }
 }

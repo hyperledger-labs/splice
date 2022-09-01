@@ -195,6 +195,12 @@ class LocalSplitwiseAppReference(
       adminCommand(GrpcSplitwiseAppClient.ListBalances(key))
     }
 
+  @Help.Summary("Get the primary party of the daml user specified in the config.")
+  def getPartyId(): PartyId =
+    consoleEnvironment.run {
+      adminCommand(GrpcSplitwiseAppClient.GetPartyId())
+    }
+
   /** secret, not publicly documented way to get the admin token */
   def adminToken: Option[String] = underlying.map(_.adminToken.secret)
 }

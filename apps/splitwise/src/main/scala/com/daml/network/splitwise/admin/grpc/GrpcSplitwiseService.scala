@@ -411,6 +411,15 @@ class GrpcSplitwiseService(
       }
     }
 
+  def getPartyId(request: Empty): Future[v0.GetPartyIdResponse] =
+    withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
+      for {
+        party <- connection.getPrimaryParty(damlUser)
+      } yield {
+        v0.GetPartyIdResponse(Proto.encode(party))
+      }
+    }
+
   private def installKey(
       provider: PartyId,
       user: PartyId,

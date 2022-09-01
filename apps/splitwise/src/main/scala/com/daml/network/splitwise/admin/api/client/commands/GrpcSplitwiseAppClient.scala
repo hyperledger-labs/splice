@@ -431,4 +431,20 @@ object GrpcSplitwiseAppClient {
         .traverse(Contract.fromProto(walletCodegen.AcceptedAppPayment)(_))
         .leftMap(_.toString)
   }
+
+  case class GetPartyId(
+  ) extends BaseCommand[Empty, v0.GetPartyIdResponse, PartyId] {
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
+
+    override def submitRequest(
+        service: SplitwiseServiceStub,
+        request: Empty,
+    ): Future[v0.GetPartyIdResponse] = service.getPartyId(request)
+
+    override def handleResponse(
+        response: v0.GetPartyIdResponse
+    ): Either[String, PartyId] =
+      Proto.decode(Proto.Party)(response.partyId)
+  }
 }

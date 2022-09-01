@@ -35,6 +35,7 @@ service SplitwiseService {
   rpc ListBalanceUpdates (ListBalanceUpdatesRequest) returns (ListBalanceUpdatesResponse);
   rpc ListBalances (ListBalancesRequest) returns (ListBalancesResponse);
   rpc ListAcceptedAppPayments (ListAcceptedAppPaymentsRequest) returns (ListAcceptedAppPaymentsResponse);
+  rpc GetPartyId (google.protobuf.Empty) returns (GetPartyIdResponse);
 }
 
 message InitializeRequest {
@@ -189,4 +190,8 @@ message ListAcceptedAppPaymentsRequest {
 
 message ListAcceptedAppPaymentsResponse {
   repeated com.daml.network.v0.Contract accepted_app_payments = 1;
+}
+
+message GetPartyIdResponse {
+  string party_id = 1;
 }
