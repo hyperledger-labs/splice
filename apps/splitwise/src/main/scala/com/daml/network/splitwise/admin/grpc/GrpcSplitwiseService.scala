@@ -92,9 +92,7 @@ class GrpcSplitwiseService(
           Seq.empty,
           Proto
             .tryDecodeContractId[splitCodegen.SplitwiseInstallProposal](request.proposalContractId)
-            .exerciseSplitwiseInstallProposal_Accept(
-              party.toPrim
-            ),
+            .exerciseSplitwiseInstallProposal_Accept(),
         )
       } yield v0.AcceptInstallProposalResponse(Proto.encode(cid))
     }
@@ -111,7 +109,6 @@ class GrpcSplitwiseService(
           Seq(party),
           Seq.empty,
           installKey(provider, party).exerciseSplitwiseInstall_CreateGroup(
-            party.toPrim,
             splitCodegen.Group(
               owner = party.toPrim,
               provider = provider.toPrim,
@@ -120,7 +117,7 @@ class GrpcSplitwiseService(
               id = splitCodegen.GroupId(request.groupId),
               collectionDuration = collectionDuration,
               acceptDuration = acceptDuration,
-            ),
+            )
           ),
         )
       } yield v0.CreateGroupResponse(Proto.encode(cid))
@@ -137,7 +134,6 @@ class GrpcSplitwiseService(
           Seq(party),
           Seq.empty,
           installKey(provider, party).exerciseSplitwiseInstall_CreateInvite(
-            party.toPrim,
             groupKey_(party, provider, request.groupId),
             observers,
           ),
@@ -155,11 +151,10 @@ class GrpcSplitwiseService(
           Seq(party),
           Seq.empty,
           installKey(provider, party).exerciseSplitwiseInstall_Join(
-            party.toPrim,
             Proto
               .tryDecodeContractId[splitCodegen.AcceptedGroupInvite](
                 request.acceptedGroupInviteContractId
-              ),
+              )
           ),
         )
       } yield v0.JoinGroupResponse(Proto.encode(cid))
@@ -176,9 +171,8 @@ class GrpcSplitwiseService(
           Seq(party),
           Seq.empty,
           installKey(provider, party).exerciseSplitwiseInstall_AcceptInvite(
-            party.toPrim,
             Proto
-              .tryDecodeContractId[splitCodegen.GroupInvite](request.groupInviteContractId),
+              .tryDecodeContractId[splitCodegen.GroupInvite](request.groupInviteContractId)
           ),
         )
       } yield v0.AcceptInviteResponse(
@@ -197,7 +191,6 @@ class GrpcSplitwiseService(
           Seq(party),
           Seq.empty,
           installKey(provider, party).exerciseSplitwiseInstall_EnterPayment(
-            party.toPrim,
             groupKey_(request.getGroupKey),
             Proto.tryDecode(Proto.BigDecimal)(request.quantity),
             request.description,
@@ -218,7 +211,6 @@ class GrpcSplitwiseService(
           Seq(party),
           Seq.empty,
           installKey(provider, party).exerciseSplitwiseInstall_InitiateTransfer(
-            party.toPrim,
             groupKey_(request.getGroupKey),
             Proto.tryDecode(Proto.CodegenParty)(request.receiverPartyId),
             Proto.tryDecode(Proto.BigDecimal)(request.quantity),
@@ -239,7 +231,6 @@ class GrpcSplitwiseService(
           Seq(party),
           Seq(getValidatorParty),
           installKey(provider, party).exerciseSplitwiseInstall_CompleteTransfer(
-            party.toPrim,
             groupKey_(request.getGroupKey),
             Proto.tryDecodeContractId[walletCodegen.AcceptedAppPayment](
               request.acceptedAppPaymentContractId
@@ -267,7 +258,6 @@ class GrpcSplitwiseService(
           Seq(party),
           Seq.empty,
           installKey(provider, party).exerciseSplitwiseInstall_Net(
-            party.toPrim,
             groupKey_(request.getGroupKey),
             balanceChanges = balanceUpdates,
           ),

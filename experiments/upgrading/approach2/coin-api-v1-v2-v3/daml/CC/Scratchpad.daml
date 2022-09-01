@@ -35,8 +35,8 @@ template CoinData
   where
     signatory svc, owner
 
-    implements Coin where
-      coin_View = this
+    interface instance Coin for CoinData where
+      view = this
 
 
 -- | A lock held by a particular party until its expiry.
@@ -53,8 +53,8 @@ template LockedCoinData
   where
     signatory signatory coin, lock.holder
 
-    implements LockedCoin where
-      lockedCoin_View = this
+    interface instance LockedCoin for LockedCoinData where
+      view = this
 
 
 
@@ -133,9 +133,13 @@ exerciseCoinRulesByKey svc actors c = do
   rulesKey <- exerciseByKey @CoinRulesKey svc (CoinRulesKey_Fetch (toParties actors))
   exercise rulesKey.cid c
 
+data CoinRulesView = CoinRulesView
+  with
+    svc : Party
+
 interface CoinRules
   where
-    getSvc : Party
+    viewtype CoinRulesView
 
     coinRules_Transfer_impl : ContractId CoinRules -> CoinRules_Transfer -> Update [TransferResult]
 
@@ -156,42 +160,42 @@ interface CoinRules
     nonconsuming choice CoinRules_LockedCoin_Unlock : ContractId Coin
       with
         cid : ContractId LockedCoin
-        view : LockedCoinData
+        view' : LockedCoinData
         dataArg : LockedCoin_Unlock
-      controller signatory view, controller' view dataArg
-      do coinRules_LockedCoin_Unlock_impl this cid view dataArg
+      controller signatory view', controller' view' dataArg
+      do coinRules_LockedCoin_Unlock_impl this cid view' dataArg
 
     nonconsuming choice CoinRules_LockedCoin_OwnerExpireLock : ContractId Coin
       with
         cid : ContractId LockedCoin
-        view : LockedCoinData
+        view' : LockedCoinData
         dataArg : LockedCoin_OwnerExpireLock
-      controller signatory view, controller' view dataArg
-      do coinRules_LockedCoin_OwnerExpireLock_impl this cid view dataArg
+      controller signatory view', controller' view' dataArg
+      do coinRules_LockedCoin_OwnerExpireLock_impl this cid view' dataArg
 
     nonconsuming choice CoinRules_ValidatorReward_ArchiveAsValidator : ()
       with
         cid : ContractId ValidatorReward
-        view : ValidatorRewardView
+        view' : ValidatorRewardView
         dataArg : ValidatorReward_ArchiveAsValidator
-      controller signatory view, controller' view dataArg
-      do coinRules_ValidatorReward_ArchiveAsValidator_impl this cid view dataArg
+      controller signatory view', controller' view' dataArg
+      do coinRules_ValidatorReward_ArchiveAsValidator_impl this cid view' dataArg
 
     nonconsuming choice CoinRules_ValidatorReward_SvcExpire : ()
       with
         cid : ContractId ValidatorReward
-        view : ValidatorRewardView
+        view' : ValidatorRewardView
         dataArg : ValidatorReward_SvcExpire
-      controller signatory view, controller' view dataArg
-      do coinRules_ValidatorReward_SvcExpire_impl this cid view dataArg
+      controller signatory view', controller' view' dataArg
+      do coinRules_ValidatorReward_SvcExpire_impl this cid view' dataArg
 
     nonconsuming choice CoinRules_AppReward_SvcExpire : ()
       with
         cid : ContractId AppReward
-        view : AppRewardView
+        view' : AppRewardView
         dataArg : AppReward_SvcExpire
-      controller signatory view, controller' view dataArg
-      do coinRules_AppReward_SvcExpire_impl this cid view dataArg
+      controller signatory view', controller' view' dataArg
+      do coinRules_AppReward_SvcExpire_impl this cid view' dataArg
 
 
 -- Data
@@ -264,30 +268,30 @@ data TransferResult
 --------------
 
 interface Coin where
-  coin_View : CoinData
+  viewtype CoinData
 
   choice Coin_Archive : ()
     controller signatory this
     do pure ()
 
 interface LockedCoin where
-  lockedCoin_View : LockedCoinData
+  viewtype LockedCoinData
 
   nonconsuming choice LockedCoin_Unlock : ContractId Coin
-    controller (lockedCoin_View this).lock.holder
+    controller (view this).lock.holder
     do
       exerciseCoinRulesByKey
-        (lockedCoin_View this).coin.svc
+        (view this).coin.svc
         (signatory this)
-        (CoinRules_LockedCoin_Unlock self (lockedCoin_View this) arg)
+        (CoinRules_LockedCoin_Unlock self (view this) arg)
 
   nonconsuming choice LockedCoin_OwnerExpireLock : ContractId Coin
-    controller (lockedCoin_View this).coin.owner
+    controller (view this).coin.owner
     do
       exerciseCoinRulesByKey
-        (lockedCoin_View this).coin.svc
+        (view this).coin.svc
         (signatory this)
-        (CoinRules_LockedCoin_OwnerExpireLock self (lockedCoin_View this) arg)
+        (CoinRules_LockedCoin_OwnerExpireLock self (view this) arg)
 
   choice LockedCoin_Archive : ()
     controller signatory this
@@ -308,7 +312,7 @@ instance HasController LockedCoinData LockedCoin_OwnerExpireLock where
 -- ================
 
 interface ValidatorRight where
-  validatorRight_View : ValidatorRightView
+  viewtype ValidatorRightView
 
 data ValidatorRightView = ValidatorRightView
   with
@@ -325,17 +329,17 @@ instance HasSignatory ValidatorRightView where
 -- ===========
 
 interface AppReward where
-  appReward_View : AppRewardView
+  viewtype AppRewardView
 
   nonconsuming choice AppReward_SvcExpire : ()
     with
       miningRoundCid : ContractId ClosedMiningRound
-    controller (appReward_View this).svc
+    controller (view this).svc
     do
       exerciseCoinRulesByKey
-        (appReward_View this).svc
+        (view this).svc
         (signatory this)
-        (CoinRules_AppReward_SvcExpire self (appReward_View this) arg)
+        (CoinRules_AppReward_SvcExpire self (view this) arg)
 
 
   choice AppReward_Archive : ()
@@ -366,7 +370,7 @@ instance HasSignatory AppRewardView where
 
 interface ValidatorReward where
   -- REVIEW (SM): should we enforce that the signatories of the view are a subset of the signatories of the template?
-  validatorReward_View : ValidatorRewardView
+  viewtype ValidatorRewardView
 
   nonconsuming choice ValidatorReward_ArchiveAsValidator : ()
     with
@@ -375,19 +379,19 @@ interface ValidatorReward where
     controller validator
     do
       exerciseCoinRulesByKey
-        (validatorReward_View this).svc
+        (view this).svc
         (signatory this)
-        (CoinRules_ValidatorReward_ArchiveAsValidator self (validatorReward_View this) arg)
+        (CoinRules_ValidatorReward_ArchiveAsValidator self (view this) arg)
 
   nonconsuming choice ValidatorReward_SvcExpire: ()
     with
       miningRoundCid : ContractId ClosedMiningRound
-    controller (validatorReward_View this).svc
+    controller (view this).svc
     do
       exerciseCoinRulesByKey
-        (validatorReward_View this).svc
+        (view this).svc
         (signatory this)
-        (CoinRules_ValidatorReward_SvcExpire self (validatorReward_View this) arg)
+        (CoinRules_ValidatorReward_SvcExpire self (view this) arg)
 
   -- REVIEW (SM): Food for thought:
   -- Wat's the argoument for why don't we use an indirection via the coinrules here?
@@ -429,16 +433,16 @@ instance HasSignatory ValidatorRewardView where
 
 -- REVIEW (SM): why is there no archive choice here?
 interface OpenMiningRound where
-  openMiningRound_View : OpenMiningRoundView
+  viewtype OpenMiningRoundView
 
 interface ClosingMiningRound where
-  closingMiningRound_View : ClosingMiningRoundView
+  viewtype ClosingMiningRoundView
 
 interface IssuingMiningRound where
-  issuingMiningRound_View : IssuingMiningRoundView
+  viewtype IssuingMiningRoundView
 
 interface ClosedMiningRound where
-  closedMiningRound_View : ClosedMiningRoundView
+  viewtype ClosedMiningRoundView
 
 
 -- Data

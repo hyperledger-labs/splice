@@ -18,10 +18,14 @@ template TransferWrapper
       controller CoinApi.transferControllers transfer
       do CoinApi.exerciseCoinRulesByKey svc (CoinApi.transferControllers transfer) (CoinApi.CoinRules_Transfer transfer)
 
+data PaymentReferenceView = PaymentReferenceView
+  with
+    description : Text
+
 -- Defined by CC wallet
 interface PaymentReference
   where
-    getDescription : Text
+    viewtype PaymentReferenceView
 
 -- Defined by CC wallet
 template PaymentRequest

@@ -5,7 +5,7 @@ package com.digitalasset.canton.integration
 
 import com.daml.ledger.api.refinements.ApiTypes.TemplateId
 import com.daml.ledger.api.v1.value.Identifier
-import com.digitalasset.canton.config.TimeoutDuration
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.{
   CommandFailure,
   LocalParticipantReference,
@@ -94,7 +94,7 @@ trait BaseIntegrationTest[E <: Environment, TCE <: TestConsoleEnvironment[E]]
     withClue(s"${sender.name} was unable to ping ${receiver.name} within ${timeoutMillis}ms:") {
       sender.health.maybe_ping(
         receiver.id,
-        TimeoutDuration(timeoutMillis.millis),
+        NonNegativeDuration(timeoutMillis.millis),
         workflowId,
         id,
       ) shouldBe defined

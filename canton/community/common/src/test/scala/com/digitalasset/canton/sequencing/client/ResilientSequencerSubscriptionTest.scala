@@ -20,7 +20,7 @@ import com.digitalasset.canton.sequencing.protocol.{ClosedEnvelope, SequencedEve
 import com.digitalasset.canton.sequencing.{SequencerTestUtils, SerializedEventHandler}
 import com.digitalasset.canton.store.SequencedEventStore.OrdinarySequencedEvent
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.{BaseTest, HasExecutionContext, SequencerCounter}
+import com.digitalasset.canton.{BaseTest, DiscardOps, HasExecutionContext, SequencerCounter}
 import org.scalatest.Assertion
 import org.scalatest.wordspec.{AnyWordSpec, AsyncWordSpec}
 
@@ -196,16 +196,29 @@ class ResilientSequencerSubscriptionTest
         Promise[
           Either[SequencerSubscriptionCreationError, SequencerSubscription[TestHandlerError]]
         ]()
+
+      val subscriptionFactory =
+        new SequencerSubscriptionFactory[TestHandlerError] {
+          override def create(
+              startingCounter: SequencerCounter,
+              handler: SerializedEventHandler[TestHandlerError],
+          )(implicit traceContext: TraceContext): EitherT[
+            Future,
+            SequencerSubscriptionCreationError,
+            (SequencerSubscription[TestHandlerError], SubscriptionErrorRetryPolicy),
+          ] = {
+            askedForSubscriptionPromise.success(())
+            EitherT(
+              underlyingSubscriptionPromise.future.map(_.map(_ -> TestSubscriptionError.retryRule))
+            )
+          }
+        }
+
       val resilientSequencerSubscription = new ResilientSequencerSubscription[TestHandlerError](
         "test",
         0L,
         _ => Future.successful[Either[TestHandlerError, Unit]](Right(())),
-        (_, _) =>
-          _ => {
-            askedForSubscriptionPromise.success(())
-            EitherT(underlyingSubscriptionPromise.future)
-          },
-        TestSubscriptionError.retryRule,
+        subscriptionFactory,
         retryDelay(),
         timeouts,
         loggerFactory,
@@ -215,6 +228,9 @@ class ResilientSequencerSubscriptionTest
         override protected def timeouts = ResilientSequencerSubscriptionTest.this.timeouts
         override protected def loggerFactory: NamedLoggerFactory =
           ResilientSequencerSubscriptionTest.this.loggerFactory
+        override private[canton] def complete(reason: SubscriptionCloseReason[TestHandlerError])(
+            implicit traceContext: TraceContext
+        ): Unit = ()
       }
 
       // kick off
@@ -291,8 +307,7 @@ trait ResilientSequencerSubscriptionTestUtils {
       "test",
       0L,
       _ => Future.successful[Either[TestHandlerError, Unit]](Right(())),
-      subscriptionTestFactory.createET,
-      TestSubscriptionError.retryRule,
+      subscriptionTestFactory,
       retryDelayRule,
       DefaultProcessingTimeouts.testing,
       loggerFactory,
@@ -301,20 +316,23 @@ trait ResilientSequencerSubscriptionTestUtils {
     subscription
   }
 
-  trait SubscriptionTestFactory {
-    def create(counter: SequencerCounter, _handler: SerializedEventHandler[TestHandlerError])(
-        traceContext: TraceContext
-    ): SequencerSubscription[TestHandlerError]
+  trait SubscriptionTestFactory extends SequencerSubscriptionFactory[TestHandlerError] {
+    protected def createInternal(
+        counter: SequencerCounter,
+        handler: SerializedEventHandler[TestHandlerError],
+    )(implicit traceContext: TraceContext): SequencerSubscription[TestHandlerError]
 
-    def createET(counter: SequencerCounter, _handler: SerializedEventHandler[TestHandlerError])(
-        traceContext: TraceContext
-    ): EitherT[Future, SequencerSubscriptionCreationError, SequencerSubscription[
-      TestHandlerError
-    ]] = {
+    override def create(
+        startingCounter: SequencerCounter,
+        handler: SerializedEventHandler[TestHandlerError],
+    )(implicit traceContext: TraceContext): EitherT[
+      Future,
+      SequencerSubscriptionCreationError,
+      (SequencerSubscription[TestHandlerError], SubscriptionErrorRetryPolicy),
+    ] =
       EitherT.pure[Future, SequencerSubscriptionCreationError](
-        create(counter, _handler)(traceContext)
+        (createInternal(startingCounter, handler), TestSubscriptionError.retryRule)
       )
-    }
   }
 
   object SubscriptionTestFactory {
@@ -324,16 +342,19 @@ trait ResilientSequencerSubscriptionTestUtils {
         reason: SubscriptionCloseReason[TestHandlerError]
     ): SubscriptionTestFactory =
       new SubscriptionTestFactory {
-        override def create(
+        override def createInternal(
             counter: SequencerCounter,
-            _handler: SerializedEventHandler[TestHandlerError],
-        )(traceContext: TraceContext) =
+            handler: SerializedEventHandler[TestHandlerError],
+        )(implicit traceContext: TraceContext): SequencerSubscription[TestHandlerError] =
           new SequencerSubscription[TestHandlerError] {
             override protected def loggerFactory: NamedLoggerFactory =
               ResilientSequencerSubscriptionTestUtils.this.loggerFactory
             closeReasonPromise.trySuccess(reason)
             override protected def timeouts: ProcessingTimeout = DefaultProcessingTimeouts.testing
             override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Nil
+            override private[canton] def complete(
+                reason: SubscriptionCloseReason[TestHandlerError]
+            )(implicit traceContext: TraceContext): Unit = ()
           }
       }
   }
@@ -365,6 +386,10 @@ trait ResilientSequencerSubscriptionTestUtils {
       } else {
         subscribedP.trySuccess(())
       }
+
+      override private[canton] def complete(reason: SubscriptionCloseReason[TestHandlerError])(
+          implicit traceContext: TraceContext
+      ): Unit = closeReasonPromise.trySuccess(reason).discard[Boolean]
 
       override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Nil
 
@@ -423,15 +448,16 @@ trait ResilientSequencerSubscriptionTestUtils {
       add(new MockSubscriptionResponse(Some(reason)))
     }
 
-    def add(mockSubscriptionResponse: MockSubscriptionResponse) = {
+    def add(mockSubscriptionResponse: MockSubscriptionResponse): MockedSubscriptions = {
       subscriptions += mockSubscriptionResponse
       this
     }
 
-    def create(counter: SequencerCounter, _handler: SerializedEventHandler[TestHandlerError])(
-        traceContext: TraceContext
-    ): SequencerSubscription[TestHandlerError] =
-      subscriptions(nextSubscription.getAndIncrement()).create(counter, _handler)
+    override def createInternal(
+        counter: SequencerCounter,
+        handler: SerializedEventHandler[TestHandlerError],
+    )(implicit traceContext: TraceContext): SequencerSubscription[TestHandlerError] =
+      subscriptions(nextSubscription.getAndIncrement()).create(counter, handler)
 
     def allShouldHaveBeenUsed: Assertion = nextSubscription.get() shouldBe subscriptions.length
   }

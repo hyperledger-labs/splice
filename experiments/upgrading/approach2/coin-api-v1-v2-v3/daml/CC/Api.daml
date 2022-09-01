@@ -27,7 +27,10 @@ class HasController t c where
 -- Implementation pointer for CC.Api
 -----------------------------------------------------------------------------------------------------------------------
 
+data AnyImplementationView = AnyImplementationView with
+
 interface AnyImplementation where
+  viewtype AnyImplementationView
 
 template ImplementationPointer with
     provider : Party   -- the party providing the concrete implementation
@@ -67,16 +70,16 @@ template V1_CoinData
   where
     signatory svc, owner
 
-    implements V1_Coin where
-      getV1_CoinData = this
+    interface instance V1_Coin for V1_CoinData where
+      view = this
 
 
     -- FEATURE GAP: retroactive instances so that this instance could be added
     -- as part of the V2 API code
 
     -- A V1_CoinData is like a V2_Coin with no holding fees.
-    implements V2_Coin where
-      getV2_CoinData = V2_CoinData with
+    interface instance V2_Coin for V1_CoinData where
+      view = V2_CoinData with
         svc
         owner
         quantity = ExpiringQuantity with
@@ -95,7 +98,7 @@ instance HasController V1_CoinData V2_Coin_Expire where
 
 
 interface V1_Coin where
-  getV1_CoinData : V1_CoinData
+  viewtype V1_CoinData
 
   -- FEATURE GAP: making all interfaces archivable
   choice V1_Coin_Archive : ()
@@ -145,8 +148,8 @@ template V1_CoinRulesData
   where
     signatory svc
 
-    implements V1_CoinRules where
-        getV1_CoinRulesData = this
+    interface instance V1_CoinRules for V1_CoinRulesData where
+        view = this
 
         -- NOTE: this is just a fancy redirection to the Implementation_V1
         -- contract's actual choice of a body.
@@ -162,8 +165,8 @@ template V1_CoinRulesData
               choiceArg
 
     -- FEATURE GAP: retroactive instance to declare this as part of V2
-    implements V2_CoinRules where
-      getV2_CoinRulesData = 
+    interface instance V2_CoinRules for V1_CoinRulesData where
+      view =
         let V1_CoinConfig{..} = config
         in V2_CoinRulesData with
             svc
@@ -172,15 +175,15 @@ template V1_CoinRulesData
               ..
 
     -- FEATURE GAP: retroactive instance to declare this as part of V3
-    implements V3_CoinRules where
-      getV3_CoinRulesData = V3_CoinRulesData with svc, config = v1_to_v3_config config
+    interface instance V3_CoinRules for V1_CoinRulesData where
+      view = V3_CoinRulesData with svc, config = v1_to_v3_config config
         where v1_to_v3_config V1_CoinConfig{..} = V3_CoinConfig with
                 holdingFee = RatePerRound 0.0
                 coinsIssuedPerRound = 1.0
                 svcIssuanceRatio = 1.0
                 ..
       v3_CoinRules_Transfer_impl self choiceArg = do
-        let contract = getV3_CoinRulesData this
+        let contract = view (toInterface @V3_CoinRules this)
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_CoinRulesData_V3_CoinRules_Transfer
           this.svc
@@ -190,7 +193,7 @@ template V1_CoinRulesData
             contract
             choiceArg
       v3_CoinRules_MiningRound_Open_impl self choiceArg = do
-        let contract = getV3_CoinRulesData this
+        let contract = view (toInterface @V3_CoinRules this)
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_Open
           this.svc
@@ -200,7 +203,7 @@ template V1_CoinRulesData
             contract
             choiceArg
       v3_CoinRules_MiningRound_StartIssuing_impl self choiceArg = do
-        let contract = getV3_CoinRulesData this
+        let contract = view (toInterface @V3_CoinRules this)
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_StartIssuing
           this.svc
@@ -210,7 +213,7 @@ template V1_CoinRulesData
             contract
             choiceArg
       v3_CoinRules_MiningRound_StartClosing_impl self choiceArg = do
-        let contract = getV3_CoinRulesData this
+        let contract = view (toInterface @V3_CoinRules this)
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_StartClosing
           this.svc
@@ -220,7 +223,7 @@ template V1_CoinRulesData
             contract
             choiceArg
       v3_CoinRules_MiningRound_Close_impl self choiceArg = do
-        let contract = getV3_CoinRulesData this
+        let contract = view (toInterface @V3_CoinRules this)
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_Close
           this.svc
@@ -230,7 +233,7 @@ template V1_CoinRulesData
             contract
             choiceArg
       v3_CoinRules_MiningRound_Archive_impl self choiceArg = do
-        let contract = getV3_CoinRulesData this
+        let contract = view (toInterface @V3_CoinRules this)
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_Archive
           this.svc
@@ -291,7 +294,7 @@ type V1_TransferResult = ContractId V1_Coin
 
 interface V1_CoinRules
   where
-    getV1_CoinRulesData : V1_CoinRulesData
+    viewtype V1_CoinRulesData
 
     v1_coinRules_Transfer_impl : ContractId V1_CoinRules -> V1_CoinRules_Transfer -> Update [V1_TransferResult]
 
@@ -312,6 +315,7 @@ instance HasController V1_CoinRulesData V1_CoinRules_Transfer where
 ---------------------
 
 interface V1_Implementation requires AnyImplementation where
+    viewtype AnyImplementationView
 
     -- FIXME: do we really want to have these generic creates? The alternative is to always create data
     -- template instances directly; and exclusively use upgrade-on-read.
@@ -380,11 +384,11 @@ template V2_OpenMiningRoundData with
     key (svc, round) : (Party, Round)
     maintainer key._1
 
-    implements V2_OpenMiningRound where
-      getV2_OpenMiningRoundData = this
+    interface instance V2_OpenMiningRound for V2_OpenMiningRoundData where
+      view = this
 
 interface V2_OpenMiningRound where
-  getV2_OpenMiningRoundData : V2_OpenMiningRoundData
+  viewtype V2_OpenMiningRoundData
 
 template V3_OpenMiningRoundData with
     svc : Party
@@ -396,15 +400,15 @@ template V3_OpenMiningRoundData with
     key (svc, round) : (Party, Round)
     maintainer key._1
 
-    implements V2_OpenMiningRound where
-      getV2_OpenMiningRoundData = V2_OpenMiningRoundData with svc, round
+    interface instance V2_OpenMiningRound for V3_OpenMiningRoundData where
+      view = V2_OpenMiningRoundData with svc, round
 
-    implements V3_OpenMiningRound where
-      getV3_OpenMiningRoundData = this
+    interface instance V3_OpenMiningRound for V3_OpenMiningRoundData where
+      view = this
 
 
 interface V3_OpenMiningRound where
-  getV3_OpenMiningRoundData : V3_OpenMiningRoundData
+  viewtype V3_OpenMiningRoundData
 
 -- | A mining round for which the total sum of registered rewards
 -- is being computed. Rewards can no longer be registered aginst such a round.
@@ -419,11 +423,11 @@ template V3_ClosingMiningRoundData
     key (svc, round) : (Party, Round)
     maintainer key._1
 
-    implements V3_ClosingMiningRound where
-      getV3_ClosingMiningRoundData = this
+    interface instance V3_ClosingMiningRound for V3_ClosingMiningRoundData where
+      view = this
 
 interface V3_ClosingMiningRound where
-  getV3_ClosingMiningRoundData : V3_ClosingMiningRoundData
+  viewtype V3_ClosingMiningRoundData
 
 -- | A mining round for whose rewards coins are being issued.
 template V3_IssuingMiningRoundData
@@ -438,11 +442,11 @@ template V3_IssuingMiningRoundData
     key (svc, round) : (Party, Round)
     maintainer key._1
 
-    implements V3_IssuingMiningRound where
-      getV3_IssuingMiningRoundData = this
+    interface instance V3_IssuingMiningRound for V3_IssuingMiningRoundData where
+      view = this
 
 interface V3_IssuingMiningRound where
-  getV3_IssuingMiningRoundData : V3_IssuingMiningRoundData
+  viewtype V3_IssuingMiningRoundData
 
 -- | A record that a specific mining round has been closed, which can
 -- be used to archive expired rewards.
@@ -457,12 +461,12 @@ template V3_ClosedMiningRoundData
     key (svc, round) : (Party, Round)
     maintainer key._1
 
-    implements V3_ClosedMiningRound where
-      getV3_ClosedMiningRoundData = this
+    interface instance V3_ClosedMiningRound for V3_ClosedMiningRoundData where
+      view = this
 
 
 interface V3_ClosedMiningRound where
-  getV3_ClosedMiningRoundData : V3_ClosedMiningRoundData
+  viewtype V3_ClosedMiningRoundData
 
 -- Coin
 -------
@@ -490,14 +494,14 @@ template V2_CoinData
     -- not not account for the holding fees as of the time that the
     -- read is executed. We believe this to be the better option compared
     -- to not supporting V1_Coin reads.
-    implements V1_Coin where
-      getV1_CoinData = V1_CoinData with
+    interface instance V1_Coin for V2_CoinData where
+      view = V1_CoinData with
         svc
         owner
         quantity = quantity.initialQuantity
 
-    implements V2_Coin where
-      getV2_CoinData = this
+    interface instance V2_Coin for V2_CoinData where
+      view = this
 
       v2_Coin_Expire_impl self choiceArg = 
         callV2_Implementation svc [owner] V2_CoinData_V2_Coin_Expire with
@@ -509,7 +513,7 @@ instance HasController V2_CoinData V2_Coin_Expire where
   controller' _ V2_Coin_Expire{actor} = pure actor
 
 interface V2_Coin where
-  getV2_CoinData : V2_CoinData
+  viewtype V2_CoinData
 
   v2_Coin_Expire_impl : ContractId V2_Coin -> V2_Coin_Expire -> Update ()
 
@@ -523,7 +527,7 @@ interface V2_Coin where
       actor : Party
       roundCid : ContractId V2_OpenMiningRound
     controller actor
-    -- implementation provider (getV2_CoinData this).svc
+    -- implementation provider (view this).svc
     do v2_Coin_Expire_impl this self arg
 
 type V3_Coin = V2_Coin
@@ -558,8 +562,8 @@ template V2_CoinRulesData
   where
     signatory svc
 
-    implements V1_CoinRules where
-      getV1_CoinRulesData = 
+    interface instance V1_CoinRules for V2_CoinRulesData where
+      view =
         let V2_CoinConfig{..} = config
         in V1_CoinRulesData with
               svc
@@ -578,19 +582,19 @@ template V2_CoinRulesData
             contract
             choiceArg
 
-    implements V2_CoinRules where
-      getV2_CoinRulesData = this
+    interface instance V2_CoinRules for V2_CoinRulesData where
+      view = this
 
     -- FEATURE GAP: Retroactive instance
-    implements V3_CoinRules where
-      getV3_CoinRulesData = V3_CoinRulesData with svc, config = v2_to_v3_config config
+    interface instance V3_CoinRules for V2_CoinRulesData where
+      view = V3_CoinRulesData with svc, config = v2_to_v3_config config
         where v2_to_v3_config V2_CoinConfig{..} =
                 V3_CoinConfig with
                   coinsIssuedPerRound = 1.0
                   svcIssuanceRatio = 1.0
                   ..
       v3_CoinRules_Transfer_impl self choiceArg = do
-        let contract = getV3_CoinRulesData this
+        let contract = view (toInterface @V3_CoinRules this)
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_CoinRulesData_V3_CoinRules_Transfer
           this.svc
@@ -600,7 +604,7 @@ template V2_CoinRulesData
             contract
             choiceArg
       v3_CoinRules_MiningRound_Open_impl self choiceArg = do
-        let contract = getV3_CoinRulesData this
+        let contract = view (toInterface @V3_CoinRules this)
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_Open
           this.svc
@@ -610,7 +614,7 @@ template V2_CoinRulesData
             contract
             choiceArg
       v3_CoinRules_MiningRound_StartIssuing_impl self choiceArg = do
-        let contract = getV3_CoinRulesData this
+        let contract = view (toInterface @V3_CoinRules this)
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_StartIssuing
           this.svc
@@ -620,7 +624,7 @@ template V2_CoinRulesData
             contract
             choiceArg
       v3_CoinRules_MiningRound_StartClosing_impl self choiceArg = do
-        let contract = getV3_CoinRulesData this
+        let contract = view (toInterface @V3_CoinRules this)
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_StartClosing
           this.svc
@@ -630,7 +634,7 @@ template V2_CoinRulesData
             contract
             choiceArg
       v3_CoinRules_MiningRound_Close_impl self choiceArg = do
-        let contract = getV3_CoinRulesData this
+        let contract = view (toInterface @V3_CoinRules this)
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_Close
           this.svc
@@ -640,7 +644,7 @@ template V2_CoinRulesData
             contract
             choiceArg
       v3_CoinRules_MiningRound_Archive_impl self choiceArg = do
-        let contract = getV3_CoinRulesData this
+        let contract = view (toInterface @V3_CoinRules this)
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_Archive
           this.svc
@@ -653,7 +657,7 @@ template V2_CoinRulesData
 
 
 interface V2_CoinRules where
-    getV2_CoinRulesData : V2_CoinRulesData
+    viewtype V2_CoinRulesData
 
 instance HasController V2_CoinRulesData V1_CoinRules_Transfer where
   controller' _contract choiceArg = Set.toList $ v1_transferControllers choiceArg.transfer
@@ -663,6 +667,7 @@ instance HasController V2_CoinRulesData V1_CoinRules_Transfer where
 ---------------------
 
 interface V2_Implementation requires V1_Implementation, AnyImplementation where
+    viewtype AnyImplementationView
     v2_CoinRulesData_V1_CoinRules_Transfer_impl : ContractId V2_CoinRulesData -> V1_CoinRules_Transfer -> Update [V1_TransferResult]
     v1_CoinData_V2_Coin_Expire_impl : ContractId V1_CoinData -> V1_CoinData -> V2_Coin_Expire -> Update ()
     v2_CoinData_V2_Coin_Expire_impl : ContractId V2_CoinData -> V2_CoinData -> V2_Coin_Expire -> Update ()
@@ -725,8 +730,8 @@ template V3_LockedCoinData
   where
     signatory lock.holder, signatory coin
 
-    implements V3_LockedCoin where
-      getV3_LockedCoinData = this
+    interface instance V3_LockedCoin for V3_LockedCoinData where
+      view = this
 
       v3_LockedCoin_Coin_Unlock_impl self choiceArg = do
         let contract = this
@@ -762,23 +767,23 @@ template V3_LockedCoinData
             choiceArg
 
 interface V3_LockedCoin where
-  getV3_LockedCoinData : V3_LockedCoinData
+  viewtype V3_LockedCoinData
   v3_LockedCoin_Coin_Unlock_impl : ContractId V3_LockedCoin -> V3_LockedCoin_Coin_Unlock -> Update (ContractId V2_Coin)
   v3_LockedCoin_Coin_OwnerExpireLock_impl : ContractId V3_LockedCoin -> V3_LockedCoin_Coin_OwnerExpireLock -> Update (ContractId V2_Coin)
   v3_LockedCoin_Coin_SvcExpireLock_impl : ContractId V3_LockedCoin -> V3_LockedCoin_Coin_SvcExpireLock -> Update (ContractId V2_Coin)
 
   choice V3_LockedCoin_Coin_Unlock : ContractId V2_Coin
-    controller (getV3_LockedCoinData this).lock.holder
+    controller (view this).lock.holder
     do
       v3_LockedCoin_Coin_Unlock_impl this self arg
 
   choice V3_LockedCoin_Coin_OwnerExpireLock : ContractId V2_Coin
-    controller (getV3_LockedCoinData this).coin.owner
+    controller (view this).coin.owner
     do
       v3_LockedCoin_Coin_OwnerExpireLock_impl this self arg
 
   choice V3_LockedCoin_Coin_SvcExpireLock : ContractId V2_Coin
-    controller (getV3_LockedCoinData this).coin.svc
+    controller (view this).coin.svc
     do
       v3_LockedCoin_Coin_SvcExpireLock_impl this self arg
 
@@ -844,12 +849,12 @@ template V3_CoinRulesData
   where
     signatory svc
 
-    implements V2_CoinRules where
-      getV2_CoinRulesData = V2_CoinRulesData with svc, config = v3_to_v2_config config
+    interface instance V2_CoinRules for V3_CoinRulesData where
+      view = V2_CoinRulesData with svc, config = v3_to_v2_config config
         where v3_to_v2_config V3_CoinConfig{..} = V2_CoinConfig with ..
 
-    implements V3_CoinRules where
-      getV3_CoinRulesData = this
+    interface instance V3_CoinRules for V3_CoinRulesData where
+      view = this
       v3_CoinRules_Transfer_impl self choiceArg = do
         let contract = this
         let cid = fromInterfaceContractId self
@@ -861,7 +866,7 @@ template V3_CoinRulesData
             contract
             choiceArg
       v3_CoinRules_MiningRound_Open_impl self choiceArg = do
-        let contract = getV3_CoinRulesData this
+        let contract = view (toInterface @V3_CoinRules this)
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_Open
           this.svc
@@ -871,7 +876,7 @@ template V3_CoinRulesData
             contract
             choiceArg
       v3_CoinRules_MiningRound_StartIssuing_impl self choiceArg = do
-        let contract = getV3_CoinRulesData this
+        let contract = view (toInterface @V3_CoinRules this)
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_StartIssuing
           this.svc
@@ -881,7 +886,7 @@ template V3_CoinRulesData
             contract
             choiceArg
       v3_CoinRules_MiningRound_StartClosing_impl self choiceArg = do
-        let contract = getV3_CoinRulesData this
+        let contract = view (toInterface @V3_CoinRules this)
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_StartClosing
           this.svc
@@ -891,7 +896,7 @@ template V3_CoinRulesData
             contract
             choiceArg
       v3_CoinRules_MiningRound_Close_impl self choiceArg = do
-        let contract = getV3_CoinRulesData this
+        let contract = view (toInterface @V3_CoinRules this)
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_Close
           this.svc
@@ -901,7 +906,7 @@ template V3_CoinRulesData
             contract
             choiceArg
       v3_CoinRules_MiningRound_Archive_impl self choiceArg = do
-        let contract = getV3_CoinRulesData this
+        let contract = view (toInterface @V3_CoinRules this)
         let cid = fromInterfaceContractId self
         callV3_Implementation @V3_CoinRulesData_V3_CoinRules_MiningRound_Archive
           this.svc
@@ -920,7 +925,7 @@ v3_transferControllers t =
     addOutputController s (V3_OutputReceiverCoin with receiver; ..) = Set.insert receiver s
 
 interface V3_CoinRules where
-  getV3_CoinRulesData : V3_CoinRulesData
+  viewtype V3_CoinRulesData
   v3_CoinRules_Transfer_impl : ContractId V3_CoinRules -> V3_CoinRules_Transfer -> Update [V3_TransferResult]
   v3_CoinRules_MiningRound_Open_impl : ContractId V3_CoinRules -> V3_CoinRules_MiningRound_Open -> Update (ContractId V3_OpenMiningRound)
   v3_CoinRules_MiningRound_StartClosing_impl : ContractId V3_CoinRules -> V3_CoinRules_MiningRound_StartClosing -> Update (ContractId V3_ClosingMiningRound)
@@ -939,7 +944,7 @@ interface V3_CoinRules where
     : ContractId V3_OpenMiningRound
     with
       coinPrice : Decimal
-    controller (getV3_CoinRulesData this).svc
+    controller (view this).svc
     do
       v3_CoinRules_MiningRound_Open_impl this self arg
 
@@ -947,7 +952,7 @@ interface V3_CoinRules where
     : ContractId  V3_ClosingMiningRound
     with
       miningRoundCid : ContractId  V3_OpenMiningRound
-    controller (getV3_CoinRulesData this).svc
+    controller (view this).svc
     do 
       v3_CoinRules_MiningRound_StartClosing_impl this self arg
 
@@ -957,7 +962,7 @@ interface V3_CoinRules where
       miningRoundCid : ContractId  V3_ClosingMiningRound
       -- The amount of coin burned in this round.
       totalBurnQuantity : Decimal
-    controller (getV3_CoinRulesData this).svc
+    controller (view this).svc
     do 
       v3_CoinRules_MiningRound_StartIssuing_impl this self arg
 
@@ -965,7 +970,7 @@ interface V3_CoinRules where
     : ContractId  V3_ClosedMiningRound
     with
       miningRoundCid : ContractId  V3_IssuingMiningRound
-    controller (getV3_CoinRulesData this).svc
+    controller (view this).svc
     do
       v3_CoinRules_MiningRound_Close_impl this self arg
 
@@ -973,12 +978,12 @@ interface V3_CoinRules where
     : ()
     with
       miningRoundCid : ContractId  V3_ClosedMiningRound
-    controller (getV3_CoinRulesData this).svc
+    controller (view this).svc
     do
       v3_CoinRules_MiningRound_Archive_impl this self arg
 
 instance HasController V3_LockedCoinData V3_LockedCoin_Coin_Unlock where
-  controller' t _ = pure (getV3_LockedCoinData t).lock.holder
+  controller' t _ = pure (view $ toInterface @V3_LockedCoin t).lock.holder
 
 instance HasController V3_LockedCoinData V3_LockedCoin_Coin_OwnerExpireLock where
   controller' t _ = toParties t.lock.holder
@@ -1005,6 +1010,7 @@ instance HasController V3_CoinRulesData V3_CoinRules_MiningRound_Archive where
   controller' t _ = toParties t.svc
 
 interface V3_Implementation requires V2_Implementation, V1_Implementation, AnyImplementation where
+  viewtype AnyImplementationView
   v3_LockedCoinData_Coin_Unlock_impl : ContractId V3_LockedCoinData -> Update (ContractId V2_Coin)
   v3_LockedCoinData_Coin_OwnerExpireLock_impl : ContractId V3_LockedCoinData -> Update (ContractId V2_Coin)
   v3_LockedCoinData_Coin_SvcExpireLock_impl : ContractId V3_LockedCoinData -> Update (ContractId V2_Coin)

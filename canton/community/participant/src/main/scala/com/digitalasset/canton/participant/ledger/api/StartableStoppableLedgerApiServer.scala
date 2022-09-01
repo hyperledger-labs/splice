@@ -12,10 +12,9 @@ import com.daml.ledger.api.v1.experimental_features.{
   CommandDeduplicationPeriodSupport,
   CommandDeduplicationType,
 }
+import com.daml.ledger.participant.state.v2.metrics.{TimedReadService, TimedWriteService}
 import com.daml.ledger.resources.{Resource, ResourceContext}
-import com.daml.lf.engine.ValueEnricher
 import com.daml.logging.LoggingContext
-import com.daml.metrics.Metrics
 import com.daml.platform.LedgerApiServer
 import com.daml.platform.apiserver.{ApiServerConfig, ApiServiceOwner, LedgerFeatures}
 import com.daml.platform.configuration.{
@@ -55,14 +54,12 @@ import scala.jdk.DurationConverters._
   * @param config ledger api server configuration
   * @param participantDataSourceConfig configuration for the data source (e.g., jdbc url)
   * @param dbConfig the Index DB config
-  * @param metrics metrics to be used by the indexer and ledger api service
   * @param executionContext the execution context
   */
 class StartableStoppableLedgerApiServer(
     config: CantonLedgerApiServerWrapper.Config,
     participantDataSourceConfig: ParticipantDataSourceConfig,
     dbConfig: DbSupport.DbConfig,
-    metrics: Metrics,
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     actorSystem: ActorSystem,
@@ -148,7 +145,7 @@ class StartableStoppableLedgerApiServer(
 
   private def buildLedgerApiServerOwner(
       overrideIndexerStartupMode: Option[IndexerStartupMode]
-  )(implicit loggingContext: LoggingContext) = {
+  )(implicit traceContext: TraceContext) = {
     val lfValueTranslationCacheConfig = LfValueTranslationCache.Config(
       eventsMaximumSize = config.serverConfig.maxEventCacheWeight,
       contractsMaximumSize = config.serverConfig.maxContractCacheWeight,
@@ -157,7 +154,7 @@ class StartableStoppableLedgerApiServer(
     val lfValueTranslationCache =
       LfValueTranslationCache.Cache.newInstrumentedInstance(
         config = lfValueTranslationCacheConfig,
-        metrics = metrics,
+        metrics = config.metrics,
       )
 
     val indexServiceConfig = LedgerIndexServiceConfig(
@@ -174,9 +171,13 @@ class StartableStoppableLedgerApiServer(
       maxContractKeyStateCacheSize = config.serverConfig.maxContractKeyStateCacheSize,
       maxTransactionsInMemoryFanOutBufferSize =
         config.serverConfig.maxTransactionsInMemoryFanOutBufferSize,
-      enableInMemoryFanOutForLedgerApi = config.serverConfig.enableInMemoryFanOutForLedgerApi,
       apiStreamShutdownTimeout = config.serverConfig.apiStreamShutdownTimeout.duration.toScala,
       inMemoryStateUpdaterParallelism = config.serverConfig.inMemoryStateUpdaterParallelism,
+      inMemoryFanOutThreadPoolSize = config.serverConfig.inMemoryFanOutThreadPoolSize.getOrElse(
+        LedgerApiServerConfig.DefaultInMemoryFanOutThreadPoolSize
+      ),
+      preparePackageMetadataTimeOutWarning =
+        config.serverConfig.preparePackageMetadataTimeOutWarning.duration.toScala,
     )
 
     val indexerConfig = config.indexerConfig.damlConfig(
@@ -193,29 +194,31 @@ class StartableStoppableLedgerApiServer(
     )
 
     for {
-      (inMemoryState, inMemoryStateUpdater) <-
+      (inMemoryState, inMemoryStateUpdaterFlow) <-
         LedgerApiServer.createInMemoryStateAndUpdater(
           indexServiceConfig,
-          metrics,
+          config.metrics,
           executionContext,
         )
+      timedReadService = new TimedReadService(config.syncService, config.metrics)
       indexerHealth <- new IndexerServiceOwner(
         config.participantId,
         participantDataSourceConfig,
-        config.syncService,
+        timedReadService,
         overrideIndexerStartupMode
           .map(overrideStartupMode => indexerConfig.copy(startupMode = overrideStartupMode))
           .getOrElse(indexerConfig),
-        metrics,
+        config.metrics,
         lfValueTranslationCache,
         inMemoryState,
-        inMemoryStateUpdater.flow,
+        inMemoryStateUpdaterFlow,
         config.serverConfig.additionalMigrationPaths,
+        executionContext,
       )
       dbSupport <- DbSupport
         .owner(
           serverRole = ServerRole.ApiServer,
-          metrics = metrics,
+          metrics = config.metrics,
           dbConfig = dbConfig,
         )
       indexService <- new IndexServiceOwner(
@@ -223,16 +226,16 @@ class StartableStoppableLedgerApiServer(
         initialLedgerId = domain.LedgerId(config.ledgerId),
         config = indexServiceConfig,
         participantId = config.participantId,
-        metrics = metrics,
+        metrics = config.metrics,
         servicesExecutionContext = executionContext,
         lfValueTranslationCache = lfValueTranslationCache,
-        enricher = new ValueEnricher(config.engine),
+        engine = config.engine,
         inMemoryState = inMemoryState,
       )
       userManagementStore =
         PersistentUserManagementStore.cached(
           dbSupport = dbSupport,
-          metrics = metrics,
+          metrics = config.metrics,
           timeProvider = TimeProvider.UTC,
           cacheExpiryAfterWriteInSeconds =
             config.serverConfig.userManagementService.cacheExpiryAfterWriteInSeconds,
@@ -251,6 +254,7 @@ class StartableStoppableLedgerApiServer(
         party = PartyConfiguration.Default,
         port = Port(config.serverConfig.port.unwrap),
         portFile = None,
+        rateLimit = config.serverConfig.rateLimit,
         seeding = config.cantonParameterConfig.contractIdSeeding,
         timeProviderType = config.testingTimeService match {
           case Some(_) => TimeProviderType.Static
@@ -261,19 +265,20 @@ class StartableStoppableLedgerApiServer(
         userManagement = config.serverConfig.userManagementService.damlConfig,
       )
 
+      timedWriteService = new TimedWriteService(config.syncService, config.metrics)
       _ <- ApiServiceOwner(
         indexService = indexService,
         userManagementStore = userManagementStore,
         ledgerId = config.ledgerId,
         participantId = config.participantId,
         config = ledgerApiServerConfig,
-        optWriteService = Some(config.syncService),
+        optWriteService = Some(timedWriteService),
         healthChecks = new HealthChecks(
-          "read" -> config.syncService,
+          "read" -> timedReadService,
           "write" -> (() => config.syncService.currentWriteHealth()),
           "indexer" -> indexerHealth,
         ),
-        metrics = metrics,
+        metrics = config.metrics,
         timeServiceBackend = config.testingTimeService,
         otherServices = Nil,
         otherInterceptors = List(
@@ -308,6 +313,7 @@ class StartableStoppableLedgerApiServer(
           config.adminToken,
           parent = config.serverConfig.authServices.map(_.create()),
         ),
+        jwtTimestampLeeway = None,
       )
     } yield ()
   }

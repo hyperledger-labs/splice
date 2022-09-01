@@ -18,7 +18,7 @@ import com.digitalasset.canton.config.{
 import com.digitalasset.canton.crypto.{Hash, TestHash}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, NamedLoggingContext}
 import com.digitalasset.canton.metrics.{CommonMockMetrics, SequencerClientMetrics}
 import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
 import com.digitalasset.canton.sequencing._
@@ -176,9 +176,18 @@ class SequencerClientTest extends AsyncWordSpec with BaseTest with HasExecutorSe
 
       for {
         env @ Env(client, transport, _, _, _) <- Env.create(
-          eventValidator = event => {
-            validated.set(true)
-            Env.eventAlwaysValid.validate(event)
+          eventValidator = new SequencedEventValidator {
+            override def validate(
+                event: OrdinarySerializedEvent
+            ): EitherT[Future, SequencedEventValidationError, Unit] = {
+              validated.set(true)
+              Env.eventAlwaysValid.validate(event)
+            }
+
+            override def validateOnReconnect(
+                reconnectEvent: OrdinarySerializedEvent
+            ): EitherT[Future, SequencedEventValidationError, Unit] =
+              validate(reconnectEvent)
           },
           storedEvents = Seq(deliver),
         )
@@ -686,6 +695,12 @@ class SequencerClientTest extends AsyncWordSpec with BaseTest with HasExecutorSe
     override protected def loggerFactory: NamedLoggerFactory =
       SequencerClientTest.this.loggerFactory
     override protected def timeouts: ProcessingTimeout = DefaultProcessingTimeouts.testing
+    override private[canton] def complete(reason: SubscriptionCloseReason[E])(implicit
+        traceContext: TraceContext
+    ): Unit = {
+      closeReasonPromise.success(reason)
+      close()
+    }
     def closeSubscription(reason: E): Unit = this.closeReasonPromise.success(HandlerError(reason))
     def closeSubscription(error: Throwable): Unit =
       this.closeReasonPromise.success(HandlerException(error))
@@ -751,7 +766,11 @@ class SequencerClientTest extends AsyncWordSpec with BaseTest with HasExecutorSe
   }
 
   object Env {
-    val eventAlwaysValid: ValidateSequencedEvent = _ => EitherT.rightT(())
+    val eventAlwaysValid: SequencedEventValidator = SequencedEventValidator.noValidation(
+      DefaultTestIdentities.domainId,
+      DefaultTestIdentities.sequencer,
+      warn = false,
+    )
 
     /** @param useParallelExecutionContext Set to true to use a parallel execution context which is handy for
       *                                    verifying close behavior that can involve an Await that would deadlock
@@ -762,7 +781,7 @@ class SequencerClientTest extends AsyncWordSpec with BaseTest with HasExecutorSe
     def create(
         storedEvents: Seq[SequencedEvent[ClosedEnvelope]] = Seq.empty,
         cleanPrehead: Option[CursorPrehead[SequencerCounter]] = None,
-        eventValidator: ValidateSequencedEvent = eventAlwaysValid,
+        eventValidator: SequencedEventValidator = eventAlwaysValid,
         options: SequencerClientConfig = SequencerClientConfig(),
         useParallelExecutionContext: Boolean = false,
     ): Future[Env] = {
@@ -788,6 +807,14 @@ class SequencerClientTest extends AsyncWordSpec with BaseTest with HasExecutorSe
         )
       val domainParameters = BaseTest.defaultStaticDomainParameters
 
+      val eventValidatorFactory = new SequencedEventValidatorFactory {
+        override def create(
+            initialLastEventProcessedO: Option[PossiblyIgnoredSerializedEvent],
+            unauthenticated: Boolean,
+        )(implicit loggingContext: NamedLoggingContext): SequencedEventValidator =
+          eventValidator
+      }
+
       val client = new SequencerClient(
         DefaultTestIdentities.domainId,
         participant1,
@@ -796,7 +823,7 @@ class SequencerClientTest extends AsyncWordSpec with BaseTest with HasExecutorSe
         TestingConfigInternal(),
         domainParameters,
         timeouts,
-        _ => eventValidator,
+        eventValidatorFactory,
         clock,
         sequencedEventStore,
         sendTracker,

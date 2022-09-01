@@ -10,6 +10,8 @@ import cats.syntax.functor._
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances._
 import com.daml.platform.apiserver.SeedService.Seeding
+import com.daml.platform.apiserver.configuration.RateLimitingConfig
+import com.daml.platform.indexer.PackageMetadataViewConfig
 import com.digitalasset.canton.config.ConfigErrors.{
   CannotParseFilesError,
   CannotReadFilesError,
@@ -154,19 +156,21 @@ final case class MonitoringConfig(
   * @param testingBong default bong timeout
   */
 final case class ConsoleCommandTimeout(
-    bounded: TimeoutDuration = ConsoleCommandTimeout.defaultBoundedTimeout,
-    unbounded: TimeoutDuration = ConsoleCommandTimeout.defaultUnboundedTimeout,
-    ledgerCommand: TimeoutDuration = ConsoleCommandTimeout.defaultLedgerCommandsTimeout,
-    ping: TimeoutDuration = ConsoleCommandTimeout.defaultPingTimeout,
-    testingBong: TimeoutDuration = ConsoleCommandTimeout.defaultTestingBongTimeout,
+    bounded: NonNegativeDuration = ConsoleCommandTimeout.defaultBoundedTimeout,
+    unbounded: NonNegativeDuration = ConsoleCommandTimeout.defaultUnboundedTimeout,
+    ledgerCommand: NonNegativeDuration = ConsoleCommandTimeout.defaultLedgerCommandsTimeout,
+    ping: NonNegativeDuration = ConsoleCommandTimeout.defaultPingTimeout,
+    testingBong: NonNegativeDuration = ConsoleCommandTimeout.defaultTestingBongTimeout,
 )
 
 object ConsoleCommandTimeout {
-  val defaultBoundedTimeout: TimeoutDuration = TimeoutDuration.tryFromDuration(1.minute)
-  val defaultUnboundedTimeout: TimeoutDuration = TimeoutDuration.tryFromDuration(Duration.Inf)
-  val defaultLedgerCommandsTimeout: TimeoutDuration = TimeoutDuration.tryFromDuration(1.minute)
-  val defaultPingTimeout: TimeoutDuration = TimeoutDuration.tryFromDuration(20.seconds)
-  val defaultTestingBongTimeout: TimeoutDuration = TimeoutDuration.tryFromDuration(1.minute)
+  val defaultBoundedTimeout: NonNegativeDuration = NonNegativeDuration.tryFromDuration(1.minute)
+  val defaultUnboundedTimeout: NonNegativeDuration =
+    NonNegativeDuration.tryFromDuration(Duration.Inf)
+  val defaultLedgerCommandsTimeout: NonNegativeDuration =
+    NonNegativeDuration.tryFromDuration(1.minute)
+  val defaultPingTimeout: NonNegativeDuration = NonNegativeDuration.tryFromDuration(20.seconds)
+  val defaultTestingBongTimeout: NonNegativeDuration = NonNegativeDuration.tryFromDuration(1.minute)
 }
 
 /** Timeout settings configuration */
@@ -497,15 +501,15 @@ object CantonConfig {
       }
     }
 
-    implicit val timeoutDurationReader: ConfigReader[TimeoutDuration] =
-      ConfigReader.fromString[TimeoutDuration] { str =>
+    implicit val nonNegativeDurationReader: ConfigReader[NonNegativeDuration] =
+      ConfigReader.fromString[NonNegativeDuration] { str =>
         def err(message: String) =
-          CannotConvert(str, TimeoutDuration.getClass.getName, message)
+          CannotConvert(str, NonNegativeDuration.getClass.getName, message)
 
         Either
           .catchOnly[NumberFormatException](Duration.apply(str))
           .leftMap(error => err(error.getMessage))
-          .flatMap(duration => TimeoutDuration.fromDuration(duration).leftMap(err))
+          .flatMap(duration => NonNegativeDuration.fromDuration(duration).leftMap(err))
       }
 
     private def strToFiniteDuration(str: String): Either[String, FiniteDuration] =
@@ -659,7 +663,8 @@ object CantonConfig {
       deriveEnumerationReader[CryptoKeyFormat]
     implicit def cryptoSchemeConfig[S: ConfigReader: Order]: ConfigReader[CryptoSchemeConfig[S]] =
       deriveReader[CryptoSchemeConfig[S]]
-    lazy implicit val cryptoReader: ConfigReader[CryptoConfig] = deriveReader[CryptoConfig]
+    lazy implicit val communityCryptoReader: ConfigReader[CommunityCryptoConfig] =
+      deriveReader[CommunityCryptoConfig]
     lazy implicit val apiTypeGrpcConfigReader: ConfigReader[ApiType.Grpc.type] =
       deriveReader[ApiType.Grpc.type]
     lazy implicit val apiTypeHttpConfigReader: ConfigReader[ApiType.Http.type] =
@@ -721,6 +726,8 @@ object CantonConfig {
       deriveReader[AuthServiceConfig]
     lazy implicit val postgresDataSourceConfigReader: ConfigReader[PostgresDataSourceConfigCanton] =
       deriveReader[PostgresDataSourceConfigCanton]
+    lazy implicit val rateLimitConfigReader: ConfigReader[RateLimitingConfig] =
+      deriveReader[RateLimitingConfig]
     lazy implicit val ledgerApiServerConfigReader: ConfigReader[LedgerApiServerConfig] =
       deriveReader[LedgerApiServerConfig]
     lazy implicit val activeContractsServiceConfigReader
@@ -732,6 +739,8 @@ object CantonConfig {
       deriveReader[UserManagementServiceConfig]
     lazy implicit val indexerConfigReader: ConfigReader[IndexerConfig] =
       deriveReader[IndexerConfig]
+    lazy implicit val packageMetadataViewConfigReader: ConfigReader[PackageMetadataViewConfig] =
+      deriveReader[PackageMetadataViewConfig]
     lazy implicit val identityConfigReader: ConfigReader[TopologyConfig] =
       deriveReader[TopologyConfig]
     lazy implicit val sequencerConnectionConfigCertificateFileReader
@@ -885,12 +894,13 @@ object CantonConfig {
         parent
     }
 
-    implicit val timeoutDurationWriter: ConfigWriter[TimeoutDuration] = ConfigWriter.toString { x =>
-      x.unwrap match {
-        case Duration.Inf => "Inf"
-        case y => y.toString
+    implicit val nonNegativeDurationWriter: ConfigWriter[NonNegativeDuration] =
+      ConfigWriter.toString { x =>
+        x.unwrap match {
+          case Duration.Inf => "Inf"
+          case y => y.toString
+        }
       }
-    }
 
     implicit val lengthLimitedStringWriter: ConfigWriter[LengthLimitedString] =
       ConfigWriter.toString(_.unwrap)
@@ -983,7 +993,8 @@ object CantonConfig {
       deriveEnumerationWriter[CryptoKeyFormat]
     implicit def cryptoSchemeConfigWriter[S: ConfigWriter]: ConfigWriter[CryptoSchemeConfig[S]] =
       deriveWriter[CryptoSchemeConfig[S]]
-    lazy implicit val cryptoWriter: ConfigWriter[CryptoConfig] = deriveWriter[CryptoConfig]
+    lazy implicit val communityCryptoWriter: ConfigWriter[CommunityCryptoConfig] =
+      deriveWriter[CommunityCryptoConfig]
     lazy implicit val clientConfigWriter: ConfigWriter[ClientConfig] = deriveWriter[ClientConfig]
     lazy implicit val remoteDomainConfigWriter: ConfigWriter[RemoteDomainConfig] =
       deriveWriter[RemoteDomainConfig]
@@ -1050,6 +1061,8 @@ object CantonConfig {
       deriveWriter[AuthServiceConfig]
     lazy implicit val postgresDataSourceWriter: ConfigWriter[PostgresDataSourceConfigCanton] =
       deriveWriter[PostgresDataSourceConfigCanton]
+    lazy implicit val rateLimitConfigWriter: ConfigWriter[RateLimitingConfig] =
+      deriveWriter[RateLimitingConfig]
     lazy implicit val ledgerApiServerConfigWriter: ConfigWriter[LedgerApiServerConfig] =
       deriveWriter[LedgerApiServerConfig]
     lazy implicit val activeContractsServiceConfigWriter
@@ -1059,6 +1072,8 @@ object CantonConfig {
       deriveWriter[CommandServiceConfig]
     lazy implicit val userManagementServiceConfigWriter: ConfigWriter[UserManagementServiceConfig] =
       deriveWriter[UserManagementServiceConfig]
+    lazy implicit val packageMetadataViewConfigWriter: ConfigWriter[PackageMetadataViewConfig] =
+      deriveWriter[PackageMetadataViewConfig]
     lazy implicit val indexerConfigWriter: ConfigWriter[IndexerConfig] =
       deriveWriter[IndexerConfig]
     lazy implicit val identityConfigWriter: ConfigWriter[TopologyConfig] =

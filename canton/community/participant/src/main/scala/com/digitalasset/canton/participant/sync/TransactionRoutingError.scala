@@ -3,7 +3,8 @@
 
 package com.digitalasset.canton.participant.sync
 
-import com.daml.error.{ErrorCategory, ErrorCode, ErrorGroup, ErrorResource, Explanation, Resolution}
+import com.daml.error._
+import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.TransactionErrorGroup.RoutingErrorGroup
 import com.digitalasset.canton.error._
@@ -12,6 +13,9 @@ import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.DomainId
 
 sealed trait TransactionRoutingError extends TransactionError with Product with Serializable
+trait TransactionRoutingErrorWithDomain extends TransactionRoutingError {
+  def domainId: DomainId
+}
 
 /** All routing errors happen before in-flight submission checking and are therefore never definite answers. */
 object TransactionRoutingError extends RoutingErrorGroup {
@@ -49,7 +53,7 @@ object TransactionRoutingError extends RoutingErrorGroup {
     @Explanation(
       """This error indicates that the transaction should be submitted to a domain which is not connected or not configured."""
     )
-    @Resolution("Ensure that the domain is correctly connected.")
+    @Resolution("""Ensure that the domain specified in the workflowId is correctly connected.""")
     object SubmissionDomainNotReady
         extends ErrorCode(
           id = "SUBMISSION_DOMAIN_NOT_READY",
@@ -63,6 +67,42 @@ object TransactionRoutingError extends RoutingErrorGroup {
           with TransactionSubmissionError
     }
 
+    object InvalidPrescribedDomainId
+        extends ErrorCode(
+          id = "INVALID_PRESCRIBED_DOMAIN_ID",
+          ErrorCategory.InvalidGivenCurrentSystemStateOther,
+        ) {
+
+      case class InputContractsNotOnDomain(
+          domainId: DomainId,
+          inputContractDomain: DomainId,
+      ) extends TransactionErrorImpl(
+            cause = s"The needed input contracts are not on $domainId, but on $inputContractDomain"
+          )
+          with TransactionRoutingErrorWithDomain
+
+      case class NotAllInformeeAreOnDomain(
+          domainId: DomainId,
+          domainsOfAllInformee: NonEmpty[Set[DomainId]],
+      ) extends TransactionErrorImpl(
+            cause =
+              s"Not all informee are on the specified domainID: $domainId, but on $domainsOfAllInformee"
+          )
+          with TransactionRoutingErrorWithDomain
+
+      case class NotConnected(domainId: DomainId)
+          extends TransactionErrorImpl(
+            cause =
+              s"Cannot submit transaction to prescribed domain `$domainId` because the participant is not connected to this domain"
+          )
+          with TransactionRoutingErrorWithDomain
+
+      case class Generic(domainId: DomainId, reason: String)
+          extends TransactionErrorImpl(
+            cause = s"Cannot submit transaction to prescribed domain `$domainId` because: $reason"
+          )
+          with TransactionRoutingErrorWithDomain
+    }
   }
 
   object MalformedInputErrors extends ErrorGroup() {
@@ -237,6 +277,27 @@ object TransactionRoutingError extends RoutingErrorGroup {
     }
 
     @Explanation(
+      """This error indicates that no valid domain was found for submission."""
+    )
+    @Resolution(
+      "Check the status of your domain connections, that packages are vetted and that your are connected to domains running recent protocol versions."
+    )
+    object NoDomainForSubmission
+        extends ErrorCode(
+          id = "NO_DOMAIN_FOR_SUBMISSION",
+          ErrorCategory.InvalidGivenCurrentSystemStateOther,
+        ) {
+
+      /** @param domainsNotUsed The reason why each domain cannot be used for submission.
+        */
+      case class Error(domainsNotUsed: Map[DomainId, String])
+          extends TransactionErrorImpl(
+            cause = "No valid domain for submission found."
+          )
+          with TransactionRoutingError {}
+    }
+
+    @Explanation(
       """This error indicates that the transaction is referring to contracts on domains to which this participant is currently not connected."""
     )
     @Resolution("Check the status of your domain connections.")
@@ -277,7 +338,6 @@ object TransactionRoutingError extends RoutingErrorGroup {
         )
       }
     }
-
   }
 
   @Explanation(
@@ -297,6 +357,24 @@ object TransactionRoutingError extends RoutingErrorGroup {
           cause = "Automatically transferring contracts to a common domain failed."
         )
         with TransactionRoutingError
+  }
+
+  @Explanation(
+    """This error indicates that topology information could not be queried."""
+  )
+  @Resolution(
+    """Check that the participant is connected to the domain."""
+  )
+  object UnableToQueryTopologySnapshot
+      extends ErrorCode(
+        id = "UNABLE_TO_GET_TOPOLOGY_SNAPSHOT",
+        ErrorCategory.InvalidGivenCurrentSystemStateOther,
+      ) {
+    case class Failed(domainId: DomainId)
+        extends TransactionErrorImpl(
+          cause = s"Participant is not connected to domain `$domainId`."
+        )
+        with TransactionRoutingErrorWithDomain
   }
 
   @Explanation(

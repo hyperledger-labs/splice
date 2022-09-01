@@ -28,8 +28,8 @@ template OpenMiningRound
     key (svc, round) : (Party, Round)
     maintainer key._1
 
-    implements RoundIface.OpenMiningRound where
-      openMiningRound_View = RoundIface.OpenMiningRoundView with ..
+    interface instance RoundIface.OpenMiningRound for OpenMiningRound where
+      view = RoundIface.OpenMiningRoundView with ..
 
 -- | A mining round for which the total sum of registered rewards
 -- is being computed. Rewards can no longer be registered aginst such a round.
@@ -44,8 +44,8 @@ template ClosingMiningRound
     key (svc, round) : (Party, Round)
     maintainer key._1
 
-    implements RoundIface.ClosingMiningRound where
-      closingMiningRound_View = RoundIface.ClosingMiningRoundView with ..
+    interface instance RoundIface.ClosingMiningRound for ClosingMiningRound where
+      view = RoundIface.ClosingMiningRoundView with ..
 
 -- | A mining round for whose rewards coins are being issued.
 template IssuingMiningRound
@@ -60,8 +60,8 @@ template IssuingMiningRound
     key (svc, round) : (Party, Round)
     maintainer key._1
 
-    implements RoundIface.IssuingMiningRound where
-      issuingMiningRound_View = RoundIface.IssuingMiningRoundView with ..
+    interface instance RoundIface.IssuingMiningRound for IssuingMiningRound where
+      view = RoundIface.IssuingMiningRoundView with ..
 
 -- | A record that a specific mining round has been closed, which can
 -- be used to archive expired rewards.
@@ -76,5 +76,5 @@ template ClosedMiningRound
     key (svc, round) : (Party, Round)
     maintainer key._1
 
-    implements RoundIface.ClosedMiningRound where
-      closedMiningRound_View = RoundIface.ClosedMiningRoundView with ..
+    interface instance RoundIface.ClosedMiningRound for ClosedMiningRound where
+      view = RoundIface.ClosedMiningRoundView with ..

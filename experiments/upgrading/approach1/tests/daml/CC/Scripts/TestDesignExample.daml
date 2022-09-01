@@ -29,12 +29,12 @@ template Escrow
         paymentCoin : ContractId CoinIface.Coin
       controller p
       do lockedCoin <- fetch lockedCoinCid
-         let CoinIface.LockedCoinView { lock, coin = locked } = CoinIface.lockedCoin_View lockedCoin
+         let CoinIface.LockedCoinView { lock, coin = locked } = view lockedCoin
          assertMsg "SVC matches locked coin" (locked.svc == this.svc)
          assertMsg "owner matches locked coin" (locked.owner == this.p)
          assertMsg "lock holder matches locked coin " (arbiter == lock.holder)
          payment <- fetch paymentCoin
-         let paymentView = CoinIface.coin_View payment
+         let paymentView = view payment
          assertMsg "SVC matches payment coin" (paymentView.svc == this.svc)
          assertMsg "owner matches payment coin" (paymentView.owner == this.p)
          cid <- exercise lockedCoinCid CoinIface.LockedCoin_Unlock

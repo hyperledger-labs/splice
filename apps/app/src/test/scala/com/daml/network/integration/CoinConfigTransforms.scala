@@ -11,7 +11,7 @@ import com.digitalasset.canton.config.{
   ClientConfig,
   CommunityAdminServerConfig,
   NodeConfig,
-  TimeoutDuration,
+  NonNegativeDuration,
 }
 import com.digitalasset.canton.domain.config.{CommunityDomainConfig, CommunityPublicServerConfig}
 import com.digitalasset.canton.participant.config.{
@@ -29,11 +29,11 @@ object CoinConfigTransforms {
   def makeAllTimeoutsBounded: CoinConfigTransform = {
     // make unbounded duration bounded for our test
     _.focus(_.parameters.timeouts.console.unbounded)
-      .replace(TimeoutDuration.tryFromDuration(2.minutes))
+      .replace(NonNegativeDuration.tryFromDuration(2.minutes))
       .focus(_.parameters.timeouts.processing.unbounded)
-      .replace(TimeoutDuration.tryFromDuration(2.minutes))
+      .replace(NonNegativeDuration.tryFromDuration(2.minutes))
       .focus(_.parameters.timeouts.processing.shutdownProcessing)
-      .replace(TimeoutDuration.tryFromDuration(10.seconds))
+      .replace(NonNegativeDuration.tryFromDuration(10.seconds))
   }
 
   /** Default transforms to apply to tests using a [[CoinEnvironmentDefinition]].

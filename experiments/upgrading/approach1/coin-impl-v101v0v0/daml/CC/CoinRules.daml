@@ -52,21 +52,21 @@ template CoinRules
   where
     signatory svc
 
-    implements CoinApi.CoinRules where
-      getSvc = svc
+    interface instance CoinApi.CoinRules for CoinRules where
+      view = CoinApi.CoinRulesView svc
 
       coinRules_Transfer_impl _ (CoinApi.CoinRules_Transfer transfer) = executeTransfer config svc transfer
 
       coinRules_LockedCoin_Unlock_impl lockedCoinCid lockedCoinView _arg = do
         lockedCoin <- fetch lockedCoinCid
-        CoinApi.lockedCoin_View lockedCoin === lockedCoinView
+        view lockedCoin === lockedCoinView
         case fromInterface @CoinImpl.LockedCoin lockedCoin of
           Some coin -> toInterfaceContractId <$> create coin.coin
           None -> abort $ "Unsupported coin impl: "  <> show (interfaceTypeRep lockedCoin)
 
       coinRules_LockedCoin_OwnerExpireLock_impl lockedCoinCid lockedCoinView _arg = do
         lockedCoin <- fetch lockedCoinCid
-        CoinApi.lockedCoin_View lockedCoin === lockedCoinView
+        view lockedCoin === lockedCoinView
         case fromInterface @CoinImpl.LockedCoin lockedCoin of
           Some coin -> do
             t <- getTime
@@ -77,7 +77,7 @@ template CoinRules
       coinRules_ValidatorReward_ArchiveAsValidator_impl rewardCid rewardView (CoinApi.ValidatorReward_ArchiveAsValidator validator rightCid) = do
         reward <- fetch rewardCid
         -- REVIEW (SM): why do we need this check given that we archive by contract-id?
-        CoinApi.validatorReward_View reward === rewardView
+        view reward === rewardView
         right <- fetch rightCid
         assertMsg "Right must match" (right == toInterface (CoinImpl.ValidatorRight with svc; validator, user = rewardView.user))
         exercise rewardCid CoinApi.ValidatorReward_Archive
@@ -85,8 +85,8 @@ template CoinRules
 
       coinRules_ValidatorReward_SvcExpire_impl rewardCid rewardView (CoinApi.ValidatorReward_SvcExpire miningRoundCid) = do
         reward <- fetch rewardCid
-        CoinApi.validatorReward_View reward === rewardView
-        miningRound <- CoinApi.closedMiningRound_View <$> fetch miningRoundCid
+        view reward === rewardView
+        miningRound <- view <$> fetch miningRoundCid
         assertMsg "Mining round > expiry round" (rewardView.round <= miningRound.round)
         pure ()
 
@@ -95,8 +95,8 @@ template CoinRules
         -- REVIEW (SM): it seems we are not archiving the reward in this choice.
         -- We probably want a `fetchAndArchive` together with a rule that all choices
         -- are non-consuming by default to simplify writing and rewieving this kind of code.
-        CoinApi.appReward_View reward === rewardView
-        miningRound <- CoinApi.closedMiningRound_View <$> fetch miningRoundCid
+        view reward === rewardView
+        miningRound <- view <$> fetch miningRoundCid
         assertMsg "Mining round > expiry round" (rewardView.round <= miningRound.round)
         pure ()
 
@@ -305,7 +305,7 @@ summarizeAndConsumeInputs now config svc sender inps = do
     summarizeAndConsumeInput now s (CoinApi.InputCoin coinCid) = do
       coin <- fetch coinCid
       exercise coinCid CoinApi.Coin_Archive
-      let coinView = CoinApi.coin_View coin
+      let coinView = view coin
       assertMsg "SVC matches" (svc == coinView.svc)
       assertMsg "Sender matches owner" (sender == coinView.owner)
       let quantity = actualQuantity now coinView.quantity
@@ -321,7 +321,7 @@ summarizeAndConsumeInputs now config svc sender inps = do
     summarizeAndConsumeInput now s (CoinApi.InputAppReward rewardCid) = do
       reward <- fetch rewardCid
       exercise rewardCid CoinApi.AppReward_Archive
-      let rewardView = CoinApi.appReward_View reward
+      let rewardView = view reward
       assertMsg "SVC matches" (svc == rewardView.svc)
       (_, miningRound) <- fetchByKey @IssuingMiningRound (svc, rewardView.round)
       assertMsg "Sender matches app owner" (sender == rewardView.owner)
@@ -333,7 +333,7 @@ summarizeAndConsumeInputs now config svc sender inps = do
 
     summarizeAndConsumeInput now s (CoinApi.InputValidatorReward rewardCid) = do
       reward <- fetch rewardCid
-      let rewardView = CoinApi.validatorReward_View reward
+      let rewardView = view reward
       assertMsg "SVC matches" (svc == rewardView.svc)
       (_, miningRound) <- fetchByKey @IssuingMiningRound (svc, rewardView.round)
       -- TODO Should this fetch via an interface?

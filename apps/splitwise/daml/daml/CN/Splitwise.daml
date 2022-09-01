@@ -247,8 +247,9 @@ template TransferInProgress
     quantity : Decimal
   where
     signatory group.owner, sender, receiver
-    implements PaymentReference where
-      paymentReference_getDescription = "Transfer from " <> show sender <> " to " <> show receiver <> " for " <> show quantity
+    interface instance PaymentReference for TransferInProgress where
+      view = PaymentReferenceView with
+        description = "Transfer from " <> show sender <> " to " <> show receiver <> " for " <> show quantity
 
 template BalanceUpdate
   with

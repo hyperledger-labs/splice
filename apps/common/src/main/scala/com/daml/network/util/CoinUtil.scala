@@ -7,7 +7,7 @@ import com.daml.ledger.api.v1.commands.Command
 import com.daml.ledger.client.binding
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinLedgerConnection
-import com.digitalasset.canton.ledger.api.client.{DecodeUtil, LedgerConnection}
+import com.digitalasset.canton.participant.ledger.api.client.{DecodeUtil, LedgerConnection}
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -89,12 +89,7 @@ object CoinUtil extends UploadablePackage {
           config = defaultCoinConfig,
         )
         .createAnd
-        .exerciseCoinRules_MiningRound_Open(
-          actor = svc.toPrim,
-          choiceArgument = CC.CoinRules.CoinRules_MiningRound_Open(
-            coinPrice = 1.0
-          ),
-        )
+        .exerciseCoinRules_MiningRound_Open(coinPrice = 1.0)
         .command
     connection
       .submitCommand(
@@ -150,7 +145,7 @@ object CoinUtil extends UploadablePackage {
                 readAs = Seq.empty,
                 command = Seq(
                   cid
-                    .exerciseAccept(svcPartyId.toPrim, openMiningRounds, issuingMiningRounds)
+                    .exerciseAccept(openMiningRounds, issuingMiningRounds)
                     .command
                 ),
               )

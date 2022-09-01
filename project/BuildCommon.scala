@@ -317,7 +317,7 @@ object BuildCommon {
         `canton-blake2b`,
         `canton-functionmeta`,
         `canton-slick-fork`,
-        `canton-wartremover-extension`,
+        `canton-wartremover-extension` % "compile->compile;test->test",
       )
       .settings(
         sharedCantonSettings,
@@ -580,6 +580,7 @@ object BuildCommon {
       .settings(
         sharedSettings,
         libraryDependencies ++= Seq(
+          cats,
           mockito_scala % Test,
           scalatestMockito % Test,
           scalatest % Test,

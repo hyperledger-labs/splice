@@ -16,28 +16,30 @@ template V3
   where
     signatory packageSignatory
 
-    implements CoinApi.V1_Implementation where
+    interface instance CoinApi.V1_Implementation for V3 where
+      view = CoinApi.AnyImplementationView
       v1_Create_Coin_impl = fmap toInterfaceContractId . create
       v1_Create_CoinRules_impl = fmap toInterfaceContractId . create
       v1_CoinRulesData_V1_CoinRules_Transfer_impl v1_rulesDataCid CoinApi.V1_CoinRules_Transfer{transfer} = do
-        v3_xfers <- exercise v1_rulesDataCid $ CoinApi.V3_CoinRules_Transfer (v1_to_v3_xfer transfer)
+        v3_xfers <- exercise (toInterfaceContractId @CoinApi.V3_CoinRules v1_rulesDataCid) $ CoinApi.V3_CoinRules_Transfer (v1_to_v3_xfer transfer)
         mapA v3_to_v1_result v3_xfers
 
-    implements CoinApi.V2_Implementation where
+    interface instance CoinApi.V2_Implementation for V3 where
+      view = CoinApi.AnyImplementationView
       v2_CoinRulesData_V1_CoinRules_Transfer_impl v2_rulesDataCid CoinApi.V1_CoinRules_Transfer{transfer} = do
-        v3_xfers <- exercise v2_rulesDataCid $ CoinApi.V3_CoinRules_Transfer (v1_to_v3_xfer transfer)
+        v3_xfers <- exercise (toInterfaceContractId @CoinApi.V3_CoinRules v2_rulesDataCid) $ CoinApi.V3_CoinRules_Transfer (v1_to_v3_xfer transfer)
         mapA v3_to_v1_result v3_xfers
 
       v1_CoinData_V2_Coin_Expire_impl v1_coinCid v1_coinData CoinApi.V2_Coin_Expire{roundCid} =
-        do miningRound <- CoinApi.getV2_OpenMiningRoundData <$> fetch roundCid
-           let v2_coinData = CoinApi.getV2_CoinData v1_coinData
+        do miningRound <- view <$> fetch roundCid
+           v2_coinData <- view <$> fetch (toInterfaceContractId @CoinApi.V2_Coin v1_coinCid)
            assertMsg "Mining round > expiry round" (v2_coinData.quantity.createdAt <= miningRound.round)
-           exercise v1_coinCid CoinApi.V1_Coin_Archive
+           exercise (toInterfaceContractId @CoinApi.V1_Coin v1_coinCid) CoinApi.V1_Coin_Archive
 
       v2_CoinData_V2_Coin_Expire_impl v2_coinCid v2_coinData CoinApi.V2_Coin_Expire{roundCid} =
-        do miningRound <- CoinApi.getV2_OpenMiningRoundData <$> fetch roundCid
+        do miningRound <- view <$> fetch roundCid
            assertMsg "Mining round > expiry round" (v2_coinData.quantity.createdAt <= miningRound.round)
-           exercise v2_coinCid CoinApi.V2_Coin_Archive
+           exercise (toInterfaceContractId @CoinApi.V2_Coin v2_coinCid) CoinApi.V2_Coin_Archive
 
     let v1_to_v3_xfer : CoinApi.V1_Transfer -> CoinApi.V3_Transfer
         v1_to_v3_xfer v1_transfer = CoinApi.V3_Transfer with
@@ -59,7 +61,8 @@ template V3
             assertMsg "Lock not expired" (lock.expiresAt <= t)
             toInterfaceContractId <$> create coin
 
-    implements CoinApi.V3_Implementation where
+    interface instance CoinApi.V3_Implementation for V3 where
+      view = CoinApi.AnyImplementationView
       v3_LockedCoinData_Coin_Unlock_impl lockedCid = do
         CoinApi.V3_LockedCoinData{coin} <- fetch lockedCid
         archive lockedCid
@@ -87,7 +90,7 @@ template V3
         CoinApi.V3_CoinRulesData{svc}
         CoinApi.V3_CoinRules_MiningRound_StartClosing{miningRoundCid} = do
           -- archive open mining round
-          miningRound <- CoinApi.getV3_OpenMiningRoundData <$> fetch miningRoundCid
+          miningRound <- view <$> fetch miningRoundCid
           archive $ fromInterfaceContractId @CoinApi.V3_OpenMiningRoundData miningRoundCid
           assertMsg "SVC matches" (miningRound.svc == svc)
           -- create closing round
@@ -99,7 +102,7 @@ template V3
         CoinApi.V3_CoinRulesData{svc, config}
         CoinApi.V3_CoinRules_MiningRound_StartIssuing{totalBurnQuantity, miningRoundCid} = do
           -- archive closing mining round
-          miningRound <- CoinApi.getV3_ClosingMiningRoundData <$> fetch miningRoundCid
+          miningRound <- view <$> fetch miningRoundCid
           archive $ fromInterfaceContractId @CoinApi.V3_ClosingMiningRoundData miningRoundCid
           assertMsg "SVC matches" (miningRound.svc == svc)
           assertMsg "Positive total burn quantity" (totalBurnQuantity >= 0.0)
@@ -128,7 +131,7 @@ template V3
         CoinApi.V3_CoinRulesData{svc}
         CoinApi.V3_CoinRules_MiningRound_Close{miningRoundCid} = do
           -- archive issuing mining round
-          miningRound <- CoinApi.getV3_IssuingMiningRoundData <$> fetch miningRoundCid
+          miningRound <- view <$> fetch miningRoundCid
           archive $ fromInterfaceContractId @CoinApi.V3_IssuingMiningRoundData miningRoundCid
           assertMsg "SVC matches" (miningRound.svc == svc)
           -- create closing round
@@ -140,12 +143,13 @@ template V3
         CoinApi.V3_CoinRulesData{svc}
         CoinApi.V3_CoinRules_MiningRound_Archive{miningRoundCid} = do
           -- archive closed mining round
-          miningRound <- CoinApi.getV3_ClosedMiningRoundData <$> fetch miningRoundCid
+          miningRound <- view <$> fetch miningRoundCid
           archive $ fromInterfaceContractId @CoinApi.V3_ClosedMiningRoundData miningRoundCid
           assertMsg "SVC matches" (miningRound.svc == svc)
 
 
-    implements CoinApi.AnyImplementation where
+    interface instance CoinApi.AnyImplementation for V3 where
+      view = CoinApi.AnyImplementationView
 
 
 -------------------- Coin.daml ---------------------
@@ -407,7 +411,7 @@ summarizeAndConsumeInputs now config svc sender inps = do
       totalHoldingFees = 0.0
 
     summarizeAndConsumeInput now s (coinCid) = do
-      coin <- CoinApi.getV2_CoinData <$> fetch coinCid
+      coin <- view <$> fetch coinCid
       exercise coinCid CoinApi.V2_Coin_Archive
       assertMsg "SVC matches" (svc == coin.svc)
       assertMsg "Sender matches owner" (sender == coin.owner)

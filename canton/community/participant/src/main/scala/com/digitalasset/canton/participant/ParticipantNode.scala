@@ -19,6 +19,10 @@ import com.digitalasset.canton.concurrent.{
 }
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.{DbConfig, H2DbConfig, TestingConfigInternal}
+import com.digitalasset.canton.crypto.store.CryptoPrivateStore.{
+  CommunityCryptoPrivateStoreFactory,
+  CryptoPrivateStoreFactory,
+}
 import com.digitalasset.canton.crypto.{CryptoPureApi, SyncCryptoApiProvider}
 import com.digitalasset.canton.domain.api.v0.DomainTimeServiceGrpc
 import com.digitalasset.canton.environment.{CantonNode, CantonNodeBootstrapBase}
@@ -92,6 +96,7 @@ class ParticipantNodeBootstrap(
     cantonSyncServiceFactory: CantonSyncService.Factory[CantonSyncService],
     metrics: ParticipantMetrics,
     storageFactory: StorageFactory,
+    cryptoPrivateStoreFactory: CryptoPrivateStoreFactory,
     setStartableStoppableLedgerApiAndCantonServices: (
         StartableStoppableLedgerApiServer,
         StartableStoppableLedgerApiDependentServices,
@@ -118,6 +123,7 @@ class ParticipantNodeBootstrap(
       clock,
       metrics,
       storageFactory,
+      cryptoPrivateStoreFactory,
       parentLogger.append(ParticipantNodeBootstrap.LoggerFactoryKeyName, name.unwrap),
     ) {
 
@@ -264,13 +270,20 @@ class ParticipantNodeBootstrap(
           OwnerToKeyMapping(participantId, encryptionKey),
           protocolVersion,
         )
-        // initialize certificate
-        _ <- (new LegalIdentityInit(certificateGenerator, crypto)).checkOrInitializeCertificate(
-          uid,
-          Seq(participantId),
-          namespaceKey,
-          protocolVersion,
-        )(topologyManager, authorizedTopologyStore)
+
+        // initialize certificate if enabled
+        _ <-
+          if (config.init.generateLegalIdentityCertificate) {
+            (new LegalIdentityInit(certificateGenerator, crypto)).checkOrInitializeCertificate(
+              uid,
+              Seq(participantId),
+              namespaceKey,
+              protocolVersion,
+            )(topologyManager, authorizedTopologyStore)
+          } else {
+            EitherT.rightT[Future, String](())
+          }
+
         // finally, we store the node id, which means that the node will not be auto-initialised next time when we start
         _ <- storeId(nodeId)
       } yield ()
@@ -354,7 +367,7 @@ class ParticipantNodeBootstrap(
 
       // Package Store and Management
       packageService = {
-        val (packageStore) = storage match {
+        val packageStore = storage match {
           case _: MemoryStorage =>
             new InMemoryDamlPackageStore(loggerFactory)
           case pool: DbStorage =>
@@ -642,7 +655,6 @@ object ParticipantNodeBootstrap {
   }
 
   object CommunityParticipantFactory extends Factory[CommunityParticipantConfig] {
-
     override def create(
         name: String,
         participantConfig: CommunityParticipantConfig,
@@ -676,6 +688,7 @@ object ParticipantNodeBootstrap {
             CantonSyncService.DefaultFactory,
             participantMetrics,
             new CommunityStorageFactory(participantConfig.storage),
+            new CommunityCryptoPrivateStoreFactory,
             (_ledgerApi, _ledgerApiDependentServices) => (),
             _ =>
               new ResourceManagementService.CommunityResourceManagementService(

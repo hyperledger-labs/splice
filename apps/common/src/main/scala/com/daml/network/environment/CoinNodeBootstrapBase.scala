@@ -100,6 +100,7 @@ abstract class CoinNodeBootstrapBase[
       .tryCreate(
         connectionPoolForParticipant,
         parameterConfig.logQueryCost,
+        clock,
         dbStorageMetrics,
         parameterConfig.processingTimeouts,
         loggerFactory,

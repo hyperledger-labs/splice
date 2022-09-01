@@ -20,8 +20,8 @@ template DirectoryEntryRequest
   where
     signatory signatory entry
 
-    implements PaymentReference where
-      paymentReference_getDescription = "Directory entry request: " <> show entry
+    interface instance PaymentReference for DirectoryEntryRequest where
+      view = PaymentReferenceView with description = "Directory entry request: " <> show entry
 
     choice Reject : ()
       controller entry.provider

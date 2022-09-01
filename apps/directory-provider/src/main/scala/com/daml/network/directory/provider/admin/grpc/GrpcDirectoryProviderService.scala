@@ -74,7 +74,7 @@ class GrpcDirectoryProviderService(
           acceptDuration = acceptDuration,
         )
         installCid = Proto.tryDecodeContractId[codegen.DirectoryInstallRequest](request.contractId)
-        acceptCmd = installCid.exerciseDirectoryInstallRequest_Accept(partyId.toPrim, arg)
+        acceptCmd = installCid.exerciseDirectoryInstallRequest_Accept(arg)
         installCid <- connection.submitWithResult(Seq(partyId), Seq(), acceptCmd)
       } yield {
         v0.AcceptInstallRequestResponse(Proto.encode(installCid))
@@ -113,8 +113,7 @@ class GrpcDirectoryProviderService(
         cmd = codegen.DirectoryInstall
           .key(DA.Types.Tuple2(partyId.toPrim, entryRequest.value.entry.user))
           .exerciseDirectoryInstall_RequestEntryPayment(
-            partyId.toPrim,
-            codegen.DirectoryInstall_RequestEntryPayment(entryRequest.contractId),
+            codegen.DirectoryInstall_RequestEntryPayment(entryRequest.contractId)
           )
         requestCid <- connection.submitWithResult(Seq(partyId), Seq(), cmd)
       } yield {
@@ -136,8 +135,7 @@ class GrpcDirectoryProviderService(
         cmd = codegen.DirectoryInstall
           .key(DA.Types.Tuple2(partyId.toPrim, acceptedAppPayment.value.sender))
           .exerciseDirectoryInstall_CollectEntryPayment(
-            partyId.toPrim,
-            codegen.DirectoryInstall_CollectEntryPayment(acceptedAppPayment.contractId),
+            codegen.DirectoryInstall_CollectEntryPayment(acceptedAppPayment.contractId)
           )
         entryCid <- connection.submitWithResult(Seq(partyId), Seq(), cmd)
       } yield {

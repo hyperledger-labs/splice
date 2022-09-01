@@ -11,7 +11,7 @@ import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.util.BinaryFileUtil
 import com.digitalasset.canton.{ProtoDeserializationError, checked}
 import com.google.protobuf.ByteString
-import slick.jdbc.{GetResult, SetParameter}
+import slick.jdbc.{GetResult, PositionedParameters, SetParameter}
 
 import scala.collection.immutable
 
@@ -33,6 +33,14 @@ sealed abstract case class RepresentativeProtocolVersion[+ValueClass](
   def representative: ProtocolVersion = v
 }
 
+object RepresentativeProtocolVersion {
+
+  implicit val setParameterRepresentativeProtocolVersion
+      : SetParameter[RepresentativeProtocolVersion[_]] =
+    (rpv: RepresentativeProtocolVersion[_], pp: PositionedParameters) => pp >> rpv.v
+
+}
+
 final case class ProtobufVersion(v: Int) extends AnyVal
 
 object ProtobufVersion {
@@ -43,8 +51,8 @@ object ProtobufVersion {
 /** Trait for classes that can be serialized by using ProtoBuf.
   * See "CONTRIBUTING.md" for our guidelines on serialization.
   *
-  * This version of the wrapper is to be used when some attributes of the class
-  * depend on the protocol version (e.g., the signature).
+  * This wrapper is to be used when every instance can be tied to a single protocol version.
+  * Consequently, some attributes of the class may depend on the protocol version (e.g., the signature).
   * The protocol version is then bundled with the instance and does not need to
   * be passed to the toProtoVersioned, toByteString and getCryptographicEvidence
   * methods.
@@ -138,6 +146,13 @@ trait HasSupportedProtoVersions[ValueClass] {
   ): ProtobufVersion =
     supportedProtoVersions.protobufVersionFor(protocolVersion)
 
+  /** Return the Protobuf version corresponding to the protocol version
+    */
+  def protobufVersionFor(
+      protocolVersion: ProtocolVersion
+  ): ProtobufVersion =
+    supportedProtoVersions.protobufVersionFor(protocolVersionRepresentativeFor(protocolVersion))
+
   /** Supported protobuf version
     * @param fromInclusive The protocol version when this protobuf version was introduced
     * @param deserializer Deserialization method
@@ -179,13 +194,6 @@ trait HasSupportedProtoVersions[ValueClass] {
 
     def deserializerFor(protoVersion: ProtobufVersion): Deserializer =
       converters.get(protoVersion).map(_.deserializer).getOrElse(higherConverter.deserializer)
-
-    def deserializerFor(protocolVersion: ProtocolVersion): Deserializer = converterFor(
-      protocolVersion
-    ).deserializer
-
-    def serializerFor(protocolVersion: RepresentativeProtocolVersion[ValueClass]): Serializer =
-      converterFor(protocolVersion.representative).serializer
 
     def protobufVersionFor(
         protocolVersion: RepresentativeProtocolVersion[ValueClass]

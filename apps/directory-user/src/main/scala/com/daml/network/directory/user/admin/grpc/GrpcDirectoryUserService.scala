@@ -53,12 +53,11 @@ class GrpcDirectoryUserService(
         cmd = codegen.DirectoryInstall
           .key(DA.Types.Tuple2(providerParty.toPrim, userParty.toPrim))
           .exerciseDirectoryInstall_RequestEntry(
-            userParty.toPrim,
             codegen.DirectoryEntry(
               provider = providerParty.toPrim,
               user = userParty.toPrim,
               name = request.name,
-            ),
+            )
           )
         requestCid <- connection.submitWithResult(Seq(userParty), Seq(), cmd)
       } yield v0.RequestDirectoryEntryResponse(Proto.encode(requestCid))

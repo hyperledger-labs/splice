@@ -22,7 +22,7 @@ import com.daml.ledger.client.binding.{
 }
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.ErrorCodeUtils
-import com.digitalasset.canton.ledger.api.client.DecodeUtil
+import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,

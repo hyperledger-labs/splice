@@ -70,7 +70,6 @@ class GrpcWalletService(
           .key(DA.Types.Tuple2(svcParty.toPrim, getValidatorParty.toPrim))
           .exerciseCoinRules_Tap(
             walletParty.toPrim,
-            walletParty.toPrim,
             quantity,
           )
         coinCid <- connection.submitWithResult(Seq(walletParty), Seq(getValidatorParty), tapCmd)
@@ -112,7 +111,7 @@ class GrpcWalletService(
           request.requestContractId
         )
         acceptCommand = requestCid
-          .exerciseAppPaymentRequest_Accept(walletParty.toPrim, arg)
+          .exerciseAppPaymentRequest_Accept(arg)
         paymentCid <- connection.submitWithResult(
           Seq(walletParty),
           Seq(getValidatorParty),
@@ -134,7 +133,7 @@ class GrpcWalletService(
           request.requestContractId
         )
         cmd = requestCid
-          .exerciseAppPaymentRequest_Reject(walletParty.toPrim, arg)
+          .exerciseAppPaymentRequest_Reject(arg)
           .command
         _ <- connection.submitCommand(
           Seq(walletParty),
@@ -243,7 +242,7 @@ class GrpcWalletService(
           request.proposalContractId
         )
         cmd = proposalCid
-          .exercisePaymentChannelProposal_Accept(walletParty.toPrim, arg)
+          .exercisePaymentChannelProposal_Accept(arg)
         channelCid <- connection.submitWithResult(
           Seq(walletParty),
           Seq(),
@@ -262,7 +261,7 @@ class GrpcWalletService(
         senderParty = Proto.tryDecode(Proto.Party)(request.senderPartyId)
         cmd = walletCodegen.PaymentChannel
           .key(DA.Types.Tuple3(senderParty.toPrim, walletParty.toPrim, svcParty.toPrim))
-          .exercisePaymentChannel_Cancel(senderParty.toPrim)
+          .exercisePaymentChannel_Cancel()
           .command
         _ <- connection.submitCommand(
           Seq(walletParty),
@@ -289,7 +288,7 @@ class GrpcWalletService(
         )
         cmd = walletCodegen.PaymentChannel
           .key(DA.Types.Tuple3(walletParty.toPrim, receiverParty.toPrim, svcParty.toPrim))
-          .exercisePaymentChannel_ExecuteDirectTransfer(walletParty.toPrim, arg)
+          .exercisePaymentChannel_ExecuteDirectTransfer(arg)
           .command
         _ <- connection.submitCommand(
           Seq(walletParty),
@@ -351,7 +350,7 @@ class GrpcWalletService(
         )
         cmd = walletCodegen.PaymentChannel
           .key(DA.Types.Tuple3(senderParty.toPrim, walletParty.toPrim, svcParty.toPrim))
-          .exercisePaymentChannel_CreatePaymentRequest(walletParty.toPrim, arg)
+          .exercisePaymentChannel_CreatePaymentRequest(arg)
         requestCid <- connection.submitWithResult(
           Seq(walletParty),
           Seq(),
@@ -395,7 +394,7 @@ class GrpcWalletService(
           request.requestContractId
         )
         cmd = requestCid
-          .exerciseOnChannelPaymentRequest_Accept(walletParty.toPrim, arg)
+          .exerciseOnChannelPaymentRequest_Accept(arg)
           .command
         _ <- connection.submitCommand(
           Seq(walletParty),
@@ -417,7 +416,7 @@ class GrpcWalletService(
           request.requestContractId
         )
         cmd = requestCid
-          .exerciseOnChannelPaymentRequest_Reject(walletParty.toPrim, arg)
+          .exerciseOnChannelPaymentRequest_Reject(arg)
           .command
         _ <- connection.submitCommand(
           Seq(walletParty),
@@ -438,7 +437,7 @@ class GrpcWalletService(
           request.requestContractId
         )
         cmd = requestCid
-          .exerciseOnChannelPaymentRequest_Withdraw(walletParty.toPrim, arg)
+          .exerciseOnChannelPaymentRequest_Withdraw(arg)
           .command
         _ <- connection.submitCommand(
           Seq(walletParty),
@@ -467,13 +466,12 @@ class GrpcWalletService(
         cmd = coinRulesCodegen.CoinRules
           .key(DA.Types.Tuple2(svcParty.toPrim, getValidatorParty.toPrim))
           .exerciseCoinRules_Transfer(
-            party.toPrim,
             coinRulesCodegen.Transfer(
               sender = party.toPrim,
               inputs = inputs,
               outputs = outputs,
               payload = "redistribute",
-            ),
+            )
           )
         transferResults <- connection.submitWithResult(
           Seq(party),

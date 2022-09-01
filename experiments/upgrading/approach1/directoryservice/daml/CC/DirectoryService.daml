@@ -23,8 +23,8 @@ template DirectoryEntryRequest
   where
     signatory signatory entry
 
-    implements PaymentReference where
-      getDescription = "Directory entry request: " <> show entry
+    interface instance PaymentReference for DirectoryEntryRequest where
+      view = PaymentReferenceView ("Directory entry request: " <> show entry)
 
     choice Reject : ()
       controller entry.provider
@@ -63,7 +63,7 @@ template DirectoryRules with
         coinCid : ContractId Coin
         ccWalletUrl : Text
       controller user
-      do coin <- coin_View <$> fetch coinCid
+      do coin <- view <$> fetch coinCid
          assertMsg "Coin owner & svc match" ((coin.owner, coin.svc) == (user, svc))
          create DirectoryServiceAppInstall
            with

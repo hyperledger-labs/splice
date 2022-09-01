@@ -23,7 +23,12 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.Lifecycle.toCloseableOption
 import com.digitalasset.canton.lifecycle._
 import com.digitalasset.canton.logging.pretty.CantonPrettyPrinter
-import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{
+  ErrorLoggingContext,
+  NamedLoggerFactory,
+  NamedLogging,
+  NamedLoggingContext,
+}
 import com.digitalasset.canton.metrics.SequencerClientMetrics
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.protocol.StaticDomainParameters
@@ -56,6 +61,7 @@ import com.digitalasset.canton.time.{Clock, DomainTimeTracker, NonNegativeFinite
 import com.digitalasset.canton.topology._
 import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced, TracingConfig}
 import com.digitalasset.canton.util.ShowUtil._
+import com.digitalasset.canton.util.Thereafter.syntax._
 import com.digitalasset.canton.util._
 import com.digitalasset.canton.util.retry.RetryUtil.AllExnRetryable
 import com.digitalasset.canton.version.ProtocolVersion
@@ -91,7 +97,7 @@ import scala.util.{Failure, Success, Try}
   * @param keepAlive keep alive config used for GRPC sequencers
   * @param authToken configuration settings for the authentication token manager
   * @param optimisticSequencedEventValidation if true, sequenced event signatures will be validated first optimistically
-  *                                           and only strict if the optimistical evaluation failed. this means that
+  *                                           and only strict if the optimistic evaluation failed. this means that
   *                                           for a split second, we might still accept an event signed with a key that
   *                                           has just been revoked.
   * @param skipSequencedEventValidation if true, sequenced event validation will be skipped. the default setting is false.
@@ -111,6 +117,7 @@ case class SequencerClientConfig(
     acknowledgementInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofMinutes(1),
     keepAliveClient: Option[KeepAliveClientConfig] = Some(KeepAliveClientConfig()),
     authToken: AuthenticationTokenManagerConfig = AuthenticationTokenManagerConfig(),
+    // TODO(#10040) remove optimistic validation
     optimisticSequencedEventValidation: Boolean = true,
     skipSequencedEventValidation: Boolean = false,
 )
@@ -135,12 +142,6 @@ object SendType {
   }
 }
 
-/** settings to control the behaviour of the sequenced event validation factory */
-case class EventValidatorFactoryArgs(
-    initialLastEventProcessedO: Option[PossiblyIgnoredSerializedEvent],
-    unauthenticated: Boolean,
-)
-
 /** The sequencer client facilitates access to the individual domain sequencer. A client centralizes the
   * message signing operations, as well as the handling and storage of message receipts and delivery proofs,
   * such that this functionality does not have to be duplicated throughout the participant node.
@@ -153,7 +154,7 @@ class SequencerClient(
     testingConfig: TestingConfigInternal,
     val staticDomainParameters: StaticDomainParameters,
     override val timeouts: ProcessingTimeout,
-    eventValidatorFactory: EventValidatorFactoryArgs => ValidateSequencedEvent,
+    eventValidatorFactory: SequencedEventValidatorFactory,
     clock: Clock,
     private val sequencedEventStore: SequencedEventStore,
     sendTracker: SendTracker,
@@ -175,7 +176,10 @@ class SequencerClient(
 
   private val closeReasonPromise = Promise[SequencerClient.CloseReason]()
   // Keeps track of the subscription.
-  private val currentSubscription = new AtomicReference[Option[SubscriptionAndFactory]](None)
+  private val currentSubscription =
+    new AtomicReference[Option[ResilientSequencerSubscription[SequencerClientSubscriptionError]]](
+      None
+    )
   // Optional reference as is only created when tracking is subscribed
   private val periodicAcknowledgementsRef =
     new AtomicReference[Option[PeriodicAcknowledgements]](None)
@@ -202,7 +206,7 @@ class SequencerClient(
 
   /** returns true if the sequencer subscription is healthy */
   def subscriptionIsHealthy: Boolean =
-    currentSubscription.get().exists(x => !x.subscription.isDegraded)
+    currentSubscription.get().exists(!_.isDegraded)
 
   override def sendAsync(
       batch: Batch[DefaultOpenEnvelope],
@@ -498,236 +502,172 @@ class SequencerClient(
       fetchCleanTimestamp: PeriodicAcknowledgements.FetchCleanTimestamp,
       requiresAuthentication: Boolean,
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    val factory = new SubscriptionFactory(
-      priorTimestamp,
-      cleanPreheadTsO,
-      eventHandler,
-      timeTracker,
-      timeoutHandler,
-      fetchCleanTimestamp,
-      requiresAuthentication,
-    )
-    factory.create(transport, replaceExisting = false)
-  }
-
-  private class SubscriptionFactory(
-      priorTimestamp: CantonTimestamp,
-      cleanPreheadTsO: Option[CantonTimestamp],
-      eventHandler: PossiblyIgnoredApplicationHandler[ClosedEnvelope],
-      timeTracker: DomainTimeTracker,
-      timeoutHandler: SendTimeoutHandler,
-      fetchCleanTimestamp: PeriodicAcknowledgements.FetchCleanTimestamp,
-      requiresAuthentication: Boolean,
-  ) {
-    def create(
-        transport: SequencerClientTransport,
-        replaceExisting: Boolean,
-    )(implicit traceContext: TraceContext): Future[Unit] = {
-      // if changing transport, close previous subscription before creating the new one
-      if (replaceExisting)
-        currentSubscription
-          .get()
-          .map(_.subscription)
-          .foreach(_.giveUp(Success(SubscriptionCloseReason.TransportChange)))
-      val subscriptionF = performUnlessClosingF(functionFullName) {
-        for {
-          initialPriorEventO <- sequencedEventStore
+    val subscriptionF = performUnlessClosingUSF(functionFullName) {
+      for {
+        initialPriorEventO <- FutureUnlessShutdown.outcomeF(
+          sequencedEventStore
             .find(SequencedEventStore.LatestUpto(priorTimestamp))
             .toOption
             .value
-          _ = if (initialPriorEventO.isEmpty) {
-            logger.info(s"No event found up to $priorTimestamp. Resubscribing from the beginning.")
-          }
-          _ = cleanPreheadTsO.zip(initialPriorEventO).fold(()) {
-            case (cleanPreheadTs, initialPriorEvent) =>
-              ErrorUtil.requireArgument(
-                initialPriorEvent.timestamp <= cleanPreheadTs,
-                s"The initial prior event's timestamp ${initialPriorEvent.timestamp} is after the clean prehead at $cleanPreheadTs.",
-              )
-          }
+        )
+        _ = if (initialPriorEventO.isEmpty) {
+          logger.info(s"No event found up to $priorTimestamp. Resubscribing from the beginning.")
+        }
+        _ = cleanPreheadTsO.zip(initialPriorEventO).fold(()) {
+          case (cleanPreheadTs, initialPriorEvent) =>
+            ErrorUtil.requireArgument(
+              initialPriorEvent.timestamp <= cleanPreheadTs,
+              s"The initial prior event's timestamp ${initialPriorEvent.timestamp} is after the clean prehead at $cleanPreheadTs.",
+            )
+        }
 
-          // bulk-feed the event handler with everything that we already have in the SequencedEventStore
-          replayStartTimeInclusive = initialPriorEventO
-            .fold(CantonTimestamp.MinValue)(_.timestamp)
-            .immediateSuccessor
-          _ = logger.info(
-            s"Processing events from the SequencedEventStore from ${replayStartTimeInclusive} on"
-          )
+        // bulk-feed the event handler with everything that we already have in the SequencedEventStore
+        replayStartTimeInclusive = initialPriorEventO
+          .fold(CantonTimestamp.MinValue)(_.timestamp)
+          .immediateSuccessor
+        _ = logger.info(
+          s"Processing events from the SequencedEventStore from ${replayStartTimeInclusive} on"
+        )
 
-          replayEvents <- sequencedEventStore
+        replayEvents <- FutureUnlessShutdown.outcomeF(
+          sequencedEventStore
             .findRange(
               SequencedEventStore
                 .ByTimestampRange(replayStartTimeInclusive, CantonTimestamp.MaxValue),
               limit = None,
             )
-            .valueOr {
-              case SequencedEventRangeOverlapsWithPruning(
-                    _criterion,
-                    pruningStatus,
-                    _foundEvents,
-                  ) =>
-                ErrorUtil.internalError(
-                  new IllegalStateException(
-                    s"Sequenced event store's pruning at ${pruningStatus.timestamp} is at or after the resubscription at $replayStartTimeInclusive."
-                  )
+            .valueOr { overlap =>
+              ErrorUtil.internalError(
+                new IllegalStateException(
+                  s"Sequenced event store's pruning at ${overlap.pruningStatus.timestamp} is at or after the resubscription at $replayStartTimeInclusive."
                 )
-            }
-
-          _ <-
-            if (!replaceExisting) {
-              val resubscriptionStartsAt = replayEvents.headOption.fold(
-                cleanPreheadTsO.fold(ResubscriptionStart.FreshSubscription: ResubscriptionStart)(
-                  ResubscriptionStart.CleanHeadResubscriptionStart
-                )
-              )(replayEv =>
-                ResubscriptionStart.ReplayResubscriptionStart(replayEv.timestamp, cleanPreheadTsO)
               )
-              for {
-                _ <- eventHandler
-                  .resubscriptionStartsAt(resubscriptionStartsAt)
-                  .onShutdown(
-                    // TODO(#4638) properly propagate the shutdown
-                    ErrorUtil.internalError(
-                      new IllegalStateException("Shutdown during sequencer subscription.")
-                    )
-                  )
-
-                eventBatches = replayEvents.grouped(config.eventInboxSize.unwrap)
-                _ <- MonadUtil
-                  .sequentialTraverse_(eventBatches)(processEventBatch(eventHandler, _))
-                  .valueOr(err => throw SequencerClientSubscriptionException(err))
-              } yield ()
-            } else Future.unit
-
-        } yield {
-          val lastEvent = replayEvents.lastOption
-          val preSubscriptionEvent = lastEvent.orElse(initialPriorEventO)
-
-          val nextCounter =
-            // if replacing subscription, previously seen counter takes precedence over initial
-            if (replaceExisting)
-              preSubscriptionEvent.fold(initialCounter.getOrElse(GenesisSequencerCounter))(
-                _.counter
-              )
-            else
-              initialCounter
-                .getOrElse(preSubscriptionEvent.fold(GenesisSequencerCounter)(_.counter))
-
-          val eventValidator = eventValidatorFactory(
-            EventValidatorFactoryArgs(
-              preSubscriptionEvent,
-              // we need to inform the validator if this connection is unauthenticated, as unauthenticated connections
-              // do not have the topology data to verify signatures
-              unauthenticated = !requiresAuthentication,
-            )
-          )
-
-          logger.info(
-            s"Starting subscription at timestamp ${preSubscriptionEvent.map(_.timestamp)}; next counter $nextCounter"
-          )
-
-          val eventDelay: DelaySequencedEvent = {
-            val first = testingConfig.testSequencerClientFor.find(elem =>
-              elem.memberName == member.uid.id.unwrap
-                &&
-                elem.domainName == domainId.unwrap.id.unwrap
-            )
-
-            first match {
-              case Some(value) =>
-                DelayedSequencerClient.registerAndCreate(
-                  value.environmentId,
-                  domainId,
-                  member.uid.toString,
-                )
-              case None => NoDelay
             }
-          }
+        )
+        subscriptionStartsAt = replayEvents.headOption.fold(
+          cleanPreheadTsO.fold(SubscriptionStart.FreshSubscription: SubscriptionStart)(
+            SubscriptionStart.CleanHeadResubscriptionStart
+          )
+        )(replayEv =>
+          SubscriptionStart.ReplayResubscriptionStart(replayEv.timestamp, cleanPreheadTsO)
+        )
+        _ <- eventHandler.subscriptionStartsAt(subscriptionStartsAt)
 
-          val subscriptionHandler = new SubscriptionHandler(
-            StoreSequencedEvent(sequencedEventStore, domainId, loggerFactory).apply(
-              timeTracker.wrapHandler(eventHandler)
-            ),
-            timeoutHandler,
-            eventValidator,
-            eventDelay,
-            preSubscriptionEvent.map(_.counter),
+        eventBatches = replayEvents.grouped(config.eventInboxSize.unwrap)
+        _ <- FutureUnlessShutdown.outcomeF(
+          MonadUtil
+            .sequentialTraverse_(eventBatches)(processEventBatch(eventHandler, _))
+            .valueOr(err => throw SequencerClientSubscriptionException(err))
+        )
+      } yield {
+        val lastEvent = replayEvents.lastOption
+        val preSubscriptionEvent = lastEvent.orElse(initialPriorEventO)
+
+        val nextCounter = initialCounter
+          .getOrElse(preSubscriptionEvent.fold(GenesisSequencerCounter)(_.counter))
+
+        val eventValidator = eventValidatorFactory.create(
+          // We validate events before we persist them in the SequencedEventStore
+          // so we do not need to revalidate the replayed events.
+          preSubscriptionEvent,
+          // we need to inform the validator if this connection is unauthenticated, as unauthenticated connections
+          // do not have the topology data to verify signatures
+          unauthenticated = !requiresAuthentication,
+        )
+
+        logger.info(
+          s"Starting subscription at timestamp ${preSubscriptionEvent.map(_.timestamp)}; next counter $nextCounter"
+        )
+
+        val eventDelay: DelaySequencedEvent = {
+          val first = testingConfig.testSequencerClientFor.find(elem =>
+            elem.memberName == member.uid.id.unwrap
+              &&
+              elem.domainName == domainId.unwrap.id.unwrap
           )
 
-          val subscription = ResilientSequencerSubscription[SequencerClientSubscriptionError](
-            domainId.toString,
-            member,
-            transport,
-            subscriptionHandler.handleEvent,
-            nextCounter,
-            config.initialConnectionRetryDelay.toScala,
-            config.warnDisconnectDelay.toScala,
-            config.maxConnectionRetryDelay.toScala,
-            timeouts,
-            requiresAuthentication,
-            loggerFactory,
-          )
-
-          if (replaceExisting) {
-            currentSubscription.set(
-              Some(SubscriptionAndFactory(subscription, SubscriptionFactory.this))
-            )
-          } else if (
-            !currentSubscription.compareAndSet(
-              None,
-              Some(SubscriptionAndFactory(subscription, SubscriptionFactory.this)),
-            )
-          ) {
-            // there's an existing subscription!
-            logger.warn(
-              "Cannot create additional subscriptions to the sequencer from the same client"
-            )
-            sys.error("The sequencer client already has a running subscription")
+          first match {
+            case Some(value) =>
+              DelayedSequencerClient.registerAndCreate(
+                value.environmentId,
+                domainId,
+                member.uid.toString,
+              )
+            case None => NoDelay
           }
-
-          // periodically acknowledge that we've successfully processed up to the clean counter
-          {
-            val old = periodicAcknowledgementsRef.getAndSet(
-              PeriodicAcknowledgements(
-                member,
-                config.acknowledgementInterval.toScala,
-                subscriptionIsHealthy,
-                transport,
-                fetchCleanTimestamp,
-                clock,
-                timeouts,
-                loggerFactory,
-              ).some
-            )
-            old.foreach(_.close())
-          }
-
-          // pipe the eventual close reason of the subscription to the client itself
-          subscription.closeReason onComplete closeWithSubscriptionReason
-
-          // now start the subscription
-          subscription.start
-
-          subscription
         }
-      }
 
-      // we may have actually not created a subscription if we have been closed
-      val loggedAbortF = subscriptionF.unwrap.map {
-        case UnlessShutdown.AbortedDueToShutdown =>
-          logger.info("Ignoring the sequencer subscription request as the client is being closed")
-        case UnlessShutdown.Outcome(_subscription) =>
-          // Everything is fine, so no need to log anything.
-          ()
+        val subscriptionHandler = new SubscriptionHandler(
+          StoreSequencedEvent(sequencedEventStore, domainId, loggerFactory).apply(
+            timeTracker.wrapHandler(eventHandler)
+          ),
+          timeoutHandler,
+          eventValidator,
+          eventDelay,
+          preSubscriptionEvent.map(_.counter),
+        )
+
+        val subscription = ResilientSequencerSubscription[SequencerClientSubscriptionError](
+          domainId.toString,
+          member,
+          transport,
+          subscriptionHandler.handleEvent,
+          nextCounter,
+          config.initialConnectionRetryDelay.toScala,
+          config.warnDisconnectDelay.toScala,
+          config.maxConnectionRetryDelay.toScala,
+          timeouts,
+          requiresAuthentication,
+          loggerFactory,
+        )
+
+        val replaced = currentSubscription.compareAndSet(None, Some(subscription))
+        if (!replaced) {
+          // there's an existing subscription!
+          logger.warn(
+            "Cannot create additional subscriptions to the sequencer from the same client"
+          )
+          sys.error("The sequencer client already has a running subscription")
+        }
+
+        // periodically acknowledge that we've successfully processed up to the clean counter
+        // We only need to it setup once; the sequencer client will direct the acknowledgements to the
+        // right transport.
+        periodicAcknowledgementsRef.compareAndSet(
+          None,
+          PeriodicAcknowledgements
+            .create(
+              config.acknowledgementInterval.toScala,
+              subscriptionIsHealthy,
+              SequencerClient.this,
+              fetchCleanTimestamp,
+              clock,
+              timeouts,
+              loggerFactory,
+            )
+            .some,
+        )
+
+        // pipe the eventual close reason of the subscription to the client itself
+        subscription.closeReason onComplete closeWithSubscriptionReason
+
+        // now start the subscription
+        subscription.start
+
+        subscription
       }
-      FutureUtil.logOnFailure(loggedAbortF, "Sequencer subscription failed")
     }
-  }
 
-  private case class SubscriptionAndFactory(
-      subscription: ResilientSequencerSubscription[SequencerClientSubscriptionError],
-      factory: SubscriptionFactory,
-  )
+    // we may have actually not created a subscription if we have been closed
+    val loggedAbortF = subscriptionF.unwrap.map {
+      case UnlessShutdown.AbortedDueToShutdown =>
+        logger.info("Ignoring the sequencer subscription request as the client is being closed")
+      case UnlessShutdown.Outcome(_subscription) =>
+        // Everything is fine, so no need to log anything.
+        ()
+    }
+    FutureUtil.logOnFailure(loggedAbortF, "Sequencer subscription failed")
+  }
 
   private val loggingTimeoutHandler: SendTimeoutHandler = msgId => {
     // logged at debug as this is likely logged at the caller using a send callback at a higher level
@@ -738,7 +678,7 @@ class SequencerClient(
   private class SubscriptionHandler(
       applicationHandler: OrdinaryApplicationHandler[ClosedEnvelope],
       timeoutHandler: SendTimeoutHandler,
-      eventValidator: ValidateSequencedEvent,
+      eventValidator: SequencedEventValidator,
       processingDelay: DelaySequencedEvent,
       initialPriorEventCounter: Option[SequencerCounter],
   ) {
@@ -782,24 +722,24 @@ class SequencerClient(
         // we'll also see the last event replayed if the resilient sequencer subscription reconnects.
         val isReplayOfPriorEvent = priorEventCounter.get().contains(serializedEvent.counter)
 
-        def validationResultOrErrF: EitherT[Future, SequencerClientSubscriptionError, Unit] =
-          eventValidator
-            .validate(serializedEvent)
-            .leftMap[SequencerClientSubscriptionError](EventValidationError)
-
         if (isReplayOfPriorEvent) {
           // just validate
           logger.debug(
             s"Do not handle event with sequencerCounter ${serializedEvent.counter}, as it is replayed and has already been handled."
           )
-          validationResultOrErrF.value
+          eventValidator
+            .validateOnReconnect(serializedEvent)
+            .leftMap[SequencerClientSubscriptionError](EventValidationError)
+            .value
         } else {
           logger.debug(
             s"Validating sequenced event with counter ${serializedEvent.counter} and timestamp ${serializedEvent.timestamp}"
           )
           (for {
             _unit <- EitherT.liftF(processingDelay.delay(serializedEvent))
-            _ <- validationResultOrErrF
+            _ <- eventValidator
+              .validate(serializedEvent)
+              .leftMap[SequencerClientSubscriptionError](EventValidationError)
             _ <- notifySendTracker(serializedEvent)
           } yield {
             batchAndCallHandler()
@@ -889,9 +829,10 @@ class SequencerClient(
     * or [[com.digitalasset.canton.lifecycle.UnlessShutdown.AbortedDueToShutdown]]
     * then [[applicationHandlerFailure]] contains an error.
     */
-  private def processEventBatch[Box[+X <: Envelope[_]] <: PossiblyIgnoredSequencedEvent[
-    X
-  ], Env <: Envelope[_]](
+  private def processEventBatch[
+      Box[+X <: Envelope[_]] <: PossiblyIgnoredSequencedEvent[X],
+      Env <: Envelope[_],
+  ](
       eventHandler: ApplicationHandler[Lambda[`+X <: Envelope[_]` => Traced[Seq[Box[X]]]], Env],
       eventBatch: Seq[Box[Env]],
   ): EitherT[Future, ApplicationHandlerFailure, Unit] =
@@ -1034,18 +975,23 @@ class SequencerClient(
     }
   }
 
+  /** Acknowledge that we have successfully processed all events up to and including the given timestamp.
+    * The client should then never subscribe for events from before this point.
+    */
+  private[client] def acknowledge(timestamp: CantonTimestamp)(implicit
+      traceContext: TraceContext
+  ): Future[Unit] =
+    transport.acknowledge(member, timestamp)
+
   def changeTransport(
-      sequencerClientTransport: SequencerClientTransport
+      newTransport: SequencerClientTransport
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    val oldTransport = currentTransport.getAndSet(sequencerClientTransport)
+    val oldTransport = currentTransport.getAndSet(newTransport)
     currentSubscription
       .get()
-      .map(_.factory)
-      .map(subscriptionFactory =>
-        subscriptionFactory.create(sequencerClientTransport, replaceExisting = true)
-      )
+      .map(_.resubscribeOnTransportChange())
       .getOrElse(Future.unit)
-      .map(_ => oldTransport.close())
+      .thereafter { _ => oldTransport.close() }
   }
 
   /** Future which is completed when the client is not functional any more and is ready to be closed.
@@ -1054,7 +1000,7 @@ class SequencerClient(
   def completion: Future[SequencerClient.CloseReason] = closeReasonPromise.future
 
   def closeSubscription(): Unit = {
-    currentSubscription.getAndSet(None).foreach { case SubscriptionAndFactory(subscription, _) =>
+    currentSubscription.getAndSet(None).foreach { subscription =>
       import TraceContext.Implicits.Empty._
       logger.debug(s"Closing sequencer subscription...")
       subscription.close()
@@ -1186,17 +1132,27 @@ object SequencerClient {
             loggerFactory,
           )
           // pluggable send approach to support transitioning to the new async sends
-          validatorFactory = (args: EventValidatorFactoryArgs) =>
-            new SequencedEventValidator(
-              args.initialLastEventProcessedO,
-              args.unauthenticated,
-              config.optimisticSequencedEventValidation,
-              config.skipSequencedEventValidation,
-              domainId,
-              sequencerId,
-              syncCryptoApi,
-              loggerFactory,
-            )
+          validatorFactory = new SequencedEventValidatorFactory {
+            override def create(
+                initialLastEventProcessedO: Option[PossiblyIgnoredSerializedEvent],
+                unauthenticated: Boolean,
+            )(implicit loggingContext: NamedLoggingContext): SequencedEventValidator =
+              if (config.skipSequencedEventValidation) {
+                SequencedEventValidator.noValidation(domainId, sequencerId)(
+                  NamedLoggingContext(loggerFactory, TraceContext.empty)
+                )
+              } else {
+                new SequencedEventValidatorImpl(
+                  initialLastEventProcessedO,
+                  unauthenticated,
+                  config.optimisticSequencedEventValidation,
+                  domainId,
+                  sequencerId,
+                  syncCryptoApi,
+                  loggerFactory,
+                )
+              }
+          }
         } yield new SequencerClient(
           domainId,
           member,

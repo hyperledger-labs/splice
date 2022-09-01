@@ -22,6 +22,7 @@ import com.digitalasset.canton.topology.processing.{
 import com.digitalasset.canton.topology.transaction.LegalIdentityClaimEvidence.X509Cert
 import com.digitalasset.canton.topology.transaction._
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{LfPartyId, checked}
 
 import scala.Ordered.orderingToOrdered
@@ -202,7 +203,7 @@ trait PartyTopologySnapshotClient {
       check: (ParticipantPermission => Boolean) = _.isActive,
   ): EitherT[Future, Set[LfPartyId], Unit]
 
-  /** Returns true if there is at least one participant that can confirm */
+  /** Returns true if there is at least one participant that satisfies the predicate */
   def isHostedByAtLeastOneParticipantF(
       party: LfPartyId,
       check: ParticipantAttributes => Boolean,
@@ -347,7 +348,9 @@ trait DomainGovernanceSnapshotClient {
           // we must use zero as default change delay parameter, as otherwise static time tests will not work
           // however, once the domain has published the initial set of domain parameters, the zero time will be
           // adjusted.
-          topologyChangeDelay = DynamicDomainParameters.topologyChangeDelayIfAbsent
+          topologyChangeDelay = DynamicDomainParameters.topologyChangeDelayIfAbsent,
+          protocolVersion =
+            ProtocolVersion.latest, // TODO(#9900) remove this hardcoded representative protocol version
         )
     }
 

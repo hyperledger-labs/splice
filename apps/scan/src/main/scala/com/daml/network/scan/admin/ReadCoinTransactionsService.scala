@@ -10,7 +10,7 @@ import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history._
 import com.daml.network.scan.store.ScanCCHistoryStore
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
-import com.digitalasset.canton.ledger.api.client.DecodeUtil
+import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId

@@ -3,12 +3,12 @@
 // architecture-handbook-entry-begin: topology
 
 // update parameters
-iou.service.update_dynamic_parameters(
-  _.copy(transferExclusivityTimeout = TimeoutDuration.Zero)
+iou.service.update_dynamic_domain_parameters(
+  _.update(transferExclusivityTimeout = Duration.Zero)
 ) // disables automatic transfer-in
 
-paint.service.update_dynamic_parameters(
-  _.copy(transferExclusivityTimeout = TimeoutDuration.ofSeconds(2))
+paint.service.update_dynamic_domain_parameters(
+  _.update(transferExclusivityTimeout = 2.seconds)
 )
 
 // connect participants to the domain
@@ -45,7 +45,7 @@ participants.all.dars.upload(darPath)
 // architecture-handbook-entry-begin: imports
 import com.digitalasset.canton.examples.Iou.{Amount, Iou}
 import com.digitalasset.canton.examples.Paint.{OfferToPaintHouseByOwner, PaintHouse}
-import com.digitalasset.canton.ledger.api.client.DecodeUtil.decodeAllCreated
+import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil.decodeAllCreated
 import com.digitalasset.canton.protocol.ContractIdSyntax._
 // architecture-handbook-entry-end: imports
 

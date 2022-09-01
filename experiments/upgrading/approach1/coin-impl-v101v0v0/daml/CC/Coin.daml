@@ -11,8 +11,8 @@ template Coin
   where
     signatory svc, owner
 
-    implements CoinApi.Coin where
-      coin_View = CoinApi.CoinView with
+    interface instance CoinApi.Coin for Coin where
+      view = CoinApi.CoinView with
         svc
         owner
         quantity
@@ -24,9 +24,9 @@ template LockedCoin
   where
     signatory signatory coin, lock.holder
 
-    implements CoinApi.LockedCoin where
-      lockedCoin_View = CoinApi.LockedCoinView with
-        coin = CoinApi.coin_View coin
+    interface instance CoinApi.LockedCoin for LockedCoin where
+      view = CoinApi.LockedCoinView with
+        coin = Prelude.view (toInterface @CoinApi.Coin this.coin)
         lock
 
 -- | The right to claim coin issuances for a user's burns as their validator.
@@ -40,8 +40,8 @@ template ValidatorRight with
     key this : ValidatorRight
     maintainer key.user, key.validator
 
-    implements CoinApi.ValidatorRight where
-      validatorRight_View = CoinApi.ValidatorRightView with
+    interface instance CoinApi.ValidatorRight for ValidatorRight where
+      view = CoinApi.ValidatorRightView with
         svc
         user
         validator
@@ -58,8 +58,8 @@ template AppReward
     signatory svc, owner
     ensure quantity > 0.0
 
-    implements CoinApi.AppReward where
-      appReward_View = CoinApi.AppRewardView with
+    interface instance CoinApi.AppReward for AppReward where
+      view = CoinApi.AppRewardView with
         svc
         owner
         quantity
@@ -75,8 +75,8 @@ template ValidatorReward
     signatory svc, user
     ensure quantity > 0.0
 
-    implements CoinApi.ValidatorReward where
-      validatorReward_View = CoinApi.ValidatorRewardView with
+    interface instance CoinApi.ValidatorReward for ValidatorReward where
+      view = CoinApi.ValidatorRewardView with
         svc
         user
         quantity

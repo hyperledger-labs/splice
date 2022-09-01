@@ -7,7 +7,7 @@ import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.svc.v0
 import com.daml.network.svc.v0.SvcServiceGrpc
 import com.daml.network.util.{CoinUtil, Proto}
-import com.digitalasset.canton.ledger.api.client.{DecodeUtil, LedgerConnection}
+import com.digitalasset.canton.participant.ledger.api.client.{DecodeUtil, LedgerConnection}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
@@ -87,12 +87,7 @@ class GrpcSvcAppService(
         cmds = validators.toList.map(v =>
           CC.CoinRules.CoinRules
             .key(DA.Types.Tuple2(svc.toPrim, v.toPrim))
-            .exerciseCoinRules_MiningRound_Open(
-              svc.toPrim,
-              CC.CoinRules.CoinRules_MiningRound_Open(
-                price
-              ),
-            )
+            .exerciseCoinRules_MiningRound_Open(price)
             .command
         )
         // For now we submit one command per validator. We could do some batching here but given
@@ -117,10 +112,7 @@ class GrpcSvcAppService(
         cmds = openRounds.toList.map { case (v, cid) =>
           CC.CoinRules.CoinRules
             .key(DA.Types.Tuple2(svc.toPrim, v))
-            .exerciseCoinRules_MiningRound_StartClosing(
-              svc.toPrim,
-              CC.CoinRules.CoinRules_MiningRound_StartClosing(cid),
-            )
+            .exerciseCoinRules_MiningRound_StartClosing(cid)
             .command
         }
         submitResults <- cmds.traverse { cmd =>
@@ -145,11 +137,7 @@ class GrpcSvcAppService(
         cmds = openRounds.toList.map { case (v, cid) =>
           CC.CoinRules.CoinRules
             .key(DA.Types.Tuple2(svc.toPrim, v))
-            .exerciseCoinRules_MiningRound_StartIssuing(
-              svc.toPrim,
-              CC.CoinRules
-                .CoinRules_MiningRound_StartIssuing(cid, totalBurn),
-            )
+            .exerciseCoinRules_MiningRound_StartIssuing(cid, totalBurn)
             .command
         }
         submitResults <- cmds.traverse { cmd =>
@@ -171,10 +159,7 @@ class GrpcSvcAppService(
         cmds = openRounds.toList.map { case (v, cid) =>
           CC.CoinRules.CoinRules
             .key(DA.Types.Tuple2(svc.toPrim, v))
-            .exerciseCoinRules_MiningRound_Close(
-              svc.toPrim,
-              CC.CoinRules.CoinRules_MiningRound_Close(cid),
-            )
+            .exerciseCoinRules_MiningRound_Close(cid)
             .command
         }
         submitResults <- cmds.traverse { cmd =>
@@ -195,10 +180,7 @@ class GrpcSvcAppService(
         cmds = openRounds.toList.map { case (v, cid) =>
           CC.CoinRules.CoinRules
             .key(DA.Types.Tuple2(svc.toPrim, v))
-            .exerciseCoinRules_MiningRound_Archive(
-              svc.toPrim,
-              CC.CoinRules.CoinRules_MiningRound_Archive(cid),
-            )
+            .exerciseCoinRules_MiningRound_Archive(cid)
             .command
         }
         _ <- cmds.traverse_ { cmd =>

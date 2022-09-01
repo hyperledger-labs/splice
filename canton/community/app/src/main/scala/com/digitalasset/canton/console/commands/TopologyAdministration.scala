@@ -9,8 +9,8 @@ import cats.syntax.traverseFilter._
 import com.daml.lf.data.Ref.PackageId
 import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.admin.api.client.commands.TopologyAdminCommands
-import com.digitalasset.canton.admin.api.client.data._
-import com.digitalasset.canton.config.TimeoutDuration
+import com.digitalasset.canton.admin.api.client.data.console._
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
   ConsoleCommandResult,
@@ -31,13 +31,14 @@ import com.digitalasset.canton.crypto.{
 }
 import com.digitalasset.canton.health.admin.data.TopologyQueueStatus
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.protocol.DynamicDomainParameters
+import com.digitalasset.canton.protocol.{DynamicDomainParameters => DomainDynamicDomainParameters}
+import com.digitalasset.canton.topology._
 import com.digitalasset.canton.topology.admin.grpc.BaseQuery
 import com.digitalasset.canton.topology.store.TopologyStoreId.AuthorizedStore
 import com.digitalasset.canton.topology.store.{StoredTopologyTransactions, TimeQuery}
 import com.digitalasset.canton.topology.transaction.LegalIdentityClaimEvidence.X509Cert
 import com.digitalasset.canton.topology.transaction._
-import com.digitalasset.canton.topology.{DomainId, _}
+import com.digitalasset.canton.version.ProtocolVersion
 import com.google.protobuf.ByteString
 
 import java.util.concurrent.atomic.AtomicReference
@@ -126,7 +127,7 @@ class TopologyAdministrationGroup(
     @Help.Summary("Wait until the topology processing of a node is idle")
     @Help.Description("""This function waits until the `is_idle()` function returns true.""")
     def await_idle(
-        timeout: TimeoutDuration = consoleEnvironment.commandTimeouts.bounded
+        timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.bounded
     ): Unit =
       ConsoleMacros.utils.retry_until_true(timeout)(
         is_idle(),
@@ -134,7 +135,7 @@ class TopologyAdministrationGroup(
       )
 
     /** run a topology change command synchronized and wait until the node becomes idle again */
-    private[console] def run[T](timeout: Option[TimeoutDuration])(func: => T): T = {
+    private[console] def run[T](timeout: Option[NonNegativeDuration])(func: => T): T = {
       val ret = func
       ConsoleMacros.utils.synchronize_topology(timeout)(consoleEnvironment)
       ret
@@ -194,7 +195,7 @@ class TopologyAdministrationGroup(
         authorizedKey: Fingerprint,
         isRootDelegation: Boolean = false,
         signedBy: Option[Fingerprint] = None,
-        synchronize: Option[TimeoutDuration] = Some(
+        synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
     ): ByteString =
@@ -220,6 +221,7 @@ class TopologyAdministrationGroup(
         filterSigningKey: Filter for transactions that are authorized with a key that starts with the given filter string.
         filterNamespace: Filter for namespaces starting with the given filter string.
         filterTargetKey: Filter for namespaces delegations for the given target key.
+        protocolVersion: Export the topology transactions in the optional protocol version.
         """)
     def list(
         filterStore: String = "",
@@ -229,11 +231,19 @@ class TopologyAdministrationGroup(
         filterNamespace: String = "",
         filterSigningKey: String = "",
         filterTargetKey: Option[Fingerprint] = None,
+        protocolVersion: Option[String] = None,
     ): Seq[ListNamespaceDelegationResult] = {
       val delegations = consoleEnvironment.run {
         adminCommand(
           TopologyAdminCommands.Read.ListNamespaceDelegation(
-            BaseQuery(filterStore, useStateStore, timeQuery, operation, filterSigningKey),
+            BaseQuery(
+              filterStore,
+              useStateStore,
+              timeQuery,
+              operation,
+              filterSigningKey,
+              protocolVersion.map(ProtocolVersion.tryCreate),
+            ),
             filterNamespace,
           )
         )
@@ -266,7 +276,7 @@ class TopologyAdministrationGroup(
         identifier: UniqueIdentifier,
         authorizedKey: Fingerprint,
         signedBy: Option[Fingerprint] = None,
-        synchronize: Option[TimeoutDuration] = Some(
+        synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
     ): ByteString =
@@ -290,8 +300,8 @@ class TopologyAdministrationGroup(
                    TimeQuery.Range(fromO, toO): Time-range of when the transaction was added to the store
         operation: Optionally, what type of operation the transaction should have. State store only has "Add".
         filterSigningKey: Filter for transactions that are authorized with a key that starts with the given filter string.
-
         filterUid: Filter for unique identifiers starting with the given filter string.
+        protocolVersion: Export the topology transactions in the optional protocol version.
         |""")
     def list(
         filterStore: String = "",
@@ -301,11 +311,19 @@ class TopologyAdministrationGroup(
         filterUid: String = "",
         filterSigningKey: String = "",
         filterTargetKey: Option[Fingerprint] = None,
+        protocolVersion: Option[String] = None,
     ): Seq[ListIdentifierDelegationResult] = {
       val delegations = consoleEnvironment.run {
         adminCommand(
           TopologyAdminCommands.Read.ListIdentifierDelegation(
-            BaseQuery(filterStore, useStateStore, timeQuery, operation, filterSigningKey),
+            BaseQuery(
+              filterStore,
+              useStateStore,
+              timeQuery,
+              operation,
+              filterSigningKey,
+              protocolVersion.map(ProtocolVersion.tryCreate),
+            ),
             filterUid,
           )
         )
@@ -343,7 +361,7 @@ class TopologyAdministrationGroup(
         key: Fingerprint,
         purpose: KeyPurpose,
         signedBy: Option[Fingerprint] = None,
-        synchronize: Option[TimeoutDuration] = Some(
+        synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
         force: Boolean = false,
@@ -372,6 +390,7 @@ class TopologyAdministrationGroup(
         filterKeyOwnerType: Filter for a particular type of key owner (KeyOwnerCode).
         filterKeyOwnerUid: Filter for key owners unique identifier starting with the given filter string.
         filterKeyPurpose: Filter for keys with a particular purpose (Encryption or Signing)
+        protocolVersion: Export the topology transactions in the optional protocol version.
         |""")
     def list(
         filterStore: String = "",
@@ -382,11 +401,19 @@ class TopologyAdministrationGroup(
         filterKeyOwnerUid: String = "",
         filterKeyPurpose: Option[KeyPurpose] = None,
         filterSigningKey: String = "",
+        protocolVersion: Option[String] = None,
     ): Seq[ListOwnerToKeyMappingResult] =
       consoleEnvironment.run {
         adminCommand(
           TopologyAdminCommands.Read.ListOwnerToKeyMapping(
-            BaseQuery(filterStore, useStateStore, timeQuery, operation, filterSigningKey),
+            BaseQuery(
+              filterStore,
+              useStateStore,
+              timeQuery,
+              operation,
+              filterSigningKey,
+              protocolVersion.map(ProtocolVersion.tryCreate),
+            ),
             filterKeyOwnerType,
             filterKeyOwnerUid,
             filterKeyPurpose,
@@ -459,7 +486,7 @@ class TopologyAdministrationGroup(
         side: RequestSide = RequestSide.Both,
         permission: ParticipantPermission = ParticipantPermission.Submission,
         signedBy: Option[Fingerprint] = None,
-        synchronize: Option[TimeoutDuration] = Some(
+        synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
         replaceExisting: Boolean = true,
@@ -501,6 +528,7 @@ class TopologyAdministrationGroup(
         filterParty: Filter for parties starting with the given filter string.
         filterParticipant: Filter for participants starting with the given filter string.
         filterRequestSide: Optional filter for a particular request side (Both, From, To).
+        protocolVersion: Export the topology transactions in the optional protocol version.
         |"""
     )
     def list(
@@ -513,11 +541,19 @@ class TopologyAdministrationGroup(
         filterRequestSide: Option[RequestSide] = None,
         filterPermission: Option[ParticipantPermission] = None,
         filterSigningKey: String = "",
+        protocolVersion: Option[String] = None,
     ): Seq[ListPartyToParticipantResult] =
       consoleEnvironment.run {
         adminCommand(
           TopologyAdminCommands.Read.ListPartyToParticipant(
-            BaseQuery(filterStore, useStateStore, timeQuery, operation, filterSigningKey),
+            BaseQuery(
+              filterStore,
+              useStateStore,
+              timeQuery,
+              operation,
+              filterSigningKey,
+              protocolVersion.map(ProtocolVersion.tryCreate),
+            ),
             filterParty,
             filterParticipant,
             filterRequestSide,
@@ -542,6 +578,7 @@ class TopologyAdministrationGroup(
                    TimeQuery.Range(fromO, toO): Time-range of when the transaction was added to the store
         operation: Optionally, what type of operation the transaction should have. State store only has "Add".
         filterAuthorizedKey: Filter the topology transactions by the key that has authorized the transactions.
+        protocolVersion: Export the topology transactions in the optional protocol version.
         |"""
     )
     def list(
@@ -550,12 +587,20 @@ class TopologyAdministrationGroup(
         timeQuery: TimeQuery = TimeQuery.HeadState,
         operation: Option[TopologyChangeOp] = None,
         filterAuthorizedKey: Option[Fingerprint] = None,
+        protocolVersion: Option[String] = None,
     ): StoredTopologyTransactions[TopologyChangeOp] = {
       val storedTransactions = consoleEnvironment
         .run {
           adminCommand(
             TopologyAdminCommands.Read.ListAll(
-              BaseQuery(filterStore, useStateStore, timeQuery, operation, filterSigningKey = "")
+              BaseQuery(
+                filterStore,
+                useStateStore,
+                timeQuery,
+                operation,
+                filterSigningKey = "",
+                protocolVersion.map(ProtocolVersion.tryCreate),
+              )
             )
           )
         }
@@ -759,7 +804,7 @@ class TopologyAdministrationGroup(
             case DomainGovernanceTransaction(element) =>
               element.mapping match {
                 case DomainParametersChange(domainId, domainParameters) =>
-                  domain_parameters_changes.authorize(
+                  domain_parameters_changes.authorizeInternal(
                     domainId,
                     domainParameters,
                     authorizeWith.some,
@@ -796,6 +841,7 @@ class TopologyAdministrationGroup(
 
         filterDomain: Filter for domains starting with the given filter string.
         filterParticipant: Filter for participants starting with the given filter string.
+        protocolVersion: Export the topology transactions in the optional protocol version.
         |""")
     def list(
         filterStore: String = "",
@@ -805,11 +851,19 @@ class TopologyAdministrationGroup(
         filterDomain: String = "",
         filterParticipant: String = "",
         filterSigningKey: String = "",
+        protocolVersion: Option[String] = None,
     ): Seq[ListParticipantDomainStateResult] =
       consoleEnvironment.run {
         adminCommand(
           TopologyAdminCommands.Read.ListParticipantDomainState(
-            BaseQuery(filterStore, useStateStore, timeQuery, operation, filterSigningKey),
+            BaseQuery(
+              filterStore,
+              useStateStore,
+              timeQuery,
+              operation,
+              filterSigningKey,
+              protocolVersion.map(ProtocolVersion.tryCreate),
+            ),
             filterDomain,
             filterParticipant,
           )
@@ -842,7 +896,7 @@ class TopologyAdministrationGroup(
         permission: ParticipantPermission = ParticipantPermission.Submission,
         trustLevel: TrustLevel = TrustLevel.Ordinary,
         signedBy: Option[Fingerprint] = None,
-        synchronize: Option[TimeoutDuration] = Some(
+        synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
         replaceExisting: Boolean = true,
@@ -909,6 +963,7 @@ class TopologyAdministrationGroup(
 
         filterDomain: Filter for domains starting with the given filter string.
         filterMediator Filter for mediators starting with the given filter string.
+        protocolVersion: Export the topology transactions in the optional protocol version.
         |""")
     def list(
         filterStore: String = "",
@@ -918,11 +973,19 @@ class TopologyAdministrationGroup(
         filterDomain: String = "",
         filterMediator: String = "",
         filterSigningKey: String = "",
+        protocolVersion: Option[String] = None,
     ): Seq[ListMediatorDomainStateResult] =
       consoleEnvironment.run {
         adminCommand(
           TopologyAdminCommands.Read.ListMediatorDomainState(
-            BaseQuery(filterStore, useStateStore, timeQuery, operation, filterSigningKey),
+            BaseQuery(
+              filterStore,
+              useStateStore,
+              timeQuery,
+              operation,
+              filterSigningKey,
+              protocolVersion.map(ProtocolVersion.tryCreate),
+            ),
             filterDomain,
             filterMediator,
           )
@@ -951,7 +1014,7 @@ class TopologyAdministrationGroup(
         mediator: MediatorId,
         side: RequestSide,
         signedBy: Option[Fingerprint] = None,
-        synchronize: Option[TimeoutDuration] = Some(
+        synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
         replaceExisting: Boolean = true,
@@ -989,8 +1052,8 @@ class TopologyAdministrationGroup(
                    TimeQuery.Range(fromO, toO): Time-range of when the transaction was added to the store
         operation: Optionally, what type of operation the transaction should have. State store only has "Add".
         filterSigningKey: Filter for transactions that are authorized with a key that starts with the given filter string.
-
         filterUid: Filter for unique identifiers starting with the given filter string.
+        protocolVersion: Export the topology transactions in the optional protocol version.
         |"""
     )
     def list(
@@ -1000,13 +1063,21 @@ class TopologyAdministrationGroup(
         operation: Option[TopologyChangeOp] = None,
         filterUid: String = "",
         filterSigningKey: String = "",
+        protocolVersion: Option[String] = None,
     ): Seq[ListSignedLegalIdentityClaimResult] =
       check(FeatureFlag.Preview) {
         consoleEnvironment.run {
           adminCommand(
             TopologyAdminCommands.Read
               .ListSignedLegalIdentityClaim(
-                BaseQuery(filterStore, useStateStore, timeQuery, operation, filterSigningKey),
+                BaseQuery(
+                  filterStore,
+                  useStateStore,
+                  timeQuery,
+                  operation,
+                  filterSigningKey,
+                  protocolVersion.map(ProtocolVersion.tryCreate),
+                ),
                 filterUid,
               )
           )
@@ -1084,7 +1155,7 @@ class TopologyAdministrationGroup(
         ops: TopologyChangeOp,
         claim: SignedLegalIdentityClaim,
         signedBy: Option[Fingerprint] = None,
-        synchronize: Option[TimeoutDuration] = Some(
+        synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
     ): ByteString = check(FeatureFlag.Preview) {
@@ -1125,7 +1196,7 @@ class TopologyAdministrationGroup(
         participant: ParticipantId,
         packageIds: Seq[PackageId],
         signedBy: Option[Fingerprint] = None,
-        synchronize: Option[TimeoutDuration] = Some(
+        synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
         force: Boolean = false,
@@ -1152,8 +1223,8 @@ class TopologyAdministrationGroup(
                    TimeQuery.Range(fromO, toO): Time-range of when the transaction was added to the store
         operation: Optionally, what type of operation the transaction should have. State store only has "Add".
         filterSigningKey: Filter for transactions that are authorized with a key that starts with the given filter string.
-
         filterParticipant: Filter for participants starting with the given filter string.
+        protocolVersion: Export the topology transactions in the optional protocol version.
         |"""
     )
     def list(
@@ -1163,11 +1234,19 @@ class TopologyAdministrationGroup(
         operation: Option[TopologyChangeOp] = None,
         filterParticipant: String = "",
         filterSigningKey: String = "",
+        protocolVersion: Option[String] = None,
     ): Seq[ListVettedPackagesResult] =
       consoleEnvironment.run {
         adminCommand(
           TopologyAdminCommands.Read.ListVettedPackages(
-            BaseQuery(filterStore, useStateStore, timeQuery, operation, filterSigningKey),
+            BaseQuery(
+              filterStore,
+              useStateStore,
+              timeQuery,
+              operation,
+              filterSigningKey,
+              protocolVersion.map(ProtocolVersion.tryCreate),
+            ),
             filterParticipant,
           )
         )
@@ -1182,22 +1261,58 @@ class TopologyAdministrationGroup(
     @Help.Description("""Authorize a transaction to change parameters of the domain.
       |domainId: Id of the domain affected by the change.
       |newParameters: New value of the domain parameters.
+      |protocolVersion: The protocol version of the domain
       |signedBy: Refers to the fingerprint of the authorizing key which in turn must be authorized by a valid, locally existing certificate.
       |          If none is given, a key is automatically determined.
       |synchronize: Synchronize timeout can be used to ensure that the state has been propagated into the node
+      |force: Enable potentially dangerous changes. Required to increase ``ledgerTimeRecordTimeTolerance``.
+      |
+      |Use ``myDomain.service.set_ledger_time_record_time_tolerance`` to securely increase ``ledgerTimeRecordTimeTolerance``.
       """)
     def authorize(
         domainId: DomainId,
         newParameters: DynamicDomainParameters,
+        protocolVersion: ProtocolVersion,
         signedBy: Option[Fingerprint] = None,
-        synchronize: Option[TimeoutDuration] = Some(
+        synchronize: Option[NonNegativeDuration] = Some(
+          consoleEnvironment.commandTimeouts.bounded
+        ),
+        force: Boolean = false,
+    ): ByteString = {
+      synchronisation.run(synchronize)(
+        consoleEnvironment.run {
+          adminCommand(
+            TopologyAdminCommands.Write
+              .AuthorizeDomainParametersChange(
+                signedBy,
+                domainId,
+                newParameters,
+                protocolVersion,
+                force,
+              )
+          )
+        }
+      )
+    }
+
+    // This method accepts parameters in the internal format; used by [[all.renew]] above
+    private[TopologyAdministrationGroup] def authorizeInternal(
+        domainId: DomainId,
+        newParameters: DomainDynamicDomainParameters,
+        signedBy: Option[Fingerprint] = None,
+        synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
     ): ByteString = synchronisation.run(synchronize)(
       consoleEnvironment.run {
         adminCommand(
           TopologyAdminCommands.Write
-            .AuthorizeDomainParametersChange(signedBy, domainId, newParameters, force = false)
+            .AuthorizeDomainParametersChangeInternal(
+              signedBy,
+              domainId,
+              newParameters,
+              force = false,
+            )
         )
       }
     )
@@ -1225,6 +1340,7 @@ class TopologyAdministrationGroup(
                    TimeQuery.Snapshot(ts): The state at a certain point in time.
                    TimeQuery.Range(fromO, toO): Time-range of when the transaction was added to the store
         filterSigningKey: Filter for transactions that are authorized with a key that starts with the given filter string.
+        protocolVersion: Export the topology transactions in the optional protocol version.
         |"""
     )
     def list(
@@ -1232,6 +1348,7 @@ class TopologyAdministrationGroup(
         useStateStore: Boolean = true,
         timeQuery: TimeQuery = TimeQuery.HeadState,
         filterSigningKey: String = "",
+        protocolVersion: Option[String] = None,
     ): Seq[ListDomainParametersChangeResult] = {
       val baseQuery = BaseQuery(
         filterStore = filterStore,
@@ -1239,6 +1356,7 @@ class TopologyAdministrationGroup(
         timeQuery = timeQuery,
         ops = None,
         filterSigningKey = filterSigningKey,
+        protocolVersion = protocolVersion.map(ProtocolVersion.tryCreate),
       )
 
       consoleEnvironment.run {

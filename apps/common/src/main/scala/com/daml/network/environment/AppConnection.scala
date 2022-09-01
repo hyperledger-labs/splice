@@ -23,7 +23,7 @@ abstract class AppConnection(
     extends FlagCloseableAsync
     with NamedLogging {
   private val channel = new CloseableChannel(
-    ClientChannelBuilder.createChannel(config),
+    ClientChannelBuilder.createChannelToTrustedServer(config),
     logger,
     s"$serviceName connection",
   )

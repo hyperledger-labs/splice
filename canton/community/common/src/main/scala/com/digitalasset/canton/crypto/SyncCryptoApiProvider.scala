@@ -25,9 +25,11 @@ import com.digitalasset.canton.topology.client.{
   TopologySnapshot,
 }
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.LoggerUtil
 import com.digitalasset.canton.version.{HasVersionedToByteString, ProtocolVersion}
 import com.digitalasset.canton.{DomainAlias, checked}
 import com.google.protobuf.ByteString
+import org.slf4j.event.Level
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
@@ -122,7 +124,6 @@ object SyncCryptoClient {
       client: SyncCryptoClient[SyncCryptoApi],
       desiredTimestamp: CantonTimestamp,
       previousTimestampO: Option[CantonTimestamp],
-      protocolVersion: ProtocolVersion,
       warnIfApproximate: Boolean = true,
   )(implicit
       executionContext: ExecutionContext,
@@ -138,15 +139,12 @@ object SyncCryptoClient {
       )
       previousTimestampO match {
         case None =>
-          lazy val msg =
-            s"Using approximate topology snapshot for desired timestamp $desiredTimestamp"
-          if (warnIfApproximate && protocolVersion != ProtocolVersion.v2_0_0)
-            loggingContext.logger.warn(msg)
-          else
-            loggingContext.logger.info(
-              s"Using approximate topology snapshot for desired timestamp $desiredTimestamp"
-            )
-          Future.successful(client.currentSnapshotApproximation)
+          val approximateSnapshot = client.currentSnapshotApproximation
+          LoggerUtil.logAtLevel(
+            if (warnIfApproximate) Level.WARN else Level.INFO,
+            s"Using approximate topology snapshot at ${approximateSnapshot.ipsSnapshot.timestamp} for desired timestamp $desiredTimestamp",
+          )
+          Future.successful(approximateSnapshot)
         case Some(previousTimestamp) =>
           if (desiredTimestamp <= previousTimestamp.immediateSuccessor)
             client.awaitSnapshotSupervised(
@@ -341,10 +339,6 @@ class DomainSnapshotSyncCryptoApi(
   ): Future[Map[Fingerprint, SigningPublicKey]] =
     ipsSnapshot.signingKeys(owner).map(_.map(x => (x.fingerprint, x)).toMap)
 
-  /** Verify signature of a given owner
-    *
-    * Convenience method to lookup a key of a given owner, domain and timestamp and verify the result.
-    */
   override def verifySignature(
       hash: Hash,
       signer: KeyOwner,
@@ -372,13 +366,6 @@ class DomainSnapshotSyncCryptoApi(
       validKeys.get(signature.signedBy) match {
         case Some(key) =>
           EitherT.fromEither(crypto.pureCrypto.verifySignature(hash, key, signature))
-        case None if signer.uid == domainId.unwrap && signer.code == SequencerId.Code =>
-          // skip signature verification if we are not yet initialized
-          // TODO(i4639) improve the situation such that we don't have to trust TLS upon reconnect/initial connect
-          ownerIsInitialized(keysAsSeq).subflatMap {
-            case false => Right(())
-            case true => signatureCheckFailed(keysAsSeq)
-          }
         case None =>
           EitherT.fromEither(signatureCheckFailed(keysAsSeq))
       }
@@ -390,7 +377,7 @@ class DomainSnapshotSyncCryptoApi(
   ): EitherT[Future, SignatureCheckError, Boolean] =
     owner match {
       case participant: ParticipantId => EitherT.right(ipsSnapshot.isParticipantActive(participant))
-      case _ => // we assume that a member other than a participant is initialised if at least one valid sequencer key is known
+      case _ => // we assume that a member other than a participant is initialised if at least one valid key is known
         EitherT.rightT(validKeys.nonEmpty)
     }
 

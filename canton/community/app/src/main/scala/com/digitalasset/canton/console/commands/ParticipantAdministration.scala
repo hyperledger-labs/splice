@@ -17,8 +17,11 @@ import com.digitalasset.canton.admin.api.client.commands.{
   LedgerApiCommands,
   ParticipantAdminCommands,
 }
-import com.digitalasset.canton.admin.api.client.data.ListConnectedDomainsResult
-import com.digitalasset.canton.config.TimeoutDuration
+import com.digitalasset.canton.admin.api.client.data.console.{
+  DarMetadata,
+  ListConnectedDomainsResult,
+}
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
   BaseInspection,
@@ -196,7 +199,7 @@ class ParticipantTestingGroup(
   def bong(
       targets: Set[ParticipantId],
       validators: Set[ParticipantId] = Set(),
-      timeout: TimeoutDuration = consoleEnvironment.commandTimeouts.testingBong,
+      timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.testingBong,
       levels: Long = 0,
       gracePeriodMillis: Long = 1000,
       workflowId: String = "",
@@ -214,7 +217,7 @@ class ParticipantTestingGroup(
   def maybe_bong(
       targets: Set[ParticipantId],
       validators: Set[ParticipantId] = Set(),
-      timeout: TimeoutDuration = consoleEnvironment.commandTimeouts.testingBong,
+      timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.testingBong,
       levels: Long = 0,
       gracePeriodMillis: Long = 1000,
       workflowId: String = "",
@@ -238,7 +241,7 @@ class ParticipantTestingGroup(
   @Help.Summary("Fetch the current time from the given domain", FeatureFlag.Testing)
   def fetch_domain_time(
       domainAlias: DomainAlias,
-      timeout: TimeoutDuration,
+      timeout: NonNegativeDuration,
   ): CantonTimestamp =
     check(FeatureFlag.Testing) {
       val id = participantRef.domains.id_of(domainAlias)
@@ -248,7 +251,7 @@ class ParticipantTestingGroup(
   @Help.Summary("Fetch the current time from the given domain", FeatureFlag.Testing)
   def fetch_domain_time(
       domainId: DomainId,
-      timeout: TimeoutDuration = consoleEnvironment.commandTimeouts.ledgerCommand,
+      timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.ledgerCommand,
   ): CantonTimestamp =
     check(FeatureFlag.Testing) {
       consoleEnvironment.run {
@@ -264,7 +267,7 @@ class ParticipantTestingGroup(
 
   @Help.Summary("Fetch the current time from all connected domains", FeatureFlag.Testing)
   def fetch_domain_times(
-      timeout: TimeoutDuration = consoleEnvironment.commandTimeouts.ledgerCommand
+      timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.ledgerCommand
   ): Unit =
     check(FeatureFlag.Testing) {
       participantRef.domains.list_connected().foreach { item =>
@@ -276,7 +279,7 @@ class ParticipantTestingGroup(
   def await_domain_time(
       domainAlias: DomainAlias,
       time: CantonTimestamp,
-      timeout: TimeoutDuration,
+      timeout: NonNegativeDuration,
   ): Unit =
     check(FeatureFlag.Testing) {
       val id = participantRef.domains.id_of(domainAlias)
@@ -287,7 +290,7 @@ class ParticipantTestingGroup(
   def await_domain_time(
       domainId: DomainId,
       time: CantonTimestamp,
-      timeout: TimeoutDuration = consoleEnvironment.commandTimeouts.ledgerCommand,
+      timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.ledgerCommand,
   ): Unit =
     check(FeatureFlag.Testing) {
       consoleEnvironment.run {
@@ -706,8 +709,23 @@ trait ParticipantAdministration extends FeatureFlagFilter {
     }
 
     @Help.Summary("List installed DAR files")
-    def list(limit: Option[Int] = None): Seq[v0.DarDescription] = consoleEnvironment.run {
-      adminCommand(ParticipantAdminCommands.Package.ListDars(limit: Option[Int]))
+    @Help.Description("""List DARs installed on this participant
+      |The arguments are:
+      |  filterName: filter by name (source description)
+      |  limit: Limit number of results (default none)
+      """)
+    def list(limit: Option[Int] = None, filterName: String = ""): Seq[v0.DarDescription] =
+      consoleEnvironment
+        .run {
+          adminCommand(ParticipantAdminCommands.Package.ListDars(limit: Option[Int]))
+        }
+        .filter(_.name.startsWith(filterName))
+
+    @Help.Summary("List contents of DAR files")
+    def list_contents(hash: String): DarMetadata = consoleEnvironment.run {
+      adminCommand(
+        ParticipantAdminCommands.Package.ListDarContents(hash)
+      )
     }
 
     @Help.Summary("Upload a Dar to Canton")
@@ -891,7 +909,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         |that commands are only submitted once the package vetting has been observed by some other connected participant
         |known to the console. This command can be used in such cases.""")
     def synchronize_vetting(
-        timeout: TimeoutDuration = consoleEnvironment.commandTimeouts.bounded
+        timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.bounded
     ): Unit = {
       val connected = domains.list_connected().map(_.domainId).toSet
       def vetted: Set[PackageId] = topology.vetted_packages
@@ -1073,7 +1091,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         alias: Option[DomainAlias] = None,
         maxRetryDelayMillis: Option[Long] = None,
         priority: Int = 0,
-        synchronize: Option[TimeoutDuration] = Some(
+        synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
     ): Unit = {
@@ -1104,7 +1122,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
 
     private def connectFromConfig(
         config: DomainConnectionConfig,
-        synchronize: Option[TimeoutDuration],
+        synchronize: Option[NonNegativeDuration],
     ): Unit = {
       val current = this.config(config.domain)
       // if the config did not change, we'll just treat this as idempotent, otherwise, we'll use register to fail
@@ -1163,7 +1181,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
         certificatesPath: String = "",
         priority: Int = 0,
         timeTrackerConfig: DomainTimeTrackerConfig = DomainTimeTrackerConfig(),
-        synchronize: Option[TimeoutDuration] = Some(
+        synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
     ): DomainConnectionConfig = {
@@ -1221,7 +1239,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
     def connect_multi(
         domainAlias: DomainAlias,
         connections: Seq[SequencerConnection],
-        synchronize: Option[TimeoutDuration] = Some(
+        synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
     ): DomainConnectionConfig = {
@@ -1247,7 +1265,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
     def reconnect(
         domainAlias: DomainAlias,
         retry: Boolean = true,
-        synchronize: Option[TimeoutDuration] = Some(
+        synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
     ): Boolean = {
@@ -1274,7 +1292,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
     def reconnect_local(
         ref: DomainReference,
         retry: Boolean = true,
-        synchronize: Option[TimeoutDuration] = Some(
+        synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
     ): Boolean = reconnect(ref.name, retry, synchronize)
@@ -1287,7 +1305,7 @@ trait ParticipantAdministration extends FeatureFlagFilter {
     """)
     def reconnect_all(
         ignoreFailures: Boolean = true,
-        synchronize: Option[TimeoutDuration] = Some(
+        synchronize: Option[NonNegativeDuration] = Some(
           consoleEnvironment.commandTimeouts.bounded
         ),
     ): Unit = {
@@ -1533,7 +1551,7 @@ class ParticipantHealthAdministration(
   )
   def ping(
       participantId: ParticipantId,
-      timeout: TimeoutDuration = consoleEnvironment.commandTimeouts.ping,
+      timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.ping,
       workflowId: String = "",
       id: String = "",
   ): Duration = {
@@ -1565,7 +1583,7 @@ class ParticipantHealthAdministration(
   )
   def maybe_ping(
       participantId: ParticipantId,
-      timeout: TimeoutDuration = consoleEnvironment.commandTimeouts.ping,
+      timeout: NonNegativeDuration = consoleEnvironment.commandTimeouts.ping,
       workflowId: String = "",
       id: String = "",
   ): Option[Duration] = check(FeatureFlag.Testing) {

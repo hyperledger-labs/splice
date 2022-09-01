@@ -40,7 +40,7 @@ template DirectoryRules with
         let expiresAt = addRelTime t requestDuration
             entryFee = dailyLeaseFee -- FIXME: properly scale the lease fee with entry duration
         coin <- fetch coinCid
-        let coinView = CoinIface.coin_View coin
+        let coinView = view coin
         assertMsg "Coin SVC and owner must match" ((ccSvc, entry.user) == (coinView.svc, coinView.owner))
 
         let transfer = CoinRulesIface.Transfer with

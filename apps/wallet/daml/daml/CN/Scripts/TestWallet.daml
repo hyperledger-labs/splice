@@ -103,8 +103,8 @@ template TestReference
     description : Text
   where
     signatory p
-    implements PaymentReference where
-      paymentReference_getDescription = description
+    interface instance PaymentReference for TestReference where
+      view = PaymentReferenceView with description
 
 
 acceptPaymentRequest : CCApp -> Party -> ContractId AppPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppPayment)

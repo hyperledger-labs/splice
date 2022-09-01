@@ -5,22 +5,24 @@ module OpenBusiness.Expiry where
 
 import CC.Round
 
--- | A contract which expires at some time.
-interface ExpiringContract where
+data ExpiringContractView = ExpiringContractView with
   -- | The round after which the contract is expired, and can be archived.
   contractExpiresAt : Round
-
   -- | The party charged with expiring the contract as soon as it expires.
   -- Other parties can expire the contract as well, but are expected to wait for some extra time to avoid contention.
   -- To prove that the contract is expired an active OpenMiningRound has to be presented.
   expiryManager : Party
 
+-- | A contract which expires at some time.
+interface ExpiringContract where
+  viewtype ExpiringContractView
+
   choice ExpiringContract_ExpireAsManager : ()
     with
       roundCid : ContractId OpenMiningRound
-    controller expiryManager this
+    controller (view this).expiryManager
     do round <- fetch roundCid
-       assertMsg "Contract expired" (contractExpiresAt this < round.round)
+       assertMsg "Contract expired" ((view this).contractExpiresAt < round.round)
 
   choice ExpiringContract_ExpireAsStakeholder : ()
     with
@@ -28,5 +30,5 @@ interface ExpiringContract where
       roundCid : ContractId OpenMiningRound
     controller actor
     do round <- fetch roundCid
-       assertMsg "Contract expired" (contractExpiresAt this < round.round)
+       assertMsg "Contract expired" ((view this).contractExpiresAt < round.round)
        assertMsg "Only stakeholders can expire" (actor `elem` stakeholder this)

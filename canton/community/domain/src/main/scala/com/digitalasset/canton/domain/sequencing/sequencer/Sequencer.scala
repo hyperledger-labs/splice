@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.domain.sequencing.sequencer
 
+import akka.Done
 import akka.stream.KillSwitch
 import akka.stream.scaladsl.Source
 import cats.data.EitherT
@@ -16,10 +17,13 @@ import com.digitalasset.canton.domain.sequencing.sequencer.errors.{
 }
 import com.digitalasset.canton.health.admin.data.SequencerHealthStatus
 import com.digitalasset.canton.lifecycle.{FlagCloseable, HasCloseContext}
-import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.{HasLoggerName, NamedLoggerFactory}
 import com.digitalasset.canton.sequencing._
-import com.digitalasset.canton.sequencing.protocol.{SendAsyncError, SubmissionRequest}
-import com.digitalasset.canton.time.NonNegativeFiniteDuration
+import com.digitalasset.canton.sequencing.protocol.{
+  DeliverErrorReason,
+  SendAsyncError,
+  SubmissionRequest,
+}
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
@@ -155,34 +159,33 @@ trait Sequencer extends FlagCloseable with HasCloseContext {
   def disableMember(member: Member)(implicit traceContext: TraceContext): Future[Unit]
 }
 
-object Sequencer {
-  type EventSource = Source[OrdinarySerializedEvent, KillSwitch]
+object Sequencer extends HasLoggerName {
 
-  def validateSigningTimestamp(
-      signingTolerance: NonNegativeFiniteDuration
-  )(now: CantonTimestamp, requestedSigningTimestamp: CantonTimestamp): Either[String256M, Unit] = {
-    val lowerBoundExcl = now.minus(signingTolerance.unwrap)
-    // TODO(i4638): The upper bound is too high. The highest acceptable value is the timestamp of the recent identity snapshot.
-    //  We should distinguish between a point in time that's truly in the future (then the sender is misbehaving) and
-    //  the sequencer not yet having caught up (we can then think about rejecting the SubmissionRequest
-    //  with an appropriate reason so that the sender can resend the request later).
-    val upperBoundIncl = now
+  /** The materialized future completes when all internal side-flows of the source have completed after the kill switch
+    * was pulled. Termination of the main flow must be awaited separately.
+    */
+  type EventSource = Source[OrdinarySerializedEvent, (KillSwitch, Future[Done])]
 
-    for {
-      _ <- Either.cond(
-        requestedSigningTimestamp > lowerBoundExcl,
-        (),
-        String256M.tryCreate(
-          s"Invalid signing timestamp $requestedSigningTimestamp. The signing timestamp must be strictly after $lowerBoundExcl."
-        ),
-      )
-      _ <- Either.cond(
-        requestedSigningTimestamp <= upperBoundIncl,
-        (),
-        String256M.tryCreate(
-          s"Invalid signing timestamp $requestedSigningTimestamp. The signing timestamp must be before or at $upperBoundIncl."
-        ),
-      )
-    } yield ()
+  // TODO(#5990) use an error code
+  def signingTimestampAfterSequencingTimestampError(
+      signingTimestamp: CantonTimestamp,
+      sequencingTimestamp: CantonTimestamp,
+  ): String256M =
+    String256M.tryCreate(
+      s"Invalid signing timestamp $signingTimestamp. The signing timestamp must be before or at $sequencingTimestamp."
+    )
+
+  // TODO(#5990) use an error code
+  def signingTimestampTooEarlyError(
+      signingTimestamp: CantonTimestamp,
+      sequencingTimestamp: CantonTimestamp,
+  ): DeliverErrorReason.BatchRefused = {
+    // We can't easily compute a valid signing timestamp because we'd have to scan through
+    // the domain parameter updates to compute a bound, as the signing tolerance is taken
+    // from the domain parameters valid at the signing timestamp, not the sequencing timestamp.
+    val errorMsg =
+      s"Signing timestamp $signingTimestamp is too early for sequencing time $sequencingTimestamp."
+    DeliverErrorReason.BatchRefused(errorMsg)
   }
+
 }

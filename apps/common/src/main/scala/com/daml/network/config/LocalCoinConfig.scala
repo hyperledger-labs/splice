@@ -2,6 +2,7 @@ package com.daml.network.config
 
 import com.digitalasset.canton.config.{
   CachingConfigs,
+  CommunityCryptoConfig,
   CryptoConfig,
   InitConfig,
   LocalNodeConfig,
@@ -22,7 +23,7 @@ import com.digitalasset.canton.version.ProtocolVersion
   */
 abstract class LocalCoinConfig extends LocalNodeConfig {
   override val init: InitConfig = InitConfig()
-  override val crypto: CryptoConfig = CryptoConfig()
+  override val crypto: CryptoConfig = CommunityCryptoConfig()
   override val sequencerClient: SequencerClientConfig = SequencerClientConfig()
   override val caching: CachingConfigs = CachingConfigs()
   def remoteParticipant: RemoteParticipantConfig
@@ -31,9 +32,7 @@ abstract class LocalCoinConfig extends LocalNodeConfig {
 /** Abstraction to remove code duplication when implementing Canton traits and specifying parameters we don't use
   * anyway.
   */
-abstract class RemoteCoinConfig extends NodeConfig {
-  override val crypto: CryptoConfig = CryptoConfig()
-}
+abstract class RemoteCoinConfig extends NodeConfig {}
 
 /** This class aggregates binary-level configuration options that are shared between each CN app instance.
   * For example, the [[TracingConfig]] is configured once for all CN apps that are started by a CN binary as part of the

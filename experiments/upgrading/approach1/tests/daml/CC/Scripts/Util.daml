@@ -60,7 +60,7 @@ setupApp = do
     cid = toInterfaceContractId cid
     svc = svc
 
-  submitExerciseCoinRulesByKey app [svc] CoinRules_MiningRound_Open with
+  submitExerciseCoinRulesByKey' app [svc] CoinRules_MiningRound_Open with
     coinPrice = 1.0
 
   -- return the off-ledger reference to the app for later script steps
@@ -117,38 +117,38 @@ runNextIssuance app coinPrice = do
       -- app rewards
       rewards <- queryFilter @AppReward app.svc (\r -> r.round == miningRound.round)
       forA_ rewards $ \(rcid, _) ->
-        submit app.svc $ exerciseCmd rcid CoinRulesIface.AppReward_SvcExpire with miningRoundCid = toInterfaceContractId miningRoundCid
+        submit app.svc $ exerciseCmd (toInterfaceContractId @CoinRulesIface.AppReward rcid) CoinRulesIface.AppReward_SvcExpire with miningRoundCid = toInterfaceContractId miningRoundCid
       -- validator rewards
       rewards <- queryFilter @ValidatorReward app.svc (\r -> r.round == miningRound.round)
       forA_ rewards $ \(rcid, _) ->
-        submit app.svc $ exerciseCmd rcid CoinIface.ValidatorReward_SvcExpire with miningRoundCid = toInterfaceContractId miningRoundCid
+        submit app.svc $ exerciseCmd (toInterfaceContractId @CoinRulesIface.ValidatorReward rcid) CoinIface.ValidatorReward_SvcExpire with miningRoundCid = toInterfaceContractId miningRoundCid
       -- the closed round
-      submitExerciseCoinRulesByKey app [app.svc] CoinRules_MiningRound_Archive with
+      submitExerciseCoinRulesByKey' app [app.svc] CoinRules_MiningRound_Archive with
         miningRoundCid
 
     -- close current issuing rounds if there are any
     imcs <- query @IssuingMiningRound app.svc
     forA_ imcs $ \(miningRoundCid, _) ->
-      submitExerciseCoinRulesByKey app [app.svc] CoinRules_MiningRound_Close with
+      submitExerciseCoinRulesByKey' app [app.svc] CoinRules_MiningRound_Close with
         miningRoundCid
 
     -- transition current OpenMiningRound into an IssuingMiningRound
     Some (_, st) <- queryContractKey @IssuanceState app.svc app.svc
     Some (openRoundCid, _) <- queryContractKey @OpenMiningRound app.svc (app.svc, st.currentRound)
-    closingRoundCid <- submitExerciseCoinRulesByKey app [app.svc] CoinRules_MiningRound_StartClosing with
+    closingRoundCid <- submitExerciseCoinRulesByKey' app [app.svc] CoinRules_MiningRound_StartClosing with
       miningRoundCid = openRoundCid
 
     appRewards <- queryFilter @AppReward app.svc (\bc -> bc.round == st.currentRound)
     validatorRewards <- queryFilter @ValidatorReward app.svc (\bc -> bc.round == st.currentRound)
 
-    submitExerciseCoinRulesByKey app [app.svc] CoinRules_MiningRound_StartIssuing with
+    submitExerciseCoinRulesByKey' app [app.svc] CoinRules_MiningRound_StartIssuing with
       miningRoundCid = closingRoundCid
       totalBurnQuantity =
         sum [ r.quantity | (_, r) <- appRewards] +
         sum [ r.quantity | (_, r) <- validatorRewards]
 
     -- open another round
-    void $ submitExerciseCoinRulesByKey app [app.svc] CoinRules_MiningRound_Open with
+    void $ submitExerciseCoinRulesByKey' app [app.svc] CoinRules_MiningRound_Open with
       coinPrice
 
 
@@ -160,8 +160,14 @@ unlockedCoins : Party -> Script [ContractId Coin]
 unlockedCoins p = map fst <$> queryFilter @Coin p (\c -> c.owner == p)
 
 -- TODO Only exercise interface choices using this.
-submitExerciseCoinRulesByKey : Choice CoinRules c r => CCApp -> [Party] -> c -> Script r
+submitExerciseCoinRulesByKey : Choice CoinRulesIface.CoinRules c r => CCApp -> [Party] -> c -> Script r
 submitExerciseCoinRulesByKey app actors arg = do
+  rulesKey <- submitMulti actors [app.svc] $ exerciseByKeyCmd @CoinRulesIface.CoinRulesKey app.svc (CoinRulesIface.CoinRulesKey_Fetch actors)
+  submitMulti actors [app.svc] $
+    exerciseCmd rulesKey.cid arg
+
+submitExerciseCoinRulesByKey' : Choice CoinRules c r => CCApp -> [Party] -> c -> Script r
+submitExerciseCoinRulesByKey' app actors arg = do
   rulesKey <- submitMulti actors [app.svc] $ exerciseByKeyCmd @CoinRulesIface.CoinRulesKey app.svc (CoinRulesIface.CoinRulesKey_Fetch actors)
   submitMulti actors [app.svc] $
     exerciseCmd (fromInterfaceContractId @CoinRules rulesKey.cid) arg

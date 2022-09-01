@@ -626,7 +626,7 @@ Both our deployment and tests follow the [port allocation scheme](./apps/app/src
    The exclusion is because those files are under a symlink and we don’t want to change them twice.
 4. Create a commit to ease review.
 5. Now check out the commit in the Canton OSS repo that you want to update to and update the current commit below.
-6. Copy the Canton changes: `./scripts-copy-canton.sh path/to/canton-oss`
+6. Copy the Canton changes: `./scripts/copy-canton.sh path/to/canton-oss`
 7. Create a commit to ease review.
 8. Reapply our changes `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton --reject canton.patch`
    and resolve any conflicts (if any).
@@ -639,4 +639,4 @@ Both our deployment and tests follow the [port allocation scheme](./apps/app/src
 12. Make a PR with your changes.
 You can refer to https://github.com/DACH-NY/the-real-canton-coin/pull/446/commits for an example of how the update PR should look like.
 
-Current Canton commit: 9e5ec309ad5fe229e53ab668b6b180db67b555bc
+Current Canton commit: 4cc7e32924f9c674a8ea9b4417a8bd5907510e84

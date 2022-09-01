@@ -163,11 +163,15 @@ template OnChannelPaymentRequest
       controller sender
       do pure ()
 
+data PaymentReferenceView = PaymentReferenceView
+  with
+    description : Text
+
 -- | A reference to the reason for a payment.
 -- TODO: better naming
 interface PaymentReference
   where
-    paymentReference_getDescription : Text
+    viewtype PaymentReferenceView
 
 template AppPaymentRequest
   with

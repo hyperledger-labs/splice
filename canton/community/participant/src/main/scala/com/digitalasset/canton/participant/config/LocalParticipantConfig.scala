@@ -5,22 +5,29 @@ package com.digitalasset.canton.participant.config
 
 import com.daml.ledger.api.tls.{SecretsUrl, TlsConfiguration, TlsVersion}
 import com.daml.platform.apiserver.SeedService.Seeding
+import com.daml.platform.apiserver.configuration.RateLimitingConfig
 import com.daml.platform.apiserver.{ApiServerConfig => DamlApiServerConfig}
 import com.daml.platform.configuration.{
   CommandConfiguration,
   IndexServiceConfig => DamlIndexServiceConfig,
 }
 import com.daml.platform.indexer.ha.HaConfig
-import com.daml.platform.indexer.{IndexerConfig => DamlIndexerConfig, IndexerStartupMode}
+import com.daml.platform.indexer.{
+  IndexerConfig => DamlIndexerConfig,
+  IndexerStartupMode,
+  PackageMetadataViewConfig,
+}
 import com.daml.platform.store.DbSupport.{DataSourceProperties => DamlDataSourceProperties}
 import com.daml.platform.store.backend.postgresql.{
   PostgresDataSourceConfig => DamlPostgresDataSourceConfig
 }
 import com.daml.platform.usermanagement.UserManagementConfig
 import com.digitalasset.canton.DiscardOps
+import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt._
 import com.digitalasset.canton.config.RequireTypes._
 import com.digitalasset.canton.config._
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.participant.admin.AdminWorkflowConfig
 import com.digitalasset.canton.participant.config.PostgresDataSourceConfigCanton.{
@@ -140,7 +147,7 @@ case class ParticipantNodeParameters(
   */
 case class CommunityParticipantConfig(
     override val init: InitConfig = InitConfig(),
-    override val crypto: CryptoConfig = CryptoConfig(),
+    override val crypto: CommunityCryptoConfig = CommunityCryptoConfig(),
     override val ledgerApi: LedgerApiServerConfig = LedgerApiServerConfig(),
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
@@ -157,7 +164,7 @@ case class CommunityParticipantConfig(
   override def clientLedgerApi: ClientConfig = ledgerApi.clientConfig
 
   def toRemoteConfig: RemoteParticipantConfig =
-    RemoteParticipantConfig(clientAdminApi, clientLedgerApi, crypto)
+    RemoteParticipantConfig(clientAdminApi, clientLedgerApi)
 
   override def withDefaults: CommunityParticipantConfig = {
     import ConfigDefaults._
@@ -173,14 +180,11 @@ case class CommunityParticipantConfig(
   *
   * @param adminApi the configuration to connect the console to the remote admin api
   * @param ledgerApi the configuration to connect the console to the remote ledger api
-  * @param crypto determines the algorithms used for signing, hashing, and encryption, used
-  *               on the client side for serialization.
   * @param token optional bearer token to use on the ledger-api if jwt authorization is enabled
   */
 case class RemoteParticipantConfig(
     adminApi: ClientConfig,
     ledgerApi: ClientConfig,
-    crypto: CryptoConfig = CryptoConfig(),
     token: Option[String] = None,
 ) extends BaseParticipantConfig {
   override def clientAdminApi: ClientConfig = adminApi
@@ -210,10 +214,13 @@ case class RemoteParticipantConfig(
   * @param maxContractKeyStateCacheSize    maximum caffeine cache size of mutable state cache of contract keys
   * @param maxInboundMessageSize     maximum inbound message size
   * @param databaseConnectionTimeout database connection timeout
-  * @param enableInMemoryFanOutForLedgerApi enable the "in-memory fanout" performance optimization (default false; not tested for production yet)
+  * @param enableInMemoryFanOutForLedgerApi enable the "in-memory fan-out" performance optimization (default false; not tested for production yet)
   * @param maxTransactionsInMemoryFanOutBufferSize maximum number of transactions to hold in the "in-memory fanout" (if enabled)
   * @param additionalMigrationPaths Optional extra paths for the database migrations
   * @param inMemoryStateUpdaterParallelism The processing parallelism of the Ledger API server in-memory state updater
+  * @param inMemoryFanOutThreadPoolSize Size of the thread-pool backing the Ledger API in-memory fan-out.
+  *                                     If not set, defaults to ((number of thread)/4 + 1)
+  * @param rateLimit limit the ledger api server request rates based on system metrics
   */
 case class LedgerApiServerConfig(
     address: String = "127.0.0.1",
@@ -248,6 +255,10 @@ case class LedgerApiServerConfig(
     additionalMigrationPaths: Seq[String] = Seq.empty,
     inMemoryStateUpdaterParallelism: Int =
       LedgerApiServerConfig.DefaultInMemoryStateUpdaterParallelism,
+    inMemoryFanOutThreadPoolSize: Option[Int] = None,
+    rateLimit: Option[RateLimitingConfig] = None,
+    preparePackageMetadataTimeOutWarning: NonNegativeFiniteDuration =
+      LedgerApiServerConfig.DefaultPreparePackageMetadataTimeOutWarning,
 ) extends CommunityServerConfig // We can't currently expose enterprise server features at the ledger api anyway
     {
 
@@ -279,6 +290,14 @@ object LedgerApiServerConfig {
   val DefaultApiStreamShutdownTimeout: NonNegativeFiniteDuration =
     NonNegativeFiniteDuration.ofSeconds(5)
   val DefaultInMemoryStateUpdaterParallelism: Int = 2
+  val DefaultPreparePackageMetadataTimeOutWarning: NonNegativeFiniteDuration =
+    NonNegativeFiniteDuration(DamlIndexServiceConfig.PreparePackageMetadataTimeOutWarning.toJava)
+
+  def DefaultInMemoryFanOutThreadPoolSize(implicit loggingContext: ErrorLoggingContext): Int = {
+    val numberOfThreads =
+      Threading.detectNumberOfThreads(loggingContext.logger)(loggingContext.traceContext)
+    numberOfThreads / 4 + 1
+  }
 
   /** the following case class match will help us detect any additional configuration options added
     * when we upgrade the Daml code. if the below match fails because there are more config options,
@@ -320,9 +339,10 @@ object LedgerApiServerConfig {
       _maxContractStateCacheSize,
       _maxContractKeyStateCacheSize,
       _maxTransactionsInMemoryFanOutBufferSize,
-      _enableInMemoryFanOutForLedgerApi,
       _apiStreamShutdownTimeout, // configured via LedgerApiServerConfig.apiStreamShutdownTimeout
-      _inMemoryStateUpdaterParallelism,
+      inMemoryStateUpdaterParallelism,
+      inMemoryFanOutThreadPoolSize,
+      preparePackageMetadataTimeOutWarning,
     ) = indexServiceConfig
 
     def fromClientAuth(clientAuth: ClientAuth): ServerAuthRequirementConfig = {
@@ -375,7 +395,10 @@ object LedgerApiServerConfig {
       managementServiceTimeout = NonNegativeFiniteDuration(managementServiceTimeout.toJava),
       apiStreamShutdownTimeout =
         NonNegativeFiniteDuration.ofMillis(_apiStreamShutdownTimeout.toMillis),
-      inMemoryStateUpdaterParallelism = _inMemoryStateUpdaterParallelism,
+      inMemoryStateUpdaterParallelism = inMemoryStateUpdaterParallelism,
+      inMemoryFanOutThreadPoolSize = Some(inMemoryFanOutThreadPoolSize),
+      preparePackageMetadataTimeOutWarning =
+        NonNegativeFiniteDuration(preparePackageMetadataTimeOutWarning.toJava),
     ).discard
   }
 
@@ -589,6 +612,10 @@ case class IndexerConfig(
     schemaMigrationAttempts: Int = IndexerStartupMode.DefaultSchemaMigrationAttempts,
     schemaMigrationAttemptBackoff: NonNegativeFiniteDuration =
       IndexerConfig.DefaultSchemaMigrationAttemptBackoff,
+    packageMetadataView: PackageMetadataViewConfig =
+      DamlIndexerConfig.DefaultPackageMetadataViewConfig,
+    maxOutputBatchedBufferSize: Int = DamlIndexerConfig.DefaultMaxOutputBatchedBufferSize,
+    maxTailerBatchSize: Int = DamlIndexerConfig.DefaultMaxTailerBatchSize,
 ) {
   def damlConfig(
       indexerLockIds: Option[IndexerLockIds],
@@ -628,9 +655,12 @@ object IndexerConfig {
       ingestionParallelism,
       inputMappingParallelism,
       maxInputBufferSize,
+      packageMetadataView,
       restartDelay,
       startupMode, // not configurable in canton and decided based on participant-HA replica role
       submissionBatchSize,
+      maxOutputBatchedBufferSize,
+      maxTailerBatchSize,
     ) = config
 
     val (schemaMigrationAttempts, schemaMigrationAttemptBackoff) = (startupMode match {
@@ -660,6 +690,9 @@ object IndexerConfig {
       schemaMigrationAttempts = schemaMigrationAttempts,
       schemaMigrationAttemptBackoff =
         NonNegativeFiniteDuration.ofSeconds(schemaMigrationAttemptBackoff.toSeconds),
+      packageMetadataView = packageMetadataView,
+      maxOutputBatchedBufferSize = maxOutputBatchedBufferSize,
+      maxTailerBatchSize = maxTailerBatchSize,
     ).discard
   }
 
