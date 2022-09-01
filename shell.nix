@@ -26,13 +26,17 @@ in pkgs.mkShell {
     kubectl
     lnav
     minikube
+    nix
     nodejs
     openjdk11
+    protobuf
+    protoc-gen-grpc-web
     postgresql_11
     python3
     python3Packages.sphinx_rtd_theme
     sbt
     sphinx
+    unzip
     x86Pkgs.sphinx-autobuild
     zip
   ];

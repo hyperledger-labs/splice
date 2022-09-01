@@ -23,3 +23,8 @@ canton-release
 .disable-unused-warnings
 todo-out
 temp/
+# Exclude generated ts protobuf sources
+**/com/daml/ledger/api/**/*.ts
+**/com/daml/ledger/api/**/*.js
+**/com/daml/network/**/*.ts
+**/com/daml/network/**/*.js

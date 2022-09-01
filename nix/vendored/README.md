@@ -1,4 +1,4 @@
-# daml2ts
+# daml2ts & typescript libraries
 
 We vendor daml2ts sources to include patches that also support
 decoding/encoding to grpc-web protobuf types.
@@ -15,3 +15,9 @@ path/to/daml/repo/language-support/ts/extract-codegen-cabal.sh daml2ts-1.0.0.tar
 ```
 
 If you change dependencies, you also need to run `cabal2nix daml2ts-1.0.0 > ../daml2ts.nix`.
+
+To update the patched typescript libraries run:
+
+```
+path/to/daml/repo/language-support/ts/extract-ts-libs.sh nix/vendored
+```

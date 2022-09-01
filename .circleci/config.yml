@@ -483,6 +483,27 @@ jobs:
           destination: release-artifacts
       - cleanup_sbt_test_job
 
+  wallet_frontend:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - setup_sbt_test_job
+      - execute_sbt_command:
+          cmd: "protocGenerate damlBuild"
+          retry_fetch: "50"
+      - run_bash_command_in_nix:
+          cmd_name: Build web frontend
+          cmd: |
+            cd apps/wallet/frontend
+            ./gen-ledger-api-proto.sh
+            ./copy-proto-sources.sh
+            ./codegen.sh
+            npm install
+            npm run build
+      - cleanup_sbt_test_job
+
   deployment_test:
     docker:
       - image: cimg/base:2021.04
@@ -736,6 +757,8 @@ workflows:
     - test:
         <<: *notify-fail
     - bundle:
+        <<: *notify-fail
+    - wallet_frontend:
         <<: *notify-fail
     # Ops
     - update_pipeline_schedule:

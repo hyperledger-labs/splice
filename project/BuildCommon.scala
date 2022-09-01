@@ -13,6 +13,28 @@ import sbt.internal.util.ManagedLogger
 
 object BuildCommon {
 
+  val grpcWebGen = {
+    // While the error claims that being in PATH is sufficient, the error is lying. It really
+    // needs to be an absolute path. Since some people also like starting
+    // SBT outside of the nix-shell we query nix directly for the PATH.
+    val processLogger = new DamlPlugin.BufferedLogger
+    val exitCode = scala.sys.process
+      .Process(
+        Seq("nix-build", "-E", "(import nix/default.nix {}).protoc-gen-grpc-web", "--no-out-link"),
+        None,
+      ) ! processLogger
+    val output = processLogger.output()
+    if (exitCode != 0) {
+      val errorMsg =
+        s"Running command returned non-zero exit code: $exitCode $output}"
+      throw new IllegalStateException(errorMsg)
+    }
+    PB.gens.plugin(
+      name = "grpc-web",
+      path = s"$output/bin/protoc-gen-grpc-web",
+    )
+  }
+
   lazy val sharedSettings: Seq[Def.Setting[_]] = Seq(
     libraryDependencies += scalatest % Test
   )
@@ -21,7 +43,14 @@ object BuildCommon {
     sharedSettings ++ cantonWarts ++ protobufLintSettings ++ unusedImportsSetting ++
       Seq(
         Compile / PB.targets := Seq(
-          scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf"
+          scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf",
+          (
+            grpcWebGen,
+            Seq("mode=grpcwebtext", "import_style=typescript"),
+          ) -> (Compile / sourceManaged).value / "ts",
+        ),
+        Compile / PB.protocOptions ++= Seq(
+          s"--js_out=import_style=commonjs:${(Compile / sourceManaged).value / "ts"}"
         ),
         Compile / PB.protoSources ++= (Test / PB.protoSources).value,
         scalacOptions += "-Wconf:src=src_managed/.*:silent",
