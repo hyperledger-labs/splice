@@ -188,7 +188,7 @@ To edit the files in a particular Daml project, for example, `/apps/wallet/daml`
 *Tip:* if `damlBuild` fails with weird errors, then that might be due to stale `damlBuild` outputs.
 Try forcing a clean rebuild by cleaning via SBT, e.g., `apps-common/clean` and similar for the dependent project.
 
-## Building the Wallet frontend
+## Building the Wallet & Splitwise frontend
 
 To build the wallet frontend you first need to generate the TypeScript
 files based on our protobuf files as well as run the Daml codegen on
@@ -197,30 +197,31 @@ our daml models.
 1. Generating protobuf files:
 
 ```
-sbt protocGenerate # Generate typescript for our own protobufs
+sbt protocGenerate damlBuild # Generate typescript for our own protobufs
+```
+
+2. Build the wallet frontend:
+
+```
 cd apps/wallet/frontend
 ./gen-ledger-api-proto.sh # generate typescript for ledger API protobufs
 ./copy-proto-sources.sh # Copy the generated files to the right place
-```
-2. Run Daml codegen:
-
-```
-./codegen.sh
-```
-
-3. NPM install
-
-```
+./codegen.sh # Run Daml Codegen
 npm install
-```
-
-4. Run NPM build
-
-```
 npm run build
 ```
 
-## Running the wallet frontend
+2. Build the splitwise frontend:
+
+```
+cd apps/splitwise/frontend
+./gen-ledger-api-proto.sh # generate typescript for ledger API protobufs
+./copy-proto-sources.sh # Copy the generated files to the right place
+./codegen.sh # Run Daml Codegen
+npm install
+npm run build
+```
+## Running the wallet and splitwise frontend
 
 To test out the wallet frontend, you first need to start Canton and
 our own apps. Here we use the topology from our tests:
@@ -231,48 +232,42 @@ our own apps. Here we use the topology from our tests:
 
 ```
 
-2. Start the Coin apps
+2. Start the Coin apps and run the bootstrap script to initialize.
+
+We use a single bootstrap script to initialize both the wallets and the splitwise apps.
 ```
-sbt "apps-app/runMain com.daml.network.CoinApp --config apps/app/src/test/resources/simple-topology.conf"
+sbt "apps-app/runMain com.daml.network.CoinApp --config apps/app/src/test/resources/simple-topology.conf --bootstrap apps/splitwise/frontend/bootstrap.canton"
 ```
 
-3. Initialize Alice’s wallet
+4. Start the envoy grpc-web proxy for the wallet apps
 
 ```
-val aliceValidatorParty = aliceValidator.initialize()
-val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
-aliceWallet.initialize(aliceValidatorParty)
-```
-
-Optionally also initialize Bob’s wallet if you want to use that:
-
-```
-val bobValidatorParty = bobValidator.initialize()
-val bobUserParty = bobValidator.onboardUser(bobWallet.config.damlUser)
-bobWallet.initialize(bobValidatorParty)
-```
-
-4. Start the envoy grpc-web proxy
-
-```
+cd apps/wallet/frontend
 ./start-envoy.sh
 ```
 
 This starts a grpc-web proxy on port 8080 for Alice’s wallet and on
 port 8081 for Bob’s wallet.
 
-5. Start the wallet frontend
+5. Start the envoy grpc-web proxy for the splitwise apps
 
 ```
-npm start
+cd apps/wallet/frontend
+./start-envoy.sh
 ```
 
-This starts Alice’s wallet on port 3000.
+This starts a grpc-web proxy on port 8082 for Alice’s wallet and on
+port 8083 for Bob’s wallet.
 
-To start Bob’s wallet use
+5. Start the frontends:
 
 ```
-PORT=3001 REACT_APP_GRPC_URL=http://localhost:8081 npm start
+cd apps/wallet/frontend
+PORT=3000 REACT_APP_GRPC_URL=http://localhost:8080 npm start # Alice's wallet
+PORT=3001 REACT_APP_GRPC_URL=http://localhost:8081 npm start # Bob's wallet
+cd apps/splitwise/frontend
+PORT=3002 REACT_APP_GRPC_URL=http://localhost:8082 npm start # Alice's splitwise
+PORT=3003 REACT_APP_GRPC_URL=http://localhost:8083 npm start # Bob's splitwise
 ```
 
 If the frontend shows up but nothing happens when you click tap or

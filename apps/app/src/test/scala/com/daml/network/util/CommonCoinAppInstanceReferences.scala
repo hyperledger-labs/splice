@@ -56,10 +56,16 @@ trait CommonCoinAppInstanceReferences {
     "directoryProvider"
   )
 
-  def directoryUser(implicit
+  def aliceDirectoryUser(implicit
       env: CoinTestConsoleEnvironment
   ): LocalDirectoryUserAppReference = du(
-    "directoryUser"
+    "aliceDirectoryUser"
+  )
+
+  def bobDirectoryUser(implicit
+      env: CoinTestConsoleEnvironment
+  ): LocalDirectoryUserAppReference = du(
+    "bobDirectoryUser"
   )
 
   def aliceSplitwise(implicit

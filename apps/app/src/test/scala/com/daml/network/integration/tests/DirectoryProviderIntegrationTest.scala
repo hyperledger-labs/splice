@@ -26,7 +26,7 @@ class DirectoryProviderIntegrationTest
       .simpleTopology(this.getClass.getSimpleName)
       .withSetup(implicit env => {
         directoryValidator.remoteParticipant.dars.upload(directoryDarPath)
-        directoryUser.remoteParticipant.dars.upload(directoryDarPath)
+        aliceDirectoryUser.remoteParticipant.dars.upload(directoryDarPath)
       })
 
   "A directory provider" should {
@@ -48,7 +48,7 @@ class DirectoryProviderIntegrationTest
 
       directoryProvider.listInstallRequests() shouldBe Seq()
 
-      val installRequestCid = directoryUser.requestDirectoryInstall()
+      val installRequestCid = aliceDirectoryUser.requestDirectoryInstall()
 
       directoryProvider.remoteParticipant.ledger_api.acs
         .await(providerParty, codegen.DirectoryInstallRequest)
@@ -73,8 +73,8 @@ class DirectoryProviderIntegrationTest
 
       // Request entry
 
-      directoryUser.remoteParticipant.ledger_api.acs.await(userParty, codegen.DirectoryInstall)
-      directoryUser.requestDirectoryEntry(entryName)
+      aliceDirectoryUser.remoteParticipant.ledger_api.acs.await(userParty, codegen.DirectoryInstall)
+      aliceDirectoryUser.requestDirectoryEntry(entryName)
       val entryRequest = directoryProvider.remoteParticipant.ledger_api.acs
         .await(providerParty, codegen.DirectoryEntryRequest)
       val entryRequests = directoryProvider.listEntryRequests()
@@ -118,11 +118,11 @@ class DirectoryProviderIntegrationTest
       )
 
       // Read entries from user
-      directoryUser.listEntries() shouldBe Seq(entryValue)
-      directoryUser.lookupEntryByName(entryName) shouldBe entryValue
-      directoryUser.lookupEntryByParty(userParty) shouldBe entryValue
+      aliceDirectoryUser.listEntries() shouldBe Seq(entryValue)
+      aliceDirectoryUser.lookupEntryByName(entryName) shouldBe entryValue
+      aliceDirectoryUser.lookupEntryByParty(userParty) shouldBe entryValue
       assertThrowsAndLogsCommandFailures(
-        directoryUser.lookupEntryByName("nonexistentname"),
+        aliceDirectoryUser.lookupEntryByName("nonexistentname"),
         _.errorMessage should include("nonexistentname"),
       )
     }

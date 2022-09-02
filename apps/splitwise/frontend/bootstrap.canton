@@ -1,0 +1,47 @@
+import com.daml.lf.value.Value.ContractId
+Seq(aliceSplitwise.remoteParticipant, bobSplitwise.remoteParticipant, directoryProvider.remoteParticipant).foreach { p =>
+  p.dars.upload("apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar")
+}
+
+val aliceValidatorParty = aliceValidator.initialize()
+val aliceUserParty = aliceValidator.onboardUser("alice_wallet_user")
+aliceWallet.initialize(aliceValidatorParty)
+aliceSplitwise.initialize(aliceValidatorParty)
+val bobValidatorParty = bobValidator.initialize()
+val bobUserParty = bobValidator.onboardUser("bob_wallet_user")
+bobWallet.initialize(bobValidatorParty)
+bobSplitwise.initialize(bobValidatorParty)
+directoryValidator.initialize()
+
+val aliceRequestCid = aliceDirectoryUser.requestDirectoryInstall()
+val bobRequestCid = bobDirectoryUser.requestDirectoryInstall()
+utils.retry_until_true { directoryProvider.listInstallRequests().length == 2 }
+directoryProvider.listInstallRequests().foreach { case request =>
+  directoryProvider.acceptInstallRequest(request.contractId)
+}
+
+aliceDirectoryUser.requestDirectoryEntry("alice.cns")
+bobDirectoryUser.requestDirectoryEntry("bob.cns")
+
+utils.retry_until_true { directoryProvider.listEntryRequests().length == 2 }
+directoryProvider.listEntryRequests().foreach { case request =>
+  directoryProvider.requestEntryPayment(request.contractId)
+}
+
+val aliceCoin = aliceWallet.tap(5.0)
+utils.retry_until_true { aliceWallet.listAppPaymentRequests().length == 1 }
+val aliceAccepted = aliceWallet.acceptAppPaymentRequest(aliceWallet.listAppPaymentRequests()(0).contractId, aliceCoin)
+val bobCoin = bobWallet.tap(5.0)
+utils.retry_until_true { bobWallet.listAppPaymentRequests().length == 1 }
+val bobAccepted = bobWallet.acceptAppPaymentRequest(bobWallet.listAppPaymentRequests()(0).contractId, bobCoin)
+
+val directoryParty = directoryProvider.getProviderPartyId()
+directoryProvider.remoteParticipant.ledger_api.acs.await_active_contract(directoryParty, ContractId.assertFromString(aliceAccepted.toString))
+directoryProvider.remoteParticipant.ledger_api.acs.await_active_contract(directoryParty, ContractId.assertFromString(bobAccepted.toString))
+directoryProvider.collectEntryPayment(aliceAccepted)
+directoryProvider.collectEntryPayment(bobAccepted)
+
+Seq((aliceSplitwise, aliceUserParty), (bobSplitwise, bobUserParty)).foreach { case (splitwise, party) =>
+  val proposal = splitwise.createInstallProposal(party)
+  splitwise.acceptInstallProposal(proposal)
+}
