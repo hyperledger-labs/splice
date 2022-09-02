@@ -664,54 +664,6 @@ jobs:
            . .envrc.vars
            .circleci/setup-pipeline.sh
 
-  upgrading_coin:
-    docker:
-    - image: eclipse-temurin:11
-    environment:
-      <<: *env
-      SDK_VERSION: << pipeline.parameters.sdk-version >>
-    steps:
-      - checkout
-      - install_daml_dependencies
-      - run:
-         name: make all
-         command: |
-           set -euo pipefail
-           export PATH=$HOME/.daml/bin:$PATH
-           cd experiments/upgrading/approach1
-           make all
-      - run:
-         name: make test
-         command: |
-           set -euo pipefail
-           export PATH=$HOME/.daml/bin:$PATH
-           cd experiments/upgrading/approach1
-           make test
-
-  upgrading_coin_2:
-    docker:
-    - image: eclipse-temurin:11
-    environment:
-      <<: *env
-      SDK_VERSION: << pipeline.parameters.sdk-version >>
-    steps:
-      - checkout
-      - install_daml_dependencies
-      - run:
-         name: make all
-         command: |
-           set -euo pipefail
-           export PATH=$HOME/.daml/bin:$PATH
-           cd experiments/upgrading/approach2
-           make all
-      - run:
-         name: make test
-         command: |
-           set -euo pipefail
-           export PATH=$HOME/.daml/bin:$PATH
-           cd experiments/upgrading/approach2
-           make test-cc
-
   docs:
     docker:
     - image: cimg/base:2021.04
@@ -764,10 +716,6 @@ workflows:
     when:
       not: << pipeline.parameters.run-schedule >>
     jobs:
-    - upgrading_coin:
-        <<: *notify-fail
-    - upgrading_coin_2:
-        <<: *notify-fail
     # Documentation
     - docs:
         <<: *notify-fail
