@@ -23,6 +23,9 @@ local SVC_APP_PORTS = [
     name: 'svc-app-adm-api',
     port: 5005,
   },
+];
+
+local SCAN_APP_PORTS = [
   {
     name: 'scan-api',
     port: 5012,
@@ -55,6 +58,7 @@ local CANTON_PARTICIPANT_PORTS = [
 local ALL_PORTS = flatten([
   DOCS_PORTS,
   SVC_APP_PORTS,
+  SCAN_APP_PORTS,
   CANTON_DOMAIN_PORTS,
   CANTON_PARTICIPANT_PORTS,
 ]);
@@ -135,6 +139,7 @@ local cantonNetwork(config) = objects(
   [
     deployment(config, 'docs', DOCS_PORTS),
     deployment(config, 'svc-app', SVC_APP_PORTS),
+    deployment(config, 'scan-app', SCAN_APP_PORTS),
     deployment(
       config,
       'canton-domain',

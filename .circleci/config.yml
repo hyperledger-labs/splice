@@ -783,7 +783,6 @@ workflows:
         requires:
            - deployment_test
            - docker-images-push
-      # TODO(i554): Re-enable
     - preflight_check:
         <<: *notify-fail
         <<: *main-branch-only

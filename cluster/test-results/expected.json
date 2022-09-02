@@ -100,10 +100,6 @@
                            {
                               "containerPort": 5005,
                               "name": "svc-app-adm-api"
-                           },
-                           {
-                              "containerPort": 5012,
-                              "name": "scan-api"
                            }
                         ]
                      }
@@ -124,7 +120,65 @@
                   "name": "svc-app-adm-api",
                   "port": 5005,
                   "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "svc-app"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "scan-app"
+            },
+            "name": "scan-app"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "scan-app"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "scan-app",
+                     "external": "true"
+                  }
                },
+               "spec": {
+                  "containers": [
+                     {
+                        "image": "region-docker.pkg.dev/project/repo/scan-app:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "scan-app",
+                        "ports": [
+                           {
+                              "containerPort": 5012,
+                              "name": "scan-api"
+                           }
+                        ]
+                     }
+                  ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "name": "scan-app"
+         },
+         "spec": {
+            "ports": [
                {
                   "name": "scan-api",
                   "port": 5012,
@@ -132,7 +186,7 @@
                }
             ],
             "selector": {
-               "app": "svc-app"
+               "app": "scan-app"
             }
          }
       },

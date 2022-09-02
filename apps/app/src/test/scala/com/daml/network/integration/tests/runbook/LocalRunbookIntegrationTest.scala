@@ -28,6 +28,7 @@ class LocalRunbookIntegrationTest
   val svcParticipantPath = "canton-participant"
   val svcDomainPath = "canton-domain"
   val svcAppPath = "svc-app"
+  val scanAppPath = "scan-app"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
@@ -39,6 +40,7 @@ class LocalRunbookIntegrationTest
         svcParticipantPath / "svc-participant.conf",
         svcDomainPath / "svc-domain.conf",
         svcAppPath / "svc.conf",
+        scanAppPath / "scan.conf",
       )
       .clearConfigTransforms()
       .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy1000(conf))

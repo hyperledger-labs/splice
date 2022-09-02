@@ -5,6 +5,7 @@
 apps := \
 	cn-app \
 	svc-app \
+	scan-app \
 	canton-domain \
 	canton-participant \
 	docs \
