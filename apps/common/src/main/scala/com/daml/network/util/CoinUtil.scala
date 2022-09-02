@@ -190,7 +190,7 @@ object CoinUtil extends UploadablePackage {
     minRewardQuantity = 0.011, // in $
 
     // Fee for transferring some quantity of coin to a new owner.
-    // TODO Finetuning required
+    // TODO(M1-90) Finetuning required
     transferFee = OpenBusiness.Fees.SteppedRate(
       initialRate = 0.01,
       steps = Seq(
@@ -212,7 +212,7 @@ object CoinUtil extends UploadablePackage {
     maxNumOutputs = 100,
 
     // Fits a hex-encoded SHA-256 or a UUID
-    // TODO: charge per character
+    // TODO(M1-90): charge per character
     maxPayloadLength = 32,
   )
 

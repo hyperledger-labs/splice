@@ -14,7 +14,6 @@ import scala.util.{Failure, Success}
 
 /** Orchestrates the background (Ledger API) automations that run on a given CN node.
   *
-  * TODO(i543): we only want one ledger connection per CN app
   * Each automation workflow is an independent application with their own ledger connection.
   *
   * Modelled after Canton's [[com.digitalasset.canton.participant.admin.AdminWorkflowServices]].

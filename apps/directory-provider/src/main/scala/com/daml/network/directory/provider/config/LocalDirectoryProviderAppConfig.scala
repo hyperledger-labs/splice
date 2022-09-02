@@ -17,7 +17,7 @@ case class LocalDirectoryProviderAppConfig(
     override val remoteParticipant: RemoteParticipantConfig,
     remoteScan: RemoteScanAppConfig,
 ) extends LocalCoinConfig
-    with BaseDirectoryProviderAppConfig // TODO(142): fork or generalize this trait.
+    with BaseDirectoryProviderAppConfig // TODO(Arne): fork or generalize this trait.
     {
   override val nodeTypeName: String = "directoryProvider"
 

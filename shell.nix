@@ -15,7 +15,6 @@ in pkgs.mkShell {
     cabal2nix
     curl
     docker
-    gawk
     git
     google-cloud-sdk
     grpcurl

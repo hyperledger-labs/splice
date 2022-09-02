@@ -50,7 +50,7 @@ template CoinRules
     svc : Party
     config : CoinConfig
     obs: Party -- TODO(M1-06): remove workaround for explicit disclosure
-    -- TODO: use a schedule with effective dating to make fees predictable to users
+    -- TODO(M1-90): use a schedule with effective dating to make fees predictable to users
   where
     signatory svc
     observer obs -- TODO(M1-06): remove workaround for explicit disclosure
@@ -253,7 +253,7 @@ data ReceiverCoinType
 
 -- | A way to store some debug info on the ledger.
 --
--- TODO: replace by automated testing.
+-- TODO(M1-92): replace by automated testing.
 template TransferDebugNote with
     svc : Party
     transfer : Transfer
@@ -478,7 +478,7 @@ preprocessAndSummarizeOutputs config sender outs = do
                 | otherwise ->
                 let transferFee = chargeSteppedRate config.transferFee quantity
                     -- NOTE: only part of the transferFee is attributed to and minable by the receiver
-                    -- TODO: check that this does loose fee quantity
+                    -- TODO(M1-92): check that this does not loose fee quantity
                     receiverFee = transferFee * (1.0 - senderTransferFeeRatio)
                     senderTransferFee = transferFee - receiverFee
                 in (receiverFee, senderTransferFee, PreprocessedFixedOutput $ quantity - receiverFee)
@@ -488,7 +488,7 @@ preprocessAndSummarizeOutputs config sender outs = do
             preprocessedType = preprocessedType
               -- NOTE: the check for non-negative quantity happens as part of coin creation.
             lock =
-              -- TODO (post-MVP): consider whether we should (and can with good UX) offer locking
+              -- TODO(M99-90): consider whether we should (and can with good UX) offer locking
               -- a receivers coin
               None
       return TransferOutputsSummary with
@@ -594,7 +594,7 @@ distributeOutputs now config svc sender summary outs =
       PreprocessedFloatingOutput n ->
         let quantity
               | n < summary.numFloatingCoins = perCoinExcessQuantity
-              -- TODO: consider smearing this remainder excess quantity above perCoinExcessQuantity
+              -- TODO(M1-07): consider smearing this remainder excess quantity above perCoinExcessQuantity
               -- as thinly as possible over the appropriate number of floating coins.
               | otherwise = st.remainingExcessQuantity
             receiverFee

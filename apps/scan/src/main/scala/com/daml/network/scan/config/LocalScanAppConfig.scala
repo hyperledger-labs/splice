@@ -12,7 +12,7 @@ case class LocalScanAppConfig(
     svcUser: String = "svc",
     override val remoteParticipant: RemoteParticipantConfig,
 ) extends LocalCoinConfig
-    with BaseScanAppConfig // TODO(142): fork or generalize this trait.
+    with BaseScanAppConfig // TODO(Arne): fork or generalize this trait.
     {
   override val nodeTypeName: String = "scan"
 

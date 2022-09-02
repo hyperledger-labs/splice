@@ -59,7 +59,7 @@ queryBalances p k = do
   where
     f acc BalanceUpdate{..} = case update of
       ExternalPayment {..} ->
-        let split = quantity / intToNumeric (length group.members + 1) -- TODO Make sure nothing gets lost here.
+        let split = quantity / intToNumeric (length group.members + 1) -- TODO(M1-90) Make sure nothing gets lost here.
         in if payer == p
              then let g acc x
                         | x == payer = acc
@@ -74,7 +74,7 @@ queryBalances p k = do
         None -> acc
         Some changes -> foldl (\acc (p', v) -> insertWith (+) p' v acc) acc (M.toList changes)
 
--- TODO Remove on next SDK upgrade in favor of upstream implementation.
+-- TODO(M1-90) Remove on next SDK upgrade in favor of upstream implementation.
 insertWith : Ord k => (v -> v -> v) -> k -> v -> Map k v -> Map k v
 insertWith f k v m =
   case M.lookup k m of

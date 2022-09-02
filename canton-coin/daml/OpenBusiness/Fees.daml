@@ -29,7 +29,7 @@ newtype RatePerRound = RatePerRound with rate : Decimal
 chargeRatePerRound : RatePerRound -> RelRound -> Decimal
 chargeRatePerRound rate dt = rate.rate * intToDecimal dt.diff
 
--- | TODO: better name
+-- | TODO(M1-07): better name
 spentWithRatePerRound : RatePerRound -> Decimal -> RelRound
 spentWithRatePerRound rate quantity =  RelRound (ceiling $ quantity / rate.rate)
 
@@ -45,7 +45,7 @@ scaleRatePerRound s r = RatePerRound with rate = s * r.rate
 ---------------------------
 
 -- | A fixed fee independent of the action being taken.
--- TODO: check whether this name matches usage in financial terms, it probably isn't. Should it be 'flat-fee', 'constantfee', ... ???
+-- TODO(M1-07): check whether this name matches usage in financial terms, it probably isn't. Should it be 'flat-fee', 'constantfee', ... ???
 newtype FixedFee = FixedFee with fee : Decimal
   deriving (Eq, Ord, Show)
 
@@ -102,7 +102,7 @@ data ExpiringQuantity = ExpiringQuantity with
     ratePerRound : RatePerRound
   deriving (Eq, Ord, Show)
 
--- TODO This does not handle time overflows.
+-- TODO(M1-07) This does not handle time overflows.
 quantityExpiresAt : ExpiringQuantity -> Round
 quantityExpiresAt e = e.createdAt `addRelRound` spentWithRatePerRound e.ratePerRound e.initialQuantity
 

@@ -34,7 +34,7 @@ class GrpcDirectoryProviderService(
 
   private val connection = ledgerClient.connection("GrpcDirectoryProviderService")
 
-  // TODO (MK) Make these parameters configurable
+  // TODO(Moritz) Make these parameters configurable
   private val entryFee: Primitive.Numeric = 1.0
   private val collectionDuration = RelTime(
     10_000_000

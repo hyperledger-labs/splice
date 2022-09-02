@@ -82,7 +82,7 @@ setupUser : CCApp -> Text -> Party -> Script Party
 setupUser app name validator = do
   user <- allocatePartyWithHint name (PartyIdHint name)
   userId <- validateUserId name
-  createUser (User userId (Some user)) [CanActAs user, CanReadAs validator] -- TODO(rautenrieth-da): CanReadAs has no effect?
+  createUser (User userId (Some user)) [CanActAs user, CanReadAs validator] -- TODO(Robert): CanReadAs has no effect?
   _ <- submit user $ createCmd CCUserHostedAt with user; validator
   onboardUser app user
   return user
@@ -159,7 +159,7 @@ runCoinRulesAcceptBot app = do
 
 -- | Run the next issuance.
 --
--- TODO: use overlapping issuances so that there are always 2 open issuances, 1 closing issuance,
+-- TODO(M1-07): use overlapping issuances so that there are always 2 open issuances, 1 closing issuance,
 -- and 2 issuing issuances
 runNextIssuance : CCApp -> Decimal -> Script ()
 runNextIssuance app coinPrice = do
@@ -260,7 +260,7 @@ queryCoinRulesByKey svc =
 -- The left-over quantity is kept.
 pay : CCApp -> Party -> Party -> Decimal -> Text -> Script ()
 pay app sender recipient coinQuantity msg = do
-  -- TODO: create payment pre-approval flow and use that here instead of submitMulti
+  -- TODO(M1-92): create payment pre-approval flow and use that here instead of submitMulti
   validator <- getHostingValidator sender
   coins <- unlockedCoins sender
   let transfer = Transfer with
@@ -286,7 +286,7 @@ lockTo : CCApp -> Party -> Party -> Decimal -> RelTime -> Text -> Script ()
 lockTo app sender lockHolder coinQuantity lockDuration msg = do
   now <- getTime
   validator <- getHostingValidator sender
-  -- TODO: create payment pre-approval flow and use that here instead of submitMulti
+  -- TODO(M1-92): create payment pre-approval flow and use that here instead of submitMulti
   coins <- unlockedCoins sender
   let transfer = Transfer with
         sender

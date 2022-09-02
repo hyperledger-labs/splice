@@ -12,7 +12,7 @@ import OpenBusiness.Fees
 -- | A lock held by a particular party until its expiry.
 data TimeLock = TimeLock with
     holder: Party
-    -- TODO: consider adding support for groups of lock holders.
+    -- TODO(M99-90): consider adding support for groups of lock holders.
     expiresAt: Time
   deriving (Eq, Ord, Show)
 
@@ -29,7 +29,7 @@ template Coin
     signatory svc, owner
     ensure validExpiringQuantity quantity
 
-    {- TODO Reenable once https://github.com/digital-asset/daml/issues/13754 is fixed
+    {- TODO(M1-07) Reenable once https://github.com/digital-asset/daml/issues/13754 is fixed
     implements ExpiringContract where
       contractExpiresAt = quantityExpiresAt quantity
       expiryManager = svc
@@ -43,7 +43,7 @@ template LockedCoin
   where
     signatory lock.holder, signatory coin
 
-    {- TODO Reenable once https://github.com/digital-asset/daml/issues/13504 is fixed
+    {- TODO(M1-07) Reenable once https://github.com/digital-asset/daml/issues/13504 is fixed
     implements ExpiringContract where
       contractExpiresAt = quantityExpiresAt coin.quantity
       expiryManager = coin.svc
@@ -93,7 +93,7 @@ template ValidatorRight with
       controller user
       do pure ()
 
-    -- TODO: cancellation, withdrawal
+    -- TODO(M1-07): cancellation, withdrawal
 
 
 
@@ -164,8 +164,7 @@ template ValidatorReward
       with
         miningRoundCid : ContractId ClosedMiningRound
       controller user
-      -- TODO: consider whether we should use time-based expiry so that the
-      -- user can expire it unilaterally after let's say 24h
+      -- TODO(M1-07): consider whether we should use time-based expiry so that the user can expire it unilaterally after let's say 24h
       do miningRound <- fetch miningRoundCid
          assertMsg "Mining round > expiry round" (round <= miningRound.round)
 

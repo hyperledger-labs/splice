@@ -168,7 +168,7 @@ data PaymentReferenceView = PaymentReferenceView
     description : Text
 
 -- | A reference to the reason for a payment.
--- TODO: better naming
+-- TODO(M1-07): better naming
 interface PaymentReference
   where
     viewtype PaymentReferenceView

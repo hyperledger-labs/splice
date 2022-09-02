@@ -7,7 +7,7 @@ import DA.Foldable (forA_)
 import DA.Time
 import CN.Wallet
 
--- TODO https://github.com/DACH-NY/the-real-canton-coin/issues/592
+-- TODO(i592)
 -- fake dependency
 import CN.Directory
 _unused : DirectoryEntry -> DirectoryEntry
@@ -265,7 +265,7 @@ data BalanceUpdateType
       payer : Party
       description : Text
       quantity : Decimal -- Quantity in CC
-      -- TODO Support $ and translate to CC. This needs some refactoring,
+      -- TODO(M1-90) Support $ and translate to CC. This needs some refactoring,
       -- we don’t want direct CoinRules access.
   -- | Transfer from sender to receiver to reduce their debt.
   -- Note that it is possible to transfer preemptively before a bill has been submitted.

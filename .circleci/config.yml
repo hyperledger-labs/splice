@@ -409,6 +409,16 @@ commands:
             curl https://get.daml.com | sh -s $SDK_VERSION
             printf "auto-install: false\nupdate-check: never\n" >> $HOME/.daml/daml-config.yaml
 
+  run_todo_script:
+    steps:
+      - run_bash_command_in_nix:
+          cmd: ./scripts/check-todos.sh
+          additional_nix_args: "--keep GITHUB_TOKEN"
+      - store_artifacts:
+          name: Store todos as artifacts
+          path: todo-out/todos
+          destination: todos
+
 parameters:
   sdk-version:
     type: string
@@ -430,6 +440,7 @@ jobs:
       - execute_sbt_command:
           cmd: "lint"
           retry_fetch: "50"
+      - run_todo_script
       - cleanup_sbt_test_job
 
   test:

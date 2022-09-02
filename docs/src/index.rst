@@ -31,10 +31,10 @@ Canton Network Documentation
    :maxdepth: 2
    :caption: DevNet Architecture
 
-   devnet/svc_app.rst
+   devnet/index.rst
 
 
-.. TODO: add back if need it
+.. TODO(M1-14): add back indices and search functionality if required
 
 .. Indices and tables
 .. ==================

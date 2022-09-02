@@ -11,7 +11,7 @@ case class LocalValidatorAppConfig(
     damlUser: String = "validator",
     remoteParticipant: RemoteParticipantConfig,
     remoteScan: RemoteScanAppConfig,
-) extends LocalCoinConfig // TODO(142): fork or generalize this trait.
+) extends LocalCoinConfig // TODO(Arne): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"
 
