@@ -92,8 +92,8 @@ styleguide
 * module structure, e.g., batteries included modules
 
 
-What anti-patterns to avoid?
-----------------------------
+Anti-Patterns
+-------------
 * Avoid observers since they allow for spam, instead distribute initially via explicit disclosure and then rely on signatories afterwards
 * Avoid contention, in particular contract keys contention. Minimal contention is fine and can be solved by retries
 * Avoid unexpirable contracts, any active contract should be time-limited
@@ -102,4 +102,3 @@ What anti-patterns to avoid?
 * contention on disclosed contract-ids
 
 How to make your model evolvable?
----------------------------------

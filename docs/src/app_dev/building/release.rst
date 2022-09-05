@@ -1,10 +1,12 @@
 Release Management
 ==================
 
+.. TODO(M1-14): link and/or incorporate our recommended upgrade practices here? Versioning is pretty closely linked to this.
+
 Versioning of Daml APIs
 -----------------------
 
-* Use [semantic versioning](https://semver.org/) to version your APIs
+* Use `semantic versioning <https://semver.org/>`_ to version your APIs
 
     * Patch: bugfix to implementation of interface method/view
     * Minor: newly added choices/interfaces/templates, backwards & forwards instances for all existing templates/interfaces
@@ -13,7 +15,7 @@ Versioning of Daml APIs
 Versioning of Daml Implementations
 ----------------------------------
 
-* Use [semantic versioning](https://semver.org/) to version your APIs
+* Use `semantic versioning <https://semver.org/>`_ to version your APIs
 
     * Patch: bugfix to choice impl
     * Minor: newly added choice impls, existing choice impls functionally identical source (but recompiled) modulo bugfixes
@@ -22,8 +24,7 @@ Versioning of Daml Implementations
 Release of Daml APIs & Implementations
 --------------------------------------
 
-* Release via [Package Distribution
-  API](https://docs.google.com/document/d/1Oogaz1mZ54Ar5Avfttt1QG6Sh4AZ1nwLcUP_lFYZD48/edit#bookmark=id.gc276jfx71kq)
+* Release via Package Distribution API (inital spec available from this `DA internal design doc <https://docs.google.com/document/d/1Oogaz1mZ54Ar5Avfttt1QG6Sh4AZ1nwLcUP_lFYZD48/edit#bookmark=id.gc276jfx71kq>`_)
 
 
 Versioning and Release of Read Access APIs

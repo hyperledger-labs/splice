@@ -1,8 +1,10 @@
 Application Developer Guidelines
 ================================
 
-CN app devs need docs that explain how to go from business idea to app implementing that idea.
-These docs serve as a drafting space for this kind of docs.
+The docs below provide a (very) rough draft of how we recomend CN app devs to
+to go from business idea to building and operating an app implementing that
+idea.
+
 
 .. toctree::
 
