@@ -26,6 +26,14 @@ main-branch-only: &main-branch-only
          - main
 
 commands:
+  install_daml_sdk:
+    description: Install Daml SDK
+    steps:
+    - run:
+        name: install daml sdk
+        command: |
+          set -eou pipefail
+          curl -sSL https://get.daml.com/ | sh -s << pipeline.parameters.sdk-version >>
   setup_nix:
     description: Set up Nix
     steps:
@@ -683,10 +691,13 @@ jobs:
     steps:
       - checkout
       - setup_nix
+      - install_daml_sdk
       - run_bash_command_in_nix:
          cmd_name: build
          cmd: |
            cd docs
+           export PATH=$HOME/.daml/bin:$PATH
+           ./gen-daml-docs.sh
            make html
 
   docker-images-push:
@@ -697,6 +708,7 @@ jobs:
     steps:
       - checkout
       - setup_nix
+      - install_daml_sdk
       - run_bash_command_in_nix:
          cmd_name: build images
          additional_nix_args: "--keep DOCKER_CERT_PATH \
@@ -704,7 +716,9 @@ jobs:
                               --keep DOCKER_MACHINE_NAME \
                               --keep DOCKER_TLS_VERIFY \
                               --keep NO_PROXY"
-         cmd: make docker-build
+         cmd: |
+           export PATH=$HOME/.daml/bin:$PATH
+           make docker-build
 
 
       - run_bash_command_in_nix:
@@ -718,6 +732,7 @@ jobs:
          cmd: |
            echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
            (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
+           export PATH=$HOME/.daml/bin:$PATH
            make docker-push
 
 

@@ -101,8 +101,7 @@ template ValidatorRight with
 template AppReward
   with
     svc : Party
-    -- | Application owner.
-    owner : Party
+    owner : Party -- ^ Application owner
     quantity : Decimal
     round : Round
   where
@@ -123,11 +122,10 @@ template AppReward
       do miningRound <- fetch miningRoundCid
          assertMsg "Mining round > expiry round" (round <= miningRound.round)
 
-
-    -- | This choice is used by the SVC to merge all burned coins per validator.
-    -- The expectation is that there is at most one burned coin per validator before
-    -- the issuance event is triggered.
     choice AppReward_Merge : ContractId AppReward
+      -- ^ This choice is used by the SVC to merge all burned coins per validator.
+      -- The expectation is that there is at most one burned coin per validator before
+      -- the issuance event is triggered.
       with
         cids : [ContractId AppReward]
       controller svc
@@ -169,10 +167,10 @@ template ValidatorReward
          assertMsg "Mining round > expiry round" (round <= miningRound.round)
 
 
-    -- | This choice is used by the SVC to merge all burned coins per validator.
-    -- The expectation is that there is at most one burned coin per validator before
-    -- the issuance event is triggered.
     choice ValidatorReward_Merge : ContractId ValidatorReward
+      -- ^ This choice is used by the SVC to merge all burned coins per validator.
+      -- The expectation is that there is at most one burned coin per validator before
+      -- the issuance event is triggered.
       with
         cids : [ContractId ValidatorReward]
       controller svc
@@ -185,8 +183,8 @@ template ValidatorReward
           return burnedCoin.quantity
         create this with quantity = this.quantity + sum quantities
 
-    -- | This choice is used by validators to archive the burn receipt upon claiming its corresponding issuance.
     choice ValidatorReward_ArchiveAsValidator : ()
+      -- ^ This choice is used by validators to archive the burn receipt upon claiming its corresponding issuance.
       with
         validator : Party
         rightCid : ContractId ValidatorRight
@@ -212,8 +210,7 @@ template BurnOracle
 template IssuanceState
   with
     svc : Party
-    -- | The most recent open round
-    currentRound : Round
+    currentRound : Round -- ^ The most recent open round
     obs : Party
   where
     signatory svc

@@ -6,12 +6,10 @@ module OpenBusiness.Expiry where
 import CC.Round
 
 data ExpiringContractView = ExpiringContractView with
-  -- | The round after which the contract is expired, and can be archived.
-  contractExpiresAt : Round
-  -- | The party charged with expiring the contract as soon as it expires.
+  contractExpiresAt : Round -- ^ The round after which the contract is expired, and can be archived.
+  expiryManager : Party -- ^ The party charged with expiring the contract as soon as it expires.
   -- Other parties can expire the contract as well, but are expected to wait for some extra time to avoid contention.
   -- To prove that the contract is expired an active OpenMiningRound has to be presented.
-  expiryManager : Party
 
 -- | A contract which expires at some time.
 interface ExpiringContract where

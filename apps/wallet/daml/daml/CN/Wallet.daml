@@ -14,20 +14,13 @@ import CC.Scripts.Util (CCUserHostedAt(..))
 -- | A one-directional payment channel governing transfers of CC from the sender to the reciever.
 template PaymentChannel
   with
-    sender : Party
-    -- ^ Sender of CC transferred on this payment channel.
-    receiver : Party
-    -- ^ Receiver of CC transferred on this payment channel.
-    svc : Party
-    -- ^ The issuer of the CC that flows on this payment channel.
-    allowRequests : Bool
-    -- ^ Whether to allow the receiver to request CC transfers.
-    allowOffers : Bool
-    -- ^ Whether to allow the sender to offer CC transfers.
-    allowDirectTransfers : Bool
-    -- ^ Whether the receiver allows the sender to transfer CC without any receiver involvement.
-    senderTransferFeeRatio : Decimal
-    -- ^ How to split the transfer fee between the sender and the receiver.
+    sender : Party -- ^ Sender of CC transferred on this payment channel.
+    receiver : Party -- ^ Receiver of CC transferred on this payment channel.
+    svc : Party -- ^ The issuer of the CC that flows on this payment channel.
+    allowRequests : Bool -- ^ Whether to allow the receiver to request CC transfers.
+    allowOffers : Bool -- ^ Whether to allow the sender to offer CC transfers.
+    allowDirectTransfers : Bool -- ^ Whether the receiver allows the sender to transfer CC without any receiver involvement.
+    senderTransferFeeRatio : Decimal -- ^ How to split the transfer fee between the sender and the receiver.
   where
     signatory sender, receiver
 
@@ -86,8 +79,7 @@ template PaymentChannelProposal
   with
     proposer : Party
     channel : PaymentChannel
-    -- | Optional reference to an existing channel to replace.
-    replacesChannel : Optional (ContractId PaymentChannel)
+    replacesChannel : Optional (ContractId PaymentChannel) -- ^ Optional reference to an existing channel to replace.
   where
     ensure (proposer == channel.sender || proposer == channel.receiver)
     signatory proposer
@@ -115,18 +107,12 @@ template PaymentChannelProposal
 
 template OnChannelPaymentRequest
   with
-    sender : Party
-    -- ^ The party that should pay.
-    receiver : Party
-    -- ^ The party requesting to be paid.
-    svc : Party
-    -- ^ The issuer of the CC that flows on this payment channel.
-    quantity : Decimal
-    -- ^ The amount of CC to be paid.
-    description : Text
-    -- ^ The reference to the reason / good for which the payment is requested.
-    senderTransferFeeRatio : Decimal
-    -- ^ How to split the transfer fee between the sender and the receiver.
+    sender : Party -- ^ The party that should pay.
+    receiver : Party -- ^ The party requesting to be paid.
+    svc : Party -- ^ The issuer of the CC that flows on this payment channel.
+    quantity : Decimal -- ^ The amount of CC to be paid.
+    description : Text -- ^ The reference to the reason / good for which the payment is requested.
+    senderTransferFeeRatio : Decimal -- ^ How to split the transfer fee between the sender and the receiver.
   where
     signatory sender, receiver
     ensure quantity > 0.0
@@ -175,20 +161,13 @@ interface PaymentReference
 
 template AppPaymentRequest
   with
-    sender : Party
-    -- ^ The party that should pay.
-    receiver : Party
-    -- ^ The party requesting to be paid.
-    svc : Party
-    -- ^ The issuer of CC that should be used to make the payment.
-    quantity : Decimal
-    -- ^ The amount of CC to be paid.
-    expiresAt : Time
-    -- ^ When the payment request expires.
-    collectionDuration : RelTime
-    -- ^ The time available to the provider to collect a payment.
-    reference : ContractId PaymentReference
-    -- ^ The reference to the reason / good for which the payment is requested.
+    sender : Party -- ^ The party that should pay.
+    receiver : Party -- ^ The party requesting to be paid.
+    svc : Party -- ^ The issuer of CC that should be used to make the payment.
+    quantity : Decimal -- ^ The amount of CC to be paid.
+    expiresAt : Time -- ^ When the payment request expires.
+    collectionDuration : RelTime -- ^ The time available to the provider to collect a payment.
+    reference : ContractId PaymentReference -- ^ The reference to the reason / good for which the payment is requested.
   where
     signatory sender, receiver
     ensure (collectionDuration > aunit && quantity > 0.0)

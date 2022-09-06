@@ -14,4 +14,5 @@ html: $(html)
 $(docker-build): $(html)
 
 $(html): $(src)
+	./gen-daml-docs.sh
 	sphinx-build -M html src target -W

@@ -12,3 +12,12 @@ idea.
    topology
    building/index
    operating/index
+
+API Reference
+=============
+
+.. toctree::
+
+   api/cc/index
+   api/wallet/index
+   api/directory-service/index

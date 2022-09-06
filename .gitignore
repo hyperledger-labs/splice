@@ -28,3 +28,4 @@ temp/
 **/com/daml/ledger/api/**/*.js
 **/com/daml/network/**/*.ts
 **/com/daml/network/**/*.js
+docs/src/app_dev/api
