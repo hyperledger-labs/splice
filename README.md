@@ -521,12 +521,18 @@ whatever configuration is necessary to identify a given cluster.
 
 Available operations include:
 
-* `cncluster create` - Create a new instance of the CN cluster in GCE,
-  if it does not already exist.
-* `cncluster ipaddr` - Return the toplevel IP address of the cluster.
+
 * `cncluster apply` - Apply the cluster configuration to the currently
   running CN cluster in GCE.
+* `cncluster check` - Run a series of simple validity checks against the
+  external API exposed by a cluster.
+* `cncluster create` - Create a new instance of the CN cluster in GCE,
+  if it does not already exist.
 * `cncluster delete` - Delete the currently running CN cluster from GCE.
+* `cncluster ipaddr` - Return the toplevel IP address of the cluster.
+* `cncluster push` - Update the deployment tag for a single running
+  module in the cluster. (This allows individual modules to be tested
+  in the context of an existing cluster.)
 
 Internally, these operations rely on the following environment
 variables. As stated above, these are usually populated via `.envrc`.

@@ -133,7 +133,7 @@ function cluster_create() {
 
     echo "Cluster at IP ${IPADDR}, applying configuration."
 
-    cluster_apply
+    _cluster_apply
 }
 
 function _check_cluster_grpc_port() {
@@ -167,6 +167,28 @@ function cluster_check() {
     _check_cluster_grpc_port 5012 "Scan App API"
 
     _check_cluster_ledger
+}
+
+function _cluster_reset() {
+    kubectl get pods -o=name | xargs kubectl delete
+}
+
+function cluster_ciapply() {
+    # A CI specific variant of 'cncluster apply' that removes the need
+    # for manual confirmation and ensures that all pods are deleted
+    # and recreated during the apply. With current (September 2022)
+    # DevNet, the ledger is stored in memory and the pod reset
+    # has the effect of clearing out all ledger state.
+
+    if [ -z "${CI-}" ]; then
+        _error "This subcommand available to CI jobs only."
+        exit 1
+    fi
+
+    cluster_show
+
+    _cluster_reset
+    _cluster_apply
 }
 
 function cluster_delete() {
@@ -230,6 +252,13 @@ function cluster_push() {
     k8s_set_image "${module}" "${image}"
 }
 
+function cluster_reset() {
+    cluster_confirm "Reset cluster state by deleting ALL pods."
+
+    _cluster_reset
+}
+
+
 case "${SUBCOMMAND_NAME}" in
     activate)
         cluster_activate
@@ -247,6 +276,10 @@ case "${SUBCOMMAND_NAME}" in
         cluster_check
         ;;
 
+    ciapply)
+        cluster_ciapply
+        ;;
+
     delete)
         cluster_delete
         ;;
@@ -259,8 +292,12 @@ case "${SUBCOMMAND_NAME}" in
         cluster_push $@
         ;;
 
+    reset)
+        cluster_reset $@
+        ;;
+
     *)
-	    _error "Usage: $SCRIPTNAME {activate|apply|create|check|delete|ipaddr|push}" >&2
+	    _error "Usage: $SCRIPTNAME {activate|apply|create|check|delete|ipaddr|push|reset}" >&2
 	    exit 3
 	    ;;
 esac
