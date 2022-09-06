@@ -15,11 +15,16 @@ Default Application Topology
   multi-party business workflows
 * the diagram below depicts the topology of such an app
 
+.. TODO(M1-14): [polish] And link to a chapter that explains the standard components of CN, otherwise things like "app users have their own validator node" don't make sense to the reader.
+
 
 .. image:: images/provider-centric-topology.png
    :alt: Topology of a provider-centric app
 
 ..  https://lucid.app/lucidchart/7279c336-b1a0-48de-979e-d08d0182f1a1/edit?viewport_loc=1290%2C-69%2C2972%2C1264%2C0_0&invitationId=inv_e9daab9d-1ebc-4423-b297-053ac0f84d09#
+
+.. TODO(M1-14): [polish] What does it mean for an app to be installed? What is the difference between "app" on the right side and "app Daml package" on the left side?
+.. TODO(M1-14): [polish] Are "wallet" and "directory" not standard components of CN?
 
 * the diagram uses the following notation:
 
@@ -71,14 +76,19 @@ Default Application Topology
        name of the app provider.
 
     3. A **Restricted Ledger API** is served by a validator node to the UI of an
-       installed app. The restrictions ensures that the UI can only
+       installed app. The restrictions ensure that the UI can only
        act in the name of the user as per the rights defined by the
        app's install contract (see :doc:`building/model`); and the UI can only
        read data of the templates specified in the install contract.
 
+       .. TODO(M1-14): [polish] Linked doc doesn't explain what an install contract is.
+       .. TODO(M1-14): [unclear to me] Explain how does this work? Is this a regular ledger API with a new kind of JWT token? Or a completely new API?
+
        This API also supports the issuance of app access-tokens,
        which allow a user to prove to the provider that the user has an active
        installation of the provider's app.
+
+       .. TODO(M1-14): explain where and how are these app access-tokens are used?
 
     4. A generic **app installation API** which is served by the provider's
        validator node to deliver the necessary Daml packages to the user's
@@ -136,7 +146,7 @@ Limitations
     the domains explicitly. The general rule is that only contracts from the
     app integration Daml package are moved between domains.
 
-  * the provider's domain needs to be configured such that user's won't abuse
+  * the provider's domain needs to be configured such that users won't abuse
     that domain; e.g.., to process transactions from completely unrelated apps
 
   * the app user needs to instruct its participant to connect to the app

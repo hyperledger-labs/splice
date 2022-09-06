@@ -6,6 +6,7 @@ Disaster Recovery
   * backup the validator's participant DB: https://docs.daml.com/canton/usermanual/operational_processes.html#backup-and-restore
   * backup your app backend's persistent cache, if rehydration from the
     participant node is not possible within the target recovery time
+  * ensure that you periodically test your backup/restore procedure
 
 * How to deal with data loss on the participant node?
 

@@ -21,6 +21,8 @@ Use of Codegens
 Use of the HTTP JSON API
 ------------------------
 
+You can use the `HTTP JSON API <https://docs.daml.com/json-api/index.html>`_ under the following conditions:
+
 * Small amount of data that can all be refetched & kept in memory
 * Linear scan is acceptable for payload queries
 * State-driven apps that only depend on the ACS, streaming endpoints

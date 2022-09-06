@@ -39,9 +39,12 @@ Releasing Backends and Frontends
 
 * Release backends as docker containers (if they’re released at all)
 * Make all URLs & ports of your own app and the ones you try to reach for dependencies configurable
-* Release frontend as bundle of static files (if they’re released at all)
+* Assuming you build your frontent as a Single-Page Application,
+  release frontend as bundle of static files (if they’re released at all)
 * Either make host/port configurable or assume they’re hosted on the
   same port behind a reverse proxy
+
+.. TODO(M1-14): think about pros/cons and changes in workflows if frontends are delivered as traditional web applications
 
 .. todo::
 

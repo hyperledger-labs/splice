@@ -46,7 +46,8 @@ Introduction
       from IoT devices (it's OK if some measurements get lost or duplicated)
 
     * processes completely internal to a business entity (e.g., vacation
-      tracking)
+      tracking) that the business does not expect to *ever* connect to
+      an external process
 
 
 Getting Started

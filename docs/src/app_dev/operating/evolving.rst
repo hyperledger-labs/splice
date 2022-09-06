@@ -10,3 +10,11 @@ Evolving
      API technology (gRPC or OpenAPI) and Daml package upgrading
   3. Build and test the change in a staging environment
   4. Deploy to production once you are happy with the change
+
+
+.. todo::
+  * How does testing in a staging environment work?
+  * Do we expect each 3rd party developer to run an entire local Canton
+    Network, with deployments of each app that their app interacts with?
+  * Do we expect them to use explicit testing services, like Stripe's `test
+    mode and test cards <https://stripe.com/docs/testing>`_?

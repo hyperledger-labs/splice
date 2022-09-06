@@ -52,7 +52,8 @@ Providing an API for other services to integrate with
 App Rights
 ----------
 
-* App rights defined by choices and tx filter on install contract
+* App rights defined by choices and tx filter on install contract, whereby
+  the tx filter is encoded as a Daml value
 * UIs only write through install contract & read through tx filter
   defined by install contract.
 
@@ -82,9 +83,14 @@ Common patterns
 * receipt contracts and workflow references
 * Batch choices for common operations that accept a list of inputs and
   perform the same operation on each of them
-* store reference data as contracts with the provider as the only signatory and an open choice
-  for reading the reference data that is rate limited; use explicit disclosure to distribute the reference data
+* store reference data as contracts with the provider as the only signatory
 
+  * use explicit disclosure to distribute the reference data
+  * provide an open choice if you want to allow using that reference data in
+    workflows where the provider is no authorizer; and thus ``fetch``'s
+    authorization rules would be too strict
+  * make the open choice consume some token or update some state contract to
+    rate limit it or charge for its use, if required
 
 styleguide
 ----------
@@ -98,7 +104,15 @@ Anti-Patterns
 * Avoid contention, in particular contract keys contention. Minimal contention is fine and can be solved by retries
 * Avoid unexpirable contracts, any active contract should be time-limited
 * Avoid free open choice since they allow for spam, instead ensure that there is some cost paid by the actor on-ledger when executing an open choice
-* Avoid contracts with contract id references to archived contracts. Instead prefer references via keys or make sure contracts get updated in sync. If a contract does have a contract id reference, validate its activeness before usage.
+* Avoid contracts with contract id references to archived contracts.
+  Instead prefer references via keys or make sure contracts get updated in sync.
+  If you do required contracts whose payload stores contract id's, then
+  ensure to validate the contract id's activeness before creating a contract
+  storing it.
 * contention on disclosed contract-ids
 
 How to make your model evolvable?
+
+.. todo::
+
+  Expand this section once the upgrading design is complete.

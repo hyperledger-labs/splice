@@ -5,7 +5,7 @@ Test Driven Development
 -----------------------
 
 - Write integration tests via the APIs also used by your frontend. If
-  possible (due to same/compatible langauage), share client library with frontend.
+  possible (due to same/compatible language), share client library with frontend.
 - Run most tests against locally started CN network. Keep networking
   running through all tests and isolate tests by allocating different
   users/parties.
@@ -50,7 +50,7 @@ Ledger Views
 * If needed, store can support querying at a given offset allowing
   combination of multiple queries to a query at a consistent offset
 * During development that store can be an in-memory store, for
-  production apps back it by a database
+  production apps consider backing it by a database to ensure scalability
 
 Defining Read-Access APIs
 -------------------------
@@ -58,6 +58,7 @@ Defining Read-Access APIs
 * Define APIs in a way that allows consumers to codegen clients
   in their favorite language (openAPI/graphQL/gRPC).
 * Authorize via cross-participant access tokens.
+  See `this draft design design doc on scalable read delegation <https://docs.google.com/document/d/1QnaZvNehEt9_dKDix0zdqLsuvX5LUHU6uw1PHySejss/edit#bookmark=id.y0anh0l5ncaq>`_ for background.
 
 Failure Handling for Ledger API Calls
 -------------------------------------
@@ -65,7 +66,7 @@ Failure Handling for Ledger API Calls
 * Assume all RPCs (e.g., ledger API calls) can fail and retry on transient failures
 * Only retry up to a maximum and retry with exponential backoff
 * Rely on command dedup for retries
-* Report errors with unique error-ids and include documention with your app mapping
+* Report errors with unique error-ids and include documentation with your app mapping
   error-ids to likely causes and resolutions
 
 Integration with Off-Ledger Services
