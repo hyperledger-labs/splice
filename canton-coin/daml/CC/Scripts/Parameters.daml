@@ -8,7 +8,7 @@ import OpenBusiness.Fees
 --
 -- TODO(M1-07): it looks like we need to lower these fees a bit further
 -- to be competitive with ETH and BTC: https://ycharts.com/indicators/ethereum_average_transaction_fee
-defaultCoinConfig : CoinConfig
+defaultCoinConfig : CoinConfig USD
 defaultCoinConfig = CoinConfig with
     -- | Fee to create a new coin.
     -- Set to the fixed part of the transfer fee.

@@ -169,7 +169,7 @@ object CoinUtil extends UploadablePackage {
   def damlNumeric(x: Double): BigDecimal =
     BigDecimal(x).setScale(10, BigDecimal.RoundingMode.HALF_EVEN)
 
-  def defaultCoinConfig: CC.CoinRules.CoinConfig = CC.CoinRules.CoinConfig(
+  def defaultCoinConfig: CC.CoinRules.CoinConfig[CC.CoinRules.USD] = CC.CoinRules.CoinConfig(
     // Fee to create a new coin.
     // Set to the fixed part of the transfer fee.
     createFee = OpenBusiness.Fees.FixedFee(0.09),

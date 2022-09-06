@@ -17,12 +17,14 @@ import OpenBusiness.Fees
 -- Types
 --------
 
+data CC = CC deriving (Show, Eq)
+data USD = USD deriving (Show, Eq)
 
 -- | Configuration determining the fees and limits for CC transfers granted by
 -- the CoinRules.
 --
 -- See CC.Scripts.Parameters for concrete values.
-data CoinConfig = CoinConfig with
+data CoinConfig currency = CoinConfig with
     -- | Fee to create a new coin.
     createFee : FixedFee
     -- | Fee to update an existing coin.
@@ -48,7 +50,7 @@ data CoinConfig = CoinConfig with
 template CoinRules
   with
     svc : Party
-    config : CoinConfig
+    config : CoinConfig USD
     obs: Party -- TODO(M1-06): remove workaround for explicit disclosure
     -- TODO(M1-90): use a schedule with effective dating to make fees predictable to users
   where
@@ -260,7 +262,7 @@ template TransferDebugNote with
     isum : TransferInputsSummary
     osum : TransferOutputsSummary
     summary : TransferSummary
-    scaledConfig : CoinConfig
+    scaledConfig : CoinConfig CC
     round : Round
     validator : Party
   where
@@ -285,12 +287,12 @@ data TransferResult
   | TransferResultLockedCoin (ContractId LockedCoin)
   deriving (Show, Eq, Ord)
 
-scaleConfig : OpenMiningRound -> CoinConfig -> CoinConfig
+scaleConfig : OpenMiningRound -> CoinConfig USD -> CoinConfig CC
 scaleConfig openRound config = scaleFees (1.0 / openRound.coinPrice) config
 
 -- | Execute a transfer.
 --
-executeTransfer : CoinConfig -> Party -> Party -> Transfer -> Update [TransferResult]
+executeTransfer : CoinConfig USD -> Party -> Party -> Transfer -> Update [TransferResult]
 executeTransfer config0 svc validator t = do
   -- MISSING FEATURE 'fetchByKey + off-ledger disclosure': we do not want to have a dependency on
   -- the issuance state, as that will lead to contention. We'd expect to just fetch some
@@ -379,7 +381,7 @@ mergeReceiverFees fees summary =
       fees
     totalTransferFees = summary.totalTransferFees + sum (Map.values fees)
 
-summarizeAndConsumeInputs : Round -> CoinConfig -> Party -> Party -> Party -> [TransferInput] -> Update TransferInputsSummary
+summarizeAndConsumeInputs : Round -> CoinConfig CC -> Party -> Party -> Party -> [TransferInput] -> Update TransferInputsSummary
 summarizeAndConsumeInputs now config svc sender validator inps = do
     foldlA (summarizeAndConsumeInput now) initialSummary inps
   where
@@ -429,7 +431,7 @@ summarizeAndConsumeInputs now config svc sender validator inps = do
         totalHoldingFees = s.totalHoldingFees
 
 
-preprocessAndSummarizeOutputs : CoinConfig -> Party -> [TransferOutput] -> Update TransferOutputsSummary
+preprocessAndSummarizeOutputs : CoinConfig CC -> Party -> [TransferOutput] -> Update TransferOutputsSummary
 preprocessAndSummarizeOutputs config sender outs = do
     -- NOTE: the preprocessed outputs are produced in reverse order. This is intentional,
     -- as it simplifies distributing excess quantity and holdingTime in a way that prefers
@@ -506,7 +508,7 @@ preprocessAndSummarizeOutputs config sender outs = do
         receiverFees = Map.alter (\old -> Some (receiverFee + fromOptional 0.0 old)) receiver s.receiverFees
 
 
-summarizeTransfer : CoinConfig -> TransferInputsSummary -> TransferOutputsSummary -> Update TransferSummary
+summarizeTransfer : CoinConfig CC -> TransferInputsSummary -> TransferOutputsSummary -> Update TransferSummary
 summarizeTransfer config inp out = do
     return TransferSummary with
       quantityBalance = inp.totalQuantity - out.requiredQuantity - senderActionFees - out.senderTransferFees
@@ -529,7 +531,7 @@ summarizeTransfer config inp out = do
     totalTransferFees = out.senderTransferFees + sum (Map.values out.receiverFees)
 
 
-issueRewards : CoinConfig -> OpenMiningRound -> Party -> TransferSummary -> Update ()
+issueRewards : CoinConfig CC -> OpenMiningRound -> Party -> TransferSummary -> Update ()
 issueRewards config openRound sender summary = do
     let validatorReward = summary.senderAdminFees + summary.senderHoldingFees + summary.totalTransferFees
     -- issue reward for the validator of the sender
@@ -565,7 +567,7 @@ data DistributedOutputs = DistributedOutputs with
   coins : [DistributedCoin]
   receiverFees : Map Party Decimal  -- ^ Receiver fees _only_ for floating sender outputs.
 
-distributeOutputs : Round -> CoinConfig -> Party -> Party -> TransferSummary -> [PreprocessedTransferOutput] -> DistributedOutputs
+distributeOutputs : Round -> CoinConfig CC -> Party -> Party -> TransferSummary -> [PreprocessedTransferOutput] -> DistributedOutputs
 distributeOutputs now config svc sender summary outs =
     let st = foldl createOutput initialState outs
     in DistributedOutputs with
@@ -613,7 +615,7 @@ distributeOutputs now config svc sender summary outs =
                  else Map.alter (\old -> Some (receiverFee + fromOptional 0.0 old)) out.owner st.receiverFees
 
 
-createTransferOutputs : Round -> CoinConfig -> Party -> [DistributedCoin] -> Update [TransferResult]
+createTransferOutputs : Round -> CoinConfig CC -> Party -> [DistributedCoin] -> Update [TransferResult]
 createTransferOutputs now config svc outs =
     mapA createOutput outs
   where
@@ -628,7 +630,7 @@ createTransferOutputs now config svc outs =
 
 
 -- | Scale the 'CoinConfig' such that the fees charged are scaled by the same scale factor.
-scaleFees : Decimal -> CoinConfig -> CoinConfig
+scaleFees : Decimal -> CoinConfig USD -> CoinConfig CC
 scaleFees s c = CoinConfig with
     createFee = scaleFixedFee s c.createFee
     updateFee = scaleFixedFee s c.updateFee
