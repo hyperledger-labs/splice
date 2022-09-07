@@ -1,8 +1,5 @@
 # -*- makefile -*-
 include ../build-tools/common.mk
-include ../build-tools/docker.mk
-
-all: docker-build
 
 src := Dockerfile empty.conf
 
