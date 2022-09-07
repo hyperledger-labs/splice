@@ -259,7 +259,7 @@ port 8081 for Bob’s wallet.
 5. Start the envoy grpc-web proxy for the splitwise apps
 
 ```
-cd apps/wallet/frontend
+cd apps/splitwise/frontend
 ./start-envoy.sh
 ```
 
