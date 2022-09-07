@@ -19,7 +19,14 @@ const PaymentChannels: React.FC<{}> = () => {
     const [receiver, setReceiver] = useState<string>("");
     const proposeChannel = async (ev: React.FormEvent<HTMLFormElement>) => {
         ev.preventDefault();
-        await walletClient.proposePaymentChannel(new ProposePaymentChannelRequest().setReceiverPartyId(receiver), null);
+        await walletClient.proposePaymentChannel(
+            new ProposePaymentChannelRequest()
+                .setReceiverPartyId(receiver)
+                .setAllowDirectTransfers(true)
+                .setAllowOffers(true)
+                .setAllowRequests(true)
+                .setSenderTransferFeeRatio("0.5"),
+            null);
         setReceiver("");
     };
     const approveChannel = async (cid: string) => {
