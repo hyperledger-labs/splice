@@ -4,9 +4,9 @@
   "private": true,
   "dependencies": {
     "@daml.js/canton-coin": "file:daml.js/canton-coin-0.1.0",
-    "@daml.js/wallet": "file:daml.js/wallet-0.1.0",
     "@daml.js/directory": "file:daml.js/directory-service-0.1.0",
     "@daml.js/splitwise": "file:daml.js/splitwise-0.1.0",
+    "@daml.js/wallet": "file:daml.js/wallet-0.1.0",
     "@daml/ledger": "file:../../../nix/vendored/daml-ledger-0.0.0.tgz",
     "@daml/ledger-api": "file:../../../nix/vendored/daml-ledger-api-0.0.0.tgz",
     "@daml/types": "file:../../../nix/vendored/daml-types-0.0.0.tgz",
@@ -34,13 +34,20 @@
     "start": "react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test",
-    "eject": "react-scripts eject"
+    "eject": "react-scripts eject",
+    "format:fix": "echo 'TODO(Alex) // implement later'",
+    "format:check": "prettier --check src"
   },
   "eslintConfig": {
     "extends": [
       "react-app",
       "react-app/jest"
     ]
+  },
+  "prettier": {
+    "printWidth": 100,
+    "singleQuote": true,
+    "arrowParens": "avoid"
   },
   "browserslist": {
     "production": [
@@ -53,5 +60,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "prettier": "^2.7.1"
   }
 }
