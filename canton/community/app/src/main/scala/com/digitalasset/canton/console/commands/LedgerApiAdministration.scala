@@ -349,11 +349,13 @@ trait BaseLedgerApiAdministration extends NoTracing {
           deduplicationPeriod: Option[DeduplicationPeriod] = None,
           submissionId: String = "",
           minLedgerTimeAbs: Option[Instant] = None,
+          readAs: Seq[PartyId] = Seq.empty,
       ): TransactionTree = check(FeatureFlag.Testing) {
         val tx = consoleEnvironment.run {
           ledgerApiCommand(
             LedgerApiCommands.CommandService.SubmitAndWaitTransactionTree(
               actAs.map(_.toLf),
+              readAs.map(_.toLf),
               commands,
               workflowId,
               commandId,
@@ -390,11 +392,13 @@ trait BaseLedgerApiAdministration extends NoTracing {
           deduplicationPeriod: Option[DeduplicationPeriod] = None,
           submissionId: String = "",
           minLedgerTimeAbs: Option[Instant] = None,
+          readAs: Seq[PartyId] = Seq.empty,
       ): Transaction = check(FeatureFlag.Testing) {
         val tx = consoleEnvironment.run {
           ledgerApiCommand(
             LedgerApiCommands.CommandService.SubmitAndWaitTransaction(
               actAs.map(_.toLf),
+              readAs.map(_.toLf),
               commands,
               workflowId,
               commandId,
@@ -420,11 +424,13 @@ trait BaseLedgerApiAdministration extends NoTracing {
           deduplicationPeriod: Option[DeduplicationPeriod] = None,
           submissionId: String = "",
           minLedgerTimeAbs: Option[Instant] = None,
+          readAs: Seq[PartyId] = Seq.empty,
       ): Unit = check(FeatureFlag.Testing) {
         consoleEnvironment.run {
           ledgerApiCommand(
             LedgerApiCommands.CommandSubmissionService.Submit(
               actAs.map(_.toLf),
+              readAs.map(_.toLf),
               commands,
               workflowId,
               commandId,

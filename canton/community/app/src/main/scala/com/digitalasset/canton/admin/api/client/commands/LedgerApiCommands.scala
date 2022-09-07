@@ -556,6 +556,7 @@ object LedgerApiCommands {
 
   private[commands] trait SubmitCommand extends PrettyPrinting {
     def actAs: Seq[LfPartyId]
+    def readAs: Seq[LfPartyId]
     def commands: Seq[Command]
     def workflowId: String
     def commandId: String
@@ -568,6 +569,7 @@ object LedgerApiCommands {
       applicationId = applicationId,
       commandId = if (commandId.isEmpty) UUID.randomUUID().toString else commandId,
       actAs = actAs,
+      readAs = readAs,
       commands = commands,
       deduplicationPeriod = deduplicationPeriod.fold(
         CommandsV1.DeduplicationPeriod.Empty: CommandsV1.DeduplicationPeriod
@@ -589,6 +591,7 @@ object LedgerApiCommands {
     override def pretty: Pretty[this.type] =
       prettyOfClass(
         param("actAs", _.actAs),
+        param("readAs", _.readAs),
         param("commandId", _.commandId.singleQuoted),
         param("workflowId", _.workflowId.singleQuoted),
         param("submissionId", _.submissionId.singleQuoted),
@@ -607,6 +610,7 @@ object LedgerApiCommands {
 
     final case class Submit(
         override val actAs: Seq[LfPartyId],
+        override val readAs: Seq[LfPartyId],
         override val commands: Seq[Command],
         override val workflowId: String,
         override val commandId: String,
@@ -639,6 +643,7 @@ object LedgerApiCommands {
 
     final case class SubmitAndWaitTransactionTree(
         override val actAs: Seq[LfPartyId],
+        override val readAs: Seq[LfPartyId],
         override val commands: Seq[Command],
         override val workflowId: String,
         override val commandId: String,
@@ -672,6 +677,7 @@ object LedgerApiCommands {
 
     final case class SubmitAndWaitTransaction(
         override val actAs: Seq[LfPartyId],
+        override val readAs: Seq[LfPartyId],
         override val commands: Seq[Command],
         override val workflowId: String,
         override val commandId: String,
