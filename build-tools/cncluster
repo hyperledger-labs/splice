@@ -170,7 +170,7 @@ function cluster_check() {
 }
 
 function _cluster_reset() {
-    kubectl get pods -o=name | xargs kubectl delete
+    kubectl delete pods --all
 }
 
 function cluster_ciapply() {
