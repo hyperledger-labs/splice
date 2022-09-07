@@ -76,9 +76,9 @@ class SplitwiseIntegrationTest
       aliceUserParty,
       10.0,
     )
-    val acceptedPayment = inside(bobWallet.listAppPaymentRequests()) { case Seq(request) =>
-      val coin = bobWallet.tap(20)
-      bobWallet.acceptAppPaymentRequest(
+    val acceptedPayment = inside(bobRemoteWallet.listAppPaymentRequests()) { case Seq(request) =>
+      val coin = bobRemoteWallet.tap(20)
+      bobRemoteWallet.acceptAppPaymentRequest(
         request.contractId,
         coin,
       )
@@ -129,13 +129,15 @@ class SplitwiseIntegrationTest
     "support self-hosted mode" in { implicit env =>
       // Onboard alice on her self-hosted validator
       val aliceValidatorParty = aliceValidator.initialize()
-      val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
+      val aliceDamlUser = aliceRemoteWallet.config.damlUser
+      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
       aliceWallet.initialize(aliceValidatorParty)
       aliceSplitwise.initialize(aliceValidatorParty)
 
       // Onboard bob on his self-hosted validator
       val bobValidatorParty = bobValidator.initialize()
-      val bobUserParty = bobValidator.onboardUser(bobWallet.config.damlUser)
+      val bobDamlUser = bobRemoteWallet.config.damlUser
+      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
       bobWallet.initialize(bobValidatorParty)
       bobSplitwise.initialize(bobValidatorParty)
 
@@ -166,13 +168,15 @@ class SplitwiseIntegrationTest
     "support provider-hosted mode" in { implicit env =>
       // Onboard alice on her self-hosted validator
       val aliceValidatorParty = aliceValidator.initialize()
-      val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
+      val aliceDamlUser = aliceRemoteWallet.config.damlUser
+      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
       aliceWallet.initialize(aliceValidatorParty)
       aliceSplitwise.initialize(aliceValidatorParty)
 
       // Onboard bob on his self-hosted validator
       val bobValidatorParty = bobValidator.initialize()
-      val bobUserParty = bobValidator.onboardUser(bobWallet.config.damlUser)
+      val bobDamlUser = bobRemoteWallet.config.damlUser
+      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
       bobWallet.initialize(bobValidatorParty)
       bobSplitwise.initialize(bobValidatorParty)
 
@@ -204,7 +208,8 @@ class SplitwiseIntegrationTest
 
     "return the primary party of the user" in { implicit env =>
       val aliceValidatorParty = aliceValidator.initialize()
-      val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
+      val aliceDamlUser = aliceRemoteWallet.config.damlUser
+      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
       aliceSplitwise.initialize(aliceValidatorParty)
       aliceSplitwise.getPartyId() shouldBe aliceUserParty
     }

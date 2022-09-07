@@ -1,8 +1,7 @@
 import { Coin } from "@daml.js/canton-coin/lib/CC/Coin";
 import { Button, FormGroup, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField } from "@mui/material";
-import { Empty } from "google-protobuf/google/protobuf/empty_pb";
 import { useCallback, useState } from "react";
-import { TapRequest } from "./com/daml/network/wallet/v0/wallet_service_pb";
+import { ListRequest, TapRequest } from "./com/daml/network/wallet/v0/wallet_service_pb";
 import { Contract } from "./Contract";
 import { sameContracts, useInterval } from "./Util";
 import { useWalletClient } from "./WalletServiceContext";
@@ -14,7 +13,8 @@ const Coins: React.FC<{}> = () => {
     const walletClient = useWalletClient();
 
     const fetchCoins = useCallback(async () => {
-        const newCoins = (await walletClient.list(new Empty(), null)).getCoinsList();
+        // TODO(i680)
+        const newCoins = (await walletClient.list(new ListRequest(), null)).getCoinsList();
         const decoded = newCoins.map(c => Contract.decode(c, Coin));
         setCoins((prev) => sameContracts(prev, decoded) ? prev : decoded);
     }, [walletClient, setCoins]);

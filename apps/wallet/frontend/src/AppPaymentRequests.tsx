@@ -1,8 +1,7 @@
 import { AppPaymentRequest } from "@daml.js/wallet/lib/CN/Wallet";
 import { Button, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField } from "@mui/material";
-import { Empty } from "google-protobuf/google/protobuf/empty_pb";
 import React, { useCallback, useState } from "react";
-import { AcceptAppPaymentRequestRequest } from "./com/daml/network/wallet/v0/wallet_service_pb";
+import { AcceptAppPaymentRequestRequest, ListAppPaymentRequestsRequest } from "./com/daml/network/wallet/v0/wallet_service_pb";
 import { Contract } from "./Contract";
 import { sameContracts, useInterval } from "./Util";
 import { useWalletClient } from "./WalletServiceContext";
@@ -11,7 +10,8 @@ const AppPaymentRequests: React.FC<{}> = () => {
     const walletClient = useWalletClient();
     const [appPaymentRequests, setAppPaymentRequests] = useState<Contract<AppPaymentRequest>[]>([]);
     const fetchAppPaymentRequests = useCallback(async () => {
-        const newAppPaymentRequests = (await walletClient.listAppPaymentRequests(new Empty(), null)).getPaymentRequestsList();
+        // TODO(i680)
+        const newAppPaymentRequests = (await walletClient.listAppPaymentRequests(new ListAppPaymentRequestsRequest(), null)).getPaymentRequestsList();
         const decoded = newAppPaymentRequests.map(c => Contract.decode(c, AppPaymentRequest));
         setAppPaymentRequests((prev) => sameContracts(decoded, prev) ? prev : decoded);
     }, [walletClient, setAppPaymentRequests]);

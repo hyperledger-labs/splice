@@ -29,8 +29,8 @@ class ScanIntegrationTest
 
   "see CC transfers" in { implicit env =>
     val (aliceP, bobP) = setup(env)
-    val tappedCoinCid = aliceWallet.tap(50)
-    aliceWallet.executeDirectTransfer(bobP, 10, tappedCoinCid)
+    val tappedCoinCid = aliceRemoteWallet.tap(50)
+    aliceRemoteWallet.executeDirectTransfer(bobP, 10, tappedCoinCid)
     import scala.concurrent.duration._
     eventually(5.seconds) {
       val history = scan.getTxHistory()
@@ -79,23 +79,25 @@ class ScanIntegrationTest
     import env._
     // Onboard alice on her self-hosted validator
     val aliceValidatorParty = aliceValidator.initialize()
-    val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
+    val aliceDamlUser = aliceRemoteWallet.config.damlUser
+    val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
     aliceWallet.initialize(aliceValidatorParty)
 
     // Onboard bob on his self-hosted validator
     val bobValidatorParty = bobValidator.initialize()
-    val bobUserParty = bobValidator.onboardUser(bobWallet.config.damlUser)
+    val bobDamlUser = bobRemoteWallet.config.damlUser
+    val bobUserParty = bobValidator.onboardUser(bobDamlUser)
     bobWallet.initialize(bobValidatorParty)
     // ensure the participants see the CoinRules
     aliceWallet.remoteParticipant.ledger_api.acs.await(aliceValidatorParty, CoinRules)
     bobWallet.remoteParticipant.ledger_api.acs.await(bobValidatorParty, CoinRules)
 
-    val proposalId = aliceWallet.proposePaymentChannel(bobUserParty)
+    val proposalId = aliceRemoteWallet.proposePaymentChannel(bobUserParty)
     // Bob monitors proposals and accepts the one
-    utils.retry_until_true(bobWallet.listPaymentChannelProposals().size == 1)
-    bobWallet.acceptPaymentChannelProposal(proposalId)
+    utils.retry_until_true(bobRemoteWallet.listPaymentChannelProposals().size == 1)
+    bobRemoteWallet.acceptPaymentChannelProposal(proposalId)
 
-    utils.retry_until_true(aliceWallet.listPaymentChannels().size == 1)
+    utils.retry_until_true(aliceRemoteWallet.listPaymentChannels().size == 1)
     (aliceUserParty, bobUserParty)
   }
 }

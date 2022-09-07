@@ -7,34 +7,42 @@ import "google/protobuf/empty.proto";
 
 service WalletService {
   rpc Initialize (InitializeRequest) returns (google.protobuf.Empty);
-  rpc List (google.protobuf.Empty) returns (ListResponse);
+  rpc List (ListRequest) returns (ListResponse);
   rpc Tap (TapRequest) returns (TapResponse);
 
-  rpc ListAppPaymentRequests (google.protobuf.Empty) returns (ListAppPaymentRequestsResponse);
+  rpc ListAppPaymentRequests (ListAppPaymentRequestsRequest) returns (ListAppPaymentRequestsResponse);
   rpc AcceptAppPaymentRequest (AcceptAppPaymentRequestRequest) returns (AcceptAppPaymentRequestResponse);
   rpc RejectAppPaymentRequest (RejectAppPaymentRequestRequest) returns (google.protobuf.Empty);
-  rpc ListAcceptedAppPayments (google.protobuf.Empty) returns (ListAcceptedAppPaymentsResponse);
+  rpc ListAcceptedAppPayments (ListAcceptedAppPaymentsRequest) returns (ListAcceptedAppPaymentsResponse);
 
   rpc ProposePaymentChannel (ProposePaymentChannelRequest) returns (ProposePaymentChannelResponse);
-  rpc ListPaymentChannelProposals (google.protobuf.Empty) returns (ListPaymentChannelProposalsResponse);
-  rpc ListPaymentChannels (google.protobuf.Empty) returns (ListPaymentChannelsResponse);
+  rpc ListPaymentChannelProposals (ListPaymentChannelProposalsRequest) returns (ListPaymentChannelProposalsResponse);
+  rpc ListPaymentChannels (ListPaymentChannelsRequest) returns (ListPaymentChannelsResponse);
   rpc AcceptPaymentChannelProposal (AcceptPaymentChannelProposalRequest) returns (AcceptPaymentChannelProposalResponse);
   rpc CancelPaymentChannel(CancelPaymentChannelRequest) returns (google.protobuf.Empty);
   rpc ExecuteDirectTransfer (ExecuteDirectTransferRequest) returns (google.protobuf.Empty);
   rpc CreateOnChannelPaymentRequest (CreateOnChannelPaymentRequestRequest) returns (CreateOnChannelPaymentRequestResponse);
-  rpc ListOnChannelPaymentRequests (google.protobuf.Empty) returns (ListOnChannelPaymentRequestsResponse);
+  rpc ListOnChannelPaymentRequests (ListOnChannelPaymentRequestsRequest) returns (ListOnChannelPaymentRequestsResponse);
   rpc AcceptOnChannelPaymentRequest (AcceptOnChannelPaymentRequestRequest) returns (google.protobuf.Empty);
   rpc RejectOnChannelPaymentRequest (RejectOnChannelPaymentRequestRequest) returns (google.protobuf.Empty);
   rpc WithdrawOnChannelPaymentRequest (WithdrawOnChannelPaymentRequestRequest) returns (google.protobuf.Empty);
 
-  rpc ListAppRewards (google.protobuf.Empty) returns (ListAppRewardsResponse);
-  rpc ListValidatorRewards (google.protobuf.Empty) returns (ListValidatorRewardsResponse);
+  rpc ListAppRewards (ListAppRewardsRequest) returns (ListAppRewardsResponse);
+  rpc ListValidatorRewards (ListValidatorRewardsRequest) returns (ListValidatorRewardsResponse);
 
   rpc Redistribute (RedistributeRequest) returns (RedistributeResponse);
 }
 
+message WalletContext {
+  string user_id = 1;
+}
+
 message InitializeRequest {
   string validator_party_id = 2;
+}
+
+message ListRequest {
+  WalletContext wallet_ctx = 1;
 }
 
 message ListResponse {
@@ -43,10 +51,15 @@ message ListResponse {
 
 message TapRequest {
   string quantity = 1;
+  WalletContext wallet_ctx = 2;
 }
 
 message TapResponse {
   string contract_id = 1;
+}
+
+message ListAppPaymentRequestsRequest {
+  WalletContext wallet_ctx = 1;
 }
 
 message ListAppPaymentRequestsResponse {
@@ -60,6 +73,8 @@ message AcceptAppPaymentRequestRequest {
   // Coin to be used as input to locking amount to be paid.
   // TODO(M1-07): have the backend determine the coin inputs by itself.
   string coin_contract_id = 2;
+
+  WalletContext wallet_ctx = 3;
 }
 
 message AcceptAppPaymentRequestResponse {
@@ -68,6 +83,12 @@ message AcceptAppPaymentRequestResponse {
 
 message RejectAppPaymentRequestRequest {
   string request_contract_id = 1;
+
+  WalletContext wallet_ctx = 2;
+}
+
+message ListAcceptedAppPaymentsRequest {
+  WalletContext wallet_ctx = 1;
 }
 
 message ListAcceptedAppPaymentsResponse {
@@ -88,14 +109,24 @@ message ProposePaymentChannelRequest {
   bool allow_direct_transfers = 5;
   // How to split the transfer fee between the sender and the receiver
   string sender_transfer_fee_ratio = 6;
+
+  WalletContext wallet_ctx = 7;
 }
 
 message ProposePaymentChannelResponse {
   string proposal_contract_id = 1;
 }
 
+message ListPaymentChannelProposalsRequest {
+  WalletContext wallet_ctx = 1;
+}
+
 message ListPaymentChannelProposalsResponse {
   repeated com.daml.network.v0.Contract proposals = 1;
+}
+
+message ListPaymentChannelsRequest {
+  WalletContext wallet_ctx = 1;
 }
 
 message ListPaymentChannelsResponse {
@@ -104,10 +135,14 @@ message ListPaymentChannelsResponse {
 
 message AcceptPaymentChannelProposalRequest {
   string proposal_contract_id = 1;
+
+  WalletContext wallet_ctx = 2;
 }
 
 message CancelPaymentChannelRequest {
   string sender_party_id = 1;
+
+  WalletContext wallet_ctx = 2;
 }
 
 message AcceptPaymentChannelProposalResponse {
@@ -123,10 +158,20 @@ message ExecuteDirectTransferRequest {
 
   // TODO(M1-07): auto-select inputs for the transfer
   string coin_contract_id = 4;
+
+  WalletContext wallet_ctx = 5;
+}
+
+message ListAppRewardsRequest {
+  WalletContext wallet_ctx = 1;
 }
 
 message ListAppRewardsResponse {
   repeated com.daml.network.v0.Contract app_rewards = 1;
+}
+
+message ListValidatorRewardsRequest {
+  WalletContext wallet_ctx = 1;
 }
 
 message ListValidatorRewardsResponse {
@@ -142,10 +187,16 @@ message CreateOnChannelPaymentRequestRequest {
 
   // Reason for the request
   string description = 3;
+
+  WalletContext wallet_ctx = 4;
 }
 
 message CreateOnChannelPaymentRequestResponse {
   string request_contract_id = 1;
+}
+
+message ListOnChannelPaymentRequestsRequest {
+  WalletContext wallet_ctx = 1;
 }
 
 message ListOnChannelPaymentRequestsResponse {
@@ -160,16 +211,22 @@ message AcceptOnChannelPaymentRequestRequest {
   // Coin to use for the transfer
   // TODO(M1-07): auto-select inputs for the transfer
   string coin_contract_id = 2;
+
+  WalletContext wallet_ctx = 3;
 }
 
 message RejectOnChannelPaymentRequestRequest {
   // The request to reject
   string request_contract_id = 1;
+
+  WalletContext wallet_ctx = 2;
 }
 
 message WithdrawOnChannelPaymentRequestRequest {
   // The request to withdraw
   string request_contract_id = 1;
+
+  WalletContext wallet_ctx = 2;
 }
 
 message RedistributeOutput {
@@ -181,6 +238,8 @@ message RedistributeRequest {
   repeated com.daml.network.v0.Value inputs = 1;
   // The outputs to distribute to.
   repeated RedistributeOutput outputs = 2;
+
+  WalletContext wallet_ctx = 3;
 }
 
 message RedistributeResponse {

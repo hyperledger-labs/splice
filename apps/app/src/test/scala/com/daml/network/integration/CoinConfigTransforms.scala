@@ -49,7 +49,9 @@ object CoinConfigTransforms {
         val config3 =
           updateAllValidatorConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config2)
         val config4 =
-          updateAllWalletAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config3)
+          updateAllRemoteWalletAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
+            config3
+          )
         val config5 = updateAllDirectoryProviderAppConfigs_(c =>
           c.copy(damlUser = s"${c.damlUser}-$suffix")
         )(config4)
@@ -92,6 +94,13 @@ object CoinConfigTransforms {
       update: WalletAppTransform
   ): CoinConfigTransform =
     _.focus(_.walletApps).modify(_.map { case (name, config) =>
+      (name, update(config))
+    })
+
+  def updateAllRemoteWalletAppConfigs_(
+      update: RemoteWalletAppTransform
+  ): CoinConfigTransform =
+    _.focus(_.remoteWalletApps).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 

@@ -35,11 +35,20 @@ trait CommonCoinAppInstanceReferences {
   def aliceWallet(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference = w(
     "aliceWallet"
   )
+  def aliceRemoteWallet(implicit env: CoinTestConsoleEnvironment): RemoteWalletAppReference = rw(
+    "aliceRemoteWallet"
+  )
   def aliceValidator(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
     "aliceValidator"
   )
   def bobWallet(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference = w(
     "bobWallet"
+  )
+  def bobRemoteWallet(implicit env: CoinTestConsoleEnvironment): RemoteWalletAppReference = rw(
+    "bobRemoteWallet"
+  )
+  def charlieRemoteWallet(implicit env: CoinTestConsoleEnvironment): RemoteWalletAppReference = rw(
+    "charlieRemoteWallet"
   )
   def bobValidator(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
     "bobValidator"

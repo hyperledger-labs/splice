@@ -38,7 +38,7 @@ class DirectoryProviderIntegrationTest
       // The provider of the directory service
       val providerParty = directoryValidator.initialize()
       // The user of the directory service.
-      val userParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
+      val userParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
 
       aliceWallet.initialize(aliceValidatorParty)
       aliceWallet.remoteParticipant.ledger_api.acs
@@ -85,7 +85,7 @@ class DirectoryProviderIntegrationTest
 
       // User: wait until payment request becomes visible
       def getPaymentRequest() =
-        aliceWallet
+        aliceRemoteWallet
           .listAppPaymentRequests()
           .find(c => c.payload.reference == entryRequest.contractId)
       utils.retry_until_true { getPaymentRequest().isDefined }
@@ -94,8 +94,8 @@ class DirectoryProviderIntegrationTest
       walletPaymentRequest.contractId shouldBe paymentRequest
 
       // Accept payment request
-      val coin = aliceWallet.tap(5.0)
-      val _ = aliceWallet.acceptAppPaymentRequest(walletPaymentRequest.contractId, coin)
+      val coin = aliceRemoteWallet.tap(5.0)
+      val _ = aliceRemoteWallet.acceptAppPaymentRequest(walletPaymentRequest.contractId, coin)
 
       // Collect payment
       val acceptedPayment = directoryProvider.remoteParticipant.ledger_api.acs

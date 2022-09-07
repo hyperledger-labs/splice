@@ -1,8 +1,7 @@
 import { PaymentChannelProposal } from "@daml.js/wallet/lib/CN/Wallet";
 import { Button, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
-import { Empty } from "google-protobuf/google/protobuf/empty_pb";
 import React, { useCallback, useState } from "react";
-import { AcceptPaymentChannelProposalRequest, ExecuteDirectTransferRequest, ProposePaymentChannelRequest } from "./com/daml/network/wallet/v0/wallet_service_pb";
+import { AcceptPaymentChannelProposalRequest, ExecuteDirectTransferRequest, ListPaymentChannelProposalsRequest, ProposePaymentChannelRequest } from "./com/daml/network/wallet/v0/wallet_service_pb";
 import { Contract } from "./Contract";
 import { useInterval } from "./Util";
 import { useWalletClient } from "./WalletServiceContext";
@@ -11,7 +10,8 @@ const PaymentChannels: React.FC<{}> = () => {
     const walletClient = useWalletClient();
     const [proposals, setProposals] = useState<Contract<PaymentChannelProposal>[]>([]);
     const fetchChannelProposals = useCallback(async () => {
-        const proposalList = (await walletClient.listPaymentChannelProposals(new Empty(), null)).getProposalsList();
+        // TODO(i680)
+        const proposalList = (await walletClient.listPaymentChannelProposals(new ListPaymentChannelProposalsRequest(), null)).getProposalsList();
         setProposals(proposalList.map(c => Contract.decode(c, PaymentChannelProposal)));
     }, [walletClient, setProposals]);
     useInterval(fetchChannelProposals, 500);

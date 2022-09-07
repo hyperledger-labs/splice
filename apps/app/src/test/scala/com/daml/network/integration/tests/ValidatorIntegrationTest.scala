@@ -44,7 +44,7 @@ class ValidatorIntegrationTest
       .await(aliceValidatorParty, CC.CoinRules.CoinRules)
 
     // onboard end user
-    aliceValidator.onboardUser(aliceWallet.config.damlUser)
+    aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
   }
 
 }
