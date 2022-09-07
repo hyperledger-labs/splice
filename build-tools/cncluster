@@ -6,9 +6,18 @@ shift
 set -euo pipefail
 
 source ${TOOLS_LIB}/libcli.source
-source ${TOOLS_LIB}/k8s.source
 
 SCRIPTNAME=${0##*/}
+
+# Ensure we're running in a cluster deployment context
+
+if [ -z "${GCP_CLUSTER_BASENAME-}" ]; then
+    _error "GCP_CLUSTER_BASENAME is undefined, this script must be run in a deployment/ directory."
+    exit 1
+fi
+
+
+##
 
 GCP_CLUSTER_NAME="cn-${GCP_CLUSTER_BASENAME}net"
 CLUSTER_DNS_NAME="${GCP_CLUSTER_BASENAME}.network.canton.global"
@@ -31,19 +40,18 @@ function cluster_ip() {
 }
 
 function _cluster_apply() {
-    k8s_apply $(cluster_ip)
+    jsonnet --tla-str gcpRegion=${CLOUDSDK_COMPUTE_REGION} \
+            --tla-str gcpRepoName=${GCP_REPO_NAME} \
+            --tla-str imageTag=$(version-gen) \
+            --tla-str ipAddr=$(cluster_ip) \
+            $REPO_ROOT/cluster/canton-network-config.jsonnet \
+        | kubectl apply -f -
 }
 
-function ensure_deployment_context() {
-    if [ -z "${GCP_CLUSTER_NAME-}" ]; then
-        _error "GCP_CLUSTER_NAME is undefined, this script must be run in a deployment/ directory."
-        exit 1
-    fi
-}
+
+
 
 function cluster_show() {
-    ensure_deployment_context
-
     echo "CLOUDSDK_COMPUTE_REGION : ${CLOUDSDK_COMPUTE_REGION}"
     echo "CLOUDSDK_CORE_PROJECT   : ${CLOUDSDK_CORE_PROJECT}"
     echo "GCP_REPO_NAME           : ${GCP_REPO_NAME}"
@@ -215,8 +223,6 @@ function cluster_delete() {
 }
 
 function cluster_ipaddr() {
-    ensure_deployment_context
-
     if cluster_exists; then
         cluster_ip
     else
@@ -249,7 +255,7 @@ function cluster_push() {
 
     image=$(<${tagfile})
 
-    k8s_set_image "${module}" "${image}"
+    kubectl set image "deployment/${module}" "${module}=${image}"
 }
 
 function cluster_reset() {

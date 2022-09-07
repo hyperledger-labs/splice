@@ -24,7 +24,6 @@ in pkgs.mkShell {
     jsonnet
     kubectl
     lnav
-    minikube
     nix
     nodejs
     openjdk11
