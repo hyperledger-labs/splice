@@ -18,15 +18,14 @@ import com.daml.network.codegen.CC.Round.IssuingMiningRound
 sealed trait ParentNode {
   def toProtoV0: v0.ParentNode
 }
-case class Transfer(node: ExerciseNode[CoinRules_Transfer, P.List[TransferResult]])
-    extends ParentNode {
+case class Transfer(node: ExerciseNode[CoinRules_Transfer, TransferResult]) extends ParentNode {
   def toProtoV0: v0.ParentNode =
     v0.ParentNode().withTransfer(node.toProtoV0)
 }
 
 object Transfer extends ExerciseNodeCompanion {
   override type Arg = CoinRules_Transfer
-  override type Res = P.List[TransferResult]
+  override type Res = TransferResult
 
   def fromProtoV0(
       transferP: v0.ParentNode.Type.Transfer

@@ -480,8 +480,9 @@ class GrpcWalletService(
         )
       } yield {
         v0.RedistributeResponse(
-          transferResults.collect { case coinRulesCodegen.TransferResult.TransferResultCoin(cid) =>
-            Proto.encode(cid)
+          transferResults.createdCoins.collect {
+            case coinRulesCodegen.CreatedCoin.TransferResultCoin(cid) =>
+              Proto.encode(cid)
           }
         )
       }

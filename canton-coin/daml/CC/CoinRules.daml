@@ -51,7 +51,7 @@ template CoinRules
     key (svc, obs) : (Party, Party)
     maintainer key._1
 
-    nonconsuming choice CoinRules_Transfer : [TransferResult]
+    nonconsuming choice CoinRules_Transfer : TransferResult
       -- ^ Execute a transfer.
       --
       -- Transfers support a batch-in batch-out model, which enables CC users
@@ -270,9 +270,19 @@ transferControllers t =
     addOutputController s (OutputSenderCoin with lock; ..) = optional s (`Set.insert` s) (holder <$> lock)
     addOutputController s (OutputReceiverCoin with receiver; ..) = Set.insert receiver s
 
--- | Contracts created during a transfer and
--- returned as choice results.
+
+-- | Includes contracts created during a transfer and meta information about the transfer.
+-- Returned as choice result.
 data TransferResult
+  = TransferResult
+  with
+    round: Round
+    summary: TransferSummary
+    createdCoins: [CreatedCoin]
+  deriving (Show, Eq)
+
+-- The coins created during a transfer ordered as specified in the respective TransferOutput
+data CreatedCoin
   = TransferResultCoin (ContractId Coin)
   | TransferResultLockedCoin (ContractId LockedCoin)
   deriving (Show, Eq, Ord)
@@ -282,7 +292,7 @@ scaleConfig openRound config = scaleFees (1.0 / openRound.coinPrice) config
 
 -- | Execute a transfer.
 --
-executeTransfer : CoinConfig USD -> Party -> Party -> Transfer -> Update [TransferResult]
+executeTransfer : CoinConfig USD -> Party -> Party -> Transfer -> Update TransferResult
 executeTransfer config0 svc validator t = do
   -- MISSING FEATURE 'fetchByKey + off-ledger disclosure': we do not want to have a dependency on
   -- the issuance state, as that will lead to contention. We'd expect to just fetch some
@@ -310,9 +320,13 @@ executeTransfer config0 svc validator t = do
   -- record debugging note
   create TransferDebugNote with transfer = t; scaledConfig = config; round = issuanceState.currentRound; ..
   -- issue rewards for burns
-  issueRewards config openRound t.sender (mergeReceiverFees distributed.receiverFees summary)
+  issueRewards config openRound t.sender summary
   -- record outputs
-  createTransferOutputs openRound.round config svc distributed.coins
+  createdCoins <- createTransferOutputs openRound.round config svc distributed.coins
+
+  return TransferResult with
+    round = openRound.round
+    ..
 
 data TransferInputsSummary = TransferInputsSummary with
     numBurnInputs : Int
@@ -603,7 +617,7 @@ distributeOutputs now config svc sender summary outs =
                  else Map.alter (\old -> Some (receiverFee + fromOptional 0.0 old)) out.owner st.receiverFees
 
 
-createTransferOutputs : Round -> CoinConfig CC -> Party -> [DistributedCoin] -> Update [TransferResult]
+createTransferOutputs : Round -> CoinConfig CC -> Party -> [DistributedCoin] -> Update [CreatedCoin]
 createTransferOutputs now config svc outs =
     mapA createOutput outs
   where

@@ -59,10 +59,10 @@ class ScanIntegrationTest
           transferParentNode shouldBe transferParentNode2
           transferParentNode2 shouldBe transferParentNode3
 
-          inside(transferParentNode) { case Some(Transfer(ExerciseNode(argument, results))) =>
+          inside(transferParentNode) { case Some(Transfer(ExerciseNode(argument, result))) =>
             argument.transfer.sender shouldBe aliceP.toPrim
             // one transfer result for alice, one for bob
-            results should have length 2
+            result.createdCoins should have length 2
           }
 
           aliceNew should matchPattern { case CoinCreate(_) => }

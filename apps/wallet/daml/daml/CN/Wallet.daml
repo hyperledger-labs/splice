@@ -27,7 +27,7 @@ template PaymentChannel
     key (sender, receiver, svc) : (Party, Party, Party)
     maintainer key._1, key._2
 
-    nonconsuming choice PaymentChannel_ExecuteDirectTransfer : [TransferResult]
+    nonconsuming choice PaymentChannel_ExecuteDirectTransfer : TransferResult
       with
         inputs : [TransferInput]
         quantity : Decimal
@@ -196,8 +196,8 @@ template AppPaymentRequest
                 ]
               payload = "lock payment"
          (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt sender
-         (TransferResultLockedCoin lockedCoin::_) <-
-            exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
+         result <- exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
+         let (TransferResultLockedCoin lockedCoin::_) = result.createdCoins
          create AcceptedAppPayment
            with
              svc, receiver, sender, reference, lockedCoin
