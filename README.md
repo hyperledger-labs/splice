@@ -288,7 +288,11 @@ PORT=3003 REACT_APP_GRPC_URL=http://localhost:8083 npm start # Bob's splitwise
 ```
 
 If the frontend shows up but nothing happens when you click tap or
-other buttons, check your browser console.
+other buttons, check your browser console. If you see a stream of 503 errors,
+iptables on your host might be blocking the connections. Try running on the host:
+```
+sudo iptables -A INPUT -i docker0 -p tcp -m tcp --dport 5000:5999 -j ACCEPT
+```
 
 ### Daml Numerics
 
