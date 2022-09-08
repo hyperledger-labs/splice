@@ -421,7 +421,7 @@ commands:
     steps:
       - run_bash_command_in_nix:
           cmd: ./scripts/check-todos.sh
-          additional_nix_args: "--keep GITHUB_TOKEN"
+          additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_PULL_REQUEST"
       - store_artifacts:
           name: Store todos as artifacts
           path: todo-out/todos
