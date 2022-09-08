@@ -1,28 +1,28 @@
 import { Coin } from "@daml.js/canton-coin/lib/CC/Coin";
 import { Button, FormGroup, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField } from "@mui/material";
 import { useCallback, useState } from "react";
-import { ListRequest, TapRequest } from "./com/daml/network/wallet/v0/wallet_service_pb";
+import { ListRequest, TapRequest, WalletContext } from "./com/daml/network/wallet/v0/wallet_service_pb";
 import { Contract } from "./Contract";
 import { sameContracts, useInterval } from "./Util";
 import { useWalletClient } from "./WalletServiceContext";
 
-const Coins: React.FC<{}> = () => {
+const Coins: React.FC<{userId: string}> = ({ userId }) => {
     const [coins, setCoins] = useState<Contract<Coin>[]>([]);
     const [tapValue, setTapValue] = useState<string>("");
 
     const walletClient = useWalletClient();
+    const walletRequestCtx = new WalletContext().setUserId(userId);
 
     const fetchCoins = useCallback(async () => {
-        // TODO(i680)
-        const newCoins = (await walletClient.list(new ListRequest(), null)).getCoinsList();
+        const newCoins = (await walletClient.list(new ListRequest().setWalletCtx(walletRequestCtx), null)).getCoinsList();
         const decoded = newCoins.map(c => Contract.decode(c, Coin));
         setCoins((prev) => sameContracts(prev, decoded) ? prev : decoded);
-    }, [walletClient, setCoins]);
+    }, [walletClient, walletRequestCtx, setCoins]);
 
     useInterval(fetchCoins, 500);
 
     const onTap = async () => {
-        await walletClient.tap(new TapRequest().setQuantity(tapValue), null);
+        await walletClient.tap(new TapRequest().setQuantity(tapValue).setWalletCtx(walletRequestCtx), null);
     };
 
     const copyToClipboard = async (text: string) => {

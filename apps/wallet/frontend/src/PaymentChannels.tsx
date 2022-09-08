@@ -1,19 +1,20 @@
 import { PaymentChannelProposal } from "@daml.js/wallet/lib/CN/Wallet";
 import { Button, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from "@mui/material";
 import React, { useCallback, useState } from "react";
-import { AcceptPaymentChannelProposalRequest, ExecuteDirectTransferRequest, ListPaymentChannelProposalsRequest, ProposePaymentChannelRequest } from "./com/daml/network/wallet/v0/wallet_service_pb";
+import { AcceptPaymentChannelProposalRequest, ExecuteDirectTransferRequest, ListPaymentChannelProposalsRequest, ProposePaymentChannelRequest, WalletContext } from "./com/daml/network/wallet/v0/wallet_service_pb";
 import { Contract } from "./Contract";
 import { useInterval } from "./Util";
 import { useWalletClient } from "./WalletServiceContext";
 
-const PaymentChannels: React.FC<{}> = () => {
+const PaymentChannels: React.FC<{userId: string}> = ({ userId }) => {
     const walletClient = useWalletClient();
+    const walletRequestCtx = new WalletContext().setUserId(userId);
+
     const [proposals, setProposals] = useState<Contract<PaymentChannelProposal>[]>([]);
     const fetchChannelProposals = useCallback(async () => {
-        // TODO(i680)
-        const proposalList = (await walletClient.listPaymentChannelProposals(new ListPaymentChannelProposalsRequest(), null)).getProposalsList();
+        const proposalList = (await walletClient.listPaymentChannelProposals(new ListPaymentChannelProposalsRequest().setWalletCtx(walletRequestCtx), null)).getProposalsList();
         setProposals(proposalList.map(c => Contract.decode(c, PaymentChannelProposal)));
-    }, [walletClient, setProposals]);
+    }, [walletClient, walletRequestCtx, setProposals]);
     useInterval(fetchChannelProposals, 500);
 
     const [receiver, setReceiver] = useState<string>("");
@@ -25,18 +26,19 @@ const PaymentChannels: React.FC<{}> = () => {
                 .setAllowDirectTransfers(true)
                 .setAllowOffers(true)
                 .setAllowRequests(true)
-                .setSenderTransferFeeRatio("0.5"),
+                .setSenderTransferFeeRatio("0.5")
+                .setWalletCtx(walletRequestCtx),
             null);
         setReceiver("");
     };
     const approveChannel = async (cid: string) => {
-        await walletClient.acceptPaymentChannelProposal(new AcceptPaymentChannelProposalRequest().setProposalContractId(cid), null);
+        await walletClient.acceptPaymentChannelProposal(new AcceptPaymentChannelProposalRequest().setProposalContractId(cid).setWalletCtx(walletRequestCtx), null);
     };
 
     const [transferRequest, setTransferRequest] = useState(new ExecuteDirectTransferRequest());
     const directTransfer = async (ev: React.FormEvent<HTMLFormElement>) => {
         ev.preventDefault();
-        await walletClient.executeDirectTransfer(transferRequest, null);
+        await walletClient.executeDirectTransfer(transferRequest.setWalletCtx(walletRequestCtx), null);
     };
     return <Stack spacing={2}>
         <form onSubmit={directTransfer}>

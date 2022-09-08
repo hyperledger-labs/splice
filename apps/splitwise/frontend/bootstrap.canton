@@ -28,12 +28,12 @@ directoryProvider.listEntryRequests().foreach { case request =>
   directoryProvider.requestEntryPayment(request.contractId)
 }
 
-val aliceCoin = aliceWallet.tap(5.0)
-utils.retry_until_true { aliceWallet.listAppPaymentRequests().length == 1 }
-val aliceAccepted = aliceWallet.acceptAppPaymentRequest(aliceWallet.listAppPaymentRequests()(0).contractId, aliceCoin)
-val bobCoin = bobWallet.tap(5.0)
-utils.retry_until_true { bobWallet.listAppPaymentRequests().length == 1 }
-val bobAccepted = bobWallet.acceptAppPaymentRequest(bobWallet.listAppPaymentRequests()(0).contractId, bobCoin)
+val aliceCoin = aliceRemoteWallet.tap(5.0)
+utils.retry_until_true { aliceRemoteWallet.listAppPaymentRequests().length == 1 }
+val aliceAccepted = aliceRemoteWallet.acceptAppPaymentRequest(aliceRemoteWallet.listAppPaymentRequests()(0).contractId, aliceCoin)
+val bobCoin = bobRemoteWallet.tap(5.0)
+utils.retry_until_true { bobRemoteWallet.listAppPaymentRequests().length == 1 }
+val bobAccepted = bobRemoteWallet.acceptAppPaymentRequest(bobRemoteWallet.listAppPaymentRequests()(0).contractId, bobCoin)
 
 val directoryParty = directoryProvider.getProviderPartyId()
 directoryProvider.remoteParticipant.ledger_api.acs.await_active_contract(directoryParty, ContractId.assertFromString(aliceAccepted.toString))

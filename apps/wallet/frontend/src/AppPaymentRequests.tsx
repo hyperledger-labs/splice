@@ -1,26 +1,27 @@
 import { AppPaymentRequest } from "@daml.js/wallet/lib/CN/Wallet";
 import { Button, Stack, Table, TableBody, TableCell, TableHead, TableRow, TextField } from "@mui/material";
 import React, { useCallback, useState } from "react";
-import { AcceptAppPaymentRequestRequest, ListAppPaymentRequestsRequest } from "./com/daml/network/wallet/v0/wallet_service_pb";
+import { AcceptAppPaymentRequestRequest, ListAppPaymentRequestsRequest, WalletContext } from "./com/daml/network/wallet/v0/wallet_service_pb";
 import { Contract } from "./Contract";
 import { sameContracts, useInterval } from "./Util";
 import { useWalletClient } from "./WalletServiceContext";
 
-const AppPaymentRequests: React.FC<{}> = () => {
+const AppPaymentRequests: React.FC<{userId: string}> = ({ userId }) => {
     const walletClient = useWalletClient();
+    const walletRequestCtx = new WalletContext().setUserId(userId);
+
     const [appPaymentRequests, setAppPaymentRequests] = useState<Contract<AppPaymentRequest>[]>([]);
     const fetchAppPaymentRequests = useCallback(async () => {
-        // TODO(i680)
-        const newAppPaymentRequests = (await walletClient.listAppPaymentRequests(new ListAppPaymentRequestsRequest(), null)).getPaymentRequestsList();
+        const newAppPaymentRequests = (await walletClient.listAppPaymentRequests(new ListAppPaymentRequestsRequest().setWalletCtx(walletRequestCtx), null)).getPaymentRequestsList();
         const decoded = newAppPaymentRequests.map(c => Contract.decode(c, AppPaymentRequest));
         setAppPaymentRequests((prev) => sameContracts(decoded, prev) ? prev : decoded);
-    }, [walletClient, setAppPaymentRequests]);
+    }, [walletClient, walletRequestCtx, setAppPaymentRequests]);
     useInterval(fetchAppPaymentRequests, 500);
 
     const Request: React.FC<{ request: Contract<AppPaymentRequest> }> = ({ request }) => {
         const [coinId, setCoinId] = useState<string>("");
         const onAccept = async () => {
-            await walletClient.acceptAppPaymentRequest(new AcceptAppPaymentRequestRequest().setCoinContractId(coinId).setRequestContractId(request.contractId), null);
+            await walletClient.acceptAppPaymentRequest(new AcceptAppPaymentRequestRequest().setCoinContractId(coinId).setRequestContractId(request.contractId).setWalletCtx(walletRequestCtx), null);
         };
         return <TableRow>
             <TableCell>{request.payload.receiver}</TableCell>
