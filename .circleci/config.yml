@@ -520,6 +520,7 @@ jobs:
             ./copy-proto-sources.sh
             ./codegen.sh
             npm install
+            npm run format:check
             npm run build
       - cleanup_sbt_test_job
 
@@ -541,6 +542,7 @@ jobs:
             ./copy-proto-sources.sh
             ./codegen.sh
             npm install
+            npm run format:check
             npm run build
       - cleanup_sbt_test_job
 
@@ -608,28 +610,28 @@ jobs:
             cat \<<EOF >route
             #!/usr/bin/expect -f
             set timeout -1
-            
+
             set VPN_HOST_NAME [lindex \$argv 0]
             set VPN_USER [lindex \$argv 1]
             set VPN_PASSWORD [lindex \$argv 2]
 
             spawn echo \$VPN_USER \$VPN_PASSWORD
-            spawn sudo charon-cmd --host \$VPN_HOST_NAME --identity \$VPN_USER --eap-identity \$VPN_USER --profile ikev2-eap --cert /etc/ssl/certs/ISRG_Root_X1.pem            
+            spawn sudo charon-cmd --host \$VPN_HOST_NAME --identity \$VPN_USER --eap-identity \$VPN_USER --profile ikev2-eap --cert /etc/ssl/certs/ISRG_Root_X1.pem
             expect "EAP password: "
 
             send "\$VPN_PASSWORD\r"
-            expect eof        
+            expect eof
             EOF
-            
+
             chmod +x route
             ./route $VPN_HOST_NAME $VPN_USER $VPN_PASSWORD
       - run:
           name: verify vpn connection
           command: |
             set +e
-            
+
             echo "Checking IP"
-            
+
             count=0
             success=42
             while [ ${count} -lt 10 ]; do
@@ -643,7 +645,7 @@ jobs:
                 sleep 1
               fi
             done
-            
+
             exit $success
       - execute_sbt_command:
           cmd: "\"testOnly *PreflightIntegrationTest\""

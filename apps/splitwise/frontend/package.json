@@ -35,7 +35,7 @@
     "build": "react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject",
-    "format:fix": "echo 'TODO(Alex) // implement later'",
+    "format:fix": "prettier --write src",
     "format:check": "prettier --check src"
   },
   "eslintConfig": {
@@ -47,7 +47,13 @@
   "prettier": {
     "printWidth": 100,
     "singleQuote": true,
-    "arrowParens": "avoid"
+    "arrowParens": "avoid",
+    "importOrder": [
+      "^@mui.*",
+      "^@daml.*",
+      "^[./]"
+    ],
+    "importOrderSeparation": true
   },
   "browserslist": {
     "production": [
@@ -62,6 +68,7 @@
     ]
   },
   "devDependencies": {
+    "@trivago/prettier-plugin-sort-imports": "^3.3.0",
     "prettier": "^2.7.1"
   }
 }
