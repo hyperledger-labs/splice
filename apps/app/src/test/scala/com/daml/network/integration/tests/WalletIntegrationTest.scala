@@ -41,8 +41,8 @@ class WalletIntegrationTest
       val aliceValidatorParty = aliceValidator.initialize()
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
       // TODO(Arne): consider adding synchronization 'wait-for-participant-x' to this command
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
       aliceWallet.initialize(aliceValidatorParty)
+      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
       // ensure wallet's participant sees the CoinRules
       aliceWallet.remoteParticipant.ledger_api.acs.await(aliceValidatorParty, CoinRules)
@@ -64,8 +64,8 @@ class WalletIntegrationTest
       val aliceValidatorParty = aliceValidator.initialize()
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
       // TODO(M1-90 Backlog): consider adding synchronization 'wait-for-participant-x' to this command
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
       aliceWallet.initialize(aliceValidatorParty)
+      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
       // Check that no payment requests exist
       aliceRemoteWallet.listAppPaymentRequests() shouldBe empty
@@ -122,8 +122,8 @@ class WalletIntegrationTest
       val aliceValidatorParty = aliceValidator.initialize()
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
       // TODO(M1-90 Backlog): consider adding synchronization 'wait-for-participant-x' to this command
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
       aliceWallet.initialize(aliceValidatorParty)
+      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
       aliceWallet.remoteParticipant.ledger_api.commands.submit(
         Seq(aliceUserParty),
@@ -187,14 +187,14 @@ class WalletIntegrationTest
       // Onboard alice on her self-hosted validator
       val aliceValidatorParty = aliceValidator.initialize()
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
       aliceWallet.initialize(aliceValidatorParty)
+      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
       // Onboard bob on his self-hosted validator
       val bobValidatorParty = bobValidator.initialize()
       val bobDamlUser = bobRemoteWallet.config.damlUser
-      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
       bobWallet.initialize(bobValidatorParty)
+      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
 
       // Neither Alice nor Bob see a payment channel proposal
       aliceRemoteWallet.listPaymentChannelProposals() shouldBe empty
@@ -296,8 +296,8 @@ class WalletIntegrationTest
       // Onboard alice on her self-hosted validator
       val aliceValidatorParty = aliceValidator.initialize()
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
       aliceWallet.initialize(aliceValidatorParty)
+      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
       aliceRemoteWallet.tap(50.0)
       checkWallet(aliceUserParty, aliceRemoteWallet, Seq((50, 50)))
@@ -319,14 +319,14 @@ class WalletIntegrationTest
       // Onboard alice on her self-hosted validator
       val aliceValidatorParty = aliceValidator.initialize()
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
       aliceWallet.initialize(aliceValidatorParty)
+      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
       // Onboard bob on his self-hosted validator
       val bobValidatorParty = bobValidator.initialize()
       val bobDamlUser = bobRemoteWallet.config.damlUser
-      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
       bobWallet.initialize(bobValidatorParty)
+      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
 
       // Alice proposes payment channel to Bob
       aliceRemoteWallet.proposePaymentChannel(bobUserParty)
@@ -351,14 +351,14 @@ class WalletIntegrationTest
       // Onboard alice on her self-hosted validator
       val aliceValidatorParty = aliceValidator.initialize()
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
       aliceWallet.initialize(aliceValidatorParty)
+      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
       // Onboard bob on his self-hosted validator
       val bobValidatorParty = bobValidator.initialize()
       val bobDamlUser = bobRemoteWallet.config.damlUser
-      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
       bobWallet.initialize(bobValidatorParty)
+      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
 
       // Setup payment channel between alice and bob
       val aliceProposalId =

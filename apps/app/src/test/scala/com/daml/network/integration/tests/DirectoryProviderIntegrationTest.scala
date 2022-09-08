@@ -37,12 +37,13 @@ class DirectoryProviderIntegrationTest
       val aliceValidatorParty = aliceValidator.initialize()
       // The provider of the directory service
       val providerParty = directoryValidator.initialize()
-      // The user of the directory service.
-      val userParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
 
       aliceWallet.initialize(aliceValidatorParty)
       aliceWallet.remoteParticipant.ledger_api.acs
         .await(aliceValidatorParty, coinCodegen.CoinRules.CoinRules)
+
+      // The user of the directory service.
+      val userParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
 
       // Setup DirectoryInstall
 

@@ -82,14 +82,15 @@ class ScanIntegrationTest
     // Onboard alice on her self-hosted validator
     val aliceValidatorParty = aliceValidator.initialize()
     val aliceDamlUser = aliceRemoteWallet.config.damlUser
-    val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
     aliceWallet.initialize(aliceValidatorParty)
+    val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
     // Onboard bob on his self-hosted validator
     val bobValidatorParty = bobValidator.initialize()
     val bobDamlUser = bobRemoteWallet.config.damlUser
-    val bobUserParty = bobValidator.onboardUser(bobDamlUser)
     bobWallet.initialize(bobValidatorParty)
+    val bobUserParty = bobValidator.onboardUser(bobDamlUser)
+
     // ensure the participants see the CoinRules
     aliceWallet.remoteParticipant.ledger_api.acs.await(aliceValidatorParty, CoinRules)
     bobWallet.remoteParticipant.ledger_api.acs.await(bobValidatorParty, CoinRules)

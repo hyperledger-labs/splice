@@ -253,3 +253,57 @@ template AcceptedAppPayment
     choice AcceptedAppPayment_Expire : ContractId Coin
       controller sender
       do exercise lockedCoin Coin_OwnerExpireLock
+
+
+-- TODO(M1-96): add an abstraction using interfaces, so that the validator app doesn't depend on this concrete Daml package
+template WalletApp
+  with
+    serviceUser : Party
+    validatorUser : Party
+  where
+    signatory serviceUser, validatorUser
+
+    -- Key to prevent double installs
+    key (serviceUser, validatorUser) : (Party, Party)
+    maintainer key._1
+
+    -- Called by a trusted backend that can act on behalf of any user
+    nonconsuming choice Install : ContractId WalletAppInstall
+      with
+        endUser : Party
+        svcUser : Party
+      controller endUser
+      do
+        create WalletAppInstall with ..
+
+
+-- Note: includes the svc party and the validator app service party, so that choices can look up CoinRules (where the validator is observer)
+-- This should be replaced by explicit disclosure
+template WalletAppInstall
+  with
+    serviceUser : Party
+    endUser : Party
+    svcUser : Party -- TODO(M1-06): remove workaround for explicit disclosure
+    validatorUser : Party -- TODO(M1-06): remove workaround for explicit disclosure
+  where
+    signatory serviceUser, endUser, validatorUser
+
+    key (endUser, serviceUser) : (Party, Party)
+    maintainer key._2
+
+    -- Command: Tap
+    nonconsuming choice WalletAppInstall_Tap : ContractId Coin
+      with
+        quantity : Decimal
+      controller serviceUser
+      do
+        exerciseByKey @CoinRules (svcUser, validatorUser) (CoinRules_Tap endUser quantity)
+
+    -- Command: AcceptAppPaymentRequestRequest
+    nonconsuming choice WalletAppInstall_AcceptAppPaymentRequestRequest : ContractId AcceptedAppPayment
+      with
+        requestCid : ContractId AppPaymentRequest
+        transferInput : [TransferInput]
+      controller serviceUser
+      do
+        exercise requestCid (AppPaymentRequest_Accept transferInput)

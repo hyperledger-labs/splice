@@ -2,16 +2,16 @@
 import com.daml.network.codegen.CC.CoinRules.CoinRules
 
 val validatorParty = validatorApp.initialize()
-val aliceParty = validatorApp.onboardUser("alice_wallet")
 aliceWallet.remoteParticipant.ledger_api.acs.await(validatorParty, CoinRules)
 aliceWallet.initialize(validatorParty)
+val aliceParty = validatorApp.onboardUser("alice_wallet")
 
 require(aliceRemoteWallet.list().length == 0)
 val coinId = aliceRemoteWallet.tap(100.0)
 require(aliceRemoteWallet.list().length == 1)
 
-val bobParty = validatorApp.onboardUser("bob_wallet")
 bobWallet.initialize(validatorParty)
+val bobParty = validatorApp.onboardUser("bob_wallet")
 require(bobRemoteWallet.list().length == 0)
 
 val aliceProposal = aliceRemoteWallet.proposePaymentChannel(bobParty)

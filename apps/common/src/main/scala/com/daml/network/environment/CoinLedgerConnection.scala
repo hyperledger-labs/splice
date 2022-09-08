@@ -5,6 +5,7 @@ import akka.stream.KillSwitches
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
 import com.daml.grpc.{GrpcException, GrpcStatus}
+import com.daml.ledger.api.domain.UserRight
 import com.daml.ledger.api.refinements.ApiTypes.{ApplicationId, ContractId, TemplateId, WorkflowId}
 import com.daml.ledger.api.v1.commands.Commands.DeduplicationPeriod
 import com.daml.ledger.api.v1.commands.{Command, Commands}
@@ -15,10 +16,10 @@ import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, Tra
 import com.daml.ledger.api.v1.value.Identifier
 import com.daml.ledger.client.binding.{
   Contract,
-  Primitive => P,
   TemplateCompanion,
-  Value => CodegenValue,
   ValueDecoder,
+  Primitive => P,
+  Value => CodegenValue,
 }
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.ErrorCodeUtils
@@ -45,7 +46,7 @@ import io.grpc.StatusRuntimeException
 import scalaz.syntax.tag._
 
 import java.util.UUID
-import com.daml.ledger.api.domain.UserRight.CanActAs
+import com.daml.ledger.api.domain.UserRight.{CanActAs, CanReadAs}
 import com.daml.ledger.api.v1.command_service.{
   SubmitAndWaitForTransactionResponse,
   SubmitAndWaitForTransactionTreeResponse,
@@ -158,6 +159,12 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
   def uploadDarFile(pkg: UploadablePackage)(implicit traceContext: TraceContext): Future[Unit]
 
   def allocatePartyViaLedgerApi(hint: Option[String], displayName: Option[String]): Future[PartyId]
+
+  def grantUserRights(
+      user: String,
+      actAsParties: Seq[PartyId],
+      readAsParties: Seq[PartyId],
+  ): Future[Seq[UserRight]]
 
 }
 
@@ -509,6 +516,18 @@ object CoinLedgerConnection {
             Future.successful
           )
         } yield partyId
+      }
+
+      override def grantUserRights(
+          user: String,
+          actAsParties: Seq[PartyId],
+          readAsParties: Seq[PartyId],
+      ): Future[Seq[UserRight]] = {
+        val userId = com.daml.lf.data.Ref.UserId.assertFromString(user)
+        val grants =
+          actAsParties.map(p => CanActAs(p.toLf)) ++ readAsParties.map(p => CanReadAs(p.toLf))
+
+        client.userManagementClient.grantUserRights(userId, grants)
       }
 
       private def uploadDarFileInternal(packageId: String, darFile: => ByteString)(implicit

@@ -1,6 +1,7 @@
 package com.daml.network.wallet.admin.grpc
 
 import cats.implicits._
+import com.daml.ledger.client.binding.{Primitive, Template, ValueDecoder}
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.{Contract, Proto, Value}
@@ -21,9 +22,15 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
+case class WalletServiceState(
+    validatorParty: PartyId,
+    walletServiceParty: PartyId,
+)
+
 class GrpcWalletService(
     ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
+    walletServiceUser: String,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -34,16 +41,22 @@ class GrpcWalletService(
 
   private val connection = ledgerClient.connection("GrpcWalletService")
 
-  val validatorParty: AtomicReference[Option[PartyId]] = new AtomicReference[Option[PartyId]](None)
-
-  def getValidatorParty: PartyId =
-    validatorParty.get.getOrElse(
+  val state: AtomicReference[Option[WalletServiceState]] =
+    new AtomicReference[Option[WalletServiceState]](None)
+  private def getState: WalletServiceState =
+    state.get.getOrElse(
       throw new StatusRuntimeException(
         Status.FAILED_PRECONDITION.withDescription(
           "Wallet is not initialized, run wallet.initialize(validatorParty) first"
         )
       )
     )
+
+  def getValidatorParty: PartyId =
+    getState.validatorParty
+
+  def getWalletServiceParty: PartyId =
+    getState.walletServiceParty
 
   @nowarn("cat=unused")
   override def list(request: v0.ListRequest): Future[v0.ListResponse] =
@@ -60,20 +73,10 @@ class GrpcWalletService(
     }
 
   override def tap(request: v0.TapRequest): Future[v0.TapResponse] =
-    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
-      for {
-        svcParty <- scanConnection.getSvcPartyId()
-        walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
-        quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
-        tapCmd = coinRulesCodegen.CoinRules
-          .key(DA.Types.Tuple2(svcParty.toPrim, getValidatorParty.toPrim))
-          .exerciseCoinRules_Tap(
-            walletParty.toPrim,
-            quantity,
-          )
-        coinCid <- connection.submitWithResult(Seq(walletParty), Seq(getValidatorParty), tapCmd)
-      } yield v0.TapResponse(Proto.encode(coinCid))
-    }
+    exerciseWalletAction(c => {
+      val quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
+      c.exerciseWalletAppInstall_Tap(quantity)
+    })(request.getWalletCtx, coinCid => v0.TapResponse(Proto.encode(coinCid)))
 
   @nowarn("cat=unused")
   override def listAppPaymentRequests(
@@ -99,27 +102,20 @@ class GrpcWalletService(
   override def acceptAppPaymentRequest(
       request: v0.AcceptAppPaymentRequestRequest
   ): Future[v0.AcceptAppPaymentRequestResponse] =
-    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
-      for {
-        walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
-        coinCid = Proto.tryDecodeContractId[coinCodegen.Coin](request.coinContractId)
-        arg = walletCodegen.AppPaymentRequest_Accept(
-          Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
-        )
-        requestCid = Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](
-          request.requestContractId
-        )
-        acceptCommand = requestCid
-          .exerciseAppPaymentRequest_Accept(arg)
-        paymentCid <- connection.submitWithResult(
-          Seq(walletParty),
-          Seq(getValidatorParty),
-          acceptCommand,
-        )
-      } yield v0.AcceptAppPaymentRequestResponse(
-        Proto.encode(paymentCid)
+    exerciseWalletAction(c => {
+      val coinCid = Proto.tryDecodeContractId[coinCodegen.Coin](request.coinContractId)
+      val requestCid = Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](
+        request.requestContractId
       )
-    }
+      val transferInput = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
+      c.exerciseWalletAppInstall_AcceptAppPaymentRequestRequest(requestCid, transferInput)
+    })(
+      request.getWalletCtx,
+      paymentCid =>
+        v0.AcceptAppPaymentRequestResponse(
+          Proto.encode(paymentCid)
+        ),
+    )
 
   override def rejectAppPaymentRequest(
       request: v0.RejectAppPaymentRequestRequest
@@ -496,12 +492,59 @@ class GrpcWalletService(
 
   override def initialize(request: InitializeRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => _ =>
-      validatorParty.set(Some(PartyId.tryFromProtoPrimitive(request.validatorPartyId)))
+      val validatorServiceParty = PartyId.tryFromProtoPrimitive(request.validatorPartyId)
 
       for {
         _ <- connection.uploadDarFile(
           WalletUtil
         ) // TODO(i353) move away from dar upload during init
-      } yield Empty()
+        walletServiceParty <- connection.getOrAllocateParty(walletServiceUser)
+        _ <- WalletUtil.initializeWalletApp(
+          walletServiceParty,
+          validatorServiceParty,
+          connection,
+          logger,
+        )
+      } yield {
+        state.set(
+          Some(
+            WalletServiceState(
+              validatorParty = validatorServiceParty,
+              walletServiceParty = walletServiceParty,
+            )
+          )
+        )
+        Empty()
+      }
+    }
+
+  /** Executes a wallet action by calling a choice on the WalletAppInstall contract of the
+    * end user specified in the given WalletContext.
+    *
+    * The choice is always executed with the wallet service party as the submitter, and the
+    * wallet user party as a readAs party.
+    *
+    * Additionally, the validator service party is also a readAs party (workaround for lack
+    * of explicit disclosure for CoinRules).
+    *
+    * Note: curried syntax helps with type inference
+    */
+  private def exerciseWalletAction[Response, ChoiceResult](
+      choice: Template.Key[walletCodegen.WalletAppInstall] => Primitive.Update[ChoiceResult]
+  )(
+      ctx: com.daml.network.wallet.v0.WalletContext,
+      response: ChoiceResult => Response,
+  )(implicit valueDecoder: ValueDecoder[ChoiceResult]): Future[Response] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        walletUserParty <- connection.getPrimaryParty(ctx.userId)
+        installTemplate = walletCodegen.WalletAppInstall
+          .key(DA.Types.Tuple2(walletUserParty.toPrim, getWalletServiceParty.toPrim))
+        result <- connection.submitWithResult(
+          Seq(getWalletServiceParty),
+          Seq(getValidatorParty, walletUserParty),
+          choice(installTemplate),
+        )
+      } yield response(result)
     }
 }

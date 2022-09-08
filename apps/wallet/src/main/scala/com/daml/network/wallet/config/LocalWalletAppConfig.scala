@@ -8,6 +8,7 @@ import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 case class LocalWalletAppConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
+    serviceUser: String,
     remoteParticipant: RemoteParticipantConfig,
     remoteScan: RemoteScanAppConfig,
 ) extends LocalCoinConfig // TODO(Arne): fork or generalize this trait.

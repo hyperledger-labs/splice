@@ -87,6 +87,7 @@ lazy val `apps-validator` =
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
       `apps-scan` % "compile->compile;test->test",
+      `apps-wallet` % "compile->compile;test->test",
     )
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),

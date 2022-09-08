@@ -130,16 +130,16 @@ class SplitwiseIntegrationTest
       // Onboard alice on her self-hosted validator
       val aliceValidatorParty = aliceValidator.initialize()
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
       aliceWallet.initialize(aliceValidatorParty)
       aliceSplitwise.initialize(aliceValidatorParty)
+      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
       // Onboard bob on his self-hosted validator
       val bobValidatorParty = bobValidator.initialize()
       val bobDamlUser = bobRemoteWallet.config.damlUser
-      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
       bobWallet.initialize(bobValidatorParty)
       bobSplitwise.initialize(bobValidatorParty)
+      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
 
       // Setup install contracts for self-hosted usage
       val aliceProviderParty = aliceUserParty
@@ -169,16 +169,16 @@ class SplitwiseIntegrationTest
       // Onboard alice on her self-hosted validator
       val aliceValidatorParty = aliceValidator.initialize()
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
       aliceWallet.initialize(aliceValidatorParty)
       aliceSplitwise.initialize(aliceValidatorParty)
+      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
       // Onboard bob on his self-hosted validator
       val bobValidatorParty = bobValidator.initialize()
       val bobDamlUser = bobRemoteWallet.config.damlUser
-      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
       bobWallet.initialize(bobValidatorParty)
       bobSplitwise.initialize(bobValidatorParty)
+      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
 
       // Setup install contracts for provider-hosted mode usage
       val providerParty = splitwiseValidator.initialize()

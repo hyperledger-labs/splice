@@ -6,6 +6,7 @@ import com.daml.network.validator.v0._
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.{CoinUtil, Proto}
 import com.daml.network.validator.store.ValidatorAppStore
+import com.daml.network.wallet.util.WalletUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
@@ -78,12 +79,21 @@ class GrpcValidatorAppService(
           )
         }(Future.successful)
         userPartyId <- connection.createPartyAndUser(name)
-        svc <- scanConnection.getSvcPartyId()
+        svcPartyId <- scanConnection.getSvcPartyId()
         _ <- CoinUtil.ExplicitDisclosureWorkaround.recordUserHostedAt(
           userPartyId,
           validatorPartyId,
           connection,
         )
+        _ <- WalletUtil.installWalletForUser(
+          endUserParty = userPartyId,
+          validatorServiceParty = validatorPartyId,
+          svcParty = svcPartyId,
+          connection = connection,
+          logger = logger,
+        )
+        // Workaround for the lack of "act-as-any-party" rights
+        _ <- connection.grantUserRights(validatorUserName, Seq(userPartyId), Seq.empty)
       } yield OnboardUserResponse(Proto.encode(userPartyId))
     }
 }

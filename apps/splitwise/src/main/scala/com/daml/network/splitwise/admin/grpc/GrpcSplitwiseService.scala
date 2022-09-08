@@ -49,7 +49,7 @@ class GrpcSplitwiseService(
     validatorParty.get.getOrElse(
       throw new StatusRuntimeException(
         Status.FAILED_PRECONDITION.withDescription(
-          "Wallet is not initialized, run wallet.initialize(validatorParty) first"
+          "Splitwise is not initialized, run splitwise.initialize(validatorParty) first"
         )
       )
     )
