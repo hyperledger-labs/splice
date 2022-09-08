@@ -36,6 +36,10 @@ docker-clean-build-push: test
 	$(call make_apps, clean)
 	$(call make_apps, docker-push)
 
+.PHONY: docker-check
+docker-check:
+	$(call make_apps, docker-check)
+
 .PHONY: test
 test:
 	make -C cluster test

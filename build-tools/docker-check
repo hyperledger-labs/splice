@@ -9,22 +9,19 @@ else
     image=$1
 fi
 
-# start the check
-_log "Considering image: ${image}"
-
 # check if docker is running
-out="$(docker info 2>&1)" || _error "docker seems to be down:\n${out}"
+out="$(docker info 2>&1)" || _error "Cannot check for image, docker seems to be down:\n${out}"
 
 # check the image exists
 gcloud container images describe "${image}" > /dev/null 2>&1
 IMAGE_CHECK=$?
 
 if [ "${IMAGE_CHECK}" -eq 0 ] ; then
-  _log "Image exists in repo"
-  rc=1
+  _log "Image exists in repo: ${image}"
+  exit 0
 else
-  _log "Image does not exist in repo"
-  rc=0
+  _error "Image does not exist in repo: ${image}"
+  exit 1
 fi
 
 exit ${rc}

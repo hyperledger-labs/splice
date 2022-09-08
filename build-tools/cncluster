@@ -19,6 +19,7 @@ fi
 
 ##
 
+SOURCE_IMAGE_TAG=$(version-gen)
 GCP_CLUSTER_NAME="cn-${GCP_CLUSTER_BASENAME}net"
 CLUSTER_DNS_NAME="${GCP_CLUSTER_BASENAME}.network.canton.global"
 
@@ -40,16 +41,18 @@ function cluster_ip() {
 }
 
 function _cluster_apply() {
+    if ! make -C ${REPO_ROOT} docker-check; then
+        _error "Images missing from artifact registry, cannot apply."
+        exit 1
+    fi
+
     jsonnet --tla-str gcpRegion=${CLOUDSDK_COMPUTE_REGION} \
             --tla-str gcpRepoName=${GCP_REPO_NAME} \
-            --tla-str imageTag=$(version-gen) \
+            --tla-str imageTag=${SOURCE_IMAGE_TAG} \
             --tla-str ipAddr=$(cluster_ip) \
             $REPO_ROOT/cluster/canton-network-config.jsonnet \
         | kubectl apply -f -
 }
-
-
-
 
 function cluster_show() {
     echo "CLOUDSDK_COMPUTE_REGION : ${CLOUDSDK_COMPUTE_REGION}"
@@ -61,6 +64,7 @@ function cluster_show() {
     echo "GCP_CLUSTER_NAME        : ${GCP_CLUSTER_NAME}"
 
     echo "CLUSTER_DNS_NAME        : ${CLUSTER_DNS_NAME}"
+    echo "SOURCE_IMAGE_TAG        : ${SOURCE_IMAGE_TAG}"
 }
 
 function cluster_confirm() {

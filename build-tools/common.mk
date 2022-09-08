@@ -98,6 +98,14 @@ docker-push: $(docker-build)
 docker-push-force: $(docker-build)
 	docker-push ${image-tag} --force
 
+##############
+# docker check
+##############
+
+.PHONY: docker-check
+docker-check:
+	docker-check $(image-tag)
+
 _did_common := true
 endif
 
