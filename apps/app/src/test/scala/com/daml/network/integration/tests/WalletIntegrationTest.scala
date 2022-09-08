@@ -339,11 +339,10 @@ class WalletIntegrationTest
 
       // Bob then immediately cancels the channel
       bobRemoteWallet.cancelPaymentChannel(aliceUserParty)
-      utils.retry_until_true(aliceRemoteWallet.listPaymentChannelProposals().isEmpty)
 
       // Neither sees the payment channel anymore
-      aliceRemoteWallet.listPaymentChannels() shouldBe empty
       bobRemoteWallet.listPaymentChannels() shouldBe empty
+      utils.retry_until_true(aliceRemoteWallet.listPaymentChannels().isEmpty)
     }
 
     "list and collect app & validator rewards" in { implicit env =>
