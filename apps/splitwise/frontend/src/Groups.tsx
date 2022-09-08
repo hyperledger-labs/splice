@@ -56,7 +56,7 @@ interface BalancesProps {
   provider: string;
 }
 
-const balanceEqual = (a: Map<string, string>, b: Map<string, string>): Boolean => {
+const balanceEqual = (a: Map<string, string>, b: Map<string, string>): boolean => {
   if (a.size !== b.size) return false;
   for (let [k, va] of a) {
     const vb = b.get(k);
@@ -219,7 +219,7 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, provider }) => {
         ></TextField>
         <Autocomplete<DirectoryEntry, false, false, true>
           sx={{ width: '38%' }}
-          freeSolo={true}
+          freeSolo
           options={directoryEntries.getAllEntries()}
           getOptionLabel={option => (typeof option === 'string' ? option : option.name)}
           value={transferReceiverEntry}

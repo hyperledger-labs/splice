@@ -2,7 +2,7 @@ import { useState } from 'react';
 
 import { Button, Grid, TextField, Typography } from '@mui/material';
 
-function Login({ onLogin }: { onLogin: (userId: string) => void }) {
+const Login: React.FC<{ onLogin: (userId: string) => void }> = ({ onLogin }) => {
   const [userId, setUserId] = useState<string>('');
   return (
     <Grid
@@ -31,6 +31,6 @@ function Login({ onLogin }: { onLogin: (userId: string) => void }) {
       </Button>
     </Grid>
   );
-}
+};
 
 export default Login;

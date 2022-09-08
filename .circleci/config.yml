@@ -520,7 +520,7 @@ jobs:
             ./copy-proto-sources.sh
             ./codegen.sh
             npm install
-            npm run format:check
+            npm run check
             npm run build
       - cleanup_sbt_test_job
 
@@ -542,7 +542,7 @@ jobs:
             ./copy-proto-sources.sh
             ./codegen.sh
             npm install
-            npm run format:check
+            npm run check
             npm run build
       - cleanup_sbt_test_job
 

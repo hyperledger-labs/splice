@@ -53,7 +53,7 @@ const Coins: React.FC<{ userId: string }> = ({ userId }) => {
 
   return (
     <Stack spacing={2}>
-      <FormGroup row={true}>
+      <FormGroup row>
         <TextField
           label="Amount"
           value={tapValue}

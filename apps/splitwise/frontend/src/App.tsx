@@ -14,7 +14,7 @@ import { SplitwiseClientProvider, useSplitwiseClient } from './SplitwiseServiceC
 import { sameContracts, useInterval } from './Util';
 import { DirectoryProviderServiceClient } from './com/daml/network/directory_provider/v0/Directory_provider_serviceServiceClientPb';
 
-function App() {
+const App: React.FC = () => {
   const [directoryEntries, setDirectoryEntries] = useState<Contract<DirectoryEntry>[]>([]);
   const dirEntries = new DirectoryEntries(directoryEntries);
   const directoryClient = useMemo(
@@ -30,7 +30,7 @@ function App() {
 
   useInterval(fetchDirectoryEntries, 500);
 
-  const Wrapper: React.FC<{}> = () => {
+  const Wrapper: React.FC = () => {
     const splitwiseClient = useSplitwiseClient();
 
     const [party, setParty] = useState<string>('');
@@ -67,6 +67,6 @@ function App() {
       <Wrapper />
     </SplitwiseClientProvider>
   );
-}
+};
 
 export default App;

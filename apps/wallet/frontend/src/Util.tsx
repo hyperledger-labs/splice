@@ -2,14 +2,14 @@ import { useEffect } from 'react';
 
 import { Contract } from './Contract';
 
-export const useInterval = (f: () => void, ms: number) => {
+export const useInterval = (f: () => void, ms: number): void => {
   useEffect(() => {
     const timer = setInterval(f, ms);
     return () => clearInterval(timer);
   }, [f, ms]);
 };
 
-export const sameContracts = <T,>(a: Contract<T>[], b: Contract<T>[]): Boolean => {
+export const sameContracts = <T,>(a: Contract<T>[], b: Contract<T>[]): boolean => {
   if (a.length !== b.length) {
     return false;
   }

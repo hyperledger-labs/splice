@@ -52,7 +52,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({ directoryEntries, provider }) =
 
   return (
     <Stack spacing={2}>
-      <FormGroup row={true}>
+      <FormGroup row>
         <TextField
           label="Group ID"
           value={groupId}

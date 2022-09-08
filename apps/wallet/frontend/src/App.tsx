@@ -20,7 +20,7 @@ import Login from './Login';
 import PaymentChannels from './PaymentChannels';
 import { WalletClientProvider } from './WalletServiceContext';
 
-function App() {
+const App: React.FC = () => {
   // TODO(i701) -- create a React context to manage auth state
   const [damlUserId, setDamlUserId] = useState<string>();
 
@@ -44,7 +44,7 @@ function App() {
       </Container>
     </Box>
   );
-}
+};
 
 const Main: React.FC<{ userId: string }> = ({ userId }) => {
   const [tabValue, setTabValue] = useState<string>('coins');
