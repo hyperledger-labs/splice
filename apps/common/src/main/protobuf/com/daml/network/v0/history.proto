@@ -21,6 +21,8 @@ message ParentNode {
     ExerciseNode transfer = 2;
     ExerciseNode start_issuing = 3;
     ExerciseNode coin_unlock = 4;
+    ExerciseNode owner_expire_lock = 5;
+    ExerciseNode svc_expire_lock = 6;
   }
 }
 
@@ -28,8 +30,10 @@ message CCEvent {
   oneof coin {
     com.daml.network.v0.Contract create = 1;
     com.daml.network.v0.Contract archive = 2;
+    com.daml.network.v0.Contract locked_create = 3;
+    com.daml.network.v0.Contract locked_archive = 4;
   }
-  ParentNode parent = 3;
+  ParentNode parent = 5;
 }
 
 message TransactionMetadata {

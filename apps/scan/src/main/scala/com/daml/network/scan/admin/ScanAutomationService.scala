@@ -7,7 +7,7 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
-import com.daml.network.codegen.CC.Coin.Coin
+import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContextExecutor
@@ -33,8 +33,9 @@ class ScanAutomationService(
 
   val (coinFlatStreamSubscription, readCcTransfersService) =
     // TODO(Arne): the subscription here should read from ledger start
-    createService("Scan:ReadCoinTransactionsService", ledgerClient, Seq(Coin.id)) { connection =>
-      new ReadCoinTransactionsService(svcParty, connection, store, loggerFactory)
+    createService("Scan:ReadCoinTransactionsService", ledgerClient, Seq(Coin.id, LockedCoin.id)) {
+      connection =>
+        new ReadCoinTransactionsService(svcParty, connection, store, loggerFactory)
     }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq[AsyncOrSyncCloseable](

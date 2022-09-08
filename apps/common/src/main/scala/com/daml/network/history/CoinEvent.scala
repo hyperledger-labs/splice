@@ -5,7 +5,13 @@ import com.daml.ledger.client.binding.{Primitive => P}
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
-import com.daml.network.codegen.CC.Coin.{Coin, Coin_Unlock}
+import com.daml.network.codegen.CC.Coin.{
+  Coin,
+  Coin_OwnerExpireLock,
+  Coin_SvcExpireLock,
+  Coin_Unlock,
+  LockedCoin,
+}
 import com.daml.network.codegen.CC.CoinRules.{
   CoinRules_MiningRound_StartIssuing,
   CoinRules_Tap,
@@ -69,6 +75,40 @@ object StartIssuing extends ExerciseNodeCompanion {
   } yield StartIssuing(node)
 }
 
+case class OwnerExpireLock(node: ExerciseNode[Coin_OwnerExpireLock, P.ContractId[Coin]])
+    extends ParentNode {
+  def toProtoV0: v0.ParentNode =
+    v0.ParentNode().withOwnerExpireLock(node.toProtoV0)
+}
+
+object OwnerExpireLock extends ExerciseNodeCompanion {
+  override type Arg = Coin_OwnerExpireLock
+  override type Res = P.ContractId[Coin]
+
+  def fromProtoV0(
+      expireP: v0.ParentNode.Type.OwnerExpireLock
+  ): Either[ProtoDeserializationError, OwnerExpireLock] = for {
+    node <- ExerciseNode.fromProto(OwnerExpireLock)(expireP.value)
+  } yield OwnerExpireLock(node)
+}
+
+case class SvcExpireLock(node: ExerciseNode[Coin_SvcExpireLock, P.ContractId[Coin]])
+    extends ParentNode {
+  def toProtoV0: v0.ParentNode =
+    v0.ParentNode().withSvcExpireLock(node.toProtoV0)
+}
+
+object SvcExpireLock extends ExerciseNodeCompanion {
+  override type Arg = Coin_SvcExpireLock
+  override type Res = P.ContractId[Coin]
+
+  def fromProtoV0(
+      expireP: v0.ParentNode.Type.SvcExpireLock
+  ): Either[ProtoDeserializationError, SvcExpireLock] = for {
+    node <- ExerciseNode.fromProto(SvcExpireLock)(expireP.value)
+  } yield SvcExpireLock(node)
+}
+
 case class CoinUnlock(
     node: ExerciseNode[Coin_Unlock, P.ContractId[Coin]]
 ) extends ParentNode {
@@ -95,33 +135,59 @@ object ParentNode {
       case tap: v0.ParentNode.Type.Tap => Tap.fromProtoV0(tap)
       case transfer: v0.ParentNode.Type.Transfer => Transfer.fromProtoV0(transfer)
       case issuing: v0.ParentNode.Type.StartIssuing => StartIssuing.fromProtoV0(issuing)
-      case issuing: v0.ParentNode.Type.CoinUnlock => CoinUnlock.fromProtoV0(issuing)
+      case unlock: v0.ParentNode.Type.CoinUnlock => CoinUnlock.fromProtoV0(unlock)
+      case ownerLock: v0.ParentNode.Type.OwnerExpireLock => OwnerExpireLock.fromProtoV0(ownerLock)
+      case svcLock: v0.ParentNode.Type.SvcExpireLock => SvcExpireLock.fromProtoV0(svcLock)
     }
   }
 }
 
+/** Trait that represents union types of Coin/LockedCoin Contract's
+  * Note that we don't add a type variable on purpose, as otherwise `CoinTransaction` would require that all
+  * events in a transaction would contain exclusively either `Coin`s or `LockedCoin`s (but not a mix of them)
+  */
+sealed trait CoinOrLockedCoinContract {
+  def toProtoV0: v0.Contract
+}
+
+case class CoinContract(contract: Contract[Coin]) extends CoinOrLockedCoinContract {
+  override def toProtoV0: v0.Contract = contract.toProtoV0
+}
+
+case class LockedCoinContract(contract: Contract[LockedCoin]) extends CoinOrLockedCoinContract {
+  override def toProtoV0: v0.Contract = contract.toProtoV0
+}
+
 sealed trait EventTypeAndCoin {
-  def coin: Contract[Coin]
+  def coin: CoinOrLockedCoinContract
   def isArchive: Boolean
   def isCreate: Boolean = !isArchive
   def toProtoV0: v0.CCEvent.Coin
 }
 
 object EventTypeAndCoin {
-  def fromProtoV0(proto: v0.CCEvent.Coin): Either[ProtoDeserializationError, EventTypeAndCoin] = {
+  def fromProtoV0(
+      proto: v0.CCEvent.Coin
+  ): Either[ProtoDeserializationError, EventTypeAndCoin] = {
     proto match {
       case v0.CCEvent.Coin.Empty => Left(ProtoDeserializationError.FieldNotSet("CCEvent.coin"))
-      case v0.CCEvent.Coin.Create(create) => Contract.fromProto(Coin)(create).map(CoinCreate)
-      case v0.CCEvent.Coin.Archive(archive) => Contract.fromProto(Coin)(archive).map(CoinArchive)
+      case v0.CCEvent.Coin.Create(create) =>
+        Contract.fromProto(Coin)(create).map(c => CoinCreate(CoinContract(c)))
+      case v0.CCEvent.Coin.Archive(archive) =>
+        Contract.fromProto(Coin)(archive).map(c => CoinArchive(CoinContract(c)))
+      case v0.CCEvent.Coin.LockedCreate(create) =>
+        Contract.fromProto(LockedCoin)(create).map(c => CoinCreate(LockedCoinContract(c)))
+      case v0.CCEvent.Coin.LockedArchive(archive) =>
+        Contract.fromProto(LockedCoin)(archive).map(c => CoinArchive(LockedCoinContract(c)))
     }
   }
 }
 
-case class CoinCreate(coin: Contract[Coin]) extends EventTypeAndCoin {
+case class CoinCreate(coin: CoinOrLockedCoinContract) extends EventTypeAndCoin {
   override def isArchive: Boolean = false
   def toProtoV0: v0.CCEvent.Coin = v0.CCEvent.Coin.Create(coin.toProtoV0)
 }
-case class CoinArchive(coin: Contract[Coin]) extends EventTypeAndCoin {
+case class CoinArchive(coin: CoinOrLockedCoinContract) extends EventTypeAndCoin {
   override def isArchive: Boolean = true
   def toProtoV0: v0.CCEvent.Coin = v0.CCEvent.Coin.Archive(coin.toProtoV0)
 }

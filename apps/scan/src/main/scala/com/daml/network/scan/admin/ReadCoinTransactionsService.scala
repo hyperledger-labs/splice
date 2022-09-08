@@ -60,7 +60,11 @@ class ReadCoinTransactionsService(
   private val activeCoins: concurrent.Map[Primitive.ContractId[Coin], Contract[Coin]] =
     TrieMap[Primitive.ContractId[Coin], Contract[Coin]]()
 
-  /** Traverse a TransactionTree via pre-order DFS */
+  private val activeLockedCoins
+      : concurrent.Map[Primitive.ContractId[LockedCoin], Contract[LockedCoin]] =
+    TrieMap[Primitive.ContractId[LockedCoin], Contract[LockedCoin]]()
+
+  /** Traverse a Ledger API TransactionTree via a pre-order DFS and extract the CoinEvents */
   @SuppressWarnings(Array("org.wartremover.warts.While"))
   private def traverseForest(tree: TransactionTree): Future[Seq[CoinEvent]] = Future {
 
@@ -68,6 +72,28 @@ class ReadCoinTransactionsService(
         stack: mutable.Stack[StackElement],
         coinEvents: mutable.Buffer[CoinEvent],
     ): mutable.Buffer[CoinEvent] = {
+      def addToEvents(event: EventTypeAndCoin, parentO: Option[TreeEvent.Kind]) = {
+        parentO match {
+          case None =>
+            // thoughts: debug when not seeing LockedCoin archival parent, else still warning
+            event match {
+              case CoinArchive(contract: LockedCoinContract) =>
+                logger.debug(
+                  s"An archive of a LockedCoin contract had no parent node in the transaction tree. Note that this is" +
+                    s"expected when, e.g., paying for a directory entry without involving the SVC. Contract: $contract"
+                )
+              case _ =>
+                logger.warn(
+                  s"Following Coin or LockedCoin event had no parent node in the transaction tree: $event"
+                )
+            }
+            coinEvents.append(CoinEvent(event, None))
+          case Some(parent) =>
+            coinEvents.append(CoinEvent(event, parseParentEvent(parent)))
+        }
+
+      }
+
       while (stack.nonEmpty) {
         val (node, pathToNode) = stack.pop()
         node match {
@@ -78,11 +104,14 @@ class ReadCoinTransactionsService(
               .foreach(c => {
                 val coinContract = Contract.fromCodegenContract(c)
                 activeCoins.addOne((coinContract.contractId, coinContract))
-                val res = CoinEvent(
-                  CoinCreate(coinContract),
-                  parseParentEvent(pathToNode.lastOption),
-                )
-                coinEvents.append(res)
+                addToEvents(CoinCreate(CoinContract(coinContract)), pathToNode.lastOption)
+              })
+            DecodeUtil
+              .decodeCreated(LockedCoin)(created.value)
+              .foreach(c => {
+                val coinContract = Contract.fromCodegenContract(c)
+                activeLockedCoins.addOne((coinContract.contractId, coinContract))
+                addToEvents(CoinCreate(LockedCoinContract(coinContract)), pathToNode.lastOption)
               })
           case exercised: Exercised =>
             val coinContractOpt = DecodeUtil.decodeArchivedExercise(Coin)(exercised)
@@ -94,9 +123,18 @@ class ReadCoinTransactionsService(
                     s"Observed an archive for the coin contract with contract id $cid, but we haven't observed the corresponding create"
                   )
                 )
-              coinEvents.append(
-                CoinEvent(CoinArchive(coinContract), parseParentEvent(pathToNode.lastOption))
-              )
+              addToEvents(CoinArchive(CoinContract(coinContract)), pathToNode.lastOption)
+            })
+            val lockedCoinContractOpt = DecodeUtil.decodeArchivedExercise(LockedCoin)(exercised)
+            lockedCoinContractOpt.foreach(cid => {
+              val coinContract = activeLockedCoins
+                .remove(cid)
+                .getOrElse(
+                  ErrorUtil.invalidState(
+                    s"Observed an archive for the LockedCoin contract with contract id $cid, but we haven't observed the corresponding create"
+                  )
+                )
+              addToEvents(CoinArchive(LockedCoinContract(coinContract)), pathToNode.lastOption)
             })
             val children = exercised.value.childEventIds.map(tree.eventsById(_).kind)
             stack.pushAll(children.map((_, pathToNode :+ node)).reverse)
@@ -143,38 +181,38 @@ class ReadCoinTransactionsService(
 
   import cats.syntax.option._
 
-  private def tryDecodeEvent(companion: ExerciseNodeCompanion)(exercised: Exercised)(implicit decArg: ValueDecoder[companion.Arg], decRes: ValueDecoder[companion.Res]): ExerciseNode[companion.Arg, companion.Res] =
-    ExerciseNode(tryDecode[companion.Arg](exercised.value.getChoiceArgument), tryDecode[companion.Res](exercised.value.getExerciseResult))
+  private def tryDecodeEvent(companion: ExerciseNodeCompanion)(exercised: Exercised)(implicit
+      decArg: ValueDecoder[companion.Arg],
+      decRes: ValueDecoder[companion.Res],
+  ): ExerciseNode[companion.Arg, companion.Res] =
+    ExerciseNode(
+      tryDecode[companion.Arg](exercised.value.getChoiceArgument),
+      tryDecode[companion.Res](exercised.value.getExerciseResult),
+    )
 
-  private def parseParentEvent(parent: Option[TreeEvent.Kind]): Option[ParentNode] = {
+  private def parseParentEvent(parent: TreeEvent.Kind): Option[ParentNode] = {
     parent match {
-      case None => // coin create or archival has no parent node
-        logger.warn("Ancestor of Coin had no parent node in the transaction tree")
+      case exercised: Exercised if isTransfer(exercised.value) =>
+        Transfer(tryDecodeEvent(Transfer)(exercised)).some
+      case exercised: Exercised if isTap(exercised.value) =>
+        Tap(tryDecodeEvent(Tap)(exercised)).some
+      case exercised: Exercised if isStartIssuing(exercised.value) =>
+        StartIssuing(tryDecodeEvent(StartIssuing)(exercised)).some
+      case exercised: Exercised if isCoinUnlock(exercised.value) =>
+        CoinUnlock(tryDecodeEvent(CoinUnlock)(exercised)).some
+      case other: Exercised =>
+        logger.warn(
+          s"Parent of coin create or archival was not a tap, transfer or start issuing but ${other.getClass} ($other)"
+        )
         None
-      case Some(parent) =>
-        parent match {
-          case exercised: Exercised if isTransfer(exercised.value) =>
-            Transfer(tryDecodeEvent(Transfer)(exercised)).some
-          case exercised: Exercised if isTap(exercised.value) =>
-            Tap(tryDecodeEvent(Tap)(exercised)).some
-          case exercised: Exercised if isStartIssuing(exercised.value) =>
-            StartIssuing(tryDecodeEvent(StartIssuing)(exercised)).some
-          case exercised: Exercised if isCoinUnlock(exercised.value) =>
-            CoinUnlock(tryDecodeEvent(CoinUnlock)(exercised)).some
-          case other: Exercised =>
-            logger.warn(
-              s"Parent of coin create or archival was not a tap, transfer or start issuing but ${other.getClass} ($other)"
-            )
-            None
-          case created: Created =>
-            ErrorUtil.invalidState(
-              "Observed that the parent of a Coin create or archival is a `Created` node" +
-                s"$created. However, a `Created` node should never have any children. "
-            )
-          case Empty =>
-            logger.warn("Ancestor of Coin event in the transaction tree was an empty node")
-            None
-        }
+      case created: Created =>
+        ErrorUtil.invalidState(
+          "Observed that the parent of a Coin create or archival is a `Created` node" +
+            s"$created. However, a `Created` node should never have any children. "
+        )
+      case Empty =>
+        logger.warn("Ancestor of Coin event in the transaction tree was an empty node")
+        None
     }
   }
 

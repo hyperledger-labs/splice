@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.CC.CoinRules.CoinRules
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.history._
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -11,8 +12,10 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.util.{CommonCoinAppInstanceReferences, ExerciseNode}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
-import com.daml.network.codegen.CC.CoinRules.CoinRules
 
+import scala.concurrent.duration._
+
+// TODO(M1-92): Add tests that cover all possible CoinEvents
 class ScanIntegrationTest
     extends CoinIntegrationTest
     with IsolatedCoinEnvironments
@@ -31,7 +34,6 @@ class ScanIntegrationTest
     val (aliceP, bobP) = setup(env)
     val tappedCoinCid = aliceRemoteWallet.tap(50)
     aliceRemoteWallet.executeDirectTransfer(bobP, 10, tappedCoinCid)
-    import scala.concurrent.duration._
     eventually(5.seconds) {
       val history = scan.getTxHistory()
       history should have length 2
@@ -68,8 +70,8 @@ class ScanIntegrationTest
           aliceNew should matchPattern { case CoinCreate(_) => }
           aliceOld should matchPattern { case CoinArchive(_) => }
 
-          inside(bob) { case CoinCreate(coin) =>
-            coin.payload.quantity.initialQuantity shouldBe BigDecimal(10)
+          inside(bob) { case CoinCreate(coin: CoinContract) =>
+            coin.contract.payload.quantity.initialQuantity shouldBe BigDecimal(10)
           }
       }
     }
