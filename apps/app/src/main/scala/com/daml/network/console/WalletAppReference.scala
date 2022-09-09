@@ -159,14 +159,26 @@ abstract class WalletAppReference(
     }
   }
 
-  @Help.Summary("Cancel an existing payment channel.")
+  @Help.Summary("Cancel an existing payment channel, by providing the receiver.")
+  @Help.Description(
+    "Cancel an existing payment channel associated with a receiver." +
+      "Prevents subsequent use of that channel. The sender is assumed to be the wallet user."
+  )
+  def cancelPaymentChannelByReceiver(receiverPartyId: PartyId): Unit =
+    consoleEnvironment.run {
+      adminCommand(
+        GrpcWalletAppClient.CancelPaymentChannelByReceiver(receiverPartyId, getWalletCtx())
+      )
+    }
+
+  @Help.Summary("Cancel an existing payment channel, by providing the sender.")
   @Help.Description(
     "Cancel an existing payment channel associated with a sender." +
-      "Prevents subsequent use of that channel."
+      "Prevents subsequent use of that channel. The receiver is assumed to be the wallet user."
   )
-  def cancelPaymentChannel(senderPartyId: PartyId): Unit =
+  def cancelPaymentChannelBySender(senderPartyId: PartyId): Unit =
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.CancelPaymentChannel(senderPartyId, getWalletCtx()))
+      adminCommand(GrpcWalletAppClient.CancelPaymentChannelBySender(senderPartyId, getWalletCtx()))
     }
 
   @Help.Summary("Execute a direct transfer over a payment channel")

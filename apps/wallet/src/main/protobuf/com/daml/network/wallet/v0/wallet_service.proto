@@ -19,7 +19,8 @@ service WalletService {
   rpc ListPaymentChannelProposals (ListPaymentChannelProposalsRequest) returns (ListPaymentChannelProposalsResponse);
   rpc ListPaymentChannels (ListPaymentChannelsRequest) returns (ListPaymentChannelsResponse);
   rpc AcceptPaymentChannelProposal (AcceptPaymentChannelProposalRequest) returns (AcceptPaymentChannelProposalResponse);
-  rpc CancelPaymentChannel(CancelPaymentChannelRequest) returns (google.protobuf.Empty);
+  rpc CancelPaymentChannelBySender(CancelPaymentChannelBySenderRequest) returns (google.protobuf.Empty);
+  rpc CancelPaymentChannelByReceiver(CancelPaymentChannelByReceiverRequest) returns (google.protobuf.Empty);
   rpc ExecuteDirectTransfer (ExecuteDirectTransferRequest) returns (google.protobuf.Empty);
   rpc CreateOnChannelPaymentRequest (CreateOnChannelPaymentRequestRequest) returns (CreateOnChannelPaymentRequestResponse);
   rpc ListOnChannelPaymentRequests (ListOnChannelPaymentRequestsRequest) returns (ListOnChannelPaymentRequestsResponse);
@@ -139,8 +140,14 @@ message AcceptPaymentChannelProposalRequest {
   WalletContext wallet_ctx = 2;
 }
 
-message CancelPaymentChannelRequest {
+message CancelPaymentChannelBySenderRequest {
   string sender_party_id = 1;
+
+  WalletContext wallet_ctx = 2;
+}
+
+message CancelPaymentChannelByReceiverRequest {
+  string receiver_party_id = 1;
 
   WalletContext wallet_ctx = 2;
 }

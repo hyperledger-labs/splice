@@ -139,19 +139,38 @@ object GrpcWalletAppClient {
       )
   }
 
-  case class CancelPaymentChannel(senderPartyId: PartyId, walletCtx: WalletContext)
+  case class CancelPaymentChannelByReceiver(receiverPartyId: PartyId, walletCtx: WalletContext)
       extends BaseCommand[
-        v0.CancelPaymentChannelRequest,
+        v0.CancelPaymentChannelByReceiverRequest,
         Empty,
         Unit,
       ] {
-    override def createRequest(): Either[String, v0.CancelPaymentChannelRequest] =
-      Right(v0.CancelPaymentChannelRequest(Proto.encode(senderPartyId), Some(walletCtx)))
+    override def createRequest(): Either[String, v0.CancelPaymentChannelByReceiverRequest] =
+      Right(
+        v0.CancelPaymentChannelByReceiverRequest(Proto.encode(receiverPartyId), Some(walletCtx))
+      )
 
     override def submitRequest(
         service: WalletServiceStub,
-        request: v0.CancelPaymentChannelRequest,
-    ): Future[Empty] = service.cancelPaymentChannel(request)
+        request: v0.CancelPaymentChannelByReceiverRequest,
+    ): Future[Empty] = service.cancelPaymentChannelByReceiver(request)
+
+    override def handleResponse(response: Empty): Either[String, Unit] = Right(())
+  }
+
+  case class CancelPaymentChannelBySender(senderPartyId: PartyId, walletCtx: WalletContext)
+      extends BaseCommand[
+        v0.CancelPaymentChannelBySenderRequest,
+        Empty,
+        Unit,
+      ] {
+    override def createRequest(): Either[String, v0.CancelPaymentChannelBySenderRequest] =
+      Right(v0.CancelPaymentChannelBySenderRequest(Proto.encode(senderPartyId), Some(walletCtx)))
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.CancelPaymentChannelBySenderRequest,
+    ): Future[Empty] = service.cancelPaymentChannelBySender(request)
 
     override def handleResponse(response: Empty): Either[String, Unit] = Right(())
   }

@@ -70,8 +70,12 @@ template PaymentChannel
 
     -- TODO(M1-08): create payment offers
 
-    choice PaymentChannel_Cancel : ()
+    choice PaymentChannel_Cancel_By_Sender : ()
       controller receiver
+      do pure ()
+
+    choice PaymentChannel_Cancel_By_Receiver : ()
+      controller sender
       do pure ()
 
 

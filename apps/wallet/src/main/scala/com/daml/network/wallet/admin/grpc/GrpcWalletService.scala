@@ -250,7 +250,9 @@ class GrpcWalletService(
       )
     }
 
-  override def cancelPaymentChannel(request: v0.CancelPaymentChannelRequest): Future[Empty] =
+  override def cancelPaymentChannelBySender(
+      request: v0.CancelPaymentChannelBySenderRequest
+  ): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         svcParty <- scanConnection.getSvcPartyId()
@@ -258,7 +260,27 @@ class GrpcWalletService(
         senderParty = Proto.tryDecode(Proto.Party)(request.senderPartyId)
         cmd = walletCodegen.PaymentChannel
           .key(DA.Types.Tuple3(senderParty.toPrim, walletParty.toPrim, svcParty.toPrim))
-          .exercisePaymentChannel_Cancel()
+          .exercisePaymentChannel_Cancel_By_Sender()
+          .command
+        _ <- connection.submitCommand(
+          Seq(walletParty),
+          Seq(getValidatorParty),
+          Seq(cmd),
+        )
+      } yield Empty()
+    }
+
+  override def cancelPaymentChannelByReceiver(
+      request: v0.CancelPaymentChannelByReceiverRequest
+  ): Future[Empty] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        svcParty <- scanConnection.getSvcPartyId()
+        walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
+        receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
+        cmd = walletCodegen.PaymentChannel
+          .key(DA.Types.Tuple3(walletParty.toPrim, receiverParty.toPrim, svcParty.toPrim))
+          .exercisePaymentChannel_Cancel_By_Receiver()
           .command
         _ <- connection.submitCommand(
           Seq(walletParty),

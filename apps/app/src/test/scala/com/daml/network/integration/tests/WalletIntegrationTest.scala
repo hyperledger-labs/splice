@@ -313,7 +313,7 @@ class WalletIntegrationTest
       checkWallet(charlieUserParty, aliceWallet, Seq((50, 50)))
     }
 
-    "propose, accept, and cancel a payment channel" in { implicit env =>
+    "(propose, accept, and) cancel a payment channel by sender" in { implicit env =>
       import env._
 
       // Onboard alice on her self-hosted validator
@@ -337,12 +337,50 @@ class WalletIntegrationTest
       utils.retry_until_true(bobRemoteWallet.listPaymentChannelProposals().size == 1)
       bobRemoteWallet.acceptPaymentChannelProposal(aliceProposal.contractId)
 
-      // Bob then immediately cancels the channel
-      bobRemoteWallet.cancelPaymentChannel(aliceUserParty)
+      // Bob requests a payment, and then immediately cancels the channel
+      bobRemoteWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please pay")
+      bobRemoteWallet.cancelPaymentChannelBySender(aliceUserParty)
 
-      // Neither sees the payment channel anymore
+      // Neither sees the payment channel nor the payment request anymore
       bobRemoteWallet.listPaymentChannels() shouldBe empty
+      bobRemoteWallet.listOnChannelPaymentRequests() should not be empty
+      utils.retry_until_true(aliceRemoteWallet.listOnChannelPaymentRequests().nonEmpty)
       utils.retry_until_true(aliceRemoteWallet.listPaymentChannels().isEmpty)
+    }
+
+    "(propose, accept, and) cancel a payment channel by receiver" in { implicit env =>
+      import env._
+
+      // Onboard alice on her self-hosted validator
+      val aliceValidatorParty = aliceValidator.initialize()
+      val aliceDamlUser = aliceRemoteWallet.config.damlUser
+      aliceWallet.initialize(aliceValidatorParty)
+      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+
+      // Onboard bob on his self-hosted validator
+      val bobValidatorParty = bobValidator.initialize()
+      val bobDamlUser = bobRemoteWallet.config.damlUser
+      bobWallet.initialize(bobValidatorParty)
+      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
+
+      // Alice proposes payment channel to Bob
+      aliceRemoteWallet.proposePaymentChannel(bobUserParty)
+      val aliceProposals = aliceRemoteWallet.listPaymentChannelProposals()
+      val aliceProposal = aliceProposals(0)
+
+      // Bob monitors proposals and accepts the one
+      utils.retry_until_true(bobRemoteWallet.listPaymentChannelProposals().size == 1)
+      bobRemoteWallet.acceptPaymentChannelProposal(aliceProposal.contractId)
+
+      // Bob requests a payment, and then immediately cancels the channel
+      bobRemoteWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please pay")
+      aliceRemoteWallet.cancelPaymentChannelByReceiver(bobUserParty)
+
+      // Neither sees the payment channel nor the payment request anymore
+      aliceRemoteWallet.listPaymentChannels() shouldBe empty
+      aliceRemoteWallet.listOnChannelPaymentRequests() should not be empty
+      utils.retry_until_true(bobRemoteWallet.listOnChannelPaymentRequests().nonEmpty)
+      utils.retry_until_true(bobRemoteWallet.listPaymentChannels().isEmpty)
     }
 
     "list and collect app & validator rewards" in { implicit env =>
