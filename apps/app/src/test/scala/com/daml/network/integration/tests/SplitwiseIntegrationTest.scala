@@ -104,6 +104,10 @@ class SplitwiseIntegrationTest
       case Seq(accepted) =>
         aliceSplitwise.joinGroup(aliceProviderParty, accepted.contractId)
     }
+
+    splitwiseValidator.remoteParticipant.ledger_api.acs
+      .await(charlieProviderParty, splitCodegen.Group)
+
     charlieSplitwise.listBalances(key) shouldBe Map.empty
     charlieSplitwise.enterPayment(charlieProviderParty, key, 33.0, "payment")
     charlieSplitwise.listBalances(key) shouldBe Map(aliceUserParty -> 11, bobUserParty -> 11)
