@@ -430,7 +430,7 @@ commands:
 parameters:
   sdk-version:
     type: string
-    default: "2.4.0-snapshot.20220830.10494.0.4622de48" # sdk-version
+    default: "2.4.0-snapshot.20220905.10544.0.a2ea3ce6" # sdk-version
   run-schedule:
     type: boolean
     default: false

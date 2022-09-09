@@ -13,6 +13,7 @@ import com.daml.network.svc.config.{LocalSvcAppConfig, RemoteSvcAppConfig}
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.config.CantonCommunityConfig.CantonDeprecationImplicits
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.{
@@ -20,6 +21,8 @@ import com.digitalasset.canton.config.{
   CantonFeatures,
   CantonParameters,
   ConfigDefaults,
+  DefaultPorts,
+  DeprecatedConfigUtils,
   MonitoringConfig,
 }
 import com.digitalasset.canton.domain.config.{CommunityDomainConfig, RemoteDomainConfig}
@@ -56,7 +59,7 @@ case class CoinConfig(
     parameters: CantonParameters = CantonParameters(),
     features: CantonFeatures = CantonFeatures(),
 ) extends CantonConfig // TODO(Arne): generalize or fork this trait.
-    with ConfigDefaults[CoinConfig] {
+    with ConfigDefaults[DefaultPorts, CoinConfig] {
 
   override type DomainConfigType = CommunityDomainConfig
   override type ParticipantConfigType = CommunityParticipantConfig
@@ -351,11 +354,13 @@ case class CoinConfig(
 
   override def dumpString: String = "TODO(Arne): remove or implement."
 
-  override def withDefaults: CoinConfig =
+  override def withDefaults(ports: DefaultPorts): CoinConfig =
     this // TODO(Arne): CantonCommunityConfig does more here. Do we want to copy that?
+  // NOTE(Simon): in particular it handles default ports derived from the ports object introduced in https://github.com/DACH-NY/canton/commit/ccff59fccf349893cc68413a7859e8ef748a94fa
 }
 
-// All this implicit weirdness below is copied analogue from CantonCommunityConfig
+// NOTE: the below is patterned after CantonCommunityConfig.
+// In case of changes, recopy from there.
 @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
 object CoinConfig {
 
@@ -370,8 +375,13 @@ object CoinConfig {
   import CantonConfig._
 
   @nowarn("cat=unused")
-  private lazy implicit val coinConfigReader: ConfigReader[CoinConfig] = {
+  private implicit def coinConfigReader(implicit
+      elc: ErrorLoggingContext
+  ): ConfigReader[CoinConfig] = {
     import CantonConfig.ConfigReaders._
+    import DeprecatedConfigUtils._
+    import CantonDeprecationImplicits._
+
     implicit val remoteScanConfigReader: ConfigReader[RemoteScanAppConfig] =
       deriveReader[RemoteScanAppConfig]
     implicit val validatorConfigReader: ConfigReader[LocalValidatorAppConfig] =
@@ -397,10 +407,11 @@ object CoinConfig {
       deriveReader[LocalDirectoryUserAppConfig]
     implicit val splitwiseConfigReader: ConfigReader[LocalSplitwiseAppConfig] =
       deriveReader[LocalSplitwiseAppConfig]
+
     implicit val communityDomainConfigReader: ConfigReader[CommunityDomainConfig] =
-      deriveReader[CommunityDomainConfig]
+      deriveReader[CommunityDomainConfig].applyDeprecations
     implicit val communityParticipantConfigReader: ConfigReader[CommunityParticipantConfig] =
-      deriveReader[CommunityParticipantConfig]
+      deriveReader[CommunityParticipantConfig].applyDeprecations
 
     deriveReader[CoinConfig]
   }

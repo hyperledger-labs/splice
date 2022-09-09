@@ -29,3 +29,4 @@ temp/
 **/com/daml/network/**/*.ts
 **/com/daml/network/**/*.js
 docs/src/app_dev/api
+canton.patch

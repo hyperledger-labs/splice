@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 set -eou pipefail
 
-SDK_VERSION=2.4.0-snapshot.20220830.10494.0.4622de48
-CANTON_VERSION=20220830
+SDK_VERSION=2.4.0-snapshot.20220905.10544.0.a2ea3ce6
+CANTON_VERSION=20220906
 
 if [ ! -d canton-release ]; then
     echo "No canton release in canton-release, downloading"

@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests.runbook
 
 import better.files.{File, _}
+import cats.syntax.functor._
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
@@ -12,6 +13,7 @@ import com.daml.network.integration.{
   CoinConfigTransforms,
   CoinEnvironmentDefinition,
 }
+import com.digitalasset.canton.console.LocalInstanceReference
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens._
@@ -56,7 +58,8 @@ class LocalRunbookIntegrationTest
         // However, when automatic start is enabled it is currently impossible to connect participants to a domain
         // until all other nodes defined the configuration are already started
         // For this reason, we (1) first start the Canton nodes...
-        Seq(domains.local, participants.local).flatten.foreach(_.start())
+        Seq(domains.local.widen[LocalInstanceReference], participants.local).flatten
+          .foreach(_.start())
         // ... (2) connect the SVC participant to the SVC domain...
         p("svc_participant").domains.connect_local(d("svc_domain"))
         // ... (3) only then start the rest of the nodes

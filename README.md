@@ -628,23 +628,33 @@ Both our deployment and tests follow the [port allocation scheme](./apps/app/src
 
 ### Bumping our Canton fork
 
-1. Check out the [Canton Open Source repo](https://github.com/digital-asset/canton) at the Canton commit listed below.
-2. Create a Canton patch file capturing all our changes relative to that `./scripts/diff-canton.sh path/to/canton-oss/ > canton.patch`
-3. Undo our changes: `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton -R canton.patch`
-   The exclusion is because those files are under a symlink and we don’t want to change them twice.
-4. Create a commit to ease review.
-5. Now check out the commit in the Canton OSS repo that you want to update to and update the current commit below.
-6. Copy the Canton changes: `./scripts/copy-canton.sh path/to/canton-oss`
-7. Create a commit to ease review.
-8. Reapply our changes `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton --reject canton.patch`
-   and resolve any conflicts (if any).
-9. Bump the SDK/Canton versions in the following places:
-    1. `releaseVersionToProtocolVersion` in `CantonVersion.scala`
-    2. `version` in `CantonDependencies`
-    3. `SDK_VERSION` and `CANTON_VERSION` in `start-canton.sh`
-10. Bump the sdk version in our own daml.yaml files via `./set-sdk.sh $sdkversion` to the same version.
-11. Create another commit.
-12. Make a PR with your changes.
-You can refer to https://github.com/DACH-NY/the-real-canton-coin/pull/446/commits for an example of how the update PR should look like.
+Current Canton commit: `606a286a97e3bc47d19f3045048dd71b12a9800a`
 
-Current Canton commit: `4cc7e32924f9c674a8ea9b4417a8bd5907510e84`
+1. Check out the [Canton Open Source repo](https://github.com/digital-asset/canton) at the current Canton commit listed above.
+   NOTE: if you can't find the the comment, then you are probably using the closed source https://github.com/DACH-NY/canton repo.
+   That won't work. You need the Canton OSS repo linked above.
+2. Create a branch named `canton-bump-<sprintnr>`
+3. Define the environment variable used in the commands below using `export PATH_TO_CANTON_OSS=<your-canton-oss-repo-path>`
+4. Create a Canton patch file capturing all our changes relative to that `./scripts/diff-canton.sh $PATH_TO_CANTON_OSS/ > canton.patch`
+5. Undo our changes: `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton -R canton.patch`
+   The exclusion is because those files are under a symlink and we don’t want to change them twice.
+6. Create a commit to ease review, `git add canton/ && git commit -m"Undo our changes"`
+7. Checkout `main` in the Canton OSS repo and check that this is indeed a newer commit than the one we are currently using.
+8. Copy the Canton changes: `./scripts/copy-canton.sh $PATH_TO_CANTON_OSS`
+9. Create a commit to ease review, `git add canton/ && git commit -m"Bump Canton commit"`
+10. Reapply our changes `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton --reject canton.patch`
+    and resolve conflicts (if any).
+11. Create a commit to rease review `git add canton/ && git commit -m"Reapply our changes"`
+12. Learn Canton's SDK version from `head -n15 $PATH_TO_CANTON_OSS/project/project/DamlVersions.scala`
+13. Bump the SDK/Canton versions in the following places:
+    1. The current Canton commit in this `README.md`
+    1. `releaseVersionToProtocolVersion` in `ReleaseVersionToProtocolVersions.scala`
+    2. `version` in `CantonDependencies`
+    3. `SDK_VERSION` and `CANTON_VERSION` in `download-canton.sh`
+14. Bump the sdk version in our own daml.yaml files via `./set-sdk.sh $sdkversion` to the same version.
+15. Create another commit, `git add -A && git commit -m"Bump Canton commit and Canton/SDK versions"`
+16. Make a PR with your changes, so CI starts churning.
+17. Test whether things compile using `sbt test:compile`.
+    In case of problems, find the related change in the **closed source Canton repo** and use the change and its commit message to adjust our code.
+
+You can refer to https://github.com/DACH-NY/the-real-canton-coin/pull/446/commits for an example of how the update PR should look like.
