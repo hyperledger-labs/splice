@@ -41,11 +41,6 @@ function cluster_ip() {
 }
 
 function _cluster_apply() {
-    if ! make -C ${REPO_ROOT} docker-check; then
-        _error "Images missing from artifact registry, cannot apply."
-        exit 1
-    fi
-
     jsonnet --tla-str gcpRegion=${CLOUDSDK_COMPUTE_REGION} \
             --tla-str gcpRepoName=${GCP_REPO_NAME} \
             --tla-str imageTag=${SOURCE_IMAGE_TAG} \
@@ -87,6 +82,11 @@ function cluster_activate() {
 
 function cluster_apply() {
     cluster_confirm "Apply configuration"
+
+    if ! make -C ${REPO_ROOT} docker-check; then
+        _error "Images missing from artifact registry, cannot apply."
+        exit 1
+    fi
 
     _cluster_apply
 }
