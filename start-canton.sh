@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
 set -eou pipefail
+
+if [ -f "canton.pid" ]; then
+  >&2 echo "Canton seems to already be running. Did you mean to run stop-canton.sh first?"
+  exit 1
+fi
+
 rm -f canton.ports
 
 POSTGRES_MODE=${1:-docker}
