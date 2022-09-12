@@ -252,9 +252,6 @@ commands:
         # Fail if there is an error in the sbt output.
         default: true
         type: boolean
-      with_devnet_authentication:
-        type: boolean
-        default: false
       pre_sbt_cmd:
         type: string
         default: ""
@@ -264,7 +261,6 @@ commands:
     steps:
       - run_bash_command_in_nix:
           cmd_name: Executing "sbt << parameters.cmd >>"
-          with_devnet_authentication: << parameters.with_devnet_authentication >>
           cmd: |
             on_exit() {
               local CODE="$?"
@@ -336,6 +332,9 @@ commands:
       with_devnet_authentication:
         type: boolean
         default: false
+      with_scratchnet_authentication:
+        type: boolean
+        default: false
       additional_nix_args:
         type: string
         default: ""
@@ -350,6 +349,9 @@ commands:
             if [[ << parameters.with_devnet_authentication >> == true ]]; then
               ADDITIONAL_NIX_ARGS+=" --keep GCP_DA_CN_DEVNET_KEY"
             fi
+            if [[ << parameters.with_scratchnet_authentication >> == true ]]; then
+              ADDITIONAL_NIX_ARGS+=" --keep GCP_DA_CN_SCRATCHNET_KEY"
+            fi
 
             nix-shell shell.nix \
               --pure \
@@ -359,8 +361,10 @@ commands:
               . .envrc.vars
 
               if [[ << parameters.with_devnet_authentication >> == true ]]; then
-                . $REPO_ROOT/deployment/devnet/.envrc.vars
                 echo $GCP_DA_CN_DEVNET_KEY | gcloud auth activate-service-account --key-file=-
+              fi
+              if [[ << parameters.with_scratchnet_authentication >> == true ]]; then
+                echo $GCP_DA_CN_SCRATCHNET_KEY | gcloud auth activate-service-account --key-file=-
               fi
 
               << parameters.cmd >>
@@ -558,7 +562,28 @@ jobs:
          cmd_name: deployment test
          cmd: make test
 
-  deploy_cluster:
+  deploy_staging_cluster:
+    circleci_ip_ranges: true
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    steps:
+      - checkout
+      - setup_nix
+      - run_bash_command_in_nix:
+         cmd_name: apply cluster manifest
+         with_scratchnet_authentication: true
+         cmd: |
+           . $REPO_ROOT/deployment/staging/.envrc.vars
+           cncluster activate
+           cncluster ciapply
+      - slack/notify:
+          event: pass
+          template: success_tagged_deploy_1
+
+  deploy_devnet_cluster:
     circleci_ip_ranges: true
     docker:
     - image: cimg/base:2021.04
@@ -572,6 +597,7 @@ jobs:
          cmd_name: apply cluster manifest
          with_devnet_authentication: true
          cmd: |
+           . $REPO_ROOT/deployment/devnet/.envrc.vars
            cncluster activate
            cncluster ciapply
       - slack/notify:
@@ -766,8 +792,7 @@ workflows:
     - deployment_test:
         <<: *notify-fail
 
-  deploy:
-    when: << pipeline.parameters.run-schedule >>
+  deploy_staging:
     jobs:
     # Deployment
     - docker-images-push:
@@ -776,7 +801,7 @@ workflows:
     - deployment_test:
         <<: *notify-fail
         <<: *main-branch-only
-    - deploy_cluster:
+    - deploy_staging_cluster:
         <<: *notify-fail
         <<: *main-branch-only
         requires:
@@ -791,7 +816,34 @@ workflows:
         requires:
           - deployment_test
           - docker-images-push
-          - deploy_cluster
+          - deploy_staging_cluster
+
+  deploy_devnet:
+    when: << pipeline.parameters.run-schedule >>
+    jobs:
+    # Deployment
+    - docker-images-push:
+        <<: *notify-fail
+        <<: *main-branch-only
+    - deployment_test:
+        <<: *notify-fail
+        <<: *main-branch-only
+    - deploy_devnet_cluster:
+        <<: *notify-fail
+        <<: *main-branch-only
+        requires:
+           - deployment_test
+           - docker-images-push
+    - preflight_check:
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - canton-network-vpn
+          - slack-context
+        requires:
+          - deployment_test
+          - docker-images-push
+          - deploy_devnet_cluster
 
   manual_preflight_check:
     jobs:
