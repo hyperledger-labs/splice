@@ -79,12 +79,22 @@ function cluster_activate() {
     fi
 }
 
-
 function cluster_apply() {
     cluster_confirm "Apply configuration"
 
     if ! make -C ${REPO_ROOT} docker-check; then
         _error "Images missing from artifact registry, cannot apply."
+        exit 1
+    fi
+
+    _cluster_apply
+}
+
+function cluster_deploy() {
+    cluster_confirm "Build and apply configuration"
+
+    if ! make -C ${REPO_ROOT} docker-push; then
+        _error "Error building images, cannot apply."
         exit 1
     fi
 
@@ -271,31 +281,35 @@ function cluster_reset() {
 
 case "${SUBCOMMAND_NAME}" in
     activate)
-        cluster_activate
+        cluster_activate $@
         ;;
 
     apply)
-        cluster_apply
+        cluster_apply $@
         ;;
 
     create)
-        cluster_create
+        cluster_create $@
         ;;
 
     check)
-        cluster_check
+        cluster_check $@
         ;;
 
     ciapply)
-        cluster_ciapply
+        cluster_ciapply $@
         ;;
 
     delete)
-        cluster_delete
+        cluster_delete $@
+        ;;
+
+    deploy)
+        cluster_deploy $@
         ;;
 
     ipaddr)
-        cluster_ipaddr
+        cluster_ipaddr $@
         ;;
 
     push)
