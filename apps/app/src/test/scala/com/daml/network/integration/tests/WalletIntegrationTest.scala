@@ -20,7 +20,9 @@ import com.daml.network.codegen.CN.Scripts.{TestWallet => testWalletCodegen}
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
+
 import java.time.temporal.ChronoUnit
+import scala.util.Try
 
 class WalletIntegrationTest
     extends CoinIntegrationTest
@@ -504,18 +506,20 @@ class WalletIntegrationTest
       walletParty: PartyId,
       wallet: WalletAppReference,
       expectedQuantityRanges: Seq[(BigDecimal, BigDecimal)],
-  ) = {
-    val coins = wallet.list().sortBy(coin => coin.payload.quantity.initialQuantity)
-    coins should have size (expectedQuantityRanges.size.toLong)
-    coins
-      .zip(expectedQuantityRanges)
-      .foreach { case (coin, (quantityLb: BigDecimal, quantityUb: BigDecimal)) =>
-        coin.payload.owner shouldBe walletParty.toPrim
-        val ExpiringQuantity(initialQuantity, createdAt, ratePerRound) = coin.payload.quantity
-        initialQuantity should (be >= quantityLb and be <= quantityUb)
-        ratePerRound shouldBe RatePerRound(
-          CoinUtil.defaultHoldingFee.rate.doubleValue
-        )
-      }
+  )(implicit env: CoinTestConsoleEnvironment): Unit = {
+    env.utils.retry(Try {
+      val coins = wallet.list().sortBy(coin => coin.payload.quantity.initialQuantity)
+      coins should have size (expectedQuantityRanges.size.toLong)
+      coins
+        .zip(expectedQuantityRanges)
+        .foreach { case (coin, (quantityLb: BigDecimal, quantityUb: BigDecimal)) =>
+          coin.payload.owner shouldBe walletParty.toPrim
+          val ExpiringQuantity(initialQuantity, createdAt, ratePerRound) = coin.payload.quantity
+          initialQuantity should (be >= quantityLb and be <= quantityUb)
+          ratePerRound shouldBe RatePerRound(
+            CoinUtil.defaultHoldingFee.rate.doubleValue
+          )
+        }
+    })(_.isFailure)
   }
 }

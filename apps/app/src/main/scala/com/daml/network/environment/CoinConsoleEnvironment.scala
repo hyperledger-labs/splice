@@ -68,6 +68,24 @@ class CoinConsoleEnvironment(
     ),
   )
 
+  /* Local apps that are (in the target deployment) operated by the SVC */
+  lazy val appsHostedBySvc = NodeReferences(
+    mergeLocalInstances(svcOpt.toList, scanOpt.toList, directoryProviders.local),
+    mergeRemoteInstances(remoteSvcOpt.toList, directoryProviders.remote),
+  )
+
+  /* Local apps that are (in the target deployment) operated by a self-hosted validator */
+  lazy val appsHostedByValidator = NodeReferences(
+    mergeLocalInstances(validators, wallets.local),
+    mergeRemoteInstances(wallets.remote),
+  )
+
+  /* Local apps that are (in the target deployment) operated by a third party */
+  lazy val appsHostedByThirdParty = NodeReferences(
+    splitwises.local,
+    splitwises.remote,
+  )
+
   lazy val validators: Seq[LocalValidatorAppReference] =
     environment.config.validatorsByString.keys.map(createValidatorReference).toSeq
 
@@ -229,7 +247,28 @@ class CoinConsoleEnvironment(
         .map(svc => TopLevelValue(svc.name, helpText("SVC app", svc.name), svc, Seq("SVC")))
         .toList :++ scanOpt
         .map(scan => TopLevelValue(scan.name, helpText("Scan app", scan.name), scan, Seq("Scan")))
-        .toList
+        .toList :+ TopLevelValue(
+        "appsHostedBySvc",
+        helpText("All local apps hosted by the SVC" + genericNodeReferencesDoc, "appsHostedBySvc"),
+        appsHostedBySvc,
+        Seq("App References"),
+      ) :+ TopLevelValue(
+        "appsHostedByValidator",
+        helpText(
+          "All local apps hosted by the self-hosted validator" + genericNodeReferencesDoc,
+          "appsHostedByValidator",
+        ),
+        appsHostedByValidator,
+        Seq("App References"),
+      ) :+ TopLevelValue(
+        "appsHostedByThirdParty",
+        helpText(
+          "All local apps hosted by a third party" + genericNodeReferencesDoc,
+          "appsHostedByThirdParty",
+        ),
+        appsHostedByThirdParty,
+        Seq("App References"),
+      )
 
   }
 

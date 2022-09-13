@@ -14,6 +14,7 @@ import com.digitalasset.canton.tracing.Spanning
 import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.codegen.DA
+import com.daml.network.wallet.store.WalletAppStore
 import com.google.protobuf.empty.Empty
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
@@ -28,6 +29,7 @@ case class WalletServiceState(
 )
 
 class GrpcWalletService(
+    store: WalletAppStore,
     ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
     walletServiceUser: String,
@@ -58,17 +60,13 @@ class GrpcWalletService(
   def getWalletServiceParty: PartyId =
     getState.walletServiceParty
 
-  @nowarn("cat=unused")
   override def list(request: v0.ListRequest): Future[v0.ListResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
-        coinsLAPI <- connection.activeContracts(walletParty, coinCodegen.Coin)
+        coins <- store.listCoins(walletParty)
       } yield {
-        // TODO(i207): persist response to store
-        val coinsProto =
-          coinsLAPI.map(x => Contract.fromCodegenContract[coinCodegen.Coin](x).toProtoV0)
-        v0.ListResponse(coinsProto)
+        v0.ListResponse(coins.map(x => x.toProtoV0))
       }
     }
 
@@ -517,10 +515,7 @@ class GrpcWalletService(
       val validatorServiceParty = PartyId.tryFromProtoPrimitive(request.validatorPartyId)
 
       for {
-        _ <- connection.uploadDarFile(
-          WalletUtil
-        ) // TODO(i353) move away from dar upload during init
-        walletServiceParty <- connection.getOrAllocateParty(walletServiceUser)
+        walletServiceParty <- connection.getPrimaryParty(walletServiceUser)
         _ <- WalletUtil.initializeWalletApp(
           walletServiceParty,
           validatorServiceParty,

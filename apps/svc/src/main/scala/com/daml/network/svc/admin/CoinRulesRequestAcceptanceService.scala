@@ -1,6 +1,7 @@
 package com.daml.network.svc.admin
 
 import com.daml.ledger.api.v1.transaction.Transaction
+import com.daml.ledger.client.binding.Primitive
 import com.daml.network.admin.LedgerAutomationService
 import com.daml.network.environment.CoinLedgerConnection
 import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
@@ -21,6 +22,8 @@ class CoinRulesRequestAcceptanceService(
 )(implicit ec: ExecutionContext)
     extends LedgerAutomationService
     with NamedLogging {
+
+  override def templateIds: Seq[Primitive.TemplateId[_]] = Seq(CoinRulesRequest.id)
 
   // TODO(M1-90): This should not run concurrently with round management commands.
   // Both operations are non-atomic read-modify-write operations on the set of mining rounds.

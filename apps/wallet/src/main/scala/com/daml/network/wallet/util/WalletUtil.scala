@@ -21,14 +21,14 @@ object WalletUtil extends UploadablePackage {
   // See `Compile / resourceGenerators` in build.sbt
   lazy val resourcePath: String = "dar/wallet-0.1.0.dar"
 
-  def geWalletApp(
+  def geWalletApps(
       serviceParty: PartyId,
       connection: CoinLedgerConnection,
       logger: TracedLogger,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ): Future[Option[Primitive.ContractId[walletCodegen.WalletApp]]] = {
+  ): Future[Seq[Primitive.ContractId[walletCodegen.WalletApp]]] = {
     connection
       .activeContracts(
         LedgerConnection.transactionFilterByParty(
@@ -36,14 +36,14 @@ object WalletUtil extends UploadablePackage {
         )
       )
       .map(_.flatMap(DecodeUtil.decodeCreated(walletCodegen.WalletApp)))
-      .map(_.headOption.map(_.contractId))
+      .map(_.map(_.contractId))
       .recover {
         case e if e.getMessage.contains("Templates do not exist") =>
           logger.debug(
-            "Wallet daml model not uploaded, can not find WalletApp contracts. " +
+            "Wallet daml model not uploaded, can not find any WalletApp contracts. " +
               "This should only happen if you onboard a user onto a deployment that has no wallet app."
           )
-          None
+          Seq.empty
       }
   }
 
@@ -58,41 +58,45 @@ object WalletUtil extends UploadablePackage {
       traceContext: TraceContext,
   ): Future[Unit] = {
     for {
-      appCidO <- geWalletApp(validatorServiceParty, connection, logger)
-      _ <- appCidO match {
-        case None =>
+      // Note: it is possible to have multiple wallet apps running on the same participant.
+      appCids <- geWalletApps(validatorServiceParty, connection, logger)
+      _ <-
+        if (appCids.isEmpty) {
           logger.debug(
             s"No WalletApp contract visible for validator $validatorServiceParty. Skipping installing the wallet for user $endUserParty. " +
               "This should only happen if you onboard a user onto a deployment that has no wallet app."
           )
           Future.successful(())
-        case Some(appCid) =>
-          logger.debug(
-            s"Installing wallet for endUserParty=$endUserParty, validatorServiceParty=$validatorServiceParty, svcParty=$svcParty."
-          )
-          connection
-            .submitCommand(
-              Seq(endUserParty, validatorServiceParty),
-              Seq(),
-              Seq(
-                appCid
-                  .exerciseInstall(
-                    endUser = endUserParty.toPrim,
-                    svcUser = svcParty.toPrim,
-                  )
-                  .command
-              ),
+        } else {
+          Future.traverse(appCids)(appCid => {
+            logger.debug(
+              s"Installing wallet for endUserParty=$endUserParty, validatorServiceParty=$validatorServiceParty, svcParty=$svcParty, " +
+                s"using install contract $appCid"
             )
-            .recover {
-              // TODO (i751): use self-service error codes
-              case e if e.getMessage.contains("DUPLICATE_CONTRACT_KEY") =>
-                logger.debug(
-                  s"Installing the wallet for user $endUserParty resulted in duplicate contract key." +
-                    "This probably means the wallet was already installed before, ignoring the error."
-                )
-                ()
-            }
-      }
+            connection
+              .submitCommand(
+                Seq(endUserParty, validatorServiceParty),
+                Seq(),
+                Seq(
+                  appCid
+                    .exerciseInstall(
+                      endUser = endUserParty.toPrim,
+                      svcUser = svcParty.toPrim,
+                    )
+                    .command
+                ),
+              )
+              .recover {
+                // TODO (i751): better way to make this method idempotent
+                case e if e.getMessage.contains("DUPLICATE_CONTRACT_KEY") =>
+                  logger.debug(
+                    s"Installing the wallet for user $endUserParty resulted in duplicate contract key." +
+                      "This probably means the wallet was already installed before, ignoring the error."
+                  )
+                  ()
+              }
+          })
+        }
     } yield ()
   }
 

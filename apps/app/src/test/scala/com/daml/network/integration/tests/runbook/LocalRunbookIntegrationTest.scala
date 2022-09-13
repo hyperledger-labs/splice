@@ -52,6 +52,8 @@ class LocalRunbookIntegrationTest
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
       .withSetup(env => {
         import env._
+        // This section starts the core of the Canton Network (i.e., it does not include participants and apps
+        // operated by a self-hosted validator).
         // It is not possible to start an environment definition that contains Canton components CN components with
         // automatic start in integration tests
         // This is because the SVC app `start` call relies on the Canton participants already being connected to a domain
@@ -63,7 +65,7 @@ class LocalRunbookIntegrationTest
         // ... (2) connect the SVC participant to the SVC domain...
         p("svc_participant").domains.connect_local(d("svc_domain"))
         // ... (3) only then start the rest of the nodes
-        nodes.local.foreach(_.start())
+        env.appsHostedBySvc.local.foreach(_.start())
       })
 
   private def remoteScanAddressToLocalhost: CoinConfigTransform = {

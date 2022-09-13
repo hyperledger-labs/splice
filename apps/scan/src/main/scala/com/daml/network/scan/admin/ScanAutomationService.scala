@@ -7,7 +7,6 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
-import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContextExecutor
@@ -29,21 +28,15 @@ class ScanAutomationService(
     ) {
   override protected def timeouts: ProcessingTimeout = processingTimeouts
 
-  override def readAs: PartyId = svcParty
-
-  val (coinFlatStreamSubscription, readCcTransfersService) =
-    createService("Scan:ReadCoinTransactionsService", ledgerClient, Seq(Coin.id, LockedCoin.id)) {
-      connection =>
-        new ReadCoinTransactionsService(svcParty, connection, store, loggerFactory)
+  val readCoinTransactions =
+    createService("Scan:ReadCoinTransactionsService", ledgerClient, Seq(svcParty)) { connection =>
+      new ReadCoinTransactionsService(svcParty, connection, store, loggerFactory)
     }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq[AsyncOrSyncCloseable](
     SyncCloseable(
       "SVC automation services",
-      Lifecycle.close(
-        coinFlatStreamSubscription,
-        readCcTransfersService,
-      )(logger),
+      Lifecycle.close(readCoinTransactions)(logger),
     )
   )
 }

@@ -2,6 +2,7 @@ package com.daml.network.wallet
 
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.wallet.admin.WalletAutomationService
 import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.daml.network.wallet.store.WalletAppStore
 import com.digitalasset.canton.environment.CantonNode
@@ -23,7 +24,8 @@ class WalletApp(
     val config: LocalWalletAppConfig,
     val coinAppParameters: SharedCoinAppParameters,
     storage: Storage,
-    dummyStore: WalletAppStore,
+    store: WalletAppStore,
+    automation: WalletAutomationService,
     scanConnection: ScanConnection,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -46,6 +48,6 @@ class WalletApp(
 
   override def close(): Unit = {
     logger.info("Stopping wallet node")
-    Lifecycle.close(storage, dummyStore, scanConnection)(logger)
+    Lifecycle.close(automation, storage, store, scanConnection)(logger)
   }
 }

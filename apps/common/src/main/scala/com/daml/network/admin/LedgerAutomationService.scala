@@ -1,6 +1,7 @@
 package com.daml.network.admin
 
 import com.daml.ledger.api.v1.transaction.Transaction
+import com.daml.ledger.client.binding
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.Future
@@ -9,6 +10,9 @@ import scala.concurrent.Future
   * Analogue to Canton's [[com.digitalasset.canton.participant.admin.AdminWorkflowService]] workflow services.
   */
 trait LedgerAutomationService extends AutoCloseable {
+
+  /** The set of template IDs that this service should subscribe for */
+  def templateIds: Seq[binding.Primitive.TemplateId[_]]
 
   /** Processing the transaction must not block; shutdown problems occur otherwise.
     * Long-running computations or blocking calls should be spawned off into an asynchronous computation

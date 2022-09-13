@@ -70,6 +70,47 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         case m: MethodSymbol if m.isCaseAccessor => s"${m.name}:${m.returnType}"
       }.toList
 
+    @Help.Summary("Wait for a value computation to not fail, using default timeouts")
+    @Help.Description("""
+      |Wait until the value computes successfully, with a timeout taken from the parameters.timeouts.console.bounded 
+      |configuration parameter.""")
+    final def retry[A](computeValue: => A)(isFailure: A => Boolean)(implicit
+        env: ConsoleEnvironment
+    ): A = retry(env.commandTimeouts.bounded, 10.seconds)(computeValue)(
+      isFailure,
+      s"Condition never became true within ${env.commandTimeouts.bounded.unwrap}",
+    )
+
+    @Help.Summary("Wait for a value computation to not fail")
+    @Help.Description("""Wait `timeout` duration until `computeValue` does not fail (as indicated by `isFailure`). 
+      | Retry evaluating `computeValue` with an exponentially increasing back-off up to `maxWaitPeriod` duration between retries. 
+      |""")
+    @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.While"))
+    final def retry[A](
+        timeout: NonNegativeDuration,
+        maxWaitPeriod: NonNegativeDuration,
+    )(computeValue: => A)(
+        isFailure: A => Boolean,
+        failure: => String = s"Condition never became true within $timeout",
+    ): A = {
+      val deadline = timeout.asFiniteApproximation.fromNow
+      var result = computeValue
+      var waitMillis = 1L
+      while (isFailure(result)) {
+        val timeLeft = deadline.timeLeft
+        if (timeLeft > Duration.Zero) {
+          val remaining = (timeLeft min (waitMillis.millis)) max 1.millis
+          Threading.sleep(remaining.toMillis)
+          // capped exponentially back off
+          waitMillis = (waitMillis * 2) min maxWaitPeriod.duration.toMillis
+          result = computeValue
+        } else {
+          throw new IllegalStateException(failure)
+        }
+      }
+      result
+    }
+
     @Help.Summary("Wait for a condition to become true, using default timeouts")
     @Help.Description("""
        |Wait until condition becomes true, with a timeout taken from the parameters.timeouts.console.bounded 
@@ -95,21 +136,8 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         condition: => Boolean,
         failure: => String = s"Condition never became true within $timeout",
     ): Unit = {
-      val deadline = timeout.asFiniteApproximation.fromNow
-      var isCompleted = condition
-      var waitMillis = 1L
-      while (!isCompleted) {
-        val timeLeft = deadline.timeLeft
-        if (timeLeft > Duration.Zero) {
-          val remaining = (timeLeft min (waitMillis.millis)) max 1.millis
-          Threading.sleep(remaining.toMillis)
-          // capped exponentially back off
-          waitMillis = (waitMillis * 2) min maxWaitPeriod.duration.toMillis
-          isCompleted = condition
-        } else {
-          throw new IllegalStateException(failure)
-        }
-      }
+      retry(timeout, maxWaitPeriod)(condition)(x => !x, failure)
+      ()
     }
 
     @Help.Summary("Wait until all topology changes have been effected on all accessible nodes")

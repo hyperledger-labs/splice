@@ -22,6 +22,7 @@ import com.daml.network.codegen.CC.CoinRules.CoinRules
 import scala.collection.{concurrent, mutable}
 import scala.concurrent.{ExecutionContext, Future}
 import com.daml.ledger.api.v1
+import com.daml.ledger.client.binding
 
 import scala.collection.concurrent.TrieMap
 
@@ -33,6 +34,8 @@ class ReadCoinTransactionsService(
 )(implicit ec: ExecutionContext, tc: TraceContext)
     extends LedgerAutomationService
     with NamedLogging {
+
+  override def templateIds: Seq[binding.Primitive.TemplateId[_]] = Seq(Coin.id, LockedCoin.id)
 
   /** This works as follows:
     * - read the flat transaction stream filtered for `Coin` creates and archives
