@@ -263,6 +263,7 @@ class WalletIntegrationTest
       // Bob asks for more coins, alice rejects
       val request1 =
         bobRemoteWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please reject")
+      utils.retry_until_true(aliceRemoteWallet.listOnChannelPaymentRequests().size == 1)
       aliceRemoteWallet.rejectOnChannelPaymentRequest(request1)
       checkWallet(aliceUserParty, aliceRemoteWallet, Seq((29, 30)))
       checkWallet(bobUserParty, bobRemoteWallet, Seq((9, 10), (9, 10)))
