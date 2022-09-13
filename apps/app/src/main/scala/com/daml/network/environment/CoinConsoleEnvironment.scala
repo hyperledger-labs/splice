@@ -8,8 +8,10 @@ import com.daml.network.console.{
   LocalSvcAppReference,
   LocalValidatorAppReference,
   LocalWalletAppReference,
+  RemoteSplitwiseAppReference,
   RemoteSvcAppReference,
   RemoteWalletAppReference,
+  SplitwiseAppReference,
   WalletAppReference,
 }
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
@@ -55,12 +57,13 @@ class CoinConsoleEnvironment(
       wallets.local,
       directoryProviders,
       directoryUsers,
-      splitwises,
+      splitwises.local,
     ),
     mergeRemoteInstances(
       participants.remote,
       domains.remote,
       wallets.remote,
+      splitwises.remote,
     ),
   )
 
@@ -93,8 +96,15 @@ class CoinConsoleEnvironment(
   lazy val directoryUsers: Seq[LocalDirectoryUserAppReference] =
     environment.config.directoryUsersByString.keys.map(createDirectoryUserReference).toSeq
 
-  lazy val splitwises: Seq[LocalSplitwiseAppReference] =
-    environment.config.splitwisesByString.keys.map(createSplitwiseReference).toSeq
+  lazy val splitwises: NodeReferences[
+    SplitwiseAppReference,
+    RemoteSplitwiseAppReference,
+    LocalSplitwiseAppReference,
+  ] =
+    NodeReferences(
+      environment.config.splitwisesByString.keys.map(createSplitwiseReference).toSeq,
+      environment.config.remoteSplitwisesByString.keys.map(createRemoteSplitwiseReference).toSeq,
+    )
 
   private def createValidatorReference(name: String): LocalValidatorAppReference =
     new LocalValidatorAppReference(this, name)
@@ -122,6 +132,9 @@ class CoinConsoleEnvironment(
 
   private def createSplitwiseReference(name: String): LocalSplitwiseAppReference =
     new LocalSplitwiseAppReference(this, name)
+
+  private def createRemoteSplitwiseReference(name: String): RemoteSplitwiseAppReference =
+    new RemoteSplitwiseAppReference(this, name)
 
   override protected def topLevelValues: Seq[TopLevelValue[_]] = {
 
@@ -171,15 +184,25 @@ class CoinConsoleEnvironment(
         ),
         directoryUsers,
         Seq("App References"),
-      ) :++ splitwises.map(v =>
-        TopLevelValue(v.name, helpText("splitwise app", v.name), v, Seq("App References"))
+      ) :++ splitwises.local.map(v =>
+        TopLevelValue(v.name, helpText("local splitwise app", v.name), v, Seq("App References"))
+      ) :++ splitwises.remote.map(v =>
+        TopLevelValue(v.name, helpText("remote splitwise app", v.name), v, Seq("App References"))
       ) :+ TopLevelValue(
         "splitwises",
         helpText(
-          "All splitwise instances" + genericNodeReferencesDoc,
+          "All local splitwise instances" + genericNodeReferencesDoc,
           "Splitwises",
         ),
-        directoryUsers,
+        splitwises.local,
+        Seq("App References"),
+      ) :+ TopLevelValue(
+        "remoteSplitwises",
+        helpText(
+          "All remote splitwise instances" + genericNodeReferencesDoc,
+          "Splitwises",
+        ),
+        splitwises.remote,
         Seq("App References"),
       ) :++ svcOpt
         .map(svc => TopLevelValue(svc.name, helpText("SVC app", svc.name), svc, Seq("SVC")))

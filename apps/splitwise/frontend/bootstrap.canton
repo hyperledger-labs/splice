@@ -1,16 +1,16 @@
 import com.daml.lf.value.Value.ContractId
-Seq(aliceSplitwise.remoteParticipant, bobSplitwise.remoteParticipant, directoryProvider.remoteParticipant).foreach { p =>
+Seq(aliceSplitwiseBackend.remoteParticipant, bobSplitwiseBackend.remoteParticipant, directoryProviderBackend.remoteParticipant).foreach { p =>
   p.dars.upload("apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar")
 }
 
 val aliceValidatorParty = aliceValidator.initialize()
 val aliceUserParty = aliceValidator.onboardUser("alice_wallet_user")
 aliceWallet.initialize(aliceValidatorParty)
-aliceSplitwise.initialize(aliceValidatorParty)
+aliceSplitwiseBackend.initialize(aliceValidatorParty)
 val bobValidatorParty = bobValidator.initialize()
 val bobUserParty = bobValidator.onboardUser("bob_wallet_user")
 bobWallet.initialize(bobValidatorParty)
-bobSplitwise.initialize(bobValidatorParty)
+bobSplitwiseBackend.initialize(bobValidatorParty)
 directoryValidator.initialize()
 
 val aliceRequestCid = aliceDirectoryUser.requestDirectoryInstall()

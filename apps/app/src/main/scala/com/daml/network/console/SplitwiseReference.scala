@@ -3,9 +3,14 @@ package com.daml.network.console
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.splitwise.admin.api.client.commands.GrpcSplitwiseAppClient
-import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
+import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
 import com.daml.network.util.Contract
-import com.digitalasset.canton.console.{BaseInspection, Help, LocalInstanceReference}
+import com.digitalasset.canton.console.{
+  BaseInspection,
+  GrpcRemoteInstanceReference,
+  Help,
+  LocalInstanceReference,
+}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 import com.daml.network.codegen.CN.{Splitwise => splitCodegen, Wallet => walletCodegen}
@@ -13,35 +18,10 @@ import com.daml.network.codegen.CN.{Splitwise => splitCodegen, Wallet => walletC
 /** Single local Splitwise app reference. Defines the console commands that can be run against a local Splitwise
   * app reference.
   */
-class LocalSplitwiseAppReference(
+abstract class SplitwiseAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
-) extends CoinAppReference(consoleEnvironment, name)
-    with LocalInstanceReference
-    with BaseInspection[ParticipantNode] {
-
-  override protected val instanceType = "Splitwise"
-
-  protected val nodes = consoleEnvironment.environment.splitwises
-  @Help.Summary("Return splitwise app config")
-  def config: LocalSplitwiseAppConfig =
-    consoleEnvironment.environment.config.splitwisesByString(name)
-
-  /** Remote participant this Splitwise app is configured to interact with. */
-  val remoteParticipant =
-    new CoinRemoteParticipantReference(
-      consoleEnvironment,
-      s"remote participant for `$name``",
-      name,
-      config.remoteParticipant,
-    )
-
-  // Commands for init
-  @Help.Summary("Initialize splitwise with the validator party")
-  def initialize(validator: PartyId): Unit =
-    consoleEnvironment.run {
-      adminCommand(GrpcSplitwiseAppClient.Initialize(validator))
-    }
+) extends CoinAppReference(consoleEnvironment, name) {
 
   // Commands for managing installs
 
@@ -200,7 +180,50 @@ class LocalSplitwiseAppReference(
     consoleEnvironment.run {
       adminCommand(GrpcSplitwiseAppClient.GetPartyId())
     }
+}
 
-  /** secret, not publicly documented way to get the admin token */
-  def adminToken: Option[String] = underlying.map(_.adminToken.secret)
+final class RemoteSplitwiseAppReference(
+    override val consoleEnvironment: CoinConsoleEnvironment,
+    name: String,
+) extends SplitwiseAppReference(consoleEnvironment, name)
+    with GrpcRemoteInstanceReference
+    with BaseInspection[ParticipantNode] {
+
+  override protected val instanceType = "Remote Splitwise"
+
+  @Help.Summary("Return remote splitwise app config")
+  def config: RemoteSplitwiseAppConfig =
+    consoleEnvironment.environment.config.remoteSplitwisesByString(name)
+}
+
+final class LocalSplitwiseAppReference(
+    override val consoleEnvironment: CoinConsoleEnvironment,
+    name: String,
+) extends SplitwiseAppReference(consoleEnvironment, name)
+    with LocalInstanceReference
+    with BaseInspection[ParticipantNode] {
+
+  override protected val instanceType = "Local Splitwise"
+
+  override protected val nodes = consoleEnvironment.environment.splitwises
+
+  // Commands for init
+  @Help.Summary("Initialize splitwise with the validator party")
+  def initialize(validator: PartyId): Unit =
+    consoleEnvironment.run {
+      adminCommand(GrpcSplitwiseAppClient.Initialize(validator))
+    }
+
+  @Help.Summary("Return local splitwise app config")
+  def config: LocalSplitwiseAppConfig =
+    consoleEnvironment.environment.config.splitwisesByString(name)
+
+  /** Remote participant this Wallet app is configured to interact with. */
+  val remoteParticipant =
+    new CoinRemoteParticipantReference(
+      consoleEnvironment,
+      s"remote participant for `$name``",
+      name,
+      config.remoteParticipant,
+    )
 }

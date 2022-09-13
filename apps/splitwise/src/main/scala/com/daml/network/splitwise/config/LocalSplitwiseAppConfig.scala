@@ -1,6 +1,6 @@
 package com.daml.network.splitwise.config
 
-import com.daml.network.config.LocalCoinConfig
+import com.daml.network.config.{LocalCoinConfig, RemoteCoinConfig}
 import com.daml.network.scan.config.RemoteScanAppConfig
 import com.digitalasset.canton.config._
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
@@ -18,4 +18,10 @@ case class LocalSplitwiseAppConfig(
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 
+}
+
+case class RemoteSplitwiseAppConfig(
+    adminApi: ClientConfig
+) extends RemoteCoinConfig {
+  override def clientAdminApi: ClientConfig = adminApi
 }

@@ -10,6 +10,7 @@ import com.daml.network.console.{
   LocalWalletAppReference,
   RemoteSvcAppReference,
   RemoteWalletAppReference,
+  RemoteSplitwiseAppReference,
 }
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.topology.PartyId
@@ -79,20 +80,38 @@ trait CommonCoinAppInstanceReferences {
 
   def aliceSplitwise(implicit
       env: CoinTestConsoleEnvironment
-  ): LocalSplitwiseAppReference = sw(
+  ): RemoteSplitwiseAppReference = rsw(
     "aliceSplitwise"
+  )
+
+  def aliceSplitwiseBackend(implicit
+      env: CoinTestConsoleEnvironment
+  ): LocalSplitwiseAppReference = sw(
+    "aliceSplitwiseBackend"
   )
 
   def bobSplitwise(implicit
       env: CoinTestConsoleEnvironment
-  ): LocalSplitwiseAppReference = sw(
+  ): RemoteSplitwiseAppReference = rsw(
     "bobSplitwise"
+  )
+
+  def bobSplitwiseBackend(implicit
+      env: CoinTestConsoleEnvironment
+  ): LocalSplitwiseAppReference = sw(
+    "bobSplitwiseBackend"
   )
 
   def providerSplitwise(implicit
       env: CoinTestConsoleEnvironment
-  ): LocalSplitwiseAppReference = sw(
+  ): RemoteSplitwiseAppReference = rsw(
     "providerSplitwise"
+  )
+
+  def providerSplitwiseBackend(implicit
+      env: CoinTestConsoleEnvironment
+  ): LocalSplitwiseAppReference = sw(
+    "providerSplitwiseBackend"
   )
 
   def w(name: String)(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference =
@@ -127,7 +146,14 @@ trait CommonCoinAppInstanceReferences {
   def sw(
       name: String
   )(implicit env: CoinTestConsoleEnvironment): LocalSplitwiseAppReference =
-    env.splitwises
+    env.splitwises.local
       .find(_.name == name)
-      .getOrElse(sys.error(s"splitwise [$name] not configured"))
+      .getOrElse(sys.error(s"local splitwise [$name] not configured"))
+
+  def rsw(
+      name: String
+  )(implicit env: CoinTestConsoleEnvironment): RemoteSplitwiseAppReference =
+    env.splitwises.remote
+      .find(_.name == name)
+      .getOrElse(sys.error(s"remote splitwise [$name] not configured"))
 }

@@ -8,7 +8,7 @@ import com.daml.network.directory.provider.config.{
 }
 import com.daml.network.directory.user.config.LocalDirectoryUserAppConfig
 import com.daml.network.scan.config.{LocalScanAppConfig, RemoteScanAppConfig}
-import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
+import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
 import com.daml.network.svc.config.{LocalSvcAppConfig, RemoteSvcAppConfig}
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
@@ -50,6 +50,7 @@ case class CoinConfig(
     directoryProviderApps: Map[InstanceName, LocalDirectoryProviderAppConfig] = Map.empty,
     directoryUserApps: Map[InstanceName, LocalDirectoryUserAppConfig] = Map.empty,
     splitwiseApps: Map[InstanceName, LocalSplitwiseAppConfig] = Map.empty,
+    remoteSplitwiseApps: Map[InstanceName, RemoteSplitwiseAppConfig] = Map.empty,
     // TODO(Arne): we want to remove all of these.
     domains: Map[InstanceName, CommunityDomainConfig] = Map.empty,
     participants: Map[InstanceName, CommunityParticipantConfig] = Map.empty,
@@ -352,6 +353,11 @@ case class CoinConfig(
       n.unwrap -> c
     }
 
+  def remoteSplitwisesByString: Map[String, RemoteSplitwiseAppConfig] =
+    remoteSplitwiseApps.map { case (n, c) =>
+      n.unwrap -> c
+    }
+
   override def dumpString: String = "TODO(Arne): remove or implement."
 
   override def withDefaults(ports: DefaultPorts): CoinConfig =
@@ -407,6 +413,8 @@ object CoinConfig {
       deriveReader[LocalDirectoryUserAppConfig]
     implicit val splitwiseConfigReader: ConfigReader[LocalSplitwiseAppConfig] =
       deriveReader[LocalSplitwiseAppConfig]
+    implicit val remoteSplitwiseConfigReader: ConfigReader[RemoteSplitwiseAppConfig] =
+      deriveReader[RemoteSplitwiseAppConfig]
 
     implicit val communityDomainConfigReader: ConfigReader[CommunityDomainConfig] =
       deriveReader[CommunityDomainConfig].applyDeprecations
