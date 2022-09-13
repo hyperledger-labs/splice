@@ -210,7 +210,6 @@ sbt protocGenerate damlBuild # Generate typescript for our own protobufs
 ```
 
 2. Build the wallet frontend:
-
 ```
 cd apps/wallet/frontend
 ./gen-ledger-api-proto.sh # generate typescript for ledger API protobufs
@@ -294,6 +293,10 @@ other buttons, check your browser console. If you see a stream of 503 errors,
 iptables on your host might be blocking the connections. Try running on the host:
 ```
 sudo iptables -A INPUT -i docker0 -p tcp -m tcp --dport 5000:5999 -j ACCEPT
+```
+To make this change persistent, type:
+```
+sudo sh -c 'iptables-save > /etc/iptables/rules.v4'
 ```
 
 ### Daml Numerics
