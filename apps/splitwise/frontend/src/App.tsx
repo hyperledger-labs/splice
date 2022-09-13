@@ -39,7 +39,7 @@ const App: React.FC = () => {
 
     useEffect(() => {
       const fetchParty = async () => {
-        const party = await splitwiseClient.getPartyId(new Empty(), null);
+        const party = await splitwiseClient.getProviderPartyId(new Empty(), null);
         setParty(party.getPartyId());
       };
       fetchParty();

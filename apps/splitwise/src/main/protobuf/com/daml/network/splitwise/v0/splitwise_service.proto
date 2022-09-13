@@ -6,13 +6,20 @@ import "google/protobuf/empty.proto";
 
 service SplitwiseService {
   // Read-only
-  rpc ListGroups (google.protobuf.Empty) returns (ListGroupsResponse);
-  rpc ListGroupInvites (google.protobuf.Empty) returns (ListGroupInvitesResponse);
+  rpc ListGroups (ListGroupsRequest) returns (ListGroupsResponse);
+  rpc ListGroupInvites (ListGroupInvitesRequest) returns (ListGroupInvitesResponse);
   rpc ListAcceptedGroupInvites (ListAcceptedGroupInvitesRequest) returns (ListAcceptedGroupInvitesResponse);
   rpc ListBalanceUpdates (ListBalanceUpdatesRequest) returns (ListBalanceUpdatesResponse);
   rpc ListBalances (ListBalancesRequest) returns (ListBalancesResponse);
 
-  rpc GetPartyId (google.protobuf.Empty) returns (GetPartyIdResponse);
+  rpc GetProviderPartyId (google.protobuf.Empty) returns (GetProviderPartyIdResponse);
+}
+
+// The context from which a request originates.
+// Used to distinguish requests from UIs run by different end-users.
+message SplitwiseContext {
+  // The party of the user of the client sending a request to the backend.
+  string party_id = 1;
 }
 
 message InitializeRequest {
@@ -25,8 +32,16 @@ message GroupKey {
   string id = 3;
 }
 
+message ListGroupsRequest {
+  SplitwiseContext context = 1;
+}
+
 message ListGroupsResponse {
   repeated com.daml.network.v0.Contract groups = 1;
+}
+
+message ListGroupInvitesRequest {
+  SplitwiseContext context = 1;
 }
 
 message ListGroupInvitesResponse {
@@ -34,8 +49,8 @@ message ListGroupInvitesResponse {
 }
 
 message ListAcceptedGroupInvitesRequest {
-  string provider_party_id = 1;
   string group_id = 2;
+  SplitwiseContext context = 3;
 }
 
 message ListAcceptedGroupInvitesResponse {
@@ -44,6 +59,7 @@ message ListAcceptedGroupInvitesResponse {
 
 message ListBalanceUpdatesRequest {
   GroupKey group_key = 1;
+  SplitwiseContext context = 2;
 }
 
 message ListBalanceUpdatesResponse {
@@ -52,12 +68,13 @@ message ListBalanceUpdatesResponse {
 
 message ListBalancesRequest {
   GroupKey group_key = 1;
+  SplitwiseContext context = 2;
 }
 
 message ListBalancesResponse {
   map<string, string> balances = 1;
 }
 
-message GetPartyIdResponse {
+message GetProviderPartyIdResponse {
   string party_id = 1;
 }

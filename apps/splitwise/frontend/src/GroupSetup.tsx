@@ -1,4 +1,3 @@
-import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useCallback, useState } from 'react';
 
 import { Button, FormGroup, List, ListItem, Stack, TextField, Typography } from '@mui/material';
@@ -10,6 +9,7 @@ import DirectoryEntries from './DirectoryEntries';
 import { useLedgerApiClient } from './LedgerApiContext';
 import { useSplitwiseClient } from './SplitwiseServiceContext';
 import { sameContracts, useInterval } from './Util';
+import { ListGroupInvitesRequest } from './com/daml/network/splitwise/v0/splitwise_service_pb';
 
 interface GroupSetupProps {
   directoryEntries: DirectoryEntries;
@@ -28,7 +28,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({ directoryEntries, provider }) =
 
   const fetchInvites = useCallback(async () => {
     const groupInvites = (
-      await splitwiseClient.listGroupInvites(new Empty(), null)
+      await splitwiseClient.listGroupInvites(new ListGroupInvitesRequest(), null)
     ).getGroupInvitesList();
     const decoded = groupInvites.map(c => Contract.decode(c, GroupInvite));
     setGroupInvites(prev => (sameContracts(prev, decoded) ? prev : decoded));

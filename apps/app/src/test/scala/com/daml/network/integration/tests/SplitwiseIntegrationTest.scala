@@ -11,6 +11,7 @@ import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import com.daml.network.codegen.CN.{Splitwise => splitCodegen}
+import com.daml.network.console.RemoteSplitwiseAppReference
 
 class SplitwiseIntegrationTest
     extends CoinIntegrationTest
@@ -22,6 +23,8 @@ class SplitwiseIntegrationTest
   private def charlieSplitwiseBackend(implicit env: CoinTestConsoleEnvironment) =
     providerSplitwiseBackend
   private def charlieSplitwise(implicit env: CoinTestConsoleEnvironment) = providerSplitwise
+  private def charlieSplitwiseSelfHosted(implicit env: CoinTestConsoleEnvironment) =
+    providerSplitwiseSelfHosted
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
@@ -36,10 +39,13 @@ class SplitwiseIntegrationTest
       })
 
   def test(
+      aliceSplitwise: RemoteSplitwiseAppReference,
       aliceUserParty: PartyId,
       aliceProviderParty: PartyId,
+      bobSplitwise: RemoteSplitwiseAppReference,
       bobUserParty: PartyId,
       bobProviderParty: PartyId,
+      charlieSplitwise: RemoteSplitwiseAppReference,
       charlieUserParty: PartyId,
       charlieProviderParty: PartyId,
   )(implicit env: CoinTestConsoleEnvironment) = {
@@ -59,9 +65,8 @@ class SplitwiseIntegrationTest
     }
     aliceValidator.remoteParticipant.ledger_api.acs
       .await(aliceUserParty, splitCodegen.AcceptedGroupInvite)
-    inside(aliceSplitwise.listAcceptedGroupInvites(aliceProviderParty, "group1")) {
-      case Seq(accepted) =>
-        aliceSplitwise.joinGroup(aliceProviderParty, accepted.contractId)
+    inside(aliceSplitwise.listAcceptedGroupInvites("group1")) { case Seq(accepted) =>
+      aliceSplitwise.joinGroup(aliceProviderParty, accepted.contractId)
     }
 
     val key = GrpcSplitwiseAppClient.GroupKey(aliceUserParty, aliceProviderParty, "group1")
@@ -102,9 +107,8 @@ class SplitwiseIntegrationTest
     }
     aliceValidator.remoteParticipant.ledger_api.acs
       .await(aliceUserParty, splitCodegen.AcceptedGroupInvite)
-    inside(aliceSplitwise.listAcceptedGroupInvites(aliceProviderParty, "group1")) {
-      case Seq(accepted) =>
-        aliceSplitwise.joinGroup(aliceProviderParty, accepted.contractId)
+    inside(aliceSplitwise.listAcceptedGroupInvites("group1")) { case Seq(accepted) =>
+      aliceSplitwise.joinGroup(aliceProviderParty, accepted.contractId)
     }
 
     splitwiseValidator.remoteParticipant.ledger_api.acs
@@ -160,10 +164,13 @@ class SplitwiseIntegrationTest
       providerSplitwise.acceptInstallProposal(charlieInstallProposal)
 
       test(
+        aliceSplitwiseSelfHosted,
         aliceUserParty,
         aliceProviderParty,
+        bobSplitwiseSelfHosted,
         bobUserParty,
         bobProviderParty,
+        charlieSplitwiseSelfHosted,
         charlieUserParty,
         charlieProviderParty,
       )
@@ -197,19 +204,21 @@ class SplitwiseIntegrationTest
       providerSplitwise.acceptInstallProposal(charlieInstallProposal)
 
       test(
+        aliceSplitwise,
         aliceUserParty,
         providerParty,
+        bobSplitwise,
         bobUserParty,
         providerParty,
+        charlieSplitwise,
         charlieUserParty,
         providerParty,
       )
     }
 
     "return the primary party of the user" in { implicit env =>
-      aliceValidator.initialize()
-      val aliceUserParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
-      aliceSplitwise.getPartyId() shouldBe aliceUserParty
+      val providerParty = splitwiseValidator.initialize()
+      providerSplitwiseBackend.getProviderPartyId() shouldBe providerParty
     }
   }
 }

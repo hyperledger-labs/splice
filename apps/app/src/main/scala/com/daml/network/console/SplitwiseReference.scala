@@ -41,6 +41,8 @@ abstract class SplitwiseAppReference(
 
   protected def userId: String
 
+  protected def context: GrpcSplitwiseAppClient.SplitwiseContext
+
   protected val remoteScanConfig: RemoteScanAppConfig
 
   private val collectionDuration = RelTime(
@@ -309,22 +311,21 @@ abstract class SplitwiseAppReference(
   @Help.Summary("List all groups")
   def listGroups(): Seq[Contract[splitCodegen.Group]] =
     consoleEnvironment.run {
-      adminCommand(GrpcSplitwiseAppClient.ListGroups())
+      adminCommand(GrpcSplitwiseAppClient.ListGroups(context))
     }
 
   @Help.Summary("List all group invites that you have not already accepted")
   def listGroupInvites(): Seq[Contract[splitCodegen.GroupInvite]] =
     consoleEnvironment.run {
-      adminCommand(GrpcSplitwiseAppClient.ListGroupInvites())
+      adminCommand(GrpcSplitwiseAppClient.ListGroupInvites(context))
     }
 
   @Help.Summary("List accepted group invites for the given group that can be used in joinGroup")
   def listAcceptedGroupInvites(
-      provider: PartyId,
-      id: String,
+      id: String
   ): Seq[Contract[splitCodegen.AcceptedGroupInvite]] =
     consoleEnvironment.run {
-      adminCommand(GrpcSplitwiseAppClient.ListAcceptedGroupInvites(provider, id))
+      adminCommand(GrpcSplitwiseAppClient.ListAcceptedGroupInvites(id, context))
     }
 
   @Help.Summary("List balance updates for the given group")
@@ -332,7 +333,7 @@ abstract class SplitwiseAppReference(
     Contract[splitCodegen.BalanceUpdate]
   ] =
     consoleEnvironment.run {
-      adminCommand(GrpcSplitwiseAppClient.ListBalanceUpdates(key))
+      adminCommand(GrpcSplitwiseAppClient.ListBalanceUpdates(key, context))
     }
 
   @Help.Summary(
@@ -340,13 +341,13 @@ abstract class SplitwiseAppReference(
   )
   def listBalances(key: GrpcSplitwiseAppClient.GroupKey): Map[PartyId, BigDecimal] =
     consoleEnvironment.run {
-      adminCommand(GrpcSplitwiseAppClient.ListBalances(key))
+      adminCommand(GrpcSplitwiseAppClient.ListBalances(key, context))
     }
 
-  @Help.Summary("Get the primary party of the daml user specified in the config.")
-  def getPartyId(): PartyId =
+  @Help.Summary("Get the primary party of the provider’s daml user specified in the config.")
+  def getProviderPartyId(): PartyId =
     consoleEnvironment.run {
-      adminCommand(GrpcSplitwiseAppClient.GetPartyId())
+      adminCommand(GrpcSplitwiseAppClient.GetProviderPartyId())
     }
 }
 
@@ -367,6 +368,9 @@ final class RemoteSplitwiseAppReference(
     )(consoleEnvironment)
 
   override protected val userId: String = config.damlUser
+
+  override protected lazy val context =
+    GrpcSplitwiseAppClient.SplitwiseContext(getUserPrimaryParty())
 
   @Help.Summary("Return remote splitwise app config")
   def config: RemoteSplitwiseAppConfig =
@@ -389,6 +393,11 @@ final class LocalSplitwiseAppReference(
   override protected lazy val ledgerApi = remoteParticipant
 
   override protected val userId: String = config.damlUser
+
+  // TODO(#661) Move commands to remote splitwise reference.
+  override protected def context = throw new RuntimeException(
+    "Commands must be run through remote splitwise ref"
+  )
 
   @Help.Summary("Return local splitwise app config")
   def config: LocalSplitwiseAppConfig =

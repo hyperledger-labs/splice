@@ -1,4 +1,3 @@
-import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useCallback, useState } from 'react';
 
 import {
@@ -36,6 +35,7 @@ import {
   ListAcceptedGroupInvitesRequest,
   ListBalancesRequest,
   ListBalanceUpdatesRequest,
+  ListGroupsRequest,
 } from './com/daml/network/splitwise/v0/splitwise_service_pb';
 
 const key = (group: Contract<CodegenGroup>) =>
@@ -123,15 +123,13 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({
   const fetchAcceptedInvites = useCallback(async () => {
     const invites = (
       await splitwiseClient.listAcceptedGroupInvites(
-        new ListAcceptedGroupInvitesRequest()
-          .setGroupId(group.payload.id.unpack)
-          .setProviderPartyId(provider),
+        new ListAcceptedGroupInvitesRequest().setGroupId(group.payload.id.unpack),
         null
       )
     ).getAcceptedGroupInvitesList();
     const decoded = invites.map(c => Contract.decode(c, AcceptedGroupInvite));
     setAcceptedInvites(prev => (sameContracts(decoded, prev) ? prev : decoded));
-  }, [group, setAcceptedInvites, splitwiseClient, provider]);
+  }, [group, setAcceptedInvites, splitwiseClient]);
   useInterval(fetchAcceptedInvites, 500);
   const onAddMember = async (invite: Contract<AcceptedGroupInvite>) => {
     await ledgerApiClient.joinGroup(provider, invite.contractId);
@@ -388,7 +386,9 @@ const Groups: React.FC<GroupsProps> = ({ directoryEntries, party, provider }) =>
   const [groups, setGroups] = useState<Contract<CodegenGroup>[]>([]);
 
   const fetchGroups = useCallback(async () => {
-    const newGroups = (await splitwiseClient.listGroups(new Empty(), null)).getGroupsList();
+    const newGroups = (
+      await splitwiseClient.listGroups(new ListGroupsRequest(), null)
+    ).getGroupsList();
     const decoded = newGroups.map(c => Contract.decode(c, CodegenGroup));
     setGroups(prev => (sameContracts(prev, decoded) ? prev : decoded));
   }, [splitwiseClient, setGroups]);

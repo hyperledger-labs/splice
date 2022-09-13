@@ -14,6 +14,13 @@ import scala.concurrent.Future
 
 object GrpcSplitwiseAppClient {
 
+  // Context passed to all read requests
+  case class SplitwiseContext(
+      partyId: PartyId
+  ) {
+    def toProtoV0: v0.SplitwiseContext = v0.SplitwiseContext(Proto.encode(partyId))
+  }
+
   abstract class BaseCommand[Req, Res, Result] extends GrpcAdminCommand[Req, Res, Result] {
     override type Svc = SplitwiseServiceStub
     override def createService(channel: ManagedChannel): SplitwiseServiceStub =
@@ -33,14 +40,16 @@ object GrpcSplitwiseAppClient {
     )
   }
 
-  case class ListGroups(
-  ) extends BaseCommand[Empty, v0.ListGroupsResponse, Seq[Contract[splitCodegen.Group]]] {
-    override def createRequest(): Either[String, Empty] =
-      Right(Empty())
+  case class ListGroups(context: SplitwiseContext)
+      extends BaseCommand[v0.ListGroupsRequest, v0.ListGroupsResponse, Seq[
+        Contract[splitCodegen.Group]
+      ]] {
+    override def createRequest(): Either[String, v0.ListGroupsRequest] =
+      Right(v0.ListGroupsRequest())
 
     override def submitRequest(
         service: SplitwiseServiceStub,
-        request: Empty,
+        request: v0.ListGroupsRequest,
     ): Future[v0.ListGroupsResponse] = service.listGroups(request)
 
     override def handleResponse(
@@ -49,18 +58,18 @@ object GrpcSplitwiseAppClient {
       response.groups.traverse(Contract.fromProto(splitCodegen.Group)(_)).leftMap(_.toString)
   }
 
-  case class ListGroupInvites(
-  ) extends BaseCommand[
-        Empty,
+  case class ListGroupInvites(context: SplitwiseContext)
+      extends BaseCommand[
+        v0.ListGroupInvitesRequest,
         v0.ListGroupInvitesResponse,
         Seq[Contract[splitCodegen.GroupInvite]],
       ] {
-    override def createRequest(): Either[String, Empty] =
-      Right(Empty())
+    override def createRequest(): Either[String, v0.ListGroupInvitesRequest] =
+      Right(v0.ListGroupInvitesRequest(Some(context.toProtoV0)))
 
     override def submitRequest(
         service: SplitwiseServiceStub,
-        request: Empty,
+        request: v0.ListGroupInvitesRequest,
     ): Future[v0.ListGroupInvitesResponse] = service.listGroupInvites(request)
 
     override def handleResponse(
@@ -72,15 +81,15 @@ object GrpcSplitwiseAppClient {
   }
 
   case class ListAcceptedGroupInvites(
-      provider: PartyId,
       id: String,
+      context: SplitwiseContext,
   ) extends BaseCommand[
         v0.ListAcceptedGroupInvitesRequest,
         v0.ListAcceptedGroupInvitesResponse,
         Seq[Contract[splitCodegen.AcceptedGroupInvite]],
       ] {
     override def createRequest(): Either[String, v0.ListAcceptedGroupInvitesRequest] =
-      Right(v0.ListAcceptedGroupInvitesRequest(Proto.encode(provider), id))
+      Right(v0.ListAcceptedGroupInvitesRequest(id, Some(context.toProtoV0)))
 
     override def submitRequest(
         service: SplitwiseServiceStub,
@@ -96,12 +105,13 @@ object GrpcSplitwiseAppClient {
   }
 
   case class ListBalanceUpdates(
-      key: GroupKey
+      key: GroupKey,
+      context: SplitwiseContext,
   ) extends BaseCommand[v0.ListBalanceUpdatesRequest, v0.ListBalanceUpdatesResponse, Seq[
         Contract[splitCodegen.BalanceUpdate]
       ]] {
     override def createRequest(): Either[String, v0.ListBalanceUpdatesRequest] =
-      Right(v0.ListBalanceUpdatesRequest(Some(key.toProtoV0)))
+      Right(v0.ListBalanceUpdatesRequest(Some(key.toProtoV0), Some(context.toProtoV0)))
 
     override def submitRequest(
         service: SplitwiseServiceStub,
@@ -117,10 +127,11 @@ object GrpcSplitwiseAppClient {
   }
 
   case class ListBalances(
-      key: GroupKey
+      key: GroupKey,
+      context: SplitwiseContext,
   ) extends BaseCommand[v0.ListBalancesRequest, v0.ListBalancesResponse, Map[PartyId, BigDecimal]] {
     override def createRequest(): Either[String, v0.ListBalancesRequest] =
-      Right(v0.ListBalancesRequest(Some(key.toProtoV0)))
+      Right(v0.ListBalancesRequest(Some(key.toProtoV0), Some(context.toProtoV0)))
 
     override def submitRequest(
         service: SplitwiseServiceStub,
@@ -141,18 +152,18 @@ object GrpcSplitwiseAppClient {
         .leftMap(_.toString)
   }
 
-  case class GetPartyId(
-  ) extends BaseCommand[Empty, v0.GetPartyIdResponse, PartyId] {
+  case class GetProviderPartyId(
+  ) extends BaseCommand[Empty, v0.GetProviderPartyIdResponse, PartyId] {
     override def createRequest(): Either[String, Empty] =
       Right(Empty())
 
     override def submitRequest(
         service: SplitwiseServiceStub,
         request: Empty,
-    ): Future[v0.GetPartyIdResponse] = service.getPartyId(request)
+    ): Future[v0.GetProviderPartyIdResponse] = service.getProviderPartyId(request)
 
     override def handleResponse(
-        response: v0.GetPartyIdResponse
+        response: v0.GetProviderPartyIdResponse
     ): Either[String, PartyId] =
       Proto.decode(Proto.Party)(response.partyId)
   }
