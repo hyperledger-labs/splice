@@ -21,26 +21,6 @@ object WalletUtil extends UploadablePackage {
   // See `Compile / resourceGenerators` in build.sbt
   lazy val resourcePath: String = "dar/wallet-0.1.0.dar"
 
-  // TODO (Robert): remove, each app needs to maintain the ACS of install contracts in its store
-  def getWalletAppInstall(
-      endUserParty: PartyId,
-      connection: CoinLedgerConnection,
-  )(implicit
-      ec: ExecutionContext
-  ): Future[Option[Primitive.ContractId[walletCodegen.WalletAppInstall]]] = {
-    for {
-      acs <- connection
-        .activeContracts(
-          LedgerConnection.transactionFilterByParty(
-            Map(endUserParty -> Seq(walletCodegen.WalletAppInstall.id))
-          )
-        )
-        .map(_.flatMap(DecodeUtil.decodeCreated(walletCodegen.WalletAppInstall)))
-    } yield {
-      acs.find(_.value.endUser == endUserParty.toPrim).map(_.contractId)
-    }
-  }
-
   def geWalletApp(
       serviceParty: PartyId,
       connection: CoinLedgerConnection,
@@ -104,7 +84,7 @@ object WalletUtil extends UploadablePackage {
               ),
             )
             .recover {
-              // TODO (Robert): better way to make this method idempotent
+              // TODO (i751): use self-service error codes
               case e if e.getMessage.contains("DUPLICATE_CONTRACT_KEY") =>
                 logger.debug(
                   s"Installing the wallet for user $endUserParty resulted in duplicate contract key." +
@@ -138,7 +118,7 @@ object WalletUtil extends UploadablePackage {
       )
       .map(_ => ())
       .recover {
-        // TODO (Robert): better way to make this method idempotent
+        // TODO (i751): use self-service error codes
         case e if e.getMessage.contains("DUPLICATE_CONTRACT_KEY") =>
           logger.debug(
             s"Initializing the wallet app for service party $walletServiceParty resulted in duplicate contract key." +

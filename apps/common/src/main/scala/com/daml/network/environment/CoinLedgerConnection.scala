@@ -480,7 +480,7 @@ object CoinLedgerConnection {
         } yield partyId
       }
 
-      // TODO(Robert): Factor out user/party allocation and make it robust (current implementation is racy)
+      // TODO(M1-92): Factor out user/party allocation and make it robust (current implementation is racy)
       override def getOrAllocateParty(
           username: String
       )(implicit traceContext: TraceContext): Future[PartyId] = {
