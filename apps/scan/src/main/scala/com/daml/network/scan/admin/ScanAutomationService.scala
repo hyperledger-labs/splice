@@ -32,7 +32,6 @@ class ScanAutomationService(
   override def readAs: PartyId = svcParty
 
   val (coinFlatStreamSubscription, readCcTransfersService) =
-    // TODO(Arne): the subscription here should read from ledger start
     createService("Scan:ReadCoinTransactionsService", ledgerClient, Seq(Coin.id, LockedCoin.id)) {
       connection =>
         new ReadCoinTransactionsService(svcParty, connection, store, loggerFactory)

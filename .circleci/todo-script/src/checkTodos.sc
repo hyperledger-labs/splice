@@ -220,6 +220,7 @@ val tags: List[RegexCategory] = List(
   Tag(List("Arne")),
   Tag(List("Itai")),
   Tag(List("Robert")),
+  Tag(List("tech-debt")), // treat this like an alias for M1-92
   Tag(List("Soren")), // added due to comments within DamlPlugin.scala
 )
 

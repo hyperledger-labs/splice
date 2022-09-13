@@ -23,7 +23,7 @@ object GrpcSvcAppClient {
   }
 
   /** A command that takes no input and returns no result (other than an error on failure) */
-  // TODO(Arne): Move this somewhere to Canton codebase?
+  // TODO(tech-debt): Move this somewhere to Canton codebase?
   abstract class UnitCommand(adminApiCall: SvcServiceStub => (Empty => Future[Empty]))
       extends BaseCommand[Empty, Empty, Unit] {
     override def createRequest(): Either[String, Empty] = Right(Empty())

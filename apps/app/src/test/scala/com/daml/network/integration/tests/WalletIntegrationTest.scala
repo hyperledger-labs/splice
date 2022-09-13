@@ -40,7 +40,6 @@ class WalletIntegrationTest
     "allow calling tap and then list the created coins - locally and remotely" in { implicit env =>
       val aliceValidatorParty = aliceValidator.initialize()
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      // TODO(Arne): consider adding synchronization 'wait-for-participant-x' to this command
       aliceWallet.initialize(aliceValidatorParty)
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 

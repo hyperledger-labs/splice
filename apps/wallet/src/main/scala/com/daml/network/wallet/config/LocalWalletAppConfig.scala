@@ -11,7 +11,7 @@ case class LocalWalletAppConfig(
     serviceUser: String,
     remoteParticipant: RemoteParticipantConfig,
     remoteScan: RemoteScanAppConfig,
-) extends LocalCoinConfig // TODO(Arne): fork or generalize this trait.
+) extends LocalCoinConfig // TODO(i736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "wallet"
 

@@ -27,12 +27,12 @@ class ScanApp(
     dummyStore: ScanCCHistoryStore,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
-) extends CantonNode // TODO(Arne): CantonNode needs to be forked or generalized.
+) extends CantonNode // TODO(i736): CantonNode needs to be forked or generalized.
     with NamedLogging
     with HasUptime
     with NoTracing {
 
-  // TODO(Arne): fork or generalize status definition.
+  // TODO(i736): fork or generalize status definition.
   override def status: Future[NodeStatus.Status] = {
     val status = SimpleStatus(
       UniqueIdentifier.tryFromProtoPrimitive("example::default"),

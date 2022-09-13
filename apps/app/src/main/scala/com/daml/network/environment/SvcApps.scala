@@ -19,7 +19,7 @@ class SvcApps(
     _loggerFactory: NamedLoggerFactory,
 )(implicit
     protected val executionContext: ExecutionContextIdlenessExecutorService
-) extends ManagedNodes[ // TODO(Arne): We should remove the CantonNode/CantonNodeBootstrap type requirements from
+) extends ManagedNodes[ // TODO(i736): We should remove the CantonNode/CantonNodeBootstrap type requirements from
       // this trait.
       SvcAppNode,
       LocalSvcAppConfig,

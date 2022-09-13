@@ -43,7 +43,7 @@ abstract class CoinAppReference(
 
   override type Status = ParticipantStatus
 
-  // TODO(Arne): remove/cleanup all the uninteresting console commands.
+  // TODO(i736): remove/cleanup all the uninteresting console commands copied from Canton.
   @Help.Summary("Health and diagnostic related commands")
   @Help.Group("Health")
   override def health =
@@ -87,7 +87,7 @@ abstract class CoinAppReference(
   @Help.Group("Parties")
   override def parties: ParticipantPartiesAdministrationGroup = partiesGroup
 
-  // TODO(Arne): slightly adapted this.
+  // TODO(i736): slightly adapted compared to Canton.
   // above command needs to be def such that `Help` works.
   lazy private val partiesGroup =
     new ParticipantPartiesAdministrationGroup(this.id, this, consoleEnvironment)

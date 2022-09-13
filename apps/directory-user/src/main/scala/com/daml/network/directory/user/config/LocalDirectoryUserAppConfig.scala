@@ -12,7 +12,7 @@ case class LocalDirectoryUserAppConfig(
     damlUser: String = "directoryUser",
     remoteParticipant: RemoteParticipantConfig,
     remoteDirectoryProvider: RemoteDirectoryProviderAppConfig,
-) extends LocalCoinConfig // TODO(Arne): fork or generalize this trait.
+) extends LocalCoinConfig // TODO(i736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "directoryUser"
 

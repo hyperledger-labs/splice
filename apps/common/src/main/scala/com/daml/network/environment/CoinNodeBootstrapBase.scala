@@ -32,7 +32,7 @@ import scala.concurrent.{Future, blocking}
 /** Modelled after CantonNodeBootstrap
   */
 trait CoinNodeBootstrap[+Node <: CantonNode]
-    extends CantonNodeBootstrap[Node] // TODO(Arne): remove the dependence on this trait.
+    extends CantonNodeBootstrap[Node] // TODO(i736): remove the dependency on this trait.
     {
 
   def name: InstanceName
@@ -48,7 +48,7 @@ trait CoinNodeBootstrap[+Node <: CantonNode]
 
   def getNode: Option[Node]
 
-  // TODO(Arne): following methods are only here because of the CantonNodeBootstrap trait
+  // TODO(i736): following methods are only here because of the CantonNodeBootstrap trait
   def initializeWithProvidedId(id: NodeId): EitherT[Future, String, Unit] = initialize
   def getId: Option[NodeId] = None
   def crypto: Crypto = ???
@@ -65,8 +65,6 @@ trait CoinNodeBootstrap[+Node <: CantonNode]
   * - removed replica support
   * - removed all topology commands
   * - removed all crypto key generation
-  *
-  * TODO(Arne): potentially completely remove separation into initialization and start step.
   */
 abstract class CoinNodeBootstrapBase[
     T <: CantonNode,
@@ -110,7 +108,6 @@ abstract class CoinNodeBootstrapBase[
   private val ref: AtomicReference[Option[T]] = new AtomicReference(None)
   private val starting = new AtomicBoolean(false)
 
-  // TODO(Arne): revisit.
   /** kick off initialisation during startup */
   protected def startInstanceUnlessClosing(
       instanceET: => EitherT[Future, String, T]
@@ -141,7 +138,7 @@ abstract class CoinNodeBootstrapBase[
   def getNode: Option[T] = ref.get()
   def isInitialized: Boolean = ref.get().isDefined
 
-  // TODO(Arne): obviously we don't need this. however, removing this likely requires a Canton upstream change.
+  // TODO(i736): obviously we don't need this. however, removing this likely requires a Canton upstream change.
   // This absolutely must be a "def", because it is used during class initialization.
   protected def connectionPoolForParticipant: Boolean = false
 
@@ -178,7 +175,6 @@ abstract class CoinNodeBootstrapBase[
   }
 
   /** Attempt to start the node.
-    * TODO(Arne): revisit - should this be merged with the `initialize` function?
     */
   def start(): EitherT[Future, String, Unit] = {
     initialize.leftMap { err =>

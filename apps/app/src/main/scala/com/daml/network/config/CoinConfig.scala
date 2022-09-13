@@ -51,7 +51,7 @@ case class CoinConfig(
     directoryUserApps: Map[InstanceName, LocalDirectoryUserAppConfig] = Map.empty,
     splitwiseApps: Map[InstanceName, LocalSplitwiseAppConfig] = Map.empty,
     remoteSplitwiseApps: Map[InstanceName, RemoteSplitwiseAppConfig] = Map.empty,
-    // TODO(Arne): we want to remove all of these.
+    // TODO(i736): we want to remove all of the configurations options below:
     domains: Map[InstanceName, CommunityDomainConfig] = Map.empty,
     participants: Map[InstanceName, CommunityParticipantConfig] = Map.empty,
     remoteDomains: Map[InstanceName, RemoteDomainConfig] = Map.empty,
@@ -59,15 +59,13 @@ case class CoinConfig(
     monitoring: MonitoringConfig = MonitoringConfig(),
     parameters: CantonParameters = CantonParameters(),
     features: CantonFeatures = CantonFeatures(),
-) extends CantonConfig // TODO(Arne): generalize or fork this trait.
+) extends CantonConfig // TODO(i736): generalize or fork this trait.
     with ConfigDefaults[DefaultPorts, CoinConfig] {
 
   override type DomainConfigType = CommunityDomainConfig
   override type ParticipantConfigType = CommunityParticipantConfig
   override def validate: Validated[NonEmpty[Seq[String]], Unit] = Validated.valid(())
 
-  // TODO(Arne): Revisit all of the classes/methods pertaining to ValidatorNodeParameters.
-  // Can hopefully upstream some improvements.
   private lazy val validatorAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
     validatorApps.fmap { validatorConfig =>
       SharedCoinAppParameters(
@@ -358,10 +356,10 @@ case class CoinConfig(
       n.unwrap -> c
     }
 
-  override def dumpString: String = "TODO(Arne): remove or implement."
+  override def dumpString: String = "TODO(i736): remove or implement."
 
   override def withDefaults(ports: DefaultPorts): CoinConfig =
-    this // TODO(Arne): CantonCommunityConfig does more here. Do we want to copy that?
+    this // TODO(i736): CantonCommunityConfig does more here. Do we want to copy that?
   // NOTE(Simon): in particular it handles default ports derived from the ports object introduced in https://github.com/DACH-NY/canton/commit/ccff59fccf349893cc68413a7859e8ef748a94fa
 }
 
