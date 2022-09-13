@@ -320,6 +320,22 @@ abstract class WalletAppReference(
         } yield coins(0)
       }
     }
+
+  @Help.Summary("Redistribute coins")
+  @Help.Description(
+    "Redistributes value from a given set of coins. The outputs declare the number of outputs and for each output the desired quantity or None for a floating output."
+  )
+  def redistribute(
+      inputCoins: Seq[Primitive.ContractId[coinCodegen.Coin]],
+      outputQuantities: Seq[Option[BigDecimal]],
+  ): Seq[Primitive.ContractId[coinCodegen.Coin]] =
+    consoleEnvironment.run {
+      val inputs: Seq[Value[coinRulesCodegen.TransferInput]] =
+        inputCoins.map(c => Value(coinRulesCodegen.TransferInput.InputCoin(c)))
+      val outputs = outputQuantities.map(q => GrpcWalletAppClient.RedistributeOutput(q))
+      adminCommand(GrpcWalletAppClient.Redistribute(inputs, outputs, getWalletCtx()))
+    }
+
 }
 
 class RemoteWalletAppReference(
