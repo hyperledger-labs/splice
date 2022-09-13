@@ -26,7 +26,7 @@ class DirectoryProviderIntegrationTest
       .simpleTopology(this.getClass.getSimpleName)
       .withSetup(implicit env => {
         directoryValidator.remoteParticipant.dars.upload(directoryDarPath)
-        aliceDirectoryUser.remoteParticipant.dars.upload(directoryDarPath)
+        aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
       })
 
   "A directory provider" should {
@@ -49,7 +49,7 @@ class DirectoryProviderIntegrationTest
 
       directoryProvider.listInstallRequests() shouldBe Seq()
 
-      val installRequestCid = aliceDirectoryUser.requestDirectoryInstall()
+      val installRequestCid = aliceDirectory.requestDirectoryInstall()
 
       directoryProvider.remoteParticipant.ledger_api.acs
         .await(providerParty, codegen.DirectoryInstallRequest)
@@ -74,8 +74,8 @@ class DirectoryProviderIntegrationTest
 
       // Request entry
 
-      aliceDirectoryUser.remoteParticipant.ledger_api.acs.await(userParty, codegen.DirectoryInstall)
-      aliceDirectoryUser.requestDirectoryEntry(entryName)
+      aliceValidator.remoteParticipant.ledger_api.acs.await(userParty, codegen.DirectoryInstall)
+      aliceDirectory.requestDirectoryEntry(entryName)
       val entryRequest = directoryProvider.remoteParticipant.ledger_api.acs
         .await(providerParty, codegen.DirectoryEntryRequest)
       val entryRequests = directoryProvider.listEntryRequests()
@@ -119,11 +119,11 @@ class DirectoryProviderIntegrationTest
       )
 
       // Read entries from user
-      aliceDirectoryUser.listEntries() shouldBe Seq(entryValue)
-      aliceDirectoryUser.lookupEntryByName(entryName) shouldBe entryValue
-      aliceDirectoryUser.lookupEntryByParty(userParty) shouldBe entryValue
+      aliceDirectory.listEntries() shouldBe Seq(entryValue)
+      aliceDirectory.lookupEntryByName(entryName) shouldBe entryValue
+      aliceDirectory.lookupEntryByParty(userParty) shouldBe entryValue
       assertThrowsAndLogsCommandFailures(
-        aliceDirectoryUser.lookupEntryByName("nonexistentname"),
+        aliceDirectory.lookupEntryByName("nonexistentname"),
         _.errorMessage should include("nonexistentname"),
       )
     }

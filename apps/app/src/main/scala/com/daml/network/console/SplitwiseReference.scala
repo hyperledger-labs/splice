@@ -6,7 +6,8 @@ import com.daml.ledger.client.binding.{
   Template,
   ValueDecoder,
 }
-import com.daml.network.environment.{CoinConsoleEnvironment, CoinLedgerConnection}
+import com.daml.network.console.LedgerApiUtils
+import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.scan.config.RemoteScanAppConfig
 import com.daml.network.splitwise.admin.api.client.commands.GrpcSplitwiseAppClient
 import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
@@ -59,37 +60,15 @@ abstract class SplitwiseAppReference(
       remoteScanConfig,
     )
 
-  // TODO(#661) Check that this is no longer used and has been deleted or stop yolo’ing error handling.
-  def getUserPrimaryParty() = {
-    val userList = ledgerApi.ledger_api.users.list(
-      filterUser = userId
-    )
-    PartyId
-      .fromLfParty(
-        userList
-          .users(0)
-          .primaryParty
-          .getOrElse(throw new RuntimeException(s"User $userId has no primary party"))
-      )
-      .getOrElse(throw new RuntimeException(s"Party conversion failed"))
-  }
+  def getUserPrimaryParty() = LedgerApiUtils.getUserPrimaryParty(ledgerApi, userId)
 
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   def submitWithResult[T](
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
       update: Primitive.Update[T],
       commandId: Option[String] = None,
-  )(implicit decoder: ValueDecoder[T]): T = {
-    val tree = ledgerApi.ledger_api.commands.submit(
-      actAs,
-      Seq(update.command),
-      workflowId = "",
-      commandId.getOrElse(""),
-      readAs = readAs,
-    )
-    CoinLedgerConnection.decodeExerciseResult(update.toString, tree)
-  }
+  )(implicit decoder: ValueDecoder[T]): T =
+    LedgerApiUtils.submitWithResult(ledgerApi, actAs, readAs, update, commandId)
 
   private def installKey(
       provider: PartyId,

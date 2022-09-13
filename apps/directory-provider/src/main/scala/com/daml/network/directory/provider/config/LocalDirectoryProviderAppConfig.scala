@@ -5,20 +5,13 @@ import com.daml.network.scan.config.RemoteScanAppConfig
 import com.digitalasset.canton.config._
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 
-trait BaseDirectoryProviderAppConfig {
-  def remoteParticipant: RemoteParticipantConfig
-}
-
 case class LocalDirectoryProviderAppConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
-    // temporary. We likely want only an email here eventually once we are using Oauth2 with wallets
-    damlUser: String = "directoryProvider",
+    damlUser: String,
     override val remoteParticipant: RemoteParticipantConfig,
     remoteScan: RemoteScanAppConfig,
-) extends LocalCoinConfig
-    with BaseDirectoryProviderAppConfig // TODO(i736): fork or generalize this trait.
-    {
+) extends LocalCoinConfig {
   override val nodeTypeName: String = "directoryProvider"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
@@ -26,9 +19,9 @@ case class LocalDirectoryProviderAppConfig(
 }
 
 case class RemoteDirectoryProviderAppConfig(
+    damlUser: String,
     adminApi: ClientConfig,
-    override val remoteParticipant: RemoteParticipantConfig,
-) extends RemoteCoinConfig
-    with BaseDirectoryProviderAppConfig {
+    ledgerApi: ClientConfig,
+) extends RemoteCoinConfig {
   override def clientAdminApi: ClientConfig = adminApi
 }

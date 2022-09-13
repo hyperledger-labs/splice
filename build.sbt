@@ -42,7 +42,6 @@ lazy val root = (project in file("."))
     `apps-app`,
     `apps-wallet`,
     `apps-directory-provider`,
-    `apps-directory-user`,
     `canton-community-common`,
     `canton-blake2b`,
     `canton-slick-fork`,
@@ -149,18 +148,6 @@ lazy val `apps-directory-provider` =
       Test / damlSourceDirectory := (Compile / damlSourceDirectory).value,
       Compile / damlDarOutput := file("apps/directory-provider/daml") / ".daml" / "dist",
       BuildCommon.damlCodegenSettings,
-    )
-
-lazy val `apps-directory-user` =
-  project
-    .in(file("apps/directory-user"))
-    .dependsOn(
-      `apps-common` % "compile->compile;test->test",
-      `apps-directory-provider` % "compile->compile;test->test",
-    )
-    .settings(
-      libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
-      BuildCommon.sharedAppSettings,
     )
 
 lazy val `apps-splitwise` =
@@ -287,7 +274,6 @@ lazy val `apps-app` =
       // come first in the classpath. Otherwise, you get NoSuchMethod errors at runtime.
       `apps-splitwise`,
       `apps-directory-provider`,
-      `apps-directory-user`,
       `apps-validator`,
       `apps-svc`,
       `apps-scan`,

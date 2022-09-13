@@ -2,12 +2,12 @@ package com.daml.network.util
 
 import com.daml.network.console.{
   LocalDirectoryProviderAppReference,
-  LocalDirectoryUserAppReference,
   LocalScanAppReference,
   LocalSplitwiseAppReference,
   LocalSvcAppReference,
   LocalValidatorAppReference,
   LocalWalletAppReference,
+  RemoteDirectoryProviderAppReference,
   RemoteSvcAppReference,
   RemoteWalletAppReference,
   RemoteSplitwiseAppReference,
@@ -66,16 +66,16 @@ trait CommonCoinAppInstanceReferences {
     "directoryProvider"
   )
 
-  def aliceDirectoryUser(implicit
+  def aliceDirectory(implicit
       env: CoinTestConsoleEnvironment
-  ): LocalDirectoryUserAppReference = du(
-    "aliceDirectoryUser"
+  ): RemoteDirectoryProviderAppReference = rdp(
+    "aliceDirectory"
   )
 
-  def bobDirectoryUser(implicit
+  def bobDirectory(implicit
       env: CoinTestConsoleEnvironment
-  ): LocalDirectoryUserAppReference = du(
-    "bobDirectoryUser"
+  ): RemoteDirectoryProviderAppReference = rdp(
+    "bobDirectory"
   )
 
   def aliceSplitwise(implicit
@@ -150,16 +150,16 @@ trait CommonCoinAppInstanceReferences {
   def dp(
       name: String
   )(implicit env: CoinTestConsoleEnvironment): LocalDirectoryProviderAppReference =
-    env.directoryProviders
+    env.directoryProviders.local
       .find(_.name == name)
       .getOrElse(sys.error(s"directory provider [$name] not configured"))
 
-  def du(
+  def rdp(
       name: String
-  )(implicit env: CoinTestConsoleEnvironment): LocalDirectoryUserAppReference =
-    env.directoryUsers
+  )(implicit env: CoinTestConsoleEnvironment): RemoteDirectoryProviderAppReference =
+    env.directoryProviders.remote
       .find(_.name == name)
-      .getOrElse(sys.error(s"directory user [$name] not configured"))
+      .getOrElse(sys.error(s"remote directory provider [$name] not configured"))
 
   def sw(
       name: String

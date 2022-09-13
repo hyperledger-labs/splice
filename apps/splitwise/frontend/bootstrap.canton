@@ -13,15 +13,15 @@ bobWallet.initialize(bobValidatorParty)
 bobSplitwiseBackend.initialize(bobValidatorParty)
 directoryValidator.initialize()
 
-val aliceRequestCid = aliceDirectoryUser.requestDirectoryInstall()
-val bobRequestCid = bobDirectoryUser.requestDirectoryInstall()
+val aliceRequestCid = aliceDirectory.requestDirectoryInstall()
+val bobRequestCid = bobDirectory.requestDirectoryInstall()
 utils.retry_until_true { directoryProvider.listInstallRequests().length == 2 }
 directoryProvider.listInstallRequests().foreach { case request =>
   directoryProvider.acceptInstallRequest(request.contractId)
 }
 
-aliceDirectoryUser.requestDirectoryEntry("alice.cns")
-bobDirectoryUser.requestDirectoryEntry("bob.cns")
+aliceDirectory.requestDirectoryEntry("alice.cns")
+bobDirectory.requestDirectoryEntry("bob.cns")
 
 utils.retry_until_true { directoryProvider.listEntryRequests().length == 2 }
 directoryProvider.listEntryRequests().foreach { case request =>

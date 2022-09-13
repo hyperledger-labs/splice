@@ -6,7 +6,6 @@ import com.daml.network.directory.provider.config.{
   LocalDirectoryProviderAppConfig,
   RemoteDirectoryProviderAppConfig,
 }
-import com.daml.network.directory.user.config.LocalDirectoryUserAppConfig
 import com.daml.network.scan.config.{LocalScanAppConfig, RemoteScanAppConfig}
 import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
 import com.daml.network.svc.config.{LocalSvcAppConfig, RemoteSvcAppConfig}
@@ -48,7 +47,7 @@ case class CoinConfig(
     walletApps: Map[InstanceName, LocalWalletAppConfig] = Map.empty,
     remoteWalletApps: Map[InstanceName, RemoteWalletAppConfig] = Map.empty,
     directoryProviderApps: Map[InstanceName, LocalDirectoryProviderAppConfig] = Map.empty,
-    directoryUserApps: Map[InstanceName, LocalDirectoryUserAppConfig] = Map.empty,
+    remoteDirectoryProviderApps: Map[InstanceName, RemoteDirectoryProviderAppConfig] = Map.empty,
     splitwiseApps: Map[InstanceName, LocalSplitwiseAppConfig] = Map.empty,
     remoteSplitwiseApps: Map[InstanceName, RemoteSplitwiseAppConfig] = Map.empty,
     // TODO(i736): we want to remove all of the configurations options below:
@@ -275,41 +274,8 @@ case class CoinConfig(
       n.unwrap -> c
     }
 
-  private lazy val directoryUserAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
-    directoryUserApps.fmap { directoryUserConfig =>
-      SharedCoinAppParameters(
-        monitoring.tracing,
-        monitoring.delayLoggingThreshold,
-        monitoring.getLoggingConfig,
-        monitoring.logQueryCost,
-        parameters.timeouts.processing,
-        directoryUserConfig.caching,
-        parameters.enableAdditionalConsistencyChecks,
-        features.enablePreviewCommands,
-        parameters.nonStandardConfig,
-        directoryUserConfig.sequencerClient,
-        devVersionSupport = false,
-        dontWarnOnDeprecatedPV = false,
-        initialProtocolVersion = ProtocolVersion.latest,
-      )
-    }
-
-  private[network] def directoryUserAppParameters(
-      appName: InstanceName
-  ): SharedCoinAppParameters =
-    nodeParametersFor(directoryUserAppParameters_, "directoryUser-app", appName)
-
-  /** Use `directoryUserAppParameters` instead!
-    */
-  def tryDirectoryUserAppParametersByString(name: String): SharedCoinAppParameters =
-    directoryUserAppParameters(
-      InstanceName.tryCreate(name)
-    )
-
-  /** Use `directoryUsers` instead!
-    */
-  def directoryUsersByString: Map[String, LocalDirectoryUserAppConfig] =
-    directoryUserApps.map { case (n, c) =>
+  def remoteDirectoryProvidersByString: Map[String, RemoteDirectoryProviderAppConfig] =
+    remoteDirectoryProviderApps.map { case (n, c) =>
       n.unwrap -> c
     }
 
@@ -407,8 +373,6 @@ object CoinConfig {
     implicit val remoteDirectoryProviderConfigReader
         : ConfigReader[RemoteDirectoryProviderAppConfig] =
       deriveReader[RemoteDirectoryProviderAppConfig]
-    implicit val directoryUserConfigReader: ConfigReader[LocalDirectoryUserAppConfig] =
-      deriveReader[LocalDirectoryUserAppConfig]
     implicit val splitwiseConfigReader: ConfigReader[LocalSplitwiseAppConfig] =
       deriveReader[LocalSplitwiseAppConfig]
     implicit val remoteSplitwiseConfigReader: ConfigReader[RemoteSplitwiseAppConfig] =
