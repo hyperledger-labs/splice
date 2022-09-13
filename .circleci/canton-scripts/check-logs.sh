@@ -25,8 +25,8 @@ source "$SRCDIR"/common.sh
 source "$SRCDIR"/io-utils.sh
 
 # Install the canton log format
-REPO_ROOT="$SRCDIR/../.."
-lnav -i "$REPO_ROOT/canton-release/canton.lnav.json"
+CANTON_LNAV_JSON="$(nix-build -E '(import nix/default.nix {}).canton' --no-out-link)/canton.lnav.json"
+lnav -i "$CANTON_LNAV_JSON"
 # Check consistency of format
 lnav -C
 
