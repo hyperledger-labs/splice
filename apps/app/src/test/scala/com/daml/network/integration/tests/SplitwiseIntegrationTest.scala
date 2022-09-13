@@ -137,14 +137,12 @@ class SplitwiseIntegrationTest
       val aliceValidatorParty = aliceValidator.initialize()
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
       aliceWallet.initialize(aliceValidatorParty)
-      aliceSplitwiseBackend.initialize(aliceValidatorParty)
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
       // Onboard bob on his self-hosted validator
       val bobValidatorParty = bobValidator.initialize()
       val bobDamlUser = bobRemoteWallet.config.damlUser
       bobWallet.initialize(bobValidatorParty)
-      bobSplitwiseBackend.initialize(bobValidatorParty)
       val bobUserParty = bobValidator.onboardUser(bobDamlUser)
 
       // Setup install contracts for self-hosted usage
@@ -157,7 +155,6 @@ class SplitwiseIntegrationTest
 
       // We reuse the provider as charlie here to avoid setting up another splitwise instance.
       val charlieUserParty = splitwiseValidator.initialize()
-      charlieSplitwiseBackend.initialize(charlieUserParty)
       val charlieProviderParty = charlieUserParty
       val charlieInstallProposal = providerSplitwise.createInstallProposal(charlieUserParty)
       providerSplitwise.acceptInstallProposal(charlieInstallProposal)
@@ -176,19 +173,16 @@ class SplitwiseIntegrationTest
       val aliceValidatorParty = aliceValidator.initialize()
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
       aliceWallet.initialize(aliceValidatorParty)
-      aliceSplitwiseBackend.initialize(aliceValidatorParty)
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
       // Onboard bob on his self-hosted validator
       val bobValidatorParty = bobValidator.initialize()
       val bobDamlUser = bobRemoteWallet.config.damlUser
       bobWallet.initialize(bobValidatorParty)
-      bobSplitwiseBackend.initialize(bobValidatorParty)
       val bobUserParty = bobValidator.onboardUser(bobDamlUser)
 
       // Setup install contracts for provider-hosted mode usage
       val providerParty = splitwiseValidator.initialize()
-      charlieSplitwiseBackend.initialize(providerParty)
       val aliceInstallProposal = aliceSplitwise.createInstallProposal(providerParty)
       providerSplitwiseBackend.remoteParticipant.ledger_api.acs
         .await(providerParty, splitCodegen.SplitwiseInstallProposal)
@@ -213,10 +207,8 @@ class SplitwiseIntegrationTest
     }
 
     "return the primary party of the user" in { implicit env =>
-      val aliceValidatorParty = aliceValidator.initialize()
-      val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
-      aliceSplitwiseBackend.initialize(aliceValidatorParty)
+      aliceValidator.initialize()
+      val aliceUserParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
       aliceSplitwise.getPartyId() shouldBe aliceUserParty
     }
   }

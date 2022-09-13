@@ -7,12 +7,9 @@ import { GroupInvite } from '@daml.js/splitwise/lib/CN/Splitwise';
 
 import { Contract } from './Contract';
 import DirectoryEntries from './DirectoryEntries';
+import { useLedgerApiClient } from './LedgerApiContext';
 import { useSplitwiseClient } from './SplitwiseServiceContext';
 import { sameContracts, useInterval } from './Util';
-import {
-  AcceptInviteRequest,
-  CreateGroupRequest,
-} from './com/daml/network/splitwise/v0/splitwise_service_pb';
 
 interface GroupSetupProps {
   directoryEntries: DirectoryEntries;
@@ -21,12 +18,10 @@ interface GroupSetupProps {
 
 const GroupSetup: React.FC<GroupSetupProps> = ({ directoryEntries, provider }) => {
   const splitwiseClient = useSplitwiseClient();
+  const ledgerApiClient = useLedgerApiClient();
   const [groupId, setGroupId] = useState<string>('');
   const onCreateGroup = async () => {
-    await splitwiseClient.createGroup(
-      new CreateGroupRequest().setGroupId(groupId).setProviderPartyId(provider),
-      null
-    );
+    await ledgerApiClient.createGroup(provider, groupId);
   };
 
   const [groupInvites, setGroupInvites] = useState<Contract<GroupInvite>[]>([]);
@@ -42,12 +37,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({ directoryEntries, provider }) =
   useInterval(fetchInvites, 500);
 
   const onAcceptInvite = async (invite: Contract<GroupInvite>) => {
-    await splitwiseClient.acceptInvite(
-      new AcceptInviteRequest()
-        .setGroupInviteContractId(invite.contractId)
-        .setProviderPartyId(provider),
-      null
-    );
+    await ledgerApiClient.acceptInvite(provider, invite.contractId);
   };
 
   return (

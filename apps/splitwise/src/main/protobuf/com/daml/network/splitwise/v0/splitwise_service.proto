@@ -5,29 +5,6 @@ import "com/daml/network/v0/contract.proto";
 import "google/protobuf/empty.proto";
 
 service SplitwiseService {
-  // Init
-  rpc Initialize (InitializeRequest) returns (google.protobuf.Empty);
-
-  // Install management
-  rpc CreateInstallProposal (CreateInstallProposalRequest) returns (CreateInstallProposalResponse);
-  // No list proposals request for now since we expect this to change once we do have explicit disclosure.
-  rpc AcceptInstallProposal (AcceptInstallProposalRequest) returns (AcceptInstallProposalResponse);
-
-
-  // Owner operations
-  rpc CreateGroup (CreateGroupRequest) returns (CreateGroupResponse);
-  rpc CreateGroupInvite (CreateGroupInviteRequest) returns (CreateGroupInviteResponse);
-  rpc JoinGroup (JoinGroupRequest) returns (JoinGroupResponse);
-
-  // Member invite
-  rpc AcceptInvite (AcceptInviteRequest) returns (AcceptInviteResponse);
-
-  // Member operations
-  rpc EnterPayment (EnterPaymentRequest) returns (EnterPaymentResponse);
-  rpc InitiateTransfer (InitiateTransferRequest) returns (InitiateTransferResponse);
-  rpc CompleteTransfer (CompleteTransferRequest) returns (CompleteTransferResponse);
-  rpc Net (NetRequest) returns (NetResponse);
-
   // Read-only
   rpc ListGroups (google.protobuf.Empty) returns (ListGroupsResponse);
   rpc ListGroupInvites (google.protobuf.Empty) returns (ListGroupInvitesResponse);
@@ -35,6 +12,7 @@ service SplitwiseService {
   rpc ListBalanceUpdates (ListBalanceUpdatesRequest) returns (ListBalanceUpdatesResponse);
   rpc ListBalances (ListBalancesRequest) returns (ListBalancesResponse);
   rpc ListAcceptedAppPayments (ListAcceptedAppPaymentsRequest) returns (ListAcceptedAppPaymentsResponse);
+
   rpc GetPartyId (google.protobuf.Empty) returns (GetPartyIdResponse);
 }
 
@@ -42,113 +20,10 @@ message InitializeRequest {
   string validator_party_id = 2;
 }
 
-message CreateInstallProposalRequest {
-  string provider = 1;
-}
-
-message CreateInstallProposalResponse {
-  string proposal_contract_id = 1;
-}
-
-message AcceptInstallProposalRequest {
-  string proposal_contract_id = 1;
-}
-
-message AcceptInstallProposalResponse {
-  string install_contract_id = 1;
-}
-
 message GroupKey {
   string owner_party_id = 1;
   string provider_party_id = 2;
   string id = 3;
-}
-
-
-message CreateGroupRequest {
-  string provider_party_id = 1;
-  string group_id = 2;
-}
-
-message CreateGroupResponse {
-  string group_contract_id = 1;
-}
-
-message CreateGroupInviteRequest {
-  string provider_party_id = 1;
-  string group_id = 2;
-  repeated string observer_party_ids = 3;
-}
-
-message CreateGroupInviteResponse {
-  string group_invite_contract_id = 1;
-}
-
-message JoinGroupRequest {
-  string provider_party_id = 1;
-  string accepted_group_invite_contract_id = 2;
-}
-
-message JoinGroupResponse {
-  string group_contract_id = 1;
-}
-
-
-message AcceptInviteRequest {
-  string provider_party_id = 1;
-  string group_invite_contract_id = 2;
-}
-
-message AcceptInviteResponse {
-  string accepted_group_invite_contract_id = 1;
-}
-
-message EnterPaymentRequest {
-  string provider_party_id = 1;
-  GroupKey group_key = 2;
-  string quantity = 3;
-  string description = 4;
-}
-
-message EnterPaymentResponse {
-  string balance_update_contract_id = 1;
-}
-
-message InitiateTransferRequest {
-  string provider_party_id = 1;
-  GroupKey group_key = 2;
-  string receiver_party_id = 3;
-  string quantity = 4;
-}
-
-message InitiateTransferResponse {
-  string transfer_request_contract_id = 1;
-}
-
-message CompleteTransferRequest {
-  string provider_party_id = 1;
-  GroupKey group_key = 2;
-  string accepted_app_payment_contract_id = 3;
-}
-
-message CompleteTransferResponse {
-  string balance_update_contract_id = 1;
-}
-
-message NetRequest {
-  string provider_party_id = 1;
-  GroupKey group_key = 2;
-  // Map from Party to the balance updates for that party.
-  map<string, BalanceUpdatePerParty> balance_updates = 3;
-}
-
-message BalanceUpdatePerParty {
-  // Map from party to quantity by which balance changes.
-  map<string, string> balance_updates_per_party = 1;
-}
-
-message NetResponse {
-  string balance_update_contract_id = 1;
 }
 
 message ListGroupsResponse {

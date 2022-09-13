@@ -3,7 +3,7 @@ package com.daml.network.integration
 import com.daml.network.directory.provider.config.LocalDirectoryProviderAppConfig
 import com.daml.network.directory.user.config.LocalDirectoryUserAppConfig
 import com.daml.network.scan.config.LocalScanAppConfig
-import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
+import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
@@ -61,7 +61,11 @@ object CoinConfigTransforms {
           )
         val config7 =
           updateAllSplitwiseAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config6)
-        config7
+        val config8 =
+          updateAllRemoteSplitwiseAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
+            config7
+          )
+        config8
       },
     )
   }
@@ -75,6 +79,7 @@ object CoinConfigTransforms {
   type SvcAppTransform = CnAppConfigTransform[LocalSvcAppConfig]
   type ScanAppTransform = CnAppConfigTransform[LocalScanAppConfig]
   type SplitwiseAppTransform = CnAppConfigTransform[LocalSplitwiseAppConfig]
+  type RemoteSplitwiseAppTransform = CnAppConfigTransform[RemoteSplitwiseAppConfig]
 
   def updateAllDirectoryUserAppConfigs_(
       update: DirectoryUserAppTransform
@@ -146,6 +151,13 @@ object CoinConfigTransforms {
       update: SplitwiseAppTransform
   ): CoinConfigTransform =
     _.focus(_.splitwiseApps).modify(_.map { case (name, config) =>
+      (name, update(config))
+    })
+
+  def updateAllRemoteSplitwiseAppConfigs_(
+      update: RemoteSplitwiseAppTransform
+  ): CoinConfigTransform =
+    _.focus(_.remoteSplitwiseApps).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 

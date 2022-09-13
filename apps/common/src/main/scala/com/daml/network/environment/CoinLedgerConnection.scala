@@ -338,33 +338,7 @@ object CoinLedgerConnection {
           .apply(submitCommandOnceTree(fullCommand), RetryOnRetryableLedgerApiError)
           .map { case result =>
             val transaction = result.getTransaction
-            // We limit ourselves to non-batched commands here for simplicity.
-            if (transaction.rootEventIds.size == 1) {
-              val event = transaction.eventsById(transaction.rootEventIds(0))
-              event.kind match {
-                case TreeEvent.Kind.Created(created) =>
-                  // We don’t have enough information here to check that T is a contract id.
-                  // We could try to commit some crimes using Scala reflection & TypeTag
-                  // but in the end this cast seems much simpler and the Scala codegen
-                  // makes Update internal so we can rely on people not making up garbage
-                  // Update values.
-                  ContractId(created.contractId).asInstanceOf[T]
-                case TreeEvent.Kind.Exercised(exercised) =>
-                  CodegenValue
-                    .decode[T](exercised.getExerciseResult)
-                    .getOrElse(
-                      throw new IllegalArgumentException(
-                        s"Executing [$update] produced result [$exercised] of unexpected type."
-                      )
-                    )
-                case TreeEvent.Kind.Empty =>
-                  throw new IllegalArgumentException(s"Unknown tree event kind")
-              }
-            } else {
-              throw new IllegalArgumentException(
-                s"Expected exactly one root event id but got ${transaction.rootEventIds.size}"
-              )
-            }
+            decodeExerciseResult(update.toString, transaction)
           }
       }
 
@@ -702,4 +676,37 @@ object CoinLedgerConnection {
     o.fold(Future.failed[A](new IllegalStateException(s"Empty option: $o")))(a =>
       Future.successful(a)
     )
+
+  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+  def decodeExerciseResult[T](
+      cmdDescription: String,
+      transaction: TransactionTree,
+  )(implicit decoder: ValueDecoder[T]): T = {
+    if (transaction.rootEventIds.size == 1) {
+      val event = transaction.eventsById(transaction.rootEventIds(0))
+      event.kind match {
+        case TreeEvent.Kind.Created(created) =>
+          // We don’t have enough information here to check that T is a contract id.
+          // We could try to commit some crimes using Scala reflection & TypeTag
+          // but in the end this cast seems much simpler and the Scala codegen
+          // makes Update internal so we can rely on people not making up garbage
+          // Update values.
+          ContractId(created.contractId).asInstanceOf[T]
+        case TreeEvent.Kind.Exercised(exercised) =>
+          CodegenValue
+            .decode[T](exercised.getExerciseResult)
+            .getOrElse(
+              throw new IllegalArgumentException(
+                s"Executing [$cmdDescription] produced result [$exercised] of unexpected type."
+              )
+            )
+        case TreeEvent.Kind.Empty =>
+          throw new IllegalArgumentException(s"Unknown tree event kind")
+      }
+    } else {
+      throw new IllegalArgumentException(
+        s"Expected exactly one root event id but got ${transaction.rootEventIds.size}"
+      )
+    }
+  }
 }

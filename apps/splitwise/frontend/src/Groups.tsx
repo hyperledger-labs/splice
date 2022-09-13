@@ -28,15 +28,11 @@ import { AcceptedAppPayment } from '@daml.js/wallet/lib/CN/Wallet';
 
 import { Contract } from './Contract';
 import DirectoryEntries, { Entry as DirectoryEntry } from './DirectoryEntries';
+import { useLedgerApiClient } from './LedgerApiContext';
 import { useSplitwiseClient } from './SplitwiseServiceContext';
 import { sameContracts, useInterval } from './Util';
 import {
-  CompleteTransferRequest,
-  CreateGroupInviteRequest,
-  EnterPaymentRequest,
   GroupKey,
-  InitiateTransferRequest,
-  JoinGroupRequest,
   ListAcceptedAppPaymentsRequest,
   ListAcceptedGroupInvitesRequest,
   ListBalancesRequest,
@@ -123,6 +119,7 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({
   provider,
 }) => {
   const splitwiseClient = useSplitwiseClient();
+  const ledgerApiClient = useLedgerApiClient();
   const [acceptedInvites, setAcceptedInvites] = useState<Contract<AcceptedGroupInvite>[]>([]);
   const fetchAcceptedInvites = useCallback(async () => {
     const invites = (
@@ -138,12 +135,7 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({
   }, [group, setAcceptedInvites, splitwiseClient, provider]);
   useInterval(fetchAcceptedInvites, 500);
   const onAddMember = async (invite: Contract<AcceptedGroupInvite>) => {
-    await splitwiseClient.joinGroup(
-      new JoinGroupRequest()
-        .setAcceptedGroupInviteContractId(invite.contractId)
-        .setProviderPartyId(provider),
-      null
-    );
+    await ledgerApiClient.joinGroup(provider, invite.contractId);
   };
   return (
     <Box>
@@ -171,29 +163,20 @@ interface EntryProps {
 }
 
 const Entry: React.FC<EntryProps> = ({ directoryEntries, group, provider }) => {
-  const splitwiseClient = useSplitwiseClient();
+  const ledgerApiClient = useLedgerApiClient();
   const [paymentQuantity, setPaymentQuantity] = useState<string>('');
   const [paymentDescription, setPaymentDescription] = useState<string>('');
   const onEnterPayment = async () => {
-    await splitwiseClient.enterPayment(
-      new EnterPaymentRequest()
-        .setDescription(paymentDescription)
-        .setQuantity(paymentQuantity)
-        .setGroupKey(key(group))
-        .setProviderPartyId(provider),
-      null
-    );
+    await ledgerApiClient.enterPayment(provider, key(group), paymentQuantity, paymentDescription);
   };
   const [transferQuantity, setTransferQuantity] = useState<string>('');
   const [transferReceiverEntry, setTransferReceiverEntry] = useState<DirectoryEntry | null>(null);
   const onInitiateTransfer = async () => {
-    await splitwiseClient.initiateTransfer(
-      new InitiateTransferRequest()
-        .setReceiverPartyId(transferReceiverEntry!.user)
-        .setQuantity(transferQuantity)
-        .setGroupKey(key(group))
-        .setProviderPartyId(provider),
-      null
+    await ledgerApiClient.initiateTransfer(
+      provider,
+      key(group),
+      transferReceiverEntry!.user,
+      transferQuantity
     );
   };
   return (
@@ -303,6 +286,7 @@ const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({
   provider,
 }) => {
   const splitwiseClient = useSplitwiseClient();
+  const ledgerApiClient = useLedgerApiClient();
   const [acceptedAppPayments, setAcceptedAppPayments] = useState<Contract<AcceptedAppPayment>[]>(
     []
   );
@@ -319,13 +303,7 @@ const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({
   useInterval(fetchAcceptedAppPayments, 500);
 
   const onRedeem = async (acceptedAppPayment: Contract<AcceptedAppPayment>) => {
-    await splitwiseClient.completeTransfer(
-      new CompleteTransferRequest()
-        .setGroupKey(key(group))
-        .setAcceptedAppPaymentContractId(acceptedAppPayment.contractId)
-        .setProviderPartyId(provider),
-      null
-    );
+    await ledgerApiClient.completeTransfer(provider, key(group), acceptedAppPayment.contractId);
   };
 
   const AcceptedPayment: React.FC<{ acceptedAppPayment: Contract<AcceptedAppPayment> }> = ({
@@ -361,15 +339,13 @@ interface GroupProps {
 }
 
 const Group: React.FC<GroupProps> = ({ directoryEntries, group, party, provider }) => {
-  const splitwiseClient = useSplitwiseClient();
+  const ledgerApiClient = useLedgerApiClient();
   const isOwner = party === group.payload.owner;
   const onCreateInvite = async () => {
-    await splitwiseClient.createGroupInvite(
-      new CreateGroupInviteRequest()
-        .setObserverPartyIdsList(directoryEntries.getAllParties())
-        .setGroupId(group.payload.id.unpack)
-        .setProviderPartyId(provider),
-      null
+    await ledgerApiClient.createGroupInvite(
+      provider,
+      group.payload.id.unpack,
+      directoryEntries.getAllParties()
     );
   };
 

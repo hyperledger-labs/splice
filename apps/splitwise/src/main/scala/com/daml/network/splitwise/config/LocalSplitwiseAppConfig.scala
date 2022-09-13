@@ -8,8 +8,8 @@ import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 case class LocalSplitwiseAppConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
-    // temporary. We likely want only an email here eventually once we are using Oauth2 with wallets
-    damlUser: String = "splitwise",
+    // TODO(#661) Rename this to provider user once we finished this.
+    damlUser: String,
     remoteParticipant: RemoteParticipantConfig,
     remoteScan: RemoteScanAppConfig,
 ) extends LocalCoinConfig // TODO(i736): fork or generalize this trait.
@@ -21,7 +21,12 @@ case class LocalSplitwiseAppConfig(
 }
 
 case class RemoteSplitwiseAppConfig(
-    adminApi: ClientConfig
+    // Admin API for reads.
+    adminApi: ClientConfig,
+    // Ledger API for writes.
+    ledgerApi: ClientConfig,
+    remoteScan: RemoteScanAppConfig,
+    damlUser: String,
 ) extends RemoteCoinConfig {
   override def clientAdminApi: ClientConfig = adminApi
 }
