@@ -1,6 +1,5 @@
 package com.daml.network.splitwise.admin.grpc
 
-import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.{Primitive, Template}
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -11,8 +10,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
 import com.daml.network.codegen.DA
-import com.daml.network.codegen.DA.Time.Types.RelTime
-import com.daml.network.codegen.CN.{Splitwise => splitCodegen, Wallet => walletCodegen}
+import com.daml.network.codegen.CN.{Splitwise => splitCodegen}
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
 
@@ -34,14 +32,7 @@ class GrpcSplitwiseService(
 
   private val connection = ledgerClient.connection("GrpcSplitwiseService")
 
-  private val collectionDuration = RelTime(
-    10_000_000
-  )
-  private val acceptDuration = RelTime(
-    60_000_000
-  )
-
-  def listGroups(
+  override def listGroups(
       request: com.google.protobuf.empty.Empty
   ): Future[v0.ListGroupsResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
@@ -51,7 +42,7 @@ class GrpcSplitwiseService(
       } yield v0.ListGroupsResponse(groups.map(c => Contract.fromCodegenContract(c).toProtoV0))
     }
 
-  def listGroupInvites(
+  override def listGroupInvites(
       request: com.google.protobuf.empty.Empty
   ): Future[v0.ListGroupInvitesResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
@@ -63,7 +54,7 @@ class GrpcSplitwiseService(
       )
     }
 
-  def listAcceptedGroupInvites(
+  override def listAcceptedGroupInvites(
       request: v0.ListAcceptedGroupInvitesRequest
   ): Future[v0.ListAcceptedGroupInvitesResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
@@ -82,7 +73,7 @@ class GrpcSplitwiseService(
       }
     }
 
-  def listBalanceUpdates(
+  override def listBalanceUpdates(
       request: v0.ListBalanceUpdatesRequest
   ): Future[v0.ListBalanceUpdatesResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
@@ -103,7 +94,7 @@ class GrpcSplitwiseService(
       }
     }
 
-  def listBalances(
+  override def listBalances(
       request: v0.ListBalancesRequest
   ): Future[v0.ListBalancesResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
@@ -158,34 +149,7 @@ class GrpcSplitwiseService(
       }
     }
 
-  def listAcceptedAppPayments(
-      request: v0.ListAcceptedAppPaymentsRequest
-  ): Future[v0.ListAcceptedAppPaymentsResponse] =
-    withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
-      for {
-        party <- connection.getPrimaryParty(damlUser)
-        transfersInProgress <- connection.activeContracts(party, splitCodegen.TransferInProgress)
-        acceptedPayments <- connection.activeContracts(party, walletCodegen.AcceptedAppPayment)
-      } yield {
-        val filteredInProgress: Set[ApiTypes.ContractId] = transfersInProgress
-          .filter(c =>
-            splitCodegen
-              .GroupKey(c.value.group.owner, c.value.group.provider, c.value.group.id) == groupKey_(
-              request.getGroupKey
-            ) && c.value.sender == party.toPrim
-          )
-          .map(_.contractId)
-          .toSet
-        val filteredPayments = acceptedPayments.filter(payment =>
-          filteredInProgress.contains(payment.value.reference: ApiTypes.ContractId)
-        )
-        v0.ListAcceptedAppPaymentsResponse(
-          filteredPayments.map(c => Contract.fromCodegenContract(c).toProtoV0)
-        )
-      }
-    }
-
-  def getPartyId(request: Empty): Future[v0.GetPartyIdResponse] =
+  override def getPartyId(request: Empty): Future[v0.GetPartyIdResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       for {
         party <- connection.getPrimaryParty(damlUser)

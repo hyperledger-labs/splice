@@ -1,5 +1,8 @@
 import React, { useContext } from 'react';
 
+import { AcceptedAppPayment } from '@daml.js/wallet/lib/CN/Wallet';
+
+import { Contract } from './Contract';
 import { GroupKey } from './com/daml/network/splitwise/v0/splitwise_service_pb';
 
 class LedgerApiClient {
@@ -24,6 +27,9 @@ class LedgerApiClient {
   }
   async completeTransfer(provider: string, key: GroupKey, acceptedPaymentContractId: string) {
     throw new Error('not implemented');
+  }
+  async listAcceptedAppPayments(key: GroupKey): Promise<Contract<AcceptedAppPayment>[]> {
+    throw new Error('Not implemented');
   }
 }
 

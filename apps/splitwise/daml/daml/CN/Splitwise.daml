@@ -291,7 +291,7 @@ template GroupInvite
       -- before the invite is accepted (to reduce contention).
     observers : [Party]
   where
-    signatory group.owner
+    signatory group.owner, group.provider
     observer observers -- workaround for lack of explicit disclosure.
     nonconsuming choice GroupInvite_Accept : ContractId AcceptedGroupInvite
       with
@@ -306,7 +306,7 @@ template AcceptedGroupInvite
     groupKey : GroupKey
     invitee : Party
   where
-    signatory groupKey.owner, invitee
+    signatory groupKey.owner, groupKey.provider, invitee
     choice AcceptedGroupInvite_Join : ContractId Group
       controller groupKey.owner
       do exerciseByKey @Group groupKey (Group_Join invitee)

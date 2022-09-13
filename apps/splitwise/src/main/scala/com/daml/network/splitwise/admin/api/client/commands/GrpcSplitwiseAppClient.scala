@@ -6,7 +6,7 @@ import com.daml.network.splitwise.v0.SplitwiseServiceGrpc.SplitwiseServiceStub
 import com.daml.network.util.{Contract, Proto}
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
-import com.daml.network.codegen.CN.{Splitwise => splitCodegen, Wallet => walletCodegen}
+import com.daml.network.codegen.CN.{Splitwise => splitCodegen}
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
 
@@ -138,27 +138,6 @@ object GrpcSplitwiseAppClient {
           } yield k -> v
         }
         .map(_.toMap)
-        .leftMap(_.toString)
-  }
-
-  case class ListAcceptedAppPayments(
-      key: GroupKey
-  ) extends BaseCommand[v0.ListAcceptedAppPaymentsRequest, v0.ListAcceptedAppPaymentsResponse, Seq[
-        Contract[walletCodegen.AcceptedAppPayment]
-      ]] {
-    override def createRequest(): Either[String, v0.ListAcceptedAppPaymentsRequest] =
-      Right(v0.ListAcceptedAppPaymentsRequest(Some(key.toProtoV0)))
-
-    override def submitRequest(
-        service: SplitwiseServiceStub,
-        request: v0.ListAcceptedAppPaymentsRequest,
-    ): Future[v0.ListAcceptedAppPaymentsResponse] = service.listAcceptedAppPayments(request)
-
-    override def handleResponse(
-        response: v0.ListAcceptedAppPaymentsResponse
-    ): Either[String, Seq[Contract[walletCodegen.AcceptedAppPayment]]] =
-      response.acceptedAppPayments
-        .traverse(Contract.fromProto(walletCodegen.AcceptedAppPayment)(_))
         .leftMap(_.toString)
   }
 

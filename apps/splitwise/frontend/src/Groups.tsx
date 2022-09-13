@@ -33,7 +33,6 @@ import { useSplitwiseClient } from './SplitwiseServiceContext';
 import { sameContracts, useInterval } from './Util';
 import {
   GroupKey,
-  ListAcceptedAppPaymentsRequest,
   ListAcceptedGroupInvitesRequest,
   ListBalancesRequest,
   ListBalanceUpdatesRequest,
@@ -285,21 +284,14 @@ const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({
   group,
   provider,
 }) => {
-  const splitwiseClient = useSplitwiseClient();
   const ledgerApiClient = useLedgerApiClient();
   const [acceptedAppPayments, setAcceptedAppPayments] = useState<Contract<AcceptedAppPayment>[]>(
     []
   );
   const fetchAcceptedAppPayments = useCallback(async () => {
-    const acceptedAppPayments = (
-      await splitwiseClient.listAcceptedAppPayments(
-        new ListAcceptedAppPaymentsRequest().setGroupKey(key(group)),
-        null
-      )
-    ).getAcceptedAppPaymentsList();
-    const decoded = acceptedAppPayments.map(c => Contract.decode(c, AcceptedAppPayment));
+    const decoded = await ledgerApiClient.listAcceptedAppPayments(key(group));
     setAcceptedAppPayments(prev => (sameContracts(prev, decoded) ? prev : decoded));
-  }, [splitwiseClient, setAcceptedAppPayments, group]);
+  }, [ledgerApiClient, setAcceptedAppPayments, group]);
   useInterval(fetchAcceptedAppPayments, 500);
 
   const onRedeem = async (acceptedAppPayment: Contract<AcceptedAppPayment>) => {

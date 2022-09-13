@@ -11,7 +11,6 @@ service SplitwiseService {
   rpc ListAcceptedGroupInvites (ListAcceptedGroupInvitesRequest) returns (ListAcceptedGroupInvitesResponse);
   rpc ListBalanceUpdates (ListBalanceUpdatesRequest) returns (ListBalanceUpdatesResponse);
   rpc ListBalances (ListBalancesRequest) returns (ListBalancesResponse);
-  rpc ListAcceptedAppPayments (ListAcceptedAppPaymentsRequest) returns (ListAcceptedAppPaymentsResponse);
 
   rpc GetPartyId (google.protobuf.Empty) returns (GetPartyIdResponse);
 }
@@ -57,14 +56,6 @@ message ListBalancesRequest {
 
 message ListBalancesResponse {
   map<string, string> balances = 1;
-}
-
-message ListAcceptedAppPaymentsRequest {
-  GroupKey group_key = 1;
-}
-
-message ListAcceptedAppPaymentsResponse {
-  repeated com.daml.network.v0.Contract accepted_app_payments = 1;
 }
 
 message GetPartyIdResponse {
