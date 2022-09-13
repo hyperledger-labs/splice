@@ -37,6 +37,7 @@ lazy val root = (project in file("."))
   .aggregate(
     `apps-common`,
     `apps-validator`,
+    `apps-scan`,
     `apps-splitwise`,
     `apps-svc`,
     `apps-app`,

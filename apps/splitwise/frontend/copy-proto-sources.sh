@@ -11,3 +11,4 @@ cp -r ../../common/target/scala-2.13/src_managed/main/ts/* src/
 cp -r ../../wallet/target/scala-2.13/src_managed/main/ts/* src/
 cp -r ../../directory-provider/target/scala-2.13/src_managed/main/ts/* src/
 cp -r ../../splitwise/target/scala-2.13/src_managed/main/ts/* src/
+cp -r ../../scan/target/scala-2.13/src_managed/main/ts/* src/

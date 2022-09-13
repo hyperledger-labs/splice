@@ -28,5 +28,7 @@ temp/
 **/com/daml/ledger/api/**/*.js
 **/com/daml/network/**/*.ts
 **/com/daml/network/**/*.js
+**/google/**/*.js
+**/google/**/*.ts
 docs/src/app_dev/api
 canton.patch

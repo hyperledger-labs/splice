@@ -12,12 +12,12 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Connection to the admin API of CC Scan. This is used by other apps
   * to query for the SVC party id.
-
   */
-final class ScanConnection (
-  config: ClientConfig,
-  timeouts: ProcessingTimeout,
-  loggerFactory: NamedLoggerFactory)(implicit ec: ExecutionContextExecutor)
+final class ScanConnection(
+    config: ClientConfig,
+    timeouts: ProcessingTimeout,
+    loggerFactory: NamedLoggerFactory,
+)(implicit ec: ExecutionContextExecutor)
     extends AppConnection(config, timeouts, loggerFactory) {
   // cached SVC reference.
   private val svcRef: AtomicReference[Option[PartyId]] = new AtomicReference(None)

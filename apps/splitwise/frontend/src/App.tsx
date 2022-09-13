@@ -10,9 +10,12 @@ import { Contract } from './Contract';
 import DirectoryEntries from './DirectoryEntries';
 import GroupSetup from './GroupSetup';
 import Groups from './Groups';
+import { LedgerApiClientProvider, useLedgerApiClient } from './LedgerApiContext';
+import Login from './Login';
 import { SplitwiseClientProvider, useSplitwiseClient } from './SplitwiseServiceContext';
 import { sameContracts, useInterval } from './Util';
 import { DirectoryProviderServiceClient } from './com/daml/network/directory_provider/v0/Directory_provider_serviceServiceClientPb';
+import { ScanServiceClient } from './com/daml/network/scan/v0/Scan_serviceServiceClientPb';
 
 const App: React.FC = () => {
   const [directoryEntries, setDirectoryEntries] = useState<Contract<DirectoryEntry>[]>([]);
@@ -21,6 +24,7 @@ const App: React.FC = () => {
     () => new DirectoryProviderServiceClient('http://localhost:8084'),
     []
   );
+  const scanClient = useMemo(() => new ScanServiceClient('http://localhost:8083'), []);
 
   const fetchDirectoryEntries = useCallback(async () => {
     const newEntries = (await directoryClient.listEntries(new Empty(), null)).getEntriesList();
@@ -30,41 +34,69 @@ const App: React.FC = () => {
 
   useInterval(fetchDirectoryEntries, 500);
 
-  const Wrapper: React.FC = () => {
-    const splitwiseClient = useSplitwiseClient();
+  const [svc, setSvc] = useState<string | undefined>();
+  useEffect(() => {
+    const fetchSvc = async () => {
+      const svc = await scanClient.getSvcPartyId(new Empty(), null);
+      setSvc(svc.getSvcPartyId());
+    };
+    fetchSvc();
+  }, [scanClient]);
 
-    const [party, setParty] = useState<string>('');
-    // For now, we only support self-hosted mode so provider = user party.
-    const provider = party;
+  const [userId, setUserId] = useState<string | undefined>();
+
+  const Wrapper: React.FC<{ userId: string }> = ({ userId }) => {
+    const splitwiseClient = useSplitwiseClient();
+    const ledgerApiClient = useLedgerApiClient();
+
+    const [provider, setProvider] = useState<string | undefined>();
+    const [party, setParty] = useState<string | undefined>();
+
+    useEffect(() => {
+      const fetchProvider = async () => {
+        const provider = await splitwiseClient.getProviderPartyId(new Empty(), null);
+        setProvider(provider.getPartyId());
+      };
+      fetchProvider();
+    }, [splitwiseClient]);
 
     useEffect(() => {
       const fetchParty = async () => {
-        const party = await splitwiseClient.getProviderPartyId(new Empty(), null);
-        setParty(party.getPartyId());
+        const party = await ledgerApiClient.getPrimaryParty(userId);
+        setParty(party);
       };
       fetchParty();
-    }, [setParty, splitwiseClient]);
-    return (
-      <Box>
-        <CssBaseline />
-        <AppBar position="static" sx={{ marginBottom: 5 }}>
-          <Toolbar>
-            <Typography variant="h6">CN Splitwise</Typography>
-          </Toolbar>
-        </AppBar>
+    }, [userId, ledgerApiClient]);
+
+    if (provider && party && svc) {
+      return (
         <Container>
           <Stack spacing={3}>
-            <GroupSetup directoryEntries={dirEntries} provider={provider} />
+            <GroupSetup directoryEntries={dirEntries} party={party} provider={provider} svc={svc} />
             <Groups directoryEntries={dirEntries} party={party} provider={provider} />
           </Stack>
         </Container>
-      </Box>
-    );
+      );
+    } else {
+      return <Typography>Loading …</Typography>;
+    }
   };
 
   return (
     <SplitwiseClientProvider url={process.env.REACT_APP_GRPC_URL || 'http://localhost:8082'}>
-      <Wrapper />
+      <LedgerApiClientProvider
+        url={process.env.REACT_APP_LEDGER_API_GRPC_URL || 'http://localhost:8085'}
+      >
+        <Box>
+          <CssBaseline />
+          <AppBar position="static" sx={{ marginBottom: 5 }}>
+            <Toolbar>
+              <Typography variant="h6">CN Splitwise</Typography>
+            </Toolbar>
+          </AppBar>
+          {userId ? <Wrapper userId={userId} /> : <Login onLogin={setUserId} />}
+        </Box>
+      </LedgerApiClientProvider>
     </SplitwiseClientProvider>
   );
 };

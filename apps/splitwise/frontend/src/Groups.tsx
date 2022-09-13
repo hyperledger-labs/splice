@@ -36,6 +36,7 @@ import {
   ListBalancesRequest,
   ListBalanceUpdatesRequest,
   ListGroupsRequest,
+  SplitwiseContext,
 } from './com/daml/network/splitwise/v0/splitwise_service_pb';
 
 const key = (group: Contract<CodegenGroup>) =>
@@ -67,7 +68,12 @@ const Balances: React.FC<BalancesProps> = ({ directoryEntries, group, party }) =
   const [balances, setBalances] = useState<Map<string, string>>(new Map());
   const fetchBalances = useCallback(async () => {
     const balanceMap = (
-      await splitwiseClient.listBalances(new ListBalancesRequest().setGroupKey(key(group)), null)
+      await splitwiseClient.listBalances(
+        new ListBalancesRequest()
+          .setGroupKey(key(group))
+          .setContext(new SplitwiseContext().setPartyId(party)),
+        null
+      )
     ).getBalancesMap();
     let balances = new Map<string, string>();
     [group.payload.owner].concat(group.payload.members).forEach(p => {
@@ -110,11 +116,13 @@ interface MembershipRequestsProps {
   directoryEntries: DirectoryEntries;
   group: Contract<CodegenGroup>;
   provider: string;
+  party: string;
 }
 
 const MembershipRequests: React.FC<MembershipRequestsProps> = ({
   directoryEntries,
   group,
+  party,
   provider,
 }) => {
   const splitwiseClient = useSplitwiseClient();
@@ -123,16 +131,18 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({
   const fetchAcceptedInvites = useCallback(async () => {
     const invites = (
       await splitwiseClient.listAcceptedGroupInvites(
-        new ListAcceptedGroupInvitesRequest().setGroupId(group.payload.id.unpack),
+        new ListAcceptedGroupInvitesRequest()
+          .setGroupId(group.payload.id.unpack)
+          .setContext(new SplitwiseContext().setPartyId(party)),
         null
       )
     ).getAcceptedGroupInvitesList();
     const decoded = invites.map(c => Contract.decode(c, AcceptedGroupInvite));
     setAcceptedInvites(prev => (sameContracts(decoded, prev) ? prev : decoded));
-  }, [group, setAcceptedInvites, splitwiseClient]);
+  }, [group.payload.id.unpack, party, splitwiseClient]);
   useInterval(fetchAcceptedInvites, 500);
   const onAddMember = async (invite: Contract<AcceptedGroupInvite>) => {
-    await ledgerApiClient.joinGroup(provider, invite.contractId);
+    await ledgerApiClient.joinGroup(party, provider, invite.contractId);
   };
   return (
     <Box>
@@ -157,19 +167,27 @@ interface EntryProps {
   directoryEntries: DirectoryEntries;
   group: Contract<CodegenGroup>;
   provider: string;
+  party: string;
 }
 
-const Entry: React.FC<EntryProps> = ({ directoryEntries, group, provider }) => {
+const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider }) => {
   const ledgerApiClient = useLedgerApiClient();
   const [paymentQuantity, setPaymentQuantity] = useState<string>('');
   const [paymentDescription, setPaymentDescription] = useState<string>('');
   const onEnterPayment = async () => {
-    await ledgerApiClient.enterPayment(provider, key(group), paymentQuantity, paymentDescription);
+    await ledgerApiClient.enterPayment(
+      party,
+      provider,
+      key(group),
+      paymentQuantity,
+      paymentDescription
+    );
   };
   const [transferQuantity, setTransferQuantity] = useState<string>('');
   const [transferReceiverEntry, setTransferReceiverEntry] = useState<DirectoryEntry | null>(null);
   const onInitiateTransfer = async () => {
     await ledgerApiClient.initiateTransfer(
+      party,
       provider,
       key(group),
       transferReceiverEntry!.user,
@@ -221,21 +239,24 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, provider }) => {
 interface BalanceUpdatesProps {
   directoryEntries: DirectoryEntries;
   group: Contract<CodegenGroup>;
+  party: string;
 }
 
-const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ directoryEntries, group }) => {
+const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ directoryEntries, group, party }) => {
   const splitwiseClient = useSplitwiseClient();
   const [balanceUpdates, setBalanceUpdates] = useState<Contract<BalanceUpdate>[]>([]);
   const fetchBalanceUpdates = useCallback(async () => {
     const balanceUpdates = (
       await splitwiseClient.listBalanceUpdates(
-        new ListBalanceUpdatesRequest().setGroupKey(key(group)),
+        new ListBalanceUpdatesRequest()
+          .setGroupKey(key(group))
+          .setContext(new SplitwiseContext().setPartyId(party)),
         null
       )
     ).getBalanceUpdatesList();
     const decoded = balanceUpdates.reverse().map(c => Contract.decode(c, BalanceUpdate));
     setBalanceUpdates(prev => (sameContracts(decoded, prev) ? prev : decoded));
-  }, [splitwiseClient, setBalanceUpdates, group]);
+  }, [splitwiseClient, group, party]);
   useInterval(fetchBalanceUpdates, 500);
 
   const Update: React.FC<{ update: Contract<BalanceUpdate> }> = ({ update }) => {
@@ -275,11 +296,13 @@ interface AcceptedAppPaymentsProps {
   directoryEntries: DirectoryEntries;
   group: Contract<CodegenGroup>;
   provider: string;
+  party: string;
 }
 
 const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({
   directoryEntries,
   group,
+  party,
   provider,
 }) => {
   const ledgerApiClient = useLedgerApiClient();
@@ -287,13 +310,20 @@ const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({
     []
   );
   const fetchAcceptedAppPayments = useCallback(async () => {
-    const decoded = await ledgerApiClient.listAcceptedAppPayments(key(group));
+    const decoded = await ledgerApiClient.listAcceptedAppPayments(party, key(group));
     setAcceptedAppPayments(prev => (sameContracts(prev, decoded) ? prev : decoded));
-  }, [ledgerApiClient, setAcceptedAppPayments, group]);
+  }, [ledgerApiClient, party, group]);
   useInterval(fetchAcceptedAppPayments, 500);
 
   const onRedeem = async (acceptedAppPayment: Contract<AcceptedAppPayment>) => {
-    await ledgerApiClient.completeTransfer(provider, key(group), acceptedAppPayment.contractId);
+    const validator = await ledgerApiClient.getValidatorPartyId(party);
+    await ledgerApiClient.completeTransfer(
+      party,
+      provider,
+      validator,
+      key(group),
+      acceptedAppPayment.contractId
+    );
   };
 
   const AcceptedPayment: React.FC<{ acceptedAppPayment: Contract<AcceptedAppPayment> }> = ({
@@ -333,6 +363,7 @@ const Group: React.FC<GroupProps> = ({ directoryEntries, group, party, provider 
   const isOwner = party === group.payload.owner;
   const onCreateInvite = async () => {
     await ledgerApiClient.createGroupInvite(
+      party,
       provider,
       group.payload.id.unpack,
       directoryEntries.getAllParties()
@@ -355,11 +386,21 @@ const Group: React.FC<GroupProps> = ({ directoryEntries, group, party, provider 
       </Stack>
       <Divider />
       {isOwner && (
-        <MembershipRequests group={group} directoryEntries={directoryEntries} provider={provider} />
+        <MembershipRequests
+          group={group}
+          directoryEntries={directoryEntries}
+          party={party}
+          provider={provider}
+        />
       )}
-      <Entry group={group} directoryEntries={directoryEntries} provider={provider} />
+      <Entry group={group} directoryEntries={directoryEntries} party={party} provider={provider} />
       <Divider />
-      <AcceptedAppPayments group={group} directoryEntries={directoryEntries} provider={provider} />
+      <AcceptedAppPayments
+        group={group}
+        directoryEntries={directoryEntries}
+        party={party}
+        provider={provider}
+      />
       <Divider />
       <Balances
         group={group}
@@ -368,7 +409,7 @@ const Group: React.FC<GroupProps> = ({ directoryEntries, group, party, provider 
         provider={provider}
       />
       <Divider />
-      <BalanceUpdates directoryEntries={directoryEntries} group={group} />
+      <BalanceUpdates directoryEntries={directoryEntries} group={group} party={party} />
       <Divider />
     </Paper>
   );
@@ -387,11 +428,14 @@ const Groups: React.FC<GroupsProps> = ({ directoryEntries, party, provider }) =>
 
   const fetchGroups = useCallback(async () => {
     const newGroups = (
-      await splitwiseClient.listGroups(new ListGroupsRequest(), null)
+      await splitwiseClient.listGroups(
+        new ListGroupsRequest().setContext(new SplitwiseContext().setPartyId(party)),
+        null
+      )
     ).getGroupsList();
     const decoded = newGroups.map(c => Contract.decode(c, CodegenGroup));
     setGroups(prev => (sameContracts(prev, decoded) ? prev : decoded));
-  }, [splitwiseClient, setGroups]);
+  }, [splitwiseClient, party]);
 
   useInterval(fetchGroups, 500);
 

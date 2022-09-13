@@ -283,9 +283,11 @@ cd apps/wallet/frontend
 PORT=3000 REACT_APP_GRPC_URL=http://localhost:8080 npm start # Alice's wallet
 PORT=3001 REACT_APP_GRPC_URL=http://localhost:8081 npm start # Bob's wallet
 cd apps/splitwise/frontend
-PORT=3002 REACT_APP_GRPC_URL=http://localhost:8082 npm start # Alice's splitwise
-PORT=3003 REACT_APP_GRPC_URL=http://localhost:8083 npm start # Bob's splitwise
+PORT=3002 REACT _APP_LEDGER_API_GRPC_URL=http://localhost:8085 npm start # Alice’s splitwise
+PORT=3003 REACT _APP_LEDGER_API_GRPC_URL=http://localhost:8086 npm start # Bob’s splitwise
 ```
+
+You can login as `alice_wallet_user` and `bob_wallet_user` respectively.
 
 If the frontend shows up but nothing happens when you click tap or
 other buttons, check your browser console. If you see a stream of 503 errors,
