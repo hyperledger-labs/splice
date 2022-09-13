@@ -427,7 +427,8 @@ class WalletIntegrationTest
       val appRewards = aliceRemoteWallet.listAppRewards()
       appRewards should have size 1
       aliceRemoteWallet.listValidatorRewards() shouldBe empty
-      // TODO(i296) We cannot use the wallet as the validator yet so create a validator right where alice is their own validator.
+      // TODO(i723) We cannot use the wallet as the validator yet so create a validator right where alice is their own validator.
+      //            To collect rewards to the validator party's wallet, we additionally need to ensure validator users are also onboarded
       aliceWallet.remoteParticipant.ledger_api.commands.submit(
         Seq(aliceUserParty),
         optTimeout = None,
