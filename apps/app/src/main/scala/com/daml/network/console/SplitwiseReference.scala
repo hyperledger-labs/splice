@@ -23,7 +23,7 @@ import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 import com.daml.network.codegen.CC.Scripts.Util.CCUserHostedAt
-import com.daml.network.codegen.CN.{Splitwise => splitCodegen, Wallet => walletCodegen}
+import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen, Wallet => walletCodegen}
 import com.daml.network.codegen.DA
 import com.daml.network.codegen.DA.Time.Types.RelTime
 
@@ -40,18 +40,7 @@ abstract class SplitwiseAppReference(
   // from the console.
   protected def ledgerApi: BaseLedgerApiAdministration
 
-  protected def userId: String
-
-  protected def context: GrpcSplitwiseAppClient.SplitwiseContext
-
   protected val remoteScanConfig: RemoteScanAppConfig
-
-  private val collectionDuration = RelTime(
-    10_000_000
-  )
-  private val acceptDuration = RelTime(
-    60_000_000
-  )
 
   lazy val remoteScan =
     new RemoteScanAppReference(
@@ -59,8 +48,6 @@ abstract class SplitwiseAppReference(
       s"remote scan for `$name``",
       remoteScanConfig,
     )
-
-  def getUserPrimaryParty() = LedgerApiUtils.getUserPrimaryParty(ledgerApi, userId)
 
   def submitWithResult[T](
       actAs: Seq[PartyId],
@@ -70,30 +57,70 @@ abstract class SplitwiseAppReference(
   )(implicit decoder: ValueDecoder[T]): T =
     LedgerApiUtils.submitWithResult(ledgerApi, actAs, readAs, update, commandId)
 
+  @Help.Summary("Get the primary party of the provider’s daml user specified in the config.")
+  def getProviderPartyId(): PartyId =
+    consoleEnvironment.run {
+      adminCommand(GrpcSplitwiseAppClient.GetProviderPartyId())
+    }
+}
+
+final class RemoteSplitwiseAppReference(
+    override val consoleEnvironment: CoinConsoleEnvironment,
+    name: String,
+) extends SplitwiseAppReference(consoleEnvironment, name)
+    with GrpcRemoteInstanceReference
+    with BaseInspection[ParticipantNode] {
+  private val collectionDuration = RelTime(
+    10_000_000
+  )
+  private val acceptDuration = RelTime(
+    60_000_000
+  )
+
+  override protected val instanceType = "Remote Splitwise"
+
+  override protected lazy val ledgerApi =
+    new ExternalLedgerApiClient(
+      config.ledgerApi.address,
+      config.ledgerApi.port,
+      config.ledgerApi.tls,
+    )(consoleEnvironment)
+
+  val userId: String = config.damlUser
+
+  lazy val context =
+    GrpcSplitwiseAppClient.SplitwiseContext(getUserPrimaryParty())
+
   private def installKey(
       provider: PartyId,
       user: PartyId,
-  ): Template.Key[splitCodegen.SplitwiseInstall] =
-    splitCodegen.SplitwiseInstall.key(DA.Types.Tuple2(user.toPrim, provider.toPrim))
+  ): Template.Key[splitwiseCodegen.SplitwiseInstall] =
+    splitwiseCodegen.SplitwiseInstall.key(DA.Types.Tuple2(user.toPrim, provider.toPrim))
 
-  private def groupKey_(owner: PartyId, provider: PartyId, id: String): splitCodegen.GroupKey =
-    splitCodegen.GroupKey(
+  private def groupKey_(owner: PartyId, provider: PartyId, id: String): splitwiseCodegen.GroupKey =
+    splitwiseCodegen.GroupKey(
       owner.toPrim,
       provider.toPrim,
-      splitCodegen.GroupId(id),
+      splitwiseCodegen.GroupId(id),
     )
+
+  private def getUserPrimaryParty() = LedgerApiUtils.getUserPrimaryParty(ledgerApi, userId)
+
+  @Help.Summary("Return remote splitwise app config")
+  def config: RemoteSplitwiseAppConfig =
+    consoleEnvironment.environment.config.remoteSplitwisesByString(name)
 
   // Commands for managing installs
 
   @Help.Summary("Create splitwise install proposal for given provider party")
   def createInstallProposal(
       provider: PartyId
-  ): Primitive.ContractId[splitCodegen.SplitwiseInstallProposal] = {
+  ): Primitive.ContractId[splitwiseCodegen.SplitwiseInstallProposal] = {
     val party = getUserPrimaryParty()
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      splitCodegen
+      splitwiseCodegen
         .SplitwiseInstallProposal(
           user = party.toPrim,
           provider = provider.toPrim,
@@ -102,34 +129,22 @@ abstract class SplitwiseAppReference(
     )
   }
 
-  @Help.Summary("Accept splitwise install proposal")
-  def acceptInstallProposal(
-      proposal: Primitive.ContractId[splitCodegen.SplitwiseInstallProposal]
-  ): Primitive.ContractId[splitCodegen.SplitwiseInstall] = {
-    val party = getUserPrimaryParty()
-    submitWithResult(
-      actAs = Seq(party),
-      readAs = Seq.empty,
-      proposal.exerciseSplitwiseInstallProposal_Accept(),
-    )
-  }
-
   // Commands for the group owner
 
   @Help.Summary("Create group with the given id")
-  def createGroup(provider: PartyId, id: String): Primitive.ContractId[splitCodegen.Group] = {
+  def createGroup(provider: PartyId, id: String): Primitive.ContractId[splitwiseCodegen.Group] = {
     val party = getUserPrimaryParty()
     val svc = remoteScan.getSvcPartyId()
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
       installKey(provider, party).exerciseSplitwiseInstall_CreateGroup(
-        splitCodegen.Group(
+        splitwiseCodegen.Group(
           owner = party.toPrim,
           provider = provider.toPrim,
           svc = svc.toPrim,
           members = Seq.empty,
-          id = splitCodegen.GroupId(id),
+          id = splitwiseCodegen.GroupId(id),
           collectionDuration = collectionDuration,
           acceptDuration = acceptDuration,
         )
@@ -144,7 +159,7 @@ abstract class SplitwiseAppReference(
       provider: PartyId,
       id: String,
       observers: Seq[PartyId],
-  ): Primitive.ContractId[splitCodegen.GroupInvite] = {
+  ): Primitive.ContractId[splitwiseCodegen.GroupInvite] = {
     val party = getUserPrimaryParty()
     submitWithResult(
       actAs = Seq(party),
@@ -159,8 +174,8 @@ abstract class SplitwiseAppReference(
   @Help.Summary("Add the invitee on the accepted group invite to the group")
   def joinGroup(
       provider: PartyId,
-      acceptedGroupInvite: Primitive.ContractId[splitCodegen.AcceptedGroupInvite],
-  ): Primitive.ContractId[splitCodegen.Group] = {
+      acceptedGroupInvite: Primitive.ContractId[splitwiseCodegen.AcceptedGroupInvite],
+  ): Primitive.ContractId[splitwiseCodegen.Group] = {
     val party = getUserPrimaryParty()
     submitWithResult(
       actAs = Seq(party),
@@ -176,8 +191,8 @@ abstract class SplitwiseAppReference(
   @Help.Summary("Accept the group invite")
   def acceptInvite(
       provider: PartyId,
-      groupInvite: Primitive.ContractId[splitCodegen.GroupInvite],
-  ): Primitive.ContractId[splitCodegen.AcceptedGroupInvite] = {
+      groupInvite: Primitive.ContractId[splitwiseCodegen.GroupInvite],
+  ): Primitive.ContractId[splitwiseCodegen.AcceptedGroupInvite] = {
     val party = getUserPrimaryParty()
     submitWithResult(
       actAs = Seq(party),
@@ -198,7 +213,7 @@ abstract class SplitwiseAppReference(
       key: GrpcSplitwiseAppClient.GroupKey,
       quantity: BigDecimal,
       description: String,
-  ): Primitive.ContractId[splitCodegen.BalanceUpdate] = {
+  ): Primitive.ContractId[splitwiseCodegen.BalanceUpdate] = {
     val party = getUserPrimaryParty()
     submitWithResult(
       actAs = Seq(party),
@@ -237,7 +252,7 @@ abstract class SplitwiseAppReference(
       provider: PartyId,
       key: GrpcSplitwiseAppClient.GroupKey,
       acceptedPayment: Primitive.ContractId[walletCodegen.AcceptedAppPayment],
-  ): Primitive.ContractId[splitCodegen.BalanceUpdate] = {
+  ): Primitive.ContractId[splitwiseCodegen.BalanceUpdate] = {
     val party = getUserPrimaryParty()
     // TODO(M1-06) Explicit disclosure workaround
     val hostedAt = ledgerApi.ledger_api.acs.await(
@@ -267,7 +282,7 @@ abstract class SplitwiseAppReference(
       provider: PartyId,
       key: GrpcSplitwiseAppClient.GroupKey,
       balanceChanges: Map[PartyId, Map[PartyId, BigDecimal]],
-  ): Primitive.ContractId[splitCodegen.BalanceUpdate] = {
+  ): Primitive.ContractId[splitwiseCodegen.BalanceUpdate] = {
     val party = getUserPrimaryParty()
     val balanceChangesPrim
         : Primitive.GenMap[Primitive.Party, Primitive.GenMap[Primitive.Party, BigDecimal]] =
@@ -288,13 +303,13 @@ abstract class SplitwiseAppReference(
   // Read operations
 
   @Help.Summary("List all groups")
-  def listGroups(): Seq[Contract[splitCodegen.Group]] =
+  def listGroups(): Seq[Contract[splitwiseCodegen.Group]] =
     consoleEnvironment.run {
       adminCommand(GrpcSplitwiseAppClient.ListGroups(context))
     }
 
   @Help.Summary("List all group invites that you have not already accepted")
-  def listGroupInvites(): Seq[Contract[splitCodegen.GroupInvite]] =
+  def listGroupInvites(): Seq[Contract[splitwiseCodegen.GroupInvite]] =
     consoleEnvironment.run {
       adminCommand(GrpcSplitwiseAppClient.ListGroupInvites(context))
     }
@@ -302,14 +317,14 @@ abstract class SplitwiseAppReference(
   @Help.Summary("List accepted group invites for the given group that can be used in joinGroup")
   def listAcceptedGroupInvites(
       id: String
-  ): Seq[Contract[splitCodegen.AcceptedGroupInvite]] =
+  ): Seq[Contract[splitwiseCodegen.AcceptedGroupInvite]] =
     consoleEnvironment.run {
       adminCommand(GrpcSplitwiseAppClient.ListAcceptedGroupInvites(id, context))
     }
 
   @Help.Summary("List balance updates for the given group")
   def listBalanceUpdates(key: GrpcSplitwiseAppClient.GroupKey): Seq[
-    Contract[splitCodegen.BalanceUpdate]
+    Contract[splitwiseCodegen.BalanceUpdate]
   ] =
     consoleEnvironment.run {
       adminCommand(GrpcSplitwiseAppClient.ListBalanceUpdates(key, context))
@@ -322,38 +337,6 @@ abstract class SplitwiseAppReference(
     consoleEnvironment.run {
       adminCommand(GrpcSplitwiseAppClient.ListBalances(key, context))
     }
-
-  @Help.Summary("Get the primary party of the provider’s daml user specified in the config.")
-  def getProviderPartyId(): PartyId =
-    consoleEnvironment.run {
-      adminCommand(GrpcSplitwiseAppClient.GetProviderPartyId())
-    }
-}
-
-final class RemoteSplitwiseAppReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
-    name: String,
-) extends SplitwiseAppReference(consoleEnvironment, name)
-    with GrpcRemoteInstanceReference
-    with BaseInspection[ParticipantNode] {
-
-  override protected val instanceType = "Remote Splitwise"
-
-  override protected lazy val ledgerApi =
-    new ExternalLedgerApiClient(
-      config.ledgerApi.address,
-      config.ledgerApi.port,
-      config.ledgerApi.tls,
-    )(consoleEnvironment)
-
-  override protected val userId: String = config.damlUser
-
-  override protected lazy val context =
-    GrpcSplitwiseAppClient.SplitwiseContext(getUserPrimaryParty())
-
-  @Help.Summary("Return remote splitwise app config")
-  def config: RemoteSplitwiseAppConfig =
-    consoleEnvironment.environment.config.remoteSplitwisesByString(name)
 
   override val remoteScanConfig = config.remoteScan
 }
@@ -371,16 +354,21 @@ final class LocalSplitwiseAppReference(
 
   override protected lazy val ledgerApi = remoteParticipant
 
-  override protected val userId: String = config.damlUser
-
-  // TODO(#661) Move commands to remote splitwise reference.
-  override protected def context = throw new RuntimeException(
-    "Commands must be run through remote splitwise ref"
-  )
-
   @Help.Summary("Return local splitwise app config")
   def config: LocalSplitwiseAppConfig =
     consoleEnvironment.environment.config.splitwisesByString(name)
+
+  @Help.Summary("Accept splitwise install proposal")
+  def acceptInstallProposal(
+      proposal: Primitive.ContractId[splitwiseCodegen.SplitwiseInstallProposal]
+  ): Primitive.ContractId[splitwiseCodegen.SplitwiseInstall] = {
+    val provider = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.providerUser)
+    submitWithResult(
+      actAs = Seq(provider),
+      readAs = Seq.empty,
+      proposal.exerciseSplitwiseInstallProposal_Accept(),
+    )
+  }
 
   override val remoteScanConfig = config.remoteScan
 

@@ -45,7 +45,7 @@ const App: React.FC = () => {
 
   const [userId, setUserId] = useState<string | undefined>();
 
-  const Wrapper: React.FC<{ userId: string }> = ({ userId }) => {
+  const LoggedInBody: React.FC<{ userId: string }> = ({ userId }) => {
     const splitwiseClient = useSplitwiseClient();
     const ledgerApiClient = useLedgerApiClient();
 
@@ -82,21 +82,26 @@ const App: React.FC = () => {
     }
   };
 
+  const LoggedIn: React.FC<{ userId: string }> = ({ userId }) => (
+    <LedgerApiClientProvider
+      url={process.env.REACT_APP_LEDGER_API_GRPC_URL || 'http://localhost:8085'}
+      userId={userId}
+    >
+      <LoggedInBody userId={userId} />
+    </LedgerApiClientProvider>
+  );
+
   return (
     <SplitwiseClientProvider url={process.env.REACT_APP_GRPC_URL || 'http://localhost:8082'}>
-      <LedgerApiClientProvider
-        url={process.env.REACT_APP_LEDGER_API_GRPC_URL || 'http://localhost:8085'}
-      >
-        <Box>
-          <CssBaseline />
-          <AppBar position="static" sx={{ marginBottom: 5 }}>
-            <Toolbar>
-              <Typography variant="h6">CN Splitwise</Typography>
-            </Toolbar>
-          </AppBar>
-          {userId ? <Wrapper userId={userId} /> : <Login onLogin={setUserId} />}
-        </Box>
-      </LedgerApiClientProvider>
+      <Box>
+        <CssBaseline />
+        <AppBar position="static" sx={{ marginBottom: 5 }}>
+          <Toolbar>
+            <Typography variant="h6">CN Splitwise</Typography>
+          </Toolbar>
+        </AppBar>
+        {userId ? <LoggedIn userId={userId} /> : <Login onLogin={setUserId} />}
+      </Box>
     </SplitwiseClientProvider>
   );
 };

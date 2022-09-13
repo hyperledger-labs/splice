@@ -58,7 +58,9 @@ object CoinConfigTransforms {
           c.copy(damlUser = s"${c.damlUser}-$suffix")
         )(config4)
         val config6 =
-          updateAllSplitwiseAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config5)
+          updateAllSplitwiseAppConfigs_(c => c.copy(providerUser = s"${c.providerUser}-$suffix"))(
+            config5
+          )
         val config7 =
           updateAllRemoteSplitwiseAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
             config6

@@ -10,7 +10,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
 import com.daml.network.codegen.DA
-import com.daml.network.codegen.CN.{Splitwise => splitCodegen}
+import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
 
@@ -42,9 +42,9 @@ class GrpcSplitwiseService(
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       for {
         providerParty <- getProviderParty
-        userParty = Proto.tryDecode(Proto.Party)(request.getContext.partyId)
+        userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
         // TODO(M1-11): check (or simulate check) of the user's cross-participant access token
-        groups <- connection.activeContracts(providerParty, splitCodegen.Group)
+        groups <- connection.activeContracts(providerParty, splitwiseCodegen.Group)
       } yield {
         val filtered = groups.filter(c => c.hasStakeholder(userParty.toPrim))
         v0.ListGroupsResponse(filtered.map(c => Contract.fromCodegenContract(c).toProtoV0))
@@ -57,8 +57,8 @@ class GrpcSplitwiseService(
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       for {
         providerParty <- getProviderParty
-        userParty = Proto.tryDecode(Proto.Party)(request.getContext.partyId)
-        groupInvites <- connection.activeContracts(providerParty, splitCodegen.GroupInvite)
+        userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
+        groupInvites <- connection.activeContracts(providerParty, splitwiseCodegen.GroupInvite)
       } yield {
         val filtered = groupInvites.filter(c => c.hasStakeholder(userParty.toPrim))
         v0.ListGroupInvitesResponse(
@@ -73,10 +73,10 @@ class GrpcSplitwiseService(
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       for {
         providerParty <- getProviderParty
-        userParty = Proto.tryDecode(Proto.Party)(request.getContext.partyId)
+        userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
         acceptedGroupInvites <- connection.activeContracts(
           providerParty,
-          splitCodegen.AcceptedGroupInvite,
+          splitwiseCodegen.AcceptedGroupInvite,
         )
       } yield {
         val filtered =
@@ -96,12 +96,12 @@ class GrpcSplitwiseService(
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       for {
         providerParty <- getProviderParty
-        userParty = Proto.tryDecode(Proto.Party)(request.getContext.partyId)
-        balanceUpdates <- connection.activeContracts(providerParty, splitCodegen.BalanceUpdate)
+        userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
+        balanceUpdates <- connection.activeContracts(providerParty, splitwiseCodegen.BalanceUpdate)
       } yield {
         val filtered = balanceUpdates.filter(c =>
           c.hasStakeholder(userParty.toPrim) &&
-            splitCodegen.GroupKey(
+            splitwiseCodegen.GroupKey(
               c.value.group.owner,
               c.value.group.provider,
               c.value.group.id,
@@ -119,13 +119,13 @@ class GrpcSplitwiseService(
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       for {
         providerParty <- getProviderParty
-        userParty = Proto.tryDecode(Proto.Party)(request.getContext.partyId)
-        balanceUpdates <- connection.activeContracts(providerParty, splitCodegen.BalanceUpdate)
+        userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
+        balanceUpdates <- connection.activeContracts(providerParty, splitwiseCodegen.BalanceUpdate)
       } yield {
         val filtered = balanceUpdates
           .filter(c =>
             c.hasStakeholder(userParty.toPrim) &&
-              splitCodegen
+              splitwiseCodegen
                 .GroupKey(
                   c.value.group.owner,
                   c.value.group.provider,
@@ -137,10 +137,14 @@ class GrpcSplitwiseService(
           .map(_.value)
         def combine(
             acc: Map[Primitive.Party, BigDecimal],
-            update: splitCodegen.BalanceUpdate,
+            update: splitwiseCodegen.BalanceUpdate,
         ): Map[Primitive.Party, BigDecimal] =
           update.update match {
-            case splitCodegen.BalanceUpdateType.ExternalPayment(payer, description, quantity) => {
+            case splitwiseCodegen.BalanceUpdateType.ExternalPayment(
+                  payer,
+                  description,
+                  quantity,
+                ) => {
               val split: BigDecimal = quantity / (update.group.members.length + 1)
               if (payer == userParty.toPrim) {
                 (update.group.owner +: update.group.members).foldLeft(acc) { case (acc, member) =>
@@ -154,13 +158,13 @@ class GrpcSplitwiseService(
                 acc
               }
             }
-            case splitCodegen.BalanceUpdateType.Transfer(sender, receiver, quantity) =>
+            case splitwiseCodegen.BalanceUpdateType.Transfer(sender, receiver, quantity) =>
               if (sender == userParty.toPrim) {
                 acc.updatedWith(receiver)(prev => Some(prev.getOrElse[BigDecimal](0.0) + quantity))
               } else if (receiver == userParty.toPrim) {
                 acc.updatedWith(sender)(prev => Some(prev.getOrElse[BigDecimal](0.0) - quantity))
               } else acc
-            case splitCodegen.BalanceUpdateType.Netting(balanceUpdates) =>
+            case splitwiseCodegen.BalanceUpdateType.Netting(balanceUpdates) =>
               balanceUpdates
                 .getOrElse(userParty.toPrim, Map.empty[Primitive.Party, BigDecimal])
                 .iterator
@@ -186,28 +190,28 @@ class GrpcSplitwiseService(
   private def installKey(
       provider: PartyId,
       user: PartyId,
-  ): Template.Key[splitCodegen.SplitwiseInstall] =
-    splitCodegen.SplitwiseInstall.key(DA.Types.Tuple2(user.toPrim, provider.toPrim))
+  ): Template.Key[splitwiseCodegen.SplitwiseInstall] =
+    splitwiseCodegen.SplitwiseInstall.key(DA.Types.Tuple2(user.toPrim, provider.toPrim))
 
-  private def groupKey(key: v0.GroupKey): Template.Key[splitCodegen.Group] =
-    splitCodegen.Group.key(groupKey_(key))
-  private def groupKey_(key: v0.GroupKey): splitCodegen.GroupKey =
-    splitCodegen.GroupKey(
+  private def groupKey(key: v0.GroupKey): Template.Key[splitwiseCodegen.Group] =
+    splitwiseCodegen.Group.key(groupKey_(key))
+  private def groupKey_(key: v0.GroupKey): splitwiseCodegen.GroupKey =
+    splitwiseCodegen.GroupKey(
       Proto.tryDecode(Proto.CodegenParty)(key.ownerPartyId),
       Proto.tryDecode(Proto.CodegenParty)(key.providerPartyId),
-      splitCodegen.GroupId(key.id),
+      splitwiseCodegen.GroupId(key.id),
     )
   private def groupKey(
       owner: PartyId,
       provider: PartyId,
       id: String,
-  ): Template.Key[splitCodegen.Group] =
-    splitCodegen.Group.key(groupKey_(owner, provider, id))
-  private def groupKey_(owner: PartyId, provider: PartyId, id: String): splitCodegen.GroupKey =
-    splitCodegen.GroupKey(
+  ): Template.Key[splitwiseCodegen.Group] =
+    splitwiseCodegen.Group.key(groupKey_(owner, provider, id))
+  private def groupKey_(owner: PartyId, provider: PartyId, id: String): splitwiseCodegen.GroupKey =
+    splitwiseCodegen.GroupKey(
       owner.toPrim,
       provider.toPrim,
-      splitCodegen.GroupId(id),
+      splitwiseCodegen.GroupId(id),
     )
 }
 

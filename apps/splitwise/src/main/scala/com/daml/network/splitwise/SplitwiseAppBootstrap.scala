@@ -81,7 +81,7 @@ class SplitwiseAppBootstrap(
           new GrpcSplitwiseService(
             ledgerClient,
             scanConnection,
-            config.damlUser,
+            config.providerUser,
             loggerFactory,
           ),
           executionContext,

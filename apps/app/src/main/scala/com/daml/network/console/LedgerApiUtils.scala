@@ -19,6 +19,7 @@ object LedgerApiUtils {
       workflowId = "",
       commandId.getOrElse(""),
       readAs = readAs,
+      optTimeout = None,
     )
     CoinLedgerConnection.decodeExerciseResult(update.toString, tree)
   }

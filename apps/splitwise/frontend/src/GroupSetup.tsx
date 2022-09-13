@@ -34,7 +34,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({ directoryEntries, party, provid
   const fetchInvites = useCallback(async () => {
     const groupInvites = (
       await splitwiseClient.listGroupInvites(
-        new ListGroupInvitesRequest().setContext(new SplitwiseContext().setPartyId(party)),
+        new ListGroupInvitesRequest().setContext(new SplitwiseContext().setUserPartyId(party)),
         null
       )
     ).getGroupInvitesList();

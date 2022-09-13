@@ -30,6 +30,7 @@ class LedgerApiClient {
   activeContractsServiceClient: ActiveContractsServiceClient;
   commandServiceClient: CommandServiceClient;
   userManagementServiceClient: UserManagementServiceClient;
+  userId: string;
 
   collectionDuration: string = (5 * 60 * 1000000).toString();
   acceptDuration: string = (5 * 60 * 1000000).toString();
@@ -37,11 +38,13 @@ class LedgerApiClient {
   constructor(
     activeContractsServiceClient: ActiveContractsServiceClient,
     commandServiceClient: CommandServiceClient,
-    userManagementServiceClient: UserManagementServiceClient
+    userManagementServiceClient: UserManagementServiceClient,
+    userId: string
   ) {
     this.activeContractsServiceClient = activeContractsServiceClient;
     this.commandServiceClient = commandServiceClient;
     this.userManagementServiceClient = userManagementServiceClient;
+    this.userId = userId;
   }
 
   async exerciseByKey<T extends object, C, R, K>(
@@ -69,8 +72,7 @@ class LedgerApiClient {
       .setCommandsList([cmd])
       .setActAsList(actAs)
       .setReadAsList(readAs)
-      // TODO(#661) pass along user id and use that here.
-      .setApplicationId('splitwise-web-ui')
+      .setApplicationId(this.userId)
       .setCommandId(uuidv4());
     const request = new SubmitAndWaitRequest().setCommands(cmds);
     const response = await this.commandServiceClient.submitAndWaitForTransactionTree(request, null);
@@ -265,16 +267,23 @@ const LedgerApiClientContext = React.createContext<LedgerApiClient | undefined>(
 
 interface LedgerApiClientProps {
   url: string;
+  userId: string;
 }
 
 export const LedgerApiClientProvider: React.FC<React.PropsWithChildren<LedgerApiClientProps>> = ({
   children,
   url,
+  userId,
 }) => {
   const acsClient = new ActiveContractsServiceClient(url);
   const commandClient = new CommandServiceClient(url);
   const userManagementClient = new UserManagementServiceClient(url);
-  const splitwiseClient = new LedgerApiClient(acsClient, commandClient, userManagementClient);
+  const splitwiseClient = new LedgerApiClient(
+    acsClient,
+    commandClient,
+    userManagementClient,
+    userId
+  );
   return (
     <LedgerApiClientContext.Provider value={splitwiseClient}>
       {children}

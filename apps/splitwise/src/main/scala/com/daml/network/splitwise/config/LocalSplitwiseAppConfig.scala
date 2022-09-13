@@ -8,8 +8,7 @@ import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 case class LocalSplitwiseAppConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
-    // TODO(#661) Rename this to provider user once we finished this.
-    damlUser: String,
+    providerUser: String,
     remoteParticipant: RemoteParticipantConfig,
     remoteScan: RemoteScanAppConfig,
 ) extends LocalCoinConfig // TODO(i736): fork or generalize this trait.

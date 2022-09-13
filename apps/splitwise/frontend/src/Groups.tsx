@@ -71,7 +71,7 @@ const Balances: React.FC<BalancesProps> = ({ directoryEntries, group, party }) =
       await splitwiseClient.listBalances(
         new ListBalancesRequest()
           .setGroupKey(key(group))
-          .setContext(new SplitwiseContext().setPartyId(party)),
+          .setContext(new SplitwiseContext().setUserPartyId(party)),
         null
       )
     ).getBalancesMap();
@@ -133,7 +133,7 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({
       await splitwiseClient.listAcceptedGroupInvites(
         new ListAcceptedGroupInvitesRequest()
           .setGroupId(group.payload.id.unpack)
-          .setContext(new SplitwiseContext().setPartyId(party)),
+          .setContext(new SplitwiseContext().setUserPartyId(party)),
         null
       )
     ).getAcceptedGroupInvitesList();
@@ -250,7 +250,7 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ directoryEntries, group
       await splitwiseClient.listBalanceUpdates(
         new ListBalanceUpdatesRequest()
           .setGroupKey(key(group))
-          .setContext(new SplitwiseContext().setPartyId(party)),
+          .setContext(new SplitwiseContext().setUserPartyId(party)),
         null
       )
     ).getBalanceUpdatesList();
@@ -429,7 +429,7 @@ const Groups: React.FC<GroupsProps> = ({ directoryEntries, party, provider }) =>
   const fetchGroups = useCallback(async () => {
     const newGroups = (
       await splitwiseClient.listGroups(
-        new ListGroupsRequest().setContext(new SplitwiseContext().setPartyId(party)),
+        new ListGroupsRequest().setContext(new SplitwiseContext().setUserPartyId(party)),
         null
       )
     ).getGroupsList();

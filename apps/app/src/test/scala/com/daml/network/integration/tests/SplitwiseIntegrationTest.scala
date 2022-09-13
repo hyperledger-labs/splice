@@ -10,7 +10,7 @@ import com.daml.network.splitwise.admin.api.client.commands.GrpcSplitwiseAppClie
 import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
-import com.daml.network.codegen.CN.{Splitwise => splitCodegen}
+import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
 import com.daml.network.console.RemoteSplitwiseAppReference
 import org.scalatest.concurrent.Eventually
 
@@ -61,12 +61,12 @@ class SplitwiseIntegrationTest
     )
 
     bobValidator.remoteParticipant.ledger_api.acs
-      .await(bobUserParty, splitCodegen.GroupInvite)
+      .await(bobUserParty, splitwiseCodegen.GroupInvite)
     inside(bobSplitwise.listGroupInvites()) { case Seq(invite) =>
       bobSplitwise.acceptInvite(bobProviderParty, invite.contractId)
     }
     aliceValidator.remoteParticipant.ledger_api.acs
-      .await(aliceUserParty, splitCodegen.AcceptedGroupInvite)
+      .await(aliceUserParty, splitwiseCodegen.AcceptedGroupInvite)
     inside(aliceSplitwise.listAcceptedGroupInvites("group1")) { case Seq(accepted) =>
       aliceSplitwise.joinGroup(aliceProviderParty, accepted.contractId)
     }
@@ -108,13 +108,13 @@ class SplitwiseIntegrationTest
       charlieSplitwise.acceptInvite(charlieProviderParty, invite.contractId)
     }
     aliceValidator.remoteParticipant.ledger_api.acs
-      .await(aliceUserParty, splitCodegen.AcceptedGroupInvite)
+      .await(aliceUserParty, splitwiseCodegen.AcceptedGroupInvite)
     inside(aliceSplitwise.listAcceptedGroupInvites("group1")) { case Seq(accepted) =>
       aliceSplitwise.joinGroup(aliceProviderParty, accepted.contractId)
     }
 
     splitwiseValidator.remoteParticipant.ledger_api.acs
-      .await(charlieProviderParty, splitCodegen.Group)
+      .await(charlieProviderParty, splitwiseCodegen.Group)
 
     charlieSplitwise.listBalances(key) shouldBe Map.empty
     charlieSplitwise.enterPayment(charlieProviderParty, key, 33.0, "payment")
@@ -162,16 +162,16 @@ class SplitwiseIntegrationTest
       // Setup install contracts for self-hosted usage
       val aliceProviderParty = aliceUserParty
       val aliceInstallProposal = aliceSplitwise.createInstallProposal(aliceUserParty)
-      aliceSplitwise.acceptInstallProposal(aliceInstallProposal)
+      aliceSplitwiseBackend.acceptInstallProposal(aliceInstallProposal)
       val bobProviderParty = bobUserParty
       val bobInstallProposal = bobSplitwise.createInstallProposal(bobUserParty)
-      bobSplitwise.acceptInstallProposal(bobInstallProposal)
+      bobSplitwiseBackend.acceptInstallProposal(bobInstallProposal)
 
       // We reuse the provider as charlie here to avoid setting up another splitwise instance.
       val charlieUserParty = splitwiseValidator.initialize()
       val charlieProviderParty = charlieUserParty
       val charlieInstallProposal = providerSplitwise.createInstallProposal(charlieUserParty)
-      providerSplitwise.acceptInstallProposal(charlieInstallProposal)
+      providerSplitwiseBackend.acceptInstallProposal(charlieInstallProposal)
 
       test(
         aliceSplitwiseSelfHosted,
@@ -202,16 +202,16 @@ class SplitwiseIntegrationTest
       val providerParty = splitwiseValidator.initialize()
       val aliceInstallProposal = aliceSplitwise.createInstallProposal(providerParty)
       providerSplitwiseBackend.remoteParticipant.ledger_api.acs
-        .await(providerParty, splitCodegen.SplitwiseInstallProposal)
-      providerSplitwise.acceptInstallProposal(aliceInstallProposal)
+        .await(providerParty, splitwiseCodegen.SplitwiseInstallProposal)
+      providerSplitwiseBackend.acceptInstallProposal(aliceInstallProposal)
       val bobInstallProposal = bobSplitwise.createInstallProposal(providerParty)
       providerSplitwiseBackend.remoteParticipant.ledger_api.acs
-        .await(providerParty, splitCodegen.SplitwiseInstallProposal)
-      providerSplitwise.acceptInstallProposal(bobInstallProposal)
+        .await(providerParty, splitwiseCodegen.SplitwiseInstallProposal)
+      providerSplitwiseBackend.acceptInstallProposal(bobInstallProposal)
       // We reuse the provider as charlie to avoid setting up another splitwise instance.
       val charlieUserParty = providerParty
       val charlieInstallProposal = providerSplitwise.createInstallProposal(charlieUserParty)
-      providerSplitwise.acceptInstallProposal(charlieInstallProposal)
+      providerSplitwiseBackend.acceptInstallProposal(charlieInstallProposal)
 
       test(
         aliceSplitwise,

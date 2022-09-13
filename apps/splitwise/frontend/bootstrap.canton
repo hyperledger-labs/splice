@@ -44,5 +44,5 @@ val providerParty = splitwiseValidator.initialize()
 Seq(aliceSplitwise, bobSplitwise).foreach { splitwise =>
   val proposal = splitwise.createInstallProposal(providerParty)
   providerSplitwiseBackend.remoteParticipant.ledger_api.acs.await_active_contract(providerParty, ContractId.assertFromString(proposal.toString))
-  providerSplitwise.acceptInstallProposal(proposal)
+  providerSplitwiseBackend.acceptInstallProposal(proposal)
 }

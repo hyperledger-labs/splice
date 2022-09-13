@@ -19,7 +19,7 @@ service SplitwiseService {
 // Used to distinguish requests from UIs run by different end-users.
 message SplitwiseContext {
   // The party of the user of the client sending a request to the backend.
-  string party_id = 1;
+  string user_party_id = 1;
 }
 
 message InitializeRequest {
