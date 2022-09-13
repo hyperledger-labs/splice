@@ -9,6 +9,7 @@ in (import src) ({
   overlays = [(self: super: {
     sbt = super.sbt.override { jre = super.openjdk11; };
     lnav = super.callPackage ./lnav.nix {};
+    canton = super.callPackage ./canton.nix {};
     haskellPackages = super.haskellPackages.override {
       overrides = hsSelf: hsSuper: {
         data-diverse = super.haskell.lib.unmarkBroken (super.haskell.lib.dontCheck hsSuper.data-diverse);

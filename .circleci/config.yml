@@ -613,9 +613,6 @@ jobs:
       VPN_HOST_IP: 34.132.91.75
     steps:
       - setup_sbt_test_job
-      - run:
-          name: download canton
-          command: ./download-canton.sh
       - execute_sbt_command:
           cmd: "Test/compile"
           retry_fetch: "50"

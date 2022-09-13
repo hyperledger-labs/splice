@@ -13,6 +13,7 @@ in pkgs.mkShell {
     ammonite
     buf
     cabal2nix
+    canton
     curl
     docker
     git

@@ -650,9 +650,12 @@ Current Canton commit: `606a286a97e3bc47d19f3045048dd71b12a9800a`
 12. Learn Canton's SDK version from `head -n15 $PATH_TO_CANTON_OSS/project/project/DamlVersions.scala`
 13. Bump the SDK/Canton versions in the following places:
     1. The current Canton commit in this `README.md`
-    1. `releaseVersionToProtocolVersion` in `ReleaseVersionToProtocolVersions.scala`
-    2. `version` in `CantonDependencies`
-    3. `SDK_VERSION` and `CANTON_VERSION` in `download-canton.sh`
+    2. `releaseVersionToProtocolVersion` in `ReleaseVersionToProtocolVersions.scala`
+    3. `version` in `CantonDependencies`
+    4. In `nix/canton.nix`:
+       1. Bump `version` to the desired canton version
+       2. Bump `sdk_version` to the associated sdk snapshot version
+       3. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.
 14. Bump the sdk version in our own daml.yaml files via `./set-sdk.sh $sdkversion` to the same version.
 15. Create another commit, `git add -A && git commit -m"Bump Canton commit and Canton/SDK versions"`
 16. Make a PR with your changes, so CI starts churning.

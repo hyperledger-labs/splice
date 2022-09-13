@@ -21,11 +21,8 @@ POSTGRES_MODE=${1:-docker}
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwise"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_da"
 
-# Download Canton
-./download-canton.sh
-
 # Start Canton
-./canton-release/bin/canton \
+canton \
     daemon --auto-connect-local --log-level-canton=DEBUG \
     --no-tty -c ./apps/app/src/test/resources/simple-topology-canton.conf -C canton.parameters.ports-file=canton.ports &
 PID=$!
