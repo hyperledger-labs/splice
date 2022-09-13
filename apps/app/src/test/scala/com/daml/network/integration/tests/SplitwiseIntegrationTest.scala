@@ -12,11 +12,13 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import com.daml.network.codegen.CN.{Splitwise => splitCodegen}
 import com.daml.network.console.RemoteSplitwiseAppReference
+import org.scalatest.concurrent.Eventually
 
 class SplitwiseIntegrationTest
     extends CoinIntegrationTest
     with IsolatedCoinEnvironments
-    with CommonCoinAppInstanceReferences {
+    with CommonCoinAppInstanceReferences
+    with Eventually {
 
   private val darPath = "apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar"
   // We reuse the provider’s splitwise as charlie’s splitwise
@@ -130,9 +132,17 @@ class SplitwiseIntegrationTest
         charlieUserParty -> Map(aliceUserParty -> -11, bobUserParty -> 11),
       ),
     )
-    aliceSplitwise.listBalances(key) shouldBe Map(bobUserParty -> 0, charlieUserParty -> 0)
-    bobSplitwise.listBalances(key) shouldBe Map(aliceUserParty -> 0, charlieUserParty -> -22)
-    charlieSplitwise.listBalances(key) shouldBe Map(aliceUserParty -> 0, bobUserParty -> 22)
+    // The participants we need to synchronize with are different in self-hosted & provider-hosted mode so
+    // we just eventually everything instead of trying to be clever.
+    eventually {
+      aliceSplitwise.listBalances(key) shouldBe Map(bobUserParty -> 0, charlieUserParty -> 0)
+    }
+    eventually {
+      bobSplitwise.listBalances(key) shouldBe Map(aliceUserParty -> 0, charlieUserParty -> -22)
+    }
+    eventually {
+      charlieSplitwise.listBalances(key) shouldBe Map(aliceUserParty -> 0, bobUserParty -> 22)
+    }
   }
 
   "splitwise" should {
