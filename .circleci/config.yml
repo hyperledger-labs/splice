@@ -580,8 +580,8 @@ jobs:
            cncluster activate
            cncluster ciapply
       - slack/notify:
-          event: pass
-          template: success_tagged_deploy_1
+          event: fail
+          template: basic_fail_1
 
   deploy_devnet_cluster:
     circleci_ip_ranges: true
@@ -804,16 +804,6 @@ workflows:
         requires:
            - deployment_test
            - docker-images-push
-    - preflight_check:
-        <<: *notify-fail
-        <<: *main-branch-only
-        context:
-          - canton-network-vpn
-          - slack-context
-        requires:
-          - deployment_test
-          - docker-images-push
-          - deploy_staging_cluster
 
   deploy_devnet:
     when: << pipeline.parameters.run-schedule >>
