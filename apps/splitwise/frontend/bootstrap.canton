@@ -4,11 +4,11 @@ Seq(aliceSplitwiseBackend.remoteParticipant, bobSplitwiseBackend.remoteParticipa
 }
 
 val aliceValidatorParty = aliceValidator.initialize()
-val aliceUserParty = aliceValidator.onboardUser("alice_wallet_user")
 aliceWallet.initialize(aliceValidatorParty)
+val aliceUserParty = aliceValidator.onboardUser("alice_wallet_user")
 val bobValidatorParty = bobValidator.initialize()
-val bobUserParty = bobValidator.onboardUser("bob_wallet_user")
 bobWallet.initialize(bobValidatorParty)
+val bobUserParty = bobValidator.onboardUser("bob_wallet_user")
 directoryValidator.initialize()
 
 val aliceRequestCid = aliceDirectory.requestDirectoryInstall()
