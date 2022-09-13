@@ -192,6 +192,9 @@ case class CoinArchive(coin: CoinOrLockedCoinContract) extends EventTypeAndCoin 
   def toProtoV0: v0.CCEvent.Coin = v0.CCEvent.Coin.Archive(coin.toProtoV0)
 }
 
+/** Representation of a Coin event. A CoinEvent is the create or archive of a Coin or LockedCoin and additionally
+  * saves the respective parent node from the TransactionTree.
+  */
 case class CoinEvent(
     coin: EventTypeAndCoin,
     parentO: Option[ParentNode],

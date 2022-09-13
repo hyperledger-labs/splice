@@ -75,7 +75,6 @@ class ReadCoinTransactionsService(
       def addToEvents(event: EventTypeAndCoin, parentO: Option[TreeEvent.Kind]) = {
         parentO match {
           case None =>
-            // thoughts: debug when not seeing LockedCoin archival parent, else still warning
             event match {
               case CoinArchive(contract: LockedCoinContract) =>
                 logger.debug(
@@ -164,6 +163,10 @@ class ReadCoinTransactionsService(
     event.choice == "Coin_Unlock" && isLockedCoin(event)
   private def isTransfer(event: ExercisedEvent) =
     event.choice == "CoinRules_Transfer" && isCoinRules(event)
+  private def isSvcExpireLock(event: ExercisedEvent) =
+    event.choice == "Coin_SvcExpireLock" && isLockedCoin(event)
+  private def isOwnerExpireLock(event: ExercisedEvent) =
+    event.choice == "Coin_OwnerExpireLock" && isLockedCoin(event)
   private def isStartIssuing(event: ExercisedEvent) =
     event.choice == "CoinRules_MiningRound_StartIssuing" && isCoinRules(event)
 
@@ -200,6 +203,10 @@ class ReadCoinTransactionsService(
         StartIssuing(tryDecodeEvent(StartIssuing)(exercised)).some
       case exercised: Exercised if isCoinUnlock(exercised.value) =>
         CoinUnlock(tryDecodeEvent(CoinUnlock)(exercised)).some
+      case exercised: Exercised if isSvcExpireLock(exercised.value) =>
+        SvcExpireLock(tryDecodeEvent(SvcExpireLock)(exercised)).some
+      case exercised: Exercised if isOwnerExpireLock(exercised.value) =>
+        OwnerExpireLock(tryDecodeEvent(OwnerExpireLock)(exercised)).some
       case other: Exercised =>
         logger.warn(
           s"Parent of coin create or archival was not a tap, transfer or start issuing but ${other.getClass} ($other)"

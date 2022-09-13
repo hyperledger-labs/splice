@@ -49,15 +49,15 @@ class ScanIntegrationTest
       // Coins in order: archive 50, bob-10, alice 40-ish,
       inside(transferEvents) {
         case Seq(
-              // alice's new coin after deducting the quantity send to bob
+              // alice's input coin
               CoinEvent(aliceOld, transferParentNode),
               // bob's new coin
               CoinEvent(bob, transferParentNode2),
-              // alice's input coin
+              // alice's change after deducting the quantity send to bob
               CoinEvent(aliceNew, transferParentNode3),
             ) =>
           // all three coin-events created by the transfer should have the transfer node as parent
-          transferParentNode should matchPattern { case Some(transfer) => }
+          transferParentNode should matchPattern { case Some(transfer: Transfer) => }
           transferParentNode shouldBe transferParentNode2
           transferParentNode2 shouldBe transferParentNode3
 

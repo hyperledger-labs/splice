@@ -7,6 +7,9 @@ import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.google.protobuf.timestamp.Timestamp
 
+/** Representation of a Coin transaction. A Coin transaction consists of at least one CoinEvent and meta-data
+  * about the corresponding Daml transaction.
+  */
 case class CoinTransaction(events: Seq[CoinEvent], txMetadata: TransactionMetadata) {
   def toProtoV0: v0.CCTransaction =
     v0.CCTransaction(events.map(_.toProtoV0), metadata = Some(txMetadata.toProtoV0))
