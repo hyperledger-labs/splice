@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 
+set -eou pipefail
+
 # Postgres settings
 DOCKER_POSTGRES_CONTAINER_NAME="postgres-for-canton-coin"
 LOCAL_POSTGRES_DATA_DIRECTORY="$REPO_ROOT/temp/postgres"
