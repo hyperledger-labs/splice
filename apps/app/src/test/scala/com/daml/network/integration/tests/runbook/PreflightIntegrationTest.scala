@@ -11,6 +11,7 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.integration.{CoinConfigTransforms, CoinEnvironmentDefinition}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
+import monocle.macros.syntax.lens._
 
 /** Integration test for the runbook. Uses the exact same configuration files and bootstrap scripts as the runbook.
   * This test also doubles as the pre-flight validator test.
@@ -32,6 +33,9 @@ class PreflightIntegrationTest
       )
       .clearConfigTransforms()
       .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy1000(conf))
+      // Disable autostart, because our apps require the participant to be connected to a domain
+      // when the app starts. The apps are started manually in `validator-participant.canton` below.
+      .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
 
   // when running locally, this test may fail if the CC DAR deployed to DevNet differs from the latest one on your branch
   "run through runbook against devnet SVC" taggedAs LiveDevNetTest in { implicit env =>
