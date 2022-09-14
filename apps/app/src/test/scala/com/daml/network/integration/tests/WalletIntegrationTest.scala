@@ -286,6 +286,7 @@ class WalletIntegrationTest
       bobRemoteWallet.acceptPaymentChannelProposal(
         bobRemoteWallet.listPaymentChannelProposals().head.contractId
       )
+      utils.retry_until_true(aliceRemoteWallet.listPaymentChannels().size == 1)
       loggerFactory.assertThrowsAndLogs[CommandFailure](
         aliceRemoteWallet
           .executeDirectTransfer(bobUserParty, 10, aliceRemoteWallet.list().head.contractId),
