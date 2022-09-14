@@ -77,6 +77,18 @@ class ScanIntegrationTest
     }
   }
 
+  "report correct reference data" in { implicit env =>
+    setup(env)
+    eventually(1.seconds) { scan.getReferenceData().currentRound shouldBe 0 }
+
+    svc.startClosingRound(0)
+    svc.startIssuingRound(0)
+    svc.closeRound(0)
+    svc.openRound(1.0)
+
+    eventually(1.seconds) { scan.getReferenceData().currentRound shouldBe 1 }
+  }
+
   def setup(implicit env: CoinTestConsoleEnvironment): (PartyId, PartyId) = {
     import env._
     // Onboard alice on her self-hosted validator

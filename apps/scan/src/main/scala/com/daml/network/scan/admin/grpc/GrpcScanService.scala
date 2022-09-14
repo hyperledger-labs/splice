@@ -34,6 +34,15 @@ class GrpcScanService(
       } yield v0.GetSvcPartyIdResponse(party.toProtoPrimitive)
     }
 
+  override def getReferenceData(request: Empty): Future[v0.GetReferenceDataResponse] =
+    withSpanFromGrpcContext("GrpcScanService") { traceContext => span =>
+      for {
+        round <- store.getCurrentRound
+      } yield v0.GetReferenceDataResponse(
+        currentRound = round
+      )
+    }
+
   override def getHistory(request: Empty): Future[GetHistoryResponse] =
     withSpanFromGrpcContext("GrpcScanService") { traceContext => span =>
       for {

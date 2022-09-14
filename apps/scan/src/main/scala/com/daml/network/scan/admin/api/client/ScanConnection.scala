@@ -41,4 +41,8 @@ final class ScanConnection(
         }
     }
   }
+
+  def getCurrentRound()(implicit traceContext: TraceContext): Future[Long] = {
+    runCmd(GrpcScanAppClient.GetReferenceData()).map(_.currentRound)
+  }
 }

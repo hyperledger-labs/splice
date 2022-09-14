@@ -537,7 +537,6 @@ object CoinLedgerConnection {
       }
 
       override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List[AsyncOrSyncCloseable](
-        SyncCloseable("ledgerClient", client.close())
       )
 
       override def subscription[T](

@@ -34,6 +34,14 @@ abstract class ScanAppReference(
     consoleEnvironment.run {
       adminCommand(GrpcScanAppClient.GetHistory())
     }
+
+  @Help.Summary(
+    "Returns reference data (e.g., mining rounds or coin rules) of the Canton network."
+  )
+  def getReferenceData(): GrpcScanAppClient.ReferenceData =
+    consoleEnvironment.run {
+      adminCommand(GrpcScanAppClient.GetReferenceData())
+    }
 }
 
 final class LocalScanAppReference(

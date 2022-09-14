@@ -33,10 +33,15 @@ class ScanAutomationService(
       new ReadCoinTransactionsService(svcParty, connection, store, loggerFactory)
     }
 
+  val readReferenceData =
+    createService("Scan:ReadReferenceData", ledgerClient, Seq(svcParty)) { connection =>
+      new ReadReferenceDataService(svcParty, connection, store, loggerFactory)
+    }
+
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq[AsyncOrSyncCloseable](
     SyncCloseable(
-      "SVC automation services",
-      Lifecycle.close(readCoinTransactions)(logger),
+      "Scan automation services",
+      Lifecycle.close(readCoinTransactions, readReferenceData)(logger),
     )
   )
 }

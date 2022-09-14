@@ -19,13 +19,14 @@ import io.grpc.StatusRuntimeException
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
 import org.slf4j.event.Level
 import com.daml.ledger.client.services.transactions.TransactionClient
+import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** The physical connection to the ledger API.
   * Contains properties shared among all logical connections (workflows).
   */
-trait CoinLedgerClient {
+trait CoinLedgerClient extends FlagCloseableAsync {
   def applicationId: ApplicationId
   def timeouts: ProcessingTimeout
   def token: Option[String]
@@ -141,5 +142,8 @@ object CoinLedgerClient {
       override def actorSystem: ActorSystem = as
       override def executionContextExecutor: ExecutionContextExecutor = ec
 
+      override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List(
+        SyncCloseable("client", client.close())
+      )
     }
 }

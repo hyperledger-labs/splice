@@ -46,4 +46,28 @@ object GrpcScanAppClient {
       response.transactions.traverse(CoinTransaction.fromProtoV0).leftMap(_.toString)
 
   }
+
+  case class ReferenceData(
+      currentRound: Long
+  )
+
+  final case class GetReferenceData()
+      extends BaseCommand[Empty, v0.GetReferenceDataResponse, ReferenceData] {
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
+    override def submitRequest(
+        service: ScanServiceStub,
+        req: Empty,
+    ): Future[v0.GetReferenceDataResponse] =
+      service.getReferenceData(req)
+    override def handleResponse(
+        response: v0.GetReferenceDataResponse
+    ): Either[String, ReferenceData] =
+      Right(
+        ReferenceData(
+          currentRound = response.currentRound
+        )
+      )
+
+  }
 }

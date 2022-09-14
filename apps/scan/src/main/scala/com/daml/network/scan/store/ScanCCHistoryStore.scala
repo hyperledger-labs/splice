@@ -11,6 +11,9 @@ trait ScanCCHistoryStore extends AutoCloseable {
   // TODO(i300): eventually this probably needs a start & end offset - related to #300
   def getCCHistory: Future[Seq[CoinTransaction]]
   def addTransaction(transaction: CoinTransaction): Future[Unit]
+
+  def getCurrentRound: Future[Long]
+  def setCurrentRound(round: Long): Future[Unit]
 }
 
 object ScanCCHistoryStore {
