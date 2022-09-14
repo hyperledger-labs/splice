@@ -4,7 +4,7 @@ import cats.implicits._
 import com.daml.ledger.client.binding.{Primitive, Template, ValueDecoder}
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.{Contract, Proto, Value}
+import com.daml.network.util.{CoinUtil, Contract, Proto, Value}
 import com.daml.network.wallet.util.WalletUtil
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.{InitializeRequest, WalletServiceGrpc}
@@ -93,6 +93,40 @@ class GrpcWalletService(
           filteredRequests.map(r =>
             Contract.fromCodegenContract[walletCodegen.AppPaymentRequest](r).toProtoV0
           )
+        )
+      }
+    }
+
+  override def getBalance(
+      request: v0.GetBalanceRequest
+  ): Future[v0.GetBalanceResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
+        // TODO(i779) switch to wallet store query instead of ACS query
+        coinsLAPI <- connection.activeContracts(walletParty, coinCodegen.Coin)
+        lockedCoinsLAPI <- connection.activeContracts(walletParty, coinCodegen.LockedCoin)
+        currentRound <- scanConnection.getCurrentRound()
+      } yield {
+        val unlockedHoldingFees =
+          coinsLAPI.foldl(BigDecimal(0))((qty, coin) =>
+            qty + CoinUtil.holdingFee(coin.value, currentRound)
+          )
+
+        val unlockedQty =
+          coinsLAPI.foldl(BigDecimal(0))((qty, coin) =>
+            qty + CoinUtil.currentQuantity(coin.value, currentRound)
+          )
+
+        val lockedQty = lockedCoinsLAPI.foldl(BigDecimal(0))((qty, coin) =>
+          qty + CoinUtil.currentQuantity(coin.value.coin, currentRound)
+        )
+
+        v0.GetBalanceResponse(
+          currentRound,
+          Proto.encode(unlockedQty),
+          Proto.encode(lockedQty),
+          Proto.encode(unlockedHoldingFees),
         )
       }
     }

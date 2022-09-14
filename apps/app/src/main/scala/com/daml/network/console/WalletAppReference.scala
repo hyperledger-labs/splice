@@ -56,6 +56,16 @@ abstract class WalletAppReference(
     }
   }
 
+  @Help.Summary("Retrieve an overall balance of coin holdings")
+  @Help.Description(
+    "Display a count across all coin holdings, consisting of: total unlocked coin balance, total locked coin balance, total holding fees accumulated. Balances are calculated after holding fees are applied."
+  )
+  def balance(): GrpcWalletAppClient.Balance = {
+    consoleEnvironment.run {
+      adminCommand(GrpcWalletAppClient.GetBalance(getWalletCtx()))
+    }
+  }
+
   @Help.Summary("List all payment requests of the configured user")
   @Help.Description(
     "Queries the configured remote participant for the PaymentRequests of the configured user. " +

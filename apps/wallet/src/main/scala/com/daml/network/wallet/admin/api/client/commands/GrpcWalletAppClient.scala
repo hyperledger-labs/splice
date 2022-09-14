@@ -10,7 +10,7 @@ import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
 import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
-import com.daml.network.wallet.v0.WalletContext
+import com.daml.network.wallet.v0.{GetBalanceRequest, GetBalanceResponse, WalletContext}
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
 
@@ -83,6 +83,39 @@ object GrpcWalletAppClient {
         response: v0.TapResponse
     ): Either[String, Primitive.ContractId[coinCodegen.Coin]] =
       Proto.decodeContractId[coinCodegen.Coin](response.contractId)
+  }
+
+  case class Balance(
+      round: Long,
+      unlockedQty: BigDecimal,
+      lockedQty: BigDecimal,
+      holdingFees: BigDecimal,
+  )
+
+  case class GetBalance(walletCtx: WalletContext)
+      extends BaseCommand[v0.GetBalanceRequest, v0.GetBalanceResponse, Balance] {
+
+    override def createRequest(): Either[String, v0.GetBalanceRequest] = {
+      Right(
+        v0.GetBalanceRequest(walletCtx = Some(walletCtx))
+      )
+    }
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: GetBalanceRequest,
+    ): Future[GetBalanceResponse] = service.getBalance(request)
+
+    override def handleResponse(
+        response: v0.GetBalanceResponse
+    ): Either[String, Balance] = Right(
+      Balance(
+        response.round,
+        Proto.tryDecode(Proto.BigDecimal)(response.effectiveUnlockedQty),
+        Proto.tryDecode(Proto.BigDecimal)(response.effectiveLockedQty),
+        Proto.tryDecode(Proto.BigDecimal)(response.totalHoldingFees),
+      )
+    )
   }
 
   case class ListAppPaymentRequests(walletCtx: WalletContext)

@@ -252,4 +252,18 @@ object CoinUtil extends UploadablePackage {
       )
     }
   }
+
+  def holdingFee(
+      coin: Coin,
+      currentRound: Long,
+  ): BigDecimal = {
+    (currentRound - coin.quantity.createdAt.number) * coin.quantity.ratePerRound.rate
+  }
+
+  def currentQuantity(
+      coin: Coin,
+      currentRound: Long,
+  ): BigDecimal = {
+    coin.quantity.initialQuantity - holdingFee(coin, currentRound)
+  }
 }

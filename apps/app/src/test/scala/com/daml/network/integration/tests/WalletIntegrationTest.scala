@@ -20,6 +20,7 @@ import com.daml.network.codegen.CN.Scripts.{TestWallet => testWalletCodegen}
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
+import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.Balance
 
 import java.time.temporal.ChronoUnit
 import scala.util.Try
@@ -39,26 +40,50 @@ class WalletIntegrationTest
       })
 
   "A wallet" should {
-    "allow calling tap and then list the created coins - locally and remotely" in { implicit env =>
-      val aliceValidatorParty = aliceValidator.initialize()
-      val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      aliceWallet.initialize(aliceValidatorParty)
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+    "allow calling tap, list the created coins, and get the balance - locally and remotely" in {
+      implicit env =>
+        val aliceValidatorParty = aliceValidator.initialize()
+        val aliceDamlUser = aliceRemoteWallet.config.damlUser
+        aliceWallet.initialize(aliceValidatorParty)
+        val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
-      // ensure wallet's participant sees the CoinRules
-      aliceWallet.remoteParticipant.ledger_api.acs.await(aliceValidatorParty, CoinRules)
-      aliceRemoteWallet.list() shouldBe Seq()
+        // ensure wallet's participant sees the CoinRules
+        aliceWallet.remoteParticipant.ledger_api.acs.await(aliceValidatorParty, CoinRules)
+        aliceRemoteWallet.list() shouldBe Seq()
 
-      val exactly = (x: BigDecimal) => (x, x)
-      val ranges1 = Seq(exactly(50))
-      aliceRemoteWallet.tap(50)
-      checkWallet(aliceUserParty, aliceRemoteWallet, ranges1)
-      checkWallet(aliceUserParty, aliceRemoteWallet, ranges1)
+        val exactly = (x: BigDecimal) => (x, x)
+        val ranges1 = Seq(exactly(50))
+        aliceRemoteWallet.tap(50)
+        checkWallet(aliceUserParty, aliceRemoteWallet, ranges1)
+        checkWallet(aliceUserParty, aliceRemoteWallet, ranges1)
 
-      val ranges2 = Seq(exactly(50), exactly(60))
-      aliceRemoteWallet.tap(60)
-      checkWallet(aliceUserParty, aliceRemoteWallet, ranges2)
-      checkWallet(aliceUserParty, aliceRemoteWallet, ranges2)
+        val ranges2 = Seq(exactly(50), exactly(60))
+        aliceRemoteWallet.tap(60)
+        checkWallet(aliceUserParty, aliceRemoteWallet, ranges2)
+        checkWallet(aliceUserParty, aliceRemoteWallet, ranges2)
+
+        checkBalance(aliceRemoteWallet.balance(), 0, exactly(110), exactly(0), exactly(0))
+
+        nextRound()
+        lockCoins(aliceUserParty, 10) // Lock away 10 coins in a payment request to the same party
+
+        checkBalance(
+          aliceRemoteWallet.balance(),
+          1,
+          (99, 100),
+          exactly(10),
+          (0.000004, 0.000005),
+        )
+
+        nextRound()
+
+        checkBalance(
+          aliceRemoteWallet.balance(),
+          2,
+          (99, 100),
+          (9, 10),
+          (0.00001, 0.00002),
+        )
     }
 
     "allow a user to create, list, and reject app payment requests" in { implicit env =>
@@ -522,5 +547,75 @@ class WalletIntegrationTest
           )
         }
     })(_.isFailure)
+  }
+
+  def checkBalance(
+      balance: Balance,
+      expectedRound: Long,
+      expectedUQRange: (BigDecimal, BigDecimal),
+      expectedLQRange: (BigDecimal, BigDecimal),
+      expectedHRange: (BigDecimal, BigDecimal),
+  ): Unit = {
+    balance.round shouldBe expectedRound
+    balance.unlockedQty should (be >= expectedUQRange._1 and be <= expectedUQRange._2)
+    balance.lockedQty should (be >= expectedLQRange._1 and be <= expectedLQRange._2)
+    balance.holdingFees should (be >= expectedHRange._1 and be <= expectedHRange._2)
+  }
+
+  def lockCoins(userParty: PartyId, amt: Int)(implicit
+      env: CoinTestConsoleEnvironment
+  ): Unit = {
+    aliceWallet.remoteParticipant.ledger_api.commands.submit(
+      Seq(userParty),
+      optTimeout = None,
+      commands = Seq(
+        testWalletCodegen
+          .TestReference(
+            p = userParty.toPrim,
+            description = "description",
+          )
+          .create
+          .command
+      ),
+    )
+
+    val referenceId =
+      aliceWallet.remoteParticipant.ledger_api.acs
+        .await(userParty, testWalletCodegen.TestReference)
+        .contractId
+
+    // Create a payment request to self.
+    val reqC = walletCodegen.AppPaymentRequest(
+      sender = userParty.toPrim,
+      receiver = userParty.toPrim,
+      svc = svcParty.toPrim,
+      quantity = BigDecimal(amt),
+      expiresAt = binding.Primitive.Timestamp
+        .discardNanos(java.time.Instant.now().plus(30, ChronoUnit.MINUTES))
+        .getOrElse(sys.error("Invalid instant")),
+      collectionDuration = RelTime(microseconds = 60 * 1000000),
+      reference = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
+    )
+    aliceWallet.remoteParticipant.ledger_api.commands.submit(
+      actAs = Seq(userParty),
+      optTimeout = None,
+      commands = Seq(reqC.create.command),
+    )
+
+    // Check that we can see the created payment request
+    val reqFound = aliceRemoteWallet.listAppPaymentRequests().headOption.value
+
+    // Accept the payment request
+    aliceRemoteWallet.acceptAppPaymentRequest(
+      reqFound.contractId,
+      aliceRemoteWallet.list().head.contractId,
+    )
+  }
+
+  def nextRound()(implicit env: CoinTestConsoleEnvironment): Unit = {
+    svc.startClosingRound(0)
+    svc.startIssuingRound(0)
+    svc.closeRound(0)
+    svc.openRound(1)
   }
 }
