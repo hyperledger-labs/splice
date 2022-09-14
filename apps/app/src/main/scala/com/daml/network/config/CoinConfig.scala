@@ -2,10 +2,7 @@ package com.daml.network.config
 
 import cats.data.Validated
 import cats.syntax.functor._
-import com.daml.network.directory.provider.config.{
-  LocalDirectoryProviderAppConfig,
-  RemoteDirectoryProviderAppConfig,
-}
+import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.scan.config.{LocalScanAppConfig, RemoteScanAppConfig}
 import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
 import com.daml.network.svc.config.{LocalSvcAppConfig, RemoteSvcAppConfig}
@@ -46,8 +43,8 @@ case class CoinConfig(
     scanApp: Option[LocalScanAppConfig] = None,
     walletApps: Map[InstanceName, LocalWalletAppConfig] = Map.empty,
     remoteWalletApps: Map[InstanceName, RemoteWalletAppConfig] = Map.empty,
-    directoryProviderApps: Map[InstanceName, LocalDirectoryProviderAppConfig] = Map.empty,
-    remoteDirectoryProviderApps: Map[InstanceName, RemoteDirectoryProviderAppConfig] = Map.empty,
+    directoryApps: Map[InstanceName, LocalDirectoryAppConfig] = Map.empty,
+    remoteDirectoryApps: Map[InstanceName, RemoteDirectoryAppConfig] = Map.empty,
     splitwiseApps: Map[InstanceName, LocalSplitwiseAppConfig] = Map.empty,
     remoteSplitwiseApps: Map[InstanceName, RemoteSplitwiseAppConfig] = Map.empty,
     // TODO(i736): we want to remove all of the configurations options below:
@@ -236,46 +233,46 @@ case class CoinConfig(
       n.unwrap -> c
   }
 
-  private lazy val directoryProviderAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
-    directoryProviderApps.fmap { directoryProviderConfig =>
+  private lazy val directoryAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
+    directoryApps.fmap { directoryConfig =>
       SharedCoinAppParameters(
         monitoring.tracing,
         monitoring.delayLoggingThreshold,
         monitoring.getLoggingConfig,
         monitoring.logQueryCost,
         parameters.timeouts.processing,
-        directoryProviderConfig.caching,
+        directoryConfig.caching,
         parameters.enableAdditionalConsistencyChecks,
         features.enablePreviewCommands,
         parameters.nonStandardConfig,
-        directoryProviderConfig.sequencerClient,
+        directoryConfig.sequencerClient,
         devVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
       )
     }
 
-  private[network] def directoryProviderAppParameters(
+  private[network] def directoryAppParameters(
       appName: InstanceName
   ): SharedCoinAppParameters =
-    nodeParametersFor(directoryProviderAppParameters_, "directoryProvider-app", appName)
+    nodeParametersFor(directoryAppParameters_, "directory-app", appName)
 
-  /** Use `directoryProviderAppParameters` instead!
+  /** Use `directoryAppParameters` instead!
     */
-  def tryDirectoryProviderAppParametersByString(name: String): SharedCoinAppParameters =
-    directoryProviderAppParameters(
+  def tryDirectoryAppParametersByString(name: String): SharedCoinAppParameters =
+    directoryAppParameters(
       InstanceName.tryCreate(name)
     )
 
-  /** Use `directoryProviders` instead!
+  /** Use `directories` instead!
     */
-  def directoryProvidersByString: Map[String, LocalDirectoryProviderAppConfig] =
-    directoryProviderApps.map { case (n, c) =>
+  def directoriesByString: Map[String, LocalDirectoryAppConfig] =
+    directoryApps.map { case (n, c) =>
       n.unwrap -> c
     }
 
-  def remoteDirectoryProvidersByString: Map[String, RemoteDirectoryProviderAppConfig] =
-    remoteDirectoryProviderApps.map { case (n, c) =>
+  def remoteDirectoriesByString: Map[String, RemoteDirectoryAppConfig] =
+    remoteDirectoryApps.map { case (n, c) =>
       n.unwrap -> c
     }
 
@@ -368,11 +365,10 @@ object CoinConfig {
       deriveReader[LocalWalletAppConfig]
     implicit val remoteWalletConfigReader: ConfigReader[RemoteWalletAppConfig] =
       deriveReader[RemoteWalletAppConfig]
-    implicit val directoryProviderConfigReader: ConfigReader[LocalDirectoryProviderAppConfig] =
-      deriveReader[LocalDirectoryProviderAppConfig]
-    implicit val remoteDirectoryProviderConfigReader
-        : ConfigReader[RemoteDirectoryProviderAppConfig] =
-      deriveReader[RemoteDirectoryProviderAppConfig]
+    implicit val directoryConfigReader: ConfigReader[LocalDirectoryAppConfig] =
+      deriveReader[LocalDirectoryAppConfig]
+    implicit val remoteDirectoryConfigReader: ConfigReader[RemoteDirectoryAppConfig] =
+      deriveReader[RemoteDirectoryAppConfig]
     implicit val splitwiseConfigReader: ConfigReader[LocalSplitwiseAppConfig] =
       deriveReader[LocalSplitwiseAppConfig]
     implicit val remoteSplitwiseConfigReader: ConfigReader[RemoteSplitwiseAppConfig] =

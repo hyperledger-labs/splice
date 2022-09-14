@@ -14,16 +14,13 @@ import { LedgerApiClientProvider, useLedgerApiClient } from './LedgerApiContext'
 import Login from './Login';
 import { SplitwiseClientProvider, useSplitwiseClient } from './SplitwiseServiceContext';
 import { sameContracts, useInterval } from './Util';
-import { DirectoryProviderServiceClient } from './com/daml/network/directory_provider/v0/Directory_provider_serviceServiceClientPb';
+import { DirectoryServiceClient } from './com/daml/network/directory/v0/Directory_serviceServiceClientPb';
 import { ScanServiceClient } from './com/daml/network/scan/v0/Scan_serviceServiceClientPb';
 
 const App: React.FC = () => {
   const [directoryEntries, setDirectoryEntries] = useState<Contract<DirectoryEntry>[]>([]);
   const dirEntries = new DirectoryEntries(directoryEntries);
-  const directoryClient = useMemo(
-    () => new DirectoryProviderServiceClient('http://localhost:8084'),
-    []
-  );
+  const directoryClient = useMemo(() => new DirectoryServiceClient('http://localhost:8084'), []);
   const scanClient = useMemo(() => new ScanServiceClient('http://localhost:8083'), []);
 
   const fetchDirectoryEntries = useCallback(async () => {

@@ -1,5 +1,5 @@
 import com.daml.lf.value.Value.ContractId
-Seq(aliceSplitwiseBackend.remoteParticipant, bobSplitwiseBackend.remoteParticipant, providerSplitwiseBackend.remoteParticipant, directoryProvider.remoteParticipant).foreach { p =>
+Seq(aliceSplitwiseBackend.remoteParticipant, bobSplitwiseBackend.remoteParticipant, providerSplitwiseBackend.remoteParticipant, directoryBackend.remoteParticipant).foreach { p =>
   p.dars.upload("apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar")
 }
 
@@ -13,17 +13,17 @@ directoryValidator.initialize()
 
 val aliceRequestCid = aliceDirectory.requestDirectoryInstall()
 val bobRequestCid = bobDirectory.requestDirectoryInstall()
-utils.retry_until_true { directoryProvider.listInstallRequests().length == 2 }
-directoryProvider.listInstallRequests().foreach { case request =>
-  directoryProvider.acceptInstallRequest(request.contractId)
+utils.retry_until_true { directoryBackend.listInstallRequests().length == 2 }
+directoryBackend.listInstallRequests().foreach { case request =>
+  directoryBackend.acceptInstallRequest(request.contractId)
 }
 
 aliceDirectory.requestDirectoryEntry("alice.cns")
 bobDirectory.requestDirectoryEntry("bob.cns")
 
-utils.retry_until_true { directoryProvider.listEntryRequests().length == 2 }
-directoryProvider.listEntryRequests().foreach { case request =>
-  directoryProvider.requestEntryPayment(request.contractId)
+utils.retry_until_true { directoryBackend.listEntryRequests().length == 2 }
+directoryBackend.listEntryRequests().foreach { case request =>
+  directoryBackend.requestEntryPayment(request.contractId)
 }
 
 val aliceCoin = aliceRemoteWallet.tap(5.0)
@@ -33,11 +33,11 @@ val bobCoin = bobRemoteWallet.tap(5.0)
 utils.retry_until_true { bobRemoteWallet.listAppPaymentRequests().length == 1 }
 val bobAccepted = bobRemoteWallet.acceptAppPaymentRequest(bobRemoteWallet.listAppPaymentRequests()(0).contractId, bobCoin)
 
-val directoryParty = directoryProvider.getProviderPartyId()
-directoryProvider.remoteParticipant.ledger_api.acs.await_active_contract(directoryParty, ContractId.assertFromString(aliceAccepted.toString))
-directoryProvider.remoteParticipant.ledger_api.acs.await_active_contract(directoryParty, ContractId.assertFromString(bobAccepted.toString))
-directoryProvider.collectEntryPayment(aliceAccepted)
-directoryProvider.collectEntryPayment(bobAccepted)
+val directoryParty = directoryBackend.getProviderPartyId()
+directoryBackend.remoteParticipant.ledger_api.acs.await_active_contract(directoryParty, ContractId.assertFromString(aliceAccepted.toString))
+directoryBackend.remoteParticipant.ledger_api.acs.await_active_contract(directoryParty, ContractId.assertFromString(bobAccepted.toString))
+directoryBackend.collectEntryPayment(aliceAccepted)
+directoryBackend.collectEntryPayment(bobAccepted)
 
 val providerParty = splitwiseValidator.initialize()
 

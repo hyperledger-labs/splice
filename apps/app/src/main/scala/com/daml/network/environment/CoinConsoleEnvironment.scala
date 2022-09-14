@@ -1,14 +1,14 @@
 package com.daml.network.environment
 
 import com.daml.network.console.{
-  DirectoryProviderAppReference,
-  LocalDirectoryProviderAppReference,
+  DirectoryAppReference,
+  LocalDirectoryAppReference,
   LocalScanAppReference,
   LocalSplitwiseAppReference,
   LocalSvcAppReference,
   LocalValidatorAppReference,
   LocalWalletAppReference,
-  RemoteDirectoryProviderAppReference,
+  RemoteDirectoryAppReference,
   RemoteSplitwiseAppReference,
   RemoteSvcAppReference,
   RemoteWalletAppReference,
@@ -56,11 +56,11 @@ class CoinConsoleEnvironment(
       svcOpt.toList,
       scanOpt.toList,
       wallets.local,
-      directoryProviders.local,
+      directories.local,
       splitwises.local,
     ),
     mergeRemoteInstances(
-      directoryProviders.remote,
+      directories.remote,
       participants.remote,
       domains.remote,
       wallets.remote,
@@ -70,8 +70,8 @@ class CoinConsoleEnvironment(
 
   /* Local apps that are (in the target deployment) operated by the SVC */
   lazy val appsHostedBySvc = NodeReferences(
-    mergeLocalInstances(svcOpt.toList, scanOpt.toList, directoryProviders.local),
-    mergeRemoteInstances(remoteSvcOpt.toList, directoryProviders.remote),
+    mergeLocalInstances(svcOpt.toList, scanOpt.toList, directories.local),
+    mergeRemoteInstances(remoteSvcOpt.toList, directories.remote),
   )
 
   /* Local apps that are (in the target deployment) operated by a self-hosted validator */
@@ -109,17 +109,17 @@ class CoinConsoleEnvironment(
       environment.config.remoteWalletsByString.keys.map(createRemoteWalletReference).toSeq,
     )
 
-  lazy val directoryProviders: NodeReferences[
-    DirectoryProviderAppReference,
-    RemoteDirectoryProviderAppReference,
-    LocalDirectoryProviderAppReference,
+  lazy val directories: NodeReferences[
+    DirectoryAppReference,
+    RemoteDirectoryAppReference,
+    LocalDirectoryAppReference,
   ] =
     NodeReferences(
-      environment.config.directoryProvidersByString.keys
-        .map(createDirectoryProviderReference)
+      environment.config.directoriesByString.keys
+        .map(createDirectoryReference)
         .toSeq,
-      environment.config.remoteDirectoryProvidersByString.keys
-        .map(createRemoteDirectoryProviderReference)
+      environment.config.remoteDirectoriesByString.keys
+        .map(createRemoteDirectoryReference)
         .toSeq,
     )
 
@@ -151,13 +151,13 @@ class CoinConsoleEnvironment(
   private def createRemoteWalletReference(name: String): RemoteWalletAppReference =
     new RemoteWalletAppReference(this, name)
 
-  private def createDirectoryProviderReference(name: String): LocalDirectoryProviderAppReference =
-    new LocalDirectoryProviderAppReference(this, name)
+  private def createDirectoryReference(name: String): LocalDirectoryAppReference =
+    new LocalDirectoryAppReference(this, name)
 
-  private def createRemoteDirectoryProviderReference(
+  private def createRemoteDirectoryReference(
       name: String
-  ): RemoteDirectoryProviderAppReference =
-    new RemoteDirectoryProviderAppReference(this, name)
+  ): RemoteDirectoryAppReference =
+    new RemoteDirectoryAppReference(this, name)
 
   private def createSplitwiseReference(name: String): LocalSplitwiseAppReference =
     new LocalSplitwiseAppReference(this, name)
@@ -192,36 +192,36 @@ class CoinConsoleEnvironment(
         wallets.remote,
         Seq("App References"),
       ) :++
-      directoryProviders.local.map(v =>
+      directories.local.map(v =>
         TopLevelValue(
           v.name,
-          helpText("local directory provider app", v.name),
+          helpText("local directory app", v.name),
           v,
           Seq("App References"),
         )
       ) :+ TopLevelValue(
-        "directoryProviders",
+        "directories",
         helpText(
-          "All local directory provider app instances" + genericNodeReferencesDoc,
-          "Directory providers",
+          "All local directory app instances" + genericNodeReferencesDoc,
+          "Directory apps",
         ),
-        directoryProviders.local,
+        directories.local,
         Seq("App References"),
       ) :++
-      directoryProviders.remote.map(v =>
+      directories.remote.map(v =>
         TopLevelValue(
           v.name,
-          helpText("remote directory provider app", v.name),
+          helpText("remote directory app", v.name),
           v,
           Seq("App References"),
         )
       ) :+ TopLevelValue(
-        "remoteDirectoryProviders",
+        "remoteDirectories",
         helpText(
-          "All remote directory provider app instances" + genericNodeReferencesDoc,
-          "Directory providers",
+          "All remote directory app instances" + genericNodeReferencesDoc,
+          "Remote directory apps",
         ),
-        directoryProviders.remote,
+        directories.remote,
         Seq("App References"),
       ) :++ splitwises.local.map(v =>
         TopLevelValue(v.name, helpText("local splitwise app", v.name), v, Seq("App References"))

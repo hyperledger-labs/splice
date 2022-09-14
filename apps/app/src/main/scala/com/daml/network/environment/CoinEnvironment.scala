@@ -2,8 +2,8 @@ package com.daml.network.environment
 
 import cats.syntax.either._
 import com.daml.network.config.CoinConfig
-import com.daml.network.directory.provider.DirectoryProviderAppBootstrap
-import com.daml.network.directory.provider.config.LocalDirectoryProviderAppConfig
+import com.daml.network.directory.DirectoryAppBootstrap
+import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.metrics.CoinMetricsFactory
 import com.daml.network.scan.ScanAppBootstrap
 import com.daml.network.scan.config.LocalScanAppConfig
@@ -155,17 +155,17 @@ trait CoinEnvironment extends Environment {
     loggerFactory,
   )
 
-  protected def createDirectoryProvider(
+  protected def createDirectory(
       name: String,
-      directoryProviderConfig: LocalDirectoryProviderAppConfig,
-  ): DirectoryProviderAppBootstrap =
-    DirectoryProviderAppBootstrap(
+      directoryConfig: LocalDirectoryAppConfig,
+  ): DirectoryAppBootstrap =
+    DirectoryAppBootstrap(
       name,
-      directoryProviderConfig,
-      config.tryDirectoryProviderAppParametersByString(name),
-      createClock(Some(DirectoryProviderAppBootstrap.LoggerFactoryKeyName -> name)),
+      directoryConfig,
+      config.tryDirectoryAppParametersByString(name),
+      createClock(Some(DirectoryAppBootstrap.LoggerFactoryKeyName -> name)),
       testingTimeService,
-      coinMetrics.forDirectoryProvider(name),
+      coinMetrics.forDirectory(name),
       testingConfig,
       futureSupervisor,
       loggerFactory,
@@ -175,12 +175,12 @@ trait CoinEnvironment extends Environment {
       )
     )
 
-  lazy val directoryProviders = new DirectoryProviderApps(
-    createDirectoryProvider,
+  lazy val directories = new DirectoryApps(
+    createDirectory,
     migrationsFactory,
     timeouts,
-    config.directoryProvidersByString,
-    config.tryDirectoryProviderAppParametersByString,
+    config.directoriesByString,
+    config.tryDirectoryAppParametersByString,
     loggerFactory,
   )
 
@@ -222,13 +222,13 @@ trait CoinEnvironment extends Environment {
         scans.startAll.left.getOrElse(Seq.empty) ++
         svcs.startAll.left.getOrElse(Seq.empty) ++
         wallets.startAll.left.getOrElse(Seq.empty) ++
-        directoryProviders.startAll.left.getOrElse(Seq.empty) ++
+        directories.startAll.left.getOrElse(Seq.empty) ++
         splitwises.startAll.left.getOrElse(Seq.empty)
     Either.cond(errors.isEmpty, (), errors)
   }
 
   def allCoinNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
-    List(validators, svcs, scans, wallets, directoryProviders, splitwises)
+    List(validators, svcs, scans, wallets, directories, splitwises)
 
   override def allNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
     super.allNodes ::: allCoinNodes

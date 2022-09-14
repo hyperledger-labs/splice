@@ -17,7 +17,7 @@ Payments and integration with CC Wallet
 Integration with Directory App
 ------------------------------
 
-* No resolution within Daml, resolve names off-ledger via APIs of directory provider
+* No resolution within Daml, resolve names off-ledger via APIs of directory service
 * Design Daml models to work with parties not human readable names + resolution
 * If needed, check that resolution is still accurate in transaction by
   passing in cid of entry & fetch it

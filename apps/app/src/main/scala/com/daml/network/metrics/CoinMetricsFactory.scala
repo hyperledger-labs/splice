@@ -1,7 +1,7 @@
 package com.daml.network.metrics
 
 import com.codahale.metrics
-import com.daml.network.directory.provider.metrics.DirectoryProviderAppMetrics
+import com.daml.network.directory.metrics.DirectoryAppMetrics
 import com.daml.network.scan.metrics.ScanAppMetrics
 import com.daml.network.splitwise.metrics.SplitwiseAppMetrics
 import com.daml.network.svc.metrics.SvcAppMetrics
@@ -22,7 +22,7 @@ case class CoinMetricsFactory(
   private val svcs = TrieMap[String, SvcAppMetrics]()
   private val scans = TrieMap[String, ScanAppMetrics]()
   private val wallets = TrieMap[String, WalletAppMetrics]()
-  private val directoryProviders = TrieMap[String, DirectoryProviderAppMetrics]()
+  private val directories = TrieMap[String, DirectoryAppMetrics]()
   private val splitwises = TrieMap[String, SplitwiseAppMetrics]()
 
   override protected def allNodeMetrics: Seq[TrieMap[String, _]] = Seq(validators)
@@ -63,11 +63,11 @@ case class CoinMetricsFactory(
     )
   }
 
-  def forDirectoryProvider(name: String): DirectoryProviderAppMetrics = {
-    directoryProviders.getOrElseUpdate(
+  def forDirectory(name: String): DirectoryAppMetrics = {
+    directories.getOrElseUpdate(
       name, {
-        val metricName = deduplicateName(name, "DirectoryProvider", directoryProviders)
-        new DirectoryProviderAppMetrics(MetricsFactory.prefix, newRegistry(metricName))
+        val metricName = deduplicateName(name, "Directory", directories)
+        new DirectoryAppMetrics(MetricsFactory.prefix, newRegistry(metricName))
       },
     )
   }

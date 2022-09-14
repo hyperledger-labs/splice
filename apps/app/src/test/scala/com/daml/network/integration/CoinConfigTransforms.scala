@@ -1,9 +1,6 @@
 package com.daml.network.integration
 
-import com.daml.network.directory.provider.config.{
-  LocalDirectoryProviderAppConfig,
-  RemoteDirectoryProviderAppConfig,
-}
+import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.scan.config.LocalScanAppConfig
 import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
 import com.daml.network.svc.config.LocalSvcAppConfig
@@ -54,9 +51,8 @@ object CoinConfigTransforms {
           updateAllRemoteWalletAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
             config3
           )
-        val config5 = updateAllDirectoryProviderAppConfigs_(c =>
-          c.copy(damlUser = s"${c.damlUser}-$suffix")
-        )(config4)
+        val config5 =
+          updateAllDirectoryAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config4)
         val config6 =
           updateAllSplitwiseAppConfigs_(c => c.copy(providerUser = s"${c.providerUser}-$suffix"))(
             config5
@@ -65,7 +61,7 @@ object CoinConfigTransforms {
           updateAllRemoteSplitwiseAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
             config6
           )
-        val config8 = updateAllRemoteDirectoryProviderAppConfigs_(c =>
+        val config8 = updateAllRemoteDirectoryAppConfigs_(c =>
           c.copy(damlUser = s"${c.damlUser}-$suffix")
         )(config7)
         config8
@@ -74,8 +70,8 @@ object CoinConfigTransforms {
   }
 
   type CnAppConfigTransform[A <: NodeConfig] = A => A
-  type DirectoryProviderAppTransform = CnAppConfigTransform[LocalDirectoryProviderAppConfig]
-  type RemoteDirectoryProviderAppTransform = CnAppConfigTransform[RemoteDirectoryProviderAppConfig]
+  type DirectoryAppTransform = CnAppConfigTransform[LocalDirectoryAppConfig]
+  type RemoteDirectoryAppTransform = CnAppConfigTransform[RemoteDirectoryAppConfig]
   type ValidatorAppTransform = CnAppConfigTransform[LocalValidatorAppConfig]
   type WalletAppTransform = CnAppConfigTransform[LocalWalletAppConfig]
   type RemoteWalletAppTransform = CnAppConfigTransform[RemoteWalletAppConfig]
@@ -84,17 +80,17 @@ object CoinConfigTransforms {
   type SplitwiseAppTransform = CnAppConfigTransform[LocalSplitwiseAppConfig]
   type RemoteSplitwiseAppTransform = CnAppConfigTransform[RemoteSplitwiseAppConfig]
 
-  def updateAllDirectoryProviderAppConfigs_(
-      update: DirectoryProviderAppTransform
+  def updateAllDirectoryAppConfigs_(
+      update: DirectoryAppTransform
   ): CoinConfigTransform =
-    _.focus(_.directoryProviderApps).modify(_.map { case (name, config) =>
+    _.focus(_.directoryApps).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 
-  def updateAllRemoteDirectoryProviderAppConfigs_(
-      update: RemoteDirectoryProviderAppTransform
+  def updateAllRemoteDirectoryAppConfigs_(
+      update: RemoteDirectoryAppTransform
   ): CoinConfigTransform =
-    _.focus(_.remoteDirectoryProviderApps).modify(_.map { case (name, config) =>
+    _.focus(_.remoteDirectoryApps).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 

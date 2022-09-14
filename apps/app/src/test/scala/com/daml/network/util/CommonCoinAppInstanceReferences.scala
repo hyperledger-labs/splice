@@ -1,13 +1,13 @@
 package com.daml.network.util
 
 import com.daml.network.console.{
-  LocalDirectoryProviderAppReference,
+  LocalDirectoryAppReference,
   LocalScanAppReference,
   LocalSplitwiseAppReference,
   LocalSvcAppReference,
   LocalValidatorAppReference,
   LocalWalletAppReference,
-  RemoteDirectoryProviderAppReference,
+  RemoteDirectoryAppReference,
   RemoteSvcAppReference,
   RemoteWalletAppReference,
   RemoteSplitwiseAppReference,
@@ -60,21 +60,21 @@ trait CommonCoinAppInstanceReferences {
   def splitwiseValidator(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
     "splitwiseValidator"
   )
-  def directoryProvider(implicit
+  def directoryBackend(implicit
       env: CoinTestConsoleEnvironment
-  ): LocalDirectoryProviderAppReference = dp(
-    "directoryProvider"
+  ): LocalDirectoryAppReference = dp(
+    "directoryBackend"
   )
 
   def aliceDirectory(implicit
       env: CoinTestConsoleEnvironment
-  ): RemoteDirectoryProviderAppReference = rdp(
+  ): RemoteDirectoryAppReference = rdp(
     "aliceDirectory"
   )
 
   def bobDirectory(implicit
       env: CoinTestConsoleEnvironment
-  ): RemoteDirectoryProviderAppReference = rdp(
+  ): RemoteDirectoryAppReference = rdp(
     "bobDirectory"
   )
 
@@ -149,17 +149,17 @@ trait CommonCoinAppInstanceReferences {
 
   def dp(
       name: String
-  )(implicit env: CoinTestConsoleEnvironment): LocalDirectoryProviderAppReference =
-    env.directoryProviders.local
+  )(implicit env: CoinTestConsoleEnvironment): LocalDirectoryAppReference =
+    env.directories.local
       .find(_.name == name)
-      .getOrElse(sys.error(s"directory provider [$name] not configured"))
+      .getOrElse(sys.error(s"directory [$name] not configured"))
 
   def rdp(
       name: String
-  )(implicit env: CoinTestConsoleEnvironment): RemoteDirectoryProviderAppReference =
-    env.directoryProviders.remote
+  )(implicit env: CoinTestConsoleEnvironment): RemoteDirectoryAppReference =
+    env.directories.remote
       .find(_.name == name)
-      .getOrElse(sys.error(s"remote directory provider [$name] not configured"))
+      .getOrElse(sys.error(s"remote directory [$name] not configured"))
 
   def sw(
       name: String

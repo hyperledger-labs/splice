@@ -13,4 +13,4 @@ gen_project_docs () {
 
 gen_project_docs canton-coin cc
 gen_project_docs apps/wallet/daml wallet
-gen_project_docs apps/directory-provider/daml directory-service
+gen_project_docs apps/directory/daml directory-service

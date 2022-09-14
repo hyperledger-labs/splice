@@ -42,7 +42,7 @@ lazy val root = (project in file("."))
     `apps-svc`,
     `apps-app`,
     `apps-wallet`,
-    `apps-directory-provider`,
+    `apps-directory`,
     `canton-community-common`,
     `canton-blake2b`,
     `canton-slick-fork`,
@@ -132,9 +132,9 @@ lazy val `apps-wallet` =
       BuildCommon.copyDarResources,
     )
 
-lazy val `apps-directory-provider` =
+lazy val `apps-directory` =
   project
-    .in(file("apps/directory-provider"))
+    .in(file("apps/directory"))
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
       `apps-wallet` % "compile->compile;test->test",
@@ -144,10 +144,10 @@ lazy val `apps-directory-provider` =
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
       Compile / damlDependencies := (`apps-wallet` / Compile / damlBuild).value,
-      Compile / damlSourceDirectory := file("apps/directory-provider/daml"),
+      Compile / damlSourceDirectory := file("apps/directory/daml"),
       cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
       Test / damlSourceDirectory := (Compile / damlSourceDirectory).value,
-      Compile / damlDarOutput := file("apps/directory-provider/daml") / ".daml" / "dist",
+      Compile / damlDarOutput := file("apps/directory/daml") / ".daml" / "dist",
       BuildCommon.damlCodegenSettings,
     )
 
@@ -157,12 +157,12 @@ lazy val `apps-splitwise` =
     .enablePlugins(DamlPlugin)
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
-      `apps-directory-provider` % "compile->compile;test->test",
+      `apps-directory` % "compile->compile;test->test",
     )
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
-      Compile / damlDependencies := (`apps-directory-provider` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`apps-directory` / Compile / damlBuild).value,
       Compile / damlSourceDirectory := file("apps/splitwise/daml"),
       cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
       Test / damlSourceDirectory := (Compile / damlSourceDirectory).value,
@@ -197,7 +197,7 @@ val scalaCodegenStrategy = new MergeStrategy {
       case f if sourceOfFileForMerge(tempDir, f)._1.getPath().contains("splitwise") => f
     }
     result match {
-      case None => Left(s"None of the codegened files originate from directory-provider: ${files}")
+      case None => Left(s"None of the codegened files originate from directory: ${files}")
       case Some(f) => Right(Seq((f, path)))
     }
   }
@@ -274,7 +274,7 @@ lazy val `apps-app` =
       // Splitwise needs to come first so that the codegened files
       // come first in the classpath. Otherwise, you get NoSuchMethod errors at runtime.
       `apps-splitwise`,
-      `apps-directory-provider`,
+      `apps-directory`,
       `apps-validator`,
       `apps-svc`,
       `apps-scan`,
