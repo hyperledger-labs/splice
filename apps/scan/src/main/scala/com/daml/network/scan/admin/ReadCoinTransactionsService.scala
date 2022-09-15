@@ -6,6 +6,7 @@ import com.daml.ledger.api.v1.transaction.TreeEvent.Kind.{Created, Empty, Exerci
 import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree, TreeEvent}
 import com.daml.ledger.client.binding.{Primitive, ValueDecoder, Value => CodegenValue}
 import com.daml.network.admin.LedgerAutomationService
+import com.daml.network.util.Trees
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history._
 import com.daml.network.scan.store.ScanCCHistoryStore
@@ -71,88 +72,73 @@ class ReadCoinTransactionsService(
   @SuppressWarnings(Array("org.wartremover.warts.While"))
   private def traverseForest(tree: TransactionTree): Future[Seq[CoinEvent]] = Future {
 
-    def preorder(
-        stack: mutable.Stack[StackElement],
-        coinEvents: mutable.Buffer[CoinEvent],
-    ): mutable.Buffer[CoinEvent] = {
-      def addToEvents(event: EventTypeAndCoin, parentO: Option[TreeEvent.Kind]) = {
-        parentO match {
-          case None =>
-            event match {
-              case CoinArchive(contract: LockedCoinContract) =>
-                logger.debug(
-                  s"An archive of a LockedCoin contract had no parent node in the transaction tree. Note that this is" +
-                    s"expected when, e.g., paying for a directory entry without involving the SVC. Contract: $contract"
-                )
-              case _ =>
-                logger.warn(
-                  s"Following Coin or LockedCoin event had no parent node in the transaction tree: $event"
-                )
-            }
-            coinEvents.append(CoinEvent(event, None))
-          case Some(parent) =>
-            coinEvents.append(CoinEvent(event, parseParentEvent(parent)))
-        }
+    val coinEvents: mutable.Buffer[CoinEvent] = mutable.ListBuffer()
 
+    def addToEvents(event: EventTypeAndCoin, parentO: Option[TreeEvent.Kind]) = {
+      parentO match {
+        case None =>
+          event match {
+            case CoinArchive(contract: LockedCoinContract) =>
+              logger.debug(
+                s"An archive of a LockedCoin contract had no parent node in the transaction tree. Note that this is" +
+                  s"expected when, e.g., paying for a directory entry without involving the SVC. Contract: $contract"
+              )
+            case _ =>
+              logger.warn(
+                s"Following Coin or LockedCoin event had no parent node in the transaction tree: $event"
+              )
+          }
+          coinEvents.append(CoinEvent(event, None))
+        case Some(parent) =>
+          coinEvents.append(CoinEvent(event, parseParentEvent(parent)))
       }
-
-      while (stack.nonEmpty) {
-        val (node, pathToNode) = stack.pop()
-        node match {
-          case Empty =>
-          case created: Created =>
-            DecodeUtil
-              .decodeCreated(Coin)(created.value)
-              .foreach(c => {
-                val coinContract = Contract.fromCodegenContract(c)
-                activeCoins.addOne((coinContract.contractId, coinContract))
-                addToEvents(CoinCreate(CoinContract(coinContract)), pathToNode.lastOption)
-              })
-            DecodeUtil
-              .decodeCreated(LockedCoin)(created.value)
-              .foreach(c => {
-                val coinContract = Contract.fromCodegenContract(c)
-                activeLockedCoins.addOne((coinContract.contractId, coinContract))
-                addToEvents(CoinCreate(LockedCoinContract(coinContract)), pathToNode.lastOption)
-              })
-          case exercised: Exercised =>
-            val coinContractOpt = DecodeUtil.decodeArchivedExercise(Coin)(exercised)
-            coinContractOpt.foreach(cid => {
-              val coinContract = activeCoins
-                .remove(cid)
-                .getOrElse(
-                  ErrorUtil.invalidState(
-                    s"Observed an archive for the coin contract with contract id $cid, but we haven't observed the corresponding create"
-                  )
-                )
-              addToEvents(CoinArchive(CoinContract(coinContract)), pathToNode.lastOption)
-            })
-            val lockedCoinContractOpt = DecodeUtil.decodeArchivedExercise(LockedCoin)(exercised)
-            lockedCoinContractOpt.foreach(cid => {
-              val coinContract = activeLockedCoins
-                .remove(cid)
-                .getOrElse(
-                  ErrorUtil.invalidState(
-                    s"Observed an archive for the LockedCoin contract with contract id $cid, but we haven't observed the corresponding create"
-                  )
-                )
-              addToEvents(CoinArchive(LockedCoinContract(coinContract)), pathToNode.lastOption)
-            })
-            val children = exercised.value.childEventIds.map(tree.eventsById(_).kind)
-            stack.pushAll(children.map((_, pathToNode :+ node)).reverse)
-        }
-      }
-      coinEvents
     }
 
-    // node and path to that node
-    type StackElement = (TreeEvent.Kind, Seq[TreeEvent.Kind])
+    Trees.traverseTree(
+      tree,
+      onCreate = (created: Created, pathToNode: Seq[TreeEvent.Kind]) => {
+        DecodeUtil
+          .decodeCreated(Coin)(created.value)
+          .foreach(c => {
+            val coinContract = Contract.fromCodegenContract(c)
+            activeCoins.addOne((coinContract.contractId, coinContract))
+            addToEvents(CoinCreate(CoinContract(coinContract)), pathToNode.lastOption)
+          })
+        DecodeUtil
+          .decodeCreated(LockedCoin)(created.value)
+          .foreach(c => {
+            val coinContract = Contract.fromCodegenContract(c)
+            activeLockedCoins.addOne((coinContract.contractId, coinContract))
+            addToEvents(CoinCreate(LockedCoinContract(coinContract)), pathToNode.lastOption)
+          })
+      },
+      onExercise = (exercised: Exercised, pathToNode: Seq[TreeEvent.Kind]) => {
+        val coinContractOpt = DecodeUtil.decodeArchivedExercise(Coin)(exercised)
+        coinContractOpt.foreach(cid => {
+          val coinContract = activeCoins
+            .remove(cid)
+            .getOrElse(
+              ErrorUtil.invalidState(
+                s"Observed an archive for the coin contract with contract id $cid, but we haven't observed the corresponding create"
+              )
+            )
+          addToEvents(CoinArchive(CoinContract(coinContract)), pathToNode.lastOption)
+        })
+        val lockedCoinContractOpt = DecodeUtil.decodeArchivedExercise(LockedCoin)(exercised)
+        lockedCoinContractOpt.foreach(cid => {
+          val coinContract = activeLockedCoins
+            .remove(cid)
+            .getOrElse(
+              ErrorUtil.invalidState(
+                s"Observed an archive for the LockedCoin contract with contract id $cid, but we haven't observed the corresponding create"
+              )
+            )
+          addToEvents(CoinArchive(LockedCoinContract(coinContract)), pathToNode.lastOption)
+        })
+      },
+    )
 
-    val coinEvents: mutable.Buffer[CoinEvent] = mutable.ListBuffer()
-    val roots = tree.rootEventIds.map(id => tree.eventsById(id).kind)
-    val stack: mutable.Stack[StackElement] = mutable.Stack()
-    stack.pushAll(roots.map((_, Seq())).reverse)
-    preorder(stack, coinEvents).toSeq
+    coinEvents.toSeq
   }
 
   // Some helper methods
