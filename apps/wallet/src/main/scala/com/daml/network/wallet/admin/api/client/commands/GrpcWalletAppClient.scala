@@ -142,7 +142,6 @@ object GrpcWalletAppClient {
 
   case class AcceptAppPaymentRequest(
       requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest],
-      coinId: Primitive.ContractId[coinCodegen.Coin],
       walletCtx: WalletContext,
   ) extends BaseCommand[
         v0.AcceptAppPaymentRequestRequest,
@@ -154,7 +153,6 @@ object GrpcWalletAppClient {
       Right(
         v0.AcceptAppPaymentRequestRequest(
           Proto.encode(requestId),
-          Proto.encode(coinId),
           Some(walletCtx),
         )
       )
@@ -382,7 +380,6 @@ object GrpcWalletAppClient {
   case class ExecuteDirectTransfer(
       receiver: PartyId,
       quantity: BigDecimal,
-      coinId: Primitive.ContractId[coinCodegen.Coin],
       walletCtx: WalletContext,
   ) extends BaseCommand[
         v0.ExecuteDirectTransferRequest,
@@ -395,7 +392,6 @@ object GrpcWalletAppClient {
         v0.ExecuteDirectTransferRequest(
           receiverPartyId = Proto.encode(receiver),
           quantity = Proto.encode(quantity),
-          coinContractId = Proto.encode(coinId),
           walletCtx = Some(walletCtx),
         )
       )
@@ -473,7 +469,6 @@ object GrpcWalletAppClient {
 
   case class AcceptOnChannelPaymentRequest(
       requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest],
-      coinId: Primitive.ContractId[coinCodegen.Coin],
       walletCtx: WalletContext,
   ) extends BaseCommand[
         v0.AcceptOnChannelPaymentRequestRequest,
@@ -484,7 +479,6 @@ object GrpcWalletAppClient {
       Right(
         v0.AcceptOnChannelPaymentRequestRequest(
           requestContractId = Proto.encode(requestId),
-          coinContractId = Proto.encode(coinId),
           walletCtx = Some(walletCtx),
         )
       )

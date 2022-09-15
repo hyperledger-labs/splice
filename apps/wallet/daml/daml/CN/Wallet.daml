@@ -295,7 +295,6 @@ template WalletAppInstall
     key (endUser, serviceUser) : (Party, Party)
     maintainer key._2
 
-    -- Command: Tap
     nonconsuming choice WalletAppInstall_Tap : ContractId Coin
       with
         quantity : Decimal
@@ -303,11 +302,28 @@ template WalletAppInstall
       do
         exerciseByKey @CoinRules (svcUser, validatorUser) (CoinRules_Tap endUser quantity)
 
-    -- Command: AcceptAppPaymentRequestRequest
-    nonconsuming choice WalletAppInstall_AcceptAppPaymentRequestRequest : ContractId AcceptedAppPayment
+    nonconsuming choice WalletAppInstall_AcceptAppPaymentRequest : ContractId AcceptedAppPayment
       with
         requestCid : ContractId AppPaymentRequest
         transferInput : [TransferInput]
       controller serviceUser
       do
         exercise requestCid (AppPaymentRequest_Accept transferInput)
+
+    nonconsuming choice WalletAppInstall_AcceptOnChannelPaymentRequest : ()
+      with
+        requestCid : ContractId OnChannelPaymentRequest
+        transferInput : [TransferInput]
+      controller serviceUser
+      do
+        exercise requestCid (OnChannelPaymentRequest_Accept transferInput)
+
+    nonconsuming choice WalletAppInstall_ExecuteDirectTransfer : TransferResult
+      with
+        receiver : Party
+        inputs : [TransferInput]
+        quantity : Decimal
+        payload : Text
+      controller serviceUser
+      do
+        exerciseByKey @PaymentChannel (endUser, receiver, svcUser) (PaymentChannel_ExecuteDirectTransfer inputs quantity payload)

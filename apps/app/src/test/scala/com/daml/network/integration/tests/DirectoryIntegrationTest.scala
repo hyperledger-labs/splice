@@ -95,8 +95,8 @@ class DirectoryIntegrationTest
       walletPaymentRequest.contractId shouldBe paymentRequest
 
       // Accept payment request
-      val coin = aliceRemoteWallet.tap(5.0)
-      val _ = aliceRemoteWallet.acceptAppPaymentRequest(walletPaymentRequest.contractId, coin)
+      aliceRemoteWallet.tap(5.0)
+      val _ = aliceRemoteWallet.acceptAppPaymentRequest(walletPaymentRequest.contractId)
 
       // Collect payment
       val acceptedPayment = directoryBackend.remoteParticipant.ledger_api.acs

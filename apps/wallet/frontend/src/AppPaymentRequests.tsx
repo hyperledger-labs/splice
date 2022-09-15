@@ -1,15 +1,6 @@
 import React, { useCallback, useState } from 'react';
 
-import {
-  Button,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  TextField,
-} from '@mui/material';
+import { Button, Stack, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 
 import { AppPaymentRequest } from '@daml.js/wallet/lib/CN/Wallet';
 
@@ -40,11 +31,9 @@ const AppPaymentRequests: React.FC<{ userId: string }> = ({ userId }) => {
   useInterval(fetchAppPaymentRequests, 500);
 
   const Request: React.FC<{ request: Contract<AppPaymentRequest> }> = ({ request }) => {
-    const [coinId, setCoinId] = useState<string>('');
     const onAccept = async () => {
       await walletClient.acceptAppPaymentRequest(
         new AcceptAppPaymentRequestRequest()
-          .setCoinContractId(coinId)
           .setRequestContractId(request.contractId)
           .setWalletCtx(walletRequestCtx),
         null
@@ -54,13 +43,6 @@ const AppPaymentRequests: React.FC<{ userId: string }> = ({ userId }) => {
       <TableRow>
         <TableCell>{request.payload.receiver}</TableCell>
         <TableCell>{request.payload.quantity}</TableCell>
-        <TableCell>
-          <TextField
-            value={coinId}
-            onChange={ev => setCoinId(ev.target.value)}
-            label="Coin Contract ID"
-          />
-        </TableCell>
         <TableCell>
           <Button type="submit" onClick={onAccept}>
             Accept

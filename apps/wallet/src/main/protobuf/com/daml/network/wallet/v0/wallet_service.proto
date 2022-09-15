@@ -84,10 +84,6 @@ message ListAppPaymentRequestsResponse {
 message AcceptAppPaymentRequestRequest {
   string request_contract_id = 1;
 
-  // Coin to be used as input to locking amount to be paid.
-  // TODO(M1-07): have the backend determine the coin inputs by itself.
-  string coin_contract_id = 2;
-
   WalletContext wallet_ctx = 3;
 }
 
@@ -176,9 +172,6 @@ message ExecuteDirectTransferRequest {
   // Quantity of CC to transfer.
   string quantity = 2;
 
-  // TODO(M1-07): auto-select inputs for the transfer
-  string coin_contract_id = 4;
-
   WalletContext wallet_ctx = 5;
 }
 
@@ -227,10 +220,6 @@ message ListOnChannelPaymentRequestsResponse {
 message AcceptOnChannelPaymentRequestRequest {
   // The request to accept
   string request_contract_id = 1;
-
-  // Coin to use for the transfer
-  // TODO(M1-07): auto-select inputs for the transfer
-  string coin_contract_id = 2;
 
   WalletContext wallet_ctx = 3;
 }

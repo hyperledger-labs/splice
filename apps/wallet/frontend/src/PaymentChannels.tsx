@@ -82,13 +82,6 @@ const PaymentChannels: React.FC<{ userId: string }> = ({ userId }) => {
             }
           ></TextField>
           <TextField
-            label="Input coin"
-            value={transferRequest.getCoinContractId()}
-            onChange={event =>
-              setTransferRequest(prev => prev.setCoinContractId(event.target.value))
-            }
-          ></TextField>
-          <TextField
             label="Amount"
             value={transferRequest.getQuantity()}
             onChange={event => setTransferRequest(prev => prev.setQuantity(event.target.value))}

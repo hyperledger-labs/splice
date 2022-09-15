@@ -83,11 +83,10 @@ abstract class WalletAppReference(
       " Returns the contract ID of the accepted payment."
   )
   def acceptAppPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest],
-      coinId: Primitive.ContractId[coinCodegen.Coin],
+      requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest]
   ): Primitive.ContractId[walletCodegen.AcceptedAppPayment] = {
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.AcceptAppPaymentRequest(requestId, coinId, getWalletCtx()))
+      adminCommand(GrpcWalletAppClient.AcceptAppPaymentRequest(requestId, getWalletCtx()))
     }
   }
 
@@ -198,11 +197,10 @@ abstract class WalletAppReference(
   def executeDirectTransfer(
       receiver: PartyId,
       quantity: BigDecimal,
-      coinId: Primitive.ContractId[coinCodegen.Coin],
   ): Unit = {
     consoleEnvironment.run {
       adminCommand(
-        GrpcWalletAppClient.ExecuteDirectTransfer(receiver, quantity, coinId, getWalletCtx())
+        GrpcWalletAppClient.ExecuteDirectTransfer(receiver, quantity, getWalletCtx())
       )
     }
   }
@@ -243,12 +241,11 @@ abstract class WalletAppReference(
     "Accepts the request using the given coin."
   )
   def acceptOnChannelPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest],
-      coinId: Primitive.ContractId[coinCodegen.Coin],
+      requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]
   ): Unit = {
     consoleEnvironment.run {
       adminCommand(
-        GrpcWalletAppClient.AcceptOnChannelPaymentRequest(requestId, coinId, getWalletCtx())
+        GrpcWalletAppClient.AcceptOnChannelPaymentRequest(requestId, getWalletCtx())
       )
     }
   }

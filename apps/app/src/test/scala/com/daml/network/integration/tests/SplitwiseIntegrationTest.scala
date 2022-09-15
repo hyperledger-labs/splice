@@ -86,11 +86,8 @@ class SplitwiseIntegrationTest
       10.0,
     )
     val acceptedPayment = inside(bobRemoteWallet.listAppPaymentRequests()) { case Seq(request) =>
-      val coin = bobRemoteWallet.tap(20)
-      bobRemoteWallet.acceptAppPaymentRequest(
-        request.contractId,
-        coin,
-      )
+      bobRemoteWallet.tap(20)
+      bobRemoteWallet.acceptAppPaymentRequest(request.contractId)
     }
     bobSplitwise.completeTransfer(
       bobProviderParty,

@@ -10,7 +10,7 @@ import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.{InitializeRequest, WalletServiceGrpc}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.codegen.DA
@@ -71,10 +71,12 @@ class GrpcWalletService(
     }
 
   override def tap(request: v0.TapRequest): Future[v0.TapResponse] =
-    exerciseWalletAction(c => {
-      val quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
-      c.exerciseWalletAppInstall_Tap(quantity)
-    })(request.getWalletCtx, coinCid => v0.TapResponse(Proto.encode(coinCid)))
+    exerciseSyncWalletAction(_ =>
+      (c, _) => {
+        val quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
+        c.exerciseWalletAppInstall_Tap(quantity)
+      }
+    )(request.getWalletCtx, coinCid => v0.TapResponse(Proto.encode(coinCid)))
 
   @nowarn("cat=unused")
   override def listAppPaymentRequests(
@@ -134,14 +136,30 @@ class GrpcWalletService(
   override def acceptAppPaymentRequest(
       request: v0.AcceptAppPaymentRequestRequest
   ): Future[v0.AcceptAppPaymentRequestResponse] =
-    exerciseWalletAction(c => {
-      val coinCid = Proto.tryDecodeContractId[coinCodegen.Coin](request.coinContractId)
-      val requestCid = Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](
-        request.requestContractId
-      )
-      val transferInput = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
-      c.exerciseWalletAppInstall_AcceptAppPaymentRequestRequest(requestCid, transferInput)
-    })(
+    exerciseWalletAction(implicit traceContext =>
+      (c, party) => {
+        for {
+          requestC <- store.findAppPaymentRequest(party, request.requestContractId)
+          quantity = requestC
+            .getOrElse(
+              sys.error(
+                s"Could not find app payment request ${request.requestContractId}. " +
+                  "Note that there is a very small delay before payment requests appear in the wallet. " +
+                  "If you have recently received a request, retry the command."
+              )
+            )
+            .payload
+            .quantity
+          coinCid <- selectCoin(party, quantity, store)
+        } yield {
+          val requestCid = Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](
+            request.requestContractId
+          )
+          val transferInput = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
+          c.exerciseWalletAppInstall_AcceptAppPaymentRequest(requestCid, transferInput)
+        }
+      }
+    )(
       request.getWalletCtx,
       paymentCid =>
         v0.AcceptAppPaymentRequestResponse(
@@ -325,29 +343,26 @@ class GrpcWalletService(
   override def executeDirectTransfer(
       request: v0.ExecuteDirectTransferRequest
   ): Future[Empty] =
-    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
-      for {
-        svcParty <- scanConnection.getSvcPartyId()
-        walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
-        coinCid = Proto.tryDecodeContractId[coinCodegen.Coin](request.coinContractId)
-        receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
-        quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
-        arg = walletCodegen.PaymentChannel_ExecuteDirectTransfer(
-          inputs = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid)),
-          quantity = quantity,
-          payload = "wallet: execute direct transfer",
-        )
-        cmd = walletCodegen.PaymentChannel
-          .key(DA.Types.Tuple3(walletParty.toPrim, receiverParty.toPrim, svcParty.toPrim))
-          .exercisePaymentChannel_ExecuteDirectTransfer(arg)
-          .command
-        _ <- connection.submitCommand(
-          Seq(walletParty),
-          Seq(getValidatorParty),
-          Seq(cmd),
-        )
-      } yield Empty()
-    }
+    exerciseWalletAction(implicit traceContext =>
+      (c, party) => {
+        val quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
+        for {
+          coinCid <- selectCoin(party, quantity, store)
+        } yield {
+          val receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
+          val arg = walletCodegen.WalletAppInstall_ExecuteDirectTransfer(
+            receiver = receiverParty.toPrim,
+            inputs = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid)),
+            quantity = quantity,
+            payload = "wallet: execute direct transfer",
+          )
+          c.exerciseWalletAppInstall_ExecuteDirectTransfer(arg)
+        }
+      }
+    )(
+      request.getWalletCtx,
+      _ => Empty(),
+    )
 
   @nowarn("cat=unused")
   override def listAppRewards(
@@ -437,26 +452,33 @@ class GrpcWalletService(
   override def acceptOnChannelPaymentRequest(
       request: v0.AcceptOnChannelPaymentRequestRequest
   ): Future[Empty] =
-    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
-      for {
-        walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
-        coinCid = Proto.tryDecodeContractId[coinCodegen.Coin](request.coinContractId)
-        arg = walletCodegen.OnChannelPaymentRequest_Accept(
-          inputs = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
-        )
-        requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](
-          request.requestContractId
-        )
-        cmd = requestCid
-          .exerciseOnChannelPaymentRequest_Accept(arg)
-          .command
-        _ <- connection.submitCommand(
-          Seq(walletParty),
-          Seq(getValidatorParty),
-          Seq(cmd),
-        )
-      } yield Empty()
-    }
+    exerciseWalletAction(implicit traceContext =>
+      (c, party) => {
+        for {
+          requestC <- store.findOnChannelPaymentRequest(party, request.requestContractId)
+          quantity = requestC
+            .getOrElse(
+              sys.error(
+                s"Could not find on channel payment request ${request.requestContractId}. " +
+                  "Note that there is a very small delay before payment requests appear in the wallet. " +
+                  "If you have recently received a request, retry the command."
+              )
+            )
+            .payload
+            .quantity
+          coinCid <- selectCoin(party, quantity, store)
+        } yield {
+          val requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](
+            request.requestContractId
+          )
+          val transferInput = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
+          c.exerciseWalletAppInstall_AcceptOnChannelPaymentRequest(requestCid, transferInput)
+        }
+      }
+    )(
+      request.getWalletCtx,
+      _ => Empty(),
+    )
 
   override def rejectOnChannelPaymentRequest(
       request: v0.RejectOnChannelPaymentRequestRequest
@@ -579,7 +601,10 @@ class GrpcWalletService(
     * Note: curried syntax helps with type inference
     */
   private def exerciseWalletAction[Response, ChoiceResult](
-      choice: Template.Key[walletCodegen.WalletAppInstall] => Primitive.Update[ChoiceResult]
+      choice: TraceContext => (
+          Template.Key[walletCodegen.WalletAppInstall],
+          PartyId,
+      ) => Future[Primitive.Update[ChoiceResult]]
   )(
       ctx: com.daml.network.wallet.v0.WalletContext,
       response: ChoiceResult => Response,
@@ -589,11 +614,58 @@ class GrpcWalletService(
         walletUserParty <- connection.getPrimaryParty(ctx.userId)
         installTemplate = walletCodegen.WalletAppInstall
           .key(DA.Types.Tuple2(walletUserParty.toPrim, getWalletServiceParty.toPrim))
+        update <- choice(traceContext)(installTemplate, walletUserParty)
         result <- connection.submitWithResult(
           Seq(getWalletServiceParty),
           Seq(getValidatorParty, walletUserParty),
-          choice(installTemplate),
+          update,
         )
       } yield response(result)
     }
+
+  private def exerciseSyncWalletAction[Response, ChoiceResult](
+      choice: TraceContext => (
+          Template.Key[walletCodegen.WalletAppInstall],
+          PartyId,
+      ) => Primitive.Update[ChoiceResult]
+  )(
+      ctx: com.daml.network.wallet.v0.WalletContext,
+      response: ChoiceResult => Response,
+  )(implicit valueDecoder: ValueDecoder[ChoiceResult]): Future[Response] =
+    exerciseWalletAction(tc => (t, p) => Future.successful(choice(tc)(t, p)))(ctx, response)
+
+  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  private def selectCoin(
+      owner: PartyId,
+      quantity: BigDecimal,
+      store: WalletAppStore,
+  )(implicit tc: TraceContext): Future[Primitive.ContractId[coinCodegen.Coin]] = {
+    for {
+      currentRound <- scanConnection.getCurrentRound()
+      coins <- store.listCoins(owner)
+      candidates = coins
+        .filter(c => CoinUtil.currentQuantity(c.payload, currentRound) >= quantity)
+    } yield {
+      logger.debug(
+        s"Selecting a coin for $owner with a remaining quantity of $quantity in round $currentRound. " +
+          s"There are ${coins.length} coins, ${candidates.length} of which are big enough."
+      )
+      if (coins.isEmpty) {
+        throw new RuntimeException(
+          s"Party $owner has no coins. " +
+            "Note that there is a very small delay before coins appear in the wallet. " +
+            "If you have recently acquired some coins, retry the command."
+        )
+      } else if (candidates.isEmpty) {
+        throw new RuntimeException(
+          s"Party $owner has ${coins.length} coins, but none of them have enough remaining quantity." +
+            "Note that there is a very small delay before coins appear in the wallet. " +
+            "If you have recently acquired some coins, retry the command."
+        )
+      } else {
+        // Use the coin that is most expensive to hold
+        candidates.maxBy(_.payload.quantity.ratePerRound.rate).contractId
+      }
+    }
+  }
 }

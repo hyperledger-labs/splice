@@ -32,8 +32,8 @@ class ScanIntegrationTest
 
   "see CC transfers" in { implicit env =>
     val (aliceP, bobP) = setup(env)
-    val tappedCoinCid = aliceRemoteWallet.tap(50)
-    aliceRemoteWallet.executeDirectTransfer(bobP, 10, tappedCoinCid)
+    aliceRemoteWallet.tap(50)
+    aliceRemoteWallet.executeDirectTransfer(bobP, 10)
     eventually(5.seconds) {
       val history = scan.getTxHistory()
       history should have length 2
