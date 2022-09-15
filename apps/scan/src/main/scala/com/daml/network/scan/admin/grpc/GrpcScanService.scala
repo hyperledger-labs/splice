@@ -1,9 +1,15 @@
 package com.daml.network.scan.admin.grpc
 
+import com.daml.ledger.api.v1.transaction.TransactionTree
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.store.ScanCCHistoryStore
 import com.daml.network.scan.v0
-import com.daml.network.scan.v0.{GetHistoryResponse, ScanServiceGrpc}
+import com.daml.network.scan.v0.{
+  GetCoinTransactionDetailsRequest,
+  GetCoinTransactionDetailsResponse,
+  GetHistoryResponse,
+  ScanServiceGrpc,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
 import com.google.protobuf.empty.Empty
@@ -49,4 +55,19 @@ class GrpcScanService(
         result <- store.getCCHistory
       } yield v0.GetHistoryResponse(result.map(_.toProtoV0))
     }
+
+  override def getCoinTransactionDetails(
+      request: GetCoinTransactionDetailsRequest
+  ): Future[GetCoinTransactionDetailsResponse] = withSpanFromGrpcContext("GrpcScanService") {
+    traceContext => span =>
+      for {
+        svc <- connection.getPrimaryParty(svcUser)
+        treeO <- connection.transactionTreeById(Seq(svc), request.transactionId)
+        tree: TransactionTree = treeO.getOrElse(
+          sys.error(
+            s"Ledger didn't return a result when querying for the transaction tree of transaction ${request.transactionId}"
+          )
+        )
+      } yield v0.GetCoinTransactionDetailsResponse(Some(tree))
+  }
 }

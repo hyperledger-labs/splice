@@ -1,7 +1,9 @@
 package com.daml.network.history
 
 import cats.syntax.traverse._
-import com.daml.ledger.api.v1.transaction.Transaction
+import com.daml.ledger.api.v1.event.{CreatedEvent, ExercisedEvent}
+import com.daml.ledger.api.v1.transaction.TreeEvent.Kind.{Created, Exercised}
+import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree, TreeEvent}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.serialization.ProtoConverter
@@ -24,6 +26,48 @@ object CoinTransaction {
       .required("CoinTransaction.metadata", transactionP.metadata)
       .flatMap(TransactionMetadata.fromProtoV0)
   } yield CoinTransaction(events, metadata)
+}
+
+/** Representation of a coin transaction with an ASCII-fied view of the transaction tree. */
+case class CoinTransactionTreeView(
+    transactionId: String,
+    offset: String,
+    forestOfEventsASCII: String,
+)
+
+object CoinTransactionTreeView {
+  def fromTree(tree: TransactionTree): CoinTransactionTreeView =
+    CoinTransactionTreeView(tree.transactionId, tree.offset, makeASCIITree(tree))
+
+  def makeASCIITree(tree: TransactionTree): String = {
+    def traverseTree(curr: TreeEvent.Kind, depth: Int): String = {
+      lazy val indent = "\t" * depth
+      curr match {
+        case TreeEvent.Kind.Empty => ""
+        case Created(created: CreatedEvent) =>
+          s"""$indent create ${created.templateId}
+             |$indent with
+             |$indent  ${created.createArguments}
+             |""".stripMargin
+        case Exercised(exercised: ExercisedEvent) =>
+          val children = {
+            exercised.childEventIds
+              .map(child => traverseTree(tree.eventsById(child).kind, depth + 1))
+              .mkString(System.lineSeparator())
+          }
+          s"""$indent '${exercised.actingParties}' exercises ${exercised.choice}
+             |$indent with
+             |$indent ${exercised.choiceArgument}
+             |$indent children:
+             |$indent  $children
+             |""".stripMargin
+
+      }
+    }
+
+    val roots = tree.rootEventIds.map(rootId => tree.eventsById(rootId).kind)
+    roots.map(r => traverseTree(r, 0)).mkString(System.lineSeparator())
+  }
 }
 
 case class TransactionMetadata(

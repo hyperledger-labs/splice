@@ -30,7 +30,7 @@ class ScanIntegrationTest
         participants.all.foreach(_.domains.connect_local(da))
       })
 
-  "see CC transfers" in { implicit env =>
+  "see Coin transfers" in { implicit env =>
     val (aliceP, bobP) = setup(env)
     aliceRemoteWallet.tap(50)
     aliceRemoteWallet.executeDirectTransfer(bobP, 10)
@@ -75,6 +75,34 @@ class ScanIntegrationTest
           }
       }
     }
+  }
+
+  "get details of a single Coin transfer" in { implicit env =>
+    val (aliceP, bobP) = setup(env)
+    val tappedCoinCid = aliceRemoteWallet.tap(50)
+    aliceRemoteWallet.executeDirectTransfer(bobP, 10, tappedCoinCid)
+
+    eventually(5.seconds) {
+      val history = scan.getTxHistory()
+      history should have length 2
+      val tapTransaction = history(0)
+      val tap = scan.getCoinTransactionTreePretty(tapTransaction.txMetadata.transactionId)
+
+      tap.transactionId shouldBe tapTransaction.txMetadata.transactionId
+      tap.forestOfEventsASCII should (include("alice_wallet_user") and include(
+        "Tap"
+      ) and not include ("bob_wallet_user"))
+
+      val transferTransaction = history(1)
+      val transfer =
+        scan.getCoinTransactionTreePretty(transferTransaction.txMetadata.transactionId)
+
+      transfer.transactionId shouldBe transferTransaction.txMetadata.transactionId
+      transfer.forestOfEventsASCII should (include("alice_wallet_user") and include(
+        "CoinRules_Transfer"
+      ) and include("bob_wallet_user"))
+    }
+
   }
 
   "report correct reference data" in { implicit env =>

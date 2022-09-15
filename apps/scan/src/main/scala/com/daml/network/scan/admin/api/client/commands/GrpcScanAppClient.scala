@@ -1,6 +1,7 @@
 package com.daml.network.scan.admin.api.client.commands
 import cats.syntax.either._
 import cats.syntax.traverse._
+import com.daml.ledger.api.v1.transaction.TransactionTree
 import com.daml.network.history.CoinTransaction
 import com.daml.network.scan.v0
 import com.daml.network.scan.v0.ScanServiceGrpc.ScanServiceStub
@@ -69,5 +70,26 @@ object GrpcScanAppClient {
         )
       )
 
+  }
+
+  final case class GetCoinTransactionDetails(transactionId: String)
+      extends BaseCommand[
+        v0.GetCoinTransactionDetailsRequest,
+        v0.GetCoinTransactionDetailsResponse,
+        TransactionTree,
+      ] {
+    override def createRequest(): Either[String, v0.GetCoinTransactionDetailsRequest] =
+      Right(v0.GetCoinTransactionDetailsRequest(transactionId))
+    override def submitRequest(
+        service: ScanServiceStub,
+        req: v0.GetCoinTransactionDetailsRequest,
+    ): Future[v0.GetCoinTransactionDetailsResponse] =
+      service.getCoinTransactionDetails(req)
+    override def handleResponse(
+        response: v0.GetCoinTransactionDetailsResponse
+    ): Either[String, TransactionTree] =
+      response.tree.toRight(
+        "received no transaction tree in the GetCoinTransactionDetailsResponse response from the server"
+      )
   }
 }

@@ -1,7 +1,8 @@
 package com.daml.network.console
 
+import com.daml.ledger.api.v1.transaction.TransactionTree
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.history.CoinTransaction
+import com.daml.network.history.{CoinTransaction, CoinTransactionTreeView}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
 import com.daml.network.scan.config.{LocalScanAppConfig, RemoteScanAppConfig}
 import com.digitalasset.canton.console.{
@@ -42,6 +43,23 @@ abstract class ScanAppReference(
     consoleEnvironment.run {
       adminCommand(GrpcScanAppClient.GetReferenceData())
     }
+
+  @Help.Summary(
+    """Returns the Daml transaction tree for a Coin transaction as visible to the SVC. """
+  )
+  def getCoinTransactionTree(transactionId: String): TransactionTree =
+    consoleEnvironment.run {
+      adminCommand(GrpcScanAppClient.GetCoinTransactionDetails(transactionId))
+    }
+
+  @Help.Summary(
+    """Same as `getCoinTransactionTree` except that it returns a custom type that contains an ASCII visualization 
+      |of the Daml transaction tree. """.stripMargin
+  )
+  def getCoinTransactionTreePretty(transactionId: String): CoinTransactionTreeView = {
+    val tree = getCoinTransactionTree(transactionId)
+    CoinTransactionTreeView.fromTree(tree)
+  }
 }
 
 final class LocalScanAppReference(
