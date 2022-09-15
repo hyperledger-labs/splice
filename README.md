@@ -79,6 +79,7 @@ This Section gives an overview of common sbt commands.
 More commands can be found in build.sbt and BuildCommon.scala.
 
 - `clean`: deletes all generated files (in the target directory)
+- `clean-cn`: like clean but only for our own apps not for the Canton fork
 - `compile`: compile production code (excluding test code)
 - `Test/compile`: compile production and test code
 - `apps-common/compile`: compile production code of the `apps-common` subproject

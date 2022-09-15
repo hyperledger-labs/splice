@@ -120,6 +120,10 @@ object BuildCommon {
         addCommandAlias(
           "lint",
           "; protobufLint ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck",
+        ) ++
+        addCommandAlias(
+          "clean-cn",
+          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwise/clean; apps-svc/clean; apps-wallet/clean; apps-directory/clean; apps-app/clean",
         )
     val buildSettings = inThisBuild(
       Seq(
