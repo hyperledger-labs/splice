@@ -92,6 +92,7 @@ class SvcAppBootstrap(
         ledgerClient,
         loggerFactory,
         timeouts,
+        svcStore,
       )
     } yield {
       new SvcAppNode(

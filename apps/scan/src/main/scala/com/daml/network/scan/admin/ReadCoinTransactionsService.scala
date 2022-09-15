@@ -18,7 +18,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
-import com.daml.network.codegen.CC.CoinRules.{CoinRules, TransferResult}
+import com.daml.network.codegen.CC.CoinRules.CoinRules
 
 import scala.collection.{concurrent, mutable}
 import scala.concurrent.{ExecutionContext, Future}
@@ -55,10 +55,9 @@ class ReadCoinTransactionsService(
           s"Unexpectedly, the Ledger API didn't know the transaction tree associated with transaction $tx"
         )
       )
-      (events, transfers) <- traverseForest(tree)
+      events <- traverseForest(tree)
       metadata = TransactionMetadata(tx)
       _ <- store.addTransaction(CoinTransaction(events, metadata))
-      _ <- store.addTransfers(transfers)
     } yield ()
   }
 
@@ -71,11 +70,10 @@ class ReadCoinTransactionsService(
 
   /** Traverse a Ledger API TransactionTree via a pre-order DFS and extract the CoinEvents */
   @SuppressWarnings(Array("org.wartremover.warts.While"))
-  private def traverseForest(tree: TransactionTree): Future[(Seq[CoinEvent], Seq[TransferResult])] =
+  private def traverseForest(tree: TransactionTree): Future[Seq[CoinEvent]] =
     Future {
 
       val coinEvents: mutable.Buffer[CoinEvent] = mutable.ListBuffer()
-      val allExercises: mutable.Buffer[Option[ParentNode]] = mutable.ListBuffer()
 
       def addToEvents(event: EventTypeAndCoin, parentO: Option[TreeEvent.Kind]) = {
         parentO match {
@@ -138,12 +136,10 @@ class ReadCoinTransactionsService(
               )
             addToEvents(CoinArchive(LockedCoinContract(coinContract)), pathToNode.lastOption)
           })
-          allExercises.append(parseEvent(exercised))
         },
       )
 
-      val transferResults = allExercises.collect { case Some(t: Transfer) => t.node.result }
-      (coinEvents.toSeq, transferResults.toSeq)
+      coinEvents.toSeq
     }
 
   // Some helper methods
@@ -188,7 +184,6 @@ class ReadCoinTransactionsService(
     )
 
   private def parseEvent(event: TreeEvent.Kind): Option[ParentNode] = {
-    //TODO(i775): might make sense to rename ParentNode now
     event match {
       case exercised: Exercised if isTransfer(exercised.value) =>
         Transfer(tryDecodeEvent(Transfer)(exercised)).some

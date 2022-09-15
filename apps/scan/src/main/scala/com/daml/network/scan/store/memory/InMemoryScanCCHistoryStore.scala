@@ -1,5 +1,4 @@
 package com.daml.network.scan.store.memory
-import com.daml.network.codegen.CC.CoinRules.{TransferResult, TransferSummary}
 import com.daml.network.history.CoinTransaction
 import com.daml.network.scan.store.ScanCCHistoryStore
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -16,7 +15,6 @@ class InMemoryScanCCHistoryStore(override protected val loggerFactory: NamedLogg
   val events: mutable.Buffer[CoinTransaction] = mutable.ListBuffer()
   @SuppressWarnings(Array("org.wartremover.warts.Var"))
   var currentRound: Long = 0
-  val transfersPerRound: mutable.Map[Long, Seq[TransferSummary]] = mutable.Map()
 
   override def getCCHistory: Future[Seq[CoinTransaction]] = Future {
     blocking {
@@ -46,20 +44,6 @@ class InMemoryScanCCHistoryStore(override protected val loggerFactory: NamedLogg
     blocking {
       synchronized {
         currentRound
-      }
-    }
-  }
-
-  /** Expected to be called once per transaction, with all transfers found within that transaction
-    */
-  def addTransfers(transfers: Seq[TransferResult]): Future[Unit] = Future {
-    blocking {
-      synchronized {
-        val _ = transfers.map(tr => {
-          val round = tr.round.number
-          val summary = tr.summary
-          transfersPerRound += (round -> (transfersPerRound.get(round).getOrElse(Seq()) :+ summary))
-        })
       }
     }
   }
