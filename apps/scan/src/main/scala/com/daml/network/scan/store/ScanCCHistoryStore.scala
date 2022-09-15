@@ -2,6 +2,7 @@ package com.daml.network.scan.store
 
 import com.daml.network.history.CoinTransaction
 import com.daml.network.scan.store.memory.InMemoryScanCCHistoryStore
+import com.daml.network.codegen.CC.CoinRules.TransferResult
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 
@@ -14,6 +15,8 @@ trait ScanCCHistoryStore extends AutoCloseable {
 
   def getCurrentRound: Future[Long]
   def setCurrentRound(round: Long): Future[Unit]
+
+  def addTransfers(transfers: Seq[TransferResult]): Future[Unit]
 }
 
 object ScanCCHistoryStore {
