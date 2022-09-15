@@ -32,7 +32,7 @@ trait CoinEnvironment extends Environment {
   override type Config = CoinConfig
   override type Console = CoinConsoleEnvironment
 
-  // TODO(tech-debt): check that the CoinMetrics factory is used in all of this trait's methods.
+  // TODO(M1-92): check that the CoinMetrics factory is used in all of this trait's methods.
   val coinMetrics = CoinMetricsFactory.forConfig(config.monitoring.metrics)
 
   protected def createValidator(

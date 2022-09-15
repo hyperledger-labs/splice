@@ -48,7 +48,7 @@ object TransactionMetadata {
   ): Either[ProtoDeserializationError, TransactionMetadata] = {
     val v0.TransactionMetadata(transactionId, commandId, workflowId, effectiveAt, offset, _) =
       metadataP
-    // TODO(tech-debt): add validation for all of these and switch to types from com.daml.ledger.api.domain.
+    // TODO(M1-92): add validation for all of these and switch to types from com.daml.ledger.api.domain.
     Right(TransactionMetadata(transactionId, commandId, workflowId, effectiveAt, offset))
   }
 }

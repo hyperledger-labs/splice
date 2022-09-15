@@ -82,7 +82,7 @@ setupUser : CCApp -> Text -> Party -> Script Party
 setupUser app name validator = do
   user <- allocatePartyWithHint name (PartyIdHint name)
   userId <- validateUserId name
-  createUser (User userId (Some user)) [CanActAs user, CanReadAs validator] -- TODO(Robert): CanReadAs has no effect?
+  createUser (User userId (Some user)) [CanActAs user, CanReadAs validator]
   _ <- submit user $ createCmd CCUserHostedAt with user; validator
   onboardUser app user
   return user
