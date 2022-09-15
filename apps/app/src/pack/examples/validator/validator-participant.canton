@@ -2,7 +2,7 @@ val domainUrl = System.getProperty("DOMAIN_URL", "http://dev.network.canton.glob
 
 println("Starting participant node")
 validatorParticipant.start()
-println("Connecting self-hosted validator to the domain")
+println(s"Connecting self-hosted validator to the domain $domainUrl")
 validatorParticipant.domains.connect("canton-network", domainUrl)
 println("Starting all first-party apps of the self-hosted validator")
 nodes.local.foreach(_.start())

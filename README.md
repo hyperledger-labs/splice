@@ -150,6 +150,23 @@ The logs from test executions are output to `/logs/canton_test.log`.
 Use `lnav` to view these logs for debugging failing test cases.
 No installation of `lnav` is required, as it is provided by default by our `direnv`.
 
+### Running the preflight check
+
+The preflight check runs an integration test where a local validator connects to a global canton network.
+
+To run the preflight check against devnet (see section `GCE Clusters`), use
+```
+sbt "testOnly *PreflightIntegrationTest"
+```
+
+To run the preflight check against scratchnet, use
+```
+sbt -DDOMAIN_URL=http://scratch.network.canton.global:5008 -DNETWORK_APPS_ADDRESS=scratch.network.canton.global "testOnly *PreflightIntegrationTest"
+```
+
+Note that the preflight check will fail if you branch is sufficiently divergent from the main branch
+(in particular, if you made any changes to the Daml model).
+
 #### Setting up `lnav` to inspect Canton logs
 
 If you have never used `lnav` to inspect Canton logs, then we recommend:
