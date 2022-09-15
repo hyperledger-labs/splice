@@ -439,7 +439,6 @@ class GrpcWalletService(
   ): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
-        svcParty <- scanConnection.getSvcPartyId()
         walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
         coinCid = Proto.tryDecodeContractId[coinCodegen.Coin](request.coinContractId)
         arg = walletCodegen.OnChannelPaymentRequest_Accept(
@@ -464,7 +463,6 @@ class GrpcWalletService(
   ): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
-        svcParty <- scanConnection.getSvcPartyId()
         walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
         arg = walletCodegen.OnChannelPaymentRequest_Reject()
         requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](

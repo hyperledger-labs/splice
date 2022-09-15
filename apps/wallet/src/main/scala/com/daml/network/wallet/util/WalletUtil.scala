@@ -21,7 +21,7 @@ object WalletUtil extends UploadablePackage {
   // See `Compile / resourceGenerators` in build.sbt
   lazy val resourcePath: String = "dar/wallet-0.1.0.dar"
 
-  def geWalletApps(
+  def getWalletApps(
       serviceParty: PartyId,
       connection: CoinLedgerConnection,
       logger: TracedLogger,
@@ -59,7 +59,7 @@ object WalletUtil extends UploadablePackage {
   ): Future[Unit] = {
     for {
       // Note: it is possible to have multiple wallet apps running on the same participant.
-      appCids <- geWalletApps(validatorServiceParty, connection, logger)
+      appCids <- getWalletApps(validatorServiceParty, connection, logger)
       _ <-
         if (appCids.isEmpty) {
           logger.debug(
