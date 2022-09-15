@@ -14,7 +14,8 @@ import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.codegen.DA
-import com.daml.network.wallet.store.WalletAppStore
+import com.daml.network.store.AppCoinStore
+import com.daml.network.wallet.store.{WalletAppRequestStore}
 import com.google.protobuf.empty.Empty
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
@@ -29,7 +30,8 @@ case class WalletServiceState(
 )
 
 class GrpcWalletService(
-    store: WalletAppStore,
+    coinStore: AppCoinStore,
+    store: WalletAppRequestStore,
     ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
     walletServiceUser: String,
@@ -64,7 +66,7 @@ class GrpcWalletService(
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
-        coins <- store.listCoins(walletParty)
+        coins <- coinStore.listCoins(walletParty)
       } yield {
         v0.ListResponse(coins.map(x => x.toProtoV0))
       }
@@ -638,11 +640,11 @@ class GrpcWalletService(
   private def selectCoin(
       owner: PartyId,
       quantity: BigDecimal,
-      store: WalletAppStore,
+      store: WalletAppRequestStore,
   )(implicit tc: TraceContext): Future[Primitive.ContractId[coinCodegen.Coin]] = {
     for {
       currentRound <- scanConnection.getCurrentRound()
-      coins <- store.listCoins(owner)
+      coins <- coinStore.listCoins(owner)
       candidates = coins
         .filter(c => CoinUtil.currentQuantity(c.payload, currentRound) >= quantity)
     } yield {

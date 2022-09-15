@@ -8,14 +8,14 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.util.Contract
-import com.daml.network.wallet.store.WalletAppStore
+import com.daml.network.wallet.store.WalletAppPartyStore
 import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.Future
 
 // TODO (i713): This whole class is only a workaround for missing `read-as-any-party` rights in the ledger API.
 class InstallIngestionService(
-    store: WalletAppStore,
+    partyStore: WalletAppPartyStore,
     protected val loggerFactory: NamedLoggerFactory,
 ) extends LedgerAutomationService
     with NamedLogging {
@@ -28,7 +28,7 @@ class InstallIngestionService(
     DecodeUtil
       .decodeAllCreated(walletCodegen.WalletAppInstall)(tx)
       .foreach(c =>
-        store.addParty(PartyId.tryFromPrim(Contract.fromCodegenContract(c).payload.endUser))
+        partyStore.addParty(PartyId.tryFromPrim(Contract.fromCodegenContract(c).payload.endUser))
       )
     // TODO(i763): not handling archive events, uninstalling first party apps is not supported yet
   }

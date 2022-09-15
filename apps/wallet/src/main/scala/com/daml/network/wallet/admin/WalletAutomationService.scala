@@ -3,10 +3,11 @@ package com.daml.network.wallet.admin
 import akka.stream.Materializer
 import com.daml.network.admin.LedgerAutomationServiceOrchestrator
 import com.daml.network.environment.CoinLedgerClient
+import com.daml.network.store.AppCoinStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.daml.network.wallet.store.WalletAppStore
+import com.daml.network.wallet.store.{WalletAppPartyStore, WalletAppRequestStore}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.FutureUtil
 import io.opentelemetry.api.trace.Tracer
@@ -17,7 +18,9 @@ import scala.concurrent.ExecutionContextExecutor
 /** Manages background automation that runs on an Wallet app.
   */
 class WalletAutomationService(
-    store: WalletAppStore,
+    coinStore: AppCoinStore,
+    partyStore: WalletAppPartyStore,
+    store: WalletAppRequestStore,
     serviceUser: String,
     serviceParty: PartyId,
     ledgerClient: CoinLedgerClient,
@@ -37,13 +40,13 @@ class WalletAutomationService(
 
   val coinIngestion = new AtomicReference(
     createService("walletCoinIngestionService", ledgerClient, Seq.empty) { _ =>
-      new CoinIngestionService(store, loggerFactory)
+      new CoinIngestionService(coinStore, store, loggerFactory)
     }
   )
 
   val installIngestion =
     createService("walletInstallIngestionService", ledgerClient, Seq(serviceParty)) { _ =>
-      new InstallIngestionService(store, loggerFactory)
+      new InstallIngestionService(partyStore, loggerFactory)
     }
 
   // Every time the set of parties for which a WalletAppInstall contract exists changes:
@@ -53,7 +56,7 @@ class WalletAutomationService(
   // and requires the app to have full admin rights on the ledger API.
   // TODO (i713): remove this workaround for missing `read-as-any-party` rights
   FutureUtil.doNotAwait(
-    store.getPartiesStream
+    partyStore.getPartiesStream
       .mapAsync(1)(parties =>
         performUnlessClosingF("subscribe to new parties") {
           for {

@@ -7,11 +7,12 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrapBase
 import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.store.AppCoinStore
 import com.daml.network.wallet.admin.WalletAutomationService
 import com.daml.network.wallet.admin.grpc.GrpcWalletService
 import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.daml.network.wallet.metrics.WalletAppMetrics
-import com.daml.network.wallet.store.WalletAppStore
+import com.daml.network.wallet.store.{WalletAppPartyStore, WalletAppRequestStore}
 import com.daml.network.wallet.util.WalletUtil
 import com.daml.network.wallet.v0.WalletServiceGrpc
 import com.digitalasset.canton.concurrent.{
@@ -62,7 +63,9 @@ class WalletAppBootstrap(
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
-    val store = WalletAppStore(storage, loggerFactory)
+    val coinStore = AppCoinStore(storage, loggerFactory)
+    val partyStore = WalletAppPartyStore(storage, loggerFactory)
+    val store = WalletAppRequestStore(storage, loggerFactory)
 
     val ledgerClient =
       createLedgerClient(config.remoteParticipant, walletAppParameters.processingTimeouts)
@@ -77,6 +80,7 @@ class WalletAppBootstrap(
     adminServerRegistry.addService(
       WalletServiceGrpc.bindService(
         new GrpcWalletService(
+          coinStore,
           store,
           ledgerClient,
           scanConnection,
@@ -97,6 +101,8 @@ class WalletAppBootstrap(
       ) // TODO(i353) move away from dar upload during init
     } yield {
       val automation = new WalletAutomationService(
+        coinStore,
+        partyStore,
         store,
         config.serviceUser,
         walletServicePartyId,
@@ -108,7 +114,7 @@ class WalletAppBootstrap(
         config,
         walletAppParameters,
         storage,
-        store,
+        partyStore,
         automation,
         scanConnection,
         clock,

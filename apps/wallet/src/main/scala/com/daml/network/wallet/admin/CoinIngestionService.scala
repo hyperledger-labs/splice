@@ -8,13 +8,15 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.daml.network.codegen.{CC => coinCodegen}
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
+import com.daml.network.store.AppCoinStore
 import com.daml.network.util.Contract
-import com.daml.network.wallet.store.WalletAppStore
+import com.daml.network.wallet.store.WalletAppRequestStore
 
 import scala.concurrent.Future
 
 class CoinIngestionService(
-    store: WalletAppStore,
+    coinStore: AppCoinStore,
+    store: WalletAppRequestStore,
     protected val loggerFactory: NamedLoggerFactory,
 ) extends LedgerAutomationService
     with NamedLogging {
@@ -30,10 +32,10 @@ class CoinIngestionService(
   ): Future[Unit] = Future.successful {
     DecodeUtil
       .decodeAllCreated(coinCodegen.Coin.Coin)(tx)
-      .foreach(c => store.addCoin(Contract.fromCodegenContract(c)))
+      .foreach(c => coinStore.addCoin(Contract.fromCodegenContract(c)))
     DecodeUtil
       .decodeAllArchived(coinCodegen.Coin.Coin)(tx)
-      .foreach(cid => store.archiveCoin(cid))
+      .foreach(cid => coinStore.archiveCoin(cid))
 
     DecodeUtil
       .decodeAllCreated(walletCodegen.AppPaymentRequest)(tx)
