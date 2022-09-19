@@ -108,7 +108,7 @@ object DamlPlugin extends AutoPlugin {
         val allDamlFiles =
           damlSourceDirectory.value ** "*.daml" --- (damlSourceDirectory.value ** ".daml" ** "*.daml")
         val damlProjectFiles =
-          damlSourceDirectory.value ** "daml.yaml" // TODO(i190) Expecting the `daml.yaml` project file to reside in the source dir is not consistent with SDK paths (daml.yaml at root, source under `./daml`)
+          damlSourceDirectory.value ** "daml.yaml"
 
         val buildDependencies = damlBuildOrder.value
 
