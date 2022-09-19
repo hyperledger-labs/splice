@@ -152,21 +152,14 @@ No installation of `lnav` is required, as it is provided by default by our `dire
 
 ### Running the preflight check
 
-The preflight check runs an integration test where a local validator connects to a global canton network.
+The preflight check runs an integration test where a local validator
+connects to a global canton network. To run the check against a
+cluster (see section `GCE Clusters`), change into the cluster's
+deployment directory and run `cncluster preflight`:
 
-To run the preflight check against devnet (see section `GCE Clusters`), use
 ```
-sbt "testOnly *PreflightIntegrationTest"
-```
-
-To run the preflight check against ScratchNet, use
-```
-sbt -DDOMAIN_URL=http://scratch.network.canton.global:5008 -DNETWORK_APPS_ADDRESS=scratch.network.canton.global "testOnly *PreflightIntegrationTest"
-```
-
-To run the preflight check against Staging, use
-```
-sbt -DDOMAIN_URL=http://staging.network.canton.global:5008 -DNETWORK_APPS_ADDRESS=staging.network.canton.global "testOnly *PreflightIntegrationTest"
+cd deployment/devnet
+cncluster preflight
 ```
 
 Note that the preflight check will fail if you branch is sufficiently divergent from the main branch

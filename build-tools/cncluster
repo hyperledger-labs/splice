@@ -246,6 +246,13 @@ function cluster_ipaddr() {
     fi
 }
 
+function cluster_preflight() {
+    (cd ${REPO_ROOT} && \
+         sbt -DDOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 \
+             -DNETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global \
+             "testOnly *PreflightIntegrationTest")
+}
+
 function cluster_push() {
     module=$1
 
@@ -313,6 +320,10 @@ case "${SUBCOMMAND_NAME}" in
         cluster_ipaddr $@
         ;;
 
+    preflight)
+        cluster_preflight $@
+        ;;
+
     push)
         cluster_push $@
         ;;
@@ -322,7 +333,7 @@ case "${SUBCOMMAND_NAME}" in
         ;;
 
     *)
-	    _error "Usage: $SCRIPTNAME {activate|apply|create|check|delete|ipaddr|push|reset}" >&2
+	    _error "Usage: $SCRIPTNAME {activate|apply|create|check|delete|deploy|ipaddr|push|reset}" >&2
 	    exit 3
 	    ;;
 esac
