@@ -188,6 +188,7 @@ function cluster_check() {
     _check_cluster_grpc_port 5005 "SVC App API"
     _check_cluster_grpc_port 5012 "Scan App API"
 
+    _log "Checking cluster via ping test..."
     _check_cluster_ledger
 }
 
