@@ -159,9 +159,14 @@ To run the preflight check against devnet (see section `GCE Clusters`), use
 sbt "testOnly *PreflightIntegrationTest"
 ```
 
-To run the preflight check against scratchnet, use
+To run the preflight check against ScratchNet, use
 ```
 sbt -DDOMAIN_URL=http://scratch.network.canton.global:5008 -DNETWORK_APPS_ADDRESS=scratch.network.canton.global "testOnly *PreflightIntegrationTest"
+```
+
+To run the preflight check against Staging, use
+```
+sbt -DDOMAIN_URL=http://staging.network.canton.global:5008 -DNETWORK_APPS_ADDRESS=staging.network.canton.global "testOnly *PreflightIntegrationTest"
 ```
 
 Note that the preflight check will fail if you branch is sufficiently divergent from the main branch
@@ -368,11 +373,12 @@ Below we list additional rules specific to our project:
 ## GCE Clusters
 
 The public Canton Network clusters are currently hosted in Google
-Cloud. There are two clusters, both of which are accessible only
+Cloud. There are multiple clusters, all of which are accessible only
 through VPN.
 
 * DevNet - http://dev.network.canton.global
 * ScratchNet - http://scratch.network.canton.global
+* Staging - http://staging.network.canton.global
 
 The DevNet cluster is automatically updated every day at
 [0650 UTC](/.circleci/run-schedule-pipeline.json) via
