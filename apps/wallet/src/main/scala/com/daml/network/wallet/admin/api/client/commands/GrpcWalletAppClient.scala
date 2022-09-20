@@ -3,14 +3,14 @@ package com.daml.network.wallet.admin.api.client.commands
 import cats.syntax.either._
 import cats.syntax.traverse._
 import com.daml.ledger.client.binding.Primitive
+import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
+import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.util.{Contract, Proto, Value}
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.WalletServiceGrpc.WalletServiceStub
+import com.daml.network.wallet.v0.{GetBalanceRequest, GetBalanceResponse, WalletContext}
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
-import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
-import com.daml.network.codegen.CN.{Wallet => walletCodegen}
-import com.daml.network.wallet.v0.{GetBalanceRequest, GetBalanceResponse, WalletContext}
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
 

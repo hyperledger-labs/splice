@@ -1,12 +1,12 @@
 package com.daml.network.splitwise.admin.api.client.commands
 
 import cats.implicits._
+import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
 import com.daml.network.splitwise.v0
 import com.daml.network.splitwise.v0.SplitwiseServiceGrpc.SplitwiseServiceStub
 import com.daml.network.util.{Contract, Proto}
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
-import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
 

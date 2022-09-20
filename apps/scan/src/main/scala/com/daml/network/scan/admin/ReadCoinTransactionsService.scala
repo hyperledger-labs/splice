@@ -1,31 +1,29 @@
 package com.daml.network.scan.admin
 
 import com.daml.ledger.api.refinements.ApiTypes
+import com.daml.ledger.api.v1
 import com.daml.ledger.api.v1.event.ExercisedEvent
 import com.daml.ledger.api.v1.transaction.TreeEvent.Kind.{Created, Empty, Exercised}
 import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree, TreeEvent}
-import com.daml.ledger.client.binding.{Primitive, ValueDecoder, Value => CodegenValue}
+import com.daml.ledger.client.binding
+import com.daml.ledger.client.binding.{Primitive, Value => CodegenValue, ValueDecoder}
 import com.daml.network.admin.LedgerAutomationService
-import com.daml.network.util.Trees
+import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
+import com.daml.network.codegen.CC.CoinRules.CoinRules
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history._
 import com.daml.network.scan.store.ScanCCHistoryStore
-import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
-import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
+import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion, Trees}
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
-import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
-import com.daml.network.codegen.CC.CoinRules.CoinRules
-
-import scala.collection.{concurrent, mutable}
-import scala.concurrent.{ExecutionContext, Future}
-import com.daml.ledger.api.v1
-import com.daml.ledger.client.binding
 
 import scala.collection.concurrent.TrieMap
+import scala.collection.{concurrent, mutable}
+import scala.concurrent.{ExecutionContext, Future}
 
 class ReadCoinTransactionsService(
     svcParty: PartyId,

@@ -6,7 +6,13 @@ import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
 import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.daml.ledger.api.domain.UserRight
+import com.daml.ledger.api.domain.UserRight.{CanActAs, CanReadAs}
 import com.daml.ledger.api.refinements.ApiTypes.{ApplicationId, ContractId, TemplateId, WorkflowId}
+import com.daml.ledger.api.v1.command_service.{
+  SubmitAndWaitForTransactionResponse,
+  SubmitAndWaitForTransactionTreeResponse,
+  SubmitAndWaitRequest,
+}
 import com.daml.ledger.api.v1.commands.Commands.DeduplicationPeriod
 import com.daml.ledger.api.v1.commands.{Command, Commands}
 import com.daml.ledger.api.v1.event.CreatedEvent
@@ -16,14 +22,15 @@ import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, Tra
 import com.daml.ledger.api.v1.value.Identifier
 import com.daml.ledger.client.binding.{
   Contract,
-  TemplateCompanion,
-  ValueDecoder,
   Primitive => P,
+  TemplateCompanion,
   Value => CodegenValue,
+  ValueDecoder,
 }
+import com.daml.network.util.UploadablePackage
+import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.error.ErrorCodeUtils
-import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
@@ -31,6 +38,7 @@ import com.digitalasset.canton.lifecycle.{
   SyncCloseable,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
@@ -42,20 +50,11 @@ import com.digitalasset.canton.util.retry.RetryUtil.{
   TransientErrorKind,
 }
 import com.digitalasset.canton.util.{AkkaUtil, retry}
+import com.google.protobuf.ByteString
 import io.grpc.StatusRuntimeException
 import scalaz.syntax.tag._
 
 import java.util.UUID
-import com.daml.ledger.api.domain.UserRight.{CanActAs, CanReadAs}
-import com.daml.ledger.api.v1.command_service.{
-  SubmitAndWaitForTransactionResponse,
-  SubmitAndWaitForTransactionTreeResponse,
-  SubmitAndWaitRequest,
-}
-import com.daml.network.util.UploadablePackage
-import com.digitalasset.canton.concurrent.Threading
-import com.google.protobuf.ByteString
-
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success, Try}

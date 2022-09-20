@@ -3,14 +3,14 @@ package com.daml.network.wallet.admin
 import com.daml.ledger.api.v1.transaction.Transaction
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.admin.LedgerAutomationService
-import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.TraceContext
-import com.daml.network.codegen.{CC => coinCodegen}
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
+import com.daml.network.codegen.{CC => coinCodegen}
 import com.daml.network.store.AppCoinStore
 import com.daml.network.util.Contract
 import com.daml.network.wallet.store.WalletAppRequestStore
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.Future
 

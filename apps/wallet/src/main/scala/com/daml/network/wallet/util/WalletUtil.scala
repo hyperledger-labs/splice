@@ -2,9 +2,9 @@ package com.daml.network.wallet.util
 
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.Primitive
-import com.daml.network.util.UploadablePackage
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.participant.ledger.api.client.{DecodeUtil, LedgerConnection}
 import com.digitalasset.canton.topology.PartyId

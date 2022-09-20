@@ -1,18 +1,18 @@
 package com.daml.network.scan.admin
 
 import com.daml.ledger.api.v1.transaction.Transaction
+import com.daml.ledger.client.binding
 import com.daml.network.admin.LedgerAutomationService
+import com.daml.network.codegen.CC.{Round => roundCodegen}
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.scan.store.ScanCCHistoryStore
-import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import com.daml.network.codegen.CC.{Round => roundCodegen}
 
 import scala.concurrent.Future
-import com.daml.ledger.client.binding
 
 class ReadReferenceDataService(
     svcParty: PartyId,

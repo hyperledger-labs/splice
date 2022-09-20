@@ -3,14 +3,14 @@ package com.daml.network.svc.admin
 import com.daml.ledger.api.v1.transaction.Transaction
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.admin.LedgerAutomationService
-import com.daml.network.environment.CoinLedgerConnection
-import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
-import com.digitalasset.canton.lifecycle.Lifecycle
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
 import com.daml.network.codegen.CC.CoinRules.CoinRulesRequest
 import com.daml.network.codegen.CC.Round.{IssuingMiningRound, OpenMiningRound}
+import com.daml.network.environment.CoinLedgerConnection
+import com.digitalasset.canton.lifecycle.Lifecycle
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 

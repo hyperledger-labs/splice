@@ -2,9 +2,6 @@ package com.daml.network.history
 
 import cats.syntax.traverse._
 import com.daml.ledger.client.binding.{Primitive => P}
-import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
-import com.daml.network.v0
-import com.digitalasset.canton.ProtoDeserializationError
 import com.daml.network.codegen.CC.Coin.{
   Coin,
   Coin_OwnerExpireLock,
@@ -19,6 +16,9 @@ import com.daml.network.codegen.CC.CoinRules.{
   TransferResult,
 }
 import com.daml.network.codegen.CC.Round.IssuingMiningRound
+import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
+import com.daml.network.v0
+import com.digitalasset.canton.ProtoDeserializationError
 
 /** Parent node of a Canton coin create or archive within the corresponding transaction tree. */
 sealed trait ParentNode {

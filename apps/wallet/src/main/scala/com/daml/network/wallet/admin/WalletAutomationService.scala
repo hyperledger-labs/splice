@@ -4,10 +4,10 @@ import akka.stream.Materializer
 import com.daml.network.admin.LedgerAutomationServiceOrchestrator
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.store.AppCoinStore
+import com.daml.network.wallet.store.{WalletAppPartyStore, WalletAppRequestStore}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.daml.network.wallet.store.{WalletAppPartyStore, WalletAppRequestStore}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.FutureUtil
 import io.opentelemetry.api.trace.Tracer

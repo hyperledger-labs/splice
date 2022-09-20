@@ -2,20 +2,20 @@ package com.daml.network.wallet.admin.grpc
 
 import cats.implicits._
 import com.daml.ledger.client.binding.{Primitive, Template, ValueDecoder}
+import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
+import com.daml.network.codegen.CN.{Wallet => walletCodegen}
+import com.daml.network.codegen.DA
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.store.AppCoinStore
 import com.daml.network.util.{CoinUtil, Contract, Proto, Value}
+import com.daml.network.wallet.store.WalletAppRequestStore
 import com.daml.network.wallet.util.WalletUtil
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.{InitializeRequest, WalletServiceGrpc}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
-import com.daml.network.codegen.CN.{Wallet => walletCodegen}
-import com.daml.network.codegen.DA
-import com.daml.network.store.AppCoinStore
-import com.daml.network.wallet.store.{WalletAppRequestStore}
 import com.google.protobuf.empty.Empty
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer

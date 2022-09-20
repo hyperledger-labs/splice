@@ -1,7 +1,5 @@
 package com.daml.network.scan
 
-import java.util.concurrent.ScheduledExecutorService
-
 import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either._
@@ -28,6 +26,7 @@ import com.digitalasset.canton.util.retry.RetryUtil.AllExnRetryable
 import com.digitalasset.canton.util.retry.{Backoff, Forever, Success}
 import com.google.protobuf.empty.Empty
 
+import java.util.concurrent.ScheduledExecutorService
 import scala.annotation.nowarn
 import scala.concurrent.Future
 import scala.concurrent.duration._

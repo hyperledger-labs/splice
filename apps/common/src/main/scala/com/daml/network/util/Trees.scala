@@ -5,6 +5,7 @@ package com.daml.network.util
 
 import com.daml.ledger.api.v1.transaction.TreeEvent.Kind.{Created, Empty, Exercised}
 import com.daml.ledger.api.v1.transaction.{TransactionTree, TreeEvent}
+
 import scala.collection.mutable
 
 object Trees {

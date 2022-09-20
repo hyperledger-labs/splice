@@ -1,15 +1,14 @@
 package com.daml.network.store
 
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-
-import scala.concurrent.{ExecutionContext, Future, blocking}
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.CC.Coin.Coin
 import com.daml.network.util.Contract
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.collection.mutable
+import scala.concurrent.{ExecutionContext, Future, blocking}
 
 /** Memory store for unlocked coins on ledger. */
 class InMemoryAppCoinStore(protected val loggerFactory: NamedLoggerFactory)(implicit

@@ -1,6 +1,8 @@
 package com.daml.network.splitwise.admin.grpc
 
 import com.daml.ledger.client.binding.{Contract => CodegenContract, Primitive, Template}
+import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
+import com.daml.network.codegen.DA
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.v0
@@ -9,8 +11,6 @@ import com.daml.network.util.{Contract, Proto}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
-import com.daml.network.codegen.DA
-import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
 

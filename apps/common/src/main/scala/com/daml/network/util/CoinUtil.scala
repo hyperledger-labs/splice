@@ -6,14 +6,14 @@ import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionRespons
 import com.daml.ledger.api.v1.commands.Command
 import com.daml.ledger.client.binding
 import com.daml.ledger.client.binding.Primitive
-import com.daml.network.environment.CoinLedgerConnection
-import com.digitalasset.canton.participant.ledger.api.client.{DecodeUtil, LedgerConnection}
-import com.digitalasset.canton.logging.TracedLogger
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
 import com.daml.network.codegen.CC.Coin.Coin
 import com.daml.network.codegen.CC.CoinRules.CoinRules
 import com.daml.network.codegen.{CC, OpenBusiness}
+import com.daml.network.environment.CoinLedgerConnection
+import com.digitalasset.canton.logging.TracedLogger
+import com.digitalasset.canton.participant.ledger.api.client.{DecodeUtil, LedgerConnection}
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 

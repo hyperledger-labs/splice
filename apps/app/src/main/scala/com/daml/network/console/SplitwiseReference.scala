@@ -6,12 +6,17 @@ import com.daml.ledger.client.binding.{
   Template,
   ValueDecoder,
 }
+import com.daml.network.codegen.CC.Scripts.Util.CCUserHostedAt
+import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen, Wallet => walletCodegen}
+import com.daml.network.codegen.DA
+import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.console.LedgerApiUtils
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.scan.config.RemoteScanAppConfig
 import com.daml.network.splitwise.admin.api.client.commands.GrpcSplitwiseAppClient
 import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
 import com.daml.network.util.Contract
+import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.console.{
   BaseInspection,
   ExternalLedgerApiClient,
@@ -19,13 +24,8 @@ import com.digitalasset.canton.console.{
   Help,
   LocalInstanceReference,
 }
-import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
-import com.daml.network.codegen.CC.Scripts.Util.CCUserHostedAt
-import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen, Wallet => walletCodegen}
-import com.daml.network.codegen.DA
-import com.daml.network.codegen.DA.Time.Types.RelTime
 
 /** Single local Splitwise app reference. Defines the console commands that can be run against a local Splitwise
   * app reference.

@@ -1,10 +1,14 @@
 package com.daml.network.console
 
 import com.daml.ledger.client.binding.Primitive
+import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
+import com.daml.network.codegen.CN.Wallet.PaymentChannel
+import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.util.{Contract, Value}
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
+import com.daml.network.wallet.v0.WalletContext
 import com.digitalasset.canton.console.{
   BaseInspection,
   ConsoleCommandResult,
@@ -14,10 +18,6 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
-import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
-import com.daml.network.codegen.CN.Wallet.PaymentChannel
-import com.daml.network.codegen.CN.{Wallet => walletCodegen}
-import com.daml.network.wallet.v0.WalletContext
 
 import java.util.concurrent.atomic.AtomicReference
 

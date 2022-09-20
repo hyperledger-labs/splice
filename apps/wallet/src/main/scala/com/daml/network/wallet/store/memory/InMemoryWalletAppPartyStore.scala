@@ -1,16 +1,15 @@
 package com.daml.network.wallet.store.memory
 
 import akka.NotUsed
-import akka.stream.{Materializer, OverflowStrategy}
 import akka.stream.scaladsl.Source
+import akka.stream.{Materializer, OverflowStrategy}
 import com.daml.network.wallet.store.WalletAppPartyStore
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-
-import scala.concurrent.{ExecutionContext, Future, blocking}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.collection.mutable
+import scala.concurrent.{ExecutionContext, Future, blocking}
 
 class InMemoryWalletAppPartyStore(override protected val loggerFactory: NamedLoggerFactory)(implicit
     ec: ExecutionContext,

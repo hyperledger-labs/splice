@@ -1,11 +1,11 @@
 package com.daml.network.wallet.store
 
-import com.daml.network.wallet.store.memory.InMemoryWalletAppRequestStore
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.util.Contract
+import com.daml.network.wallet.store.memory.InMemoryWalletAppRequestStore
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 

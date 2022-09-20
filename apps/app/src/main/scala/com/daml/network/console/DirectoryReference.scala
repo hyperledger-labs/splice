@@ -1,6 +1,8 @@
 package com.daml.network.console
 
 import com.daml.ledger.client.binding.Primitive
+import com.daml.network.codegen.CN.{Directory => codegen, Wallet => walletCodegen}
+import com.daml.network.codegen.DA
 import com.daml.network.directory.admin.api.client.commands.GrpcDirectoryAppClient
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.environment.CoinConsoleEnvironment
@@ -14,8 +16,6 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
-import com.daml.network.codegen.DA
-import com.daml.network.codegen.CN.{Directory => codegen, Wallet => walletCodegen}
 
 abstract class DirectoryAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,

@@ -1,10 +1,10 @@
 package com.daml.network.store
 
-import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.CC.{Coin => coinCodegen}
 import com.daml.network.util.Contract
+import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 

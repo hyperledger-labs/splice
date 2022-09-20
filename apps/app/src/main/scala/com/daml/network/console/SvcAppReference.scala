@@ -1,6 +1,7 @@
 package com.daml.network.console
 
 import com.daml.ledger.client.binding.Primitive.ContractId
+import com.daml.network.codegen.CC.{Round => roundCodegen}
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.svc.admin.api.client.commands.GrpcSvcAppClient
 import com.daml.network.svc.config.{LocalSvcAppConfig, RemoteSvcAppConfig}
@@ -12,7 +13,6 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
-import com.daml.network.codegen.CC.{Round => roundCodegen}
 
 abstract class SvcAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,

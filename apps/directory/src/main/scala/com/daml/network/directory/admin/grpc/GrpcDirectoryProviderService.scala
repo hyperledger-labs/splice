@@ -1,18 +1,18 @@
 package com.daml.network.directory.admin.grpc
 
 import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.client.binding.{Primitive}
-import com.daml.network.environment.CoinLedgerClient
+import com.daml.ledger.client.binding.Primitive
+import com.daml.network.codegen.CN.{Directory => codegen, Wallet => walletCodegen}
+import com.daml.network.codegen.DA
+import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.directory.v0
 import com.daml.network.directory.v0.DirectoryServiceGrpc
+import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.{Contract, Proto}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
-import com.daml.network.codegen.CN.{Directory => codegen, Wallet => walletCodegen}
-import com.daml.network.codegen.DA
-import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.google.protobuf.empty.Empty
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
