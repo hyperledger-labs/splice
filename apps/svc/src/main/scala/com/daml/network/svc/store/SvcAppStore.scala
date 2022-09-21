@@ -1,6 +1,6 @@
 package com.daml.network.svc.store
 
-import com.daml.network.codegen.CC.CoinRules.TransferResult
+import com.daml.network.codegen.CC.CoinRules.{TransferResult, TransferSummary}
 import com.daml.network.svc.store.memory.InMemorySvcAppStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -13,6 +13,7 @@ trait SvcAppStore extends AutoCloseable {
   def increment(int: Int)(implicit tc: TraceContext): Future[Int]
 
   def addTransfers(transfers: Seq[TransferResult]): Future[Unit]
+  def getTransferSummariesPerRound(round: Long): Seq[TransferSummary]
 }
 
 object SvcAppStore {

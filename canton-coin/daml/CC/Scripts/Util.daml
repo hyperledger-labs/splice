@@ -182,6 +182,15 @@ runNextIssuance app coinPrice = do
     imcs <- queryFilter @IssuingMiningRound app.svc (\r -> r.obs == app.svc)
     forA_ imcs $ \(miningRoundCid, _) ->
       submitExerciseCoinRulesByKey app [app.svc] [] app.svc CoinRules_MiningRound_Close with
+        totalTransferFees = 0.0
+        totalAdminFees = 0.0
+        totalHoldingFees = 0.0
+        totalTransferInputs = 0.0
+        totalNonSelfTransferOutputs = 0.0
+        totalSelfTransferOutputs = 0.0
+        -- Putting actual values here would require duplicating the logic from
+        -- the svc app here, and is not currently required for any of the existing
+        -- tests.
         miningRoundCid
 
     -- transition current OpenMiningRound into an IssuingMiningRound

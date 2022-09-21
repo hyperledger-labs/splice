@@ -69,6 +69,7 @@ class SvcAppBootstrap(
     val service = new GrpcSvcAppService(
       ledgerClient,
       config.damlUser,
+      svcStore,
       loggerFactory,
     )
 

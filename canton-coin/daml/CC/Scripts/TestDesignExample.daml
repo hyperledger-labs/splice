@@ -122,8 +122,13 @@ test = do
     preprocessedOutputs = []
     numUnlockedSenderCoins = 1
     receiverFees = Map.fromList [(arbiter, 0.01)]
+    totalSelfOutputs = 1000.25
+    totalNonSelfOutputs = 1.0
   note.summary === TransferSummary with
     numOutputs = 3
+    inQuantity = 1005.2499855325
+    nonSelfOutQuantity = 0.99
+    selfOutQuantity = 1004.1299855325
     quantityBalance = 3.8799855325
     numFloatingCoins = 1
     totalTransferFees = 0.01

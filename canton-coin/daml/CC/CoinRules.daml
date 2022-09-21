@@ -148,16 +148,35 @@ template CoinRules
       : ContractId ClosedMiningRound
       with
         miningRoundCid : ContractId IssuingMiningRound
+        totalTransferFees : Decimal
+        totalAdminFees : Decimal
+        totalHoldingFees : Decimal
+        totalTransferInputs : Decimal -- after deducting holding fees
+        totalNonSelfTransferOutputs : Decimal -- sum of outputs where receiver != sender
+        totalSelfTransferOutputs : Decimal -- sum of outputs where receiver == sender
       controller svc
       do
         -- archive issuing mining round
         miningRound <- fetch miningRoundCid
         archive miningRoundCid
         assertMsg "SVC matches" (miningRound.svc == svc)
+        assertMsg "Non-negative transfer fees" (totalTransferFees >= 0.0)
+        assertMsg "Non-negative admin fees" (totalAdminFees >= 0.0)
+        assertMsg "Non-negative holding fees" (totalHoldingFees >= 0.0)
+        assertMsg "Fees cannot exceed transfer inputs" (totalAdminFees + totalHoldingFees <= totalTransferInputs)
+        assertMsg "transfer outputs cannot exceed transfer inputs" (totalSelfTransferOutputs + totalNonSelfTransferOutputs <= totalTransferInputs)
+        assertMsg "transfer inputs + fees must match outputs" ((totalTransferInputs + totalTransferFees + totalAdminFees + totalHoldingFees) == (totalSelfTransferOutputs + totalNonSelfTransferOutputs))
+
         -- create closing round
         create ClosedMiningRound with
           svc
           obs
+          totalTransferFees
+          totalAdminFees
+          totalHoldingFees
+          totalTransferInputs
+          totalNonSelfTransferOutputs
+          totalSelfTransferOutputs
           round = miningRound.round
 
     nonconsuming choice CoinRules_MiningRound_Archive
@@ -317,6 +336,7 @@ executeTransfer config0 svc validator t = do
   -- distribute floating outputs
   let distributed = distributeOutputs openRound.round config svc t.sender summary osum.preprocessedOutputs
   summary <- pure $ mergeReceiverFees distributed.receiverFees summary
+  summary <- pure $ mergeDistributedOutputs distributed t.sender summary
   -- record debugging note
   create TransferDebugNote with transfer = t; scaledConfig = config; round = issuanceState.currentRound; ..
   -- issue rewards for burns
@@ -344,6 +364,8 @@ data TransferOutputsSummary = TransferOutputsSummary with
     senderTransferFees : Decimal
     preprocessedOutputs : [PreprocessedTransferOutput]
     receiverFees : Map Party Decimal
+    totalSelfOutputs : Decimal -- sum of output coins (including floating) where receiver != sender
+    totalNonSelfOutputs : Decimal -- sum of output coins (including floating) where receiver == sender
   deriving (Eq, Show)
 
 data PreprocessedTransferOutputType
@@ -360,6 +382,9 @@ data PreprocessedTransferOutput = PreprocessedTransferOutput with
   deriving (Eq, Show)
 
 data TransferSummary = TransferSummary with
+    inQuantity : Decimal -- Total input coins, after deducting holding fees
+    selfOutQuantity : Decimal -- Total of output coins where sender == receiver
+    nonSelfOutQuantity : Decimal -- Total of output coins where sender != receiver
     numInputs : Int
     numOutputs : Int
     quantityBalance : Decimal
@@ -382,6 +407,24 @@ mergeReceiverFees fees summary =
       summary.receiverFees
       fees
     totalTransferFees = summary.totalTransferFees + sum (Map.values fees)
+
+-- | Add floating outputs to the transfer summary.
+mergeDistributedOutputs : DistributedOutputs -> Party -> TransferSummary -> TransferSummary
+mergeDistributedOutputs distributed sender summary = 
+    let selfOut = foldl sumSelfOut 0.0 distributed.coins
+        nonSelfOut = foldl sumNonSelfOut 0.0 distributed.coins
+    in summary with
+      selfOutQuantity = selfOut
+      nonSelfOutQuantity = nonSelfOut
+  where
+    sumSelfOut st distCoin = 
+      if distCoin.owner == sender
+        then st + distCoin.quantity
+        else st
+    sumNonSelfOut st distCoin =
+      if distCoin.owner == sender
+        then st
+        else st + distCoin.quantity
 
 summarizeAndConsumeInputs : Round -> CoinConfig CC -> Party -> Party -> Party -> [TransferInput] -> Update TransferInputsSummary
 summarizeAndConsumeInputs now config svc sender validator inps = do
@@ -449,6 +492,8 @@ preprocessAndSummarizeOutputs config sender outs = do
       numFloatingCoins = 0
       preprocessedOutputs = []
       receiverFees = Map.empty
+      totalSelfOutputs = 0.0
+      totalNonSelfOutputs = 0.0
 
     summarizeOutput s (OutputSenderCoin with exactQuantity; lock) = do
       -- check validity of locking request
@@ -473,6 +518,8 @@ preprocessAndSummarizeOutputs config sender outs = do
         numFloatingCoins = s.numFloatingCoins + (if isSome exactQuantity then 0 else 1)
         preprocessedOutputs = output :: s.preprocessedOutputs
         receiverFees = s.receiverFees
+        totalSelfOutputs = s.totalSelfOutputs + fromOptional 0.0 exactQuantity -- floating amounts will be added after distribution
+        totalNonSelfOutputs = s.totalNonSelfOutputs
 
     summarizeOutput s (OutputReceiverCoin with receiver; coinType) = do
       let (receiverFee, senderTransferFee, preprocessedType) =
@@ -508,11 +555,18 @@ preprocessAndSummarizeOutputs config sender outs = do
           FloatingReceiverCoin -> 1
         preprocessedOutputs = output :: s.preprocessedOutputs
         receiverFees = Map.alter (\old -> Some (receiverFee + fromOptional 0.0 old)) receiver s.receiverFees
+        totalSelfOutputs = s.totalSelfOutputs
+        totalNonSelfOutputs = s.totalNonSelfOutputs + case coinType of
+          FixedReceiverCoin{quantity} -> quantity
+          FloatingReceiverCoin{} -> 0.0 -- floating amounts will be added after distribution
 
 
 summarizeTransfer : CoinConfig CC -> TransferInputsSummary -> TransferOutputsSummary -> Update TransferSummary
 summarizeTransfer config inp out = do
     return TransferSummary with
+      inQuantity = inQuantity
+      nonSelfOutQuantity = out.totalNonSelfOutputs
+      selfOutQuantity = out.totalSelfOutputs
       quantityBalance = inp.totalQuantity - out.requiredQuantity - senderActionFees - out.senderTransferFees
       numFloatingCoins = out.numFloatingCoins
       receiverFees = out.receiverFees
@@ -531,6 +585,7 @@ summarizeTransfer config inp out = do
     coinLockFees = config.updateFee.fee * intToDecimal out.numLockedSenderCoins
     senderActionFees = coinCreateFees + coinUpdateFees + coinLockFees
     totalTransferFees = out.senderTransferFees + sum (Map.values out.receiverFees)
+    inQuantity = inp.totalQuantity
 
 
 issueRewards : CoinConfig CC -> OpenMiningRound -> Party -> TransferSummary -> Update ()

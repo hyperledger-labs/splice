@@ -36,5 +36,8 @@ class InMemorySvcAppStore(override protected val loggerFactory: NamedLoggerFacto
     }
   }
 
+  def getTransferSummariesPerRound(round: Long): Seq[TransferSummary] =
+    transfersPerRound.get(round).getOrElse(Seq())
+
   override def close(): Unit = ()
 }

@@ -12,6 +12,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ledger.api.client.{DecodeUtil, LedgerConnection}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
+import com.daml.network.svc.store.SvcAppStore
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
 
@@ -20,6 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class GrpcSvcAppService(
     ledgerClient: CoinLedgerClient,
     svcUserName: String,
+    store: SvcAppStore,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -156,10 +158,19 @@ class GrpcSvcAppService(
       for {
         svc <- connection.getPrimaryParty(svcUserName)
         openRounds <- getRounds(CC.Round.IssuingMiningRound)(_.round, _.obs)(svc, request.round)
+        totals = getTotalsPerRound(request.round)
         cmds = openRounds.toList.map { case (v, cid) =>
           CC.CoinRules.CoinRules
             .key(DA.Types.Tuple2(svc.toPrim, v))
-            .exerciseCoinRules_MiningRound_Close(cid)
+            .exerciseCoinRules_MiningRound_Close(
+              cid,
+              totals.transferFees,
+              totals.adminFees,
+              totals.holdingFees,
+              totals.transferInputs,
+              totals.nonSelfTransferOutputs,
+              totals.selfTransferOutputs,
+            )
             .command
         }
         submitResults <- cmds.traverse { cmd =>
@@ -171,6 +182,31 @@ class GrpcSvcAppService(
         )
       )
     }
+
+  private case class RoundTotals(
+      transferFees: BigDecimal = 0.0,
+      adminFees: BigDecimal = 0.0,
+      holdingFees: BigDecimal = 0.0,
+      transferInputs: BigDecimal = 0.0,
+      nonSelfTransferOutputs: BigDecimal = 0.0,
+      selfTransferOutputs: BigDecimal = 0.0,
+  )
+
+  private def getTotalsPerRound(round: Long): RoundTotals = {
+    val transfers = store.getTransferSummariesPerRound(round)
+    val totals = RoundTotals()
+    transfers.foldLeft(totals)((t, transfer) => {
+      RoundTotals(
+        t.transferFees + transfer.totalTransferFees,
+        t.adminFees + transfer.senderAdminFees,
+        t.holdingFees + transfer.senderHoldingFees,
+        t.transferInputs + transfer.inQuantity,
+        t.nonSelfTransferOutputs + transfer.nonSelfOutQuantity,
+        t.selfTransferOutputs + transfer.selfOutQuantity,
+      )
+    })
+    totals
+  }
 
   override def archiveRound(request: v0.ArchiveRoundRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>

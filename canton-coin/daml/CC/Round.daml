@@ -71,6 +71,12 @@ template ClosedMiningRound
   with
     svc : Party
     round : Round
+    totalTransferFees : Decimal
+    totalAdminFees : Decimal
+    totalHoldingFees : Decimal
+    totalTransferInputs : Decimal -- after deducting holding fees
+    totalNonSelfTransferOutputs : Decimal -- sum of outputs where receiver != sender
+    totalSelfTransferOutputs : Decimal -- sum of outputs where receiver == sender
     obs : Party -- TODO(M1-06): remove workaround for explicit disclosure
   where
     signatory svc
