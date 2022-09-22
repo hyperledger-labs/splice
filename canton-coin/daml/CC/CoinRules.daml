@@ -165,7 +165,7 @@ template CoinRules
         assertMsg "Non-negative holding fees" (totalHoldingFees >= 0.0)
         assertMsg "Fees cannot exceed transfer inputs" (totalAdminFees + totalHoldingFees <= totalTransferInputs)
         assertMsg "transfer outputs cannot exceed transfer inputs" (totalSelfTransferOutputs + totalNonSelfTransferOutputs <= totalTransferInputs)
-        assertMsg "transfer inputs + fees must match outputs" ((totalTransferInputs + totalTransferFees + totalAdminFees + totalHoldingFees) == (totalSelfTransferOutputs + totalNonSelfTransferOutputs))
+        assertMsg "transfer inputs - fees must match outputs" ((totalTransferInputs - totalTransferFees - totalAdminFees) == (totalSelfTransferOutputs + totalNonSelfTransferOutputs))
 
         -- create closing round
         create ClosedMiningRound with
