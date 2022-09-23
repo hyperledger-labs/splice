@@ -66,7 +66,7 @@ class RoundSummaryCollectionService(
 
   override def close(): Unit = Lifecycle.close(connection)(logger)
 
-  //TODO(i775) all code below has been copied over from scan's ReadCoinTransactionService. Move it to some shared util place instead - potentially to ExerciseNodeCompanion.
+  //TODO(i844) all code below has been copied over from scan's ReadCoinTransactionService. Move it to some shared util place instead - potentially to ExerciseNodeCompanion.
 
   private def tryDecode[A](
       value: v1.value.Value
