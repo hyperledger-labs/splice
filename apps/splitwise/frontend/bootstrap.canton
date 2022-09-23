@@ -5,10 +5,10 @@ Seq(aliceSplitwiseBackend.remoteParticipant, bobSplitwiseBackend.remoteParticipa
 
 val aliceValidatorParty = aliceValidator.initialize()
 aliceWallet.initialize(aliceValidatorParty)
-val aliceUserParty = aliceValidator.onboardUser("alice_wallet_user")
+val aliceUserParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
 val bobValidatorParty = bobValidator.initialize()
 bobWallet.initialize(bobValidatorParty)
-val bobUserParty = bobValidator.onboardUser("bob_wallet_user")
+val bobUserParty = bobValidator.onboardUser(bobRemoteWallet.config.damlUser)
 directoryValidator.initialize()
 
 val aliceRequestCid = aliceDirectory.requestDirectoryInstall()
@@ -28,10 +28,10 @@ directoryBackend.listEntryRequests().foreach { case request =>
 
 val aliceCoin = aliceRemoteWallet.tap(5.0)
 utils.retry_until_true { aliceRemoteWallet.listAppPaymentRequests().length == 1 }
-val aliceAccepted = aliceRemoteWallet.acceptAppPaymentRequest(aliceRemoteWallet.listAppPaymentRequests()(0).contractId, aliceCoin)
+val aliceAccepted = aliceRemoteWallet.acceptAppPaymentRequest(aliceRemoteWallet.listAppPaymentRequests()(0).contractId)
 val bobCoin = bobRemoteWallet.tap(5.0)
 utils.retry_until_true { bobRemoteWallet.listAppPaymentRequests().length == 1 }
-val bobAccepted = bobRemoteWallet.acceptAppPaymentRequest(bobRemoteWallet.listAppPaymentRequests()(0).contractId, bobCoin)
+val bobAccepted = bobRemoteWallet.acceptAppPaymentRequest(bobRemoteWallet.listAppPaymentRequests()(0).contractId)
 
 val directoryParty = directoryBackend.getProviderPartyId()
 directoryBackend.remoteParticipant.ledger_api.acs.await_active_contract(directoryParty, ContractId.assertFromString(aliceAccepted.toString))
