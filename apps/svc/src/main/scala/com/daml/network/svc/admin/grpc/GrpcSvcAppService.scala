@@ -194,8 +194,7 @@ class GrpcSvcAppService(
 
   private def getTotalsPerRound(round: Long): RoundTotals = {
     val transfers = store.getTransferSummariesPerRound(round)
-    val totals = RoundTotals()
-    transfers.foldLeft(totals)((t, transfer) => {
+    transfers.foldLeft(RoundTotals())((t, transfer) => {
       RoundTotals(
         t.transferFees + transfer.totalTransferFees,
         t.adminFees + transfer.senderAdminFees,
@@ -205,7 +204,6 @@ class GrpcSvcAppService(
         t.selfTransferOutputs + transfer.selfOutQuantity,
       )
     })
-    totals
   }
 
   override def archiveRound(request: v0.ArchiveRoundRequest): Future[Empty] =
