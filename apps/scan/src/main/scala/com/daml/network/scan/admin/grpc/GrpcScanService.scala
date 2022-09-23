@@ -5,11 +5,15 @@ import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.store.ScanCCHistoryStore
 import com.daml.network.scan.v0
 import com.daml.network.scan.v0.{
+  GetClosedRoundsResponse,
   GetCoinTransactionDetailsRequest,
   GetCoinTransactionDetailsResponse,
   GetHistoryResponse,
   ScanServiceGrpc,
 }
+import com.daml.network.codegen.CC.{Round => roundCodegen}
+import com.daml.network.util.Contract
+//import com.daml.network.util.Proto
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
 import com.google.protobuf.empty.Empty
@@ -70,4 +74,24 @@ class GrpcScanService(
         )
       } yield v0.GetCoinTransactionDetailsResponse(Some(tree))
   }
+
+  override def getClosedRounds(request: Empty): Future[GetClosedRoundsResponse] =
+    withSpanFromGrpcContext("GrpcScanService") { traceContext => span =>
+      for {
+        svc <- connection.getPrimaryParty(svcUser)
+        rounds <- connection.activeContracts(svc, roundCodegen.ClosedMiningRound)
+      } yield {
+        val filteredRounds = rounds
+          .filter(r =>
+            r.value.obs == r.value.svc
+          ) // TODO(M1-06): this filter is needed only due to the explicit disclosure workaround
+          .sortWith(_.value.round.number > _.value.round.number)
+        v0.GetClosedRoundsResponse(
+          filteredRounds.map(r =>
+            Contract.fromCodegenContract[roundCodegen.ClosedMiningRound](r).toProtoV0
+          )
+        )
+      }
+    }
+
 }

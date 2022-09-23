@@ -1,10 +1,12 @@
 package com.daml.network.console
 
 import com.daml.ledger.api.v1.transaction.TransactionTree
+import com.daml.network.codegen.CC.Round.ClosedMiningRound
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.history.{CoinTransaction, CoinTransactionTreeView}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
 import com.daml.network.scan.config.{LocalScanAppConfig, RemoteScanAppConfig}
+import com.daml.network.util.Contract
 import com.digitalasset.canton.console.{
   BaseInspection,
   GrpcRemoteInstanceReference,
@@ -60,6 +62,14 @@ abstract class ScanAppReference(
     val tree = getCoinTransactionTree(transactionId)
     CoinTransactionTreeView.fromTree(tree)
   }
+
+  @Help.Summary(
+    "Lists all closed rounds with their collected statistics"
+  )
+  def getClosedRounds(): Seq[Contract[ClosedMiningRound]] =
+    consoleEnvironment.run {
+      adminCommand(GrpcScanAppClient.GetClosedRounds())
+    }
 }
 
 final class LocalScanAppReference(

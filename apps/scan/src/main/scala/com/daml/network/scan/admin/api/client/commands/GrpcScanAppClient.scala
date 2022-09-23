@@ -2,9 +2,12 @@ package com.daml.network.scan.admin.api.client.commands
 import cats.syntax.either._
 import cats.syntax.traverse._
 import com.daml.ledger.api.v1.transaction.TransactionTree
+import com.daml.network.codegen.CC.{Round => roundCodegen}
 import com.daml.network.history.CoinTransaction
 import com.daml.network.scan.v0
+import com.daml.network.scan.v0.GetClosedRoundsResponse
 import com.daml.network.scan.v0.ScanServiceGrpc.ScanServiceStub
+import com.daml.network.util.{Contract}
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.empty.Empty
@@ -91,5 +94,28 @@ object GrpcScanAppClient {
       response.tree.toRight(
         "received no transaction tree in the GetCoinTransactionDetailsResponse response from the server"
       )
+  }
+
+  final case class GetClosedRounds()
+      extends BaseCommand[
+        Empty,
+        v0.GetClosedRoundsResponse,
+        Seq[Contract[roundCodegen.ClosedMiningRound]],
+      ] {
+
+    override def createRequest(): Either[String, Empty] = Right(Empty())
+
+    override def submitRequest(
+        service: ScanServiceStub,
+        req: Empty,
+    ): Future[GetClosedRoundsResponse] = service.getClosedRounds(req)
+
+    override def handleResponse(
+        response: GetClosedRoundsResponse
+    ): Either[String, Seq[Contract[roundCodegen.ClosedMiningRound]]] = {
+      response.rounds
+        .traverse(round => Contract.fromProto(roundCodegen.ClosedMiningRound)(round))
+        .leftMap(_.toString)
+    }
   }
 }

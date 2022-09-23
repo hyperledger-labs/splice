@@ -4,12 +4,14 @@ package com.daml.network.scan.v0;
 import "google/protobuf/empty.proto";
 import "com/daml/network/v0/history.proto";
 import "com/daml/ledger/api/v1/transaction.proto";
+import "com/daml/network/v0/contract.proto";
 
 service ScanService {
   rpc GetSvcPartyId (google.protobuf.Empty) returns (GetSvcPartyIdResponse);
   rpc GetReferenceData (google.protobuf.Empty) returns (GetReferenceDataResponse);
   rpc GetHistory (google.protobuf.Empty) returns (GetHistoryResponse);
   rpc GetCoinTransactionDetails (GetCoinTransactionDetailsRequest) returns (GetCoinTransactionDetailsResponse);
+  rpc GetClosedRounds (google.protobuf.Empty) returns (GetClosedRoundsResponse);
 }
 
 message GetSvcPartyIdResponse {
@@ -32,4 +34,8 @@ message GetCoinTransactionDetailsRequest {
 
 message GetCoinTransactionDetailsResponse {
   com.daml.ledger.api.v1.TransactionTree tree = 1;
+}
+
+message GetClosedRoundsResponse {
+  repeated com.daml.network.v0.Contract rounds = 1;
 }
