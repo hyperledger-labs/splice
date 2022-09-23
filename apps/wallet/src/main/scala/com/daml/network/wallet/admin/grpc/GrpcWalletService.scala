@@ -12,7 +12,7 @@ import com.daml.network.util.{CoinUtil, Contract, Proto, Value}
 import com.daml.network.wallet.store.WalletAppRequestStore
 import com.daml.network.wallet.util.WalletUtil
 import com.daml.network.wallet.v0
-import com.daml.network.wallet.v0.{InitializeRequest, WalletServiceGrpc}
+import com.daml.network.wallet.v0.{CollectRewardsRequest, InitializeRequest, WalletServiceGrpc}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -152,7 +152,7 @@ class GrpcWalletService(
             )
             .payload
             .quantity
-          coinCid <- selectCoin(party, quantity, store)
+          coinCid <- selectCoin(party, quantity)
         } yield {
           val requestCid = Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](
             request.requestContractId
@@ -349,7 +349,7 @@ class GrpcWalletService(
       (c, party) => {
         val quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
         for {
-          coinCid <- selectCoin(party, quantity, store)
+          coinCid <- selectCoin(party, quantity)
         } yield {
           val receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
           val arg = walletCodegen.WalletAppInstall_ExecuteDirectTransfer(
@@ -366,6 +366,15 @@ class GrpcWalletService(
       _ => Empty(),
     )
 
+  private def listAppRewards(
+      party: PartyId
+  ) =
+    for {
+      appRewards <- connection.activeContracts(party, coinCodegen.AppReward)
+    } yield {
+      appRewards.filter(c => c.value.owner == party.toPrim)
+    }
+
   @nowarn("cat=unused")
   override def listAppRewards(
       request: v0.ListAppRewardsRequest
@@ -373,14 +382,29 @@ class GrpcWalletService(
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         party <- connection.getPrimaryParty(request.getWalletCtx.userId)
-        appRewards <- connection.activeContracts(party, coinCodegen.AppReward)
+        appRewards <- listAppRewards(party)
       } yield {
-        val filtered = appRewards.filter(c => c.value.owner == party.toPrim)
         v0.ListAppRewardsResponse(
-          filtered.map(c => Contract.fromCodegenContract(c).toProtoV0)
+          appRewards.map(c => Contract.fromCodegenContract(c).toProtoV0)
         )
       }
     }
+
+  private def listValidatorRewards(
+      party: PartyId
+  ) = for {
+    validatorRights <- connection.activeContracts(party, coinCodegen.ValidatorRight)
+    users = validatorRights
+      .filter(c => c.value.validator == party.toPrim)
+      .map(c => PartyId.tryFromPrim(c.value.user))
+      .toSet
+    validatorRewards <-
+      if (users.isEmpty) {
+        Future.successful(Seq.empty)
+      } else {
+        connection.activeContracts(users, coinCodegen.ValidatorReward)
+      }
+  } yield validatorRewards
 
   @nowarn("cat=unused")
   override def listValidatorRewards(
@@ -389,21 +413,36 @@ class GrpcWalletService(
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         party <- connection.getPrimaryParty(request.getWalletCtx.userId)
-        validatorRights <- connection.activeContracts(party, coinCodegen.ValidatorRight)
-        users = validatorRights
-          .filter(c => c.value.validator == party.toPrim)
-          .map(c => PartyId.tryFromPrim(c.value.user))
-          .toSet
-        validatorRewards <-
-          if (users.isEmpty) {
-            Future.successful(Seq.empty)
-          } else {
-            connection.activeContracts(users, coinCodegen.ValidatorReward)
-          }
+        validatorRewards <- listValidatorRewards(party)
       } yield {
         v0.ListValidatorRewardsResponse(
           validatorRewards.map(c => Contract.fromCodegenContract(c).toProtoV0)
         )
+      }
+    }
+
+  override def collectRewards(request: CollectRewardsRequest): Future[Empty] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        party <- connection.getPrimaryParty(request.getWalletCtx.userId)
+        validatorRewards <- listValidatorRewards(party)
+        validatorRewardInputs = validatorRewards
+          .filter(c => c.value.round.number == request.round)
+          .map(c => coinRulesCodegen.TransferInput.InputValidatorReward(c.contractId))
+        appRewards <- listAppRewards(party)
+        appRewardInputs = appRewards
+          .filter(c => c.value.round.number == request.round)
+          .map(c => coinRulesCodegen.TransferInput.InputAppReward(c.contractId))
+        coinCid <- selectCoin(party, 0)
+        inputCoin = coinRulesCodegen.TransferInput.InputCoin(coinCid)
+        inputs = (inputCoin +: validatorRewardInputs :++ appRewardInputs)
+        outputs = Seq(
+          coinRulesCodegen.TransferOutput.OutputSenderCoin(exactQuantity = None, lock = None)
+        )
+        coins <- redistribute(party, inputs, outputs)
+      } yield {
+        require(coins.size == 1, "Expected exactly one coin")
+        Empty()
       }
     }
 
@@ -468,7 +507,7 @@ class GrpcWalletService(
             )
             .payload
             .quantity
-          coinCid <- selectCoin(party, quantity, store)
+          coinCid <- selectCoin(party, quantity)
         } yield {
           val requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](
             request.requestContractId
@@ -524,6 +563,35 @@ class GrpcWalletService(
       } yield Empty()
     }
 
+  private def redistribute(
+      party: PartyId,
+      inputs: Seq[coinRulesCodegen.TransferInput],
+      outputs: Seq[coinRulesCodegen.TransferOutput],
+  )(implicit tc: TraceContext) = {
+    for {
+      svcParty <- scanConnection.getSvcPartyId()
+      cmd = coinRulesCodegen.CoinRules
+        .key(DA.Types.Tuple2(svcParty.toPrim, getValidatorParty.toPrim))
+        .exerciseCoinRules_Transfer(
+          coinRulesCodegen.Transfer(
+            sender = party.toPrim,
+            inputs = inputs,
+            outputs = outputs,
+            payload = "redistribute",
+          )
+        )
+      transferResults <- connection.submitWithResult(
+        Seq(party),
+        Seq(getValidatorParty),
+        cmd,
+      )
+    } yield {
+      transferResults.createdCoins.collect {
+        case coinRulesCodegen.CreatedCoin.TransferResultCoin(cid) => cid
+      }
+    }
+  }
+
   override def redistribute(request: v0.RedistributeRequest): Future[v0.RedistributeResponse] = {
     def toOutput(output: v0.RedistributeOutput): coinRulesCodegen.TransferOutput =
       coinRulesCodegen.TransferOutput.OutputSenderCoin(
@@ -535,33 +603,13 @@ class GrpcWalletService(
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         party <- connection.getPrimaryParty(request.getWalletCtx.userId)
-        svcParty <- scanConnection.getSvcPartyId()
         inputs = request.inputs
           .traverse(Value.fromProto[coinRulesCodegen.TransferInput](_).map(_.value))
           .valueOr(err => throw err.toAdminError.asGrpcError)
         outputs = request.outputs.map(toOutput)
-        cmd = coinRulesCodegen.CoinRules
-          .key(DA.Types.Tuple2(svcParty.toPrim, getValidatorParty.toPrim))
-          .exerciseCoinRules_Transfer(
-            coinRulesCodegen.Transfer(
-              sender = party.toPrim,
-              inputs = inputs,
-              outputs = outputs,
-              payload = "redistribute",
-            )
-          )
-        transferResults <- connection.submitWithResult(
-          Seq(party),
-          Seq(getValidatorParty),
-          cmd,
-        )
+        createdCoins <- redistribute(party, inputs, outputs)
       } yield {
-        v0.RedistributeResponse(
-          transferResults.createdCoins.collect {
-            case coinRulesCodegen.CreatedCoin.TransferResultCoin(cid) =>
-              Proto.encode(cid)
-          }
-        )
+        v0.RedistributeResponse(createdCoins.map(cid => Proto.encode(cid)))
       }
     }
   }
@@ -640,7 +688,6 @@ class GrpcWalletService(
   private def selectCoin(
       owner: PartyId,
       quantity: BigDecimal,
-      store: WalletAppRequestStore,
   )(implicit tc: TraceContext): Future[Primitive.ContractId[coinCodegen.Coin]] = {
     for {
       currentRound <- scanConnection.getCurrentRound()

@@ -11,7 +11,6 @@ import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConf
 import com.daml.network.wallet.v0.WalletContext
 import com.digitalasset.canton.console.{
   BaseInspection,
-  ConsoleCommandResult,
   GrpcRemoteInstanceReference,
   Help,
   LocalInstanceReference,
@@ -292,40 +291,13 @@ abstract class WalletAppReference(
 
   @Help.Summary("Collect rewards")
   @Help.Description(
-    "Merge all currently open app and validator rewards for the given round with the given coin"
+    "Merge all currently open app and validator rewards for the given round with an existing coin"
   )
   def collectRewards(
-      coinId: Primitive.ContractId[coinCodegen.Coin],
-      round: Long,
-  ): Primitive.ContractId[coinCodegen.Coin] =
+      round: Long
+  ): Unit =
     consoleEnvironment.run {
-      val ctx = getWalletCtx()
-      ConsoleCommandResult.fromEither {
-        for {
-          validatorRewards <- adminCommand(
-            GrpcWalletAppClient.ListValidatorRewards(ctx)
-          ).toEither
-          validatorRewardInputs = validatorRewards
-            .filter(c => c.payload.round.number == round)
-            .map(c => coinRulesCodegen.TransferInput.InputValidatorReward(c.contractId))
-          appRewards <- adminCommand(GrpcWalletAppClient.ListAppRewards(ctx)).toEither
-          appRewardInputs = appRewards
-            .filter(c => c.payload.round.number == round)
-            .map(c => coinRulesCodegen.TransferInput.InputAppReward(c.contractId))
-          inputCoin = coinRulesCodegen.TransferInput.InputCoin(coinId)
-          inputs = (inputCoin +: validatorRewardInputs :++ appRewardInputs).map(Value(_))
-          outputs = Seq(GrpcWalletAppClient.RedistributeOutput(exactQuantity = None))
-          coins <- adminCommand(
-            GrpcWalletAppClient.Redistribute(inputs = inputs, outputs = outputs, ctx)
-          ).toEither
-          _ <-
-            if (coins.size == 1) Right(())
-            else
-              Left(
-                s"Expected exactly one coin as a result of Redistribute but got ${coins.size} coins $coins"
-              )
-        } yield coins(0)
-      }
+      adminCommand(GrpcWalletAppClient.CollectRewards(round, getWalletCtx()))
     }
 
   @Help.Summary("Redistribute coins")

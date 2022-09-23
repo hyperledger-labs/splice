@@ -23,7 +23,7 @@ import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRoun
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.Balance
 
 import java.time.temporal.ChronoUnit
-import scala.util.Try
+import scala.concurrent.duration._
 
 class WalletIntegrationTest
     extends CoinIntegrationTest
@@ -514,12 +514,13 @@ class WalletIntegrationTest
       )
       val validatorRewards = aliceRemoteWallet.listValidatorRewards()
       validatorRewards should have size 1
+      aliceRemoteWallet.tap(200)
+      utils.retry_until_true(aliceRemoteWallet.list().size == 3)
       val prevCoins = aliceRemoteWallet.list()
-      val inputCoin = aliceRemoteWallet.tap(200)
       svc.openRound(1)
       svc.startClosingRound(0)
       svc.startIssuingRound(0)
-      aliceRemoteWallet.collectRewards(inputCoin, 0)
+      aliceRemoteWallet.collectRewards(0)
       aliceRemoteWallet.listAppRewards() shouldBe empty
       aliceRemoteWallet.listValidatorRewards() shouldBe empty
       // We just check that we have a coin roughly in the right range, in particular higher than the input, rather than trying to repeat the calculation
@@ -527,9 +528,9 @@ class WalletIntegrationTest
       checkWallet(
         aliceUserParty,
         aliceRemoteWallet,
-        (prevCoins.map(c =>
-          (c.payload.quantity.initialQuantity, c.payload.quantity.initialQuantity)
-        ) :+ (200, 202): Seq[(BigDecimal, BigDecimal)]).sortBy(_._1),
+        prevCoins
+          .map(c => (c.payload.quantity.initialQuantity, c.payload.quantity.initialQuantity + 2))
+          .sortBy(_._1),
       )
     }
   }
@@ -572,21 +573,25 @@ class WalletIntegrationTest
       walletParty: PartyId,
       wallet: WalletAppReference,
       expectedQuantityRanges: Seq[(BigDecimal, BigDecimal)],
-  )(implicit env: CoinTestConsoleEnvironment): Unit = {
-    env.utils.retry(Try {
+  ): Unit = {
+    eventually(10.seconds, 500.millis) {
       val coins = wallet.list().sortBy(coin => coin.payload.quantity.initialQuantity)
       coins should have size (expectedQuantityRanges.size.toLong)
-      coins
-        .zip(expectedQuantityRanges)
-        .foreach { case (coin, (quantityLb: BigDecimal, quantityUb: BigDecimal)) =>
-          coin.payload.owner shouldBe walletParty.toPrim
-          val ExpiringQuantity(initialQuantity, createdAt, ratePerRound) = coin.payload.quantity
-          initialQuantity should (be >= quantityLb and be <= quantityUb)
-          ratePerRound shouldBe RatePerRound(
-            CoinUtil.defaultHoldingFee.rate.doubleValue
-          )
-        }
-    })(_.isFailure)
+      clue(
+        s"Comparing ${coins.map(_.payload.quantity.initialQuantity)} with $expectedQuantityRanges"
+      ) {
+        coins
+          .zip(expectedQuantityRanges)
+          .foreach { case (coin, (quantityLb: BigDecimal, quantityUb: BigDecimal)) =>
+            coin.payload.owner shouldBe walletParty.toPrim
+            val ExpiringQuantity(initialQuantity, createdAt, ratePerRound) = coin.payload.quantity
+            initialQuantity should (be >= quantityLb and be <= quantityUb)
+            ratePerRound shouldBe RatePerRound(
+              CoinUtil.defaultHoldingFee.rate.doubleValue
+            )
+          }
+      }
+    }
   }
 
   def checkBalance(

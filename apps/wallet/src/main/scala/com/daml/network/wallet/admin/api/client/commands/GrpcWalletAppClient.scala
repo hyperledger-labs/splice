@@ -593,6 +593,22 @@ object GrpcWalletAppClient {
         .leftMap(_.toString)
   }
 
+  case class CollectRewards(round: Long, walletCtx: WalletContext)
+      extends BaseCommand[v0.CollectRewardsRequest, Empty, Unit] {
+
+    override def createRequest(): Either[String, v0.CollectRewardsRequest] =
+      Right(v0.CollectRewardsRequest(Some(walletCtx)))
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.CollectRewardsRequest,
+    ): Future[Empty] = service.collectRewards(request)
+
+    override def handleResponse(
+        response: Empty
+    ): Either[String, Unit] = Right(())
+  }
+
   case class RedistributeOutput(
       exactQuantity: Option[BigDecimal]
   ) {
