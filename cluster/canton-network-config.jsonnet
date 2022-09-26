@@ -11,6 +11,9 @@ local objects(items) = {
   items: flatten(items),
 };
 
+local imageName(config, name) =
+  config.gcpRegion + '-docker.pkg.dev/' + config.gcpRepoName + '/' + name + ':' + config.imageTag;
+
 local DOCS_PORTS = [
   {
     name: 'http',
@@ -46,6 +49,16 @@ local DIRECTORY_APP_PORTS = [
   },
 ];
 
+local DIRECTORY_APP_PORT_PROXIED_TO_GRPC_WEB = {
+  name: 'grpc-web',
+  grpcPort: 5010,
+};
+
+local toGrpcWebPort(port) = {
+  name: port.name,
+  port: port.grpcPort + 1000,
+};
+
 local CANTON_DOMAIN_PORTS = [
   {
     name: 'canton-pub-api',
@@ -74,11 +87,12 @@ local ALL_PORTS = flatten([
   SVC_APP_PORTS,
   SCAN_APP_PORTS,
   DIRECTORY_APP_PORTS,
+  toGrpcWebPort(DIRECTORY_APP_PORT_PROXIED_TO_GRPC_WEB),
   CANTON_DOMAIN_PORTS,
   CANTON_PARTICIPANT_PORTS,
 ]);
 
-local deployment(config, name, ports, ext={}) = [
+local deployment(config, name, ports, ext={}, proxyToGrpcWeb=null) = [
   {
     apiVersion: 'apps/v1',
     kind: 'Deployment',
@@ -109,11 +123,34 @@ local deployment(config, name, ports, ext={}) = [
           containers: [
             {
               name: name,
-              image: config.gcpRegion + '-docker.pkg.dev/' + config.gcpRepoName + '/' + name + ':' + config.imageTag,
+              image: imageName(config, name),
               imagePullPolicy: 'Always',
               ports: [{ name: p.name, containerPort: p.port } for p in ports],
             } + ext,
-          ],
+          ] + (if proxyToGrpcWeb != null then
+          [
+            {
+              name: 'envoy-proxy',
+              image: imageName(config, 'envoy-proxy'),
+              imagePullPolicy: 'Always',
+              ports: [{name: 'grpc-web', containerPort: toGrpcWebPort(proxyToGrpcWeb).port}],
+              env: [
+                {
+                  name: 'GRPC_ADDRESS',
+                  value: '127.0.0.1',
+                },
+                {
+                  name: 'GRPC_PORT',
+                  value: std.toString(proxyToGrpcWeb.grpcPort),
+                },
+                {
+                  name: 'GRPC_WEB_PORT',
+                  value: std.toString(toGrpcWebPort(proxyToGrpcWeb).port),
+                },
+              ],
+            }
+          ] else []
+          ),
         },
       },
     },
@@ -128,7 +165,7 @@ local deployment(config, name, ports, ext={}) = [
       selector: {
         app: name,
       },
-      ports: [{ name: p.name, protocol: 'TCP', port: p.port } for p in ports],
+      ports: [{ name: p.name, protocol: 'TCP', port: p.port } for p in (ports + (if proxyToGrpcWeb != null then [toGrpcWebPort(proxyToGrpcWeb)] else []))],
     },
   },
 ];
@@ -155,7 +192,7 @@ local cantonNetwork(config) = objects(
     deployment(config, 'docs', DOCS_PORTS),
     deployment(config, 'svc-app', SVC_APP_PORTS),
     deployment(config, 'scan-app', SCAN_APP_PORTS),
-    deployment(config, 'directory-app', DIRECTORY_APP_PORTS),
+    deployment(config, 'directory-app', DIRECTORY_APP_PORTS, proxyToGrpcWeb = DIRECTORY_APP_PORT_PROXIED_TO_GRPC_WEB),
     deployment(
       config,
       'canton-domain',

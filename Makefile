@@ -11,7 +11,8 @@ apps := \
 	canton-participant \
 	docs \
 	external-proxy \
-	gcs-proxy
+	gcs-proxy \
+	envoy-proxy
 
 define make_apps
   for app in $(apps); do \
