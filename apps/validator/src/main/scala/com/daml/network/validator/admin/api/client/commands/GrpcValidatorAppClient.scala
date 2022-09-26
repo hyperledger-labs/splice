@@ -50,4 +50,19 @@ object GrpcValidatorAppClient {
     ): Either[String, PartyId] = Proto.decode(Proto.Party)(response.partyId)
   }
 
+  case class InstallWalletForValidator() extends BaseCommand[Empty, Empty, Unit] {
+
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
+
+    override def submitRequest(
+        service: ValidatorAppServiceStub,
+        request: Empty,
+    ): Future[Empty] = service.installWalletForValidator(request)
+
+    override def handleResponse(
+        response: Empty
+    ): Either[String, Unit] = Right(())
+  }
+
 }

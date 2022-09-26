@@ -458,6 +458,7 @@ class WalletIntegrationTest
       val aliceValidatorParty = aliceValidator.initialize()
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
       aliceWallet.initialize(aliceValidatorParty)
+      aliceValidator.installWalletForValidator()
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
       // Onboard bob on his self-hosted validator
@@ -496,23 +497,7 @@ class WalletIntegrationTest
       val appRewards = aliceRemoteWallet.listAppRewards()
       appRewards should have size 1
       aliceRemoteWallet.listValidatorRewards() shouldBe empty
-      // TODO(i723) We cannot use the wallet as the validator yet so create a validator right where alice is their own validator.
-      //            To collect rewards to the validator party's wallet, we additionally need to ensure validator users are also onboarded
-      aliceWallet.remoteParticipant.ledger_api.commands.submit(
-        Seq(aliceUserParty),
-        optTimeout = None,
-        commands = Seq(
-          coinCodegen
-            .ValidatorRight(
-              svcParty.toPrim,
-              aliceUserParty.toPrim,
-              aliceUserParty.toPrim,
-            )
-            .create
-            .command
-        ),
-      )
-      val validatorRewards = aliceRemoteWallet.listValidatorRewards()
+      val validatorRewards = aliceValidatorRemoteWallet.listValidatorRewards()
       validatorRewards should have size 1
       aliceRemoteWallet.tap(200)
       utils.retry_until_true(aliceRemoteWallet.list().size == 3)
@@ -522,7 +507,10 @@ class WalletIntegrationTest
       svc.startIssuingRound(0)
       aliceRemoteWallet.collectRewards(0)
       aliceRemoteWallet.listAppRewards() shouldBe empty
-      aliceRemoteWallet.listValidatorRewards() shouldBe empty
+      // Get a coin that the rewards can be merged into
+      aliceValidatorRemoteWallet.tap(5)
+      aliceValidatorRemoteWallet.collectRewards(0)
+      aliceValidatorRemoteWallet.listValidatorRewards() shouldBe empty
       // We just check that we have a coin roughly in the right range, in particular higher than the input, rather than trying to repeat the calculation
       // for rewards.
       checkWallet(

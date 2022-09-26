@@ -94,8 +94,9 @@ class SplitwiseIntegrationTest
       key,
       acceptedPayment,
     )
-
-    bobSplitwise.listBalanceUpdates(key) should have size 2
+    eventually {
+      bobSplitwise.listBalanceUpdates(key) should have size 2
+    }
     bobSplitwise.listBalances(key) shouldBe Seq(aliceUserParty -> -11).toMap
 
     aliceSplitwise.listBalanceUpdates(key) should have size 2

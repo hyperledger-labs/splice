@@ -1,6 +1,7 @@
 package com.daml.network.validator.admin.grpc
 
 import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionResponse
+import com.daml.network.codegen.CC.{Coin => coinCodegen}
 import com.daml.network.codegen.CC.CoinRules.CoinRulesRequest
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -10,7 +11,7 @@ import com.daml.network.validator.v0._
 import com.daml.network.wallet.util.WalletUtil
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.Spanning
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
 
@@ -30,6 +31,24 @@ class GrpcValidatorAppService(
     with NamedLogging {
 
   private val connection = ledgerClient.connection("GrpcValidatorAppService")
+
+  private def createValidatorRight(user: PartyId, validator: PartyId, svc: PartyId)(implicit
+      traceContext: TraceContext
+  ) =
+    connection.submitCommand(
+      actAs = Seq(user, validator),
+      readAs = Seq.empty,
+      Seq(
+        coinCodegen
+          .ValidatorRight(
+            svc = svc.toPrim,
+            user = user.toPrim,
+            validator = validator.toPrim,
+          )
+          .create
+          .command
+      ),
+    )
 
   override def initialize(request: Empty): Future[InitializeResponse] =
     withSpanFromGrpcContext("GrpcValidatorAppService") { implicit traceContext => span =>
@@ -59,6 +78,7 @@ class GrpcValidatorAppService(
         _ <- connection.uploadDarFile(CoinUtil) // TODO(i353) move away from dar upload during init
         validatorParty <- connection.createPartyAndUser(validatorUserName)
         svcParty <- scanConnection.getSvcPartyId()
+        _ <- createValidatorRight(user = validatorParty, validator = validatorParty, svc = svcParty)
         _ <- createRulesRequestAndUserHostedAtContracts(svcParty, validatorParty)
         _ <- store.setValidatorParty(validatorParty)
         _ <- store.setSvcParty(svcParty)
@@ -94,6 +114,32 @@ class GrpcValidatorAppService(
         )
         // Workaround for the lack of "act-as-any-party" rights
         _ <- connection.grantUserRights(validatorUserName, Seq(userPartyId), Seq.empty)
+        // Create validator right contract so validator can collect validator rewards
+        _ <- createValidatorRight(
+          user = userPartyId,
+          validator = validatorPartyId,
+          svc = svcPartyId,
+        )
       } yield OnboardUserResponse(Proto.encode(userPartyId))
+    }
+
+  override def installWalletForValidator(request: Empty): Future[Empty] =
+    withSpanFromGrpcContext("GrpcValidatorAppService") { implicit traceContext => _ =>
+      for {
+        validatorPartyIdMaybe <- store.getValidatorParty()
+        validatorPartyId <- validatorPartyIdMaybe.fold[Future[PartyId]] {
+          Future.failed(
+            new Error("Validator party not set. Did you forget to call `setupValidator`?")
+          )
+        }(Future.successful)
+        svcPartyId <- scanConnection.getSvcPartyId()
+        _ <- WalletUtil.installWalletForUser(
+          endUserParty = validatorPartyId,
+          validatorServiceParty = validatorPartyId,
+          svcParty = svcPartyId,
+          connection = connection,
+          logger = logger,
+        )
+      } yield Empty()
     }
 }
