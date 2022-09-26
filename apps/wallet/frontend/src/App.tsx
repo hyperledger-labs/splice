@@ -50,7 +50,7 @@ const Main: React.FC<{ userId: string }> = ({ userId }) => {
   const [tabValue, setTabValue] = useState<string>('coins');
 
   return (
-    <WalletClientProvider url={process.env.REACT_APP_GRPC_URL || 'http://localhost:8080'}>
+    <WalletClientProvider url={process.env.REACT_APP_GRPC_URL || 'http://localhost:5004'}>
       <Box sx={{ borderBottom: 1, borderColor: 'divider', marginBottom: 5 }}>
         <Tabs value={tabValue} onChange={(_, value) => setTabValue(value)}>
           <Tab label="Coins" value="coins" />

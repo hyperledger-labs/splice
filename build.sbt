@@ -248,7 +248,11 @@ lazy val bundleTask = {
     val log = streams.value.log
     val assemblyJar = assembly.value
     val examples = Seq("-c", "apps/app/src/pack")
-    runCommand(s"bash ./create-bundle.sh $assemblyJar ${examples.mkString(" ")}", log)
+    val webUis = Seq(("apps/wallet/frontend/build", "wallet"))
+    val args = examples ++ webUis.flatMap({ case (source, name) =>
+      Seq("-r", source, s"web-uis/$name")
+    })
+    runCommand(s"bash ./create-bundle.sh $assemblyJar ${args.mkString(" ")}", log)
   }
 }
 

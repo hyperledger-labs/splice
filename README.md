@@ -295,8 +295,8 @@ port 8083 for Bob’s wallet.
 
 ```
 cd apps/wallet/frontend
-PORT=3000 REACT_APP_GRPC_URL=http://localhost:8080 npm start # Alice's wallet
-PORT=3001 REACT_APP_GRPC_URL=http://localhost:8081 npm start # Bob's wallet
+PORT=3000 REACT_APP_GRPC_URL=http://localhost:6204 npm start # Alice's wallet
+PORT=3001 REACT_APP_GRPC_URL=http://localhost:6304 npm start # Bob's wallet
 cd apps/splitwise/frontend
 PORT=3002 REACT _APP_LEDGER_API_GRPC_URL=http://localhost:8085 npm start # Alice’s splitwise
 PORT=3003 REACT _APP_LEDGER_API_GRPC_URL=http://localhost:8086 npm start # Bob’s splitwise

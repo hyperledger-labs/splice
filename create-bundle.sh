@@ -98,12 +98,19 @@ do
       ;;
     "rename-do")
       target=$RELEASE_DIR/$arg
-      target_dir=$(dirname "$target")
-      if [[ ! -e $target_dir ]]; then
-        mkdir -p "$target_dir"
+      if [[ -d $rename ]]
+      then
+          if [[ ! -e $target ]]; then
+              mkdir -p "$target"
+          fi
+          cp -vr "$rename"/* "$target"
+      else
+          target_dir=$(dirname "$target")
+          if [[ ! -e $target_dir ]]; then
+              mkdir -p "$target_dir"
+          fi
+          cp -v "$rename" "$target"
       fi
-      # shellcheck disable=SC2086
-      cp -v $rename $target
       state="scan"
       ;;
     *)

@@ -493,6 +493,15 @@ jobs:
     steps:
       - setup_sbt_test_job
       - execute_sbt_command:
+          cmd: "protocGenerate damlBuild"
+          retry_fetch: "50"
+      - run_bash_command_in_nix:
+          cmd_name: Build wallet web frontend
+          cmd: |
+            cd apps/wallet/frontend
+            ./setup.sh
+            npm run build
+      - execute_sbt_command:
           cmd: "bundle"
           retry_fetch: "50"
       - run:
@@ -520,10 +529,7 @@ jobs:
           cmd_name: Build web frontend
           cmd: |
             cd apps/wallet/frontend
-            ./gen-ledger-api-proto.sh
-            ./copy-proto-sources.sh
-            ./codegen.sh
-            npm install
+            ./setup.sh
             npm run check
             npm run build
       - cleanup_sbt_test_job
@@ -542,10 +548,7 @@ jobs:
           cmd_name: Build web frontend
           cmd: |
             cd apps/splitwise/frontend
-            ./gen-ledger-api-proto.sh
-            ./copy-proto-sources.sh
-            ./codegen.sh
-            npm install
+            ./setup.sh
             npm run check
             npm run build
       - cleanup_sbt_test_job
