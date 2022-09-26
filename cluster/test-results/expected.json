@@ -414,6 +414,69 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
+               "app": "gcs-proxy"
+            },
+            "name": "gcs-proxy"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "gcs-proxy"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "gcs-proxy",
+                     "external": "true"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "image": "region-docker.pkg.dev/project/repo/gcs-proxy:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "gcs-proxy",
+                        "ports": [
+                           {
+                              "containerPort": 8080,
+                              "name": "http"
+                           }
+                        ]
+                     }
+                  ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "name": "gcs-proxy"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "http",
+                  "port": 8080,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "gcs-proxy"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
                "app": "external-proxy"
             },
             "name": "external-proxy"

@@ -18,6 +18,13 @@ local DOCS_PORTS = [
   },
 ];
 
+local GCS_PROXY_PORTS = [
+  {
+    name: 'http',
+    port: 8080,
+  },
+];
+
 local SVC_APP_PORTS = [
   {
     name: 'svc-app-adm-api',
@@ -169,6 +176,7 @@ local cantonNetwork(config) = objects(
       },
     ),
     deployment(config, 'canton-participant', CANTON_PARTICIPANT_PORTS),
+    deployment(config, 'gcs-proxy', GCS_PROXY_PORTS),
     deployment(config, 'external-proxy', ALL_PORTS),
     externalService(config, ALL_PORTS),
   ],

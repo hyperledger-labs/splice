@@ -1,0 +1,14 @@
+FROM debian:buster-slim
+
+WORKDIR /tmp
+ENV GCSPROXY_VERSION=0.3.1
+
+RUN apt-get update \
+    && apt-get install --no-install-suggests --no-install-recommends --yes ca-certificates wget \
+    && wget https://github.com/daichirata/gcsproxy/releases/download/v${GCSPROXY_VERSION}/gcsproxy-${GCSPROXY_VERSION}-linux-amd64.tar.gz \
+    && tar zxf gcsproxy-${GCSPROXY_VERSION}-linux-amd64.tar.gz \
+    && cp ./gcsproxy-${GCSPROXY_VERSION}-linux-amd64/gcsproxy /
+
+ENV GOOGLE_CLOUD_PROJECT=da-cn-images
+
+CMD ["/gcsproxy", "-v", "-b", "0.0.0.0:8080" ]

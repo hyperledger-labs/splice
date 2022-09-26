@@ -10,7 +10,8 @@ apps := \
 	canton-domain \
 	canton-participant \
 	docs \
-	external-proxy
+	external-proxy \
+	gcs-proxy
 
 define make_apps
   for app in $(apps); do \
