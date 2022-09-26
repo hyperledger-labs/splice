@@ -372,6 +372,7 @@ through VPN.
 * DevNet - http://dev.network.canton.global
 * ScratchNet - http://scratch.network.canton.global
 * Staging - http://staging.network.canton.global
+* TestNet - http://test.network.canton.global
 
 The DevNet cluster is automatically updated every day at
 [0650 UTC](/.circleci/run-schedule-pipeline.json) via

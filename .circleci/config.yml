@@ -435,7 +435,16 @@ parameters:
   sdk-version:
     type: string
     default: "2.4.0-snapshot.20220905.10544.0.a2ea3ce6" # sdk-version
+  # Set to true for all scheduled jobs
   run-schedule:
+    type: boolean
+    default: false
+  # Set to true for daily devnet deploy
+  run-devnet-schedule:
+    type: boolean
+    default: false
+  # Set to true for weekly testnet deploy
+  run-testnet-schedule:
     type: boolean
     default: false
 
@@ -601,6 +610,27 @@ jobs:
          with_devnet_authentication: true
          cmd: |
            . $REPO_ROOT/deployment/devnet/.envrc.vars
+           cncluster activate
+           cncluster ciapply
+      - slack/notify:
+          event: pass
+          template: success_tagged_deploy_1
+
+  deploy_testnet_cluster:
+    circleci_ip_ranges: true
+    docker:
+    - image: cimg/base:2021.04
+    environment:
+      <<: *env
+      CIRCLE_TAG: git-<< pipeline.git.revision >>
+    steps:
+      - checkout
+      - setup_nix
+      - run_bash_command_in_nix:
+         cmd_name: apply cluster manifest
+         with_devnet_authentication: true
+         cmd: |
+           . $REPO_ROOT/deployment/testnet/.envrc.vars
            cncluster activate
            cncluster ciapply
       - slack/notify:
@@ -809,7 +839,7 @@ workflows:
            - docker-images-push
 
   deploy_devnet:
-    when: << pipeline.parameters.run-schedule >>
+    when: << pipeline.parameters.run-devnet-schedule >>
     jobs:
     # Deployment
     - docker-images-push:
@@ -834,6 +864,34 @@ workflows:
           - deployment_test
           - docker-images-push
           - deploy_devnet_cluster
+
+  deploy_testnet:
+    when: << pipeline.parameters.run-testnet-schedule >>
+    jobs:
+    # Deployment
+    - docker-images-push:
+        <<: *notify-fail
+        <<: *main-branch-only
+    - deployment_test:
+        <<: *notify-fail
+        <<: *main-branch-only
+    - deploy_testnet_cluster:
+        <<: *notify-fail
+        <<: *main-branch-only
+        requires:
+           - deployment_test
+           - docker-images-push
+    # TODO(#816) Turn on preflight check after we figured out how to turn it on for staging.
+    # - preflight_check:
+    #     <<: *notify-fail
+    #     <<: *main-branch-only
+    #     context:
+    #       - canton-network-vpn
+    #       - slack-context
+    #     requires:
+    #       - deployment_test
+    #       - docker-images-push
+    #       - deploy_devnet_cluster
 
   manual_preflight_check:
     jobs:
