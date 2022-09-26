@@ -80,21 +80,31 @@ In the console, initialize the validator.  ::
 This exposes a `CoinRules` contract to the validator party through automation running on the SVC node.
 In this feature preview, the SVC automatically accepts any validator onboard requests.
 
-Now, onboard a new user called "alice_wallet" via the validator app: ::
+Now, onboard a new user called "alice" via the validator app: ::
 
-  @ val aliceParty = validatorApp.onboardUser("alice_wallet")
+  @ val aliceParty = validatorApp.onboardUser("alice")
 
 You are now registered as a validator on the Canton network. You've also configured a user that can transact through a wallet. Congratulations!
   
 Tapping some Canton Coin from the Dev Faucet
 --------------------------------------------
 
-In order to create some free canton coin to play around with, you'll need to initialize the wallet by passing in the validator party.
+In order to create some free canton coin to play around with, you'll need to initialize the wallet backend by passing in the validator party.
 Reusing the console from the previous section: ::
 
-  @ aliceWallet.initialize(validatorParty)
+  @ walletApp.initialize(validatorParty)
   
-You can create free coins like so: ::
+To use the wallet, you interact with it using a specific party user. In our example, ``aliceWallet`` has been
+configured to interact with the wallet app using the previously created user ``alice``.
+
+For all users created via ``validatorApp.onboardUser`` the wallet app is automatically installed.
+To allow the validator party to use the wallet, we need to install it manually via: ::
+
+
+  @ validatorApp.installWalletAppForValidator()
+
+
+Using Alice’s wallet, you can create free coins like so: ::
 
   @ val coinId = aliceWallet.tap(100.0)
 
@@ -124,10 +134,9 @@ If not, try calling ``aliceWallet.tap(100.0)`` and then rerunning this command.
 Preparing for the first transfer
 --------------------------------
 
-In order to have someone for Alice to transfer some coin to, please first create a second user and wallet for Bob: ::
+In order to have someone for Alice to transfer some coin to, please first create a second user for Bob: ::
 
-  @ val bobParty = validatorApp.onboardUser("bob_wallet")
-  @ bobWallet.initialize(validatorParty)
+  @ val bobParty = validatorApp.onboardUser("bob")
 
 You can double check that Bob has no coins yet. The following should return an empty list: ::
 
