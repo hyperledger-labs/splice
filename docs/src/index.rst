@@ -1,6 +1,8 @@
 Canton Network Documentation
 ============================
 
+Version: |version_literal|
+
 .. toctree::
    :maxdepth: 2
    :caption: Network Documentation

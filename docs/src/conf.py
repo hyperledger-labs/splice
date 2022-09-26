@@ -14,6 +14,8 @@
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
+import os
+
 
 # -- Project information -----------------------------------------------------
 
@@ -63,3 +65,9 @@ html_theme_options = {
     'collapse_navigation': False,
     # 'analytics_id': 'UA-64532708-4'
 }
+
+# Sphinx does not allow something like ``|version|``
+# so instead we define a replacement that includes the formatting.
+rst_prolog = """
+.. |version_literal| replace:: ``{version}``
+""".format(version = os.getenv("VERSION"))

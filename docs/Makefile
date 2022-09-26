@@ -8,8 +8,10 @@ html := target/html/index.html
 .PHONY: html
 html: $(html)
 
+build_arg := --build-arg version=$(shell version-gen)
+
 $(docker-build): $(html)
 
 $(html): $(src)
 	./gen-daml-docs.sh
-	sphinx-build -M html src target -W
+	VERSION=$(shell version-gen) sphinx-build -M html src target -D version=$(shell version-gen) -W
