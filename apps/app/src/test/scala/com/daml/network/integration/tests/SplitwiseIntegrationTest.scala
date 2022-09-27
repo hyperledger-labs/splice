@@ -67,6 +67,7 @@ class SplitwiseIntegrationTest
     }
     aliceValidator.remoteParticipant.ledger_api.acs
       .await(aliceUserParty, splitwiseCodegen.AcceptedGroupInvite)
+
     inside(aliceSplitwise.listAcceptedGroupInvites("group1")) { case Seq(accepted) =>
       aliceSplitwise.joinGroup(aliceProviderParty, accepted.contractId)
     }
@@ -183,6 +184,7 @@ class SplitwiseIntegrationTest
         charlieProviderParty,
       )
     }
+
     "support provider-hosted mode" in { implicit env =>
       // Onboard alice on her self-hosted validator
       val aliceValidatorParty = aliceValidator.initialize()

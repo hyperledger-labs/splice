@@ -274,6 +274,7 @@ pay app sender recipient coinQuantity msg = do
   coins <- unlockedCoins sender
   let transfer = Transfer with
         sender
+        provider = recipient
         payload = msg
         inputs = map InputCoin coins
         outputs =
@@ -299,6 +300,7 @@ lockTo app sender lockHolder coinQuantity lockDuration msg = do
   coins <- unlockedCoins sender
   let transfer = Transfer with
         sender
+        provider = lockHolder
         payload = msg
         inputs = map InputCoin coins
         outputs =
@@ -323,16 +325,21 @@ runCoinDepositBots app = do
     hostedUsers <- getValidatorUsers user
     rounds <- getIssuingRounds app
     appRewards <- queryFilter @AppReward app.svc $ \r ->
-      r.round `elem` rounds && r.owner == user
+      r.round `elem` rounds && r.provider == user
 
     validatorRewards <- queryFilter @ValidatorReward app.svc $ \r ->
       r.round `elem` rounds && r.user `elem` hostedUsers
 
     -- get all coins of this user
     coins <- queryFilter @Coin user (\coin -> coin.owner == user)
+    -- Need readAs rights for all hosted users to collect their validator rewards,
+    -- and readAs rights for the validator to see mining round state contracts
+    validator <- getHostingValidator user
+    let readAs = hostedUsers ++ [validator]
     -- merge multiple of them into a single coin to minimize the holding fees
     let transfer = Transfer with
           sender = user
+          provider = user
           payload = "merge all my coins"
           inputs =
               map (InputAppReward . fst) appRewards ++
@@ -343,10 +350,6 @@ runCoinDepositBots app = do
                 exactQuantity = None
                 lock = None
             ]
-    -- Need readAs rights for all hosted users to collect their validator rewards,
-    -- and readAs rights for the validator to see mining round state contracts
-    validator <- getHostingValidator user
-    let readAs = hostedUsers ++ [validator]
     when (not (null appRewards) || not (null validatorRewards) || length coins > 1) $ void $
       submitExerciseCoinRulesByKey app [user] readAs validator CoinRules_Transfer with transfer
 

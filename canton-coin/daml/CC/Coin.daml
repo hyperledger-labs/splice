@@ -101,11 +101,11 @@ template ValidatorRight with
 template AppReward
   with
     svc : Party
-    owner : Party -- ^ Application owner
+    provider : Party -- ^ Application provider
     quantity : Decimal
     round : Round
   where
-    signatory svc, owner
+    signatory svc, provider
     ensure quantity > 0.0
 
     choice AppReward_SvcExpire : ()
@@ -115,10 +115,10 @@ template AppReward
       do miningRound <- fetch miningRoundCid
          assertMsg "Mining round > expiry round" (round <= miningRound.round)
 
-    choice AppReward_OwnerExpire : ()
+    choice AppReward_ProviderExpire : ()
       with
         miningRoundCid : ContractId ClosedMiningRound
-      controller owner
+      controller provider
       do miningRound <- fetch miningRoundCid
          assertMsg "Mining round > expiry round" (round <= miningRound.round)
 

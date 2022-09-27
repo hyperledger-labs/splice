@@ -4,7 +4,6 @@ import DA.Assert
 import DA.List.Total
 import DA.Time
 import Daml.Script
-import qualified DA.Map as Map
 
 import CC.Coin
 import CC.CoinRules
@@ -35,6 +34,7 @@ template Escrow
          cid <- exercise lockedCoin Coin_Unlock
          let transfer = Transfer with
                sender = p
+               provider = p
                payload = "refresh"
                inputs = [InputCoin cid, InputCoin paymentCoin]
                outputs =
@@ -121,7 +121,7 @@ test = do
     senderTransferFees = 0.0
     preprocessedOutputs = []
     numUnlockedSenderCoins = 1
-    receiverFees = Map.fromList [(arbiter, 0.01)]
+    receiverTransferFees = 0.01
     totalSelfOutputs = 1000.25
     totalNonSelfOutputs = 1.0
   note.summary === TransferSummary with
@@ -135,7 +135,7 @@ test = do
     senderAdminFees = 0.12
     senderHoldingFees = 0.0000144675
     numInputs = 2
-    receiverFees = Map.fromList [(arbiter, 0.01)]
+    receiverTransferFees = 0.01
 
   allCoins <- query @Coin app.svc
   allLockedCoins <- query @LockedCoin app.svc

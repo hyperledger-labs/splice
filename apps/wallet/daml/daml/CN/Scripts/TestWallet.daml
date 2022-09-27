@@ -129,6 +129,7 @@ testPaymentRequest = script do
   transferRequest <- submitMulti [alice, bob] [] $ createCmd AppPaymentRequest with
     sender = alice
     receiver = bob
+    provider = alice
     svc = app.svc
     quantity = 30.0
     reference = toInterfaceContractId reference
@@ -141,6 +142,7 @@ testPaymentRequest = script do
   acceptedPayment === AcceptedAppPayment with
     sender = alice
     receiver = bob
+    provider = alice
     svc = app.svc
     lockedCoin = lockedCoin
     reference = toInterfaceContractId reference

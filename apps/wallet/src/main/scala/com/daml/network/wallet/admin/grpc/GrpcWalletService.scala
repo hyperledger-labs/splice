@@ -372,7 +372,7 @@ class GrpcWalletService(
     for {
       appRewards <- connection.activeContracts(party, coinCodegen.AppReward)
     } yield {
-      appRewards.filter(c => c.value.owner == party.toPrim)
+      appRewards.filter(c => c.value.provider == party.toPrim)
     }
 
   @nowarn("cat=unused")
@@ -575,6 +575,7 @@ class GrpcWalletService(
         .exerciseCoinRules_Transfer(
           coinRulesCodegen.Transfer(
             sender = party.toPrim,
+            provider = party.toPrim,
             inputs = inputs,
             outputs = outputs,
             payload = "redistribute",

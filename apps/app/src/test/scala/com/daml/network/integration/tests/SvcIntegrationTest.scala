@@ -73,19 +73,19 @@ class SvcIntegrationTest
     val rewards = Seq(
       AppReward(
         svc = svcParty.toPrim,
-        owner = svcParty.toPrim,
+        provider = svcParty.toPrim,
         quantity = 1.0,
         round = Round(0),
       ),
       AppReward(
         svc = svcParty.toPrim,
-        owner = svcParty.toPrim,
+        provider = svcParty.toPrim,
         quantity = 2.0,
         round = Round(0),
       ),
       AppReward(
         svc = svcParty.toPrim,
-        owner = svcParty.toPrim,
+        provider = svcParty.toPrim,
         quantity = 5.0,
         round = Round(1),
       ),

@@ -227,6 +227,7 @@ template CoinRulesRequest
 -- | Representation of a batch transfer.
 data Transfer = Transfer with
     sender : Party
+    provider : Party
     inputs : [TransferInput]
     outputs : [TransferOutput]
     payload : Text
@@ -284,7 +285,7 @@ template TransferDebugNote with
 -- | The controllers for a transfer.
 transferControllers : Transfer -> Set Party
 transferControllers t =
-    foldl addOutputController (Set.singleton t.sender) t.outputs
+    foldl addOutputController (Set.fromList [t.sender, t.provider]) t.outputs
   where
     addOutputController s (OutputSenderCoin with lock; ..) = optional s (`Set.insert` s) (holder <$> lock)
     addOutputController s (OutputReceiverCoin with receiver; ..) = Set.insert receiver s
@@ -335,12 +336,12 @@ executeTransfer config0 svc validator t = do
       (summary.numFloatingCoins > 0)
   -- distribute floating outputs
   let distributed = distributeOutputs openRound.round config svc t.sender summary osum.preprocessedOutputs
-  summary <- pure $ mergeReceiverFees distributed.receiverFees summary
+  summary <- pure $ mergeReceiverFees distributed.receiverTransferFeess summary
   summary <- pure $ mergeDistributedOutputs distributed t.sender summary
   -- record debugging note
   create TransferDebugNote with transfer = t; scaledConfig = config; round = issuanceState.currentRound; ..
   -- issue rewards for burns
-  issueRewards config openRound t.sender summary
+  issueRewards config openRound t.sender t.provider summary
   -- record outputs
   createdCoins <- createTransferOutputs openRound.round config svc distributed.coins
 
@@ -363,7 +364,7 @@ data TransferOutputsSummary = TransferOutputsSummary with
     requiredQuantity : Decimal
     senderTransferFees : Decimal
     preprocessedOutputs : [PreprocessedTransferOutput]
-    receiverFees : Map Party Decimal
+    receiverTransferFees : Decimal
     totalSelfOutputs : Decimal -- sum of output coins (including floating) where receiver != sender
     totalNonSelfOutputs : Decimal -- sum of output coins (including floating) where receiver == sender
   deriving (Eq, Show)
@@ -392,7 +393,7 @@ data TransferSummary = TransferSummary with
     totalTransferFees : Decimal
     senderAdminFees : Decimal
     senderHoldingFees : Decimal
-    receiverFees : Map Party Decimal
+    receiverTransferFees : Decimal
   deriving (Eq, Show)
 
 -- | Add additional receiver fees to the transfer summary.
@@ -400,24 +401,21 @@ data TransferSummary = TransferSummary with
 mergeReceiverFees : Map Party Decimal -> TransferSummary -> TransferSummary
 mergeReceiverFees fees summary =
   summary with
-    receiverFees = Map.merge
-      (\_ v -> Some v)
-      (\_ v -> Some v)
-      (\_ v1 v2 -> Some (v1 + v2))
-      summary.receiverFees
-      fees
-    totalTransferFees = summary.totalTransferFees + sum (Map.values fees)
+    receiverTransferFees = summary.receiverTransferFees + totFees
+    totalTransferFees = summary.totalTransferFees + totFees
+  where
+    totFees = sum (Map.values fees)
 
 -- | Add floating outputs to the transfer summary.
 mergeDistributedOutputs : DistributedOutputs -> Party -> TransferSummary -> TransferSummary
-mergeDistributedOutputs distributed sender summary = 
+mergeDistributedOutputs distributed sender summary =
     let selfOut = foldl sumSelfOut 0.0 distributed.coins
         nonSelfOut = foldl sumNonSelfOut 0.0 distributed.coins
     in summary with
       selfOutQuantity = selfOut
       nonSelfOutQuantity = nonSelfOut
   where
-    sumSelfOut st distCoin = 
+    sumSelfOut st distCoin =
       if distCoin.owner == sender
         then st + distCoin.quantity
         else st
@@ -456,7 +454,7 @@ summarizeAndConsumeInputs now config svc sender validator inps = do
       archive rewardCid
       assertMsg "SVC matches" (svc == reward.svc)
       (_, miningRound) <- fetchByKey @IssuingMiningRound (svc, validator, reward.round)
-      assertMsg "Sender matches app owner" (sender == reward.owner)
+      assertMsg "Sender matches app provider" (sender == reward.provider)
       return TransferInputsSummary with
         numBurnInputs = s.numBurnInputs + 1
         numCoinInputs = s.numCoinInputs
@@ -491,7 +489,7 @@ preprocessAndSummarizeOutputs config sender outs = do
       senderTransferFees = 0.0
       numFloatingCoins = 0
       preprocessedOutputs = []
-      receiverFees = Map.empty
+      receiverTransferFees = 0.0
       totalSelfOutputs = 0.0
       totalNonSelfOutputs = 0.0
 
@@ -517,12 +515,12 @@ preprocessAndSummarizeOutputs config sender outs = do
         senderTransferFees = s.senderTransferFees
         numFloatingCoins = s.numFloatingCoins + (if isSome exactQuantity then 0 else 1)
         preprocessedOutputs = output :: s.preprocessedOutputs
-        receiverFees = s.receiverFees
+        receiverTransferFees = s.receiverTransferFees
         totalSelfOutputs = s.totalSelfOutputs + fromOptional 0.0 exactQuantity -- floating amounts will be added after distribution
         totalNonSelfOutputs = s.totalNonSelfOutputs
 
     summarizeOutput s (OutputReceiverCoin with receiver; coinType) = do
-      let (receiverFee, senderTransferFee, preprocessedType) =
+      let (receiverTransferFee, senderTransferFee, preprocessedType) =
             case coinType of
               FixedReceiverCoin {quantity, senderTransferFeeRatio}
                 | not (0.0 <= senderTransferFeeRatio && senderTransferFeeRatio <= 1.0) -> error "Transfer fee ratio must be between 0 and 1"
@@ -530,9 +528,9 @@ preprocessAndSummarizeOutputs config sender outs = do
                 let transferFee = chargeSteppedRate config.transferFee quantity
                     -- NOTE: only part of the transferFee is attributed to and minable by the receiver
                     -- TODO(M1-92): check that this does not loose fee quantity
-                    receiverFee = transferFee * (1.0 - senderTransferFeeRatio)
-                    senderTransferFee = transferFee - receiverFee
-                in (receiverFee, senderTransferFee, PreprocessedFixedOutput $ quantity - receiverFee)
+                    receiverTransferFee = transferFee * (1.0 - senderTransferFeeRatio)
+                    senderTransferFee = transferFee - receiverTransferFee
+                in (receiverTransferFee, senderTransferFee, PreprocessedFixedOutput $ quantity - receiverTransferFee)
               FloatingReceiverCoin -> (0.0, 0.0, PreprocessedFloatingOutput (s.numFloatingCoins + 1))
           output = PreprocessedTransferOutput with
             owner = receiver
@@ -554,7 +552,7 @@ preprocessAndSummarizeOutputs config sender outs = do
           FixedReceiverCoin{} -> 0
           FloatingReceiverCoin -> 1
         preprocessedOutputs = output :: s.preprocessedOutputs
-        receiverFees = Map.alter (\old -> Some (receiverFee + fromOptional 0.0 old)) receiver s.receiverFees
+        receiverTransferFees = s.receiverTransferFees + receiverTransferFee
         totalSelfOutputs = s.totalSelfOutputs
         totalNonSelfOutputs = s.totalNonSelfOutputs + case coinType of
           FixedReceiverCoin{quantity} -> quantity
@@ -569,7 +567,7 @@ summarizeTransfer config inp out = do
       selfOutQuantity = out.totalSelfOutputs
       quantityBalance = inp.totalQuantity - out.requiredQuantity - senderActionFees - out.senderTransferFees
       numFloatingCoins = out.numFloatingCoins
-      receiverFees = out.receiverFees
+      receiverTransferFees = out.receiverTransferFees
       numInputs = inp.numCoinInputs + inp.numBurnInputs
       numOutputs = out.numUnlockedSenderCoins + out.numLockedSenderCoins + out.numReceiverCoins
       senderHoldingFees = inp.totalHoldingFees
@@ -584,12 +582,12 @@ summarizeTransfer config inp out = do
     coinUpdateFees = config.updateFee.fee * intToDecimal numCoinUpdates
     coinLockFees = config.updateFee.fee * intToDecimal out.numLockedSenderCoins
     senderActionFees = coinCreateFees + coinUpdateFees + coinLockFees
-    totalTransferFees = out.senderTransferFees + sum (Map.values out.receiverFees)
+    totalTransferFees = out.senderTransferFees + out.receiverTransferFees
     inQuantity = inp.totalQuantity
 
 
-issueRewards : CoinConfig CC -> OpenMiningRound -> Party -> TransferSummary -> Update ()
-issueRewards config openRound sender summary = do
+issueRewards : CoinConfig CC -> OpenMiningRound -> Party -> Party -> TransferSummary -> Update ()
+issueRewards config openRound sender provider summary = do
     let validatorReward = summary.senderAdminFees + summary.senderHoldingFees + summary.totalTransferFees
     -- issue reward for the validator of the sender
     when (config.minRewardQuantity <= validatorReward) $
@@ -600,13 +598,12 @@ issueRewards config openRound sender summary = do
         round = openRound.round
 
     -- issue receiver receipts
-    forA_ (Map.toList summary.receiverFees) $ \(receiver, receiverFee) ->
-      when (config.minRewardQuantity <= receiverFee) $
-        void $ create AppReward with
-          svc = openRound.svc
-          owner = receiver
-          quantity = receiverFee
-          round = openRound.round
+    when (config.minRewardQuantity <= summary.receiverTransferFees) $
+      void $ create AppReward with
+        svc = openRound.svc
+        provider
+        quantity = summary.receiverTransferFees
+        round = openRound.round
 
 -- | A coin about to be created after distributed excess quantity
 -- to floating outputs.
@@ -618,23 +615,23 @@ data DistributedCoin = DistributedCoin with
 data OutputCreationState = OutputCreationState with
   remainingExcessQuantity : Decimal
   coins : [DistributedCoin]
-  receiverFees : Map Party Decimal -- ^ Receiver fees _only_ for floating sender outputs.
+  receiverTransferFeess : Map Party Decimal -- ^ Receiver fees _only_ for floating sender outputs.
 
 data DistributedOutputs = DistributedOutputs with
   coins : [DistributedCoin]
-  receiverFees : Map Party Decimal  -- ^ Receiver fees _only_ for floating sender outputs.
+  receiverTransferFeess : Map Party Decimal  -- ^ Receiver fees _only_ for floating sender outputs.
 
 distributeOutputs : Round -> CoinConfig CC -> Party -> Party -> TransferSummary -> [PreprocessedTransferOutput] -> DistributedOutputs
 distributeOutputs now config svc sender summary outs =
     let st = foldl createOutput initialState outs
     in DistributedOutputs with
       coins = st.coins
-      receiverFees = st.receiverFees
+      receiverTransferFeess = st.receiverTransferFeess
   where
     initialState = OutputCreationState with
       remainingExcessQuantity = max 0.0 summary.quantityBalance
       coins = []
-      receiverFees = Map.empty
+      receiverTransferFeess = Map.empty
 
     perCoinExcessQuantity
       | summary.numFloatingCoins <= 0 = 0.0
@@ -649,7 +646,7 @@ distributeOutputs now config svc sender summary outs =
         in OutputCreationState with
              coins = coin :: st.coins
              remainingExcessQuantity = st.remainingExcessQuantity
-             receiverFees = st.receiverFees
+             receiverTransferFeess = st.receiverTransferFeess
       PreprocessedFloatingOutput n ->
         let quantity
               | n < summary.numFloatingCoins = perCoinExcessQuantity
@@ -666,10 +663,10 @@ distributeOutputs now config svc sender summary outs =
         in OutputCreationState with
              coins = coin :: st.coins
              remainingExcessQuantity = st.remainingExcessQuantity - quantity
-             receiverFees =
+             receiverTransferFeess =
                if receiverFee == 0.0
-                 then st.receiverFees
-                 else Map.alter (\old -> Some (receiverFee + fromOptional 0.0 old)) out.owner st.receiverFees
+                 then st.receiverTransferFeess
+                 else Map.alter (\old -> Some (receiverFee + fromOptional 0.0 old)) out.owner st.receiverTransferFeess
 
 
 createTransferOutputs : Round -> CoinConfig CC -> Party -> [DistributedCoin] -> Update [CreatedCoin]

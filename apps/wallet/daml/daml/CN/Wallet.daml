@@ -38,6 +38,7 @@ template PaymentChannel
         let
           transfer = Transfer with
             sender
+            provider = sender
             inputs = inputs
             outputs =
               [ OutputReceiverCoin with
@@ -129,6 +130,7 @@ template OnChannelPaymentRequest
         -- create the transfer
         let transfer = Transfer with
               sender
+              provider = sender
               inputs = inputs
               outputs =
                 [ OutputReceiverCoin with
@@ -167,13 +169,14 @@ template AppPaymentRequest
   with
     sender : Party -- ^ The party that should pay.
     receiver : Party -- ^ The party requesting to be paid.
+    provider : Party -- ^ The app provider; receives usage rewards.
     svc : Party -- ^ The issuer of CC that should be used to make the payment.
     quantity : Decimal -- ^ The amount of CC to be paid.
     expiresAt : Time -- ^ When the payment request expires.
     collectionDuration : RelTime -- ^ The time available to the provider to collect a payment.
     reference : ContractId PaymentReference -- ^ The reference to the reason / good for which the payment is requested.
   where
-    signatory sender, receiver
+    signatory sender, receiver, provider
     ensure (collectionDuration > aunit && quantity > 0.0)
 
     choice AppPaymentRequest_Accept : ContractId AcceptedAppPayment
@@ -187,6 +190,7 @@ template AppPaymentRequest
          -- lock the coin and create an accepted payment
          let transfer = Transfer with
               sender
+              provider
               inputs
               outputs =
                 [ OutputSenderCoin with
@@ -204,7 +208,7 @@ template AppPaymentRequest
          let (TransferResultLockedCoin lockedCoin::_) = result.createdCoins
          create AcceptedAppPayment
            with
-             svc, receiver, sender, reference, lockedCoin
+             svc, provider, receiver, sender, reference, lockedCoin
 
     choice AppPaymentRequest_Withdraw : ()
       controller receiver
@@ -218,11 +222,12 @@ template AcceptedAppPayment
   with
     sender : Party
     receiver : Party
+    provider : Party
     svc : Party
     lockedCoin : ContractId LockedCoin
     reference : ContractId PaymentReference
   where
-    signatory sender, receiver
+    signatory sender, provider, receiver
 
     choice AcceptedAppPayment_Collect : ContractId PaymentReference
       with
@@ -237,6 +242,7 @@ template AcceptedAppPayment
         coin <- exercise lockedCoin Coin_Unlock
         let transfer = Transfer with
               sender
+              provider
               inputs = [InputCoin coin]
               outputs =
                 [ OutputReceiverCoin with

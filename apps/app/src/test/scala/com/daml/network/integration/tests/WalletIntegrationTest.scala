@@ -117,6 +117,7 @@ class WalletIntegrationTest
       // Create a payment request to self.
       val reqC = walletCodegen.AppPaymentRequest(
         sender = aliceUserParty.toPrim,
+        provider = aliceUserParty.toPrim,
         receiver = aliceUserParty.toPrim,
         svc = svcParty.toPrim,
         quantity = BigDecimal(10: Int),
@@ -172,6 +173,7 @@ class WalletIntegrationTest
       // Create a payment request to self.
       val reqC = walletCodegen.AppPaymentRequest(
         sender = aliceUserParty.toPrim,
+        provider = aliceUserParty.toPrim,
         receiver = aliceUserParty.toPrim,
         svc = svcParty.toPrim,
         quantity = BigDecimal(10: Int),
@@ -200,6 +202,7 @@ class WalletIntegrationTest
         r.payload shouldBe walletCodegen.AcceptedAppPayment(
           sender = aliceUserParty.toPrim,
           receiver = aliceUserParty.toPrim,
+          provider = aliceUserParty.toPrim,
           svc = svcParty.toPrim,
           lockedCoin = r.payload.lockedCoin,
           reference = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
@@ -486,36 +489,36 @@ class WalletIntegrationTest
       utils.retry_until_true(aliceRemoteWallet.list().size == 1)
       aliceRemoteWallet.executeDirectTransfer(bobUserParty, 40)
 
-      // Retrieve transferred coin in bob's wallet and transfer part of it back to alice, and get her some app rewards
+      // Retrieve transferred coin in bob's wallet and transfer part of it back to alice; bob will receive some app rewards
       utils.retry_until_true(bobRemoteWallet.list().size == 1)
       bobRemoteWallet.executeDirectTransfer(aliceUserParty, 30)
 
-      // Wait for app rewards to become visible, and check structure
-      aliceWallet.remoteParticipant.ledger_api.acs
-        .await(aliceUserParty, coinCodegen.AppReward)
+      // Wait for app rewards to become visible in bob's wallet, and check structure
+      bobWallet.remoteParticipant.ledger_api.acs
+        .await(bobUserParty, coinCodegen.AppReward)
         .contractId
-      val appRewards = aliceRemoteWallet.listAppRewards()
+      val appRewards = bobRemoteWallet.listAppRewards()
       appRewards should have size 1
-      aliceRemoteWallet.listValidatorRewards() shouldBe empty
+      bobRemoteWallet.listValidatorRewards() shouldBe empty
+
+      // Wait for validator rewards to become visible in alice's wallet, check structure
       val validatorRewards = aliceValidatorRemoteWallet.listValidatorRewards()
       validatorRewards should have size 1
       aliceRemoteWallet.tap(200)
       utils.retry_until_true(aliceRemoteWallet.list().size == 3)
-      val prevCoins = aliceRemoteWallet.list()
+
+      // Bob collects/realizes rewards
+      val prevCoins = bobRemoteWallet.list()
       svc.openRound(1)
       svc.startClosingRound(0)
       svc.startIssuingRound(0)
-      aliceRemoteWallet.collectRewards(0)
-      aliceRemoteWallet.listAppRewards() shouldBe empty
-      // Get a coin that the rewards can be merged into
-      aliceValidatorRemoteWallet.tap(5)
-      aliceValidatorRemoteWallet.collectRewards(0)
-      aliceValidatorRemoteWallet.listValidatorRewards() shouldBe empty
+      bobRemoteWallet.collectRewards(0)
+      bobRemoteWallet.listValidatorRewards() shouldBe empty
       // We just check that we have a coin roughly in the right range, in particular higher than the input, rather than trying to repeat the calculation
       // for rewards.
       checkWallet(
-        aliceUserParty,
-        aliceRemoteWallet,
+        bobUserParty,
+        bobRemoteWallet,
         prevCoins
           .map(c => (c.payload.quantity.initialQuantity, c.payload.quantity.initialQuantity + 2))
           .sortBy(_._1),
@@ -620,6 +623,7 @@ class WalletIntegrationTest
     // Create a payment request to self.
     val reqC = walletCodegen.AppPaymentRequest(
       sender = userParty.toPrim,
+      provider = userParty.toPrim,
       receiver = userParty.toPrim,
       svc = svcParty.toPrim,
       quantity = BigDecimal(amt),

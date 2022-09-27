@@ -63,6 +63,7 @@ template DirectoryInstall with
          create AppPaymentRequest with
            receiver = provider
            sender = user
+           provider
            svc = svc
            quantity = request.entryFee
            reference = toInterfaceContractId requestCid

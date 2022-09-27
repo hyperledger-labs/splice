@@ -188,7 +188,7 @@ template Group
              sender, receiver, quantity
          now <- getTime
          create AppPaymentRequest with
-           sender, receiver, svc, quantity
+           sender, provider, receiver, svc, quantity
            expiresAt = now `addRelTime` acceptDuration
            collectionDuration = collectionDuration
            reference = toInterfaceContractId reference
@@ -205,8 +205,9 @@ template Group
          archive refCid
          let expectedAcceptedPayment = AcceptedAppPayment with
                sender = ref.sender
+               provider
                receiver = ref.receiver
-               svc = svc
+               svc
                reference = acceptedPayment.reference
                lockedCoin = acceptedPayment.lockedCoin
          acceptedPayment === expectedAcceptedPayment
