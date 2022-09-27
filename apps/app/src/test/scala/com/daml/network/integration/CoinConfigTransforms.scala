@@ -48,23 +48,27 @@ object CoinConfigTransforms {
         val config3 =
           updateAllValidatorConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config2)
         val config4 =
-          updateAllRemoteWalletAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
+          updateAllWalletAppConfigs_(c => c.copy(serviceUser = s"${c.serviceUser}-$suffix"))(
             config3
           )
         val config5 =
-          updateAllDirectoryAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config4)
-        val config6 =
-          updateAllSplitwiseAppConfigs_(c => c.copy(providerUser = s"${c.providerUser}-$suffix"))(
-            config5
+          updateAllRemoteWalletAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
+            config4
           )
+        val config6 =
+          updateAllDirectoryAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config5)
         val config7 =
-          updateAllRemoteSplitwiseAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
+          updateAllSplitwiseAppConfigs_(c => c.copy(providerUser = s"${c.providerUser}-$suffix"))(
             config6
           )
-        val config8 = updateAllRemoteDirectoryAppConfigs_(c =>
+        val config8 =
+          updateAllRemoteSplitwiseAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
+            config7
+          )
+        val config9 = updateAllRemoteDirectoryAppConfigs_(c =>
           c.copy(damlUser = s"${c.damlUser}-$suffix")
-        )(config7)
-        config8
+        )(config8)
+        config9
       },
     )
   }
