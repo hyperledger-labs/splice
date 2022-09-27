@@ -1,6 +1,7 @@
 package com.daml.network.validator
 
 import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.validator.store.ValidatorAppStore
@@ -24,6 +25,7 @@ class ValidatorAppNode(
     val validatorAppParameters: SharedCoinAppParameters,
     storage: Storage,
     dummyStore: ValidatorAppStore,
+    ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -46,6 +48,6 @@ class ValidatorAppNode(
 
   override def close(): Unit = {
     logger.info("Stopping validator node")
-    Lifecycle.close(storage, dummyStore, scanConnection)(logger)
+    Lifecycle.close(storage, dummyStore, ledgerClient, scanConnection)(logger)
   }
 }

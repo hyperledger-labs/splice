@@ -90,6 +90,7 @@ class ValidatorAppBootstrap(
         validatorAppParameters,
         storage,
         dummyStore,
+        ledgerClient,
         scanConnection,
         clock,
         loggerFactory,

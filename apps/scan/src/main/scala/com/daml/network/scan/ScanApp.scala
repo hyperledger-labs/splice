@@ -1,6 +1,7 @@
 package com.daml.network.scan
 
 import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.ScanAutomationService
 import com.daml.network.scan.config.LocalScanAppConfig
 import com.daml.network.scan.store.ScanCCHistoryStore
@@ -25,6 +26,7 @@ class ScanApp(
     storage: Storage,
     automation: ScanAutomationService,
     dummyStore: ScanCCHistoryStore,
+    ledgerClient: CoinLedgerClient,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
 ) extends CantonNode // TODO(i736): CantonNode needs to be forked or generalized.
@@ -46,6 +48,6 @@ class ScanApp(
 
   override def close(): Unit = {
     logger.info("Stopping scan node")
-    Lifecycle.close(storage, dummyStore, automation)(logger)
+    Lifecycle.close(storage, dummyStore, automation, ledgerClient)(logger)
   }
 }

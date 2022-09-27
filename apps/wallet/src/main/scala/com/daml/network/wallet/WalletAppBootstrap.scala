@@ -116,6 +116,7 @@ class WalletAppBootstrap(
         storage,
         partyStore,
         automation,
+        ledgerClient,
         scanConnection,
         clock,
         loggerFactory,

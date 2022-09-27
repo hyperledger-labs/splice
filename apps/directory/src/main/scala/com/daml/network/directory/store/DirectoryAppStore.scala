@@ -2,9 +2,10 @@ package com.daml.network.directory.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
+import com.daml.ledger.api.v1.transaction_filter.TransactionFilter
 import com.daml.ledger.api.v1.event.CreatedEvent
 import com.daml.ledger.api.v1.transaction.Transaction
-import com.daml.ledger.client.binding.Primitive
+import com.daml.ledger.client.binding.{Primitive, TemplateCompanion}
 import com.daml.network.codegen.CN.{Directory => directoryCodegen, Wallet => walletCodegen}
 import com.daml.network.directory.store.memory.InMemoryDirectoryAppStore
 import com.daml.network.util.Contract
@@ -16,10 +17,13 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.{ExecutionContext, Future}
 
 /** A query result computed as-of a specific ledger API offset. */
-case class QueryResult[T](
+case class QueryResult[A](
     offset: String,
-    value: T,
-)
+    value: A,
+) {
+  // TODO(#790): figure out how to provide these methods more efficiently. We're interested in the earliest offset as of which a result was delivered when composing query results.
+  def map[B](f: A => B): QueryResult[B] = QueryResult(offset, f(value))
+}
 
 trait DirectoryAppStore extends AutoCloseable {
 
@@ -27,6 +31,11 @@ trait DirectoryAppStore extends AutoCloseable {
     * All results from the store are scoped to contracts managed by this provider.
     */
   def getProviderParty(): Future[PartyId]
+
+  /** Lookup a contract by id. */
+  def lookupContractById[T](
+      templateCompanion: TemplateCompanion[T]
+  )(id: Primitive.ContractId[T]): Future[QueryResult[Option[Contract[T]]]]
 
   /** Lookup a directory entry by name. */
   def lookupEntryByName(
@@ -51,6 +60,10 @@ trait DirectoryAppStore extends AutoCloseable {
   /** List all install requests that are active as of a specific revision. */
   def listInstallRequests()
       : Future[QueryResult[Seq[Contract[directoryCodegen.DirectoryInstallRequest]]]]
+
+  /** List all entry requests that are active as of a specific revision. */
+  def listEntryRequests()
+      : Future[QueryResult[Seq[Contract[directoryCodegen.DirectoryEntryRequest]]]]
 
   /** All install requests to the provider.
     *
@@ -78,6 +91,11 @@ trait DirectoryAppStore extends AutoCloseable {
     * Must be called at most once.
     */
   def setProviderParty(partyId: PartyId): Future[Unit]
+
+  // TODO(#790): split ingestion into a separate trait so that readers do not get access to it
+
+  /** The transaction filter required for ingestion into this store. */
+  def transactionFilter: Future[TransactionFilter]
 
   /** Ingest create events that are part of the active contract snapshot
     * from which this store is initialized.

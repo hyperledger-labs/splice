@@ -1,6 +1,7 @@
 package com.daml.network.svc
 
 import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.svc.admin.SvcAutomationService
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.svc.store.SvcAppStore
@@ -25,6 +26,7 @@ class SvcAppNode(
     storage: Storage,
     automation: SvcAutomationService,
     dummyStore: SvcAppStore,
+    ledgerClient: CoinLedgerClient,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
 ) extends CantonNode // TODO(i736): CantonNode needs to be forked or generalized.
@@ -46,6 +48,6 @@ class SvcAppNode(
 
   override def close(): Unit = {
     logger.info("Stopping SVC node")
-    Lifecycle.close(storage, dummyStore, automation)(logger)
+    Lifecycle.close(storage, dummyStore, automation, ledgerClient)(logger)
   }
 }

@@ -4,9 +4,11 @@ import akka.stream.scaladsl.Source
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.v1.event.{ArchivedEvent, CreatedEvent, Event}
 import com.daml.ledger.api.v1.transaction.Transaction
+import com.daml.ledger.api.v1.transaction_filter.TransactionFilter
 import com.daml.ledger.client.binding.{Primitive, TemplateCompanion}
 import com.daml.network.codegen.CN.{Directory => directoryCodegen, Wallet => walletCodegen}
 import com.daml.network.directory.store.{DirectoryAppStore, QueryResult}
+import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
@@ -53,6 +55,22 @@ class InMemoryDirectoryAppStore(
       }
     }
   }
+
+  override def transactionFilter: Future[TransactionFilter] =
+    getProviderParty().map(provider =>
+      CoinLedgerConnection.transactionFilterByParty(
+        Map(
+          provider ->
+            Seq(
+              // TODO(#790): share this list with the ingestion predicate
+              directoryCodegen.DirectoryEntry.id,
+              directoryCodegen.DirectoryEntryRequest.id,
+              walletCodegen.AcceptedAppPayment.id,
+              directoryCodegen.DirectoryInstallRequest.id,
+            )
+        )
+      )
+    )
 
   override def setProviderParty(partyId: PartyId): Future[Unit] =
     Future { providerParty.success(partyId) }
@@ -213,8 +231,13 @@ class InMemoryDirectoryAppStore(
       : Source[Contract[directoryCodegen.DirectoryEntryRequest], NotUsed] =
     streamActiveContracts(directoryCodegen.DirectoryEntryRequest)
 
+  // TODO(#790): consider removing these custom methods in favor of calling the `listContracts` method directly
   def listEntries(): Future[QueryResult[Seq[Contract[directoryCodegen.DirectoryEntry]]]] =
     listContracts(directoryCodegen.DirectoryEntry)
+
+  def listEntryRequests()
+      : Future[QueryResult[Seq[Contract[directoryCodegen.DirectoryEntryRequest]]]] =
+    listContracts(directoryCodegen.DirectoryEntryRequest)
 
   def listInstallRequests()
       : Future[QueryResult[Seq[Contract[directoryCodegen.DirectoryInstallRequest]]]] =

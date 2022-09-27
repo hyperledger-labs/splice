@@ -106,6 +106,7 @@ class ScanAppBootstrap(
       storage,
       scanAutomationService,
       ccTransactionStore,
+      ledgerClient,
       clock,
       loggerFactory,
     )

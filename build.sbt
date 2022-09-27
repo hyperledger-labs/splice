@@ -149,6 +149,7 @@ lazy val `apps-directory` =
       Test / damlSourceDirectory := (Compile / damlSourceDirectory).value,
       Compile / damlDarOutput := file("apps/directory/daml") / ".daml" / "dist",
       BuildCommon.damlCodegenSettings,
+      BuildCommon.copyDarResources,
     )
 
 lazy val `apps-splitwise` =

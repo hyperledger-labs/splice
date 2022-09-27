@@ -102,6 +102,7 @@ class SvcAppBootstrap(
         storage,
         automation,
         svcStore,
+        ledgerClient,
         clock,
         loggerFactory,
       )

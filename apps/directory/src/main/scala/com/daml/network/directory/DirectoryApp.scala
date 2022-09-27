@@ -1,8 +1,10 @@
 package com.daml.network.directory
 
 import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.directory.admin.DirectoryAutomationService
 import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.directory.store.DirectoryAppStore
+import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
@@ -22,8 +24,10 @@ import scala.concurrent.Future
 class DirectoryApp(
     val config: LocalDirectoryAppConfig,
     val coinAppParameters: SharedCoinAppParameters,
+    automation: DirectoryAutomationService,
     storage: Storage,
-    dummyStore: DirectoryAppStore,
+    store: DirectoryAppStore,
+    ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -46,6 +50,6 @@ class DirectoryApp(
 
   override def close(): Unit = {
     logger.info("Stopping directory node")
-    Lifecycle.close(storage, dummyStore, scanConnection)(logger)
+    Lifecycle.close(automation, storage, store, ledgerClient, scanConnection)(logger)
   }
 }

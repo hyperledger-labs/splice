@@ -92,6 +92,7 @@ class SplitwiseAppBootstrap(
         splitwiseAppParameters,
         storage,
         dummyStore,
+        ledgerClient,
         scanConnection,
         clock,
         loggerFactory,

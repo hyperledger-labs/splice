@@ -1,6 +1,7 @@
 package com.daml.network.splitwise
 
 import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
 import com.daml.network.splitwise.store.SplitwiseAppStore
@@ -24,6 +25,7 @@ class SplitwiseApp(
     val coinAppParameters: SharedCoinAppParameters,
     storage: Storage,
     dummyStore: SplitwiseAppStore,
+    ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
@@ -46,6 +48,6 @@ class SplitwiseApp(
 
   override def close(): Unit = {
     logger.info("Stopping splitwise node")
-    Lifecycle.close(storage, dummyStore, scanConnection)(logger)
+    Lifecycle.close(storage, dummyStore, ledgerClient, scanConnection)(logger)
   }
 }

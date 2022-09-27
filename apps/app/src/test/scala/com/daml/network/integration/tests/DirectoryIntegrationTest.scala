@@ -24,14 +24,12 @@ class DirectoryIntegrationTest
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .withSetup(implicit env => {
-        directoryValidator.remoteParticipant.dars.upload(directoryDarPath)
-        aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
-      })
 
   "Directory service" should {
     "list and accept install requests" in { implicit env =>
       import env._
+      // Whitelist the directory service on alice's validator
+      aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
 
       // The validator operator of the user of the directory service.
       val aliceValidatorParty = aliceValidator.initialize()
@@ -46,7 +44,6 @@ class DirectoryIntegrationTest
       val userParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
 
       // Setup DirectoryInstall
-
       directoryBackend.listInstallRequests() shouldBe Seq()
 
       val installRequestCid = aliceDirectory.requestDirectoryInstall()
