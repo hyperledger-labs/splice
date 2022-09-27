@@ -35,6 +35,7 @@ in pkgs.mkShell {
     python3Packages.sphinx_rtd_theme
     sbt
     sphinx
+    tmux
     unzip
     x86Pkgs.sphinx-autobuild
     zip

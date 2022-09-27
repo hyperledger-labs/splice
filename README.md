@@ -271,38 +271,11 @@ We use a single bootstrap script to initialize both the wallets and the splitwis
 sbt "apps-app/runMain com.daml.network.CoinApp --config apps/app/src/test/resources/simple-topology.conf --bootstrap apps/splitwise/frontend/bootstrap.canton"
 ```
 
-4. Start the envoy grpc-web proxy for the wallet apps
-
+3. To build and start the frontends, type:
 ```
-cd apps/wallet/frontend
-./start-envoy.sh
+./start-frontends.sh
 ```
-
-This starts a grpc-web proxy on port 8080 for Alice’s wallet and on
-port 8081 for Bob’s wallet.
-
-5. Start the envoy grpc-web proxy for the splitwise apps
-
-```
-cd apps/splitwise/frontend
-./start-envoy.sh
-```
-
-This starts a grpc-web proxy on port 8082 for Alice’s wallet and on
-port 8083 for Bob’s wallet.
-
-5. Start the frontends:
-
-```
-cd apps/wallet/frontend
-PORT=3000 REACT_APP_GRPC_URL=http://localhost:6204 npm start # Alice's wallet
-PORT=3001 REACT_APP_GRPC_URL=http://localhost:6304 npm start # Bob's wallet
-cd apps/splitwise/frontend
-PORT=3002 REACT _APP_LEDGER_API_GRPC_URL=http://localhost:8085 npm start # Alice’s splitwise
-PORT=3003 REACT _APP_LEDGER_API_GRPC_URL=http://localhost:8086 npm start # Bob’s splitwise
-```
-
-You can login as `alice_wallet_user` and `bob_wallet_user` respectively.
+You can then browse to http://localhost:3000 and http://localhost:3001 for the two wallet UIs, and login as `alice_wallet_user` and `bob_wallet_user` respectively.
 
 If the frontend shows up but nothing happens when you click tap or
 other buttons, check your browser console. If you see a stream of 503 errors,
@@ -314,6 +287,10 @@ To make this change persistent, type:
 ```
 sudo sh -c 'iptables-save > /etc/iptables/rules.v4'
 ```
+
+Note that start-frontents.sh serves the different frontends from separate tmux screens,
+and then attaches the terminal to that tmux session. To detach from tmux, type `Ctrl+B D`.
+To switch between screens, type `Ctrl+B <screen>`.
 
 ### Daml Numerics
 

@@ -17,7 +17,7 @@ target
 !canton/community/participant/src/main/resources/dar/AdminWorkflows.dar
 *~
 *#
-canton.pid
+*.pid
 canton.ports
 canton-release
 .disable-unused-warnings
