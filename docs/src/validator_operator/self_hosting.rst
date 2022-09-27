@@ -38,6 +38,12 @@ To obtain the Canton Coin network binary (required to run validator and wallet a
 `the-real-canton-coin <https://github.com/DACH-NY/the-real-canton-coin>`_ repository from GitHub and follow the setup instructions.
 Then, run ``sbt bundle``. This will create a release bundle in ``the-real-canton-coin/apps/app/target/release/coin/``.
 
+(Note that a release bundle may also be downloaded here:
+|bundle_download_link|. However, you will still need a local clone of
+the github repository and the instructions do not yet reflect the use
+of this bundle.)
+
+
 Please now navigate to the examples directory in your local clone of the `the-real-canton-coin` Git repository: ::
 
   cd apps/app/target/release/coin/examples

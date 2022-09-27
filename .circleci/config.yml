@@ -522,6 +522,16 @@ jobs:
       - store_artifacts:
           path: /tmp/artifacts
           destination: release-artifacts
+      - run_bash_command_in_nix:
+         cmd_name: publish release bundles
+         additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY"
+         cmd: |
+           echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
+           export GOOGLE_CLOUD_PROJECT=da-cn-images
+           VERSION=$(version-gen)
+           (cd /tmp/artifacts ; for filename in *.tar.gz; do mv "$filename" "${VERSION}_${filename}"; done)
+           gsutil cp /tmp/artifacts/*.tar.gz gs://release-bundles
+
       - cleanup_sbt_test_job
 
   wallet_frontend:

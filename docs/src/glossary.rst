@@ -69,3 +69,4 @@ Glossary
         (similar to reverse DNS)
       * provides APIs for resolution in both directions that can be used by
         other apps (e.g., the wallet) to display and accept directory names instead of party ids
+

@@ -10,7 +10,7 @@
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
-# import os
+import os
 # import sys
 # sys.path.insert(0, os.path.abspath('.'))
 
@@ -69,5 +69,10 @@ html_theme_options = {
 # Sphinx does not allow something like ``|version|``
 # so instead we define a replacement that includes the formatting.
 rst_prolog = """
+.. role:: raw-html(raw)
+   :format: html
+
 .. |version_literal| replace:: ``{version}``
+
+.. |bundle_download_link| replace:: :raw-html:`<a class="reference external" href="/release-bundles/{version}_coin-0.1.0-SNAPSHOT.tar.gz">Download Bundle</a>`
 """.format(version = os.getenv("VERSION"))
