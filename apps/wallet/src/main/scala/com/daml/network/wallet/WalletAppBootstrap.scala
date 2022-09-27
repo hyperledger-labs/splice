@@ -98,7 +98,7 @@ class WalletAppBootstrap(
       _ = logger.info(s"Allocated wallet service party $walletServicePartyId")
       _ <- connection.uploadDarFile(
         WalletUtil
-      ) // TODO(i353) move away from dar upload during init
+      ) // TODO(i876) move away from dar upload during init
     } yield {
       val automation = new WalletAutomationService(
         coinStore,

@@ -107,7 +107,7 @@ class DirectoryAppBootstrap(
           ApiTypes.TemplateId.unwrap(directoryCodegen.DirectoryEntry.id).packageId
 
         override def resourcePath: String = "dar/directory-service-0.1.0.dar"
-      }) // TODO(i353) move away from dar upload during init
+      }) // TODO(i876) move away from dar upload during init
       providerPartyId <- connection.getOrAllocateParty(config.damlUser)
       () <- store.setProviderParty(providerPartyId)
     } yield {

@@ -75,7 +75,7 @@ class GrpcValidatorAppService(
       }
 
       for {
-        _ <- connection.uploadDarFile(CoinUtil) // TODO(i353) move away from dar upload during init
+        _ <- connection.uploadDarFile(CoinUtil) // TODO(i876) move away from dar upload during init
         validatorParty <- connection.getOrAllocateParty(validatorUserName)
         svcParty <- scanConnection.getSvcPartyId()
         _ <- createValidatorRight(user = validatorParty, validator = validatorParty, svc = svcParty)
