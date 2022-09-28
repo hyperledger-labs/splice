@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
 
-docker stop envoy-wallet
+docker stop envoy
 
 rm envoy-out.json

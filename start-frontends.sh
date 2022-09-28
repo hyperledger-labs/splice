@@ -21,10 +21,8 @@ function build_frontend() {
 }
 
 function start_envoy() {
-  app=$1
-
   script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-  cd "${script_dir}/apps/${app}/frontend"
+  cd "${script_dir}/envoy-proxy-dev"
   ./start-envoy.sh
   cd -
 }
@@ -61,9 +59,7 @@ function start_frontend() {
 build_frontend wallet
 build_frontend splitwise
 
-# TODO(i711): Use a single envoy instance for everything
-start_envoy wallet
-start_envoy splitwise
+start_envoy
 
 start_frontend wallet 3000 6204 NA alice
 start_frontend wallet 3001 6304 NA bob
