@@ -14,6 +14,7 @@ in pkgs.mkShell {
     buf
     cabal2nix
     canton
+    circleci-cli
     curl
     docker
     git

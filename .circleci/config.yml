@@ -648,6 +648,12 @@ jobs:
           template: success_tagged_deploy_1
 
   preflight_check:
+    parameters:
+      cluster:
+        type: string
+      slack_notify:
+        type: boolean
+        default: true
     machine:
       image: ubuntu-2004:202010-01
     environment:
@@ -715,25 +721,29 @@ jobs:
             exit $success
       - execute_sbt_command:
           cmd: "\"testOnly *PreflightIntegrationTest\""
+          extra_parameters: -DDOMAIN_URL=http://<<parameters.cluster>>.network.canton.global:5008 -DNETWORK_APPS_ADDRESS=<<parameters.cluster>>.network.canton.global
           timeout: "10m"
-      - slack/notify:
-          event: pass
-          branch_pattern: main
-          custom: |
-            {
-              "blocks": [
+      - when:
+          condition: << parameters.slack_notify >>
+          steps:
+          - slack/notify:
+              event: pass
+              branch_pattern: main
+              custom: |
                 {
-                  "type": "section",
-                  "fields": [
+                  "blocks": [
                     {
-                      "type": "plain_text",
-                      "text": "Pre-flight validator check succeeded! :dart:",
-                      "emoji": true
+                      "type": "section",
+                      "fields": [
+                        {
+                          "type": "plain_text",
+                          "text": "Pre-flight validator check succeeded! :dart:",
+                          "emoji": true
+                        }
+                      ]
                     }
                   ]
                 }
-              ]
-            }
       - cleanup_sbt_test_job
 
   update_pipeline_schedule:
@@ -847,11 +857,21 @@ workflows:
         requires:
            - deployment_test
            - docker-images-push
+    - preflight_check:
+        cluster: staging
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - canton-network-vpn
+          - slack-context
+        requires:
+          - deployment_test
+          - docker-images-push
+          - deploy_staging_cluster
 
   deploy_devnet:
     when: << pipeline.parameters.run-devnet-schedule >>
     jobs:
-    # Deployment
     - docker-images-push:
         <<: *notify-fail
         <<: *main-branch-only
@@ -865,6 +885,7 @@ workflows:
            - deployment_test
            - docker-images-push
     - preflight_check:
+        cluster: dev
         <<: *notify-fail
         <<: *main-branch-only
         context:
@@ -878,7 +899,6 @@ workflows:
   deploy_testnet:
     when: << pipeline.parameters.run-testnet-schedule >>
     jobs:
-    # Deployment
     - docker-images-push:
         <<: *notify-fail
         <<: *main-branch-only
@@ -891,22 +911,26 @@ workflows:
         requires:
            - deployment_test
            - docker-images-push
-    # TODO(#816) Turn on preflight check after we figured out how to turn it on for staging.
-    # - preflight_check:
-    #     <<: *notify-fail
-    #     <<: *main-branch-only
-    #     context:
-    #       - canton-network-vpn
-    #       - slack-context
-    #     requires:
-    #       - deployment_test
-    #       - docker-images-push
-    #       - deploy_devnet_cluster
+    - preflight_check:
+        cluster: test
+        <<: *notify-fail
+        <<: *main-branch-only
+        context:
+          - canton-network-vpn
+          - slack-context
+        requires:
+          - deployment_test
+          - docker-images-push
+          - deploy_testnet_cluster
 
   manual_preflight_check:
     jobs:
       - click_to_run_workflow:
           type: approval
       - preflight_check:
+          cluster: dev
+          slack_notify: false
+          context:
+            - canton-network-vpn
           requires:
             - click_to_run_workflow
