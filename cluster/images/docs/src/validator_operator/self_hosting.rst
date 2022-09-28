@@ -34,20 +34,25 @@ Please activate the VPN now.
 
 .. To run a participant node, please `download and install Canton version 2.3.2 <https://docs.daml.com/canton/usermanual/downloading.html>`_.
 
-To obtain the Canton Coin network binary (required to run validator and wallet apps), please clone the
-`the-real-canton-coin <https://github.com/DACH-NY/the-real-canton-coin>`_ repository from GitHub and follow the setup instructions.
-Then, run ``sbt bundle``. This will create a release bundle in ``the-real-canton-coin/apps/app/target/release/coin/``.
-
-(Note that a release bundle may also be downloaded here:
-|bundle_download_link|. However, you will still need a local clone of
-the github repository and the instructions do not yet reflect the use
-of this bundle.)
+To obtain the Canton Coin network binary (required to run validator
+and wallet apps), please download a release bundle here:
+|bundle_download_link|. (Source is available by cloning the
+`the-real-canton-coin <https://github.com/DACH-NY/the-real-canton-coin>`_
+repository from GitHub.)
 
 
-Please now navigate to the examples directory in your local clone of the `the-real-canton-coin` Git repository: ::
+Please now extract the downloaded bundle and change into the resulting
+root directory. The commands will look similar to these (although with
+a different version tag): ::
 
-  cd apps/app/target/release/coin/examples
+  tar xvf git-6d46d9a8381f7f650e7866c72ad18c2970d07970_coin-0.1.0-SNAPSHOT.tar
+  cd coin-0.1.0-SNAPSHOT
 
+
+.. parsed-literal::
+
+  tar xvf |version|\_coin-0.1.0-SNAPSHOT.tar
+  cd coin-0.1.0-SNAPSHOT
 
 Onboarding Validator
 --------------------
@@ -68,16 +73,15 @@ The Canton participant is responsible for hosting your Daml apps; i.e. interpret
 
 First off, you will need to start the validator participant and connect it to the devnet domain: ::
 
-  coin -c validator/validator-participant.conf --bootstrap validator/validator-participant.canton
+  bin/coin -c examples/validator/validator-participant.conf \
+      --bootstrap examples/validator/validator-participant.canton
 
 For convenience, this uses the coin binary at the moment. At a later point, the participant will need to be
-started as usual through Canton (``bin/canton``). Note that in the ``the-real-canton-coin``, we use ``direnv``
-to automatically add the alias ``coin`` for the path to the CC network binary.
+started as usual through Canton (``bin/canton``).
 
-Next, open a second terminal, navigate to the `examples` directory again, and start a console with the CN apps: ::
+Next, open a second terminal, navigate to the extracted bundle's root directory, and start a console with the CN apps: ::
 
-  cd apps/app/target/release/coin/examples
-  coin --config validator/validator.conf
+  bin/coin --config examples/validator/validator.conf
 
 In the console, initialize the validator.  ::
 
