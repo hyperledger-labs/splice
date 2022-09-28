@@ -34,7 +34,12 @@ const Coins: React.FC<{ userId: string }> = ({ userId }) => {
     const newCoins = (
       await walletClient.list(new ListRequest().setWalletCtx(walletRequestCtx), null)
     ).getCoinsList();
-    const decoded = newCoins.map(c => Contract.decode(c, Coin));
+
+    const decoded = newCoins.reduce((accumulator, c) => {
+      const contractData = c.getContract();
+      return contractData ? [...accumulator, Contract.decode(contractData, Coin)] : accumulator;
+    }, [] as Contract<Coin>[]);
+
     setCoins(prev => (sameContracts(prev, decoded) ? prev : decoded));
   }, [walletClient, walletRequestCtx, setCoins]);
 

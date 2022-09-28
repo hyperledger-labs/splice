@@ -5,6 +5,7 @@ import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionRespons
 import com.daml.ledger.client.binding.{Contract, Primitive, TemplateCompanion}
 import com.daml.network.codegen.{CC, DA}
 import com.daml.network.environment.CoinLedgerClient
+import com.daml.network.svc.store.SvcAppStore
 import com.daml.network.svc.v0
 import com.daml.network.svc.v0.SvcServiceGrpc
 import com.daml.network.util.{CoinUtil, Proto}
@@ -12,7 +13,6 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ledger.api.client.{DecodeUtil, LedgerConnection}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
-import com.daml.network.svc.store.SvcAppStore
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
 

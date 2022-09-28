@@ -43,8 +43,31 @@ object GrpcWalletAppClient {
     ): Either[String, Unit] = Right(())
   }
 
+  final case class CoinPosition(
+      contract: Contract[coinCodegen.Coin],
+      round: Long,
+      accruedHoldingFee: BigDecimal,
+      effectiveQuantity: BigDecimal,
+  )
+
+  final case class LockedCoinPosition(
+      contract: Contract[coinCodegen.LockedCoin],
+      round: Long,
+      accruedHoldingFee: BigDecimal,
+      effectiveQuantity: BigDecimal,
+  )
+
+  final case class ListResponse(
+      coins: Seq[CoinPosition],
+      lockedCoins: Seq[LockedCoinPosition],
+  )
+
   case class List(walletCtx: WalletContext)
-      extends BaseCommand[v0.ListRequest, v0.ListResponse, Seq[Contract[coinCodegen.Coin]]] {
+      extends BaseCommand[
+        v0.ListRequest,
+        v0.ListResponse,
+        ListResponse,
+      ] {
 
     override def createRequest(): Either[String, v0.ListRequest] = Right(
       v0.ListRequest(
@@ -59,10 +82,46 @@ object GrpcWalletAppClient {
 
     override def handleResponse(
         response: v0.ListResponse
-    ): Either[String, Seq[Contract[coinCodegen.Coin]]] =
-      response.coins
-        .traverse(coin => Contract.fromProto(coinCodegen.Coin)(coin))
-        .leftMap(_.toString)
+    ): Either[String, ListResponse] = {
+      def decodePositions(position: v0.CoinPosition) =
+        for {
+          contractOpt <- position.contract.toRight("Could not find contract payload")
+          contract <- Contract.fromProto(coinCodegen.Coin)(contractOpt).leftMap(_.toString)
+
+          accruedHoldingFee <- Proto.decode(Proto.BigDecimal)(position.accruedHoldingFee)
+          effectiveQuantity <- Proto.decode(Proto.BigDecimal)(position.effectiveQuantity)
+        } yield {
+          new CoinPosition(
+            contract,
+            position.round,
+            accruedHoldingFee,
+            effectiveQuantity,
+          )
+        }
+
+      def decodeLockedPositions(lockedPosition: v0.CoinPosition) =
+        for {
+          contractOpt <- lockedPosition.contract.toRight("Could not find contract payload")
+          contract <- Contract.fromProto(coinCodegen.LockedCoin)(contractOpt).leftMap(_.toString)
+
+          accruedHoldingFee <- Proto.decode(Proto.BigDecimal)(lockedPosition.accruedHoldingFee)
+          effectiveQuantity <- Proto.decode(Proto.BigDecimal)(lockedPosition.effectiveQuantity)
+        } yield {
+          new LockedCoinPosition(
+            contract,
+            lockedPosition.round,
+            accruedHoldingFee,
+            effectiveQuantity,
+          )
+        }
+
+      for {
+        positions <- response.coins.traverse(decodePositions)
+        lockedPositions <- response.lockedCoins.traverse(decodeLockedPositions)
+      } yield {
+        ListResponse(positions, lockedPositions)
+      }
+    }
   }
 
   case class Tap(quantity: BigDecimal, walletCtx: WalletContext)

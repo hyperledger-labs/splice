@@ -7,6 +7,7 @@ import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.util.{Contract, Value}
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
+import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.ListResponse
 import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
 import com.daml.network.wallet.v0.WalletContext
 import com.digitalasset.canton.console.{
@@ -32,7 +33,7 @@ abstract class WalletAppReference(
     "Queries the configured remote participant for the Coins owned by the configured user. " +
       "Returns all found coins."
   )
-  def list(): Seq[Contract[coinCodegen.Coin]] = {
+  def list(): ListResponse = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.List(getWalletCtx()))
     }

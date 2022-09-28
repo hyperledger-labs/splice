@@ -2,6 +2,7 @@ package com.daml.network.wallet.admin.grpc
 
 import cats.implicits._
 import com.daml.ledger.client.binding.{Primitive, Template, ValueDecoder}
+import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
 import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.codegen.DA
@@ -62,13 +63,37 @@ class GrpcWalletService(
   def getWalletServiceParty: PartyId =
     getState.walletServiceParty
 
+  private def coinToCoinPosition(coin: Contract[Coin], round: Long): v0.CoinPosition =
+    v0.CoinPosition(
+      Some(coin.toProtoV0),
+      round,
+      Proto.encode(CoinUtil.holdingFee(coin.payload, round)),
+      Proto.encode(CoinUtil.currentQuantity(coin.payload, round)),
+    )
+
+  private def lockedCoinToCoinPosition(
+      lockedCoin: Contract[LockedCoin],
+      round: Long,
+  ): v0.CoinPosition =
+    v0.CoinPosition(
+      Some(lockedCoin.toProtoV0),
+      round,
+      Proto.encode(CoinUtil.holdingFee(lockedCoin.payload.coin, round)),
+      Proto.encode(CoinUtil.currentQuantity(lockedCoin.payload.coin, round)),
+    )
+
   override def list(request: v0.ListRequest): Future[v0.ListResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
+        currentRound <- scanConnection.getCurrentRound()
         coins <- coinStore.listCoins(walletParty)
+        lockedCoins <- coinStore.listLockedCoins(walletParty)
       } yield {
-        v0.ListResponse(coins.map(x => x.toProtoV0))
+        v0.ListResponse(
+          coins.map(coinToCoinPosition(_, currentRound)),
+          lockedCoins.map(lockedCoinToCoinPosition(_, currentRound)),
+        )
       }
     }
 

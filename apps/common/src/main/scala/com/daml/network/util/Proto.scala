@@ -4,7 +4,9 @@
 package com.daml.network.util
 
 import cats.syntax.either._
+import com.daml.api.util.TimestampConversion
 import com.daml.ledger.api.refinements.ApiTypes
+import com.daml.ledger.api.v1.value.Value
 import com.daml.ledger.client.binding.Primitive
 import com.daml.lf.data.Numeric
 import com.digitalasset.canton.ProtoDeserializationError
@@ -78,4 +80,18 @@ object Proto {
       def encode(d: Primitive.ContractId[T]) = ApiTypes.ContractId.unwrap(d)
       def decode(e: String) = Right(Primitive.ContractId(e))
     }
+
+  implicit val timestampValue: Proto[Primitive.Timestamp, Long] =
+    new Proto[Primitive.Timestamp, Long] {
+      def encode(d: Primitive.Timestamp) = TimestampConversion.instantToMicros(d).value
+      def decode(e: Long) = {
+        val instant = TimestampConversion.microsToInstant(Value.Sum.Timestamp(e))
+        Primitive.Timestamp.discardNanos(instant).toRight("Could not convert timestamp")
+      }
+    }
+
+  object Timestamp extends ProtoCompanion[Primitive.Timestamp] {
+    type Enc = Long
+    def instance = timestampValue
+  }
 }

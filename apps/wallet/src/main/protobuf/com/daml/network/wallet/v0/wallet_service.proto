@@ -49,8 +49,16 @@ message ListRequest {
   WalletContext wallet_ctx = 1;
 }
 
+message CoinPosition {
+  com.daml.network.v0.Contract contract = 1;
+  uint64 round = 2;
+  string accrued_holding_fee = 3;
+  string effective_quantity = 4;
+}
+
 message ListResponse {
-  repeated com.daml.network.v0.Contract coins = 1;
+  repeated CoinPosition coins = 1;
+  repeated CoinPosition locked_coins = 2;
 }
 
 message TapRequest {

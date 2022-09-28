@@ -23,6 +23,7 @@ class CoinIngestionService(
 
   override def templateIds: Seq[Primitive.TemplateId[_]] = Seq(
     coinCodegen.Coin.Coin.id,
+    coinCodegen.Coin.LockedCoin.id,
     walletCodegen.AppPaymentRequest.id,
     walletCodegen.OnChannelPaymentRequest.id,
   )
@@ -36,6 +37,13 @@ class CoinIngestionService(
     DecodeUtil
       .decodeAllArchived(coinCodegen.Coin.Coin)(tx)
       .foreach(cid => coinStore.archiveCoin(cid))
+
+    DecodeUtil
+      .decodeAllCreated(coinCodegen.Coin.LockedCoin)(tx)
+      .foreach(lc => coinStore.addLockedCoin(Contract.fromCodegenContract(lc)))
+    DecodeUtil
+      .decodeAllArchived(coinCodegen.Coin.LockedCoin)(tx)
+      .foreach(cid => coinStore.archiveLockedCoin(cid))
 
     DecodeUtil
       .decodeAllCreated(walletCodegen.AppPaymentRequest)(tx)

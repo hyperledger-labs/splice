@@ -20,7 +20,7 @@ import com.daml.network.codegen.CN.Scripts.{TestWallet => testWalletCodegen}
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
-import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.Balance
+import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.{Balance, ListResponse}
 
 import java.time.temporal.ChronoUnit
 import scala.concurrent.duration._
@@ -49,7 +49,7 @@ class WalletIntegrationTest
 
         // ensure wallet's participant sees the CoinRules
         aliceWallet.remoteParticipant.ledger_api.acs.await(aliceValidatorParty, CoinRules)
-        aliceRemoteWallet.list() shouldBe Seq()
+        aliceRemoteWallet.list() shouldBe ListResponse(Seq(), Seq())
 
         val exactly = (x: BigDecimal) => (x, x)
         val ranges1 = Seq(exactly(50))
@@ -84,6 +84,48 @@ class WalletIntegrationTest
           (9, 10),
           (0.00001, 0.00002),
         )
+    }
+
+    "list all coins, including locked coins, with additional position details" in { implicit env =>
+      import env._
+
+      val aliceValidatorParty = aliceValidator.initialize()
+      val aliceDamlUser = aliceRemoteWallet.config.damlUser
+      aliceWallet.initialize(aliceValidatorParty)
+      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+
+      aliceWallet.remoteParticipant.ledger_api.acs.await(aliceValidatorParty, CoinRules)
+
+      aliceRemoteWallet.tap(50)
+
+      aliceRemoteWallet.list().coins.length shouldBe 1
+      aliceRemoteWallet.list().lockedCoins.length shouldBe 0
+
+      lockCoins(aliceUserParty, 25)
+
+      aliceRemoteWallet.list().coins.length shouldBe 1
+      utils.retry_until_true(aliceRemoteWallet.list().lockedCoins.length == 1)
+
+      aliceRemoteWallet.list().coins.head.round shouldBe 0
+      aliceRemoteWallet.list().coins.head.accruedHoldingFee shouldBe 0
+      assertInRange(aliceRemoteWallet.list().coins.head.effectiveQuantity, (24.0, 25.0))
+
+      aliceRemoteWallet.list().lockedCoins.head.round shouldBe 0
+      aliceRemoteWallet.list().lockedCoins.head.accruedHoldingFee shouldBe 0
+      assertInRange(aliceRemoteWallet.list().lockedCoins.head.effectiveQuantity, (24.0, 25.0))
+
+      nextRound()
+
+      aliceRemoteWallet.list().coins.head.round shouldBe 1
+      assertInRange(aliceRemoteWallet.list().coins.head.accruedHoldingFee, (0.000004, 0.000005))
+      assertInRange(aliceRemoteWallet.list().coins.head.effectiveQuantity, (24.0, 25.0))
+
+      aliceRemoteWallet.list().lockedCoins.head.round shouldBe 1
+      assertInRange(
+        aliceRemoteWallet.list().lockedCoins.head.accruedHoldingFee,
+        (0.000004, 0.000005),
+      )
+      assertInRange(aliceRemoteWallet.list().lockedCoins.head.effectiveQuantity, (24.0, 25.0))
     }
 
     "allow a user to create, list, and reject app payment requests" in { implicit env =>
@@ -486,11 +528,11 @@ class WalletIntegrationTest
 
       // Tap coin and do a transfer from alice to bob
       aliceRemoteWallet.tap(50)
-      utils.retry_until_true(aliceRemoteWallet.list().size == 1)
+      utils.retry_until_true(aliceRemoteWallet.list().coins.size == 1)
       aliceRemoteWallet.executeDirectTransfer(bobUserParty, 40)
 
       // Retrieve transferred coin in bob's wallet and transfer part of it back to alice; bob will receive some app rewards
-      utils.retry_until_true(bobRemoteWallet.list().size == 1)
+      utils.retry_until_true(bobRemoteWallet.list().coins.size == 1)
       bobRemoteWallet.executeDirectTransfer(aliceUserParty, 30)
 
       // Wait for app rewards to become visible in bob's wallet, and check structure
@@ -505,10 +547,10 @@ class WalletIntegrationTest
       val validatorRewards = aliceValidatorRemoteWallet.listValidatorRewards()
       validatorRewards should have size 1
       aliceRemoteWallet.tap(200)
-      utils.retry_until_true(aliceRemoteWallet.list().size == 3)
+      utils.retry_until_true(aliceRemoteWallet.list().coins.size == 3)
 
       // Bob collects/realizes rewards
-      val prevCoins = bobRemoteWallet.list()
+      val prevCoins = bobRemoteWallet.list().coins
       svc.openRound(1)
       svc.startClosingRound(0)
       svc.startIssuingRound(0)
@@ -520,7 +562,12 @@ class WalletIntegrationTest
         bobUserParty,
         bobRemoteWallet,
         prevCoins
-          .map(c => (c.payload.quantity.initialQuantity, c.payload.quantity.initialQuantity + 2))
+          .map(c =>
+            (
+              c.contract.payload.quantity.initialQuantity,
+              c.contract.payload.quantity.initialQuantity + 2,
+            )
+          )
           .sortBy(_._1),
       )
     }
@@ -543,7 +590,7 @@ class WalletIntegrationTest
       Seq(exactly(3.0), exactly(5.0), (16.0, 17.0), exactly(50.0)),
     )
 
-    val all = aliceRemoteWallet.list().map(c => c.contractId)
+    val all = aliceRemoteWallet.list().coins.map(c => c.contract.contractId)
     aliceRemoteWallet.redistribute(all, Seq(None))
     checkWallet(aliceUserParty, aliceRemoteWallet, Seq((74.0, 75.0)))
   }
@@ -566,17 +613,18 @@ class WalletIntegrationTest
       expectedQuantityRanges: Seq[(BigDecimal, BigDecimal)],
   ): Unit = {
     eventually(10.seconds, 500.millis) {
-      val coins = wallet.list().sortBy(coin => coin.payload.quantity.initialQuantity)
+      val coins = wallet.list().coins.sortBy(coin => coin.contract.payload.quantity.initialQuantity)
       coins should have size (expectedQuantityRanges.size.toLong)
       clue(
-        s"Comparing ${coins.map(_.payload.quantity.initialQuantity)} with $expectedQuantityRanges"
+        s"Comparing ${coins.map(_.contract.payload.quantity.initialQuantity)} with $expectedQuantityRanges"
       ) {
         coins
           .zip(expectedQuantityRanges)
-          .foreach { case (coin, (quantityLb: BigDecimal, quantityUb: BigDecimal)) =>
-            coin.payload.owner shouldBe walletParty.toPrim
-            val ExpiringQuantity(initialQuantity, createdAt, ratePerRound) = coin.payload.quantity
-            initialQuantity should (be >= quantityLb and be <= quantityUb)
+          .foreach { case (coin, quantityBounds) =>
+            coin.contract.payload.owner shouldBe walletParty.toPrim
+            val ExpiringQuantity(initialQuantity, createdAt, ratePerRound) =
+              coin.contract.payload.quantity
+            assertInRange(initialQuantity, quantityBounds)
             ratePerRound shouldBe RatePerRound(
               CoinUtil.defaultHoldingFee.rate.doubleValue
             )
@@ -593,9 +641,13 @@ class WalletIntegrationTest
       expectedHRange: (BigDecimal, BigDecimal),
   ): Unit = {
     balance.round shouldBe expectedRound
-    balance.unlockedQty should (be >= expectedUQRange._1 and be <= expectedUQRange._2)
-    balance.lockedQty should (be >= expectedLQRange._1 and be <= expectedLQRange._2)
-    balance.holdingFees should (be >= expectedHRange._1 and be <= expectedHRange._2)
+    assertInRange(balance.unlockedQty, expectedUQRange)
+    assertInRange(balance.lockedQty, expectedLQRange)
+    assertInRange(balance.holdingFees, expectedHRange)
+  }
+
+  def assertInRange(value: BigDecimal, range: (BigDecimal, BigDecimal)): Unit = {
+    value should (be >= range._1 and be <= range._2)
   }
 
   def lockCoins(userParty: PartyId, amt: Int)(implicit
