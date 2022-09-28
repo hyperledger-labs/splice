@@ -30,5 +30,5 @@ temp/
 **/com/daml/network/**/*.js
 **/google/**/*.js
 **/google/**/*.ts
-docs/src/app_dev/api
+cluster/images/docs/src/app_dev/api
 canton.patch
