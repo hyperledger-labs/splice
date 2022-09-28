@@ -90,6 +90,11 @@ In the console, initialize the validator.  ::
 This exposes a `CoinRules` contract to the validator party through automation running on the SVC node.
 In this feature preview, the SVC automatically accepts any validator onboard requests.
 
+We also need to initialize the wallet backend by passing in the validator party: ::
+
+  @ walletApp.initialize(validatorParty)
+
+
 Now, onboard a new user called "alice" via the validator app: ::
 
   @ val aliceParty = validatorApp.onboardUser("alice")
@@ -99,12 +104,8 @@ You are now registered as a validator on the Canton network. You've also configu
 Tapping some Canton Coin from the Dev Faucet
 --------------------------------------------
 
-In order to create some free canton coin to play around with, you'll need to initialize the wallet backend by passing in the validator party.
-Reusing the console from the previous section: ::
-
-  @ walletApp.initialize(validatorParty)
-  
-To use the wallet, you interact with it using a specific party user. In our example, ``aliceWallet`` has been
+In order to create some free canton coin to play around with, you'll interact with the wallet
+setup in the previous section as a specific user. In our example, ``aliceWallet`` has been
 configured to interact with the wallet app using the previously created user ``alice``.
 
 For all users created via ``validatorApp.onboardUser`` the wallet app is automatically installed.
@@ -214,3 +215,31 @@ You can now check again Bob's and Alice's wallets - Bob received 10 coins again,
 
   @ bobWallet.list()
   @ aliceWallet.list()
+
+Hosting the Wallet Web UI
+-------------------------
+
+The Wallet Web UI is distributed as static files that connect to the
+wallet backend that we started in the previous section via `gRPC-Web
+<https://github.com/grpc/grpc-web>`_. We use `envoy
+<https://www.envoyproxy.io/>`_ as a proxy that translates between gRPC
+and gRPC-Web.
+
+First,
+`install envoy <https://www.envoyproxy.io/docs/envoy/latest/start/install>`_
+following the instructions for your operating system.
+
+Next, start the envoy proxy. This proxies the wallet gRPC API on port
+5004 to a gRPC-Web API on port 6004. Open a new terminal and run: ::
+
+  cd apps/app/target/release/coin/examples
+  envoy -c validator/envoy.yaml
+
+Lastly, we have to host the frontend files. You can use any static
+file server for that, e.g., `NGINX <https://www.nginx.com/>`_. To keep
+things simple, we use the builtin HTTP Server in Python. Start another terminal and run: ::
+
+  cd apps/app/target/release/coin/web-uis/wallet
+  python3 -m http.server 8080
+
+The Wallet Web UI is now accessible on port 8080.
