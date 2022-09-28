@@ -37,6 +37,11 @@ trait DirectoryAppStore extends AutoCloseable {
       templateCompanion: TemplateCompanion[T]
   )(id: Primitive.ContractId[T]): Future[QueryResult[Option[Contract[T]]]]
 
+  /** Lookup the directory install for a user */
+  def lookupInstall(
+      user: PartyId
+  ): Future[QueryResult[Option[Contract[directoryCodegen.DirectoryInstall]]]]
+
   /** Lookup a directory entry by name. */
   def lookupEntryByName(
       name: String

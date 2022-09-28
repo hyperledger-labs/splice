@@ -23,49 +23,25 @@ object GrpcDirectoryAppClient {
       v0.DirectoryServiceGrpc.stub(channel)
   }
 
-  case class ListInstallRequests()
-      extends BaseCommand[Empty, v0.ListInstallRequestsResponse, Seq[
-        Contract[codegen.DirectoryInstallRequest]
+  case class LookupInstall(user: PartyId)
+      extends BaseCommand[v0.LookupInstallRequest, v0.LookupInstallResponse, Option[
+        Contract[codegen.DirectoryInstall]
       ]] {
 
-    override def createRequest(): Either[String, Empty] =
-      Right(Empty())
+    override def createRequest(): Either[String, v0.LookupInstallRequest] =
+      Right(v0.LookupInstallRequest(Proto.encode(user)))
 
     override def submitRequest(
         service: DirectoryServiceStub,
-        request: Empty,
-    ): Future[v0.ListInstallRequestsResponse] = service.listInstallRequests(request)
+        request: v0.LookupInstallRequest,
+    ): Future[v0.LookupInstallResponse] = service.lookupInstall(request)
 
     override def handleResponse(
-        response: v0.ListInstallRequestsResponse
-    ): Either[String, Seq[Contract[codegen.DirectoryInstallRequest]]] =
-      response.installRequests
-        .traverse(request => Contract.fromProto(codegen.DirectoryInstallRequest)(request))
+        response: v0.LookupInstallResponse
+    ): Either[String, Option[Contract[codegen.DirectoryInstall]]] =
+      response.install
+        .traverse(request => Contract.fromProto(codegen.DirectoryInstall)(request))
         .leftMap(_.toString)
-  }
-
-  case class AcceptInstallRequest(
-      contractId: Primitive.ContractId[codegen.DirectoryInstallRequest]
-  ) extends BaseCommand[
-        v0.AcceptInstallRequestRequest,
-        v0.AcceptInstallRequestResponse,
-        Primitive.ContractId[codegen.DirectoryInstall],
-      ] {
-
-    override def createRequest(): Either[String, v0.AcceptInstallRequestRequest] =
-      Right(
-        v0.AcceptInstallRequestRequest(Proto.encode(contractId))
-      )
-
-    override def submitRequest(
-        service: DirectoryServiceStub,
-        request: v0.AcceptInstallRequestRequest,
-    ): Future[v0.AcceptInstallRequestResponse] = service.acceptInstallRequest(request)
-
-    override def handleResponse(
-        response: v0.AcceptInstallRequestResponse
-    ): Either[String, Primitive.ContractId[codegen.DirectoryInstall]] =
-      Proto.decodeContractId[codegen.DirectoryInstall](response.contractId)
   }
 
   case class ListEntryRequests(

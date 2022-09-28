@@ -5,8 +5,7 @@ import "com/daml/network/v0/contract.proto";
 import "google/protobuf/empty.proto";
 
 service DirectoryService {
-  rpc ListInstallRequests (google.protobuf.Empty) returns (ListInstallRequestsResponse);
-  rpc AcceptInstallRequest (AcceptInstallRequestRequest) returns (AcceptInstallRequestResponse);
+  rpc LookupInstall (LookupInstallRequest) returns (LookupInstallResponse);
 
   rpc ListEntryRequests (google.protobuf.Empty) returns (ListEntryRequestsResponse);
   rpc RequestEntryPayment (RequestEntryPaymentRequest) returns (RequestEntryPaymentResponse);
@@ -19,19 +18,13 @@ service DirectoryService {
   rpc GetProviderPartyId (google.protobuf.Empty) returns (GetProviderPartyIdResponse);
 }
 
-message ListInstallRequestsResponse {
-  repeated com.daml.network.v0.Contract install_requests = 1;
+message LookupInstallRequest {
+  string user_party_id = 1;
 }
 
-message AcceptInstallRequestRequest {
-  // Contract ID of the DirectoryInstallRequest contract
-  // that should be accepted
-  string contract_id = 1;
-}
-
-message AcceptInstallRequestResponse {
-  // Contract ID of the DirectoryInstall contract that has been created
-  string contract_id = 1;
+message LookupInstallResponse {
+  // Set only if it could be found
+  com.daml.network.v0.Contract install = 1;
 }
 
 message ListEntryRequestsResponse {

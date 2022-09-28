@@ -41,37 +41,15 @@ class DirectoryIntegrationTest
         .await(aliceValidatorParty, coinCodegen.CoinRules.CoinRules)
 
       // The user of the directory service.
-      val userParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
+      val aliceUserParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
 
-      // Setup DirectoryInstall
-      directoryBackend.listInstallRequests() shouldBe Seq()
-
-      val installRequestCid = aliceDirectory.requestDirectoryInstall()
-
-      directoryBackend.remoteParticipant.ledger_api.acs
-        .await(providerParty, codegen.DirectoryInstallRequest)
-
-      val requests = directoryBackend.listInstallRequests()
-
-      requests.map(_.contractId) shouldBe Seq(installRequestCid)
-
-      val installsBefore = directoryBackend.remoteParticipant.ledger_api.acs
-        .of_party(providerParty, filterTemplates = Seq(codegen.DirectoryInstall.id))
-      installsBefore shouldBe empty
-
-      requests.foreach { case request =>
-        directoryBackend.acceptInstallRequest(request.contractId)
-      }
-
-      val installsAfter = directoryBackend.remoteParticipant.ledger_api.acs
-        .of_party(providerParty, filterTemplates = Seq(codegen.DirectoryInstall.id))
-      installsAfter should have length (1)
-
-      directoryBackend.listInstallRequests() shouldBe empty
+      // Request install and wait for provider to auto-accept
+      aliceDirectory.requestDirectoryInstall()
+      utils.retry_until_true(aliceDirectory.lookupInstall(aliceUserParty).isDefined)
 
       // Request entry
-
-      aliceValidator.remoteParticipant.ledger_api.acs.await(userParty, codegen.DirectoryInstall)
+      aliceValidator.remoteParticipant.ledger_api.acs
+        .await(aliceUserParty, codegen.DirectoryInstall)
       aliceDirectory.requestDirectoryEntry(entryName)
       val entryRequest = directoryBackend.remoteParticipant.ledger_api.acs
         .await(providerParty, codegen.DirectoryEntryRequest)
@@ -104,12 +82,15 @@ class DirectoryIntegrationTest
       entry.contractId shouldBe cid
 
       val entryValue =
-        Contract(cid, codegen.DirectoryEntry(userParty.toPrim, providerParty.toPrim, entryName))
+        Contract(
+          cid,
+          codegen.DirectoryEntry(aliceUserParty.toPrim, providerParty.toPrim, entryName),
+        )
 
       // Read entries from provider
       directoryBackend.listEntries() shouldBe Seq(entryValue)
       directoryBackend.lookupEntryByName(entryName) shouldBe entryValue
-      directoryBackend.lookupEntryByParty(userParty) shouldBe entryValue
+      directoryBackend.lookupEntryByParty(aliceUserParty) shouldBe entryValue
       assertThrowsAndLogsCommandFailures(
         directoryBackend.lookupEntryByName("nonexistentname"),
         _.errorMessage should include("nonexistentname"),
@@ -118,7 +99,7 @@ class DirectoryIntegrationTest
       // Read entries from user
       aliceDirectory.listEntries() shouldBe Seq(entryValue)
       aliceDirectory.lookupEntryByName(entryName) shouldBe entryValue
-      aliceDirectory.lookupEntryByParty(userParty) shouldBe entryValue
+      aliceDirectory.lookupEntryByParty(aliceUserParty) shouldBe entryValue
       assertThrowsAndLogsCommandFailures(
         aliceDirectory.lookupEntryByName("nonexistentname"),
         _.errorMessage should include("nonexistentname"),

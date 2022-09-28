@@ -58,22 +58,6 @@ class LocalDirectoryAppReference(
 
   override protected val instanceType = "Directory"
 
-  @Help.Summary("List all DirectoryInstallRequest contracts")
-  def listInstallRequests(): Seq[Contract[codegen.DirectoryInstallRequest]] = {
-    consoleEnvironment.run {
-      adminCommand(GrpcDirectoryAppClient.ListInstallRequests())
-    }
-  }
-
-  @Help.Summary("Accept a DirectoryInstallRequest creating a DirectoryInstall")
-  def acceptInstallRequest(
-      cid: Primitive.ContractId[codegen.DirectoryInstallRequest]
-  ): Primitive.ContractId[codegen.DirectoryInstall] = {
-    consoleEnvironment.run {
-      adminCommand(GrpcDirectoryAppClient.AcceptInstallRequest(cid))
-    }
-  }
-
   @Help.Summary("List all DirectoryEntryRequest contracts")
   def listEntryRequests(): Seq[Contract[codegen.DirectoryEntryRequest]] = {
     consoleEnvironment.run {
@@ -145,6 +129,13 @@ class RemoteDirectoryAppReference(
         .DirectoryInstallRequest(user = userParty.toPrim, provider = providerParty.toPrim)
         .create,
     )
+  }
+
+  @Help.Summary("Lookup a user's DirectoryInstall contract")
+  def lookupInstall(user: PartyId): Option[Contract[codegen.DirectoryInstall]] = {
+    consoleEnvironment.run {
+      adminCommand(GrpcDirectoryAppClient.LookupInstall(user))
+    }
   }
 
   @Help.Summary("Request DirectoryEntry with the given name")

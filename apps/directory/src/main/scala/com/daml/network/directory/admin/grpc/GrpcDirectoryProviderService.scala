@@ -3,7 +3,6 @@ package com.daml.network.directory.admin.grpc
 import com.daml.ledger.client.binding.{Primitive, TemplateCompanion}
 import com.daml.network.codegen.CN.{Directory => codegen, Wallet => walletCodegen}
 import com.daml.network.codegen.DA
-import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.directory.store.DirectoryAppStore
 import com.daml.network.directory.v0
 import com.daml.network.directory.v0.DirectoryServiceGrpc
@@ -34,15 +33,6 @@ class GrpcDirectoryService(
 
   private val connection = ledgerClient.connection("GrpcDirectoryService")
 
-  // TODO(M1-92) Make these parameters configurable
-  private val entryFee: Primitive.Numeric = 1.0
-  private val collectionDuration = RelTime(
-    10_000_000
-  )
-  private val acceptDuration = RelTime(
-    60_000_000
-  )
-
   private[this] def fetchContractById[T](
       companion: TemplateCompanion[T]
   )(cid: Primitive.ContractId[T])(implicit ec: ExecutionContext): Future[Contract[T]] =
@@ -57,32 +47,14 @@ class GrpcDirectoryService(
       )
 
   @nowarn("cat=unused")
-  override def listInstallRequests(request: Empty): Future[v0.ListInstallRequestsResponse] =
-    withSpanFromGrpcContext("GrpcDirectoryService") { implicit traceContext => span =>
-      for { installRequests <- store.listInstallRequests() } yield {
-        v0.ListInstallRequestsResponse(installRequests.value.map(_.toProtoV0))
-      }
-    }
-
-  override def acceptInstallRequest(
-      request: v0.AcceptInstallRequestRequest
-  ): Future[v0.AcceptInstallRequestResponse] =
+  override def lookupInstall(
+      request: v0.LookupInstallRequest
+  ): Future[v0.LookupInstallResponse] =
     withSpanFromGrpcContext("GrpcDirectoryService") { implicit traceContext => span =>
       for {
-        partyId <- store.getProviderParty()
-        //TODO(#790): also provide svc party from store
-        svc <- scanConnection.getSvcPartyId()
-        arg = codegen.DirectoryInstallRequest_Accept(
-          svc = svc.toPrim,
-          entryFee = entryFee,
-          collectionDuration = collectionDuration,
-          acceptDuration = acceptDuration,
-        )
-        installCid = Proto.tryDecodeContractId[codegen.DirectoryInstallRequest](request.contractId)
-        acceptCmd = installCid.exerciseDirectoryInstallRequest_Accept(arg)
-        installCid <- connection.submitWithResult(Seq(partyId), Seq(), acceptCmd)
+        install <- store.lookupInstall(PartyId.tryFromProtoPrimitive(request.userPartyId))
       } yield {
-        v0.AcceptInstallRequestResponse(Proto.encode(installCid))
+        v0.LookupInstallResponse(install.value.map(_.toProtoV0))
       }
     }
 

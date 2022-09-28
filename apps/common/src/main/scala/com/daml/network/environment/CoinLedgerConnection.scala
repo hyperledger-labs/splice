@@ -142,6 +142,13 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
       filter: Seq[PartyId],
   )(mapOperator: Flow[TransactionTree, Any, _]): CoinLedgerSubscription
 
+  // TODO(#790): this function should probably better live in a common.automation package
+  def makeSubscription[S, T](
+      source: Source[S, NotUsed],
+      mapOperator: Flow[S, T, _],
+      subscriptionName: String,
+  ): CoinLedgerSubscription
+
   def transactionTreeById(parties: Seq[PartyId], id: String): Future[Option[TransactionTree]]
   def transactionById(parties: Seq[PartyId], id: String): Future[Option[Transaction]]
 
@@ -578,7 +585,7 @@ object CoinLedgerConnection {
           subscriptionName,
         )
 
-      private def makeSubscription[S, T](
+      override def makeSubscription[S, T](
           source: Source[S, NotUsed],
           mapOperator: Flow[S, T, _],
           subscriptionName: String,

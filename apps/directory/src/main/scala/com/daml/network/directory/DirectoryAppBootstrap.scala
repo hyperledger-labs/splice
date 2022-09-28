@@ -72,20 +72,21 @@ class DirectoryAppBootstrap(
         directoryAppParameters.processingTimeouts,
       )
 
-    val automation = new DirectoryAutomationService(
-      config.damlUser,
-      store,
-      ledgerClient,
-      loggerFactory,
-      timeouts,
-    )
-
     val scanConnection: ScanConnection =
       new ScanConnection(
         config.remoteScan.clientAdminApi,
         directoryAppParameters.processingTimeouts,
         loggerFactory,
       )
+
+    val automation = new DirectoryAutomationService(
+      config.damlUser,
+      store,
+      ledgerClient,
+      scanConnection,
+      loggerFactory,
+      timeouts,
+    )
 
     adminServerRegistry.addService(
       DirectoryServiceGrpc.bindService(

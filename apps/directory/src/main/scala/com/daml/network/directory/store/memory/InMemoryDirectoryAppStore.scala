@@ -67,6 +67,7 @@ class InMemoryDirectoryAppStore(
               directoryCodegen.DirectoryEntryRequest.id,
               walletCodegen.AcceptedAppPayment.id,
               directoryCodegen.DirectoryInstallRequest.id,
+              directoryCodegen.DirectoryInstall.id,
             )
         )
       )
@@ -128,6 +129,9 @@ class InMemoryDirectoryAppStore(
         .exists(co => co.value.receiver == provider) ||
       DecodeUtil
         .decodeCreated(directoryCodegen.DirectoryInstallRequest)(ev)
+        .exists(co => co.value.provider == provider) ||
+      DecodeUtil
+        .decodeCreated(directoryCodegen.DirectoryInstall)(ev)
         .exists(co => co.value.provider == provider)
 
   def findContract[T](
@@ -177,6 +181,11 @@ class InMemoryDirectoryAppStore(
           )
       }
     }
+
+  override def lookupInstall(
+      user: PartyId
+  ): Future[QueryResult[Option[Contract[directoryCodegen.DirectoryInstall]]]] =
+    findContract(directoryCodegen.DirectoryInstall)(co => co.payload.user == user.toPrim)
 
   override def lookupEntryByName(
       name: String
