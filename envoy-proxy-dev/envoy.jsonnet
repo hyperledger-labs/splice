@@ -1,8 +1,10 @@
 local utils = import "envoy-util.libsonnet";
 
-local docker_cluster(cluster_name, port) = utils.cluster(cluster_name, "host.docker.internal", port);
+function(hostname="host.docker.internal") {
 
-{
+    local cluster(cluster_name, port) = utils.cluster(cluster_name, hostname, port),
+
+
   "admin": {
     "access_log_path": "/tmp/admin_access.log",
     "address": {
@@ -23,13 +25,13 @@ local docker_cluster(cluster_name, port) = utils.cluster(cluster_name, "host.doc
       utils.listener("bob_lapi", 8086)
     ],
     "clusters": [
-      docker_cluster("alice_wallet", 5204),
-      docker_cluster("bob_wallet", 5304),
-      docker_cluster("splitwise", 5113),
-      docker_cluster("scan", 5012),
-      docker_cluster("directory", 5110),
-      docker_cluster("alice_lapi", 5201),
-      docker_cluster("bob_lapi", 5301)
+      cluster("alice_wallet", 5204),
+      cluster("bob_wallet", 5304),
+      cluster("splitwise", 5113),
+      cluster("scan", 5012),
+      cluster("directory", 5110),
+      cluster("alice_lapi", 5201),
+      cluster("bob_lapi", 5301)
     ]
   }
 }

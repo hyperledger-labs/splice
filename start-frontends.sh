@@ -1,10 +1,6 @@
 #!/usr/bin/env bash
 set -eou pipefail
 
-tmux_session="cn-frontends"
-tmux_window=0
-tmux new-session -d -s "${tmux_session}"
-
 function build_frontend() {
   app=$1
 
@@ -23,7 +19,7 @@ function build_frontend() {
 function start_envoy() {
   script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
   cd "${script_dir}/envoy-proxy-dev"
-  ./start-envoy.sh
+  ./start-envoy.sh ${envoy_mode}
   cd -
 }
 
@@ -54,6 +50,34 @@ function start_frontend() {
 
   tmux_cmd "${app}-${user}" "${frontend_dir}" "BROWSER=none PORT=$port REACT_APP_GRPC_URL=http://localhost:${app_grpc} REACT_APP_LEDGER_API_GRPC_URL=http://localhost:${ledger_grpc} npm start"
 }
+
+function usage() {
+  echo "Usage: ./start-frontends.sh <flags>"
+  echo "Flags:"
+  echo "  -h   display this help message"
+  echo "  -l   run envoy locally (default: in a docker container)"
+}
+
+envoy_mode=docker
+while getopts "hl" arg; do
+  case ${arg} in
+    h)
+      usage
+      exit 0
+      ;;
+    l)
+      envoy_mode=local
+      ;;
+    ?)
+      usage
+      exit 1
+      ;;
+  esac
+done
+
+tmux_session="cn-frontends"
+tmux_window=0
+tmux new-session -d -s "${tmux_session}"
 
 # TODO(i711): Move build steps into sbt
 build_frontend wallet

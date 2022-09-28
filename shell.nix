@@ -17,6 +17,7 @@ in pkgs.mkShell {
     circleci-cli
     curl
     docker
+    (lib.optional stdenv.isLinux envoy)
     git
     google-cloud-sdk
     grpcurl
