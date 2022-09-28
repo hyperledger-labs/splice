@@ -32,12 +32,11 @@ class SplitwiseIntegrationTest
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
+      .withConnectedDomains()
+      .withAllocatedValidatorUsers()
       .withSetup(implicit env => {
-        import env._
-        participants.all.foreach(_.domains.connect_local(da))
         aliceSplitwiseBackend.remoteParticipant.dars.upload(darPath)
         bobSplitwiseBackend.remoteParticipant.dars.upload(darPath)
-        providerSplitwiseBackend.remoteParticipant.dars.upload(darPath)
       })
 
   def test(
@@ -167,7 +166,8 @@ class SplitwiseIntegrationTest
       bobSplitwiseBackend.acceptInstallProposal(bobInstallProposal)
 
       // We reuse the provider as charlie here to avoid setting up another splitwise instance.
-      val charlieUserParty = splitwiseValidator.initialize()
+      splitwiseValidator.initialize()
+      val charlieUserParty = providerSplitwiseBackend.getProviderPartyId()
       val charlieProviderParty = charlieUserParty
       val charlieInstallProposal = providerSplitwise.createInstallProposal(charlieUserParty)
       providerSplitwiseBackend.acceptInstallProposal(charlieInstallProposal)
@@ -199,7 +199,8 @@ class SplitwiseIntegrationTest
       val bobUserParty = bobValidator.onboardUser(bobDamlUser)
 
       // Setup install contracts for provider-hosted mode usage
-      val providerParty = splitwiseValidator.initialize()
+      splitwiseValidator.initialize()
+      val providerParty = providerSplitwiseBackend.getProviderPartyId()
       val aliceInstallProposal = aliceSplitwise.createInstallProposal(providerParty)
       providerSplitwiseBackend.remoteParticipant.ledger_api.acs
         .await(providerParty, splitwiseCodegen.SplitwiseInstallProposal)
@@ -227,8 +228,11 @@ class SplitwiseIntegrationTest
     }
 
     "return the primary party of the user" in { implicit env =>
-      val providerParty = splitwiseValidator.initialize()
-      providerSplitwiseBackend.getProviderPartyId() shouldBe providerParty
+      val users = providerSplitwiseBackend.remoteParticipant.ledger_api.users
+        .list(filterUser = providerSplitwiseBackend.config.providerUser)
+      inside(users.users) { case Seq(user) =>
+        Some(providerSplitwiseBackend.getProviderPartyId().toLf) shouldBe user.primaryParty
+      }
     }
   }
 }

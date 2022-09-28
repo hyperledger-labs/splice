@@ -75,6 +75,8 @@ sealed trait EnvironmentSetup[E <: Environment, TCE <: TestConsoleEnvironment[E]
         plugins.foreach(_.afterEnvironmentCreated(finalConfig, testEnvironment))
       }
 
+      envDef.preSetup(testEnvironment)
+
       if (!finalConfig.parameters.manualStart)
         testEnvironment.startAll()
 

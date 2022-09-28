@@ -26,10 +26,13 @@ case class CommunityEnvironmentDefinition(
 ) extends BaseEnvironmentDefinition[CommunityEnvironment, CommunityTestConsoleEnvironment](
       baseConfig,
       testingConfig,
+      _ => (),
       setup,
       teardown,
       configTransforms,
     ) {
+
+  override val preSetup: CommunityTestConsoleEnvironment => Unit = _ => ()
 
   def withManualStart: CommunityEnvironmentDefinition =
     copy(baseConfig = baseConfig.focus(_.parameters.manualStart).replace(true))

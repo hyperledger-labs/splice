@@ -6,7 +6,7 @@ import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirecto
 import com.daml.network.scan.config.{LocalScanAppConfig, RemoteScanAppConfig}
 import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
 import com.daml.network.svc.config.{LocalSvcAppConfig, RemoteSvcAppConfig}
-import com.daml.network.validator.config.LocalValidatorAppConfig
+import com.daml.network.validator.config.{AppInstance, LocalValidatorAppConfig}
 import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonCommunityConfig.CantonDeprecationImplicits
@@ -349,6 +349,8 @@ object CoinConfig {
     import DeprecatedConfigUtils._
     import CantonDeprecationImplicits._
 
+    implicit val appInstanceReader: ConfigReader[AppInstance] =
+      deriveReader[AppInstance]
     implicit val remoteScanConfigReader: ConfigReader[RemoteScanAppConfig] =
       deriveReader[RemoteScanAppConfig]
     implicit val validatorConfigReader: ConfigReader[LocalValidatorAppConfig] =

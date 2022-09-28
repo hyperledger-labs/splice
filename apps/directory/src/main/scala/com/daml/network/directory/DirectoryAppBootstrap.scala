@@ -4,7 +4,6 @@ import akka.actor.ActorSystem
 import cats.data.EitherT
 import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.directory.admin.DirectoryAutomationService
 import com.daml.network.directory.admin.grpc.GrpcDirectoryService
@@ -12,9 +11,8 @@ import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.directory.metrics.DirectoryAppMetrics
 import com.daml.network.directory.store.DirectoryAppStore
 import com.daml.network.directory.v0.DirectoryServiceGrpc
-import com.daml.network.environment.CoinNodeBootstrapBase
+import com.daml.network.environment.{CoinLedgerConnection, CoinNodeBootstrapBase}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -24,7 +22,6 @@ import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource._
 import com.digitalasset.canton.time._
-import com.daml.network.codegen.CN.{Directory => directoryCodegen}
 
 import java.util.concurrent.ScheduledExecutorService
 import scala.annotation.nowarn
@@ -103,13 +100,11 @@ class DirectoryAppBootstrap(
     val connection = ledgerClient.connection("DirectoryAppBootstrap")
 
     val directoryApp = for {
-      () <- connection.uploadDarFile(new UploadablePackage {
-        override def packageId: String =
-          ApiTypes.TemplateId.unwrap(directoryCodegen.DirectoryEntry.id).packageId
-
-        override def resourcePath: String = "dar/directory-service-0.1.0.dar"
-      }) // TODO(i876) move away from dar upload during init
-      providerPartyId <- connection.getOrAllocateParty(config.damlUser)
+      providerPartyId <- connection.retryLedgerApi(
+        connection.getPrimaryParty(config.damlUser),
+        CoinLedgerConnection.RetryOnUserManagementError,
+      )
+      _ = logger.info(s"Got primary party of Directory user: $providerPartyId")
       () <- store.setProviderParty(providerPartyId)
     } yield {
       new DirectoryApp(

@@ -11,7 +11,6 @@ import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AppCoinStore
 import com.daml.network.util.{CoinUtil, Contract, Proto, Value}
 import com.daml.network.wallet.store.WalletAppRequestStore
-import com.daml.network.wallet.util.WalletUtil
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.{CollectRewardsRequest, InitializeRequest, WalletServiceGrpc}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -641,17 +640,11 @@ class GrpcWalletService(
   }
 
   override def initialize(request: InitializeRequest): Future[Empty] =
-    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => _ =>
+    withSpanFromGrpcContext("GrpcWalletService") { _ => _ =>
       val validatorServiceParty = PartyId.tryFromProtoPrimitive(request.validatorPartyId)
 
       for {
         walletServiceParty <- connection.getPrimaryParty(walletServiceUser)
-        _ <- WalletUtil.initializeWalletApp(
-          walletServiceParty,
-          validatorServiceParty,
-          connection,
-          logger,
-        )
       } yield {
         state.set(
           Some(

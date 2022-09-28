@@ -19,32 +19,29 @@ class SvcIntegrationTest
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .withSetup(env => {
-        import env._
-        participants.all.foreach(_.domains.connect_local(da))
-      })
+      .withConnectedDomains()
+      .withAllocatedValidatorUsers()
 
   "round management" in { implicit env =>
     import env._
     val coinPrice: BigDecimal = 23.0
-    aliceValidator.initialize()
 
     // Sync with background automation that onboards validator.
     utils.retry_until_true({
       val requests = svc.remoteParticipant.ledger_api.acs
         .filter(svcParty, OpenMiningRound)
-      requests.length == 2
+      requests.length == 5
     })
 
     val closingRounds = svc.startClosingRound(0)
-    closingRounds should have size 2
+    closingRounds should have size 5
     svc.remoteParticipant.ledger_api.acs
       .filter(svcParty, ClosingMiningRound)
       .map(_.contractId) should contain theSameElementsAs closingRounds.values
     svc.remoteParticipant.ledger_api.acs.filter(svcParty, OpenMiningRound) shouldBe empty
 
     val issuingRoundResponse = svc.startIssuingRound(0)
-    issuingRoundResponse.validatorRounds should have size 2
+    issuingRoundResponse.validatorRounds should have size 5
     svc.remoteParticipant.ledger_api.acs
       .filter(svcParty, IssuingMiningRound)
       .map(
@@ -53,7 +50,7 @@ class SvcIntegrationTest
     svc.remoteParticipant.ledger_api.acs.filter(svcParty, ClosingMiningRound) shouldBe empty
 
     val closedRounds = svc.closeRound(0)
-    closedRounds should have size 2
+    closedRounds should have size 5
     svc.remoteParticipant.ledger_api.acs
       .filter(svcParty, ClosedMiningRound)
       .map(_.contractId) should contain theSameElementsAs closedRounds.values
@@ -63,7 +60,7 @@ class SvcIntegrationTest
     svc.remoteParticipant.ledger_api.acs.filter(svcParty, ClosedMiningRound) shouldBe empty
 
     remoteSvc.openRound(coinPrice)
-    svc.remoteParticipant.ledger_api.acs.filter(svcParty, OpenMiningRound) should have length 2
+    svc.remoteParticipant.ledger_api.acs.filter(svcParty, OpenMiningRound) should have length 5
 
   }
 

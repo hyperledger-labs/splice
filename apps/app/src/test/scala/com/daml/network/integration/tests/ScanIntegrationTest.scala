@@ -26,10 +26,8 @@ class ScanIntegrationTest
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .withSetup(env => {
-        import env._
-        participants.all.foreach(_.domains.connect_local(da))
-      })
+      .withConnectedDomains()
+      .withAllocatedValidatorUsers()
 
   "see Coin transfers" in { implicit env =>
     val (aliceP, bobP) = setup(env)

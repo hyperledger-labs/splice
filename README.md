@@ -673,3 +673,54 @@ Current Canton commit: `606a286a97e3bc47d19f3045048dd71b12a9800a`
     In case of problems, find the related change in the **closed source Canton repo** and use the change and its commit message to adjust our code.
 
 You can refer to https://github.com/DACH-NY/the-real-canton-coin/pull/446/commits for an example of how the update PR should look like.
+
+### App Initialization
+
+#### SVC app
+
+The SVC app is special since it creates the SVC party which eventually
+needs to be decentralized and because other apps rely on the SVC app
+being up so they can query the SVC party identity.
+
+Startup proceeds as follows:
+
+1. Allocate SVC party and user
+2. Upload DAR file
+3. Create initial coin rules
+4. Start automation
+5. Start gRPC service
+
+#### Validator app
+
+The validator app is the only application with admin claims and is
+responsible for allocating parties/users and uploading DARs for all
+other apps including the wallet. The wallet user and the DARs and
+users for other applications are specified in the static config of the
+validator app.
+
+The user of the validator app itself is allocated outside of the app
+by the validator operator. This is required because the validator app
+does not have authorization to allocate its own user.
+
+Startup proceeds as follows:
+
+1. Wait for the validator user to be created and query the primary party.
+2. Create users and their primary parties for the wallet and all other applications
+   specified in the config provided these users and their parties have not already been created.
+3. Upload DARs for wallet and all other applications.
+4. Perform one-time initialization, e.g., create validator right for
+   the validator party itself
+5. Launch gRPC service
+   
+
+#### All other applications
+
+All other applications have one service user and do not have admin claims.
+
+Startup proceeds as follows:
+
+1. Wait for the user to be created and query the primary party.
+2. Wait for the DARs to be uploaded (TODO(#885) not yet implemented)
+3. Run one-time initialization, e.g., create certain contracts.
+4. Start automation
+5. Start gRPC service

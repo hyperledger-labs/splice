@@ -9,6 +9,7 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.codegen.CC
+import monocle.macros.syntax.lens._
 
 class ValidatorIntegrationTest
     extends CoinIntegrationTest
@@ -16,10 +17,16 @@ class ValidatorIntegrationTest
     with CommonCoinAppInstanceReferences {
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition.simpleTopology(this.getClass.getSimpleName)
+    CoinEnvironmentDefinition
+      .simpleTopology(this.getClass.getSimpleName)
+      .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
+      .withConnectedDomains()
+      .withAllocatedValidatorUsers()
 
   "initialize svc and validator apps" in { implicit env =>
     import env._
+    svc.start()
+    scan.start()
     // check that there is exactly one CoinRule and OpenMiningRound
     val coinRules = svc.remoteParticipant.ledger_api.acs
       .of_party(svcParty, filterTemplates = Seq(CC.CoinRules.CoinRules.id))
@@ -27,9 +34,11 @@ class ValidatorIntegrationTest
 
     val openRounds = svc.remoteParticipant.ledger_api.acs
       .of_party(svcParty, filterTemplates = Seq(CC.Round.OpenMiningRound.id))
-    openRounds.length shouldBe 1
+    openRounds should have length 1
 
-    // initialize alice's validator
+    // Start Alice’s validator
+    aliceValidator.start()
+    // Get Alice’s validator party
     val aliceValidatorParty = aliceValidator.initialize()
 
     // check that no coin rules request is outstanding

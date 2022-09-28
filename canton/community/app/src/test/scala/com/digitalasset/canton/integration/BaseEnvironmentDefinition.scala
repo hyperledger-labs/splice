@@ -16,6 +16,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 abstract class BaseEnvironmentDefinition[E <: Environment, TCE <: TestConsoleEnvironment[E]](
     val baseConfig: E#Config,
     val testingConfig: TestingConfigInternal,
+    val preSetup: TCE => Unit = (_: TCE) => (),
     val setup: TCE => Unit = (_: TCE) => (),
     val teardown: Unit => Unit = _ => (),
     val configTransforms: Seq[E#Config => E#Config],

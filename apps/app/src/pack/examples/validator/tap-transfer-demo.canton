@@ -4,7 +4,6 @@ import com.daml.network.codegen.CC.CoinRules.CoinRules
 val validatorParty = validatorApp.initialize()
 validatorApp.remoteParticipant.ledger_api.acs.await(validatorParty, CoinRules)
 walletApp.initialize(validatorParty)
-validatorApp.installWalletForValidator()
 val aliceParty = validatorApp.onboardUser("alice")
 val bobParty = validatorApp.onboardUser("bob")
 

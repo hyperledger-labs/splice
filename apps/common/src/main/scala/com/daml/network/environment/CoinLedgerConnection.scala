@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.KillSwitches
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
+import com.daml.error.ErrorCategory
 import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.daml.ledger.api.domain.UserRight
 import com.daml.ledger.api.domain.UserRight.{CanActAs, CanReadAs}
@@ -54,6 +55,7 @@ import com.google.protobuf.ByteString
 import io.grpc.StatusRuntimeException
 import scalaz.syntax.tag._
 
+import java.nio.file.{Files, Path}
 import java.util.UUID
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -83,6 +85,9 @@ trait CoinLedgerSubscription extends FlagCloseableAsync with NamedLogging {
 }
 
 trait CoinLedgerConnection extends CoinLedgerSubmit {
+  def retryLedgerApi[T](task: => Future[T], retryable: ExceptionRetryable)(implicit
+      traceContext: TraceContext
+  ): Future[T]
   def ledgerEnd: Future[LedgerOffset]
   def activeContractsWithOffset(
       filter: TransactionFilter
@@ -163,6 +168,7 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
   )(implicit traceContext: TraceContext): Future[PartyId]
 
   def uploadDarFile(pkg: UploadablePackage)(implicit traceContext: TraceContext): Future[Unit]
+  def uploadDarFile(path: Path)(implicit traceContext: TraceContext): Future[Unit]
 
   def allocatePartyViaLedgerApi(hint: Option[String], displayName: Option[String]): Future[PartyId]
 
@@ -183,6 +189,42 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
 // - actAs/readAs parties are specified for each submission, instead of being static for the duration of the connection
 // - there are new methods for interacting with the ledger API (e.g., party/package management)
 object CoinLedgerConnection {
+
+  trait RetryLedgerApiError extends ExceptionRetryable {
+
+    protected def extraRetryableCategories: Set[ErrorCategory] = Set.empty
+
+    override def retryOK(outcome: Try[_], logger: TracedLogger)(implicit
+        tc: TraceContext
+    ): ErrorKind = outcome match {
+      case Failure(ex @ GrpcException(GrpcStatus(_, Some(description)), _)) =>
+        val errorCategory = ErrorCodeUtils.errorCategoryFromString(description)
+        errorCategory match {
+          case Some(cat) if cat.retryable.nonEmpty || extraRetryableCategories.contains(cat) =>
+            // Apps may start before their user has been created so we consider this retryable.
+            logger.info(s"Ledger API call failed with a retryable error", ex)
+            TransientErrorKind
+          case _ =>
+            logger.warn(s"Ledger API call failed with a non-retryable error", ex)
+            FatalErrorKind
+        }
+      case Failure(ex) =>
+        logger.warn(s"Ledger API call failed with an unknown exception, not retrying", ex)
+        FatalErrorKind
+      case util.Success(_) =>
+        NoErrorKind
+    }
+  }
+
+  case object RetryOnRetryableLedgerApiError extends RetryLedgerApiError
+
+  case object RetryOnUserManagementError extends RetryLedgerApiError {
+    // Apps may start before their user has been created so we consider this retryable.
+    override val extraRetryableCategories = Set(
+      ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing
+    )
+  }
+
   def apply(
       coinLedgerClient: CoinLedgerClient,
       maxRetries: Int,
@@ -222,25 +264,14 @@ object CoinLedgerConnection {
         }
       }
 
-      case object RetryOnRetryableLedgerApiError extends ExceptionRetryable {
-
-        override def retryOK(outcome: Try[_], logger: TracedLogger)(implicit
-            tc: TraceContext
-        ): ErrorKind = outcome match {
-          case Failure(ex @ GrpcException(GrpcStatus(_, Some(description)), _)) =>
-            if (ErrorCodeUtils.errorCategoryFromString(description).exists(_.retryable.nonEmpty)) {
-              logger.info(s"Ledger API call failed with a retryable error", ex)
-              TransientErrorKind
-            } else {
-              logger.info(s"Ledger API call failed with a non-retryable error", ex)
-              FatalErrorKind
-            }
-          case Failure(ex) =>
-            logger.info(s"Ledger API call failed with an unknown exception, not retrying", ex)
-            FatalErrorKind
-          case util.Success(_) =>
-            NoErrorKind
-        }
+      override def retryLedgerApi[T](
+          task: => Future[T],
+          retryable: ExceptionRetryable = RetryOnRetryableLedgerApiError,
+      )(implicit traceContext: TraceContext): Future[T] = {
+        implicit val success = com.digitalasset.canton.util.retry.Success.always
+        retry
+          .Backoff(logger, this, maxRetries, 10.millis, 5.second, "submitCommand")
+          .apply(task, retryable)
       }
 
       override def activeContracts(
@@ -313,10 +344,7 @@ object CoinLedgerConnection {
             command,
           )
 
-        implicit val success = com.digitalasset.canton.util.retry.Success.always
-        retry
-          .Backoff(logger, this, maxRetries, 10.millis, 5.second, "submitCommand")
-          .apply(submitCommandOnce(fullCommand), RetryOnRetryableLedgerApiError)
+        retryLedgerApi(submitCommandOnce(fullCommand), RetryOnRetryableLedgerApiError)
       }
 
       @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -338,10 +366,7 @@ object CoinLedgerConnection {
             Seq(update.command),
           )
 
-        implicit val success = com.digitalasset.canton.util.retry.Success.always
-        retry
-          .Backoff(logger, this, maxRetries, 10.millis, 5.second, "submitCommandWithResult")
-          .apply(submitCommandOnceTree(fullCommand), RetryOnRetryableLedgerApiError)
+        retryLedgerApi(submitCommandOnceTree(fullCommand), RetryOnRetryableLedgerApiError)
           .map { case result =>
             val transaction = result.getTransaction
             decodeExerciseResult(update.toString, transaction)
@@ -447,11 +472,6 @@ object CoinLedgerConnection {
           user <- client.userManagementClient
             .getUser(userId, coinLedgerClient.token)
             .map(Some(_))
-            .recover {
-              case e: StatusRuntimeException
-                  if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
-                None
-            }
           partyId = user.map(u =>
             PartyId.tryFromLfParty(
               u.primaryParty
@@ -491,7 +511,11 @@ object CoinLedgerConnection {
           username: String
       )(implicit traceContext: TraceContext): Future[PartyId] = {
         for {
-          existingPartyId <- getOptionalPrimaryParty(username)
+          existingPartyId <- getOptionalPrimaryParty(username).recover {
+            case e: StatusRuntimeException
+                if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
+              None
+          }
           partyId <- existingPartyId.fold[Future[PartyId]](createPartyAndUser(username))(
             Future.successful
           )
@@ -539,6 +563,21 @@ object CoinLedgerConnection {
           //  Need to wait a bit, or use the Canton admin API to upload the package (that one does block).
           _ = Threading.sleep(500)
           _ = logger.info(s"Package ${pkg.packageId} is uploaded")
+        } yield ()
+      }
+
+      override def uploadDarFile(
+          path: Path
+      )(implicit traceContext: TraceContext): Future[Unit] = {
+        for {
+          darFile <- Future { ByteString.readFrom(Files.newInputStream(path)) }
+          // TODO(M1-90) Consider if we want to be clever
+          // and only upload if it has not already been uploaded.
+          _ <- client.packageManagementClient.uploadDarFile(darFile)
+          // TODO(M1-90): The ledger API does not block until the package is vetted.
+          //  Need to wait a bit, or use the Canton admin API to upload the package (that one does block).
+          _ = Threading.sleep(500)
+          _ = logger.info(s"DAR $path is uploaded")
         } yield ()
       }
 

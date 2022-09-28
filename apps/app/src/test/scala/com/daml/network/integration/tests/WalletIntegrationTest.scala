@@ -34,10 +34,8 @@ class WalletIntegrationTest
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .withSetup(env => {
-        import env._
-        participants.all.foreach(_.domains.connect_local(da))
-      })
+      .withConnectedDomains()
+      .withAllocatedValidatorUsers()
 
   "A wallet" should {
     "allow calling tap, list the created coins, and get the balance - locally and remotely" in {
@@ -400,6 +398,7 @@ class WalletIntegrationTest
       loggerFactory.assertThrowsAndLogs[CommandFailure](
         aliceRemoteWallet
           .executeDirectTransfer(bobUserParty, 10),
+        _.warningMessage should include("Ledger API call failed with a non-retryable error"),
         _.errorMessage should include("failed due to an exception"),
         _.errorMessage should include("Direct transfers are allowed"),
       )
@@ -503,7 +502,6 @@ class WalletIntegrationTest
       val aliceValidatorParty = aliceValidator.initialize()
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
       aliceWallet.initialize(aliceValidatorParty)
-      aliceValidator.installWalletForValidator()
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
       // Onboard bob on his self-hosted validator

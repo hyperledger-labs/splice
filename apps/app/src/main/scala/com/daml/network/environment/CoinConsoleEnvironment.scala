@@ -284,7 +284,9 @@ class CoinConsoleEnvironment(
       case _: LocalDomainReference => 1
       case _: LocalParticipantReference => 2
       case _: LocalSvcAppReference => 3
-      case _ => 4
+      case _: LocalScanAppReference => 4
+      case _: LocalValidatorAppReference => 5
+      case _ => 6
     }
 
   override protected def domainsTopLevelValue(

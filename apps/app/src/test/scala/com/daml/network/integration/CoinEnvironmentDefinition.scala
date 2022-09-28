@@ -24,6 +24,7 @@ import monocle.macros.syntax.lens._
 case class CoinEnvironmentDefinition(
     override val baseConfig: CoinConfig,
     override val testingConfig: TestingConfigInternal = TestingConfigInternal(),
+    override val preSetup: CoinTestConsoleEnvironment => Unit = _ => (),
     override val setup: CoinTestConsoleEnvironment => Unit = _ => (),
     override val teardown: Unit => Unit = _ => (),
     val context: String, // String context included in generation of unique names. This could, e.g., be the test suite name
@@ -32,6 +33,7 @@ case class CoinEnvironmentDefinition(
 ) extends BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment](
       baseConfig,
       testingConfig,
+      preSetup,
       setup,
       teardown,
       configTransformsWithContext(context),
@@ -39,6 +41,29 @@ case class CoinEnvironmentDefinition(
   override val configTransforms = configTransformsWithContext(context)
   def withManualStart: CoinEnvironmentDefinition =
     copy(baseConfig = baseConfig.focus(_.parameters.manualStart).replace(true))
+  def withConnectedDomains(): CoinEnvironmentDefinition =
+    copy(preSetup = env => {
+      import env._
+      this.preSetup(env)
+      participants.all.foreach(_.domains.connect_local(da))
+    })
+  def withAllocatedValidatorUsers(): CoinEnvironmentDefinition =
+    copy(preSetup = env => {
+      import env._
+      this.preSetup(env)
+      validators.foreach(validator => {
+        val validatorParty = validator.remoteParticipant.parties.enable(validator.config.damlUser)
+        validator.remoteParticipant.ledger_api.users.create(
+          id = validator.config.damlUser,
+          actAs = Set(validatorParty.toLf),
+          primaryParty = Some(validatorParty.toLf),
+          readAs = Set.empty,
+          participantAdmin = true,
+        )
+      })
+    })
+  def withPreSetup(preSetup: CoinTestConsoleEnvironment => Unit): CoinEnvironmentDefinition =
+    copy(preSetup = preSetup)
   def withSetup(setup: CoinTestConsoleEnvironment => Unit): CoinEnvironmentDefinition =
     copy(setup = setup)
   def clearConfigTransforms(): CoinEnvironmentDefinition =

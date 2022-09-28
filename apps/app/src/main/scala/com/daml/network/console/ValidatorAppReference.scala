@@ -42,17 +42,6 @@ class LocalValidatorAppReference(
     }
   }
 
-  @Help.Summary("Install wallet for validator operator")
-  @Help.Description(
-    """This installs the wallet for the operator user. For all other users this is done as part of onboardUser.
-                      |Must be called after both the wallet and the validator app have been initialized.""".stripMargin
-  )
-  def installWalletForValidator(): Unit = {
-    consoleEnvironment.run {
-      adminCommand(GrpcValidatorAppClient.InstallWalletForValidator())
-    }
-  }
-
   /** Remote participant this validator app is configured to interact with. */
   val remoteParticipant =
     new CoinRemoteParticipantReference(

@@ -46,7 +46,15 @@ object CoinConfigTransforms {
         val config1 = updateSvcConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config0)
         val config2 = updateCcScanConfig(c => c.copy(svcUser = s"${c.svcUser}-$suffix"))(config1)
         val config3 =
-          updateAllValidatorConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config2)
+          updateAllValidatorConfigs_(c =>
+            c.copy(
+              damlUser = s"${c.damlUser}-$suffix",
+              walletServiceUser = s"${c.walletServiceUser}-$suffix",
+              appInstances = c.appInstances.view
+                .mapValues(i => i.copy(serviceUser = s"${i.serviceUser}-$suffix"))
+                .toMap,
+            )
+          )(config2)
         val config4 =
           updateAllWalletAppConfigs_(c => c.copy(serviceUser = s"${c.serviceUser}-$suffix"))(
             config3

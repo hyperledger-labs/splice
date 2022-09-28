@@ -1,5 +1,5 @@
 import com.daml.lf.value.Value.ContractId
-Seq(aliceSplitwiseBackend.remoteParticipant, bobSplitwiseBackend.remoteParticipant, providerSplitwiseBackend.remoteParticipant, directoryBackend.remoteParticipant).foreach { p =>
+Seq(aliceSplitwiseBackend.remoteParticipant, bobSplitwiseBackend.remoteParticipant).foreach { p =>
   p.dars.upload("apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar")
 }
 
@@ -37,7 +37,7 @@ directoryBackend.remoteParticipant.ledger_api.acs.await_active_contract(director
 directoryBackend.collectEntryPayment(aliceAccepted)
 directoryBackend.collectEntryPayment(bobAccepted)
 
-val providerParty = splitwiseValidator.initialize()
+val providerParty = providerSplitwiseBackend.getProviderPartyId()
 
 Seq(aliceSplitwise, bobSplitwise).foreach { splitwise =>
   val proposal = splitwise.createInstallProposal(providerParty)

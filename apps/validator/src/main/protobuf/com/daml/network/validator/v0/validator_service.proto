@@ -6,7 +6,6 @@ import "google/protobuf/empty.proto";
 service ValidatorAppService {
   rpc OnboardUser (OnboardUserRequest) returns (OnboardUserResponse);
   rpc Initialize (google.protobuf.Empty) returns (InitializeResponse);
-  rpc InstallWalletForValidator (google.protobuf.Empty) returns (google.protobuf.Empty);
 }
 
 message InitializeResponse {

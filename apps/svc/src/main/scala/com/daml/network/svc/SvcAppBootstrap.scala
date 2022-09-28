@@ -85,7 +85,7 @@ class SvcAppBootstrap(
     val svcApp = for {
       svcPartyId <- connection.getOrAllocateParty(config.damlUser)
       _ = logger.info(s"Allocated SVC party $svcPartyId")
-      _ <- connection.uploadDarFile(CoinUtil) // TODO(i876) move away from dar upload during init
+      _ <- connection.uploadDarFile(CoinUtil)
       _ <- CoinUtil.setupApp(svcPartyId, connection)
       _ = logger.info(s"SVC App is initialized")
       automation = new SvcAutomationService(

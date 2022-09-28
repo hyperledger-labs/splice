@@ -5,7 +5,7 @@ import cats.data.EitherT
 import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.CoinNodeBootstrapBase
+import com.daml.network.environment.{CoinLedgerConnection, CoinNodeBootstrapBase}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AppCoinStore
 import com.daml.network.wallet.admin.WalletAutomationService
@@ -13,7 +13,6 @@ import com.daml.network.wallet.admin.grpc.GrpcWalletService
 import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.daml.network.wallet.metrics.WalletAppMetrics
 import com.daml.network.wallet.store.{WalletAppPartyStore, WalletAppRequestStore}
-import com.daml.network.wallet.util.WalletUtil
 import com.daml.network.wallet.v0.WalletServiceGrpc
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
@@ -94,11 +93,11 @@ class WalletAppBootstrap(
     val connection = ledgerClient.connection("SvcAppBootstrap")
 
     val walletApp = for {
-      walletServicePartyId <- connection.getOrAllocateParty(config.serviceUser)
-      _ = logger.info(s"Allocated wallet service party $walletServicePartyId")
-      _ <- connection.uploadDarFile(
-        WalletUtil
-      ) // TODO(i876) move away from dar upload during init
+      walletServicePartyId <- connection.retryLedgerApi(
+        connection.getPrimaryParty(config.serviceUser),
+        CoinLedgerConnection.RetryOnUserManagementError,
+      )
+      _ = logger.info(s"Got primary party of wallet service user: $walletServicePartyId")
     } yield {
       val automation = new WalletAutomationService(
         coinStore,

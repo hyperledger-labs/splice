@@ -108,13 +108,6 @@ In order to create some free canton coin to play around with, you'll interact wi
 setup in the previous section as a specific user. In our example, ``aliceWallet`` has been
 configured to interact with the wallet app using the previously created user ``alice``.
 
-For all users created via ``validatorApp.onboardUser`` the wallet app is automatically installed.
-To allow the validator party to use the wallet, we need to install it manually via: ::
-
-
-  @ validatorApp.installWalletAppForValidator()
-
-
 Using Alice’s wallet, you can create free coins like so: ::
 
   @ val coinId = aliceWallet.tap(100.0)

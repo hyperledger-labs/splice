@@ -13,7 +13,7 @@ import com.digitalasset.canton.util.FutureUtil
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Manages background automation that runs on an Wallet app.
   */
@@ -50,19 +50,14 @@ class WalletAutomationService(
     }
 
   // Every time the set of parties for which a WalletAppInstall contract exists changes:
-  // - Grant readAs rights for all of these parties to the wallet app service user
   // - Subscribe to the transaction stream of coins for all of these parties
-  // Note that the app granting itself readAs rights is problematic from an auth POV,
-  // and requires the app to have full admin rights on the ledger API.
-  // TODO (i713): remove this workaround for missing `read-as-any-party` rights
   FutureUtil.doNotAwait(
     partyStore.getPartiesStream
       .mapAsync(1)(parties =>
         performUnlessClosingF("subscribe to new parties") {
-          for {
-            _ <- connection.grantUserRights(serviceUser, Seq.empty, parties)
-            _ = coinIngestion.updateAndGet(s => updateReadAs(s, parties))
-          } yield ()
+          Future {
+            coinIngestion.updateAndGet(s => updateReadAs(s, parties))
+          }
         }.onShutdown(())
       )
       .run(),

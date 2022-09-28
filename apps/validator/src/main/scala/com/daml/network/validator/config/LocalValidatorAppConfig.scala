@@ -4,11 +4,19 @@ import com.daml.network.config.LocalCoinConfig
 import com.daml.network.scan.config.RemoteScanAppConfig
 import com.digitalasset.canton.config._
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
+import java.nio.file.Path
+
+case class AppInstance(
+    serviceUser: String,
+    dars: Seq[Path],
+)
 
 case class LocalValidatorAppConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     damlUser: String = "validator",
+    walletServiceUser: String,
+    appInstances: Map[String, AppInstance],
     remoteParticipant: RemoteParticipantConfig,
     remoteScan: RemoteScanAppConfig,
 ) extends LocalCoinConfig // TODO(i736): fork or generalize this trait.

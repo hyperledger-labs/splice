@@ -9,18 +9,24 @@ import scala.concurrent.{ExecutionContext, Future}
 
 /** Example for "Store" pattern. */
 trait ValidatorAppStore extends AutoCloseable {
-  def setSvcParty(partyId: PartyId): Future[Unit]
-  def getSvcParty(): Future[Option[PartyId]]
-  def setValidatorParty(partyId: PartyId): Future[Unit]
-  def getValidatorParty(): Future[Option[PartyId]]
+  def getSvcParty(): Future[PartyId]
+  def getValidatorParty(): Future[PartyId]
+  def getWalletServiceParty(): Future[PartyId]
 }
 
 object ValidatorAppStore {
-  def apply(storage: Storage, loggerFactory: NamedLoggerFactory)(implicit
+  def apply(
+      validatorParty: PartyId,
+      svcParty: PartyId,
+      walletServiceParty: PartyId,
+      storage: Storage,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit
       ec: ExecutionContext
   ): ValidatorAppStore =
     storage match {
-      case _: MemoryStorage => new InMemoryValidatorAppStore(loggerFactory)
+      case _: MemoryStorage =>
+        new InMemoryValidatorAppStore(validatorParty, svcParty, walletServiceParty, loggerFactory)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 }
