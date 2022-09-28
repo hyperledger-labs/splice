@@ -263,12 +263,12 @@ function cluster_push() {
         exit 1
     fi
 
-    if [ ! -d "${REPO_ROOT}/${module}" ]; then
+    if [ ! -d "${REPO_ROOT}/cluster/images/${module}" ]; then
         _error "Unknown module: $1"
         exit 1
     fi
 
-    tagfile="${REPO_ROOT}/${module}/target/docker.push"
+    tagfile="${REPO_ROOT}/cluster/images/${module}/target/docker.push"
 
     if [ ! -f ${tagfile} ]; then
         _error "Module not built: $1"

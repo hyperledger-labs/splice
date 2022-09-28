@@ -1,5 +1,5 @@
 # -*- makefile -*-
-include ../build-tools/common.mk
+include ../../../build-tools/common.mk
 
 src := Dockerfile $(shell find conf -name '*.conf' -type f)
 

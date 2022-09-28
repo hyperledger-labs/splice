@@ -12,7 +12,9 @@ format:
 
 .PHONY: test
 test:
-	diff test-results/expected.json	<(jsonnet $(test-vars) canton-network-config.jsonnet)
+	jsonnet $(test-vars) canton-network-config.jsonnet > test-results/actual.json
+	diff test-results/expected.json	test-results/actual.json
+	rm test-results/actual.json
 
 .PHONY: test-update
 test-update:

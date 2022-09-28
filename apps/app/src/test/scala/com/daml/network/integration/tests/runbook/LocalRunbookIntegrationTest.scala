@@ -26,11 +26,12 @@ class LocalRunbookIntegrationTest
     with IsolatedCoinEnvironments
     with HasConsoleScriptRunner {
   val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
+  val clusterImagesPath: File = "cluster" / "images"
   val validatorPath: File = examplesPath / "validator"
-  val svcParticipantPath = "canton-participant"
-  val svcDomainPath = "canton-domain"
-  val svcAppPath = "svc-app"
-  val scanAppPath = "scan-app"
+  val svcParticipantPath: File = clusterImagesPath / "canton-participant"
+  val svcDomainPath: File = clusterImagesPath / "canton-domain"
+  val svcAppPath: File = clusterImagesPath / "svc-app"
+  val scanAppPath: File = clusterImagesPath / "scan-app"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
