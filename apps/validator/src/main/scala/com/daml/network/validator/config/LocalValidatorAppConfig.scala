@@ -14,7 +14,7 @@ case class AppInstance(
 case class LocalValidatorAppConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
-    damlUser: String = "validator",
+    damlUser: String,
     walletServiceUser: String,
     appInstances: Map[String, AppInstance],
     remoteParticipant: RemoteParticipantConfig,

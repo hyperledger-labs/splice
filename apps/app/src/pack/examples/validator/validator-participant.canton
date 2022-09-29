@@ -5,9 +5,9 @@ validatorParticipant.start()
 println(s"Connecting self-hosted validator to the domain $domainUrl")
 validatorParticipant.domains.connect("canton-network", domainUrl)
 println(s"Creating validator user")
-val validatorParty = validatorParticipant.parties.enable("validator")
+val validatorParty = validatorParticipant.parties.enable("validator_user")
 validatorParticipant.ledger_api.users.create(
-    id = "validator",
+    id = "validator_user",
     actAs = Set(validatorParty.toLf),
     readAs = Set.empty,
     primaryParty = Some(validatorParty.toLf),

@@ -9,7 +9,7 @@ trait BaseScanAppConfig {}
 case class LocalScanAppConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
-    svcUser: String = "svc",
+    svcUser: String,
     override val remoteParticipant: RemoteParticipantConfig,
 ) extends LocalCoinConfig
     with BaseScanAppConfig // TODO(i736): fork or generalize this trait.
