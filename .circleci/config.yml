@@ -651,7 +651,7 @@ jobs:
     parameters:
       cluster:
         type: string
-      slack_notify:
+      slack_notify_success:
         type: boolean
         default: true
     machine:
@@ -724,7 +724,7 @@ jobs:
           extra_parameters: -DDOMAIN_URL=http://<<parameters.cluster>>.network.canton.global:5008 -DNETWORK_APPS_ADDRESS=<<parameters.cluster>>.network.canton.global
           timeout: "10m"
       - when:
-          condition: << parameters.slack_notify >>
+          condition: << parameters.slack_notify_success >>
           steps:
           - slack/notify:
               event: pass
@@ -859,6 +859,7 @@ workflows:
            - docker-images-push
     - preflight_check:
         cluster: staging
+        slack_notify_success: false
         <<: *notify-fail
         <<: *main-branch-only
         context:
@@ -929,7 +930,7 @@ workflows:
           type: approval
       - preflight_check:
           cluster: dev
-          slack_notify: false
+          slack_notify_success: false
           context:
             - canton-network-vpn
           requires:
