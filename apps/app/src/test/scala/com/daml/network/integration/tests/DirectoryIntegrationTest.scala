@@ -1,4 +1,6 @@
 package com.daml.network.integration.tests
+import com.daml.ledger.api.v1.event.Event
+import com.daml.network.codegen.CN.{Directory => codegen}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -6,9 +8,10 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
   IsolatedCoinEnvironments,
 }
-import com.daml.network.util.{CommonCoinAppInstanceReferences, Contract}
+import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.daml.network.codegen.CN.{Directory => codegen, Wallet => walletCodegen}
+
+import scala.util.Try
 
 class DirectoryIntegrationTest
     extends CoinIntegrationTest
@@ -43,62 +46,65 @@ class DirectoryIntegrationTest
       utils.retry_until_true(aliceDirectory.lookupInstall(aliceUserParty).isDefined)
 
       // Request entry
-      aliceValidator.remoteParticipant.ledger_api.acs
-        .await(aliceUserParty, codegen.DirectoryInstall)
       aliceDirectory.requestDirectoryEntry(entryName)
-      val entryRequest = directory.remoteParticipant.ledger_api.acs
-        .await(providerParty, codegen.DirectoryEntryRequest)
-      val entryRequests = directory.listEntryRequests()
-      entryRequests.map(_.contractId) shouldBe Seq(entryRequest.contractId)
-
-      // Provider: Request payment for entry
-      val paymentRequest = directory.requestEntryPayment(entryRequest.contractId)
 
       // User: wait until payment request becomes visible
-      def getPaymentRequest() =
-        aliceRemoteWallet
-          .listAppPaymentRequests()
-          .headOption
-      utils.retry_until_true { getPaymentRequest().isDefined }
-      val walletPaymentRequest =
-        getPaymentRequest().getOrElse(sys.error("Payment request is unexpectedly not defined."))
-      walletPaymentRequest.contractId shouldBe paymentRequest
+      def getPaymentRequest() = aliceRemoteWallet.listAppPaymentRequests().headOption
+      val walletPaymentRequest = utils
+        .retry(getPaymentRequest())(_.isEmpty)
+        .getOrElse(fail("Payment request is unexpectedly not defined."))
 
       // Accept payment request
       aliceRemoteWallet.tap(5.0)
       val _ = aliceRemoteWallet.acceptAppPaymentRequest(walletPaymentRequest.contractId)
 
-      // Collect payment
-      val acceptedPayment = directory.remoteParticipant.ledger_api.acs
-        .await(providerParty, walletCodegen.AcceptedAppPayment)
-      val cid = directory.collectEntryPayment(acceptedPayment.contractId)
-      val entry = directory.remoteParticipant.ledger_api.acs
-        .await(providerParty, codegen.DirectoryEntry)
-      entry.contractId shouldBe cid
-
-      val entryValue =
-        Contract(
-          cid,
-          codegen.DirectoryEntry(aliceUserParty.toPrim, providerParty.toPrim, entryName),
-        )
+      // Wait until payment is processed and entry was created
+      val entryPayload =
+        codegen.DirectoryEntry(aliceUserParty.toPrim, providerParty.toPrim, entryName)
+      def tryGetEntry() =
+        Try(loggerFactory.suppressErrors(directory.lookupEntryByName(entryName)))
+      val entry = utils.retry(tryGetEntry())(_.isFailure).get
+      entry.payload shouldBe entryPayload
 
       // Read entries from provider
-      directory.listEntries() shouldBe Seq(entryValue)
-      directory.lookupEntryByName(entryName) shouldBe entryValue
-      directory.lookupEntryByParty(aliceUserParty) shouldBe entryValue
+      directory.listEntries() shouldBe Seq(entry)
+      directory.lookupEntryByName(entryName) shouldBe entry
+      directory.lookupEntryByParty(aliceUserParty) shouldBe entry
       assertThrowsAndLogsCommandFailures(
         directory.lookupEntryByName("nonexistentname"),
         _.errorMessage should include("nonexistentname"),
       )
 
       // Read entries from user
-      aliceDirectory.listEntries() shouldBe Seq(entryValue)
-      aliceDirectory.lookupEntryByName(entryName) shouldBe entryValue
-      aliceDirectory.lookupEntryByParty(aliceUserParty) shouldBe entryValue
+      aliceDirectory.listEntries() shouldBe Seq(entry)
+      aliceDirectory.lookupEntryByName(entryName) shouldBe entry
+      aliceDirectory.lookupEntryByParty(aliceUserParty) shouldBe entry
       assertThrowsAndLogsCommandFailures(
         aliceDirectory.lookupEntryByName("nonexistentname"),
         _.errorMessage should include("nonexistentname"),
       )
+
+      // Check that a second request for the same entry is rejected
+      val entriesBefore = aliceDirectory.listEntries()
+      val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
+      val entryRequestId = aliceDirectory.requestDirectoryEntry(entryName)
+
+      // Wait for the tx creating the entry request, and the following that archives it
+      val txs = aliceValidator.remoteParticipant.ledger_api.transactions
+        .flat(Set(aliceUserParty), completeAfter = 2, beginOffset = offsetBefore)
+      inside(txs) { case Seq(_, tx2) =>
+        assert(
+          tx2.events.exists(ev =>
+            ev.event match {
+              case Event.Event.Archived(archival) => archival.contractId == entryRequestId
+              case _ => false
+            }
+          )
+        )
+      }
+      // Directory entries are unchanged
+      aliceDirectory.listEntries() shouldBe entriesBefore
+
     }
   }
 }

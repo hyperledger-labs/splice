@@ -7,10 +7,6 @@ import "google/protobuf/empty.proto";
 service DirectoryService {
   rpc LookupInstall (LookupInstallRequest) returns (LookupInstallResponse);
 
-  rpc ListEntryRequests (google.protobuf.Empty) returns (ListEntryRequestsResponse);
-  rpc RequestEntryPayment (RequestEntryPaymentRequest) returns (RequestEntryPaymentResponse);
-  rpc CollectEntryPayment (CollectEntryPaymentRequest) returns (CollectEntryPaymentResponse);
-
   rpc ListEntries (google.protobuf.Empty) returns (ListEntriesResponse);
   rpc LookupEntryByParty (LookupEntryByPartyRequest) returns (LookupEntryByPartyResponse);
   rpc LookupEntryByName (LookupEntryByNameRequest) returns (LookupEntryByNameResponse);

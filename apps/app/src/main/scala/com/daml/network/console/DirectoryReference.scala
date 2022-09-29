@@ -1,7 +1,7 @@
 package com.daml.network.console
 
 import com.daml.ledger.client.binding.Primitive
-import com.daml.network.codegen.CN.{Directory => codegen, Wallet => walletCodegen}
+import com.daml.network.codegen.CN.{Directory => codegen}
 import com.daml.network.codegen.DA
 import com.daml.network.directory.admin.api.client.commands.GrpcDirectoryAppClient
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
@@ -57,31 +57,6 @@ class LocalDirectoryAppReference(
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Directory"
-
-  @Help.Summary("List all DirectoryEntryRequest contracts")
-  def listEntryRequests(): Seq[Contract[codegen.DirectoryEntryRequest]] = {
-    consoleEnvironment.run {
-      adminCommand(GrpcDirectoryAppClient.ListEntryRequests())
-    }
-  }
-
-  @Help.Summary("Create an AppPaymentRequest for a given DirectoryEntryRequest")
-  def requestEntryPayment(
-      cid: Primitive.ContractId[codegen.DirectoryEntryRequest]
-  ): Primitive.ContractId[walletCodegen.AppPaymentRequest] = {
-    consoleEnvironment.run {
-      adminCommand(GrpcDirectoryAppClient.RequestEntryPayment(cid))
-    }
-  }
-
-  @Help.Summary("Collect the AcceptedAppPayment and create the DirectoryEntry")
-  def collectEntryPayment(
-      cid: Primitive.ContractId[walletCodegen.AcceptedAppPayment]
-  ): Primitive.ContractId[codegen.DirectoryEntry] = {
-    consoleEnvironment.run {
-      adminCommand(GrpcDirectoryAppClient.CollectEntryPayment(cid))
-    }
-  }
 
   @Help.Summary("Return directory app config")
   def config: LocalDirectoryAppConfig =

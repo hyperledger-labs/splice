@@ -2,7 +2,7 @@ package com.daml.network.directory.store
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl._
-import com.daml.ledger.api.v1.event.{CreatedEvent, Event}
+import com.daml.ledger.api.v1.event.{ArchivedEvent, CreatedEvent, Event}
 import com.daml.ledger.api.v1.transaction.Transaction
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.CN.{Directory => directoryCodegen}
@@ -68,6 +68,16 @@ class DirectoryAppStoreTest extends AsyncWordSpec with BaseTest {
     )
   }
 
+  def toArchivedEvent[T](contract: Contract[T]): ArchivedEvent = {
+    val contractP = contract.toProtoV0
+    ArchivedEvent(
+      eventId = "dummyEventId",
+      contractId = contractP.contractId,
+      templateId = contractP.templateId,
+      witnessParties = Seq.empty,
+    )
+  }
+
   // test values
   val (reqs, txReqs) = Seq(0, 1, 2, 3)
     .map(i =>
@@ -82,8 +92,10 @@ class DirectoryAppStoreTest extends AsyncWordSpec with BaseTest {
 
   val entries =
     Seq(0, 1).map(i => directoryEntry(i, providerParty, userParty(i), s"entry-name-$i"))
+  val entriesToArchive =
+    Seq(2, 3).map(i => directoryEntry(i, providerParty, userParty(i), s"entry-name-$i"))
   // these entries have the provider party as a user, and should be disregarded in lookups
-  val confusingEntries = Seq(0, 1).map(i =>
+  val nonIngestedEntries = Seq(0, 1, 3).map(i =>
     directoryEntry(
       i + 100,
       mkPartyId(s"other-provider-$i"),
@@ -91,14 +103,27 @@ class DirectoryAppStoreTest extends AsyncWordSpec with BaseTest {
       s"entry-name-$i",
     )
   )
-  val testEvents =
-    entries.map(toCreatedEvent) ++ reqs.map(toCreatedEvent) ++ confusingEntries.map(toCreatedEvent)
+  val acsEvents =
+    entriesToArchive.map(toCreatedEvent) ++ entries.map(toCreatedEvent)
 
-  val acsOffset = "001"
-  val txOffset = "002"
+  val acsOffset = "010"
+  val tx1Offset = "011"
+  val tx2Offset = "012"
+  val tx3Offset = "013"
 
-  val tx: Transaction = Transaction(
-    offset = txOffset,
+  val tx1: Transaction = Transaction(
+    offset = tx1Offset,
+    events = entriesToArchive.map(co => Event.of(Event.Event.Archived(toArchivedEvent(co))))
+      ++ reqs.map(co => Event.of(Event.Event.Created(toCreatedEvent(co)))),
+  )
+
+  val tx2: Transaction = Transaction(
+    offset = tx2Offset,
+    events = nonIngestedEntries.map(co => Event.of(Event.Event.Created(toCreatedEvent(co)))),
+  )
+
+  val tx3: Transaction = Transaction(
+    offset = tx3Offset,
     events = txReqs.map(co => Event.of(Event.Event.Created(toCreatedEvent(co)))),
   )
 
@@ -108,8 +133,11 @@ class DirectoryAppStoreTest extends AsyncWordSpec with BaseTest {
       // store provider party after initialization
       () <- store.setProviderParty(providerParty)
       // ingest test events
-      () <- store.ingestActiveContracts(testEvents)
+      () <- store.ingestActiveContracts(acsEvents)
       () <- store.switchToIngestingTransactions(acsOffset)
+      // ingest test txs
+      () <- store.ingestTransaction(tx1)
+      () <- store.ingestTransaction(tx2)
     } yield store
   }
 
@@ -125,42 +153,42 @@ class DirectoryAppStoreTest extends AsyncWordSpec with BaseTest {
         results <- Future.sequence(reqs.map(req => {
           store.lookupEntryRequestById(req.contractId)
         }))
-      } yield results shouldBe reqs.map(req => QueryResult(acsOffset, Some(req)))
+      } yield results shouldBe reqs.map(req => QueryResult(tx2Offset, Some(req)))
     }
 
     "lookup a non-ingested entry by id" in {
       for {
         store <- mkStore()
         result <- store.lookupEntryRequestById(Primitive.ContractId(s"non-existent#1"))
-      } yield result shouldBe QueryResult(acsOffset, None)
+      } yield result shouldBe QueryResult(tx2Offset, None)
     }
 
     "lookup an ingested entry by name" in {
       for {
         store <- mkStore()
         result <- store.lookupEntryByName("entry-name-1")
-      } yield result shouldBe QueryResult(acsOffset, Some(entries(1)))
+      } yield result shouldBe QueryResult(tx2Offset, Some(entries(1)))
     }
 
     "lookup an non-ingested entry by party" in {
       for {
         store <- mkStore()
         result <- store.lookupEntryByParty(providerParty)
-      } yield result shouldBe QueryResult(acsOffset, None)
+      } yield result shouldBe QueryResult(tx2Offset, None)
     }
 
     "lookup an ingested entry by party" in {
       for {
         store <- mkStore()
         result <- store.lookupEntryByParty(userParty(1))
-      } yield result shouldBe QueryResult(acsOffset, Some(entries(1)))
+      } yield result shouldBe QueryResult(tx2Offset, Some(entries(1)))
     }
 
-    "list all ingested directory entries" in {
+    "list all ingested and active directory entries" in {
       for {
         store <- mkStore()
         result <- store.listEntries()
-      } yield result shouldBe QueryResult(acsOffset, entries)
+      } yield result shouldBe QueryResult(tx2Offset, entries)
     }
 
     "stream all ingested entry requests" in {
@@ -189,7 +217,7 @@ class DirectoryAppStoreTest extends AsyncWordSpec with BaseTest {
         // sleep for 10 millis so the source had a chance to produce extra elements if it was buggy
         _ = Threading.sleep(10)
         reqsBeforeIngestion = acc.get()
-        () <- store.ingestTransaction(tx)
+        () <- store.ingestTransaction(tx3)
         () <- extraReqsPromise.future
         reqsAfterIngestion = acc.get()
       } yield {

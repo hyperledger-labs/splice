@@ -15,7 +15,6 @@ import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
-import scala.annotation.nowarn
 import scala.collection.immutable
 import scala.concurrent._
 
@@ -38,18 +37,23 @@ class InMemoryDirectoryAppStore(
       Promise(),
     )
 
+  // Boolean flag to enable very verbose state update logging
+  private val logAllStateUpdates: Boolean = false
+
   private val finishedAcsIngestion: Promise[Unit] = Promise()
   private val providerParty: Promise[PartyId] = Promise()
 
-  @nowarn("cat=unused")
   private def updateState[T](
       f: InMemoryDirectoryAppStore.State => (InMemoryDirectoryAppStore.State, T)
   )(implicit traceContext: TraceContext): Future[T] = {
     Future {
       blocking {
         synchronized {
+          val stOld = stateVar
           val (stNew, result) = f(stateVar)
           stateVar = stNew
+          if (logAllStateUpdates)
+            logger.debug(s"Updated state\nstOld=\n${stOld.pretty}\nstNew=\n${stNew.pretty}")
           result
         }
       }
@@ -65,6 +69,7 @@ class InMemoryDirectoryAppStore(
               // TODO(#790): share this list with the ingestion predicate
               directoryCodegen.DirectoryEntry.id,
               directoryCodegen.DirectoryEntryRequest.id,
+              directoryCodegen.DirectoryEntryOffer.id,
               walletCodegen.AcceptedAppPayment.id,
               directoryCodegen.DirectoryInstallRequest.id,
               directoryCodegen.DirectoryInstall.id,
@@ -123,6 +128,9 @@ class InMemoryDirectoryAppStore(
       .exists(co => co.value.provider == provider) ||
       DecodeUtil
         .decodeCreated(directoryCodegen.DirectoryEntryRequest)(ev)
+        .exists(co => co.value.entry.provider == provider) ||
+      DecodeUtil
+        .decodeCreated(directoryCodegen.DirectoryEntryOffer)(ev)
         .exists(co => co.value.entry.provider == provider) ||
       DecodeUtil
         .decodeCreated(walletCodegen.AcceptedAppPayment)(ev)
@@ -199,6 +207,11 @@ class InMemoryDirectoryAppStore(
     // TODO(#790): add an index to make this more efficient
     findContract(directoryCodegen.DirectoryEntry)(co => co.payload.user == partyId.toPrim)
 
+  def lookupEntryOfferById(
+      id: Primitive.ContractId[directoryCodegen.DirectoryEntryOffer]
+  ): Future[QueryResult[Option[Contract[directoryCodegen.DirectoryEntryOffer]]]] =
+    lookupContractById(directoryCodegen.DirectoryEntryOffer)(id)
+
   override def lookupEntryRequestById(
       id: Primitive.ContractId[directoryCodegen.DirectoryEntryRequest]
   ): Future[QueryResult[Option[Contract[directoryCodegen.DirectoryEntryRequest]]]] =
@@ -207,7 +220,7 @@ class InMemoryDirectoryAppStore(
   def streamActiveContracts[T](
       templateCompanion: TemplateCompanion[T]
   ): Source[Contract[T], NotUsed] =
-    Source.unfoldAsync(1: Long)(eventNumber =>
+    Source.unfoldAsync(0: Long)(eventNumber =>
       nextActiveContract(templateCompanion, eventNumber).map(Some(_))
     )
 
@@ -226,7 +239,7 @@ class InMemoryDirectoryAppStore(
     optEntry match {
       case None =>
         st.offsetChanged.future.flatMap(_ =>
-          nextActiveContract(templateCompanion, st.eventNumber + 1)
+          nextActiveContract(templateCompanion, st.nextEventNumber)
         )
       case Some((eventNumber, co)) => Future((eventNumber + 1, co))
     }
@@ -244,14 +257,6 @@ class InMemoryDirectoryAppStore(
   def listEntries(): Future[QueryResult[Seq[Contract[directoryCodegen.DirectoryEntry]]]] =
     listContracts(directoryCodegen.DirectoryEntry)
 
-  def listEntryRequests()
-      : Future[QueryResult[Seq[Contract[directoryCodegen.DirectoryEntryRequest]]]] =
-    listContracts(directoryCodegen.DirectoryEntryRequest)
-
-  def listInstallRequests()
-      : Future[QueryResult[Seq[Contract[directoryCodegen.DirectoryInstallRequest]]]] =
-    listContracts(directoryCodegen.DirectoryInstallRequest)
-
   override def streamInstallRequests()
       : Source[Contract[directoryCodegen.DirectoryInstallRequest], NotUsed] =
     streamActiveContracts(directoryCodegen.DirectoryInstallRequest)
@@ -263,18 +268,29 @@ class InMemoryDirectoryAppStore(
 object InMemoryDirectoryAppStore {
   case class State(
       offset: Option[String],
-      eventNumber: Long,
+      nextEventNumber: Long,
       createEvents: immutable.SortedMap[Long, CreatedEvent],
       createEventsById: immutable.Map[String, Long],
       offsetChanged: Promise[Unit],
   ) {
+    def pretty: String = {
+      def prettyEntry(entry: (Long, CreatedEvent)) = entry match {
+        case (evNum, ev) => s"    $evNum -> ${ev.templateId} -- ${ev.contractId}"
+      }
+      val lines = Seq(
+        s"  offset=$offset",
+        s"  nextEventNumber=$nextEventNumber",
+        s"  createEventsById=",
+      ) ++ createEvents.map(prettyEntry)
+
+      lines.mkString("\n")
+    }
     def ingestCreatedEvent(ev: CreatedEvent): State = {
-      val i: Long = eventNumber + 1
       State(
         offset = offset,
-        eventNumber = i,
-        createEvents = createEvents + (i -> ev),
-        createEventsById = createEventsById + (ev.contractId -> i),
+        nextEventNumber = nextEventNumber + 1,
+        createEvents = createEvents + (nextEventNumber -> ev),
+        createEventsById = createEventsById + (ev.contractId -> nextEventNumber),
         offsetChanged = offsetChanged,
       )
     }
@@ -288,7 +304,7 @@ object InMemoryDirectoryAppStore {
           assert(createEvents.contains(eventNumber), s"event number $eventNumber defined")
           State(
             offset = offset,
-            eventNumber = eventNumber + 1,
+            nextEventNumber = nextEventNumber,
             createEvents = createEvents - eventNumber,
             createEventsById = createEventsById - ev.contractId,
             offsetChanged = offsetChanged,
@@ -306,7 +322,7 @@ object InMemoryDirectoryAppStore {
       (
         State(
           offset = Some(acsOffset),
-          eventNumber = eventNumber,
+          nextEventNumber = nextEventNumber,
           createEvents = createEvents,
           createEventsById = createEventsById,
           offsetChanged = Promise(),
@@ -329,7 +345,7 @@ object InMemoryDirectoryAppStore {
       (
         State(
           offset = Some(tx.offset),
-          eventNumber = stNew.eventNumber,
+          nextEventNumber = stNew.nextEventNumber,
           createEvents = stNew.createEvents,
           createEventsById = stNew.createEventsById,
           offsetChanged = Promise(),

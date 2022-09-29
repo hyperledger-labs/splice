@@ -1,8 +1,6 @@
 package com.daml.network.directory.admin.grpc
 
 import com.daml.ledger.client.binding.{Primitive, TemplateCompanion}
-import com.daml.network.codegen.CN.{Directory => codegen, Wallet => walletCodegen}
-import com.daml.network.codegen.DA
 import com.daml.network.directory.store.DirectoryAppStore
 import com.daml.network.directory.v0
 import com.daml.network.directory.v0.DirectoryServiceGrpc
@@ -55,55 +53,6 @@ class GrpcDirectoryService(
         install <- store.lookupInstall(PartyId.tryFromProtoPrimitive(request.userPartyId))
       } yield {
         v0.LookupInstallResponse(install.value.map(_.toProtoV0))
-      }
-    }
-
-  @nowarn("cat=unused")
-  override def listEntryRequests(request: Empty): Future[v0.ListEntryRequestsResponse] =
-    withSpanFromGrpcContext("GrpcDirectoryService") { implicit traceContext => span =>
-      for { reqs <- store.listEntryRequests() } yield {
-        v0.ListEntryRequestsResponse(reqs.value.map(_.toProtoV0))
-      }
-    }
-
-  override def requestEntryPayment(
-      request: v0.RequestEntryPaymentRequest
-  ): Future[v0.RequestEntryPaymentResponse] =
-    withSpanFromGrpcContext("GrpcDirectoryService") { implicit traceContext => span =>
-      for {
-        partyId <- store.getProviderParty()
-        entryRequest <- fetchContractById(codegen.DirectoryEntryRequest)(
-          Proto.tryDecodeContractId(request.contractId)
-        )
-        cmd = codegen.DirectoryInstall
-          .key(DA.Types.Tuple2(partyId.toPrim, entryRequest.payload.entry.user))
-          .exerciseDirectoryInstall_RequestEntryPayment(
-            codegen.DirectoryInstall_RequestEntryPayment(entryRequest.contractId)
-          )
-        requestCid <- connection.submitWithResult(Seq(partyId), Seq(), cmd)
-      } yield {
-        v0.RequestEntryPaymentResponse(Proto.encode(requestCid))
-      }
-    }
-
-  override def collectEntryPayment(
-      request: v0.CollectEntryPaymentRequest
-  ): Future[v0.CollectEntryPaymentResponse] =
-    withSpanFromGrpcContext("GrpcDirectoryService") { implicit traceContext => span =>
-      for {
-        partyId <- store.getProviderParty()
-        acceptedAppPayment <- fetchContractById(walletCodegen.AcceptedAppPayment)(
-          Proto.tryDecodeContractId(request.contractId)
-        )
-        // TODO(i321) Add uniqueness check
-        cmd = codegen.DirectoryInstall
-          .key(DA.Types.Tuple2(partyId.toPrim, acceptedAppPayment.payload.sender))
-          .exerciseDirectoryInstall_CollectEntryPayment(
-            codegen.DirectoryInstall_CollectEntryPayment(acceptedAppPayment.contractId)
-          )
-        result <- connection.submitWithResult(Seq(partyId), Seq(), cmd)
-      } yield {
-        v0.CollectEntryPaymentResponse(Proto.encode(result._1))
       }
     }
 

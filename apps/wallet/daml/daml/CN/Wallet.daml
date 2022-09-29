@@ -239,6 +239,7 @@ template AcceptedAppPayment
     choice AcceptedAppPayment_Collect : ContractId Coin
       with
         submitter : Party
+      -- TODO(M1-42): consider why we don't have the provider as a controller here as well
       controller sender, receiver
       do
         -- archive delivery offer
@@ -266,11 +267,12 @@ template AcceptedAppPayment
         let [TransferResultCoin coinCid] = result.createdCoins
         pure coinCid
 
-    choice AcceptedAppPayment_Discard : ContractId Coin
+    choice AcceptedAppPayment_Reject : ContractId Coin
       controller receiver
       do exercise deliveryOffer DeliveryOffer_Archive
          exercise lockedCoin Coin_Unlock
 
+    -- TODO(M3-90): allow all signatories to expire the payment
     choice AcceptedAppPayment_Expire : ContractId Coin
       controller sender
       do exercise deliveryOffer DeliveryOffer_Archive

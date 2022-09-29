@@ -54,21 +54,18 @@ trait DirectoryAppStore extends AutoCloseable {
       partyId: PartyId
   ): Future[QueryResult[Option[Contract[directoryCodegen.DirectoryEntry]]]]
 
+  /** Lookup a directory entry offer by its id. */
+  def lookupEntryOfferById(
+      id: Primitive.ContractId[directoryCodegen.DirectoryEntryOffer]
+  ): Future[QueryResult[Option[Contract[directoryCodegen.DirectoryEntryOffer]]]]
+
   /** Lookup a directory entry request by its id. */
   def lookupEntryRequestById(
-      requestId: Primitive.ContractId[directoryCodegen.DirectoryEntryRequest]
+      id: Primitive.ContractId[directoryCodegen.DirectoryEntryRequest]
   ): Future[QueryResult[Option[Contract[directoryCodegen.DirectoryEntryRequest]]]]
 
   /** List all directory entries that are active as of a specific revision. */
   def listEntries(): Future[QueryResult[Seq[Contract[directoryCodegen.DirectoryEntry]]]]
-
-  /** List all install requests that are active as of a specific revision. */
-  def listInstallRequests()
-      : Future[QueryResult[Seq[Contract[directoryCodegen.DirectoryInstallRequest]]]]
-
-  /** List all entry requests that are active as of a specific revision. */
-  def listEntryRequests()
-      : Future[QueryResult[Seq[Contract[directoryCodegen.DirectoryEntryRequest]]]]
 
   /** All install requests to the provider.
     *
