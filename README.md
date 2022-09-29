@@ -638,6 +638,80 @@ cncluster reset
 
 Both our deployment and tests follow the [port allocation scheme](./apps/app/src/test/resources/README.md).
 
+### Updating the canton network deployment
+
+This section provides simple step-by-step instructions for how to change a CN cluster.
+For details on the individual steps, read the above sections.
+
+1. Acquire at least a minimal knowledge about [kubernetes](https://kubernetes.io/docs/concepts/overview/). TLDR:
+   1. A _container_ is a portable executable image that contains software and all of its dependencies.
+   2. A _pod_ is a group of containers with shared storage/network resources, running in a shared environment.
+   It's analogous to a set of applications running on the same machine.
+   Containers within a pod can reach each other's ports on `localhost`.
+   A pod also defines what ports it exposes to the outside world.
+   3. A _service_ is a logical set of pods and a policy by which to access them.
+   A service defines what ports it exposes, and where requests sent to those ports are routed to (e.g., to pods).
+   4. Each service gets a DNS name equal to `<service-name>.<namespace-name>`,
+   pods in the same namespace can use simply `<service-name>`.
+   Use service DNS names for communication between pods.
+2. Edit the canton network cluster definition
+    1. If you need to add a new asset (e.g., a new frontend bundle):
+       make sure that asset is included in the bundle produced by `sbt bundle`.
+       That release bundle is included in the `./cluster/images/cn-app` image,
+       which is used by many of our other images.
+    2. If you need to edit an existing cluster component
+       (e.g., change the config of some app backend):
+       edit the corresponding folder in `./cluster/images`.
+       Each component defines its own docker image.
+    3. If you need to add a new component:
+        1. Add a new folder to `./cluster/images`
+           1. Make sure the new folder contains a Dockerfile and a Makefile that depends on `common.mk`.
+              When in doubt, start by duplicating an existing component.
+        2. Edit `./Makefile`, adding the component at the end of the existing list of components
+           1. Note that the order matters, if the image of your component depends on the image of another component,
+              your component must be listed after the dependency.
+        3. Edit `./cluster/canton-network-config.jsonnet`, adding the new component to the `cantonNetwork()` function
+    4. If you need to change the network configuration:
+       1. Edit `./cluster/canton-network-config.jsonnet`
+       2. Note that you are responsible for making sure the ports defined in the `./cluster/canton-network-config.jsonnet`
+          are consistent with the ports that the applications actually use
+          (typically defined in config files baked into individual component images).
+3. If you touched `./cluster/canton-network-config.jsonnet`,
+   run `make -C cluster test-update`
+4. Make sure you are connected to a full tunnel VPN
+   whenever you run a command interacting with the cloud.
+5. Build and upload all docker images
+    1. The dependency tracking of the build system is currently not reliable. Do the following workarounds:
+       1. Run `sbt bundle` if you changed any app or updated canton
+          (otherwise the docker images might contain outdated apps).
+       2. Run `make clean` or manually delete all `./cluster/images/**/target` folders
+          (otherwise the build might not upload docker files because of too aggressive caching).
+       3. If you still run into any issues, run `sbt clean && make clean` to trigger a full rebuild
+    2. Run `make docker-push`
+    3. Do not edit any local files while running `make docker-push`.
+6. Deploy your cluster definition to scratchnet
+    1. Scratchnet is used for ad-hoc testing, and we only have once instance of scratchnet.
+       Coordinate with team members if you are not sure that you are the only one using it.
+    2. Run `cd deployment/scratchnet` and execute all following commands in this section from that directory
+    3. Run `cncluster apply` to deploy your cluster definition.
+        1. If you get errors about missing images, re-upload your docker images. 
+7. Debug your deployment on scratchnet
+   1. Run `cd deployment/scratchnet` and execute all following commands in this section from that directory
+   2. Run `kubectl get pods` to get the status of all pods.
+   3. Run `kubectl describe pod <pod-name>` to get a detailed status of the given pod.
+   4. Run `kubectl logs` to download application logs
+      1. Run `kubectl logs -l app=<app-name>` to get the log for the given application.
+      2. Run `kubectl logs -l 'app in (<app-name>, <app-name>)'` to get a combined log for all the given applications.
+      3. Run `kubectl logs <pod-name>` to get the application log for the given pod.
+      4. Add `--tail=-1` to get the complete log snapshot (no limit on the number of lines returned)
+      5. Add `-f` to get the live log (new entries streaming to your console)
+      6. Add `--since=30m` to only return entries from the past 30min
+      7. Add `-p` to get the log from the previous instance. Use this to access the log of a crashed container after it restarted.
+   5. Use `lnav` to quickly analyze log files downloaded using `kubectl logs`.
+      Before opening the log file in `lnav`, manually remove the first ~100 lines that use a different log line format, otherwise `lnav` will not work correctly.
+   6. If you prefer a web UI to read logs, open `https://console.cloud.google.com/logs/query?project=da-cn-scratchnet`
+
+
 ### Bumping our Canton fork
 
 Current Canton commit: `606a286a97e3bc47d19f3045048dd71b12a9800a`
