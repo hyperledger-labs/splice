@@ -65,7 +65,7 @@ class DirectoryIntegrationTest
       def getPaymentRequest() =
         aliceRemoteWallet
           .listAppPaymentRequests()
-          .find(c => c.payload.reference == entryRequest.contractId)
+          .headOption
       utils.retry_until_true { getPaymentRequest().isDefined }
       val walletPaymentRequest =
         getPaymentRequest().getOrElse(sys.error("Payment request is unexpectedly not defined."))

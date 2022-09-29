@@ -182,7 +182,7 @@ template Group
       controller sender
       do assertMsg "sender is a member" (sender `elem` groupMembers this)
          assertMsg "receiver is a member" (receiver `elem` groupMembers this)
-         reference <- create TransferInProgress
+         deliveryOffer <- create TransferInProgress
            with
              group = this
              sender, receiver, quantity
@@ -191,7 +191,7 @@ template Group
            sender, provider, receiver, svc, quantity
            expiresAt = now `addRelTime` acceptDuration
            collectionDuration = collectionDuration
-           reference = toInterfaceContractId reference
+           deliveryOffer = toInterfaceContractId deliveryOffer
 
     nonconsuming choice Group_CompleteTransfer : ContractId BalanceUpdate
       with
@@ -199,16 +199,15 @@ template Group
         sender : Party
       controller sender
       do acceptedPayment <- fetch acceptedPaymentCid
+         Some (refCid, ref) <- fetchFromInterface @TransferInProgress acceptedPayment.deliveryOffer
          exercise acceptedPaymentCid (AcceptedAppPayment_Collect sender)
          acceptedPayment.sender === sender
-         Some (refCid, ref) <- fetchFromInterface @TransferInProgress acceptedPayment.reference
-         archive refCid
          let expectedAcceptedPayment = AcceptedAppPayment with
                sender = ref.sender
                provider
                receiver = ref.receiver
                svc
-               reference = acceptedPayment.reference
+               deliveryOffer = acceptedPayment.deliveryOffer
                lockedCoin = acceptedPayment.lockedCoin
          acceptedPayment === expectedAcceptedPayment
          -- Check that sender and receiver are both still members.
@@ -248,8 +247,8 @@ template TransferInProgress
     quantity : Decimal
   where
     signatory group.owner, sender, receiver
-    interface instance PaymentReference for TransferInProgress where
-      view = PaymentReferenceView with
+    interface instance DeliveryOffer for TransferInProgress where
+      view = DeliveryOfferView with
         description = "Transfer from " <> show sender <> " to " <> show receiver <> " for " <> show quantity
 
 template BalanceUpdate

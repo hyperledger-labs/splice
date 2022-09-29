@@ -3,6 +3,7 @@ module CN.Directory where
 import DA.Assert
 import DA.Time
 
+import CC.Coin
 import CN.Wallet
 
 template DirectoryEntry
@@ -13,6 +14,7 @@ template DirectoryEntry
   where
     signatory user, provider
 
+-- A request for a directory entry
 template DirectoryEntryRequest
   with
     entry : DirectoryEntry
@@ -20,12 +22,18 @@ template DirectoryEntryRequest
   where
     signatory signatory entry
 
-    interface instance PaymentReference for DirectoryEntryRequest where
-      view = PaymentReferenceView with description = "Directory entry request: " <> show entry
-
-    choice Reject : ()
+    choice DirectoryEntryRequest_Reject : ()
       controller entry.provider
       do pure ()
+
+template DirectoryEntryOffer
+  with
+    entry : DirectoryEntry
+  where
+    signatory signatory entry
+
+    interface instance DeliveryOffer for DirectoryEntryOffer where
+      view = DeliveryOfferView with description = "Directory entry: " <> show entry
 
 template DirectoryInstall with
     provider : Party
@@ -57,29 +65,33 @@ template DirectoryInstall with
         requestCid : ContractId DirectoryEntryRequest
       controller provider
       do request <- fetch requestCid
+         archive requestCid
          request.entry.provider === provider
          request.entry.user === user
          now <- getTime
+         offerCid <- create DirectoryEntryOffer with entry = request.entry
          create AppPaymentRequest with
            receiver = provider
            sender = user
            provider
            svc = svc
            quantity = request.entryFee
-           reference = toInterfaceContractId requestCid
+           deliveryOffer = toInterfaceContractId offerCid
            collectionDuration = collectionDuration
            expiresAt = now `addRelTime` acceptDuration
 
-    nonconsuming choice DirectoryInstall_CollectEntryPayment : ContractId DirectoryEntry
+    nonconsuming choice DirectoryInstall_CollectEntryPayment : (ContractId DirectoryEntry, ContractId Coin)
       with
-        acceptedAppPayment : ContractId AcceptedAppPayment
+        acceptedAppPaymentCid : ContractId AcceptedAppPayment
       controller provider
-      do -- collect accepted payment
-         reference <- exercise acceptedAppPayment (AcceptedAppPayment_Collect provider)
-         -- deliver the promised good: the entry referenced in the payment
-         Some (requestId, request) <- fetchFromInterface @DirectoryEntryRequest reference
-         archive requestId
-         create request.entry
+      do -- deliver the promised good: the entry referenced in the payment
+         acceptedAppPayment <- fetch acceptedAppPaymentCid
+         Some (_, offer) <- fetchFromInterface @DirectoryEntryOffer acceptedAppPayment.deliveryOffer
+         entryCid <- create offer.entry
+         -- accept payment, which archives the offer
+         coinCid <- exercise acceptedAppPaymentCid (AcceptedAppPayment_Collect provider)
+         -- return the created contracts
+         pure (entryCid, coinCid)
 
 -- | A request from a user to a directory service provider for an installation.
 -- Used to mock the actuall installation process until we have

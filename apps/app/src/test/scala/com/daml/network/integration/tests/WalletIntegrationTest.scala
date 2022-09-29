@@ -141,7 +141,7 @@ class WalletIntegrationTest
         optTimeout = None,
         commands = Seq(
           testWalletCodegen
-            .TestReference(
+            .TestDeliveryOffer(
               p = aliceUserParty.toPrim,
               description = "description",
             )
@@ -151,7 +151,7 @@ class WalletIntegrationTest
       )
       val referenceId =
         aliceWallet.remoteParticipant.ledger_api.acs
-          .await(aliceUserParty, testWalletCodegen.TestReference)
+          .await(aliceUserParty, testWalletCodegen.TestDeliveryOffer)
           .contractId
 
       // Create a payment request to self.
@@ -165,7 +165,7 @@ class WalletIntegrationTest
           .discardNanos(java.time.Instant.now().plus(1, ChronoUnit.MINUTES))
           .getOrElse(sys.error("Invalid instant")),
         collectionDuration = RelTime(microseconds = 60 * 1000000),
-        reference = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
+        deliveryOffer = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
       )
       aliceWallet.remoteParticipant.ledger_api.commands.submit(
         actAs = Seq(aliceUserParty),
@@ -197,7 +197,7 @@ class WalletIntegrationTest
         optTimeout = None,
         commands = Seq(
           testWalletCodegen
-            .TestReference(
+            .TestDeliveryOffer(
               p = aliceUserParty.toPrim,
               description = "description",
             )
@@ -207,7 +207,7 @@ class WalletIntegrationTest
       )
       val referenceId =
         aliceWallet.remoteParticipant.ledger_api.acs
-          .await(aliceUserParty, testWalletCodegen.TestReference)
+          .await(aliceUserParty, testWalletCodegen.TestDeliveryOffer)
           .contractId
 
       // Create a payment request to self.
@@ -221,7 +221,7 @@ class WalletIntegrationTest
           .discardNanos(java.time.Instant.now().plus(1, ChronoUnit.MINUTES))
           .getOrElse(sys.error("Invalid instant")),
         collectionDuration = RelTime(microseconds = 60 * 1000000),
-        reference = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
+        deliveryOffer = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
       )
       aliceWallet.remoteParticipant.ledger_api.commands.submit(
         actAs = Seq(aliceUserParty),
@@ -245,7 +245,7 @@ class WalletIntegrationTest
           provider = aliceUserParty.toPrim,
           svc = svcParty.toPrim,
           lockedCoin = r.payload.lockedCoin,
-          reference = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
+          deliveryOffer = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
         )
       }
     }
@@ -656,7 +656,7 @@ class WalletIntegrationTest
       optTimeout = None,
       commands = Seq(
         testWalletCodegen
-          .TestReference(
+          .TestDeliveryOffer(
             p = userParty.toPrim,
             description = "description",
           )
@@ -667,7 +667,7 @@ class WalletIntegrationTest
 
     val referenceId =
       aliceWallet.remoteParticipant.ledger_api.acs
-        .await(userParty, testWalletCodegen.TestReference)
+        .await(userParty, testWalletCodegen.TestDeliveryOffer)
         .contractId
 
     // Create a payment request to self.
@@ -681,7 +681,7 @@ class WalletIntegrationTest
         .discardNanos(java.time.Instant.now().plus(30, ChronoUnit.MINUTES))
         .getOrElse(sys.error("Invalid instant")),
       collectionDuration = RelTime(microseconds = 60 * 1000000),
-      reference = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
+      deliveryOffer = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
     )
     aliceWallet.remoteParticipant.ledger_api.commands.submit(
       actAs = Seq(userParty),

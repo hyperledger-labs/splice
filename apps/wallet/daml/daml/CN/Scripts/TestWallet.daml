@@ -97,14 +97,14 @@ test = script do
   pure ()
 
 
-template TestReference
+template TestDeliveryOffer
   with
     p : Party
     description : Text
   where
     signatory p
-    interface instance PaymentReference for TestReference where
-      view = PaymentReferenceView with description
+    interface instance DeliveryOffer for TestDeliveryOffer where
+      view = DeliveryOfferView with description
 
 
 acceptPaymentRequest : CCApp -> Party -> ContractId AppPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppPayment)
@@ -123,7 +123,7 @@ testPaymentRequest = script do
   bob <- setupUser app "bob" validator
 
   coin <- tap app alice 42.0
-  reference <- submit alice $ createCmd (TestReference alice "mycoolref")
+  deliveryOffer <- submit alice $ createCmd (TestDeliveryOffer alice "mycoolref")
   -- multi-party submit to simplify test
   t <- getTime
   transferRequest <- submitMulti [alice, bob] [] $ createCmd AppPaymentRequest with
@@ -132,7 +132,7 @@ testPaymentRequest = script do
     provider = alice
     svc = app.svc
     quantity = 30.0
-    reference = toInterfaceContractId reference
+    deliveryOffer = toInterfaceContractId deliveryOffer
     expiresAt = t `addRelTime` minutes 5
     collectionDuration = minutes 5
 
@@ -145,6 +145,6 @@ testPaymentRequest = script do
     provider = alice
     svc = app.svc
     lockedCoin = lockedCoin
-    reference = toInterfaceContractId reference
+    deliveryOffer = toInterfaceContractId deliveryOffer
 
   pure ()

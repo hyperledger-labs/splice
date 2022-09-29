@@ -155,15 +155,21 @@ template OnChannelPaymentRequest
       controller sender
       do pure ()
 
-data PaymentReferenceView = PaymentReferenceView
+data DeliveryOfferView = DeliveryOfferView
   with
     description : Text
 
--- | A reference to the reason for a payment.
--- TODO(M1-07): better naming
-interface PaymentReference
+-- | The description of an offer of delivery for payment.
+--
+-- Contracts implementing this interface are used to carry extra data along the payment request and approval flow.
+-- Their lifetime is bound 1-1 with the lifetime of the 'AppPaymentRequest' and 'AcceptedAppPayment' referencing them.
+interface DeliveryOffer
   where
-    viewtype PaymentReferenceView
+    viewtype DeliveryOfferView
+
+    choice DeliveryOffer_Archive : ()
+      controller (signatory this)
+      do pure ()
 
 template AppPaymentRequest
   with
@@ -174,7 +180,7 @@ template AppPaymentRequest
     quantity : Decimal -- ^ The amount of CC to be paid.
     expiresAt : Time -- ^ When the payment request expires.
     collectionDuration : RelTime -- ^ The time available to the provider to collect a payment.
-    reference : ContractId PaymentReference -- ^ The reference to the reason / good for which the payment is requested.
+    deliveryOffer : ContractId DeliveryOffer -- ^ The reference to delivery offered for successful payment.
   where
     signatory sender, receiver, provider
     ensure (collectionDuration > aunit && quantity > 0.0)
@@ -184,8 +190,8 @@ template AppPaymentRequest
         inputs : [TransferInput]
       controller sender
       do now <- getTime
-         -- check that the reference is active and implements PaymentReference
-         void $ fetch reference
+         -- check that the delivery offer is active and implements DeliveryOffer
+         void $ fetchFromInterface @DeliveryOffer deliveryOffer
          assertMsg "AppPaymentRequest has not expired" (now < expiresAt)
          -- lock the coin and create an accepted payment
          let transfer = Transfer with
@@ -208,15 +214,16 @@ template AppPaymentRequest
          let (TransferResultLockedCoin lockedCoin::_) = result.createdCoins
          create AcceptedAppPayment
            with
-             svc, provider, receiver, sender, reference, lockedCoin
+             svc, provider, receiver, sender, deliveryOffer, lockedCoin
 
     choice AppPaymentRequest_Withdraw : ()
       controller receiver
-      do pure ()
+      do exercise deliveryOffer DeliveryOffer_Archive
+
 
     choice AppPaymentRequest_Reject : ()
       controller sender
-      do pure ()
+      do exercise deliveryOffer DeliveryOffer_Archive
 
 template AcceptedAppPayment
   with
@@ -225,19 +232,23 @@ template AcceptedAppPayment
     provider : Party
     svc : Party
     lockedCoin : ContractId LockedCoin
-    reference : ContractId PaymentReference
+    deliveryOffer : ContractId DeliveryOffer
   where
     signatory sender, provider, receiver
 
-    choice AcceptedAppPayment_Collect : ContractId PaymentReference
+    choice AcceptedAppPayment_Collect : ContractId Coin
       with
         submitter : Party
       controller sender, receiver
       do
+        -- archive delivery offer
+        exercise deliveryOffer DeliveryOffer_Archive
+
         -- To make our workarounds for lack of explicit disclosure work
         -- we need to fetch the right CCUserHostedAt contract so we
         -- allow passing in the submitter.
         assertMsg ("Submitter must be sender or receiver") (submitter `elem` [sender, receiver])
+
         -- unlock coin and transfer the remainder to the receiver
         coin <- exercise lockedCoin Coin_Unlock
         let transfer = Transfer with
@@ -251,18 +262,19 @@ template AcceptedAppPayment
                 ]
               payload = "transfer locked payment"
         (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt submitter
-        void $ exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
-        -- defensive check that the reference is still active
-        void $ fetch reference
-        pure reference
+        result <- exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
+        let [TransferResultCoin coinCid] = result.createdCoins
+        pure coinCid
 
     choice AcceptedAppPayment_Discard : ContractId Coin
       controller receiver
-      do exercise lockedCoin Coin_Unlock
+      do exercise deliveryOffer DeliveryOffer_Archive
+         exercise lockedCoin Coin_Unlock
 
     choice AcceptedAppPayment_Expire : ContractId Coin
       controller sender
-      do exercise lockedCoin Coin_OwnerExpireLock
+      do exercise deliveryOffer DeliveryOffer_Archive
+         exercise lockedCoin Coin_OwnerExpireLock
 
 
 -- Note: includes the svc party and the validator app service party, so that choices can look up CoinRules (where the validator is observer)

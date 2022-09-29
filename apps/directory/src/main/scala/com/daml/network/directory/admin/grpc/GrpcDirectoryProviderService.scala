@@ -101,9 +101,9 @@ class GrpcDirectoryService(
           .exerciseDirectoryInstall_CollectEntryPayment(
             codegen.DirectoryInstall_CollectEntryPayment(acceptedAppPayment.contractId)
           )
-        entryCid <- connection.submitWithResult(Seq(partyId), Seq(), cmd)
+        result <- connection.submitWithResult(Seq(partyId), Seq(), cmd)
       } yield {
-        v0.CollectEntryPaymentResponse(Proto.encode(entryCid))
+        v0.CollectEntryPaymentResponse(Proto.encode(result._1))
       }
     }
 

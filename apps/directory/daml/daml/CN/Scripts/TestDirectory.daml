@@ -10,6 +10,7 @@ import CN.Wallet
 
 import CC.Scripts.Util
 
+test : Script ()
 test = script do
   app <- setupApp
 
@@ -53,13 +54,13 @@ test = script do
   [(coin, _)] <- queryFilter @Coin user (\c -> c.quantity.initialQuantity > 1.02)
   -- cc wallet accepts payment and locks coin to provider
   -- how: cc wallet
-  acceptedAppPayment <- submitMulti [user] [app.svc] $ exerciseCmd appPaymentRequest AppPaymentRequest_Accept with
+  acceptedAppPaymentCid <- submitMulti [user] [app.svc] $ exerciseCmd appPaymentRequest AppPaymentRequest_Accept with
     inputs = [InputCoin coin]
 
   -- directory providers transactionally unlocks & transfer coins
   -- and creates directory entry in return.
   -- how: provider on their own participant
   submitMulti [provider] [app.svc] $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryPayment with
-    acceptedAppPayment = acceptedAppPayment
+    acceptedAppPaymentCid
 
   pure ()
