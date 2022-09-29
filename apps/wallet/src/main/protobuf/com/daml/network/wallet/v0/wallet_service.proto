@@ -6,7 +6,6 @@ import "com/daml/network/v0/value.proto";
 import "google/protobuf/empty.proto";
 
 service WalletService {
-  rpc Initialize (InitializeRequest) returns (google.protobuf.Empty);
   rpc List (ListRequest) returns (ListResponse);
   rpc Tap (TapRequest) returns (TapResponse);
 

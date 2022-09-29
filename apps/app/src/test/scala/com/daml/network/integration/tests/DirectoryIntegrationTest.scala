@@ -9,7 +9,6 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.util.{CommonCoinAppInstanceReferences, Contract}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.codegen.CN.{Directory => codegen, Wallet => walletCodegen}
-import com.daml.network.codegen.{CC => coinCodegen}
 
 class DirectoryIntegrationTest
     extends CoinIntegrationTest
@@ -33,14 +32,8 @@ class DirectoryIntegrationTest
       // Whitelist the directory service on alice's validator
       aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
 
-      // The validator operator of the user of the directory service.
-      val aliceValidatorParty = aliceValidator.initialize()
       // The provider of the directory service
-      val providerParty = directoryValidator.initialize()
-
-      aliceWallet.initialize(aliceValidatorParty)
-      aliceWallet.remoteParticipant.ledger_api.acs
-        .await(aliceValidatorParty, coinCodegen.CoinRules.CoinRules)
+      val providerParty = directoryBackend.getProviderPartyId()
 
       // The user of the directory service.
       val aliceUserParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)

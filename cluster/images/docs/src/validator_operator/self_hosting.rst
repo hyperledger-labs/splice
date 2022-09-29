@@ -83,10 +83,6 @@ Next, open a second terminal, navigate to the extracted bundle's root directory,
 
   bin/coin --config examples/validator/validator.conf
 
-In the console, initialize the validator.  ::
-
-  @ val validatorParty = validatorApp.initialize()
-
 This exposes a `CoinRules` contract to the validator party through automation running on the SVC node.
 In this feature preview, the SVC automatically accepts any validator onboard requests.
 
@@ -104,8 +100,7 @@ You are now registered as a validator on the Canton network. You've also configu
 Tapping some Canton Coin from the Dev Faucet
 --------------------------------------------
 
-In order to create some free canton coin to play around with, you'll interact with the wallet
-setup in the previous section as a specific user. In our example, ``aliceWallet`` has been
+To use the wallet, you interact with the wallet setup in the previous section using a specific party user. In our example, ``aliceWallet`` has been
 configured to interact with the wallet app using the previously created user ``alice``.
 
 Using Alice’s wallet, you can create free coins like so: ::

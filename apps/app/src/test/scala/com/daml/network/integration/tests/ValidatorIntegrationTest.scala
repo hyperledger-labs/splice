@@ -38,8 +38,6 @@ class ValidatorIntegrationTest
 
     // Start Alice’s validator
     aliceValidator.start()
-    // Get Alice’s validator party
-    val aliceValidatorParty = aliceValidator.initialize()
 
     // check that no coin rules request is outstanding
     utils.retry_until_true(
@@ -49,6 +47,7 @@ class ValidatorIntegrationTest
     )
 
     // check that alice's validator can see the coinrules
+    val aliceValidatorParty = aliceValidator.getValidatorPartyId()
     aliceValidator.remoteParticipant.ledger_api.acs
       .await(aliceValidatorParty, CC.CoinRules.CoinRules)
 

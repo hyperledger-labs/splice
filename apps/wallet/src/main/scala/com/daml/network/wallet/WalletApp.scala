@@ -3,6 +3,7 @@ package com.daml.network.wallet
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.validator.admin.api.client.ValidatorConnection
 import com.daml.network.wallet.admin.WalletAutomationService
 import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.daml.network.wallet.store.WalletAppPartyStore
@@ -29,6 +30,7 @@ class WalletApp(
     automation: WalletAutomationService,
     ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
+    validatorConnection: ValidatorConnection,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
 ) extends CantonNode // TODO(i736): CantonNode needs to be forked or generalized.
@@ -50,6 +52,13 @@ class WalletApp(
 
   override def close(): Unit = {
     logger.info("Stopping wallet node")
-    Lifecycle.close(automation, storage, partyStore, ledgerClient, scanConnection)(logger)
+    Lifecycle.close(
+      automation,
+      storage,
+      partyStore,
+      ledgerClient,
+      scanConnection,
+      validatorConnection,
+    )(logger)
   }
 }

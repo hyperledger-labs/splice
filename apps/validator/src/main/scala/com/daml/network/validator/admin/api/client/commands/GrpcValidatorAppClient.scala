@@ -18,7 +18,8 @@ object GrpcValidatorAppClient {
       v0.ValidatorAppServiceGrpc.stub(channel)
   }
 
-  case class SetupValidatorCommand() extends BaseCommand[Empty, v0.InitializeResponse, PartyId] {
+  case class GetValidatorPartyId()
+      extends BaseCommand[Empty, v0.GetValidatorPartyIdResponse, PartyId] {
 
     override def createRequest(): Either[String, Empty] =
       Right(Empty())
@@ -26,10 +27,10 @@ object GrpcValidatorAppClient {
     override def submitRequest(
         service: ValidatorAppServiceStub,
         request: Empty,
-    ): Future[v0.InitializeResponse] = service.initialize(request)
+    ): Future[v0.GetValidatorPartyIdResponse] = service.getValidatorPartyId(request)
 
     override def handleResponse(
-        response: v0.InitializeResponse
+        response: v0.GetValidatorPartyIdResponse
     ): Either[String, PartyId] =
       Proto.decode(Proto.Party)(response.partyId)
   }

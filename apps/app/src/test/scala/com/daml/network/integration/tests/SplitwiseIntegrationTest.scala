@@ -146,15 +146,11 @@ class SplitwiseIntegrationTest
   "splitwise" should {
     "support self-hosted mode" in { implicit env =>
       // Onboard alice on her self-hosted validator
-      val aliceValidatorParty = aliceValidator.initialize()
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      aliceWallet.initialize(aliceValidatorParty)
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
       // Onboard bob on his self-hosted validator
-      val bobValidatorParty = bobValidator.initialize()
       val bobDamlUser = bobRemoteWallet.config.damlUser
-      bobWallet.initialize(bobValidatorParty)
       val bobUserParty = bobValidator.onboardUser(bobDamlUser)
 
       // Setup install contracts for self-hosted usage
@@ -166,7 +162,6 @@ class SplitwiseIntegrationTest
       bobSplitwiseBackend.acceptInstallProposal(bobInstallProposal)
 
       // We reuse the provider as charlie here to avoid setting up another splitwise instance.
-      splitwiseValidator.initialize()
       val charlieUserParty = providerSplitwiseBackend.getProviderPartyId()
       val charlieProviderParty = charlieUserParty
       val charlieInstallProposal = providerSplitwise.createInstallProposal(charlieUserParty)
@@ -187,19 +182,14 @@ class SplitwiseIntegrationTest
 
     "support provider-hosted mode" in { implicit env =>
       // Onboard alice on her self-hosted validator
-      val aliceValidatorParty = aliceValidator.initialize()
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      aliceWallet.initialize(aliceValidatorParty)
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
       // Onboard bob on his self-hosted validator
-      val bobValidatorParty = bobValidator.initialize()
       val bobDamlUser = bobRemoteWallet.config.damlUser
-      bobWallet.initialize(bobValidatorParty)
       val bobUserParty = bobValidator.onboardUser(bobDamlUser)
 
       // Setup install contracts for provider-hosted mode usage
-      splitwiseValidator.initialize()
       val providerParty = providerSplitwiseBackend.getProviderPartyId()
       val aliceInstallProposal = aliceSplitwise.createInstallProposal(providerParty)
       providerSplitwiseBackend.remoteParticipant.ledger_api.acs

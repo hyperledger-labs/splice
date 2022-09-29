@@ -24,25 +24,6 @@ object GrpcWalletAppClient {
       v0.WalletServiceGrpc.stub(channel)
   }
 
-  case class Initialize(validator: PartyId) extends BaseCommand[v0.InitializeRequest, Empty, Unit] {
-
-    override def createRequest(): Either[String, v0.InitializeRequest] =
-      Right(
-        v0.InitializeRequest(
-          validatorPartyId = Proto.encode(validator)
-        )
-      )
-
-    override def submitRequest(
-        service: WalletServiceStub,
-        request: v0.InitializeRequest,
-    ): Future[Empty] = service.initialize(request)
-
-    override def handleResponse(
-        response: Empty
-    ): Either[String, Unit] = Right(())
-  }
-
   final case class CoinPosition(
       contract: Contract[coinCodegen.Coin],
       round: Long,

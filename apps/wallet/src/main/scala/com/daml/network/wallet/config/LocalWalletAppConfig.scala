@@ -1,6 +1,6 @@
 package com.daml.network.wallet.config
 
-import com.daml.network.config.LocalCoinConfig
+import com.daml.network.config.{LocalCoinConfig, RemoteCoinConfig}
 import com.daml.network.scan.config.RemoteScanAppConfig
 import com.digitalasset.canton.config._
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
@@ -11,10 +11,18 @@ case class LocalWalletAppConfig(
     serviceUser: String,
     remoteParticipant: RemoteParticipantConfig,
     remoteScan: RemoteScanAppConfig,
+    validator: WalletRemoteValidatorAppConfig,
 ) extends LocalCoinConfig // TODO(i736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "wallet"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
 
+}
+
+// Inlined to avoid a dependency
+case class WalletRemoteValidatorAppConfig(
+    adminApi: ClientConfig
+) extends RemoteCoinConfig {
+  override def clientAdminApi: ClientConfig = adminApi
 }

@@ -22,12 +22,11 @@ abstract class ValidatorAppReference(
 
   override protected val instanceType = "Validator"
 
-  @Help.Summary("Set up a new validator")
-  @Help.Description("""Create `CoinProposal` and sets up party for the validator.
-                      |Return the party set up for the validator""".stripMargin)
-  def initialize(): PartyId = {
+  @Help.Summary("Get validator party id")
+  @Help.Description("Return the party id of the validator operator")
+  def getValidatorPartyId(): PartyId = {
     consoleEnvironment.run {
-      adminCommand(GrpcValidatorAppClient.SetupValidatorCommand())
+      adminCommand(GrpcValidatorAppClient.GetValidatorPartyId())
     }
   }
 

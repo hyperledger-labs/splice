@@ -11,7 +11,11 @@ import com.daml.network.validator.config.{
   LocalValidatorAppConfig,
   RemoteValidatorAppConfig,
 }
-import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
+import com.daml.network.wallet.config.{
+  LocalWalletAppConfig,
+  RemoteWalletAppConfig,
+  WalletRemoteValidatorAppConfig,
+}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonCommunityConfig.CantonDeprecationImplicits
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
@@ -362,6 +366,8 @@ object CoinConfig {
       deriveReader[RemoteSvcAppConfig]
     implicit val coinAppParametersReader: ConfigReader[SharedCoinAppParameters] =
       deriveReader[SharedCoinAppParameters]
+    implicit val walletRemoteValidatorConfigReader: ConfigReader[WalletRemoteValidatorAppConfig] =
+      deriveReader[WalletRemoteValidatorAppConfig]
     implicit val walletConfigReader: ConfigReader[LocalWalletAppConfig] =
       deriveReader[LocalWalletAppConfig]
     implicit val remoteWalletConfigReader: ConfigReader[RemoteWalletAppConfig] =

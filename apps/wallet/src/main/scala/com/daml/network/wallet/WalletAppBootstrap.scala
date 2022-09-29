@@ -7,6 +7,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerConnection, CoinNodeBootstrapBase}
 import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.validator.admin.api.client.ValidatorConnection
 import com.daml.network.store.AppCoinStore
 import com.daml.network.wallet.admin.WalletAutomationService
 import com.daml.network.wallet.admin.grpc.GrpcWalletService
@@ -18,6 +19,7 @@ import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
 }
+import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -41,6 +43,12 @@ class WalletAppBootstrap(
     metrics: WalletAppMetrics,
     storageFactory: StorageFactory,
     parentLogger: NamedLoggerFactory,
+    // Passed in as a parameter to avoid circular dependency between wallet and validator.
+    getValidatorConnection: (
+        ClientConfig,
+        ProcessingTimeout,
+        NamedLoggerFactory,
+    ) => ValidatorConnection,
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     @nowarn("cat=unused")
@@ -76,19 +84,12 @@ class WalletAppBootstrap(
         loggerFactory,
       )
 
-    adminServerRegistry.addService(
-      WalletServiceGrpc.bindService(
-        new GrpcWalletService(
-          coinStore,
-          store,
-          ledgerClient,
-          scanConnection,
-          config.serviceUser,
-          loggerFactory,
-        ),
-        executionContext,
+    val validatorConnection: ValidatorConnection =
+      getValidatorConnection(
+        config.validator.clientAdminApi,
+        walletAppParameters.processingTimeouts,
+        loggerFactory,
       )
-    )
 
     val connection = ledgerClient.connection("SvcAppBootstrap")
 
@@ -97,8 +98,23 @@ class WalletAppBootstrap(
         connection.getPrimaryParty(config.serviceUser),
         CoinLedgerConnection.RetryOnUserManagementError,
       )
+      validatorParty <- validatorConnection.getValidatorPartyId()
       _ = logger.info(s"Got primary party of wallet service user: $walletServicePartyId")
     } yield {
+      adminServerRegistry.addService(
+        WalletServiceGrpc.bindService(
+          new GrpcWalletService(
+            coinStore,
+            store,
+            ledgerClient,
+            scanConnection,
+            validatorParty = validatorParty,
+            walletServiceParty = walletServicePartyId,
+            loggerFactory = loggerFactory,
+          ),
+          executionContext,
+        )
+      )
       val automation = new WalletAutomationService(
         coinStore,
         partyStore,
@@ -117,6 +133,7 @@ class WalletAppBootstrap(
         automation,
         ledgerClient,
         scanConnection,
+        validatorConnection,
         clock,
         loggerFactory,
       )
@@ -148,6 +165,11 @@ object WalletAppBootstrap {
       testingConfigInternal: TestingConfigInternal,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
+      getValidatorConnection: (
+          ClientConfig,
+          ProcessingTimeout,
+          NamedLoggerFactory,
+      ) => ValidatorConnection,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
       scheduler: ScheduledExecutorService,
@@ -166,6 +188,7 @@ object WalletAppBootstrap {
           walletMetrics,
           new CommunityStorageFactory(walletConfig.storage),
           loggerFactory,
+          getValidatorConnection,
         )
       )
       .leftMap(_.toString)

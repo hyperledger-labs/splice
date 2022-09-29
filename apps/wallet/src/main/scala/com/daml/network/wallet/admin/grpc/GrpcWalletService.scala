@@ -12,29 +12,23 @@ import com.daml.network.store.AppCoinStore
 import com.daml.network.util.{CoinUtil, Contract, Proto, Value}
 import com.daml.network.wallet.store.WalletAppRequestStore
 import com.daml.network.wallet.v0
-import com.daml.network.wallet.v0.{CollectRewardsRequest, InitializeRequest, WalletServiceGrpc}
+import com.daml.network.wallet.v0.{CollectRewardsRequest, WalletServiceGrpc}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.google.protobuf.empty.Empty
-import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
-import java.util.concurrent.atomic.AtomicReference
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
-
-case class WalletServiceState(
-    validatorParty: PartyId,
-    walletServiceParty: PartyId,
-)
 
 class GrpcWalletService(
     coinStore: AppCoinStore,
     store: WalletAppRequestStore,
     ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
-    walletServiceUser: String,
+    walletServiceParty: PartyId,
+    validatorParty: PartyId,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -44,23 +38,6 @@ class GrpcWalletService(
     with NamedLogging {
 
   private val connection = ledgerClient.connection("GrpcWalletService")
-
-  val state: AtomicReference[Option[WalletServiceState]] =
-    new AtomicReference[Option[WalletServiceState]](None)
-  private def getState: WalletServiceState =
-    state.get.getOrElse(
-      throw new StatusRuntimeException(
-        Status.FAILED_PRECONDITION.withDescription(
-          "Wallet is not initialized, run wallet.initialize(validatorParty) first"
-        )
-      )
-    )
-
-  def getValidatorParty: PartyId =
-    getState.validatorParty
-
-  def getWalletServiceParty: PartyId =
-    getState.walletServiceParty
 
   private def coinToCoinPosition(coin: Contract[Coin], round: Long): v0.CoinPosition =
     v0.CoinPosition(
@@ -340,7 +317,7 @@ class GrpcWalletService(
           .command
         _ <- connection.submitCommand(
           Seq(walletParty),
-          Seq(getValidatorParty),
+          Seq(validatorParty),
           Seq(cmd),
         )
       } yield Empty()
@@ -360,7 +337,7 @@ class GrpcWalletService(
           .command
         _ <- connection.submitCommand(
           Seq(walletParty),
-          Seq(getValidatorParty),
+          Seq(validatorParty),
           Seq(cmd),
         )
       } yield Empty()
@@ -595,7 +572,7 @@ class GrpcWalletService(
     for {
       svcParty <- scanConnection.getSvcPartyId()
       cmd = coinRulesCodegen.CoinRules
-        .key(DA.Types.Tuple2(svcParty.toPrim, getValidatorParty.toPrim))
+        .key(DA.Types.Tuple2(svcParty.toPrim, validatorParty.toPrim))
         .exerciseCoinRules_Transfer(
           coinRulesCodegen.Transfer(
             sender = party.toPrim,
@@ -607,7 +584,7 @@ class GrpcWalletService(
         )
       transferResults <- connection.submitWithResult(
         Seq(party),
-        Seq(getValidatorParty),
+        Seq(validatorParty),
         cmd,
       )
     } yield {
@@ -639,25 +616,6 @@ class GrpcWalletService(
     }
   }
 
-  override def initialize(request: InitializeRequest): Future[Empty] =
-    withSpanFromGrpcContext("GrpcWalletService") { _ => _ =>
-      val validatorServiceParty = PartyId.tryFromProtoPrimitive(request.validatorPartyId)
-
-      for {
-        walletServiceParty <- connection.getPrimaryParty(walletServiceUser)
-      } yield {
-        state.set(
-          Some(
-            WalletServiceState(
-              validatorParty = validatorServiceParty,
-              walletServiceParty = walletServiceParty,
-            )
-          )
-        )
-        Empty()
-      }
-    }
-
   /** Executes a wallet action by calling a choice on the WalletAppInstall contract of the
     * end user specified in the given WalletContext.
     *
@@ -682,11 +640,11 @@ class GrpcWalletService(
       for {
         walletUserParty <- connection.getPrimaryParty(ctx.userId)
         installTemplate = walletCodegen.WalletAppInstall
-          .key(DA.Types.Tuple2(walletUserParty.toPrim, getWalletServiceParty.toPrim))
+          .key(DA.Types.Tuple2(walletUserParty.toPrim, walletServiceParty.toPrim))
         update <- choice(traceContext)(installTemplate, walletUserParty)
         result <- connection.submitWithResult(
-          Seq(getWalletServiceParty),
-          Seq(getValidatorParty, walletUserParty),
+          Seq(walletServiceParty),
+          Seq(validatorParty, walletUserParty),
           update,
         )
       } yield response(result)

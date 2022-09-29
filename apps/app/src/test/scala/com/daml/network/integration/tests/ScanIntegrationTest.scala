@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.CC.Round.{ClosedMiningRound, Round}
-import com.daml.network.codegen.CC.CoinRules.CoinRules
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.history._
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -173,21 +172,14 @@ class ScanIntegrationTest
   def setup(implicit env: CoinTestConsoleEnvironment): (PartyId, PartyId) = {
     import env._
     // Onboard alice on her self-hosted validator
-    val aliceValidatorParty = aliceValidator.initialize()
     val aliceDamlUser = aliceRemoteWallet.config.damlUser
-    aliceWallet.initialize(aliceValidatorParty)
     val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
     // Onboard bob on his self-hosted validator
-    val bobValidatorParty = bobValidator.initialize()
     val bobDamlUser = bobRemoteWallet.config.damlUser
-    bobWallet.initialize(bobValidatorParty)
     val bobUserParty = bobValidator.onboardUser(bobDamlUser)
 
     // ensure the participants see the CoinRules
-    aliceWallet.remoteParticipant.ledger_api.acs.await(aliceValidatorParty, CoinRules)
-    bobWallet.remoteParticipant.ledger_api.acs.await(bobValidatorParty, CoinRules)
-
     val proposalId = aliceRemoteWallet.proposePaymentChannel(bobUserParty)
     // Bob monitors proposals and accepts the one
     utils.retry_until_true(bobRemoteWallet.listPaymentChannelProposals().size == 1)

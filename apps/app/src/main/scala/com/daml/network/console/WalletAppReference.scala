@@ -39,12 +39,6 @@ abstract class WalletAppReference(
     }
   }
 
-  def initialize(validator: PartyId): Unit = {
-    consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.Initialize(validator))
-    }
-  }
-
   @Help.Summary("Credits the requested quantity of Canton coin to the wallet's user")
   @Help.Description(
     "This function will only be available in the testnet. It allows creating coins for testing purposes." +
