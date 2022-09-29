@@ -68,11 +68,15 @@ trait CommonCoinAppInstanceReferences {
   def splitwiseValidator(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
     "splitwiseValidator"
   )
-  def directoryBackend(implicit
+
+  def directory(implicit
       env: CoinTestConsoleEnvironment
-  ): LocalDirectoryAppReference = dp(
-    "directoryBackend"
-  )
+  ): LocalDirectoryAppReference =
+    env.directories.local.headOption.getOrElse(
+      sys.error(
+        "Tried to access the Directory app but it isn't defined in the test's configuration file"
+      )
+    )
 
   def aliceDirectory(implicit
       env: CoinTestConsoleEnvironment
@@ -154,13 +158,6 @@ trait CommonCoinAppInstanceReferences {
     env.validators.local
       .find(_.name == name)
       .getOrElse(sys.error(s"validator [$name] not configured"))
-
-  def dp(
-      name: String
-  )(implicit env: CoinTestConsoleEnvironment): LocalDirectoryAppReference =
-    env.directories.local
-      .find(_.name == name)
-      .getOrElse(sys.error(s"directory [$name] not configured"))
 
   def rdp(
       name: String

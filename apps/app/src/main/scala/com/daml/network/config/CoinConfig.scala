@@ -53,7 +53,7 @@ case class CoinConfig(
     remoteScanApps: Map[InstanceName, RemoteScanAppConfig] = Map.empty,
     walletApps: Map[InstanceName, LocalWalletAppConfig] = Map.empty,
     remoteWalletApps: Map[InstanceName, RemoteWalletAppConfig] = Map.empty,
-    directoryApps: Map[InstanceName, LocalDirectoryAppConfig] = Map.empty,
+    directoryApp: Option[LocalDirectoryAppConfig] = None,
     remoteDirectoryApps: Map[InstanceName, RemoteDirectoryAppConfig] = Map.empty,
     splitwiseApps: Map[InstanceName, LocalSplitwiseAppConfig] = Map.empty,
     remoteSplitwiseApps: Map[InstanceName, RemoteSplitwiseAppConfig] = Map.empty,
@@ -233,6 +233,12 @@ case class CoinConfig(
   def walletsByString: Map[String, LocalWalletAppConfig] = walletApps.map { case (n, c) =>
     n.unwrap -> c
   }
+
+  // The config contains one optional unnamed directory app (because in M3, there can only be one)
+  // Since the rest of the code generally expects a map of nodes, we'll create one.
+  private lazy val directoryAppInstanceName = InstanceName.tryCreate("directory-app")
+  private lazy val directoryApps =
+    directoryApp.toList.map(config => directoryAppInstanceName -> config).toMap
 
   private lazy val directoryAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
     directoryApps.fmap { directoryConfig =>

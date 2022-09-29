@@ -14,9 +14,9 @@ utils.retry_until_true { bobDirectory.lookupInstall(bobUserParty).isDefined }
 aliceDirectory.requestDirectoryEntry("alice.cns")
 bobDirectory.requestDirectoryEntry("bob.cns")
 
-utils.retry_until_true { directoryBackend.listEntryRequests().length == 2 }
-directoryBackend.listEntryRequests().foreach { case request =>
-  directoryBackend.requestEntryPayment(request.contractId)
+utils.retry_until_true { `directory-app`.listEntryRequests().length == 2 }
+`directory-app`.listEntryRequests().foreach { case request =>
+  `directory-app`.requestEntryPayment(request.contractId)
 }
 
 val aliceCoin = aliceRemoteWallet.tap(5.0)
@@ -26,11 +26,11 @@ val bobCoin = bobRemoteWallet.tap(5.0)
 utils.retry_until_true { bobRemoteWallet.listAppPaymentRequests().length == 1 }
 val bobAccepted = bobRemoteWallet.acceptAppPaymentRequest(bobRemoteWallet.listAppPaymentRequests()(0).contractId)
 
-val directoryParty = directoryBackend.getProviderPartyId()
-directoryBackend.remoteParticipant.ledger_api.acs.await_active_contract(directoryParty, ContractId.assertFromString(aliceAccepted.toString))
-directoryBackend.remoteParticipant.ledger_api.acs.await_active_contract(directoryParty, ContractId.assertFromString(bobAccepted.toString))
-directoryBackend.collectEntryPayment(aliceAccepted)
-directoryBackend.collectEntryPayment(bobAccepted)
+val directoryParty = `directory-app`.getProviderPartyId()
+`directory-app`.remoteParticipant.ledger_api.acs.await_active_contract(directoryParty, ContractId.assertFromString(aliceAccepted.toString))
+`directory-app`.remoteParticipant.ledger_api.acs.await_active_contract(directoryParty, ContractId.assertFromString(bobAccepted.toString))
+`directory-app`.collectEntryPayment(aliceAccepted)
+`directory-app`.collectEntryPayment(bobAccepted)
 
 val providerParty = providerSplitwiseBackend.getProviderPartyId()
 

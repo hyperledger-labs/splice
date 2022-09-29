@@ -33,7 +33,7 @@ class DirectoryIntegrationTest
       aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
 
       // The provider of the directory service
-      val providerParty = directoryBackend.getProviderPartyId()
+      val providerParty = directory.getProviderPartyId()
 
       // The user of the directory service.
       val aliceUserParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
@@ -46,13 +46,13 @@ class DirectoryIntegrationTest
       aliceValidator.remoteParticipant.ledger_api.acs
         .await(aliceUserParty, codegen.DirectoryInstall)
       aliceDirectory.requestDirectoryEntry(entryName)
-      val entryRequest = directoryBackend.remoteParticipant.ledger_api.acs
+      val entryRequest = directory.remoteParticipant.ledger_api.acs
         .await(providerParty, codegen.DirectoryEntryRequest)
-      val entryRequests = directoryBackend.listEntryRequests()
+      val entryRequests = directory.listEntryRequests()
       entryRequests.map(_.contractId) shouldBe Seq(entryRequest.contractId)
 
       // Provider: Request payment for entry
-      val paymentRequest = directoryBackend.requestEntryPayment(entryRequest.contractId)
+      val paymentRequest = directory.requestEntryPayment(entryRequest.contractId)
 
       // User: wait until payment request becomes visible
       def getPaymentRequest() =
@@ -69,10 +69,10 @@ class DirectoryIntegrationTest
       val _ = aliceRemoteWallet.acceptAppPaymentRequest(walletPaymentRequest.contractId)
 
       // Collect payment
-      val acceptedPayment = directoryBackend.remoteParticipant.ledger_api.acs
+      val acceptedPayment = directory.remoteParticipant.ledger_api.acs
         .await(providerParty, walletCodegen.AcceptedAppPayment)
-      val cid = directoryBackend.collectEntryPayment(acceptedPayment.contractId)
-      val entry = directoryBackend.remoteParticipant.ledger_api.acs
+      val cid = directory.collectEntryPayment(acceptedPayment.contractId)
+      val entry = directory.remoteParticipant.ledger_api.acs
         .await(providerParty, codegen.DirectoryEntry)
       entry.contractId shouldBe cid
 
@@ -83,11 +83,11 @@ class DirectoryIntegrationTest
         )
 
       // Read entries from provider
-      directoryBackend.listEntries() shouldBe Seq(entryValue)
-      directoryBackend.lookupEntryByName(entryName) shouldBe entryValue
-      directoryBackend.lookupEntryByParty(aliceUserParty) shouldBe entryValue
+      directory.listEntries() shouldBe Seq(entryValue)
+      directory.lookupEntryByName(entryName) shouldBe entryValue
+      directory.lookupEntryByParty(aliceUserParty) shouldBe entryValue
       assertThrowsAndLogsCommandFailures(
-        directoryBackend.lookupEntryByName("nonexistentname"),
+        directory.lookupEntryByName("nonexistentname"),
         _.errorMessage should include("nonexistentname"),
       )
 

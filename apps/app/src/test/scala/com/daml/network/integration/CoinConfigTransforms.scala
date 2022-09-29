@@ -95,9 +95,13 @@ object CoinConfigTransforms {
   def updateAllDirectoryAppConfigs_(
       update: DirectoryAppTransform
   ): CoinConfigTransform =
-    _.focus(_.directoryApps).modify(_.map { case (name, config) =>
-      (name, update(config))
-    })
+    cantonConfig =>
+      cantonConfig
+        .focus(_.directoryApp)
+        .replace(cantonConfig.directoryApp match {
+          case None => None
+          case Some(directoryApp) => Some(update(directoryApp))
+        })
 
   def updateAllRemoteDirectoryAppConfigs_(
       update: RemoteDirectoryAppTransform
