@@ -221,17 +221,19 @@ trait CoinEnvironment extends Environment {
     */
   override def startAll(): Either[Seq[StartupError], Unit] = {
     val errors =
-      validators.startAll.left.getOrElse(Seq.empty) ++
+      // Ordering here matches CoinConsoleEnvironment.startupOrderPrecedence
+      svcs.startAll.left.getOrElse(Seq.empty) ++
         scans.startAll.left.getOrElse(Seq.empty) ++
-        svcs.startAll.left.getOrElse(Seq.empty) ++
+        validators.startAll.left.getOrElse(Seq.empty) ++
         wallets.startAll.left.getOrElse(Seq.empty) ++
         directories.startAll.left.getOrElse(Seq.empty) ++
         splitwises.startAll.left.getOrElse(Seq.empty)
     Either.cond(errors.isEmpty, (), errors)
   }
 
+  // Ordering here matches CoinConsoleEnvironment.startupOrderPrecedence
   def allCoinNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
-    List(validators, svcs, scans, wallets, directories, splitwises)
+    List(svcs, scans, validators, wallets, directories, splitwises)
 
   override def allNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
     super.allNodes ::: allCoinNodes

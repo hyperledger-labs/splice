@@ -5,7 +5,7 @@ POSTGRES_MODE=${1:-docker}
 
 if [ -f "canton.pid" ]; then
     PID=$(cat canton.pid)
-    kill "$PID"
+    kill "$PID" || true
     rm canton.pid
 else
     echo "The file canton.pid does not exist, not stopping Canton"

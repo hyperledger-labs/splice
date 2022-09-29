@@ -1,0 +1,15 @@
+Seq(
+  (aliceParticipant, "alice_validator_user"),
+  (bobParticipant, "bob_validator_user"),
+  (directoryParticipant, "directory_validator_user"),
+  (splitwiseParticipant, "splitwise_validator_user"),
+).foreach { case (participant, user) =>
+  val validatorParty = participant.parties.enable(user)
+  participant.ledger_api.users.create(
+    id = user,
+    actAs = Set(validatorParty.toLf),
+    primaryParty = Some(validatorParty.toLf),
+    readAs = Set.empty,
+    participantAdmin = true,
+  )
+}

@@ -24,7 +24,8 @@ POSTGRES_MODE=${1:-docker}
 # Start Canton
 canton \
     daemon --auto-connect-local --log-level-canton=DEBUG \
-    --no-tty -c ./apps/app/src/test/resources/simple-topology-canton.conf -C canton.parameters.ports-file=canton.ports &
+    --no-tty -c ./apps/app/src/test/resources/simple-topology-canton.conf -C canton.parameters.ports-file=canton.ports \
+    --bootstrap bootstrap-canton.canton &
 PID=$!
 echo "$PID" > canton.pid
 
