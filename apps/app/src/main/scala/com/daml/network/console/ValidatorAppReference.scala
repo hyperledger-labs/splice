@@ -2,27 +2,25 @@ package com.daml.network.console
 
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.validator.admin.api.client.commands.GrpcValidatorAppClient
-import com.daml.network.validator.config.LocalValidatorAppConfig
-import com.digitalasset.canton.console.{BaseInspection, Help, LocalInstanceReference}
+import com.daml.network.validator.config.{LocalValidatorAppConfig, RemoteValidatorAppConfig}
+import com.digitalasset.canton.console.{
+  BaseInspection,
+  GrpcRemoteInstanceReference,
+  Help,
+  LocalInstanceReference,
+}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
 /** Single local validator app reference. Defines the console commands that can be run against a local validator
   * app reference.
   */
-class LocalValidatorAppReference(
+abstract class ValidatorAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
-) extends CoinAppReference(consoleEnvironment, name)
-    with LocalInstanceReference
-    with BaseInspection[ParticipantNode] {
+) extends CoinAppReference(consoleEnvironment, name) {
 
   override protected val instanceType = "Validator"
-
-  protected val nodes = consoleEnvironment.environment.validators
-  @Help.Summary("Return validator app config")
-  override def config: LocalValidatorAppConfig =
-    consoleEnvironment.environment.config.validatorsByString(name)
 
   @Help.Summary("Set up a new validator")
   @Help.Description("""Create `CoinProposal` and sets up party for the validator.
@@ -41,6 +39,22 @@ class LocalValidatorAppReference(
       adminCommand(GrpcValidatorAppClient.OnboardUserCommand(user))
     }
   }
+}
+
+final class LocalValidatorAppReference(
+    override val consoleEnvironment: CoinConsoleEnvironment,
+    name: String,
+) extends ValidatorAppReference(consoleEnvironment, name)
+    with LocalInstanceReference
+    with BaseInspection[ParticipantNode] {
+
+  override protected val instanceType = "Local Validator"
+
+  protected val nodes = consoleEnvironment.environment.validators
+
+  @Help.Summary("Return local validator app config")
+  override def config: LocalValidatorAppConfig =
+    consoleEnvironment.environment.config.validatorsByString(name)
 
   /** Remote participant this validator app is configured to interact with. */
   val remoteParticipant =
@@ -53,5 +67,18 @@ class LocalValidatorAppReference(
 
   /** secret, not publicly documented way to get the admin token */
   def adminToken: Option[String] = underlying.map(_.adminToken.secret)
+}
 
+/** Remote reference to a scan app in the style of CoinRemoteParticipantReference, i.e.,
+  * it accepts the config as an argument rather than reading it from the global map.
+  */
+final class RemoteValidatorAppReference(
+    override val consoleEnvironment: CoinConsoleEnvironment,
+    name: String,
+    override val config: RemoteValidatorAppConfig,
+) extends ValidatorAppReference(consoleEnvironment, name)
+    with GrpcRemoteInstanceReference
+    with BaseInspection[ParticipantNode] {
+
+  override protected val instanceType = "Remote Validator"
 }

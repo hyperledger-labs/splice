@@ -321,6 +321,7 @@ abstract class WalletAppReference(
 class RemoteWalletAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
+    override val config: RemoteWalletAppConfig,
 ) extends WalletAppReference(consoleEnvironment, name)
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
@@ -330,11 +331,6 @@ class RemoteWalletAppReference(
   override def getWalletCtx(): WalletContext = {
     new WalletContext(config.damlUser)
   }
-
-  @Help.Summary("Return remote wallet config")
-  def config: RemoteWalletAppConfig =
-    consoleEnvironment.environment.config.remoteWalletsByString(name)
-
 }
 
 /** Single local Wallet app reference. Defines the console commands that can be run against a local Wallet

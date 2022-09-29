@@ -86,15 +86,12 @@ abstract class SvcAppReference(
 class RemoteSvcAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
+    override val config: RemoteSvcAppConfig,
 ) extends SvcAppReference(consoleEnvironment, name)
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Remote SVC"
-
-  @Help.Summary("return remote svc config")
-  def config: RemoteSvcAppConfig =
-    consoleEnvironment.environment.config.remoteSvcsByString(name)
 }
 
 /** Single local SVC app reference. Defines the console commands that can be run against a local SVC

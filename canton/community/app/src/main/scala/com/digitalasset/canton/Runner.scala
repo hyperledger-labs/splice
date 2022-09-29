@@ -76,7 +76,9 @@ class ConsoleInteractiveRunner[E <: Environment](
         val consoleEnvironment = environment.createConsole()
         InteractiveConsole(consoleEnvironment, noTty, bootstrapScript, logger)
       } catch {
-        case NonFatal(_) => false
+        case NonFatal(e) =>
+          logger.error(e.getMessage)(TraceContext.empty)
+          false
       } finally {
         // ensure anything that's been left running is cleanly shutdown
         environment.close()

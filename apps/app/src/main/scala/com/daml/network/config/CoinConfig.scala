@@ -6,7 +6,11 @@ import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirecto
 import com.daml.network.scan.config.{LocalScanAppConfig, RemoteScanAppConfig}
 import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
 import com.daml.network.svc.config.{LocalSvcAppConfig, RemoteSvcAppConfig}
-import com.daml.network.validator.config.{AppInstance, LocalValidatorAppConfig}
+import com.daml.network.validator.config.{
+  AppInstance,
+  LocalValidatorAppConfig,
+  RemoteValidatorAppConfig,
+}
 import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.CantonCommunityConfig.CantonDeprecationImplicits
@@ -38,9 +42,11 @@ import scala.annotation.nowarn
 
 case class CoinConfig(
     validatorApps: Map[InstanceName, LocalValidatorAppConfig] = Map.empty,
+    remoteValidatorApps: Map[InstanceName, RemoteValidatorAppConfig] = Map.empty,
     svcApp: Option[LocalSvcAppConfig] = None,
     remoteSvcApp: Option[RemoteSvcAppConfig] = None,
     scanApp: Option[LocalScanAppConfig] = None,
+    remoteScanApps: Map[InstanceName, RemoteScanAppConfig] = Map.empty,
     walletApps: Map[InstanceName, LocalWalletAppConfig] = Map.empty,
     remoteWalletApps: Map[InstanceName, RemoteWalletAppConfig] = Map.empty,
     directoryApps: Map[InstanceName, LocalDirectoryAppConfig] = Map.empty,
@@ -102,9 +108,9 @@ case class CoinConfig(
   // The config contains one optional unnamed SVC app (because in M1, there can only be one)
   // Since the rest of the code generally expects a map of nodes, we'll create one.
   private lazy val svcAppInstanceName = InstanceName.tryCreate("svc-app")
-  private lazy val svcApps = svcApp.toList.map(config => svcAppInstanceName -> config).toMap
+  lazy val svcApps = svcApp.toList.map(config => svcAppInstanceName -> config).toMap
   private lazy val remoteSvcAppInstanceName = InstanceName.tryCreate("remote-svc-app")
-  private lazy val remoteSvcApps =
+  lazy val remoteSvcApps =
     remoteSvcApp.toList.map(config => remoteSvcAppInstanceName -> config).toMap
 
   private lazy val svcAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
@@ -141,10 +147,6 @@ case class CoinConfig(
   /** Use `svcs` instead!
     */
   def svcsByString: Map[String, LocalSvcAppConfig] = svcApps.map { case (n, c) =>
-    n.unwrap -> c
-  }
-
-  def remoteSvcsByString: Map[String, RemoteSvcAppConfig] = remoteSvcApps.map { case (n, c) =>
     n.unwrap -> c
   }
 
@@ -226,11 +228,6 @@ case class CoinConfig(
     */
   def walletsByString: Map[String, LocalWalletAppConfig] = walletApps.map { case (n, c) =>
     n.unwrap -> c
-  }
-
-  def remoteWalletsByString: Map[String, RemoteWalletAppConfig] = remoteWalletApps.map {
-    case (n, c) =>
-      n.unwrap -> c
   }
 
   private lazy val directoryAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
@@ -355,6 +352,8 @@ object CoinConfig {
       deriveReader[RemoteScanAppConfig]
     implicit val validatorConfigReader: ConfigReader[LocalValidatorAppConfig] =
       deriveReader[LocalValidatorAppConfig]
+    implicit val remoteValidatorConfigReader: ConfigReader[RemoteValidatorAppConfig] =
+      deriveReader[RemoteValidatorAppConfig]
     implicit val scanConfigReader: ConfigReader[LocalScanAppConfig] =
       deriveReader[LocalScanAppConfig]
     implicit val svcConfigReader: ConfigReader[LocalSvcAppConfig] =

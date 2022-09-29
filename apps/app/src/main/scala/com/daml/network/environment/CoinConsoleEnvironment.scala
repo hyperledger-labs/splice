@@ -9,13 +9,22 @@ import com.daml.network.console.{
   LocalValidatorAppReference,
   LocalWalletAppReference,
   RemoteDirectoryAppReference,
+  RemoteScanAppReference,
   RemoteSplitwiseAppReference,
   RemoteSvcAppReference,
+  RemoteValidatorAppReference,
   RemoteWalletAppReference,
+  ScanAppReference,
   SplitwiseAppReference,
+  ValidatorAppReference,
   WalletAppReference,
 }
+import com.daml.network.scan.config.RemoteScanAppConfig
+import com.daml.network.svc.config.RemoteSvcAppConfig
+import com.daml.network.validator.config.RemoteValidatorAppConfig
+import com.daml.network.wallet.config.RemoteWalletAppConfig
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
+import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.console.{
   CantonHealthAdministration,
   CommunityCantonHealthAdministration,
@@ -52,9 +61,9 @@ class CoinConsoleEnvironment(
     mergeLocalInstances(
       participants.local,
       domains.local,
-      validators,
+      validators.local,
       svcOpt.toList,
-      scanOpt.toList,
+      scans.local,
       wallets.local,
       directories.local,
       splitwises.local,
@@ -63,6 +72,8 @@ class CoinConsoleEnvironment(
       directories.remote,
       participants.remote,
       domains.remote,
+      validators.remote,
+      scans.remote,
       wallets.remote,
       splitwises.remote,
     ),
@@ -70,14 +81,14 @@ class CoinConsoleEnvironment(
 
   /* Local apps that are (in the target deployment) operated by the SVC */
   lazy val appsHostedBySvc = NodeReferences(
-    mergeLocalInstances(svcOpt.toList, scanOpt.toList, directories.local),
-    mergeRemoteInstances(remoteSvcOpt.toList, directories.remote),
+    mergeLocalInstances(svcOpt.toList, scans.local, directories.local),
+    mergeRemoteInstances(remoteSvcOpt.toList, scans.remote, directories.remote),
   )
 
   /* Local apps that are (in the target deployment) operated by a self-hosted validator */
   lazy val appsHostedByValidator = NodeReferences(
-    mergeLocalInstances(validators, wallets.local),
-    mergeRemoteInstances(wallets.remote),
+    mergeLocalInstances(validators.local, wallets.local),
+    mergeRemoteInstances(validators.remote, wallets.remote),
   )
 
   /* Local apps that are (in the target deployment) operated by a third party */
@@ -86,11 +97,21 @@ class CoinConsoleEnvironment(
     splitwises.remote,
   )
 
-  lazy val validators: Seq[LocalValidatorAppReference] =
-    environment.config.validatorsByString.keys.map(createValidatorReference).toSeq
+  lazy val validators: NodeReferences[
+    ValidatorAppReference,
+    RemoteValidatorAppReference,
+    LocalValidatorAppReference,
+  ] =
+    NodeReferences(
+      environment.config.validatorsByString.keys.map(createValidatorReference).toSeq,
+      environment.config.remoteValidatorApps.toSeq.map(createRemoteValidatorReference),
+    )
 
-  lazy val scanOpt: Option[LocalScanAppReference] =
-    environment.config.scansByString.keys.map(createScanReference).headOption
+  lazy val scans: NodeReferences[ScanAppReference, RemoteScanAppReference, LocalScanAppReference] =
+    NodeReferences(
+      environment.config.scansByString.keys.map(createScanReference).toSeq,
+      environment.config.remoteScanApps.toSeq.map(createRemoteScanReference),
+    )
 
   lazy val svcOpt: Option[LocalSvcAppReference] =
     environment.config.svcsByString.keys
@@ -98,7 +119,7 @@ class CoinConsoleEnvironment(
       .headOption
 
   lazy val remoteSvcOpt: Option[RemoteSvcAppReference] =
-    environment.config.remoteSvcsByString.keys
+    environment.config.remoteSvcApps.toSeq
       .map(createRemoteSvcReference)
       .headOption
 
@@ -106,7 +127,7 @@ class CoinConsoleEnvironment(
       : NodeReferences[WalletAppReference, RemoteWalletAppReference, LocalWalletAppReference] =
     NodeReferences(
       environment.config.walletsByString.keys.map(createWalletReference).toSeq,
-      environment.config.remoteWalletsByString.keys.map(createRemoteWalletReference).toSeq,
+      environment.config.remoteWalletApps.toSeq.map(createRemoteWalletReference),
     )
 
   lazy val directories: NodeReferences[
@@ -136,20 +157,34 @@ class CoinConsoleEnvironment(
   private def createValidatorReference(name: String): LocalValidatorAppReference =
     new LocalValidatorAppReference(this, name)
 
+  private def createRemoteValidatorReference(
+      conf: (InstanceName, RemoteValidatorAppConfig)
+  ): RemoteValidatorAppReference =
+    new RemoteValidatorAppReference(this, conf._1.unwrap, conf._2)
+
   private def createScanReference(name: String): LocalScanAppReference =
     new LocalScanAppReference(this, name)
+
+  private def createRemoteScanReference(
+      conf: (InstanceName, RemoteScanAppConfig)
+  ): RemoteScanAppReference =
+    new RemoteScanAppReference(this, conf._1.unwrap, conf._2)
 
   private def createSvcReference(name: String): LocalSvcAppReference =
     new LocalSvcAppReference(this, name)
 
-  private def createRemoteSvcReference(name: String): RemoteSvcAppReference =
-    new RemoteSvcAppReference(this, name)
+  private def createRemoteSvcReference(
+      conf: (InstanceName, RemoteSvcAppConfig)
+  ): RemoteSvcAppReference =
+    new RemoteSvcAppReference(this, conf._1.unwrap, conf._2)
 
   private def createWalletReference(name: String): LocalWalletAppReference =
     new LocalWalletAppReference(this, name)
 
-  private def createRemoteWalletReference(name: String): RemoteWalletAppReference =
-    new RemoteWalletAppReference(this, name)
+  private def createRemoteWalletReference(
+      conf: (InstanceName, RemoteWalletAppConfig)
+  ): RemoteWalletAppReference =
+    new RemoteWalletAppReference(this, conf._1.unwrap, conf._2)
 
   private def createDirectoryReference(name: String): LocalDirectoryAppReference =
     new LocalDirectoryAppReference(this, name)
@@ -168,12 +203,23 @@ class CoinConsoleEnvironment(
   override protected def topLevelValues: Seq[TopLevelValue[_]] = {
 
     super.topLevelValues ++
-      validators.map(v =>
-        TopLevelValue(v.name, helpText("validator app", v.name), v, Seq("App References"))
+      validators.local.map(v =>
+        TopLevelValue(v.name, helpText("local validator app", v.name), v, Seq("App References"))
       ) :+ TopLevelValue(
         "validators",
-        helpText("All validator app instances" + genericNodeReferencesDoc, "Validators"),
-        validators,
+        helpText("All local validator app instances" + genericNodeReferencesDoc, "Validators"),
+        validators.local,
+        Seq("App References"),
+      ) :++
+      validators.remote.map(v =>
+        TopLevelValue(v.name, helpText("remote validator app", v.name), v, Seq("App References"))
+      ) :+ TopLevelValue(
+        "remoteValidators",
+        helpText(
+          "All remote validator app instances" + genericNodeReferencesDoc,
+          "Remote Validators",
+        ),
+        validators.remote,
         Seq("App References"),
       ) :++
       wallets.local.map(w =>
@@ -245,8 +291,14 @@ class CoinConsoleEnvironment(
         Seq("App References"),
       ) :++ svcOpt
         .map(svc => TopLevelValue(svc.name, helpText("SVC app", svc.name), svc, Seq("SVC")))
-        .toList :++ scanOpt
+        .toList :++ remoteSvcOpt
+        .map(svc => TopLevelValue(svc.name, helpText("Remote SVC app", svc.name), svc, Seq("SVC")))
+        .toList :++ scans.local.headOption
         .map(scan => TopLevelValue(scan.name, helpText("Scan app", scan.name), scan, Seq("Scan")))
+        .toList :++ scans.remote.headOption
+        .map(scan =>
+          TopLevelValue(scan.name, helpText("Remote scan app", scan.name), scan, Seq("Scan"))
+        )
         .toList :+ TopLevelValue(
         "appsHostedBySvc",
         helpText("All local apps hosted by the SVC" + genericNodeReferencesDoc, "appsHostedBySvc"),

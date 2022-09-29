@@ -51,7 +51,7 @@ case class CoinEnvironmentDefinition(
     copy(preSetup = env => {
       import env._
       this.preSetup(env)
-      validators.foreach(validator => {
+      validators.local.foreach(validator => {
         val validatorParty = validator.remoteParticipant.parties.enable(validator.config.damlUser)
         validator.remoteParticipant.ledger_api.users.create(
           id = validator.config.damlUser,

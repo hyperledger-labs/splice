@@ -30,9 +30,12 @@ trait CommonCoinAppInstanceReferences {
         "Tried to access the remote SVC app but it isn't defined in the test's configuration file"
       )
     )
-  def scan(implicit env: CoinTestConsoleEnvironment): LocalScanAppReference = env.scanOpt.getOrElse(
-    sys.error("Tried to access the Scan app but it isn't defined in the test's configuration file")
-  )
+  def scan(implicit env: CoinTestConsoleEnvironment): LocalScanAppReference =
+    env.scans.local.headOption.getOrElse(
+      sys.error(
+        "Tried to access the Scan app but it isn't defined in the test's configuration file"
+      )
+    )
   def aliceWallet(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference = w(
     "aliceWallet"
   )
@@ -148,7 +151,7 @@ trait CommonCoinAppInstanceReferences {
       .getOrElse(sys.error(s"wallet [$name] not configured"))
 
   def v(name: String)(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference =
-    env.validators
+    env.validators.local
       .find(_.name == name)
       .getOrElse(sys.error(s"validator [$name] not configured"))
 
