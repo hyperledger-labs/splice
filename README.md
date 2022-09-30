@@ -671,11 +671,13 @@ For details on the individual steps, read the above sections.
            1. Note that the order matters, if the image of your component depends on the image of another component,
               your component must be listed after the dependency.
         3. Edit `./cluster/canton-network-config.jsonnet`, adding the new component to the `cantonNetwork()` function
-    4. If you need to change the network configuration:
-       1. Edit `./cluster/canton-network-config.jsonnet`
-       2. Note that you are responsible for making sure the ports defined in the `./cluster/canton-network-config.jsonnet`
-          are consistent with the ports that the applications actually use
-          (typically defined in config files baked into individual component images).
+        4. If the new component has an API that should be reachable from the internet,
+           add a new config file to `./cluster/images/external-proxy/config`
+    4. Note that you are responsible for making sure the ports defined in different config files are consistent.
+       In particular, consider:
+       1. `./cluster/canton-network-config.jsonnet` (ports used within the cluster)
+       2. `./cluster/images/external-proxy/config` (egress of the cluster)
+       3. config files baked into individual component images (ports that the applications actually use)
 3. If you touched `./cluster/canton-network-config.jsonnet`,
    run `make -C cluster test-update`
 4. Make sure you are connected to a full tunnel VPN
@@ -707,9 +709,14 @@ For details on the individual steps, read the above sections.
       5. Add `-f` to get the live log (new entries streaming to your console)
       6. Add `--since=30m` to only return entries from the past 30min
       7. Add `-p` to get the log from the previous instance. Use this to access the log of a crashed container after it restarted.
-   5. Use `lnav` to quickly analyze log files downloaded using `kubectl logs`.
+   5. Run `kubectl get svc` to get an overview of ports used within the cluster.
+   6. Use `lnav` to quickly analyze log files downloaded using `kubectl logs`.
       Before opening the log file in `lnav`, manually remove the first ~100 lines that use a different log line format, otherwise `lnav` will not work correctly.
-   6. If you prefer a web UI to read logs, open `https://console.cloud.google.com/logs/query?project=da-cn-scratchnet`
+   7. If you prefer a web UI to read logs, open `https://console.cloud.google.com/logs/query?project=da-cn-scratchnet`
+8. Test CN applications on scratchnet
+   1. Run `CLUSTER_ADDR=scratch.network.canton.global coin -v -c ./build-tools/cluster.conf` to connect a CN console
+      to the scratchnet cluster. The config file should allow you to use any component deployed to the cluster.
+      1. E.g., run `validator1_validator.onboardUser("dave")` inside the coin console to onboard a new end-user onto the validator1 node.
 
 
 ### Bumping our Canton fork
