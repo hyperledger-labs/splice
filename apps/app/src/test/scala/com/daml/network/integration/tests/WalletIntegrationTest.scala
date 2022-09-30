@@ -2,7 +2,8 @@ package com.daml.network.integration.tests
 
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding
-import com.daml.network.console.WalletAppReference
+import com.daml.ledger.client.binding.Primitive
+import com.daml.network.console.{LocalWalletAppReference, WalletAppReference}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -10,15 +11,18 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
   IsolatedCoinEnvironments,
 }
-import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences}
+import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences, Proto}
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import com.daml.network.codegen.CC.{Coin => coinCodegen}
+import com.daml.network.codegen.CC.{CoinRules => coinRulesCodegen}
 import com.daml.network.codegen.CN.Scripts.{TestWallet => testWalletCodegen}
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
+import com.daml.network.codegen.DA
 import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
+import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.{Balance, ListResponse}
 
 import java.time.temporal.ChronoUnit
@@ -40,7 +44,9 @@ class WalletIntegrationTest
     "allow calling tap, list the created coins, and get the balance - locally and remotely" in {
       implicit env =>
         val aliceDamlUser = aliceRemoteWallet.config.damlUser
+
         val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+        val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
         aliceRemoteWallet.list() shouldBe ListResponse(Seq(), Seq())
 
@@ -58,7 +64,13 @@ class WalletIntegrationTest
         checkBalance(aliceRemoteWallet.balance(), 0, exactly(110), exactly(0), exactly(0))
 
         nextRound()
-        lockCoins(aliceUserParty, 10) // Lock away 10 coins in a payment request to the same party
+        lockCoins(
+          aliceWallet,
+          aliceUserParty,
+          aliceValidatorParty,
+          aliceRemoteWallet.list().coins,
+          10,
+        ) // Lock away 10 coins in a payment request to the same party
 
         checkBalance(
           aliceRemoteWallet.balance(),
@@ -83,14 +95,22 @@ class WalletIntegrationTest
       import env._
 
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
+
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+      val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
       aliceRemoteWallet.tap(50)
 
       aliceRemoteWallet.list().coins.length shouldBe 1
       aliceRemoteWallet.list().lockedCoins.length shouldBe 0
 
-      lockCoins(aliceUserParty, 25)
+      lockCoins(
+        aliceWallet,
+        aliceUserParty,
+        aliceValidatorParty,
+        aliceRemoteWallet.list().coins,
+        25,
+      )
 
       aliceRemoteWallet.list().coins.length shouldBe 1
       utils.retry_until_true(aliceRemoteWallet.list().lockedCoins.length == 1)
@@ -598,52 +618,60 @@ class WalletIntegrationTest
     value should (be >= range._1 and be <= range._2)
   }
 
-  def lockCoins(userParty: PartyId, amt: Int)(implicit
+  def lockCoins(
+      userWallet: LocalWalletAppReference,
+      userParty: PartyId,
+      validatorParty: PartyId,
+      coins: Seq[GrpcWalletAppClient.CoinPosition],
+      quantity: Int,
+  )(implicit
       env: CoinTestConsoleEnvironment
   ): Unit = {
-    aliceWallet.remoteParticipant.ledger_api.commands.submit(
-      Seq(userParty),
-      optTimeout = None,
-      commands = Seq(
-        testWalletCodegen
-          .TestDeliveryOffer(
-            p = userParty.toPrim,
-            description = "description",
-          )
-          .create
-          .command
-      ),
-    )
+    val coinOpt = coins.find(_.effectiveQuantity >= quantity)
+    val expirationOpt = Proto.decode(Proto.Timestamp)(20000000000000000L) // Wed May 18 2033
 
-    val referenceId =
-      aliceWallet.remoteParticipant.ledger_api.acs
-        .await(userParty, testWalletCodegen.TestDeliveryOffer)
-        .contractId
-
-    // Create a payment request to self.
-    val reqC = walletCodegen.AppPaymentRequest(
-      sender = userParty.toPrim,
-      provider = userParty.toPrim,
-      receiver = userParty.toPrim,
-      svc = svcParty.toPrim,
-      quantity = BigDecimal(amt),
-      expiresAt = binding.Primitive.Timestamp
-        .discardNanos(java.time.Instant.now().plus(30, ChronoUnit.MINUTES))
-        .getOrElse(sys.error("Invalid instant")),
-      collectionDuration = RelTime(microseconds = 60 * 1000000),
-      deliveryOffer = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
-    )
-    aliceWallet.remoteParticipant.ledger_api.commands.submit(
-      actAs = Seq(userParty),
-      optTimeout = None,
-      commands = Seq(reqC.create.command),
-    )
-
-    // Check that we can see the created payment request
-    val reqFound = aliceRemoteWallet.listAppPaymentRequests().headOption.value
-
-    // Accept the payment request
-    aliceRemoteWallet.acceptAppPaymentRequest(reqFound.contractId)
+    (coinOpt, expirationOpt) match {
+      case (Some(coin), Right(expiration)) => {
+        userWallet.remoteParticipant.ledger_api.commands.submit(
+          Seq(userParty, validatorParty),
+          optTimeout = None,
+          commands = Seq(
+            coinRulesCodegen.CoinRules
+              .key(DA.Types.Tuple2(svcParty.toPrim, validatorParty.toPrim))
+              .exerciseCoinRules_Transfer(
+                coinRulesCodegen.Transfer(
+                  sender = userParty.toPrim,
+                  provider = userParty.toPrim,
+                  inputs = Primitive.List(
+                    coinRulesCodegen.TransferInput.InputCoin(coin.contract.contractId)
+                  ),
+                  outputs = Primitive.List(
+                    coinRulesCodegen.TransferOutput.OutputSenderCoin(
+                      exactQuantity = Some(quantity),
+                      lock = Primitive.Optional[coinCodegen.TimeLock](
+                        coinCodegen.TimeLock(
+                          userParty.toPrim,
+                          expiresAt = expiration,
+                        )
+                      ),
+                    ),
+                    coinRulesCodegen.TransferOutput.OutputSenderCoin(
+                      exactQuantity = None,
+                      lock = None,
+                    ),
+                  ),
+                  payload = "lock coins",
+                )
+              )
+              .command
+          ),
+        )
+      }
+      case _ => {
+        coinOpt shouldBe a[Some[_]]
+        expirationOpt shouldBe a[Right[_, _]]
+      }
+    }
   }
 
   def nextRound()(implicit env: CoinTestConsoleEnvironment): Unit = {

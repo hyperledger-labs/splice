@@ -148,14 +148,18 @@ object GrpcWalletAppClient {
 
     override def handleResponse(
         response: v0.GetBalanceResponse
-    ): Either[String, Balance] = Right(
+    ): Either[String, Balance] = for {
+      effectiveUnlockedQty <- Proto.decode(Proto.BigDecimal)(response.effectiveUnlockedQty)
+      effectiveLockedQty <- Proto.decode(Proto.BigDecimal)(response.effectiveLockedQty)
+      totalHoldingFees <- Proto.decode(Proto.BigDecimal)(response.totalHoldingFees)
+    } yield {
       Balance(
         response.round,
-        Proto.tryDecode(Proto.BigDecimal)(response.effectiveUnlockedQty),
-        Proto.tryDecode(Proto.BigDecimal)(response.effectiveLockedQty),
-        Proto.tryDecode(Proto.BigDecimal)(response.totalHoldingFees),
+        effectiveUnlockedQty,
+        effectiveLockedQty,
+        totalHoldingFees,
       )
-    )
+    }
   }
 
   case class ListAppPaymentRequests(walletCtx: WalletContext)

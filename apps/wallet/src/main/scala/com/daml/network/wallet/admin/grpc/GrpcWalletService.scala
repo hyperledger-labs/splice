@@ -108,24 +108,16 @@ class GrpcWalletService(
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
         walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
-        // TODO(i779) switch to wallet store query instead of ACS query
-        coinsLAPI <- connection.activeContracts(walletParty, coinCodegen.Coin)
-        lockedCoinsLAPI <- connection.activeContracts(walletParty, coinCodegen.LockedCoin)
+        coins <- coinStore.listCoins(walletParty)
+        lockedCoins <- coinStore.listLockedCoins(walletParty)
         currentRound <- scanConnection.getCurrentRound()
       } yield {
         val unlockedHoldingFees =
-          coinsLAPI.foldl(BigDecimal(0))((qty, coin) =>
-            qty + CoinUtil.holdingFee(coin.value, currentRound)
-          )
-
+          coins.view.map(c => CoinUtil.holdingFee(c.payload, currentRound)).sum
         val unlockedQty =
-          coinsLAPI.foldl(BigDecimal(0))((qty, coin) =>
-            qty + CoinUtil.currentQuantity(coin.value, currentRound)
-          )
-
-        val lockedQty = lockedCoinsLAPI.foldl(BigDecimal(0))((qty, coin) =>
-          qty + CoinUtil.currentQuantity(coin.value.coin, currentRound)
-        )
+          coins.view.map(c => CoinUtil.currentQuantity(c.payload, currentRound)).sum
+        val lockedQty =
+          lockedCoins.view.map(c => CoinUtil.currentQuantity(c.payload.coin, currentRound)).sum
 
         v0.GetBalanceResponse(
           currentRound,
