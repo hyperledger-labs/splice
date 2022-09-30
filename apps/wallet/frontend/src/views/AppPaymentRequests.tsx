@@ -4,14 +4,13 @@ import { Button, Stack, Table, TableBody, TableCell, TableHead, TableRow } from 
 
 import { AppPaymentRequest } from '@daml.js/wallet/lib/CN/Wallet';
 
-import { Contract } from './Contract';
-import { sameContracts, useInterval } from './Util';
-import { useWalletClient } from './WalletServiceContext';
 import {
   AcceptAppPaymentRequestRequest,
   ListAppPaymentRequestsRequest,
   WalletContext,
-} from './com/daml/network/wallet/v0/wallet_service_pb';
+} from '../com/daml/network/wallet/v0/wallet_service_pb';
+import { useWalletClient } from '../contexts/WalletServiceContext';
+import { sameContracts, useInterval, Contract } from '../utils';
 
 const AppPaymentRequests: React.FC<{ userId: string }> = ({ userId }) => {
   const walletClient = useWalletClient();

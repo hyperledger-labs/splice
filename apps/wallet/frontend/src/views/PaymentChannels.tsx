@@ -14,16 +14,15 @@ import {
 
 import { PaymentChannelProposal } from '@daml.js/wallet/lib/CN/Wallet';
 
-import { Contract } from './Contract';
-import { useInterval } from './Util';
-import { useWalletClient } from './WalletServiceContext';
 import {
   AcceptPaymentChannelProposalRequest,
   ExecuteDirectTransferRequest,
   ListPaymentChannelProposalsRequest,
   ProposePaymentChannelRequest,
   WalletContext,
-} from './com/daml/network/wallet/v0/wallet_service_pb';
+} from '../com/daml/network/wallet/v0/wallet_service_pb';
+import { useWalletClient } from '../contexts/WalletServiceContext';
+import { useInterval, Contract } from '../utils';
 
 const PaymentChannels: React.FC<{ userId: string }> = ({ userId }) => {
   const walletClient = useWalletClient();

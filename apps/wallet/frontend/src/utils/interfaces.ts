@@ -1,7 +1,7 @@
 import { Value } from '@daml/ledger-api';
 import { Template } from '@daml/types';
 
-import { Contract as ProtoContract } from './com/daml/network/v0/contract_pb';
+import { Contract as ProtoContract } from '../com/daml/network/v0/contract_pb';
 
 export interface Contract<T> {
   contractId: string;

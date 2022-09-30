@@ -14,14 +14,13 @@ import {
 
 import { Coin } from '@daml.js/canton-coin/lib/CC/Coin';
 
-import { Contract } from './Contract';
-import { sameContracts, useInterval } from './Util';
-import { useWalletClient } from './WalletServiceContext';
 import {
   ListRequest,
   TapRequest,
   WalletContext,
-} from './com/daml/network/wallet/v0/wallet_service_pb';
+} from '../com/daml/network/wallet/v0/wallet_service_pb';
+import { useWalletClient } from '../contexts/WalletServiceContext';
+import { sameContracts, useInterval, Contract } from '../utils';
 
 const Coins: React.FC<{ userId: string }> = ({ userId }) => {
   const [coins, setCoins] = useState<Contract<Coin>[]>([]);

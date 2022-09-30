@@ -1,6 +1,6 @@
 import React, { useContext } from 'react';
 
-import { WalletServiceClient } from './com/daml/network/wallet/v0/Wallet_serviceServiceClientPb';
+import { WalletServiceClient } from '../com/daml/network/wallet/v0/Wallet_serviceServiceClientPb';
 
 const WalletContext = React.createContext<WalletServiceClient | undefined>(undefined);
 

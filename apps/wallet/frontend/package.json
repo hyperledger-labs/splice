@@ -3,6 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
+    "@auth0/auth0-react": "^1.11.0",
     "@daml.js/canton-coin": "file:daml.js/canton-coin-0.1.0",
     "@daml.js/wallet": "file:daml.js/wallet-0.1.0",
     "@daml/ledger": "file:../../../nix/vendored/daml-ledger-0.0.0.tgz",
@@ -49,7 +50,13 @@
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/explicit-module-boundary-types": "warn",
       "@typescript-eslint/ban-types": "warn",
-      "react/jsx-key": ["warn", { "warnOnDuplicates": true, "checkFragmentShorthand": true }],
+      "react/jsx-key": [
+        "warn",
+        {
+          "warnOnDuplicates": true,
+          "checkFragmentShorthand": true
+        }
+      ],
       "react/jsx-boolean-value": "warn",
       "react/function-component-definition": [
         "warn",
