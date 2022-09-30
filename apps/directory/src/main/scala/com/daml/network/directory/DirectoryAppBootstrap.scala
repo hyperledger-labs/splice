@@ -61,7 +61,6 @@ class DirectoryAppBootstrap(
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
-    val store = DirectoryAppStore(storage, loggerFactory)
 
     val ledgerClient =
       createLedgerClient(
@@ -76,27 +75,6 @@ class DirectoryAppBootstrap(
         loggerFactory,
       )
 
-    val automation = new DirectoryAutomationService(
-      config.damlUser,
-      store,
-      ledgerClient,
-      scanConnection,
-      loggerFactory,
-      timeouts,
-    )
-
-    adminServerRegistry.addService(
-      DirectoryServiceGrpc.bindService(
-        new GrpcDirectoryService(
-          store,
-          ledgerClient,
-          scanConnection,
-          loggerFactory,
-        ),
-        executionContext,
-      )
-    )
-
     val connection = ledgerClient.connection("DirectoryAppBootstrap")
 
     val directoryApp = for {
@@ -105,8 +83,23 @@ class DirectoryAppBootstrap(
         CoinLedgerConnection.RetryOnUserManagementError,
       )
       _ = logger.info(s"Got primary party of Directory user: $providerPartyId")
-      () <- store.setProviderParty(providerPartyId)
+      store = DirectoryAppStore(storage, loggerFactory, providerPartyId)
+      automation = new DirectoryAutomationService(
+        store,
+        ledgerClient,
+        scanConnection,
+        loggerFactory,
+        timeouts,
+      )
+      grpcServer =
+        new GrpcDirectoryService(
+          store,
+          ledgerClient,
+          scanConnection,
+          loggerFactory,
+        )
     } yield {
+      adminServerRegistry.addService(DirectoryServiceGrpc.bindService(grpcServer, executionContext))
       new DirectoryApp(
         config,
         directoryAppParameters,

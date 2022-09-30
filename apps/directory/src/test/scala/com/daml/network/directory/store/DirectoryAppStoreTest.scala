@@ -6,6 +6,7 @@ import com.daml.ledger.api.v1.event.{ArchivedEvent, CreatedEvent, Event}
 import com.daml.ledger.api.v1.transaction.Transaction
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.CN.{Directory => directoryCodegen}
+import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.Contract
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.concurrent.Threading
@@ -128,16 +129,14 @@ class DirectoryAppStoreTest extends AsyncWordSpec with BaseTest {
   )
 
   def mkStore(): Future[DirectoryAppStore] = {
-    val store = DirectoryAppStore(new MemoryStorage, loggerFactory)
+    val store = DirectoryAppStore(new MemoryStorage, loggerFactory, providerParty)
     for {
-      // store provider party after initialization
-      () <- store.setProviderParty(providerParty)
       // ingest test events
-      () <- store.ingestActiveContracts(acsEvents)
-      () <- store.switchToIngestingTransactions(acsOffset)
+      () <- store.acsIngestionSink.ingestActiveContracts(acsEvents)
+      () <- store.acsIngestionSink.switchToIngestingTransactions(acsOffset)
       // ingest test txs
-      () <- store.ingestTransaction(tx1)
-      () <- store.ingestTransaction(tx2)
+      () <- store.acsIngestionSink.ingestTransaction(tx1)
+      () <- store.acsIngestionSink.ingestTransaction(tx2)
     } yield store
   }
 
@@ -217,7 +216,7 @@ class DirectoryAppStoreTest extends AsyncWordSpec with BaseTest {
         // sleep for 10 millis so the source had a chance to produce extra elements if it was buggy
         _ = Threading.sleep(10)
         reqsBeforeIngestion = acc.get()
-        () <- store.ingestTransaction(tx3)
+        () <- store.acsIngestionSink.ingestTransaction(tx3)
         () <- extraReqsPromise.future
         reqsAfterIngestion = acc.get()
       } yield {

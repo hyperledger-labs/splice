@@ -97,8 +97,10 @@ class GrpcDirectoryService(
   @nowarn("cat=unused")
   override def getProviderPartyId(request: Empty): Future[v0.GetProviderPartyIdResponse] =
     withSpanFromGrpcContext("GrpcDirectoryService") { implicit traceContext => span =>
-      for { partyId <- store.getProviderParty() } yield v0.GetProviderPartyIdResponse(
-        Proto.encode(partyId)
+      Future.successful(
+        v0.GetProviderPartyIdResponse(
+          Proto.encode(store.providerParty)
+        )
       )
     }
 
