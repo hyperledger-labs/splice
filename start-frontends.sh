@@ -58,8 +58,9 @@ function usage() {
   echo "  -l   run envoy locally (default: in a docker container)"
 }
 
+daemon=0
 envoy_mode=docker
-while getopts "hl" arg; do
+while getopts "hdl" arg; do
   case ${arg} in
     h)
       usage
@@ -67,6 +68,9 @@ while getopts "hl" arg; do
       ;;
     l)
       envoy_mode=local
+      ;;
+    d)
+      daemon=1
       ;;
     ?)
       usage
@@ -90,4 +94,11 @@ start_frontend wallet 3001 6304 NA bob
 start_frontend splitwise 3002 8082 8085 alice
 start_frontend splitwise 3003 8082 8086 bob
 
-tmux attach -t ${tmux_session}
+if [ $daemon -eq 0 ]; then
+  tmux attach -t ${tmux_session}
+else
+  echo ""
+  echo ""
+  echo "-d specified, running in daemon mode. To attach to frontends terminal, type:"
+  echo "  tmux attach -t ${tmux_session}"
+fi

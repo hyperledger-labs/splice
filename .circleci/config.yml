@@ -473,6 +473,7 @@ jobs:
           POSTGRES_INITDB_ARGS: -A scram-sha-256
           POSTGRES_PASSWORD: postgres
           POSTGRES_USER: postgres
+    resource_class: xlarge
     environment:
       <<: *env
       POSTGRES_HOST: localhost
@@ -485,9 +486,9 @@ jobs:
           retry_fetch: "50"
       - execute_sbt_command:
           # run all tests except the live cluster ones
-          pre_sbt_cmd: ./start-canton.sh external
+          pre_sbt_cmd: ./start-canton.sh external && ./start-frontends.sh -d -l
           cmd: "\"testOnly * -- -l LiveDevNetTest\""
-          post_sbt_cmd: ./stop-canton.sh external
+          post_sbt_cmd: ./stop-canton.sh external && ./stop-frontends.sh
           timeout: "10m"
       - execute_sbt_command:
           cmd: "damlTest"

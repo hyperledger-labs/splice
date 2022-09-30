@@ -15,7 +15,7 @@ case "$mode" in
     echo "docker" > envoy.pid
     ;;
   local)
-    jsonnet --tla-str hostname="localhost" envoy.jsonnet > envoy-out.json
+    jsonnet --tla-str hostname="127.0.0.1" envoy.jsonnet > envoy-out.json
     envoy -c envoy-out.json &
     PID=$!
     echo "$PID" > envoy.pid
