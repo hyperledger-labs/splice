@@ -62,8 +62,9 @@ const Coins: React.FC<{ userId: string }> = ({ userId }) => {
           label="Amount"
           value={tapValue}
           onChange={event => setTapValue(event.target.value)}
+          id="tap-amount-field"
         ></TextField>
-        <Button variant="contained" onClick={() => onTap()}>
+        <Button variant="contained" onClick={() => onTap()} id="tap-button">
           Tap
         </Button>
       </FormGroup>
@@ -77,7 +78,7 @@ const Coins: React.FC<{ userId: string }> = ({ userId }) => {
         </TableHead>
         <TableBody>
           {coins.map(c => (
-            <TableRow key={c.contractId}>
+            <TableRow key={c.contractId} className="coins-table-row">
               <TableCell>
                 <Button
                   variant="text"
@@ -87,7 +88,9 @@ const Coins: React.FC<{ userId: string }> = ({ userId }) => {
                   {c.contractId.slice(0, 10)}…
                 </Button>
               </TableCell>
-              <TableCell>{c.payload.quantity.initialQuantity}</TableCell>
+              <TableCell className="coins-table-quantity">
+                {c.payload.quantity.initialQuantity}
+              </TableCell>
               <TableCell>{c.payload.quantity.createdAt.number}</TableCell>
             </TableRow>
           ))}

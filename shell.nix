@@ -18,6 +18,8 @@ in pkgs.mkShell {
     curl
     docker
     (lib.optional stdenv.isLinux envoy)
+    firefox
+    geckodriver
     git
     google-cloud-sdk
     grpcurl
@@ -36,6 +38,7 @@ in pkgs.mkShell {
     python3
     python3Packages.sphinx_rtd_theme
     sbt
+    selenium-server-standalone
     sphinx
     tmux
     unzip

@@ -132,6 +132,12 @@ with the running Canton instance so try restarting.
 ERROR c.d.n.e.CoinLedgerConnection$$anon$1:WalletIntegrationTest/SVC=svc-app - Failed to instantiate ledger client due to connection failure, exiting...
 ```
 
+### Managing frontends for tests
+
+Some integration tests use our web frontends. Similarly to Canton described above, we also serve the frontends outside of the tests themselves.
+To start serving the frontends run `./start-frontends.sh` (add `-d` if you prefer to avoid attaching the terminal to the npm server).
+It can be stopped via `./stop-frontends.sh`.
+
 ### Running and debugging integration tests
 
 The integration tests are located at [`/apps/app/src/test/scala/com/daml/network/integration/tests/`](/apps/app/src/test/scala/com/daml/network/integration/tests).

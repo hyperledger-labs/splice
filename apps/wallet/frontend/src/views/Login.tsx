@@ -33,6 +33,7 @@ const Login: React.FC<{ onLogin: (userId: string) => void }> = ({ onLogin }) => 
           e.preventDefault();
           onLogin(userId);
         }}
+        id="login-button"
       >
         Log In
       </Button>
