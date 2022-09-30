@@ -55,4 +55,23 @@ class ValidatorIntegrationTest
     aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
   }
 
+  "onboard users with party hint sanitizer" in { implicit env =>
+    // Start nodes
+    svc.start()
+    scan.start()
+    aliceValidator.start()
+
+    // Make uniqueness of the user ID more probable when running the test multiple times in a row
+    val randomId = (new scala.util.Random).nextInt(10000)
+
+    val partyIdFromBadUserId = aliceValidator.onboardUser(s"test@example!#+~-user|123|${randomId}")
+    partyIdFromBadUserId.toString
+      .split("::")
+      .head should fullyMatch regex (s"test_example____-user_123_${randomId}-.*")
+
+    val partyIdFromGoodUserId = aliceValidator.onboardUser(s"other-_us:er-${randomId}")
+    partyIdFromGoodUserId.toString
+      .split("::")
+      .head should fullyMatch regex (s"other-_us:er-${randomId}")
+  }
 }

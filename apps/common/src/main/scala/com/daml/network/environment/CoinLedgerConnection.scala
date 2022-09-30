@@ -511,7 +511,7 @@ object CoinLedgerConnection {
 
       override def createPartyAndUser(user: String): Future[PartyId] = {
         for {
-          party <- allocatePartyViaLedgerApi(Some(user), Some(user))
+          party <- allocatePartyViaLedgerApi(Some(sanitizePartyHint(user)), Some(user))
           userId = com.daml.lf.data.Ref.UserId.assertFromString(user)
           userLf = com.daml.ledger.api.domain.User(userId, Some(party.toLf))
 
@@ -700,6 +700,24 @@ object CoinLedgerConnection {
             PartyId.tryFromLfParty(details.party)
         }
     }
+
+  def sanitizePartyHint(hint: String): String = {
+    val (processedHint, invalidCharDetected) = hint.foldLeft(("", false))((res, currentChar) => {
+      if ("[^\\w-_:]".r matches (s"$currentChar")) {
+        (res._1 + "_", true)
+      } else {
+        (res._1 + currentChar, res._2)
+      }
+    })
+
+    if (invalidCharDetected) {
+      // append a UUID if we had to rewrite the party hint,
+      // because there's a chance it could now conflict with an existing party
+      s"${processedHint}-${UUID.randomUUID.toString}"
+    } else {
+      processedHint
+    }
+  }
 
   def transactionFilter(ps: PartyId*): TransactionFilter =
     TransactionFilter(ps.map(p => p.toProtoPrimitive -> Filters.defaultInstance).toMap)
