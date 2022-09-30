@@ -212,16 +212,8 @@ def numsToIssue(str: String): IssueBucket =
   }
 
 val tags: List[RegexCategory] = List(
-  Tag(List("Luciano")),
-  Tag(List("Alex")),
-  Tag(List("Mike")),
-  Tag(List("Simon")),
-  Tag(List("Moritz")),
-  Tag(List("Arne")),
-  Tag(List("Itai")),
-  Tag(List("Robert")),
   Tag(List("tech-debt")), // treat this like an alias for M1-92
-  Tag(List("Soren")), // added due to comments within DamlPlugin.scala
+  Tag(List("Mx-90")),
 )
 
 val allRegexps: List[RegexCategory] = tags ++ List(Issue, Milestone)

@@ -1,7 +1,7 @@
 Wallet
 ======
 
-.. TODO(M1-07): write user facing docs for CC Wallet
+.. TODO(M1-41): write user facing docs for CC Wallet
 
 .. todo::
 

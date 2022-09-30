@@ -15,7 +15,7 @@ Default Application Topology
   multi-party business workflows
 * the diagram below depicts the topology of such an app
 
-.. TODO(M1-14): [polish] And link to a chapter that explains the standard components of CN, otherwise things like "app users have their own validator node" don't make sense to the reader.
+.. TODO(M1-90): [polish] And link to a chapter that explains the standard components of CN, otherwise things like "app users have their own validator node" don't make sense to the reader.
 
 
 .. image:: images/provider-centric-topology.png
@@ -23,8 +23,8 @@ Default Application Topology
 
 ..  https://lucid.app/lucidchart/7279c336-b1a0-48de-979e-d08d0182f1a1/edit?viewport_loc=1290%2C-69%2C2972%2C1264%2C0_0&invitationId=inv_e9daab9d-1ebc-4423-b297-053ac0f84d09#
 
-.. TODO(M1-14): [polish] What does it mean for an app to be installed? What is the difference between "app" on the right side and "app Daml package" on the left side?
-.. TODO(M1-14): [polish] Are "wallet" and "directory" not standard components of CN?
+.. TODO(M1-90): [polish] What does it mean for an app to be installed? What is the difference between "app" on the right side and "app Daml package" on the left side?
+.. TODO(M1-90): [polish] Are "wallet" and "directory" not standard components of CN?
 
 * the diagram uses the following notation:
 
@@ -81,14 +81,14 @@ Default Application Topology
        app's install contract (see :doc:`building/model`); and the UI can only
        read data of the templates specified in the install contract.
 
-       .. TODO(M1-14): [polish] Linked doc doesn't explain what an install contract is.
-       .. TODO(M1-14): [unclear to me] Explain how does this work? Is this a regular ledger API with a new kind of JWT token? Or a completely new API?
+       .. TODO(M1-90): [polish] Linked doc doesn't explain what an install contract is.
+       .. TODO(M1-90): [unclear to me] Explain how does this work? Is this a regular ledger API with a new kind of JWT token? Or a completely new API?
 
        This API also supports the issuance of app access-tokens,
        which allow a user to prove to the provider that the user has an active
        installation of the provider's app.
 
-       .. TODO(M1-14): explain where and how are these app access-tokens are used?
+       .. TODO(M1-90): explain where and how are these app access-tokens are used?
 
     4. A generic **app installation API** which is served by the provider's
        validator node to deliver the necessary Daml packages to the user's

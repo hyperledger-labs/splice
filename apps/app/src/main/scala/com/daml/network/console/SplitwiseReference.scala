@@ -254,7 +254,7 @@ final class RemoteSplitwiseAppReference(
       acceptedPayment: Primitive.ContractId[walletCodegen.AcceptedAppPayment],
   ): Primitive.ContractId[splitwiseCodegen.BalanceUpdate] = {
     val party = getUserPrimaryParty()
-    // TODO(M1-06) Explicit disclosure workaround
+    // TODO(M1-51) Explicit disclosure workaround
     val hostedAt = ledgerApi.ledger_api.acs.await(
       party,
       CCUserHostedAt,

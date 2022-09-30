@@ -43,11 +43,11 @@ template CoinRules
   with
     svc : Party
     config : CoinConfig USD
-    obs: Party -- TODO(M1-06): remove workaround for explicit disclosure
+    obs: Party -- TODO(M1-51): remove workaround for explicit disclosure
     -- TODO(M1-90): use a schedule with effective dating to make fees predictable to users
   where
     signatory svc
-    observer obs -- TODO(M1-06): remove workaround for explicit disclosure
+    observer obs -- TODO(M1-51): remove workaround for explicit disclosure
     key (svc, obs) : (Party, Party)
     maintainer key._1
 
@@ -205,7 +205,7 @@ template CoinRules
 -- the new CoinRules contracts.
 -- Once explicit disclosure is available, we want to remove the request contracts and use an off-ledger flow
 -- to stream in the latest CoinRules contracts.
--- TODO(M1-06): remove workaround for explicit disclosure
+-- TODO(M1-51): remove workaround for explicit disclosure
 template CoinRulesRequest
   with
     user : Party
@@ -650,7 +650,7 @@ distributeOutputs now config svc sender summary outs =
       PreprocessedFloatingOutput n ->
         let quantity
               | n < summary.numFloatingCoins = perCoinExcessQuantity
-              -- TODO(M1-07): consider smearing this remainder excess quantity above perCoinExcessQuantity
+              -- TODO(M3-90): consider smearing this remainder excess quantity above perCoinExcessQuantity
               -- as thinly as possible over the appropriate number of floating coins.
               | otherwise = st.remainingExcessQuantity
             receiverFee

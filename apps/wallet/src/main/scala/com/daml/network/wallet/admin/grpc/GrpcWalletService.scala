@@ -242,7 +242,7 @@ class GrpcWalletService(
       for {
         walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
         svcParty <- scanConnection.getSvcPartyId()
-        // TODO(M1-07): guard making the proposal by a check that a like channel does not yet exist
+        // TODO(Mx-90): guard making the proposal by a check that a like channel does not yet exist
         receiver = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
         cmd = walletCodegen
           .PaymentChannelProposal(

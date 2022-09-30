@@ -69,7 +69,7 @@ template PaymentChannel
           description
           senderTransferFeeRatio
 
-    -- TODO(M1-08): create payment offers
+    -- TODO(Mx-90): create payment offers
 
     choice PaymentChannel_Cancel_By_Sender : ()
       controller receiver
@@ -89,7 +89,7 @@ template PaymentChannelProposal
     ensure (proposer == channel.sender || proposer == channel.receiver)
     signatory proposer
 
-    -- TODO(M1-06): remove this observer once we can share out-of-band using explicit disclosure
+    -- TODO(M1-51): remove this observer once we can share out-of-band using explicit disclosure
     observer (signatory channel)
 
     choice PaymentChannelProposal_Accept : ContractId PaymentChannel
@@ -285,8 +285,8 @@ template WalletAppInstall
   with
     serviceUser : Party
     endUser : Party
-    svcUser : Party -- TODO(M1-06): remove workaround for explicit disclosure
-    validatorUser : Party -- TODO(M1-06): remove workaround for explicit disclosure
+    svcUser : Party -- TODO(M1-51): remove workaround for explicit disclosure
+    validatorUser : Party -- TODO(M1-51): remove workaround for explicit disclosure
   where
     signatory serviceUser, endUser, validatorUser
 

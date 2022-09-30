@@ -22,7 +22,7 @@ Deployment
     * deploy a web-server hosting the app user UI
     * instruct your validator node to host your app Daml package
 
-.. TODO(M1-04): add instructions on how to set up auth & IAM integration
+.. TODO(M1-41): add instructions on how to set up auth & IAM integration
 
 
 .. todo::

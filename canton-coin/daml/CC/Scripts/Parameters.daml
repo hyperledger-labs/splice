@@ -6,7 +6,7 @@ import OpenBusiness.Fees
 
 -- | Default proposal for cost-competitive fees.
 --
--- TODO(M1-07): it looks like we need to lower these fees a bit further
+-- TODO(M3-90): it looks like we need to lower these fees a bit further
 -- to be competitive with ETH and BTC: https://ycharts.com/indicators/ethereum_average_transaction_fee
 defaultCoinConfig : CoinConfig USD
 defaultCoinConfig = CoinConfig with
@@ -32,7 +32,7 @@ defaultCoinConfig = CoinConfig with
 
     -- Fee for transferring some quantity of coin to a new owner.
     --
-    -- TODO(M1-07) Finetuning required
+    -- TODO(M3-90) Finetuning required
     transferFee = SteppedRate with
       initialRate = 0.01
       steps = [(100.0, 0.001), (1000.0, 0.0001), (1000000.0, 0.00001)]
@@ -53,5 +53,5 @@ defaultCoinConfig = CoinConfig with
 
     -- Fits a hex-encoded SHA-256 or a UUID
     --
-    -- TODO(M1-07): charge per character
+    -- TODO(M3-90): charge per character
     maxPayloadLength = 32

@@ -117,7 +117,7 @@ activeRound app = do
 -- For the workaround for explicit disclosure, we need to know at which validator node a user is hosted.
 -- This is so that we can set the correct readAs party for all coin transfer commands submitted by the user.
 -- 
--- TODO(M1-06): remove workaround for explicit disclosure
+-- TODO(M1-51): remove workaround for explicit disclosure
 template CCUserHostedAt
   with
     user : Party
@@ -135,7 +135,7 @@ getHostingValidator user = do
     Some (_, result) -> pure result.validator
     None -> throw (GeneralError ("No CCUserHostedAt for " <> show user))
 
--- TODO(M1-06): remove workaround for explicit disclosure
+-- TODO(M1-51): remove workaround for explicit disclosure
 requestCoinRules : CCApp -> Party -> Script ()
 requestCoinRules app user = do
   submit user $ createCmd CoinRulesRequest with
@@ -143,7 +143,7 @@ requestCoinRules app user = do
     user = user
   pure ()
 
--- TODO(M1-06): remove workaround for explicit disclosure
+-- TODO(M1-51): remove workaround for explicit disclosure
 -- Note: this must not run concurrently with commands that modify the mining rounds (e.g., runNextIssuance)
 runCoinRulesAcceptBot : CCApp -> Script ()
 runCoinRulesAcceptBot app = do
@@ -159,7 +159,7 @@ runCoinRulesAcceptBot app = do
 
 -- | Run the next issuance.
 --
--- TODO(M1-07): use overlapping issuances so that there are always 2 open issuances, 1 closing issuance,
+-- TODO(M1-90): use overlapping issuances so that there are always 2 open issuances, 1 closing issuance,
 -- and 2 issuing issuances
 runNextIssuance : CCApp -> Decimal -> Script ()
 runNextIssuance app coinPrice = do
@@ -218,7 +218,7 @@ runNextIssuance app coinPrice = do
 -- Each validator has their own copy of IssuanceState, OpenMiningRound, ClosedMiningRound, IssuingMiningRound contracts
 -- This updates all of these copies to match the original contracts owned by the SVC
 -- 
--- TODO(M1-06): remove workaround for explicit disclosure
+-- TODO(M1-51): remove workaround for explicit disclosure
 updateDisclosedMiningRoundContracts : CCApp -> Script ()
 updateDisclosedMiningRoundContracts app = do
   -- Get the list of registered validators (each of them has exactly one CoinRules contract)

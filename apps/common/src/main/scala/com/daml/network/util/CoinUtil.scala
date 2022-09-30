@@ -215,7 +215,7 @@ object CoinUtil extends UploadablePackage {
     maxPayloadLength = 32,
   )
 
-  // TODO(M1-06): Remove workaround for explicit disclosure
+  // TODO(M1-51): Remove workaround for explicit disclosure
   object ExplicitDisclosureWorkaround {
 
     /** Like recordUserHostedAt but only builds the command.

@@ -1,7 +1,7 @@
 Release Management
 ==================
 
-.. TODO(M1-14): link and/or incorporate our recommended upgrade practices here? Versioning is pretty closely linked to this.
+.. TODO(M3-90): link and/or incorporate our recommended upgrade practices here? Versioning is pretty closely linked to this.
 
 Versioning of Daml APIs
 -----------------------
@@ -44,7 +44,7 @@ Releasing Backends and Frontends
 * Either make host/port configurable or assume they’re hosted on the
   same port behind a reverse proxy
 
-.. TODO(M1-14): think about pros/cons and changes in workflows if frontends are delivered as traditional web applications
+.. TODO(M1-90): think about pros/cons and changes in workflows if frontends are delivered as traditional web applications
 
 .. todo::
 
