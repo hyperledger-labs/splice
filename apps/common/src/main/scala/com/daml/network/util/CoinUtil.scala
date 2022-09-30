@@ -2,7 +2,6 @@ package com.daml.network.util
 
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.refinements.ApiTypes.TemplateId
-import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionResponse
 import com.daml.ledger.api.v1.commands.Command
 import com.daml.ledger.client.binding
 import com.daml.ledger.client.binding.Primitive
@@ -244,11 +243,14 @@ object CoinUtil extends UploadablePackage {
         user: PartyId,
         validator: PartyId,
         connection: CoinLedgerConnection,
-    )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionResponse] = {
-      connection.submitCommand(
-        actAs = Seq(user),
-        readAs = Seq.empty,
-        command = Seq(recordUserHostedAtCommand(user, validator)),
+    )(implicit traceContext: TraceContext): Future[Unit] = {
+      connection.ignoreDuplicateKeyErrors(
+        connection.submitCommand(
+          actAs = Seq(user),
+          readAs = Seq.empty,
+          command = Seq(recordUserHostedAtCommand(user, validator)),
+        ),
+        s"CCUserHostedAt($user, $validator)",
       )
     }
   }

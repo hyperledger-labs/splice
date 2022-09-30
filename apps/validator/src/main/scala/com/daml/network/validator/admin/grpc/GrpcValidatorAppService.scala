@@ -44,7 +44,7 @@ class GrpcValidatorAppService(
 
       for {
         validatorPartyId <- store.getValidatorParty()
-        userPartyId <- connection.createPartyAndUser(name)
+        userPartyId <- connection.getOrAllocateParty(name)
         svcPartyId <- scanConnection.getSvcPartyId()
         _ <- CoinUtil.ExplicitDisclosureWorkaround.recordUserHostedAt(
           userPartyId,

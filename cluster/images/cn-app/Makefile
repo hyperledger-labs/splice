@@ -25,7 +25,5 @@ $(wallet-frontend): $(wallet-daml)
 	cd ${REPO_ROOT}/apps/wallet/frontend && npm run build
 
 .PHONY: clean-sbt
-clean: clean-sbt
-
 clean-sbt:
 	cd ${REPO_ROOT} && sbt clean

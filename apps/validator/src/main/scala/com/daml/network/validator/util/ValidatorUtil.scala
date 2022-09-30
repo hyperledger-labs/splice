@@ -17,21 +17,25 @@ private[validator] object ValidatorUtil {
       connection: CoinLedgerConnection,
   )(implicit
       traceContext: TraceContext
-  ) =
-    connection.submitCommand(
-      actAs = Seq(user, validator),
-      readAs = Seq.empty,
-      Seq(
-        coinCodegen
-          .ValidatorRight(
-            svc = svc.toPrim,
-            user = user.toPrim,
-            validator = validator.toPrim,
-          )
-          .create
-          .command
+  ): Future[Unit] = {
+    connection.ignoreDuplicateKeyErrors(
+      connection.submitCommand(
+        actAs = Seq(user, validator),
+        readAs = Seq.empty,
+        Seq(
+          coinCodegen
+            .ValidatorRight(
+              svc = svc.toPrim,
+              user = user.toPrim,
+              validator = validator.toPrim,
+            )
+            .create
+            .command
+        ),
       ),
+      s"ValidatorRight($svc, $user, $validator)",
     )
+  }
 
   def installWalletForUser(
       validatorServiceParty: PartyId,
@@ -51,31 +55,25 @@ private[validator] object ValidatorUtil {
     for {
       // TODO (i713): remove this workaround for missing `read-as-any-party` rights
       _ <- connection.grantUserRights(walletServiceUser, Seq.empty, Seq(endUserParty))
-      _ <- connection
-        .submitCommand(
-          Seq(validatorServiceParty, walletServiceParty, endUserParty),
-          Seq(),
-          Seq(
-            walletCodegen
-              .WalletAppInstall(
-                serviceUser = walletServiceParty.toPrim,
-                endUser = endUserParty.toPrim,
-                svcUser = svcParty.toPrim,
-                validatorUser = validatorServiceParty.toPrim,
-              )
-              .create
-              .command
+      _ <- connection.ignoreDuplicateKeyErrors(
+        connection
+          .submitCommand(
+            Seq(validatorServiceParty, walletServiceParty, endUserParty),
+            Seq(),
+            Seq(
+              walletCodegen
+                .WalletAppInstall(
+                  serviceUser = walletServiceParty.toPrim,
+                  endUser = endUserParty.toPrim,
+                  svcUser = svcParty.toPrim,
+                  validatorUser = validatorServiceParty.toPrim,
+                )
+                .create
+                .command
+            ),
           ),
-        )
-        .recover {
-          // TODO (i751): better way to make this method idempotent
-          case e if e.getMessage.contains("DUPLICATE_CONTRACT_KEY") =>
-            logger.debug(
-              s"Installing the wallet for user $endUserParty resulted in duplicate contract key." +
-                "This probably means the wallet was already installed before, ignoring the error."
-            )
-            ()
-        }
+        s"WalletAppInstall($walletServiceParty, $endUserParty, $svcParty, $validatorServiceParty)",
+      )
     } yield ()
   }
 }

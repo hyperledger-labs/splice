@@ -444,6 +444,234 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
+               "app": "validator1-participant"
+            },
+            "name": "validator1-participant"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "validator1-participant"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "validator1-participant",
+                     "external": "true"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "image": "region-docker.pkg.dev/project/repo/validator1-participant:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "validator1-participant",
+                        "ports": [
+                           {
+                              "containerPort": 5102,
+                              "name": "val1-adm-api"
+                           },
+                           {
+                              "containerPort": 5101,
+                              "name": "val1-ledger-api"
+                           }
+                        ]
+                     }
+                  ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "name": "validator1-participant"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "val1-adm-api",
+                  "port": 5102,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-ledger-api",
+                  "port": 5101,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "validator1-participant"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "validator1-validator-app"
+            },
+            "name": "validator1-validator-app"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "validator1-validator-app"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "validator1-validator-app",
+                     "external": "true"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "image": "region-docker.pkg.dev/project/repo/validator1-validator-app:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "validator1-validator-app",
+                        "ports": [
+                           {
+                              "containerPort": 5103,
+                              "name": "val1-val-api"
+                           }
+                        ]
+                     }
+                  ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "name": "validator1-validator-app"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "val1-val-api",
+                  "port": 5103,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "validator1-validator-app"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "validator1-wallet-app"
+            },
+            "name": "validator1-wallet-app"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "validator1-wallet-app"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "validator1-wallet-app",
+                     "external": "true"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "image": "region-docker.pkg.dev/project/repo/validator1-wallet-app:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "validator1-wallet-app",
+                        "ports": [
+                           {
+                              "containerPort": 5104,
+                              "name": "val1-wal-api"
+                           }
+                        ]
+                     },
+                     {
+                        "env": [
+                           {
+                              "name": "GRPC_ADDRESS",
+                              "value": "127.0.0.1"
+                           },
+                           {
+                              "name": "GRPC_PORT",
+                              "value": "5104"
+                           },
+                           {
+                              "name": "GRPC_WEB_PORT",
+                              "value": "6104"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/envoy-proxy:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "envoy-proxy",
+                        "ports": [
+                           {
+                              "containerPort": 6104,
+                              "name": "grpc-web"
+                           }
+                        ]
+                     }
+                  ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "name": "validator1-wallet-app"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "val1-wal-api",
+                  "port": 5104,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-wal-gweb",
+                  "port": 6104,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "validator1-wallet-app"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
                "app": "gcs-proxy"
             },
             "name": "gcs-proxy"
@@ -570,6 +798,26 @@
                            {
                               "containerPort": 5001,
                               "name": "cp-ledger-api"
+                           },
+                           {
+                              "containerPort": 5103,
+                              "name": "val1-val-api"
+                           },
+                           {
+                              "containerPort": 5104,
+                              "name": "val1-wal-api"
+                           },
+                           {
+                              "containerPort": 6104,
+                              "name": "val1-wal-gweb"
+                           },
+                           {
+                              "containerPort": 5102,
+                              "name": "val1-adm-api"
+                           },
+                           {
+                              "containerPort": 5101,
+                              "name": "val1-ledger-api"
                            }
                         ]
                      }
@@ -629,6 +877,31 @@
                {
                   "name": "cp-ledger-api",
                   "port": 5001,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-val-api",
+                  "port": 5103,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-wal-api",
+                  "port": 5104,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-wal-gweb",
+                  "port": 6104,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-adm-api",
+                  "port": 5102,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-ledger-api",
+                  "port": 5101,
                   "protocol": "TCP"
                }
             ],
@@ -695,6 +968,31 @@
                {
                   "name": "cp-ledger-api",
                   "port": 5001,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-val-api",
+                  "port": 5103,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-wal-api",
+                  "port": 5104,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-wal-gweb",
+                  "port": 6104,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-adm-api",
+                  "port": 5102,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-ledger-api",
+                  "port": 5101,
                   "protocol": "TCP"
                }
             ],

@@ -1,0 +1,30 @@
+println("Bootstrapping validator1 participant...")
+
+val domainLabel = "canton-network"
+val domainUrl = System.getProperty("DOMAIN_URL", "http://canton-domain:5008")
+
+println(s"Connecting to domain $domainUrl...")
+if (`validator1_participant`.domains.list_connected().isEmpty) {
+    println("No registered domains, so connecting to the CN domain for the first time...")
+
+    `validator1_participant`.domains.connect(domainLabel, domainUrl)
+    utils.retry_until_true(`validator1_participant`.domains.active(domainLabel))
+
+    println("Executing self ping for connection verification...")
+    `validator1_participant`.health.ping(`validator1_participant`)
+}
+
+val validatorServiceUserName = "validator1_validator_service_user"
+val walletServiceUserName = "validator1_wallet_service_user"
+
+println(s"Creating validator user $validatorServiceUserName...")
+val validatorParty = `validator1_participant`.parties.enable(validatorServiceUserName)
+`validator1_participant`.ledger_api.users.create(
+  id = validatorServiceUserName,
+  actAs = Set(validatorParty.toLf),
+  readAs = Set.empty,
+  primaryParty = Some(validatorParty.toLf),
+  participantAdmin = true,
+)
+
+println("Bootstrapped validator1 participant!")

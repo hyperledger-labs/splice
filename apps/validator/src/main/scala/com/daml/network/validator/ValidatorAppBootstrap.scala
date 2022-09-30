@@ -113,25 +113,46 @@ class ValidatorAppBootstrap(
       }
     }
 
+    def createValidatorRight(validatorParty: PartyId, svcParty: PartyId): Future[Unit] = {
+      logger.info(s"Attempting to create validator right...")
+      for {
+        _ <- ValidatorUtil.createValidatorRight(
+          user = validatorParty,
+          validator = validatorParty,
+          svc = svcParty,
+          connection = connection,
+        )
+      } yield {
+        logger.info(
+          s"Created validator right with validator $validatorParty, svc $svcParty."
+        )
+      }
+    }
+
     def createRulesRequestAndUserHostedAtContracts(
         svcParty: PartyId,
         validatorParty: PartyId,
     ): Future[Unit] = {
+      logger.info("Attempting to create rules request and userHostedAt.")
       val coinRulesReq = CoinRulesRequest(user = validatorParty.toPrim, svc = svcParty.toPrim)
-      connection
-        .submitCommand(
-          actAs = Seq(validatorParty),
-          readAs = Seq(validatorParty),
-          command = Seq(coinRulesReq.create.command),
+      for {
+        _ <- connection.ignoreDuplicateKeyErrors(
+          connection
+            .submitCommand(
+              actAs = Seq(validatorParty),
+              readAs = Seq(validatorParty),
+              command = Seq(coinRulesReq.create.command),
+            ),
+          s"CoinRulesRequest($validatorParty, $svcParty)",
         )
-        .flatMap { _ =>
-          CoinUtil.ExplicitDisclosureWorkaround.recordUserHostedAt(
-            validatorParty,
-            validatorParty,
-            connection,
-          )
-        }
-        .map(_ => ())
+        _ <- CoinUtil.ExplicitDisclosureWorkaround.recordUserHostedAt(
+          validatorParty,
+          validatorParty,
+          connection,
+        )
+      } yield {
+        logger.info("Created rules request and userHostedAt.")
+      }
     }
 
     def init() = for {
@@ -145,12 +166,7 @@ class ValidatorAppBootstrap(
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>
         setupAppInstance(name, instance)
       })
-      _ <- ValidatorUtil.createValidatorRight(
-        user = validatorParty,
-        validator = validatorParty,
-        svc = svcParty,
-        connection = connection,
-      )
+      _ <- createValidatorRight(validatorParty, svcParty)
       _ <- createRulesRequestAndUserHostedAtContracts(svcParty, validatorParty)
     } yield {
       ValidatorAppStore(

@@ -188,6 +188,11 @@ function cluster_check() {
     _check_cluster_grpc_port 5005 "SVC App API"
     _check_cluster_grpc_port 5012 "Scan App API"
 
+    _check_cluster_grpc_port 5101 "Validator1: Ledger Participant API"
+    _check_cluster_grpc_port 5102 "Validator1: Ledger Participant Admin API"
+    _check_cluster_grpc_port 5103 "Validator1: Validator App API"
+    _check_cluster_grpc_port 5104 "Validator1: Wallet App API"
+
     _log "Checking cluster via ping test..."
     _check_cluster_ledger
 }
