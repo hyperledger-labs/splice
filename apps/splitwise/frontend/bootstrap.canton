@@ -4,6 +4,7 @@ Seq(aliceSplitwiseBackend.remoteParticipant, bobSplitwiseBackend.remoteParticipa
 }
 
 val aliceUserParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
+aliceValidator.onboardUser("auth0|632de6b067ec7e396a03262d")
 val bobUserParty = bobValidator.onboardUser(bobRemoteWallet.config.damlUser)
 
 val aliceRequestCid = aliceDirectory.requestDirectoryInstall()
