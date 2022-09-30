@@ -12,7 +12,6 @@ import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
 import com.daml.network.svc.SvcAppBootstrap
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.validator.ValidatorAppBootstrap
-import com.daml.network.validator.admin.api.client.ValidatorConnectionImpl
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.wallet.WalletAppBootstrap
 import com.daml.network.wallet.config.LocalWalletAppConfig
@@ -140,8 +139,6 @@ trait CoinEnvironment extends Environment {
       testingConfig,
       futureSupervisor,
       loggerFactory,
-      (config, timeouts, loggerFactory) =>
-        new ValidatorConnectionImpl(config, timeouts, loggerFactory),
     )
       .valueOr(err =>
         throw new RuntimeException(

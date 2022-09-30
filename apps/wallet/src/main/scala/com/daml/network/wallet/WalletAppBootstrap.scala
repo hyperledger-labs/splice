@@ -19,7 +19,6 @@ import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
 }
-import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -43,12 +42,6 @@ class WalletAppBootstrap(
     metrics: WalletAppMetrics,
     storageFactory: StorageFactory,
     parentLogger: NamedLoggerFactory,
-    // Passed in as a parameter to avoid circular dependency between wallet and validator.
-    getValidatorConnection: (
-        ClientConfig,
-        ProcessingTimeout,
-        NamedLoggerFactory,
-    ) => ValidatorConnection,
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     @nowarn("cat=unused")
@@ -85,7 +78,7 @@ class WalletAppBootstrap(
       )
 
     val validatorConnection: ValidatorConnection =
-      getValidatorConnection(
+      new ValidatorConnection(
         config.validator.clientAdminApi,
         walletAppParameters.processingTimeouts,
         loggerFactory,
@@ -165,11 +158,6 @@ object WalletAppBootstrap {
       testingConfigInternal: TestingConfigInternal,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
-      getValidatorConnection: (
-          ClientConfig,
-          ProcessingTimeout,
-          NamedLoggerFactory,
-      ) => ValidatorConnection,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
       scheduler: ScheduledExecutorService,
@@ -188,7 +176,6 @@ object WalletAppBootstrap {
           walletMetrics,
           new CommunityStorageFactory(walletConfig.storage),
           loggerFactory,
-          getValidatorConnection,
         )
       )
       .leftMap(_.toString)

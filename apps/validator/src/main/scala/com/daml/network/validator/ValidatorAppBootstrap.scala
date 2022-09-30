@@ -7,16 +7,17 @@ import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.codegen.CC.CoinRules.CoinRulesRequest
 import com.daml.network.config.SharedCoinAppParameters
+import com.daml.ledger.api.refinements.ApiTypes
+import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNodeBootstrapBase}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.CoinUtil
+import com.daml.network.util.{CoinUtil, UploadablePackage}
 import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
 import com.daml.network.validator.config.{AppInstance, LocalValidatorAppConfig}
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.daml.network.validator.store.ValidatorAppStore
 import com.daml.network.validator.util.ValidatorUtil
 import com.daml.network.validator.v0.ValidatorAppServiceGrpc
-import com.daml.network.wallet.util.WalletUtil
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -82,7 +83,15 @@ class ValidatorAppBootstrap(
     def setupWallet(): Future[PartyId] = {
       logger.info(s"Attempting to setup wallet...")
       for {
-        _ <- connection.uploadDarFile(WalletUtil)
+        _ <- connection.uploadDarFile(new UploadablePackage {
+          lazy val walletTemplateId: com.daml.ledger.api.v1.value.Identifier =
+            ApiTypes.TemplateId.unwrap(walletCodegen.AppPaymentRequest.id)
+
+          lazy val packageId: String = walletTemplateId.packageId
+
+          // See `Compile / resourceGenerators` in build.sbt
+          lazy val resourcePath: String = "dar/wallet-0.1.0.dar"
+        })
         party <- connection.getOrAllocateParty(config.walletServiceUser)
       } yield {
         logger.info(

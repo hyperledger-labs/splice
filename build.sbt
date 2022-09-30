@@ -42,6 +42,7 @@ lazy val root = (project in file("."))
     `apps-svc`,
     `apps-app`,
     `apps-wallet`,
+    `apps-wallet-daml`,
     `apps-directory`,
     `canton-community-common`,
     `canton-blake2b`,
@@ -87,7 +88,7 @@ lazy val `apps-validator` =
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
       `apps-scan` % "compile->compile;test->test",
-      `apps-wallet` % "compile->compile;test->test",
+      `apps-wallet-daml` % "compile->compile;test->test",
     )
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
@@ -112,24 +113,36 @@ lazy val `apps-scan` =
       BuildCommon.sharedAppSettings,
     )
 
-lazy val `apps-wallet` =
+lazy val `apps-wallet-daml` =
   project
-    .in(file("apps/wallet"))
+    .in(file("apps/wallet/daml"))
     .dependsOn(
-      `apps-common` % "compile->compile;test->test",
-      `apps-scan` % "compile->compile;test->test",
     )
     .enablePlugins(DamlPlugin)
     .settings(
-      libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
-      Compile / damlDependencies := (`apps-common` / Compile / damlBuild).value,
       BuildCommon.sharedAppSettings,
+      libraryDependencies ++= Seq(daml_bindings_scala),
+      Compile / damlDependencies := (`apps-common` / Compile / damlBuild).value,
       Compile / damlSourceDirectory := file("apps/wallet/daml"),
       cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
       Test / damlSourceDirectory := file("apps/wallet/daml"),
       Compile / damlDarOutput := file("apps/wallet/daml") / ".daml" / "dist",
       BuildCommon.damlCodegenSettings,
       BuildCommon.copyDarResources,
+    )
+
+lazy val `apps-wallet` =
+  project
+    .in(file("apps/wallet"))
+    .dependsOn(
+      `apps-common` % "compile->compile;test->test",
+      `apps-scan` % "compile->compile;test->test",
+      `apps-validator` % "compile->compile;test->test",
+      `apps-wallet-daml` % "compile->compile;test->test",
+    )
+    .settings(
+      libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
+      BuildCommon.sharedAppSettings,
     )
 
 lazy val `apps-directory` =
@@ -143,7 +156,7 @@ lazy val `apps-directory` =
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
-      Compile / damlDependencies := (`apps-wallet` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`apps-wallet-daml` / Compile / damlBuild).value,
       Compile / damlSourceDirectory := file("apps/directory/daml"),
       cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
       Test / damlSourceDirectory := (Compile / damlSourceDirectory).value,
@@ -284,6 +297,7 @@ lazy val `apps-app` =
       `apps-svc`,
       `apps-scan`,
       `apps-wallet`,
+      `apps-wallet-daml`,
       `canton-community-app` % "compile->compile;test->test",
     )
     .settings(

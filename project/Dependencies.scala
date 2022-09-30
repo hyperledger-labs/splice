@@ -18,4 +18,7 @@ object Dependencies {
 
   lazy val daml_ledger_api_proto =
     "com.daml" % "ledger-api-proto" % CantonDependencies.daml_libraries_version
+
+  lazy val daml_bindings_scala =
+    "com.daml" %% "bindings-scala" % CantonDependencies.daml_libraries_version
 }
