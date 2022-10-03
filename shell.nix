@@ -44,6 +44,7 @@ in pkgs.mkShell {
     sphinx
     tmux
     unzip
+    which
     x86Pkgs.sphinx-autobuild
     zip
   ] ++ linuxOnly;

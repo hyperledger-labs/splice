@@ -82,6 +82,7 @@ tmux new-session -d -s "${tmux_session}"
 # TODO(i711): Move build steps into sbt
 build_frontend wallet
 build_frontend splitwise
+build_frontend directory
 
 start_envoy
 
@@ -89,6 +90,7 @@ start_frontend wallet 3000 6204 NA alice
 start_frontend wallet 3001 6304 NA bob
 start_frontend splitwise 3002 8082 8085 alice
 start_frontend splitwise 3003 8082 8086 bob
+start_frontend directory 3004 8084 8085 alice
 
 if [ $daemon -eq 0 ]; then
   tmux attach -t ${tmux_session}

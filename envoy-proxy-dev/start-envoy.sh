@@ -2,7 +2,7 @@
 set -eou pipefail
 
 jsonnet --tla-str hostname="127.0.0.1" envoy.jsonnet > envoy-out.json
-if [ -z "$(/usr/bin/which envoy)" ]; then
+if [ -z "$(which envoy)" ]; then
   echo "envoy executable not found. On MacOS, please install envoy globally using brew" >&2
   exit 1
 fi
