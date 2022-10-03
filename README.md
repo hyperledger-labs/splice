@@ -24,7 +24,9 @@ project dependencies on its `PATH`.
 
 If you encounter issues, try exiting & reentering the directory to reactivate direnv.
 
-5. On MacOS, please install envoy globally by running: `brew update ; brew install envoy`
+5. On MacOS, please install the following globally:
+   1. Envoy, by running: `brew update ; brew install envoy`
+   2. Firefox, by following the process here: <https://www.firefox.com>
 
 ### As a new joiner
 For your first issue, you can take a look at [issues labelled with the `starter` tag](https://github.com/DACH-NY/the-real-canton-coin/issues?q=is%3Aissue+label%3Astarter). Else, please ask your onboarding

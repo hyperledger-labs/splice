@@ -1,9 +1,13 @@
 let
+  inherit (pkgs) stdenv;
   pkgs = import ./nix/default.nix {};
   # pyopenssl is currently broken on M1 due to
   # https://github.com/NixOS/nixpkgs/issues/174457#issuecomment-1137385758
   # To work around this we fetch some packages via rosetta.
   x86Pkgs = if builtins.currentSystem == "aarch64-darwin" then import ./nix/default.nix { system = "x86_64-darwin"; } else pkgs;
+
+  # No macOS support for firefox
+  linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ envoy firefox ];
 in pkgs.mkShell {
   SSL_CERT_FILE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
   buildInputs = with pkgs; [
@@ -17,8 +21,6 @@ in pkgs.mkShell {
     circleci-cli
     curl
     docker
-    (lib.optional stdenv.isLinux envoy)
-    firefox
     geckodriver
     git
     google-cloud-sdk
@@ -44,5 +46,5 @@ in pkgs.mkShell {
     unzip
     x86Pkgs.sphinx-autobuild
     zip
-  ];
+  ] ++ linuxOnly;
 }
