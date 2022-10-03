@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 
-mode=${1:-docker}
+if [[ $(uname) == Linux ]]; then
+    mode_default=local
+else
+    mode_default=docker
+fi
+
+mode=${1:-$mode_default}
 
 
 case "$mode" in

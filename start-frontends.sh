@@ -60,14 +60,14 @@ function usage() {
 
 daemon=0
 envoy_mode=docker
-while getopts "hdl" arg; do
+if [[ $(uname) == Linux ]]; then
+    envoy_mode=local
+fi
+while getopts "hd" arg; do
   case ${arg} in
     h)
       usage
       exit 0
-      ;;
-    l)
-      envoy_mode=local
       ;;
     d)
       daemon=1

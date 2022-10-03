@@ -486,7 +486,7 @@ jobs:
           retry_fetch: "50"
       - execute_sbt_command:
           # run all tests except the live cluster ones
-          pre_sbt_cmd: ./start-canton.sh external && ./start-frontends.sh -d -l
+          pre_sbt_cmd: ./start-canton.sh external && ./start-frontends.sh -d
           cmd: "\"testOnly * -- -l LiveDevNetTest\""
           post_sbt_cmd: ./stop-canton.sh external && ./stop-frontends.sh
           timeout: "10m"
