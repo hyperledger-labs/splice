@@ -10,6 +10,8 @@ logfile
 testlog
 _build/
 .idea/*
+# We want to share run configurations
+!.idea/runConfigurations
 .vscode/*
 target
 .bsp

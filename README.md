@@ -66,7 +66,6 @@ M3 - TestNet Launch.
 You should then see a 'sbt shell' window in IntelliJ that allows you to build and test the Scala code while using the
 same package references as nix. If IntelliJ asks you at the end if you want to overwrite any previous `.idea/*` files, say yes.
 
-
 ## sbt
 ### sbt settings
 Make sure to configure the JVM heap size to at least 4G when using IntelliJ. In particular:
@@ -155,6 +154,23 @@ You can also run them from `sbt` as explained in the section on `sbt` below.
 The logs from test executions are output to `/logs/canton_test.log`.
 Use `lnav` to view these logs for debugging failing test cases.
 No installation of `lnav` is required, as it is provided by default by our `direnv`.
+
+### Testing app behaviour outside of tests without running bundle 
+
+Sometimes, you may need to debug startup behaviour of the Canton coin apps that is causing issues for the 
+initialization of the [[com.daml.network.environment.CoinEnvironment]]. You usually can't debug this behaviour
+via our integration tests because the integration tests require an initialized CoinEnvironment. 
+At other times, you may want to start an interactive console without having to run `sbt bundle`.
+
+You can achieve this by using the ['Simple topology' runtime configuration](https://i.imgur.com/dPgUd2Q.png) from IntelliJ.
+After starting it, a `Run` window with an interactive console should open: [console](https://i.imgur.com/zQfbVvs.png).
+Using the runtime configuration, you can also set breakpoints as you could when executing a test from Intellij and 
+see the results of adding log statements without needing to run `sbt bundle`. 
+ 
+All screenshots are from IntelliJ IDEA 2020.1.4 on Ubuntu. 
+
+If you don't use IntellIJ, a workaround is running `sbt apps-app/runMain com.daml.network.CoinApp -c <conf-files>`, however,
+this doesn't give you a debugger.
 
 ### Running the preflight check
 
