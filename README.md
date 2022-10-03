@@ -24,6 +24,8 @@ project dependencies on its `PATH`.
 
 If you encounter issues, try exiting & reentering the directory to reactivate direnv.
 
+5. On MacOS, please install envoy globally by running: `brew update ; brew install envoy`
+
 ### As a new joiner
 For your first issue, you can take a look at [issues labelled with the `starter` tag](https://github.com/DACH-NY/the-real-canton-coin/issues?q=is%3Aissue+label%3Astarter). Else, please ask your onboarding
 buddy for help with getting started on the code base.
@@ -298,17 +300,6 @@ sbt "apps-app/runMain com.daml.network.CoinApp --config apps/app/src/test/resour
 ./start-frontends.sh
 ```
 You can then browse to http://localhost:3000 and http://localhost:3001 for the two wallet UIs, and login as `alice_wallet_user` and `bob_wallet_user` respectively.
-
-If the frontend shows up but nothing happens when you click tap or
-other buttons, check your browser console. If you see a stream of 503 errors,
-iptables on your host might be blocking the connections. Try running on the host:
-```
-sudo iptables -A INPUT -i docker0 -p tcp -m tcp --dport 5000:5999 -j ACCEPT
-```
-To make this change persistent, type:
-```
-sudo sh -c 'iptables-save > /etc/iptables/rules.v4'
-```
 
 Note that start-frontents.sh serves the different frontends from separate tmux screens,
 and then attaches the terminal to that tmux session. To detach from tmux, type `Ctrl+B D`.

@@ -19,7 +19,7 @@ function build_frontend() {
 function start_envoy() {
   script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
   cd "${script_dir}/envoy-proxy-dev"
-  ./start-envoy.sh ${envoy_mode}
+  ./start-envoy.sh
   cd -
 }
 
@@ -55,14 +55,10 @@ function usage() {
   echo "Usage: ./start-frontends.sh <flags>"
   echo "Flags:"
   echo "  -h   display this help message"
-  echo "  -l   run envoy locally (default: in a docker container)"
+  echo "  -d   start in detached mode"
 }
 
 daemon=0
-envoy_mode=docker
-if [[ $(uname) == Linux ]]; then
-    envoy_mode=local
-fi
 while getopts "hd" arg; do
   case ${arg} in
     h)

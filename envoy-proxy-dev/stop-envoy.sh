@@ -6,11 +6,7 @@ if [ ! -f "envoy.pid" ]; then
 fi
 
 PID=$(cat envoy.pid)
-if [ "$PID" == "docker" ]; then
-  docker stop envoy
-else
-  kill "$PID"
-fi
+kill "$PID"
 
 rm envoy.pid
 rm envoy-out.json
