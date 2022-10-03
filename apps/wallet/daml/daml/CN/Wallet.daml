@@ -10,7 +10,6 @@ import CC.CoinRules
 
 import CC.Scripts.Util (CCUserHostedAt(..))
 
-
 -- | A one-directional payment channel governing transfers of CC from the sender to the reciever.
 template PaymentChannel
   with
@@ -278,6 +277,119 @@ template AcceptedAppPayment
       do exercise deliveryOffer DeliveryOffer_Archive
          exercise lockedCoin Coin_OwnerExpireLock
 
+data ReceiverQuantity = ReceiverQuantity with receiver : Party, quantity : Decimal
+  deriving (Show, Eq)
+
+unzipReceiverQuantities : [ReceiverQuantity] -> ([Party], [Decimal])
+unzipReceiverQuantities = foldr (\ReceiverQuantity{..} (rs,cs) -> (receiver :: rs, quantity :: cs)) ([], [])
+
+template AppMultiPaymentRequest
+  with
+    sender : Party -- ^ The party that should pay.
+    receiverQuantities : [ReceiverQuantity] -- ^ Pairs of (party, quantity) requesting to be paid.
+    provider : Party -- ^ The app provider; receives usage rewards.
+    svc : Party -- ^ The issuer of CC that should be used to make the payment.
+    expiresAt : Time -- ^ When the payment request expires.
+    collectionDuration : RelTime -- ^ The time available to the provider to collect a payment.
+    deliveryOffer : ContractId DeliveryOffer -- ^ The reference to the reason / good for which the payment is requested.
+  where
+    let (receivers, quantities) = unzipReceiverQuantities receiverQuantities
+    signatory sender, receivers, provider
+    ensure (collectionDuration > aunit && all (> 0.0) quantities)
+
+    choice AppMultiPaymentRequest_Accept : ContractId AcceptedAppMultiPayment
+      with
+        inputs : [TransferInput]
+      controller sender
+      do now <- getTime
+         -- check that the reference is active and implements DeliveryOffer
+         void $ fetch deliveryOffer
+         assertMsg "AppMultiPaymentRequest has not expired" (now < expiresAt)
+         -- lock the coin and create an accepted payment
+         let transfer = Transfer with
+              sender
+              provider
+              inputs
+              outputs =
+                [ OutputSenderCoin with
+                    exactQuantity = Some (sum quantities)
+                    lock = Some TimeLock with
+                      holder = provider
+                      expiresAt = now `addRelTime` collectionDuration
+                , OutputSenderCoin with
+                    exactQuantity = None
+                    lock = None
+                ]
+              payload = "lock payment"
+         (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt sender
+         result <- exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
+         let (TransferResultLockedCoin lockedCoin::_) = result.createdCoins
+         create AcceptedAppMultiPayment
+           with
+             svc, provider, receivers, sender, deliveryOffer, lockedCoin
+
+    choice AppMultiPaymentRequest_Withdraw : ()
+      controller receivers
+      do exercise deliveryOffer DeliveryOffer_Archive
+
+    choice AppMultiPaymentRequest_Reject : ()
+      controller sender
+      do exercise deliveryOffer DeliveryOffer_Archive
+
+data ReceiverCoin = ReceiverCoin with receiver : Party, lockedCoin : ContractId LockedCoin
+  deriving (Eq, Show)
+
+unzipReceiverCoins : [ReceiverCoin] -> ([Party], [ContractId LockedCoin])
+unzipReceiverCoins = foldr (\ReceiverCoin{..} (rs,cs) -> (receiver :: rs, lockedCoin :: cs)) ([], [])
+
+template AcceptedAppMultiPayment
+  with
+    sender : Party
+    receivers : [Party]
+    provider : Party
+    svc : Party
+    lockedCoin : ContractId LockedCoin
+    deliveryOffer : ContractId DeliveryOffer
+  where
+    signatory sender, provider, receivers
+
+    choice AcceptedAppMultiPayment_Collect : ContractId DeliveryOffer
+      with
+        submitter : Party
+      controller sender, provider, receivers
+      do
+        -- To make our workarounds for lack of explicit disclosure work
+        -- we need to fetch the right CCUserHostedAt contract so we
+        -- allow passing in the submitter.
+        assertMsg ("Submitter must be sender or receiver") (submitter `elem` (sender :: receivers))
+
+        -- unlock coin and transfer the remainder to the receiver
+        coin <- exercise lockedCoin Coin_Unlock
+        let transfer = Transfer with
+              sender
+              provider
+              inputs = [InputCoin coin]
+              outputs = fmap
+                (\receiver -> OutputReceiverCoin with
+                  receiver
+                  coinType = FloatingReceiverCoin
+                ) receivers
+              payload = "transfer locked payment"
+        (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt submitter
+        void $ exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
+        -- defensive check that the reference is still active
+        void $ fetch deliveryOffer
+        pure deliveryOffer
+
+    choice AcceptedAppMultiPayment_Reject : ContractId Coin
+      controller receivers
+      do exercise deliveryOffer DeliveryOffer_Archive
+         exercise lockedCoin Coin_Unlock
+
+    choice AcceptedAppMultiPayment_Expire : ContractId Coin
+      controller sender
+      do exercise deliveryOffer DeliveryOffer_Archive
+         exercise lockedCoin Coin_OwnerExpireLock
 
 -- Note: includes the svc party and the validator app service party, so that choices can look up CoinRules (where the validator is observer)
 -- This should be replaced by explicit disclosure
@@ -299,6 +411,14 @@ template WalletAppInstall
       controller serviceUser
       do
         exerciseByKey @CoinRules (svcUser, validatorUser) (CoinRules_Tap endUser quantity)
+
+    nonconsuming choice WalletAppInstall_AcceptAppMultiPaymentRequest : ContractId AcceptedAppMultiPayment
+      with
+        requestCid : ContractId AppMultiPaymentRequest
+        transferInput : [TransferInput]
+      controller serviceUser
+      do
+        exercise requestCid (AppMultiPaymentRequest_Accept transferInput)
 
     nonconsuming choice WalletAppInstall_AcceptAppPaymentRequest : ContractId AcceptedAppPayment
       with

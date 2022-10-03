@@ -15,6 +15,10 @@ service WalletService {
   rpc AcceptAppPaymentRequest (AcceptAppPaymentRequestRequest) returns (AcceptAppPaymentRequestResponse);
   rpc RejectAppPaymentRequest (RejectAppPaymentRequestRequest) returns (google.protobuf.Empty);
   rpc ListAcceptedAppPayments (ListAcceptedAppPaymentsRequest) returns (ListAcceptedAppPaymentsResponse);
+  rpc ListAppMultiPaymentRequests (ListAppMultiPaymentRequestsRequest) returns (ListAppMultiPaymentRequestsResponse);
+  rpc AcceptAppMultiPaymentRequest (AcceptAppMultiPaymentRequestRequest) returns (AcceptAppMultiPaymentRequestResponse);
+  rpc RejectAppMultiPaymentRequest (RejectAppMultiPaymentRequestRequest) returns (google.protobuf.Empty);
+  rpc ListAcceptedAppMultiPayments (ListAcceptedAppMultiPaymentsRequest) returns (ListAcceptedAppMultiPaymentsResponse);
 
   rpc ProposePaymentChannel (ProposePaymentChannelRequest) returns (ProposePaymentChannelResponse);
   rpc ListPaymentChannelProposals (ListPaymentChannelProposalsRequest) returns (ListPaymentChannelProposalsResponse);
@@ -80,13 +84,28 @@ message GetBalanceResponse {
   string total_holding_fees = 4;
 }
 
+message ListAppMultiPaymentRequestsRequest {
+  WalletContext wallet_ctx = 1;
+}
+
 message ListAppPaymentRequestsRequest {
   WalletContext wallet_ctx = 1;
+}
+
+message ListAppMultiPaymentRequestsResponse {
+  // TODO(i300): add pagination for payment requests
+  repeated com.daml.network.v0.Contract payment_requests = 1;
 }
 
 message ListAppPaymentRequestsResponse {
   // TODO(i300): add pagination for payment requests
   repeated com.daml.network.v0.Contract payment_requests = 1;
+}
+
+message AcceptAppMultiPaymentRequestRequest {
+  string request_contract_id = 1;
+
+  WalletContext wallet_ctx = 3;
 }
 
 message AcceptAppPaymentRequestRequest {
@@ -95,8 +114,18 @@ message AcceptAppPaymentRequestRequest {
   WalletContext wallet_ctx = 3;
 }
 
+message AcceptAppMultiPaymentRequestResponse {
+  string accepted_multi_payment_contract_id = 1;
+}
+
 message AcceptAppPaymentRequestResponse {
   string accepted_payment_contract_id = 1;
+}
+
+message RejectAppMultiPaymentRequestRequest {
+  string request_contract_id = 1;
+
+  WalletContext wallet_ctx = 2;
 }
 
 message RejectAppPaymentRequestRequest {
@@ -105,8 +134,16 @@ message RejectAppPaymentRequestRequest {
   WalletContext wallet_ctx = 2;
 }
 
+message ListAcceptedAppMultiPaymentsRequest {
+  WalletContext wallet_ctx = 1;
+}
+
 message ListAcceptedAppPaymentsRequest {
   WalletContext wallet_ctx = 1;
+}
+
+message ListAcceptedAppMultiPaymentsResponse {
+  repeated com.daml.network.v0.Contract accepted_app_multi_payments = 1;
 }
 
 message ListAcceptedAppPaymentsResponse {

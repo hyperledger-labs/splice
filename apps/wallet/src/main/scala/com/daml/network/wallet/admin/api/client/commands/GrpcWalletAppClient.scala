@@ -162,6 +162,32 @@ object GrpcWalletAppClient {
     }
   }
 
+  case class ListAppMultiPaymentRequests(walletCtx: WalletContext)
+      extends BaseCommand[
+        v0.ListAppMultiPaymentRequestsRequest,
+        v0.ListAppMultiPaymentRequestsResponse,
+        Seq[
+          Contract[walletCodegen.AppMultiPaymentRequest]
+        ],
+      ] {
+
+    override def createRequest(): Either[String, v0.ListAppMultiPaymentRequestsRequest] = Right(
+      v0.ListAppMultiPaymentRequestsRequest(Some(walletCtx))
+    )
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.ListAppMultiPaymentRequestsRequest,
+    ): Future[v0.ListAppMultiPaymentRequestsResponse] = service.listAppMultiPaymentRequests(request)
+
+    override def handleResponse(
+        response: v0.ListAppMultiPaymentRequestsResponse
+    ): Either[String, Seq[Contract[walletCodegen.AppMultiPaymentRequest]]] =
+      response.paymentRequests
+        .traverse(req => Contract.fromProto(walletCodegen.AppMultiPaymentRequest)(req))
+        .leftMap(_.toString)
+  }
+
   case class ListAppPaymentRequests(walletCtx: WalletContext)
       extends BaseCommand[v0.ListAppPaymentRequestsRequest, v0.ListAppPaymentRequestsResponse, Seq[
         Contract[walletCodegen.AppPaymentRequest]
@@ -182,6 +208,37 @@ object GrpcWalletAppClient {
       response.paymentRequests
         .traverse(req => Contract.fromProto(walletCodegen.AppPaymentRequest)(req))
         .leftMap(_.toString)
+  }
+
+  case class AcceptAppMultiPaymentRequest(
+      requestId: Primitive.ContractId[walletCodegen.AppMultiPaymentRequest],
+      walletCtx: WalletContext,
+  ) extends BaseCommand[
+        v0.AcceptAppMultiPaymentRequestRequest,
+        v0.AcceptAppMultiPaymentRequestResponse,
+        Primitive.ContractId[walletCodegen.AcceptedAppMultiPayment],
+      ] {
+
+    override def createRequest(): Either[String, v0.AcceptAppMultiPaymentRequestRequest] =
+      Right(
+        v0.AcceptAppMultiPaymentRequestRequest(
+          Proto.encode(requestId),
+          Some(walletCtx),
+        )
+      )
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.AcceptAppMultiPaymentRequestRequest,
+    ): Future[v0.AcceptAppMultiPaymentRequestResponse] =
+      service.acceptAppMultiPaymentRequest(request)
+
+    override def handleResponse(
+        response: v0.AcceptAppMultiPaymentRequestResponse
+    ): Either[String, Primitive.ContractId[walletCodegen.AcceptedAppMultiPayment]] =
+      Proto.decodeContractId[walletCodegen.AcceptedAppMultiPayment](
+        response.acceptedMultiPaymentContractId
+      )
   }
 
   case class AcceptAppPaymentRequest(
@@ -250,6 +307,34 @@ object GrpcWalletAppClient {
     override def handleResponse(response: Empty): Either[String, Unit] = Right(())
   }
 
+  case class RejectAppMultiPaymentRequest(
+      requestId: Primitive.ContractId[walletCodegen.AppMultiPaymentRequest],
+      walletCtx: WalletContext,
+  ) extends BaseCommand[
+        v0.RejectAppMultiPaymentRequestRequest,
+        Empty,
+        Unit,
+      ] {
+
+    override def createRequest(): Either[String, v0.RejectAppMultiPaymentRequestRequest] =
+      Right(
+        v0.RejectAppMultiPaymentRequestRequest(
+          Proto.encode(requestId),
+          Some(walletCtx),
+        )
+      )
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.RejectAppMultiPaymentRequestRequest,
+    ): Future[Empty] = service.rejectAppMultiPaymentRequest(request)
+
+    override def handleResponse(
+        response: Empty
+    ): Either[String, Unit] =
+      Right(())
+  }
+
   case class RejectAppPaymentRequest(
       requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest],
       walletCtx: WalletContext,
@@ -276,6 +361,32 @@ object GrpcWalletAppClient {
         response: Empty
     ): Either[String, Unit] =
       Right(())
+  }
+
+  case class ListAcceptedAppMultiPayments(walletCtx: WalletContext)
+      extends BaseCommand[
+        v0.ListAcceptedAppMultiPaymentsRequest,
+        v0.ListAcceptedAppMultiPaymentsResponse,
+        Seq[
+          Contract[walletCodegen.AcceptedAppMultiPayment]
+        ],
+      ] {
+
+    override def createRequest(): Either[String, v0.ListAcceptedAppMultiPaymentsRequest] =
+      Right(v0.ListAcceptedAppMultiPaymentsRequest(Some(walletCtx)))
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.ListAcceptedAppMultiPaymentsRequest,
+    ): Future[v0.ListAcceptedAppMultiPaymentsResponse] =
+      service.listAcceptedAppMultiPayments(request)
+
+    override def handleResponse(
+        response: v0.ListAcceptedAppMultiPaymentsResponse
+    ): Either[String, Seq[Contract[walletCodegen.AcceptedAppMultiPayment]]] =
+      response.acceptedAppMultiPayments
+        .traverse(req => Contract.fromProto(walletCodegen.AcceptedAppMultiPayment)(req))
+        .leftMap(_.toString)
   }
 
   case class ListAcceptedAppPayments(walletCtx: WalletContext)

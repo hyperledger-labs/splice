@@ -11,6 +11,7 @@ import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
+import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.console.RemoteSplitwiseAppReference
 import org.scalatest.concurrent.Eventually
 
@@ -79,17 +80,18 @@ class SplitwiseIntegrationTest
       42.0,
       "payment",
     )
-    bobSplitwise.initiateTransfer(
+    bobSplitwise.initiateMultiTransfer(
       bobProviderParty,
       key,
-      aliceUserParty,
-      10.0,
+      Seq(walletCodegen.ReceiverQuantity(aliceUserParty.toPrim, 10.0)),
     )
-    val acceptedPayment = inside(bobRemoteWallet.listAppPaymentRequests()) { case Seq(request) =>
-      bobRemoteWallet.tap(20)
-      bobRemoteWallet.acceptAppPaymentRequest(request.contractId)
+    utils.retry_until_true(bobRemoteWallet.listAppMultiPaymentRequests().nonEmpty)
+    val acceptedPayment = inside(bobRemoteWallet.listAppMultiPaymentRequests()) {
+      case Seq(request) =>
+        bobRemoteWallet.tap(20)
+        bobRemoteWallet.acceptAppMultiPaymentRequest(request.contractId)
     }
-    bobSplitwise.completeTransfer(
+    bobSplitwise.completeMultiTransfer(
       bobProviderParty,
       key,
       acceptedPayment,

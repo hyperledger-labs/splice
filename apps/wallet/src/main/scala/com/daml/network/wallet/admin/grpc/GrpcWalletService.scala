@@ -81,6 +81,16 @@ class GrpcWalletService(
       }
     )(request.getWalletCtx, coinCid => v0.TapResponse(Proto.encode(coinCid)))
 
+  override def listAppMultiPaymentRequests(
+      request: v0.ListAppMultiPaymentRequestsRequest
+  ): Future[v0.ListAppMultiPaymentRequestsResponse] =
+    withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => span =>
+      for {
+        walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
+        filteredRequests <- store.listAppMultiPaymentRequests(walletParty)
+      } yield v0.ListAppMultiPaymentRequestsResponse(filteredRequests.map(_.toProtoV0))
+    }
+
   @nowarn("cat=unused")
   override def listAppPaymentRequests(
       request: v0.ListAppPaymentRequestsRequest
@@ -128,6 +138,42 @@ class GrpcWalletService(
       }
     }
 
+  override def acceptAppMultiPaymentRequest(
+      request: v0.AcceptAppMultiPaymentRequestRequest
+  ): Future[v0.AcceptAppMultiPaymentRequestResponse] =
+    exerciseWalletAction(implicit traceContext =>
+      (c, party) => {
+        for {
+          requestC <- store.findAppMultiPaymentRequest(party, request.requestContractId)
+          quantity = requestC
+            .getOrElse(
+              sys.error(
+                s"Could not find app multi-payment request ${request.requestContractId}. " +
+                  "Note that there is a very small delay before payment requests appear in the wallet. " +
+                  "If you have recently received a request, retry the command."
+              )
+            )
+            .payload
+            .receiverQuantities
+            .map(_.quantity)
+            .sum
+          coinCid <- selectCoin(party, quantity)
+        } yield {
+          val requestCid = Proto.tryDecodeContractId[walletCodegen.AppMultiPaymentRequest](
+            request.requestContractId
+          )
+          val transferInput = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
+          c.exerciseWalletAppInstall_AcceptAppMultiPaymentRequest(requestCid, transferInput)
+        }
+      }
+    )(
+      request.getWalletCtx,
+      paymentCid =>
+        v0.AcceptAppMultiPaymentRequestResponse(
+          Proto.encode(paymentCid)
+        ),
+    )
+
   override def acceptAppPaymentRequest(
       request: v0.AcceptAppPaymentRequestRequest
   ): Future[v0.AcceptAppPaymentRequestResponse] =
@@ -162,6 +208,27 @@ class GrpcWalletService(
         ),
     )
 
+  override def rejectAppMultiPaymentRequest(
+      request: v0.RejectAppMultiPaymentRequestRequest
+  ): Future[Empty] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
+        arg = walletCodegen.AppMultiPaymentRequest_Reject()
+        requestCid = Proto.tryDecodeContractId[walletCodegen.AppMultiPaymentRequest](
+          request.requestContractId
+        )
+        cmd = requestCid
+          .exerciseAppMultiPaymentRequest_Reject(arg)
+          .command
+        _ <- connection.submitCommand(
+          Seq(walletParty),
+          Seq(),
+          Seq(cmd),
+        )
+      } yield Empty()
+    }
+
   override def rejectAppPaymentRequest(
       request: v0.RejectAppPaymentRequestRequest
   ): Future[Empty] =
@@ -181,6 +248,25 @@ class GrpcWalletService(
           Seq(cmd),
         )
       } yield Empty()
+    }
+
+  @nowarn("cat=unused")
+  override def listAcceptedAppMultiPayments(
+      request: v0.ListAcceptedAppMultiPaymentsRequest
+  ): Future[v0.ListAcceptedAppMultiPaymentsResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      for {
+        party <- connection.getPrimaryParty(request.getWalletCtx.userId)
+        acceptedAppMultiPayments <- connection.activeContracts(
+          party,
+          walletCodegen.AcceptedAppMultiPayment,
+        )
+      } yield {
+        val filtered = acceptedAppMultiPayments.filter(c => c.value.sender == party.toPrim)
+        v0.ListAcceptedAppMultiPaymentsResponse(
+          filtered.map(c => Contract.fromCodegenContract(c).toProtoV0)
+        )
+      }
     }
 
   @nowarn("cat=unused")

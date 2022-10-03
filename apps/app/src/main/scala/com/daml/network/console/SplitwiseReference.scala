@@ -270,6 +270,48 @@ final class RemoteSplitwiseAppReference(
     )
   }
 
+  @Help.Summary("Initiate a transfer to multiple receiver. Must be confirmed in the wallet.")
+  def initiateMultiTransfer(
+      provider: PartyId,
+      key: GrpcSplitwiseAppClient.GroupKey,
+      receiverQuantities: Seq[walletCodegen.ReceiverQuantity],
+  ): Primitive.ContractId[walletCodegen.AppMultiPaymentRequest] = {
+    val party = getUserPrimaryParty()
+    submitWithResult(
+      actAs = Seq(party),
+      readAs = Seq.empty,
+      installKey(provider, party).exerciseSplitwiseInstall_InitiateMultiTransfer(
+        key.toPrim,
+        receiverQuantities,
+      ),
+    )
+  }
+
+  @Help.Summary(
+    "Complete the multi-transfer by actually transferring the coins and creating a balance update."
+  )
+  def completeMultiTransfer(
+      provider: PartyId,
+      key: GrpcSplitwiseAppClient.GroupKey,
+      acceptedPayment: Primitive.ContractId[walletCodegen.AcceptedAppMultiPayment],
+  ): Seq[Primitive.ContractId[splitwiseCodegen.BalanceUpdate]] = {
+    val party = getUserPrimaryParty()
+    // TODO(M1-06) Explicit disclosure workaround
+    val hostedAt = ledgerApi.ledger_api.acs.await(
+      party,
+      CCUserHostedAt,
+      predicate = (c: CodegenContract[CCUserHostedAt]) => c.value.user == party.toPrim,
+    )
+    submitWithResult(
+      actAs = Seq(party),
+      readAs = Seq(PartyId.tryFromPrim(hostedAt.value.validator)),
+      installKey(provider, party).exerciseSplitwiseInstall_CompleteMultiTransfer(
+        key.toPrim,
+        acceptedPayment,
+      ),
+    )
+  }
+
   @Help.Summary("Net balances of the parties in the group.")
   @Help.Description(
     """This allows us to emulate [splitwise simplify debt feature](https://www.splitwise.com/l/sdv/FgPQSo3Bsev).

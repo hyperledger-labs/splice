@@ -5,6 +5,7 @@ import qualified DA.Map as M
 import DA.Assert
 import DA.Foldable (forA_)
 import DA.Time
+import DA.Set qualified as Set
 import CN.Wallet
 
 -- TODO(i592)
@@ -115,6 +116,24 @@ template SplitwiseInstall
            sender = user
            ..
 
+    nonconsuming choice SplitwiseInstall_InitiateMultiTransfer : ContractId AppMultiPaymentRequest
+      with
+        groupKey : GroupKey
+        receiverQuantities : [ReceiverQuantity]
+      controller user
+      do exerciseByKey @Group groupKey Group_InitiateMultiTransfer with
+           sender = user
+           ..
+
+    nonconsuming choice SplitwiseInstall_CompleteMultiTransfer : [ContractId BalanceUpdate]
+      with
+        groupKey : GroupKey
+        acceptedPaymentCid : ContractId AcceptedAppMultiPayment
+      controller user
+      do exerciseByKey @Group groupKey Group_CompleteMultiTransfer with
+           sender = user
+           ..
+
     nonconsuming choice SplitwiseInstall_Net : ContractId BalanceUpdate
       with
         groupKey : GroupKey
@@ -123,6 +142,10 @@ template SplitwiseInstall
       do assertOwner groupKey user
          exerciseByKey @Group groupKey Group_Net with
            ..
+
+-- | Is `a` a subset of `b`?
+subset : forall a . (Ord a) => [a] -> [a] -> Bool
+subset (Set.fromList -> a) (Set.fromList -> b) = a `Set.intersection` b == a
 
 -- | A round identified by a a given GroupKey.
 -- The member ship can change over time by people joining the group
@@ -222,6 +245,58 @@ template Group
              receiver = ref.receiver
              quantity = ref.quantity
 
+
+    nonconsuming choice Group_InitiateMultiTransfer : ContractId AppMultiPaymentRequest
+      with
+        sender : Party
+        receiverQuantities : [ReceiverQuantity]
+      controller sender
+      do assertMsg "sender is a member" (sender `elem` groupMembers this)
+         assertMsg "receiver is a member" (fmap (\x -> x.receiver) receiverQuantities `subset` groupMembers this)
+         deliveryOffer <- create MultiTransferInProgress
+           with
+             group = this
+             sender
+             receiverQuantities
+         now <- getTime
+         create AppMultiPaymentRequest with
+           sender, provider, receiverQuantities, svc
+           expiresAt = now `addRelTime` acceptDuration
+           collectionDuration = collectionDuration
+           deliveryOffer = toInterfaceContractId deliveryOffer
+
+    nonconsuming choice Group_CompleteMultiTransfer : [ContractId BalanceUpdate]
+      with
+        acceptedPaymentCid : ContractId AcceptedAppMultiPayment
+        sender : Party
+      controller sender
+      do acceptedPayment <- fetch acceptedPaymentCid
+         Some (refCid, ref) <- fetchFromInterface @MultiTransferInProgress acceptedPayment.deliveryOffer
+         exercise acceptedPaymentCid (AcceptedAppMultiPayment_Collect sender)
+         acceptedPayment.sender === sender
+         archive refCid
+         let  (receivers, _) = unzipReceiverQuantities ref.receiverQuantities
+              expectedAcceptedPayment = AcceptedAppMultiPayment with
+               sender = ref.sender
+               provider
+               receivers
+               svc
+               lockedCoin = acceptedPayment.lockedCoin
+               deliveryOffer = acceptedPayment.deliveryOffer
+         acceptedPayment === expectedAcceptedPayment
+         -- Check that sender and receiver are both still members.
+         assertMsg "Sender is member" (ref.sender `elem` groupMembers this)
+         assertMsg "Receivers are members" (receivers `subset` groupMembers this)
+         -- Check that this belongs to the right group.
+         key ref.group === key this
+         forA ref.receiverQuantities \ReceiverQuantity{receiver, quantity} -> 
+           create BalanceUpdate with
+             group = this
+             update = Transfer with
+               sender = ref.sender
+               receiver
+               quantity
+
     nonconsuming choice Group_Net : ContractId BalanceUpdate
       with
         balanceChanges : Map Party (Map Party Decimal) -- Map of Party to map of balance changes for each party. The balance changes for each party must add up to zero.
@@ -250,6 +325,18 @@ template TransferInProgress
     interface instance DeliveryOffer for TransferInProgress where
       view = DeliveryOfferView with
         description = "Transfer from " <> show sender <> " to " <> show receiver <> " for " <> show quantity
+
+template MultiTransferInProgress
+  with
+    group : Group
+    sender : Party
+    receiverQuantities : [ReceiverQuantity]
+  where
+    let (receivers, _) = unzipReceiverQuantities receiverQuantities
+    signatory group.owner, sender, receivers
+    interface instance DeliveryOffer for MultiTransferInProgress where
+      view = DeliveryOfferView with
+        description = "Transfer from " <> show sender <> " to " <> show receivers
 
 template BalanceUpdate
   with

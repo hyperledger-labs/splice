@@ -4,6 +4,7 @@ import CN.Splitwise
 import CN.Scripts.TestWallet
 
 import DA.Action
+import DA.List (sort)
 import DA.Map (Map)
 import qualified DA.Map as M
 import DA.Assert
@@ -94,6 +95,16 @@ completeTransfer sender provider groupKey acceptedPaymentCid = do
   validator <- getHostingValidator sender
   void $ submitMulti [sender] [validator] $ exerciseByKeyCmd @SplitwiseInstall (sender, provider) SplitwiseInstall_CompleteTransfer with ..
 
+
+initiateMultiTransfer : Party -> Party -> GroupKey -> [ReceiverQuantity] -> Script (ContractId AppMultiPaymentRequest)
+initiateMultiTransfer sender provider groupKey receiverQuantities =
+  submit sender $ exerciseByKeyCmd @SplitwiseInstall (sender, provider) SplitwiseInstall_InitiateMultiTransfer with ..
+
+completeMultiTransfer : Party -> Party -> GroupKey -> ContractId AcceptedAppMultiPayment -> Script ()
+completeMultiTransfer sender provider groupKey acceptedPaymentCid = do
+  validator <- getHostingValidator sender
+  void $ submitMulti [sender] [validator] $ exerciseByKeyCmd @SplitwiseInstall (sender, provider) SplitwiseInstall_CompleteMultiTransfer with ..
+
 testSelfHosted = script do
   app <- setupApp
   runNextIssuance app 1.0
@@ -146,45 +157,56 @@ testCase app Parties{..} = do
   acceptInvite bob (getProvider bob) groupInviteCid
   joinAllInvites alice (getProvider alice)
 
+  acceptInvite charlie (getProvider charlie) groupInviteCid
+  joinAllInvites alice (getProvider alice)
+
   Some (_, group) <- queryContractKey @Group alice groupKey
-  group.members === [bob]
+  sort group.members === [bob, charlie]
 
   balance <- queryBalances alice (key group)
   balance === M.empty
   balance <- queryBalances bob (key group)
   balance === M.empty
+  balance <- queryBalances charlie (key group)
+  balance === M.empty
 
-  enterPayment alice (getProvider alice) (key group) 42.0 "foo"
+  enterPayment alice (getProvider alice) (key group) 63.0 "foo"
 
   balance <- queryBalances alice (key group)
-  balance === M.fromList [(bob, 21.0)]
+  balance === M.fromList [(bob, 21.0), (charlie, 21.0)]
   balance <- queryBalances bob (key group)
   balance === M.fromList [(alice, -21.0)]
+  balance <- queryBalances charlie (key group)
+  balance === M.fromList [(alice, -21.0)]
 
-  enterPayment bob (getProvider bob) (key group) 22.0 "foo"
+  enterPayment bob (getProvider bob) (key group) 33.0 "foo"
   balance <- queryBalances alice (key group)
-  balance === M.fromList [(bob, 10.0)]
+  balance === M.fromList [(bob, 10.0), (charlie, 21.0)]
   balance <- queryBalances bob (key group)
-  balance === M.fromList [(alice, -10.0)]
+  balance === M.fromList [(alice, -10.0), (charlie, 11.0)]
+  balance <- queryBalances charlie (key group)
+  balance === M.fromList [(alice, -21.0), (bob, -11.0)]
 
   request <- initiateTransfer alice (getProvider alice) (key group) bob 8.0
-  coin <- tap app alice 42.0
+  coin <- tap app alice 63.0
   receipt <- acceptPaymentRequest app alice request coin
 
   completeTransfer alice (getProvider alice) (key group) receipt
 
   balance <- queryBalances alice (key group)
-  balance === M.fromList [(bob, 18.0)]
+  balance === M.fromList [(bob, 18.0), (charlie, 21.0)]
   balance <- queryBalances bob (key group)
-  balance === M.fromList [(alice, -18.0)]
+  balance === M.fromList [(alice, -18.0), (charlie, 11.0)]
+  balance <- queryBalances charlie (key group)
+  balance === M.fromList [(alice, -21.0), (bob, -11.0)]
 
-  acceptInvite charlie (getProvider charlie) groupInviteCid
-  joinAllInvites alice (getProvider alice)
-
-  request <- initiateTransfer charlie (getProvider charlie) (key group) alice 18.0
-  coin <- tap app charlie 20.0
-  receipt <- acceptPaymentRequest app charlie request coin
-  completeTransfer charlie (getProvider charlie) (key group) receipt
+  request <- initiateMultiTransfer charlie (getProvider charlie) (key group) [
+      ReceiverQuantity alice 39.0,
+      ReceiverQuantity bob 11.0
+    ]
+  coin <- tap app charlie 55.0
+  receipt <- acceptMultiPaymentRequest app charlie request coin
+  completeMultiTransfer charlie (getProvider charlie) (key group) receipt
 
   balance <- queryBalances alice (key group)
   balance === M.fromList [(bob, 18.0), (charlie, -18.0)]

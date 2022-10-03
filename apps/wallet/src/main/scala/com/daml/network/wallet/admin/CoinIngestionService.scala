@@ -25,6 +25,7 @@ class CoinIngestionService(
     coinCodegen.Coin.Coin.id,
     coinCodegen.Coin.LockedCoin.id,
     walletCodegen.AppPaymentRequest.id,
+    walletCodegen.AppMultiPaymentRequest.id,
     walletCodegen.OnChannelPaymentRequest.id,
   )
 
@@ -51,6 +52,13 @@ class CoinIngestionService(
     DecodeUtil
       .decodeAllArchived(walletCodegen.AppPaymentRequest)(tx)
       .foreach(cid => store.removeAppPaymentRequest(cid))
+
+    DecodeUtil
+      .decodeAllCreated(walletCodegen.AppMultiPaymentRequest)(tx)
+      .foreach(c => store.addAppMultiPaymentRequest(Contract.fromCodegenContract(c)))
+    DecodeUtil
+      .decodeAllArchived(walletCodegen.AppMultiPaymentRequest)(tx)
+      .foreach(cid => store.removeAppMultiPaymentRequest(cid))
 
     DecodeUtil
       .decodeAllCreated(walletCodegen.OnChannelPaymentRequest)(tx)

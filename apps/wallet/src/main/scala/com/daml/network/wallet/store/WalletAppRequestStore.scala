@@ -12,6 +12,25 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.concurrent.{ExecutionContext, Future}
 
 trait WalletAppRequestStore {
+  def addAppMultiPaymentRequest(
+      req: Contract[walletCodegen.AppMultiPaymentRequest]
+  )(implicit tc: TraceContext): Future[Unit]
+  def removeAppMultiPaymentRequest(req: Primitive.ContractId[walletCodegen.AppMultiPaymentRequest])(
+      implicit tc: TraceContext
+  ): Future[Unit]
+  def listAppMultiPaymentRequests(party: PartyId)(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[walletCodegen.AppMultiPaymentRequest]]]
+  def findAppMultiPaymentRequest(
+      party: PartyId,
+      cid: String,
+  )(implicit
+      tc: TraceContext,
+      ec: ExecutionContext,
+  ): Future[Option[Contract[walletCodegen.AppMultiPaymentRequest]]] = {
+    listAppMultiPaymentRequests(party).map(_.find(_.contractId == cid))
+  }
+
   def addAppPaymentRequest(req: Contract[walletCodegen.AppPaymentRequest])(implicit
       tc: TraceContext
   ): Future[Unit]

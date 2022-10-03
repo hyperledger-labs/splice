@@ -113,6 +113,12 @@ acceptPaymentRequest app p transferRequest coin = do
   submitMulti [p] [validator] $ exerciseCmd transferRequest AppPaymentRequest_Accept with
     inputs = [InputCoin coin]
 
+acceptMultiPaymentRequest : CCApp -> Party -> ContractId AppMultiPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppMultiPayment)
+acceptMultiPaymentRequest app sender transferRequest coin = do
+  validator <- getHostingValidator sender
+  submitMulti [sender] [validator] $ exerciseCmd transferRequest AppMultiPaymentRequest_Accept with
+    inputs = [InputCoin coin]
+
 testPaymentRequest = script do
   app <- setupApp
   runNextIssuance app 1.0
@@ -123,7 +129,7 @@ testPaymentRequest = script do
   bob <- setupUser app "bob" validator
 
   coin <- tap app alice 42.0
-  deliveryOffer <- submit alice $ createCmd (TestDeliveryOffer alice "mycoolref")
+  deliveryOffer <- submit alice $ createCmd (TestDeliveryOffer alice "single party submit")
   -- multi-party submit to simplify test
   t <- getTime
   transferRequest <- submitMulti [alice, bob] [] $ createCmd AppPaymentRequest with
@@ -142,6 +148,40 @@ testPaymentRequest = script do
   acceptedPayment === AcceptedAppPayment with
     sender = alice
     receiver = bob
+    provider = alice
+    svc = app.svc
+    lockedCoin = lockedCoin
+    deliveryOffer = toInterfaceContractId deliveryOffer
+
+  pure ()
+
+testMultiPaymentRequest = script do
+  app <- setupApp
+  runNextIssuance app 1.0
+  runCoinDepositBots app
+
+  validator <- setupValidator app "validator1"
+  alice <- setupUser app "alice" validator
+  bob <- setupUser app "bob" validator
+  charlie <- setupUser app "charlie" validator
+
+  coin <- tap app alice 75.0
+  deliveryOffer <- submit alice $ createCmd (TestDeliveryOffer alice "multi party submit")
+  t <- getTime
+  transferRequest <- submitMulti [alice, bob, charlie] [] $ createCmd AppMultiPaymentRequest with
+    sender = alice
+    receiverQuantities = [ReceiverQuantity alice 30.0, ReceiverQuantity charlie 40.0]
+    provider = alice
+    svc = app.svc
+    deliveryOffer = toInterfaceContractId deliveryOffer
+    expiresAt = t `addRelTime` minutes 5
+    collectionDuration = minutes 5
+  acceptedPaymentCid <- acceptMultiPaymentRequest app alice transferRequest coin
+  Some acceptedPayment <- queryContractId alice acceptedPaymentCid
+  [(lockedCoin, _)] <- query @LockedCoin alice
+  acceptedPayment === AcceptedAppMultiPayment with
+    sender = alice
+    receivers = [alice, charlie]
     provider = alice
     svc = app.svc
     lockedCoin = lockedCoin

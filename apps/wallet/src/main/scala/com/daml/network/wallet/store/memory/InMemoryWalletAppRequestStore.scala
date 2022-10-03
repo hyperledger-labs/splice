@@ -3,7 +3,11 @@ package com.daml.network.wallet.store.memory
 import com.daml.ledger.client
 import com.daml.ledger.client.binding
 import com.daml.ledger.client.binding.Primitive
-import com.daml.network.codegen.CN.Wallet.{AppPaymentRequest, OnChannelPaymentRequest}
+import com.daml.network.codegen.CN.Wallet.{
+  AppPaymentRequest,
+  AppMultiPaymentRequest,
+  OnChannelPaymentRequest,
+}
 import com.daml.network.util.Contract
 import com.daml.network.wallet.store.WalletAppRequestStore
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -23,12 +27,67 @@ class InMemoryWalletAppRequestStore(override protected val loggerFactory: NamedL
       : mutable.Map[Primitive.ContractId[AppPaymentRequest], Contract[AppPaymentRequest]] =
     mutable.Map.empty[Primitive.ContractId[AppPaymentRequest], Contract[AppPaymentRequest]]
 
+  private val appMultiPaymentRequests
+      : mutable.Map[Primitive.ContractId[AppMultiPaymentRequest], Contract[
+        AppMultiPaymentRequest
+      ]] =
+    mutable.Map
+      .empty[Primitive.ContractId[AppMultiPaymentRequest], Contract[AppMultiPaymentRequest]]
+
   private val onChannelPaymentRequests
       : mutable.Map[Primitive.ContractId[OnChannelPaymentRequest], Contract[
         OnChannelPaymentRequest
       ]] =
     mutable.Map
       .empty[Primitive.ContractId[OnChannelPaymentRequest], Contract[OnChannelPaymentRequest]]
+
+  override def addAppMultiPaymentRequest(
+      req: Contract[AppMultiPaymentRequest]
+  )(implicit tc: TraceContext): Future[Unit] =
+    Future {
+      blocking {
+        synchronized {
+          logger.debug(
+            s"Adding app multi payment request from ${req.payload.sender} to ${req.payload.receiverQuantities}"
+          )
+          appMultiPaymentRequests += (req.contractId -> req)
+          ()
+        }
+      }
+    }
+
+  override def removeAppMultiPaymentRequest(
+      req: binding.Primitive.ContractId[AppMultiPaymentRequest]
+  )(implicit
+      tc: TraceContext
+  ): Future[Unit] =
+    Future {
+      blocking {
+        synchronized {
+          logger.debug(s"Removing app multi payment request $req")
+          appMultiPaymentRequests -= req
+          ()
+        }
+      }
+    }
+
+  override def listAppMultiPaymentRequests(party: PartyId)(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[AppMultiPaymentRequest]]] =
+    Future {
+      blocking {
+        synchronized {
+          appMultiPaymentRequests.values
+            .filter(req =>
+              req.payload.sender == party.toPrim || req.payload.receiverQuantities
+                .map(_.quantity)
+                .toSet
+                .contains(party.toPrim)
+            )
+            .toSeq
+        }
+      }
+    }
 
   override def addAppPaymentRequest(
       req: Contract[AppPaymentRequest]
