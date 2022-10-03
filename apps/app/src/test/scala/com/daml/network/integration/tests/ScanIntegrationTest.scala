@@ -9,9 +9,8 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
   IsolatedCoinEnvironments,
 }
-import com.daml.network.util.{CommonCoinAppInstanceReferences, ExerciseNode}
+import com.daml.network.util.{CommonCoinAppInstanceReferences, ExerciseNode, PaymentChannelTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.duration._
 
@@ -19,7 +18,8 @@ import scala.concurrent.duration._
 class ScanIntegrationTest
     extends CoinIntegrationTest
     with IsolatedCoinEnvironments
-    with CommonCoinAppInstanceReferences {
+    with CommonCoinAppInstanceReferences
+    with PaymentChannelTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
@@ -29,7 +29,7 @@ class ScanIntegrationTest
       .withAllocatedValidatorUsers()
 
   "see Coin transfers" in { implicit env =>
-    val (aliceP, bobP) = setup(env)
+    val (aliceP, bobP) = setupAliceAndBobAndChannel(env)
     aliceRemoteWallet.tap(50)
     aliceRemoteWallet.executeDirectTransfer(bobP, 10)
     eventually(5.seconds) {
@@ -76,7 +76,7 @@ class ScanIntegrationTest
   }
 
   "get details of a single Coin transfer" in { implicit env =>
-    val (aliceP, bobP) = setup(env)
+    val (aliceP, bobP) = setupAliceAndBobAndChannel(env)
     aliceRemoteWallet.tap(50)
     aliceRemoteWallet.executeDirectTransfer(bobP, 10)
 
@@ -104,7 +104,7 @@ class ScanIntegrationTest
   }
 
   "report correct reference data" in { implicit env =>
-    setup(env)
+    setupAliceAndBobAndChannel(env)
     eventually(1.seconds) { scan.getReferenceData().currentRound shouldBe 0 }
 
     svc.startClosingRound(0)
@@ -116,7 +116,7 @@ class ScanIntegrationTest
   }
 
   "list closed rounds" in { implicit env =>
-    val (aliceUserParty, bobUserParty) = setup(env)
+    val (aliceUserParty, bobUserParty) = setupAliceAndBobAndChannel(env)
     eventually(1.seconds) { scan.getReferenceData().currentRound shouldBe 0 }
 
     aliceRemoteWallet.tap(200)
@@ -169,23 +169,4 @@ class ScanIntegrationTest
     }
   }
 
-  def setup(implicit env: CoinTestConsoleEnvironment): (PartyId, PartyId) = {
-    import env._
-    // Onboard alice on her self-hosted validator
-    val aliceDamlUser = aliceRemoteWallet.config.damlUser
-    val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
-
-    // Onboard bob on his self-hosted validator
-    val bobDamlUser = bobRemoteWallet.config.damlUser
-    val bobUserParty = bobValidator.onboardUser(bobDamlUser)
-
-    // ensure the participants see the CoinRules
-    val proposalId = aliceRemoteWallet.proposePaymentChannel(bobUserParty)
-    // Bob monitors proposals and accepts the one
-    utils.retry_until_true(bobRemoteWallet.listPaymentChannelProposals().size == 1)
-    bobRemoteWallet.acceptPaymentChannelProposal(proposalId)
-
-    utils.retry_until_true(aliceRemoteWallet.listPaymentChannels().size == 1)
-    (aliceUserParty, bobUserParty)
-  }
 }

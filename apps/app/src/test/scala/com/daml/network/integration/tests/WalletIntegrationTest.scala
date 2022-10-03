@@ -11,7 +11,12 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
   IsolatedCoinEnvironments,
 }
-import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences, Proto}
+import com.daml.network.util.{
+  CoinUtil,
+  CommonCoinAppInstanceReferences,
+  Proto,
+  PaymentChannelTestUtil,
+}
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
@@ -26,12 +31,19 @@ import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.{Balance, ListResponse}
 
 import java.time.temporal.ChronoUnit
+
+import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.concurrent.Threading
+
+import scala.concurrent.Future
 import scala.concurrent.duration._
 
 class WalletIntegrationTest
     extends CoinIntegrationTest
     with IsolatedCoinEnvironments
-    with CommonCoinAppInstanceReferences {
+    with HasExecutionContext
+    with CommonCoinAppInstanceReferences
+    with PaymentChannelTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
@@ -572,6 +584,20 @@ class WalletIntegrationTest
     val all = aliceRemoteWallet.list().coins.map(c => c.contract.contractId)
     aliceRemoteWallet.redistribute(all, Seq(None))
     checkWallet(aliceUserParty, aliceRemoteWallet, Seq((74.0, 75.0)))
+  }
+
+  "fails when trying to execute concurrent-coin manipulating operations" in { implicit env =>
+    val (alice, bob) = setupAliceAndBobAndChannel
+    aliceRemoteWallet.tap(50)
+    val _ = Future({
+      // ensure that this transfer is executed after the previous transfer, but not too late after it
+      Threading.sleep(20)
+      assertThrowsAndLogsCommandFailures(
+        aliceRemoteWallet.executeDirectTransfer(bob, 15),
+        _.errorMessage should include("CONTRACT_NOT_FOUND"),
+      )
+    })
+    aliceRemoteWallet.executeDirectTransfer(bob, 20)
   }
 
   /** @param expectedQuantityRanges: lower and upper bounds for coins sorted by their initial quantity in ascending order. */
