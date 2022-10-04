@@ -184,7 +184,7 @@ template AppPaymentRequest
     signatory sender, receiver, provider
     ensure (collectionDuration > aunit && quantity > 0.0)
 
-    choice AppPaymentRequest_Accept : ContractId AcceptedAppPayment
+    choice AppPaymentRequest_Accept : (ContractId AcceptedAppPayment, ContractId Coin)
       with
         inputs : [TransferInput]
       controller sender
@@ -210,10 +210,11 @@ template AppPaymentRequest
               payload = "lock payment"
          (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt sender
          result <- exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
-         let (TransferResultLockedCoin lockedCoin::_) = result.createdCoins
-         create AcceptedAppPayment
+         let [TransferResultLockedCoin lockedCoin, TransferResultCoin senderChange] = result.createdCoins
+         acceptedPayment <- create AcceptedAppPayment
            with
              svc, provider, receiver, sender, deliveryOffer, lockedCoin
+         return (acceptedPayment, senderChange)
 
     choice AppPaymentRequest_Withdraw : ()
       controller receiver
@@ -391,6 +392,13 @@ template AcceptedAppMultiPayment
       do exercise deliveryOffer DeliveryOffer_Archive
          exercise lockedCoin Coin_OwnerExpireLock
 
+sequencePaymentRequests : ([TransferInput], [ContractId AcceptedAppPayment]) -> ContractId AppPaymentRequest -> Update ([TransferInput], [(ContractId AcceptedAppPayment)])
+sequencePaymentRequests inputsAndResults requestCid = do
+  let (inputs, results) = inputsAndResults
+  (acceptedRequestCid, change) <- exercise requestCid AppPaymentRequest_Accept with inputs
+  return ([InputCoin change], acceptedRequestCid :: results)
+
+
 -- Note: includes the svc party and the validator app service party, so that choices can look up CoinRules (where the validator is observer)
 -- This should be replaced by explicit disclosure
 template WalletAppInstall
@@ -404,6 +412,16 @@ template WalletAppInstall
 
     key (endUser, serviceUser) : (Party, Party)
     maintainer key._2
+
+    -- TODO(i952) - generalize the batching
+    nonconsuming choice WalletAppInstall_ExecuteBatch: [ContractId AcceptedAppPayment]
+      with 
+        inputs: [TransferInput]
+        operations : [ContractId AppPaymentRequest]
+      controller serviceUser
+      do
+        ([InputCoin coin], accepted) <- foldlA sequencePaymentRequests (inputs, []) operations
+        return $ reverse accepted
 
     nonconsuming choice WalletAppInstall_Tap : ContractId Coin
       with
@@ -426,7 +444,8 @@ template WalletAppInstall
         transferInput : [TransferInput]
       controller serviceUser
       do
-        exercise requestCid (AppPaymentRequest_Accept transferInput)
+        (accepted, change) <- exercise requestCid (AppPaymentRequest_Accept transferInput)
+        return accepted
 
     nonconsuming choice WalletAppInstall_AcceptOnChannelPaymentRequest : ()
       with
