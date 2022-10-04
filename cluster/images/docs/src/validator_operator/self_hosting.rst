@@ -86,11 +86,6 @@ Next, open a second terminal, navigate to the extracted bundle's root directory,
 This exposes a `CoinRules` contract to the validator party through automation running on the SVC node.
 In this feature preview, the SVC automatically accepts any validator onboard requests.
 
-We also need to initialize the wallet backend by passing in the validator party: ::
-
-  @ walletApp.initialize(validatorParty)
-
-
 Now, onboard a new user called "alice" via the validator app: ::
 
   @ val aliceParty = validatorApp.onboardUser("alice")

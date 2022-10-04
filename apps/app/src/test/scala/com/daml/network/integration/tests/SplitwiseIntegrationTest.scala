@@ -115,7 +115,9 @@ class SplitwiseIntegrationTest
 
       charlieSplitwise.listBalances(key) shouldBe Map.empty
       charlieSplitwise.enterPayment(key, 33.0, "payment")
-      charlieSplitwise.listBalances(key) shouldBe Map(aliceUserParty -> 11, bobUserParty -> 11)
+      eventually {
+        charlieSplitwise.listBalances(key) shouldBe Map(aliceUserParty -> 11, bobUserParty -> 11)
+      }
 
       utils.retry_until_true(aliceSplitwise.listBalanceUpdates(key).size == 3)
       aliceSplitwise.listBalances(key) shouldBe Map(bobUserParty -> 11, charlieUserParty -> -11)
