@@ -5,11 +5,11 @@ import cats.data.EitherT
 import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.directory.admin.DirectoryAutomationService
 import com.daml.network.directory.admin.grpc.GrpcDirectoryService
+import com.daml.network.directory.automation.DirectoryAutomationService
 import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.directory.metrics.DirectoryAppMetrics
-import com.daml.network.directory.store.DirectoryAppStore
+import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.directory.v0.DirectoryServiceGrpc
 import com.daml.network.environment.{CoinLedgerConnection, CoinNodeBootstrapBase}
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -83,19 +83,22 @@ class DirectoryAppBootstrap(
         CoinLedgerConnection.RetryOnUserManagementError,
       )
       _ = logger.info(s"Got primary party of Directory user: $providerPartyId")
-      store = DirectoryAppStore(storage, loggerFactory, providerPartyId)
+      svcParty <- scanConnection.getSvcPartyId()
+      store = DirectoryStore(
+        providerParty = providerPartyId,
+        svcParty = svcParty,
+        storage,
+        loggerFactory,
+      )
       automation = new DirectoryAutomationService(
         store,
         ledgerClient,
-        scanConnection,
         loggerFactory,
         timeouts,
       )
       grpcServer =
         new GrpcDirectoryService(
           store,
-          ledgerClient,
-          scanConnection,
           loggerFactory,
         )
     } yield {

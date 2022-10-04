@@ -2,9 +2,9 @@ package com.daml.network.directory.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.ledger.client.binding.{Primitive, TemplateCompanion}
+import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.CN.{Directory => directoryCodegen, Wallet => walletCodegen}
-import com.daml.network.directory.store.memory.InMemoryDirectoryAppStore
+import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.store.AcsStore
 import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -19,7 +19,7 @@ import scala.concurrent.{ExecutionContext, Future}
   * to simplify implementing the store. They are all made overridable so that a DB backed store can use
   * custom indices to ensure the scalability of these queries.
   */
-trait DirectoryAppStore extends AutoCloseable {
+trait DirectoryStore extends AutoCloseable {
   import AcsStore.QueryResult
 
   /** The sink to use for ingesting data from the ledger into this store. */
@@ -33,11 +33,8 @@ trait DirectoryAppStore extends AutoCloseable {
     */
   def providerParty: PartyId
 
-  /** Lookup a contract by id. */
-  def lookupContractById[T](
-      templateCompanion: TemplateCompanion[T]
-  )(id: Primitive.ContractId[T]): Future[QueryResult[Option[Contract[T]]]] =
-    acsStore.lookupContractById(templateCompanion)(id)
+  /** Get the party-id of the SVC issuing CC accepted by this provider. */
+  def svcParty: PartyId
 
   /** Lookup the directory install for a user */
   def lookupInstall(
@@ -63,13 +60,13 @@ trait DirectoryAppStore extends AutoCloseable {
   def lookupEntryOfferById(
       id: Primitive.ContractId[directoryCodegen.DirectoryEntryOffer]
   ): Future[QueryResult[Option[Contract[directoryCodegen.DirectoryEntryOffer]]]] =
-    lookupContractById(directoryCodegen.DirectoryEntryOffer)(id)
+    acsStore.lookupContractById(directoryCodegen.DirectoryEntryOffer)(id)
 
   /** Lookup a directory entry request by its id. */
   def lookupEntryRequestById(
       id: Primitive.ContractId[directoryCodegen.DirectoryEntryRequest]
   ): Future[QueryResult[Option[Contract[directoryCodegen.DirectoryEntryRequest]]]] =
-    lookupContractById(directoryCodegen.DirectoryEntryRequest)(id)
+    acsStore.lookupContractById(directoryCodegen.DirectoryEntryRequest)(id)
 
   /** List all directory entries that are active as of a specific revision. */
   def listEntries(): Future[QueryResult[Seq[Contract[directoryCodegen.DirectoryEntry]]]] =
@@ -103,17 +100,27 @@ trait DirectoryAppStore extends AutoCloseable {
 
 }
 
-object DirectoryAppStore {
-  def apply(storage: Storage, loggerFactory: NamedLoggerFactory, provider: PartyId)(implicit
+object DirectoryStore {
+  def apply(
+      providerParty: PartyId,
+      svcParty: PartyId,
+      storage: Storage,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit
       ec: ExecutionContext
-  ): DirectoryAppStore =
+  ): DirectoryStore =
     storage match {
-      case _: MemoryStorage => new InMemoryDirectoryAppStore(loggerFactory, provider)
+      case _: MemoryStorage =>
+        new InMemoryDirectoryStore(
+          providerParty = providerParty,
+          svcParty = svcParty,
+          loggerFactory,
+        )
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 
-  /** Scope of a directory app store for a specific provider. */
-  def scope(providerPartyId: PartyId): AcsStore.ContractFilter = {
+  /** Contract filter of a directory app store for a specific provider. */
+  def contractFilter(providerPartyId: PartyId): AcsStore.ContractFilter = {
     import AcsStore.mkFilter
     val provider = providerPartyId.toPrim
 

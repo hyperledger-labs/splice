@@ -10,7 +10,7 @@ import com.daml.ledger.client.binding.{Primitive, TemplateCompanion}
 import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 
 import scala.collection.immutable
 import scala.concurrent._
@@ -21,15 +21,15 @@ import scala.concurrent._
 class InMemoryAcsStore(
     override protected val loggerFactory: NamedLoggerFactory,
     override val contractFilter: AcsStore.ContractFilter,
+
+    // Boolean flag to enable very verbose state update logging
+    logAllStateUpdates: Boolean = false,
 )(implicit
     ec: ExecutionContext
 ) extends AcsStore
     with NamedLogging {
 
   import AcsStore.QueryResult
-
-  // Boolean flag to enable very verbose state update logging
-  private val logAllStateUpdates: Boolean = false
 
   private val finishedAcsIngestion: Promise[Unit] = Promise()
 
@@ -44,7 +44,7 @@ class InMemoryAcsStore(
       Promise(),
     )
 
-  val ingestionSink: AcsStore.IngestionSink = new AcsStore.IngestionSink {
+  val ingestionSink: AcsStore.IngestionSink = new AcsStore.IngestionSink with NoTracing {
 
     override def transactionFilter: TransactionFilter = contractFilter.transactionFilter
 
@@ -67,12 +67,12 @@ class InMemoryAcsStore(
 
     override def ingestActiveContracts(
         evs: Seq[CreatedEvent]
-    )(implicit traceContext: TraceContext): Future[Unit] =
+    ): Future[Unit] =
       updateState(st => (st.ingestCreatedEvents(evs.filter(contractFilter.contains)), ()))
 
     override def switchToIngestingTransactions(
         acsOffset: String
-    )(implicit traceContext: TraceContext): Future[Unit] =
+    ): Future[Unit] =
       updateState(
         _.switchToIngestingTransactions(acsOffset)
       ).map(offsetChanged => {
@@ -80,9 +80,7 @@ class InMemoryAcsStore(
         finishedAcsIngestion.success(())
       })
 
-    override def ingestTransaction(tx: Transaction)(implicit
-        traceContext: TraceContext
-    ): Future[Unit] =
+    override def ingestTransaction(tx: Transaction): Future[Unit] =
       updateState(
         _.ingestTransaction(tx, contractFilter.contains)
       ).map(offsetChanged => offsetChanged.success(()))

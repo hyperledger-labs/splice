@@ -13,7 +13,6 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
 
 import scala.collection.immutable
 import scala.concurrent.{ExecutionContext, Future}
@@ -79,6 +78,32 @@ object AcsStore {
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 
+  /** A query result computed as-of a specific ledger API offset. */
+  case class QueryResult[A](
+      offset: String,
+      value: A,
+  )
+
+  /** A sink for ingesting an initial ACS snapshot and transactions changing it. */
+  trait IngestionSink {
+
+    /** The transaction filter required for ingestion. */
+    def transactionFilter: TransactionFilter
+
+    /** Ingest create events that are part of the initial active contract snapshot ingestion */
+    def ingestActiveContracts(
+        events: Seq[CreatedEvent]
+    ): Future[Unit]
+
+    /** Signal the end of ingesting the active contract snapshot. */
+    def switchToIngestingTransactions(
+        acsOffset: String
+    ): Future[Unit]
+
+    /** Ingest a transaction served by the transaction stream. */
+    def ingestTransaction(tx: Transaction): Future[Unit]
+  }
+
   /** Static specification of a set of create events in scope for ingestion into an AcsStore. */
   trait ContractFilter {
 
@@ -124,31 +149,4 @@ object AcsStore {
           .decodeCreated(templateCompanion)(ev)
           .exists(co => p(Contract.fromCodegenContract(co))),
     )
-
-  /** A query result computed as-of a specific ledger API offset. */
-  case class QueryResult[A](
-      offset: String,
-      value: A,
-  )
-
-  /** A sink for ingesting an initial ACS snapshot and transactions changing it. */
-  trait IngestionSink {
-
-    /** The transaction filter required for ingestion. */
-    def transactionFilter: TransactionFilter
-
-    /** Ingest create events that are part of the initial active contract snapshot ingestion */
-    def ingestActiveContracts(
-        events: Seq[CreatedEvent]
-        // TOOD(#790): consider whether we can remove the trace-context, as it is a background process triggering ingestion
-    )(implicit traceContext: TraceContext): Future[Unit]
-
-    /** Signal the end of ingesting the active contract snapshot. */
-    def switchToIngestingTransactions(
-        acsOffset: String
-    )(implicit traceContext: TraceContext): Future[Unit]
-
-    /** Ingest a transaction served by the transaction stream. */
-    def ingestTransaction(tx: Transaction)(implicit traceContext: TraceContext): Future[Unit]
-  }
 }

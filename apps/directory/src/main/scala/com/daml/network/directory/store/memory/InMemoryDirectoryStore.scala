@@ -1,22 +1,22 @@
 package com.daml.network.directory.store.memory
-import com.daml.network.directory.store.DirectoryAppStore
+import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.store.{AcsStore, InMemoryAcsStore}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent._
 
-/** Example for in-memory store in the store pattern. */
-class InMemoryDirectoryAppStore(
-    override protected val loggerFactory: NamedLoggerFactory,
+class InMemoryDirectoryStore(
     override val providerParty: PartyId,
+    override val svcParty: PartyId,
+    override protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext
-) extends DirectoryAppStore
+) extends DirectoryStore
     with NamedLogging {
 
   private val inMemoryAcsStore =
-    new InMemoryAcsStore(loggerFactory, DirectoryAppStore.scope(providerParty))
+    new InMemoryAcsStore(loggerFactory, DirectoryStore.contractFilter(providerParty))
 
   override val acsStore: AcsStore = inMemoryAcsStore
 

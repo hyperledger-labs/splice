@@ -17,12 +17,13 @@ import org.scalatest.wordspec.AsyncWordSpec
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{Future, Promise}
 
-class DirectoryAppStoreTest extends AsyncWordSpec with BaseTest {
+class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
 
   implicit val actorSystem: ActorSystem = ActorSystem("DirectoryAppStoreTest")
 
   def mkPartyId(name: String) = PartyId.tryFromPrim(Primitive.Party(name + "::dummy"))
   val providerParty: PartyId = mkPartyId("provider")
+  val svcParty: PartyId = mkPartyId("svc")
   def userParty(i: Int) = mkPartyId(s"user-$i")
 
   def directoryEntry(
@@ -128,8 +129,13 @@ class DirectoryAppStoreTest extends AsyncWordSpec with BaseTest {
     events = txReqs.map(co => Event.of(Event.Event.Created(toCreatedEvent(co)))),
   )
 
-  def mkStore(): Future[DirectoryAppStore] = {
-    val store = DirectoryAppStore(new MemoryStorage, loggerFactory, providerParty)
+  def mkStore(): Future[DirectoryStore] = {
+    val store = DirectoryStore(
+      providerParty = providerParty,
+      svcParty = svcParty,
+      new MemoryStorage,
+      loggerFactory,
+    )
     for {
       // ingest test events
       () <- store.acsIngestionSink.ingestActiveContracts(acsEvents)

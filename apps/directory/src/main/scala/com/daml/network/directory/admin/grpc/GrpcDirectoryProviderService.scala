@@ -1,12 +1,9 @@
 package com.daml.network.directory.admin.grpc
 
-import com.daml.ledger.client.binding.{Primitive, TemplateCompanion}
-import com.daml.network.directory.store.DirectoryAppStore
+import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.directory.v0
 import com.daml.network.directory.v0.DirectoryServiceGrpc
-import com.daml.network.environment.CoinLedgerClient
-import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.{Contract, Proto}
+import com.daml.network.util.Proto
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
@@ -18,9 +15,7 @@ import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcDirectoryService(
-    store: DirectoryAppStore,
-    ledgerClient: CoinLedgerClient,
-    scanConnection: ScanConnection,
+    store: DirectoryStore,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -28,21 +23,6 @@ class GrpcDirectoryService(
 ) extends DirectoryServiceGrpc.DirectoryService
     with Spanning
     with NamedLogging {
-
-  private val connection = ledgerClient.connection("GrpcDirectoryService")
-
-  private[this] def fetchContractById[T](
-      companion: TemplateCompanion[T]
-  )(cid: Primitive.ContractId[T])(implicit ec: ExecutionContext): Future[Contract[T]] =
-    store
-      .lookupContractById(companion)(cid)
-      .map(result =>
-        result.value.getOrElse(
-          throw new IllegalStateException(
-            s"No active contract of template ${companion.id} with contract id $cid"
-          )
-        )
-      )
 
   @nowarn("cat=unused")
   override def lookupInstall(

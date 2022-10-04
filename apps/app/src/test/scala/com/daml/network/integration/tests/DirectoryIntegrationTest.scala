@@ -30,7 +30,39 @@ class DirectoryIntegrationTest
       .withAllocatedValidatorUsers()
 
   "Directory service" should {
-    "list and accept install requests" in { implicit env =>
+    "accept unique install requests" in { implicit env =>
+      import env._
+
+      // Whitelist the directory service on alice's validator
+      aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
+
+      // The user of the directory service.
+      val aliceUserParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
+
+      // Request install and wait for provider to auto-accept
+      aliceDirectory.requestDirectoryInstall()
+      utils.retry_until_true(aliceDirectory.lookupInstall(aliceUserParty).isDefined)
+
+      // Request another install and check that it is rejected
+      // TODO(#790): change test to check uniqueness that requires command-dedup and retries
+      val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
+      val installRequestId = aliceDirectory.requestDirectoryInstall()
+
+      // Check that this request gets archived as it is a duplicate
+      val txs = aliceValidator.remoteParticipant.ledger_api.transactions
+        .flat(Set(aliceUserParty), completeAfter = 2, beginOffset = offsetBefore)
+      inside(txs) { case Seq(_, txArchive) =>
+        txArchive.events should have(size(1))
+        txArchive
+          .events(0)
+          .event
+          .archived
+          .getOrElse(fail("expected an archive event"))
+          .contractId shouldBe installRequestId
+      }
+    }
+
+    "allocate unique directory entries" in { implicit env =>
       import env._
       // Whitelist the directory service on alice's validator
       aliceValidator.remoteParticipant.dars.upload(directoryDarPath)

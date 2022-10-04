@@ -1,9 +1,9 @@
 package com.daml.network.directory
 
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.directory.admin.DirectoryAutomationService
+import com.daml.network.directory.automation.DirectoryAutomationService
 import com.daml.network.directory.config.LocalDirectoryAppConfig
-import com.daml.network.directory.store.DirectoryAppStore
+import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.digitalasset.canton.environment.CantonNode
@@ -26,7 +26,7 @@ class DirectoryApp(
     val coinAppParameters: SharedCoinAppParameters,
     automation: DirectoryAutomationService,
     storage: Storage,
-    store: DirectoryAppStore,
+    store: DirectoryStore,
     ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
     override protected val clock: Clock,

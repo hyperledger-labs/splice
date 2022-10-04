@@ -114,3 +114,7 @@ template DirectoryInstallRequest with
         acceptDuration : RelTime -- Time user has to accept a payment request
       controller provider
       do create DirectoryInstall with ..
+
+    choice DirectoryInstallRequest_Reject : ()
+      controller provider
+      do pure ()
