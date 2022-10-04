@@ -5,16 +5,9 @@ import cats.data.EitherT
 import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerConnection, CoinNodeBootstrapBase}
-import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.validator.admin.api.client.ValidatorConnection
-import com.daml.network.store.AppCoinStore
-import com.daml.network.wallet.admin.WalletAutomationService
-import com.daml.network.wallet.admin.grpc.GrpcWalletService
+import com.daml.network.environment.CoinNodeBootstrapBase
 import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.daml.network.wallet.metrics.WalletAppMetrics
-import com.daml.network.wallet.store.{WalletAppPartyStore, WalletAppRequestStore}
-import com.daml.network.wallet.v0.WalletServiceGrpc
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -63,83 +56,21 @@ class WalletAppBootstrap(
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
-    val coinStore = AppCoinStore(storage, loggerFactory)
-    val partyStore = WalletAppPartyStore(storage, loggerFactory)
-    val store = WalletAppRequestStore(storage, loggerFactory)
-
-    val ledgerClient =
-      createLedgerClient(config.remoteParticipant, walletAppParameters.processingTimeouts)
-
-    val scanConnection: ScanConnection =
-      new ScanConnection(
-        config.remoteScan.clientAdminApi,
-        walletAppParameters.processingTimeouts,
-        loggerFactory,
-      )
-
-    val validatorConnection: ValidatorConnection =
-      new ValidatorConnection(
-        config.validator.clientAdminApi,
-        walletAppParameters.processingTimeouts,
-        loggerFactory,
-      )
-
-    val connection = ledgerClient.connection("SvcAppBootstrap")
-
-    val walletApp = for {
-      walletServicePartyId <- connection.retryLedgerApi(
-        connection.getPrimaryParty(config.serviceUser),
-        CoinLedgerConnection.RetryOnUserManagementError,
-      )
-      validatorParty <- validatorConnection.getValidatorPartyId()
-      _ = logger.info(s"Got primary party of wallet service user: $walletServicePartyId")
-    } yield {
-      adminServerRegistry.addService(
-        WalletServiceGrpc.bindService(
-          new GrpcWalletService(
-            coinStore,
-            store,
-            ledgerClient,
-            scanConnection,
-            validatorParty = validatorParty,
-            walletServiceParty = walletServicePartyId,
-            loggerFactory = loggerFactory,
-          ),
-          executionContext,
+    EitherT.fromEither(
+      Right(
+        // WalletApp constructor spawns Future that
+        // performs actual initialization in the background.
+        new WalletApp(
+          name,
+          config,
+          walletAppParameters,
+          storage,
+          clock,
+          loggerFactory,
+          tracerProvider,
+          adminServerRegistry,
         )
       )
-      val automation = new WalletAutomationService(
-        coinStore,
-        partyStore,
-        store,
-        config.serviceUser,
-        walletServicePartyId,
-        ledgerClient,
-        loggerFactory,
-        timeouts,
-      )
-      new WalletApp(
-        config,
-        walletAppParameters,
-        storage,
-        partyStore,
-        automation,
-        ledgerClient,
-        scanConnection,
-        validatorConnection,
-        clock,
-        loggerFactory,
-      )
-    }
-
-    // TODO(i447): more robust retry + finding out where exceptions (e.g. io.grpc.StatusRuntimeException) disappear too
-    EitherT(
-      walletApp
-        .recover { err =>
-          logger.error(s"Wallet initialization failed with $err")
-          sys.exit(1)
-        }
-        .map(Right(_)): Future[Either[String, WalletApp]]
     )
   }
 
