@@ -24,7 +24,6 @@ class ValidatorIntegrationTest
       .withAllocatedValidatorUsers()
 
   "initialize svc and validator apps" in { implicit env =>
-    import env._
     svc.start()
     scan.start()
     // check that there is exactly one CoinRule and OpenMiningRound
@@ -40,10 +39,10 @@ class ValidatorIntegrationTest
     aliceValidator.start()
 
     // check that no coin rules request is outstanding
-    utils.retry_until_true(
+    eventually()(
       svc.remoteParticipant.ledger_api.acs
         .filter(svcParty, CC.CoinRules.CoinRulesRequest)
-        .isEmpty
+        shouldBe empty
     )
 
     // check that alice's validator can see the coinrules

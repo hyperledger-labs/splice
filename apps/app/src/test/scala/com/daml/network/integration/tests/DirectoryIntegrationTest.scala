@@ -31,8 +31,6 @@ class DirectoryIntegrationTest
 
   "Directory service" should {
     "accept unique install requests" in { implicit env =>
-      import env._
-
       // Whitelist the directory service on alice's validator
       aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
 
@@ -41,7 +39,7 @@ class DirectoryIntegrationTest
 
       // Request install and wait for provider to auto-accept
       aliceDirectory.requestDirectoryInstall()
-      utils.retry_until_true(aliceDirectory.lookupInstall(aliceUserParty).isDefined)
+      eventually()(aliceDirectory.lookupInstall(aliceUserParty) shouldBe defined)
 
       // Request another install and check that it is rejected
       // TODO(#790): change test to check uniqueness that requires command-dedup and retries
@@ -63,7 +61,6 @@ class DirectoryIntegrationTest
     }
 
     "allocate unique directory entries" in { implicit env =>
-      import env._
       // Whitelist the directory service on alice's validator
       aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
 
@@ -75,19 +72,20 @@ class DirectoryIntegrationTest
 
       // Request install and wait for provider to auto-accept
       aliceDirectory.requestDirectoryInstall()
-      utils.retry_until_true(aliceDirectory.lookupInstall(aliceUserParty).isDefined)
+      eventually()(aliceDirectory.lookupInstall(aliceUserParty) shouldBe defined)
 
       // Request entry
       aliceDirectory.requestDirectoryEntry(entryName)
 
       // User: wait until payment request becomes visible
       def getPaymentRequest() = aliceRemoteWallet.listAppPaymentRequests().headOption
-      val walletPaymentRequest = utils
-        .retry(getPaymentRequest())(_.isEmpty)
-        .getOrElse(fail("Payment request is unexpectedly not defined."))
 
-      // Accept payment request
       aliceRemoteWallet.tap(5.0)
+
+      val walletPaymentRequest = eventually()(
+        getPaymentRequest().getOrElse(fail("Payment request is unexpectedly not defined"))
+      )
+      // Accept payment request
       val _ = aliceRemoteWallet.acceptAppPaymentRequest(walletPaymentRequest.contractId)
 
       // Wait until payment is processed and entry was created
@@ -95,7 +93,7 @@ class DirectoryIntegrationTest
         codegen.DirectoryEntry(aliceUserParty.toPrim, providerParty.toPrim, entryName)
       def tryGetEntry() =
         Try(loggerFactory.suppressErrors(directory.lookupEntryByName(entryName)))
-      val entry = utils.retry(tryGetEntry())(_.isFailure).get
+      val entry = eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $entryName")))
       entry.payload shouldBe entryPayload
 
       // Read entries from provider

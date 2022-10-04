@@ -104,8 +104,6 @@ class WalletIntegrationTest
     }
 
     "list all coins, including locked coins, with additional position details" in { implicit env =>
-      import env._
-
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
 
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
@@ -125,7 +123,7 @@ class WalletIntegrationTest
       )
 
       aliceRemoteWallet.list().coins.length shouldBe 1
-      utils.retry_until_true(aliceRemoteWallet.list().lockedCoins.length == 1)
+      eventually()(aliceRemoteWallet.list().lockedCoins should have length 1)
 
       aliceRemoteWallet.list().coins.head.round shouldBe 0
       aliceRemoteWallet.list().coins.head.accruedHoldingFee shouldBe 0
@@ -268,8 +266,6 @@ class WalletIntegrationTest
     }
 
     "correctly select coins for payments" in { implicit env =>
-      import env._
-
       val aliceUserParty = clue("Onboard alice on her self-hosted validator") {
         val aliceDamlUser = aliceRemoteWallet.config.damlUser
         aliceValidator.onboardUser(aliceDamlUser)
@@ -282,9 +278,9 @@ class WalletIntegrationTest
 
       clue("Alice opens payment channel to Bob") {
         val proposalId = aliceRemoteWallet.proposePaymentChannel(bobUserParty)
-        utils.retry_until_true(bobRemoteWallet.listPaymentChannelProposals().size == 1)
+        eventually()(bobRemoteWallet.listPaymentChannelProposals() should have size 1)
         bobRemoteWallet.acceptPaymentChannelProposal(proposalId)
-        utils.retry_until_true(bobRemoteWallet.listPaymentChannelProposals().isEmpty)
+        eventually()(bobRemoteWallet.listPaymentChannelProposals() shouldBe empty)
       }
 
       clue("Alice gets some coins") {
@@ -307,8 +303,6 @@ class WalletIntegrationTest
     }
 
     "allow two users to create a payment channel and use it for a transfer" in { implicit env =>
-      import env._
-
       // Onboard alice on her self-hosted validator
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
@@ -341,18 +335,18 @@ class WalletIntegrationTest
       aliceChannel.receiver shouldBe bobUserParty.toPrim
 
       // Bob monitors proposals and accepts the one
-      utils.retry_until_true(bobRemoteWallet.listPaymentChannelProposals().size == 1)
+      eventually()(bobRemoteWallet.listPaymentChannelProposals() should have size 1)
       val bobProposals = bobRemoteWallet.listPaymentChannelProposals()
       aliceProposals shouldBe bobProposals
       bobRemoteWallet.acceptPaymentChannelProposal(aliceProposal.contractId)
-      utils.retry_until_true(aliceRemoteWallet.listPaymentChannelProposals().isEmpty)
+      eventually()(aliceRemoteWallet.listPaymentChannelProposals() shouldBe empty)
 
       // Neither Alice nor Bob see a payment channel proposal
       aliceRemoteWallet.listPaymentChannelProposals() shouldBe empty
       bobRemoteWallet.listPaymentChannelProposals() shouldBe empty
 
       // But both see the established channel now
-      utils.retry_until_true(aliceRemoteWallet.listPaymentChannels().size == 1)
+      eventually()(aliceRemoteWallet.listPaymentChannels() should have size 1)
       aliceRemoteWallet.listPaymentChannels() shouldBe bobRemoteWallet.listPaymentChannels()
 
       // Alice taps and does a direct transfer to Bob
@@ -366,15 +360,15 @@ class WalletIntegrationTest
       // Bob asks for more coins, alice accepts
       aliceRemoteWallet.listOnChannelPaymentRequests().size shouldBe 0
       val request = bobRemoteWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please pay")
-      utils.retry_until_true(aliceRemoteWallet.listOnChannelPaymentRequests().size == 1)
+      eventually()(aliceRemoteWallet.listOnChannelPaymentRequests() should have size 1)
       aliceRemoteWallet.listOnChannelPaymentRequests().headOption.value.contractId shouldBe request
       bobRemoteWallet.listOnChannelPaymentRequests() shouldBe aliceRemoteWallet
         .listOnChannelPaymentRequests()
       aliceRemoteWallet.acceptOnChannelPaymentRequest(request)
-      utils.retry_until_true(
+      eventually()(
         bobWallet.remoteParticipant.ledger_api.acs
           .of_party(bobUserParty, None, true, Seq(coinCodegen.Coin.id))
-          .size == 2
+          should have size 2
       )
       checkWallet(aliceUserParty, aliceRemoteWallet, Seq((29, 30)))
       checkWallet(bobUserParty, bobRemoteWallet, Seq((9, 10), (9, 10)))
@@ -382,7 +376,7 @@ class WalletIntegrationTest
       // Bob asks for more coins, alice rejects
       val request1 =
         bobRemoteWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please reject")
-      utils.retry_until_true(aliceRemoteWallet.listOnChannelPaymentRequests().size == 1)
+      eventually()(aliceRemoteWallet.listOnChannelPaymentRequests() should have size 1)
       aliceRemoteWallet.rejectOnChannelPaymentRequest(request1)
       checkWallet(aliceUserParty, aliceRemoteWallet, Seq((29, 30)))
       checkWallet(bobUserParty, bobRemoteWallet, Seq((9, 10), (9, 10)))
@@ -399,11 +393,11 @@ class WalletIntegrationTest
         Some(aliceRemoteWallet.listPaymentChannels().head.contractId),
         allowDirectTransfers = false,
       )
-      utils.retry_until_true(bobRemoteWallet.listPaymentChannelProposals().size == 1)
+      eventually()(bobRemoteWallet.listPaymentChannelProposals() should have size 1)
       bobRemoteWallet.acceptPaymentChannelProposal(
         bobRemoteWallet.listPaymentChannelProposals().head.contractId
       )
-      utils.retry_until_true(aliceRemoteWallet.listPaymentChannels().size == 1)
+      eventually()(aliceRemoteWallet.listPaymentChannels() should have size 1)
       loggerFactory.assertThrowsAndLogs[CommandFailure](
         aliceRemoteWallet
           .executeDirectTransfer(bobUserParty, 10),
@@ -433,8 +427,6 @@ class WalletIntegrationTest
     }
 
     "(propose, accept, and) cancel a payment channel by sender" in { implicit env =>
-      import env._
-
       // Onboard alice on her self-hosted validator
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
@@ -449,7 +441,7 @@ class WalletIntegrationTest
       val aliceProposal = aliceProposals(0)
 
       // Bob monitors proposals and accepts the one
-      utils.retry_until_true(bobRemoteWallet.listPaymentChannelProposals().size == 1)
+      eventually()(bobRemoteWallet.listPaymentChannelProposals() should have size 1)
       bobRemoteWallet.acceptPaymentChannelProposal(aliceProposal.contractId)
 
       // Bob requests a payment, and then immediately cancels the channel
@@ -459,13 +451,11 @@ class WalletIntegrationTest
       // Neither sees the payment channel nor the payment request anymore
       bobRemoteWallet.listPaymentChannels() shouldBe empty
       bobRemoteWallet.listOnChannelPaymentRequests() should not be empty
-      utils.retry_until_true(aliceRemoteWallet.listOnChannelPaymentRequests().nonEmpty)
-      utils.retry_until_true(aliceRemoteWallet.listPaymentChannels().isEmpty)
+      eventually()(aliceRemoteWallet.listOnChannelPaymentRequests() should not be empty)
+      eventually()(aliceRemoteWallet.listPaymentChannels() shouldBe empty)
     }
 
     "(propose, accept, and) cancel a payment channel by receiver" in { implicit env =>
-      import env._
-
       // Onboard alice on her self-hosted validator
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
@@ -480,7 +470,7 @@ class WalletIntegrationTest
       val aliceProposal = aliceProposals(0)
 
       // Bob monitors proposals and accepts the one
-      utils.retry_until_true(bobRemoteWallet.listPaymentChannelProposals().size == 1)
+      eventually()(bobRemoteWallet.listPaymentChannelProposals() should have size 1)
       bobRemoteWallet.acceptPaymentChannelProposal(aliceProposal.contractId)
 
       // Bob requests a payment, and then immediately cancels the channel
@@ -490,13 +480,11 @@ class WalletIntegrationTest
       // Neither sees the payment channel nor the payment request anymore
       aliceRemoteWallet.listPaymentChannels() shouldBe empty
       aliceRemoteWallet.listOnChannelPaymentRequests() should not be empty
-      utils.retry_until_true(bobRemoteWallet.listOnChannelPaymentRequests().nonEmpty)
-      utils.retry_until_true(bobRemoteWallet.listPaymentChannels().isEmpty)
+      eventually()(bobRemoteWallet.listOnChannelPaymentRequests() should not be empty)
+      eventually()(bobRemoteWallet.listPaymentChannels() shouldBe empty)
     }
 
     "list and collect app & validator rewards" in { implicit env =>
-      import env._
-
       // Onboard alice on her self-hosted validator
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
@@ -508,24 +496,24 @@ class WalletIntegrationTest
       // Setup payment channel between alice and bob
       val aliceProposalId =
         aliceRemoteWallet.proposePaymentChannel(bobUserParty, senderTransferFeeRatio = 0.5)
-      utils.retry_until_true(bobRemoteWallet.listPaymentChannelProposals().size == 1)
+      eventually()(bobRemoteWallet.listPaymentChannelProposals() should have size 1)
       bobRemoteWallet.acceptPaymentChannelProposal(aliceProposalId)
-      utils.retry_until_true(aliceRemoteWallet.listPaymentChannels().size == 1)
+      eventually()(aliceRemoteWallet.listPaymentChannels() should have size 1)
 
       // Setup payment channel between bob and alice
       val bobProposalId =
         bobRemoteWallet.proposePaymentChannel(aliceUserParty, senderTransferFeeRatio = 0.5)
-      utils.retry_until_true(aliceRemoteWallet.listPaymentChannelProposals().size == 1)
+      eventually()(aliceRemoteWallet.listPaymentChannelProposals() should have size 1)
       aliceRemoteWallet.acceptPaymentChannelProposal(bobProposalId)
-      utils.retry_until_true(bobRemoteWallet.listPaymentChannels().size == 2)
+      eventually()(bobRemoteWallet.listPaymentChannels() should have size 2)
 
       // Tap coin and do a transfer from alice to bob
       aliceRemoteWallet.tap(50)
-      utils.retry_until_true(aliceRemoteWallet.list().coins.size == 1)
+      eventually()(aliceRemoteWallet.list().coins should have size 1)
       aliceRemoteWallet.executeDirectTransfer(bobUserParty, 40)
 
       // Retrieve transferred coin in bob's wallet and transfer part of it back to alice; bob will receive some app rewards
-      utils.retry_until_true(bobRemoteWallet.list().coins.size == 1)
+      eventually()(bobRemoteWallet.list().coins should have size 1)
       bobRemoteWallet.executeDirectTransfer(aliceUserParty, 30)
 
       // Wait for app rewards to become visible in bob's wallet, and check structure
@@ -540,7 +528,7 @@ class WalletIntegrationTest
       val validatorRewards = aliceValidatorRemoteWallet.listValidatorRewards()
       validatorRewards should have size 1
       aliceRemoteWallet.tap(200)
-      utils.retry_until_true(aliceRemoteWallet.list().coins.size == 3)
+      eventually()(aliceRemoteWallet.list().coins should have size 3)
 
       // Bob collects/realizes rewards
       val prevCoins = bobRemoteWallet.list().coins

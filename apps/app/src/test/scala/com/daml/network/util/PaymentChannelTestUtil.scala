@@ -1,7 +1,9 @@
 package com.daml.network.util
 
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
+import com.digitalasset.canton.sequencing.SequencerTestUtils.eventually
 import com.digitalasset.canton.topology.PartyId
+import org.scalatest.matchers.should.Matchers._
 
 // TODO(M1-92 - Tech Debt): This could be reused in more places and extended
 trait PaymentChannelTestUtil { this: CommonCoinAppInstanceReferences =>
@@ -10,7 +12,6 @@ trait PaymentChannelTestUtil { this: CommonCoinAppInstanceReferences =>
   def setupAliceAndBobAndChannel(implicit
       env: CoinTestConsoleEnvironment
   ): (PartyId, PartyId) = {
-    import env._
     // Onboard alice on her self-hosted validator
     val aliceDamlUser = aliceRemoteWallet.config.damlUser
     val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
@@ -22,10 +23,10 @@ trait PaymentChannelTestUtil { this: CommonCoinAppInstanceReferences =>
     // ensure the participants see the CoinRules
     val proposalId = aliceRemoteWallet.proposePaymentChannel(bobUserParty)
     // Bob monitors proposals and accepts the one
-    utils.retry_until_true(bobRemoteWallet.listPaymentChannelProposals().size == 1)
+    eventually()(bobRemoteWallet.listPaymentChannelProposals() should have size 1)
     bobRemoteWallet.acceptPaymentChannelProposal(proposalId)
 
-    utils.retry_until_true(aliceRemoteWallet.listPaymentChannels().size == 1)
+    eventually()(aliceRemoteWallet.listPaymentChannels() should have size 1)
     (aliceUserParty, bobUserParty)
   }
 }

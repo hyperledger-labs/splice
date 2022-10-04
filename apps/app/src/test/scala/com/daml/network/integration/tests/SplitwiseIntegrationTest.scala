@@ -11,13 +11,11 @@ import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
-import org.scalatest.concurrent.Eventually
 
 class SplitwiseIntegrationTest
     extends CoinIntegrationTest
     with IsolatedCoinEnvironments
-    with CommonCoinAppInstanceReferences
-    with Eventually {
+    with CommonCoinAppInstanceReferences {
 
   private val darPath = "apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar"
 
@@ -34,8 +32,6 @@ class SplitwiseIntegrationTest
 
   "splitwise" should {
     "support provider-hosted mode" in { implicit env =>
-      import env._
-
       // Onboard users
       val aliceUserParty = aliceValidator.onboardUser(aliceSplitwise.config.damlUser)
       val charlieUserParty = aliceValidator.onboardUser(charlieSplitwise.config.damlUser)
@@ -83,7 +79,7 @@ class SplitwiseIntegrationTest
         key,
         Seq(walletCodegen.ReceiverQuantity(aliceUserParty.toPrim, 10.0)),
       )
-      utils.retry_until_true(bobRemoteWallet.listAppMultiPaymentRequests().nonEmpty)
+      eventually()(bobRemoteWallet.listAppMultiPaymentRequests() should not be empty)
       val acceptedPayment = inside(bobRemoteWallet.listAppMultiPaymentRequests()) {
         case Seq(request) =>
           bobRemoteWallet.tap(20)
@@ -93,7 +89,7 @@ class SplitwiseIntegrationTest
         key,
         acceptedPayment,
       )
-      eventually {
+      eventually() {
         bobSplitwise.listBalanceUpdates(key) should have size 2
       }
       bobSplitwise.listBalances(key) shouldBe Seq(aliceUserParty -> -11).toMap
@@ -115,11 +111,11 @@ class SplitwiseIntegrationTest
 
       charlieSplitwise.listBalances(key) shouldBe Map.empty
       charlieSplitwise.enterPayment(key, 33.0, "payment")
-      eventually {
+      eventually() {
         charlieSplitwise.listBalances(key) shouldBe Map(aliceUserParty -> 11, bobUserParty -> 11)
       }
 
-      utils.retry_until_true(aliceSplitwise.listBalanceUpdates(key).size == 3)
+      eventually()(aliceSplitwise.listBalanceUpdates(key) should have size 3)
       aliceSplitwise.listBalances(key) shouldBe Map(bobUserParty -> 11, charlieUserParty -> -11)
 
       aliceSplitwise.net(
@@ -130,13 +126,13 @@ class SplitwiseIntegrationTest
           charlieUserParty -> Map(aliceUserParty -> -11, bobUserParty -> 11),
         ),
       )
-      eventually {
+      eventually() {
         aliceSplitwise.listBalances(key) shouldBe Map(bobUserParty -> 0, charlieUserParty -> 0)
       }
-      eventually {
+      eventually() {
         bobSplitwise.listBalances(key) shouldBe Map(aliceUserParty -> 0, charlieUserParty -> -22)
       }
-      eventually {
+      eventually() {
         charlieSplitwise.listBalances(key) shouldBe Map(aliceUserParty -> 0, bobUserParty -> 22)
       }
     }

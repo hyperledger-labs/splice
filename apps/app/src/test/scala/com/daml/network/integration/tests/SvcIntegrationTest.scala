@@ -23,14 +23,13 @@ class SvcIntegrationTest
       .withAllocatedValidatorUsers()
 
   "round management" in { implicit env =>
-    import env._
     val coinPrice: BigDecimal = 23.0
 
     // Sync with background automation that onboards validator.
-    utils.retry_until_true({
+    eventually()({
       val requests = svc.remoteParticipant.ledger_api.acs
         .filter(svcParty, OpenMiningRound)
-      requests.length == 5
+      requests should have length 5
     })
 
     val closingRounds = svc.startClosingRound(0)
