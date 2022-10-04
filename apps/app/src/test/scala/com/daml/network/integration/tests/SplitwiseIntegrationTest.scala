@@ -100,8 +100,9 @@ class SplitwiseIntegrationTest
       inside(charlieSplitwise.listGroupInvites()) { case Seq(invite) =>
         charlieSplitwise.acceptInvite(invite.contractId)
       }
-      aliceValidator.remoteParticipant.ledger_api.acs
-        .await(aliceUserParty, splitwiseCodegen.AcceptedGroupInvite)
+      eventually {
+        aliceSplitwise.listAcceptedGroupInvites("group1") should have size 1
+      }
       inside(aliceSplitwise.listAcceptedGroupInvites("group1")) { case Seq(accepted) =>
         aliceSplitwise.joinGroup(accepted.contractId)
       }
