@@ -13,7 +13,7 @@ import com.daml.network.validator.admin.api.client.ValidatorConnection
 import com.daml.network.wallet.admin.{WalletAutomationService}
 import com.daml.network.wallet.admin.grpc.GrpcWalletService
 import com.daml.network.wallet.config.LocalWalletAppConfig
-import com.daml.network.wallet.store.{WalletAppPartyStore, WalletAppRequestStore}
+import com.daml.network.wallet.store.{WalletStore, WalletAppRequestStore}
 import com.daml.network.wallet.v0.WalletServiceGrpc
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
@@ -52,7 +52,6 @@ class WalletApp(
   override def initialize(): Future[WalletApp.State] =
     for {
       coinStore <- Future.successful(AppCoinStore(storage, loggerFactory))
-      partyStore = WalletAppPartyStore(storage, loggerFactory)
       store = WalletAppRequestStore(storage, loggerFactory)
       ledgerClient = CoinLedgerClient(
         config.remoteParticipant.ledgerApi,
@@ -79,14 +78,20 @@ class WalletApp(
 
       connection = ledgerClient.connection("SvcAppBootstrap")
 
-      walletServicePartyId <-
+      walletServiceParty <-
         connection.retryLedgerApi(
           connection.getPrimaryParty(config.serviceUser),
           CoinLedgerConnection.RetryOnUserManagementError,
         )
-
-      validatorPartyId <- validatorConnection.getValidatorPartyId()
+      validatorParty <- validatorConnection.getValidatorPartyId()
+      svcParty <- scanConnection.getSvcPartyId()
     } yield {
+      val walletStoreKey = WalletStore.Key(
+        walletServiceParty = walletServiceParty,
+        validatorParty = validatorParty,
+        svcParty = svcParty,
+      )
+      val walletStore = WalletStore(walletStoreKey, storage, loggerFactory)
 
       adminServerRegistry.addService(
         WalletServiceGrpc.bindService(
@@ -95,8 +100,8 @@ class WalletApp(
             store,
             ledgerClient,
             scanConnection,
-            validatorParty = validatorPartyId,
-            walletServiceParty = walletServicePartyId,
+            validatorParty = validatorParty,
+            walletServiceParty = walletServiceParty,
             loggerFactory = loggerFactory,
           ),
           ec,
@@ -104,10 +109,8 @@ class WalletApp(
       )
       val automation = new WalletAutomationService(
         coinStore,
-        partyStore,
+        walletStore,
         store,
-        config.serviceUser,
-        walletServicePartyId,
         ledgerClient,
         loggerFactory,
         timeouts,
@@ -116,7 +119,7 @@ class WalletApp(
         automation,
         storage,
         coinStore,
-        partyStore,
+        walletStore,
         store,
         ledgerClient,
         scanConnection,
@@ -143,7 +146,7 @@ object WalletApp {
       automation: WalletAutomationService,
       storage: Storage,
       coinStore: AppCoinStore,
-      partyStore: WalletAppPartyStore,
+      walletStore: WalletStore,
       store: WalletAppRequestStore,
       ledgerClient: CoinLedgerClient,
       scanConnection: ScanConnection,
@@ -154,7 +157,7 @@ object WalletApp {
       Lifecycle.close(
         automation,
         storage,
-        partyStore,
+        walletStore,
         ledgerClient,
         scanConnection,
         validatorConnection,

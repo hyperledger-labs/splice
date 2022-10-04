@@ -44,14 +44,17 @@ abstract class AutomationService(implicit
   ): Unit = {
     def handler(task: T): Future[Unit] = {
       lazy val prettiedTask = pretty(task)
-      logger.debug(s"Attempting to process $prettiedTask")
-      val resultF = handler0(task)
-      resultF.andThen {
-        case Success(_) =>
-          logger.debug(s"Successfully processed $prettiedTask.")
-        case Failure(ex) =>
-          logger.warn(s"Processing $prettiedTask failed! Reason:", ex)
-      }
+      performUnlessClosingF(prettiedTask)({
+        // TODO(#790): use tracing within the handler's log messages
+        logger.debug(s"Attempting to process $prettiedTask")
+        val resultF = handler0(task)
+        resultF.andThen {
+          case Success(_) =>
+            logger.debug(s"Successfully processed $prettiedTask.")
+          case Failure(ex) =>
+            logger.warn(s"Processing $prettiedTask failed! Reason:", ex)
+        }
+      }).onShutdown(())
     }
     val service = new AutomationService.TaskHandlerService[T](
       name,
