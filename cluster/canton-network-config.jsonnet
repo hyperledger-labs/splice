@@ -245,6 +245,13 @@ local cantonNetwork(config) = objects(
           failureThreshold: 5,
           periodSeconds: 10,
         },
+        startupPrope: {
+          tcpSocket: {
+            port: 'canton-pub-api',
+          },
+          failureThreshold: 20,
+          periodSeconds: 10,
+        }
       },
     ),
     deployment(config, 'canton-participant', CANTON_PARTICIPANT_PORTS),

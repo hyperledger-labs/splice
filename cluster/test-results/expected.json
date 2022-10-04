@@ -336,6 +336,13 @@
                            "tcpSocket": {
                               "port": "canton-pub-api"
                            }
+                        },
+                        "startupPrope": {
+                           "failureThreshold": 20,
+                           "periodSeconds": 10,
+                           "tcpSocket": {
+                              "port": "canton-pub-api"
+                           }
                         }
                      }
                   ]
