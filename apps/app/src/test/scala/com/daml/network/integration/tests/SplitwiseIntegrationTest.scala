@@ -100,7 +100,7 @@ class SplitwiseIntegrationTest
       inside(charlieSplitwise.listGroupInvites()) { case Seq(invite) =>
         charlieSplitwise.acceptInvite(invite.contractId)
       }
-      eventually {
+      eventually() {
         aliceSplitwise.listAcceptedGroupInvites("group1") should have size 1
       }
       inside(aliceSplitwise.listAcceptedGroupInvites("group1")) { case Seq(accepted) =>
