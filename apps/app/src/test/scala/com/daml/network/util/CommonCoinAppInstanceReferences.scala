@@ -96,46 +96,16 @@ trait CommonCoinAppInstanceReferences {
     "aliceSplitwise"
   )
 
-  def aliceSplitwiseSelfHosted(implicit
-      env: CoinTestConsoleEnvironment
-  ): RemoteSplitwiseAppReference = rsw(
-    "aliceSplitwiseSelfHosted"
-  )
-
-  def aliceSplitwiseBackend(implicit
-      env: CoinTestConsoleEnvironment
-  ): LocalSplitwiseAppReference = sw(
-    "aliceSplitwiseBackend"
-  )
-
   def bobSplitwise(implicit
       env: CoinTestConsoleEnvironment
   ): RemoteSplitwiseAppReference = rsw(
     "bobSplitwise"
   )
 
-  def bobSplitwiseSelfHosted(implicit
+  def charlieSplitwise(implicit
       env: CoinTestConsoleEnvironment
   ): RemoteSplitwiseAppReference = rsw(
-    "bobSplitwiseSelfHosted"
-  )
-
-  def bobSplitwiseBackend(implicit
-      env: CoinTestConsoleEnvironment
-  ): LocalSplitwiseAppReference = sw(
-    "bobSplitwiseBackend"
-  )
-
-  def providerSplitwise(implicit
-      env: CoinTestConsoleEnvironment
-  ): RemoteSplitwiseAppReference = rsw(
-    "providerSplitwise"
-  )
-
-  def providerSplitwiseSelfHosted(implicit
-      env: CoinTestConsoleEnvironment
-  ): RemoteSplitwiseAppReference = rsw(
-    "providerSplitwiseSelfHosted"
+    "charlieSplitwise"
   )
 
   def providerSplitwiseBackend(implicit

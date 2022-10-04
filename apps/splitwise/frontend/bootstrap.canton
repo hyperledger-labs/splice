@@ -1,5 +1,5 @@
 import com.daml.lf.value.Value.ContractId
-Seq(aliceSplitwiseBackend.remoteParticipant, bobSplitwiseBackend.remoteParticipant).foreach { p =>
+Seq(aliceValidator.remoteParticipant, bobValidator.remoteParticipant).foreach { p =>
   p.dars.upload("apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar")
 }
 
@@ -22,12 +22,10 @@ val bobCoin = bobRemoteWallet.tap(5.0)
 utils.retry_until_true { bobRemoteWallet.listAppPaymentRequests().length == 1 }
 val bobAccepted = bobRemoteWallet.acceptAppPaymentRequest(bobRemoteWallet.listAppPaymentRequests()(0).contractId)
 
-val directoryParty = `directory-app`.getProviderPartyId()
-
 val providerParty = providerSplitwiseBackend.getProviderPartyId()
 
 Seq(aliceSplitwise, bobSplitwise).foreach { splitwise =>
-  val proposal = splitwise.createInstallProposal(providerParty)
+  val proposal = splitwise.createInstallProposal()
   providerSplitwiseBackend.remoteParticipant.ledger_api.acs.await_active_contract(providerParty, ContractId.assertFromString(proposal.toString))
   providerSplitwiseBackend.acceptInstallProposal(proposal)
 }

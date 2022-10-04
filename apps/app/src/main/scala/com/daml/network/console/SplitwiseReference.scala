@@ -92,17 +92,20 @@ final class RemoteSplitwiseAppReference(
     GrpcSplitwiseAppClient.SplitwiseContext(getUserPrimaryParty())
 
   private def installKey(
-      provider: PartyId,
-      user: PartyId,
-  ): Template.Key[splitwiseCodegen.SplitwiseInstall] =
+      user: PartyId
+  ): Template.Key[splitwiseCodegen.SplitwiseInstall] = {
+    val provider = getProviderPartyId()
     splitwiseCodegen.SplitwiseInstall.key(DA.Types.Tuple2(user.toPrim, provider.toPrim))
+  }
 
-  private def groupKey_(owner: PartyId, provider: PartyId, id: String): splitwiseCodegen.GroupKey =
+  private def groupKey_(owner: PartyId, id: String): splitwiseCodegen.GroupKey = {
+    val provider = getProviderPartyId()
     splitwiseCodegen.GroupKey(
       owner.toPrim,
       provider.toPrim,
       splitwiseCodegen.GroupId(id),
     )
+  }
 
   private def getUserPrimaryParty() = LedgerApiUtils.getUserPrimaryParty(ledgerApi, userId)
 
@@ -114,9 +117,9 @@ final class RemoteSplitwiseAppReference(
 
   @Help.Summary("Create splitwise install proposal for given provider party")
   def createInstallProposal(
-      provider: PartyId
   ): Primitive.ContractId[splitwiseCodegen.SplitwiseInstallProposal] = {
     val party = getUserPrimaryParty()
+    val provider = getProviderPartyId()
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
@@ -132,13 +135,14 @@ final class RemoteSplitwiseAppReference(
   // Commands for the group owner
 
   @Help.Summary("Create group with the given id")
-  def createGroup(provider: PartyId, id: String): Primitive.ContractId[splitwiseCodegen.Group] = {
+  def createGroup(id: String): Primitive.ContractId[splitwiseCodegen.Group] = {
     val party = getUserPrimaryParty()
+    val provider = getProviderPartyId()
     val svc = remoteScan.getSvcPartyId()
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      installKey(provider, party).exerciseSplitwiseInstall_CreateGroup(
+      installKey(party).exerciseSplitwiseInstall_CreateGroup(
         splitwiseCodegen.Group(
           owner = party.toPrim,
           provider = provider.toPrim,
@@ -156,7 +160,6 @@ final class RemoteSplitwiseAppReference(
     "Create invite for the group with the given id and make it visible to the observers"
   )
   def createGroupInvite(
-      provider: PartyId,
       id: String,
       observers: Seq[PartyId],
   ): Primitive.ContractId[splitwiseCodegen.GroupInvite] = {
@@ -164,8 +167,8 @@ final class RemoteSplitwiseAppReference(
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      installKey(provider, party).exerciseSplitwiseInstall_CreateInvite(
-        groupKey_(party, provider, id),
+      installKey(party).exerciseSplitwiseInstall_CreateInvite(
+        groupKey_(party, id),
         observers.map(_.toPrim),
       ),
     )
@@ -173,14 +176,13 @@ final class RemoteSplitwiseAppReference(
 
   @Help.Summary("Add the invitee on the accepted group invite to the group")
   def joinGroup(
-      provider: PartyId,
-      acceptedGroupInvite: Primitive.ContractId[splitwiseCodegen.AcceptedGroupInvite],
+      acceptedGroupInvite: Primitive.ContractId[splitwiseCodegen.AcceptedGroupInvite]
   ): Primitive.ContractId[splitwiseCodegen.Group] = {
     val party = getUserPrimaryParty()
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      installKey(provider, party).exerciseSplitwiseInstall_Join(
+      installKey(party).exerciseSplitwiseInstall_Join(
         acceptedGroupInvite
       ),
     )
@@ -190,14 +192,13 @@ final class RemoteSplitwiseAppReference(
 
   @Help.Summary("Accept the group invite")
   def acceptInvite(
-      provider: PartyId,
-      groupInvite: Primitive.ContractId[splitwiseCodegen.GroupInvite],
+      groupInvite: Primitive.ContractId[splitwiseCodegen.GroupInvite]
   ): Primitive.ContractId[splitwiseCodegen.AcceptedGroupInvite] = {
     val party = getUserPrimaryParty()
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      installKey(provider, party).exerciseSplitwiseInstall_AcceptInvite(
+      installKey(party).exerciseSplitwiseInstall_AcceptInvite(
         groupInvite
       ),
     )
@@ -209,7 +210,6 @@ final class RemoteSplitwiseAppReference(
     "Enter a payment to the group on your behalf. Payment quantity is split equally between current group members."
   )
   def enterPayment(
-      provider: PartyId,
       key: GrpcSplitwiseAppClient.GroupKey,
       quantity: BigDecimal,
       description: String,
@@ -218,7 +218,7 @@ final class RemoteSplitwiseAppReference(
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      installKey(provider, party).exerciseSplitwiseInstall_EnterPayment(
+      installKey(party).exerciseSplitwiseInstall_EnterPayment(
         key.toPrim,
         quantity,
         description,
@@ -228,7 +228,6 @@ final class RemoteSplitwiseAppReference(
 
   @Help.Summary("Initiate a transfer to the receiver. Must be confirmed in the wallet.")
   def initiateTransfer(
-      provider: PartyId,
       key: GrpcSplitwiseAppClient.GroupKey,
       receiver: PartyId,
       quantity: BigDecimal,
@@ -237,7 +236,7 @@ final class RemoteSplitwiseAppReference(
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      installKey(provider, party).exerciseSplitwiseInstall_InitiateTransfer(
+      installKey(party).exerciseSplitwiseInstall_InitiateTransfer(
         key.toPrim,
         receiver.toPrim,
         quantity,
@@ -249,7 +248,6 @@ final class RemoteSplitwiseAppReference(
     "Complete the transfer by actually transferring the coins and creating a balance update."
   )
   def completeTransfer(
-      provider: PartyId,
       key: GrpcSplitwiseAppClient.GroupKey,
       acceptedPayment: Primitive.ContractId[walletCodegen.AcceptedAppPayment],
   ): Primitive.ContractId[splitwiseCodegen.BalanceUpdate] = {
@@ -263,7 +261,7 @@ final class RemoteSplitwiseAppReference(
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq(PartyId.tryFromPrim(hostedAt.value.validator)),
-      installKey(provider, party).exerciseSplitwiseInstall_CompleteTransfer(
+      installKey(party).exerciseSplitwiseInstall_CompleteTransfer(
         key.toPrim,
         acceptedPayment,
       ),
@@ -272,7 +270,6 @@ final class RemoteSplitwiseAppReference(
 
   @Help.Summary("Initiate a transfer to multiple receiver. Must be confirmed in the wallet.")
   def initiateMultiTransfer(
-      provider: PartyId,
       key: GrpcSplitwiseAppClient.GroupKey,
       receiverQuantities: Seq[walletCodegen.ReceiverQuantity],
   ): Primitive.ContractId[walletCodegen.AppMultiPaymentRequest] = {
@@ -280,7 +277,7 @@ final class RemoteSplitwiseAppReference(
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      installKey(provider, party).exerciseSplitwiseInstall_InitiateMultiTransfer(
+      installKey(party).exerciseSplitwiseInstall_InitiateMultiTransfer(
         key.toPrim,
         receiverQuantities,
       ),
@@ -291,7 +288,6 @@ final class RemoteSplitwiseAppReference(
     "Complete the multi-transfer by actually transferring the coins and creating a balance update."
   )
   def completeMultiTransfer(
-      provider: PartyId,
       key: GrpcSplitwiseAppClient.GroupKey,
       acceptedPayment: Primitive.ContractId[walletCodegen.AcceptedAppMultiPayment],
   ): Seq[Primitive.ContractId[splitwiseCodegen.BalanceUpdate]] = {
@@ -305,7 +301,7 @@ final class RemoteSplitwiseAppReference(
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq(PartyId.tryFromPrim(hostedAt.value.validator)),
-      installKey(provider, party).exerciseSplitwiseInstall_CompleteMultiTransfer(
+      installKey(party).exerciseSplitwiseInstall_CompleteMultiTransfer(
         key.toPrim,
         acceptedPayment,
       ),
@@ -321,7 +317,6 @@ final class RemoteSplitwiseAppReference(
       |"""
   )
   def net(
-      provider: PartyId,
       key: GrpcSplitwiseAppClient.GroupKey,
       balanceChanges: Map[PartyId, Map[PartyId, BigDecimal]],
   ): Primitive.ContractId[splitwiseCodegen.BalanceUpdate] = {
@@ -335,7 +330,7 @@ final class RemoteSplitwiseAppReference(
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      installKey(provider, party).exerciseSplitwiseInstall_Net(
+      installKey(party).exerciseSplitwiseInstall_Net(
         key.toPrim,
         balanceChangesPrim,
       ),

@@ -123,7 +123,7 @@ object BuildCommon {
         ) ++
         addCommandAlias(
           "clean-cn",
-          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwise/clean; apps-svc/clean; apps-wallet/clean; apps-directory/clean; apps-app/clean",
+          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwise/clean; apps-svc/clean; apps-wallet/clean; apps-directory/clean; apps-app/clean; apps-wallet-daml/clean",
         )
     val buildSettings = inThisBuild(
       Seq(
