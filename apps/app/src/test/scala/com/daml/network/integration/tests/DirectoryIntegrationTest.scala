@@ -39,7 +39,8 @@ class DirectoryIntegrationTest
 
       // Request install and wait for provider to auto-accept
       aliceDirectory.requestDirectoryInstall()
-      eventually()(aliceDirectory.lookupInstall(aliceUserParty) shouldBe defined)
+      aliceValidator.remoteParticipant.ledger_api.acs
+        .await(aliceUserParty, codegen.DirectoryInstall)
 
       // Request another install and check that it is rejected
       // TODO(#790): change test to check uniqueness that requires command-dedup and retries
