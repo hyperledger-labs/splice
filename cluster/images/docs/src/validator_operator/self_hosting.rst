@@ -215,14 +215,13 @@ following the instructions for your operating system.
 Next, start the envoy proxy. This proxies the wallet gRPC API on port
 5004 to a gRPC-Web API on port 6004. Open a new terminal and run: ::
 
-  cd apps/app/target/release/coin/examples
-  envoy -c validator/envoy.yaml
+  envoy -c examples/validator/envoy.yaml
 
 Lastly, we have to host the frontend files. You can use any static
 file server for that, e.g., `NGINX <https://www.nginx.com/>`_. To keep
 things simple, we use the builtin HTTP Server in Python. Start another terminal and run: ::
 
-  cd apps/app/target/release/coin/web-uis/wallet
+  cd web-uis/wallet
   python3 -m http.server 8080
 
 The Wallet Web UI is now accessible on port 8080.
