@@ -217,6 +217,11 @@ Next, start the envoy proxy. This proxies the wallet gRPC API on port
 
   envoy -c examples/validator/envoy.yaml
 
+Next, configure the frontend to connect to your backend and IAM.
+Edit the following file: ::
+
+  apps/app/target/release/coin/web-uis/wallet/public/config.js
+
 Lastly, we have to host the frontend files. You can use any static
 file server for that, e.g., `NGINX <https://www.nginx.com/>`_. To keep
 things simple, we use the builtin HTTP Server in Python. Start another terminal and run: ::
