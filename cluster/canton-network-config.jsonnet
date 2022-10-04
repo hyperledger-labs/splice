@@ -127,7 +127,7 @@ local ALL_PORTS = flatten([
   VALIDATOR1_PARTICIPANT_PORTS,
 ]);
 
-local deployment(config, name, ports, ext={}, proxyToGrpcWeb=null) = [
+local deployment(config, name, ports, memoryLimitMiB=256, ext={}, proxyToGrpcWeb=null) = [
   {
     apiVersion: 'apps/v1',
     kind: 'Deployment',
@@ -161,30 +161,39 @@ local deployment(config, name, ports, ext={}, proxyToGrpcWeb=null) = [
               image: imageName(config, name),
               imagePullPolicy: 'Always',
               ports: [{ name: p.name, containerPort: p.port } for p in ports],
+              resources: {
+                requests: {
+                  memory: memoryLimitMiB + 'Mi',
+                },
+                limits: {
+                  memory: memoryLimitMiB + 'Mi',
+                },
+              },
             } + ext,
-          ] + (if proxyToGrpcWeb != null then
-          [
-            {
-              name: 'envoy-proxy',
-              image: imageName(config, 'envoy-proxy'),
-              imagePullPolicy: 'Always',
-              ports: [{name: 'grpc-web', containerPort: toGrpcWebPort(proxyToGrpcWeb).port}],
-              env: [
+          ] + (
+            if proxyToGrpcWeb != null then
+              [
                 {
-                  name: 'GRPC_ADDRESS',
-                  value: '127.0.0.1',
+                  name: 'envoy-proxy',
+                  image: imageName(config, 'envoy-proxy'),
+                  imagePullPolicy: 'Always',
+                  ports: [{ name: 'grpc-web', containerPort: toGrpcWebPort(proxyToGrpcWeb).port }],
+                  env: [
+                    {
+                      name: 'GRPC_ADDRESS',
+                      value: '127.0.0.1',
+                    },
+                    {
+                      name: 'GRPC_PORT',
+                      value: std.toString(proxyToGrpcWeb.grpcPort),
+                    },
+                    {
+                      name: 'GRPC_WEB_PORT',
+                      value: std.toString(toGrpcWebPort(proxyToGrpcWeb).port),
+                    },
+                  ],
                 },
-                {
-                  name: 'GRPC_PORT',
-                  value: std.toString(proxyToGrpcWeb.grpcPort),
-                },
-                {
-                  name: 'GRPC_WEB_PORT',
-                  value: std.toString(toGrpcWebPort(proxyToGrpcWeb).port),
-                },
-              ],
-            }
-          ] else []
+              ] else []
           ),
         },
       },
@@ -222,17 +231,23 @@ local externalService(config, ports) = {
   },
 };
 
+// memoryLimitMiB values for deployments are taken emperically from
+// DevNet with `kubectl top pod`. Note that these were taken on a very
+// lightly loaded cluster and will very likely need to be revised for
+// clusters with higher loads.
+
 local cantonNetwork(config) = objects(
   [
     deployment(config, 'docs', DOCS_PORTS),
     deployment(config, 'svc-app', SVC_APP_PORTS),
     deployment(config, 'scan-app', SCAN_APP_PORTS),
-    deployment(config, 'directory-app', DIRECTORY_APP_PORTS, proxyToGrpcWeb = DIRECTORY_APP_PORT_PROXIED_TO_GRPC_WEB),
+    deployment(config, 'directory-app', DIRECTORY_APP_PORTS, proxyToGrpcWeb=DIRECTORY_APP_PORT_PROXIED_TO_GRPC_WEB),
     deployment(
       config,
       'canton-domain',
       CANTON_DOMAIN_PORTS,
-      {
+      memoryLimitMiB=768,
+      ext={
         readinessProbe: {
           tcpSocket: {
             port: 'canton-pub-api',
@@ -253,11 +268,12 @@ local cantonNetwork(config) = objects(
           periodSeconds: 10,
         }
       },
+
     ),
-    deployment(config, 'canton-participant', CANTON_PARTICIPANT_PORTS),
-    deployment(config, 'validator1-participant', VALIDATOR1_PARTICIPANT_PORTS),
+    deployment(config, 'canton-participant', CANTON_PARTICIPANT_PORTS, memoryLimitMiB=1536),
+    deployment(config, 'validator1-participant', VALIDATOR1_PARTICIPANT_PORTS, memoryLimitMiB=1536),
     deployment(config, 'validator1-validator-app', VALIDATOR1_VALIDATOR_PORTS),
-    deployment(config, 'validator1-wallet-app', VALIDATOR1_WALLET_PORTS, proxyToGrpcWeb = VALIDATOR1_WALLET_PORT_PROXIED_TO_GRPC_WEB),
+    deployment(config, 'validator1-wallet-app', VALIDATOR1_WALLET_PORTS, proxyToGrpcWeb=VALIDATOR1_WALLET_PORT_PROXIED_TO_GRPC_WEB),
     deployment(config, 'gcs-proxy', GCS_PROXY_PORTS),
     deployment(config, 'external-proxy', ALL_PORTS),
     externalService(config, ALL_PORTS),

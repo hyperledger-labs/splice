@@ -38,7 +38,15 @@
                               "containerPort": 80,
                               "name": "http"
                            }
-                        ]
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "256Mi"
+                           },
+                           "requests": {
+                              "memory": "256Mi"
+                           }
+                        }
                      }
                   ]
                }
@@ -101,7 +109,15 @@
                               "containerPort": 5005,
                               "name": "svc-app-adm-api"
                            }
-                        ]
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "256Mi"
+                           },
+                           "requests": {
+                              "memory": "256Mi"
+                           }
+                        }
                      }
                   ]
                }
@@ -164,7 +180,15 @@
                               "containerPort": 5012,
                               "name": "scan-api"
                            }
-                        ]
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "256Mi"
+                           },
+                           "requests": {
+                              "memory": "256Mi"
+                           }
+                        }
                      }
                   ]
                }
@@ -227,7 +251,15 @@
                               "containerPort": 5010,
                               "name": "directory-api"
                            }
-                        ]
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "256Mi"
+                           },
+                           "requests": {
+                              "memory": "256Mi"
+                           }
+                        }
                      },
                      {
                         "env": [
@@ -337,6 +369,14 @@
                               "port": "canton-pub-api"
                            }
                         },
+                        "resources": {
+                           "limits": {
+                              "memory": "768Mi"
+                           },
+                           "requests": {
+                              "memory": "768Mi"
+                           }
+                        },
                         "startupPrope": {
                            "failureThreshold": 20,
                            "periodSeconds": 10,
@@ -415,7 +455,15 @@
                               "containerPort": 5001,
                               "name": "cp-ledger-api"
                            }
-                        ]
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "memory": "1536Mi"
+                           }
+                        }
                      }
                   ]
                }
@@ -487,7 +535,15 @@
                               "containerPort": 5101,
                               "name": "val1-ledger-api"
                            }
-                        ]
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "memory": "1536Mi"
+                           }
+                        }
                      }
                   ]
                }
@@ -555,7 +611,15 @@
                               "containerPort": 5103,
                               "name": "val1-val-api"
                            }
-                        ]
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "256Mi"
+                           },
+                           "requests": {
+                              "memory": "256Mi"
+                           }
+                        }
                      }
                   ]
                }
@@ -618,7 +682,15 @@
                               "containerPort": 5104,
                               "name": "val1-wal-api"
                            }
-                        ]
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "256Mi"
+                           },
+                           "requests": {
+                              "memory": "256Mi"
+                           }
+                        }
                      },
                      {
                         "env": [
@@ -711,7 +783,15 @@
                               "containerPort": 8080,
                               "name": "http"
                            }
-                        ]
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "256Mi"
+                           },
+                           "requests": {
+                              "memory": "256Mi"
+                           }
+                        }
                      }
                   ]
                }
@@ -826,7 +906,15 @@
                               "containerPort": 5101,
                               "name": "val1-ledger-api"
                            }
-                        ]
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "256Mi"
+                           },
+                           "requests": {
+                              "memory": "256Mi"
+                           }
+                        }
                      }
                   ]
                }
