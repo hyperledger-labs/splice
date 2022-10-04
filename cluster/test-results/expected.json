@@ -41,10 +41,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "256Mi"
+                              "memory": "1024Mi"
                            },
                            "requests": {
-                              "memory": "256Mi"
+                              "memory": "1024Mi"
                            }
                         }
                      }
@@ -112,10 +112,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "256Mi"
+                              "memory": "1024Mi"
                            },
                            "requests": {
-                              "memory": "256Mi"
+                              "memory": "1024Mi"
                            }
                         }
                      }
@@ -183,10 +183,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "256Mi"
+                              "memory": "1024Mi"
                            },
                            "requests": {
-                              "memory": "256Mi"
+                              "memory": "1024Mi"
                            }
                         }
                      }
@@ -254,10 +254,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "256Mi"
+                              "memory": "1024Mi"
                            },
                            "requests": {
-                              "memory": "256Mi"
+                              "memory": "1024Mi"
                            }
                         }
                      },
@@ -371,10 +371,10 @@
                         },
                         "resources": {
                            "limits": {
-                              "memory": "768Mi"
+                              "memory": "1024Mi"
                            },
                            "requests": {
-                              "memory": "768Mi"
+                              "memory": "1024Mi"
                            }
                         },
                         "startupPrope": {
@@ -614,10 +614,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "256Mi"
+                              "memory": "1024Mi"
                            },
                            "requests": {
-                              "memory": "256Mi"
+                              "memory": "1024Mi"
                            }
                         }
                      }
@@ -685,10 +685,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "256Mi"
+                              "memory": "1024Mi"
                            },
                            "requests": {
-                              "memory": "256Mi"
+                              "memory": "1024Mi"
                            }
                         }
                      },
@@ -786,10 +786,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "256Mi"
+                              "memory": "512Mi"
                            },
                            "requests": {
-                              "memory": "256Mi"
+                              "memory": "512Mi"
                            }
                         }
                      }
@@ -909,10 +909,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "256Mi"
+                              "memory": "512Mi"
                            },
                            "requests": {
-                              "memory": "256Mi"
+                              "memory": "512Mi"
                            }
                         }
                      }
