@@ -42,12 +42,7 @@ repository from GitHub.)
 
 
 Please now extract the downloaded bundle and change into the resulting
-root directory. The commands will look similar to these (although with
-a different version tag): ::
-
-  tar xvf git-6d46d9a8381f7f650e7866c72ad18c2970d07970_coin-0.1.0-SNAPSHOT.tar
-  cd coin-0.1.0-SNAPSHOT
-
+root directory. The commands will look similar to these: ::
 
 .. parsed-literal::
 
@@ -217,11 +212,6 @@ Next, start the envoy proxy. This proxies the wallet gRPC API on port
 
   envoy -c examples/validator/envoy.yaml
 
-Next, configure the frontend to connect to your backend and IAM.
-Edit the following file: ::
-
-  apps/app/target/release/coin/web-uis/wallet/public/config.js
-
 Lastly, we have to host the frontend files. You can use any static
 file server for that, e.g., `NGINX <https://www.nginx.com/>`_. To keep
 things simple, we use the builtin HTTP Server in Python. Start another terminal and run: ::
@@ -229,4 +219,4 @@ things simple, we use the builtin HTTP Server in Python. Start another terminal 
   cd web-uis/wallet
   python3 -m http.server 8080
 
-The Wallet Web UI is now accessible on port 8080.
+The Wallet Web UI is now accessible on port 8080, where you can login as alice and see the coins you tapped earlier in this tutorial.
