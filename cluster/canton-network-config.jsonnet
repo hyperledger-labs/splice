@@ -14,6 +14,12 @@ local objects(items) = {
 local imageName(config, name) =
   config.gcpRegion + '-docker.pkg.dev/' + config.gcpRepoName + '/' + name + ':' + config.imageTag;
 
+// The amount of memory reserved for the operating system in containers
+// hosting a JVM. The JVM heap size is the container limit less this
+// amount. The number here is a best estimate and may need to be
+// adjusted.
+local JVM_SYSTEM_MEMORY_MIB = 256;
+
 local DOCS_PORTS = [
   {
     name: 'http',
@@ -176,6 +182,12 @@ local deployment(config, name, ports, memoryLimitMiB=1024, ext={}, proxyToGrpcWe
               image: imageName(config, name),
               imagePullPolicy: 'Always',
               ports: [{ name: p.name, containerPort: p.port } for p in ports],
+              env: [
+                {
+                  name: 'JAVA_TOOL_OPTIONS',
+                  value: '-Xms%sM -Xmx%sM' % [memoryLimitMiB - JVM_SYSTEM_MEMORY_MIB, memoryLimitMiB - JVM_SYSTEM_MEMORY_MIB],
+                },
+              ],
               resources: {
                 requests: {
                   memory: memoryLimitMiB + 'Mi',
@@ -192,6 +204,14 @@ local deployment(config, name, ports, memoryLimitMiB=1024, ext={}, proxyToGrpcWe
                   name: 'envoy-proxy',
                   image: imageName(config, 'envoy-proxy'),
                   imagePullPolicy: 'Always',
+                  resources: {
+                    requests: {
+                      memory: '256Mi',
+                    },
+                    limits: {
+                      memory: '256Mi',
+                    },
+                  },
                   ports: [{ name: 'grpc-web', containerPort: toGrpcWebPort(proxyToGrpcWeb).port }],
                   env: [
                     {
@@ -280,7 +300,7 @@ local cantonNetwork(config) = objects(
           },
           failureThreshold: 20,
           periodSeconds: 10,
-        }
+        },
       },
 
     ),

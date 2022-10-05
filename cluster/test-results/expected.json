@@ -30,6 +30,12 @@
                "spec": {
                   "containers": [
                      {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms768M -Xmx768M"
+                           }
+                        ],
                         "image": "region-docker.pkg.dev/project/repo/docs:tag",
                         "imagePullPolicy": "Always",
                         "name": "docs",
@@ -101,6 +107,12 @@
                "spec": {
                   "containers": [
                      {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms768M -Xmx768M"
+                           }
+                        ],
                         "image": "region-docker.pkg.dev/project/repo/svc-app:tag",
                         "imagePullPolicy": "Always",
                         "name": "svc-app",
@@ -172,6 +184,12 @@
                "spec": {
                   "containers": [
                      {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms768M -Xmx768M"
+                           }
+                        ],
                         "image": "region-docker.pkg.dev/project/repo/scan-app:tag",
                         "imagePullPolicy": "Always",
                         "name": "scan-app",
@@ -243,6 +261,12 @@
                "spec": {
                   "containers": [
                      {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms768M -Xmx768M"
+                           }
+                        ],
                         "image": "region-docker.pkg.dev/project/repo/directory-app:tag",
                         "imagePullPolicy": "Always",
                         "name": "directory-app",
@@ -284,7 +308,15 @@
                               "containerPort": 6010,
                               "name": "grpc-web"
                            }
-                        ]
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "256Mi"
+                           },
+                           "requests": {
+                              "memory": "256Mi"
+                           }
+                        }
                      }
                   ]
                }
@@ -344,6 +376,12 @@
                "spec": {
                   "containers": [
                      {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms768M -Xmx768M"
+                           }
+                        ],
                         "image": "region-docker.pkg.dev/project/repo/canton-domain:tag",
                         "imagePullPolicy": "Always",
                         "livenessProbe": {
@@ -443,6 +481,12 @@
                "spec": {
                   "containers": [
                      {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1280M -Xmx1280M"
+                           }
+                        ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
                         "imagePullPolicy": "Always",
                         "name": "canton-participant",
@@ -523,6 +567,12 @@
                "spec": {
                   "containers": [
                      {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1280M -Xmx1280M"
+                           }
+                        ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-participant:tag",
                         "imagePullPolicy": "Always",
                         "name": "validator1-participant",
@@ -603,6 +653,12 @@
                "spec": {
                   "containers": [
                      {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms768M -Xmx768M"
+                           }
+                        ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-validator-app:tag",
                         "imagePullPolicy": "Always",
                         "name": "validator1-validator-app",
@@ -674,6 +730,12 @@
                "spec": {
                   "containers": [
                      {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms768M -Xmx768M"
+                           }
+                        ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-wallet-app:tag",
                         "imagePullPolicy": "Always",
                         "name": "validator1-wallet-app",
@@ -715,7 +777,15 @@
                               "containerPort": 6104,
                               "name": "grpc-web"
                            }
-                        ]
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "256Mi"
+                           },
+                           "requests": {
+                              "memory": "256Mi"
+                           }
+                        }
                      }
                   ]
                }
@@ -775,6 +845,12 @@
                "spec": {
                   "containers": [
                      {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms768M -Xmx768M"
+                           }
+                        ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-wallet-web-ui:tag",
                         "imagePullPolicy": "Always",
                         "name": "validator1-wallet-web-ui",
@@ -846,6 +922,12 @@
                "spec": {
                   "containers": [
                      {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms256M -Xmx256M"
+                           }
+                        ],
                         "image": "region-docker.pkg.dev/project/repo/gcs-proxy:tag",
                         "imagePullPolicy": "Always",
                         "name": "gcs-proxy",
@@ -917,6 +999,12 @@
                "spec": {
                   "containers": [
                      {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms256M -Xmx256M"
+                           }
+                        ],
                         "image": "region-docker.pkg.dev/project/repo/external-proxy:tag",
                         "imagePullPolicy": "Always",
                         "name": "external-proxy",
