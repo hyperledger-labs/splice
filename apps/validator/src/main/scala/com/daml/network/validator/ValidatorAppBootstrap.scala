@@ -1,23 +1,14 @@
 package com.daml.network.validator
 
 import akka.actor.ActorSystem
-import cats.implicits._
 import cats.data.EitherT
+import cats.implicits._
 import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.codegen.CC.CoinRules.CoinRulesRequest
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.network.codegen.CN.{Wallet => walletCodegen}
-import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNodeBootstrapBase}
-import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.{CoinUtil, UploadablePackage}
-import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
-import com.daml.network.validator.config.{AppInstance, LocalValidatorAppConfig}
+import com.daml.network.environment.CoinNodeBootstrapBase
+import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.validator.metrics.ValidatorAppMetrics
-import com.daml.network.validator.store.ValidatorAppStore
-import com.daml.network.validator.util.ValidatorUtil
-import com.daml.network.validator.v0.ValidatorAppServiceGrpc
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -27,8 +18,6 @@ import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource._
 import com.digitalasset.canton.time._
-import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.util.EitherTUtil
 
 import java.util.concurrent.ScheduledExecutorService
 import scala.annotation.nowarn
@@ -68,143 +57,20 @@ class ValidatorAppBootstrap(
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
-
-    val ledgerClient: CoinLedgerClient =
-      createLedgerClient(config.remoteParticipant, validatorAppParameters.processingTimeouts)
-
-    val scanConnection: ScanConnection =
-      new ScanConnection(
-        config.remoteScan.clientAdminApi,
-        validatorAppParameters.processingTimeouts,
-        loggerFactory,
-      )
-    val connection = ledgerClient.connection("ValidatorAppBootstrap")
-
-    def setupWallet(): Future[PartyId] = {
-      logger.info(s"Attempting to setup wallet...")
-      for {
-        _ <- connection.uploadDarFile(new UploadablePackage {
-          lazy val walletTemplateId: com.daml.ledger.api.v1.value.Identifier =
-            ApiTypes.TemplateId.unwrap(walletCodegen.AppPaymentRequest.id)
-
-          lazy val packageId: String = walletTemplateId.packageId
-
-          // See `Compile / resourceGenerators` in build.sbt
-          lazy val resourcePath: String = "dar/wallet-0.1.0.dar"
-        })
-        party <- connection.getOrAllocateParty(config.walletServiceUser)
-      } yield {
-        logger.info(
-          s"Setup wallet with service user ${config.walletServiceUser} and primary party $party"
-        )
-        party
-      }
-    }
-
-    def setupAppInstance(name: String, instance: AppInstance): Future[Unit] = {
-      logger.info(s"Attempting to setup app $name...")
-      for {
-        _ <- instance.dars.traverse_(dar => connection.uploadDarFile(dar))
-        party <- connection.getOrAllocateParty(instance.serviceUser)
-      } yield {
-        logger.info(
-          s"Setup app $name with service user ${instance.serviceUser},  primary party $party, and uploaded ${instance.dars}."
-        )
-      }
-    }
-
-    def createValidatorRight(validatorParty: PartyId, svcParty: PartyId): Future[Unit] = {
-      logger.info(s"Attempting to create validator right...")
-      for {
-        _ <- ValidatorUtil.createValidatorRight(
-          user = validatorParty,
-          validator = validatorParty,
-          svc = svcParty,
-          connection = connection,
-        )
-      } yield {
-        logger.info(
-          s"Created validator right with validator $validatorParty, svc $svcParty."
-        )
-      }
-    }
-
-    def createRulesRequestAndUserHostedAtContracts(
-        svcParty: PartyId,
-        validatorParty: PartyId,
-    ): Future[Unit] = {
-      logger.info("Attempting to create rules request and userHostedAt.")
-      val coinRulesReq = CoinRulesRequest(user = validatorParty.toPrim, svc = svcParty.toPrim)
-      for {
-        _ <- connection.ignoreDuplicateKeyErrors(
-          connection
-            .submitCommand(
-              actAs = Seq(validatorParty),
-              readAs = Seq(validatorParty),
-              command = Seq(coinRulesReq.create.command),
-            ),
-          s"CoinRulesRequest($validatorParty, $svcParty)",
-        )
-        _ <- CoinUtil.ExplicitDisclosureWorkaround.recordUserHostedAt(
-          validatorParty,
-          validatorParty,
-          connection,
-        )
-      } yield {
-        logger.info("Created rules request and userHostedAt.")
-      }
-    }
-
-    def init() = for {
-      validatorParty <- connection.retryLedgerApi(
-        connection.getPrimaryParty(config.damlUser),
-        CoinLedgerConnection.RetryOnUserManagementError,
-      )
-      _ = logger.info(s"Got primary party of validator user: $validatorParty")
-      svcParty <- scanConnection.getSvcPartyId()
-      walletServiceParty <- setupWallet()
-      _ <- config.appInstances.toList.traverse({ case (name, instance) =>
-        setupAppInstance(name, instance)
-      })
-      _ <- createValidatorRight(validatorParty, svcParty)
-      _ <- createRulesRequestAndUserHostedAtContracts(svcParty, validatorParty)
-    } yield {
-      ValidatorAppStore(
-        validatorParty = validatorParty,
-        svcParty = svcParty,
-        walletServiceParty = walletServiceParty,
-        storage,
-        loggerFactory,
-      )
-    }
-
-    for {
-      store <- EitherTUtil.fromFuture(init(), _.toString)
-    } yield {
-      adminServerRegistry.addService(
-        ValidatorAppServiceGrpc.bindService(
-          new GrpcValidatorAppService(
-            ledgerClient,
-            scanConnection,
-            store,
-            config.damlUser,
-            config.walletServiceUser,
-            loggerFactory,
-          ),
-          executionContext,
+    EitherT.fromEither(
+      Right(
+        new ValidatorAppNode(
+          name,
+          config,
+          validatorAppParameters,
+          storage,
+          clock,
+          loggerFactory,
+          tracerProvider,
+          adminServerRegistry,
         )
       )
-      new ValidatorAppNode(
-        config,
-        validatorAppParameters,
-        storage,
-        store,
-        ledgerClient,
-        scanConnection,
-        clock,
-        loggerFactory,
-      )
-    }
+    )
   }
 
   override def isActive: Boolean = storage.isActive

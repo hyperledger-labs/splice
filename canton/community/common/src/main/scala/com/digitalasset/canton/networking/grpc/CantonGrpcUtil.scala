@@ -89,7 +89,9 @@ object CantonGrpcUtil {
       timeout: Duration,
       logger: TracedLogger,
       logPolicy: GrpcError => TracedLogger => TraceContext => Unit = err =>
-        logger => traceContext => err.log(logger)(traceContext),
+        logger => implicit traceContext => logger.warn(err.toString, err.status.getCause),
+      logPolicyRetry: GrpcError => TracedLogger => TraceContext => Unit = err =>
+        logger => implicit traceContext => logger.info(err.toString, err.status.getCause),
       retryPolicy: GrpcError => Boolean = _.retry,
   )(implicit traceContext: TraceContext): EitherT[Future, GrpcError, Res] = {
     implicit val ec: ExecutionContext = DirectExecutionContext(logger)
@@ -123,10 +125,10 @@ object CantonGrpcUtil {
           Future.successful(Right(value))
         case Failure(e: StatusRuntimeException) =>
           val error = GrpcError(requestDescription, serverName, e)
-          logPolicy(error)(logger)(traceContext)
           if (retryPolicy(error)) {
             val effectiveBackoff = calcEffectiveBackoff(backoffMs)
             if (effectiveBackoff > 0) {
+              logPolicyRetry(error)(logger)(traceContext)
               logger.info(s"Waiting for ${effectiveBackoff}ms before retrying...")
               DelayUtil
                 .delay(FiniteDuration.apply(effectiveBackoff, TimeUnit.MILLISECONDS))
@@ -135,6 +137,7 @@ object CantonGrpcUtil {
                   go(backoffMs * 2)
                 }
             } else {
+              logPolicy(error)(logger)(traceContext)
               logger.warn("Retry timeout has elapsed, giving up.")
               Future.successful(Left(error))
             }
@@ -168,7 +171,9 @@ object CantonGrpcUtil {
       timeout: Duration,
       logger: TracedLogger,
       logPolicy: GrpcError => TracedLogger => TraceContext => Unit = err =>
-        logger => traceContext => err.log(logger)(traceContext),
+        logger => implicit traceContext => logger.warn(err.toString, err.status.getCause),
+      logPolicyRetry: GrpcError => TracedLogger => TraceContext => Unit = err =>
+        logger => implicit traceContext => logger.info(err.toString, err.status.getCause),
       retryPolicy: GrpcError => Boolean = _.retry,
   )(
       send: Svc => Future[Res]
@@ -183,6 +188,7 @@ object CantonGrpcUtil {
       timeout,
       logger,
       logPolicy,
+      logPolicyRetry,
       retryPolicy,
     )
 

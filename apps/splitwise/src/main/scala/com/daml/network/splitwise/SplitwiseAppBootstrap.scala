@@ -6,12 +6,8 @@ import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrapBase
-import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.splitwise.admin.grpc.GrpcSplitwiseService
 import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
 import com.daml.network.splitwise.metrics.SplitwiseAppMetrics
-import com.daml.network.splitwise.store.SplitwiseAppStore
-import com.daml.network.splitwise.v0.SplitwiseServiceGrpc
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -60,44 +56,20 @@ class SplitwiseAppBootstrap(
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
-    EitherT.rightT[Future, String] {
-      val dummyStore = SplitwiseAppStore(storage, loggerFactory)
-
-      val ledgerClient =
-        createLedgerClient(
-          config.remoteParticipant,
-          splitwiseAppParameters.processingTimeouts,
-        )
-
-      val scanConnection: ScanConnection =
-        new ScanConnection(
-          config.remoteScan.clientAdminApi,
-          splitwiseAppParameters.processingTimeouts,
+    EitherT.fromEither(
+      Right(
+        new SplitwiseApp(
+          name,
+          config,
+          splitwiseAppParameters,
+          storage,
+          clock,
           loggerFactory,
-        )
-
-      adminServerRegistry.addService(
-        SplitwiseServiceGrpc.bindService(
-          new GrpcSplitwiseService(
-            ledgerClient,
-            scanConnection,
-            config.providerUser,
-            loggerFactory,
-          ),
-          executionContext,
+          tracerProvider,
+          adminServerRegistry,
         )
       )
-      new SplitwiseApp(
-        config,
-        splitwiseAppParameters,
-        storage,
-        dummyStore,
-        ledgerClient,
-        scanConnection,
-        clock,
-        loggerFactory,
-      )
-    }
+    )
   }
 
   override def isActive: Boolean = storage.isActive

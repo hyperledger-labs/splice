@@ -1,4 +1,5 @@
 package com.daml.network.integration.tests
+
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -20,16 +21,18 @@ class ValidatorIntegrationTest
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
-      .withConnectedDomains()
-      .withAllocatedValidatorUsers()
+      // We manually start apps so we disable the default setup
+      // that blocks on all apps being initialized.
+      .withSetup(setup = _ => ())
 
   "initialize svc and validator apps" in { implicit env =>
     svc.start()
     scan.start()
+    svc.waitForInitialization()
     // check that there is exactly one CoinRule and OpenMiningRound
     val coinRules = svc.remoteParticipant.ledger_api.acs
       .of_party(svcParty, filterTemplates = Seq(CC.CoinRules.CoinRules.id))
-    coinRules.length shouldBe 1
+    coinRules should have length 1
 
     val openRounds = svc.remoteParticipant.ledger_api.acs
       .of_party(svcParty, filterTemplates = Seq(CC.Round.OpenMiningRound.id))
@@ -37,6 +40,7 @@ class ValidatorIntegrationTest
 
     // Start Alice’s validator
     aliceValidator.start()
+    aliceValidator.waitForInitialization()
 
     // check that no coin rules request is outstanding
     eventually()(
@@ -59,6 +63,7 @@ class ValidatorIntegrationTest
     svc.start()
     scan.start()
     aliceValidator.start()
+    aliceValidator.waitForInitialization()
 
     // Make uniqueness of the user ID more probable when running the test multiple times in a row
     val randomId = (new scala.util.Random).nextInt(10000)

@@ -62,6 +62,7 @@ class GrpcCtlRunner(
         timeout,
         logger,
         CantonGrpcUtil.silentLogPolicy, // silent log policy, as the ConsoleEnvironment will log the result
+        CantonGrpcUtil.silentLogPolicy, // silent log policy, as the ConsoleEnvironment will log the result
         _ => false, // no retry to optimize for low latency
       )
       .leftMap(_.toString)

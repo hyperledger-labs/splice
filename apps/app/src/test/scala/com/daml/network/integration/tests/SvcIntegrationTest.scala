@@ -19,8 +19,6 @@ class SvcIntegrationTest
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .withConnectedDomains()
-      .withAllocatedValidatorUsers()
 
   "round management" in { implicit env =>
     val coinPrice: BigDecimal = 23.0

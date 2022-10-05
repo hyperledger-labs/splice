@@ -1,53 +1,209 @@
 package com.daml.network.validator
 
+import com.daml.network.codegen.CC.CoinRules.CoinRulesRequest
+import com.daml.network.util.CoinUtil
+import com.daml.network.validator.util.ValidatorUtil
+import cats.implicits._
+import akka.actor.ActorSystem
+import com.daml.ledger.api.refinements.ApiTypes
+import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.CoinLedgerClient
+import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.validator.config.LocalValidatorAppConfig
+import com.daml.network.util.UploadablePackage
+import com.daml.network.validator.v0.ValidatorAppServiceGrpc
+import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
+import com.daml.network.validator.config.{AppInstance, LocalValidatorAppConfig}
 import com.daml.network.validator.store.ValidatorAppStore
-import com.digitalasset.canton.environment.CantonNode
-import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
+import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.time.{Clock, HasUptime}
-import com.digitalasset.canton.topology.UniqueIdentifier
-import com.digitalasset.canton.tracing.NoTracing
+import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TracerProvider
+import com.daml.network.codegen.CN.{Wallet => walletCodegen}
+import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Class representing a Validator app instance.
   *
   * Modelled after Canton's ParticipantNode class.
   */
 class ValidatorAppNode(
+    override val name: InstanceName,
     val config: LocalValidatorAppConfig,
-    val validatorAppParameters: SharedCoinAppParameters,
+    val coinAppParameters: SharedCoinAppParameters,
     storage: Storage,
-    dummyStore: ValidatorAppStore,
-    ledgerClient: CoinLedgerClient,
-    scanConnection: ScanConnection,
     override protected val clock: Clock,
     val loggerFactory: NamedLoggerFactory,
-) extends CantonNode // TODO(i736): CantonNode needs to be forked or generalized.
-    with NamedLogging
-    with HasUptime
-    with NoTracing {
+    tracerProvider: TracerProvider,
+    adminServerRegistry: CantonMutableHandlerRegistry,
+)(implicit
+    ac: ActorSystem,
+    ec: ExecutionContextExecutor,
+    esf: ExecutionSequencerFactory,
+    tracer: Tracer,
+) extends CoinNode[ValidatorAppNode.State](coinAppParameters, loggerFactory, tracerProvider) {
 
-  // TODO(i736): fork or generalize status definition.
-  override def status: Future[NodeStatus.Status] = {
-    val status = SimpleStatus(
-      UniqueIdentifier.tryFromProtoPrimitive("example::default"),
-      uptime(),
-      Map("admin" -> config.adminApi.port),
-      storage.isActive,
-      TopologyQueueStatus(0, 0, 0),
-    )
-    Future.successful(status)
+  private def setupWallet(connection: CoinLedgerConnection): Future[PartyId] = {
+    logger.info(s"Attempting to setup wallet...")
+    for {
+      _ <- connection.uploadDarFile(new UploadablePackage {
+        lazy val walletTemplateId: com.daml.ledger.api.v1.value.Identifier =
+          ApiTypes.TemplateId.unwrap(walletCodegen.AppPaymentRequest.id)
+
+        lazy val packageId: String = walletTemplateId.packageId
+
+        // See `Compile / resourceGenerators` in build.sbt
+        lazy val resourcePath: String = "dar/wallet-0.1.0.dar"
+      })
+      party <- connection.getOrAllocateParty(config.walletServiceUser)
+    } yield {
+      logger.info(
+        s"Setup wallet with service user ${config.walletServiceUser} and primary party $party"
+      )
+      party
+    }
   }
 
-  override def close(): Unit = {
-    logger.info("Stopping validator node")
-    Lifecycle.close(storage, dummyStore, ledgerClient, scanConnection)(logger)
+  private def setupAppInstance(
+      connection: CoinLedgerConnection,
+      name: String,
+      instance: AppInstance,
+  ): Future[Unit] = {
+    logger.info(s"Attempting to setup app $name...")
+    for {
+      _ <- instance.dars.traverse_(dar => connection.uploadDarFile(dar))
+      party <- connection.getOrAllocateParty(instance.serviceUser)
+    } yield {
+      logger.info(
+        s"Setup app $name with service user ${instance.serviceUser},  primary party $party, and uploaded ${instance.dars}."
+      )
+    }
+  }
+
+  private def createValidatorRight(
+      connection: CoinLedgerConnection,
+      validatorParty: PartyId,
+      svcParty: PartyId,
+  ): Future[Unit] = {
+    logger.info(s"Attempting to create validator right...")
+    for {
+      _ <- ValidatorUtil.createValidatorRight(
+        user = validatorParty,
+        validator = validatorParty,
+        svc = svcParty,
+        connection = connection,
+      )
+    } yield {
+      logger.info(
+        s"Created validator right with validator $validatorParty, svc $svcParty."
+      )
+    }
+  }
+
+  private def createRulesRequestAndUserHostedAtContracts(
+      connection: CoinLedgerConnection,
+      svcParty: PartyId,
+      validatorParty: PartyId,
+  ): Future[Unit] = {
+    logger.info("Attempting to create rules request and userHostedAt.")
+    val coinRulesReq = CoinRulesRequest(user = validatorParty.toPrim, svc = svcParty.toPrim)
+    for {
+      _ <- connection.ignoreDuplicateKeyErrors(
+        connection
+          .submitCommand(
+            actAs = Seq(validatorParty),
+            readAs = Seq(validatorParty),
+            command = Seq(coinRulesReq.create.command),
+          ),
+        s"CoinRulesRequest($validatorParty, $svcParty)",
+      )
+      _ <- CoinUtil.ExplicitDisclosureWorkaround.recordUserHostedAt(
+        validatorParty,
+        validatorParty,
+        connection,
+      )
+    } yield {
+      logger.info("Created rules request and userHostedAt.")
+    }
+  }
+
+  override def initialize(): Future[ValidatorAppNode.State] =
+    for {
+      ledgerClient <-
+        Future.successful(createLedgerClient(config.remoteParticipant))
+
+      scanConnection =
+        new ScanConnection(
+          config.remoteScan.clientAdminApi,
+          coinAppParameters.processingTimeouts,
+          loggerFactory,
+        )
+      connection = ledgerClient.connection("ValidatorAppBootstrap")
+      validatorParty <- connection.retryLedgerApi(
+        connection.getPrimaryParty(config.damlUser),
+        CoinLedgerConnection.RetryOnUserManagementError,
+      )
+      _ = logger.info(s"Got primary party of validator user: $validatorParty")
+      svcParty <- scanConnection.getSvcPartyId()
+      walletServiceParty <- setupWallet(connection)
+      _ <- config.appInstances.toList.traverse({ case (name, instance) =>
+        setupAppInstance(connection, name, instance)
+      })
+      _ <- createValidatorRight(connection, validatorParty, svcParty)
+      _ <- createRulesRequestAndUserHostedAtContracts(connection, svcParty, validatorParty)
+    } yield {
+      val store = ValidatorAppStore(
+        validatorParty = validatorParty,
+        svcParty = svcParty,
+        walletServiceParty = walletServiceParty,
+        storage,
+        loggerFactory,
+      )
+      adminServerRegistry.addService(
+        ValidatorAppServiceGrpc.bindService(
+          new GrpcValidatorAppService(
+            ledgerClient,
+            scanConnection,
+            store,
+            config.damlUser,
+            config.walletServiceUser,
+            loggerFactory,
+          ),
+          ec,
+        )
+      )
+      ValidatorAppNode.State(
+        storage,
+        store,
+        ledgerClient,
+        scanConnection,
+        loggerFactory.getTracedLogger(ValidatorAppNode.State.getClass),
+      )
+    }
+
+  override val ports = Map("admin" -> config.adminApi.port)
+}
+
+object ValidatorAppNode {
+  case class State(
+      storage: Storage,
+      store: ValidatorAppStore,
+      ledgerClient: CoinLedgerClient,
+      scanConnection: ScanConnection,
+      logger: TracedLogger,
+  ) extends AutoCloseable {
+    override def close() =
+      Lifecycle.close(
+        storage,
+        store,
+        ledgerClient,
+        scanConnection,
+      )(logger)
+
   }
 }

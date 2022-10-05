@@ -22,8 +22,6 @@ class BootstrapTest
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .withConnectedDomains()
-      .withAllocatedValidatorUsers()
 
   "Bootstrap script should pass" in { implicit env =>
     runScript(File("apps/splitwise/frontend/bootstrap.canton"))(env.environment)

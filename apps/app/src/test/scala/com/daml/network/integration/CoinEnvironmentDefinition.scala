@@ -2,6 +2,7 @@ package com.daml.network.integration
 
 import better.files.{File, Resource}
 import com.daml.network.config.CoinConfig
+import com.daml.network.console.CoinAppReference
 import com.daml.network.environment.{
   CoinConsoleEnvironment,
   CoinEnvironmentFactory,
@@ -62,6 +63,11 @@ case class CoinEnvironmentDefinition(
         )
       })
     })
+  def withInitializedNodes(): CoinEnvironmentDefinition =
+    copy(setup = implicit env => {
+      this.setup(env)
+      CoinEnvironmentDefinition.waitForNodeInitialization(env)
+    })
   def withPreSetup(preSetup: CoinTestConsoleEnvironment => Unit): CoinEnvironmentDefinition =
     copy(preSetup = preSetup)
   def withSetup(setup: CoinTestConsoleEnvironment => Unit): CoinEnvironmentDefinition =
@@ -97,6 +103,9 @@ case class CoinEnvironmentDefinition(
 object CoinEnvironmentDefinition {
   def simpleTopology(testName: String): CoinEnvironmentDefinition =
     fromResource("simple-topology.conf", testName)
+      .withConnectedDomains()
+      .withAllocatedValidatorUsers()
+      .withInitializedNodes()
 
   def fromResource(path: String, testName: String): CoinEnvironmentDefinition =
     CoinEnvironmentDefinition(
@@ -113,4 +122,9 @@ object CoinEnvironmentDefinition {
     val config = CoinConfig.parseAndLoadOrExit(files.map(_.toJava))
     CoinEnvironmentDefinition(baseConfig = config, context = testName)
   }
+  def waitForNodeInitialization(env: CoinConsoleEnvironment): Unit =
+    env.nodes.local.foreach {
+      case node: CoinAppReference => node.waitForInitialization()(env)
+      case _ =>
+    }
 }

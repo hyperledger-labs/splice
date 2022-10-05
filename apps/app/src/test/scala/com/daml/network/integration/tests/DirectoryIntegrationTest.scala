@@ -26,8 +26,6 @@ class DirectoryIntegrationTest
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .withConnectedDomains()
-      .withAllocatedValidatorUsers()
 
   "Directory service" should {
     "accept unique install requests" in { implicit env =>

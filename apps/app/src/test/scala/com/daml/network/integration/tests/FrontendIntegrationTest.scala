@@ -27,8 +27,6 @@ trait FrontendIntegrationTest
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .withConnectedDomains()
-      .withAllocatedValidatorUsers()
 
   // TODO(i711): try sending the log output to our logfiles instead of /dev/null
   System.setProperty(FirefoxDriver.SystemProperty.BROWSER_LOGFILE, "/dev/null")

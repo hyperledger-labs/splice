@@ -6,13 +6,8 @@ import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrapBase
-import com.daml.network.svc.admin.SvcAutomationService
-import com.daml.network.svc.admin.grpc.GrpcSvcAppService
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.svc.metrics.SvcAppMetrics
-import com.daml.network.svc.store.SvcAppStore
-import com.daml.network.svc.v0.SvcServiceGrpc
-import com.daml.network.util.CoinUtil
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
   FutureSupervisor,
@@ -61,61 +56,19 @@ class SvcAppBootstrap(
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
-    val svcStore = SvcAppStore(storage, loggerFactory)
-
-    val ledgerClient =
-      createLedgerClient(config.remoteParticipant, svcAppParameters.processingTimeouts)
-
-    val service = new GrpcSvcAppService(
-      ledgerClient,
-      config.damlUser,
-      svcStore,
-      loggerFactory,
-    )
-
-    adminServerRegistry.addService(
-      SvcServiceGrpc.bindService(
-        service,
-        executionContext,
+    EitherT.fromEither(
+      Right(
+        new SvcAppNode(
+          name,
+          config,
+          svcAppParameters,
+          storage,
+          clock,
+          loggerFactory,
+          tracerProvider,
+          adminServerRegistry,
+        )
       )
-    )
-
-    val connection = ledgerClient.connection("SvcAppBootstrap")
-
-    val svcApp = for {
-      svcPartyId <- connection.getOrAllocateParty(config.damlUser)
-      _ = logger.info(s"Allocated SVC party $svcPartyId")
-      _ <- connection.uploadDarFile(CoinUtil)
-      _ <- CoinUtil.setupApp(svcPartyId, connection)
-      _ = logger.info(s"SVC App is initialized")
-      automation = new SvcAutomationService(
-        svcPartyId,
-        ledgerClient,
-        loggerFactory,
-        timeouts,
-        svcStore,
-      )
-    } yield {
-      new SvcAppNode(
-        config,
-        svcAppParameters,
-        storage,
-        automation,
-        svcStore,
-        ledgerClient,
-        clock,
-        loggerFactory,
-      )
-    }
-
-    // TODO(i447): more robust retry + finding out where exceptions (e.g. io.grpc.StatusRuntimeException) disappear too
-    EitherT(
-      svcApp
-        .recover { err =>
-          logger.error(s"SVC initialization failed with $err")
-          sys.exit(1)
-        }
-        .map(Right(_)): Future[Either[String, SvcAppNode]]
     )
   }
 

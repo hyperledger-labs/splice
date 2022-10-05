@@ -49,8 +49,6 @@ class WalletIntegrationTest
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .withConnectedDomains()
-      .withAllocatedValidatorUsers()
 
   "A wallet" should {
     "allow calling tap, list the created coins, and get the balance - locally and remotely" in {

@@ -87,7 +87,11 @@ trait CoinLedgerSubscription extends FlagCloseableAsync with NamedLogging {
 }
 
 trait CoinLedgerConnection extends CoinLedgerSubmit {
-  def retryLedgerApi[T](task: => Future[T], retryable: ExceptionRetryable)(implicit
+  def retryLedgerApi[T](
+      task: => Future[T],
+      retryable: ExceptionRetryable,
+      maxRetriesO: Option[Int] = None,
+  )(implicit
       traceContext: TraceContext
   ): Future[T]
   def ignoreDuplicateKeyErrors[T](task: => Future[T], name: String)(implicit
@@ -272,10 +276,18 @@ object CoinLedgerConnection {
       override def retryLedgerApi[T](
           task: => Future[T],
           retryable: ExceptionRetryable = RetryOnRetryableLedgerApiError,
+          maxRetriesO: Option[Int] = None,
       )(implicit traceContext: TraceContext): Future[T] = {
         implicit val success = com.digitalasset.canton.util.retry.Success.always
         retry
-          .Backoff(logger, this, maxRetries, 10.millis, 5.second, "submitCommand")
+          .Backoff(
+            logger,
+            this,
+            maxRetriesO.getOrElse(maxRetries),
+            10.millis,
+            5.second,
+            "submitCommand",
+          )
           .apply(task, retryable)
       }
 

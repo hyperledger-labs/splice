@@ -5,7 +5,7 @@ import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.console.commands.{
   LedgerApiAdministration,
   ParticipantAdministration,
-  ParticipantHealthAdministration,
+  HealthAdministration,
   ParticipantPartiesAdministrationGroup,
   ParticipantPruningAdministrationGroup,
   ParticipantTestingGroup,
@@ -14,6 +14,7 @@ import com.digitalasset.canton.console.commands.{
 import com.digitalasset.canton.console.{
   ConsoleCommandResult,
   ConsoleEnvironment,
+  ConsoleMacros,
   FeatureFlag,
   Help,
   InstanceReference,
@@ -21,7 +22,7 @@ import com.digitalasset.canton.console.{
   RemoteParticipantReference,
 }
 import com.digitalasset.canton.environment.CantonNodeBootstrap
-import com.digitalasset.canton.health.admin.data.ParticipantStatus
+import com.digitalasset.canton.health.admin.data.SimpleStatus
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
@@ -41,13 +42,13 @@ abstract class CoinAppReference(
   override protected val loggerFactory: NamedLoggerFactory =
     consoleEnvironment.environment.loggerFactory.append("Wallet", name)
 
-  override type Status = ParticipantStatus
+  override type Status = SimpleStatus
 
   // TODO(i736): remove/cleanup all the uninteresting console commands copied from Canton.
   @Help.Summary("Health and diagnostic related commands")
   @Help.Group("Health")
   override def health =
-    new ParticipantHealthAdministration(this, consoleEnvironment, loggerFactory)
+    new HealthAdministration[SimpleStatus](this, consoleEnvironment, SimpleStatus.fromProtoV0)
 
   @Help.Summary(
     "Yields the globally unique id of this participant. " +
@@ -86,6 +87,10 @@ abstract class CoinAppReference(
   @Help.Summary("Inspect and manage parties")
   @Help.Group("Parties")
   override def parties: ParticipantPartiesAdministrationGroup = partiesGroup
+
+  @Help.Summary("Wait until initialization has completed")
+  def waitForInitialization()(implicit env: ConsoleEnvironment): Unit =
+    ConsoleMacros.utils.retry_until_true(health.status.successOption.map(_.active).getOrElse(false))
 
   // TODO(i736): slightly adapted compared to Canton.
   // above command needs to be def such that `Help` works.
