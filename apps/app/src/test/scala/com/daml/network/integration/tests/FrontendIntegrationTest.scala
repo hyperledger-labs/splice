@@ -42,6 +42,14 @@ trait FrontendIntegrationTest
 
   override def afterEach() = {
     super.afterEach()
+    findAll(id("error")).toList.map(e => fail(s"Found unexpected error: ${e.text}"))
     webDriver.quit()
   }
+
+  protected def consumeError(err: String): Unit = {
+    val text = inside(findAll(id("error")).toList) { case Seq(elem) => elem.text }
+    text shouldBe err
+    click on "clear-error-button"
+  }
+
 }

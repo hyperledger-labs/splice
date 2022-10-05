@@ -414,7 +414,7 @@ To build the wallet frontend you first need to generate the TypeScript
 files based on our protobuf files as well as run the Daml codegen on
 our daml models.
 
-In order to pass in CI, source code must be formatted by `prettier`.
+In order to pass in CI, source code must be formatted by `prettier` (by e.g. running `cd apps/wallet/frontend && npx prettier --write src`).
 
 1. Generating protobuf files:
 

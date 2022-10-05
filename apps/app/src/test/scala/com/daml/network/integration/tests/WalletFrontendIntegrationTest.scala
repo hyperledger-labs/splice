@@ -26,5 +26,22 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest {
       val quantity = row.childElement(className("coins-table-quantity"))
       quantity.text should be("15.0000000000")
     }
+
+    "report errors" in { implicit env =>
+      val aliceDamlUser = aliceRemoteWallet.config.damlUser
+      aliceValidator.onboardUser(aliceDamlUser)
+
+      go to "http://localhost:3000"
+      click on "user-id-field"
+      textField("user-id-field").value = aliceDamlUser
+      click on "login-button"
+      click on "tap-amount-field"
+      textField("tap-amount-field").value = "non-numeric"
+      loggerFactory.suppressErrors(click on "tap-button")
+      eventually()(
+        findAll(id("error")).toList should not be empty
+      )
+      consumeError("RpcError: Could not read Numeric string \"non-numeric\"")
+    }
   }
 }

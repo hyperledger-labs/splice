@@ -16,6 +16,7 @@ import { SplitwiseClientProvider, useSplitwiseClient } from './SplitwiseServiceC
 import { sameContracts, useInterval } from './Util';
 import { DirectoryServiceClient } from './com/daml/network/directory/v0/Directory_serviceServiceClientPb';
 import { ScanServiceClient } from './com/daml/network/scan/v0/Scan_serviceServiceClientPb';
+import ErrorBoundary from './utils/ErrorBoundary';
 
 const App: React.FC = () => {
   const [directoryEntries, setDirectoryEntries] = useState<Contract<DirectoryEntry>[]>([]);
@@ -90,15 +91,17 @@ const App: React.FC = () => {
 
   return (
     <SplitwiseClientProvider url={process.env.REACT_APP_GRPC_URL || 'http://localhost:8082'}>
-      <Box>
-        <CssBaseline />
-        <AppBar position="static" sx={{ marginBottom: 5 }}>
-          <Toolbar>
-            <Typography variant="h6">CN Splitwise</Typography>
-          </Toolbar>
-        </AppBar>
-        {userId ? <LoggedIn userId={userId} /> : <Login onLogin={setUserId} />}
-      </Box>
+      <ErrorBoundary>
+        <Box>
+          <CssBaseline />
+          <AppBar position="static" sx={{ marginBottom: 5 }}>
+            <Toolbar>
+              <Typography variant="h6">CN Splitwise</Typography>
+            </Toolbar>
+          </AppBar>
+          {userId ? <LoggedIn userId={userId} /> : <Login onLogin={setUserId} />}
+        </Box>
+      </ErrorBoundary>
     </SplitwiseClientProvider>
   );
 };
