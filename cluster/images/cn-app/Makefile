@@ -16,7 +16,7 @@ $(target-bundle): $(app-bundle)
 	mkdir -p $(@D)
 	cp $< $@
 
-$(app-bundle): $(wallet-frontend)
+$(app-bundle): $(wallet-frontend) $(directory-frontend)
 	cd ${REPO_ROOT} && sbt bundle
 
 $(wallet-daml):
