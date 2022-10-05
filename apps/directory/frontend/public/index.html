@@ -30,6 +30,12 @@
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
     <title>React App</title>
+    <!--
+         Frontend configuration. Not part of the bundled application code,
+         so that operators can change the config without having to rebuild
+         the application.
+    -->
+    <script src="%PUBLIC_URL%/config.js"></script>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>
