@@ -40,9 +40,17 @@ trait FrontendIntegrationTest
     super.beforeEach()
   }
 
+  override def testFinished(env: CoinTestConsoleEnvironment): Unit = {
+    // testFinished runs before afterEach and tears down all our apps.
+    // Therefore, we need to check for errors here. Otherwise, we run
+    // into issues where we get an error just by virtue of the gRPC
+    // service being down.
+    findAll(id("error")).toList.map(e => fail(s"Found unexpected error: ${e.text}"))
+    super.testFinished(env)
+  }
+
   override def afterEach() = {
     super.afterEach()
-    findAll(id("error")).toList.map(e => fail(s"Found unexpected error: ${e.text}"))
     webDriver.quit()
   }
 
