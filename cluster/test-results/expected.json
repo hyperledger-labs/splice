@@ -751,6 +751,77 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
+               "app": "validator1-wallet-web-ui"
+            },
+            "name": "validator1-wallet-web-ui"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "validator1-wallet-web-ui"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "validator1-wallet-web-ui",
+                     "external": "true"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "image": "region-docker.pkg.dev/project/repo/validator1-wallet-web-ui:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "validator1-wallet-web-ui",
+                        "ports": [
+                           {
+                              "containerPort": 80,
+                              "name": "val1-wal-ui"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1024Mi"
+                           },
+                           "requests": {
+                              "memory": "1024Mi"
+                           }
+                        }
+                     }
+                  ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "name": "validator1-wallet-web-ui"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "val1-wal-ui",
+                  "port": 80,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "validator1-wallet-web-ui"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
                "app": "gcs-proxy"
             },
             "name": "gcs-proxy"
@@ -905,6 +976,10 @@
                            {
                               "containerPort": 5101,
                               "name": "val1-ledger-api"
+                           },
+                           {
+                              "containerPort": 7104,
+                              "name": "val1-wal-ui"
                            }
                         ],
                         "resources": {
@@ -998,6 +1073,11 @@
                   "name": "val1-ledger-api",
                   "port": 5101,
                   "protocol": "TCP"
+               },
+               {
+                  "name": "val1-wal-ui",
+                  "port": 7104,
+                  "protocol": "TCP"
                }
             ],
             "selector": {
@@ -1088,6 +1168,11 @@
                {
                   "name": "val1-ledger-api",
                   "port": 5101,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-wal-ui",
+                  "port": 7104,
                   "protocol": "TCP"
                }
             ],

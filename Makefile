@@ -15,7 +15,8 @@ apps := \
 	cluster/images/envoy-proxy \
 	cluster/images/validator1-participant \
 	cluster/images/validator1-validator-app \
-	cluster/images/validator1-wallet-app
+	cluster/images/validator1-wallet-app \
+	cluster/images/validator1-wallet-web-ui
 
 define make_apps
   for app in $(apps); do \
