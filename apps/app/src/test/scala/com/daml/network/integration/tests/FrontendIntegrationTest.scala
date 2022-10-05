@@ -1,5 +1,7 @@
 package com.daml.network.integration.tests
 
+import java.time.Duration
+
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
@@ -36,6 +38,7 @@ trait FrontendIntegrationTest
 
   override def beforeEach() = {
     webDriver = new FirefoxDriver(options)
+    webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
     super.beforeEach()
   }
 
