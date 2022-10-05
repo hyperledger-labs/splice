@@ -90,18 +90,41 @@ object CoinUtil extends UploadablePackage {
         .createAnd
         .exerciseCoinRules_MiningRound_Open(coinPrice = 1.0)
         .command
-    connection
-      .submitCommand(
-        actAs = Seq(svc),
-        readAs = Seq.empty,
-        command = Seq(
-          recordUserHostedAtCmd,
-          recordValidatorOfCmd,
-          createIssuanceStateCmd,
-          createCoinRulesCmd,
+    for {
+      _ <- connection.ignoreDuplicateKeyErrors(
+        connection.submitCommand(
+          actAs = Seq(svc),
+          readAs = Seq.empty,
+          command = Seq(recordUserHostedAtCmd),
         ),
+        s"SVC.setupApp($svc, ...)",
       )
-      .map(_ => ())
+      _ <- connection.ignoreDuplicateKeyErrors(
+        connection
+          .submitCommand(
+            actAs = Seq(svc),
+            readAs = Seq.empty,
+            command = Seq(recordValidatorOfCmd),
+          ),
+        s"SVC.setupApp($svc, ...)",
+      )
+      _ <- connection.ignoreDuplicateKeyErrors(
+        connection.submitCommand(
+          actAs = Seq(svc),
+          readAs = Seq.empty,
+          command = Seq(createIssuanceStateCmd),
+        ),
+        s"SVC.setupApp($svc, ...)",
+      )
+      _ <- connection.ignoreDuplicateKeyErrors(
+        connection.submitCommand(
+          actAs = Seq(svc),
+          readAs = Seq.empty,
+          command = Seq(createCoinRulesCmd),
+        ),
+        s"SVC.setupApp($svc, ...)",
+      )
+    } yield ()
   }
 
   def acceptCoinRulesRequests(
