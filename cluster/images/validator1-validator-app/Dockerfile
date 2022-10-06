@@ -8,4 +8,4 @@ COPY validator1-validator.conf .
 COPY bootstrap.scala .
 
 # default arguments if none are specified by user
-CMD ["daemon", "--no-tty", "--log-level-stdout", "DEBUG", "--log-level-canton=DEBUG", "--config", "validator1-validator.conf", "--bootstrap", "bootstrap.scala" ]
+CMD [ "daemon", "--no-tty", "--log-level-stdout=DEBUG", "--log-level-canton=DEBUG", "--log-file-appender=off", "--config", "validator1-validator.conf", "--bootstrap", "bootstrap.scala" ]

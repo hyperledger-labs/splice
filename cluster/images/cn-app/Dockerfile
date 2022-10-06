@@ -24,4 +24,4 @@ ADD ${APP_PATH} .
 ENTRYPOINT [ "coin-0.1.0-SNAPSHOT/bin/coin" ]
 
 # default arguments if none are specified by user
-CMD ["daemon", "--no-tty", "--log-level-stdout", "DEBUG", "--log-level-canton=DEBUG" ]
+CMD [ "daemon", "--no-tty", "--log-level-stdout=DEBUG", "--log-level-canton=DEBUG", "--log-file-appender=off" ]
