@@ -12,7 +12,12 @@ import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, Contract, Proto, Value}
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
 import com.daml.network.wallet.v0
-import com.daml.network.wallet.v0.{CollectRewardsRequest, WalletServiceGrpc}
+import com.daml.network.wallet.v0.{
+  CollectRewardsRequest,
+  UserStatusRequest,
+  UserStatusResponse,
+  WalletServiceGrpc,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -40,6 +45,23 @@ class GrpcWalletService(
   private val validatorParty: PartyId = store.key.validatorParty
 
   private val connection = ledgerClient.connection("GrpcWalletService")
+
+  @nowarn("cat=unused")
+  override def userStatus(request: UserStatusRequest): Future[UserStatusResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      val ctx = request.getWalletCtx.userName
+      val userStoreO = store.lookupEndUserStore(ctx)
+      for {
+        installation <- userStoreO
+          .map(_.lookupInstall().map(_.value))
+          .getOrElse(Future.successful(None))
+      } yield {
+        UserStatusResponse(
+          partyId = installation.fold("")(x => Primitive.Party.unwrap(x.payload.endUserParty)),
+          userOnboarded = installation.isDefined,
+        )
+      }
+    }
 
   private def coinToCoinPosition(coin: Contract[Coin], round: Long): v0.CoinPosition =
     v0.CoinPosition(

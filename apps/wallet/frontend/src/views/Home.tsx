@@ -3,8 +3,6 @@ import { useState } from 'react';
 import { TabPanel, TabContext } from '@mui/lab';
 import { Box, Tab, Tabs } from '@mui/material';
 
-import { WalletClientProvider } from '../contexts/WalletServiceContext';
-import { config } from '../utils';
 import AppPaymentRequests from './AppPaymentRequests';
 import Coins from './Coins';
 import PaymentChannels from './PaymentChannels';
@@ -13,7 +11,7 @@ const Home: React.FC<{ userId: string }> = ({ userId }) => {
   const [tabValue, setTabValue] = useState<string>('coins');
 
   return (
-    <WalletClientProvider url={config.wallet.grpcUrl}>
+    <>
       <Box sx={{ borderBottom: 1, borderColor: 'divider', marginBottom: 5 }}>
         <Tabs value={tabValue} onChange={(_, value) => setTabValue(value)}>
           <Tab label="Coins" value="coins" />
@@ -32,7 +30,7 @@ const Home: React.FC<{ userId: string }> = ({ userId }) => {
           <AppPaymentRequests userId={userId} />
         </TabPanel>
       </TabContext>
-    </WalletClientProvider>
+    </>
   );
 };
 

@@ -6,6 +6,7 @@ import "com/daml/network/v0/value.proto";
 import "google/protobuf/empty.proto";
 
 service WalletService {
+  rpc UserStatus (UserStatusRequest) returns (UserStatusResponse);
   rpc List (ListRequest) returns (ListResponse);
   rpc Tap (TapRequest) returns (TapResponse);
 
@@ -45,8 +46,13 @@ message WalletContext {
   string user_name = 1;
 }
 
-message InitializeRequest {
-  string validator_party_id = 2;
+message UserStatusRequest {
+  WalletContext wallet_ctx = 1;
+}
+
+message UserStatusResponse {
+  string party_id = 1;
+  bool user_onboarded = 2;
 }
 
 message ListRequest {

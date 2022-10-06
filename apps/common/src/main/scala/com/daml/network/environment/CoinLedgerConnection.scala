@@ -6,6 +6,7 @@ import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
 import com.daml.error.ErrorCategory
 import com.daml.error.definitions.LedgerApiErrors
+import com.daml.error.definitions.groups.UserManagementServiceErrors
 import com.daml.error.utils.ErrorDetails
 import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.daml.ledger.api.domain.UserRight
@@ -165,6 +166,8 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
 
   def transactionTreeById(parties: Seq[PartyId], id: String): Future[Option[TransactionTree]]
   def transactionById(parties: Seq[PartyId], id: String): Future[Option[Transaction]]
+
+  def userExists(user: String): Future[Boolean]
 
   def getPrimaryParty(user: String): Future[PartyId]
 
@@ -498,6 +501,24 @@ object CoinLedgerConnection {
           .map { resp =>
             resp.transaction
           }
+
+      override def userExists(user: String): Future[Boolean] = {
+        val userId = com.daml.lf.data.Ref.UserId.assertFromString(user)
+        for {
+          result <- client.userManagementClient
+            .getUser(userId, coinLedgerClient.token)
+            .transform {
+              case Success(_) => Success(true)
+              case Failure(e: StatusRuntimeException)
+                  if ErrorDetails.matches(
+                    e,
+                    UserManagementServiceErrors.UserNotFound,
+                  ) =>
+                Success(false)
+              case Failure(e) => Failure(e)
+            }
+        } yield result
+      }
 
       override def getOptionalPrimaryParty(user: String): Future[Option[PartyId]] = {
         val userId = com.daml.lf.data.Ref.UserId.assertFromString(user)

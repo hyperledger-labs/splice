@@ -43,12 +43,13 @@ function start_frontend() {
   port=$2
   app_grpc=$3
   ledger_grpc=$4
-  user=$5
+  validator_grpc=$5
+  user=$6
 
   script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
   frontend_dir="${script_dir}/apps/${app}/frontend"
 
-  tmux_cmd "${app}-${user}" "${frontend_dir}" "BROWSER=none PORT=$port REACT_APP_GRPC_URL=http://localhost:${app_grpc} REACT_APP_LEDGER_API_GRPC_URL=http://localhost:${ledger_grpc} npm start"
+  tmux_cmd "${app}-${user}" "${frontend_dir}" "BROWSER=none PORT=$port REACT_APP_GRPC_URL=http://localhost:${app_grpc} REACT_APP_VALIDATOR_API_GRPC_URL=http://localhost:${validator_grpc} REACT_APP_LEDGER_API_GRPC_URL=http://localhost:${ledger_grpc} npm start"
 }
 
 function usage() {
@@ -86,11 +87,11 @@ build_frontend directory
 
 start_envoy
 
-start_frontend wallet 3000 6204 NA alice
-start_frontend wallet 3001 6304 NA bob
-start_frontend splitwise 3002 8082 8085 alice
-start_frontend splitwise 3003 8082 8086 bob
-start_frontend directory 3004 8084 8085 alice
+start_frontend wallet 3000 6204 NA 6203 alice
+start_frontend wallet 3001 6304 NA 6303 bob
+start_frontend splitwise 3002 8082 8085 NA alice
+start_frontend splitwise 3003 8082 8086 NA bob
+start_frontend directory 3004 8084 8085 NA alice
 
 if [ $daemon -eq 0 ]; then
   tmux attach -t ${tmux_session}
