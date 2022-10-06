@@ -176,6 +176,8 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
       username: String
   )(implicit traceContext: TraceContext): Future[PartyId]
 
+  def listPackages()(implicit traceContext: TraceContext): Future[Set[String]]
+
   def uploadDarFile(pkg: UploadablePackage)(implicit traceContext: TraceContext): Future[Unit]
   def uploadDarFile(path: Path)(implicit traceContext: TraceContext): Future[Unit]
 
@@ -564,6 +566,9 @@ object CoinLedgerConnection {
 
         client.userManagementClient.grantUserRights(userId, grants)
       }
+
+      override def listPackages()(implicit traceContext: TraceContext): Future[Set[String]] =
+        client.packageClient.listPackages().map(_.packageIds.toSet)
 
       private def uploadDarFileInternal(packageId: String, darFile: => ByteString)(implicit
           traceContext: TraceContext

@@ -23,8 +23,8 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
-import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import io.opentelemetry.api.trace.Tracer
+import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -46,7 +46,13 @@ class ValidatorAppNode(
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
-) extends CoinNode[ValidatorAppNode.State](coinAppParameters, loggerFactory, tracerProvider) {
+) extends CoinNode[ValidatorAppNode.State](
+      config.damlUser,
+      config.remoteParticipant,
+      coinAppParameters,
+      loggerFactory,
+      tracerProvider,
+    ) {
 
   private def setupWallet(connection: CoinLedgerConnection): Future[PartyId] = {
     logger.info(s"Attempting to setup wallet...")
@@ -132,22 +138,20 @@ class ValidatorAppNode(
     }
   }
 
-  override def initialize(): Future[ValidatorAppNode.State] =
+  override def initialize(
+      ledgerClient: CoinLedgerClient,
+      validatorParty: PartyId,
+  ): Future[ValidatorAppNode.State] =
     for {
-      ledgerClient <-
-        Future.successful(createLedgerClient(config.remoteParticipant))
-
-      scanConnection =
-        new ScanConnection(
-          config.remoteScan.clientAdminApi,
-          coinAppParameters.processingTimeouts,
-          loggerFactory,
+      scanConnection <-
+        Future.successful(
+          new ScanConnection(
+            config.remoteScan.clientAdminApi,
+            coinAppParameters.processingTimeouts,
+            loggerFactory,
+          )
         )
       connection = ledgerClient.connection("ValidatorAppBootstrap")
-      validatorParty <- connection.retryLedgerApi(
-        connection.getPrimaryParty(config.damlUser),
-        CoinLedgerConnection.RetryOnUserManagementError,
-      )
       _ = logger.info(s"Got primary party of validator user: $validatorParty")
       svcParty <- scanConnection.getSvcPartyId()
       walletServiceParty <- setupWallet(connection)
@@ -180,20 +184,21 @@ class ValidatorAppNode(
       ValidatorAppNode.State(
         storage,
         store,
-        ledgerClient,
         scanConnection,
         loggerFactory.getTracedLogger(ValidatorAppNode.State.getClass),
       )
     }
 
   override val ports = Map("admin" -> config.adminApi.port)
+
+  // Validator actually uploads packages so no dep.
+  override val requiredTemplates = Set.empty
 }
 
 object ValidatorAppNode {
   case class State(
       storage: Storage,
       store: ValidatorAppStore,
-      ledgerClient: CoinLedgerClient,
       scanConnection: ScanConnection,
       logger: TracedLogger,
   ) extends AutoCloseable {
@@ -201,7 +206,6 @@ object ValidatorAppNode {
       Lifecycle.close(
         storage,
         store,
-        ledgerClient,
         scanConnection,
       )(logger)
 

@@ -21,7 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class GrpcSplitwiseService(
     ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
-    providerUser: String,
+    providerParty: PartyId,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -34,15 +34,12 @@ class GrpcSplitwiseService(
 
   private val connection = ledgerClient.connection("GrpcSplitwiseService")
 
-  def getProviderParty = connection.getPrimaryParty(providerUser)
-
   override def listGroups(
       request: v0.ListGroupsRequest
   ): Future[v0.ListGroupsResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
+      val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
       for {
-        providerParty <- getProviderParty
-        userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
         // TODO(M1-42): check (or simulate check) of the user's cross-participant access token
         groups <- connection.activeContracts(providerParty, splitwiseCodegen.Group)
       } yield {
@@ -55,9 +52,8 @@ class GrpcSplitwiseService(
       request: v0.ListGroupInvitesRequest
   ): Future[v0.ListGroupInvitesResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
+      val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
       for {
-        providerParty <- getProviderParty
-        userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
         groupInvites <- connection.activeContracts(providerParty, splitwiseCodegen.GroupInvite)
       } yield {
         val filtered = groupInvites.filter(c => c.hasStakeholder(userParty.toPrim))
@@ -71,9 +67,8 @@ class GrpcSplitwiseService(
       request: v0.ListAcceptedGroupInvitesRequest
   ): Future[v0.ListAcceptedGroupInvitesResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
+      val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
       for {
-        providerParty <- getProviderParty
-        userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
         acceptedGroupInvites <- connection.activeContracts(
           providerParty,
           splitwiseCodegen.AcceptedGroupInvite,
@@ -94,9 +89,8 @@ class GrpcSplitwiseService(
       request: v0.ListBalanceUpdatesRequest
   ): Future[v0.ListBalanceUpdatesResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
+      val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
       for {
-        providerParty <- getProviderParty
-        userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
         balanceUpdates <- connection.activeContracts(providerParty, splitwiseCodegen.BalanceUpdate)
       } yield {
         val filtered = balanceUpdates.filter(c =>
@@ -117,9 +111,8 @@ class GrpcSplitwiseService(
       request: v0.ListBalancesRequest
   ): Future[v0.ListBalancesResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
+      val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
       for {
-        providerParty <- getProviderParty
-        userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
         balanceUpdates <- connection.activeContracts(providerParty, splitwiseCodegen.BalanceUpdate)
       } yield {
         val filtered = balanceUpdates
@@ -180,11 +173,7 @@ class GrpcSplitwiseService(
 
   override def getProviderPartyId(request: Empty): Future[v0.GetProviderPartyIdResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
-      for {
-        party <- getProviderParty
-      } yield {
-        v0.GetProviderPartyIdResponse(Proto.encode(party))
-      }
+      Future.successful(v0.GetProviderPartyIdResponse(Proto.encode(providerParty)))
     }
 
   private def installKey(

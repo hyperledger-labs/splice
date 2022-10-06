@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerConnection, CoinLedgerClient, CoinNode}
+import com.daml.network.environment.{CoinLedgerClient, CoinNode}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AppCoinStore
 import com.daml.network.validator.admin.api.client.ValidatorConnection
@@ -19,7 +19,9 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
+import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -42,13 +44,24 @@ class WalletApp(
     esf: ExecutionSequencerFactory,
     mat: Materializer,
     tracer: Tracer,
-) extends CoinNode[WalletApp.State](coinAppParameters, loggerFactory, tracerProvider) {
+) extends CoinNode[WalletApp.State](
+      config.serviceUser,
+      config.remoteParticipant,
+      coinAppParameters,
+      loggerFactory,
+      tracerProvider,
+    ) {
 
-  override def initialize(): Future[WalletApp.State] =
+  // Wallet app starts last so we bump the retries here
+  override val maxRetries = 20
+
+  override def initialize(
+      ledgerClient: CoinLedgerClient,
+      walletServiceParty: PartyId,
+  ): Future[WalletApp.State] =
     for {
       coinStore <- Future.successful(AppCoinStore(storage, loggerFactory))
       store = WalletAppRequestStore(storage, loggerFactory)
-      ledgerClient = createLedgerClient(config.remoteParticipant)
       scanConnection =
         new ScanConnection(
           config.remoteScan.clientAdminApi,
@@ -65,13 +78,6 @@ class WalletApp(
 
       connection = ledgerClient.connection("SvcAppBootstrap")
 
-      walletServiceParty <-
-        connection.retryLedgerApi(
-          connection.getPrimaryParty(config.serviceUser),
-          CoinLedgerConnection.RetryOnUserManagementError,
-          // Wallet app starts last so we bump the retries here
-          maxRetriesO = Some(20),
-        )
       validatorParty <- validatorConnection.getValidatorPartyId()
       svcParty <- scanConnection.getSvcPartyId()
     } yield {
@@ -110,7 +116,6 @@ class WalletApp(
         coinStore,
         walletStore,
         store,
-        ledgerClient,
         scanConnection,
         validatorConnection,
         loggerFactory.getTracedLogger(WalletApp.State.getClass),
@@ -119,6 +124,8 @@ class WalletApp(
 
   override val ports =
     Map("admin" -> config.adminApi.port)
+
+  override val requiredTemplates = Set(walletCodegen.WalletAppInstall)
 }
 
 object WalletApp {
@@ -128,7 +135,6 @@ object WalletApp {
       coinStore: AppCoinStore,
       walletStore: WalletStore,
       store: WalletAppRequestStore,
-      ledgerClient: CoinLedgerClient,
       scanConnection: ScanConnection,
       validatorConnection: ValidatorConnection,
       logger: TracedLogger,
@@ -138,7 +144,6 @@ object WalletApp {
         automation,
         storage,
         walletStore,
-        ledgerClient,
         scanConnection,
         validatorConnection,
       )(logger)

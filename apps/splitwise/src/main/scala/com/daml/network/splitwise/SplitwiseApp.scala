@@ -9,12 +9,14 @@ import com.daml.network.splitwise.admin.grpc.GrpcSplitwiseService
 import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
 import com.daml.network.splitwise.store.SplitwiseAppStore
 import com.daml.network.splitwise.v0.SplitwiseServiceGrpc
+import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.api.trace.Tracer
 
@@ -38,17 +40,21 @@ class SplitwiseApp(
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
-) extends CoinNode[SplitwiseApp.State](coinAppParameters, loggerFactory, tracerProvider) {
+) extends CoinNode[SplitwiseApp.State](
+      config.providerUser,
+      config.remoteParticipant,
+      coinAppParameters,
+      loggerFactory,
+      tracerProvider,
+    ) {
 
   override val ports = Map("admin" -> config.adminApi.port)
 
-  override def initialize(): Future[SplitwiseApp.State] = for {
+  override def initialize(
+      ledgerClient: CoinLedgerClient,
+      party: PartyId,
+  ): Future[SplitwiseApp.State] = for {
     store <- Future.successful(SplitwiseAppStore(storage, loggerFactory))
-    ledgerClient =
-      createLedgerClient(
-        config.remoteParticipant
-      )
-
     scanConnection =
       new ScanConnection(
         config.remoteScan.clientAdminApi,
@@ -61,7 +67,7 @@ class SplitwiseApp(
         new GrpcSplitwiseService(
           ledgerClient,
           scanConnection,
-          config.providerUser,
+          party,
           loggerFactory,
         ),
         ec,
@@ -70,18 +76,18 @@ class SplitwiseApp(
     SplitwiseApp.State(
       storage,
       store,
-      ledgerClient,
       scanConnection,
       loggerFactory.getTracedLogger(SplitwiseApp.State.getClass),
     )
   }
+
+  override val requiredTemplates = Set(splitwiseCodegen.SplitwiseInstall)
 }
 
 object SplitwiseApp {
   case class State(
       storage: Storage,
       store: SplitwiseAppStore,
-      ledgerClient: CoinLedgerClient,
       scanConnection: ScanConnection,
       logger: TracedLogger,
   ) extends AutoCloseable {
@@ -89,7 +95,6 @@ object SplitwiseApp {
       Lifecycle.close(
         storage,
         store,
-        ledgerClient,
         scanConnection,
       )(logger)
   }

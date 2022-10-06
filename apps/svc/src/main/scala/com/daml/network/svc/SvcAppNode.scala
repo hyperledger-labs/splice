@@ -16,6 +16,7 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
+import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.api.trace.Tracer
 
@@ -39,19 +40,24 @@ class SvcAppNode(
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
-) extends CoinNode[SvcAppNode.State](coinAppParameters, loggerFactory, tracerProvider) {
+) extends CoinNode[SvcAppNode.State](
+      config.damlUser,
+      config.remoteParticipant,
+      coinAppParameters,
+      loggerFactory,
+      tracerProvider,
+    ) {
 
-  override def initialize(): Future[SvcAppNode.State] =
+  override val allocateServiceUser = true
+
+  override def initialize(
+      ledgerClient: CoinLedgerClient,
+      svcPartyId: PartyId,
+  ): Future[SvcAppNode.State] =
     for {
       store <- Future.successful(SvcAppStore(storage, loggerFactory))
-
-      ledgerClient =
-        createLedgerClient(config.remoteParticipant)
-
       connection = ledgerClient.connection("SvcAppBootstrap")
       _ <- connection.uploadDarFile(CoinUtil)
-      svcPartyId <- connection.getOrAllocateParty(config.damlUser)
-      _ = logger.info(s"Allocated SVC party $svcPartyId")
       _ <- CoinUtil.setupApp(svcPartyId, connection)
       _ = logger.info(s"SVC App is initialized")
       automation = new SvcAutomationService(
@@ -72,12 +78,14 @@ class SvcAppNode(
         storage,
         store,
         automation,
-        ledgerClient,
         logger,
       )
     }
 
   override val ports = Map("admin" -> config.adminApi.port)
+
+  // SVC app uploads package so no dep.
+  override val requiredTemplates = Set.empty
 }
 
 object SvcAppNode {
@@ -85,7 +93,6 @@ object SvcAppNode {
       storage: Storage,
       store: SvcAppStore,
       automation: SvcAutomationService,
-      ledgerClient: CoinLedgerClient,
       logger: TracedLogger,
   ) extends AutoCloseable {
     override def close() =
@@ -93,7 +100,6 @@ object SvcAppNode {
         storage,
         store,
         automation,
-        ledgerClient,
       )(logger)
 
   }
