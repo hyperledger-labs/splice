@@ -4,7 +4,7 @@ if [ -z "${CI}" ]; then
     revision_prefix="${USER}-"
 fi
 
-if [[ $(gitdiff --stat) != '' || $(git diff --cached) != '' ]]; then
+if [[ $(git diff --stat) != '' || $(git diff --cached) != '' ]]; then
     if [ -z "${CI}" ]; then
         revision_suffix="-dirty"
     else

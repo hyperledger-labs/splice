@@ -631,7 +631,7 @@ jobs:
          cmd_name: apply cluster manifest
          with_scratchnet_authentication: true
          cmd: |
-           . $REPO_ROOT/deployment/staging/.envrc.vars
+           . $REPO_ROOT/cluster/deployment/staging/.envrc.vars
            cncluster activate
            cncluster ciapply
       - slack/notify:
@@ -652,7 +652,7 @@ jobs:
          cmd_name: apply cluster manifest
          with_devnet_authentication: true
          cmd: |
-           . $REPO_ROOT/deployment/devnet/.envrc.vars
+           . $REPO_ROOT/cluster/deployment/devnet/.envrc.vars
            cncluster activate
            cncluster ciapply
       - slack/notify:
@@ -673,7 +673,7 @@ jobs:
          cmd_name: apply cluster manifest
          with_devnet_authentication: true
          cmd: |
-           . $REPO_ROOT/deployment/testnet/.envrc.vars
+           . $REPO_ROOT/cluster/deployment/testnet/.envrc.vars
            cncluster activate
            cncluster ciapply
       - slack/notify:

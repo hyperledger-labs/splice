@@ -376,7 +376,7 @@ cluster (see section `GCE Clusters`), change into the cluster's
 deployment directory and run `cncluster preflight`:
 
 ```
-cd deployment/devnet
+cd cluster/deployment/devnet
 cncluster preflight
 ```
 

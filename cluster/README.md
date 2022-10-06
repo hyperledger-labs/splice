@@ -248,15 +248,15 @@ authenticated properly against GCE.
 
 ### Cluster Management Operations
 
-Operations against GCE clusters are complicated by the facts that there
-are more than one cluster and these clusters are usually shared.  To
-accommodate this, there is a [`deployment`](/deployment) directory
-that is used to manage the configuration of each cluster. Each extant
-cluster has a directory under `deployments` and operations against
-that cluster must be invoked from within that directory. This reduces
-the possibility of operating on the wrong cluster, and allows the use
-of the `.envrc` mechanism to provide whatever configuration is
-necessary to identify a given cluster.
+Operations against GCE clusters are complicated by the fact that there
+is more than one cluster, and the clusters have different connection
+paramaters. To accommodate this, there is a directory under
+[`cluster/deployment`](/cluster/deployment) for each cluster that
+contains the connection configuration specific to that cluster. Operations
+against that cluster must be invoked from within that directory. This
+reduces the possibility of operating on the wrong cluster, and allows
+the use of the `.envrc` mechanism to provide whatever configuration
+is necessary to identify a given cluster.
 
 Available operations include:
 
@@ -313,11 +313,11 @@ Finally, apply the changes to the cluster. This is an example of
 applying cluster changes to DevNet.  (For this to work, you will
 need to be connected to the VPN.)
 
-`(cd deployment/devnet && CI=true cncluster apply)`
+`(cd cluster/deployment/devnet && CI=true cncluster apply)`
 
 Successful pod deplomyment can then be checked:
 
-`(cd deployment/devnet && kubectl get pods)`
+`(cd cluster/deployment/devnet && kubectl get pods)`
 
 This should produce a list of pods, all in running status:
 
@@ -486,11 +486,11 @@ For details on the individual steps, read the above sections.
 6. Deploy your cluster definition to scratchnet
     1. Scratchnet is used for ad-hoc testing, and we only have one instance of scratchnet.
        Coordinate with team members if you are not sure that you are the only one using it.
-    2. Run `cd deployment/scratchnet` and execute all following commands in this section from that directory
+    2. Run `cd cluster/deployment/scratchnet` and execute all following commands in this section from that directory
     3. Run `cncluster apply` to deploy your cluster definition.
         1. If you get errors about missing images, re-upload your docker images.
 7. Debug your deployment on scratchnet
-   1. Run `cd deployment/scratchnet` and execute all following commands in this section from that directory
+   1. Run `cd cluster/deployment/scratchnet` and execute all following commands in this section from that directory
    2. Run `kubectl get pods` to get the status of all pods.
    3. Run `kubectl describe pod <pod-name>` to get a detailed status of the given pod.
    4. Run `kubectl logs` to download application logs
