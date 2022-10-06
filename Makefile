@@ -49,7 +49,7 @@ docker-check:
 
 .PHONY: test
 test:
-	make -C cluster test
+	make -C cluster/manifest test
 
 .PHONY: clean
 clean:
