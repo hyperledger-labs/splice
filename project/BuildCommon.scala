@@ -67,13 +67,17 @@ object BuildCommon {
       )
     })
 
-  lazy val copyDarResources: Seq[Def.Setting[_]] =
-    Seq(Compile / resourceGenerators += Def.task {
-      val Seq(srcFile) = (Compile / damlBuild).value
-      val dstFile = (Compile / resourceDirectory).value / "dar" / srcFile.getName()
-      IO.copyFile(srcFile, dstFile)
-      Seq(dstFile)
-    }.taskValue)
+  lazy val copyDarResources: Seq[Def.Setting[_]] = {
+    Seq(
+      Compile / resourceGenerators += Def.task {
+        val Seq(srcFile) = (Compile / damlBuild).value
+        val dstFile = (Compile / resourceDirectory).value / "dar" / srcFile.getName()
+        IO.copyFile(srcFile, dstFile)
+        Seq(dstFile)
+      }.taskValue,
+      cleanFiles += { (Compile / resourceDirectory).value / "dar" },
+    )
+  }
 
   lazy val sbtSettings: Seq[Def.Setting[_]] = {
 
@@ -121,9 +125,11 @@ object BuildCommon {
           "lint",
           "; protobufLint ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck",
         ) ++
+        // it might happen that some DARs remain dangling on build config changes,
+        // so we explicitly remove all CN DARs here, just in case
         addCommandAlias(
           "clean-cn",
-          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwise/clean; apps-svc/clean; apps-wallet/clean; apps-directory/clean; apps-app/clean; apps-wallet-daml/clean",
+          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwise/clean; apps-svc/clean; apps-wallet/clean; apps-directory/clean; apps-app/clean; apps-wallet-daml/clean; cleanCnDars",
         )
     val buildSettings = inThisBuild(
       Seq(

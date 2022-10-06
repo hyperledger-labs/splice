@@ -271,6 +271,13 @@ lazy val bundleTask = {
   }
 }
 
+lazy val cleanCnDars = taskKey[Unit]("Remove all `.dar` files in `apps` and `canton-coin`")
+cleanCnDars := {
+  val log = streams.value.log
+  runCommand(s"find apps -name *.dar -delete", log)
+  runCommand(s"find canton-coin -name *.dar -delete", log)
+}
+
 lazy val checkErrors = taskKey[Unit]("Check test log for errors and fail if there is one")
 checkErrors := {
   import scala.sys.process._
