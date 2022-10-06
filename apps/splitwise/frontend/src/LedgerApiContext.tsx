@@ -55,7 +55,7 @@ class LedgerApiClient {
     argument: C
   ): Promise<R> {
     const encodedKey = choice.template().keyEncodeProto(key);
-    const encodedArg = choice.argumentSerializable.encodeProto(argument);
+    const encodedArg = choice.argumentSerializable().encodeProto(argument);
     const [packageId, moduleName, entityName] = choice.template().templateId.split(':');
     const templateId = new Identifier()
       .setPackageId(packageId)
@@ -81,7 +81,7 @@ class LedgerApiClient {
       .getEventsByIdMap()
       .get(transaction.getRootEventIdsList()[0])
       ?.getExercised()!;
-    const exerciseResult = choice.resultSerializable.decodeProto(exerciseEv.getExerciseResult()!);
+    const exerciseResult = choice.resultSerializable().decodeProto(exerciseEv.getExerciseResult()!);
     return exerciseResult;
   }
 

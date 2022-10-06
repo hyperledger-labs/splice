@@ -85,7 +85,8 @@ commands:
             mkdir -p /tmp/classes
             # Excluding ./track, as its contents may change while the archive is created.
             # Excluding ./log, as its large and we don't need it.
-            tar -czf /tmp/classes/classes.tar.gz --exclude-vcs --exclude=./track --exclude=./log -H posix .
+            # Excluding frontend since caching NPM is a terrible idea and we should not do it or Moritz will cry.
+            tar -czf /tmp/classes/classes.tar.gz --exclude-vcs --exclude=./track --exclude=./log --exclude frontend -H posix .
       - save_cache:
           name: Uploading archive with compiled classes to cache
           # Key components:
@@ -93,7 +94,7 @@ commands:
           # - branch: to prevent re-usage of classes between branches
           # - dependencies: to prevent re-usage of classes with mismatching libraries (this can lead to subtle errors)
           # - rev: to allow for updating the cache when sources have changed
-          key: &compiled_classes_key classes ci-job={{ .Environment.CIRCLE_JOB }} branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }} rev:{{ .Revision }}
+          key: &compiled_classes_key classes-<< pipeline.parameters.cache-version >> ci-job={{ .Environment.CIRCLE_JOB }} branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }} rev:{{ .Revision }}
           paths:
             - /tmp/classes
       - store_artifacts:
@@ -118,10 +119,10 @@ commands:
             - *compiled_classes_key
             # Then, try to download the latest class files produced for the same branch.
             # Make sure that library versions still match.
-            - classes ci-job={{ .Environment.CIRCLE_JOB }} branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }}
+            - classes-<< pipeline.parameters.cache-version >> ci-job={{ .Environment.CIRCLE_JOB }} branch:{{ .Branch }} buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }}
             # Then, try to download the latest class files produced for the main branch.
             # Make sure that library versions still match.
-            - classes ci-job={{ .Environment.CIRCLE_JOB }} branch:main buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }}
+            - classes-<< pipeline.parameters.cache-version >> ci-job={{ .Environment.CIRCLE_JOB }} branch:main buildprops:{{ checksum "project/build.properties" }} buildcommon:{{ checksum "project/BuildCommon.scala" }} damlplugin:{{ checksum "project/DamlPlugin.scala" }} dependencies:{{ checksum "project/Dependencies.scala" }} canton-dependencies:{{ checksum "project/CantonDependencies.scala" }} houserules:{{ checksum "project/Houserules.scala" }} plugins:{{ checksum "project/plugins.sbt" }} build={{ checksum "build.sbt" }}
       - run:
           name: Extracting precompiled classes
           command: |
@@ -435,6 +436,11 @@ parameters:
   sdk-version:
     type: string
     default: "2.4.0-snapshot.20220905.10544.0.a2ea3ce6" # sdk-version
+  # Bump this when you change the definition of what is being cached to make sure
+  # old files don’t pollute your build.
+  cache-version:
+    type: string
+    default: "1"
   # Set to true for all scheduled jobs
   run-schedule:
     type: boolean
