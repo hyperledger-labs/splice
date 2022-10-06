@@ -12,11 +12,12 @@ import com.digitalasset.canton.console.commands.{
   TopologyAdministrationGroup,
 }
 import com.digitalasset.canton.console.{
-  ConsoleCommandResult,
   ConsoleEnvironment,
+  ConsoleCommandResult,
   ConsoleMacros,
   FeatureFlag,
   Help,
+  LocalInstanceReference,
   InstanceReference,
   LedgerApiCommandRunner,
   RemoteParticipantReference,
@@ -29,13 +30,16 @@ import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.topology.ParticipantId
 
 /** Copy of Canton ParticipantReference */
-abstract class CoinAppReference(
-    override val consoleEnvironment: ConsoleEnvironment,
-    val name: String,
-) extends InstanceReference
+trait CoinAppReference
+    extends InstanceReference
     with ParticipantAdministration
     with LedgerApiAdministration
     with LedgerApiCommandRunner {
+
+  override val name: String
+
+  override implicit val consoleEnvironment: ConsoleEnvironment = coinConsoleEnvironment
+  implicit val coinConsoleEnvironment: CoinConsoleEnvironment
 
   override type InstanceId = ParticipantId
 
@@ -89,7 +93,7 @@ abstract class CoinAppReference(
   override def parties: ParticipantPartiesAdministrationGroup = partiesGroup
 
   @Help.Summary("Wait until initialization has completed")
-  def waitForInitialization()(implicit env: ConsoleEnvironment): Unit =
+  def waitForInitialization(): Unit =
     ConsoleMacros.utils.retry_until_true(health.status.successOption.map(_.active).getOrElse(false))
 
   // TODO(i736): slightly adapted compared to Canton.
@@ -103,6 +107,14 @@ abstract class CoinAppReference(
 
   def runningNode: Option[CantonNodeBootstrap[ParticipantNode]] =
     consoleEnvironment.environment.participants.getRunning(name)
+}
+
+trait LocalCoinAppReference extends CoinAppReference with LocalInstanceReference {
+  @Help.Summary("Start node and wait for initialization to complete")
+  def startSync(): Unit = {
+    this.start()
+    waitForInitialization()
+  }
 }
 
 /** Subclass of RemoteParticipant that takes the config as an argument

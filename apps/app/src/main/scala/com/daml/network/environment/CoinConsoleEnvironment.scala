@@ -1,6 +1,8 @@
 package com.daml.network.environment
 
 import com.daml.network.console.{
+  LocalCoinAppReference,
+  CoinAppReference,
   DirectoryAppReference,
   LocalDirectoryAppReference,
   LocalScanAppReference,
@@ -56,39 +58,54 @@ class CoinConsoleEnvironment(
   override type DomainRemoteRef = CommunityRemoteDomainReference
   override type Status = CommunityCantonStatus
 
+  def mergeLocalCoinInstances(locals: Seq[LocalCoinAppReference]*): Seq[LocalCoinAppReference] =
+    locals.flatten
+  def mergeRemoteCoinInstances(remotes: Seq[CoinAppReference]*): Seq[CoinAppReference] =
+    remotes.flatten
+
   override lazy val nodes = NodeReferences(
     // this override ensures that config options like manualStart also work for CN apps
     mergeLocalInstances(
       participants.local,
       domains.local,
-      validators.local,
-      svcOpt.toList,
-      scans.local,
-      wallets.local,
-      directories.local,
-      splitwises.local,
+      coinNodes.local,
     ),
     mergeRemoteInstances(
-      directories.remote,
       participants.remote,
       domains.remote,
-      validators.remote,
-      scans.remote,
-      wallets.remote,
-      splitwises.remote,
+      coinNodes.remote,
     ),
   )
 
+  lazy val coinNodes: NodeReferences[
+    CoinAppReference,
+    CoinAppReference,
+    LocalCoinAppReference,
+  ] = {
+    NodeReferences(
+      mergeLocalCoinInstances(
+        appsHostedBySvc.local,
+        appsHostedByValidator.local,
+        appsHostedByThirdParty.local,
+      ),
+      mergeRemoteCoinInstances(
+        appsHostedBySvc.remote,
+        appsHostedByValidator.remote,
+        appsHostedByThirdParty.remote,
+      ),
+    )
+  }
+
   /* Local apps that are (in the target deployment) operated by the SVC */
   lazy val appsHostedBySvc = NodeReferences(
-    mergeLocalInstances(svcOpt.toList, scans.local, directories.local),
-    mergeRemoteInstances(remoteSvcOpt.toList, scans.remote, directories.remote),
+    mergeLocalCoinInstances(svcOpt.toList, scans.local, directories.local),
+    mergeRemoteCoinInstances(remoteSvcOpt.toList, scans.remote, directories.remote),
   )
 
   /* Local apps that are (in the target deployment) operated by a self-hosted validator */
   lazy val appsHostedByValidator = NodeReferences(
-    mergeLocalInstances(validators.local, wallets.local),
-    mergeRemoteInstances(validators.remote, wallets.remote),
+    mergeLocalCoinInstances(validators.local, wallets.local),
+    mergeRemoteCoinInstances(validators.remote, wallets.remote),
   )
 
   /* Local apps that are (in the target deployment) operated by a third party */
@@ -320,6 +337,12 @@ class CoinConsoleEnvironment(
         ),
         appsHostedByThirdParty,
         Seq("App References"),
+      ) :+
+      TopLevelValue(
+        "coinNodes",
+        "All Coin nodes excluding standard Canton nodes",
+        coinNodes,
+        Seq("App references"),
       )
 
   }

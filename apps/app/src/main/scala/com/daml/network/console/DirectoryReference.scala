@@ -12,15 +12,14 @@ import com.digitalasset.canton.console.{
   ExternalLedgerApiClient,
   GrpcRemoteInstanceReference,
   Help,
-  LocalInstanceReference,
 }
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
 abstract class DirectoryAppReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
-    name: String,
-) extends CoinAppReference(consoleEnvironment, name) {
+    override val coinConsoleEnvironment: CoinConsoleEnvironment,
+    override val name: String,
+) extends CoinAppReference {
   @Help.Summary("List all directory entries")
   def listEntries(): Seq[Contract[codegen.DirectoryEntry]] =
     consoleEnvironment.run {
@@ -51,9 +50,9 @@ abstract class DirectoryAppReference(
   */
 class LocalDirectoryAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
-    name: String,
+    override val name: String,
 ) extends DirectoryAppReference(consoleEnvironment, name)
-    with LocalInstanceReference
+    with LocalCoinAppReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Directory"

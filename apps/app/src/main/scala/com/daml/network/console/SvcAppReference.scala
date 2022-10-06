@@ -5,19 +5,14 @@ import com.daml.network.codegen.CC.{Round => roundCodegen}
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.svc.admin.api.client.commands.GrpcSvcAppClient
 import com.daml.network.svc.config.{LocalSvcAppConfig, RemoteSvcAppConfig}
-import com.digitalasset.canton.console.{
-  BaseInspection,
-  GrpcRemoteInstanceReference,
-  Help,
-  LocalInstanceReference,
-}
+import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
 abstract class SvcAppReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
-    name: String,
-) extends CoinAppReference(consoleEnvironment, name) {
+    override val coinConsoleEnvironment: CoinConsoleEnvironment,
+    override val name: String,
+) extends CoinAppReference {
 
   @deprecated(
     "This is now automated in SvcAutomationService. We only still have it in case it may be useful.",
@@ -101,7 +96,7 @@ class LocalSvcAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
 ) extends SvcAppReference(consoleEnvironment, name)
-    with LocalInstanceReference
+    with LocalCoinAppReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "SVC"

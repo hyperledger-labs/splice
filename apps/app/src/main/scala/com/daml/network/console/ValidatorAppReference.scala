@@ -3,12 +3,7 @@ package com.daml.network.console
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.validator.admin.api.client.commands.GrpcValidatorAppClient
 import com.daml.network.validator.config.{LocalValidatorAppConfig, RemoteValidatorAppConfig}
-import com.digitalasset.canton.console.{
-  BaseInspection,
-  GrpcRemoteInstanceReference,
-  Help,
-  LocalInstanceReference,
-}
+import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
@@ -16,9 +11,9 @@ import com.digitalasset.canton.topology.PartyId
   * app reference.
   */
 abstract class ValidatorAppReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
-    name: String,
-) extends CoinAppReference(consoleEnvironment, name) {
+    override val coinConsoleEnvironment: CoinConsoleEnvironment,
+    override val name: String,
+) extends CoinAppReference {
 
   override protected val instanceType = "Validator"
 
@@ -44,7 +39,7 @@ final class LocalValidatorAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
 ) extends ValidatorAppReference(consoleEnvironment, name)
-    with LocalInstanceReference
+    with LocalCoinAppReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Local Validator"

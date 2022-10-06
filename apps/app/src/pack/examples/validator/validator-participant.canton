@@ -14,4 +14,4 @@ validatorParticipant.ledger_api.users.create(
     participantAdmin = true,
 )
 println("Starting all first-party apps of the self-hosted validator")
-nodes.local.foreach(_.start())
+coinNodes.local.foreach(_.startSync())

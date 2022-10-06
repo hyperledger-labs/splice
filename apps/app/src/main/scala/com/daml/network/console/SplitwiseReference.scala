@@ -22,7 +22,6 @@ import com.digitalasset.canton.console.{
   ExternalLedgerApiClient,
   GrpcRemoteInstanceReference,
   Help,
-  LocalInstanceReference,
 }
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
@@ -31,9 +30,9 @@ import com.digitalasset.canton.topology.PartyId
   * app reference.
   */
 abstract class SplitwiseAppReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
-    name: String,
-) extends CoinAppReference(consoleEnvironment, name) {
+    override val coinConsoleEnvironment: CoinConsoleEnvironment,
+    override val name: String,
+) extends CoinAppReference {
 
   // We go through BaseLedgerApiAdministration here rather than creating a
   // ledger connection since that one is already setup to be easily used
@@ -44,7 +43,7 @@ abstract class SplitwiseAppReference(
 
   lazy val remoteScan =
     new RemoteScanAppReference(
-      consoleEnvironment,
+      coinConsoleEnvironment,
       s"remote scan for `$name``",
       remoteScanConfig,
     )
@@ -65,9 +64,9 @@ abstract class SplitwiseAppReference(
 }
 
 final class RemoteSplitwiseAppReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
+    override val coinConsoleEnvironment: CoinConsoleEnvironment,
     name: String,
-) extends SplitwiseAppReference(consoleEnvironment, name)
+) extends SplitwiseAppReference(coinConsoleEnvironment, name)
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
   private val collectionDuration = RelTime(
@@ -111,7 +110,7 @@ final class RemoteSplitwiseAppReference(
 
   @Help.Summary("Return remote splitwise app config")
   def config: RemoteSplitwiseAppConfig =
-    consoleEnvironment.environment.config.remoteSplitwisesByString(name)
+    coinConsoleEnvironment.environment.config.remoteSplitwisesByString(name)
 
   // Commands for managing installs
 
@@ -382,7 +381,7 @@ final class LocalSplitwiseAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
 ) extends SplitwiseAppReference(consoleEnvironment, name)
-    with LocalInstanceReference
+    with LocalCoinAppReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Local Splitwise"

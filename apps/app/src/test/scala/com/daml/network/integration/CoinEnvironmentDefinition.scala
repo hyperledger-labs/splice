@@ -2,7 +2,6 @@ package com.daml.network.integration
 
 import better.files.{File, Resource}
 import com.daml.network.config.CoinConfig
-import com.daml.network.console.CoinAppReference
 import com.daml.network.environment.{
   CoinConsoleEnvironment,
   CoinEnvironmentFactory,
@@ -72,6 +71,8 @@ case class CoinEnvironmentDefinition(
     copy(preSetup = preSetup)
   def withSetup(setup: CoinTestConsoleEnvironment => Unit): CoinEnvironmentDefinition =
     copy(setup = setup)
+  def withNoSetup(): CoinEnvironmentDefinition =
+    copy(setup = _ => ())
   def clearConfigTransforms(): CoinEnvironmentDefinition =
     copy(configTransformsWithContext = _ => Seq())
   def addConfigTransforms(
@@ -123,8 +124,5 @@ object CoinEnvironmentDefinition {
     CoinEnvironmentDefinition(baseConfig = config, context = testName)
   }
   def waitForNodeInitialization(env: CoinConsoleEnvironment): Unit =
-    env.nodes.local.foreach {
-      case node: CoinAppReference => node.waitForInitialization()(env)
-      case _ =>
-    }
+    env.coinNodes.local.foreach(_.waitForInitialization())
 }

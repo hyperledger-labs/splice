@@ -10,21 +10,16 @@ import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.ListResponse
 import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
 import com.daml.network.wallet.v0.WalletContext
-import com.digitalasset.canton.console.{
-  BaseInspection,
-  GrpcRemoteInstanceReference,
-  Help,
-  LocalInstanceReference,
-}
+import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
 import java.util.concurrent.atomic.AtomicReference
 
 abstract class WalletAppReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
-    name: String,
-) extends CoinAppReference(consoleEnvironment, name) {
+    override val coinConsoleEnvironment: CoinConsoleEnvironment,
+    override val name: String,
+) extends CoinAppReference {
 
   protected def getWalletCtx(): WalletContext
 
@@ -376,7 +371,7 @@ class LocalWalletAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
 ) extends WalletAppReference(consoleEnvironment, name)
-    with LocalInstanceReference
+    with LocalCoinAppReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Wallet"

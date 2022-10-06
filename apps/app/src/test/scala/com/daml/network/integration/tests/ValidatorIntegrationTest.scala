@@ -23,12 +23,11 @@ class ValidatorIntegrationTest
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
       // We manually start apps so we disable the default setup
       // that blocks on all apps being initialized.
-      .withSetup(setup = _ => ())
+      .withNoSetup()
 
   "initialize svc and validator apps" in { implicit env =>
-    svc.start()
-    scan.start()
-    svc.waitForInitialization()
+    svc.startSync()
+    scan.startSync()
     // check that there is exactly one CoinRule and OpenMiningRound
     val coinRules = svc.remoteParticipant.ledger_api.acs
       .of_party(svcParty, filterTemplates = Seq(CC.CoinRules.CoinRules.id))
@@ -39,8 +38,7 @@ class ValidatorIntegrationTest
     openRounds should have length 1
 
     // Start Alice’s validator
-    aliceValidator.start()
-    aliceValidator.waitForInitialization()
+    aliceValidator.startSync()
 
     // check that no coin rules request is outstanding
     eventually()(
@@ -62,8 +60,7 @@ class ValidatorIntegrationTest
     // Start nodes
     svc.start()
     scan.start()
-    aliceValidator.start()
-    aliceValidator.waitForInitialization()
+    aliceValidator.startSync()
 
     // Make uniqueness of the user ID more probable when running the test multiple times in a row
     val randomId = (new scala.util.Random).nextInt(10000)

@@ -99,7 +99,6 @@ class LocalRunbookIntegrationTest
 
       runScript(svcParticipantPath / "bootstrap.scala")(env.environment)
       runScript(validatorPath / "validator-participant.canton")(env.environment)
-      CoinEnvironmentDefinition.waitForNodeInitialization(env)
       runScript(validatorPath / "tap-transfer-demo.canton")(env.environment)
     }
     if (prevProperty == null) {
