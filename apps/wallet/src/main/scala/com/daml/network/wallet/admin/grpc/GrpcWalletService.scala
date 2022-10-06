@@ -1,34 +1,32 @@
 package com.daml.network.wallet.admin.grpc
 
 import cats.implicits._
-import com.daml.ledger.client.binding.{Primitive, Template, ValueDecoder}
+import com.daml.ledger.client.binding.{Primitive, ValueDecoder}
 import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
 import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.codegen.DA
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.store.AppCoinStore
+import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, Contract, Proto, Value}
-import com.daml.network.wallet.store.WalletAppRequestStore
+import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.{CollectRewardsRequest, WalletServiceGrpc}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.google.protobuf.empty.Empty
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcWalletService(
-    coinStore: AppCoinStore,
-    store: WalletAppRequestStore,
+    store: WalletStore,
     ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
-    walletServiceParty: PartyId,
-    validatorParty: PartyId,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -36,6 +34,9 @@ class GrpcWalletService(
 ) extends WalletServiceGrpc.WalletService
     with Spanning
     with NamedLogging {
+
+  private val walletServiceParty: PartyId = store.key.walletServiceParty
+  private val validatorParty: PartyId = store.key.validatorParty
 
   private val connection = ledgerClient.connection("GrpcWalletService")
 
@@ -58,13 +59,27 @@ class GrpcWalletService(
       Proto.encode(CoinUtil.currentQuantity(lockedCoin.payload.coin, round)),
     )
 
+  private[this] def getUserStore(ctxt: v0.WalletContext): Future[EndUserWalletStore] = {
+    // TODO(#990): replace this call
+    connection
+      .getPrimaryParty(ctxt.userId)
+      .map(userParty => getUserStore(userParty))
+  }
+
+  private[this] def getUserStore(userParty: PartyId): EndUserWalletStore =
+    store
+      .lookupEndUserStore(userParty)
+      .getOrElse(
+        throw new StatusRuntimeException(Status.NOT_FOUND.withDescription(s"End-user $userParty"))
+      )
+
   override def list(request: v0.ListRequest): Future[v0.ListResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
-        walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
+        userStore <- getUserStore(request.getWalletCtx)
         currentRound <- scanConnection.getCurrentRound()
-        coins <- coinStore.listCoins(walletParty)
-        lockedCoins <- coinStore.listLockedCoins(walletParty)
+        QueryResult(_, coins) <- userStore.listCoins()
+        QueryResult(_, lockedCoins) <- userStore.listLockedCoins()
       } yield {
         v0.ListResponse(
           coins.map(coinToCoinPosition(_, currentRound)),
@@ -81,14 +96,15 @@ class GrpcWalletService(
       }
     )(request.getWalletCtx, coinCid => v0.TapResponse(Proto.encode(coinCid)))
 
+  @nowarn("cat=unused")
   override def listAppMultiPaymentRequests(
       request: v0.ListAppMultiPaymentRequestsRequest
   ): Future[v0.ListAppMultiPaymentRequestsResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => span =>
       for {
-        walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
-        filteredRequests <- store.listAppMultiPaymentRequests(walletParty)
-      } yield v0.ListAppMultiPaymentRequestsResponse(filteredRequests.map(_.toProtoV0))
+        userStore <- getUserStore(request.getWalletCtx)
+        result <- userStore.listAppMultiPaymentRequests()
+      } yield v0.ListAppMultiPaymentRequestsResponse(result.value.map(_.toProtoV0))
     }
 
   @nowarn("cat=unused")
@@ -97,19 +113,9 @@ class GrpcWalletService(
   ): Future[v0.ListAppPaymentRequestsResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => span =>
       for {
-        walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
-        paymentRequestsLAPI <- connection
-          .activeContracts(walletParty, walletCodegen.AppPaymentRequest)
-      } yield {
-        val filteredRequests = paymentRequestsLAPI.filter(contract =>
-          PartyId.tryFromPrim(contract.value.sender) == walletParty
-        )
-        v0.ListAppPaymentRequestsResponse(
-          filteredRequests.map(r =>
-            Contract.fromCodegenContract[walletCodegen.AppPaymentRequest](r).toProtoV0
-          )
-        )
-      }
+        userStore <- getUserStore(request.getWalletCtx)
+        result <- userStore.listAppPaymentRequests()
+      } yield v0.ListAppPaymentRequestsResponse(result.value.map(_.toProtoV0))
     }
 
   override def getBalance(
@@ -117,9 +123,9 @@ class GrpcWalletService(
   ): Future[v0.GetBalanceResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
-        walletParty <- connection.getPrimaryParty(request.getWalletCtx.userId)
-        coins <- coinStore.listCoins(walletParty)
-        lockedCoins <- coinStore.listLockedCoins(walletParty)
+        userStore <- getUserStore(request.getWalletCtx)
+        QueryResult(_, coins) <- userStore.listCoins()
+        QueryResult(_, lockedCoins) <- userStore.listLockedCoins()
         currentRound <- scanConnection.getCurrentRound()
       } yield {
         val unlockedHoldingFees =
@@ -142,10 +148,13 @@ class GrpcWalletService(
       request: v0.AcceptAppMultiPaymentRequestRequest
   ): Future[v0.AcceptAppMultiPaymentRequestResponse] =
     exerciseWalletAction(implicit traceContext =>
-      (c, party) => {
+      (installCid, userStore) => {
+        val requestCid = Proto.tryDecodeContractId[walletCodegen.AppMultiPaymentRequest](
+          request.requestContractId
+        )
         for {
-          requestC <- store.findAppMultiPaymentRequest(party, request.requestContractId)
-          quantity = requestC
+          requestC <- userStore.lookupAppMultiPaymentRequestById(requestCid)
+          quantity = requestC.value
             .getOrElse(
               sys.error(
                 s"Could not find app multi-payment request ${request.requestContractId}. " +
@@ -157,13 +166,13 @@ class GrpcWalletService(
             .receiverQuantities
             .map(_.quantity)
             .sum
-          coinCid <- selectCoin(party, quantity)
+          coinCid <- selectCoin(userStore, quantity)
         } yield {
-          val requestCid = Proto.tryDecodeContractId[walletCodegen.AppMultiPaymentRequest](
-            request.requestContractId
-          )
           val transferInput = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
-          c.exerciseWalletAppInstall_AcceptAppMultiPaymentRequest(requestCid, transferInput)
+          installCid.exerciseWalletAppInstall_AcceptAppMultiPaymentRequest(
+            requestCid,
+            transferInput,
+          )
         }
       }
     )(
@@ -178,10 +187,13 @@ class GrpcWalletService(
       request: v0.AcceptAppPaymentRequestRequest
   ): Future[v0.AcceptAppPaymentRequestResponse] =
     exerciseWalletAction(implicit traceContext =>
-      (c, party) => {
+      (installCid, userStore) => {
+        val requestCid = Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](
+          request.requestContractId
+        )
         for {
-          requestC <- store.findAppPaymentRequest(party, request.requestContractId)
-          quantity = requestC
+          requestC <- userStore.lookupAppPaymentRequestById(requestCid)
+          quantity = requestC.value
             .getOrElse(
               sys.error(
                 s"Could not find app payment request ${request.requestContractId}. " +
@@ -191,13 +203,10 @@ class GrpcWalletService(
             )
             .payload
             .quantity
-          coinCid <- selectCoin(party, quantity)
+          coinCid <- selectCoin(userStore, quantity)
         } yield {
-          val requestCid = Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](
-            request.requestContractId
-          )
           val transferInput = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
-          c.exerciseWalletAppInstall_AcceptAppPaymentRequest(requestCid, transferInput)
+          installCid.exerciseWalletAppInstall_AcceptAppPaymentRequest(requestCid, transferInput)
         }
       }
     )(
@@ -503,22 +512,23 @@ class GrpcWalletService(
   override def collectRewards(request: CollectRewardsRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
-        party <- connection.getPrimaryParty(request.getWalletCtx.userId)
-        validatorRewards <- listValidatorRewards(party)
+        userStore <- getUserStore(request.getWalletCtx)
+        userParty = userStore.key.endUserParty
+        validatorRewards <- listValidatorRewards(userParty)
         validatorRewardInputs = validatorRewards
           .filter(c => c.value.round.number == request.round)
           .map(c => coinRulesCodegen.TransferInput.InputValidatorReward(c.contractId))
-        appRewards <- listAppRewards(party)
-        appRewardInputs = appRewards
-          .filter(c => c.value.round.number == request.round)
+        appRewards <- userStore.listAppRewards()
+        appRewardInputs = appRewards.value
+          .filter(c => c.payload.round.number == request.round)
           .map(c => coinRulesCodegen.TransferInput.InputAppReward(c.contractId))
-        coinCid <- selectCoin(party, 0)
+        coinCid <- selectCoin(userStore, 0)
         inputCoin = coinRulesCodegen.TransferInput.InputCoin(coinCid)
         inputs = (inputCoin +: validatorRewardInputs :++ appRewardInputs)
         outputs = Seq(
           coinRulesCodegen.TransferOutput.OutputSenderCoin(exactQuantity = None, lock = None)
         )
-        coins <- redistribute(party, inputs, outputs)
+        coins <- redistribute(userParty, inputs, outputs)
       } yield {
         require(coins.size == 1, "Expected exactly one coin")
         Empty()
@@ -573,10 +583,13 @@ class GrpcWalletService(
       request: v0.AcceptOnChannelPaymentRequestRequest
   ): Future[Empty] =
     exerciseWalletAction(implicit traceContext =>
-      (c, party) => {
+      (installCid, userStore) => {
+        val requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](
+          request.requestContractId
+        )
         for {
-          requestC <- store.findOnChannelPaymentRequest(party, request.requestContractId)
-          quantity = requestC
+          requestC <- userStore.lookupOnChannelPaymentRequestById(requestCid)
+          quantity = requestC.value
             .getOrElse(
               sys.error(
                 s"Could not find on channel payment request ${request.requestContractId}. " +
@@ -586,13 +599,13 @@ class GrpcWalletService(
             )
             .payload
             .quantity
-          coinCid <- selectCoin(party, quantity)
+          coinCid <- selectCoin(userStore, quantity)
         } yield {
-          val requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](
-            request.requestContractId
-          )
           val transferInput = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
-          c.exerciseWalletAppInstall_AcceptOnChannelPaymentRequest(requestCid, transferInput)
+          installCid.exerciseWalletAppInstall_AcceptOnChannelPaymentRequest(
+            requestCid,
+            transferInput,
+          )
         }
       }
     )(
@@ -707,46 +720,58 @@ class GrpcWalletService(
     */
   private def exerciseWalletAction[Response, ChoiceResult](
       choice: TraceContext => (
-          Template.Key[walletCodegen.WalletAppInstall],
-          PartyId,
+          Primitive.ContractId[walletCodegen.WalletAppInstall],
+          EndUserWalletStore,
       ) => Future[Primitive.Update[ChoiceResult]]
   )(
       ctx: com.daml.network.wallet.v0.WalletContext,
       response: ChoiceResult => Response,
   )(implicit valueDecoder: ValueDecoder[ChoiceResult]): Future[Response] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
-      for {
-        walletUserParty <- connection.getPrimaryParty(ctx.userId)
-        installTemplate = walletCodegen.WalletAppInstall
-          .key(DA.Types.Tuple2(walletUserParty.toPrim, walletServiceParty.toPrim))
-        update <- choice(traceContext)(installTemplate, walletUserParty)
-        result <- connection.submitWithResult(
-          Seq(walletServiceParty),
-          Seq(validatorParty, walletUserParty),
-          update,
-        )
-      } yield response(result)
+      getUserStore(ctx).flatMap(userStore => {
+        val userParty = userStore.key.endUserParty
+        store.lookupInstall(userParty).flatMap {
+          case QueryResult(_, None) =>
+            throw new StatusRuntimeException(
+              Status.NOT_FOUND.withDescription(s"WalletAppInstall contrat of user $userParty")
+            )
+          case QueryResult(_, Some(install)) =>
+            choice(traceContext)(install.contractId, userStore).flatMap(update =>
+              connection
+                .submitWithResult(
+                  Seq(walletServiceParty),
+                  Seq(validatorParty, userParty),
+                  update,
+                )
+                .map(response)
+            )
+        }
+      })
     }
 
   private def exerciseSyncWalletAction[Response, ChoiceResult](
       choice: TraceContext => (
-          Template.Key[walletCodegen.WalletAppInstall],
-          PartyId,
+          Primitive.ContractId[walletCodegen.WalletAppInstall],
+          EndUserWalletStore,
       ) => Primitive.Update[ChoiceResult]
   )(
       ctx: com.daml.network.wallet.v0.WalletContext,
       response: ChoiceResult => Response,
   )(implicit valueDecoder: ValueDecoder[ChoiceResult]): Future[Response] =
-    exerciseWalletAction(tc => (t, p) => Future.successful(choice(tc)(t, p)))(ctx, response)
+    exerciseWalletAction(tc => (cid, userStore) => Future.successful(choice(tc)(cid, userStore)))(
+      ctx,
+      response,
+    )
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   private def selectCoin(
-      owner: PartyId,
+      userStore: EndUserWalletStore,
       quantity: BigDecimal,
   )(implicit tc: TraceContext): Future[Primitive.ContractId[coinCodegen.Coin]] = {
+    val owner = userStore.key.endUserParty
     for {
       currentRound <- scanConnection.getCurrentRound()
-      coins <- coinStore.listCoins(owner)
+      QueryResult(_, coins) <- userStore.listCoins()
       candidates = coins
         .filter(c => CoinUtil.currentQuantity(c.payload, currentRound) >= quantity)
     } yield {

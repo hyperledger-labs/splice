@@ -1,62 +1,76 @@
 package com.daml.network.wallet.admin
 
 import akka.stream.Materializer
-import com.daml.network.admin.LedgerAutomationServiceOrchestrator
+import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.environment.CoinLedgerClient
-import com.daml.network.store.AppCoinStore
-import com.daml.network.wallet.store.{WalletAppRequestStore, WalletStore}
+import com.daml.network.wallet.store.WalletStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import io.opentelemetry.api.trace.Tracer
+import com.digitalasset.canton.topology.PartyId
 
-import java.util.concurrent.atomic.AtomicReference
+import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Manages background automation that runs on an Wallet app.
   */
 class WalletAutomationService(
-    coinStore: AppCoinStore,
     walletStore: WalletStore,
-    appRequestStore: WalletAppRequestStore,
     ledgerClient: CoinLedgerClient,
-    loggerFactory: NamedLoggerFactory,
-    processingTimeouts: ProcessingTimeout,
+    override protected val loggerFactory: NamedLoggerFactory,
+    override protected val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContextExecutor,
-    tracer: Tracer,
     mat: Materializer,
-) extends LedgerAutomationServiceOrchestrator(loggerFactory)(
-      ec,
-      tracer,
-    ) {
-  override protected def timeouts: ProcessingTimeout = processingTimeouts
+) extends AutomationService {
 
-  val coinIngestion = new AtomicReference(
-    createService("walletCoinIngestionService", ledgerClient, Seq.empty) { _ =>
-      new CoinIngestionService(coinStore, appRequestStore, loggerFactory)
-    }
-  )
+  private val connection = ledgerClient.connection("WalletAutomationService")
 
-  // TODO(#929): remove this indirection once the whole wallet uses the new store and handler pattern
-  val newWalletAutomationService = new NewWalletAutomationService(
-    walletStore,
-    parties =>
-      Future {
-        coinIngestion.updateAndGet(s => updateReadAs(s, parties))
-        ()
-      },
-    ledgerClient,
-    loggerFactory,
-    timeouts,
-  )
-
-  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq[AsyncOrSyncCloseable](
-    SyncCloseable(
-      "Wallet automation services",
-      Lifecycle.close(coinIngestion.get, newWalletAutomationService)(
-        logger
-      ),
+  registerService(
+    new AcsIngestionService(
+      "WalletStore",
+      walletStore.acsIngestionSink,
+      connection,
+      loggerFactory,
+      timeouts,
     )
   )
+
+  private val ingestionServices: TrieMap[PartyId, AutoCloseable] = TrieMap.empty
+
+  // TODO(#763): not handling archive events, uninstalling wallets without a restart is not supported yet
+  registerTaskHandler("WalletAppInstall", walletStore.streamInstalls)(
+    install => s"onboarding wallet party: ${install.payload.endUser}",
+    install =>
+      Future {
+        val userParty = PartyId.tryFromPrim(install.payload.endUser)
+        val endUserStore = walletStore.getOrCreateEndUserStore(userParty)
+        val ingestionService = new AcsIngestionService(
+          s"EndUserWalletStore($userParty)",
+          endUserStore.acsIngestionSink,
+          connection,
+          loggerFactory,
+          timeouts,
+        )
+        val autoCloseable =
+          SyncCloseable(
+            s"EndUserWalletStore($userParty) - ingestion and store",
+            Lifecycle.close(ingestionService, endUserStore)(logger),
+          )
+        ingestionServices.putIfAbsent(userParty, autoCloseable) match {
+          case None => ()
+          case Some(_) =>
+            logger.warn(s"Duplicate onboarding of wallet party $userParty")
+            autoCloseable.close()
+        }
+      },
+  )
+
+  override def closeAsync(): Seq[AsyncOrSyncCloseable] =
+    Seq(
+      SyncCloseable(
+        "EndUserIngestionServices",
+        Lifecycle.close(ingestionServices.values.toSeq: _*)(logger),
+      )
+    ) ++ super.closeAsync()
 }

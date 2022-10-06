@@ -4,35 +4,73 @@ import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.store.AcsStore
-import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.daml.network.util.Contract
+import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.pretty._
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
 
+import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
 
-/** A store for serving all queries used by the wallet backend's gRPC request handlers and automation.
-  *
-  * Most methods have default implementations in terms of an [[com.daml.network.store.AcsStore]]
-  * to simplify implementing the store. They are all made overridable so that a DB backed store can use
-  * custom indices to ensure the scalability of these queries.
-  *
-  * TODO(#929): extend this store's functionality to cover 'WalletAppRequestStore' as well
-  */
-trait WalletStore extends AutoCloseable {
+/** A store for serving all queries used by the wallet backend's gRPC request handlers and automation. */
+trait WalletStore extends AutoCloseable with NamedLogging {
+  import AcsStore.QueryResult
+
+  protected implicit val ec: ExecutionContext
 
   /** The sink to use for ingesting data from the ledger into this store. */
   val acsIngestionSink: AcsStore.IngestionSink
 
+  val acsStore: AcsStore
+
   /** The key identifying the parties considered by this store. */
   def key: WalletStore.Key
 
-  /** The list of all known end-user parties. */
-  def listParties()(implicit tc: TraceContext): Future[Seq[PartyId]]
+  /** Lookup the WalletAppInstall for an end-user party */
+  def lookupInstall(
+      endUserParty: PartyId
+  ): Future[QueryResult[Option[Contract[walletCodegen.WalletAppInstall]]]] =
+    acsStore.findContract(walletCodegen.WalletAppInstall)(co =>
+      co.payload.endUser == endUserParty.toPrim
+    )
 
-  /** A stream of end-user parties that have been onboarded. */
-  def getPartiesStream(implicit tc: TraceContext): Source[Seq[PartyId], NotUsed]
+  def streamInstalls: Source[Contract[walletCodegen.WalletAppInstall], NotUsed] =
+    acsStore.streamContracts(walletCodegen.WalletAppInstall)
+
+  // Methods to implement per-end-user stores
+  private[this] val endUserStores: TrieMap[PartyId, EndUserWalletStore] = TrieMap.empty
+
+  /** Lookup an end-user's store.
+    * Succeeds if the user has been onboarded and its store has been initialized.
+    */
+  final def lookupEndUserStore(endUserParty: PartyId): Option[EndUserWalletStore] =
+    endUserStores.get(endUserParty)
+
+  /** Get or create the store for an end-user. Intended to be called when a user is onboarded.
+    *
+    * Do not use this in request handlers to avoid leaking resources.
+    */
+  final def getOrCreateEndUserStore(endUserParty: PartyId): EndUserWalletStore = {
+    val store = createEndUserStore(endUserParty)
+    endUserStores
+      .putIfAbsent(endUserParty, store)
+      .fold(store)(existingStore => {
+        store.close()
+        existingStore
+      })
+  }
+
+  /** Remove an end-user store. Intended to be called when a user is off-boarded. */
+  final def removeEndUserStore(endUserParty: PartyId): Unit =
+    endUserStores.remove(endUserParty).fold(())(store => store.close())
+
+  /** Abstract method to create an end-users store. */
+  protected def createEndUserStore(endUserParty: PartyId): EndUserWalletStore
+
+  override def close(): Unit =
+    Lifecycle.close(endUserStores.values.toSeq: _*)(logger)
 }
 
 object WalletStore {
@@ -69,7 +107,7 @@ object WalletStore {
     AcsStore.SimpleContractFilter(
       key.walletServiceParty,
       Map(
-        // TODO(#929): do not use 'user' as the name when a party is meant
+        // TODO(#990): do not use 'user' as the name when a party is meant
         mkFilter(walletCodegen.WalletAppInstall)(co =>
           co.payload.serviceUser == walletService &&
             co.payload.validatorUser == validator &&

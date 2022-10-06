@@ -6,12 +6,11 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.store.AppCoinStore
 import com.daml.network.validator.admin.api.client.ValidatorConnection
-import com.daml.network.wallet.admin.{WalletAutomationService}
+import com.daml.network.wallet.admin.WalletAutomationService
 import com.daml.network.wallet.admin.grpc.GrpcWalletService
 import com.daml.network.wallet.config.LocalWalletAppConfig
-import com.daml.network.wallet.store.{WalletStore, WalletAppRequestStore}
+import com.daml.network.wallet.store.WalletStore
 import com.daml.network.wallet.v0.WalletServiceGrpc
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
@@ -23,6 +22,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import io.opentelemetry.api.trace.Tracer
+
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Class representing a Wallet app instance.
@@ -58,26 +58,22 @@ class WalletApp(
   override def initialize(
       ledgerClient: CoinLedgerClient,
       walletServiceParty: PartyId,
-  ): Future[WalletApp.State] =
+  ): Future[WalletApp.State] = {
     for {
-      coinStore <- Future.successful(AppCoinStore(storage, loggerFactory))
-      store = WalletAppRequestStore(storage, loggerFactory)
-      scanConnection =
+      scanConnection <- Future {
         new ScanConnection(
           config.remoteScan.clientAdminApi,
           coinAppParameters.processingTimeouts,
           loggerFactory,
         )
-
-      validatorConnection =
+      }
+      validatorConnection <- Future {
         new ValidatorConnection(
           config.validator.clientAdminApi,
           coinAppParameters.processingTimeouts,
           loggerFactory,
         )
-
-      connection = ledgerClient.connection("SvcAppBootstrap")
-
+      }
       validatorParty <- validatorConnection.getValidatorPartyId()
       svcParty <- scanConnection.getSvcPartyId()
     } yield {
@@ -91,21 +87,16 @@ class WalletApp(
       adminServerRegistry.addService(
         WalletServiceGrpc.bindService(
           new GrpcWalletService(
-            coinStore,
-            store,
+            walletStore,
             ledgerClient,
             scanConnection,
-            validatorParty = validatorParty,
-            walletServiceParty = walletServiceParty,
             loggerFactory = loggerFactory,
           ),
           ec,
         )
       )
       val automation = new WalletAutomationService(
-        coinStore,
         walletStore,
-        store,
         ledgerClient,
         loggerFactory,
         timeouts,
@@ -113,14 +104,13 @@ class WalletApp(
       WalletApp.State(
         automation,
         storage,
-        coinStore,
         walletStore,
-        store,
         scanConnection,
         validatorConnection,
         loggerFactory.getTracedLogger(WalletApp.State.getClass),
       )
     }
+  }
 
   override val ports =
     Map("admin" -> config.adminApi.port)
@@ -132,9 +122,7 @@ object WalletApp {
   case class State(
       automation: WalletAutomationService,
       storage: Storage,
-      coinStore: AppCoinStore,
       walletStore: WalletStore,
-      store: WalletAppRequestStore,
       scanConnection: ScanConnection,
       validatorConnection: ValidatorConnection,
       logger: TracedLogger,
@@ -147,6 +135,5 @@ object WalletApp {
         scanConnection,
         validatorConnection,
       )(logger)
-
   }
 }
