@@ -276,6 +276,7 @@ Available operations include:
 * `cncluster preflight` - Run the preflight check against the cluster.
 * `cncluster reset` - Delete all `Pod`s, forcing all memory state to
   be reset.
+* `cncluster stats` - Show memory and CPU usage across the cluster.
 
 Internally, these operations rely on the following environment
 variables. As stated above, these are usually populated via `.envrc`.
@@ -418,40 +419,9 @@ validator1-validator-app-58667ffcc7-mn98t   1/1     Running   3 (41m ago)   42m 
 validator1-wallet-app-d7ffcf8fc-qvnxc       2/2     Running   3 (41m ago)   42m   10.92.0.44    gke-cn-stagingnet-default-pool-285c4578-929v   <none>           <none>
 ```
 
-There is also the `kubectl top` command, which can show memory and CPU
-usage by either `Node`...
-
-```
-$ kubectl top node
-NAME                                           CPU(cores)   CPU%   MEMORY(bytes)   MEMORY%
-gke-cn-stagingnet-default-pool-285c4578-34nx   53m          5%     843Mi           29%
-gke-cn-stagingnet-default-pool-285c4578-5qkw   88m          9%     1402Mi          49%
-gke-cn-stagingnet-default-pool-285c4578-929v   59m          6%     1064Mi          37%
-gke-cn-stagingnet-default-pool-285c4578-gwen   83m          8%     1772Mi          63%
-gke-cn-stagingnet-default-pool-285c4578-kfvr   60m          6%     579Mi           20%
-gke-cn-stagingnet-default-pool-285c4578-mzs1   69m          7%     1527Mi          54%
-gke-cn-stagingnet-default-pool-285c4578-scv2   65m          6%     1048Mi          37%
-```
-
-...or by `Pod`:
-
-
-```
-$ kubectl top pod
-
-NAME                                        CPU(cores)   MEMORY(bytes)
-canton-domain-69c9dcfbf6-pr8w2              14m          286Mi
-canton-participant-7f4dd65887-x5l2z         8m           778Mi
-directory-app-6c4d49868c-4pp8b              8m           399Mi
-docs-845c84dc5-t6zdj                        0m           2Mi
-external-proxy-55d954c97b-k7gln             0m           6Mi
-gcs-proxy-84bd947f54-tpc24                  1m           3Mi
-scan-app-6bb5f9668f-q4b6b                   6m           180Mi
-svc-app-78b84cf7-jhpg9                      6m           174Mi
-validator1-participant-7d6ff497ff-2hk4f     8m           773Mi
-validator1-validator-app-58667ffcc7-mn98t   8m           380Mi
-validator1-wallet-app-d7ffcf8fc-qvnxc       7m           196Mi
-```
+To get a summary view of cluster status, you can use `cncluster
+stats`, which will show a display of cluster status at both a pod and
+a node level.
 
 To further investigate `Pod`s in an invalid state, additional details
 may be requested through `kubectl describe pod ${POD_NAME}`. This will

@@ -113,6 +113,8 @@ function cluster_create() {
                --enable-master-authorized-networks \
                --enable-ip-alias \
                --enable-private-nodes \
+               --machine-type e2-standard-4 \
+               --num-nodes 2 \
                --master-ipv4-cidr "${GCP_MASTER_IPV4_CIDR}" \
                --node-locations "${CLOUDSDK_COMPUTE_REGION}-a"
 
@@ -291,6 +293,20 @@ function cluster_reset() {
     _cluster_reset
 }
 
+function cluster_stats() {
+    cluster_show
+
+    _log ""
+    _log "Node Usage:"
+
+    kubectl top node
+
+    _log ""
+    _log "Pod Usage:"
+
+    kubectl top pod
+}
+
 
 case "${SUBCOMMAND_NAME}" in
     activate)
@@ -335,6 +351,10 @@ case "${SUBCOMMAND_NAME}" in
 
     reset)
         cluster_reset $@
+        ;;
+
+    stats)
+        cluster_stats $@
         ;;
 
     *)
