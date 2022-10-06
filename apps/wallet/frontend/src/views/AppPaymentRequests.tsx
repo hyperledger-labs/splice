@@ -14,7 +14,7 @@ import { sameContracts, useInterval, Contract } from '../utils';
 
 const AppPaymentRequests: React.FC<{ userId: string }> = ({ userId }) => {
   const walletClient = useWalletClient();
-  const walletRequestCtx = new WalletContext().setUserId(userId);
+  const walletRequestCtx = new WalletContext().setUserName(userId);
 
   const [appPaymentRequests, setAppPaymentRequests] = useState<Contract<AppPaymentRequest>[]>([]);
   const fetchAppPaymentRequests = useCallback(async () => {

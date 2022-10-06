@@ -42,6 +42,7 @@ private[validator] object ValidatorUtil {
       walletServiceUser: String,
       walletServiceParty: PartyId,
       endUserParty: PartyId,
+      endUserName: String,
       svcParty: PartyId,
       connection: CoinLedgerConnection,
       logger: TracedLogger,
@@ -63,16 +64,17 @@ private[validator] object ValidatorUtil {
             Seq(
               walletCodegen
                 .WalletAppInstall(
-                  serviceUser = walletServiceParty.toPrim,
-                  endUser = endUserParty.toPrim,
-                  svcUser = svcParty.toPrim,
-                  validatorUser = validatorServiceParty.toPrim,
+                  walletServiceParty = walletServiceParty.toPrim,
+                  svcParty = svcParty.toPrim,
+                  validatorParty = validatorServiceParty.toPrim,
+                  endUserParty = endUserParty.toPrim,
+                  endUserName = endUserName,
                 )
                 .create
                 .command
             ),
           ),
-        s"WalletAppInstall($walletServiceParty, $endUserParty, $svcParty, $validatorServiceParty)",
+        s"WalletAppInstall($walletServiceParty, $endUserName, $endUserParty, $svcParty, $validatorServiceParty)",
       )
     } yield ()
   }

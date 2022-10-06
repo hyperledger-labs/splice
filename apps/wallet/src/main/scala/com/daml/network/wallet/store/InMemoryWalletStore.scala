@@ -26,11 +26,12 @@ class InMemoryWalletStore(
 
   override val acsIngestionSink: AcsStore.IngestionSink = inMemoryAcsStore.ingestionSink
 
-  def createEndUserStore(endUserParty: PartyId): EndUserWalletStore =
+  def createEndUserStore(endUserName: String, endUserParty: PartyId): EndUserWalletStore =
     new InMemoryEndUserWalletStore(
       EndUserWalletStore.Key(
         svcParty = key.svcParty,
         endUserParty = endUserParty,
+        endUserName = endUserName,
       ),
       loggerFactory,
     )

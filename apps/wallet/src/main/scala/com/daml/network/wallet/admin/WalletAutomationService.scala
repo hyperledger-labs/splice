@@ -36,17 +36,20 @@ class WalletAutomationService(
     )
   )
 
-  private val ingestionServices: TrieMap[PartyId, AutoCloseable] = TrieMap.empty
+  private val ingestionServices: TrieMap[String, AutoCloseable] = TrieMap.empty
 
   // TODO(#763): not handling archive events, uninstalling wallets without a restart is not supported yet
   registerTaskHandler("WalletAppInstall", walletStore.streamInstalls)(
-    install => s"onboarding wallet party: ${install.payload.endUser}",
+    install => s"onboarding wallet user: ${install.payload.endUserName}",
     install =>
       Future {
-        val userParty = PartyId.tryFromPrim(install.payload.endUser)
-        val endUserStore = walletStore.getOrCreateEndUserStore(userParty)
+        val endUserName = install.payload.endUserName
+        val endUserStore = walletStore.getOrCreateEndUserStore(
+          endUserName,
+          PartyId.tryFromPrim(install.payload.endUserParty),
+        )
         val ingestionService = new AcsIngestionService(
-          s"EndUserWalletStore($userParty)",
+          s"EndUserWalletStore($endUserName)",
           endUserStore.acsIngestionSink,
           connection,
           loggerFactory,
@@ -54,13 +57,15 @@ class WalletAutomationService(
         )
         val autoCloseable =
           SyncCloseable(
-            s"EndUserWalletStore($userParty) - ingestion and store",
+            s"EndUserWalletStore($endUserName) - ingestion and store",
             Lifecycle.close(ingestionService, endUserStore)(logger),
           )
-        ingestionServices.putIfAbsent(userParty, autoCloseable) match {
+        ingestionServices.putIfAbsent(endUserName, autoCloseable) match {
           case None => ()
           case Some(_) =>
-            logger.warn(s"Duplicate onboarding of wallet party $userParty")
+            logger.warn(
+              s"Unexpected duplicate onboarding of wallet user '$endUserName'"
+            )
             autoCloseable.close()
         }
       },

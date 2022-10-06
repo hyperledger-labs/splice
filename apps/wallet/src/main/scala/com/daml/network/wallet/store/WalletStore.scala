@@ -12,11 +12,10 @@ import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.ExecutionContext
 
 /** A store for serving all queries used by the wallet backend's gRPC request handlers and automation. */
 trait WalletStore extends AutoCloseable with NamedLogging {
-  import AcsStore.QueryResult
 
   protected implicit val ec: ExecutionContext
 
@@ -28,34 +27,29 @@ trait WalletStore extends AutoCloseable with NamedLogging {
   /** The key identifying the parties considered by this store. */
   def key: WalletStore.Key
 
-  /** Lookup the WalletAppInstall for an end-user party */
-  def lookupInstall(
-      endUserParty: PartyId
-  ): Future[QueryResult[Option[Contract[walletCodegen.WalletAppInstall]]]] =
-    acsStore.findContract(walletCodegen.WalletAppInstall)(co =>
-      co.payload.endUser == endUserParty.toPrim
-    )
-
   def streamInstalls: Source[Contract[walletCodegen.WalletAppInstall], NotUsed] =
     acsStore.streamContracts(walletCodegen.WalletAppInstall)
 
   // Methods to implement per-end-user stores
-  private[this] val endUserStores: TrieMap[PartyId, EndUserWalletStore] = TrieMap.empty
+  private[this] val endUserStores: TrieMap[String, EndUserWalletStore] = TrieMap.empty
 
   /** Lookup an end-user's store.
     * Succeeds if the user has been onboarded and its store has been initialized.
     */
-  final def lookupEndUserStore(endUserParty: PartyId): Option[EndUserWalletStore] =
-    endUserStores.get(endUserParty)
+  final def lookupEndUserStore(endUserName: String): Option[EndUserWalletStore] =
+    endUserStores.get(endUserName)
 
   /** Get or create the store for an end-user. Intended to be called when a user is onboarded.
     *
     * Do not use this in request handlers to avoid leaking resources.
     */
-  final def getOrCreateEndUserStore(endUserParty: PartyId): EndUserWalletStore = {
-    val store = createEndUserStore(endUserParty)
+  final def getOrCreateEndUserStore(
+      endUserName: String,
+      endUserParty: PartyId,
+  ): EndUserWalletStore = {
+    val store = createEndUserStore(endUserName, endUserParty: PartyId)
     endUserStores
-      .putIfAbsent(endUserParty, store)
+      .putIfAbsent(endUserName, store)
       .fold(store)(existingStore => {
         store.close()
         existingStore
@@ -63,11 +57,11 @@ trait WalletStore extends AutoCloseable with NamedLogging {
   }
 
   /** Remove an end-user store. Intended to be called when a user is off-boarded. */
-  final def removeEndUserStore(endUserParty: PartyId): Unit =
-    endUserStores.remove(endUserParty).fold(())(store => store.close())
+  final def removeEndUserStore(endUserName: String): Unit =
+    endUserStores.remove(endUserName).fold(())(store => store.close())
 
   /** Abstract method to create an end-users store. */
-  protected def createEndUserStore(endUserParty: PartyId): EndUserWalletStore
+  protected def createEndUserStore(endUserName: String, endUserParty: PartyId): EndUserWalletStore
 
   override def close(): Unit =
     Lifecycle.close(endUserStores.values.toSeq: _*)(logger)
@@ -107,11 +101,10 @@ object WalletStore {
     AcsStore.SimpleContractFilter(
       key.walletServiceParty,
       Map(
-        // TODO(#990): do not use 'user' as the name when a party is meant
         mkFilter(walletCodegen.WalletAppInstall)(co =>
-          co.payload.serviceUser == walletService &&
-            co.payload.validatorUser == validator &&
-            co.payload.svcUser == svc
+          co.payload.walletServiceParty == walletService &&
+            co.payload.validatorParty == validator &&
+            co.payload.svcParty == svc
         )
       ),
     )

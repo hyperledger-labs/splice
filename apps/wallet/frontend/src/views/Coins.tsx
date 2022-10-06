@@ -27,7 +27,7 @@ const Coins: React.FC<{ userId: string }> = ({ userId }) => {
   const [tapValue, setTapValue] = useState<string>('');
 
   const walletClient = useWalletClient();
-  const walletRequestCtx = new WalletContext().setUserId(userId);
+  const walletRequestCtx = new WalletContext().setUserName(userId);
 
   const fetchCoins = useCallback(async () => {
     const newCoins = (

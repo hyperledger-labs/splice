@@ -24,6 +24,14 @@ trait EndUserWalletStore extends AutoCloseable {
   /** The key identifying the parties considered by this store. */
   def key: EndUserWalletStore.Key
 
+  /** Lookup the end-users install contract.
+    *
+    * Returns an Option, as there can be races where this fails, and the caller has better context on
+    * how to deal with this error.
+    */
+  def lookupInstall(): Future[QueryResult[Option[Contract[walletCodegen.WalletAppInstall]]]] =
+    acsStore.findContract(walletCodegen.WalletAppInstall)(_ => true)
+
   def listCoins(): Future[QueryResult[Seq[Contract[coinCodegen.Coin]]]] =
     acsStore.listContracts(coinCodegen.Coin)
 
@@ -76,11 +84,14 @@ object EndUserWalletStore {
   case class Key(
       /** The party-id of the SVC issuing CC managed by this end-user wallet. */
       svcParty: PartyId,
-      /** The party-id of the end-user. */
+      /** The participant user name of the end-user */
+      endUserName: String,
+      /** The party-id of the end-user, which is the primary party of its participant user */
       endUserParty: PartyId,
   ) extends PrettyPrinting {
     override def pretty: Pretty[Key] = prettyOfClass(
-      param("endUser", _.endUserParty),
+      param("endUserName", _.endUserName.singleQuoted),
+      param("endUserParty", _.endUserParty),
       param("svcParty", _.svcParty),
     )
   }
@@ -97,6 +108,11 @@ object EndUserWalletStore {
     AcsStore.SimpleContractFilter(
       key.endUserParty,
       Map(
+        // Install
+        mkFilter(walletCodegen.WalletAppInstall)(co =>
+          co.payload.svcParty == svc &&
+            co.payload.endUserParty == endUser
+        ),
         // Coins
         mkFilter(coinCodegen.Coin)(co =>
           co.payload.svc == svc &&

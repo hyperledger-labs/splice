@@ -99,7 +99,7 @@ class InMemoryAcsStore(
   private def requireInScope[T](templateCompanion: TemplateCompanion[T]): Unit =
     require(
       contractFilter.mightContain(templateCompanion),
-      s"template $templateCompanion in ingestion scope",
+      s"template ${templateCompanion.id} is part of the contract filter",
     )
 
   def findContract[T](

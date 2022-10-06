@@ -41,7 +41,8 @@ service WalletService {
 }
 
 message WalletContext {
-  string user_id = 1;
+  // The name of the end-user making the request.
+  string user_name = 1;
 }
 
 message InitializeRequest {

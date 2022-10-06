@@ -196,7 +196,7 @@ testMultiPaymentRequest = script do
     deliveryOffer = toInterfaceContractId deliveryOffer
 
   pure ()
-  
+
 
 testBatchPaymentRequests : Script ()
 testBatchPaymentRequests = script do
@@ -216,10 +216,11 @@ testBatchPaymentRequests = script do
 
   install <- submitMulti [alice, validator] [] $ createCmd $ WalletAppInstall with
     -- for simplicity, alice is service and end-user
-    serviceUser = alice
-    endUser = alice
-    svcUser = app.svc
-    validatorUser = validator
+    walletServiceParty = alice
+    endUserParty = alice
+    endUserName = "wallet_service_participant_user"
+    svcParty = app.svc
+    validatorParty = validator
 
   acceptedPaymentsCid <- submitMulti [alice] [validator] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputCoin coin]

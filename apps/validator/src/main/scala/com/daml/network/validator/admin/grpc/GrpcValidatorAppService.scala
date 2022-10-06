@@ -56,6 +56,7 @@ class GrpcValidatorAppService(
         _ <- connection.grantUserRights(validatorUserName, Seq(userPartyId), Seq.empty)
         _ <- ValidatorUtil.installWalletForUser(
           endUserParty = userPartyId,
+          endUserName = name,
           walletServiceUser = walletServiceUser,
           walletServiceParty = walletServiceParty,
           validatorServiceParty = validatorPartyId,

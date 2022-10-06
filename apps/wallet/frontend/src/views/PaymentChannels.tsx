@@ -26,7 +26,7 @@ import { useInterval, Contract } from '../utils';
 
 const PaymentChannels: React.FC<{ userId: string }> = ({ userId }) => {
   const walletClient = useWalletClient();
-  const walletRequestCtx = new WalletContext().setUserId(userId);
+  const walletRequestCtx = new WalletContext().setUserName(userId);
 
   const [proposals, setProposals] = useState<Contract<PaymentChannelProposal>[]>([]);
   const fetchChannelProposals = useCallback(async () => {

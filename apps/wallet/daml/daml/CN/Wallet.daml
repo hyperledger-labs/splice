@@ -403,22 +403,23 @@ sequencePaymentRequests inputsAndResults requestCid = do
 -- This should be replaced by explicit disclosure
 template WalletAppInstall
   with
-    serviceUser : Party
-    endUser : Party
-    svcUser : Party -- TODO(M1-51): remove workaround for explicit disclosure
-    validatorUser : Party -- TODO(M1-51): remove workaround for explicit disclosure
+    svcParty : Party -- TODO(M1-51): remove workaround for explicit disclosure
+    validatorParty : Party -- TODO(M1-51): remove workaround for explicit disclosure
+    walletServiceParty : Party
+    endUserName : Text -- The participant user name of the end-user
+    endUserParty : Party -- The primary party of the end-user
   where
-    signatory serviceUser, endUser, validatorUser
+    signatory walletServiceParty, endUserParty, validatorParty
 
-    key (endUser, serviceUser) : (Party, Party)
+    key (endUserParty, walletServiceParty) : (Party, Party)
     maintainer key._2
 
     -- TODO(i952) - generalize the batching
     nonconsuming choice WalletAppInstall_ExecuteBatch: [ContractId AcceptedAppPayment]
-      with 
+      with
         inputs: [TransferInput]
         operations : [ContractId AppPaymentRequest]
-      controller serviceUser
+      controller walletServiceParty
       do
         ([InputCoin coin], accepted) <- foldlA sequencePaymentRequests (inputs, []) operations
         return $ reverse accepted
@@ -426,15 +427,15 @@ template WalletAppInstall
     nonconsuming choice WalletAppInstall_Tap : ContractId Coin
       with
         quantity : Decimal
-      controller serviceUser
+      controller walletServiceParty
       do
-        exerciseByKey @CoinRules (svcUser, validatorUser) (CoinRules_Tap endUser quantity)
+        exerciseByKey @CoinRules (svcParty, validatorParty) (CoinRules_Tap endUserParty quantity)
 
     nonconsuming choice WalletAppInstall_AcceptAppMultiPaymentRequest : ContractId AcceptedAppMultiPayment
       with
         requestCid : ContractId AppMultiPaymentRequest
         transferInput : [TransferInput]
-      controller serviceUser
+      controller walletServiceParty
       do
         exercise requestCid (AppMultiPaymentRequest_Accept transferInput)
 
@@ -442,7 +443,7 @@ template WalletAppInstall
       with
         requestCid : ContractId AppPaymentRequest
         transferInput : [TransferInput]
-      controller serviceUser
+      controller walletServiceParty
       do
         (accepted, change) <- exercise requestCid (AppPaymentRequest_Accept transferInput)
         return accepted
@@ -451,7 +452,7 @@ template WalletAppInstall
       with
         requestCid : ContractId OnChannelPaymentRequest
         transferInput : [TransferInput]
-      controller serviceUser
+      controller walletServiceParty
       do
         exercise requestCid (OnChannelPaymentRequest_Accept transferInput)
 
@@ -461,6 +462,6 @@ template WalletAppInstall
         inputs : [TransferInput]
         quantity : Decimal
         payload : Text
-      controller serviceUser
+      controller walletServiceParty
       do
-        exerciseByKey @PaymentChannel (endUser, receiver, svcUser) (PaymentChannel_ExecuteDirectTransfer inputs quantity payload)
+        exerciseByKey @PaymentChannel (endUserParty, receiver, svcParty) (PaymentChannel_ExecuteDirectTransfer inputs quantity payload)
