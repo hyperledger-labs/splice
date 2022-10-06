@@ -10,7 +10,7 @@ function build_frontend() {
   ./gen-ledger-api-proto.sh
   ./copy-proto-sources.sh
   ./codegen.sh
-  npm install
+  "${script_dir}"/build-tools/npm-install.sh
   # npm run build
   # ^^ not building production to make this script faster
   cd -

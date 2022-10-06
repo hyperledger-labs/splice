@@ -477,4 +477,19 @@ Note that start-frontents.sh serves the different frontends from separate tmux s
 and then attaches the terminal to that tmux session. To detach from tmux, type `Ctrl+B D`.
 To switch between screens, type `Ctrl+B <screen>`.
 
+### NPM Lock file issues
 
+CI enforces that the checked in lock files are up2date. However, for
+the generated JS codegen, you might see issues where CI claims those
+are not up2date.
+
+The cause of this is a damlc issue where incremental builds do not
+produce the same package id. This will be fixed in later versions.
+
+To make sure your lock files match CI, run the following steps:
+
+1. `find . -name '.daml' | xargs rm -r`
+2. `sbt damlBuild`
+3. The setup script for the broken project, e.g.,
+   `cd apps/wallet/daml/frontend && ./setup.sh`
+4. Checkin the updated lock file which should now match CI.

@@ -86,7 +86,8 @@ commands:
             # Excluding ./track, as its contents may change while the archive is created.
             # Excluding ./log, as its large and we don't need it.
             # Excluding frontend since caching NPM is a terrible idea and we should not do it or Moritz will cry.
-            tar -czf /tmp/classes/classes.tar.gz --exclude-vcs --exclude=./track --exclude=./log --exclude frontend -H posix .
+            # Excluding .daml to avoid any issues where package ids might not be reliable on incremental builds.
+            tar -czf /tmp/classes/classes.tar.gz --exclude-vcs --exclude=./track --exclude=./log --exclude frontend --exclude .daml -H posix .
       - save_cache:
           name: Uploading archive with compiled classes to cache
           # Key components:
@@ -440,7 +441,7 @@ parameters:
   # old files don’t pollute your build.
   cache-version:
     type: string
-    default: "1"
+    default: "2"
   # Set to true for all scheduled jobs
   run-schedule:
     type: boolean

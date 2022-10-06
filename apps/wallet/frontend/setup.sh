@@ -8,4 +8,4 @@ set -eou pipefail
 ./copy-proto-sources.sh
 ./gen-ledger-api-proto.sh
 
-npm install
+../../../build-tools/npm-install.sh

@@ -4,11 +4,16 @@ if [ -z "${CI}" ]; then
     revision_prefix="${USER}-"
 fi
 
-# TODO(i1017): dirty flag disabled due to annoyingly inconsistent package ids.
-#  Once we bump canton version and resolve that, we should uncomment the lines below.
-#if [[ $(gitdiff --stat) != '' || $(git diff --cached) != '' ]]; then
-#  revision_suffix="-dirty"
-#fi
+if [[ $(gitdiff --stat) != '' || $(git diff --cached) != '' ]]; then
+    if [ -z "${CI}" ]; then
+        revision_suffix="-dirty"
+    else
+        >&2 echo "Repo was dirty on CI"
+        git status
+        git diff --no-pager --cached
+        exit 1
+    fi
+fi
 
 
 # get the deployment version tag
