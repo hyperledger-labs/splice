@@ -777,6 +777,10 @@ jobs:
                     }
                   ]
                 }
+      - run:
+          name: stop vpn
+          command: |
+            sudo killall charon-cmd
       - cleanup_sbt_test_job
 
   update_pipeline_schedule:
