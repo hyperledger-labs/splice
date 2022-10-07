@@ -38,7 +38,7 @@ lazy val root = (project in file("."))
     `apps-common`,
     `apps-validator`,
     `apps-scan`,
-    `apps-splitwise`,
+    `apps-aaa-splitwise`,
     `apps-svc`,
     `apps-app`,
     `apps-wallet`,
@@ -165,7 +165,10 @@ lazy val `apps-directory` =
       BuildCommon.copyDarResources,
     )
 
-lazy val `apps-splitwise` =
+// IntelliJ just sorts dependencies in alphabetical order, and splitwise needs to come first in the classpath
+// as it is the only one containing the .class files from the daml->scala codegen.
+// TODO(#592): change the splitwise module to a better name once we have improved our daml->scala codegen usage
+lazy val `apps-aaa-splitwise` =
   project
     .in(file("apps/splitwise"))
     .enablePlugins(DamlPlugin)
@@ -299,7 +302,7 @@ lazy val `apps-app` =
     .dependsOn(
       // Splitwise needs to come first so that the codegened files
       // come first in the classpath. Otherwise, you get NoSuchMethod errors at runtime.
-      `apps-splitwise`,
+      `apps-aaa-splitwise`,
       `apps-directory`,
       `apps-validator`,
       `apps-svc`,
