@@ -644,6 +644,7 @@ jobs:
       - when:
           condition: << parameters.slack_notify_success >>
           steps:
+            # TODO(#1059): Generalise as mix-in
           - slack/notify:
               event: pass
               # Based on success_tagged_deploy_1 from https://circleci.com/developer/orbs/orb/circleci/slack#orb-source and
@@ -677,6 +678,7 @@ jobs:
                         }
                     ]
                 }
+      # TODO(#1059): Generalise as mix-in
       - slack/notify:
           event: fail
           custom: |
@@ -793,6 +795,7 @@ jobs:
           - slack/notify:
               event: pass
               branch_pattern: main
+              # TODO(#1059): Generalise as mix-in
               custom: |
                 {
                   "blocks": [
@@ -816,6 +819,39 @@ jobs:
                     }
                   ]
                 }
+      # TODO(#1059): Generalise as mix-in
+      - slack/notify:
+          event: fail
+          custom: |
+            {
+            	"blocks": [
+            		{
+            			"type": "header",
+            			"text": {
+            				"type": "plain_text",
+            				"text": "Pre-flight validator check on the '<< parameters.cluster >>' cluster failed. :red_circle:",
+            				"emoji": true
+            			}
+            		},
+                    {
+                    	"type": "section",
+                    	"fields": [
+                    		{ "type": "mrkdwn", "text": "*Branch*: $CIRCLE_BRANCH" },
+                            { "type": "mrkdwn", "text": "*Commit*: $(git log -1 --oneline --no-color)" },
+                            { "type": "mrkdwn", "text": "*Author*: $(git log -1 --pretty='%an')" }
+                    	]
+                    },
+            		{
+            			"type": "actions",
+            			"elements": [
+            				{ "type": "button",
+            					"text": { "type": "plain_text", "text": "View Job" },
+            					"url": "${CIRCLE_BUILD_URL}"
+            				}
+            			]
+            		}
+            	]
+            }
       - run:
           name: stop vpn
           command: |
@@ -930,7 +966,6 @@ workflows:
         <<: *notify-fail
         <<: *main-branch-only
     - deploy_cluster:
-        <<: *notify-fail
         <<: *main-branch-only
         cluster: "staging"
         slack_notify_success: false
@@ -940,7 +975,6 @@ workflows:
     - preflight_check:
         cluster: staging
         slack_notify_success: false
-        <<: *notify-fail
         <<: *main-branch-only
         context:
           - canton-network-vpn
@@ -960,7 +994,6 @@ workflows:
         <<: *notify-fail
         <<: *main-branch-only
     - deploy_cluster:
-        <<: *notify-fail
         <<: *main-branch-only
         cluster: "devnet"
         requires:
@@ -968,7 +1001,6 @@ workflows:
            - docker-images-push
     - preflight_check:
         cluster: dev
-        <<: *notify-fail
         <<: *main-branch-only
         context:
           - canton-network-vpn
@@ -988,7 +1020,6 @@ workflows:
         <<: *notify-fail
         <<: *main-branch-only
     - deploy_cluster:
-        <<: *notify-fail
         <<: *main-branch-only
         cluster: "testnet"
         requires:
@@ -996,7 +1027,6 @@ workflows:
            - docker-images-push
     - preflight_check:
         cluster: test
-        <<: *notify-fail
         <<: *main-branch-only
         context:
           - canton-network-vpn
