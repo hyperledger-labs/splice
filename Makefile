@@ -16,7 +16,8 @@ apps := \
 	cluster/images/validator1-participant \
 	cluster/images/validator1-validator-app \
 	cluster/images/validator1-wallet-app \
-	cluster/images/validator1-wallet-web-ui
+	cluster/images/validator1-wallet-web-ui \
+	cluster/images/validator1-directory-web-ui
 
 define make_apps
   for app in $(apps); do \

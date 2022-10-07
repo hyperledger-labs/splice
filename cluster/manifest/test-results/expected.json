@@ -594,6 +594,39 @@
                               "memory": "1536Mi"
                            }
                         }
+                     },
+                     {
+                        "env": [
+                           {
+                              "name": "GRPC_ADDRESS",
+                              "value": "127.0.0.1"
+                           },
+                           {
+                              "name": "GRPC_PORT",
+                              "value": "5101"
+                           },
+                           {
+                              "name": "GRPC_WEB_PORT",
+                              "value": "6101"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/envoy-proxy:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "envoy-proxy",
+                        "ports": [
+                           {
+                              "containerPort": 6101,
+                              "name": "grpc-web"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "256Mi"
+                           },
+                           "requests": {
+                              "memory": "256Mi"
+                           }
+                        }
                      }
                   ]
                }
@@ -616,6 +649,11 @@
                {
                   "name": "val1-ledger-api",
                   "port": 5101,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-lapi-gweb",
+                  "port": 6101,
                   "protocol": "TCP"
                }
             ],
@@ -898,6 +936,83 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
+               "app": "validator1-directory-web-ui"
+            },
+            "name": "validator1-directory-web-ui"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "validator1-directory-web-ui"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "validator1-directory-web-ui",
+                     "external": "true"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms768M -Xmx768M"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/validator1-directory-web-ui:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "validator1-directory-web-ui",
+                        "ports": [
+                           {
+                              "containerPort": 80,
+                              "name": "val1-dir-ui"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1024Mi"
+                           },
+                           "requests": {
+                              "memory": "1024Mi"
+                           }
+                        }
+                     }
+                  ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "name": "validator1-directory-web-ui"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "val1-dir-ui",
+                  "port": 80,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "validator1-directory-web-ui"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
                "app": "gcs-proxy"
             },
             "name": "gcs-proxy"
@@ -1068,6 +1183,14 @@
                            {
                               "containerPort": 7104,
                               "name": "val1-wal-ui"
+                           },
+                           {
+                              "containerPort": 7010,
+                              "name": "val1-dir-ui"
+                           },
+                           {
+                              "containerPort": 6101,
+                              "name": "val1-lapi-gweb"
                            }
                         ],
                         "resources": {
@@ -1166,6 +1289,16 @@
                   "name": "val1-wal-ui",
                   "port": 7104,
                   "protocol": "TCP"
+               },
+               {
+                  "name": "val1-dir-ui",
+                  "port": 7010,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-lapi-gweb",
+                  "port": 6101,
+                  "protocol": "TCP"
                }
             ],
             "selector": {
@@ -1261,6 +1394,16 @@
                {
                   "name": "val1-wal-ui",
                   "port": 7104,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-dir-ui",
+                  "port": 7010,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-lapi-gweb",
+                  "port": 6101,
                   "protocol": "TCP"
                }
             ],
