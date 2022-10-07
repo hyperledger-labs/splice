@@ -617,73 +617,104 @@ jobs:
          cmd_name: deployment test
          cmd: make test
 
-  deploy_staging_cluster:
+  deploy_cluster:
     circleci_ip_ranges: true
     docker:
-    - image: cimg/base:2021.04
+      - image: cimg/base:2021.04
     environment:
       <<: *env
       CIRCLE_TAG: git-<< pipeline.git.revision >>
+    parameters:
+      cluster:
+        type: enum
+        enum: ["staging", "devnet", "testnet"]
+      slack_notify_success:
+        type: boolean
+        default: true
     steps:
       - checkout
       - setup_nix
       - run_bash_command_in_nix:
-         cmd_name: apply cluster manifest
-         with_scratchnet_authentication: true
-         cmd: |
-           . $REPO_ROOT/cluster/deployment/staging/.envrc.vars
-           cncluster activate
-           cncluster ciapply
+          cmd_name: apply cluster manifest
+          with_scratchnet_authentication: true
+          cmd: |
+            . $REPO_ROOT/cluster/deployment/<< parameters.cluster >>/.envrc.vars
+            cncluster activate
+            cncluster ciapply
+      - when:
+          condition: << parameters.slack_notify_success >>
+          steps:
+          - slack/notify:
+              event: pass
+              # Based on success_tagged_deploy_1 from https://circleci.com/developer/orbs/orb/circleci/slack#orb-source and
+              # adapted to our needs
+              custom: |
+                {
+                    "blocks": [
+                        {
+                            "type": "header",
+                            "text": {
+                                "type": "plain_text",
+                                "text": "Deploying cluster '<< parameters.cluster >>' was successful! :tada:",
+                                "emoji": true
+                            }
+                        },
+                        {
+                            "type": "section",
+                            "fields": [
+                                { "type": "mrkdwn", "text": "*Branch*: $CIRCLE_BRANCH" },
+                                { "type": "mrkdwn", "text": "*Commit*: $(git log -1 --oneline --no-color)" },
+                                { "type": "mrkdwn", "text": "*Author*: $(git log -1 --pretty='%an')" }
+                            ]
+                        },
+                        {
+                            "type": "actions",
+                            "elements": [
+                                { "type": "button", "text": { "type": "plain_text", "text": "View Job" },
+                                    "url": "${CIRCLE_BUILD_URL}"
+                                }
+                            ]
+                        }
+                    ]
+                }
       - slack/notify:
           event: fail
-          template: basic_fail_1
-
-  deploy_devnet_cluster:
-    circleci_ip_ranges: true
-    docker:
-    - image: cimg/base:2021.04
-    environment:
-      <<: *env
-      CIRCLE_TAG: git-<< pipeline.git.revision >>
-    steps:
-      - checkout
-      - setup_nix
-      - run_bash_command_in_nix:
-         cmd_name: apply cluster manifest
-         with_devnet_authentication: true
-         cmd: |
-           . $REPO_ROOT/cluster/deployment/devnet/.envrc.vars
-           cncluster activate
-           cncluster ciapply
-      - slack/notify:
-          event: pass
-          template: success_tagged_deploy_1
-
-  deploy_testnet_cluster:
-    circleci_ip_ranges: true
-    docker:
-    - image: cimg/base:2021.04
-    environment:
-      <<: *env
-      CIRCLE_TAG: git-<< pipeline.git.revision >>
-    steps:
-      - checkout
-      - setup_nix
-      - run_bash_command_in_nix:
-         cmd_name: apply cluster manifest
-         with_devnet_authentication: true
-         cmd: |
-           . $REPO_ROOT/cluster/deployment/testnet/.envrc.vars
-           cncluster activate
-           cncluster ciapply
-      - slack/notify:
-          event: pass
-          template: success_tagged_deploy_1
+          custom: |
+            {
+            	"blocks": [
+            		{
+            			"type": "header",
+            			"text": {
+            				"type": "plain_text",
+            				"text": "Deploying cluster << parameters.cluster >> failed. :red_circle:",
+            				"emoji": true
+            			}
+            		},
+                    {
+                    	"type": "section",
+                    	"fields": [
+                    		{ "type": "mrkdwn", "text": "*Branch*: $CIRCLE_BRANCH" },
+                            { "type": "mrkdwn", "text": "*Commit*: $(git log -1 --oneline --no-color)" },
+                            { "type": "mrkdwn", "text": "*Author*: $(git log -1 --pretty='%an')" }
+                    	]
+                    },
+            		{
+            			"type": "actions",
+            			"elements": [
+            				{ "type": "button",
+            					"text": { "type": "plain_text", "text": "View Job" },
+            					"url": "${CIRCLE_BUILD_URL}"
+            				}
+            			]
+            		}
+            	]
+            }
 
   preflight_check:
     parameters:
       cluster:
-        type: string
+        type: enum
+        enum: ["staging", "dev", "test"]
       slack_notify_success:
         type: boolean
         default: true
@@ -770,10 +801,18 @@ jobs:
                       "fields": [
                         {
                           "type": "plain_text",
-                          "text": "Pre-flight validator check succeeded! :dart:",
+                          "text": "Pre-flight validator check on the '<< parameters.cluster >>' cluster succeeded! :dart:",
                           "emoji": true
                         }
                       ]
+                    },
+                    {
+                    	"type": "section",
+                    	"fields": [
+                    		{ "type": "mrkdwn", "text": "*Branch*: $CIRCLE_BRANCH" },
+                            { "type": "mrkdwn", "text": "*Commit*: $(git log -1 --oneline --no-color)" },
+                            { "type": "mrkdwn", "text": "*Author*: $(git log -1 --pretty='%an')" }
+                    	]
                     }
                   ]
                 }
@@ -890,9 +929,11 @@ workflows:
     - deployment_test:
         <<: *notify-fail
         <<: *main-branch-only
-    - deploy_staging_cluster:
+    - deploy_cluster:
         <<: *notify-fail
         <<: *main-branch-only
+        cluster: "staging"
+        slack_notify_success: false
         requires:
            - deployment_test
            - docker-images-push
@@ -907,7 +948,7 @@ workflows:
         requires:
           - deployment_test
           - docker-images-push
-          - deploy_staging_cluster
+          - deploy_cluster
 
   deploy_devnet:
     when: << pipeline.parameters.run-devnet-schedule >>
@@ -918,9 +959,10 @@ workflows:
     - deployment_test:
         <<: *notify-fail
         <<: *main-branch-only
-    - deploy_devnet_cluster:
+    - deploy_cluster:
         <<: *notify-fail
         <<: *main-branch-only
+        cluster: "devnet"
         requires:
            - deployment_test
            - docker-images-push
@@ -934,7 +976,7 @@ workflows:
         requires:
           - deployment_test
           - docker-images-push
-          - deploy_devnet_cluster
+          - deploy_cluster
 
   deploy_testnet:
     when: << pipeline.parameters.run-testnet-schedule >>
@@ -945,9 +987,10 @@ workflows:
     - deployment_test:
         <<: *notify-fail
         <<: *main-branch-only
-    - deploy_testnet_cluster:
+    - deploy_cluster:
         <<: *notify-fail
         <<: *main-branch-only
+        cluster: "testnet"
         requires:
            - deployment_test
            - docker-images-push
@@ -961,7 +1004,7 @@ workflows:
         requires:
           - deployment_test
           - docker-images-push
-          - deploy_testnet_cluster
+          - deploy_cluster
 
   manual_preflight_check:
     jobs:
