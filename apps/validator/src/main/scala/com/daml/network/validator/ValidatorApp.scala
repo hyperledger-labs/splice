@@ -32,7 +32,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
   *
   * Modelled after Canton's ParticipantNode class.
   */
-class ValidatorAppNode(
+class ValidatorApp(
     override val name: InstanceName,
     val config: LocalValidatorAppConfig,
     val coinAppParameters: SharedCoinAppParameters,
@@ -46,7 +46,7 @@ class ValidatorAppNode(
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
-) extends CoinNode[ValidatorAppNode.State](
+) extends CoinNode[ValidatorApp.State](
       config.damlUser,
       config.remoteParticipant,
       coinAppParameters,
@@ -156,7 +156,7 @@ class ValidatorAppNode(
   override def initialize(
       ledgerClient: CoinLedgerClient,
       validatorParty: PartyId,
-  ): Future[ValidatorAppNode.State] =
+  ): Future[ValidatorApp.State] =
     for {
       scanConnection <-
         Future.successful(
@@ -203,11 +203,11 @@ class ValidatorAppNode(
           ec,
         )
       )
-      ValidatorAppNode.State(
+      ValidatorApp.State(
         storage,
         store,
         scanConnection,
-        loggerFactory.getTracedLogger(ValidatorAppNode.State.getClass),
+        loggerFactory.getTracedLogger(ValidatorApp.State.getClass),
       )
     }
 
@@ -217,7 +217,7 @@ class ValidatorAppNode(
   override val requiredTemplates = Set.empty
 }
 
-object ValidatorAppNode {
+object ValidatorApp {
   case class State(
       storage: Storage,
       store: ValidatorAppStore,

@@ -42,7 +42,7 @@ class SvcAppBootstrap(
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,
 ) extends CoinNodeBootstrapBase[
-      SvcAppNode,
+      SvcApp,
       LocalSvcAppConfig,
       SharedCoinAppParameters,
     ](
@@ -58,7 +58,7 @@ class SvcAppBootstrap(
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
     EitherT.fromEither(
       Right(
-        new SvcAppNode(
+        new SvcApp(
           name,
           config,
           svcAppParameters,

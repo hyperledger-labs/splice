@@ -43,7 +43,7 @@ class ValidatorAppBootstrap(
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,
 ) extends CoinNodeBootstrapBase[
-      ValidatorAppNode,
+      ValidatorApp,
       LocalValidatorAppConfig,
       SharedCoinAppParameters,
     ](
@@ -59,7 +59,7 @@ class ValidatorAppBootstrap(
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
     EitherT.fromEither(
       Right(
-        new ValidatorAppNode(
+        new ValidatorApp(
           name,
           config,
           validatorAppParameters,

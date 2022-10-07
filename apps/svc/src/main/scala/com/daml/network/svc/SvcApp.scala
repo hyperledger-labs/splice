@@ -26,7 +26,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
   *
   * Modelled after Canton's ParticipantNode class.
   */
-class SvcAppNode(
+class SvcApp(
     override val name: InstanceName,
     val config: LocalSvcAppConfig,
     val coinAppParameters: SharedCoinAppParameters,
@@ -40,7 +40,7 @@ class SvcAppNode(
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
     tracer: Tracer,
-) extends CoinNode[SvcAppNode.State](
+) extends CoinNode[SvcApp.State](
       config.damlUser,
       config.remoteParticipant,
       coinAppParameters,
@@ -53,7 +53,7 @@ class SvcAppNode(
   override def initialize(
       ledgerClient: CoinLedgerClient,
       svcPartyId: PartyId,
-  ): Future[SvcAppNode.State] =
+  ): Future[SvcApp.State] =
     for {
       store <- Future.successful(SvcAppStore(storage, loggerFactory))
       connection = ledgerClient.connection("SvcAppBootstrap")
@@ -74,7 +74,7 @@ class SvcAppNode(
           ec,
         )
       )
-      SvcAppNode.State(
+      SvcApp.State(
         storage,
         store,
         automation,
@@ -88,7 +88,7 @@ class SvcAppNode(
   override val requiredTemplates = Set.empty
 }
 
-object SvcAppNode {
+object SvcApp {
   case class State(
       storage: Storage,
       store: SvcAppStore,

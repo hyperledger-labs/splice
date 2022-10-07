@@ -2,7 +2,7 @@ package com.daml.network.environment
 
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.svc.config.LocalSvcAppConfig
-import com.daml.network.svc.{SvcAppBootstrap, SvcAppNode}
+import com.daml.network.svc.{SvcAppBootstrap, SvcApp}
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.environment.ManagedNodes
@@ -21,7 +21,7 @@ class SvcApps(
     protected val executionContext: ExecutionContextIdlenessExecutorService
 ) extends ManagedNodes[ // TODO(i736): We should remove the CantonNode/CantonNodeBootstrap type requirements from
       // this trait.
-      SvcAppNode,
+      SvcApp,
       LocalSvcAppConfig,
       SharedCoinAppParameters,
       SvcAppBootstrap,
