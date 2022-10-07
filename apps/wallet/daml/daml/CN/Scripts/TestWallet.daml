@@ -107,15 +107,29 @@ template TestDeliveryOffer
     interface instance DeliveryOffer for TestDeliveryOffer where
       view = DeliveryOfferView with description
 
+createMultiPaymentRequest : CCApp -> Party -> Party -> Party -> Decimal -> ContractId TestDeliveryOffer -> Script (ContractId AppMultiPaymentRequest)
+createMultiPaymentRequest app sender receiver1 receiver2 quantity offerCid = do
+  t <- getTime
+  let receiverQuantity1 = ReceiverQuantity with receiver = receiver1; quantity = quantity
+  let receiverQuantity2 = ReceiverQuantity with receiver = receiver2; quantity = quantity
+  -- multi-party submit to simplify test
+  submitMulti [sender, receiver1, receiver2] [] $ createCmd AppMultiPaymentRequest with
+    sender = sender
+    provider = sender
+    svc = app.svc
+    receiverQuantities = [receiverQuantity1, receiverQuantity2]
+    deliveryOffer = toInterfaceContractId offerCid
+    expiresAt = t `addRelTime` minutes 5
+    collectionDuration = minutes 5
 
 createPaymentRequest : CCApp -> Party -> Party -> Decimal -> ContractId TestDeliveryOffer -> Script (ContractId AppPaymentRequest)
-createPaymentRequest app p1 p2 quantity offerCid = do
+createPaymentRequest app sender receiver quantity offerCid = do
   t <- getTime
   -- multi-party submit to simplify test
-  submitMulti [p1, p2] [] $ createCmd AppPaymentRequest with
-    sender = p1
-    receiver = p2
-    provider = p1
+  submitMulti [sender, receiver] [] $ createCmd AppPaymentRequest with
+    sender = sender
+    receiver = receiver
+    provider = sender
     svc = app.svc
     quantity = quantity
     deliveryOffer = toInterfaceContractId offerCid
@@ -132,8 +146,9 @@ acceptPaymentRequest app p transferRequest coin = do
 acceptMultiPaymentRequest : CCApp -> Party -> ContractId AppMultiPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppMultiPayment)
 acceptMultiPaymentRequest app sender transferRequest coin = do
   validator <- getHostingValidator sender
-  submitMulti [sender] [validator] $ exerciseCmd transferRequest AppMultiPaymentRequest_Accept with
+  (accept, change) <- submitMulti [sender] [validator] $ exerciseCmd transferRequest AppMultiPaymentRequest_Accept with
     inputs = [InputCoin coin]
+  return accept
 
 testPaymentRequest : Script ()
 testPaymentRequest = script do
@@ -176,20 +191,13 @@ testMultiPaymentRequest = script do
   coin <- tap app alice 75.0
   deliveryOffer <- submit alice $ createCmd (TestDeliveryOffer alice "multi party submit")
   t <- getTime
-  transferRequest <- submitMulti [alice, bob, charlie] [] $ createCmd AppMultiPaymentRequest with
-    sender = alice
-    receiverQuantities = [ReceiverQuantity alice 30.0, ReceiverQuantity charlie 40.0]
-    provider = alice
-    svc = app.svc
-    deliveryOffer = toInterfaceContractId deliveryOffer
-    expiresAt = t `addRelTime` minutes 5
-    collectionDuration = minutes 5
+  transferRequest <- createMultiPaymentRequest app alice bob charlie 10.0 deliveryOffer
   acceptedPaymentCid <- acceptMultiPaymentRequest app alice transferRequest coin
   Some acceptedPayment <- queryContractId alice acceptedPaymentCid
   [(lockedCoin, _)] <- query @LockedCoin alice
   acceptedPayment === AcceptedAppMultiPayment with
     sender = alice
-    receivers = [alice, charlie]
+    receivers = [bob, charlie]
     provider = alice
     svc = app.svc
     lockedCoin = lockedCoin
@@ -212,7 +220,7 @@ testBatchPaymentRequests = script do
   deliveryOffer <- submit alice $ createCmd (TestDeliveryOffer alice "single party submit")
   deliveryOffer2 <- submit alice $ createCmd (TestDeliveryOffer alice "single party submit2")
   transferRequest <- createPaymentRequest app alice bob 1.0 deliveryOffer
-  transferRequest2 <- createPaymentRequest app alice bob 2.0 deliveryOffer2
+  transferRequest2 <- createMultiPaymentRequest app alice bob alice 2.0 deliveryOffer2
 
   install <- submitMulti [alice, validator] [] $ createCmd $ WalletAppInstall with
     -- for simplicity, alice is service and end-user
@@ -224,15 +232,16 @@ testBatchPaymentRequests = script do
 
   acceptedPaymentsCid <- submitMulti [alice] [validator] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputCoin coin]
-    operations = [transferRequest, transferRequest2]
+    operations = [CO_AppPayment transferRequest, CO_MultiAppPayment transferRequest2]
 
-  let [payment1Cid, payment2Cid] = acceptedPaymentsCid
+  let [COO_AcceptedAppPayment payment1Cid, COO_AcceptedAppMultiPayment payment2Cid] = acceptedPaymentsCid
   Some acceptedPayment <- queryContractId alice payment1Cid
   Some acceptedPayment2 <- queryContractId alice payment2Cid
   lockedCoins <- query @LockedCoin alice
   let [(lockedCoin, _), (lockedCoin2, _)] = sortOn (\(_, lockedCoin) -> lockedCoin.coin.quantity.initialQuantity) lockedCoins
   [(aliceChange, _), _] <- query @Coin alice
 
+  -- check results
   acceptedPayment === AcceptedAppPayment with
     sender = alice
     receiver = bob
@@ -241,9 +250,9 @@ testBatchPaymentRequests = script do
     lockedCoin = lockedCoin
     deliveryOffer = toInterfaceContractId deliveryOffer
 
-  acceptedPayment2 === AcceptedAppPayment with
+  acceptedPayment2 === AcceptedAppMultiPayment with
     sender = alice
-    receiver = bob
+    receivers = [bob, alice]
     provider = alice
     svc = app.svc
     lockedCoin = lockedCoin2

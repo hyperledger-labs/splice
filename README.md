@@ -491,5 +491,5 @@ To make sure your lock files match CI, run the following steps:
 1. `find . -name '.daml' | xargs rm -r`
 2. `sbt damlBuild`
 3. The setup script for the broken project, e.g.,
-   `cd apps/wallet/daml/frontend && ./setup.sh`
-4. Checkin the updated lock file which should now match CI.
+   `cd apps/wallet/frontend && ./setup.sh`
+4. Check-in the updated lock file which should now match CI.
