@@ -106,8 +106,11 @@ abstract class CoinNode[State <: AutoCloseable](
     Future { createLedgerClient(remoteParticipant) }
 
   val initializeF: Future[State] = for {
+    _ <- Future.successful(logger.info(s"Starting initialization"))
+    _ = logger.info(s"Acquiring ledger connection")
     ledgerClient <- ledgerClientF
     connection = ledgerClient.connection(name.toString)
+    _ = logger.info(s"Acquiring primary party of service user $serviceUser")
     serviceParty <- connection.retryLedgerApi(
       if (allocateServiceUser) connection.getOrAllocateParty(serviceUser)
       else connection.getPrimaryParty(serviceUser),
@@ -115,8 +118,12 @@ abstract class CoinNode[State <: AutoCloseable](
       // Wallet app starts last so we bump the retries here
       maxRetriesO = Some(maxRetries),
     )
+    _ = logger.info(s"Acquired primary party of user $serviceUser: $serviceParty")
+    _ = logger.info(s"Waiting for templates to be uploaded: ${requiredTemplates.map(_.id)}")
     _ <- waitForPackages(connection)
+    _ = logger.info(s"Packages available, running app-specific init")
     state <- initialize(ledgerClient, serviceParty)
+    _ <- Future.successful(logger.info(s"Initialization complete"))
   } yield state
 
   initializeF.onComplete { _ =>
