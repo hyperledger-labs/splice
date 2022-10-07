@@ -54,7 +54,7 @@ class ValidatorAppNode(
       tracerProvider,
     ) {
 
-  private def setupWallet(connection: CoinLedgerConnection): Future[PartyId] = {
+  private def setupWallet(connection: CoinLedgerConnection): Future[(PartyId, String)] = {
     logger.info(s"Attempting to setup wallet...")
     for {
       _ <- connection.uploadDarFile(new UploadablePackage {
@@ -71,7 +71,7 @@ class ValidatorAppNode(
       logger.info(
         s"Setup wallet with service user ${config.walletServiceUser} and primary party $party"
       )
-      party
+      (party, config.walletServiceUser)
     }
   }
 
@@ -91,13 +91,28 @@ class ValidatorAppNode(
     }
   }
 
-  private def createValidatorRight(
+  private def createWalletAppInstallAndValidatorRight(
       connection: CoinLedgerConnection,
-      validatorParty: PartyId,
       svcParty: PartyId,
+      validatorParty: PartyId,
+      validatorUser: String,
+      walletServiceParty: PartyId,
+      walletServiceUser: String,
   ): Future[Unit] = {
-    logger.info(s"Attempting to create validator right...")
+    logger.info(
+      s"Attempting to create wallet install and validator right for validator party $validatorParty..."
+    )
     for {
+      _ <- ValidatorUtil.installWalletForUser(
+        validatorServiceParty = validatorParty,
+        walletServiceParty = walletServiceParty,
+        walletServiceUser = walletServiceUser,
+        endUserName = validatorUser,
+        endUserParty = validatorParty,
+        svcParty = svcParty,
+        connection = connection,
+        logger = logger,
+      )
       _ <- ValidatorUtil.createValidatorRight(
         user = validatorParty,
         validator = validatorParty,
@@ -106,7 +121,7 @@ class ValidatorAppNode(
       )
     } yield {
       logger.info(
-        s"Created validator right with validator $validatorParty, svc $svcParty."
+        s"Created wallet install and validator right for validator party $validatorParty, svc $svcParty."
       )
     }
   }
@@ -154,11 +169,18 @@ class ValidatorAppNode(
       connection = ledgerClient.connection("ValidatorAppBootstrap")
       _ = logger.info(s"Got primary party of validator user: $validatorParty")
       svcParty <- scanConnection.getSvcPartyId()
-      walletServiceParty <- setupWallet(connection)
+      (walletServiceParty, walletServiceUser) <- setupWallet(connection)
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>
         setupAppInstance(connection, name, instance)
       })
-      _ <- createValidatorRight(connection, validatorParty, svcParty)
+      _ <- createWalletAppInstallAndValidatorRight(
+        connection,
+        svcParty = svcParty,
+        validatorParty = validatorParty,
+        validatorUser = config.damlUser,
+        walletServiceParty = walletServiceParty,
+        walletServiceUser = walletServiceUser,
+      )
       _ <- createRulesRequestAndUserHostedAtContracts(connection, svcParty, validatorParty)
     } yield {
       val store = ValidatorAppStore(

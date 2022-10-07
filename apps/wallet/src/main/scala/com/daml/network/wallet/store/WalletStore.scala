@@ -4,6 +4,7 @@ import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.store.AcsStore
+import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.Contract
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.pretty._
@@ -12,7 +13,7 @@ import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 
 import scala.collection.concurrent.TrieMap
-import scala.concurrent.ExecutionContext
+import scala.concurrent.{ExecutionContext, Future}
 
 /** A store for serving all queries used by the wallet backend's gRPC request handlers and automation. */
 trait WalletStore extends AutoCloseable with NamedLogging {
@@ -26,6 +27,20 @@ trait WalletStore extends AutoCloseable with NamedLogging {
 
   /** The key identifying the parties considered by this store. */
   def key: WalletStore.Key
+
+  def lookupInstallByParty(
+      endUserParty: PartyId
+  ): Future[QueryResult[Option[Contract[walletCodegen.WalletAppInstall]]]] =
+    acsStore.findContract(walletCodegen.WalletAppInstall)(co =>
+      co.payload.endUserParty == endUserParty.toPrim
+    )
+
+  def lookupInstallByName(
+      endUserName: String
+  ): Future[QueryResult[Option[Contract[walletCodegen.WalletAppInstall]]]] =
+    acsStore.findContract(walletCodegen.WalletAppInstall)(co =>
+      co.payload.endUserName == endUserName
+    )
 
   def streamInstalls: Source[Contract[walletCodegen.WalletAppInstall], NotUsed] =
     acsStore.streamContracts(walletCodegen.WalletAppInstall)

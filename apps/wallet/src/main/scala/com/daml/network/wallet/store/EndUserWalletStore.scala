@@ -1,6 +1,6 @@
 package com.daml.network.wallet.store
 
-import com.daml.ledger.client.binding.Primitive
+import com.daml.ledger.client.binding.{Primitive, TemplateCompanion}
 import com.daml.network.codegen.CC.{Coin => coinCodegen}
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.store.AcsStore
@@ -32,44 +32,24 @@ trait EndUserWalletStore extends AutoCloseable {
   def lookupInstall(): Future[QueryResult[Option[Contract[walletCodegen.WalletAppInstall]]]] =
     acsStore.findContract(walletCodegen.WalletAppInstall)(_ => true)
 
-  def listCoins(): Future[QueryResult[Seq[Contract[coinCodegen.Coin]]]] =
-    acsStore.listContracts(coinCodegen.Coin)
-
-  def listLockedCoins(): Future[QueryResult[Seq[Contract[coinCodegen.LockedCoin]]]] =
-    acsStore.listContracts(coinCodegen.LockedCoin)
-
-  def listOnChannelPaymentRequests()
-      : Future[QueryResult[Seq[Contract[walletCodegen.OnChannelPaymentRequest]]]] =
-    acsStore.listContracts(walletCodegen.OnChannelPaymentRequest)
+  def listContracts[T](
+      templateCompanion: TemplateCompanion[T]
+  ): Future[QueryResult[Seq[Contract[T]]]] = acsStore.listContracts(templateCompanion)
 
   def lookupOnChannelPaymentRequestById(
       cid: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]
   ): Future[QueryResult[Option[Contract[walletCodegen.OnChannelPaymentRequest]]]] =
     acsStore.lookupContractById(walletCodegen.OnChannelPaymentRequest)(cid)
 
-  def listAppPaymentRequests()
-      : Future[QueryResult[Seq[Contract[walletCodegen.AppPaymentRequest]]]] =
-    acsStore.listContracts(walletCodegen.AppPaymentRequest)
-
   def lookupAppPaymentRequestById(
       cid: Primitive.ContractId[walletCodegen.AppPaymentRequest]
   ): Future[QueryResult[Option[Contract[walletCodegen.AppPaymentRequest]]]] =
     acsStore.lookupContractById(walletCodegen.AppPaymentRequest)(cid)
 
-  def listAppMultiPaymentRequests()
-      : Future[QueryResult[Seq[Contract[walletCodegen.AppMultiPaymentRequest]]]] =
-    acsStore.listContracts(walletCodegen.AppMultiPaymentRequest)
-
   def lookupAppMultiPaymentRequestById(
       cid: Primitive.ContractId[walletCodegen.AppMultiPaymentRequest]
   ): Future[QueryResult[Option[Contract[walletCodegen.AppMultiPaymentRequest]]]] =
     acsStore.lookupContractById(walletCodegen.AppMultiPaymentRequest)(cid)
-
-  def listValidatorRewards(): Future[QueryResult[Seq[Contract[coinCodegen.ValidatorReward]]]] =
-    acsStore.listContracts(coinCodegen.ValidatorReward)
-
-  def listAppRewards(): Future[QueryResult[Seq[Contract[coinCodegen.AppReward]]]] =
-    acsStore.listContracts(coinCodegen.AppReward)
 }
 
 object EndUserWalletStore {
@@ -132,8 +112,9 @@ object EndUserWalletStore {
             co.payload.user == endUser
         ),
         mkFilter(coinCodegen.ValidatorRight)(co =>
+          // All validator rights that entitle the endUser to collect rewards as a validator operator
           co.payload.svc == svc &&
-            co.payload.user == endUser
+            co.payload.validator == endUser
         ),
         // Payment channels
         mkFilter(walletCodegen.PaymentChannelProposal)(co => channelFilter(co.payload.channel)),
