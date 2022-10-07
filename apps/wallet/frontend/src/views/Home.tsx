@@ -16,7 +16,11 @@ const Home: React.FC<{ userId: string }> = ({ userId }) => {
         <Tabs value={tabValue} onChange={(_, value) => setTabValue(value)}>
           <Tab label="Coins" value="coins" />
           <Tab label="Payment channels" value="payment_channels" />
-          <Tab label="App payment requests" value="app_payment_requests" />
+          <Tab
+            label="App payment requests"
+            value="app_payment_requests"
+            id="payment-requests-tab"
+          />
         </Tabs>
       </Box>
       <TabContext value={tabValue}>

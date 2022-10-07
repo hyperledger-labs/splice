@@ -8,4 +8,5 @@ set -eou pipefail
 
 rm -rf src/com/daml/network
 cp -r ../../common/target/scala-2.13/src_managed/main/ts/* src/
+cp -r ../../directory/target/scala-2.13/src_managed/main/ts/* src/
 cp -r ../../wallet/target/scala-2.13/src_managed/main/ts/* src/

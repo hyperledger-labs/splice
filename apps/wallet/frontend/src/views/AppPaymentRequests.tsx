@@ -9,6 +9,7 @@ import {
   ListAppPaymentRequestsRequest,
   WalletContext,
 } from '../com/daml/network/wallet/v0/wallet_service_pb';
+import Party from '../components/Party';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 import { sameContracts, useInterval, Contract } from '../utils';
 
@@ -39,8 +40,10 @@ const AppPaymentRequests: React.FC<{ userId: string }> = ({ userId }) => {
       );
     };
     return (
-      <TableRow>
-        <TableCell>{request.payload.receiver}</TableCell>
+      <TableRow className="app-requests-table-row">
+        <TableCell className="app-request-receiver">
+          <Party partyId={request.payload.receiver} />
+        </TableCell>
         <TableCell>{request.payload.quantity}</TableCell>
         <TableCell>
           <Button type="submit" onClick={onAccept}>
