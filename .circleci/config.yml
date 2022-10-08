@@ -967,6 +967,8 @@ workflows:
         <<: *main-branch-only
     - deploy_cluster:
         <<: *main-branch-only
+        context:
+          - slack-context
         cluster: "staging"
         slack_notify_success: false
         requires:
@@ -995,6 +997,8 @@ workflows:
         <<: *main-branch-only
     - deploy_cluster:
         <<: *main-branch-only
+        context:
+          - slack-context
         cluster: "devnet"
         requires:
            - deployment_test
@@ -1021,6 +1025,8 @@ workflows:
         <<: *main-branch-only
     - deploy_cluster:
         <<: *main-branch-only
+        context:
+          - slack-context
         cluster: "testnet"
         requires:
            - deployment_test
