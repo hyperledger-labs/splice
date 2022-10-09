@@ -118,7 +118,9 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest {
   )(implicit env: CoinTestConsoleEnvironment) = {
     // Whitelist the directory service on alice's validator
     directory.requestDirectoryInstall()
-    eventually()(directory.lookupInstall(userParty) shouldBe defined)
+    eventually() {
+      aliceDirectory.ledgerApi.ledger_api.acs.await(userParty, dirCodegen.DirectoryInstall)
+    }
     aliceDirectory.requestDirectoryEntry(dirEntry)
   }
 
