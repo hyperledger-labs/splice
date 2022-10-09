@@ -24,7 +24,7 @@ GCP_CLUSTER_NAME="cn-${GCP_CLUSTER_BASENAME}net"
 CLUSTER_DNS_NAME="${GCP_CLUSTER_BASENAME}.network.canton.global"
 
 function cluster_exists() {
-  CLUSTER=$(gcloud container clusters list --filter "name:${GCP_CLUSTER_NAME}"  --format 'value(name)' 2> /dev/null)
+  CLUSTER=$(gcloud container clusters list --filter "name:${GCP_CLUSTER_NAME}"  --format 'value(name)')
 
   if [ -z "${CLUSTER}" ]; then
       return 1
@@ -76,6 +76,7 @@ function cluster_activate() {
         gcloud container clusters get-credentials ${GCP_CLUSTER_NAME}
     else
         _log "Cluster must be created before activation."
+        exit 1
     fi
 }
 

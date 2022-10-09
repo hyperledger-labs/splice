@@ -637,7 +637,9 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: apply cluster manifest
           with_scratchnet_authentication: true
+          with_devnet_authentication: true
           cmd: |
+            set -eou pipefail
             . $REPO_ROOT/cluster/deployment/<< parameters.cluster >>/.envrc.vars
             cncluster activate
             cncluster ciapply
