@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import java.nio.file.Paths
 import java.time.Duration
 
 import com.daml.network.integration.tests.CoinTests.{
@@ -28,8 +29,10 @@ trait FrontendIntegrationTest
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
 
-  // TODO(i711): try sending the log output to our logfiles instead of /dev/null
-  System.setProperty(FirefoxDriver.SystemProperty.BROWSER_LOGFILE, "/dev/null")
+  System.setProperty(
+    FirefoxDriver.SystemProperty.BROWSER_LOGFILE,
+    Paths.get("log", "browser.log").toString,
+  )
   val options: FirefoxOptions = new FirefoxOptions().setHeadless(true)
 
   implicit var webDriver: WebDriver = _
