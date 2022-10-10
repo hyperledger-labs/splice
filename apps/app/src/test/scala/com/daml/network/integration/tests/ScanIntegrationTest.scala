@@ -13,6 +13,7 @@ import com.daml.network.util.{CommonCoinAppInstanceReferences, ExerciseNode, Pay
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.concurrent.duration._
+import com.daml.network.codegen.DA
 
 // TODO(M1-92): Add tests that cover all possible CoinEvents
 class ScanIntegrationTest
@@ -60,7 +61,9 @@ class ScanIntegrationTest
           inside(transferParentNode) { case Some(Transfer(ExerciseNode(argument, result))) =>
             argument.transfer.sender shouldBe aliceP.toPrim
             // one transfer result for alice, one for bob
-            result.createdCoins should have length 2
+            inside(result) { case DA.Types.Either.Right(result) =>
+              result.createdCoins should have length 2
+            }
           }
 
           aliceNew should matchPattern { case CoinCreate(_) => }

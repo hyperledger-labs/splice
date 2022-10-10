@@ -19,19 +19,21 @@ import com.daml.network.codegen.CC.Round.IssuingMiningRound
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
+import com.daml.network.codegen.DA
 
 /** Parent node of a Canton coin create or archive within the corresponding transaction tree. */
 sealed trait ParentNode {
   def toProtoV0: v0.ParentNode
 }
-case class Transfer(node: ExerciseNode[CoinRules_Transfer, TransferResult]) extends ParentNode {
+case class Transfer(node: ExerciseNode[CoinRules_Transfer, DA.Types.Either[P.Text, TransferResult]])
+    extends ParentNode {
   def toProtoV0: v0.ParentNode =
     v0.ParentNode().withTransfer(node.toProtoV0)
 }
 
 object Transfer extends ExerciseNodeCompanion {
   override type Arg = CoinRules_Transfer
-  override type Res = TransferResult
+  override type Res = DA.Types.Either[P.Text, TransferResult]
 
   def fromProtoV0(
       transferP: v0.ParentNode.Type.Transfer

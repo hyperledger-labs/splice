@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-# no -e so we try to always clean up all frontend processes
 set -eou pipefail
 
 tmux_session="cn-frontends"

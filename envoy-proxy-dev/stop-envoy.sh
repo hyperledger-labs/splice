@@ -10,7 +10,7 @@ else
 fi
 
 # remove, even if the envoy process was stopped another way already
-echo "Deleting envoy-out.json"
+echo "Trying to remove envoy-out.json"
 rm -f envoy-out.json
 
 

@@ -1,12 +1,13 @@
 module CC.CoinRules where
 
 import DA.Action (void, when, foldlA)
-import DA.Foldable (forA_)
+import DA.Foldable (forA_, mapA_)
 import DA.Map as Map
 import DA.Optional
 import DA.Set as Set
 import DA.Text
 import DA.Time
+import DA.Traversable qualified as F
 
 import CC.Coin
 import CC.Round
@@ -51,7 +52,7 @@ template CoinRules
     key (svc, obs) : (Party, Party)
     maintainer key._1
 
-    nonconsuming choice CoinRules_Transfer : TransferResult
+    nonconsuming choice CoinRules_Transfer : Either Text TransferResult
       -- ^ Execute a transfer.
       --
       -- Transfers support a batch-in batch-out model, which enables CC users
@@ -61,6 +62,18 @@ template CoinRules
         transfer : Transfer
       controller transferControllers transfer
       do executeTransfer config svc obs transfer
+
+    nonconsuming choice CoinRules_TryTransfer : TransferResult
+      -- Same as CoinRules_Transfer except that it will return an exception if the transfer fails. 
+      with
+        transfer : Transfer
+      controller transferControllers transfer
+      do 
+        transferResult <- exercise self CoinRules_Transfer with ..
+        case transferResult of 
+              Left errorMsg -> error errorMsg
+              Right result -> return result
+
 
     nonconsuming choice CoinRules_Tap: ContractId Coin
       with
@@ -310,9 +323,20 @@ data CreatedCoin
 scaleConfig : OpenMiningRound -> CoinConfig USD -> CoinConfig CC
 scaleConfig openRound config = scaleFees (1.0 / openRound.coinPrice) config
 
+
+checkTransferConstraints: Transfer -> TransferSummary -> CoinConfig CC -> Either Text ()
+checkTransferConstraints transfer summary config 
+    | summary.numInputs > config.maxNumInputs = Left $ "More than the maximum number of inputs"
+    | summary.numOutputs > config.maxNumOutputs = Left $ "More than the maximum number of outputs"
+    | DA.Text.length transfer.payload > config.maxPayloadLength = Left $ "Payload length is above limit"
+    | summary.quantityBalance < 0.0 = Left $ "Input to output+fee quantity balance " <> show summary.quantityBalance <> " < 0" 
+    | summary.quantityBalance /= 0.0 && summary.numFloatingCoins == 0 = Left $ "There needs to be at least one floating output coin to receive excess input quantity" <> show summary.quantityBalance
+    | otherwise = Right ()
+
+
 -- | Execute a transfer.
 --
-executeTransfer : CoinConfig USD -> Party -> Party -> Transfer -> Update TransferResult
+executeTransfer : CoinConfig USD -> Party -> Party -> Transfer -> Update (Either Text TransferResult)
 executeTransfer config0 svc validator t = do
   -- MISSING FEATURE 'fetchByKey + off-ledger disclosure': we do not want to have a dependency on
   -- the issuance state, as that will lead to contention. We'd expect to just fetch some
@@ -322,32 +346,28 @@ executeTransfer config0 svc validator t = do
   (_, openRound) <- fetchByKey @OpenMiningRound (svc, validator, issuanceState.currentRound )
   let config = scaleConfig openRound config0
   -- compute summaries
-  isum <- summarizeAndConsumeInputs openRound.round config svc t.sender validator t.inputs
+  isum <- summarizeAndValidateInputs openRound.round config svc t.sender validator t.inputs
   osum <- preprocessAndSummarizeOutputs config t.sender t.outputs
-  summary <- summarizeTransfer config isum osum
+  summary0 <- summarizeTransfer config isum osum
   -- check that overall transfer constraints are satisfied
-  assertMsg "Less than the maximum number of inputs" (summary.numInputs <= config.maxNumInputs)
-  assertMsg "Less than the maximum number of outputs" (summary.numOutputs <= config.maxNumOutputs)
-  assertMsg "Payload length below limit" (DA.Text.length t.payload <= config.maxPayloadLength)
-  assertMsg ("Input to output+fee quantity balance " <> show summary.quantityBalance <> " >= 0")
-    (summary.quantityBalance >= 0.0)
-  when (summary.quantityBalance /= 0.0) $
-    assertMsg "There is at least one floating output coin to receive excess input quantity"
-      (summary.numFloatingCoins > 0)
-  -- distribute floating outputs
-  let distributed = distributeOutputs openRound.round config svc t.sender summary osum.preprocessedOutputs
-  summary <- pure $ mergeReceiverFees distributed.receiverTransferFeess summary
-  summary <- pure $ mergeDistributedOutputs distributed t.sender summary
-  -- record debugging note
-  create TransferDebugNote with transfer = t; scaledConfig = config; round = issuanceState.currentRound; ..
-  -- issue rewards for burns
-  issueRewards config openRound t.sender t.provider summary
-  -- record outputs
-  createdCoins <- createTransferOutputs openRound.round config svc distributed.coins
+  F.forA (checkTransferConstraints t summary0 config) $ \_ -> do
+    -- consume inputs only after all assertions have been checked
+    _ <- consumeInputs svc t.sender validator t.inputs
+    -- distribute floating outputs
+    let distributed = distributeOutputs openRound.round config svc t.sender summary0 osum.preprocessedOutputs
+    let summary1 = mergeReceiverFees distributed.receiverTransferFeess summary0
+    let summary2 = mergeDistributedOutputs distributed t.sender summary1
+    -- record debugging note
+    create TransferDebugNote with transfer = t; scaledConfig = config; round = issuanceState.currentRound; summary = summary2; ..
+    -- issue rewards for burns
+    issueRewards config openRound t.sender t.provider summary2
+    -- record outputs
+    createdCoins <- createTransferOutputs openRound.round config svc distributed.coins
 
-  return TransferResult with
-    round = openRound.round
-    ..
+    return TransferResult with
+      round = openRound.round
+      summary = summary2
+      ..
 
 data TransferInputsSummary = TransferInputsSummary with
     numBurnInputs : Int
@@ -424,9 +444,9 @@ mergeDistributedOutputs distributed sender summary =
         then st
         else st + distCoin.quantity
 
-summarizeAndConsumeInputs : Round -> CoinConfig CC -> Party -> Party -> Party -> [TransferInput] -> Update TransferInputsSummary
-summarizeAndConsumeInputs now config svc sender validator inps = do
-    foldlA (summarizeAndConsumeInput now) initialSummary inps
+summarizeAndValidateInputs : Round -> CoinConfig CC -> Party -> Party -> Party -> [TransferInput] -> Update TransferInputsSummary
+summarizeAndValidateInputs now config svc sender validator inps = do
+    foldlA (summarizeInput now) initialSummary inps
   where
     initialSummary = TransferInputsSummary with
       numBurnInputs = 0
@@ -434,9 +454,8 @@ summarizeAndConsumeInputs now config svc sender validator inps = do
       totalQuantity = 0.0
       totalHoldingFees = 0.0
 
-    summarizeAndConsumeInput now s (InputCoin coinCid) = do
+    summarizeInput now s (InputCoin coinCid) = do
       coin <- fetch coinCid
-      archive coinCid
       assertMsg "SVC matches" (svc == coin.svc)
       assertMsg "Sender matches owner" (sender == coin.owner)
       let quantity = actualQuantity now coin.quantity
@@ -449,9 +468,8 @@ summarizeAndConsumeInputs now config svc sender validator inps = do
         totalHoldingFees =
           s.totalHoldingFees + holdingFee
 
-    summarizeAndConsumeInput now s (InputAppReward rewardCid) = do
+    summarizeInput now s (InputAppReward rewardCid) = do
       reward <- fetch rewardCid
-      archive rewardCid
       assertMsg "SVC matches" (svc == reward.svc)
       (_, miningRound) <- fetchByKey @IssuingMiningRound (svc, validator, reward.round)
       assertMsg "Sender matches app provider" (sender == reward.provider)
@@ -461,18 +479,38 @@ summarizeAndConsumeInputs now config svc sender validator inps = do
         totalQuantity = s.totalQuantity + reward.quantity * miningRound.issuancePerCoin
         totalHoldingFees = s.totalHoldingFees
 
-    summarizeAndConsumeInput now s (InputValidatorReward rewardCid) = do
+    summarizeInput now s (InputValidatorReward rewardCid) = do
       reward <- fetch rewardCid
       assertMsg "SVC matches" (svc == reward.svc)
       (_, miningRound) <- fetchByKey @IssuingMiningRound (svc, validator, reward.round)
-      (rightCid, validatorRight) <- fetchByKey @ValidatorRight (ValidatorRight with svc = svc, validator = sender, user = reward.user)
-      exercise rewardCid ValidatorReward_ArchiveAsValidator with validator = sender; rightCid
       return TransferInputsSummary with
         numBurnInputs = s.numBurnInputs + 1
         numCoinInputs = s.numCoinInputs
         totalQuantity = s.totalQuantity + reward.quantity * miningRound.issuancePerCoin
         totalHoldingFees = s.totalHoldingFees
 
+
+consumeInputs : Party -> Party -> Party -> [TransferInput] -> Update ()
+consumeInputs svc sender validator inps = do
+    mapA_ consumeInput inps
+  where
+    initialSummary = TransferInputsSummary with
+      numBurnInputs = 0
+      numCoinInputs = 0
+      totalQuantity = 0.0
+      totalHoldingFees = 0.0
+
+    consumeInput (InputCoin coinCid) = do
+      archive coinCid
+
+    consumeInput (InputAppReward rewardCid) = do
+      archive rewardCid
+
+    consumeInput (InputValidatorReward rewardCid) = do
+      reward <- fetch rewardCid
+      (_, miningRound) <- fetchByKey @IssuingMiningRound (svc, validator, reward.round)
+      (rightCid, validatorRight) <- fetchByKey @ValidatorRight (ValidatorRight with svc = svc, validator = sender, user = reward.user)
+      exercise rewardCid ValidatorReward_ArchiveAsValidator with validator = sender; rightCid
 
 preprocessAndSummarizeOutputs : CoinConfig CC -> Party -> [TransferOutput] -> Update TransferOutputsSummary
 preprocessAndSummarizeOutputs config sender outs = do

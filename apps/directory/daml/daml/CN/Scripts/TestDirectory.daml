@@ -54,7 +54,7 @@ test = script do
   [(coin, _)] <- queryFilter @Coin user (\c -> c.quantity.initialQuantity > 1.02)
   -- cc wallet accepts payment and locks coin to provider
   -- how: cc wallet
-  (acceptedAppPaymentCid, _) <- submitMulti [user] [app.svc] $ exerciseCmd appPaymentRequest AppPaymentRequest_Accept with
+  Right (acceptedAppPaymentCid, _) <- submitMulti [user] [app.svc] $ exerciseCmd appPaymentRequest AppPaymentRequest_Accept with
     inputs = [InputCoin coin]
 
   -- directory providers transactionally unlocks & transfer coins

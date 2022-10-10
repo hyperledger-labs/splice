@@ -5,10 +5,11 @@ import com.daml.ledger.api.v1
 import com.daml.ledger.api.v1.event.ExercisedEvent
 import com.daml.ledger.api.v1.transaction.TreeEvent.Kind.Exercised
 import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree}
-import com.daml.ledger.client.binding.{Primitive, Value => CodegenValue, ValueDecoder}
+import com.daml.ledger.client.binding.{Primitive, ValueDecoder, Value => CodegenValue}
 import com.daml.network.admin.LedgerAutomationService
 import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
 import com.daml.network.codegen.CC.CoinRules.{CoinRules, TransferResult}
+import com.daml.network.codegen.DA
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history._
 import com.daml.network.svc.store.SvcAppStore
@@ -47,7 +48,6 @@ class RoundSummaryCollectionService(
       _ <- store.addTransfers(transfers)
     } yield ()
   }
-
   def traverseForest(tree: TransactionTree): Future[Seq[TransferResult]] =
     Future {
       val transferResults: mutable.Buffer[TransferResult] = mutable.ListBuffer()
@@ -56,7 +56,15 @@ class RoundSummaryCollectionService(
         onCreate = (_, _) => {},
         onExercise = (exercised: Exercised, _) => {
           if (isTransfer(exercised.value)) {
-            transferResults.append(Transfer(tryDecodeEvent(Transfer)(exercised)).node.result)
+            val tf = Transfer(tryDecodeEvent(Transfer)(exercised)).node
+            tf.result match {
+              case DA.Types.Either.Left(errorMsg) =>
+                logger.debug(
+                  s"Dropping transfer with input ${tf.argument} as it completed with an error: $errorMsg"
+                )
+              case DA.Types.Either.Right(result) => transferResults.append(result)
+            }
+
           }
         },
       )
