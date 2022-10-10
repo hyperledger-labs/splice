@@ -19,11 +19,12 @@ import com.digitalasset.canton.util.retry.RetryUtil.{
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Try}
+import io.grpc.Status
 import io.grpc.protobuf.StatusProto
 
 trait CoinRetries extends FlagCloseable {
 
-  protected val maxRetries: Int = 20
+  protected val maxRetries: Int = 40
   protected val initialDelay: FiniteDuration = 10.millis
   protected val maxDelay: Duration = 5.seconds
 
@@ -62,7 +63,9 @@ object CoinRetries {
     override def retryOK(outcome: Try[_], logger: TracedLogger)(implicit
         tc: TraceContext
     ): ErrorKind = outcome match {
-      case Failure(ex @ GrpcException(status @ GrpcStatus(_, Some(operationName)), trailers)) =>
+      case Failure(
+            ex @ GrpcException(status @ GrpcStatus(statusCode, Some(operationName)), trailers)
+          ) =>
         val errorCategory = ErrorCodeUtils.errorCategoryFromString(operationName)
         val statusProto = StatusProto.fromStatusAndTrailers(status, trailers)
         val errorDetails = ErrorDetails.from(statusProto)
@@ -73,9 +76,16 @@ object CoinRetries {
               ex,
             )
             TransientErrorKind
+          // TODO (#1066) Remove the need to retry on UNIMPLEMENTED.
+          case None if statusCode == Status.Code.UNIMPLEMENTED =>
+            logger.info(
+              s"$operationName failed with a retryable error",
+              ex,
+            )
+            TransientErrorKind
           case _ =>
             logger.warn(
-              s"$operationName failed with a non-retryable error: Error details: ${errorDetails}",
+              s"$operationName failed with a non-retryable error: Error details: ${errorDetails} $errorCategory $statusCode ${statusCode == Status.Code.UNIMPLEMENTED}",
               ex,
             )
             FatalErrorKind

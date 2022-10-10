@@ -62,7 +62,7 @@ class DirectoryApp(
           loggerFactory,
         )
       )
-      svcParty <- scanConnection.getSvcPartyId()
+      svcParty <- retry("getSvcPartyId", scanConnection.getSvcPartyId())
       store = DirectoryStore(
         providerParty = providerPartyId,
         svcParty = svcParty,

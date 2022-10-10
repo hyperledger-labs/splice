@@ -167,8 +167,7 @@ class ValidatorApp(
           )
         )
       connection = ledgerClient.connection("ValidatorAppBootstrap")
-      _ = logger.info(s"Got primary party of validator user: $validatorParty")
-      svcParty <- scanConnection.getSvcPartyId()
+      svcParty <- retry("getSvcPartyId", scanConnection.getSvcPartyId())
       (walletServiceParty, walletServiceUser) <- setupWallet(connection)
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>
         setupAppInstance(connection, name, instance)
