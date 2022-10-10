@@ -246,7 +246,7 @@ commands:
       retry_fetch:
         # If true, will send a few \r\n to sbt to ensure we download dependencies
         type: string
-        default: "0"
+        default: "50"
       extra_parameters:
         type: string
         default: ""
@@ -465,7 +465,6 @@ jobs:
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "lint"
-          retry_fetch: "50"
       - run_todo_script
       - cleanup_sbt_test_job
 
@@ -488,7 +487,6 @@ jobs:
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "Test/compile"
-          retry_fetch: "50"
       - execute_sbt_command:
           # run all tests except the live cluster ones
           pre_sbt_cmd: ./start-canton.sh external && ./start-frontends.sh -d
@@ -509,7 +507,6 @@ jobs:
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "protocGenerate damlBuild"
-          retry_fetch: "50"
       - run_bash_command_in_nix:
           cmd_name: Build wallet web frontend
           cmd: |
@@ -524,7 +521,6 @@ jobs:
             npm run build
       - execute_sbt_command:
           cmd: "bundle"
-          retry_fetch: "50"
       - run:
           name: copy bundle
           command: |
@@ -555,7 +551,6 @@ jobs:
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "protocGenerate damlBuild"
-          retry_fetch: "50"
       - run_bash_command_in_nix:
           cmd_name: Build web frontend
           cmd: |
@@ -574,7 +569,6 @@ jobs:
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "protocGenerate damlBuild"
-          retry_fetch: "50"
       - run_bash_command_in_nix:
           cmd_name: Build web frontend
           cmd: |
@@ -593,7 +587,6 @@ jobs:
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "protocGenerate damlBuild"
-          retry_fetch: "50"
       - run_bash_command_in_nix:
           cmd_name: Build web frontend
           cmd: |
@@ -729,7 +722,6 @@ jobs:
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "Test/compile"
-          retry_fetch: "50"
       - run:
           name: install vpn client
           command: |
