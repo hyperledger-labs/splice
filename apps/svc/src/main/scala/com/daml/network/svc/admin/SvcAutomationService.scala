@@ -1,7 +1,7 @@
 package com.daml.network.svc.admin
 
 import com.daml.network.admin.LedgerAutomationServiceOrchestrator
-import com.daml.network.environment.CoinLedgerClient
+import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.svc.store.SvcAppStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncCloseable}
@@ -23,6 +23,7 @@ class SvcAutomationService(
     loggerFactory: NamedLoggerFactory,
     processingTimeouts: ProcessingTimeout,
     store: SvcAppStore,
+    retries: CoinRetries,
 )(implicit
     ec: ExecutionContextExecutor,
     tracer: Tracer,
@@ -34,7 +35,7 @@ class SvcAutomationService(
 
   val coinRulesRequestAcceptance =
     createService("svcAcceptCoinRulesRequestsService", ledgerClient, Seq(svcParty)) { connection =>
-      new CoinRulesRequestAcceptanceService(svcParty, connection, loggerFactory)
+      new CoinRulesRequestAcceptanceService(svcParty, connection, loggerFactory, retries)
     }
 
   val roundSummaryCollection =

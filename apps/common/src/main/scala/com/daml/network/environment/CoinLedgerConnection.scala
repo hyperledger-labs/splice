@@ -7,7 +7,6 @@ import akka.{Done, NotUsed}
 import com.daml.error.definitions.LedgerApiErrors
 import com.daml.error.definitions.groups.UserManagementServiceErrors
 import com.daml.error.utils.ErrorDetails
-import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.daml.ledger.api.domain.UserRight
 import com.daml.ledger.api.domain.UserRight.{CanActAs, CanReadAs}
 import com.daml.ledger.api.refinements.ApiTypes.{ApplicationId, ContractId, TemplateId, WorkflowId}
@@ -33,35 +32,26 @@ import com.daml.ledger.client.binding.{
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
   FlagCloseableAsync,
   SyncCloseable,
 }
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
-import com.digitalasset.canton.util.retry.RetryUtil.{
-  ErrorKind,
-  ExceptionRetryable,
-  FatalErrorKind,
-  NoErrorKind,
-  TransientErrorKind,
-}
-import com.digitalasset.canton.util.{AkkaUtil, retry}
+import com.digitalasset.canton.util.AkkaUtil
 import com.google.protobuf.ByteString
 import io.grpc.StatusRuntimeException
 import scalaz.syntax.tag._
 
 import java.nio.file.{Files, Path}
 import java.util.UUID
-import scala.concurrent.duration.DurationInt
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 /** Extract from connection for only submitting functionality */
 trait CoinLedgerSubmit extends FlagCloseableAsync {
@@ -196,29 +186,6 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
 // - there are new methods for interacting with the ledger API (e.g., party/package management)
 object CoinLedgerConnection {
 
-  case object RetryOnRetryableLedgerApiError extends ExceptionRetryable {
-
-    override def retryOK(outcome: Try[_], logger: TracedLogger)(implicit
-        tc: TraceContext
-    ): ErrorKind = outcome match {
-      case Failure(ex @ GrpcException(GrpcStatus(_, Some(description)), _)) =>
-        val errorCategory = ErrorCodeUtils.errorCategoryFromString(description)
-        errorCategory match {
-          case Some(cat) if cat.retryable.nonEmpty =>
-            logger.info(s"Ledger API call failed with a retryable error", ex)
-            TransientErrorKind
-          case _ =>
-            logger.warn(s"Ledger API call failed with a non-retryable error", ex)
-            FatalErrorKind
-        }
-      case Failure(ex) =>
-        logger.warn(s"Ledger API call failed with an unknown exception, not retrying", ex)
-        FatalErrorKind
-      case util.Success(_) =>
-        NoErrorKind
-    }
-  }
-
   def apply(
       coinLedgerClient: CoinLedgerClient,
       maxRetries: Int,
@@ -256,24 +223,6 @@ object CoinLedgerConnection {
           val active = responseSequence.flatMap(_.activeContracts)
           (active, LedgerOffset(value = LedgerOffset.Value.Absolute(offset)))
         }
-      }
-
-      def retryLedgerApi[T](
-          task: => Future[T],
-          retryable: ExceptionRetryable = RetryOnRetryableLedgerApiError,
-          maxRetriesO: Option[Int] = None,
-      )(implicit traceContext: TraceContext): Future[T] = {
-        implicit val success = com.digitalasset.canton.util.retry.Success.always
-        retry
-          .Backoff(
-            logger,
-            this,
-            maxRetriesO.getOrElse(maxRetries),
-            10.millis,
-            5.second,
-            "submitCommand",
-          )
-          .apply(task, retryable)
       }
 
       // TODO(i885): we can't rely on unique contract keys in multi-domain.
@@ -349,7 +298,6 @@ object CoinLedgerConnection {
           commandId: Option[String] = None,
           deduplicationTime: Option[NonNegativeFiniteDuration] = None,
       )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionResponse] = {
-        // Note: reusing the same command id for all retries
         val fullCommand =
           commandsOf(
             actAs,
@@ -359,8 +307,7 @@ object CoinLedgerConnection {
             deduplicationTime,
             command,
           )
-
-        retryLedgerApi(submitCommandOnce(fullCommand), RetryOnRetryableLedgerApiError)
+        submitCommand(fullCommand)
       }
 
       @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
@@ -371,7 +318,6 @@ object CoinLedgerConnection {
           commandId: Option[String] = None,
           deduplicationTime: Option[NonNegativeFiniteDuration] = None,
       )(implicit traceContext: TraceContext, decoder: ValueDecoder[T]): Future[T] = {
-        // Note: reusing the same command id for all retries
         val fullCommand =
           commandsOf(
             actAs,
@@ -382,7 +328,7 @@ object CoinLedgerConnection {
             Seq(update.command),
           )
 
-        retryLedgerApi(submitCommandOnceTree(fullCommand), RetryOnRetryableLedgerApiError)
+        submitCommandTree(fullCommand)
           .map { case result =>
             val transaction = result.getTransaction
             decodeExerciseResult(update.toString, transaction)
@@ -402,7 +348,7 @@ object CoinLedgerConnection {
           )
         }
 
-      private def submitCommandOnce(
+      private def submitCommand(
           fullCommand: Commands
       )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionResponse] = {
         val commandIdA = fullCommand.commandId
@@ -414,7 +360,7 @@ object CoinLedgerConnection {
         result
       }
 
-      private def submitCommandOnceTree(
+      private def submitCommandTree(
           fullCommand: Commands
       )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionTreeResponse] = {
         val commandIdA = fullCommand.commandId

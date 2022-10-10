@@ -5,12 +5,14 @@ import com.daml.ledger.client.binding.Primitive
 import com.daml.network.admin.LedgerAutomationService
 import com.daml.network.codegen.CC.CoinRules.CoinRulesRequest
 import com.daml.network.codegen.CC.Round.{IssuingMiningRound, OpenMiningRound}
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+
+import java.util.UUID
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -19,6 +21,7 @@ class CoinRulesRequestAcceptanceService(
     svcParty: PartyId,
     connection: CoinLedgerConnection,
     protected val loggerFactory: NamedLoggerFactory,
+    retries: CoinRetries,
 )(implicit ec: ExecutionContext)
     extends LedgerAutomationService
     with NamedLogging {
@@ -52,16 +55,22 @@ class CoinRulesRequestAcceptanceService(
         }
       _ <- Future.sequence(
         requestCids
-          .map(cid =>
-            connection
-              .submitCommand(
-                actAs = Seq(svcParty),
-                readAs = Seq.empty,
-                command = Seq(
-                  cid
-                    .exerciseAccept(openMiningRounds, issuingMiningRounds)
-                    .command
-                ),
+          .map(cid => {
+            val commandId = UUID.randomUUID.toString
+            retries
+              .retry(
+                "Accept coin rules request",
+                connection
+                  .submitCommand(
+                    actAs = Seq(svcParty),
+                    readAs = Seq.empty,
+                    command = Seq(
+                      cid
+                        .exerciseAccept(openMiningRounds, issuingMiningRounds)
+                        .command
+                    ),
+                    commandId = Some(commandId),
+                  ),
               )
               .recoverWith { case e =>
                 logger.warn(s"Failed to accept coin rules request: $e")
@@ -71,7 +80,7 @@ class CoinRulesRequestAcceptanceService(
                 // exercising the (consuming) Accept choice until it succeeds.
                 Future.successful(())
               }
-          )
+          })
       )
     } yield ()
 

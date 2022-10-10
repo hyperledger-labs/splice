@@ -66,6 +66,7 @@ class SvcApp(
         loggerFactory,
         timeouts,
         store,
+        this,
       )
     } yield {
       adminServerRegistry.addService(

@@ -404,7 +404,6 @@ class WalletIntegrationTest
       loggerFactory.assertThrowsAndLogs[CommandFailure](
         aliceRemoteWallet
           .executeDirectTransfer(bobUserParty, 10),
-        _.warningMessage should include("Ledger API call failed with a non-retryable error"),
         _.errorMessage should include("failed due to an exception"),
         _.errorMessage should include("Direct transfers are allowed"),
       )

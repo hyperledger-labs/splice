@@ -1,5 +1,6 @@
 package com.daml.network.automation
 
+import com.daml.network.environment.CoinRetries
 import akka.NotUsed
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{KillSwitches, Materializer}
@@ -23,7 +24,8 @@ import scala.util.{Failure, Success}
 abstract class AutomationService(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
-) extends FlagCloseableAsync
+) extends CoinRetries
+    with FlagCloseableAsync
     with NamedLogging
     with NoTracing {
 
@@ -47,7 +49,7 @@ abstract class AutomationService(implicit
       performUnlessClosingF(prettiedTask)({
         // TODO(#790): use tracing within the handler's log messages
         logger.debug(s"Attempting to process $prettiedTask")
-        val resultF = handler0(task)
+        val resultF = retry(prettiedTask, handler0(task))
         resultF.andThen {
           case Success(_) =>
             logger.debug(s"Successfully processed $prettiedTask.")
