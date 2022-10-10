@@ -28,10 +28,6 @@ $(directory-frontend): $(directory-daml)
 docker-build: $(app-bundle)
 	make -C cluster docker-build
 
-.PHONY: docker-push
-docker-push: $(app-bundle)
-	make -C cluster docker-push
-
 
 .PHONY: clean
 clean:

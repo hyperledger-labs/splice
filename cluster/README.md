@@ -13,6 +13,11 @@
     1. [Checking Pod Node Assignments and Memory Usage](#checking-pod-node-assignments-and-memory-usage)
 1. [Updating the Canton Network Deployment](#updating-the-canton-network-deployment)
 
+Note that operations in this directory require authentication to use
+Google Cloud APIs. If you have `direnv` installed (which you should),
+you will be asked to authenticate when you change into this directory
+for the first time.
+
 ## Available Clusters
 
 The public Canton Network clusters are currently hosted in Google

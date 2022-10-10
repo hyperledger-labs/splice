@@ -914,7 +914,7 @@ jobs:
            echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
            (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
            export PATH=$HOME/.daml/bin:$PATH
-           make docker-push
+           make -C cluster docker-push
 
 
 workflows:
