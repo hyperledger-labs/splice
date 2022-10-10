@@ -1,1 +1,1 @@
-include ../../../build-tools/common.mk
+include ../common.mk

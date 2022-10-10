@@ -7,9 +7,6 @@ RUN apt-get update \
    && apt-get clean \
    && rm -rf /var/cache/apt/archives
 
-# allow the path we pull the coin tarball from to be overridden
-ARG APP_PATH=target/coin-0.1.0-SNAPSHOT.tar.gz
-
 # create and switch to a working directory
 RUN mkdir /cn-app
 WORKDIR /cn-app
@@ -18,7 +15,7 @@ WORKDIR /cn-app
 COPY empty.conf .
 
 # move tarball to a static name
-ADD ${APP_PATH} .
+ADD target/coin-0.1.0-SNAPSHOT.tar.gz .
 
 # point entrypoint to the coin executable
 ENTRYPOINT [ "coin-0.1.0-SNAPSHOT/bin/coin" ]

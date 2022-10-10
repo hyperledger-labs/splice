@@ -1,5 +1,5 @@
 # -*- makefile -*-
-include ../../../build-tools/common.mk
+include ../common.mk
 
 src := Dockerfile directory.conf directory-service-0.1.0.dar bootstrap.scala
 build_arg := --build-arg base_version=$(shell version-gen)

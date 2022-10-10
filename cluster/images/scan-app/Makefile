@@ -1,5 +1,5 @@
 # -*- makefile -*-
-include ../../../build-tools/common.mk
+include ../common.mk
 
 src := Dockerfile scan.conf
 build_arg := --build-arg base_version=$(shell version-gen)

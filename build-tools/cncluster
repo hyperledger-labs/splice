@@ -83,7 +83,7 @@ function cluster_activate() {
 function cluster_apply() {
     cluster_confirm "Apply configuration"
 
-    if ! make -C ${REPO_ROOT} docker-check; then
+    if ! make -C ${REPO_ROOT}/cluster docker-check; then
         _error "Images missing from artifact registry, cannot apply."
         exit 1
     fi
@@ -94,7 +94,7 @@ function cluster_apply() {
 function cluster_deploy() {
     cluster_confirm "Build and apply configuration"
 
-    if ! make -C ${REPO_ROOT} docker-push; then
+    if ! make -C ${REPO_ROOT}/cluster docker-push; then
         _error "Error building images, cannot apply."
         exit 1
     fi

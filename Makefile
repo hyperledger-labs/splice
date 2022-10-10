@@ -1,57 +1,39 @@
 # -*- makefile -*-
 
-# svc-app depends on cn-app having been built first.
-# For now, that dependency declaration is given by the order here.
-apps := \
-	cluster/images/cn-app \
-	cluster/images/svc-app \
-	cluster/images/scan-app \
-	cluster/images/directory-app \
-	cluster/images/canton-domain \
-	cluster/images/canton-participant \
-	cluster/images/docs \
-	cluster/images/external-proxy \
-	cluster/images/gcs-proxy \
-	cluster/images/envoy-proxy \
-	cluster/images/validator1-participant \
-	cluster/images/validator1-validator-app \
-	cluster/images/validator1-wallet-app \
-	cluster/images/validator1-wallet-web-ui \
-	cluster/images/validator1-directory-web-ui
+app-bundle := ${REPO_ROOT}/apps/app/target/release/coin-0.1.0-SNAPSHOT.tar.gz
+wallet-frontend := ${REPO_ROOT}/apps/wallet/frontend/build/index.html
+directory-frontend := ${REPO_ROOT}/apps/wallet/directory/build/index.html
+target-bundle := target/coin-0.1.0-SNAPSHOT.tar.gz
+wallet-daml := ${REPO_ROOT}/apps/wallet/daml/.daml/dist/wallet-0.1.0.dar
+directory-daml := ${REPO_ROOT}/apps/directory/daml/.daml/dist/directory-service-0.1.0.dar
 
-define make_apps
-  for app in $(apps); do \
-    if ! make -C $${app} $(1); then \
-      exit 1; \
-    fi \
-  done
-endef
+$(app-bundle): $(wallet-frontend) $(directory-frontend)
+	sbt bundle
+
+$(wallet-daml):
+	sbt protocGenerate damlBuild
+
+$(directory-daml):
+	sbt protocGenerate damlBuild
+
+$(wallet-frontend): $(wallet-daml)
+	cd ${REPO_ROOT}/apps/wallet/frontend && ./setup.sh
+	cd ${REPO_ROOT}/apps/wallet/frontend && npm run build
+
+$(directory-frontend): $(directory-daml)
+	cd ${REPO_ROOT}/apps/directory/frontend && ./setup.sh
+	cd ${REPO_ROOT}/apps/directory/frontend && npm run build
 
 .PHONY: docker-build
-docker-build: test
-	$(call make_apps, docker-build)
+docker-build: $(app-bundle)
+	make -C cluster docker-build
 
 .PHONY: docker-push
-docker-push: docker-build
-	$(call make_apps, docker-push)
+docker-push: $(app-bundle)
+	make -C cluster docker-push
 
-.PHONY: docker-push-force
-docker-push-force: docker-build
-	$(call make_apps, docker-push-force)
-
-.PHONY: docker-clean-build-push
-docker-clean-build-push: test
-	$(call make_apps, clean)
-	$(call make_apps, docker-push)
-
-.PHONY: docker-check
-docker-check:
-	$(call make_apps, docker-check)
-
-.PHONY: test
-test:
-	make -C cluster/manifest test
 
 .PHONY: clean
 clean:
-	$(call make_apps, clean)
+	make -C cluster clean
+	sbt clean

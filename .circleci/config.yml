@@ -606,7 +606,7 @@ jobs:
       - setup_nix
       - run_bash_command_in_nix:
          cmd_name: deployment test
-         cmd: make test
+         cmd: make -C cluster test
 
   deploy_cluster:
     circleci_ip_ranges: true
@@ -881,7 +881,7 @@ jobs:
            ./gen-daml-docs.sh
            make html
 
-  docker-images-push:
+  docker_images_push:
     machine:
       image: ubuntu-2004:202010-01
     environment:
@@ -950,7 +950,7 @@ workflows:
   deploy_staging:
     jobs:
     # Deployment
-    - docker-images-push:
+    - docker_images_push:
         <<: *notify-fail
         <<: *main-branch-only
     - deployment_test:
@@ -964,7 +964,7 @@ workflows:
         slack_notify_success: false
         requires:
            - deployment_test
-           - docker-images-push
+           - docker_images_push
     - preflight_check:
         cluster: staging
         slack_notify_success: false
@@ -974,13 +974,13 @@ workflows:
           - slack-context
         requires:
           - deployment_test
-          - docker-images-push
+          - docker_images_push
           - deploy_cluster
 
   deploy_devnet:
     when: << pipeline.parameters.run-devnet-schedule >>
     jobs:
-    - docker-images-push:
+    - docker_images_push:
         <<: *notify-fail
         <<: *main-branch-only
     - deployment_test:
@@ -993,7 +993,7 @@ workflows:
         cluster: "devnet"
         requires:
            - deployment_test
-           - docker-images-push
+           - docker_images_push
     - preflight_check:
         cluster: dev
         <<: *main-branch-only
@@ -1002,13 +1002,13 @@ workflows:
           - slack-context
         requires:
           - deployment_test
-          - docker-images-push
+          - docker_images_push
           - deploy_cluster
 
   deploy_testnet:
     when: << pipeline.parameters.run-testnet-schedule >>
     jobs:
-    - docker-images-push:
+    - docker_images_push:
         <<: *notify-fail
         <<: *main-branch-only
     - deployment_test:
@@ -1021,7 +1021,7 @@ workflows:
         cluster: "testnet"
         requires:
            - deployment_test
-           - docker-images-push
+           - docker_images_push
     - preflight_check:
         cluster: test
         <<: *main-branch-only
@@ -1030,7 +1030,7 @@ workflows:
           - slack-context
         requires:
           - deployment_test
-          - docker-images-push
+          - docker_images_push
           - deploy_cluster
 
   manual_preflight_check:
