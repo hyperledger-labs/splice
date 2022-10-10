@@ -319,23 +319,28 @@ class WalletIntegrationTest
 
       // Alice proposes payment channel to Bob
       val proposalId = aliceRemoteWallet.proposePaymentChannel(bobUserParty)
-      val aliceProposals = aliceRemoteWallet.listPaymentChannelProposals()
+      val aliceProposal = eventually() {
+        inside(aliceRemoteWallet.listPaymentChannelProposals()) { case Seq(proposal) =>
+          proposal
+        }
+      }
 
       // Alice and Bob still don't see the payment channel yet
       aliceRemoteWallet.listPaymentChannels() shouldBe empty
       bobRemoteWallet.listPaymentChannels() shouldBe empty
 
-      aliceProposals should have size (1)
-      val aliceProposal = aliceProposals(0)
       val aliceChannel = aliceProposal.payload.channel
       aliceProposal.contractId shouldBe proposalId
       aliceChannel.sender shouldBe aliceUserParty.toPrim
       aliceChannel.receiver shouldBe bobUserParty.toPrim
 
       // Bob monitors proposals and accepts the one
-      eventually()(bobRemoteWallet.listPaymentChannelProposals() should have size 1)
-      val bobProposals = bobRemoteWallet.listPaymentChannelProposals()
-      aliceProposals shouldBe bobProposals
+      val bobProposal = eventually() {
+        inside(bobRemoteWallet.listPaymentChannelProposals()) { case Seq(proposal) =>
+          proposal
+        }
+      }
+      aliceProposal shouldBe bobProposal
       bobRemoteWallet.acceptPaymentChannelProposal(aliceProposal.contractId)
       eventually()(aliceRemoteWallet.listPaymentChannelProposals() shouldBe empty)
 
