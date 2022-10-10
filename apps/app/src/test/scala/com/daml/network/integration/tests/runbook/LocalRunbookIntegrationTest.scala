@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests.runbook
 
 import better.files.{File, _}
-import cats.syntax.functor._
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
@@ -13,7 +12,6 @@ import com.daml.network.integration.{
   CoinConfigTransforms,
   CoinEnvironmentDefinition,
 }
-import com.digitalasset.canton.console.LocalInstanceReference
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens._
@@ -53,20 +51,16 @@ class LocalRunbookIntegrationTest
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
       .withSetup(env => {
         import env._
-        // This section starts the core of the Canton Network (i.e., it does not include participants and apps
-        // operated by a self-hosted validator).
-        // It is not possible to start an environment definition that contains Canton components CN components with
-        // automatic start in integration tests
-        // This is because the SVC app `start` call relies on the Canton participants already being connected to a domain
-        // However, when automatic start is enabled it is currently impossible to connect participants to a domain
-        // until all other nodes defined the configuration are already started
-        // For this reason, we (1) first start the Canton nodes...
-        Seq(domains.local.widen[LocalInstanceReference], participants.local).flatten
-          .foreach(_.start())
+        // This section starts the core of the Canton Network (i.e., it does not include self-hosted
+        // participants and other apps that are part of a self-hosted validator).
+        Seq(
+          domains.local,
+          Seq(p("svc_participant")),
+          env.appsHostedBySvc.local,
+        ).flatten.start()(env)
         // ... (2) connect the SVC participant to the SVC domain...
         p("svc_participant").domains.connect_local(d("svc_domain"))
-        // ... (3) only then start the rest of the nodes
-        env.appsHostedBySvc.local.foreach(_.start())
+        // ... (3) Self-hosted validator is started in the test.
       })
 
   private def remoteScanAddressToLocalhost: CoinConfigTransform = {
@@ -97,7 +91,6 @@ class LocalRunbookIntegrationTest
     val result = Try {
       System.setProperty(propName, "http://localhost:6008")
 
-      runScript(svcParticipantPath / "bootstrap.scala")(env.environment)
       runScript(validatorPath / "validator-participant.canton")(env.environment)
       runScript(validatorPath / "tap-transfer-demo.canton")(env.environment)
     }

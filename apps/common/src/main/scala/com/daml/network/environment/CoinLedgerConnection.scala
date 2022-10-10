@@ -4,7 +4,6 @@ import akka.actor.ActorSystem
 import akka.stream.KillSwitches
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
-import com.daml.error.ErrorCategory
 import com.daml.error.definitions.LedgerApiErrors
 import com.daml.error.definitions.groups.UserManagementServiceErrors
 import com.daml.error.utils.ErrorDetails
@@ -88,13 +87,6 @@ trait CoinLedgerSubscription extends FlagCloseableAsync with NamedLogging {
 }
 
 trait CoinLedgerConnection extends CoinLedgerSubmit {
-  def retryLedgerApi[T](
-      task: => Future[T],
-      retryable: ExceptionRetryable,
-      maxRetriesO: Option[Int] = None,
-  )(implicit
-      traceContext: TraceContext
-  ): Future[T]
   def ignoreDuplicateKeyErrors[T](task: => Future[T], name: String)(implicit
       traceContext: TraceContext
   ): Future[Unit]
@@ -204,9 +196,7 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
 // - there are new methods for interacting with the ledger API (e.g., party/package management)
 object CoinLedgerConnection {
 
-  trait RetryLedgerApiError extends ExceptionRetryable {
-
-    protected def extraRetryableCategories: Set[ErrorCategory] = Set.empty
+  case object RetryOnRetryableLedgerApiError extends ExceptionRetryable {
 
     override def retryOK(outcome: Try[_], logger: TracedLogger)(implicit
         tc: TraceContext
@@ -214,8 +204,7 @@ object CoinLedgerConnection {
       case Failure(ex @ GrpcException(GrpcStatus(_, Some(description)), _)) =>
         val errorCategory = ErrorCodeUtils.errorCategoryFromString(description)
         errorCategory match {
-          case Some(cat) if cat.retryable.nonEmpty || extraRetryableCategories.contains(cat) =>
-            // Apps may start before their user has been created so we consider this retryable.
+          case Some(cat) if cat.retryable.nonEmpty =>
             logger.info(s"Ledger API call failed with a retryable error", ex)
             TransientErrorKind
           case _ =>
@@ -228,15 +217,6 @@ object CoinLedgerConnection {
       case util.Success(_) =>
         NoErrorKind
     }
-  }
-
-  case object RetryOnRetryableLedgerApiError extends RetryLedgerApiError
-
-  case object RetryOnUserManagementError extends RetryLedgerApiError {
-    // Apps may start before their user has been created so we consider this retryable.
-    override val extraRetryableCategories = Set(
-      ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing
-    )
   }
 
   def apply(
@@ -278,7 +258,7 @@ object CoinLedgerConnection {
         }
       }
 
-      override def retryLedgerApi[T](
+      def retryLedgerApi[T](
           task: => Future[T],
           retryable: ExceptionRetryable = RetryOnRetryableLedgerApiError,
           maxRetriesO: Option[Int] = None,

@@ -6,20 +6,20 @@ import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.TemplateCompanion
 import com.daml.ledger.client.configuration.CommandClientConfiguration
 import com.daml.network.config.SharedCoinAppParameters
-import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.config.RequireTypes.{InstanceName, Port}
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, FlagCloseableAsync}
-import com.digitalasset.canton.logging.{NamedLogging, NamedLoggerFactory}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.time.HasUptime
 import com.digitalasset.canton.topology.{PartyId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.{NoTracing, TracerProvider}
-import com.digitalasset.canton.util.retry.{Backoff, Success}
 import com.digitalasset.canton.util.retry.RetryUtil.AllExnRetryable
+import com.digitalasset.canton.util.retry.{Backoff, Success}
+
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.concurrent.duration._
 
 /** A running instance of a canton node */
 abstract class CoinNode[State <: AutoCloseable](
@@ -33,6 +33,7 @@ abstract class CoinNode[State <: AutoCloseable](
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
 ) extends CantonNode
+    with CoinRetries
     with FlagCloseableAsync
     with NamedLogging
     with HasUptime
@@ -67,8 +68,6 @@ abstract class CoinNode[State <: AutoCloseable](
     Future.successful(status)
   }
 
-  protected val maxRetries: Int = 15
-
   // Whether the service user should be allocated by the app itself.
   // We use that in the SVC app at the moment.
   protected val allocateServiceUser: Boolean = false
@@ -92,7 +91,7 @@ abstract class CoinNode[State <: AutoCloseable](
     }
 
     implicit val success = Success.always
-    val policy = Backoff(logger, this, maxRetries, 30.millis, 15.seconds, "waitForPackages")
+    val policy = Backoff(logger, this, maxRetries, initialDelay, maxDelay, "waitForPackages")
     policy(
       query(),
       AllExnRetryable,
@@ -111,13 +110,10 @@ abstract class CoinNode[State <: AutoCloseable](
     ledgerClient <- ledgerClientF
     connection = ledgerClient.connection(name.toString)
     _ = logger.info(s"Acquiring primary party of service user $serviceUser")
-    serviceParty <- connection.retryLedgerApi(
-      if (allocateServiceUser) connection.getOrAllocateParty(serviceUser)
-      else connection.getPrimaryParty(serviceUser),
-      CoinLedgerConnection.RetryOnUserManagementError,
-      // Wallet app starts last so we bump the retries here
-      maxRetriesO = Some(maxRetries),
-    )
+    serviceParty <-
+      if (allocateServiceUser)
+        retry("Allocating user and party", connection.getOrAllocateParty(serviceUser))
+      else retry("Querying primary party of user", connection.getPrimaryParty(serviceUser))
     _ = logger.info(s"Acquired primary party of user $serviceUser: $serviceParty")
     _ = logger.info(s"Waiting for templates to be uploaded: ${requiredTemplates.map(_.id)}")
     _ <- waitForPackages(connection)

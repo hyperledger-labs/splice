@@ -52,9 +52,6 @@ class WalletApp(
       tracerProvider,
     ) {
 
-  // Wallet app starts last so we bump the retries here
-  override val maxRetries = 20
-
   override def initialize(
       ledgerClient: CoinLedgerClient,
       walletServiceParty: PartyId,
