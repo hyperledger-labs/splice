@@ -331,12 +331,10 @@ commands:
       cmd_name:
         type: string
         default: "Executing bash command << parameters.cmd >> in the nix shell"
-      with_devnet_authentication:
-        type: boolean
-        default: false
-      with_scratchnet_authentication:
-        type: boolean
-        default: false
+      cluster_authentication:
+        type: enum
+        enum: ["staging", "devnet", "testnet", "none"]
+        default: "none"
       additional_nix_args:
         type: string
         default: ""
@@ -348,10 +346,10 @@ commands:
             . /home/circleci/.nix-profile/etc/profile.d/nix.sh
             ADDITIONAL_NIX_ARGS="<< parameters.additional_nix_args >>"
 
-            if [[ << parameters.with_devnet_authentication >> == true ]]; then
+            if [[ << parameters.cluster_authentication >> =~ (dev|test)net  ]]; then
               ADDITIONAL_NIX_ARGS+=" --keep GCP_DA_CN_DEVNET_KEY"
             fi
-            if [[ << parameters.with_scratchnet_authentication >> == true ]]; then
+            if [[ << parameters.cluster_authentication >> == staging ]]; then
               ADDITIONAL_NIX_ARGS+=" --keep GCP_DA_CN_SCRATCHNET_KEY"
             fi
 
@@ -362,10 +360,10 @@ commands:
               set -euo pipefail
               . .envrc.vars
 
-              if [[ << parameters.with_devnet_authentication >> == true ]]; then
+              if [[ << parameters.cluster_authentication >> =~ (dev|test)net ]]; then
                 echo $GCP_DA_CN_DEVNET_KEY | gcloud auth activate-service-account --key-file=-
               fi
-              if [[ << parameters.with_scratchnet_authentication >> == true ]]; then
+              if [[ << parameters.cluster_authentication >> == staging ]]; then
                 echo $GCP_DA_CN_SCRATCHNET_KEY | gcloud auth activate-service-account --key-file=-
               fi
 
@@ -636,8 +634,7 @@ jobs:
       - setup_nix
       - run_bash_command_in_nix:
           cmd_name: apply cluster manifest
-          with_scratchnet_authentication: true
-          with_devnet_authentication: true
+          cluster_authentication: << parameters.cluster >>
           cmd: |
             set -eou pipefail
             . $REPO_ROOT/cluster/deployment/<< parameters.cluster >>/.envrc.vars
