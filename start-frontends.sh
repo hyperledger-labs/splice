@@ -7,6 +7,10 @@ function build_frontend() {
   script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
   cd "${script_dir}/apps/${app}/frontend"
 
+  if [[ -z "$(ls ../target/scala* 2>/dev/null)" ]]; then
+    echo "No compilation artifacts found in app ${app}. Please compile the repo before starting frontends" 1>&2
+    exit 1
+  fi
   ./gen-ledger-api-proto.sh
   ./copy-proto-sources.sh
   ./codegen.sh
@@ -78,7 +82,6 @@ done
 
 tmux_session="cn-frontends"
 tmux_window=0
-tmux new-session -d -s "${tmux_session}"
 
 # TODO(i711): Move build steps into sbt
 build_frontend wallet
@@ -86,6 +89,8 @@ build_frontend splitwise
 build_frontend directory
 
 start_envoy
+
+tmux new-session -d -s "${tmux_session}"
 
 start_frontend wallet 3000 6204 NA 6203 alice
 start_frontend wallet 3001 6304 NA 6303 bob
