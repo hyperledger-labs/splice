@@ -19,11 +19,11 @@ defaultCoinConfig = CoinConfig with
     updateFee = FixedFee 0.01
 
     -- Fee for keeping a coin around.
-    -- This is roughly equivalent to 1$/360 days but expressed as rounds
+    -- This is roughly equivalent to 1.05$/365 days but expressed as rounds
     -- with one day corresponding to 24*60/2.5 rounds, i.e., one round
     -- every 2.5 minutes.
     -- Incentivizes users to actively merge their coins.
-    holdingFee = RatePerRound (1.0 / 360.0 / (24.0*60.0/2.5))
+    holdingFee = RatePerRound 0.000005
 
     -- The minimal quantity of burn for which a receipt is issued.
     --

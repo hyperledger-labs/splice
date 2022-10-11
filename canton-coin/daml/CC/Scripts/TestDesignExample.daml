@@ -85,10 +85,10 @@ test = do
   lockTo app alice arbiter 1000.25 (days 90) "lock"
 
   [(lockedCoin, _)] <- query @LockedCoin alice
+  -- advance 40k rounds
   runNextIssuance app 1.0
+  skipNRounds app 39_999
   c1 <- activeRound app
-
-  setTime (t0 `addRelTime` days 72)
 
   pay app alice alice 5.0 "split"
   archiveTransferDebugNotes app
@@ -96,11 +96,11 @@ test = do
   [(paymentCoin, _)] <- queryFilter @Coin alice (\c -> c.quantity.initialQuantity == 5.0)
 
 
+  -- advance 10k rounds
   runNextIssuance app 1.0
+  skipNRounds app 9_999
 
   c2 <- activeRound app
-
-  setTime (t0 `addRelTime` days 90)
 
   prevCoinCids <- map fst <$> query @Coin app.svc
   prevLockedCoinCids <- map fst <$> query @LockedCoin app.svc
@@ -111,8 +111,8 @@ test = do
   note.isum === TransferInputsSummary with
     numBurnInputs  = 0
     numCoinInputs = 2
-    totalQuantity = 1005.2499855325
-    totalHoldingFees = 0.0000144675
+    totalQuantity = 1004.95
+    totalHoldingFees = 0.3
   note.osum { preprocessedOutputs = [] } === TransferOutputsSummary with
     numLockedSenderCoins = 1
     numReceiverCoins = 1
@@ -126,14 +126,14 @@ test = do
     totalNonSelfOutputs = 1.0
   note.summary === TransferSummary with
     numOutputs = 3
-    inQuantity = 1005.2499855325
+    inQuantity = 1004.95
     nonSelfOutQuantity = 0.99
-    selfOutQuantity = 1004.1299855325
-    quantityBalance = 3.8799855325
+    selfOutQuantity = 1003.83
+    quantityBalance = 3.58
     numFloatingCoins = 1
     totalTransferFees = 0.01
     senderAdminFees = 0.12
-    senderHoldingFees = 0.0000144675
+    senderHoldingFees = 0.3
     numInputs = 2
     receiverTransferFees = 0.01
 

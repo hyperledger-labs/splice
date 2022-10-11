@@ -215,6 +215,19 @@ runNextIssuance app coinPrice = do
     -- workaround for explicit disclosure
     updateDisclosedMiningRoundContracts app
 
+-- Skip over the next n rounds. This is used in tests because actually calling runNextIssuance a few thousand times is too slow.
+skipNRounds : CCApp -> Int -> Script ()
+skipNRounds app n = do
+  Some (stCid, st) <- queryContractKey @IssuanceState app.svc (app.svc, app.svc)
+  Some (openRoundCid, openRound) <- queryContractKey @OpenMiningRound app.svc (app.svc, app.svc, st.currentRound)
+  let newRound = Round (openRound.round.number + n)
+  submit app.svc
+    $ archiveCmd openRoundCid
+    *> createCmd openRound with round = newRound 
+    *> archiveCmd stCid
+    *> createCmd st with currentRound = newRound
+  pure ()
+
 -- Each validator has their own copy of IssuanceState, OpenMiningRound, ClosedMiningRound, IssuingMiningRound contracts
 -- This updates all of these copies to match the original contracts owned by the SVC
 -- 
