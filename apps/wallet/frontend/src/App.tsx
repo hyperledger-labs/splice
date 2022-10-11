@@ -14,6 +14,7 @@ import {
 
 import './App.css';
 import { UserStatusRequest, WalletContext } from './com/daml/network/wallet/v0/wallet_service_pb';
+import DirectoryEntry from './components/DirectoryEntry';
 import { useWalletClient } from './contexts/WalletServiceContext';
 import ErrorBoundary from './utils/ErrorBoundary';
 import Home from './views/Home';
@@ -160,8 +161,13 @@ const App: React.FC = () => {
         <CssBaseline />
         <AppBar position="static">
           <Toolbar>
-            <Typography variant="h6" sx={{ flexGrow: 1 }}>
+            <Typography variant="h6" sx={{ flexGrow: 1 }} id="app-title">
               CC Wallet
+              {state.type === 'onboarded' && (
+                <div id="logged-in-user">
+                  <DirectoryEntry partyId={state.damlPartyId} />
+                </div>
+              )}
             </Typography>
             {state.damlUserId && (
               <Button

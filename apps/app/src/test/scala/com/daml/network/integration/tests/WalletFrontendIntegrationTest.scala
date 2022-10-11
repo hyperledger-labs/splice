@@ -6,6 +6,7 @@ import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.duration.DurationInt
+import scala.util.Try
 
 class WalletFrontendIntegrationTest extends FrontendIntegrationTest {
 
@@ -50,6 +51,43 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest {
         findAll(id("error")).toList should not be empty
       )
       consumeError("RpcError: Could not read Numeric string \"non-numeric\"")
+    }
+
+    "show logged in user details" in { implicit env =>
+      // Create directory entry for alice
+      val aliceDamlUser = aliceRemoteWallet.config.damlUser
+      val entryName = "alice.cns"
+      val aliceParty = setupForTestWithDirectory(aliceDamlUser, aliceValidator)
+      submitDirectoryEntryRequest(aliceParty, aliceDirectory, entryName)
+
+      def getPaymentRequest() = aliceRemoteWallet.listAppPaymentRequests().headOption
+
+      aliceRemoteWallet.tap(5.0)
+      val walletPaymentRequest = eventually()(
+        getPaymentRequest().getOrElse(fail("Payment request is unexpectedly not defined"))
+      )
+      val _ = aliceRemoteWallet.acceptAppPaymentRequest(walletPaymentRequest.contractId)
+
+      def tryGetEntry() =
+        Try(loggerFactory.suppressErrors(directory.lookupEntryByName(entryName)))
+
+      eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $entryName")))
+
+      // Browse to alice's wallet
+      go to "http://localhost:3000"
+      click on "user-id-field"
+      textField("user-id-field").value = aliceDamlUser
+      click on "login-button"
+      eventually() {
+        find(id("logged-in-user")).getOrElse(fail("Logged-in user information never showed up"))
+      }
+
+      // Check that alice is shown as the user, and her party ID has been resolved to its directory entry correctly.
+      // We do this in another eventually() as a "..." text might appear momentarily, until the directory service responds.
+      eventually() {
+        val expected = s"alice.cns (${aliceParty.toProtoPrimitive})"
+        find(id("logged-in-user")).value.text shouldBe expected
+      }
     }
 
     "show app payment requests, and correctly handle unresolved party IDs" in { implicit env =>
