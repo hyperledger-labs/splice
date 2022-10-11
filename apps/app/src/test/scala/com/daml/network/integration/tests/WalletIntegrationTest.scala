@@ -397,10 +397,12 @@ class WalletIntegrationTest
         allowDirectTransfers = false,
       )
       eventually()(bobRemoteWallet.listPaymentChannelProposals() should have size 1)
-      bobRemoteWallet.acceptPaymentChannelProposal(
+      val updatedProposal = bobRemoteWallet.acceptPaymentChannelProposal(
         bobRemoteWallet.listPaymentChannelProposals().head.contractId
       )
-      eventually()(aliceRemoteWallet.listPaymentChannels() should have size 1)
+      eventually()(
+        aliceRemoteWallet.listPaymentChannels().map(_.contractId) should contain(updatedProposal)
+      )
       loggerFactory.assertThrowsAndLogs[CommandFailure](
         aliceRemoteWallet
           .executeDirectTransfer(bobUserParty, 10),
