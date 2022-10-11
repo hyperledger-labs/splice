@@ -22,8 +22,8 @@ parameters:
     default: "2"
   run-job:
     type: enum
-    enum: ["build", "deploy-devnet", "deploy-testnet", "healthcheck-testnet"]
-    default: "build"
+    enum: [build, deploy-devnet, deploy-testnet, healthcheck-testnet]
+    default: build
 
 
 notify-fail: &notify-fail
@@ -913,8 +913,7 @@ workflows:
   version: 2
   build:
     when:
-      condition:
-        equal: [ "build", << pipeline.parameters.run-job >> ]
+      equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
     # Documentation
     - docs:
@@ -942,8 +941,7 @@ workflows:
 
   deploy_staging:
     when:
-      condition:
-        equal: [ "build", << pipeline.parameters.run-job >> ]
+      equal: [ build, << pipeline.parameters.run-job >> ]
     jobs:
     # Deployment
     - docker_images_push:
@@ -975,8 +973,7 @@ workflows:
 
   deploy_devnet:
     when:
-      condition:
-        equal: [ "deploy-devnet", << pipeline.parameters.run-job >> ]
+      equal: [ deploy-devnet, << pipeline.parameters.run-job >> ]
     jobs:
     - docker_images_push:
         <<: *notify-fail
@@ -1005,8 +1002,7 @@ workflows:
 
   deploy_testnet:
     when:
-      condition:
-        equal: [ "deploy-testnet", << pipeline.parameters.run-job >> ]
+      equal: [ deploy-testnet, << pipeline.parameters.run-job >> ]
     jobs:
     - docker_images_push:
         <<: *notify-fail
@@ -1035,8 +1031,7 @@ workflows:
 
   testnet_health_check:
     when:
-      condition:
-        equal: [ "healthcheck-testnet", << pipeline.parameters.run-job >> ]
+      equal: [ healthcheck-testnet, << pipeline.parameters.run-job >> ]
     jobs:
       - preflight_check:
           <<: *main-branch-only
