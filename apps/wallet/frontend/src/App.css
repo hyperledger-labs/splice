@@ -42,3 +42,11 @@ body,
     transform: rotate(360deg);
   }
 }
+
+.dir-entry {
+  font-weight: bold;
+}
+
+.party-id {
+  font-weight: lighter;
+}

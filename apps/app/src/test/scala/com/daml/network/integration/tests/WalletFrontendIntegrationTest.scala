@@ -72,6 +72,7 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest {
 
     "show app payment requests, and resolve party IDs in them" in { implicit env =>
       // Register directory.cns in directory
+      val dirEntryName = "directory.cns"
       val dirPartyId = directory.getProviderPartyId()
       directory.remoteParticipant.ledger_api.commands.submit(
         actAs = Seq(dirPartyId),
@@ -80,7 +81,7 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest {
             .DirectoryEntry(
               user = dirPartyId.toPrim,
               provider = dirPartyId.toPrim,
-              name = "directory.cns",
+              name = dirEntryName,
             )
             .create
             .command
@@ -98,7 +99,9 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest {
       // We do this in another eventually() as a "..." text might appear momentarily, until the directory service responds.
       eventually() {
         inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
-          row.childElement(className("app-request-receiver")).text shouldBe "directory.cns"
+          val expected = s"directory.cns (${dirPartyId.toProtoPrimitive})"
+          row.childElement(className("app-request-receiver")).text shouldBe expected
+          row
         }
       }
     }
