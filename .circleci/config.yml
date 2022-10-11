@@ -452,6 +452,10 @@ parameters:
   run-testnet-schedule:
     type: boolean
     default: false
+  # Set to true for hourly testnet preflight
+  run-testnet-healthcheck-schedule:
+    type: boolean
+    default: false
 
 jobs:
 
@@ -1044,3 +1048,13 @@ workflows:
             - canton-network-vpn
           requires:
             - click_to_run_workflow
+
+  testnet_preflight_check:
+    when: << pipeline.parameters.run-testnet-healthcheck-schedule >>
+    jobs:
+      - preflight_check:
+          <<: *main-branch-only
+          cluster: test
+          slack_notify_success: false
+          context:
+            - canton-network-vpn
