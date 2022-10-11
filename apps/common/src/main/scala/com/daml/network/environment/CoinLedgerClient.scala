@@ -14,12 +14,10 @@ import com.daml.ledger.client.configuration.{
 import com.daml.ledger.client.services.transactions.TransactionClient
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
-import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
-import io.grpc.StatusRuntimeException
+import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
-import org.slf4j.event.Level
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
@@ -46,16 +44,14 @@ trait CoinLedgerClient extends FlagCloseableAsync {
 }
 
 object CoinLedgerClient {
-  def createLedgerClient(
+  private def createLedgerClient(
       applicationId: ApplicationId,
       config: ClientConfig,
       commandClientConfiguration: CommandClientConfiguration,
-      logger: TracedLogger,
       tracerProvider: TracerProvider,
       token: Option[String] = None,
   )(implicit
       ec: ExecutionContextExecutor,
-      tc: TraceContext,
       executionSequencerFactory: ExecutionSequencerFactory,
   ): Future[LedgerClient] = {
     val clientConfig = LedgerClientConfiguration(
@@ -79,16 +75,10 @@ object CoinLedgerClient {
         GrpcTracing.builder(tracerProvider.openTelemetry).build().newClientInterceptor()
       )
 
-    LedgerClient.fromBuilder(builder, clientConfig) recover {
-      case _: StatusRuntimeException | _: java.io.IOException => {
-        // TODO(i447) -- eventually we should drop this and replace with a more robust retry solution
-        logger.error("Failed to instantiate ledger client due to connection failure, exiting...")
-        sys.exit(1)
-      }
-    }
+    LedgerClient.fromBuilder(builder, clientConfig)
   }
 
-  def apply(
+  def create(
       clientConfig: ClientConfig,
       applicationId_ : ApplicationId,
       commandClientConfiguration: CommandClientConfiguration,
@@ -100,50 +90,46 @@ object CoinLedgerClient {
       ec: ExecutionContextExecutor,
       as: ActorSystem,
       sequencerPool: ExecutionSequencerFactory,
-  ): CoinLedgerClient with NamedLogging =
-    new CoinLedgerClient with NamedLogging {
-      protected val loggerFactory: NamedLoggerFactory = loggerFactoryForCoinLedgerConnectionOverride
+  ): Future[CoinLedgerClient with NamedLogging] =
+    createLedgerClient(
+      applicationId_,
+      clientConfig,
+      commandClientConfiguration,
+      tracerProvider,
+      token_,
+    ).map { client_ =>
+      new CoinLedgerClient with NamedLogging {
 
-      override val client: LedgerClient = {
-        import TraceContext.Implicits.Empty._
-        processingTimeouts.unbounded.await(
-          s"Creation of the ledger client",
-          logFailing = Some(Level.WARN),
-        )(
-          createLedgerClient(
-            applicationId,
-            clientConfig,
-            commandClientConfiguration,
-            logger,
+        protected val loggerFactory: NamedLoggerFactory =
+          loggerFactoryForCoinLedgerConnectionOverride
+
+        override val client: LedgerClient = client_
+
+        override def connection(
+            workflowId: String,
+            maxRetries: Int,
+        ): CoinLedgerConnection with NamedLogging =
+          CoinLedgerConnection(
+            this,
+            maxRetries,
+            WorkflowId(workflowId),
+            loggerFactoryForCoinLedgerConnectionOverride,
             tracerProvider,
-            token,
           )
+
+        override def timeouts: ProcessingTimeout = processingTimeouts
+        override def token: Option[String] = token_
+        override def applicationId: ApplicationId = applicationId_
+        override def ledgerId: LedgerId = client.ledgerId
+        override def transactionClient: TransactionClient = client.transactionClient
+
+        override def actorSystem: ActorSystem = as
+        override def executionContextExecutor: ExecutionContextExecutor = ec
+
+        override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List(
+          SyncCloseable("client", client.close())
         )
       }
-
-      override def connection(
-          workflowId: String,
-          maxRetries: Int,
-      ): CoinLedgerConnection with NamedLogging =
-        CoinLedgerConnection(
-          this,
-          maxRetries,
-          WorkflowId(workflowId),
-          loggerFactoryForCoinLedgerConnectionOverride,
-          tracerProvider,
-        )
-
-      override def timeouts: ProcessingTimeout = processingTimeouts
-      override def token: Option[String] = token_
-      override def applicationId: ApplicationId = applicationId_
-      override def ledgerId: LedgerId = client.ledgerId
-      override def transactionClient: TransactionClient = client.transactionClient
-
-      override def actorSystem: ActorSystem = as
-      override def executionContextExecutor: ExecutionContextExecutor = ec
-
-      override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List(
-        SyncCloseable("client", client.close())
-      )
     }
+
 }

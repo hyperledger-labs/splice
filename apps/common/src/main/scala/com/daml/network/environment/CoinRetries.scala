@@ -15,12 +15,12 @@ import com.digitalasset.canton.util.retry.RetryUtil.{
   NoErrorKind,
   TransientErrorKind,
 }
+import io.grpc.Status
+import io.grpc.protobuf.StatusProto
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Try}
-import io.grpc.Status
-import io.grpc.protobuf.StatusProto
 
 trait CoinRetries extends FlagCloseable {
 
@@ -77,7 +77,8 @@ object CoinRetries {
             )
             TransientErrorKind
           // TODO (#1066) Remove the need to retry on UNIMPLEMENTED.
-          case None if statusCode == Status.Code.UNIMPLEMENTED =>
+          case None
+              if Seq(Status.Code.UNIMPLEMENTED, Status.Code.UNAVAILABLE).contains(statusCode) =>
             logger.info(
               s"$operationName failed with a retryable error",
               ex,

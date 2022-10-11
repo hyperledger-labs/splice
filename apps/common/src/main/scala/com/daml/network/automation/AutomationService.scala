@@ -1,9 +1,9 @@
 package com.daml.network.automation
 
-import com.daml.network.environment.CoinRetries
 import akka.NotUsed
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{KillSwitches, Materializer}
+import com.daml.network.environment.CoinRetries
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,

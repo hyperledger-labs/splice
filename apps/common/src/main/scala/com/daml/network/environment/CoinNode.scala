@@ -100,9 +100,7 @@ abstract class CoinNode[State <: AutoCloseable](
   }
 
   val ledgerClientF: Future[CoinLedgerClient] =
-    // TODO(M1-92) Make creation of ledger client return a Future instead of
-    // blocking.
-    Future { createLedgerClient(remoteParticipant) }
+    retry("Acquiring coin ledger client", createLedgerClient(remoteParticipant))
 
   val initializeF: Future[State] = for {
     _ <- Future.successful(logger.info(s"Starting initialization"))
@@ -128,7 +126,7 @@ abstract class CoinNode[State <: AutoCloseable](
 
   // TODO(#885): Cleanup init failures
   initializeF.failed.foreach { err =>
-    logger.error(s"Initialization of $name failed with $err")
+    logger.error(s"Initialization of $name failed", err)
     sys.exit(1)
   }
 
@@ -140,8 +138,10 @@ abstract class CoinNode[State <: AutoCloseable](
     )
   }
 
-  protected def createLedgerClient(remoteParticipant: RemoteParticipantConfig): CoinLedgerClient =
-    CoinLedgerClient(
+  protected def createLedgerClient(
+      remoteParticipant: RemoteParticipantConfig
+  ): Future[CoinLedgerClient] =
+    CoinLedgerClient.create(
       remoteParticipant.ledgerApi,
       ApiTypes.ApplicationId(name.unwrap),
       CommandClientConfiguration.default,

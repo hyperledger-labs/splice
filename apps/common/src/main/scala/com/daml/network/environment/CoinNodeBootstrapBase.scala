@@ -2,9 +2,6 @@ package com.daml.network.environment
 
 import akka.actor.ActorSystem
 import cats.data.EitherT
-import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.client.configuration.CommandClientConfiguration
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.{LocalNodeConfig, LocalNodeParameters, ProcessingTimeout}
@@ -17,7 +14,6 @@ import com.digitalasset.canton.lifecycle.{HasCloseContext, Lifecycle}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.metrics.MetricHandle.NodeMetrics
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
-import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.resource.StorageFactory
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.NodeId
@@ -203,20 +199,4 @@ abstract class CoinNodeBootstrapBase[
       }
     }
   }
-
-  // configuration mostly copied from Canton
-  protected def createLedgerClient(
-      remoteParticipant: RemoteParticipantConfig,
-      processingTimeout: ProcessingTimeout,
-  )(implicit
-      sequencerPool: ExecutionSequencerFactory
-  ): CoinLedgerClient = CoinLedgerClient(
-    remoteParticipant.ledgerApi,
-    ApiTypes.ApplicationId(name.unwrap),
-    CommandClientConfiguration.default, // We use the command submission client instead of the command client
-    remoteParticipant.token,
-    processingTimeout,
-    loggerFactory,
-    tracerProvider,
-  )
 }

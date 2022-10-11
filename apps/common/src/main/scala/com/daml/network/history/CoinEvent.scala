@@ -16,10 +16,10 @@ import com.daml.network.codegen.CC.CoinRules.{
   TransferResult,
 }
 import com.daml.network.codegen.CC.Round.IssuingMiningRound
+import com.daml.network.codegen.DA
 import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
-import com.daml.network.codegen.DA
 
 /** Parent node of a Canton coin create or archive within the corresponding transaction tree. */
 sealed trait ParentNode {
