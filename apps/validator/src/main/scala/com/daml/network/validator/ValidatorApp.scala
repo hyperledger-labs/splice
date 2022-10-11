@@ -103,21 +103,27 @@ class ValidatorApp(
       s"Attempting to create wallet install and validator right for validator party $validatorParty..."
     )
     for {
-      _ <- ValidatorUtil.installWalletForUser(
-        validatorServiceParty = validatorParty,
-        walletServiceParty = walletServiceParty,
-        walletServiceUser = walletServiceUser,
-        endUserName = validatorUser,
-        endUserParty = validatorParty,
-        svcParty = svcParty,
-        connection = connection,
-        logger = logger,
+      _ <- retry(
+        "install wallet for validator",
+        ValidatorUtil.installWalletForUser(
+          validatorServiceParty = validatorParty,
+          walletServiceParty = walletServiceParty,
+          walletServiceUser = walletServiceUser,
+          endUserName = validatorUser,
+          endUserParty = validatorParty,
+          svcParty = svcParty,
+          connection = connection,
+          logger = logger,
+        ),
       )
-      _ <- ValidatorUtil.createValidatorRight(
-        user = validatorParty,
-        validator = validatorParty,
-        svc = svcParty,
-        connection = connection,
+      _ <- retry(
+        "create validator right",
+        ValidatorUtil.createValidatorRight(
+          user = validatorParty,
+          validator = validatorParty,
+          svc = svcParty,
+          connection = connection,
+        ),
       )
     } yield {
       logger.info(
@@ -134,19 +140,25 @@ class ValidatorApp(
     logger.info("Attempting to create rules request and userHostedAt.")
     val coinRulesReq = CoinRulesRequest(user = validatorParty.toPrim, svc = svcParty.toPrim)
     for {
-      _ <- connection.ignoreDuplicateKeyErrors(
-        connection
-          .submitCommand(
-            actAs = Seq(validatorParty),
-            readAs = Seq(validatorParty),
-            command = Seq(coinRulesReq.create.command),
-          ),
-        s"CoinRulesRequest($validatorParty, $svcParty)",
+      _ <- retry(
+        "Create CoinRulesRequest",
+        connection.ignoreDuplicateKeyErrors(
+          connection
+            .submitCommand(
+              actAs = Seq(validatorParty),
+              readAs = Seq(validatorParty),
+              command = Seq(coinRulesReq.create.command),
+            ),
+          s"CoinRulesRequest($validatorParty, $svcParty)",
+        ),
       )
-      _ <- CoinUtil.ExplicitDisclosureWorkaround.recordUserHostedAt(
-        validatorParty,
-        validatorParty,
-        connection,
+      _ <- retry(
+        "Create UserHostedAt for validator",
+        CoinUtil.ExplicitDisclosureWorkaround.recordUserHostedAt(
+          validatorParty,
+          validatorParty,
+          connection,
+        ),
       )
     } yield {
       logger.info("Created rules request and userHostedAt.")
