@@ -69,8 +69,19 @@ case class CoinEnvironmentDefinition(
     })
   def withPreSetup(preSetup: CoinTestConsoleEnvironment => Unit): CoinEnvironmentDefinition =
     copy(preSetup = preSetup)
-  def withSetup(setup: CoinTestConsoleEnvironment => Unit): CoinEnvironmentDefinition =
+
+  /** Use exactly this setup and replace any previously existing setup. */
+  def withThisSetup(setup: CoinTestConsoleEnvironment => Unit): CoinEnvironmentDefinition =
     copy(setup = setup)
+
+  /** Add an extra setup step after the already registered setup */
+  def withAdditionalSetup(setup: CoinTestConsoleEnvironment => Unit): CoinEnvironmentDefinition =
+    copy(setup = env => {
+      this.setup(env)
+      setup(env)
+    })
+
+  /** Remove any previously registered setup */
   def withNoSetup(): CoinEnvironmentDefinition =
     copy(setup = _ => ())
   def clearConfigTransforms(): CoinEnvironmentDefinition =

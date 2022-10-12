@@ -49,7 +49,7 @@ class LocalRunbookIntegrationTest
       .addConfigTransform((_, conf) => remoteScanAddressToLocalhost(conf))
       .addConfigTransform((_, conf) => remoteParticipantAddressToLocalhost(conf))
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
-      .withSetup(env => {
+      .withThisSetup(env => {
         import env._
         // This section starts the core of the Canton Network (i.e., it does not include self-hosted
         // participants and other apps that are part of a self-hosted validator).

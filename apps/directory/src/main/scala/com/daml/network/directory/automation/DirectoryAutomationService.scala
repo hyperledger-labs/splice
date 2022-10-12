@@ -55,11 +55,16 @@ class DirectoryAutomationService(
 
   private val hashFun = MessageDigest.getInstance("SHA-256")
 
-  // TODO(#321): generalize this so that it can be shared with other command dedup calls
-  private def mkCommandId(methodName: String, parties: Seq[PartyId]): String = {
+  // TODO(#790): generalize this so that it can be shared with other command dedup calls
+  private def mkCommandId(
+      methodName: String,
+      parties: Seq[PartyId],
+      suffix: String = "",
+  ): String = {
     require(!methodName.contains('/'))
-    val str = Seq(methodName).appendedAll(parties.map(_.toProtoPrimitive)).mkString("/")
-    hashFun.digest(str.getBytes("UTF-8")).map("%02x".format(_)).mkString
+    val str = parties.map(_.toProtoPrimitive).appended(suffix).mkString("/")
+    val hash = hashFun.digest(str.getBytes("UTF-8")).map("%02x".format(_)).mkString
+    s"${methodName}_$hash"
   }
 
   registerRequestHandler("handleDirectoryInstallRequest", store.streamInstallRequests())(
@@ -70,6 +75,7 @@ class DirectoryAutomationService(
       val user = PartyId.tryFromPrim(req.payload.user)
       store.lookupInstall(user).flatMap {
         case QueryResult(_, Some(_)) =>
+          logger.warn(s"Rejecting duplicate install request from user party $user")
           val cmd = req.contractId.exerciseDirectoryInstallRequest_Reject()
           connection
             .submitWithResult(Seq(provider), Seq(), cmd)
@@ -114,7 +120,9 @@ class DirectoryAutomationService(
           .map(_ => s"rejected request: $reason")
       }
       store.lookupInstall(user).flatMap {
-        case QueryResult(_, None) => rejectRequest("install contract not found.")
+        case QueryResult(_, None) =>
+          logger.warn(s"Install contract not found for user party $user")
+          rejectRequest("install contract not found.")
 
         case QueryResult(_, Some(install)) =>
           // TODO(M3-90): validate entry name
@@ -144,9 +152,9 @@ class DirectoryAutomationService(
         .unsafeToTemplate[directoryCodegen.DirectoryEntryOffer]
       store.lookupEntryOfferById(offerId).flatMap {
         case QueryResult(_, None) =>
-          // TODO(#790): change task handler to allow for an Eithre result
-          logger.error(s"Invariant violation: reference offer $offerId not known")
-          Future.successful("skipped due to an invariant violation.")
+          Future.failed(
+            new IllegalStateException(s"Invariant violation: reference offer $offerId not known")
+          )
 
         case QueryResult(_, Some(offer)) =>
           // shared values
@@ -154,6 +162,7 @@ class DirectoryAutomationService(
           // TODO(M3-90): understand what kind of assertions are worth checking here for defensive programming
           val entryName = offer.payload.entry.name
           def rejectPayment(reason: String) = {
+            logger.warn(s"rejecting accepted app payment: $reason")
             val arg = walletCodegen.AcceptedAppPayment_Reject()
             val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject(arg)
             connection
@@ -173,14 +182,24 @@ class DirectoryAutomationService(
 
                 case QueryResult(off, None) =>
                   // collect the payment and create the entry
-                  // TODO(#321): use command deduplication to protect against concurrent submissions
                   val arg =
                     directoryCodegen.DirectoryInstall_CollectEntryPayment(payment.contractId)
-                  val cmd = install.contractId.exerciseDirectoryInstall_CollectEntryPayment(arg)
+                  val cmd =
+                    install.contractId.exerciseDirectoryInstall_CollectEntryPayment(arg).command
+                  val commandId = mkCommandId(
+                    "com.daml.network.directory.DirectoryEntry",
+                    Seq(provider),
+                    entryName,
+                  )
                   connection
-                    .submitWithResult(Seq(provider), Seq(), cmd)
+                    .submitCommandWithDedup(
+                      actAs = Seq(provider),
+                      readAs = Seq.empty,
+                      command = Seq(cmd),
+                      commandId = commandId,
+                      deduplicationOffset = off,
+                    )
                     .map(_ => s"created directory entry.")
-
               }
           }
       }

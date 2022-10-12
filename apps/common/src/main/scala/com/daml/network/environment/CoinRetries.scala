@@ -71,7 +71,6 @@ object CoinRetries {
     // processes that change the system state.
     private val extraRetryableCategories: Set[ErrorCategory] =
       Set(
-        ErrorCategory.InvalidIndependentOfSystemState,
         ErrorCategory.InvalidGivenCurrentSystemStateOther,
         ErrorCategory.InvalidGivenCurrentSystemStateResourceExists,
         ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,

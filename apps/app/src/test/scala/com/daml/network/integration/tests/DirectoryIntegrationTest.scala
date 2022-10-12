@@ -1,7 +1,11 @@
 package com.daml.network.integration.tests
-import com.daml.ledger.api.v1.event.Event
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.CN.{Directory => codegen}
+import com.daml.network.console.{
+  LocalValidatorAppReference,
+  RemoteDirectoryAppReference,
+  RemoteWalletAppReference,
+}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -11,6 +15,7 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.daml.network.util.{CommonCoinAppInstanceReferences, Proto}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.PartyId
 
 import scala.concurrent.Future
 import scala.util.Try
@@ -20,21 +25,24 @@ class DirectoryIntegrationTest
     with IsolatedCoinEnvironments
     with CommonCoinAppInstanceReferences {
 
+  import DirectoryIntegrationTest._
+
   private val directoryDarPath =
     "apps/directory/daml/.daml/dist/directory-service-0.1.0.dar"
-  private val entryName = "mycoolentry"
+  private val testEntryName = "mycoolentry"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
+      .withAdditionalSetup(implicit env => {
+        aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
+        bobValidator.remoteParticipant.dars.upload(directoryDarPath)
+      })
 
   "Directory service" should {
     "not throw an error on shutdown" in { implicit env =>
       import env._
-
-      // Whitelist the directory service on alice's validator
-      aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
 
       // The user of the directory service.
       val aliceUserParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
@@ -55,10 +63,6 @@ class DirectoryIntegrationTest
 
     "accept unique install requests" in { implicit env =>
       import env._
-
-      // Whitelist the directory service on alice's validator
-      aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
-
       // The user of the directory service.
       val aliceUserParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
 
@@ -68,22 +72,29 @@ class DirectoryIntegrationTest
         val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
 
         // Request installs and wait for provider to auto-accept
-        // TODO(#790): check how one could write an assertion that command dedup is triggered; it is at least in local tests
-        val n = 3
-        for (_ <- 1 to n) {
-          Future {
-            aliceDirectory.requestDirectoryInstall()
-          }
-        }
+        loggerFactory.assertLogs(
+          {
+            val n = 3
+            // loggerFactory.assertLogs() assertThrowsAndLogs({
+            for (_ <- 1 to n)
+              Future {
+                aliceDirectory.requestDirectoryInstall()
+              }
 
-        // Wait until 2*n transactions have been received (one each: create request + handle request)
-        val tx = aliceValidator.remoteParticipant.ledger_api.transactions
-          .flat(Set(aliceUserParty), completeAfter = 2 * n, beginOffset = offsetBefore)
-        logger.info(
-          Seq("Received transactions:")
-            .appendedAll(tx.map(_.toString))
-            .mkString(System.lineSeparator())
+            // Wait until 2*n transactions have been received (one each: create request + handle request)
+            val tx = aliceValidator.remoteParticipant.ledger_api.transactions
+              .flat(Set(aliceUserParty), completeAfter = 2 * n, beginOffset = offsetBefore)
+            logger.info(
+              Seq("Received transactions:")
+                .appendedAll(tx.map(_.toString))
+                .mkString(System.lineSeparator())
+            )
+          },
+          _.warningMessage should include("Rejecting duplicate install request from user party"),
+          _.warningMessage should include("Rejecting duplicate install request from user party"),
         )
+
+        // check that there is only one install
         val installs = aliceValidator.remoteParticipant.ledger_api.acs
           .of_party(aliceUserParty, filterTemplates = Seq(codegen.DirectoryInstall.id))
         installs should have size (1)
@@ -114,85 +125,112 @@ class DirectoryIntegrationTest
       }
     }
 
-    "allocate unique directory entries" in { implicit env =>
-      // Whitelist the directory service on alice's validator
-      aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
+    "allocate unique directory entries, even when multiple parties race for them" in {
+      implicit env =>
+        import env._
 
-      // The provider of the directory service
-      val providerParty = directory.getProviderPartyId()
+        // The provider of the directory service
+        val providerParty = directory.getProviderPartyId()
 
-      // The user of the directory service.
-      val aliceUserParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
+        def setupUser(refs: StaticUserRefs): DynamicUserRefs = {
+          val userParty = refs.validator.onboardUser(refs.wallet.config.damlUser)
 
-      // Request install and wait for provider to auto-accept
-      aliceDirectory.requestDirectoryInstall()
-      eventually()(
-        aliceValidator.remoteParticipant.ledger_api.acs
-          .of_party(aliceUserParty, filterTemplates = Seq(codegen.DirectoryInstall.id))
-          should have size (1)
-      )
+          // Request install and wait for provider to auto-accept
+          refs.directory.requestDirectoryInstall()
+          refs.validator.remoteParticipant.ledger_api.acs.await(userParty, codegen.DirectoryInstall)
 
-      // Request entry
-      aliceDirectory.requestDirectoryEntry(entryName)
+          DynamicUserRefs(userParty, refs)
+        }
 
-      // User: wait until payment request becomes visible
-      def getPaymentRequest() = aliceRemoteWallet.listAppPaymentRequests().headOption
+        def requestAndPayForEntry(refs: DynamicUserRefs, entryName: String) = {
+          // Grab the current offset
+          val offsetBefore = refs.validator.remoteParticipant.ledger_api.transactions.end()
 
-      aliceRemoteWallet.tap(5.0)
+          // Request entry and get some money to pay for it
+          refs.directory.requestDirectoryEntry(entryName)
+          refs.wallet.tap(5.0)
 
-      val walletPaymentRequest = eventually()(
-        getPaymentRequest().getOrElse(fail("Payment request is unexpectedly not defined"))
-      )
-      // Accept payment request
-      val _ = aliceRemoteWallet.acceptAppPaymentRequest(walletPaymentRequest.contractId)
+          // Accept first payment request that becomes visible
+          eventually()(inside(refs.wallet.listAppPaymentRequests()) { case reqId +: _ =>
+            refs.wallet.acceptAppPaymentRequest(reqId.contractId)
+          })
 
-      // Wait until payment is processed and entry was created
-      val entryPayload =
-        codegen.DirectoryEntry(aliceUserParty.toPrim, providerParty.toPrim, entryName)
-      def tryGetEntry() =
-        Try(loggerFactory.suppressErrors(directory.lookupEntryByName(entryName)))
-      val entry = eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $entryName")))
-      entry.payload shouldBe entryPayload
-
-      // Read entries from provider
-      directory.listEntries() shouldBe Seq(entry)
-      directory.lookupEntryByName(entryName) shouldBe entry
-      directory.lookupEntryByParty(aliceUserParty) shouldBe entry
-      assertThrowsAndLogsCommandFailures(
-        directory.lookupEntryByName("nonexistentname"),
-        _.errorMessage should include("nonexistentname"),
-      )
-
-      // Read entries from user
-      aliceDirectory.listEntries() shouldBe Seq(entry)
-      aliceDirectory.lookupEntryByName(entryName) shouldBe entry
-      aliceDirectory.lookupEntryByParty(aliceUserParty) shouldBe entry
-      assertThrowsAndLogsCommandFailures(
-        aliceDirectory.lookupEntryByName("nonexistentname"),
-        _.errorMessage should include("nonexistentname"),
-      )
-
-      // Check that a second request for the same entry is rejected
-      val entriesBefore = aliceDirectory.listEntries()
-      val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
-      val entryRequestId = aliceDirectory.requestDirectoryEntry(entryName)
-
-      // Wait for the tx creating the entry request, and the following that archives it
-      val txs = aliceValidator.remoteParticipant.ledger_api.transactions
-        .flat(Set(aliceUserParty), completeAfter = 2, beginOffset = offsetBefore)
-      inside(txs) { case Seq(_, tx2) =>
-        assert(
-          tx2.events.exists(ev =>
-            ev.event match {
-              case Event.Event.Archived(archival) => archival.contractId == entryRequestId
-              case _ => false
-            }
+          // Wait until create entry-request, request payment, accept payment, and collect payment  have been processed
+          // NOTE: we wait for transaction to ensure the accepted payment has been processed *independent* of the outcome (accept or reject).
+          val txs = refs.validator.remoteParticipant.ledger_api.transactions
+            .flat(Set(refs.userParty), completeAfter = 4, beginOffset = offsetBefore)
+          logger.info(
+            Seq(s"Received transactions for ${refs.userParty}:")
+              .appendedAll(txs.map(_.toString))
+              .mkString(System.lineSeparator())
           )
-        )
-      }
-      // Directory entries are unchanged
-      aliceDirectory.listEntries() shouldBe entriesBefore
+        }
 
+        // Setup alice
+        val aliceStaticRefs = StaticUserRefs(aliceValidator, aliceDirectory, aliceRemoteWallet)
+        val aliceRefs = setupUser(aliceStaticRefs)
+
+        // Setup bob
+        val bobStaticRefs = StaticUserRefs(bobValidator, bobDirectory, bobRemoteWallet)
+        val bobRefs = setupUser(bobStaticRefs)
+
+        // Concurrently, request an entry as alice and bob
+        loggerFactory.assertLogs(
+          {
+            val aliceF = Future {
+              requestAndPayForEntry(aliceRefs, testEntryName)
+            }
+            val bobF = Future {
+              requestAndPayForEntry(bobRefs, testEntryName)
+            }
+
+            // Wait for both of them
+            // TODO(#790): check how one could write an assertion that command dedup is triggered
+            aliceF.futureValue
+            bobF.futureValue
+          },
+          _.warningMessage should include(
+            "rejecting accepted app payment: entry already exists and owned by"
+          ),
+        )
+
+        // Check who won
+        def tryGetEntry() =
+          Try(loggerFactory.suppressErrors(directory.lookupEntryByName(testEntryName)))
+        val entry =
+          eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $testEntryName")))
+        val winnerUserParty = PartyId.tryFromPrim(entry.payload.user)
+        logger.info(s"And the winner is ... *drumroll* ... : $winnerUserParty")
+
+        // Check content of winning entry
+        val entryPayload =
+          codegen.DirectoryEntry(winnerUserParty.toPrim, providerParty.toPrim, testEntryName)
+        entry.payload shouldBe entryPayload
+
+        // Read entries from provider
+        directory.listEntries() shouldBe Seq(entry)
+        directory.lookupEntryByName(testEntryName) shouldBe entry
+        directory.lookupEntryByParty(winnerUserParty) shouldBe entry
+        assertThrowsAndLogsCommandFailures(
+          directory.lookupEntryByName("nonexistentname"),
+          _.errorMessage should include("nonexistentname"),
+        )
     }
+  }
+}
+
+object DirectoryIntegrationTest {
+
+  // Helper classes to make it easier to write test code interacting with a users' services
+  case class StaticUserRefs(
+      validator: LocalValidatorAppReference,
+      directory: RemoteDirectoryAppReference,
+      wallet: RemoteWalletAppReference,
+  )
+
+  case class DynamicUserRefs(userParty: PartyId, static: StaticUserRefs) {
+    def validator: LocalValidatorAppReference = static.validator
+    def directory: RemoteDirectoryAppReference = static.directory
+    def wallet: RemoteWalletAppReference = static.wallet
   }
 }

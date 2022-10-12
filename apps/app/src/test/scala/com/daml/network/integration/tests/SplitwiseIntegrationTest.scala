@@ -23,8 +23,7 @@ class SplitwiseIntegrationTest
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
-      .withSetup(implicit env => {
-        CoinEnvironmentDefinition.simpleTopology(this.getClass.getSimpleName).setup(env)
+      .withAdditionalSetup(implicit env => {
         aliceValidator.remoteParticipant.dars.upload(darPath)
         bobValidator.remoteParticipant.dars.upload(darPath)
       })
