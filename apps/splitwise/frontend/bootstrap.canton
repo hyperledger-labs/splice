@@ -6,7 +6,10 @@ Seq(aliceValidator.remoteParticipant, bobValidator.remoteParticipant).foreach { 
 }
 
 val aliceUserParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
-aliceValidator.onboardUser("auth0|632de6b067ec7e396a03262d")
+val auth0testUser = "auth0|632de6b067ec7e396a03262d"
+aliceValidator.remoteParticipant.ledger_api.users.list(filterUser=auth0testUser).users.headOption.
+    getOrElse(aliceValidator.onboardUser(auth0testUser))
+//TODO(#1043): use ledger_api.users.get instead of ledger_api.users.list once available from upstream
 val bobUserParty = bobValidator.onboardUser(bobRemoteWallet.config.damlUser)
 
 val aliceRequestCid = aliceDirectory.requestDirectoryInstall()
