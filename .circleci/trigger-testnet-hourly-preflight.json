@@ -7,7 +7,7 @@
       "run-job": "healthcheck-testnet"
     },
     "timetable" : {
-      "per-hour" : 12,
+      "per-hour" : 1,
       "hours-of-day" : [ ],
       "days-of-week" : [ "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" ],
       "days-of-month" : [ ],
