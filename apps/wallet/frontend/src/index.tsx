@@ -3,6 +3,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 
 import App from './App';
+import { ValidatorClientProvider } from './contexts/ValidatorServiceContext';
 import { WalletClientProvider } from './contexts/WalletServiceContext';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
@@ -12,16 +13,18 @@ const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement)
 root.render(
   <React.StrictMode>
     <WalletClientProvider url={config.wallet.grpcUrl}>
-      {
-        // TODO(i988) Remove hack where we don't use Auth0Provider if the website doesn't run on a secure origin
-        crypto.subtle !== undefined ? (
-          <Auth0Provider {...config.auth}>
+      <ValidatorClientProvider url={config.validator.grpcUrl}>
+        {
+          // TODO(i988) Remove hack where we don't use Auth0Provider if the website doesn't run on a secure origin
+          crypto.subtle !== undefined ? (
+            <Auth0Provider {...config.auth}>
+              <App />
+            </Auth0Provider>
+          ) : (
             <App />
-          </Auth0Provider>
-        ) : (
-          <App />
-        )
-      }
+          )
+        }
+      </ValidatorClientProvider>
     </WalletClientProvider>
   </React.StrictMode>
 );

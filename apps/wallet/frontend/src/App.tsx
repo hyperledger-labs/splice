@@ -137,7 +137,8 @@ const App: React.FC = () => {
     }
   }, [state.type, state.damlUserId, getUserStatus]);
 
-  const content = (state: State, dispatch: Dispatch<Action>) => {
+  const Content = (props: { state: State; dispatch: Dispatch<Action> }) => {
+    const { state, dispatch } = props;
     switch (state.type) {
       case 'logged_out':
         return <Login onLogin={userId => dispatch({ type: 'manual_login', damlUserId: userId })} />;
@@ -182,7 +183,9 @@ const App: React.FC = () => {
             )}
           </Toolbar>
         </AppBar>
-        <Container style={{ height: '100%', flex: '1' }}>{content(state, dispatch)}</Container>
+        <Container style={{ height: '100%', flex: '1' }}>
+          <Content state={state} dispatch={dispatch} />
+        </Container>
       </Box>
     </ErrorBoundary>
   );

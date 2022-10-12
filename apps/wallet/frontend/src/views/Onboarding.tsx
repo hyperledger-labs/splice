@@ -1,6 +1,15 @@
 import { Button, Grid, Typography } from '@mui/material';
 
+import { OnboardUserRequest } from '../com/daml/network/validator/v0/validator_service_pb';
+import { useValidatorClient } from '../contexts/ValidatorServiceContext';
+
 const Onboarding: React.FC<{ userId: string }> = ({ userId }) => {
+  const validatorClient = useValidatorClient();
+
+  const onOnboardUser = async () => {
+    await validatorClient.onboardUser(new OnboardUserRequest().setName(userId), null);
+  };
+
   return (
     <Grid
       height="100%"
@@ -26,7 +35,7 @@ const Onboarding: React.FC<{ userId: string }> = ({ userId }) => {
         sx={{ margin: '15px' }}
         onClick={e => {
           e.preventDefault();
-          alert('not implemented');
+          onOnboardUser();
         }}
         id="onboard-button"
       >

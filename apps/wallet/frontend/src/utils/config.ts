@@ -16,11 +16,17 @@ export type Config = {
   wallet: {
     grpcUrl: string;
   };
+  validator: {
+    grpcUrl: string;
+  };
 };
 
 export const config: Config = {
   auth: authConfig,
   wallet: {
     grpcUrl: process.env.REACT_APP_GRPC_URL || externalConfig.wallet.grpcUrl,
+  },
+  validator: {
+    grpcUrl: process.env.REACT_APP_VALIDATOR_API_GRPC_URL || externalConfig.validator.grpcUrl,
   },
 };
