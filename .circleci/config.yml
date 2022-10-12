@@ -722,6 +722,10 @@ jobs:
             chmod +x route
             ./route $VPN_HOST_NAME $VPN_USER $VPN_PASSWORD
       - run:
+          name: Checkout Cluster Version
+          command: |
+            git checkout $(curl http://<<parameters.cluster>>.network.canton.global/version|cut -c5-)
+      - run:
           name: verify vpn connection
           command: |
             set +e

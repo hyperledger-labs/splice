@@ -1,0 +1,16 @@
+{
+    "name" : "TestNet Hourly Preflight",
+    "description" : "Hourly Preflight of TestNet",
+    "attribution-actor": "system",
+    "parameters" : {
+      "branch" : "main",
+      "run-job": "healthcheck-testnet"
+    },
+    "timetable" : {
+      "per-hour" : 12,
+      "hours-of-day" : [ ],
+      "days-of-week" : [ "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN" ],
+      "days-of-month" : [ ],
+      "months" : [ "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" ]
+    }
+}
