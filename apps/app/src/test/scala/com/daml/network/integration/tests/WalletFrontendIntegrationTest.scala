@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.CN.{Directory => dirCodegen}
-import com.daml.network.console.{RemoteDirectoryAppReference, ValidatorAppReference}
+import com.daml.network.console.{LocalValidatorAppReference, RemoteDirectoryAppReference}
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.topology.PartyId
 
@@ -145,11 +145,9 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest {
     }
   }
 
-  private def setupForTestWithDirectory(damlUser: String, validator: ValidatorAppReference)(implicit
-      env: CoinTestConsoleEnvironment
-  ) = {
-    aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
-    aliceValidator.onboardUser(damlUser)
+  private def setupForTestWithDirectory(damlUser: String, validator: LocalValidatorAppReference) = {
+    validator.remoteParticipant.dars.upload(directoryDarPath)
+    validator.onboardUser(damlUser)
   }
 
   private def submitDirectoryEntryRequest(
