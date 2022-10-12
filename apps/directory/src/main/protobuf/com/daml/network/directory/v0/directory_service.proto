@@ -5,21 +5,10 @@ import "com/daml/network/v0/contract.proto";
 import "google/protobuf/empty.proto";
 
 service DirectoryService {
-  rpc LookupInstall (LookupInstallRequest) returns (LookupInstallResponse);
-
   rpc ListEntries (google.protobuf.Empty) returns (ListEntriesResponse);
   rpc LookupEntryByParty (LookupEntryByPartyRequest) returns (LookupEntryByPartyResponse);
   rpc LookupEntryByName (LookupEntryByNameRequest) returns (LookupEntryByNameResponse);
   rpc GetProviderPartyId (google.protobuf.Empty) returns (GetProviderPartyIdResponse);
-}
-
-message LookupInstallRequest {
-  string user_party_id = 1;
-}
-
-message LookupInstallResponse {
-  // Set only if it could be found
-  com.daml.network.v0.Contract install = 1;
 }
 
 message ListEntryRequestsResponse {

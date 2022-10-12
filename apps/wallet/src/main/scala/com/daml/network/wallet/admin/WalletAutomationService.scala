@@ -2,12 +2,13 @@ package com.daml.network.wallet.admin
 
 import akka.stream.Materializer
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
-import com.daml.network.environment.CoinLedgerClient
+import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.wallet.store.WalletStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
+import io.opentelemetry.api.trace.Tracer
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -17,12 +18,14 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class WalletAutomationService(
     walletStore: WalletStore,
     ledgerClient: CoinLedgerClient,
+    retryProvider: CoinRetries,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
-) extends AutomationService {
+    tracer: Tracer,
+) extends AutomationService(retryProvider) {
 
   private val connection = ledgerClient.connection("WalletAutomationService")
 
@@ -39,9 +42,9 @@ class WalletAutomationService(
   private val ingestionServices: TrieMap[String, AutoCloseable] = TrieMap.empty
 
   // TODO(#763): not handling archive events, uninstalling wallets without a restart is not supported yet
-  registerTaskHandler("WalletAppInstall", walletStore.streamInstalls)(
-    install => s"onboarding wallet user: ${install.payload.endUserName}",
-    install =>
+  registerRequestHandler("WalletAppInstall", walletStore.streamInstalls)(
+    install => install.toString,
+    (install, traceContext) =>
       Future {
         val endUserName = install.payload.endUserName
         val endUserStore = walletStore.getOrCreateEndUserStore(
@@ -61,12 +64,15 @@ class WalletAutomationService(
             Lifecycle.close(ingestionService, endUserStore)(logger),
           )
         ingestionServices.putIfAbsent(endUserName, autoCloseable) match {
-          case None => ()
+          case None =>
+            "onboarded wallet end-user"
           case Some(_) =>
             logger.warn(
-              s"Unexpected duplicate onboarding of wallet user '$endUserName'"
-            )
+              s"Unexpected duplicate on-boarding of wallet user '$endUserName'"
+              // TODO(#790): how would we enable the implicit passing of the traceContext?
+            )(traceContext)
             autoCloseable.close()
+            "skipped duplicate on-boarding wallet end-user"
         }
       },
   )

@@ -33,6 +33,6 @@ class InMemoryWalletStore(
         endUserParty = endUserParty,
         endUserName = endUserName,
       ),
-      loggerFactory,
+      loggerFactory.append("user", endUserName),
     )
 }

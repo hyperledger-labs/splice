@@ -25,18 +25,6 @@ class GrpcDirectoryService(
     with NamedLogging {
 
   @nowarn("cat=unused")
-  override def lookupInstall(
-      request: v0.LookupInstallRequest
-  ): Future[v0.LookupInstallResponse] =
-    withSpanFromGrpcContext("GrpcDirectoryService") { implicit traceContext => span =>
-      for {
-        install <- store.lookupInstall(PartyId.tryFromProtoPrimitive(request.userPartyId))
-      } yield {
-        v0.LookupInstallResponse(install.value.map(_.toProtoV0))
-      }
-    }
-
-  @nowarn("cat=unused")
   override def listEntries(request: Empty): Future[v0.ListEntriesResponse] =
     withSpanFromGrpcContext("GrpcDirectoryService") { implicit traceContext => span =>
       for { entries <- store.listEntries() } yield v0.ListEntriesResponse(

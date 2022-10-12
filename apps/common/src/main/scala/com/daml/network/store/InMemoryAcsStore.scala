@@ -209,7 +209,7 @@ object InMemoryAcsStore {
         s"  createEventsById=",
       ) ++ createEvents.map(prettyEntry)
 
-      lines.mkString("\n")
+      lines.mkString(System.lineSeparator())
     }
 
     def ingestCreatedEvent(ev: CreatedEvent): State = {

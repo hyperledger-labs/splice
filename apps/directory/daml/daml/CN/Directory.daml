@@ -46,7 +46,13 @@ template DirectoryInstall with
     signatory provider, user
 
     key (provider, user) : (Party, Party)
-    maintainer key._1
+    maintainer key._1, key._2
+
+    choice DirectoryInstall_Cancel : ()
+      with
+        actor : Party
+      controller actor
+      do assertMsg ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
 
     nonconsuming choice DirectoryInstall_RequestEntry
       : ContractId DirectoryEntryRequest

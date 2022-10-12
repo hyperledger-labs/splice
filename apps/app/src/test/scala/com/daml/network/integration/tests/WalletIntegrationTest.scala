@@ -406,8 +406,7 @@ class WalletIntegrationTest
       loggerFactory.assertThrowsAndLogs[CommandFailure](
         aliceRemoteWallet
           .executeDirectTransfer(bobUserParty, 10),
-        _.errorMessage should include("failed due to an exception"),
-        _.errorMessage should include("Direct transfers are allowed"),
+        _.errorMessage should include regex ("Unhandled Daml exception.*Direct transfers are allowed"),
       )
     }
 

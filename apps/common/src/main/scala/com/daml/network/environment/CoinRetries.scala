@@ -1,10 +1,11 @@
 package com.daml.network.environment
 
+import com.digitalasset.canton.util.ShowUtil._
 import com.daml.error.ErrorCategory
 import com.daml.error.utils.ErrorDetails
 import com.daml.grpc.{GrpcException, GrpcStatus}
 import com.digitalasset.canton.error.ErrorCodeUtils
-import com.digitalasset.canton.lifecycle.FlagCloseable
+import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.retry.Backoff
@@ -15,6 +16,7 @@ import com.digitalasset.canton.util.retry.RetryUtil.{
   NoErrorKind,
   TransientErrorKind,
 }
+import com.digitalasset.canton.util.retry.Success
 import io.grpc.Status
 import io.grpc.protobuf.StatusProto
 
@@ -31,8 +33,8 @@ trait CoinRetries extends FlagCloseable {
   def retry[T](operationName: String, task: => Future[T])(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ) = {
-    implicit val success = com.digitalasset.canton.util.retry.Success.always
+  ): Future[T] = {
+    implicit val success: Success[T] = Success.always
 
     Backoff(
       logger,
@@ -42,6 +44,22 @@ trait CoinRetries extends FlagCloseable {
       maxDelay,
       operationName,
     ).apply(task, CoinRetries.RetryableError(operationName))
+  }
+
+  def retryUnlessShutdown[T](operationName: String, task: => FutureUnlessShutdown[T])(implicit
+      ec: ExecutionContext,
+      traceContext: TraceContext,
+  ): FutureUnlessShutdown[T] = {
+    implicit val success: Success[T] = Success.always
+
+    Backoff(
+      logger,
+      this,
+      maxRetries,
+      initialDelay,
+      maxDelay,
+      operationName,
+    ).unlessShutdown(task, CoinRetries.RetryableError(operationName))
   }
 }
 
@@ -64,15 +82,17 @@ object CoinRetries {
         tc: TraceContext
     ): ErrorKind = outcome match {
       case Failure(
-            ex @ GrpcException(status @ GrpcStatus(statusCode, Some(operationName)), trailers)
+            ex @ GrpcException(status @ GrpcStatus(statusCode, Some(description)), trailers)
           ) =>
-        val errorCategory = ErrorCodeUtils.errorCategoryFromString(operationName)
+        val errorCategory = ErrorCodeUtils.errorCategoryFromString(description)
         val statusProto = StatusProto.fromStatusAndTrailers(status, trailers)
         val errorDetails = ErrorDetails.from(statusProto)
         errorCategory match {
           case Some(cat) if cat.retryable.nonEmpty || extraRetryableCategories.contains(cat) =>
             logger.info(
-              s"$operationName failed with a retryable error: Error details: ${errorDetails}",
+              Seq(s"The operation ${operationName.singleQuoted}  failed with a retryable error:")
+                .appendedAll(errorDetails.map(_.toString))
+                .mkString(System.lineSeparator()),
               ex,
             )
             TransientErrorKind
@@ -80,13 +100,19 @@ object CoinRetries {
           case None
               if Seq(Status.Code.UNIMPLEMENTED, Status.Code.UNAVAILABLE).contains(statusCode) =>
             logger.info(
-              s"$operationName failed with a retryable error",
+              s"The operation ${operationName.singleQuoted} failed with a retryable error:",
               ex,
             )
             TransientErrorKind
           case _ =>
             logger.warn(
-              s"$operationName failed with a non-retryable error: Error details: ${errorDetails} $errorCategory $statusCode ${statusCode == Status.Code.UNIMPLEMENTED}",
+              Seq(
+                s"The operation ${operationName.singleQuoted} failed with a non-retryable error:",
+                s"category=$errorCategory",
+                s"statusCode=$statusCode",
+              )
+                .appendedAll(errorDetails.map(_.toString))
+                .mkString(System.lineSeparator()),
               ex,
             )
             FatalErrorKind

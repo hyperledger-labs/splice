@@ -72,6 +72,7 @@ class DirectoryApp(
       automation = new DirectoryAutomationService(
         store,
         ledgerClient,
+        retryProvider = this,
         loggerFactory,
         timeouts,
       )

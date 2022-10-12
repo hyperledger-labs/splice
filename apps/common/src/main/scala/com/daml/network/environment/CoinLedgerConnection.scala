@@ -7,6 +7,7 @@ import akka.{Done, NotUsed}
 import com.daml.error.definitions.LedgerApiErrors
 import com.daml.error.definitions.groups.UserManagementServiceErrors
 import com.daml.error.utils.ErrorDetails
+import com.daml.ledger.api.v1.commands.Commands.DeduplicationPeriod
 import com.daml.ledger.api.domain.UserRight
 import com.daml.ledger.api.domain.UserRight.{CanActAs, CanReadAs}
 import com.daml.ledger.api.refinements.ApiTypes.{ApplicationId, ContractId, TemplateId, WorkflowId}
@@ -15,7 +16,6 @@ import com.daml.ledger.api.v1.command_service.{
   SubmitAndWaitForTransactionTreeResponse,
   SubmitAndWaitRequest,
 }
-import com.daml.ledger.api.v1.commands.Commands.DeduplicationPeriod
 import com.daml.ledger.api.v1.commands.{Command, Commands}
 import com.daml.ledger.api.v1.event.CreatedEvent
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
@@ -24,10 +24,10 @@ import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, Tra
 import com.daml.ledger.api.v1.value.Identifier
 import com.daml.ledger.client.binding.{
   Contract,
-  Primitive => P,
   TemplateCompanion,
-  Value => CodegenValue,
   ValueDecoder,
+  Primitive => P,
+  Value => CodegenValue,
 }
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.concurrent.Threading
@@ -40,7 +40,6 @@ import com.digitalasset.canton.lifecycle.{
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
-import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.AkkaUtil
@@ -59,16 +58,23 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
       command: Seq[Command],
-      commandId: Option[String] = None,
-      deduplicationTime: Option[NonNegativeFiniteDuration] = None,
   )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionResponse]
+
+  // TODO(#790): make this the default, and name 'submitCommand' -> 'submitCommandNoDedup'; and introduce the submitResult variant
+  def submitCommandWithDedup(
+      actAs: Seq[PartyId],
+      readAs: Seq[PartyId],
+      command: Seq[Command],
+      commandId: String,
+      deduplicationOffset: String,
+  )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionResponse]
+
   def submitWithResult[T](
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
       update: P.Update[T],
-      commandId: Option[String] = None,
-      deduplicationTime: Option[NonNegativeFiniteDuration] = None,
   )(implicit traceContext: TraceContext, decoder: ValueDecoder[T]): Future[T]
+
 }
 
 /** Subscription for reading the ledger */
@@ -295,16 +301,33 @@ object CoinLedgerConnection {
           actAs: Seq[PartyId],
           readAs: Seq[PartyId],
           command: Seq[Command],
-          commandId: Option[String] = None,
-          deduplicationTime: Option[NonNegativeFiniteDuration] = None,
       )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionResponse] = {
         val fullCommand =
           commandsOf(
             actAs,
             readAs,
-            commandId,
+            None,
             workflowId,
-            deduplicationTime,
+            None,
+            command,
+          )
+        submitCommand(fullCommand)
+      }
+
+      override def submitCommandWithDedup(
+          actAs: Seq[PartyId],
+          readAs: Seq[PartyId],
+          command: Seq[Command],
+          commandId: String,
+          deduplicationOffset: String,
+      )(implicit traceContext: TraceContext): Future[SubmitAndWaitForTransactionResponse] = {
+        val fullCommand =
+          commandsOf(
+            actAs,
+            readAs,
+            Some(commandId),
+            workflowId,
+            Some(deduplicationOffset),
             command,
           )
         submitCommand(fullCommand)
@@ -315,16 +338,14 @@ object CoinLedgerConnection {
           actAs: Seq[PartyId],
           readAs: Seq[PartyId],
           update: P.Update[T],
-          commandId: Option[String] = None,
-          deduplicationTime: Option[NonNegativeFiniteDuration] = None,
       )(implicit traceContext: TraceContext, decoder: ValueDecoder[T]): Future[T] = {
         val fullCommand =
           commandsOf(
             actAs,
             readAs,
-            commandId,
+            None,
             workflowId,
-            deduplicationTime,
+            None,
             Seq(update.command),
           )
 
@@ -338,14 +359,18 @@ object CoinLedgerConnection {
       private def logCommandResult[T](commandId: String, result: Future[T])(implicit
           traceContext: TraceContext
       ) =
-        result onComplete { outcome =>
-          outcome.fold(
-            e => logger.error(s"Command [$commandId] failed due to an exception", e),
-            response =>
-              logger.debug(
-                s"Command [$commandId] succeeded"
-              ),
-          )
+        result onComplete {
+          case Failure(e: StatusRuntimeException) =>
+            val details = ErrorDetails.from(e).map(_.toString)
+            val lines =
+              Seq(s"Command (id=$commandId) failed with error details").appendedAll(details)
+            // Logging the failure at INFO level, as the caller has to decide whether that really is an error or not,
+            // which e.g. depends on whether the exception can be retried or not.
+            logger.info(lines.mkString(System.lineSeparator()), e)
+          case Failure(e) =>
+            logger.info(s"Command (id=$commandId) failed due to an exception", e)
+          case Success(response) =>
+            logger.debug(s"Command (id=$commandId) succeeded with response $response")
         }
 
       private def submitCommand(
@@ -377,7 +402,7 @@ object CoinLedgerConnection {
           readAs: Seq[PartyId],
           commandId: Option[String],
           workflowId: WorkflowId,
-          deduplicationTime: Option[NonNegativeFiniteDuration],
+          deduplicationOffset: Option[String],
           seq: Seq[Command],
       ): Commands =
         Commands(
@@ -387,8 +412,8 @@ object CoinLedgerConnection {
           commandId = commandId.getOrElse(uniqueId),
           actAs = actAs.map(_.toProtoPrimitive),
           readAs = readAs.map(_.toProtoPrimitive),
-          deduplicationPeriod = deduplicationTime
-            .map(dt => DeduplicationPeriod.DeduplicationDuration(dt.toProtoPrimitive))
+          deduplicationPeriod = deduplicationOffset
+            .map(off => DeduplicationPeriod.DeduplicationOffset(off))
             .getOrElse(DeduplicationPeriod.Empty),
           commands = seq,
         )

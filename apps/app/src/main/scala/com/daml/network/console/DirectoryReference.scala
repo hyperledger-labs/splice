@@ -105,13 +105,6 @@ class RemoteDirectoryAppReference(
     )
   }
 
-  @Help.Summary("Lookup a user's DirectoryInstall contract")
-  def lookupInstall(user: PartyId): Option[Contract[codegen.DirectoryInstall]] = {
-    consoleEnvironment.run {
-      adminCommand(GrpcDirectoryAppClient.LookupInstall(user))
-    }
-  }
-
   @Help.Summary("Request DirectoryEntry with the given name")
   def requestDirectoryEntry(name: String): Primitive.ContractId[codegen.DirectoryEntryRequest] = {
     val providerParty = getProviderPartyId()

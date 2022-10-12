@@ -12,8 +12,6 @@ import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
-import java.util.UUID
-
 import scala.concurrent.{ExecutionContext, Future}
 
 // TODO(i360): requests from before this service was created are missed.
@@ -56,7 +54,6 @@ class CoinRulesRequestAcceptanceService(
       _ <- Future.sequence(
         requestCids
           .map(cid => {
-            val commandId = UUID.randomUUID.toString
             retries
               .retry(
                 "Accept coin rules request",
@@ -69,7 +66,6 @@ class CoinRulesRequestAcceptanceService(
                         .exerciseAccept(openMiningRounds, issuingMiningRounds)
                         .command
                     ),
-                    commandId = Some(commandId),
                   ),
               )
               .recoverWith { case e =>

@@ -5,13 +5,14 @@ package com.daml.network.util
 
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.{
-  Contract => CodegenContract,
   Primitive,
   Template,
   TemplateCompanion,
+  Contract => CodegenContract,
 }
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
 import com.digitalasset.canton.serialization.ProtoConverter
 
 /** A class representing a Daml contract of a specific type (Daml template) with an assigned contract ID.
@@ -23,12 +24,23 @@ import com.digitalasset.canton.serialization.ProtoConverter
 final case class Contract[+T](
     contractId: Primitive.ContractId[T],
     payload: T with Template[T],
-) {
+) extends PrettyPrinting {
   def toProtoV0: v0.Contract = v0.Contract(
     templateId = Some(ApiTypes.TemplateId.unwrap(payload.templateId)),
     contractId = ApiTypes.ContractId.unwrap(contractId),
     payload = Some(payload.arguments),
   )
+
+  override def pretty: Pretty[Contract[Any]] = {
+
+    implicit def prettyRecord: Pretty[com.daml.ledger.api.v1.value.Record] =
+      PrettyUtil.adHocPrettyInstance
+
+    prettyOfClass(
+      param("contractId", _.contractId),
+      param("payload", _.payload.arguments),
+    )
+  }
 }
 
 object Contract {

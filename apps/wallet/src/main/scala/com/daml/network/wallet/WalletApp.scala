@@ -95,6 +95,7 @@ class WalletApp(
       val automation = new WalletAutomationService(
         walletStore,
         ledgerClient,
+        retryProvider = this,
         loggerFactory,
         timeouts,
       )

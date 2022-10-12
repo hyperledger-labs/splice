@@ -1,4 +1,6 @@
 import com.daml.lf.value.Value.ContractId
+import com.daml.network.codegen.CN.{Directory => codegen}
+
 Seq(aliceValidator.remoteParticipant, bobValidator.remoteParticipant).foreach { p =>
   p.dars.upload("apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar")
 }
@@ -9,8 +11,9 @@ val bobUserParty = bobValidator.onboardUser(bobRemoteWallet.config.damlUser)
 
 val aliceRequestCid = aliceDirectory.requestDirectoryInstall()
 val bobRequestCid = bobDirectory.requestDirectoryInstall()
-utils.retry_until_true { aliceDirectory.lookupInstall(aliceUserParty).isDefined }
-utils.retry_until_true { bobDirectory.lookupInstall(bobUserParty).isDefined }
+
+aliceValidator.remoteParticipant.ledger_api.acs.await(aliceUserParty, codegen.DirectoryInstall)
+bobValidator.remoteParticipant.ledger_api.acs.await(bobUserParty, codegen.DirectoryInstall)
 
 aliceDirectory.requestDirectoryEntry("alice.cns")
 bobDirectory.requestDirectoryEntry("bob.cns")

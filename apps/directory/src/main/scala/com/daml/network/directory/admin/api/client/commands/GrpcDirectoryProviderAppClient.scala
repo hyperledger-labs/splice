@@ -22,27 +22,6 @@ object GrpcDirectoryAppClient {
       v0.DirectoryServiceGrpc.stub(channel)
   }
 
-  case class LookupInstall(user: PartyId)
-      extends BaseCommand[v0.LookupInstallRequest, v0.LookupInstallResponse, Option[
-        Contract[codegen.DirectoryInstall]
-      ]] {
-
-    override def createRequest(): Either[String, v0.LookupInstallRequest] =
-      Right(v0.LookupInstallRequest(Proto.encode(user)))
-
-    override def submitRequest(
-        service: DirectoryServiceStub,
-        request: v0.LookupInstallRequest,
-    ): Future[v0.LookupInstallResponse] = service.lookupInstall(request)
-
-    override def handleResponse(
-        response: v0.LookupInstallResponse
-    ): Either[String, Option[Contract[codegen.DirectoryInstall]]] =
-      response.install
-        .traverse(request => Contract.fromProto(codegen.DirectoryInstall)(request))
-        .leftMap(_.toString)
-  }
-
   case class ListEntries(
   ) extends BaseCommand[
         Empty,

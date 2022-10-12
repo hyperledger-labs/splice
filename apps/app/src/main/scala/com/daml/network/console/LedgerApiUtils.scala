@@ -25,10 +25,8 @@ object LedgerApiUtils {
   }
 
   def getUserPrimaryParty(ledgerApi: BaseLedgerApiAdministration, userId: String) = {
-    // TODO (M1-92) Switch to users.get on the next Canton upgrade after 2022-09-13
-    val userList = ledgerApi.ledger_api.users.list(
-      filterUser = userId
-    )
+    // TODO (#1043) Switch to users.get on the next Canton upgrade after 2022-09-13
+    val userList = ledgerApi.ledger_api.users.list(filterUser = userId)
     if (userList.users.length != 1) {
       throw new RuntimeException(
         s"Expected exactly one user but got ${userList.users.length}: $userList"
