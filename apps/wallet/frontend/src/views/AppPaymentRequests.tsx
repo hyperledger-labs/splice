@@ -45,6 +45,9 @@ const AppPaymentRequests: React.FC<{ userId: string }> = ({ userId }) => {
           <DirectoryEntry partyId={request.payload.receiver} />
         </TableCell>
         <TableCell>{request.payload.quantity}</TableCell>
+        <TableCell className="app-request-provider">
+          <DirectoryEntry partyId={request.payload.provider} />
+        </TableCell>
         <TableCell>
           <Button type="submit" onClick={onAccept}>
             Accept
@@ -61,6 +64,7 @@ const AppPaymentRequests: React.FC<{ userId: string }> = ({ userId }) => {
           <TableRow>
             <TableCell>Receiver</TableCell>
             <TableCell>Quantity</TableCell>
+            <TableCell>Provider</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>

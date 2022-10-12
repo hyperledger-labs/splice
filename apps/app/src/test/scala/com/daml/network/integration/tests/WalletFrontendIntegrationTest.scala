@@ -139,6 +139,7 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest {
         inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
           val expected = s"directory.cns (${dirPartyId.toProtoPrimitive})"
           row.childElement(className("app-request-receiver")).text shouldBe expected
+          row.childElement(className("app-request-provider")).text shouldBe expected
           row
         }
       }
