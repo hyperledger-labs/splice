@@ -3,6 +3,7 @@ package com.daml.network.wallet
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.network.auth.AuthInterceptor
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode}
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -21,6 +22,7 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
+import io.grpc.{ServerInterceptors}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -82,16 +84,20 @@ class WalletApp(
       val walletStore = WalletStore(walletStoreKey, storage, loggerFactory)
 
       adminServerRegistry.addService(
-        WalletServiceGrpc.bindService(
-          new GrpcWalletService(
-            walletStore,
-            ledgerClient,
-            scanConnection,
-            loggerFactory = loggerFactory,
+        ServerInterceptors.intercept(
+          WalletServiceGrpc.bindService(
+            new GrpcWalletService(
+              walletStore,
+              ledgerClient,
+              scanConnection,
+              loggerFactory = loggerFactory,
+            ),
+            ec,
           ),
-          ec,
+          new AuthInterceptor(),
         )
       )
+
       val automation = new WalletAutomationService(
         walletStore,
         ledgerClient,

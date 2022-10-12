@@ -14,8 +14,8 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.util.{
   CoinUtil,
   CommonCoinAppInstanceReferences,
-  Proto,
   PaymentChannelTestUtil,
+  Proto,
 }
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -31,7 +31,6 @@ import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.{Balance, ListResponse}
 
 import java.time.temporal.ChronoUnit
-
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.concurrent.Threading
 
@@ -589,6 +588,48 @@ class WalletIntegrationTest
       )
     })
     aliceRemoteWallet.executeDirectTransfer(bob, 20)
+  }
+
+  "accepts an optional JWT token with user in subject" in { implicit env =>
+    import com.daml.network.wallet.v0
+    import com.daml.network.auth.{JwtCallCredential}
+    import com.daml.network.util.Contract
+    import io.grpc.ManagedChannelBuilder
+    import cats.syntax.either._
+    import pdi.jwt.{JwtCirce, JwtClaim, JwtAlgorithm}
+
+    val aliceDamlUser = aliceRemoteWallet.config.damlUser
+    val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+
+    val token = JwtCirce.encode(
+      new JwtClaim("", None, Some(aliceDamlUser), None, None, None, None, None),
+      "some-secret",
+      JwtAlgorithm.HS256,
+    )
+
+    // using grpc client directly rather than console refs, as token handling isn't threaded through to console command layer (yet)
+    val channel =
+      ManagedChannelBuilder
+        .forAddress("localhost", aliceWallet.config.adminApi.port.unwrap)
+        .usePlaintext()
+        .build()
+
+    val client =
+      v0.WalletServiceGrpc
+        .blockingStub(channel)
+        .withCallCredentials(new JwtCallCredential(token))
+
+    client.tap(new v0.TapRequest("10.0"))
+    val res = client.list(new v0.ListRequest())
+
+    res.coins.head.effectiveQuantity shouldBe "10.0000000000"
+
+    for {
+      contractOpt <- res.coins.head.contract.toRight("Could not find contract payload")
+      contract <- Contract.fromProto(coinCodegen.Coin)(contractOpt).leftMap(_.toString)
+    } yield {
+      contract.payload.owner.toString shouldBe aliceUserParty.toPrim.toString
+    }
   }
 
   /** @param expectedQuantityRanges: lower and upper bounds for coins sorted by their initial quantity in ascending order. */

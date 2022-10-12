@@ -21,6 +21,7 @@ in pkgs.mkShell {
     circleci-cli
     curl
     docker
+    evans
     geckodriver
     git
     google-cloud-sdk

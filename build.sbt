@@ -68,6 +68,7 @@ lazy val `apps-common` =
         scalapb_runtime,
         daml_ledger_api_scalapb,
         daml_ledger_api_proto % "protobuf",
+        jwt_scala,
       ),
       BuildCommon.sharedAppSettings,
       /* The reason we have to specify these items explicitly is that the DamlPlugin expects a gradle
