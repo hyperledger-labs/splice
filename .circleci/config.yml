@@ -629,9 +629,6 @@ jobs:
       cluster:
         type: enum
         enum: ["staging", "devnet", "testnet"]
-      slack_notify_success:
-        type: boolean
-        default: true
     steps:
       - checkout
       - setup_nix
@@ -643,43 +640,6 @@ jobs:
             . $REPO_ROOT/cluster/deployment/<< parameters.cluster >>/.envrc.vars
             cncluster activate
             cncluster ciapply
-      - when:
-          condition: << parameters.slack_notify_success >>
-          steps:
-            # TODO(#1059): Generalise as mix-in
-          - slack/notify:
-              event: pass
-              # Based on success_tagged_deploy_1 from https://circleci.com/developer/orbs/orb/circleci/slack#orb-source and
-              # adapted to our needs
-              custom: |
-                {
-                    "blocks": [
-                        {
-                            "type": "header",
-                            "text": {
-                                "type": "plain_text",
-                                "text": "Deploying cluster '<< parameters.cluster >>' was successful! :tada:",
-                                "emoji": true
-                            }
-                        },
-                        {
-                            "type": "section",
-                            "fields": [
-                                { "type": "mrkdwn", "text": "*Branch*: $CIRCLE_BRANCH" },
-                                { "type": "mrkdwn", "text": "*Commit*: $(git log -1 --oneline --no-color)" },
-                                { "type": "mrkdwn", "text": "*Author*: $(git log -1 --pretty='%an')" }
-                            ]
-                        },
-                        {
-                            "type": "actions",
-                            "elements": [
-                                { "type": "button", "text": { "type": "plain_text", "text": "View Job" },
-                                    "url": "${CIRCLE_BUILD_URL}"
-                                }
-                            ]
-                        }
-                    ]
-                }
       # TODO(#1059): Generalise as mix-in
       - slack/notify:
           event: fail
@@ -719,9 +679,6 @@ jobs:
       cluster:
         type: enum
         enum: ["staging", "dev", "test"]
-      slack_notify_success:
-        type: boolean
-        default: true
     machine:
       image: ubuntu-2004:202010-01
     environment:
@@ -790,36 +747,6 @@ jobs:
           cmd: "\"testOnly *PreflightIntegrationTest\""
           extra_parameters: -DDOMAIN_URL=http://<<parameters.cluster>>.network.canton.global:5008 -DNETWORK_APPS_ADDRESS=<<parameters.cluster>>.network.canton.global
           timeout: "10m"
-      - when:
-          condition: << parameters.slack_notify_success >>
-          steps:
-          - slack/notify:
-              event: pass
-              branch_pattern: main
-              # TODO(#1059): Generalise as mix-in
-              custom: |
-                {
-                  "blocks": [
-                    {
-                      "type": "section",
-                      "fields": [
-                        {
-                          "type": "plain_text",
-                          "text": "Pre-flight validator check on the '<< parameters.cluster >>' cluster succeeded! :dart:",
-                          "emoji": true
-                        }
-                      ]
-                    },
-                    {
-                    	"type": "section",
-                    	"fields": [
-                    		{ "type": "mrkdwn", "text": "*Branch*: $CIRCLE_BRANCH" },
-                            { "type": "mrkdwn", "text": "*Commit*: $(git log -1 --oneline --no-color)" },
-                            { "type": "mrkdwn", "text": "*Author*: $(git log -1 --pretty='%an')" }
-                    	]
-                    }
-                  ]
-                }
       # TODO(#1059): Generalise as mix-in
       - slack/notify:
           event: fail
@@ -975,13 +902,11 @@ workflows:
         context:
           - slack-context
         cluster: "staging"
-        slack_notify_success: false
         requires:
            - deployment_test
            - docker_images_push
     - preflight_check:
         cluster: staging
-        slack_notify_success: false
         <<: *main-branch-only
         context:
           - canton-network-vpn
@@ -1056,6 +981,5 @@ workflows:
       - preflight_check:
           <<: *main-branch-only
           cluster: test
-          slack_notify_success: false
           context:
             - canton-network-vpn
