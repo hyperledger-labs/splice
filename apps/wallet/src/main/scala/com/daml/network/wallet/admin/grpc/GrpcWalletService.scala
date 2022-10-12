@@ -1,9 +1,11 @@
 package com.daml.network.wallet.admin.grpc
 
 import cats.implicits._
-import com.daml.ledger.client.binding.{Primitive, TemplateCompanion, ValueDecoder}
+import com.daml.ledger.client.binding.{Primitive, TemplateCompanion}
 import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
 import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
+import com.daml.network.codegen.CN.Wallet.CoinOperationOutcome.COO_AcceptedAppMultiPayment
+import com.daml.network.codegen.CN.Wallet.{CoinOperation, CoinOperationOutcome}
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.codegen.DA
 import com.daml.network.environment.CoinLedgerClient
@@ -109,13 +111,30 @@ class GrpcWalletService(
       }
     }
 
-  override def tap(request: v0.TapRequest): Future[v0.TapResponse] =
-    exerciseSyncWalletAction(_ =>
-      (c, _) => {
+  override def tap(request: v0.TapRequest): Future[v0.TapResponse] = {
+    exerciseWalletAction(implicit tc =>
+      (c, endUserWalletStore) => {
         val quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
-        c.exerciseWalletAppInstall_Tap(quantity)
+        for {
+          svcParty <- scanConnection.getSvcPartyId()
+        } yield {
+          CoinOperation.CO_Tap(
+            svcParty.toPrim,
+            validatorParty.toPrim,
+            endUserWalletStore.key.endUserParty.toPrim,
+            quantity,
+          )
+        }
       }
-    )(request.getWalletCtx, coinCid => v0.TapResponse(Proto.encode(coinCid)))
+    )(
+      request.getWalletCtx,
+      {
+        case Seq(outcome: CoinOperationOutcome.COO_Tap) =>
+          v0.TapResponse(Proto.encode(outcome.body))
+        case other => sys.error(s"unexpected coin operation outcome: $other")
+      },
+    )
+  }
 
   override def listAppMultiPaymentRequests(
       request: v0.ListAppMultiPaymentRequestsRequest
@@ -164,74 +183,42 @@ class GrpcWalletService(
   override def acceptAppMultiPaymentRequest(
       request: v0.AcceptAppMultiPaymentRequestRequest
   ): Future[v0.AcceptAppMultiPaymentRequestResponse] =
-    exerciseWalletAction(implicit traceContext =>
+    exerciseWalletAction(_ =>
       (installCid, userStore) => {
         val requestCid = Proto.tryDecodeContractId[walletCodegen.AppMultiPaymentRequest](
           request.requestContractId
         )
-        for {
-          requestC <- userStore.lookupAppMultiPaymentRequestById(requestCid)
-          quantity = requestC.value
-            .getOrElse(
-              sys.error(
-                s"Could not find app multi-payment request ${request.requestContractId}. " +
-                  "Note that there is a very small delay before payment requests appear in the wallet. " +
-                  "If you have recently received a request, retry the command."
-              )
-            )
-            .payload
-            .receiverQuantities
-            .map(_.quantity)
-            .sum
-          coinCid <- selectCoin(userStore, quantity)
-        } yield {
-          val transferInput = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
-          installCid.exerciseWalletAppInstall_AcceptAppMultiPaymentRequest(
-            requestCid,
-            transferInput,
-          )
-        }
+        Future.successful(CoinOperation.CO_AppMultiPayment(requestCid))
       }
     )(
       request.getWalletCtx,
-      paymentCid =>
-        v0.AcceptAppMultiPaymentRequestResponse(
-          Proto.encode(paymentCid)
-        ),
+      {
+        case Seq(outcome: COO_AcceptedAppMultiPayment) =>
+          v0.AcceptAppMultiPaymentRequestResponse(
+            Proto.encode(outcome.body)
+          )
+        case other => sys.error(s"unexpected coin operation outcome: $other")
+      },
     )
 
   override def acceptAppPaymentRequest(
       request: v0.AcceptAppPaymentRequestRequest
   ): Future[v0.AcceptAppPaymentRequestResponse] =
-    exerciseWalletAction(implicit traceContext =>
+    exerciseWalletAction(traceContext =>
       (installCid, userStore) => {
-        val requestCid = Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](
-          request.requestContractId
-        )
-        for {
-          requestC <- userStore.lookupAppPaymentRequestById(requestCid)
-          quantity = requestC.value
-            .getOrElse(
-              sys.error(
-                s"Could not find app payment request ${request.requestContractId}. " +
-                  "Note that there is a very small delay before payment requests appear in the wallet. " +
-                  "If you have recently received a request, retry the command."
-              )
-            )
-            .payload
-            .quantity
-          coinCid <- selectCoin(userStore, quantity)
-        } yield {
-          val transferInput = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
-          installCid.exerciseWalletAppInstall_AcceptAppPaymentRequest(requestCid, transferInput)
-        }
+        val requestCid =
+          Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](request.requestContractId)
+        Future.successful(CoinOperation.CO_AppPayment(requestCid))
       }
     )(
       request.getWalletCtx,
-      paymentCid =>
-        v0.AcceptAppPaymentRequestResponse(
-          Proto.encode(paymentCid)
-        ),
+      {
+        case Seq(outcome: CoinOperationOutcome.COO_AcceptedAppPayment) =>
+          v0.AcceptAppPaymentRequestResponse(
+            Proto.encode(outcome.body)
+          )
+        case other => sys.error(s"unexpected coin operation outcome: $other")
+      },
     )
 
   override def rejectAppMultiPaymentRequest(
@@ -421,19 +408,19 @@ class GrpcWalletService(
       request: v0.ExecuteDirectTransferRequest
   ): Future[Empty] =
     exerciseWalletAction(implicit traceContext =>
-      (c, party) => {
+      (c, userStore) => {
         val quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
         for {
-          coinCid <- selectCoin(party, quantity)
+          svcUser <- scanConnection.getSvcPartyId()
         } yield {
           val receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
-          val arg = walletCodegen.WalletAppInstall_ExecuteDirectTransfer(
-            receiver = receiverParty.toPrim,
-            inputs = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid)),
-            quantity = quantity,
-            payload = "wallet: execute direct transfer",
+          CoinOperation.CO_ChannelTransfer(
+            userStore.key.endUserParty.toPrim,
+            receiverParty.toPrim,
+            svcUser.toPrim,
+            quantity,
+            "wallet: execute direct transfer",
           )
-          c.exerciseWalletAppInstall_ExecuteDirectTransfer(arg)
         }
       }
     )(
@@ -489,6 +476,7 @@ class GrpcWalletService(
       } yield v0.ListValidatorRewardsResponse(validatorRewards.map(_.toProtoV0))
     }
 
+  // TODO(#756) - Make this a `CoinOperation` too
   override def collectRewards(request: CollectRewardsRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       for {
@@ -554,31 +542,12 @@ class GrpcWalletService(
   override def acceptOnChannelPaymentRequest(
       request: v0.AcceptOnChannelPaymentRequestRequest
   ): Future[Empty] =
-    exerciseWalletAction(implicit traceContext =>
+    exerciseWalletAction(traceContext =>
       (installCid, userStore) => {
         val requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](
           request.requestContractId
         )
-        for {
-          requestC <- userStore.lookupOnChannelPaymentRequestById(requestCid)
-          quantity = requestC.value
-            .getOrElse(
-              sys.error(
-                s"Could not find on channel payment request ${request.requestContractId}. " +
-                  "Note that there is a very small delay before payment requests appear in the wallet. " +
-                  "If you have recently received a request, retry the command."
-              )
-            )
-            .payload
-            .quantity
-          coinCid <- selectCoin(userStore, quantity)
-        } yield {
-          val transferInput = Seq(coinRulesCodegen.TransferInput.InputCoin(coinCid))
-          installCid.exerciseWalletAppInstall_AcceptOnChannelPaymentRequest(
-            requestCid,
-            transferInput,
-          )
-        }
+        Future.successful(CoinOperation.CO_ChannelPayment(requestCid))
       }
     )(
       request.getWalletCtx,
@@ -680,8 +649,8 @@ class GrpcWalletService(
     }
   }
 
-  /** Executes a wallet action by calling a choice on the WalletAppInstall contract of the
-    * end user specified in the given WalletContext.
+  /** Executes a wallet action by calling the `WalletAppInstall_ExecuteBatch` choice on the WalletAppInstall
+    * contract of the end user specified in the given WalletContext.
     *
     * The choice is always executed with the wallet service party as the submitter, and the
     * wallet user party as a readAs party.
@@ -691,15 +660,17 @@ class GrpcWalletService(
     *
     * Note: curried syntax helps with type inference
     */
-  private def exerciseWalletAction[Response, ChoiceResult](
+  private def exerciseWalletAction[Response](
       choice: TraceContext => (
           Primitive.ContractId[walletCodegen.WalletAppInstall],
           EndUserWalletStore,
-      ) => Future[Primitive.Update[ChoiceResult]]
+          // TODO(#756): also require quantity to reject commands early?
+      ) => Future[CoinOperation]
   )(
       ctx: com.daml.network.wallet.v0.WalletContext,
-      response: ChoiceResult => Response,
-  )(implicit valueDecoder: ValueDecoder[ChoiceResult]): Future[Response] =
+      // TODO(#756): Likely adjust the return type here depending on the caller
+      response: Primitive.List[CoinOperationOutcome] => Response,
+  ): Future[Response] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       getUserStore(ctx).flatMap(userStore => {
         val userParty = userStore.key.endUserParty
@@ -709,32 +680,34 @@ class GrpcWalletService(
               Status.NOT_FOUND.withDescription(s"WalletAppInstall contract of user $userParty")
             )
           case QueryResult(_, Some(install)) =>
-            choice(traceContext)(install.contractId, userStore).flatMap(update =>
-              connection
-                .submitWithResult(
-                  Seq(walletServiceParty),
-                  Seq(validatorParty, userParty),
-                  update,
-                )
-                .map(response)
-            )
+            choice(traceContext)(install.contractId, userStore).flatMap { operation =>
+              {
+                for {
+                  // TODO(#756): smarter coin/input selection?
+                  inputs <- userStore
+                    .listContracts(coinCodegen.Coin)
+                    .map(cs =>
+                      cs.value.map(c => coinRulesCodegen.TransferInput.InputCoin(c.contractId))
+                    )
+                  // TODO(#756): queue requests and only execute them once the previous call has finished.
+                  cmd = install.contractId
+                    .exerciseWalletAppInstall_ExecuteBatch(inputs, Primitive.List(operation))
+                  res <- connection
+                    .submitWithResult(
+                      Seq(walletServiceParty),
+                      Seq(validatorParty, userParty),
+                      cmd,
+                    )
+                    .map(response)
+                } yield {
+                  res
+                }
+
+              }
+            }
         }
       })
     }
-
-  private def exerciseSyncWalletAction[Response, ChoiceResult](
-      choice: TraceContext => (
-          Primitive.ContractId[walletCodegen.WalletAppInstall],
-          EndUserWalletStore,
-      ) => Primitive.Update[ChoiceResult]
-  )(
-      ctx: com.daml.network.wallet.v0.WalletContext,
-      response: ChoiceResult => Response,
-  )(implicit valueDecoder: ValueDecoder[ChoiceResult]): Future[Response] =
-    exerciseWalletAction(tc => (cid, userStore) => Future.successful(choice(tc)(cid, userStore)))(
-      ctx,
-      response,
-    )
 
   @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
   private def selectCoin(

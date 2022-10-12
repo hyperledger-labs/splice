@@ -30,7 +30,7 @@ which are accessible only through VPN:
 |-------------|---------------------------------------|----------------------------------|------------------------------------|
 | TestNet     | http://test.network.canton.global     | Weekly, Midnight UTC Sunday      | Longer Running Tests               |
 | DevNet      | http://dev.network.canton.global      | Nightly, 6AM UTC                 | Current, Tested `main`             |
-| Staging     | http://staging.network.canton.global  | After every push to `main`          | Latest `main`                      |
+| Staging     | http://staging.network.canton.global  | After every push to `main`       | Latest `main`                      |
 | ScratchNet  | http://scratch.network.canton.global  | Ad hoc, manual                   | Cluster Configuration Development  |
 
 The automatic deployments are configured as

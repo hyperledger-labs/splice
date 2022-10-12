@@ -235,7 +235,7 @@ testBatchPaymentRequests = script do
 
   acceptedPaymentsCid <- submitMulti [alice] [validator] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputCoin coin]
-    operations = [CO_AppPayment transferRequest, CO_MultiAppPayment transferRequest2]
+    operations = [CO_AppPayment transferRequest, CO_AppMultiPayment transferRequest2]
 
   let [COO_AcceptedAppPayment payment1Cid, COO_AcceptedAppMultiPayment payment2Cid] = acceptedPaymentsCid
   Some acceptedPayment <- queryContractId alice payment1Cid
@@ -270,12 +270,12 @@ testBatchPaymentRequests = script do
   -- trying to fulfill the request for 10,000 CC will fail
   outcomes <- submitMulti [alice] [validator] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputCoin coin]
-    operations = [CO_AppPayment transferRequest3, CO_MultiAppPayment transferRequest4]
+    operations = [CO_AppPayment transferRequest3, CO_AppMultiPayment transferRequest4]
 
   -- first command errors, others are not executed
   let [COO_TransferError errorMsg, COO_NotExecuted notExecuted] = outcomes
   case notExecuted of
-    CO_MultiAppPayment request -> request === transferRequest4
+    CO_AppMultiPayment request -> request === transferRequest4
     _ -> error "expected a multi-payment request"
   
   pure ()

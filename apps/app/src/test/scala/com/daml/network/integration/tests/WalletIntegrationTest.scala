@@ -292,11 +292,11 @@ class WalletIntegrationTest
 
       clue("Alice transfers 39") {
         aliceRemoteWallet.executeDirectTransfer(bobUserParty, 39)
-        checkWallet(aliceUserParty, aliceRemoteWallet, Seq((0, 1), (10, 10), (20, 20)))
+        checkWallet(aliceUserParty, aliceRemoteWallet, Seq((30, 31)))
       }
       clue("Alice transfers 19") {
         aliceRemoteWallet.executeDirectTransfer(bobUserParty, 19)
-        checkWallet(aliceUserParty, aliceRemoteWallet, Seq((0, 1), (0, 1), (10, 10)))
+        checkWallet(aliceUserParty, aliceRemoteWallet, Seq((11, 12)))
       }
     }
 

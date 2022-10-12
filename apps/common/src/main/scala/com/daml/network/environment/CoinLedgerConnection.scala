@@ -53,7 +53,7 @@ import java.util.UUID
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
-/** Extract from connection for only submitting functionality */
+/** Extract from connection for only submitting functionality. The methods defined in this trait use the command service. */
 trait CoinLedgerSubmit extends FlagCloseableAsync {
   def submitCommand(
       actAs: Seq[PartyId],

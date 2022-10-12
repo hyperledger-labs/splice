@@ -411,11 +411,14 @@ executeCoinOperationRec : [TransferInput] -> [CoinOperationOutcome] -> [CoinOper
 executeCoinOperationRec inputs prevResults (operation::rest) = do
   case operation of
     CO_AppPayment cid -> handle AppPaymentRequest_Accept COO_AcceptedAppPayment cid
-    CO_MultiAppPayment cid -> handle AppMultiPaymentRequest_Accept COO_AcceptedAppMultiPayment cid
+    CO_AppMultiPayment cid -> handle AppMultiPaymentRequest_Accept COO_AcceptedAppMultiPayment cid
     CO_ChannelPayment cid -> handle OnChannelPaymentRequest_Accept COO_AcceptedChannelPayment cid
     CO_ChannelTransfer endUser receiver svcUser quantity payload -> do
       resultE <- exerciseByKey @PaymentChannel (endUser, receiver, svcUser) (PaymentChannel_ExecuteDirectTransfer inputs quantity payload)
       handleResult COO_AcceptedChannelTransfer resultE
+    CO_Tap svc validator endUser quantity -> do
+      coin <- exerciseByKey @CoinRules (svc, validator) (CoinRules_Tap endUser quantity)
+      executeCoinOperationRec (InputCoin coin :: inputs) (COO_Tap coin :: prevResults) rest
   where
     handle : Choice t c (Either Text (r, ContractId Coin)) => ([TransferInput] -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
     handle choiceConstructor resultConstructor cid = do
@@ -435,7 +438,7 @@ executeCoinOperationRec inputs prevResults [] = do
 -- Enum of the possible ways coins can be manipulated through the wallet.
 data CoinOperation
   = CO_AppPayment (ContractId AppPaymentRequest)
-  | CO_MultiAppPayment (ContractId AppMultiPaymentRequest)
+  | CO_AppMultiPayment (ContractId AppMultiPaymentRequest)
   | CO_ChannelPayment (ContractId OnChannelPaymentRequest)
   | CO_ChannelTransfer with
     endUser: Party
@@ -443,6 +446,12 @@ data CoinOperation
     svcUser: Party
     quantity: Decimal
     payload: Text
+  | CO_Tap with
+    svc: Party
+    validator: Party
+    endUser: Party
+    quantity: Decimal
+
 
   deriving (Eq, Show)
 
@@ -452,6 +461,7 @@ data CoinOperationOutcome
   | COO_AcceptedAppMultiPayment (ContractId AcceptedAppMultiPayment)
   | COO_AcceptedChannelPayment TransferResult
   | COO_AcceptedChannelTransfer TransferResult
+  | COO_Tap (ContractId Coin)
   | COO_TransferError Text
   -- when a batched command fails, the following commands in the batch aren't executed. 
   -- TODO(#756) - Consider removing this case 
@@ -484,13 +494,6 @@ template WalletAppInstall
         accepted <- executeCoinOperationRec inputs [] operations
         return $ reverse accepted
 
-    nonconsuming choice WalletAppInstall_Tap : ContractId Coin
-      with
-        quantity : Decimal
-      controller walletServiceParty
-      do
-        exerciseByKey @CoinRules (svcParty, validatorParty) (CoinRules_Tap endUserParty quantity)
-
     -- TODO(M1-92 Tech Debt): consider adding an interface for payment requests
     nonconsuming choice WalletAppInstall_AcceptAppMultiPaymentRequest : ContractId AcceptedAppMultiPayment
       with
@@ -501,30 +504,3 @@ template WalletAppInstall
         Right (accepted, change) <- exercise requestCid (AppMultiPaymentRequest_Accept transferInput)
         return accepted
 
-    nonconsuming choice WalletAppInstall_AcceptAppPaymentRequest : ContractId AcceptedAppPayment
-      with
-        requestCid : ContractId AppPaymentRequest
-        transferInput : [TransferInput]
-      controller walletServiceParty
-      do
-        Right (accepted, coin) <- exercise requestCid (AppPaymentRequest_Accept transferInput)
-        return accepted
-
-    nonconsuming choice WalletAppInstall_AcceptOnChannelPaymentRequest : ()
-      with
-        requestCid : ContractId OnChannelPaymentRequest
-        transferInput : [TransferInput]
-      controller walletServiceParty
-      do
-        void $ exercise requestCid (OnChannelPaymentRequest_Accept transferInput)
-
-    nonconsuming choice WalletAppInstall_ExecuteDirectTransfer : TransferResult
-      with
-        receiver : Party
-        inputs : [TransferInput]
-        quantity : Decimal
-        payload : Text
-      controller walletServiceParty
-      do
-        Right (accepted, change) <- exerciseByKey @PaymentChannel (endUserParty, receiver, svcParty) (PaymentChannel_ExecuteDirectTransfer inputs quantity payload)
-        return accepted
