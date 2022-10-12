@@ -1,7 +1,7 @@
 # -*- makefile -*-
 include ../common.mk
 
-src := Dockerfile directory.conf target/directory-service-0.1.0.dar bootstrap.scala
+src := Dockerfile coin.conf target/directory-service-0.1.0.dar bootstrap.scala
 build_arg := --build-arg base_version=$(shell version-gen)
 
 .PHONY: build

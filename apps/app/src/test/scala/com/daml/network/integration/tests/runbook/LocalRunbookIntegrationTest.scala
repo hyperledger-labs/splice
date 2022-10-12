@@ -38,10 +38,10 @@ class LocalRunbookIntegrationTest
         this.getClass.getSimpleName,
         validatorPath / "validator.conf",
         validatorPath / "validator-participant.conf",
-        svcParticipantPath / "svc-participant.conf",
-        svcDomainPath / "svc-domain.conf",
-        svcAppPath / "svc.conf",
-        scanAppPath / "scan.conf",
+        svcParticipantPath / "coin.conf",
+        svcDomainPath / "coin.conf",
+        svcAppPath / "coin.conf",
+        scanAppPath / "coin.conf",
       )
       .clearConfigTransforms()
       .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy1000(conf))

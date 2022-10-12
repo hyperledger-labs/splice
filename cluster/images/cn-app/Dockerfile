@@ -13,12 +13,10 @@ WORKDIR /cn-app
 
 # use this config until example configs are fixed
 COPY empty.conf .
+COPY entrypoint.sh .
 
 # move tarball to a static name
 ADD target/coin-0.1.0-SNAPSHOT.tar.gz .
 
 # point entrypoint to the coin executable
-ENTRYPOINT [ "coin-0.1.0-SNAPSHOT/bin/coin" ]
-
-# default arguments if none are specified by user
-CMD [ "daemon", "--no-tty", "--log-level-stdout=DEBUG", "--log-level-canton=DEBUG", "--log-file-appender=off" ]
+ENTRYPOINT /cn-app/entrypoint.sh

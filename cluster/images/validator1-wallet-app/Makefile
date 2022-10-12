@@ -1,7 +1,7 @@
 # -*- makefile -*-
 include ../common.mk
 
-src := Dockerfile validator1-wallet.conf
+src := Dockerfile coin.conf
 build_arg := --build-arg base_version=$(shell version-gen)
 
 $(docker-build): $(src)
