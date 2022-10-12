@@ -39,6 +39,7 @@ in pkgs.mkShell {
     postgresql_11
     python3
     python3Packages.sphinx_rtd_theme
+    rsync
     sbt
     selenium-server-standalone
     sphinx

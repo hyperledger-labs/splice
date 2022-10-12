@@ -7,6 +7,5 @@ set -eou pipefail
 ./codegen.sh
 ./copy-proto-sources.sh
 ./gen-ledger-api-proto.sh
-../../../build-tools/copy-common-ts.sh
 
 ../../../build-tools/npm-install.sh

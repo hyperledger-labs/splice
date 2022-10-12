@@ -11,10 +11,7 @@ function build_frontend() {
     echo "No compilation artifacts found in app ${app}. Please compile the repo before starting frontends" 1>&2
     exit 1
   fi
-  ./gen-ledger-api-proto.sh
-  ./copy-proto-sources.sh
-  ./codegen.sh
-  "${script_dir}"/build-tools/npm-install.sh
+  ./setup.sh
   # npm run build
   # ^^ not building production to make this script faster
   cd -

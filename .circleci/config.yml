@@ -588,6 +588,24 @@ jobs:
             npm run build
       - cleanup_sbt_test_job
 
+  common_frontend:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - setup_sbt_test_job
+      - execute_sbt_command:
+          cmd: "protocGenerate damlBuild"
+      - run_bash_command_in_nix:
+          cmd_name: Build web frontend
+          cmd: |
+            cd apps/common/frontend
+            ./setup.sh
+            npm run check
+            npm run build
+      - cleanup_sbt_test_job
+
   deployment_test:
     docker:
       - image: cimg/base:2021.04
@@ -931,6 +949,8 @@ workflows:
     - splitwise_frontend:
         <<: *notify-fail
     - directory_frontend:
+        <<: *notify-fail
+    - common_frontend:
         <<: *notify-fail
     # Ops
     - update_pipeline_schedule:

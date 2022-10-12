@@ -21,3 +21,8 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+src/utils/helpers.ts
+src/utils/hooks.ts
+src/utils/interfaces.ts
+src/components/DirectoryEntry.tsx
