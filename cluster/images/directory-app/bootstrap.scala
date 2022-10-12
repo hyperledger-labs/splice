@@ -1,3 +1,6 @@
 println("Bootstrapping Directory app...")
+println("Waiting for directory app init to finish")
+`directory-app`.waitForInitialization()
+println("Uploading directory DAR")
 `directory-app`.remoteParticipant.dars.upload("directory-service-0.1.0.dar")
 println("Bootstrapped Directory app!")
