@@ -39,7 +39,7 @@ class PreflightIntegrationTest
 
   // when running locally, this test may fail if the CC DAR deployed to DevNet differs from the latest one on your branch
   "run through runbook against devnet SVC" taggedAs LiveDevNetTest in { implicit env =>
-    runScript(validatorPath / "coin.canton")(env.environment)
+    runScript(validatorPath / "validator-participant.canton")(env.environment)
     runScript(validatorPath / "tap-transfer-demo.canton")(env.environment)
   }
 }
