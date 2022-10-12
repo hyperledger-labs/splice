@@ -2,7 +2,6 @@ package com.daml.network.integration.tests
 
 import java.nio.file.Paths
 import java.time.Duration
-
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
@@ -12,10 +11,15 @@ import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import org.openqa.selenium.WebDriver
+import org.openqa.selenium.{OutputType, TakesScreenshot, WebDriver}
 import org.openqa.selenium.firefox.{FirefoxDriver, FirefoxOptions}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatestplus.selenium.WebBrowser
+
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.io.File
+import org.apache.commons.io.FileUtils
 
 trait FrontendIntegrationTest
     extends CoinIntegrationTest
@@ -35,7 +39,7 @@ trait FrontendIntegrationTest
   )
   val options: FirefoxOptions = new FirefoxOptions().setHeadless(true)
 
-  implicit var webDriver: WebDriver = _
+  implicit var webDriver: WebDriver with TakesScreenshot = _
 
   override def beforeEach() = {
     webDriver = new FirefoxDriver(options)
@@ -63,4 +67,14 @@ trait FrontendIntegrationTest
     click on "clear-error-button"
   }
 
+  /** Takes a screenshot of the current browser state, into a timestamped png file in log directory.
+    * Currently intended only for manual use during development and debugging.
+    */
+  protected def screenshot(): Unit = {
+    val screenshotFile = webDriver.getScreenshotAs(OutputType.FILE)
+    val time = Calendar.getInstance.getTime
+    val timestamp = new SimpleDateFormat("yy-MM-dd-H:m:s.S").format(time)
+    val filename = Paths.get("log", s"screenshot-${timestamp}.png").toString
+    FileUtils.copyFile(screenshotFile, new File(filename))
+  }
 }
