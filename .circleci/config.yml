@@ -1039,16 +1039,3 @@ workflows:
           slack_notify_success: false
           context:
             - canton-network-vpn
-
-  manual_preflight_check:
-    jobs:
-      - click_to_run_workflow:
-          type: approval
-      - preflight_check:
-          cluster: dev
-          slack_notify_success: false
-          context:
-            - canton-network-vpn
-          requires:
-            - click_to_run_workflow
-
