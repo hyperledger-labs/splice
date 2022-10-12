@@ -1,0 +1,16 @@
+{
+    "name" : "TestNet Weekly Deployment",
+    "description" : "Weekly deployment of testnet",
+    "attribution-actor": "system",
+    "parameters" : {
+      "branch" : "main",
+      "run-job": "deploy-testnet"
+    },
+    "timetable" : {
+      "per-hour" : 1,
+      "hours-of-day" : [ 0 ],
+      "days-of-week" : [ "MON" ],
+      "days-of-month" : [ ],
+      "months" : [ "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC" ]
+    }
+}
