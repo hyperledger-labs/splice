@@ -469,25 +469,26 @@ For details on the individual steps, read the above sections.
               your component must be listed after the dependency.
         3. Edit `./cluster/manifest/canton-network-config.jsonnet`, adding the new component to the `cantonNetwork()` function
         4. If the new component has an API that should be reachable from the internet,
-           add a new config file to `./cluster/images/external-proxy/config`
+           add a new config file to `./cluster/images/external-proxy/conf`
     4. Note that you are responsible for making sure the ports defined in different config files are consistent.
        In particular, consider:
        1. `./cluster/manifest/canton-network-config.jsonnet` (ports used within the cluster)
        2. `./cluster/images/external-proxy/config` (egress of the cluster)
        3. config files baked into individual component images (ports that the applications actually use)
 3. If you touched `./cluster/manifest/canton-network-config.jsonnet`,
-   run `make -C cluster test-update`
+   run `make -C cluster/manifest test-update`
 4. Make sure you are connected to a full tunnel VPN
    whenever you run a command interacting with the cloud.
 5. Build and upload all docker images
     1. The dependency tracking of the build system is currently not reliable. Do the following workarounds:
-       1. Run `sbt bundle` if you changed any app or updated canton
+       1. Manually delete all `./cluster/images/**/target` folders
+          (otherwise the build might not upload docker files because of too aggressive caching)
+       2. Run `sbt bundle` if you changed any app or updated canton
           (otherwise the docker images might contain outdated apps).
-       2. Run `make clean` or manually delete all `./cluster/images/**/target` folders
-          (otherwise the build might not upload docker files because of too aggressive caching).
-       3. If you still run into any issues, run `sbt clean && make clean` to trigger a full rebuild
-    2. Run `make docker-push`
-    3. Do not edit any local files while running `make docker-push`.
+       3. If you still run into any issues, run `make clean` to trigger a full rebuild
+    2. Run `make`
+    3. Run `make -C cluster docker-push`
+    4. Do not edit any local files while running `make docker-push`.
 6. Deploy your cluster definition to scratchnet
     1. Scratchnet is used for ad-hoc testing, and we only have one instance of scratchnet.
        Coordinate with team members if you are not sure that you are the only one using it.
