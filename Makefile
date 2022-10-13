@@ -6,7 +6,7 @@ directory-frontend := ${REPO_ROOT}/apps/wallet/directory/build/index.html
 wallet-daml := ${REPO_ROOT}/apps/wallet/daml/.daml/dist/wallet-0.1.0.dar
 directory-daml := ${REPO_ROOT}/apps/directory/daml/.daml/dist/directory-service-0.1.0.dar
 
-$(app-bundle): $(wallet-frontend) $(directory-frontend)
+$(app-bundle): $(wallet-frontend) $(directory-frontend) $(frontend-deps)
 	sbt bundle
 
 $(wallet-daml):
@@ -15,13 +15,16 @@ $(wallet-daml):
 $(directory-daml):
 	sbt protocGenerate damlBuild
 
+$(frontend-deps):
+	cd ${REPO_ROOT}/apps && ${REPO_ROOT}/build-tools/npm-install.sh
+	cd ${REPO_ROOT}/apps && npm run build -w common-protobuf
+	cd ${REPO_ROOT}/apps && npm run build -w common-frontend
+
 $(wallet-frontend): $(wallet-daml)
-	cd ${REPO_ROOT}/apps/wallet/frontend && ./setup.sh
-	cd ${REPO_ROOT}/apps/wallet/frontend && npm run build
+	cd ${REPO_ROOT}/apps && npm run build -w wallet-frontend
 
 $(directory-frontend): $(directory-daml)
-	cd ${REPO_ROOT}/apps/directory/frontend && ./setup.sh
-	cd ${REPO_ROOT}/apps/directory/frontend && npm run build
+	cd ${REPO_ROOT}/apps && npm run build -w directory-frontend
 
 .PHONY: docker-build
 docker-build: $(app-bundle)

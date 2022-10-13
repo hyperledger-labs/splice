@@ -1,16 +1,6 @@
 #!/usr/bin/env bash
 set -eou pipefail
 
-function npm_install() {
-  set +u
-  if [ -z "${CI}" ]; then
-      npm install
-  else
-      npm ci
-  fi
-  set -u
-}
-
 function build_dependencies() {
   script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
   cd "${script_dir}/apps"
@@ -20,7 +10,7 @@ function build_dependencies() {
     exit 1
   fi
 
-  npm_install
+  "${script_dir}/build-tools/npm-install.sh"
 
   # build dependencies
   npm run build --workspace common-protobuf
