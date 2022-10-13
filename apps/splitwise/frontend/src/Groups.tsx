@@ -1,3 +1,12 @@
+import { sameContracts, useInterval } from 'common-frontend';
+import {
+  GroupKey,
+  ListAcceptedGroupInvitesRequest,
+  ListBalancesRequest,
+  ListBalanceUpdatesRequest,
+  ListGroupsRequest,
+  SplitwiseContext,
+} from 'common-protobuf/com/daml/network/splitwise/v0/splitwise_service_pb';
 import { useCallback, useState } from 'react';
 
 import {
@@ -29,15 +38,6 @@ import { Contract } from './Contract';
 import DirectoryEntries, { Entry as DirectoryEntry } from './DirectoryEntries';
 import { useLedgerApiClient } from './LedgerApiContext';
 import { useSplitwiseClient } from './SplitwiseServiceContext';
-import { sameContracts, useInterval } from './Util';
-import {
-  GroupKey,
-  ListAcceptedGroupInvitesRequest,
-  ListBalancesRequest,
-  ListBalanceUpdatesRequest,
-  ListGroupsRequest,
-  SplitwiseContext,
-} from './com/daml/network/splitwise/v0/splitwise_service_pb';
 
 const key = (group: Contract<CodegenGroup>) =>
   new GroupKey()

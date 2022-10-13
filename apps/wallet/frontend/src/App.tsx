@@ -1,4 +1,9 @@
 import { useAuth0 } from '@auth0/auth0-react';
+import { ErrorBoundary, DirectoryEntry } from 'common-frontend';
+import {
+  UserStatusRequest,
+  WalletContext,
+} from 'common-protobuf/com/daml/network/wallet/v0/wallet_service_pb';
 import { Dispatch, Reducer, useCallback, useEffect, useReducer } from 'react';
 
 import {
@@ -13,10 +18,7 @@ import {
 } from '@mui/material';
 
 import './App.css';
-import { UserStatusRequest, WalletContext } from './com/daml/network/wallet/v0/wallet_service_pb';
-import DirectoryEntry from './components/DirectoryEntry';
 import { useWalletClient } from './contexts/WalletServiceContext';
-import ErrorBoundary from './utils/ErrorBoundary';
 import Home from './views/Home';
 import Login from './views/Login';
 import Onboarding from './views/Onboarding';

@@ -1,17 +1,16 @@
+import { DirectoryEntry, sameContracts, useInterval, Contract } from 'common-frontend';
+import {
+  AcceptAppPaymentRequestRequest,
+  ListAppPaymentRequestsRequest,
+  WalletContext,
+} from 'common-protobuf/com/daml/network/wallet/v0/wallet_service_pb';
 import React, { useCallback, useState } from 'react';
 
 import { Button, Stack, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 
 import { AppPaymentRequest } from '@daml.js/wallet/lib/CN/Wallet';
 
-import {
-  AcceptAppPaymentRequestRequest,
-  ListAppPaymentRequestsRequest,
-  WalletContext,
-} from '../com/daml/network/wallet/v0/wallet_service_pb';
-import DirectoryEntry from '../components/DirectoryEntry';
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { sameContracts, useInterval, Contract } from '../utils';
 
 const AppPaymentRequests: React.FC<{ userId: string }> = ({ userId }) => {
   const walletClient = useWalletClient();

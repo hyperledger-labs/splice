@@ -1,3 +1,5 @@
+import { DirectoryServicePromiseClient } from 'common-protobuf/com/daml/network/directory/v0/directory_service_grpc_web_pb';
+import { LookupEntryByPartyRequest } from 'common-protobuf/com/daml/network/directory/v0/directory_service_pb';
 import { RpcError, StatusCode } from 'grpc-web';
 import React, { useState, useEffect, useMemo } from 'react';
 
@@ -5,8 +7,6 @@ import Tooltip from '@mui/material/Tooltip';
 
 import { DirectoryEntry as damlDirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 
-import { DirectoryServicePromiseClient } from '../com/daml/network/directory/v0/directory_service_grpc_web_pb';
-import { LookupEntryByPartyRequest } from '../com/daml/network/directory/v0/directory_service_pb';
 import { Contract } from '../utils';
 
 interface Entry {

@@ -1,3 +1,11 @@
+import { useInterval, Contract } from 'common-frontend';
+import {
+  AcceptPaymentChannelProposalRequest,
+  ExecuteDirectTransferRequest,
+  ListPaymentChannelProposalsRequest,
+  ProposePaymentChannelRequest,
+  WalletContext,
+} from 'common-protobuf/com/daml/network/wallet/v0/wallet_service_pb';
 import React, { useCallback, useState } from 'react';
 
 import {
@@ -14,15 +22,7 @@ import {
 
 import { PaymentChannelProposal } from '@daml.js/wallet/lib/CN/Wallet';
 
-import {
-  AcceptPaymentChannelProposalRequest,
-  ExecuteDirectTransferRequest,
-  ListPaymentChannelProposalsRequest,
-  ProposePaymentChannelRequest,
-  WalletContext,
-} from '../com/daml/network/wallet/v0/wallet_service_pb';
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { useInterval, Contract } from '../utils';
 
 const PaymentChannels: React.FC<{ userId: string }> = ({ userId }) => {
   const walletClient = useWalletClient();

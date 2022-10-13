@@ -1,3 +1,20 @@
+import { ActiveContractsServicePromiseClient } from 'common-protobuf/com/daml/ledger/api/v1/active_contracts_service_grpc_web_pb';
+import { GetActiveContractsRequest } from 'common-protobuf/com/daml/ledger/api/v1/active_contracts_service_pb';
+import { UserManagementServicePromiseClient } from 'common-protobuf/com/daml/ledger/api/v1/admin/user_management_service_grpc_web_pb';
+import { GetUserRequest } from 'common-protobuf/com/daml/ledger/api/v1/admin/user_management_service_pb';
+import { CommandServicePromiseClient } from 'common-protobuf/com/daml/ledger/api/v1/command_service_grpc_web_pb';
+import { SubmitAndWaitRequest } from 'common-protobuf/com/daml/ledger/api/v1/command_service_pb';
+import {
+  Command,
+  Commands,
+  ExerciseByKeyCommand,
+} from 'common-protobuf/com/daml/ledger/api/v1/commands_pb';
+import {
+  Filters,
+  InclusiveFilters,
+  TransactionFilter,
+} from 'common-protobuf/com/daml/ledger/api/v1/transaction_filter_pb';
+import { GroupKey } from 'common-protobuf/com/daml/network/splitwise/v0/splitwise_service_pb';
 import React, { useContext } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -12,19 +29,6 @@ import { Identifier, Value } from '@daml/ledger-api';
 import { Choice, ContractId, Template } from '@daml/types';
 
 import { Contract } from './Contract';
-import { ActiveContractsServicePromiseClient } from './com/daml/ledger/api/v1/active_contracts_service_grpc_web_pb';
-import { GetActiveContractsRequest } from './com/daml/ledger/api/v1/active_contracts_service_pb';
-import { UserManagementServicePromiseClient } from './com/daml/ledger/api/v1/admin/user_management_service_grpc_web_pb';
-import { GetUserRequest } from './com/daml/ledger/api/v1/admin/user_management_service_pb';
-import { CommandServicePromiseClient } from './com/daml/ledger/api/v1/command_service_grpc_web_pb';
-import { SubmitAndWaitRequest } from './com/daml/ledger/api/v1/command_service_pb';
-import { Command, Commands, ExerciseByKeyCommand } from './com/daml/ledger/api/v1/commands_pb';
-import {
-  Filters,
-  InclusiveFilters,
-  TransactionFilter,
-} from './com/daml/ledger/api/v1/transaction_filter_pb';
-import { GroupKey } from './com/daml/network/splitwise/v0/splitwise_service_pb';
 
 class LedgerApiClient {
   ActiveContractsServicePromiseClient: ActiveContractsServicePromiseClient;

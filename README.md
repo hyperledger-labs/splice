@@ -16,6 +16,7 @@
     1. [Code Layout](#code-layout)
     1. [Domain Specific Naming](#domain-specific-naming)
     1. [App Architecture - Initialization](#app-architecture---initialization)
+    1. [Frontend Code](#frontend-code)
 1. [Testing](#testing)
     1. [Managing Canton for Tests](#managing-canton-for-tests)
     1. [Managing Frontends for Tests](#managing-frontends-for-tests)
@@ -314,6 +315,38 @@ Startup proceeds as follows:
 4. Start automation
 5. Start gRPC service
 
+### Frontend Code
+
+#### Background
+
+This section discusses how to contribute, or add new frontend code for an app. To understand how to run frontends locally, see [Building and Running the Wallet and Splitwise Apps](#building-and-running-the-wallet-and-splitwise-apps).
+
+Frontend code projects are managed via [`npm workspaces`](https://docs.npmjs.com/cli/v8/using-npm/workspaces). This gives us a way to manage multiple distinct NPM packages all co-located in the same monorepo, and confers several benefits:
+
+- One local monorepo package can be installed as a dependency of another, enabling "easy" code-sharing.
+- With `npm install`, all dependencies of all workspace projects are installed in the root `node_modules` folders, giving us de-deduplication.
+- If all workspace projects share common scripts, you can easily run that script across all workspaces in one command.
+
+#### New Packages
+
+In this section only, the term "root-level directory" will describe the workspace root, which is inside `apps/` (**not** the _repo_ root directory).
+
+If you want to add a new package to the workspace, first register its directory in the root-level `apps/package.json` workspaces key. The directory referenced here must contain a `package.json` of its own defining the workspace package itself -- name, dependencies, etc.
+
+Running `npm install` from the root installs the dependencies of all registered workspace packages.
+
+Make sure your package contains at least the scripts `build`, `fix`, `check`, and `start`. This enables the use of (e.g.) `npm run build --workspaces` to run the build script for all packages in the workspace at once.
+
+Your new package will need its own `tsconfig.json` file that inherits from the root tsconfig. See any existing workspace package for an example.
+
+#### Common libs
+
+In `apps/common/frontend` we have an NPM package containing common code. This package (named `common-frontend`) can be installed with `npm install common-frontend -w my-workspace-pkg`. You can import anything from it with `import { ... } from 'common-frontend'` in your package's source code.
+
+You're also free to add more things in `common-frontend` to use across multiple frontend apps. This can really include anything: utility functions, reusable React components, shared config, etc. Just ensure whatever you add is exposed via the lib's entrypoint, `index.ts` (we use the [barreling](https://basarat.gitbook.io/typescript/main-1/barrel) technique to expose all modules from the root of the library).
+
+There is also a package available named `common-protobuf`, located in `apps/common/frontend-protobuf`. This simply contains all the web-gRPC protobuf bindings for all our services in Typescript.
+
 ## Testing
 
 ### Managing Canton for Tests
@@ -354,19 +387,19 @@ The logs from test executions are output to `/logs/canton_test.log`.
 Use `lnav` to view these logs for debugging failing test cases.
 No installation of `lnav` is required, as it is provided by default by our `direnv`.
 
-### Testing App Behaviour Outside of Tests Without Running Bundle 
+### Testing App Behaviour Outside of Tests Without Running Bundle
 
-Sometimes, you may need to debug startup behaviour of the Canton coin apps that is causing issues for the 
+Sometimes, you may need to debug startup behaviour of the Canton coin apps that is causing issues for the
 initialization of the [[com.daml.network.environment.CoinEnvironment]]. You usually can't debug this behaviour
-via our integration tests because the integration tests require an initialized CoinEnvironment. 
+via our integration tests because the integration tests require an initialized CoinEnvironment.
 At other times, you may want to start an interactive console without having to run `sbt bundle`.
 
 You can achieve this by using the ['Simple topology' runtime configuration](https://i.imgur.com/dPgUd2Q.png) from IntelliJ.
 After starting it, a `Run` window with an interactive console should open: [console](https://i.imgur.com/zQfbVvs.png).
-Using the runtime configuration, you can also set breakpoints as you could when executing a test from Intellij and 
-see the results of adding log statements without needing to run `sbt bundle`. 
- 
-All screenshots are from IntelliJ IDEA 2020.1.4 on Ubuntu. 
+Using the runtime configuration, you can also set breakpoints as you could when executing a test from Intellij and
+see the results of adding log statements without needing to run `sbt bundle`.
+
+All screenshots are from IntelliJ IDEA 2020.1.4 on Ubuntu.
 
 If you don't use IntellIJ, a workaround is running `sbt apps-app/runMain com.daml.network.CoinApp -c <conf-files>`, however,
 this doesn't give you a debugger.
@@ -423,31 +456,18 @@ our daml models.
 sbt protocGenerate damlBuild # Generate typescript for our own protobufs
 ```
 
-2. Build the wallet frontend:
+2. Build the frontend code:
 ```
-cd apps/wallet/frontend
-./gen-ledger-api-proto.sh # generate typescript for ledger API protobufs
-./copy-proto-sources.sh # Copy the generated files to the right place
-./codegen.sh # Run Daml Codegen
+cd apps
 npm install
-npm run build
-```
-
-2. Build the splitwise frontend:
-
-```
-cd apps/splitwise/frontend
-./gen-ledger-api-proto.sh # generate typescript for ledger API protobufs
-./copy-proto-sources.sh # Copy the generated files to the right place
-./codegen.sh # Run Daml Codegen
-npm install
-npm run build
+npm run build -ws
 ```
 
 3. In order to pass in CI, source code must be formatted:
 
 ```
-npm run format:fix
+# in "apps/"
+npm run fix -ws
 ```
 
 ### Running the Wallet and Splitwise Frontend

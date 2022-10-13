@@ -12,9 +12,13 @@ trap "rm -rf $DIR" EXIT
 
 curl -sSL https://github.com/digital-asset/daml/releases/download/v$SDK_VERSION/protobufs-$SDK_VERSION.zip --output $DIR/protobufs.zip
 unzip -q $DIR/protobufs.zip -d $DIR
+cp -r ../../../3rdparty/protobuf/google $DIR/protos-$SDK_VERSION/google
 mkdir $DIR/ts
+rm -rf $DIR/protos-$SDK_VERSION/com/daml/daml_lf_1_14
+rm -rf $DIR/protos-$SDK_VERSION/com/daml/daml_lf_dev
+PROTOS=$(cd $DIR/protos-$SDK_VERSION && find . -name '*.proto' | sed 's|^\./||')
 # We only generate sources for the subset we use.
-protoc -I $DIR/protos-$SDK_VERSION com/daml/ledger/api/v1/value.proto \
+protoc -I $DIR/protos-$SDK_VERSION $PROTOS \
        --js_out=import_style=commonjs:$DIR/ts \
        --grpc-web_out=import_style=commonjs+dts,mode=grpcwebtext:$DIR/ts
-cp -r $DIR/ts/* src/
+cp -r $DIR/ts/* .

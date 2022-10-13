@@ -1,6 +1,5 @@
+import { DirectoryServicePromiseClient } from 'common-protobuf/com/daml/network/directory/v0/directory_service_grpc_web_pb';
 import React, { useContext } from 'react';
-
-import { DirectoryServicePromiseClient } from '../com/daml/network/directory/v0/directory_service_grpc_web_pb';
 
 const DirectoryContext = React.createContext<DirectoryServicePromiseClient | undefined>(undefined);
 

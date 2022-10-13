@@ -1,0 +1,9 @@
+{
+  "workspaces": [
+    "common/frontend-protobuf",
+    "common/frontend",
+    "directory/frontend",
+    "wallet/frontend",
+    "splitwise/frontend"
+  ]
+}

@@ -1,10 +1,10 @@
 import { useAuth0 } from '@auth0/auth0-react';
+import { ErrorBoundary } from 'common-frontend';
 import { useEffect, useState } from 'react';
 
 import { AppBar, Box, Button, Container, CssBaseline, Toolbar, Typography } from '@mui/material';
 
 import './App.css';
-import ErrorBoundary from './utils/ErrorBoundary';
 import Home from './views/Home';
 import Login from './views/Login';
 

@@ -1,6 +1,5 @@
+import { ValidatorAppServicePromiseClient } from 'common-protobuf/com/daml/network/validator/v0/validator_service_grpc_web_pb';
 import React, { useContext } from 'react';
-
-import { ValidatorAppServicePromiseClient } from '../com/daml/network/validator/v0/validator_service_grpc_web_pb';
 
 const ValidatorContext = React.createContext<ValidatorAppServicePromiseClient | undefined>(
   undefined

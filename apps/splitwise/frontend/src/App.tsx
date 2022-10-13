@@ -1,3 +1,7 @@
+import { sameContracts, useInterval } from 'common-frontend';
+import { ErrorBoundary } from 'common-frontend';
+import { DirectoryServicePromiseClient } from 'common-protobuf/com/daml/network/directory/v0/directory_service_grpc_web_pb';
+import { ScanServicePromiseClient } from 'common-protobuf/com/daml/network/scan/v0/scan_service_grpc_web_pb';
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -13,10 +17,6 @@ import Groups from './Groups';
 import { LedgerApiClientProvider, useLedgerApiClient } from './LedgerApiContext';
 import Login from './Login';
 import { SplitwiseClientProvider, useSplitwiseClient } from './SplitwiseServiceContext';
-import { sameContracts, useInterval } from './Util';
-import { DirectoryServicePromiseClient } from './com/daml/network/directory/v0/directory_service_grpc_web_pb';
-import { ScanServicePromiseClient } from './com/daml/network/scan/v0/scan_service_grpc_web_pb';
-import ErrorBoundary from './utils/ErrorBoundary';
 
 const App: React.FC = () => {
   const [directoryEntries, setDirectoryEntries] = useState<Contract<DirectoryEntry>[]>([]);

@@ -1,30 +1,29 @@
-import React, { useContext } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-
-import { DirectoryEntry, DirectoryInstall } from '@daml.js/directory/lib/CN/Directory';
-import { Choice, ContractId, Template } from '@daml/types';
-
-import { ActiveContractsServicePromiseClient } from '../com/daml/ledger/api/v1/active_contracts_service_grpc_web_pb';
-import { GetActiveContractsRequest } from '../com/daml/ledger/api/v1/active_contracts_service_pb';
-import { UserManagementServicePromiseClient } from '../com/daml/ledger/api/v1/admin/user_management_service_grpc_web_pb';
-import { GetUserRequest } from '../com/daml/ledger/api/v1/admin/user_management_service_pb';
-import { CommandServicePromiseClient } from '../com/daml/ledger/api/v1/command_service_grpc_web_pb';
-import { SubmitAndWaitRequest } from '../com/daml/ledger/api/v1/command_service_pb';
+import { Contract } from 'common-frontend';
+import { ActiveContractsServicePromiseClient } from 'common-protobuf/com/daml/ledger/api/v1/active_contracts_service_grpc_web_pb';
+import { GetActiveContractsRequest } from 'common-protobuf/com/daml/ledger/api/v1/active_contracts_service_pb';
+import { UserManagementServicePromiseClient } from 'common-protobuf/com/daml/ledger/api/v1/admin/user_management_service_grpc_web_pb';
+import { GetUserRequest } from 'common-protobuf/com/daml/ledger/api/v1/admin/user_management_service_pb';
+import { CommandServicePromiseClient } from 'common-protobuf/com/daml/ledger/api/v1/command_service_grpc_web_pb';
+import { SubmitAndWaitRequest } from 'common-protobuf/com/daml/ledger/api/v1/command_service_pb';
 import {
   Command,
   Commands,
   CreateCommand,
   ExerciseByKeyCommand,
-} from '../com/daml/ledger/api/v1/commands_pb';
-import { CreatedEvent } from '../com/daml/ledger/api/v1/event_pb';
+} from 'common-protobuf/com/daml/ledger/api/v1/commands_pb';
+import { CreatedEvent } from 'common-protobuf/com/daml/ledger/api/v1/event_pb';
 import {
   Filters,
   InclusiveFilters,
   TransactionFilter,
-} from '../com/daml/ledger/api/v1/transaction_filter_pb';
-import { TransactionTree } from '../com/daml/ledger/api/v1/transaction_pb';
-import { Identifier, Value } from '../com/daml/ledger/api/v1/value_pb';
-import { Contract } from '../utils';
+} from 'common-protobuf/com/daml/ledger/api/v1/transaction_filter_pb';
+import { TransactionTree } from 'common-protobuf/com/daml/ledger/api/v1/transaction_pb';
+import { Identifier, Value } from 'common-protobuf/com/daml/ledger/api/v1/value_pb';
+import React, { useContext } from 'react';
+import { v4 as uuidv4 } from 'uuid';
+
+import { DirectoryEntry, DirectoryInstall } from '@daml.js/directory/lib/CN/Directory';
+import { Choice, ContractId, Template } from '@daml/types';
 
 class LedgerApiClient {
   activeContractsServiceClient: ActiveContractsServicePromiseClient;

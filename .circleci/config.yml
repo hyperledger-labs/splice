@@ -613,15 +613,21 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Build wallet web frontend
           cmd: |
-            cd apps/wallet/frontend
-            ./setup.sh
-            npm run build
+            cd apps
+            npm ci
+            npm run build --workspace common-protobuf
+            npm run build --workspace common-frontend
+
+            npm run build --workspace wallet-frontend
       - run_bash_command_in_nix:
           cmd_name: Build directory web frontend
           cmd: |
-            cd apps/directory/frontend
-            ./setup.sh
-            npm run build
+            cd apps
+            npm ci
+            npm run build --workspace common-protobuf
+            npm run build --workspace common-frontend
+
+            npm run build --workspace directory-frontend
       - execute_sbt_command:
           cmd: "bundle"
       - run:
@@ -645,7 +651,7 @@ jobs:
 
       - cleanup_sbt_test_job
 
-  wallet_frontend:
+  web_frontends:
     docker:
       - image: cimg/base:2021.04
     environment:
@@ -656,69 +662,12 @@ jobs:
       - execute_sbt_command:
           cmd: "protocGenerate damlBuild"
       - run_bash_command_in_nix:
-          cmd_name: Build web frontend
+          cmd_name: Build all web frontends
           cmd: |
-            cd apps/wallet/frontend
-            ./setup.sh
-            npm run check
-            npm run build
-      - cleanup_sbt_test_job
-
-  splitwise_frontend:
-    docker:
-      - image: cimg/base:2021.04
-    environment:
-      <<: *env
-    steps:
-      - checkout
-      - setup_sbt_test_job
-      - execute_sbt_command:
-          cmd: "protocGenerate damlBuild"
-      - run_bash_command_in_nix:
-          cmd_name: Build web frontend
-          cmd: |
-            cd apps/splitwise/frontend
-            ./setup.sh
-            npm run check
-            npm run build
-      - cleanup_sbt_test_job
-
-  directory_frontend:
-    docker:
-      - image: cimg/base:2021.04
-    environment:
-      <<: *env
-    steps:
-      - checkout
-      - setup_sbt_test_job
-      - execute_sbt_command:
-          cmd: "protocGenerate damlBuild"
-      - run_bash_command_in_nix:
-          cmd_name: Build web frontend
-          cmd: |
-            cd apps/directory/frontend
-            ./setup.sh
-            npm run check
-            npm run build
-      - cleanup_sbt_test_job
-
-  common_frontend:
-    docker:
-      - image: cimg/base:2021.04
-    environment:
-      <<: *env
-    steps:
-      - checkout
-      - setup_sbt_test_job
-      - execute_sbt_command:
-          cmd: "protocGenerate damlBuild"
-      - run_bash_command_in_nix:
-          cmd_name: Build web frontend
-          cmd: |
-            cd apps/common/frontend
-            ./setup.sh
-            npm run check
-            npm run build
+            cd apps
+            npm ci
+            npm run check --workspaces
+            npm run build --workspaces
       - cleanup_sbt_test_job
 
   deployment_test:
@@ -933,13 +882,7 @@ workflows:
         <<: *notify-fail
     - bundle:
         <<: *notify-fail
-    - wallet_frontend:
-        <<: *notify-fail
-    - splitwise_frontend:
-        <<: *notify-fail
-    - directory_frontend:
-        <<: *notify-fail
-    - common_frontend:
+    - web_frontends:
         <<: *notify-fail
     # Ops
     - update_pipeline_schedule:

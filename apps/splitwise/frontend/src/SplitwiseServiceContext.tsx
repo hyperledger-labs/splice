@@ -1,6 +1,5 @@
+import { SplitwiseServicePromiseClient } from 'common-protobuf/com/daml/network/splitwise/v0/splitwise_service_grpc_web_pb';
 import React, { useContext } from 'react';
-
-import { SplitwiseServicePromiseClient } from './com/daml/network/splitwise/v0/splitwise_service_grpc_web_pb';
 
 const SplitwiseContext = React.createContext<SplitwiseServicePromiseClient | undefined>(undefined);
 

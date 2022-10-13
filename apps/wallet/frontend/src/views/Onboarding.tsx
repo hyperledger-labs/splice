@@ -1,6 +1,7 @@
+import { OnboardUserRequest } from 'common-protobuf/com/daml/network/validator/v0/validator_service_pb';
+
 import { Button, Grid, Typography } from '@mui/material';
 
-import { OnboardUserRequest } from '../com/daml/network/validator/v0/validator_service_pb';
 import { useValidatorClient } from '../contexts/ValidatorServiceContext';
 
 const Onboarding: React.FC<{ userId: string }> = ({ userId }) => {

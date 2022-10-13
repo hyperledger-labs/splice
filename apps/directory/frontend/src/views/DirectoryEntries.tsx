@@ -1,3 +1,4 @@
+import { Contract, sameContracts, useInterval } from 'common-frontend';
 import { useCallback, useState } from 'react';
 
 import { Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
@@ -5,7 +6,6 @@ import { Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@m
 import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 
 import { useLedgerApiClient } from '../contexts/LedgerApiContext';
-import { Contract, sameContracts, useInterval } from '../utils';
 
 const DirectoryEntries: React.FC<{ primaryParty: string; provider: string }> = ({
   primaryParty,

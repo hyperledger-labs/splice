@@ -1,6 +1,5 @@
+import { WalletServicePromiseClient } from 'common-protobuf/com/daml/network/wallet/v0/wallet_service_grpc_web_pb';
 import React, { useContext } from 'react';
-
-import { WalletServicePromiseClient } from '../com/daml/network/wallet/v0/wallet_service_grpc_web_pb';
 
 const WalletContext = React.createContext<WalletServicePromiseClient | undefined>(undefined);
 

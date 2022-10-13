@@ -1,3 +1,4 @@
+import { Contract } from 'common-frontend';
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useEffect, useState } from 'react';
 
@@ -5,7 +6,7 @@ import { DirectoryInstall, DirectoryInstallRequest } from '@daml.js/directory/li
 
 import { DirectoryClientProvider, useDirectoryClient } from '../contexts/DirectoryServiceContext';
 import { LedgerApiClientProvider, useLedgerApiClient } from '../contexts/LedgerApiContext';
-import { config, Contract } from '../utils';
+import { config } from '../utils';
 import DirectoryEntries from './DirectoryEntries';
 import RequestDirectoryEntry from './RequestDirectoryEntry';
 

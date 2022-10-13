@@ -1,3 +1,8 @@
+import { sameContracts, useInterval } from 'common-frontend';
+import {
+  ListGroupInvitesRequest,
+  SplitwiseContext,
+} from 'common-protobuf/com/daml/network/splitwise/v0/splitwise_service_pb';
 import { useCallback, useState } from 'react';
 
 import { Button, FormGroup, List, ListItem, Stack, TextField, Typography } from '@mui/material';
@@ -8,11 +13,6 @@ import { Contract } from './Contract';
 import DirectoryEntries from './DirectoryEntries';
 import { useLedgerApiClient } from './LedgerApiContext';
 import { useSplitwiseClient } from './SplitwiseServiceContext';
-import { sameContracts, useInterval } from './Util';
-import {
-  ListGroupInvitesRequest,
-  SplitwiseContext,
-} from './com/daml/network/splitwise/v0/splitwise_service_pb';
 
 interface GroupSetupProps {
   directoryEntries: DirectoryEntries;

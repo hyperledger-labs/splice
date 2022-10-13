@@ -11,6 +11,7 @@ envoy-out.json
 
 # production
 /build
+/lib
 
 # misc
 .DS_Store

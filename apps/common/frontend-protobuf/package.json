@@ -1,0 +1,13 @@
+{
+  "name": "common-protobuf",
+  "version": "0.1.0",
+  "description": "Collection of codegenned protos for typescript",
+  "main": "index.js",
+  "scripts": {
+    "build": "./setup.sh",
+    "fix": "echo '[common-protobuf] no-op'",
+    "check": "echo '[common-protobuf] no-op'"
+  },
+  "author": "",
+  "license": "ISC"
+}

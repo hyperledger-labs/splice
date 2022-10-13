@@ -1,1 +1,0 @@
-../../../build-tools/frontend-setup.sh

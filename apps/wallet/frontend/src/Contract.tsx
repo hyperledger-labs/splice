@@ -1,7 +1,7 @@
-import { ContractId, Template } from '@daml/types';
+import { Value } from 'common-protobuf/com/daml/ledger/api/v1/value_pb';
+import { Contract as ProtoContract } from 'common-protobuf/com/daml/network/v0/contract_pb';
 
-import { Value } from './com/daml/ledger/api/v1/value_pb';
-import { Contract as ProtoContract } from './com/daml/network/v0/contract_pb';
+import { ContractId, Template } from '@daml/types';
 
 export interface Contract<T> {
   contractId: ContractId<T>;

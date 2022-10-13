@@ -1,19 +1,30 @@
 #!/usr/bin/env bash
 set -eou pipefail
 
-function build_frontend() {
-  app=$1
+function npm_install() {
+  set +u
+  if [ -z "${CI}" ]; then
+      npm install
+  else
+      npm ci
+  fi
+  set -u
+}
 
+function build_dependencies() {
   script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-  cd "${script_dir}/apps/${app}/frontend"
+  cd "${script_dir}/apps"
 
   if [[ -z "$(ls ../target/scala* 2>/dev/null)" ]]; then
     echo "No compilation artifacts found in app ${app}. Please compile the repo before starting frontends" 1>&2
     exit 1
   fi
-  ./setup.sh
-  # npm run build
-  # ^^ not building production to make this script faster
+
+  npm_install
+
+  # build dependencies
+  npm run build --workspace common-protobuf
+  npm run build --workspace common-frontend
   cd -
 }
 
@@ -81,13 +92,14 @@ tmux_session="cn-frontends"
 tmux_window=0
 
 # TODO(i711): Move build steps into sbt
-build_frontend wallet
-build_frontend splitwise
-build_frontend directory
+build_dependencies
 
 start_envoy
 
 tmux new-session -d -s "${tmux_session}"
+
+# listen & auto-rebuild common-frontend code when its src changes
+tmux_cmd "common-frontend" "$REPO_ROOT/apps" "npm run start --workspace common-frontend"
 
 start_frontend wallet 3000 6204 NA 6203 alice
 start_frontend wallet 3001 6304 NA 6303 bob

@@ -1,3 +1,9 @@
+import { sameContracts, useInterval, Contract } from 'common-frontend';
+import {
+  ListRequest,
+  TapRequest,
+  WalletContext,
+} from 'common-protobuf/com/daml/network/wallet/v0/wallet_service_pb';
 import { useCallback, useState } from 'react';
 
 import {
@@ -14,13 +20,7 @@ import {
 
 import { Coin } from '@daml.js/canton-coin/lib/CC/Coin';
 
-import {
-  ListRequest,
-  TapRequest,
-  WalletContext,
-} from '../com/daml/network/wallet/v0/wallet_service_pb';
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { sameContracts, useInterval, Contract } from '../utils';
 
 const Coins: React.FC<{ userId: string }> = ({ userId }) => {
   const [coins, setCoins] = useState<Contract<Coin>[]>([]);
