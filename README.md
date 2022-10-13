@@ -223,7 +223,12 @@ Current Canton commit: `606a286a97e3bc47d19f3045048dd71b12a9800a`
     2. `releaseVersionToProtocolVersion` in `ReleaseVersionToProtocolVersions.scala`
     3. `version` in `CantonDependencies`
     4. In `nix/canton.nix`:
-       1. Bump `version` to the desired canton version
+       1. Bump `version` to the desired canton version. You can find
+          that version by looking at the corresponding SDK
+          release. E.g.,
+          https://github.com/digital-asset/daml/releases/tag/v2.5.0-snapshot.20221010.10736.0.2f453a14
+          lists `canton-open-source-20221011.tar.gz` under the
+          artifacts so `20221011` is the Canton version.
        2. Bump `sdk_version` to the associated sdk snapshot version
        3. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.
 14. Bump the sdk version in our own daml.yaml files via `./set-sdk.sh $sdkversion` to the same version.
