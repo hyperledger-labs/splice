@@ -482,11 +482,9 @@ For details on the individual steps, read the above sections.
    whenever you run a command interacting with the cloud.
 5. Build and upload all docker images
     1. The dependency tracking of the build system is currently not reliable. Do the following workarounds:
-       1. Manually delete all `./cluster/images/**/target` folders
-          (otherwise the build might not upload docker files because of too aggressive caching)
-       2. Run `sbt bundle` if you changed any app or updated canton
-          (otherwise the docker images might contain outdated apps).
-       3. If you still run into any issues, run `make clean` to trigger a full rebuild
+       1. Run `make clean`. This deletes all `./cluster/images/**/target` folders and forces the next
+          `make` invocation to rerun `sbt bundle`. It does not do a full `sbt clean` though..
+       2. If you still run into any issues, run `make clean && sbt clean` to trigger a full rebuild.
     2. Run `make`
     3. Run `make -C cluster docker-push`
     4. Do not edit any local files while running `make docker-push`.

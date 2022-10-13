@@ -3,7 +3,6 @@
 app-bundle := ${REPO_ROOT}/apps/app/target/release/coin-0.1.0-SNAPSHOT.tar.gz
 wallet-frontend := ${REPO_ROOT}/apps/wallet/frontend/build/index.html
 directory-frontend := ${REPO_ROOT}/apps/wallet/directory/build/index.html
-target-bundle := target/coin-0.1.0-SNAPSHOT.tar.gz
 wallet-daml := ${REPO_ROOT}/apps/wallet/daml/.daml/dist/wallet-0.1.0.dar
 directory-daml := ${REPO_ROOT}/apps/directory/daml/.daml/dist/directory-service-0.1.0.dar
 
@@ -32,4 +31,4 @@ docker-build: $(app-bundle)
 .PHONY: clean
 clean:
 	make -C cluster clean
-	sbt clean
+	rm -rf apps/app/target/release
