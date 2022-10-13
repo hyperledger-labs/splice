@@ -231,7 +231,7 @@ object CoinLedgerConnection {
         }
       }
 
-      // TODO(i885): we can't rely on unique contract keys in multi-domain.
+      // TODO(#1094): we can't rely on unique contract keys in multi-domain.
       //  Use a different mechanism for idempotent app initialization.
       override def ignoreDuplicateKeyErrors[T](
           task: => Future[T],

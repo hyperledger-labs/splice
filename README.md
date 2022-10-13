@@ -309,12 +309,10 @@ All other applications have one service user and do not have admin claims.
 Startup proceeds as follows:
 
 1. Wait for the user to be created and query the primary party.
-2. Wait for the DARs to be uploaded (TODO(#885) not yet implemented)
+2. Wait for the DARs to be uploaded
 3. Run one-time initialization, e.g., create certain contracts.
 4. Start automation
 5. Start gRPC service
-
-
 
 ## Testing
 

@@ -124,7 +124,7 @@ abstract class CoinNode[State <: AutoCloseable](
     isInitializedVar.set(true)
   }
 
-  // TODO(#885): Cleanup init failures
+  // TODO(M1-92): Cleanup init failures
   initializeF.failed.foreach { err =>
     logger.error(s"Initialization of $name failed", err)
     sys.exit(1)
