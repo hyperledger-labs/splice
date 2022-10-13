@@ -4,42 +4,15 @@ import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.refinements.ApiTypes.TemplateId
 import com.daml.ledger.api.v1.commands.Command
 import com.daml.ledger.client.binding
-import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.CC.Coin.Coin
-import com.daml.network.codegen.CC.CoinRules.CoinRules
 import com.daml.network.codegen.{CC, OpenBusiness}
 import com.daml.network.environment.CoinLedgerConnection
-import com.digitalasset.canton.logging.TracedLogger
-import com.digitalasset.canton.participant.ledger.api.client.{DecodeUtil, LedgerConnection}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
-import scala.concurrent.{ExecutionContext, Future}
+import scala.concurrent.Future
 
-object CoinUtil extends UploadablePackage {
-  lazy val coinTemplateId: com.daml.ledger.api.v1.value.Identifier =
-    ApiTypes.TemplateId.unwrap(Coin.id)
-
-  lazy val packageId: String = coinTemplateId.packageId
-  lazy val coinModuleName: String = coinTemplateId.moduleName
-  lazy val coinEntityName: String = coinTemplateId.entityName
-
-  // See `Compile / damlCodeGeneration` in build.sbt
-  lazy val resourcePath: String = "dar/canton-coin-0.1.0.dar"
-
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
-  def tryGetCoinRules(connection: CoinLedgerConnection, validator: PartyId)(implicit
-      ec: ExecutionContext
-  ): Future[Primitive.ContractId[CoinRules]] = {
-    for {
-      createdRules <- connection.activeContracts(validator, CoinRules)
-      _ = require(
-        createdRules.length == 1,
-        s"Expected only one CoinRules instance but found ${createdRules.size} instances: $createdRules",
-      )
-      rule = createdRules.head.contractId
-    } yield rule
-  }
+object CoinUtil {
 
   def templateId[T](id: binding.Primitive.TemplateId[T]): TemplateId =
     TemplateId(ApiTypes.TemplateId.unwrap(id))
@@ -58,131 +31,6 @@ object CoinUtil extends UploadablePackage {
       )
       .create
       .command
-
-  def setupApp(
-      svc: PartyId,
-      connection: CoinLedgerConnection,
-  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
-    // Needed for ED workaround
-    val recordUserHostedAtCmd = ExplicitDisclosureWorkaround.recordUserHostedAtCommand(svc, svc)
-    // The SVC is its own validator
-    val recordValidatorOfCmd = recordValidatorOfCommand(svc, svc, svc)
-
-    // Create an IssuanceState
-    val createIssuanceStateCmd =
-      CC.Coin
-        .IssuanceState(
-          svc = svc.toPrim,
-          obs = svc.toPrim,
-          currentRound = CC.Round.Round(-1),
-        )
-        .create
-        .command
-
-    // Create CoinRules and open a first mining round
-    val createCoinRulesCmd =
-      CC.CoinRules
-        .CoinRules(
-          svc = svc.toPrim,
-          obs = svc.toPrim,
-          config = defaultCoinConfig,
-        )
-        .createAnd
-        .exerciseCoinRules_MiningRound_Open(coinPrice = 1.0)
-        .command
-    for {
-      _ <- connection.ignoreDuplicateKeyErrors(
-        connection.submitCommand(
-          actAs = Seq(svc),
-          readAs = Seq.empty,
-          command = Seq(recordUserHostedAtCmd),
-        ),
-        s"SVC.setupApp($svc, ...)",
-      )
-      _ <- connection.ignoreDuplicateKeyErrors(
-        connection
-          .submitCommand(
-            actAs = Seq(svc),
-            readAs = Seq.empty,
-            command = Seq(recordValidatorOfCmd),
-          ),
-        s"SVC.setupApp($svc, ...)",
-      )
-      _ <- connection.ignoreDuplicateKeyErrors(
-        connection.submitCommand(
-          actAs = Seq(svc),
-          readAs = Seq.empty,
-          command = Seq(createIssuanceStateCmd),
-        ),
-        s"SVC.setupApp($svc, ...)",
-      )
-      _ <- connection.ignoreDuplicateKeyErrors(
-        connection.submitCommand(
-          actAs = Seq(svc),
-          readAs = Seq.empty,
-          command = Seq(createCoinRulesCmd),
-        ),
-        s"SVC.setupApp($svc, ...)",
-      )
-    } yield ()
-  }
-
-  def acceptCoinRulesRequests(
-      svcPartyId: PartyId,
-      connection: CoinLedgerConnection,
-      logger: TracedLogger,
-  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
-    val coinRulesRequestTid = templateId(CC.CoinRules.CoinRulesRequest.id)
-    val openMiningRoundTid = templateId(CC.Round.OpenMiningRound.id)
-    val issuingMiningRoundTid = templateId(CC.Round.IssuingMiningRound.id)
-
-    for {
-      // Note: a single ACS lookup in order to have a consistent view of data
-      (requestCids, openMiningRounds, issuingMiningRounds) <- connection
-        .activeContracts(
-          LedgerConnection.transactionFilterByParty(
-            Map(svcPartyId -> Seq(coinRulesRequestTid, openMiningRoundTid, issuingMiningRoundTid))
-          )
-        )
-        .map { case events =>
-          val requestCids = events
-            .flatMap(DecodeUtil.decodeCreated(CC.CoinRules.CoinRulesRequest))
-            .map(_.contractId)
-          val openMiningRounds = events
-            .flatMap(DecodeUtil.decodeCreated(CC.Round.OpenMiningRound))
-            .filter(c => c.value.obs == svcPartyId.toPrim)
-            .map(_.value)
-          val issuingMiningRounds = events
-            .flatMap(DecodeUtil.decodeCreated(CC.Round.IssuingMiningRound))
-            .filter(c => c.value.obs == svcPartyId.toPrim)
-            .map(_.value)
-          (requestCids, openMiningRounds, issuingMiningRounds)
-        }
-      _ <- Future.sequence(
-        requestCids
-          .map(cid =>
-            connection
-              .submitCommand(
-                actAs = Seq(svcPartyId),
-                readAs = Seq.empty,
-                command = Seq(
-                  cid
-                    .exerciseAccept(openMiningRounds, issuingMiningRounds)
-                    .command
-                ),
-              )
-              .recoverWith { case e =>
-                logger.warn(s"Failed to accept coin rules request: $e")
-
-                // Note: we are potentially accepting multiple requests, don't fail the whole call if one of them fails.
-                // No other workflow is using CoinRulesRequest contracts, it is safe to blindly retry
-                // exercising the (consuming) Accept choice until it succeeds.
-                Future.successful(())
-              }
-          )
-      )
-    } yield ()
-  }
 
   lazy val defaultHoldingFee =
     OpenBusiness.Fees.RatePerRound(damlNumeric(1.0 / 360.0 / (24.0 * 60.0 / 2.5)))

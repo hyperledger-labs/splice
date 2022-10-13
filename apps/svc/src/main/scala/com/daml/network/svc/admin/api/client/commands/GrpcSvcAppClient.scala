@@ -4,8 +4,8 @@ import cats.implicits._
 import com.daml.ledger.client.binding.Primitive.ContractId
 import com.daml.network.codegen.CC.{Round => roundCodegen}
 import com.daml.network.svc.v0
+import com.daml.network.svc.v0.GetDebugInfoResponse
 import com.daml.network.svc.v0.SvcServiceGrpc.SvcServiceStub
-import com.daml.network.svc.v0.{GetDebugInfoResponse, GetValidatorConfigResponse}
 import com.daml.network.util.Proto
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
@@ -36,8 +36,6 @@ object GrpcSvcAppClient {
     ): Either[String, Unit] = Right(())
   }
 
-  case class AcceptValidators() extends UnitCommand(_.acceptValidators)
-
   case class DebugInfo(
       svcUser: String,
       svcParty: PartyId,
@@ -60,27 +58,6 @@ object GrpcSvcAppClient {
           svcParty = svc,
           coinPackageId = response.coinPackageId,
           coinRulesCids = response.coinRulesContractIds,
-        )
-      }
-  }
-
-  case class ValidatorConfigInfo(
-      svcParty: PartyId
-  )
-
-  case class GetValidatorConfig()
-      extends BaseCommand[Empty, GetValidatorConfigResponse, ValidatorConfigInfo] {
-    override def createRequest(): Either[String, Empty] = Right(Empty())
-    override def submitRequest(
-        service: SvcServiceStub,
-        request: Empty,
-    ): Future[GetValidatorConfigResponse] = service.getValidatorConfig(request)
-    override def handleResponse(
-        response: GetValidatorConfigResponse
-    ): Either[String, ValidatorConfigInfo] =
-      Proto.decode(Proto.Party)(response.svcPartyId).map { svc =>
-        ValidatorConfigInfo(
-          svcParty = svc
         )
       }
   }

@@ -116,7 +116,7 @@ activeRound app = do
 
 -- For the workaround for explicit disclosure, we need to know at which validator node a user is hosted.
 -- This is so that we can set the correct readAs party for all coin transfer commands submitted by the user.
--- 
+--
 -- TODO(M1-51): remove workaround for explicit disclosure
 template CCUserHostedAt
   with
@@ -147,11 +147,11 @@ requestCoinRules app user = do
 -- Note: this must not run concurrently with commands that modify the mining rounds (e.g., runNextIssuance)
 runCoinRulesAcceptBot : CCApp -> Script ()
 runCoinRulesAcceptBot app = do
-  openRounds <- queryFilter @OpenMiningRound app.svc (\r -> r.obs == app.svc) 
+  openRounds <- queryFilter @OpenMiningRound app.svc (\r -> r.obs == app.svc)
   issuingRounds <- queryFilter @IssuingMiningRound app.svc (\r -> r.obs == app.svc)
   requests <- query @CoinRulesRequest app.svc
   forA_ requests $ \(requestCid, request) -> do
-    submit app.svc $ exerciseCmd requestCid $ Accept (fmap snd openRounds) (fmap snd issuingRounds)
+    submit app.svc $ exerciseCmd requestCid $ CoinRulesRequest_Accept (fmap snd openRounds) (fmap snd issuingRounds)
   pure ()
 
 -- Issuance automation
@@ -223,14 +223,14 @@ skipNRounds app n = do
   let newRound = Round (openRound.round.number + n)
   submit app.svc
     $ archiveCmd openRoundCid
-    *> createCmd openRound with round = newRound 
+    *> createCmd openRound with round = newRound
     *> archiveCmd stCid
     *> createCmd st with currentRound = newRound
   pure ()
 
 -- Each validator has their own copy of IssuanceState, OpenMiningRound, ClosedMiningRound, IssuingMiningRound contracts
 -- This updates all of these copies to match the original contracts owned by the SVC
--- 
+--
 -- TODO(M1-51): remove workaround for explicit disclosure
 updateDisclosedMiningRoundContracts : CCApp -> Script ()
 updateDisclosedMiningRoundContracts app = do

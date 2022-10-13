@@ -12,7 +12,7 @@ import com.daml.network.codegen.CC.CoinRules.{CoinRules, TransferResult}
 import com.daml.network.codegen.DA
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history._
-import com.daml.network.svc.store.SvcAppStore
+import com.daml.network.svc.store.SvcEventsStore
 import com.daml.network.util.{ExerciseNode, ExerciseNodeCompanion, Trees}
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -26,7 +26,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class RoundSummaryCollectionService(
     svcParty: PartyId,
     connection: CoinLedgerConnection,
-    store: SvcAppStore,
+    store: SvcEventsStore,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, tc: TraceContext)
     extends LedgerAutomationService

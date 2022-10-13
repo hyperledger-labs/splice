@@ -1,8 +1,8 @@
 package com.daml.network.svc.admin
 
 import com.daml.network.admin.LedgerAutomationServiceOrchestrator
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
-import com.daml.network.svc.store.SvcAppStore
+import com.daml.network.environment.CoinLedgerClient
+import com.daml.network.svc.store.SvcStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -11,19 +11,16 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContextExecutor
 
-/** Manages background automation that runs on an SVC app.
-  *
-  * Currently, this class only contains:
-  * - the automation that automatically accepts `CoinRulesRequests` of validators.
-  * - collection of all transfers, for summary when closing the round.
+/** Background automation to collect audit log entries, which currently consists of only
+  * the collection of all transfers results, for summary when closing the round.
   */
-class SvcAutomationService(
+// TODO(M1-52): integrate log collection into our store infrastructure as part of the work on automating rewards issuance
+class SvcLogCollectionService(
     svcParty: PartyId,
     ledgerClient: CoinLedgerClient,
     loggerFactory: NamedLoggerFactory,
     processingTimeouts: ProcessingTimeout,
-    store: SvcAppStore,
-    retries: CoinRetries,
+    store: SvcStore,
 )(implicit
     ec: ExecutionContextExecutor,
     tracer: Tracer,
@@ -33,20 +30,15 @@ class SvcAutomationService(
     ) {
   override protected def timeouts: ProcessingTimeout = processingTimeouts
 
-  val coinRulesRequestAcceptance =
-    createService("svcAcceptCoinRulesRequestsService", ledgerClient, Seq(svcParty)) { connection =>
-      new CoinRulesRequestAcceptanceService(svcParty, connection, loggerFactory, retries)
-    }
-
   val roundSummaryCollection =
     createService("svcRoundSummaryCollectionService", ledgerClient, Seq(svcParty)) { connection =>
-      new RoundSummaryCollectionService(svcParty, connection, store, loggerFactory)
+      new RoundSummaryCollectionService(svcParty, connection, store.events, loggerFactory)
     }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq[AsyncOrSyncCloseable](
     SyncCloseable(
       "SVC automation services",
-      Lifecycle.close(coinRulesRequestAcceptance, roundSummaryCollection)(logger),
+      Lifecycle.close(roundSummaryCollection)(logger),
     )
   )
 }

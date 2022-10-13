@@ -64,13 +64,13 @@ template CoinRules
       do executeTransfer config svc obs transfer
 
     nonconsuming choice CoinRules_TryTransfer : TransferResult
-      -- Same as CoinRules_Transfer except that it will return an exception if the transfer fails. 
+      -- Same as CoinRules_Transfer except that it will return an exception if the transfer fails.
       with
         transfer : Transfer
       controller transferControllers transfer
-      do 
+      do
         transferResult <- exercise self CoinRules_Transfer with ..
-        case transferResult of 
+        case transferResult of
               Left errorMsg -> error errorMsg
               Right result -> return result
 
@@ -227,7 +227,7 @@ template CoinRulesRequest
     signatory user
     observer svc
 
-    choice Accept : () with openRounds : [OpenMiningRound], issuingRounds : [IssuingMiningRound]
+    choice CoinRulesRequest_Accept : () with openRounds : [OpenMiningRound], issuingRounds : [IssuingMiningRound]
       controller svc
       do (_, rules) <- fetchByKey @CoinRules (svc, svc)
          (_, state) <- fetchByKey @IssuanceState (svc, svc)
@@ -236,6 +236,10 @@ template CoinRulesRequest
          forA_ openRounds \round -> create round with obs = user
          forA_ issuingRounds \round -> create round with obs = user
          pure ()
+
+    choice CoinRulesRequest_Reject: ()
+      controller svc
+      do pure ()
 
 -- | Representation of a batch transfer.
 data Transfer = Transfer with
@@ -325,11 +329,11 @@ scaleConfig openRound config = scaleFees (1.0 / openRound.coinPrice) config
 
 
 checkTransferConstraints: Transfer -> TransferSummary -> CoinConfig CC -> Either Text ()
-checkTransferConstraints transfer summary config 
+checkTransferConstraints transfer summary config
     | summary.numInputs > config.maxNumInputs = Left $ "More than the maximum number of inputs"
     | summary.numOutputs > config.maxNumOutputs = Left $ "More than the maximum number of outputs"
     | DA.Text.length transfer.payload > config.maxPayloadLength = Left $ "Payload length is above limit"
-    | summary.quantityBalance < 0.0 = Left $ "Input to output+fee quantity balance " <> show summary.quantityBalance <> " < 0" 
+    | summary.quantityBalance < 0.0 = Left $ "Input to output+fee quantity balance " <> show summary.quantityBalance <> " < 0"
     | summary.quantityBalance /= 0.0 && summary.numFloatingCoins == 0 = Left $ "There needs to be at least one floating output coin to receive excess input quantity" <> show summary.quantityBalance
     | otherwise = Right ()
 

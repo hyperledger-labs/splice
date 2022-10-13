@@ -14,25 +14,9 @@ abstract class SvcAppReference(
     override val name: String,
 ) extends CoinAppReference {
 
-  @deprecated(
-    "This is now automated in SvcAutomationService. We only still have it in case it may be useful.",
-    since = "since automation was introduced",
-  )
-  def acceptValidators(): Unit = {
-    consoleEnvironment.run {
-      adminCommand(GrpcSvcAppClient.AcceptValidators())
-    }
-  }
-
   def getDebugInfo(): GrpcSvcAppClient.DebugInfo = {
     consoleEnvironment.run {
       adminCommand(GrpcSvcAppClient.GetDebugInfo())
-    }
-  }
-
-  def getValidatorConfig: GrpcSvcAppClient.ValidatorConfigInfo = {
-    consoleEnvironment.run {
-      adminCommand(GrpcSvcAppClient.GetValidatorConfig())
     }
   }
 

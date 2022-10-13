@@ -5,10 +5,10 @@ import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionRespons
 import com.daml.ledger.client.binding.{Contract, Primitive, TemplateCompanion}
 import com.daml.network.codegen.{CC, DA}
 import com.daml.network.environment.CoinLedgerClient
-import com.daml.network.svc.store.SvcAppStore
-import com.daml.network.svc.v0
+import com.daml.network.svc.store.SvcEventsStore
 import com.daml.network.svc.v0.SvcServiceGrpc
-import com.daml.network.util.{CoinUtil, Proto}
+import com.daml.network.svc.{SvcApp, v0}
+import com.daml.network.util.Proto
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ledger.api.client.{DecodeUtil, LedgerConnection}
 import com.digitalasset.canton.topology.PartyId
@@ -21,7 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class GrpcSvcAppService(
     ledgerClient: CoinLedgerClient,
     svcUserName: String,
-    store: SvcAppStore,
+    store: SvcEventsStore,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -33,15 +33,6 @@ class GrpcSvcAppService(
   private val connection = ledgerClient.connection("GrpcSvcAppService")
 
   import GrpcSvcAppService._
-  // TODO(M1-90): This should not run concurrently with round management operations.
-  // Both are non-atomic read-modify-write operations on the set of mining rounds.
-  override def acceptValidators(request: Empty): Future[Empty] =
-    withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
-      for {
-        svcPartyId <- connection.getPrimaryParty(svcUserName)
-        _ <- CoinUtil.acceptCoinRulesRequests(svcPartyId, connection, logger)
-      } yield Empty()
-    }
 
   override def getDebugInfo(request: Empty): Future[v0.GetDebugInfoResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { _ => _ =>
@@ -60,26 +51,13 @@ class GrpcSvcAppService(
           } yield v0.GetDebugInfoResponse(
             svcUser = svcUserName,
             svcPartyId = Proto.encode(partyId),
-            coinPackageId = CoinUtil.packageId,
+            coinPackageId = SvcApp.coinPackage.packageId,
             coinRulesContractIds = coinRulesCids.map(Proto.encode(_)),
           )
       }
     }
 
-  override def getValidatorConfig(request: Empty): Future[v0.GetValidatorConfigResponse] =
-    withSpanFromGrpcContext("GrpcSvcAppService") { _ => _ =>
-      connection.getOptionalPrimaryParty(svcUserName).flatMap {
-        case None =>
-          Future.failed(new RuntimeException("SVC app not yet initialized"))
-        case Some(partyId) =>
-          Future.successful(
-            v0.GetValidatorConfigResponse(
-              svcPartyId = Proto.encode(partyId)
-            )
-          )
-      }
-    }
-
+  // NOTE: the commands below have not been converted to use the store, as they'll go away when we automation issuance
   override def openRound(request: v0.OpenRoundRequest): Future[v0.OpenRoundResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {

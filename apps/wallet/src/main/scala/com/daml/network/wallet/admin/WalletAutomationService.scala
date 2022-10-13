@@ -1,3 +1,4 @@
+// TODO(#790): move to 'wallet.automation'
 package com.daml.network.wallet.admin
 
 import akka.stream.Materializer
@@ -27,7 +28,7 @@ class WalletAutomationService(
     tracer: Tracer,
 ) extends AutomationService(retryProvider) {
 
-  private val connection = ledgerClient.connection("WalletAutomationService")
+  private val connection = ledgerClient.connection(this.getClass.getSimpleName)
 
   registerService(
     new AcsIngestionService(

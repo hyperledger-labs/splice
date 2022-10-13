@@ -4,40 +4,25 @@ package com.daml.network.svc.v0;
 import "google/protobuf/empty.proto";
 
 service SvcService {
-  // Accepts all coin rule requests from validators that want to join the network.
-  // For each request, a copy of all SVC state contracts (e.g., CoinRules) is created for
-  // the requesting validator.
-  // PoC implementation: `runCoinRulesAcceptBot` in Util.daml
-  // Automated in SvcAutomationService
-  rpc AcceptValidators (google.protobuf.Empty) returns (google.protobuf.Empty);
-
   // Returns some debug info about the running app
   rpc GetDebugInfo (google.protobuf.Empty) returns (GetDebugInfoResponse);
 
-  // Returns information required to configure a new validator node
-  // TODO(M1-90): This feels like functionality of the CC-Scan app: take some on-ledger information and
-  //   disclose it through an off-ledger channel
-  rpc GetValidatorConfig (google.protobuf.Empty) returns (GetValidatorConfigResponse);
+
+  // TODO(M1-53): Replace these manual triggers by automation as part of rewards issuance milestone
 
   // Open a new mining round for all currently registered validators.
-  // TODO(M1-90): Replace this manual trigger by automation
   rpc OpenRound (OpenRoundRequest) returns (OpenRoundResponse);
 
   // Mark the given mining round as closing for all validators.
-  // TODO(M1-90): Replace this manual trigger by automation
   rpc StartClosingRound (StartClosingRoundRequest) returns (StartClosingRoundResponse);
 
   // Start issuing for the given mining round for all validators.
-  // TODO(M1-90): Replace this manual trigger by automation
   rpc StartIssuingRound (StartIssuingRoundRequest) returns (StartIssuingRoundResponse);
 
   // Close the given mining round for all validators.
-  // TODO(M1-90): Replace this manual trigger by automation
   rpc CloseRound (CloseRoundRequest) returns (CloseRoundResponse);
 
-
   // Archive the given mining round for all validators.
-  // TODO(M1-90): Replace this manual trigger by automation
   rpc ArchiveRound (ArchiveRoundRequest) returns (google.protobuf.Empty);
 }
 

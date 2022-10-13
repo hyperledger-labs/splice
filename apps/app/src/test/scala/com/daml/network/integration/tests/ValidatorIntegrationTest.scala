@@ -30,13 +30,19 @@ class ValidatorIntegrationTest
     scan.startSync()
     aliceValidator.startSync()
     aliceValidator.stop()
-    aliceValidator.startSync()
+    loggerFactory.assertLogs(
+      aliceValidator.startSync(),
+      _.warningMessage should include(
+        // TODO(M1-51): remove this once we use explicit disclosure, and onboarding does no longer use CoinRulesRequest
+        "Rejecting duplicate CoinRulesRequest from alice_validator_user"
+      ),
+    )
   }
 
   "initialize svc and validator apps" in { implicit env =>
     svc.startSync()
     scan.startSync()
-    // check that there is exactly one CoinRule and OpenMiningRound
+    // Check that there is exactly one CoinRule and OpenMiningRound
     val coinRules = svc.remoteParticipant.ledger_api.acs
       .of_party(svcParty, filterTemplates = Seq(CC.CoinRules.CoinRules.id))
     coinRules should have length 1
@@ -48,7 +54,7 @@ class ValidatorIntegrationTest
     // Start Alice’s validator
     aliceValidator.startSync()
 
-    // check that no coin rules request is outstanding
+    // Check that no coin rules request is outstanding
     eventually()(
       svc.remoteParticipant.ledger_api.acs
         .filter(svcParty, CC.CoinRules.CoinRulesRequest)
