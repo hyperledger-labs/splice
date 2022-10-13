@@ -12,6 +12,7 @@
     1. [Recovery from a Failed CI/CD Deployment](#recovery-from-a-failed-ci/cd-deployment)
     1. [Checking Pod Node Assignments and Memory Usage](#checking-pod-node-assignments-and-memory-usage)
 1. [Updating the Canton Network Deployment](#updating-the-canton-network-deployment)
+1. [Fixing connection issues in kubectl](#fixing-connection-issues-in-kubectl)
 
 Note that operations in this directory require authentication to use
 Google Cloud APIs. If you have `direnv` installed (which you should),
@@ -515,3 +516,17 @@ For details on the individual steps, read the above sections.
    1. Run `CLUSTER_ADDR=scratch.network.canton.global coin -v -c ./build-tools/cluster.conf` to connect a CN console
       to the scratchnet cluster. The config file should allow you to use any component deployed to the cluster.
       1. E.g., run `validator1_validator.onboardUser("dave")` inside the coin console to onboard a new end-user onto the validator1 node.
+
+## Fixing connection issues in kubectl
+
+If `kubectl get pods` times out for a given cluster and you know
+you are connected to the VPN, it may be necessary to
+force `.kubecfg` to be regenerated. This can be required 
+if someone else has fully rebuilt the cluster. (`cncluster delete`/`cncluster create`)
+
+To do so run the following commands from the cluster directory, e.g. `cluster/deployment/staging`:
+
+```
+rm .kubecfg
+direnv reload
+```
