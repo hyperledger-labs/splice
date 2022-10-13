@@ -3,7 +3,6 @@ module CN.Scripts.TestDirectory where
 import DA.Time
 import Daml.Script
 
-import CC.Coin
 import CC.CoinRules
 import CN.Directory
 import CN.Wallet
@@ -20,8 +19,6 @@ test = script do
   provider <- setupUser app "provider" app.svc
   user <- setupUser app "user" app.svc
 
-  pay app app.svc user 5.0 ""
-
   -- provider creates directory rules
   -- how: up to app provider
   directoryInstallRequest <- submit user $ createCmd DirectoryInstallRequest with
@@ -33,15 +30,13 @@ test = script do
     entryFee = 1.0
     collectionDuration = minutes 5
     acceptDuration = minutes 5
+    entryLifetime = days 90
 
   -- user requests entry via app install
   -- how: UI of directory service via write-delegation on app manager & call to
   -- user’s participant.
   entryRequest <- submitMulti [user] [provider, app.svc] $ exerciseCmd directoryInstall DirectoryInstall_RequestEntry with
-    entry = DirectoryEntry with
-      user = user
-      provider = provider
-      name = "cns.darth.vader"
+    name = "cns.darth.vader"
 
   -- provider requests payment for entry via app install
   -- how: provider on their own participant.
@@ -51,7 +46,7 @@ test = script do
   -- cc wallet selects a large enough coin
   -- how: cc wallet
   -- note: privacy is no concern here as coin holdings are public
-  [(coin, _)] <- queryFilter @Coin user (\c -> c.quantity.initialQuantity > 1.02)
+  coin <- tap app user 1.5
   -- cc wallet accepts payment and locks coin to provider
   -- how: cc wallet
   Right (acceptedAppPaymentCid, _) <- submitMulti [user] [app.svc] $ exerciseCmd appPaymentRequest AppPaymentRequest_Accept with
@@ -60,7 +55,27 @@ test = script do
   -- directory providers transactionally unlocks & transfer coins
   -- and creates directory entry in return.
   -- how: provider on their own participant
-  submitMulti [provider] [app.svc] $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryPayment with
+  (entryCid, _) <- submitMulti [provider] [app.svc] $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryPayment with
     acceptedAppPaymentCid
 
+  (_, renewalPaymentRequest) <- submit user $ exerciseCmd directoryInstall DirectoryInstall_RequestRenewal with
+    entryCid = entryCid
+
+  coin <- tap app user 1.5
+
+  Right (acceptedAppPaymentCid, _) <- submitMulti [user] [app.svc] $ exerciseCmd renewalPaymentRequest AppPaymentRequest_Accept with
+    inputs = [InputCoin coin]
+
+  (entryCid, _) <- submitMulti [provider] [app.svc] $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryRenewalPayment with
+    acceptedAppPaymentCid
+
+  passTime (days 91)
+
+  submitMustFail provider $ exerciseCmd entryCid (DirectoryEntry_Expire provider)
+
+  passTime (days 90)
+
+  submit provider $ exerciseCmd entryCid (DirectoryEntry_Expire provider)
+
   pure ()
+

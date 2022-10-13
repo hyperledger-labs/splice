@@ -128,10 +128,10 @@ object DirectoryStore {
       providerPartyId,
       Map(
         mkFilter(directoryCodegen.DirectoryEntry)(co => co.payload.provider == provider),
-        mkFilter(directoryCodegen.DirectoryEntryRequest)(co =>
-          co.payload.entry.provider == provider
+        mkFilter(directoryCodegen.DirectoryEntryRequest)(co => co.payload.provider == provider),
+        mkFilter(directoryCodegen.DirectoryEntryOffer)(co =>
+          co.payload.entryRequest.provider == provider
         ),
-        mkFilter(directoryCodegen.DirectoryEntryOffer)(co => co.payload.entry.provider == provider),
         mkFilter(walletCodegen.AcceptedAppPayment)(co => co.payload.receiver == provider),
         mkFilter(directoryCodegen.DirectoryInstallRequest)(co => co.payload.provider == provider),
         mkFilter(directoryCodegen.DirectoryInstall)(co => co.payload.provider == provider),

@@ -1,9 +1,13 @@
 package com.daml.network.integration.tests
 
+import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.CN.{Directory => dirCodegen}
 import com.daml.network.console.{LocalValidatorAppReference, RemoteDirectoryAppReference}
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.topology.PartyId
+
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 
 import scala.util.Try
 
@@ -150,6 +154,9 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest {
               user = dirPartyId.toPrim,
               provider = dirPartyId.toPrim,
               name = dirEntryName,
+              expiresAt = Primitive.Timestamp
+                .discardNanos(Instant.now().plus(90, ChronoUnit.DAYS))
+                .getOrElse(fail("Failed to convert timestamp")),
             )
             .create
             .command

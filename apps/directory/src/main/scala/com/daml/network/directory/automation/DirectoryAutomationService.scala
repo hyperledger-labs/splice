@@ -37,6 +37,10 @@ class DirectoryAutomationService(
   private val acceptDuration = RelTime(
     60_000_000
   )
+  private val entryLifetime = RelTime(
+    // 90 days
+    90 * 24 * 60 * 1_000_000
+  )
 
   override protected def timeouts: ProcessingTimeout = processingTimeouts
 
@@ -87,6 +91,7 @@ class DirectoryAutomationService(
             entryFee = entryFee,
             collectionDuration = collectionDuration,
             acceptDuration = acceptDuration,
+            entryLifetime = entryLifetime,
           )
           val commandId =
             mkCommandId("com.daml.network.directory.DirectoryInstall", Seq(provider, user))
@@ -111,7 +116,7 @@ class DirectoryAutomationService(
     (req, traceContext) => {
       // TODO(#790): figure out how to avoid this redeclaration
       implicit val tc: TraceContext = traceContext
-      val user = PartyId.tryFromPrim(req.payload.entry.user)
+      val user = PartyId.tryFromPrim(req.payload.user)
       val rejectRequest = (reason: String) => {
         val arg = directoryCodegen.DirectoryEntryRequest_Reject()
         val cmd = req.contractId.exerciseDirectoryEntryRequest_Reject(arg)
@@ -126,7 +131,7 @@ class DirectoryAutomationService(
 
         case QueryResult(_, Some(install)) =>
           // TODO(M3-90): validate entry name
-          store.lookupEntryByName(req.payload.entry.name).flatMap {
+          store.lookupEntryByName(req.payload.name).flatMap {
             case QueryResult(_, Some(entry)) =>
               rejectRequest(s"already exists and owned by ${entry.payload.user}.")
 
@@ -158,9 +163,9 @@ class DirectoryAutomationService(
 
         case QueryResult(_, Some(offer)) =>
           // shared values
-          val user = PartyId.tryFromPrim(offer.payload.entry.user)
+          val user = PartyId.tryFromPrim(offer.payload.entryRequest.user)
           // TODO(M3-90): understand what kind of assertions are worth checking here for defensive programming
-          val entryName = offer.payload.entry.name
+          val entryName = offer.payload.entryRequest.name
           def rejectPayment(reason: String) = {
             logger.warn(s"rejecting accepted app payment: $reason")
             val arg = walletCodegen.AcceptedAppPayment_Reject()

@@ -116,11 +116,7 @@ class RemoteDirectoryAppReference(
       update = codegen.DirectoryInstall
         .key(DA.Types.Tuple2(providerParty.toPrim, userParty.toPrim))
         .exerciseDirectoryInstall_RequestEntry(
-          codegen.DirectoryEntry(
-            provider = providerParty.toPrim,
-            user = userParty.toPrim,
-            name = name,
-          )
+          name = name
         ),
     )
   }

@@ -14,13 +14,12 @@ const RequestDirectoryEntry: React.FC<{ primaryParty: string; provider: string }
   const ledgerApiClient = useLedgerApiClient();
 
   const onRequestEntry = async () => {
-    const entry = { user: primaryParty, provider: provider, name: entryName };
     await ledgerApiClient.exerciseByKey(
       [primaryParty],
       [],
       DirectoryInstall.DirectoryInstall_RequestEntry,
       { _1: provider, _2: primaryParty },
-      { entry }
+      { name: entryName }
     );
     console.debug('Created DirectoryEntryRequest');
   };

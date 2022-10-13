@@ -14,6 +14,7 @@ import com.digitalasset.canton.resource.MemoryStorage
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.wordspec.AsyncWordSpec
 
+import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{Future, Promise}
 
@@ -31,6 +32,7 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
       provider: PartyId,
       user: PartyId,
       name: String,
+      expiresAt: Primitive.Timestamp,
   ): Contract[directoryCodegen.DirectoryEntry] =
     Contract[directoryCodegen.DirectoryEntry](
       contractId = Primitive.ContractId(s"de#$number"),
@@ -38,6 +40,7 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
         user = user.toPrim,
         provider = provider.toPrim,
         name = name,
+        expiresAt = expiresAt,
       ),
     )
 
@@ -50,7 +53,9 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
     Contract[directoryCodegen.DirectoryEntryRequest](
       contractId = Primitive.ContractId(s"der#$number"),
       payload = directoryCodegen.DirectoryEntryRequest(
-        directoryEntry(number, provider, user, name).payload,
+        user = user.toPrim,
+        provider = provider.toPrim,
+        name = name,
         entryFee = 1.0,
       ),
     )
@@ -92,10 +97,13 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
     )
     .splitAt(2)
 
+  val expiry: Primitive.Timestamp =
+    Primitive.Timestamp.discardNanos(Instant.EPOCH).getOrElse(fail("Failed to convert timestamp"))
+
   val entries =
-    Seq(0, 1).map(i => directoryEntry(i, providerParty, userParty(i), s"entry-name-$i"))
+    Seq(0, 1).map(i => directoryEntry(i, providerParty, userParty(i), s"entry-name-$i", expiry))
   val entriesToArchive =
-    Seq(2, 3).map(i => directoryEntry(i, providerParty, userParty(i), s"entry-name-$i"))
+    Seq(2, 3).map(i => directoryEntry(i, providerParty, userParty(i), s"entry-name-$i", expiry))
   // these entries have the provider party as a user, and should be disregarded in lookups
   val nonIngestedEntries = Seq(0, 1, 3).map(i =>
     directoryEntry(
@@ -103,6 +111,7 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
       mkPartyId(s"other-provider-$i"),
       providerParty,
       s"entry-name-$i",
+      expiry,
     )
   )
   val acsEvents =

@@ -1,8 +1,19 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.integration.CoinEnvironmentDefinition
 import scala.concurrent.duration.DurationInt
 
 class DirectoryFrontendIntegrationTest extends FrontendIntegrationTest {
+
+  private val directoryDarPath =
+    "apps/directory/daml/.daml/dist/directory-service-0.1.0.dar"
+
+  override def environmentDefinition =
+    CoinEnvironmentDefinition
+      .simpleTopology(this.getClass.getSimpleName)
+      .withAdditionalSetup(implicit env => {
+        aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
+      })
 
   "A directory UI" should {
 

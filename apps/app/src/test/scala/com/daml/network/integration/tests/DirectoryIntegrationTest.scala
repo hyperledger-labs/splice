@@ -210,7 +210,12 @@ class DirectoryIntegrationTest
 
         // Check content of winning entry
         val entryPayload =
-          codegen.DirectoryEntry(winnerUserParty.toPrim, providerParty.toPrim, testEntryName)
+          codegen.DirectoryEntry(
+            winnerUserParty.toPrim,
+            providerParty.toPrim,
+            testEntryName,
+            entry.payload.expiresAt,
+          )
         entry.payload shouldBe entryPayload
 
         // Read entries from provider
