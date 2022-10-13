@@ -987,3 +987,4 @@ workflows:
           cluster: test
           context:
             - canton-network-vpn
+            - slack-context
