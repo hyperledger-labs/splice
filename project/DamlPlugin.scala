@@ -8,6 +8,7 @@ import sbt.util.CacheStoreFactory
 import sbt.util.FileFunction.UpdateFunction
 import sbt.{Def, _}
 
+import scala.annotation.tailrec
 import scala.collection.mutable
 import scala.sys.process._
 import scala.util.{Failure, Success, Try}
@@ -410,6 +411,35 @@ object DamlPlugin extends AutoPlugin {
     } finally reader.close()
   }
 
+  private def retryProcess(
+      args: Seq[String],
+      logger: BufferedLogger,
+      errorMessage: Throwable => String,
+  ) = {
+    @tailrec
+    def go(n: Int): Unit = {
+      Try {
+        Process(args) !! logger
+      } match {
+        case Success(str) =>
+          if (str.nonEmpty)
+            logger.output("OUTPUT: ")
+        case Failure(t) =>
+          logger.output()
+          val msg = errorMessage(t)
+          if (n <= 0) {
+            throw new MessageOnlyException(
+              msg
+            )
+          } else {
+            Thread.sleep(1000)
+            go(n - 1)
+          }
+      }
+    }
+    go(5)
+  }
+
   private def ensureArtifactAvailable(
       url: String,
       artifactFilename: String,
@@ -432,33 +462,25 @@ object DamlPlugin extends AutoPlugin {
         val logger = new BufferedLogger()
         logger.out(s"Downloading missing ${artifactFilename} to ${root.path}")
         root.createDirectoryIfNotExists(createParents = true)
-
-        Try {
-          val curlWithBasicOptions = "curl" :: "-sSL" :: "--fail" :: Nil
-          val credentials = url match {
-            case artifactory if artifactory.startsWith("https://digitalasset.jfrog.io/") =>
-              // CircleCI specifies ARTIFACTORY_ env variables
-              val artifactoryUser = Option(System.getenv("ARTIFACTORY_USER")).getOrElse("")
-              val artifactoryPassword = Option(System.getenv("ARTIFACTORY_PASSWORD")).getOrElse("")
-              if (artifactoryUser.nonEmpty && artifactoryPassword.nonEmpty)
-                "-u" :: s"${artifactoryUser}:${artifactoryPassword}" :: Nil
-              else
-                "--netrc" :: Nil // on dev machines look up artifactory credentials in ~/.netrc per https://everything.curl.dev/usingcurl/netrc
-            case _maven => Nil // maven does not require credentials
-          }
-          val fileAndUrl =
-            "-o" :: (root / artifactFilename).toJava.getPath :: (url + artifactFilename) :: Nil
-          Process(curlWithBasicOptions ++ credentials ++ fileAndUrl) !! logger
-        } match {
-          case Success(str) =>
-            if (str.nonEmpty)
-              logger.output("OUTPUT: ")
-          case Failure(t) =>
-            logger.output()
-            throw new MessageOnlyException(
-              s"Failed to download from ${url + artifactFilename}. Exception ${t.getMessage}"
-            )
+        val curlWithBasicOptions = "curl" :: "-sSL" :: "--fail" :: Nil
+        val credentials = url match {
+          case artifactory if artifactory.startsWith("https://digitalasset.jfrog.io/") =>
+            // CircleCI specifies ARTIFACTORY_ env variables
+            val artifactoryUser = Option(System.getenv("ARTIFACTORY_USER")).getOrElse("")
+            val artifactoryPassword = Option(System.getenv("ARTIFACTORY_PASSWORD")).getOrElse("")
+            if (artifactoryUser.nonEmpty && artifactoryPassword.nonEmpty)
+              "-u" :: s"${artifactoryUser}:${artifactoryPassword}" :: Nil
+            else
+              "--netrc" :: Nil // on dev machines look up artifactory credentials in ~/.netrc per https://everything.curl.dev/usingcurl/netrc
+          case _maven => Nil // maven does not require credentials
         }
+        val fileAndUrl =
+          "-o" :: (root / artifactFilename).toJava.getPath :: (url + artifactFilename) :: Nil
+        retryProcess(
+          curlWithBasicOptions ++ credentials ++ fileAndUrl,
+          logger,
+          t => s"Failed to download from ${url + artifactFilename}. Exception ${t.getMessage}",
+        )
 
         if (tarballPath.nonEmpty) {
           val tarball = root / artifactFilename
