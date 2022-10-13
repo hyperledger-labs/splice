@@ -16,12 +16,14 @@ import org.openqa.selenium.firefox.{FirefoxDriver, FirefoxOptions}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatestplus.selenium.WebBrowser
 
+import scala.collection.mutable
+
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.io.File
 import org.apache.commons.io.FileUtils
 
-trait FrontendIntegrationTest
+abstract class FrontendIntegrationTest(frontendNames: String*)
     extends CoinIntegrationTest
     with BeforeAndAfterEach
     with IsolatedCoinEnvironments
@@ -39,11 +41,25 @@ trait FrontendIntegrationTest
   )
   val options: FirefoxOptions = new FirefoxOptions().setHeadless(true)
 
-  implicit var webDriver: WebDriver with TakesScreenshot = _
+  protected val webDrivers: mutable.Map[String, WebDriver with TakesScreenshot] = mutable.Map.empty
+
+  def withFrontEnd[A](driverName: String)(implicit f: WebDriver with TakesScreenshot => A): A =
+    f(
+      webDrivers
+        .get(driverName)
+        .getOrElse(
+          sys.error(
+            s"No such webDriver : $driverName. Did you forget to pass it to FrontendIntegrationTest?"
+          )
+        )
+    )
 
   override def beforeEach() = {
-    webDriver = new FirefoxDriver(options)
-    webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
+    for { name <- frontendNames.toSeq } {
+      val webDriver = new FirefoxDriver(options)
+      webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
+      webDrivers += (name -> webDriver)
+    }
     super.beforeEach()
   }
 
@@ -52,16 +68,18 @@ trait FrontendIntegrationTest
     // Therefore, we need to check for errors here. Otherwise, we run
     // into issues where we get an error just by virtue of the gRPC
     // service being down.
-    findAll(id("error")).toList.map(e => fail(s"Found unexpected error: ${e.text}"))
+    webDrivers.values.flatMap { implicit webDriver =>
+      findAll(id("error")).toList.map(e => fail(s"Found unexpected error: ${e.text}"))
+    }
     super.testFinished(env)
   }
 
   override def afterEach() = {
     super.afterEach()
-    webDriver.quit()
+    webDrivers.values.foreach(_.quit())
   }
 
-  protected def consumeError(err: String): Unit = {
+  protected def consumeError(err: String)(implicit webDriver: WebDriver): Unit = {
     val text = inside(findAll(id("error")).toList) { case Seq(elem) => elem.text }
     text shouldBe err
     click on "clear-error-button"
@@ -70,7 +88,7 @@ trait FrontendIntegrationTest
   /** Takes a screenshot of the current browser state, into a timestamped png file in log directory.
     * Currently intended only for manual use during development and debugging.
     */
-  protected def screenshot(): Unit = {
+  protected def screenshot()(implicit webDriver: WebDriver with TakesScreenshot): Unit = {
     val screenshotFile = webDriver.getScreenshotAs(OutputType.FILE)
     val time = Calendar.getInstance.getTime
     val timestamp = new SimpleDateFormat("yy-MM-dd-H:m:s.S").format(time)

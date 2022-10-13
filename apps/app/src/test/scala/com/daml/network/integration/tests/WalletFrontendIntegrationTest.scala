@@ -5,13 +5,14 @@ import com.daml.network.codegen.CN.{Directory => dirCodegen}
 import com.daml.network.console.{LocalValidatorAppReference, RemoteDirectoryAppReference}
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.topology.PartyId
+import org.openqa.selenium.WebDriver
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 import scala.util.Try
 
-class WalletFrontendIntegrationTest extends FrontendIntegrationTest {
+class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
 
   private val directoryDarPath =
     "apps/directory/daml/.daml/dist/directory-service-0.1.0.dar"
@@ -22,69 +23,70 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest {
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
       aliceValidator.onboardUser(aliceDamlUser)
 
-      go to "http://localhost:3000"
-      click on "user-id-field"
-      textField("user-id-field").value = aliceDamlUser
-      click on "login-button"
-      click on "tap-amount-field"
-      textField("tap-amount-field").value = "15.0"
-      click on "tap-button"
-      eventually() {
-        findAll(className("coins-table-row")) should have size 1
+      withFrontEnd("alice") { implicit webDriver =>
+        go to "http://localhost:3000"
+        click on "user-id-field"
+        textField("user-id-field").value = aliceDamlUser
+        click on "login-button"
+        click on "tap-amount-field"
+        textField("tap-amount-field").value = "15.0"
+        click on "tap-button"
+        eventually() {
+          findAll(className("coins-table-row")) should have size 1
+        }
+        val row = inside(findAll(className("coins-table-row")).toList) { case Seq(row) =>
+          row
+        }
+        val quantity = row.childElement(className("coins-table-quantity"))
+        quantity.text should be("15.0000000000")
       }
-      val row = inside(findAll(className("coins-table-row")).toList) { case Seq(row) =>
-        row
-      }
-      val quantity = row.childElement(className("coins-table-quantity"))
-      quantity.text should be("15.0000000000")
     }
 
     "allow a random user to onboard themselves, then tap and list coins" in { implicit env =>
       // Note: the test generates a unique user for each test
       val newRandomUser = aliceRemoteWallet.config.damlUser
 
-      go to "http://localhost:3000"
-      click on "user-id-field"
-      textField("user-id-field").value = newRandomUser
-      click on "login-button"
+      withFrontEnd("alice") { implicit webDriver =>
+        go to "http://localhost:3000"
+        click on "user-id-field"
+        textField("user-id-field").value = newRandomUser
+        click on "login-button"
 
-      // After a short delay, the UI should realize that the user is not onboarded,
-      // and switch to the onbaording page.
-      click on "onboard-button"
-      // TODO(i1139): The UI should handle the user repeatedly clicking on the onboarding button,
-      // which may or may not disable/disappar after the first click.
-      // find(id("onboard-button")).foreach(_.underlying.click())
+        // After a short delay, the UI should realize that the user is not onboarded,
+        // and switch to the onbaording page.
+        click on "onboard-button"
+        // TODO(i1139): The UI should handle the user repeatedly clicking on the onboarding button,
+        // which may or may not disable/disappar after the first click.
+        // find(id("onboard-button")).foreach(_.underlying.click())
 
-      // After a short delay, the UI should realize that the user is now onboarded
-      // and switch to the default view.
-      click on "tap-amount-field"
-      textField("tap-amount-field").value = "15.0"
-      click on "tap-button"
-      eventually() {
-        findAll(className("coins-table-row")) should have size 1
+        // After a short delay, the UI should realize that the user is now onboarded
+        // and switch to the default view.
+        click on "tap-amount-field"
+        textField("tap-amount-field").value = "15.0"
+        click on "tap-button"
+        eventually() {
+          findAll(className("coins-table-row")) should have size 1
+        }
       }
-      val row = inside(findAll(className("coins-table-row")).toList) { case Seq(row) =>
-        row
-      }
-      val quantity = row.childElement(className("coins-table-quantity"))
-      quantity.text should be("15.0000000000")
     }
 
     "report errors" in { implicit env =>
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
       aliceValidator.onboardUser(aliceDamlUser)
 
-      go to "http://localhost:3000"
-      click on "user-id-field"
-      textField("user-id-field").value = aliceDamlUser
-      click on "login-button"
-      click on "tap-amount-field"
-      textField("tap-amount-field").value = "non-numeric"
-      loggerFactory.suppressErrors(click on "tap-button")
-      eventually()(
-        findAll(id("error")).toList should not be empty
-      )
-      consumeError("RpcError: Could not read Numeric string \"non-numeric\"")
+      withFrontEnd("alice") { implicit webDriver =>
+        go to "http://localhost:3000"
+        click on "user-id-field"
+        textField("user-id-field").value = aliceDamlUser
+        click on "login-button"
+        click on "tap-amount-field"
+        textField("tap-amount-field").value = "non-numeric"
+        loggerFactory.suppressErrors(click on "tap-button")
+        eventually()(
+          findAll(id("error")).toList should not be empty
+        )
+        consumeError("RpcError: Could not read Numeric string \"non-numeric\"")
+      }
     }
 
     "show logged in user details" in { implicit env =>
@@ -107,20 +109,22 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest {
 
       eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $entryName")))
 
-      // Browse to alice's wallet
-      go to "http://localhost:3000"
-      click on "user-id-field"
-      textField("user-id-field").value = aliceDamlUser
-      click on "login-button"
-      eventually() {
-        find(id("logged-in-user")).getOrElse(fail("Logged-in user information never showed up"))
-      }
+      withFrontEnd("alice") { implicit webDriver =>
+        // Browse to alice's wallet
+        go to "http://localhost:3000"
+        click on "user-id-field"
+        textField("user-id-field").value = aliceDamlUser
+        click on "login-button"
+        eventually() {
+          find(id("logged-in-user")).getOrElse(fail("Logged-in user information never showed up"))
+        }
 
-      // Check that alice is shown as the user, and her party ID has been resolved to its directory entry correctly.
-      // We do this in another eventually() as a "..." text might appear momentarily, until the directory service responds.
-      eventually() {
-        val expected = s"alice.cns (${aliceParty.toProtoPrimitive})"
-        find(id("logged-in-user")).value.text shouldBe expected
+        // Check that alice is shown as the user, and her party ID has been resolved to its directory entry correctly.
+        // We do this in another eventually() as a "..." text might appear momentarily, until the directory service responds.
+        eventually() {
+          val expected = s"alice.cns (${aliceParty.toProtoPrimitive})"
+          find(id("logged-in-user")).value.text shouldBe expected
+        }
       }
     }
 
@@ -130,14 +134,16 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest {
       val aliceUserParty = setupForTestWithDirectory(aliceDamlUser, aliceValidator)
       submitDirectoryEntryRequest(aliceUserParty, aliceDirectory, "alice.cns")
 
-      browseToPaymentRequests(aliceDamlUser)
-      val dirPartyId = directory.getProviderPartyId().toProtoPrimitive
-      // ^^ PartyId's toString might truncate the ID, so we're explicitly using toProtoPrimitive to get the full ID.
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToPaymentRequests(aliceDamlUser)
+        val dirPartyId = directory.getProviderPartyId().toProtoPrimitive
+        // ^^ PartyId's toString might truncate the ID, so we're explicitly using toProtoPrimitive to get the full ID.
 
-      // Check that the directory party ID not been resolved has been handled properly, and the party ID is shown instead.
-      eventually() {
-        inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
-          row.childElement(className("app-request-receiver")).text shouldBe dirPartyId
+        // Check that the directory party ID not been resolved has been handled properly, and the party ID is shown instead.
+        eventually() {
+          inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
+            row.childElement(className("app-request-receiver")).text shouldBe dirPartyId
+          }
         }
       }
     }
@@ -169,15 +175,17 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest {
       val aliceUserParty = setupForTestWithDirectory(aliceDamlUser, aliceValidator)
       submitDirectoryEntryRequest(aliceUserParty, aliceDirectory, "alice.cns")
 
-      browseToPaymentRequests(aliceDamlUser)
-      // Check that the directory party ID has been resolved to its directory entry correctly.
-      // We do this in another eventually() as a "..." text might appear momentarily, until the directory service responds.
-      eventually() {
-        inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
-          val expected = s"directory.cns (${dirPartyId.toProtoPrimitive})"
-          row.childElement(className("app-request-receiver")).text shouldBe expected
-          row.childElement(className("app-request-provider")).text shouldBe expected
-          row
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToPaymentRequests(aliceDamlUser)
+        // Check that the directory party ID has been resolved to its directory entry correctly.
+        // We do this in another eventually() as a "..." text might appear momentarily, until the directory service responds.
+        eventually() {
+          inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
+            val expected = s"directory.cns (${dirPartyId.toProtoPrimitive})"
+            row.childElement(className("app-request-receiver")).text shouldBe expected
+            row.childElement(className("app-request-provider")).text shouldBe expected
+            row
+          }
         }
       }
     }
@@ -201,7 +209,7 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest {
     aliceDirectory.requestDirectoryEntry(dirEntry)
   }
 
-  private def browseToPaymentRequests(damlUser: String) = {
+  private def browseToPaymentRequests(damlUser: String)(implicit webDriver: WebDriver) = {
     // Go to app payment requests tab in alice's wallet
     go to "http://localhost:3000"
     click on "user-id-field"

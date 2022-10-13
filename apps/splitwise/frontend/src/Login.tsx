@@ -22,6 +22,7 @@ const Login: React.FC<{ onLogin: (userId: string) => void }> = ({ onLogin }) => 
         onChange={uid => setUserId(uid.target.value)}
       ></TextField>
       <Button
+        id="login-button"
         onClick={e => {
           e.preventDefault();
           onLogin(userId);

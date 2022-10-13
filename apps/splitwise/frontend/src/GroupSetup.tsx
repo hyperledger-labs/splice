@@ -53,16 +53,17 @@ const GroupSetup: React.FC<GroupSetupProps> = ({ directoryEntries, party, provid
       <FormGroup row>
         <TextField
           label="Group ID"
+          id="group-id-field"
           value={groupId}
           onChange={event => setGroupId(event.target.value)}
         ></TextField>
-        <Button variant="contained" onClick={onCreateGroup}>
+        <Button variant="contained" id="create-group-button" onClick={onCreateGroup}>
           Create Group
         </Button>
       </FormGroup>
       <List>
         {groupInvites.map(invite => (
-          <ListItem key={invite.contractId}>
+          <ListItem className="invites-list-item" key={invite.contractId}>
             <Stack direction="row" alignItems="baseline">
               <div>
                 <Typography variant="button">
@@ -71,7 +72,9 @@ const GroupSetup: React.FC<GroupSetupProps> = ({ directoryEntries, party, provid
                 is inviting you to join{' '}
                 <Typography variant="button">{invite.payload.group.id.unpack}</Typography>
               </div>
-              <Button onClick={() => onAcceptInvite(invite)}>Request membership</Button>
+              <Button id="request-membership-link" onClick={() => onAcceptInvite(invite)}>
+                Request membership
+              </Button>
             </Stack>
           </ListItem>
         ))}

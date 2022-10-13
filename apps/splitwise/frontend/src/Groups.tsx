@@ -101,9 +101,11 @@ const Balances: React.FC<BalancesProps> = ({ directoryEntries, group, party }) =
       >
         <TableBody>
           {Array.from(balances).map(([party, balance]) => (
-            <TableRow key={party}>
-              <TableCell>{directoryEntries.resolveParty(party)}</TableCell>
-              <TableCell>{balance}</TableCell>
+            <TableRow key={party} className="balances-table-row">
+              <TableCell className="balances-table-receiver">
+                {directoryEntries.resolveParty(party)}
+              </TableCell>
+              <TableCell className="balances-table-quantity">{balance}</TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -151,7 +153,7 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({
         <List>
           {acceptedInvites.map(invite => (
             <ListItem key={invite.contractId}>
-              <Button onClick={() => onAddMember(invite)}>
+              <Button className="add-user-link" onClick={() => onAddMember(invite)}>
                 Add {directoryEntries.resolveParty(invite.payload.invitee)}
               </Button>
             </ListItem>
@@ -199,19 +201,24 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider 
       <Stack direction="row">
         <TextField
           label="Quantity"
+          className="enter-payment-quantity-field"
           value={paymentQuantity}
           onChange={event => setPaymentQuantity(event.target.value)}
         ></TextField>
         <TextField
           label="Description"
+          className="enter-payment-description-field"
           value={paymentDescription}
           onChange={event => setPaymentDescription(event.target.value)}
         ></TextField>
-        <Button onClick={onEnterPayment}>Enter payment</Button>
+        <Button className="enter-payment-link" onClick={onEnterPayment}>
+          Enter payment
+        </Button>
       </Stack>
       <Stack direction="row" justifyContent="stretch">
         <TextField
           label="Quantity"
+          className="transfer-quantity-field"
           value={transferQuantity}
           onChange={event => setTransferQuantity(event.target.value)}
         ></TextField>
@@ -229,8 +236,11 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider 
             }
           }}
           renderInput={params => <TextField {...params} label="Receiver" />}
+          className="transfer-receiver-field"
         />
-        <Button onClick={onInitiateTransfer}>Transfer</Button>
+        <Button className="transfer-link" onClick={onInitiateTransfer}>
+          Transfer
+        </Button>
       </Stack>
     </Stack>
   );
@@ -263,15 +273,15 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ directoryEntries, group
     if (update.payload.update.tag === 'ExternalPayment') {
       const value = update.payload.update.value;
       return (
-        <ListItem>
-          {directoryEntries.resolveParty(value.payer)} payed {value.quantity} CC for{' '}
+        <ListItem className="balance-updates-list-item">
+          {directoryEntries.resolveParty(value.payer)} paid {value.quantity} CC for{' '}
           {value.description}
         </ListItem>
       );
     } else if (update.payload.update.tag === 'Transfer') {
       const value = update.payload.update.value;
       return (
-        <ListItem>
+        <ListItem className="balance-updates-list-item">
           {directoryEntries.resolveParty(value.sender)} sent {value.quantity} CC to{' '}
           {directoryEntries.resolveParty(value.receiver)}
         </ListItem>
@@ -332,7 +342,9 @@ const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({
     return (
       <ListItem>
         Accepted transfer to {directoryEntries.resolveParty(acceptedAppPayment.payload.receiver)}
-        <Button onClick={() => onRedeem(acceptedAppPayment)}>Redeem</Button>
+        <Button className="redeem-button" onClick={() => onRedeem(acceptedAppPayment)}>
+          Redeem
+        </Button>
       </ListItem>
     );
   };
@@ -379,7 +391,11 @@ const Group: React.FC<GroupProps> = ({ directoryEntries, group, party, provider 
         alignItems="center"
       >
         <Typography variant="button">{group.payload.id.unpack}</Typography>
-        {isOwner && <Button onClick={onCreateInvite}>Create Invite</Button>}
+        {isOwner && (
+          <Button id="create-invite-link" onClick={onCreateInvite}>
+            Create Invite
+          </Button>
+        )}
         <Typography variant="button">
           owned by {directoryEntries.resolveParty(group.payload.owner)}
         </Typography>
