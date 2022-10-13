@@ -421,10 +421,119 @@ commands:
 
   setup_sbt_test_job:
     steps:
-      - checkout
       - setup_nix
       - restore_sbt_cache
       - restore_precompiled_classes
+
+  setup_vpn:
+    steps:
+      - run:
+          name: install vpn client
+          command: |
+            sudo apt-get update
+            sudo apt-get install -y expect charon-cmd
+      - run:
+          name: start vpn client
+          # the charon-cmd process must remain running throughout the whole job,
+          # so run this step in the background to allow subsequent steps to continue
+          background: true
+          # we use an "expect" script to spawn charon-cmd, and supply credentials,
+          # because the interactive password prompt reads directly from
+          # /dev/tty rather than stdin, and simple IO piping doesn't work
+          command: |
+            cat \<<EOF >route
+            #!/usr/bin/expect -f
+            set timeout -1
+
+            set VPN_HOST_NAME [lindex \$argv 0]
+            set VPN_USER [lindex \$argv 1]
+            set VPN_PASSWORD [lindex \$argv 2]
+
+            spawn echo \$VPN_USER \$VPN_PASSWORD
+            spawn sudo charon-cmd --host \$VPN_HOST_NAME --identity \$VPN_USER --eap-identity \$VPN_USER --profile ikev2-eap --cert /etc/ssl/certs/ISRG_Root_X1.pem
+            expect "EAP password: "
+
+            send "\$VPN_PASSWORD\r"
+            expect eof
+            EOF
+
+            chmod +x route
+            ./route $VPN_HOST_NAME $VPN_USER $VPN_PASSWORD
+      - run:
+          name: verify vpn connection
+          command: |
+            set +e
+
+            echo "Checking IP"
+
+            count=0
+            success=42
+            while [ ${count} -lt 10 ]; do
+              if [ "$(curl checkip.amazonaws.com)" == "$VPN_HOST_IP" ]; then
+                echo "Check IP passed"
+                success=0
+                break
+              else
+                echo "Current IP is not desired VPN server IP. Retry count $count"
+                (( count++ ))
+                sleep 1
+              fi
+            done
+
+            exit $success
+
+  stop_vpn:
+    steps:
+      - run:
+          name: stop vpn
+          command: |
+            sudo killall charon-cmd
+
+  checkout_cluster_version:
+    parameters:
+      cluster:
+        type: string
+    steps:
+      - checkout
+      - run:
+          name: Checkout Cluster Version
+          command: |
+           set +e
+
+           echo "Retrieving Cluster Version of Source"
+
+           count=0
+           success=42
+           while [ ${count} -lt 10 ]; do
+
+             if cluster_version=$(curl http://<< parameters.cluster >>.network.canton.global/version --connect-timeout 2); then
+               echo "Cluster version: ${cluster_version}"
+               success=0
+               break
+             else
+               echo "Failed to retrieve cluster version. Retry count $count"
+               (( count++ ))
+               sleep 1
+             fi
+           done
+
+           if [ ${success} -ne 0 ]; then
+               echo "Could not retrieve cluster version."
+               exit 1
+           fi
+
+           if [ ${cluster_version:0:4} != "git-" ]; then
+              echo "Unexpected cluster version format: ${cluster_version}."
+              exit 2
+           fi
+
+           echo "Checking out: ${cluster_version:4}"
+           if ! git checkout ${cluster_version:4}; then
+              echo "Cannot checkout cluster version: ${cluster_version:4}."
+              exit 3
+           fi
+
+           exit $success
 
   install_daml_dependencies:
     steps:
@@ -454,6 +563,7 @@ jobs:
     environment:
       <<: *env
     steps:
+      - checkout
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "lint"
@@ -476,6 +586,7 @@ jobs:
       POSTGRES_PASSWORD: postgres
       POSTGRES_USER: postgres
     steps:
+      - checkout
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "Test/compile"
@@ -496,6 +607,7 @@ jobs:
     environment:
       <<: *env
     steps:
+      - checkout
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "protocGenerate damlBuild"
@@ -540,6 +652,7 @@ jobs:
     environment:
       <<: *env
     steps:
+      - checkout
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "protocGenerate damlBuild"
@@ -558,6 +671,7 @@ jobs:
     environment:
       <<: *env
     steps:
+      - checkout
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "protocGenerate damlBuild"
@@ -576,6 +690,7 @@ jobs:
     environment:
       <<: *env
     steps:
+      - checkout
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "protocGenerate damlBuild"
@@ -594,6 +709,7 @@ jobs:
     environment:
       <<: *env
     steps:
+      - checkout
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "protocGenerate damlBuild"
@@ -686,67 +802,12 @@ jobs:
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
       VPN_HOST_IP: 34.132.91.75
     steps:
+      - setup_vpn
+      - checkout_cluster_version:
+          cluster: <<parameters.cluster>>
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "Test/compile"
-      - run:
-          name: install vpn client
-          command: |
-            sudo apt-get update
-            sudo apt-get install -y expect charon-cmd
-      - run:
-          name: start vpn client
-          # the charon-cmd process must remain running throughout the whole job,
-          # so run this step in the background to allow subsequent steps to continue
-          background: true
-          # we use an "expect" script to spawn charon-cmd, and supply credentials,
-          # because the interactive password prompt reads directly from
-          # /dev/tty rather than stdin, and simple IO piping doesn't work
-          command: |
-            cat \<<EOF >route
-            #!/usr/bin/expect -f
-            set timeout -1
-
-            set VPN_HOST_NAME [lindex \$argv 0]
-            set VPN_USER [lindex \$argv 1]
-            set VPN_PASSWORD [lindex \$argv 2]
-
-            spawn echo \$VPN_USER \$VPN_PASSWORD
-            spawn sudo charon-cmd --host \$VPN_HOST_NAME --identity \$VPN_USER --eap-identity \$VPN_USER --profile ikev2-eap --cert /etc/ssl/certs/ISRG_Root_X1.pem
-            expect "EAP password: "
-
-            send "\$VPN_PASSWORD\r"
-            expect eof
-            EOF
-
-            chmod +x route
-            ./route $VPN_HOST_NAME $VPN_USER $VPN_PASSWORD
-      - run:
-          name: Checkout Cluster Version
-          command: |
-            git checkout $(curl http://<<parameters.cluster>>.network.canton.global/version|cut -c5-)
-      - run:
-          name: verify vpn connection
-          command: |
-            set +e
-
-            echo "Checking IP"
-
-            count=0
-            success=42
-            while [ ${count} -lt 10 ]; do
-              if [ "$(curl checkip.amazonaws.com)" == "$VPN_HOST_IP" ]; then
-                echo "Check IP passed"
-                success=0
-                break
-              else
-                echo "Current IP is not desired VPN server IP. Retry count $count"
-                (( count++ ))
-                sleep 1
-              fi
-            done
-
-            exit $success
       - execute_sbt_command:
           cmd: "\"testOnly *PreflightIntegrationTest\""
           extra_parameters: -DDOMAIN_URL=http://<<parameters.cluster>>.network.canton.global:5008 -DNETWORK_APPS_ADDRESS=<<parameters.cluster>>.network.canton.global
@@ -784,10 +845,7 @@ jobs:
             		}
             	]
             }
-      - run:
-          name: stop vpn
-          command: |
-            sudo killall charon-cmd
+      - stop_vpn
       - cleanup_sbt_test_job
 
   update_pipeline_schedule:
