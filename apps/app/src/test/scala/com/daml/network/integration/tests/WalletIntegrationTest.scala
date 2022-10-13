@@ -50,6 +50,12 @@ class WalletIntegrationTest
       .simpleTopology(this.getClass.getSimpleName)
 
   "A wallet" should {
+
+    "restart cleanly" in { implicit env =>
+      aliceWallet.stop()
+      aliceWallet.startSync()
+    }
+
     "allow calling tap, list the created coins, and get the balance - locally and remotely" in {
       implicit env =>
         val aliceDamlUser = aliceRemoteWallet.config.damlUser

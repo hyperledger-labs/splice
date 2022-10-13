@@ -69,7 +69,9 @@ class CoinRulesRequestAcceptanceService(
                   ),
               )
               .recoverWith { case e =>
-                logger.warn(s"Failed to accept coin rules request: $e")
+                // NOTE: we're using INFO here as this code does nog manage a clean shutdown.
+                // TODO(#871): replace with AcsStore and AutomationService which has built-in support for clean shutdowns
+                logger.info(s"Failed to accept coin rules request: $e")
 
                 // Note: we are potentially accepting multiple requests, don't fail the whole call if one of them fails.
                 // No other workflow is using CoinRulesRequest contracts, it is safe to blindly retry

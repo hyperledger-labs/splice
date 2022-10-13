@@ -109,7 +109,7 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
       party: Set[PartyId],
       templateCompanion: TemplateCompanion[T],
   ): Future[Seq[Contract[T]]]
-  // TODO(i331): add an index or wait for Ledger API to implement this. This is very poor performance-wise
+  // TODO(#790): remove this function
   def fetchByContractId[T](
       companion: TemplateCompanion[T]
   )(partyId: PartyId, cid: P.ContractId[T]): Future[Contract[T]]

@@ -20,6 +20,12 @@ class SvcIntegrationTest
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
 
+  "restart cleanly" in { implicit env =>
+    // TODO(M1-92): share tests for common properties of CoinApps, like restartabilty
+    svc.stop()
+    svc.startSync()
+  }
+
   "round management" in { implicit env =>
     val coinPrice: BigDecimal = 23.0
 

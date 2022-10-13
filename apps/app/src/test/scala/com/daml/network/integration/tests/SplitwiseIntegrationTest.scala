@@ -29,6 +29,11 @@ class SplitwiseIntegrationTest
       })
 
   "splitwise" should {
+    "restart cleanly" in { implicit env =>
+      providerSplitwiseBackend.stop()
+      providerSplitwiseBackend.startSync()
+    }
+
     "support provider-hosted mode" in { implicit env =>
       // Onboard users
       val aliceUserParty = aliceValidator.onboardUser(aliceSplitwise.config.damlUser)

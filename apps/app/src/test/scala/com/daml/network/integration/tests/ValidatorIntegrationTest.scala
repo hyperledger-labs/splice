@@ -25,6 +25,14 @@ class ValidatorIntegrationTest
       // that blocks on all apps being initialized.
       .withNoSetup()
 
+  "start and restart cleanly" in { implicit env =>
+    svc.startSync()
+    scan.startSync()
+    aliceValidator.startSync()
+    aliceValidator.stop()
+    aliceValidator.startSync()
+  }
+
   "initialize svc and validator apps" in { implicit env =>
     svc.startSync()
     scan.startSync()

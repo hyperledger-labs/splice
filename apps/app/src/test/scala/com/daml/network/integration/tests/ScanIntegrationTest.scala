@@ -27,6 +27,11 @@ class ScanIntegrationTest
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
 
+  "restart cleanly" in { implicit env =>
+    scan.stop()
+    scan.startSync()
+  }
+
   "see Coin transfers" in { implicit env =>
     val (aliceP, bobP) = setupAliceAndBobAndChannel(env)
     aliceRemoteWallet.tap(50)

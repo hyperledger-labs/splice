@@ -41,6 +41,12 @@ class DirectoryIntegrationTest
       })
 
   "Directory service" should {
+
+    "restart cleanly" in { implicit env =>
+      directory.stop()
+      directory.startSync()
+    }
+
     "not throw an error on shutdown" in { implicit env =>
       import env._
 
