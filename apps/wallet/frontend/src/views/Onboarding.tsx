@@ -7,7 +7,7 @@ const Onboarding: React.FC<{ userId: string }> = ({ userId }) => {
   const validatorClient = useValidatorClient();
 
   const onOnboardUser = async () => {
-    await validatorClient.onboardUser(new OnboardUserRequest().setName(userId), null);
+    await validatorClient.onboardUser(new OnboardUserRequest().setName(userId), undefined);
   };
 
   return (

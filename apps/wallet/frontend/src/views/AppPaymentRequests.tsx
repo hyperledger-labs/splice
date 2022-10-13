@@ -22,7 +22,7 @@ const AppPaymentRequests: React.FC<{ userId: string }> = ({ userId }) => {
     const newAppPaymentRequests = (
       await walletClient.listAppPaymentRequests(
         new ListAppPaymentRequestsRequest().setWalletCtx(walletRequestCtx),
-        null
+        undefined
       )
     ).getPaymentRequestsList();
     const decoded = newAppPaymentRequests.map(c => Contract.decode(c, AppPaymentRequest));
@@ -36,7 +36,7 @@ const AppPaymentRequests: React.FC<{ userId: string }> = ({ userId }) => {
         new AcceptAppPaymentRequestRequest()
           .setRequestContractId(request.contractId)
           .setWalletCtx(walletRequestCtx),
-        null
+        undefined
       );
     };
     return (

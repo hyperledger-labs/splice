@@ -12,11 +12,11 @@ import { Identifier, Value } from '@daml/ledger-api';
 import { Choice, ContractId, Template } from '@daml/types';
 
 import { Contract } from './Contract';
-import { ActiveContractsServiceClient } from './com/daml/ledger/api/v1/Active_contracts_serviceServiceClientPb';
-import { CommandServiceClient } from './com/daml/ledger/api/v1/Command_serviceServiceClientPb';
+import { ActiveContractsServicePromiseClient } from './com/daml/ledger/api/v1/active_contracts_service_grpc_web_pb';
 import { GetActiveContractsRequest } from './com/daml/ledger/api/v1/active_contracts_service_pb';
-import { UserManagementServiceClient } from './com/daml/ledger/api/v1/admin/User_management_serviceServiceClientPb';
+import { UserManagementServicePromiseClient } from './com/daml/ledger/api/v1/admin/user_management_service_grpc_web_pb';
 import { GetUserRequest } from './com/daml/ledger/api/v1/admin/user_management_service_pb';
+import { CommandServicePromiseClient } from './com/daml/ledger/api/v1/command_service_grpc_web_pb';
 import { SubmitAndWaitRequest } from './com/daml/ledger/api/v1/command_service_pb';
 import { Command, Commands, ExerciseByKeyCommand } from './com/daml/ledger/api/v1/commands_pb';
 import {
@@ -27,23 +27,23 @@ import {
 import { GroupKey } from './com/daml/network/splitwise/v0/splitwise_service_pb';
 
 class LedgerApiClient {
-  activeContractsServiceClient: ActiveContractsServiceClient;
-  commandServiceClient: CommandServiceClient;
-  userManagementServiceClient: UserManagementServiceClient;
+  ActiveContractsServicePromiseClient: ActiveContractsServicePromiseClient;
+  CommandServicePromiseClient: CommandServicePromiseClient;
+  UserManagementServicePromiseClient: UserManagementServicePromiseClient;
   userId: string;
 
   collectionDuration: string = (5 * 60 * 1000000).toString();
   acceptDuration: string = (5 * 60 * 1000000).toString();
 
   constructor(
-    activeContractsServiceClient: ActiveContractsServiceClient,
-    commandServiceClient: CommandServiceClient,
-    userManagementServiceClient: UserManagementServiceClient,
+    ActiveContractsServicePromiseClient: ActiveContractsServicePromiseClient,
+    CommandServicePromiseClient: CommandServicePromiseClient,
+    UserManagementServicePromiseClient: UserManagementServicePromiseClient,
     userId: string
   ) {
-    this.activeContractsServiceClient = activeContractsServiceClient;
-    this.commandServiceClient = commandServiceClient;
-    this.userManagementServiceClient = userManagementServiceClient;
+    this.ActiveContractsServicePromiseClient = ActiveContractsServicePromiseClient;
+    this.CommandServicePromiseClient = CommandServicePromiseClient;
+    this.UserManagementServicePromiseClient = UserManagementServicePromiseClient;
     this.userId = userId;
   }
 
@@ -75,7 +75,10 @@ class LedgerApiClient {
       .setApplicationId(this.userId)
       .setCommandId(uuidv4());
     const request = new SubmitAndWaitRequest().setCommands(cmds);
-    const response = await this.commandServiceClient.submitAndWaitForTransactionTree(request, null);
+    const response = await this.CommandServicePromiseClient.submitAndWaitForTransactionTree(
+      request,
+      undefined
+    );
     const transaction = response.getTransaction()!;
     const exerciseEv = transaction
       .getEventsByIdMap()
@@ -100,7 +103,7 @@ class LedgerApiClient {
       .set(p, new Filters().setInclusive(new InclusiveFilters().setTemplateIdsList([templateId])));
     // TODO(M1-92) Avoid relying on verbose mode. This needs changes in decoding of the protobuf values.
     const request = new GetActiveContractsRequest().setFilter(filter).setVerbose(true);
-    const response = this.activeContractsServiceClient.getActiveContracts(request);
+    const response = this.ActiveContractsServicePromiseClient.getActiveContracts(request);
     const contracts = await new Promise<Contract<T>[]>(resolve => {
       let acc: Contract<T>[] = [];
       response.on('data', el => {
@@ -255,9 +258,9 @@ class LedgerApiClient {
     return r.payload.validator;
   }
   async getPrimaryParty(userId: string): Promise<string> {
-    const user = await this.userManagementServiceClient.getUser(
+    const user = await this.UserManagementServicePromiseClient.getUser(
       new GetUserRequest().setUserId(userId),
-      null
+      undefined
     );
     return user.getUser()!.getPrimaryParty();
   }
@@ -275,9 +278,9 @@ export const LedgerApiClientProvider: React.FC<React.PropsWithChildren<LedgerApi
   url,
   userId,
 }) => {
-  const acsClient = new ActiveContractsServiceClient(url);
-  const commandClient = new CommandServiceClient(url);
-  const userManagementClient = new UserManagementServiceClient(url);
+  const acsClient = new ActiveContractsServicePromiseClient(url);
+  const commandClient = new CommandServicePromiseClient(url);
+  const userManagementClient = new UserManagementServicePromiseClient(url);
   const splitwiseClient = new LedgerApiClient(
     acsClient,
     commandClient,

@@ -20,5 +20,5 @@ PROTOS=$(cd $DIR/protos-$SDK_VERSION && find . -name '*.proto' | sed 's|^\./||')
 # We only generate sources for the subset we use.
 protoc -I $DIR/protos-$SDK_VERSION $PROTOS \
        --js_out=import_style=commonjs:$DIR/ts \
-       --grpc-web_out=import_style=typescript,mode=grpcwebtext:$DIR/ts
+       --grpc-web_out=import_style=commonjs+dts,mode=grpcwebtext:$DIR/ts
 cp -r $DIR/ts/* src/

@@ -35,7 +35,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({ directoryEntries, party, provid
     const groupInvites = (
       await splitwiseClient.listGroupInvites(
         new ListGroupInvitesRequest().setContext(new SplitwiseContext().setUserPartyId(party)),
-        null
+        undefined
       )
     ).getGroupInvitesList();
     const decoded = groupInvites.map(c => Contract.decode(c, GroupInvite));

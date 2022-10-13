@@ -46,7 +46,7 @@ object BuildCommon {
           scalapb.gen(flatPackage = true) -> (Compile / sourceManaged).value / "protobuf",
           (
             grpcWebGen,
-            Seq("mode=grpcwebtext", "import_style=typescript"),
+            Seq("mode=grpcwebtext", "import_style=commonjs+dts"),
           ) -> (Compile / sourceManaged).value / "ts",
         ),
         Compile / PB.protocOptions ++= Seq(

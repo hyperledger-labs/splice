@@ -24,7 +24,7 @@ const Home: React.FC<{ userId: string }> = ({ userId }) => {
 
   useEffect(() => {
     const fetchProviderParty = async () => {
-      const response = await directoryClient.getProviderPartyId(new Empty(), null);
+      const response = await directoryClient.getProviderPartyId(new Empty(), undefined);
       setProviderParty(response.getProviderPartyId());
     };
     fetchProviderParty();

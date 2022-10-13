@@ -31,7 +31,7 @@ const Coins: React.FC<{ userId: string }> = ({ userId }) => {
 
   const fetchCoins = useCallback(async () => {
     const newCoins = (
-      await walletClient.list(new ListRequest().setWalletCtx(walletRequestCtx), null)
+      await walletClient.list(new ListRequest().setWalletCtx(walletRequestCtx), undefined)
     ).getCoinsList();
 
     const decoded = newCoins.reduce((accumulator, c) => {
@@ -47,7 +47,7 @@ const Coins: React.FC<{ userId: string }> = ({ userId }) => {
   const onTap = async () => {
     await walletClient.tap(
       new TapRequest().setQuantity(tapValue).setWalletCtx(walletRequestCtx),
-      null
+      undefined
     );
   };
 

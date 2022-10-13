@@ -16,5 +16,5 @@ mkdir $DIR/ts
 # We only generate sources for the subset we use.
 protoc -I $DIR/protos-$SDK_VERSION com/daml/ledger/api/v1/value.proto \
        --js_out=import_style=commonjs:$DIR/ts \
-       --grpc-web_out=import_style=typescript,mode=grpcwebtext:$DIR/ts
+       --grpc-web_out=import_style=commonjs+dts,mode=grpcwebtext:$DIR/ts
 cp -r $DIR/ts/* src/

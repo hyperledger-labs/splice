@@ -112,7 +112,7 @@ const App: React.FC = () => {
       const walletRequestCtx = new WalletContext().setUserName(userId);
       const response = await walletClient.userStatus(
         new UserStatusRequest().setWalletCtx(walletRequestCtx),
-        null
+        undefined
       );
       dispatch({
         type: 'user_status_response',

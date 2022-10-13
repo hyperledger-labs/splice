@@ -72,7 +72,7 @@ const Balances: React.FC<BalancesProps> = ({ directoryEntries, group, party }) =
         new ListBalancesRequest()
           .setGroupKey(key(group))
           .setContext(new SplitwiseContext().setUserPartyId(party)),
-        null
+        undefined
       )
     ).getBalancesMap();
     let balances = new Map<string, string>();
@@ -136,7 +136,7 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({
         new ListAcceptedGroupInvitesRequest()
           .setGroupId(group.payload.id.unpack)
           .setContext(new SplitwiseContext().setUserPartyId(party)),
-        null
+        undefined
       )
     ).getAcceptedGroupInvitesList();
     const decoded = invites.map(c => Contract.decode(c, AcceptedGroupInvite));
@@ -261,7 +261,7 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ directoryEntries, group
         new ListBalanceUpdatesRequest()
           .setGroupKey(key(group))
           .setContext(new SplitwiseContext().setUserPartyId(party)),
-        null
+        undefined
       )
     ).getBalanceUpdatesList();
     const decoded = balanceUpdates.reverse().map(c => Contract.decode(c, BalanceUpdate));
@@ -446,7 +446,7 @@ const Groups: React.FC<GroupsProps> = ({ directoryEntries, party, provider }) =>
     const newGroups = (
       await splitwiseClient.listGroups(
         new ListGroupsRequest().setContext(new SplitwiseContext().setUserPartyId(party)),
-        null
+        undefined
       )
     ).getGroupsList();
     const decoded = newGroups.map(c => Contract.decode(c, CodegenGroup));

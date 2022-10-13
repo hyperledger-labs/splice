@@ -1,8 +1,8 @@
 import React, { useContext } from 'react';
 
-import { DirectoryServiceClient } from '../com/daml/network/directory/v0/Directory_serviceServiceClientPb';
+import { DirectoryServicePromiseClient } from '../com/daml/network/directory/v0/directory_service_grpc_web_pb';
 
-const DirectoryContext = React.createContext<DirectoryServiceClient | undefined>(undefined);
+const DirectoryContext = React.createContext<DirectoryServicePromiseClient | undefined>(undefined);
 
 export interface WalletProps {
   url: string;
@@ -12,12 +12,12 @@ export const DirectoryClientProvider: React.FC<React.PropsWithChildren<WalletPro
   url,
   children,
 }) => {
-  const walletClient = new DirectoryServiceClient(url, null, null);
+  const walletClient = new DirectoryServicePromiseClient(url, null, null);
   return <DirectoryContext.Provider value={walletClient}>{children}</DirectoryContext.Provider>;
 };
 
-export const useDirectoryClient: () => DirectoryServiceClient = () => {
-  const client = useContext<DirectoryServiceClient | undefined>(DirectoryContext);
+export const useDirectoryClient: () => DirectoryServicePromiseClient = () => {
+  const client = useContext<DirectoryServicePromiseClient | undefined>(DirectoryContext);
   if (!client) {
     throw new Error('Directory client not initialized');
   }

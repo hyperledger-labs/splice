@@ -5,7 +5,7 @@ import Tooltip from '@mui/material/Tooltip';
 
 import { DirectoryEntry as damlDirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 
-import { DirectoryServiceClient } from '../com/daml/network/directory/v0/Directory_serviceServiceClientPb';
+import { DirectoryServicePromiseClient } from '../com/daml/network/directory/v0/directory_service_grpc_web_pb';
 import { LookupEntryByPartyRequest } from '../com/daml/network/directory/v0/directory_service_pb';
 import { Contract } from '../utils';
 
@@ -15,14 +15,17 @@ interface Entry {
 }
 
 const DirectoryEntry: React.FC<{ partyId: string }> = ({ partyId }) => {
-  const directoryClient = useMemo(() => new DirectoryServiceClient('http://localhost:8084'), []);
+  const directoryClient = useMemo(
+    () => new DirectoryServicePromiseClient('http://localhost:8084'),
+    []
+  );
 
   const [entry, setParty] = useState<Entry | undefined>(undefined); // undefined state represents the directory lookup still being pending
   useEffect(() => {
     const getEntry = async () => {
       const req = new LookupEntryByPartyRequest().setUser(partyId);
       try {
-        const value = await directoryClient.lookupEntryByParty(req, null);
+        const value = await directoryClient.lookupEntryByParty(req, undefined);
         const entry = value.getEntry();
         if (entry === undefined) {
           throw new Error('directory lookup unexpectedly returned undefined');

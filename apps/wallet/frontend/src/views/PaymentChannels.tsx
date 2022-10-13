@@ -33,7 +33,7 @@ const PaymentChannels: React.FC<{ userId: string }> = ({ userId }) => {
     const proposalList = (
       await walletClient.listPaymentChannelProposals(
         new ListPaymentChannelProposalsRequest().setWalletCtx(walletRequestCtx),
-        null
+        undefined
       )
     ).getProposalsList();
     setProposals(proposalList.map(c => Contract.decode(c, PaymentChannelProposal)));
@@ -51,7 +51,7 @@ const PaymentChannels: React.FC<{ userId: string }> = ({ userId }) => {
         .setAllowRequests(true)
         .setSenderTransferFeeRatio('0.5')
         .setWalletCtx(walletRequestCtx),
-      null
+      undefined
     );
     setReceiver('');
   };
@@ -60,14 +60,17 @@ const PaymentChannels: React.FC<{ userId: string }> = ({ userId }) => {
       new AcceptPaymentChannelProposalRequest()
         .setProposalContractId(cid)
         .setWalletCtx(walletRequestCtx),
-      null
+      undefined
     );
   };
 
   const [transferRequest, setTransferRequest] = useState(new ExecuteDirectTransferRequest());
   const directTransfer = async (ev: React.FormEvent<HTMLFormElement>) => {
     ev.preventDefault();
-    await walletClient.executeDirectTransfer(transferRequest.setWalletCtx(walletRequestCtx), null);
+    await walletClient.executeDirectTransfer(
+      transferRequest.setWalletCtx(walletRequestCtx),
+      undefined
+    );
   };
   return (
     <Stack spacing={2}>
