@@ -5,7 +5,6 @@ import com.daml.network.console.{LocalValidatorAppReference, RemoteDirectoryAppR
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.topology.PartyId
 
-import scala.concurrent.duration.DurationInt
 import scala.util.Try
 
 class WalletFrontendIntegrationTest extends FrontendIntegrationTest {
@@ -26,7 +25,38 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest {
       click on "tap-amount-field"
       textField("tap-amount-field").value = "15.0"
       click on "tap-button"
-      eventually(scaled(5 seconds)) {
+      eventually() {
+        findAll(className("coins-table-row")) should have size 1
+      }
+      val row = inside(findAll(className("coins-table-row")).toList) { case Seq(row) =>
+        row
+      }
+      val quantity = row.childElement(className("coins-table-quantity"))
+      quantity.text should be("15.0000000000")
+    }
+
+    "allow a random user to onboard themselves, then tap and list coins" in { implicit env =>
+      // Note: the test generates a unique user for each test
+      val newRandomUser = aliceRemoteWallet.config.damlUser
+
+      go to "http://localhost:3000"
+      click on "user-id-field"
+      textField("user-id-field").value = newRandomUser
+      click on "login-button"
+
+      // After a short delay, the UI should realize that the user is not onboarded,
+      // and switch to the onbaording page.
+      click on "onboard-button"
+      // TODO(i1139): The UI should handle the user repeatedly clicking on the onboarding button,
+      // which may or may not disable/disappar after the first click.
+      // find(id("onboard-button")).foreach(_.underlying.click())
+
+      // After a short delay, the UI should realize that the user is now onboarded
+      // and switch to the default view.
+      click on "tap-amount-field"
+      textField("tap-amount-field").value = "15.0"
+      click on "tap-button"
+      eventually() {
         findAll(className("coins-table-row")) should have size 1
       }
       val row = inside(findAll(className("coins-table-row")).toList) { case Seq(row) =>
