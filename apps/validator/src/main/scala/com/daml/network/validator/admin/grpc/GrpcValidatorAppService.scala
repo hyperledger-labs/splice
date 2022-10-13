@@ -1,9 +1,8 @@
 package com.daml.network.validator.admin.grpc
 
 import com.daml.network.environment.CoinLedgerClient
-import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.{CoinUtil, Proto}
-import com.daml.network.validator.store.ValidatorAppStore
+import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
 import com.daml.network.validator.v0._
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -15,8 +14,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcValidatorAppService(
     ledgerClient: CoinLedgerClient,
-    scanConnection: ScanConnection,
-    store: ValidatorAppStore,
+    store: ValidatorStore,
     validatorUserName: String,
     walletServiceUser: String,
     protected val loggerFactory: NamedLoggerFactory,
@@ -30,10 +28,8 @@ class GrpcValidatorAppService(
   private val connection = ledgerClient.connection("GrpcValidatorAppService")
 
   override def getValidatorPartyId(request: Empty): Future[GetValidatorPartyIdResponse] =
-    withSpanFromGrpcContext("GrpcValidatorAppService") { _ => span =>
-      for {
-        validatorParty <- store.getValidatorParty()
-      } yield GetValidatorPartyIdResponse(Proto.encode(validatorParty))
+    withSpanFromGrpcContext("GrpcValidatorAppService") { _ => _ =>
+      Future.successful(GetValidatorPartyIdResponse(Proto.encode(store.key.validatorParty)))
     }
 
   override def onboardUser(request: OnboardUserRequest): Future[OnboardUserResponse] =
@@ -43,32 +39,30 @@ class GrpcValidatorAppService(
       span.setAttribute("name", name)
 
       for {
-        validatorPartyId <- store.getValidatorParty()
         userPartyId <- connection.getOrAllocateParty(name)
-        svcPartyId <- store.getSvcParty()
+        // TODO(#1139): use a single command submission to create all three contracts, so dedup works and intermediate states won't have to be handled
         _ <- CoinUtil.ExplicitDisclosureWorkaround.recordUserHostedAt(
           userPartyId,
-          validatorPartyId,
+          store.key.validatorParty,
           connection,
         )
-        walletServiceParty <- store.getWalletServiceParty()
         // Workaround for the lack of "act-as-any-party" rights
         _ <- connection.grantUserRights(validatorUserName, Seq(userPartyId), Seq.empty)
         _ <- ValidatorUtil.installWalletForUser(
           endUserParty = userPartyId,
           endUserName = name,
           walletServiceUser = walletServiceUser,
-          walletServiceParty = walletServiceParty,
-          validatorServiceParty = validatorPartyId,
-          svcParty = svcPartyId,
+          walletServiceParty = store.key.walletServiceParty,
+          validatorServiceParty = store.key.validatorParty,
+          svcParty = store.key.svcParty,
           connection = connection,
           logger = logger,
         )
         // Create validator right contract so validator can collect validator rewards
         _ <- ValidatorUtil.createValidatorRight(
           user = userPartyId,
-          validator = validatorPartyId,
-          svc = svcPartyId,
+          validator = store.key.validatorParty,
+          svc = store.key.svcParty,
           connection = connection,
         )
       } yield OnboardUserResponse(Proto.encode(userPartyId))

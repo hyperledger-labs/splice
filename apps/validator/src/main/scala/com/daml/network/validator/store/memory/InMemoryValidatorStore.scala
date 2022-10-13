@@ -1,27 +1,25 @@
-package com.daml.network.wallet.store
-
+package com.daml.network.validator.store.memory
 import com.daml.network.store.{AcsStore, InMemoryAcsStore}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.daml.network.validator.store.ValidatorStore
+import com.digitalasset.canton.logging.NamedLoggerFactory
 
-import scala.concurrent._
+import scala.concurrent.ExecutionContext
 
-class InMemoryEndUserWalletStore(
-    override val key: EndUserWalletStore.Key,
+class InMemoryValidatorStore(
+    override val key: ValidatorStore.Key,
     override protected val loggerFactory: NamedLoggerFactory,
-)(implicit
-    ec: ExecutionContext
-) extends EndUserWalletStore
-    with NamedLogging {
+)(implicit protected val ec: ExecutionContext)
+    extends ValidatorStore {
 
   private val inMemoryAcsStore =
     new InMemoryAcsStore(
       loggerFactory,
-      EndUserWalletStore.contractFilter(key),
+      ValidatorStore.contractFilter(key),
       logAllStateUpdates = true,
     )
 
   // TODO(#790): review tracing strategy for setup steps
-  noTracingLogger.debug(s"Created InMemoryEndUserWalletStore for $key")
+  noTracingLogger.debug(s"Created InMemoryValidatorStore for $key")
 
   val acsStore: AcsStore = inMemoryAcsStore
 

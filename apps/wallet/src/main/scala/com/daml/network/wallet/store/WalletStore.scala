@@ -23,7 +23,7 @@ trait WalletStore extends AutoCloseable with NamedLogging {
   /** The sink to use for ingesting data from the ledger into this store. */
   val acsIngestionSink: AcsStore.IngestionSink
 
-  val acsStore: AcsStore
+  protected val acsStore: AcsStore
 
   /** The key identifying the parties considered by this store. */
   def key: WalletStore.Key

@@ -1,20 +1,21 @@
 package com.daml.network.validator
 
-import com.daml.network.codegen.CC.CoinRules.CoinRulesRequest
-import com.daml.network.util.CoinUtil
-import com.daml.network.validator.util.ValidatorUtil
-import cats.implicits._
 import akka.actor.ActorSystem
-import com.daml.ledger.api.refinements.ApiTypes
+import cats.implicits._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.ledger.api.refinements.ApiTypes
+import com.daml.network.codegen.CC.CoinRules.CoinRulesRequest
+import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.util.UploadablePackage
-import com.daml.network.validator.v0.ValidatorAppServiceGrpc
+import com.daml.network.util.{CoinUtil, UploadablePackage}
 import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
+import com.daml.network.validator.automation.ValidatorAutomationService
 import com.daml.network.validator.config.{AppInstance, LocalValidatorAppConfig}
-import com.daml.network.validator.store.ValidatorAppStore
+import com.daml.network.validator.store.ValidatorStore
+import com.daml.network.validator.util.ValidatorUtil
+import com.daml.network.validator.v0.ValidatorAppServiceGrpc
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
@@ -24,14 +25,10 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.api.trace.Tracer
-import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
-/** Class representing a Validator app instance.
-  *
-  * Modelled after Canton's ParticipantNode class.
-  */
+/** Class representing a Validator app instance. */
 class ValidatorApp(
     override val name: InstanceName,
     val config: LocalValidatorAppConfig,
@@ -194,18 +191,16 @@ class ValidatorApp(
       )
       _ <- createRulesRequestAndUserHostedAtContracts(connection, svcParty, validatorParty)
     } yield {
-      val store = ValidatorAppStore(
+      val key = ValidatorStore.Key(
         validatorParty = validatorParty,
         svcParty = svcParty,
         walletServiceParty = walletServiceParty,
-        storage,
-        loggerFactory,
       )
+      val store = ValidatorStore(key, storage, loggerFactory)
       adminServerRegistry.addService(
         ValidatorAppServiceGrpc.bindService(
           new GrpcValidatorAppService(
             ledgerClient,
-            scanConnection,
             store,
             config.damlUser,
             config.walletServiceUser,
@@ -214,9 +209,17 @@ class ValidatorApp(
           ec,
         )
       )
+      val automation = new ValidatorAutomationService(
+        store,
+        ledgerClient,
+        this,
+        loggerFactory,
+        timeouts,
+      )
       ValidatorApp.State(
         storage,
         store,
+        automation,
         scanConnection,
         loggerFactory.getTracedLogger(ValidatorApp.State.getClass),
       )
@@ -231,15 +234,17 @@ class ValidatorApp(
 object ValidatorApp {
   case class State(
       storage: Storage,
-      store: ValidatorAppStore,
+      store: ValidatorStore,
+      automation: ValidatorAutomationService,
       scanConnection: ScanConnection,
       logger: TracedLogger,
   ) extends AutoCloseable {
     override def close() =
       Lifecycle.close(
-        storage,
+        automation,
         store,
         scanConnection,
+        storage,
       )(logger)
 
   }
