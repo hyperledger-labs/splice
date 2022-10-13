@@ -1,5 +1,6 @@
 package com.daml.network.console
 
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.console.commands.{
@@ -93,8 +94,12 @@ trait CoinAppReference
   override def parties: ParticipantPartiesAdministrationGroup = partiesGroup
 
   @Help.Summary("Wait until initialization has completed")
-  def waitForInitialization(): Unit =
-    ConsoleMacros.utils.retry_until_true(health.status.successOption.map(_.active).getOrElse(false))
+  def waitForInitialization(
+      timeout: NonNegativeDuration = coinConsoleEnvironment.commandTimeouts.bounded
+  ): Unit =
+    ConsoleMacros.utils.retry_until_true(timeout)(
+      health.status.successOption.map(_.active).getOrElse(false)
+    )
 
   // TODO(i736): slightly adapted compared to Canton.
   // above command needs to be def such that `Help` works.

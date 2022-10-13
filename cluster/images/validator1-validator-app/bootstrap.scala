@@ -1,7 +1,7 @@
 println("Bootstrapping validator1 validator...")
 
 println("Waiting for validator1 to finish init...")
-validator1_validator_backend.waitForInitialization()
+validator1_validator_backend.waitForInitialization(2.minutes)
 
 println("Onboarding users")
 
