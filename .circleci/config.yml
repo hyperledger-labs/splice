@@ -494,7 +494,6 @@ commands:
       cluster:
         type: string
     steps:
-      - checkout
       - run:
           name: Checkout Cluster Version
           command: |
@@ -802,6 +801,7 @@ jobs:
       VPN_HOST_NAME: vpn-cn-devnet.da-int.net
       VPN_HOST_IP: 34.132.91.75
     steps:
+      - checkout
       - setup_vpn
       - checkout_cluster_version:
           cluster: <<parameters.cluster>>
