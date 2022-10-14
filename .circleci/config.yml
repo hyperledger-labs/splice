@@ -127,7 +127,6 @@ commands:
         type: boolean
         default: false
     steps:
-      - checkout # Also required to compute cache keys in the next step
       - restore_cache:
           name: Downloading archive with compiled classes from cache
           keys:
@@ -754,14 +753,17 @@ jobs:
       - setup_vpn
       - checkout_cluster_version:
           cluster: <<parameters.cluster>>
+      - stop_vpn # vpn connection can be somewhat flaky so we only enable it where it is required.
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "Test/compile"
+      - setup_vpn
       - execute_sbt_command:
           cmd: "\"testOnly *PreflightIntegrationTest\""
           extra_parameters: -DDOMAIN_URL=http://<<parameters.cluster>>.network.canton.global:5008 -DNETWORK_APPS_ADDRESS=<<parameters.cluster>>.network.canton.global
           timeout: "10m"
-      # TODO(#1059): Generalise as mix-in
+      - stop_vpn
+      # # TODO(#1059): Generalise as mix-in
       - slack/notify:
           event: fail
           custom: |
@@ -794,7 +796,6 @@ jobs:
             		}
             	]
             }
-      - stop_vpn
       - cleanup_sbt_test_job
 
   update_pipeline_schedule:
