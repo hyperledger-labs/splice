@@ -3,11 +3,11 @@
 
 package com.digitalasset.canton.participant.sync
 
-import com.daml.error._
+import com.daml.error.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.TransactionErrorGroup.RoutingErrorGroup
-import com.digitalasset.canton.error._
+import com.digitalasset.canton.error.*
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.TransactionSubmissionError
 import com.digitalasset.canton.protocol.LfContractId
 import com.digitalasset.canton.topology.DomainId
@@ -87,13 +87,6 @@ object TransactionRoutingError extends RoutingErrorGroup {
       ) extends TransactionErrorImpl(
             cause =
               s"Not all informee are on the specified domainID: $domainId, but on $domainsOfAllInformee"
-          )
-          with TransactionRoutingErrorWithDomain
-
-      case class NotConnected(domainId: DomainId)
-          extends TransactionErrorImpl(
-            cause =
-              s"Cannot submit transaction to prescribed domain `$domainId` because the participant is not connected to this domain"
           )
           with TransactionRoutingErrorWithDomain
 

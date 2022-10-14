@@ -4,64 +4,65 @@
 package com.digitalasset.canton.participant.protocol
 
 import cats.data.{EitherT, OptionT}
-import cats.syntax.either._
-import cats.syntax.functor._
-import cats.syntax.functorFilter._
-import cats.syntax.option._
-import cats.syntax.traverse._
+import cats.syntax.either.*
+import cats.syntax.functor.*
+import cats.syntax.functorFilter.*
+import cats.syntax.option.*
+import cats.syntax.traverse.*
 import com.daml.error.definitions.LedgerApiErrors
 import com.daml.ledger.api.DeduplicationPeriod
-import com.daml.ledger.participant.state.v2._
+import com.daml.ledger.participant.state.v2.*
 import com.daml.lf.data.ImmArray
 import com.daml.lf.transaction.ContractStateMachine.{KeyInactive, KeyMapping}
 import com.daml.nonempty.NonEmpty
-import com.daml.nonempty.catsinstances._
-import com.digitalasset.canton.crypto._
+import com.daml.nonempty.catsinstances.*
+import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.ViewPosition.ListIndex
 import com.digitalasset.canton.data.ViewType.TransactionViewType
-import com.digitalasset.canton.data._
+import com.digitalasset.canton.data.*
 import com.digitalasset.canton.error.TransactionError
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.LedgerSyncEvent
 import com.digitalasset.canton.participant.metrics.TransactionProcessingMetrics
 import com.digitalasset.canton.participant.protocol.ProtocolProcessor.{
   MalformedPayload,
   NoMediatorError,
   PendingRequestDataOrReplayData,
 }
-import com.digitalasset.canton.participant.protocol.TransactionProcessingSteps._
+import com.digitalasset.canton.participant.protocol.TransactionProcessingSteps.*
 import com.digitalasset.canton.participant.protocol.TransactionProcessor.SubmissionErrors.{
   DomainWithoutMediatorError,
   SequencerRequest,
 }
-import com.digitalasset.canton.participant.protocol.TransactionProcessor._
+import com.digitalasset.canton.participant.protocol.TransactionProcessor.*
 import com.digitalasset.canton.participant.protocol.conflictdetection.ActivenessResult
 import com.digitalasset.canton.participant.protocol.submission.CommandDeduplicator.DeduplicationFailed
-import com.digitalasset.canton.participant.protocol.submission.ConfirmationRequestFactory._
+import com.digitalasset.canton.participant.protocol.submission.ConfirmationRequestFactory.*
 import com.digitalasset.canton.participant.protocol.submission.InFlightSubmissionTracker.{
   SubmissionAlreadyInFlight,
   TimeoutTooLow,
   UnknownDomain,
 }
 import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFactory.UnknownPackageError
-import com.digitalasset.canton.participant.protocol.submission._
+import com.digitalasset.canton.participant.protocol.submission.*
 import com.digitalasset.canton.participant.protocol.validation.ContractConsistencyChecker.ReferenceToFutureContractError
 import com.digitalasset.canton.participant.protocol.validation.TimeValidator.TimeCheckFailure
-import com.digitalasset.canton.participant.protocol.validation._
-import com.digitalasset.canton.participant.store._
-import com.digitalasset.canton.participant.sync._
-import com.digitalasset.canton.participant.{LedgerSyncEvent, RequestCounter}
+import com.digitalasset.canton.participant.protocol.validation.*
+import com.digitalasset.canton.participant.store.*
+import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
+import com.digitalasset.canton.participant.sync.*
 import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
-import com.digitalasset.canton.protocol._
-import com.digitalasset.canton.protocol.messages._
+import com.digitalasset.canton.protocol.*
+import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.resource.DbStorage.PassiveInstanceException
 import com.digitalasset.canton.sequencing.client.SendAsyncClientError
-import com.digitalasset.canton.sequencing.protocol._
-import com.digitalasset.canton.serialization.DeserializationError
+import com.digitalasset.canton.sequencing.protocol.*
+import com.digitalasset.canton.serialization.DefaultDeserializationError
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{DomainId, MediatorId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil._
+import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, IterableUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{
@@ -69,6 +70,7 @@ import com.digitalasset.canton.{
   LedgerSubmissionId,
   LfKeyResolver,
   LfPartyId,
+  RequestCounter,
   SequencerCounter,
   WorkflowId,
   checked,
@@ -106,6 +108,7 @@ class TransactionProcessingSteps(
       TransactionSubmissionError,
     ]
     with NamedLogging {
+  private def protocolVersion = staticDomainParameters.protocolVersion
 
   override type SubmissionSendError = TransactionProcessor.SubmissionErrors.SequencerRequest.Error
   override type PendingRequestData = PendingTransaction
@@ -121,8 +124,6 @@ class TransactionProcessingSteps(
 
   override type RequestError = TransactionProcessorError
   override type ResultError = TransactionProcessorError
-
-  private val alarmer = new LoggingAlarmStreamer(logger)
 
   override def pendingSubmissions(state: SyncDomainEphemeralState): Unit = ()
 
@@ -235,6 +236,7 @@ class TransactionProcessingSteps(
       val tracking = TransactionSubmissionTrackingData(
         submitterInfo.toCompletionInfo().copy(optDeduplicationPeriod = dedupInfo.some),
         TransactionSubmissionTrackingData.CauseWithTemplate(error),
+        protocolVersion,
       )
       UnsequencedSubmission(timestampForUpdate(), tracking)
     }
@@ -331,7 +333,7 @@ class TransactionProcessingSteps(
               recentSnapshot,
               TransactionTreeFactory.contractInstanceLookup(contractLookup),
               None,
-              staticDomainParameters.protocolVersion,
+              protocolVersion,
             )
             .leftMap[TransactionSubmissionTrackingData.RejectionCause] {
               case TransactionTreeFactoryError(UnknownPackageError(unknownTo)) =>
@@ -359,6 +361,7 @@ class TransactionProcessingSteps(
         val trackingData = TransactionSubmissionTrackingData(
           submitterInfoWithDedupPeriod.toCompletionInfo(),
           rejectionCause,
+          protocolVersion,
         )
         Success(Left(UnsequencedSubmission(timestampForUpdate(), trackingData)))
       }
@@ -387,6 +390,7 @@ class TransactionProcessingSteps(
       TransactionSubmissionTrackingData(
         submitterInfo.toCompletionInfo().copy(optDeduplicationPeriod = None),
         TransactionSubmissionTrackingData.TimeoutCause,
+        protocolVersion,
       )
 
     override def embedInFlightSubmissionTrackerError(
@@ -400,7 +404,7 @@ class TransactionProcessingSteps(
         )
       case UnknownDomain(domainId) =>
         TransactionRoutingError.ConfigurationErrors.SubmissionDomainNotReady.Error(domainId)
-      case TimeoutTooLow(submission, lowerBound) =>
+      case TimeoutTooLow(_submission, lowerBound) =>
         TransactionProcessor.SubmissionErrors.TimeoutError.Error(lowerBound)
     }
 
@@ -443,7 +447,8 @@ class TransactionProcessingSteps(
           TransactionProcessor.SubmissionErrors.SequencerRequest.Error(otherSendError)
       }
       val rejectionCause = TransactionSubmissionTrackingData.CauseWithTemplate(errorCode)
-      val trackingData = TransactionSubmissionTrackingData(completionInfo, rejectionCause)
+      val trackingData =
+        TransactionSubmissionTrackingData(completionInfo, rejectionCause, protocolVersion)
       UnsequencedSubmission(timestamp, trackingData)
     }
   }
@@ -476,10 +481,10 @@ class TransactionProcessingSteps(
 
       def lightTransactionViewTreeDeserializer(
           bytes: ByteString
-      ): Either[DeserializationError, LightTransactionViewTree] =
+      ): Either[DefaultDeserializationError, LightTransactionViewTree] =
         LightTransactionViewTree
           .fromByteString(pureCrypto)(bytes)
-          .leftMap(err => DeserializationError(err.message, bytes))
+          .leftMap(err => DefaultDeserializationError(err.message))
 
       type DecryptionError = EncryptedViewMessageDecryptionError[TransactionViewType]
 
@@ -491,7 +496,7 @@ class TransactionProcessingSteps(
           snapshot,
           vt,
           participantId,
-          staticDomainParameters.protocolVersion,
+          protocolVersion,
           optRandomness,
         )(
           lightTransactionViewTreeDeserializer
@@ -545,7 +550,7 @@ class TransactionProcessingSteps(
         for {
           subviewRandomness <-
             ProtocolCryptoApi
-              .hkdf(pureCrypto, staticDomainParameters.protocolVersion)(
+              .hkdf(pureCrypto, protocolVersion)(
                 randomness,
                 randomness.unwrap.size,
                 info,
@@ -556,12 +561,14 @@ class TransactionProcessingSteps(
         } yield {
           randomnessMap.get(subviewHash) match {
             case Some(promise) =>
-              promise.tryComplete(Success(subviewRandomness))
+              promise.tryComplete(Success(subviewRandomness)).discard
             case None =>
-              // TODO(M40): raise an alarm and don't confirm the request
-              logger.error(
-                s"View ${viewMessage.viewHash} lists a subview with hash $subviewHash, but I haven't received any views for this hash"
-              )
+              // TODO(M40): make sure to not approve the request
+              SyncServiceAlarm
+                .Warn(
+                  s"View ${viewMessage.viewHash} lists a subview with hash $subviewHash, but I haven't received any views for this hash"
+                )
+                .report()
           }
           ()
         }
@@ -686,7 +693,7 @@ class TransactionProcessingSteps(
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, TransactionProcessorError, StorePendingDataAndSendResponseAndCreateTimeout] = {
-    import cats.Order._
+    import cats.Order.*
 
     val PendingDataAndResponseArgs(
       enrichedTransactionO,
@@ -898,7 +905,7 @@ class TransactionProcessingSteps(
             RejectionArgs(
               pendingTransaction,
               LocalReject.TimeRejects.LocalTimeout.Reject()(
-                staticDomainParameters.protocolVersion
+                protocolVersion
               ),
             ),
           )
@@ -947,7 +954,7 @@ class TransactionProcessingSteps(
 
       TimestampedEvent(
         LedgerSyncEvent.CommandRejected(ts.toLf, completionInfo, rejection),
-        rc,
+        rc.asLocalOffset,
         Some(sc),
       )
     } -> None // Transaction processing doesn't use pending submissions
@@ -1003,7 +1010,7 @@ class TransactionProcessingSteps(
     val tse = submitterParticipantSubmitterInfo.map(info =>
       TimestampedEvent(
         LedgerSyncEvent.CommandRejected(requestTime.toLf, info, rejection),
-        requestCounter,
+        requestCounter.asLocalOffset,
         Some(requestSequencerCounter),
       )
     )
@@ -1073,10 +1080,7 @@ class TransactionProcessingSteps(
       traceContext: TraceContext
   ): EitherT[Future, TransactionProcessorError, CommitAndStoreContractsAndPublishEvent] = {
     val commitSetF = Future {
-      pendingRequestData.transactionValidationResult.commitSet(
-        pendingRequestData.requestId,
-        alarmer.alarm,
-      )
+      pendingRequestData.transactionValidationResult.commitSet(pendingRequestData.requestId)
     }
     val contractsToBeStored =
       pendingRequestData.transactionValidationResult.createdContracts.keySet
@@ -1126,7 +1130,7 @@ class TransactionProcessingSteps(
 
       timestampedEvent = TimestampedEvent(
         acceptedEvent,
-        pendingRequestData.requestCounter,
+        pendingRequestData.requestCounter.asLocalOffset,
         Some(pendingRequestData.requestSequencerCounter),
       )
     } yield CommitAndStoreContractsAndPublishEvent(
@@ -1139,7 +1143,7 @@ class TransactionProcessingSteps(
           pendingRequestData.requestTime,
           domainId,
           pendingRequestData.requestCounter,
-          staticDomainParameters.protocolVersion,
+          protocolVersion,
         )
       ),
     )
@@ -1184,7 +1188,7 @@ class TransactionProcessingSteps(
         case (_, Left(modelConformanceError)) =>
           rejected(
             LocalReject.MalformedRejects.ModelConformance.Reject(modelConformanceError.toString)(
-              staticDomainParameters.protocolVersion
+              protocolVersion
             )
           )
 
@@ -1226,7 +1230,7 @@ class TransactionProcessingSteps(
       val (usedAndCreatedContracts, hostedInformeeStakeholders) =
         extractUsedAndCreatedContracts(rootViewTrees, partyPrefetch)
       val inputAndReassignedKeys =
-        if (staticDomainParameters.protocolVersion >= ProtocolVersion.v3)
+        if (protocolVersion >= ProtocolVersion.v3)
           extractInputAndUpdatedKeysV3(rootViewTrees, partyPrefetch)
         else
           extractInputAndUpdatedKeysV2(rootViewTrees, partyPrefetch)
@@ -1296,7 +1300,7 @@ class TransactionProcessingSteps(
 
         // Since the informees of a Create node are the stakeholders of the created contract,
         // the participant either witnesses all creations in a view's core or hosts a party of all created contracts.
-        import cats.implicits._
+        import cats.implicits.*
         if (partyPrefetch.hostsAny(informees)) {
           createdContractsOfHostedStakeholdersB ++= viewParticipantData.createdCore.map(
             createdContract =>
@@ -1337,7 +1341,7 @@ class TransactionProcessingSteps(
 
     val informeeStakeholdersUsedContracts = checkActivenessOrRelative.values.flatten.toSet
 
-    //TODO(i6222): Consider tracking causal dependencies from contract keys
+    // TODO(i6222): Consider tracking causal dependencies from contract keys
     val informeeStakeholders =
       informeeStakeholdersUsedContracts ++ informeeStakeholdersCreatedContracts
 
@@ -1496,7 +1500,7 @@ class TransactionProcessingSteps(
     // Only perform activeness checks for keys on domains with unique contract key semantics
     val (updatedKeys, freeKeys) = if (staticDomainParameters.uniqueContractKeys) {
       val updatedKeys = keyUpdatesOfHostedMaintainers.map { case (key, delta) =>
-        import ContractKeyJournal._
+        import ContractKeyJournal.*
         val newStatus = (checked(inputKeysOfHostedMaintainers(key)), delta) match {
           case (status, 0) => status
           case (Assigned, -1) => Unassigned
@@ -1540,18 +1544,20 @@ class TransactionProcessingSteps(
        * the committed subtransaction would still contain the rollback node.
        */
       val freeKeysB = Set.newBuilder[LfGlobalKey]
-      rootViewTrees.foldLeft(Set.empty[LfGlobalKey]) { (seenKeys, rootViewTree) =>
-        val gki = rootViewTree.view.globalKeyInputs
-        gki.foldLeft(seenKeys) { case (seenKeys, (key, resolution)) =>
-          if (seenKeys.contains(key)) seenKeys
-          else {
-            if (resolution.resolution.isEmpty && partyPrefetch.hostsAny(resolution.maintainers)) {
-              freeKeysB.addOne(key)
+      rootViewTrees
+        .foldLeft(Set.empty[LfGlobalKey]) { (seenKeys, rootViewTree) =>
+          val gki = rootViewTree.view.globalKeyInputs
+          gki.foldLeft(seenKeys) { case (seenKeys, (key, resolution)) =>
+            if (seenKeys.contains(key)) seenKeys
+            else {
+              if (resolution.resolution.isEmpty && partyPrefetch.hostsAny(resolution.maintainers)) {
+                freeKeysB.addOne(key)
+              }
+              seenKeys.incl(key)
             }
-            seenKeys.incl(key)
           }
         }
-      }
+        .discard
       val freeKeys = freeKeysB.result()
 
       // Now find out the keys that this transaction updates.

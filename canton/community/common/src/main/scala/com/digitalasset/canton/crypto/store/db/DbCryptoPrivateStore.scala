@@ -4,23 +4,23 @@
 package com.digitalasset.canton.crypto.store.db
 
 import cats.data.EitherT
-import cats.syntax.bifunctor._
+import cats.syntax.bifunctor.*
+import com.daml.metrics.MetricHandle.Gauge
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.String300
-import com.digitalasset.canton.crypto._
-import com.digitalasset.canton.crypto.store._
+import com.digitalasset.canton.crypto.*
+import com.digitalasset.canton.crypto.store.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.metrics.MetricHandle.GaugeM
 import com.digitalasset.canton.metrics.TimedLoadGauge
 import com.digitalasset.canton.resource.DbStorage.DbAction
-import com.digitalasset.canton.resource.DbStorage.Implicits._
+import com.digitalasset.canton.resource.DbStorage.Implicits.*
 import com.digitalasset.canton.resource.{DbStorage, DbStore}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.version.ReleaseProtocolVersion
 import com.google.protobuf.ByteString
 import io.functionmeta.functionFullName
-import slick.jdbc.{GetResult, SetParameter}
+import slick.jdbc.GetResult
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -42,7 +42,10 @@ final case class StoredPrivateKey(
     name: Option[KeyName],
     wrapperKeyId: Option[String300],
 ) extends Product
-    with Serializable
+    with Serializable {
+
+  def isEncrypted: Boolean = { this.wrapperKeyId.isDefined }
+}
 
 object StoredPrivateKey {
   implicit def getResultStoredPrivateKey(implicit
@@ -55,25 +58,19 @@ object StoredPrivateKey {
 
 class DbCryptoPrivateStore(
     override protected val storage: DbStorage,
+    override protected val releaseProtocolVersion: ReleaseProtocolVersion,
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
 )(override implicit val ec: ExecutionContext)
     extends CryptoPrivateStore
     with DbStore {
 
-  import storage.api._
-  import storage.converters._
+  import storage.api.*
 
-  private val insertTime: GaugeM[TimedLoadGauge, Double] =
+  private val insertTime: Gauge[TimedLoadGauge, Double] =
     storage.metrics.loadGaugeM("crypto-private-store-insert")
-  private val queryTime: GaugeM[TimedLoadGauge, Double] =
+  private val queryTime: Gauge[TimedLoadGauge, Double] =
     storage.metrics.loadGaugeM("crypto-private-store-query")
-
-  private val protocolVersion = ProtocolVersion.v2Todo_i8793
-  private implicit val setParameterEncryptionPrivateKey: SetParameter[EncryptionPrivateKey] =
-    EncryptionPrivateKey.getVersionedSetParameter(protocolVersion)
-  private implicit val setParameterSigningPrivateKey: SetParameter[SigningPrivateKey] =
-    SigningPrivateKey.getVersionedSetParameter(protocolVersion)
 
   private def queryKeys(purpose: KeyPurpose): DbAction.ReadOnly[Set[StoredPrivateKey]] =
     sql"select key_id, data, purpose, name, wrapper_key_id from crypto_private_keys where purpose = $purpose"
@@ -150,7 +147,7 @@ class DbCryptoPrivateStore(
     }
   }
 
-  override private[crypto] def readPrivateKey(
+  private[crypto] def readPrivateKey(
       keyId: Fingerprint,
       purpose: KeyPurpose,
   )(implicit
@@ -166,14 +163,14 @@ class DbCryptoPrivateStore(
       err => CryptoPrivateStoreError.FailedToReadKey(keyId, err.toString),
     )
 
-  override private[crypto] def writePrivateKey(
+  private[crypto] def writePrivateKey(
       key: StoredPrivateKey
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, CryptoPrivateStoreError, Unit] =
     insertKey(key)
 
-  override private[store] def listPrivateKeys(purpose: KeyPurpose)(implicit
+  private[store] def listPrivateKeys(purpose: KeyPurpose, encrypted: Boolean)(implicit
       traceContext: TraceContext
   ): EitherT[Future, CryptoPrivateStoreError, Set[StoredPrivateKey]] =
     EitherTUtil
@@ -181,11 +178,12 @@ class DbCryptoPrivateStore(
         queryTime.metric
           .event(
             storage.query(queryKeys(purpose), functionFullName)
-          ),
+          )
+          .map(keys => keys.filter(_.isEncrypted == encrypted)),
         err => CryptoPrivateStoreError.FailedToListKeys(err.toString),
       )
 
-  override private[crypto] def deletePrivateKey(keyId: Fingerprint)(implicit
+  private[crypto] def deletePrivateKey(keyId: Fingerprint)(implicit
       traceContext: TraceContext
   ): EitherT[Future, CryptoPrivateStoreError, Unit] =
     EitherTUtil.fromFuture(

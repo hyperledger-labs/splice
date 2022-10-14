@@ -3,9 +3,9 @@
 
 package com.digitalasset.canton.topology.processing
 
-import cats.syntax.functor._
-import cats.syntax.functorFilter._
-import cats.syntax.traverse._
+import cats.syntax.functor.*
+import cats.syntax.functorFilter.*
+import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.concurrent.FutureSupervisor
@@ -14,13 +14,12 @@ import com.digitalasset.canton.crypto.{CryptoPureApi, PublicKey, SigningPublicKe
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.protocol.LoggingAlarmStreamer
 import com.digitalasset.canton.protocol.messages.{
   DefaultOpenEnvelope,
   DomainTopologyTransactionMessage,
   ProtocolMessage,
 }
-import com.digitalasset.canton.sequencing._
+import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.sequencing.protocol.{Batch, Deliver, DeliverError}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.time.Clock
@@ -29,20 +28,14 @@ import com.digitalasset.canton.topology.client.{
   StoreBasedDomainTopologyClient,
 }
 import com.digitalasset.canton.topology.processing.TopologyTransactionProcessor.subscriptionTimestamp
-import com.digitalasset.canton.topology.store.{
-  PositiveSignedTopologyTransactions,
-  SignedTopologyTransactions,
-  TopologyStore,
-  TopologyStoreId,
-  ValidatedTopologyTransaction,
-}
+import com.digitalasset.canton.topology.store.*
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp.Positive
-import com.digitalasset.canton.topology.transaction._
-import com.digitalasset.canton.topology.{DomainId, KeyOwner}
+import com.digitalasset.canton.topology.transaction.*
+import com.digitalasset.canton.topology.{DomainId, KeyOwner, TopologyManagerError}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.{ErrorUtil, MonadUtil, SimpleExecutionQueue}
 import com.google.common.annotations.VisibleForTesting
-import com.google.protobuf.timestamp.{Timestamp => ProtoTimestamp}
+import com.google.protobuf.timestamp.{Timestamp as ProtoTimestamp}
 import io.functionmeta.functionFullName
 
 import java.util.concurrent.atomic.AtomicBoolean
@@ -116,7 +109,6 @@ class TopologyTransactionProcessor(
     extends NamedLogging
     with FlagCloseable {
 
-  protected val alarmer = new LoggingAlarmStreamer(logger)
   private val authValidator =
     new IncomingTopologyTransactionAuthorizationValidator(
       cryptoPureApi,
@@ -134,7 +126,7 @@ class TopologyTransactionProcessor(
       approximate: ApproximateTime,
       potentialChanges: Boolean,
   )(implicit traceContext: TraceContext): Unit = {
-    listeners.foreach(_.updateHead(effective, approximate, potentialChanges))
+    listeners.toList.foreach(_.updateHead(effective, approximate, potentialChanges))
   }
 
   private def initialise(
@@ -612,8 +604,6 @@ class TopologyTransactionProcessor(
             {
               case Deliver(sc, ts, _, _, batch) =>
                 logger.debug(s"Processing sequenced event with counter $sc and timestamp $ts")
-                // TODO(#8744) avoid discarded future as part of AlarmStreamer design
-                @SuppressWarnings(Array("com.digitalasset.canton.DiscardedFuture"))
                 def extractAndCheckMessages(
                     batch: Batch[DefaultOpenEnvelope]
                 ): List[DomainTopologyTransactionMessage] = {
@@ -621,12 +611,12 @@ class TopologyTransactionProcessor(
                     ProtocolMessage.filterDomainsEnvelopes(
                       batch,
                       domainId,
-                      (wrongMsgs: List[DefaultOpenEnvelope]) => {
-                        alarmer.alarm(
-                          s"received messages with wrong domain ids: ${wrongMsgs.map(_.protocolMessage.domainId)}"
-                        )
-                        ()
-                      },
+                      (wrongMsgs: List[DefaultOpenEnvelope]) =>
+                        TopologyManagerError.TopologyManagerAlarm
+                          .Warn(
+                            s"received messages with wrong domain ids: ${wrongMsgs.map(_.protocolMessage.domainId)}"
+                          )
+                          .report(),
                     )
                   )
                 }
@@ -701,7 +691,7 @@ object TopologyTransactionProcessor {
       start: SubscriptionStart,
       storedTimestamps: Option[(SequencedTime, EffectiveTime)],
   ): (CantonTimestamp, Either[SequencedTime, EffectiveTime]) = {
-    import SubscriptionStart._
+    import SubscriptionStart.*
     start match {
       case restart: ResubscriptionStart =>
         resubscriptionTimestamp(restart)
@@ -726,7 +716,7 @@ object TopologyTransactionProcessor {
   def resubscriptionTimestamp(
       start: ResubscriptionStart
   ): (CantonTimestamp, Either[SequencedTime, EffectiveTime]) = {
-    import SubscriptionStart._
+    import SubscriptionStart.*
     start match {
       // clean-head subscription. this means that the first event we are going to get is > cleanPrehead
       // and all our stores are clean.

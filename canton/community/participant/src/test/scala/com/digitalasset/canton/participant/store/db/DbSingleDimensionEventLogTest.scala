@@ -19,7 +19,7 @@ trait DbSingleDimensionEventLogTest
   this: DbTest =>
 
   override def cleanDb(storage: DbStorage): Future[Unit] = {
-    import storage.api._
+    import storage.api.*
     storage.update_(
       DBIO.seq(
         sqlu"delete from event_log where log_id = $id", // table shared with other tests
@@ -35,6 +35,7 @@ trait DbSingleDimensionEventLogTest
         id,
         storage,
         InMemoryIndexedStringStore(),
+        testedReleaseProtocolVersion,
         timeouts,
         loggerFactory,
       )

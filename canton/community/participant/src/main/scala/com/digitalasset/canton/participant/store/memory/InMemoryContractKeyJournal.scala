@@ -4,9 +4,9 @@
 package com.digitalasset.canton.participant.store.memory
 
 import cats.data.EitherT
-import cats.syntax.either._
-import cats.syntax.foldable._
-import cats.syntax.functorFilter._
+import cats.syntax.either.*
+import cats.syntax.foldable.*
+import cats.syntax.functorFilter.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.store.ContractKeyJournal
@@ -20,7 +20,6 @@ import com.digitalasset.canton.participant.util.TimeOfChange
 import com.digitalasset.canton.protocol.LfGlobalKey
 import com.digitalasset.canton.store.memory.InMemoryPrunableByTime
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.NoCopy
 
 import scala.Ordered.orderingToOrdered
 import scala.collection.concurrent.TrieMap
@@ -33,7 +32,7 @@ class InMemoryContractKeyJournal(override protected val loggerFactory: NamedLogg
     with NamedLogging
     with InMemoryPrunableByTime[ContractKeyJournalError] {
 
-  import InMemoryContractKeyJournal._
+  import InMemoryContractKeyJournal.*
 
   private val state: TrieMap[LfGlobalKey, KeyStatus] = new TrieMap[LfGlobalKey, KeyStatus]()
 
@@ -109,7 +108,7 @@ object InMemoryContractKeyJournal {
   private type ChangeJournal = SortedMap[TimeOfChange, Status]
 
   // Invariant: All values in the change journal are non-negative.
-  case class KeyStatus private (changes: ChangeJournal) extends NoCopy {
+  case class KeyStatus private (changes: ChangeJournal) {
 
     def latest: Option[ContractKeyState] = changes.headOption.map { case (toc, status) =>
       ContractKeyState(status, toc)

@@ -753,7 +753,7 @@ class GrpcWalletService(
       })
     }
 
-  @SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
+  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   private def selectCoin(
       userStore: EndUserWalletStore,
       quantity: BigDecimal,

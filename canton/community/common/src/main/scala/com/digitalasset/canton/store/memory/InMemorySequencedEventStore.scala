@@ -9,7 +9,7 @@ import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.{OrdinarySerializedEvent, PossiblyIgnoredSerializedEvent}
-import com.digitalasset.canton.store.SequencedEventStore._
+import com.digitalasset.canton.store.SequencedEventStore.*
 import com.digitalasset.canton.store.{
   ChangeWouldResultInGap,
   SequencedEventNotFoundError,
@@ -17,7 +17,7 @@ import com.digitalasset.canton.store.{
   SequencedEventStore,
 }
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil._
+import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future, blocking}
@@ -118,7 +118,7 @@ class InMemorySequencedEventStore(protected val loggerFactory: NamedLoggerFactor
   )(implicit traceContext: TraceContext): EitherT[Future, Nothing, Unit] = {
     blocking(lock.synchronized {
       eventByTimestamp.rangeTo(beforeAndIncluding).foreach { case (ts, e) =>
-        eventByTimestamp.remove(ts)
+        eventByTimestamp.remove(ts).discard
         timestampOfCounter.remove(e.counter)
       }
     })
@@ -153,7 +153,7 @@ class InMemorySequencedEventStore(protected val loggerFactory: NamedLoggerFactor
 
     if (from <= firstSc) {
       val timestamps = (firstSc to to).map { sc =>
-        val ts = firstTs.addMicros(sc - firstSc)
+        val ts = firstTs.addMicros((sc - firstSc).unwrap)
         sc -> ts
       }.toMap
       timestampOfCounter.addAll(timestamps)
@@ -205,16 +205,14 @@ class InMemorySequencedEventStore(protected val loggerFactory: NamedLoggerFactor
         .lastOption
         .map { case (sc, _) => sc }
 
-    val fromEffective = lastNonEmptyEventSc.fold(from)(c => (c + 1) max from)
+    val fromEffective = lastNonEmptyEventSc.fold(from)(c => (c + 1).max(from))
 
-    val lastSc =
-      timestampOfCounter.lastOption
-        .map { case (sc, _) => sc }
+    val lastSc = timestampOfCounter.lastOption.map { case (sc, _) => sc }
 
     if (fromEffective <= to) {
       if (lastSc.forall(_ <= to)) {
         timestampOfCounter.rangeFrom(fromEffective).rangeTo(to).foreach { case (sc, ts) =>
-          eventByTimestamp.remove(ts)
+          eventByTimestamp.remove(ts).discard
           timestampOfCounter.remove(sc)
         }
         Right(())
@@ -231,7 +229,7 @@ class InMemorySequencedEventStore(protected val loggerFactory: NamedLoggerFactor
       from: SequencerCounter
   )(implicit traceContext: TraceContext): Future[Unit] = {
     timestampOfCounter.rangeFrom(from).foreach { case (sc, ts) =>
-      timestampOfCounter.remove(sc)
+      timestampOfCounter.remove(sc).discard
       eventByTimestamp.remove(ts)
     }
 

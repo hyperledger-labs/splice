@@ -5,10 +5,11 @@ package com.digitalasset.canton.config
 
 import cats.Order
 import cats.data.Validated
-import cats.syntax.either._
-import cats.syntax.functor._
+import cats.syntax.either.*
+import cats.syntax.functor.*
+import com.daml.jwt.JwtTimestampLeeway
 import com.daml.nonempty.NonEmpty
-import com.daml.nonempty.catsinstances._
+import com.daml.nonempty.catsinstances.*
 import com.daml.platform.apiserver.SeedService.Seeding
 import com.daml.platform.apiserver.configuration.RateLimitingConfig
 import com.daml.platform.indexer.PackageMetadataViewConfig
@@ -25,11 +26,11 @@ import com.digitalasset.canton.config.RequireTypes.LengthLimitedString.{
   InvalidLengthString,
   defaultMaxLength,
 }
-import com.digitalasset.canton.config.RequireTypes._
+import com.digitalasset.canton.config.RequireTypes.*
 import com.digitalasset.canton.console.{AmmoniteConsoleConfig, FeatureFlag}
-import com.digitalasset.canton.crypto._
-import com.digitalasset.canton.domain.config._
-import com.digitalasset.canton.domain.sequencing.sequencer._
+import com.digitalasset.canton.crypto.*
+import com.digitalasset.canton.domain.config.*
+import com.digitalasset.canton.domain.sequencing.sequencer.*
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.metrics.{MetricsConfig, MetricsPrefix, MetricsReporterConfig}
 import com.digitalasset.canton.participant.admin.AdminWorkflowConfig
@@ -37,24 +38,24 @@ import com.digitalasset.canton.participant.config.ParticipantInitConfig.{
   ParticipantLedgerApiInitConfig,
   ParticipantParametersInitConfig,
 }
-import com.digitalasset.canton.participant.config._
+import com.digitalasset.canton.participant.config.*
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
-import com.digitalasset.canton.time._
+import com.digitalasset.canton.time.*
 import com.digitalasset.canton.tracing.TracingConfig
 import com.typesafe.config.ConfigException.UnresolvedSubstitution
 import com.typesafe.config.{Config, ConfigException, ConfigFactory, ConfigRenderOptions}
 import com.typesafe.scalalogging.LazyLogging
-import monocle.macros.syntax.lens._
-import pureconfig._
+import monocle.macros.syntax.lens.*
+import pureconfig.*
 import pureconfig.error.{CannotConvert, FailureReason}
 import pureconfig.generic.{DerivedConfigWriter, FieldCoproductHint, ProductHint}
 import shapeless.Lazy
 
 import java.io.File
 import scala.annotation.nowarn
-import scala.concurrent.duration._
-import scala.jdk.DurationConverters._
+import scala.concurrent.duration.*
+import scala.jdk.DurationConverters.*
 import scala.reflect.ClassTag
 
 /** Configuration for a check */
@@ -360,6 +361,7 @@ trait CantonConfig {
   private lazy val participantNodeParameters_ : Map[InstanceName, ParticipantNodeParameters] =
     participants.fmap { participantConfig =>
       val participantParameters = participantConfig.parameters
+
       ParticipantNodeParameters(
         monitoring.tracing,
         monitoring.delayLoggingThreshold,
@@ -374,9 +376,7 @@ trait CantonConfig {
         participantParameters.maxUnzippedDarSize,
         participantParameters.stores,
         participantConfig.caching,
-        participantParameters.contractIdSeeding,
         participantConfig.sequencerClient,
-        participantParameters.indexer,
         participantParameters.transferTimeProofFreshnessProportion,
         ParticipantProtocolConfig(
           minimumProtocolVersion = participantParameters.minimumProtocolVersion.map(_.unwrap),
@@ -387,6 +387,9 @@ trait CantonConfig {
         participantConfig.init.parameters.uniqueContractKeys,
         participantConfig.init.parameters.unsafeEnableCausalityTracking,
         participantParameters.unsafeEnableDamlLfDevVersion,
+        participantParameters.ledgerApiServerParameters,
+        maxDbConnections = participantConfig.storage.maxConnectionsCanton(true, false, false).value,
+        participantParameters.excludeInfrastructureTransactions,
       )
     }
 
@@ -461,10 +464,10 @@ object CantonConfig {
 
   implicit def preventAllUnknownKeys[T]: ProductHint[T] = ProductHint[T](allowUnknownKeys = false)
 
+  import com.daml.nonempty.NonEmptyUtil.instances.*
   import pureconfig.ConfigReader
-  import pureconfig.generic.semiauto._
-  import pureconfig.module.cats._
-  import com.daml.nonempty.NonEmptyUtil.instances._
+  import pureconfig.generic.semiauto.*
+  import pureconfig.module.cats.*
 
   final case class NonNegativeFiniteDurationError(input: String, reason: String)
       extends FailureReason {
@@ -498,9 +501,9 @@ object CantonConfig {
   )
 
   object ConfigReaders {
-    import DeprecatedConfigUtils._
-    import CantonConfigUtil._
-    import ParticipantInitConfig.DeprecatedImplicits._
+    import DeprecatedConfigUtils.*
+    import CantonConfigUtil.*
+    import ParticipantInitConfig.DeprecatedImplicits.*
 
     lazy implicit val lengthLimitedStringReader: ConfigReader[LengthLimitedString] = {
       ConfigReader.fromString[LengthLimitedString] { str =>
@@ -740,6 +743,8 @@ object CantonConfig {
     lazy implicit val clockConfigSimClockReader: ConfigReader[ClockConfig.SimClock.type] =
       deriveReader[ClockConfig.SimClock.type]
     lazy implicit val clockConfigReader: ConfigReader[ClockConfig] = deriveReader[ClockConfig]
+    lazy implicit val jwtTimestampLeewayConfigReader: ConfigReader[JwtTimestampLeeway] =
+      deriveReader[JwtTimestampLeeway]
     lazy implicit val authServiceConfigUnsafeJwtHmac256Reader
         : ConfigReader[AuthServiceConfig.UnsafeJwtHmac256] =
       deriveReader[AuthServiceConfig.UnsafeJwtHmac256]
@@ -884,6 +889,9 @@ object CantonConfig {
       deriveReader[AdminWorkflowConfig]
     lazy implicit val participantStoreConfigReader: ConfigReader[ParticipantStoreConfig] =
       deriveReader[ParticipantStoreConfig]
+    lazy implicit val ledgerApiServerParametersConfigReader
+        : ConfigReader[LedgerApiServerParametersConfig] =
+      deriveReader[LedgerApiServerParametersConfig]
     lazy implicit val participantNodeParameterConfigReader
         : ConfigReader[ParticipantNodeParameterConfig] =
       deriveReader[ParticipantNodeParameterConfig]
@@ -1093,6 +1101,8 @@ object CantonConfig {
     lazy implicit val clockConfigSimClockWriter: ConfigWriter[ClockConfig.SimClock.type] =
       deriveWriter[ClockConfig.SimClock.type]
     lazy implicit val clockConfigWriter: ConfigWriter[ClockConfig] = deriveWriter[ClockConfig]
+    lazy implicit val jwtTimestampLeewayConfigWriter: ConfigWriter[JwtTimestampLeeway] =
+      deriveWriter[JwtTimestampLeeway]
     lazy implicit val authServiceConfigJwtEs256CrtWriter
         : ConfigWriter[AuthServiceConfig.JwtEs256Crt] =
       deriveWriter[AuthServiceConfig.JwtEs256Crt]
@@ -1235,6 +1245,9 @@ object CantonConfig {
       deriveWriter[AdminWorkflowConfig]
     lazy implicit val participantStoreConfigWriter: ConfigWriter[ParticipantStoreConfig] =
       deriveWriter[ParticipantStoreConfig]
+    lazy implicit val ledgerApiServerParametersConfigWriter
+        : ConfigWriter[LedgerApiServerParametersConfig] =
+      deriveWriter[LedgerApiServerParametersConfig]
     lazy implicit val participantNodeParameterConfigWriter
         : ConfigWriter[ParticipantNodeParameterConfig] =
       deriveWriter[ParticipantNodeParameterConfig]
@@ -1316,7 +1329,7 @@ object CantonConfig {
   private def parseConfigs(
       files: NonEmpty[Seq[File]]
   )(implicit elc: ErrorLoggingContext): Either[CantonConfigError, NonEmpty[Seq[Config]]] = {
-    import cats.implicits._
+    import cats.implicits.*
     files.toNEF
       .traverse(f => Either.catchOnly[ConfigException](ConfigFactory.parseFile(f)).toValidatedNec)
       .toEither

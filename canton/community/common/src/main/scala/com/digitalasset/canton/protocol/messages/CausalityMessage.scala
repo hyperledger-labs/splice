@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.protocol.messages
 
-import cats.implicits._
+import cats.implicits.*
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
@@ -14,7 +14,7 @@ import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.version.{
   HasProtocolVersionedCompanion,
-  ProtobufVersion,
+  ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
 }
@@ -27,7 +27,7 @@ import com.digitalasset.canton.version.{
   * @param transferId The ID of the transfer for which we are propagating causality information
   * @param clock The vector clock specifying causality information at the time of the transfer out
   */
-sealed abstract case class CausalityMessage(
+final case class CausalityMessage(
     domainId: DomainId,
     transferId: TransferId,
     clock: VectorClock,
@@ -60,7 +60,7 @@ sealed abstract case class CausalityMessage(
 object CausalityMessage extends HasProtocolVersionedCompanion[CausalityMessage] {
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtobufVersion(0) -> VersionedProtoConverter(
+    ProtoVersion(0) -> VersionedProtoConverter(
       ProtocolVersion.v2,
       supportedProtoVersion(v0.CausalityMessage)(fromProtoV0),
       _.toProtoV0.toByteString,
@@ -77,11 +77,11 @@ object CausalityMessage extends HasProtocolVersionedCompanion[CausalityMessage] 
       protocolVersion: ProtocolVersion,
       transferId: TransferId,
       clock: VectorClock,
-  ): CausalityMessage = new CausalityMessage(
+  ): CausalityMessage = CausalityMessage(
     domainId,
     transferId,
     clock,
-  )(protocolVersionRepresentativeFor(protocolVersion)) {}
+  )(protocolVersionRepresentativeFor(protocolVersion))
 
   def fromProtoV0(cmP: v0.CausalityMessage): ParsingResult[CausalityMessage] = {
     val v0.CausalityMessage(domainIdP, transferIdP, clockPO) = cmP
@@ -89,11 +89,11 @@ object CausalityMessage extends HasProtocolVersionedCompanion[CausalityMessage] 
       domainId <- DomainId.fromProtoPrimitive(domainIdP, "target_domain_id")
       clocks <- ProtoConverter.parseRequired(VectorClock.fromProtoV0, "clock", clockPO)
       tid <- ProtoConverter.parseRequired(TransferId.fromProtoV0, "transfer_id", transferIdP)
-    } yield new CausalityMessage(
+    } yield CausalityMessage(
       domainId,
       tid,
       clocks,
-    )(protocolVersionRepresentativeFor(ProtobufVersion(0))) {}
+    )(protocolVersionRepresentativeFor(ProtoVersion(0)))
   }
 
   override protected def name: String = "CausalityMessage"

@@ -10,12 +10,10 @@ import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.crypto.{DomainSyncCryptoClient, Encrypted, TestHash}
 import com.digitalasset.canton.data.PeanoQueue.{BeforeHead, NotInserted}
 import com.digitalasset.canton.data.{CantonTimestamp, PeanoQueue}
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown.syntax.EitherTOnShutdownSyntax
 import com.digitalasset.canton.logging.pretty.Pretty
-import com.digitalasset.canton.participant.RequestCounter.GenesisRequestCounter
 import com.digitalasset.canton.participant.config.ParticipantStoreConfig
 import com.digitalasset.canton.participant.metrics.ParticipantTestMetrics
-import com.digitalasset.canton.participant.protocol.ProtocolProcessor._
+import com.digitalasset.canton.participant.protocol.ProtocolProcessor.*
 import com.digitalasset.canton.participant.protocol.RequestJournal.RequestState
 import com.digitalasset.canton.participant.protocol.RequestJournal.RequestState.{Confirmed, Pending}
 import com.digitalasset.canton.participant.protocol.TestProcessingSteps.{
@@ -23,13 +21,13 @@ import com.digitalasset.canton.participant.protocol.TestProcessingSteps.{
   TestProcessorError,
   TestViewType,
 }
-import com.digitalasset.canton.participant.protocol.conflictdetection.ConflictDetectionHelpers._
+import com.digitalasset.canton.participant.protocol.conflictdetection.ConflictDetectionHelpers.*
 import com.digitalasset.canton.participant.protocol.submission.InFlightSubmissionTracker.InFlightSubmissionTrackerDomainState
 import com.digitalasset.canton.participant.protocol.submission.{
   InFlightSubmissionTracker,
   NoCommandDeduplicator,
 }
-import com.digitalasset.canton.participant.store.memory._
+import com.digitalasset.canton.participant.store.memory.*
 import com.digitalasset.canton.participant.store.{
   MultiDomainEventLog,
   ParticipantNodePersistentState,
@@ -40,7 +38,7 @@ import com.digitalasset.canton.participant.sync.{
   ParticipantEventPublisher,
   SyncDomainPersistentStateLookup,
 }
-import com.digitalasset.canton.protocol.messages._
+import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.{
   DynamicDomainParameters,
   RequestAndRootHashMessage,
@@ -56,12 +54,18 @@ import com.digitalasset.canton.sequencing.client.{
   SendType,
   SequencerClient,
 }
-import com.digitalasset.canton.sequencing.protocol._
+import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.store.memory.InMemoryIndexedStringStore
 import com.digitalasset.canton.store.{CursorPrehead, IndexedDomain}
 import com.digitalasset.canton.time.{DomainTimeTracker, NonNegativeFiniteDuration, WallClock}
-import com.digitalasset.canton.topology._
-import com.digitalasset.canton.{BaseTest, DiscardOps, HasExecutionContext}
+import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.{
+  BaseTest,
+  DiscardOps,
+  HasExecutionContext,
+  RequestCounter,
+  SequencerCounter,
+}
 import com.google.protobuf.ByteString
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -101,7 +105,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
         callback(
           Success(
             Deliver.create(
-              0L,
+              SequencerCounter(0),
               CantonTimestamp.Epoch,
               domain,
               Some(messageId),
@@ -121,9 +125,9 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
   when(trm.verdict).thenAnswer(Verdict.Approve(testedProtocolVersion))
 
   private val requestId = RequestId(CantonTimestamp.Epoch)
-  private val requestSc = 0L
-  private val resultSc = 1L
-  private val rc = 0L
+  private val requestSc = SequencerCounter(0)
+  private val resultSc = SequencerCounter(1)
+  private val rc = RequestCounter(0)
   private val parameters =
     DynamicDomainParameters.initialValues(NonNegativeFiniteDuration.Zero, testedProtocolVersion)
 
@@ -174,6 +178,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
         None,
         uniqueContractKeysO = Some(false),
         ParticipantStoreConfig(),
+        testedReleaseProtocolVersion,
         ParticipantTestMetrics,
         indexedStringStore,
         timeouts,
@@ -304,7 +309,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
 
     "succeed without errors" in {
       val submissionMap = TrieMap[Int, Unit]()
-      val (sut, persistent, ephemeral) = testProcessingSteps(pendingSubmissionMap = submissionMap)
+      val (sut, _persistent, _ephemeral) = testProcessingSteps(pendingSubmissionMap = submissionMap)
       sut.submit(0).valueOrFailShutdown("submission").futureValue.futureValue shouldBe (())
       submissionMap.get(0) shouldBe Some(()) // store the pending submission
     }
@@ -337,7 +342,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
 
     "clean up the pending submissions when no request is received" in {
       val submissionMap = TrieMap[Int, Unit]()
-      val (sut, persistent, ephemeral) = testProcessingSteps(pendingSubmissionMap = submissionMap)
+      val (sut, _persistent, _ephemeral) = testProcessingSteps(pendingSubmissionMap = submissionMap)
 
       sut.submit(1).valueOrFailShutdown("submission").futureValue.futureValue shouldBe (())
       submissionMap.get(1) shouldBe Some(())
@@ -367,7 +372,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
   "process request" should {
 
     "succeed without errors" in {
-      val (sut, persistent, ephemeral) = testProcessingSteps()
+      val (sut, _persistent, _ephemeral) = testProcessingSteps()
       val () =
         sut
           .processRequest(requestId.unwrap, rc, requestSc, someRequestBatch)
@@ -378,7 +383,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
 
     "transit to confirmed" in {
       val pd = TestPendingRequestData(rc, requestSc, Set.empty)
-      val (sut, persistent, ephemeral) =
+      val (sut, _persistent, ephemeral) =
         testProcessingSteps(overrideConstructedPendingRequestData = Some(pd))
       val before = ephemeral.requestJournal.query(rc).value.futureValue
       before shouldEqual None
@@ -404,7 +409,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
               requestSc + 1,
               CantonTimestamp.Epoch.minusSeconds(10),
             ),
-            GenesisRequestCounter,
+            RequestCounter.Genesis.asLocalOffset,
             None,
           ),
         )
@@ -416,14 +421,14 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
         .processRequest(requestId.unwrap, rc, requestSc, someRequestBatch)
         .onShutdown(fail())
         .futureValue
-        .discard
+        .discard[Unit]
       val requestState = ephemeral.requestJournal.query(rc).value.futureValue
       requestState shouldEqual None
     }
 
     "trigger a timeout when the result doesn't arrive" in {
       val pd = TestPendingRequestData(rc, requestSc, Set.empty)
-      val (sut, persistent, ephemeral) =
+      val (sut, _persistent, ephemeral) =
         testProcessingSteps(overrideConstructedPendingRequestData = Some(pd))
 
       val journal = ephemeral.requestJournal
@@ -478,7 +483,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
         DefaultTestIdentities.mediator,
       )
 
-      val (sut, persistent, ephemeral) = testProcessingSteps()
+      val (sut, _persistent, _ephemeral) = testProcessingSteps()
       val () =
         loggerFactory
           .assertLogs(
@@ -510,7 +515,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
         DefaultTestIdentities.mediator,
       )
 
-      val (sut, persistent, ephemeral) = testProcessingSteps()
+      val (sut, _persistent, _ephemeral) = testProcessingSteps()
       val () =
         loggerFactory
           .assertLogs(
@@ -533,7 +538,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
         otherMediatorId,
       )
 
-      val (sut, persistent, ephemeral) = testProcessingSteps()
+      val (sut, _persistent, _ephemeral) = testProcessingSteps()
       loggerFactory
         .assertLogs(
           sut
@@ -587,15 +592,17 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
     def performResultProcessing(
         timestamp: CantonTimestamp,
         sut: TestInstance,
-    ): EitherT[Future, sut.steps.ResultError, Unit] = {
-      sut.performResultProcessing(
-        mock[SignedContent[Deliver[DefaultOpenEnvelope]]],
-        Right(trm),
-        requestId,
-        timestamp,
-        resultSc,
-      )
-    }
+    ): EitherT[Future, sut.steps.ResultError, Unit] =
+      sut
+        .performResultProcessing(
+          mock[SignedContent[Deliver[DefaultOpenEnvelope]]],
+          Right(trm),
+          requestId,
+          timestamp,
+          resultSc,
+        )
+        .map(_.onShutdown(fail("Unexpected shutdown")))
+        .flatMap(identity)
 
     "succeed without errors and transit to clean" in {
       val (sut, persistent, ephemeral) = testProcessingSteps()
@@ -605,8 +612,8 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
       // Check the initial state is clean
       taskScheduler.readSequencerCounterQueue(resultSc) shouldBe NotInserted(None, None)
 
-      val () = setUpOrFail(persistent, ephemeral)
-      val () = valueOrFail(performResultProcessing(CantonTimestamp.Epoch.plusSeconds(10), sut))(
+      setUpOrFail(persistent, ephemeral)
+      valueOrFail(performResultProcessing(CantonTimestamp.Epoch.plusSeconds(10), sut))(
         "result processing failed"
       ).futureValue
 
@@ -617,7 +624,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
     }
 
     "wait for request processing to finish" in {
-      val (sut, persistent, ephemeral) = testProcessingSteps()
+      val (sut, _persistent, ephemeral) = testProcessingSteps()
 
       val taskScheduler = ephemeral.requestTracker.taskScheduler
       val requestJournal = ephemeral.requestJournal
@@ -633,11 +640,10 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
       requestJournal.query(rc).value.futureValue shouldBe None
 
       // Now process the request message. This should trigger the completion of the result processing.
-      val () =
-        sut
-          .processRequest(requestId.unwrap, rc, requestSc, someRequestBatch)
-          .onShutdown(fail())
-          .futureValue
+      sut
+        .processRequest(requestId.unwrap, rc, requestSc, someRequestBatch)
+        .onShutdown(fail())
+        .futureValue
 
       eventually() {
         processF.value.futureValue shouldEqual Right(())
@@ -647,7 +653,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
     }
 
     "succeed without errors on clean replay, not changing the request state" in {
-      val (sut, persistent, ephemeral) = testProcessingSteps(
+      val (sut, _persistent, ephemeral) = testProcessingSteps(
         startingPoints = ProcessingStartingPoints.tryCreate(
           MessageProcessingStartingPoint(rc, requestSc, CantonTimestamp.Epoch.minusSeconds(1)),
           MessageProcessingStartingPoint(
@@ -655,7 +661,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
             requestSc + 10,
             CantonTimestamp.Epoch.plusSeconds(30),
           ),
-          GenesisRequestCounter,
+          RequestCounter.Genesis.asLocalOffset,
           None,
         ),
         pendingRequest = CleanReplayData(rc, requestSc, Set.empty),
@@ -669,7 +675,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
       val taskScheduler = ephemeral.requestTracker.taskScheduler
       taskScheduler.readSequencerCounterQueue(resultSc) shouldBe NotInserted(None, None)
 
-      val () = valueOrFail(performResultProcessing(CantonTimestamp.Epoch.plusSeconds(10), sut))(
+      valueOrFail(performResultProcessing(CantonTimestamp.Epoch.plusSeconds(10), sut))(
         "result processing failed"
       ).futureValue
 
@@ -686,7 +692,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
       val taskScheduler = ephemeral.requestTracker.taskScheduler
       taskScheduler.readSequencerCounterQueue(resultSc) shouldBe NotInserted(None, None)
 
-      val () = setUpOrFail(persistent, ephemeral)
+      setUpOrFail(persistent, ephemeral)
       val result = loggerFactory.suppressWarningsAndErrors(
         leftOrFail(performResultProcessing(CantonTimestamp.Epoch.plusSeconds(5 * 60), sut))(
           "result processing did not return a left"
@@ -714,7 +720,7 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
             requestSc - 1L,
             CantonTimestamp.Epoch.minusSeconds(11),
           ),
-          rc - 1L,
+          rc.asLocalOffset - 1L,
           Some(CursorPrehead(requestSc, requestTimestamp)),
         )
       )
@@ -723,11 +729,10 @@ class ProtocolProcessorTest extends AnyWordSpec with BaseTest with HasExecutionC
       val tsBefore = CantonTimestamp.Epoch.minusSeconds(10)
       taskScheduler.addTick(requestSc - 1L, tsBefore)
       addRequestState(ephemeral)
-      val () = setUpOrFail(persistent, ephemeral)
+      setUpOrFail(persistent, ephemeral)
 
       val resultTs = CantonTimestamp.Epoch.plusSeconds(1)
-      val () =
-        valueOrFail(performResultProcessing(resultTs, sut))("result processing failed").futureValue
+      valueOrFail(performResultProcessing(resultTs, sut))("result processing failed").futureValue
 
       val finalState = ephemeral.requestJournal.query(rc).value.futureValue
       finalState.value.state shouldEqual RequestState.Clean

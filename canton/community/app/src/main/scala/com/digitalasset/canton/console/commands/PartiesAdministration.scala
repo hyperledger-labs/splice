@@ -3,9 +3,9 @@
 
 package com.digitalasset.canton.console.commands
 
-import cats.syntax.either._
-import cats.syntax.foldable._
-import cats.syntax.traverse._
+import cats.syntax.either.*
+import cats.syntax.foldable.*
+import cats.syntax.traverse.*
 import com.digitalasset.canton.LedgerParticipantId
 import com.digitalasset.canton.admin.api.client.commands.{
   ParticipantAdminCommands,
@@ -13,7 +13,7 @@ import com.digitalasset.canton.admin.api.client.commands.{
 }
 import com.digitalasset.canton.admin.api.client.data.{ListConnectedDomainsResult, ListPartiesResult}
 import com.digitalasset.canton.config.NonNegativeDuration
-import com.digitalasset.canton.config.RequireTypes.String255
+import com.digitalasset.canton.config.RequireTypes.{PositiveInt, String255}
 import com.digitalasset.canton.console.{
   AdminCommandRunner,
   BaseInspection,
@@ -30,14 +30,14 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology._
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.transaction.{
   ParticipantPermission,
   RequestSide,
   TopologyChangeOp,
 }
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil._
+import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
 
 import java.time.Instant
@@ -45,7 +45,10 @@ import java.time.Instant
 class PartiesAdministrationGroup(runner: AdminCommandRunner, consoleEnvironment: ConsoleEnvironment)
     extends Helpful {
 
-  import runner._
+  protected def defaultLimit: PositiveInt =
+    consoleEnvironment.environment.config.parameters.console.defaultLimit
+
+  import runner.*
 
   @Help.Summary(
     "List active parties, their active participants, and the participants' permissions on domains."
@@ -60,7 +63,7 @@ class PartiesAdministrationGroup(runner: AdminCommandRunner, consoleEnvironment:
       filterParticipant: Filter for parties that are hosted by a participant with an id starting with the given string
       filterDomain: Filter by domains whose id starts with the given string.
       asOf: Optional timestamp to inspect the topology state at a given point in time.
-      limit: Limit on the number of parties fetched (defaults to 100).
+      limit: Limit on the number of parties fetched (defaults to canton.parameters.console.default-limit).
             
       Example: participant1.parties.list(filterParty="alice")
       """
@@ -70,7 +73,7 @@ class PartiesAdministrationGroup(runner: AdminCommandRunner, consoleEnvironment:
       filterParticipant: String = "",
       filterDomain: String = "",
       asOf: Option[Instant] = None,
-      limit: Int = 100,
+      limit: PositiveInt = defaultLimit,
   ): Seq[ListPartiesResult] =
     consoleEnvironment.run {
       adminCommand(
@@ -101,14 +104,14 @@ class ParticipantPartiesAdministrationGroup(
       filterParty: Filter by parties starting with the given string.
       filterDomain: Filter by domains whose id starts with the given string.
       asOf: Optional timestamp to inspect the topology state at a given point in time.
-      limit: How many items to return. Defaults to 100.
+      limit: How many items to return (defaults to canton.parameters.console.default-limit)
 
       Example: participant1.parties.hosted(filterParty="alice")""")
   def hosted(
       filterParty: String = "",
       filterDomain: String = "",
       asOf: Option[Instant] = None,
-      limit: Int = 100,
+      limit: PositiveInt = defaultLimit,
   ): Seq[ListPartiesResult] = {
     list(
       filterParty,
@@ -290,7 +293,7 @@ class LocalParticipantPartiesAdministrationGroup(
 ) extends ParticipantPartiesAdministrationGroup(reference.id, runner, consoleEnvironment)
     with FeatureFlagFilter {
 
-  import runner._
+  import runner.*
 
   @Help.Summary("Waits for any topology changes to be observed", FeatureFlag.Preview)
   @Help.Description(

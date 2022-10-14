@@ -1,4 +1,5 @@
 package com.daml.network.scan.admin.api.client.commands
+
 import cats.syntax.either._
 import cats.syntax.traverse._
 import com.daml.ledger.api.v1.transaction.TransactionTree

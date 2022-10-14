@@ -5,23 +5,19 @@ package com.digitalasset.canton.participant.protocol.submission.routing
 
 import cats.data.EitherT
 import com.daml.lf.language.LanguageVersion
-import com.daml.lf.transaction.test.TransactionBuilder.Implicits._
+import com.daml.lf.transaction.test.TransactionBuilder.Implicits.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.protocol.submission.DomainSelectionFixture.Transactions.{
   ExerciseByInterface,
   ThreeExercises,
 }
-import com.digitalasset.canton.participant.protocol.submission.DomainSelectionFixture._
+import com.digitalasset.canton.participant.protocol.submission.DomainSelectionFixture.*
 import com.digitalasset.canton.participant.protocol.submission.DomainUsabilityChecker.{
   DomainNotSupportingMinimumProtocolVersion,
   UnknownPackage,
 }
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.ConfigurationErrors.InvalidPrescribedDomainId
-import com.digitalasset.canton.participant.sync.TransactionRoutingError.ConfigurationErrors.InvalidPrescribedDomainId.{
-  NotAllInformeeAreOnDomain,
-  NotConnected,
-}
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.TopologyErrors.NoDomainForSubmission
 import com.digitalasset.canton.participant.sync.TransactionRoutingError.UnableToQueryTopologySnapshot
 import com.digitalasset.canton.participant.sync.{
@@ -36,7 +32,7 @@ import com.digitalasset.canton.protocol.{
   LfVersionedTransaction,
   WithContractMetadata,
 }
-import com.digitalasset.canton.topology._
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
@@ -72,9 +68,9 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
       - one contract as input
    */
   "DomainSelector (simple exercise by interface)" should {
-    import DomainSelectorTest._
-    import DomainSelectorTest.ForSimpleTopology._
-    import SimpleTopology._
+    import DomainSelectorTest.*
+    import DomainSelectorTest.ForSimpleTopology.*
+    import SimpleTopology.*
 
     implicit val _loggerFactor = loggerFactory
 
@@ -95,13 +91,14 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
 
     "return an error when not connected to the domain" in {
       val selector = selectorForExerciseByInterface(connectedDomains = Set())
+      val expected = TransactionRoutingError.UnableToQueryTopologySnapshot.Failed(da)
 
       // Single domain
-      selector.forSingleDomain.leftValue shouldBe NotConnected(da)
+      selector.forSingleDomain.leftValue shouldBe expected
 
       // Multi domain
       selector.forMultiDomain.leftValue shouldBe NoDomainForSubmission.Error(
-        Map(da -> TransactionRoutingError.UnableToQueryTopologySnapshot.Failed(da).toString)
+        Map(da -> expected.toString)
       )
     }
 
@@ -112,10 +109,11 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
       )
 
       // Single domain: failure
-      selector.forSingleDomain.leftValue shouldBe NotAllInformeeAreOnDomain(
-        da,
-        domainsOfAllInformee = NonEmpty.mk(Set, acme),
-      )
+      selector.forSingleDomain.leftValue shouldBe InvalidPrescribedDomainId
+        .NotAllInformeeAreOnDomain(
+          da,
+          domainsOfAllInformee = NonEmpty.mk(Set, acme),
+        )
 
       // Multi domain: transfer proposal (da -> acme)
       val domainRank = transfersDaToAcme(selector.inputContractIds)
@@ -230,10 +228,11 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
           )
 
         // Multi domain
-        selector.forMultiDomain.leftValue shouldBe NotAllInformeeAreOnDomain(
-          acme,
-          domainsOfAllInformee = NonEmpty.mk(Set, da),
-        )
+        selector.forMultiDomain.leftValue shouldBe InvalidPrescribedDomainId
+          .NotAllInformeeAreOnDomain(
+            acme,
+            domainsOfAllInformee = NonEmpty.mk(Set, da),
+          )
       }
 
       "propose transfers when needed" in {
@@ -271,12 +270,12 @@ class DomainSelectorTest extends AnyWordSpec with BaseTest with HasExecutionCont
       - three contracts as input
    */
   "DomainSelector (simple transaction with three input contracts)" should {
-    import DomainSelectorTest._
-    import DomainSelectorTest.ForSimpleTopology._
-    import SimpleTopology._
+    import DomainSelectorTest.*
+    import DomainSelectorTest.ForSimpleTopology.*
+    import SimpleTopology.*
 
     "minimize the number of transfers" in {
-      import ThreeExercises._
+      import ThreeExercises.*
 
       val domains = NonEmpty.mk(Set, acme, da, repair)
 
@@ -335,7 +334,7 @@ private[routing] object DomainSelectorTest {
   val repair = createDomainId("repair")
 
   object ForSimpleTopology {
-    import SimpleTopology._
+    import SimpleTopology.*
 
     private val defaultDomainOfContracts: Seq[LfContractId] => Map[LfContractId, DomainId] =
       contracts => contracts.map(_ -> da).toMap
@@ -452,7 +451,7 @@ private[routing] object DomainSelectorTest {
         inputContractsMetadata: Set[WithContractMetadata[LfContractId]],
     )(implicit ec: ExecutionContext, traceContext: TraceContext) {
 
-      import SimpleTopology._
+      import SimpleTopology.*
 
       val inputContractIds: Set[LfContractId] = inputContractsMetadata.map(_.unwrap)
 
@@ -501,7 +500,6 @@ private[routing] object DomainSelectorTest {
           new DomainSelector(
             participantId = submitterParticipantId,
             transactionData = transactionData,
-            connectedDomains = connectedDomains,
             domainsOfSubmittersAndInformees = domainsOfSubmittersAndInformees,
             priorityOfDomain = priorityOfDomain,
             domainRankComputation = domainRankComputation,

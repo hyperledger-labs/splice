@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.protocol.messages
 
-import cats.syntax.traverse._
+import cats.syntax.traverse.*
 import com.digitalasset.canton.config.RequireTypes.LengthLimitedString.TopologyRequestId
 import com.digitalasset.canton.config.RequireTypes.String255
 import com.digitalasset.canton.protocol.{v0, v1}
@@ -12,7 +12,7 @@ import com.digitalasset.canton.topology.transaction.{SignedTopologyTransaction, 
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, UniqueIdentifier}
 import com.digitalasset.canton.version.{
   HasProtocolVersionedCompanion,
-  ProtobufVersion,
+  ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
 }
@@ -20,7 +20,7 @@ import com.digitalasset.canton.version.{
 /** @param representativeProtocolVersion The representativeProtocolVersion must correspond to the protocol version of
   *                                      every transaction in the list (enforced by the factory method)
   */
-sealed abstract case class RegisterTopologyTransactionRequest(
+final case class RegisterTopologyTransactionRequest private (
     requestedBy: Member,
     participant: ParticipantId,
     requestId: TopologyRequestId,
@@ -58,7 +58,7 @@ object RegisterTopologyTransactionRequest
     extends HasProtocolVersionedCompanion[RegisterTopologyTransactionRequest] {
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtobufVersion(0) -> VersionedProtoConverter(
+    ProtoVersion(0) -> VersionedProtoConverter(
       ProtocolVersion.v2,
       supportedProtoVersion(v0.RegisterTopologyTransactionRequest)(fromProtoV0),
       _.toProtoV0.toByteString,
@@ -75,13 +75,13 @@ object RegisterTopologyTransactionRequest
   ): Iterable[RegisterTopologyTransactionRequest] =
     transactions.groupBy(_.representativeProtocolVersion).map {
       case (_transactionRepresentativeProtocolVersion, transactions) =>
-        new RegisterTopologyTransactionRequest(
+        RegisterTopologyTransactionRequest(
           requestedBy = requestedBy,
           participant = participant,
           requestId = requestId,
           transactions = transactions,
           domainId = domainId,
-        )(protocolVersionRepresentativeFor(protocolVersion)) {}
+        )(protocolVersionRepresentativeFor(protocolVersion))
     }
 
   def fromProtoV0(
@@ -95,13 +95,13 @@ object RegisterTopologyTransactionRequest
       )
       domainUid <- UniqueIdentifier.fromProtoPrimitive(message.domainId, "domainId")
       requestId <- String255.fromProtoPrimitive(message.requestId, "requestId")
-    } yield new RegisterTopologyTransactionRequest(
+    } yield RegisterTopologyTransactionRequest(
       requestedBy,
       ParticipantId(participantUid),
       requestId,
       transactions,
       DomainId(domainUid),
-    )(protocolVersionRepresentativeFor(ProtobufVersion(0))) {}
+    )(protocolVersionRepresentativeFor(ProtoVersion(0)))
   }
 
   override protected def name: String = "RegisterTopologyTransactionRequest"

@@ -1,4 +1,5 @@
 package com.daml.network.scan.store.memory
+
 import com.daml.network.history.CoinTransaction
 import com.daml.network.scan.store.ScanCCHistoryStore
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}

@@ -3,12 +3,12 @@
 
 package com.digitalasset.canton.participant.protocol.transfer
 
-import cats.data._
-import cats.syntax.bifunctor._
-import cats.syntax.either._
-import cats.syntax.foldable._
-import cats.syntax.traverse._
-import cats.syntax.traverseFilter._
+import cats.data.*
+import cats.syntax.bifunctor.*
+import cats.syntax.either.*
+import cats.syntax.foldable.*
+import cats.syntax.traverse.*
+import cats.syntax.traverseFilter.*
 import cats.{Applicative, MonoidK}
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.crypto.{DomainSnapshotSyncCryptoApi, HashOps}
@@ -16,14 +16,12 @@ import com.digitalasset.canton.data.ViewType.TransferOutViewType
 import com.digitalasset.canton.data.{CantonTimestamp, FullTransferOutTree, ViewType}
 import com.digitalasset.canton.error.{BaseCantonError, MediatorError}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown.syntax._
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
   NamedLoggerFactory,
   NamedLogging,
   TracedLogger,
 }
-import com.digitalasset.canton.participant.RequestCounter
 import com.digitalasset.canton.participant.protocol.ProcessingSteps.PendingRequestData
 import com.digitalasset.canton.participant.protocol.ProtocolProcessor.PendingRequestDataOrReplayData
 import com.digitalasset.canton.participant.protocol.conflictdetection.{
@@ -37,23 +35,23 @@ import com.digitalasset.canton.participant.protocol.submission.{
   SeedGenerator,
 }
 import com.digitalasset.canton.participant.protocol.transfer.TransferInProcessingSteps.NoTransferData
-import com.digitalasset.canton.participant.protocol.transfer.TransferOutProcessingSteps._
-import com.digitalasset.canton.participant.protocol.transfer.TransferProcessingSteps._
+import com.digitalasset.canton.participant.protocol.transfer.TransferOutProcessingSteps.*
+import com.digitalasset.canton.participant.protocol.transfer.TransferProcessingSteps.*
 import com.digitalasset.canton.participant.protocol.{
   ProtocolProcessor,
   SingleDomainCausalTracker,
   TransferOutUpdate,
 }
 import com.digitalasset.canton.participant.store.TransferStore.TransferCompleted
-import com.digitalasset.canton.participant.store._
+import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.util.DAMLe
-import com.digitalasset.canton.protocol._
+import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.Verdict.MediatorReject
-import com.digitalasset.canton.protocol.messages._
-import com.digitalasset.canton.sequencing.protocol._
-import com.digitalasset.canton.serialization.DeserializationError
+import com.digitalasset.canton.protocol.messages.*
+import com.digitalasset.canton.sequencing.protocol.*
+import com.digitalasset.canton.serialization.DefaultDeserializationError
 import com.digitalasset.canton.time.TimeProof
-import com.digitalasset.canton.topology._
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.{
   Confirmation,
@@ -68,7 +66,7 @@ import com.digitalasset.canton.util.EitherUtil.condUnitE
 import com.digitalasset.canton.util.{EitherTUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.version.Transfer.{SourceProtocolVersion, TargetProtocolVersion}
-import com.digitalasset.canton.{LfPartyId, SequencerCounter, checked}
+import com.digitalasset.canton.{LfPartyId, RequestCounter, SequencerCounter, checked}
 import org.slf4j.event.Level
 
 import scala.collection.{concurrent, mutable}
@@ -135,14 +133,12 @@ class TransferOutProcessingSteps(
         FutureUnlessShutdown.outcomeK
       )
 
-      // TODO(#9423) change DEV to stable protocol version when released and check PVs
       /*
-        In DEV, we introduced the sourceProtocolVersion in TransferInView, which is needed for
+        In PV=4, we introduced the sourceProtocolVersion in TransferInView, which is needed for
         proper deserialization. Hence, we disallow some transfers
        */
       missingSourceProtocolVersionInTransferIn = targetProtocolVersion.v <= ProtocolVersion.v3
-      isSourceProtocolVersionRequired =
-        sourceDomainProtocolVersion.v == ProtocolVersion.dev
+      isSourceProtocolVersionRequired = sourceDomainProtocolVersion.v >= ProtocolVersion.v4
 
       _ <- condUnitET[FutureUnlessShutdown](
         !(missingSourceProtocolVersionInTransferIn && isSourceProtocolVersionRequired),
@@ -205,7 +201,7 @@ class TransferOutProcessingSteps(
         Recipients.groups(
           checked(
             NonEmptyUtil.fromUnsafe(
-              recipients.toSeq.map(participant => NonEmpty(Set, mediatorId, participant))
+              recipients.toSeq.map(participant => NonEmpty(Set, mediatorId, participant: Member))
             )
           )
         )
@@ -264,7 +260,7 @@ class TransferOutProcessingSteps(
       ) { bytes =>
         FullTransferOutTree
           .fromByteString(sourceSnapshot.pureCrypto)(bytes)
-          .leftMap(e => DeserializationError(e.toString, bytes))
+          .leftMap(e => DefaultDeserializationError(e.toString))
       }
       .map(WithRecipients(_, envelope.recipients))
   }
@@ -713,7 +709,7 @@ class TransferOutProcessingSteps(
 
 object TransferOutProcessingSteps {
 
-  import com.digitalasset.canton.util.ShowUtil._
+  import com.digitalasset.canton.util.ShowUtil.*
 
   case class SubmissionParam(
       submittingParty: LfPartyId,
@@ -761,7 +757,7 @@ object TransferOutProcessingSteps {
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
-  ): EitherT[Future, TransferProcessorError, (TransferOutRequest, Set[Member])] = {
+  ): EitherT[Future, TransferProcessorError, (TransferOutRequest, Set[ParticipantId])] = {
 
     for {
       adminPartiesAndRecipients <- transferOutRequestData(
@@ -801,7 +797,7 @@ object TransferOutProcessingSteps {
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
-  ): EitherT[Future, TransferProcessorError, (Set[LfPartyId], Set[Member])] = {
+  ): EitherT[Future, TransferProcessorError, (Set[LfPartyId], Set[ParticipantId])] = {
     for {
       canSubmit <- EitherT.right(
         sourceIps.hostedOn(submitter, participantId).map(_.exists(_.permission == Submission))
@@ -831,7 +827,7 @@ object TransferOutProcessingSteps {
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
-  ): EitherT[Future, TransferProcessorError, (Set[LfPartyId], Set[Member])] = {
+  ): EitherT[Future, TransferProcessorError, (Set[LfPartyId], Set[ParticipantId])] = {
 
     val stakeholdersWithParticipantPermissionsF = stakeholders.toList
       .traverse { stakeholder =>
@@ -874,7 +870,7 @@ object TransferOutProcessingSteps {
       val participants =
         stakeholdersWithParticipantPermissions.values
           .map(_._1.all)
-          .foldLeft[Set[Member]](Set.empty[Member])(_ ++ _)
+          .foldLeft[Set[ParticipantId]](Set.empty[ParticipantId])(_ ++ _)
       (transferOutAdminParties, participants)
     }
   }

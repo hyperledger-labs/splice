@@ -14,7 +14,7 @@ import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.{DomainId, MediatorId}
 import com.digitalasset.canton.version.{
   HasProtocolVersionedWithContextCompanion,
-  ProtobufVersion,
+  ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
 }
@@ -76,7 +76,7 @@ case class InformeeMessage(fullInformeeTree: FullInformeeTree)(protocolVersion: 
 
   def toProtoV1: v1.InformeeMessage =
     v1.InformeeMessage(
-      fullInformeeTree = Some(fullInformeeTree.toProtoV0),
+      fullInformeeTree = Some(fullInformeeTree.toProtoV1),
       protocolVersion = protocolVersion.toProtoPrimitive,
     )
 
@@ -96,14 +96,13 @@ case class InformeeMessage(fullInformeeTree: FullInformeeTree)(protocolVersion: 
 object InformeeMessage extends HasProtocolVersionedWithContextCompanion[InformeeMessage, HashOps] {
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtobufVersion(0) -> VersionedProtoConverter(
+    ProtoVersion(0) -> VersionedProtoConverter(
       ProtocolVersion.v2,
       supportedProtoVersion(v0.InformeeMessage)((hashOps, proto) => fromProtoV0(hashOps)(proto)),
       _.toProtoV0.toByteString,
     ),
-    // TODO(i9423): Migrate to next protocol version
-    ProtobufVersion(1) -> VersionedProtoConverter(
-      ProtocolVersion.dev,
+    ProtoVersion(1) -> VersionedProtoConverter(
+      ProtocolVersion.v4,
       supportedProtoVersion(v1.InformeeMessage)((hashOps, proto) => fromProtoV1(hashOps)(proto)),
       _.toProtoV1.toByteString,
     ),
@@ -133,7 +132,7 @@ object InformeeMessage extends HasProtocolVersionedWithContextCompanion[Informee
       )
       fullInformeeTree <- FullInformeeTree.fromProtoV0(hashOps, fullInformeeTreeP)
     } yield new InformeeMessage(fullInformeeTree)(
-      protocolVersionRepresentativeFor(ProtobufVersion(0)).representative
+      protocolVersionRepresentativeFor(ProtoVersion(0)).representative
     )
   }
 
@@ -149,7 +148,7 @@ object InformeeMessage extends HasProtocolVersionedWithContextCompanion[Informee
         "InformeeMessage.informeeTree",
         maybeFullInformeeTreeP,
       )
-      fullInformeeTree <- FullInformeeTree.fromProtoV0(hashOps, fullInformeeTreeP)
+      fullInformeeTree <- FullInformeeTree.fromProtoV1(hashOps, fullInformeeTreeP)
       protocolVersion = ProtocolVersion(protocolVersionP)
     } yield new InformeeMessage(fullInformeeTree)(protocolVersion)
   }

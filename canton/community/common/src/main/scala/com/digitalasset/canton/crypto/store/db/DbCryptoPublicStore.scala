@@ -4,18 +4,18 @@
 package com.digitalasset.canton.crypto.store.db
 
 import cats.data.{EitherT, OptionT}
-import cats.syntax.bifunctor._
+import cats.syntax.bifunctor.*
+import com.daml.metrics.MetricHandle.Gauge
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.crypto._
-import com.digitalasset.canton.crypto.store._
+import com.digitalasset.canton.crypto.*
+import com.digitalasset.canton.crypto.store.*
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.metrics.MetricHandle.GaugeM
 import com.digitalasset.canton.metrics.TimedLoadGauge
 import com.digitalasset.canton.resource.DbStorage.{DbAction, Profile}
 import com.digitalasset.canton.resource.{DbStorage, DbStore}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil}
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.version.ReleaseProtocolVersion
 import io.functionmeta.functionFullName
 import slick.jdbc.{GetResult, SetParameter}
 
@@ -23,25 +23,25 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class DbCryptoPublicStore(
     override protected val storage: DbStorage,
+    protected val releaseProtocolVersion: ReleaseProtocolVersion,
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
 )(override implicit val ec: ExecutionContext)
     extends CryptoPublicStore
     with DbStore {
 
-  import storage.api._
-  import storage.converters._
+  import storage.api.*
+  import storage.converters.*
 
-  private val insertTime: GaugeM[TimedLoadGauge, Double] =
+  private val insertTime: Gauge[TimedLoadGauge, Double] =
     storage.metrics.loadGaugeM("crypto-public-store-insert")
-  private val queryTime: GaugeM[TimedLoadGauge, Double] =
+  private val queryTime: Gauge[TimedLoadGauge, Double] =
     storage.metrics.loadGaugeM("crypto-public-store-query")
 
-  private val protocolVersion = ProtocolVersion.v2Todo_i8793
   private implicit val setParameterEncryptionPublicKey: SetParameter[EncryptionPublicKey] =
-    EncryptionPublicKey.getVersionedSetParameter(protocolVersion)
+    EncryptionPublicKey.getVersionedSetParameter(releaseProtocolVersion.v)
   private implicit val setParameterSigningPublicKey: SetParameter[SigningPublicKey] =
-    SigningPublicKey.getVersionedSetParameter(protocolVersion)
+    SigningPublicKey.getVersionedSetParameter(releaseProtocolVersion.v)
 
   private def queryKeys[K: GetResult](purpose: KeyPurpose): DbAction.ReadOnly[Set[K]] =
     sql"select data, name from crypto_public_keys where purpose = $purpose"

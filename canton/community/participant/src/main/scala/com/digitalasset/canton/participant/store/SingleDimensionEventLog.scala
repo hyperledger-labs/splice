@@ -19,7 +19,8 @@ import com.digitalasset.canton.store.{IndexedDomain, IndexedStringStore}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
-import com.digitalasset.canton.util.ShowUtil._
+import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.version.ReleaseProtocolVersion
 import com.digitalasset.canton.{LedgerTransactionId, checked}
 import slick.jdbc.SetParameter
 
@@ -130,7 +131,7 @@ trait SingleDimensionEventLog[+Id <: EventLogId] extends SingleDimensionEventLog
       traceContext: TraceContext
   ): Future[Boolean]
 
-  /** Deletes all events whose request counter is at least `inclusive`.
+  /** Deletes all events whose local offset is at least `inclusive`.
     * This operation need not execute atomically.
     */
   def deleteSince(inclusive: LocalOffset)(implicit traceContext: TraceContext): Future[Unit]
@@ -193,6 +194,7 @@ object SingleDimensionEventLog {
       id: Id,
       storage: Storage,
       indexedStringStore: IndexedStringStore,
+      releaseProtocolVersion: ReleaseProtocolVersion,
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
   )(implicit executionContext: ExecutionContext): SingleDimensionEventLog[Id] =
@@ -203,6 +205,7 @@ object SingleDimensionEventLog {
           id,
           dbStorage,
           indexedStringStore,
+          releaseProtocolVersion,
           timeouts,
           loggerFactory,
         )

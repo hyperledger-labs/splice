@@ -5,6 +5,7 @@ import cats.data.EitherT
 import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
 import com.daml.network.environment.CoinNodeBootstrapBase
 import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
 import com.daml.network.splitwise.metrics.SplitwiseAppMetrics
@@ -35,6 +36,7 @@ class SplitwiseAppBootstrap(
     metrics: SplitwiseAppMetrics,
     storageFactory: StorageFactory,
     parentLogger: NamedLoggerFactory,
+    writeHealthDumpToFile: HealthDumpFunction,
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     @nowarn("cat=unused")
@@ -53,6 +55,7 @@ class SplitwiseAppBootstrap(
       metrics,
       storageFactory,
       parentLogger.append(SplitwiseAppBootstrap.LoggerFactoryKeyName, name.unwrap),
+      writeHealthDumpToFile,
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
@@ -88,6 +91,7 @@ object SplitwiseAppBootstrap {
       testingConfigInternal: TestingConfigInternal,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
+      writeHealthDumpToFile: HealthDumpFunction,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
       scheduler: ScheduledExecutorService,
@@ -106,6 +110,7 @@ object SplitwiseAppBootstrap {
           splitwiseMetrics,
           new CommunityStorageFactory(splitwiseConfig.storage),
           loggerFactory,
+          writeHealthDumpToFile,
         )
       )
       .leftMap(_.toString)

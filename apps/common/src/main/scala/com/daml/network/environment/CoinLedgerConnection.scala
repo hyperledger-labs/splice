@@ -5,7 +5,7 @@ import akka.stream.KillSwitches
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
 import com.daml.error.definitions.LedgerApiErrors
-import com.daml.error.definitions.groups.UserManagementServiceErrors
+import com.daml.error.definitions.groups.UserManagementServiceErrorGroup
 import com.daml.error.utils.ErrorDetails
 import com.daml.ledger.api.v1.commands.Commands.DeduplicationPeriod
 import com.daml.ledger.api.domain.UserRight
@@ -463,7 +463,7 @@ object CoinLedgerConnection {
               case Failure(e: StatusRuntimeException)
                   if ErrorDetails.matches(
                     e,
-                    UserManagementServiceErrors.UserNotFound,
+                    UserManagementServiceErrorGroup.UserNotFound,
                   ) =>
                 Success(false)
               case Failure(e) => Failure(e)

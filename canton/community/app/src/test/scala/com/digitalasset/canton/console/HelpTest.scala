@@ -2,13 +2,11 @@
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
+
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.console.Help.forInstance
 import org.scalatest.funsuite.AnyFunSuite
 
-import scala.annotation.nowarn
-
-@SuppressWarnings(Array("org.wartremover.warts.TraversableOps"))
 class HelpTest extends AnyFunSuite with BaseTest {
 
   object Example {
@@ -51,7 +49,6 @@ class HelpTest extends AnyFunSuite with BaseTest {
     def thing(): Unit = ()
   }
 
-  @nowarn("cat=unused")
   object ImplicitsExample extends TestHelpful {
     @Help.Summary("Implicit should not be visible")
     def thing(implicit someImplicit: Int): Unit = ()

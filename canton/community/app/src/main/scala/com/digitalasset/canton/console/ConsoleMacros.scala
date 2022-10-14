@@ -4,7 +4,7 @@
 package com.digitalasset.canton.console
 
 import better.files.File
-import cats.syntax.functor._
+import cats.syntax.functor.*
 import ch.qos.logback.classic.spi.ILoggingEvent
 import ch.qos.logback.classic.{Level, Logger}
 import ch.qos.logback.core.spi.AppenderAttachable
@@ -12,44 +12,45 @@ import ch.qos.logback.core.{Appender, FileAppender}
 import com.daml.ledger.api.v1.commands.{Command, CreateCommand, ExerciseCommand}
 import com.daml.ledger.api.v1.event.CreatedEvent
 import com.daml.ledger.api.v1.value.{
-  Identifier => IdentifierV1,
-  List => ListV1,
+  Identifier as IdentifierV1,
+  List as ListV1,
   Optional,
   Record,
   RecordField,
   Value,
 }
+import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.ContractData
 import com.digitalasset.canton.admin.api.client.data.ListPartiesResult
 import com.digitalasset.canton.concurrent.Threading
-import com.digitalasset.canton.config.RequireTypes.Port
+import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
 import com.digitalasset.canton.config.{NonNegativeDuration, ProcessingTimeout}
-import com.digitalasset.canton.console.ConsoleEnvironment.Implicits._
+import com.digitalasset.canton.console.ConsoleEnvironment.Implicits.*
 import com.digitalasset.canton.external.{BackgroundRunnerHandler, BackgroundRunnerHelpers}
 import com.digitalasset.canton.logging.{LastErrorsAppender, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.admin.{RepairService, SyncStateInspection}
 import com.digitalasset.canton.participant.config.{AuthServiceConfig, BaseParticipantConfig}
 import com.digitalasset.canton.participant.ledger.api.JwtTokenUtilities
 import com.digitalasset.canton.protocol.{LfContractId, SerializableContract}
-import com.digitalasset.canton.topology._
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.{BinaryFileUtil, ErrorUtil}
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.Encoder
 import io.circe.generic.semiauto.deriveEncoder
-import io.circe.syntax._
+import io.circe.syntax.*
 
-import java.io.{File => JFile}
+import java.io.{File as JFile}
 import java.time.Instant
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import scala.annotation.nowarn
-import scala.concurrent.duration._
-import scala.jdk.CollectionConverters._
+import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
 
 trait ConsoleMacros extends NamedLogging with NoTracing {
-  import scala.reflect.runtime.universe._
+  import scala.reflect.runtime.universe.*
 
   @Help.Summary("Console utilities")
   @Help.Group("Utilities")
@@ -136,8 +137,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
         condition: => Boolean,
         failure: => String = s"Condition never became true within $timeout",
     ): Unit = {
-      retry(timeout, maxWaitPeriod)(condition)(x => !x, failure)
-      ()
+      retry(timeout, maxWaitPeriod)(condition)(x => !x, failure).discard
     }
 
     @Help.Summary("Wait until all topology changes have been effected on all accessible nodes")
@@ -181,7 +181,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
 
     @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
     private object GenerateDamlScriptParticipantsConf {
-      import ConsoleEnvironment.Implicits._
+      import ConsoleEnvironment.Implicits.*
 
       private val filename = "participant-config.json"
 
@@ -726,7 +726,7 @@ object DebuggingHelpers extends LazyLogging {
 
   def get_active_contracts(
       ref: LocalParticipantReference,
-      limit: Int = 1000000,
+      limit: PositiveInt = PositiveInt.tryCreate(1000000),
   ): (Map[String, String], Map[String, String]) =
     get_active_contracts_helper(
       ref,
@@ -736,13 +736,13 @@ object DebuggingHelpers extends LazyLogging {
   def get_active_contracts_from_internal_db_state(
       ref: ParticipantReference,
       state: SyncStateInspection,
-      limit: Int = 1000000,
+      limit: PositiveInt = PositiveInt.tryCreate(1000000),
   ): (Map[String, String], Map[String, String]) =
     get_active_contracts_helper(
       ref,
       alias =>
         TraceContext.withNewTraceContext(implicit traceContext =>
-          state.findContracts(alias, None, None, None, limit)
+          state.findContracts(alias, None, None, None, limit.value)
         ),
     )
 

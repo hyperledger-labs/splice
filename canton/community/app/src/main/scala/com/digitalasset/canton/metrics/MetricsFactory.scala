@@ -7,7 +7,12 @@ import com.codahale.metrics
 import com.codahale.metrics.{Metric, MetricFilter}
 import com.daml.metrics.{JvmMetricSet, MetricName}
 import com.digitalasset.canton.DomainAlias
-import com.digitalasset.canton.domain.metrics.{DomainMetrics, MediatorNodeMetrics, SequencerMetrics}
+import com.digitalasset.canton.domain.metrics.{
+  DomainMetrics,
+  EnvMetrics,
+  MediatorNodeMetrics,
+  SequencerMetrics,
+}
 import com.digitalasset.canton.metrics.MetricsConfig.MetricsFilterConfig
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
@@ -132,6 +137,7 @@ case class MetricsFactory(
 ) extends AutoCloseable
     with MetricsFactoryBase {
 
+  private val envMetrics = new EnvMetrics(registry)
   private val participants = TrieMap[String, ParticipantMetrics]()
   private val domains = TrieMap[String, DomainMetrics]()
   private val sequencers = TrieMap[String, SequencerMetrics]()
@@ -147,6 +153,8 @@ case class MetricsFactory(
       },
     )
   }
+
+  def forJvm: EnvMetrics = envMetrics
 
   def forDomain(name: String): DomainMetrics = {
     domains.getOrElseUpdate(
@@ -202,7 +210,7 @@ case class MetricsFactory(
 
 object MetricsFactory extends LazyLogging {
 
-  import MetricsConfig._
+  import MetricsConfig.*
 
   val prefix: MetricName = MetricName("canton")
 

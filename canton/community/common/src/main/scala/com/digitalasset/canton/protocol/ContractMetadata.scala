@@ -3,8 +3,8 @@
 
 package com.digitalasset.canton.protocol
 
-import cats.syntax.either._
-import cats.syntax.traverse._
+import cats.syntax.either.*
+import cats.syntax.traverse.*
 import com.digitalasset.canton.ProtoDeserializationError.FieldNotSet
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.ContractMetadata.InvalidContractMetadata
@@ -83,13 +83,6 @@ object ContractMetadata extends HasVersionedMessageCompanion[ContractMetadata] {
 
   case class InvalidContractMetadata(message: String) extends RuntimeException(message)
 
-  private def apply(
-      signatories: Set[LfPartyId],
-      stakeholders: Set[LfPartyId],
-      maybeKeyWithMaintainers: Option[LfVersioned[LfGlobalKeyWithMaintainers]],
-  ): ContractMetadata =
-    throw new UnsupportedOperationException("Use the other factory methods instead")
-
   def tryCreate(
       signatories: Set[LfPartyId],
       stakeholders: Set[LfPartyId],
@@ -142,7 +135,7 @@ case class WithContractMetadata[+A](private val x: A, metadata: ContractMetadata
 
 object WithContractMetadata {
   implicit def prettyWithContractMetadata[A: Pretty]: Pretty[WithContractMetadata[A]] = {
-    import Pretty._
+    import Pretty.*
     prettyOfClass(
       unnamedParam(_.x),
       param("metadata", _.metadata),

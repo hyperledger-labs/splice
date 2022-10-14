@@ -18,10 +18,11 @@ import com.digitalasset.canton.domain.sequencing.sequencer.errors.{
 import com.digitalasset.canton.health.admin.data.SequencerHealthStatus
 import com.digitalasset.canton.lifecycle.{FlagCloseable, HasCloseContext}
 import com.digitalasset.canton.logging.{HasLoggerName, NamedLoggerFactory}
-import com.digitalasset.canton.sequencing._
+import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.sequencing.protocol.{
   DeliverErrorReason,
   SendAsyncError,
+  SignedContent,
   SubmissionRequest,
 }
 import com.digitalasset.canton.topology.Member
@@ -77,6 +78,10 @@ trait Sequencer extends FlagCloseable with HasCloseContext {
   def authorizeLedgerIdentity(identity: LedgerIdentity)(implicit
       traceContext: TraceContext
   ): EitherT[Future, String, Unit]
+
+  def sendAsyncSigned(signedSubmission: SignedContent[SubmissionRequest])(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, SendAsyncError, Unit]
 
   def sendAsync(submission: SubmissionRequest)(implicit
       traceContext: TraceContext

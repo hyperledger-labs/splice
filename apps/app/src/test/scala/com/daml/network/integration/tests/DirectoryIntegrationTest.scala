@@ -1,4 +1,5 @@
 package com.daml.network.integration.tests
+
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.CN.{Directory => codegen}
 import com.daml.network.console.{

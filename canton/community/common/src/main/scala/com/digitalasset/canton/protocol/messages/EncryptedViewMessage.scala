@@ -5,10 +5,10 @@ package com.digitalasset.canton.protocol.messages
 
 import cats.Functor
 import cats.data.EitherT
-import cats.syntax.either._
-import cats.syntax.traverse._
+import cats.syntax.either.*
+import cats.syntax.traverse.*
 import com.digitalasset.canton.ProtoDeserializationError.CryptoDeserializationError
-import com.digitalasset.canton.crypto._
+import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.ViewType
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.messages.ProtocolMessage.ProtocolMessageContentCast
@@ -16,12 +16,12 @@ import com.digitalasset.canton.protocol.{ViewHash, v0, v1}
 import com.digitalasset.canton.serialization.DeserializationError
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.{DomainId, ParticipantId, UniqueIdentifier}
-import com.digitalasset.canton.util._
+import com.digitalasset.canton.util.*
 import com.digitalasset.canton.version.{
   HasProtocolVersionedCompanion,
   HasRepresentativeProtocolVersion,
   HasVersionedToByteString,
-  ProtobufVersion,
+  ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
 }
@@ -116,8 +116,7 @@ object EncryptedView {
     * instances.
     */
   case class CompressedView[+V <: HasVersionedToByteString] private (value: V)
-      extends HasVersionedToByteString
-      with NoCopy {
+      extends HasVersionedToByteString {
     override def toByteString(version: ProtocolVersion): ByteString =
       ByteStringUtil.compressGzip(value.toByteString(version))
   }
@@ -129,8 +128,11 @@ object EncryptedView {
     private[EncryptedView] def fromByteString[V <: HasVersionedToByteString](
         deserialize: ByteString => Either[DeserializationError, V]
     )(bytes: ByteString): Either[DeserializationError, CompressedView[V]] =
-      // TODO(M40) Make sure that this view does not explode into an arbitrarily large object
-      ByteStringUtil.decompressGzip(bytes).flatMap(deserialize).map(CompressedView(_))
+      // TODO(i10428) Make sure that this view does not explode into an arbitrarily large object
+      ByteStringUtil
+        .decompressGzip(bytes, maxBytesLimit = None)
+        .flatMap(deserialize)
+        .map(CompressedView(_))
   }
 
 }
@@ -183,7 +185,7 @@ sealed trait EncryptedViewMessage[+VT <: ViewType]
   def toByteString: ByteString
 }
 
-case class EncryptedViewMessageV0[+VT <: ViewType] private (
+final case class EncryptedViewMessageV0[+VT <: ViewType](
     submitterParticipantSignature: Option[Signature],
     viewHash: ViewHash,
     randomnessMap: Map[ParticipantId, Encrypted[SecureRandomness]],
@@ -195,7 +197,7 @@ case class EncryptedViewMessageV0[+VT <: ViewType] private (
   protected[messages] def participants: Option[Set[ParticipantId]] = Some(randomnessMap.keySet)
 
   val representativeProtocolVersion: RepresentativeProtocolVersion[EncryptedViewMessage[_]] =
-    EncryptedViewMessage.protocolVersionRepresentativeFor(ProtobufVersion(0))
+    EncryptedViewMessage.protocolVersionRepresentativeFor(ProtoVersion(0))
 
   def toProtoV0: v0.EncryptedViewMessage =
     v0.EncryptedViewMessage(
@@ -219,7 +221,7 @@ case class EncryptedViewMessageV0[+VT <: ViewType] private (
   override def toByteString: ByteString = toProtoV0.toByteString
 }
 
-case class EncryptedViewMessageV1[+VT <: ViewType] private (
+final case class EncryptedViewMessageV1[+VT <: ViewType](
     submitterParticipantSignature: Option[Signature],
     viewHash: ViewHash,
     randomness: Seq[AsymmetricEncrypted[SecureRandomness]],
@@ -235,7 +237,7 @@ case class EncryptedViewMessageV1[+VT <: ViewType] private (
     informeeParticipants
 
   val representativeProtocolVersion: RepresentativeProtocolVersion[EncryptedViewMessage[_]] =
-    EncryptedViewMessage.protocolVersionRepresentativeFor(ProtobufVersion(1))
+    EncryptedViewMessage.protocolVersionRepresentativeFor(ProtoVersion(1))
 
   def toProtoV1: v1.EncryptedViewMessage = v1.EncryptedViewMessage(
     viewTree = encryptedView.viewTree.ciphertext,
@@ -429,14 +431,13 @@ object EncryptedViewMessageV1 {
 object EncryptedViewMessage extends HasProtocolVersionedCompanion[EncryptedViewMessage[_]] {
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtobufVersion(0) -> VersionedProtoConverter(
+    ProtoVersion(0) -> VersionedProtoConverter(
       ProtocolVersion.v2,
       supportedProtoVersion(v0.EncryptedViewMessage)(EncryptedViewMessageV0.fromProto),
       _.toByteString,
     ),
-    ProtobufVersion(1) -> VersionedProtoConverter(
-      // TODO(i9423): Migrate to next protocol version
-      ProtocolVersion.dev,
+    ProtoVersion(1) -> VersionedProtoConverter(
+      ProtocolVersion.v4,
       supportedProtoVersion(v1.EncryptedViewMessage)(EncryptedViewMessageV1.fromProto),
       _.toByteString,
     ),

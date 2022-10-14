@@ -6,7 +6,7 @@ package com.digitalasset.canton.console
 import ammonite.util.Bind
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.data.CantonStatus
-import com.digitalasset.canton.config.RequireTypes.{InstanceName, NonNegativeInt}
+import com.digitalasset.canton.config.RequireTypes.{InstanceName, NonNegativeInt, PositiveInt}
 import com.digitalasset.canton.config.{
   ConsoleCommandTimeout,
   NonNegativeDuration,
@@ -32,10 +32,10 @@ import com.digitalasset.canton.tracing.{NoTracing, TraceContext, TracerProvider}
 import com.typesafe.scalalogging.Logger
 import io.opentelemetry.api.trace.Tracer
 
-import java.time.{Duration => JDuration, Instant}
+import java.time.{Duration as JDuration, Instant}
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.duration.{Duration => SDuration}
-import scala.reflect.runtime.{universe => ru}
+import scala.concurrent.duration.{Duration as SDuration}
+import scala.reflect.runtime.{universe as ru}
 import scala.util.control.NonFatal
 
 case class NodeReferences[A, R <: A, L <: A](local: Seq[L], remote: Seq[R]) {
@@ -174,7 +174,7 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
       *   It is up to the caller to fail more gracefully.
       */
     lazy val asBind: Bind[T] = {
-      InstanceName.tryCreate(nameUnsafe)
+      InstanceName.tryCreate(nameUnsafe).discard
 
       // Surround with back-ticks to handle the case that name is a reserved keyword in scala.
       Bind("`" + nameUnsafe + "`", value)
@@ -530,6 +530,11 @@ object ConsoleEnvironment {
       * @throws java.lang.IllegalArgumentException if `n` is negative
       */
     implicit def toNonNegativeInt(n: Int): NonNegativeInt = NonNegativeInt.tryCreate(n)
+
+    /** Implicitly map an `Int` to a `PositiveInt`.
+      * @throws java.lang.IllegalArgumentException if `n` is not positive
+      */
+    implicit def toPositiveInt(n: Int): PositiveInt = PositiveInt.tryCreate(n)
 
     /** Implicitly convert a duration to a [[com.digitalasset.canton.config.NonNegativeDuration]]
       * @throws java.lang.IllegalArgumentException if `duration` is negative

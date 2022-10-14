@@ -19,13 +19,18 @@ trait DbDomainConnectionConfigStoreTest
   this: DbTest =>
 
   override def cleanDb(storage: DbStorage): Future[_] = {
-    import storage.api._
+    import storage.api.*
     storage.update_(sqlu"truncate table participant_domain_connection_configs", functionFullName)
   }
 
   "DbDomainConnectionConfigStoreTest" should {
     behave like domainConnectionConfigStore(
-      new DbDomainConnectionConfigStore(storage, timeouts, loggerFactory).initialize()
+      new DbDomainConnectionConfigStore(
+        storage,
+        testedReleaseProtocolVersion,
+        timeouts,
+        loggerFactory,
+      ).initialize()
     )
   }
 }

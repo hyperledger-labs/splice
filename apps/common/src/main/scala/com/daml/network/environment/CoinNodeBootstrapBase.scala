@@ -1,7 +1,9 @@
 package com.daml.network.environment
 
 import akka.actor.ActorSystem
+import better.files.File
 import cats.data.EitherT
+import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.{LocalNodeConfig, LocalNodeParameters, ProcessingTimeout}
@@ -24,6 +26,10 @@ import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.{Future, blocking}
+
+object CoinNodeBootstrap {
+  type HealthDumpFunction = () => Future[File]
+}
 
 /** Modelled after CantonNodeBootstrap
   */
@@ -74,6 +80,7 @@ abstract class CoinNodeBootstrapBase[
     nodeMetrics: NodeMetrics,
     storageFactory: StorageFactory,
     val loggerFactory: NamedLoggerFactory,
+    writeHealthDumpToFile: HealthDumpFunction,
 )(
     implicit val executionContext: ExecutionContextIdlenessExecutorService,
     implicit val actorSystem: ActorSystem,
@@ -163,7 +170,12 @@ abstract class CoinNodeBootstrapBase[
 
     val registry = builder.mutableHandlerRegistry()
     val server = builder
-      .addService(StatusServiceGrpc.bindService(new GrpcStatusService(status), executionContext))
+      .addService(
+        StatusServiceGrpc.bindService(
+          new GrpcStatusService(status, writeHealthDumpToFile, parameterConfig.processingTimeouts),
+          executionContext,
+        )
+      )
       .addService(ProtoReflectionService.newInstance(), false)
       .build
       .start()

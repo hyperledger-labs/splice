@@ -83,20 +83,22 @@ class WalletApp(
       )
       val walletStore = WalletStore(walletStoreKey, storage, loggerFactory)
 
-      adminServerRegistry.addService(
-        ServerInterceptors.intercept(
-          WalletServiceGrpc.bindService(
-            new GrpcWalletService(
-              walletStore,
-              ledgerClient,
-              scanConnection,
-              loggerFactory = loggerFactory,
+      adminServerRegistry
+        .addService(
+          ServerInterceptors.intercept(
+            WalletServiceGrpc.bindService(
+              new GrpcWalletService(
+                walletStore,
+                ledgerClient,
+                scanConnection,
+                loggerFactory = loggerFactory,
+              ),
+              ec,
             ),
-            ec,
-          ),
-          new AuthInterceptor(),
+            new AuthInterceptor(),
+          )
         )
-      )
+        .discard
 
       val automation = new WalletAutomationService(
         walletStore,

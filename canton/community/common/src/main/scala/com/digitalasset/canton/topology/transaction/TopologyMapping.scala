@@ -3,19 +3,18 @@
 
 package com.digitalasset.canton.topology.transaction
 
-import cats.syntax.either._
-import cats.syntax.option._
-import cats.syntax.traverse._
+import cats.syntax.either.*
+import cats.syntax.option.*
+import cats.syntax.traverse.*
 import com.digitalasset.canton.ProtoDeserializationError.{FieldNotSet, UnrecognizedEnum}
-import com.digitalasset.canton.crypto._
-import com.digitalasset.canton.logging.pretty.PrettyInstances._
+import com.digitalasset.canton.crypto.*
+import com.digitalasset.canton.logging.pretty.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.{DynamicDomainParameters, v0, v1}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{ProtoConverter, ProtocolVersionedMemoizedEvidence}
-import com.digitalasset.canton.topology._
-import com.digitalasset.canton.util.NoCopy
-import com.digitalasset.canton.version._
+import com.digitalasset.canton.topology.*
+import com.digitalasset.canton.version.*
 import com.digitalasset.canton.{LfPackageId, ProtoDeserializationError}
 import com.google.protobuf.ByteString
 
@@ -94,7 +93,7 @@ object NamespaceDelegation {
     sit.transaction.element.mapping match {
       case nd: NamespaceDelegation =>
         nd.namespace.fingerprint == sit.key.fingerprint && nd.isRootDelegation && nd.target.fingerprint == nd.namespace.fingerprint &&
-          sit.operation == TopologyChangeOp.Add
+        sit.operation == TopologyChangeOp.Add
       case _ => false
     }
 
@@ -166,7 +165,7 @@ final case class OwnerToKeyMapping(owner: KeyOwner, key: PublicKey)
   def toProtoV0: v0.OwnerToKeyMapping =
     v0.OwnerToKeyMapping(
       keyOwner = owner.toProtoPrimitive,
-      publicKey = Some(key.toProtoPublicKey),
+      publicKey = Some(key.toProtoPublicKeyV0),
     )
 
   override def uniquePath(id: TopologyElementId): UniquePath =
@@ -231,15 +230,14 @@ object SignedLegalIdentityClaim {
     } yield SignedLegalIdentityClaim(claim.uid, value.claim, signature)
 }
 
-sealed abstract case class LegalIdentityClaim private (
+final case class LegalIdentityClaim private (
     uid: UniqueIdentifier,
     evidence: LegalIdentityClaimEvidence,
 )(
     val representativeProtocolVersion: RepresentativeProtocolVersion[LegalIdentityClaim],
     override val deserializedFrom: Option[ByteString],
 ) extends ProtocolVersionedMemoizedEvidence
-    with HasProtocolVersionedWrapper[LegalIdentityClaim]
-    with NoCopy {
+    with HasProtocolVersionedWrapper[LegalIdentityClaim] {
 
   override def companionObj = LegalIdentityClaim
 
@@ -260,7 +258,7 @@ object LegalIdentityClaim extends HasMemoizedProtocolVersionedWrapperCompanion[L
   override val name: String = "LegalIdentityClaim"
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtobufVersion(0) -> VersionedProtoConverter(
+    ProtoVersion(0) -> VersionedProtoConverter(
       ProtocolVersion.v2,
       supportedProtoVersionMemoized(v0.LegalIdentityClaim)(fromProtoV0),
       _.toProtoV0.toByteString,
@@ -272,21 +270,21 @@ object LegalIdentityClaim extends HasMemoizedProtocolVersionedWrapperCompanion[L
       evidence: LegalIdentityClaimEvidence,
       protocolVersion: ProtocolVersion,
   ): LegalIdentityClaim =
-    new LegalIdentityClaim(uid, evidence)(
+    LegalIdentityClaim(uid, evidence)(
       protocolVersionRepresentativeFor(protocolVersion),
       None,
-    ) {}
+    )
 
-  def fromProtoV0(
+  private def fromProtoV0(
       claimP: v0.LegalIdentityClaim
   )(bytes: ByteString): ParsingResult[LegalIdentityClaim] =
     for {
       uid <- UniqueIdentifier.fromProtoPrimitive(claimP.uniqueIdentifier, "uniqueIdentifier")
       evidence <- LegalIdentityClaimEvidence.fromProtoOneOf(claimP.evidence)
-    } yield new LegalIdentityClaim(uid, evidence)(
-      protocolVersionRepresentativeFor(ProtobufVersion(0)),
+    } yield LegalIdentityClaim(uid, evidence)(
+      protocolVersionRepresentativeFor(ProtoVersion(0)),
       Some(bytes),
-    ) {}
+    )
 }
 
 sealed trait LegalIdentityClaimEvidence {

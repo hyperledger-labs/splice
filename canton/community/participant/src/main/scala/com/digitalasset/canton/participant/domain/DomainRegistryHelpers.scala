@@ -5,14 +5,14 @@ package com.digitalasset.canton.participant.domain
 
 import akka.stream.Materializer
 import cats.data.EitherT
-import cats.syntax.bifunctor._
-import cats.syntax.either._
+import cats.syntax.bifunctor.*
+import cats.syntax.either.*
 import com.daml.lf.data.Ref.PackageId
-import com.digitalasset.canton._
+import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.HasFutureSupervision
 import com.digitalasset.canton.config.{CryptoConfig, ProcessingTimeout, TestingConfigInternal}
 import com.digitalasset.canton.crypto.{CryptoHandshakeValidator, SyncCryptoApiProvider}
-import com.digitalasset.canton.lifecycle._
+import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLogging}
 import com.digitalasset.canton.participant.config.{
   ParticipantNodeParameters,
@@ -31,7 +31,7 @@ import com.digitalasset.canton.sequencing.SequencerConnection
 import com.digitalasset.canton.sequencing.client.{RecordingConfig, ReplayConfig, SequencerClient}
 import com.digitalasset.canton.sequencing.protocol.{HandshakeRequest, HandshakeResponse}
 import com.digitalasset.canton.time.Clock
-import com.digitalasset.canton.topology._
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.{
   CachingDomainTopologyClient,
   DomainTopologyClientWithInit,
@@ -39,7 +39,7 @@ import com.digitalasset.canton.topology.client.{
 import com.digitalasset.canton.topology.store.TopologyStoreId.DomainStore
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreFactory, TopologyStoreId}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.version.ProtocolVersionCompatibility
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.atomic.AtomicReference
@@ -224,7 +224,7 @@ trait DomainRegistryHelpers extends FlagCloseable with NamedLogging { this: HasF
           metrics(config.domain).sequencerClient,
           participantNodeParameters.loggingConfig,
           domainLoggerFactory,
-          ProtocolVersion.supportedProtocolsParticipant(includeDevelopmentVersions =
+          ProtocolVersionCompatibility.supportedProtocolsParticipant(includeUnstableVersions =
             protocolConfig.devVersionSupport
           ),
           protocolConfig.minimumProtocolVersion,
@@ -275,6 +275,7 @@ trait DomainRegistryHelpers extends FlagCloseable with NamedLogging { this: HasF
           participantId,
           persistentState.sequencedEventStore,
           persistentState.sendTrackerStore,
+          SequencerClient.signSubmissionRequest(domainCryptoApi),
         )
         .leftMap[DomainRegistryError](
           DomainRegistryError.ConnectionErrors.FailedToConnectToSequencer.Error(_)
@@ -312,7 +313,7 @@ trait DomainRegistryHelpers extends FlagCloseable with NamedLogging { this: HasF
         .handshake(
           alias,
           HandshakeRequest(
-            ProtocolVersion.supportedProtocolsParticipant(includeDevelopmentVersions =
+            ProtocolVersionCompatibility.supportedProtocolsParticipant(includeUnstableVersions =
               protocolConfig.devVersionSupport
             ),
             protocolConfig.minimumProtocolVersion,

@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.admin.api.client.commands
 
-import cats.implicits._
+import cats.implicits.*
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
 import com.digitalasset.canton.admin.api.client.PathUtils
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
@@ -12,6 +12,7 @@ import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   TimeoutType,
 }
 import com.digitalasset.canton.admin.api.client.data.{DarMetadata, ListConnectedDomainsResult}
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.participant.admin.grpc.TransferSearchResult
 import com.digitalasset.canton.participant.admin.v0.DomainConnectivityServiceGrpc.DomainConnectivityServiceStub
@@ -23,12 +24,12 @@ import com.digitalasset.canton.participant.admin.v0.PingServiceGrpc.PingServiceS
 import com.digitalasset.canton.participant.admin.v0.PruningServiceGrpc.PruningServiceStub
 import com.digitalasset.canton.participant.admin.v0.ResourceManagementServiceGrpc.ResourceManagementServiceStub
 import com.digitalasset.canton.participant.admin.v0.TransferServiceGrpc.TransferServiceStub
-import com.digitalasset.canton.participant.admin.v0.{ResourceLimits => _, _}
+import com.digitalasset.canton.participant.admin.v0.{ResourceLimits as _, *}
 import com.digitalasset.canton.participant.admin.{ResourceLimits, v0}
 import com.digitalasset.canton.participant.domain.{
-  DomainConnectionConfig => CDomainConnectionConfig
+  DomainConnectionConfig as CDomainConnectionConfig
 }
-import com.digitalasset.canton.protocol.{LfContractId, TransferId, v0 => v0proto}
+import com.digitalasset.canton.protocol.{LfContractId, TransferId, v0 as v0proto}
 import com.digitalasset.canton.serialization.ProtoConverter.InstantConverter
 import com.digitalasset.canton.topology.{DomainId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
@@ -56,9 +57,9 @@ object ParticipantAdminCommands {
         PackageServiceGrpc.stub(channel)
     }
 
-    final case class List(limit: Option[Int])
+    final case class List(limit: PositiveInt)
         extends PackageCommand[ListPackagesRequest, ListPackagesResponse, Seq[PackageDescription]] {
-      override def createRequest() = Right(ListPackagesRequest(limit.getOrElse(0)))
+      override def createRequest() = Right(ListPackagesRequest(limit.value))
 
       override def submitRequest(
           service: PackageServiceStub,
@@ -236,10 +237,10 @@ object ParticipantAdminCommands {
 
     }
 
-    final case class ListDars(limit: Option[Int])
+    final case class ListDars(limit: PositiveInt)
         extends PackageCommand[ListDarsRequest, ListDarsResponse, Seq[DarDescription]] {
       override def createRequest(): Either[String, ListDarsRequest] = Right(
-        ListDarsRequest(limit.getOrElse(0))
+        ListDarsRequest(limit.value)
       )
 
       override def submitRequest(

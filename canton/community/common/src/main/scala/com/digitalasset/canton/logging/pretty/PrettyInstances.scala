@@ -33,6 +33,7 @@ import com.digitalasset.canton.protocol.{
 }
 import com.digitalasset.canton.topology.UniqueIdentifier
 import com.digitalasset.canton.tracing.W3CTraceContext
+import com.digitalasset.canton.util.ShowUtil.HashLength
 import com.digitalasset.canton.util.{ErrorUtil, HexString}
 import com.digitalasset.canton.{LedgerApplicationId, LfPartyId, LfTimestamp}
 import com.google.protobuf.ByteString
@@ -41,7 +42,7 @@ import pprint.Tree
 import slick.util.{DumpInfo, Dumpable}
 
 import java.net.URI
-import java.time.{Duration => JDuration, Instant}
+import java.time.{Duration as JDuration, Instant}
 import java.util.UUID
 import scala.concurrent.duration.Duration
 
@@ -49,7 +50,7 @@ import scala.concurrent.duration.Duration
   */
 trait PrettyInstances {
 
-  import Pretty._
+  import Pretty.*
 
   @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
   implicit def prettyPrettyPrinting[T <: PrettyPrinting]: Pretty[T] =
@@ -126,7 +127,7 @@ trait PrettyInstances {
   def prettyString: Pretty[String] = prettyOfString(identity)
 
   implicit val prettyByteString: Pretty[ByteString] =
-    prettyOfString(b => HexString.toHexString(b).readableHash.toString)
+    prettyOfString(b => HexString.toHexString(b, HashLength).readableHash.toString)
 
   implicit def prettyDumpInfo: Pretty[DumpInfo] = {
     implicit def prettyDumpInfoChild: Pretty[(String, Dumpable)] = { case (label, child) =>

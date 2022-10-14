@@ -4,8 +4,8 @@
 package com.digitalasset.canton.participant.protocol.submission.routing
 
 import cats.data.EitherT
-import cats.syntax.either._
-import cats.syntax.traverse._
+import cats.syntax.either.*
+import cats.syntax.traverse.*
 import com.daml.ledger.participant.state.v2.SubmitterInfo
 import com.daml.lf.engine.Blinding
 import com.digitalasset.canton.participant.sync.TransactionRoutingError
@@ -25,7 +25,7 @@ import scala.concurrent.{ExecutionContext, Future}
   * @param prescribedDomainO If non-empty, thInvalidWorkflowIde prescribed domain will be chosen for routing.
   *                          In case this domain is not admissible, submission will fail.
   */
-private[routing] sealed abstract case class TransactionData(
+private[routing] final case class TransactionData private (
     transaction: LfVersionedTransaction,
     requiredPackagesPerParty: Map[LfPartyId, Set[LfPackageId]],
     submitters: Set[LfPartyId],
@@ -53,13 +53,13 @@ private[routing] object TransactionData {
       contractsDomainData <- EitherT.liftF(
         ContractsDomainData.create(domainOfContracts, inputContractsMetadata)
       )
-    } yield new TransactionData(
+    } yield TransactionData(
       transaction = transaction,
       requiredPackagesPerParty = Blinding.partyPackages(transaction),
       submitters = submitters,
       inputContractsDomainData = contractsDomainData,
       prescribedDomainO = prescribedDomainO,
-    ) {}
+    )
   }
 
   def create(

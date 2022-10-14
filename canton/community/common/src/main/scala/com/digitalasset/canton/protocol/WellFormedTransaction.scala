@@ -4,9 +4,9 @@
 package com.digitalasset.canton.protocol
 
 import cats.data.{NonEmptyChain, Validated}
-import cats.syntax.either._
-import cats.syntax.foldable._
-import cats.syntax.functor._
+import cats.syntax.either.*
+import cats.syntax.foldable.*
+import cats.syntax.functor.*
 import com.daml.lf.CantonOnly
 import com.daml.lf.data.ImmArray
 import com.daml.nonempty.NonEmpty
@@ -15,8 +15,8 @@ import com.digitalasset.canton.data.ActionDescription
 import com.digitalasset.canton.protocol.RollbackContext.{RollbackScope, RollbackSibling}
 import com.digitalasset.canton.protocol.WellFormedTransaction.State
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.util.ShowUtil._
-import com.digitalasset.canton.util.{Checked, LfTransactionUtil, MonadUtil, NoCopy}
+import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.util.{Checked, LfTransactionUtil, MonadUtil}
 
 import scala.collection.immutable.HashMap
 import scala.collection.mutable
@@ -49,8 +49,7 @@ import scala.collection.mutable
 case class WellFormedTransaction[+S <: State] private (
     private val tx: LfVersionedTransaction,
     metadata: TransactionMetadata,
-)(state: S)
-    extends NoCopy {
+)(state: S) {
   def unwrap: LfVersionedTransaction = tx
 
   def withoutVersion: LfTransaction = CantonOnly.unwrapVersionedTransaction(tx)
@@ -85,11 +84,6 @@ case class WellFormedTransaction[+S <: State] private (
 }
 
 object WellFormedTransaction {
-
-  private[this] def apply[S <: State](tx: LfVersionedTransaction, metadata: TransactionMetadata)(
-      state: S
-  ): WellFormedTransaction[S] =
-    throw new UnsupportedOperationException("Use normalizeAndCheck or normalizeAndAssert instead.")
 
   /** Determines whether the IDs of created contracts in a transaction are suffixed */
   sealed trait State extends Product with Serializable {
@@ -243,7 +237,7 @@ object WellFormedTransaction {
               referenceRbScope.startsWith(createdScope),
               (),
               s"Contract ${refId} created in rollback scope ${createdScope
-                .mkString(".")} referenced outside of visible rollback scope ${referenceRbScope.mkString(".")}",
+                  .mkString(".")} referenced outside of visible rollback scope ${referenceRbScope.mkString(".")}",
             )
           )
         } else Checked.unit
@@ -417,7 +411,7 @@ object WellFormedTransaction {
           if (missingInformees.isEmpty) Checked.unit
           else
             Checked.continue(s"signatory or maintainer not declared as informee: ${missingInformees
-              .mkString(", ")} at node ${nodeId.index}")
+                .mkString(", ")} at node ${nodeId.index}")
         case (_nodeId, _rn: LfNodeRollback) => Checked.unit
       }
     } yield ()

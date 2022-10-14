@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.protocol
 
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.daml.lf.transaction.{TransactionCoder, TransactionOuterClass}
 import com.daml.lf.value.ValueCoder
 import com.digitalasset.canton.ProtoDeserializationError.ValueConversionError
@@ -57,14 +57,6 @@ object SerializableRawContractInstance {
       setParameterByteArray: SetParameter[Array[Byte]]
   ): SetParameter[SerializableRawContractInstance] = (c, pp) =>
     pp >> c.getCryptographicEvidence.toByteArray
-
-  // Make the apply method inaccessible such that creation must happen through factory methods
-  private[this] def apply(
-      contractInstance: LfContractInst
-  )(deserializedFrom: Option[ByteString]): SerializableRawContractInstance =
-    throw new UnsupportedOperationException(
-      "Use a factory method for creating SerializableRawContractInstance"
-    )
 
   def create(
       contractInstance: LfContractInst

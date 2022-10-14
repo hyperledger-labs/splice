@@ -5,6 +5,7 @@ import cats.data.EitherT
 import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
 import com.daml.network.environment.CoinNodeBootstrapBase
 import com.daml.network.scan.config.LocalScanAppConfig
 import com.daml.network.scan.metrics.ScanAppMetrics
@@ -35,6 +36,7 @@ class ScanAppBootstrap(
     metrics: ScanAppMetrics,
     storageFactory: StorageFactory,
     parentLogger: NamedLoggerFactory,
+    writeHealthDumpToFile: HealthDumpFunction,
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     @nowarn("cat=unused")
@@ -53,6 +55,7 @@ class ScanAppBootstrap(
       metrics,
       storageFactory,
       parentLogger.append(ScanAppBootstrap.LoggerFactoryKeyName, name.unwrap),
+      writeHealthDumpToFile,
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
@@ -88,6 +91,7 @@ object ScanAppBootstrap {
       testingConfigInternal: TestingConfigInternal,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
+      writeHealthDumpToFile: HealthDumpFunction,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
       scheduler: ScheduledExecutorService,
@@ -106,6 +110,7 @@ object ScanAppBootstrap {
           scanMetrics,
           new CommunityStorageFactory(scanConfig.storage),
           loggerFactory,
+          writeHealthDumpToFile,
         )
       )
       .leftMap(_.toString)

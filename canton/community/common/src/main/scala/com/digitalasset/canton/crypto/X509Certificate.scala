@@ -3,11 +3,11 @@
 
 package com.digitalasset.canton.crypto
 
-import better.files._
+import better.files.*
 import cats.data.EitherT
-import cats.syntax.either._
-import cats.syntax.functorFilter._
-import cats.syntax.traverse._
+import cats.syntax.either.*
+import cats.syntax.functorFilter.*
+import cats.syntax.traverse.*
 import com.digitalasset.canton.config.RequireTypes.{
   LengthLimitedStringWrapper,
   LengthLimitedStringWrapperCompanion,
@@ -20,13 +20,11 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.NoCopy
-import com.digitalasset.canton.util.ShowUtil._
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.ByteString
 import org.bouncycastle.asn1.x500.X500Name
 import org.bouncycastle.asn1.x500.style.{BCStyle, IETFUtils}
-import org.bouncycastle.asn1.x509._
+import org.bouncycastle.asn1.x509.*
 import org.bouncycastle.asn1.{ASN1ObjectIdentifier, ASN1Sequence, DERIA5String}
 import org.bouncycastle.cert.X509v3CertificateBuilder
 import org.bouncycastle.cert.jcajce.{JcaX509CertificateConverter, JcaX509CertificateHolder}
@@ -42,12 +40,12 @@ import java.security.cert.{
   CertificateException,
   CertificateFactory,
   CertificateParsingException,
-  X509Certificate => JX509Certificate,
+  X509Certificate as JX509Certificate,
 }
 import java.time.{Duration, Instant}
 import java.util.Date
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 case class CertificateId(override val str: String255)
     extends LengthLimitedStringWrapper
@@ -223,7 +221,7 @@ class X509CertificateGenerator(
           .sign(receiver.bytes, signignKeyId)
           .leftMap(signingError => X509CertificateError.SigningError(signingError))
         certificate <- getCertificate(
-          new SignatureProvider(signature.toByteString(ProtocolVersion.v2Todo_i8793))
+          new SignatureProvider(signature.unwrap)
         )
       } yield X509Certificate(certificate)
     }
@@ -387,17 +385,13 @@ sealed trait X509CertificateEncoder[Encoding] {
 }
 
 /** A X509 Certificate serialized in PEM format. */
-case class X509CertificatePem private (private val bytes: ByteString) extends NoCopy {
+case class X509CertificatePem private (private val bytes: ByteString) {
   def unwrap: ByteString = bytes
 
   override def toString: String = bytes.toStringUtf8
 }
 
 object X509CertificatePem extends X509CertificateEncoder[X509CertificatePem] {
-
-  private def apply(bytes: ByteString): X509CertificatePem =
-    throw new UnsupportedOperationException("Use the other constructor methods instead")
-
   def fromString(pem: String): Either[String, X509CertificatePem] =
     fromBytes(ByteString.copyFromUtf8(pem))
 
@@ -418,16 +412,13 @@ object X509CertificatePem extends X509CertificateEncoder[X509CertificatePem] {
 }
 
 /** A X509 Certificate serialized in DER format. */
-case class X509CertificateDer private (private val bytes: ByteString) extends NoCopy {
+case class X509CertificateDer private (private val bytes: ByteString) {
   def unwrap: ByteString = bytes
 
   override def toString: String = bytes.toStringUtf8
 }
 
 object X509CertificateDer extends X509CertificateEncoder[X509CertificateDer] {
-  private def apply(bytes: ByteString): X509CertificateDer =
-    throw new UnsupportedOperationException("Use the other constructor methods instead")
-
   override def fromBytes(der: ByteString): Either[String, X509CertificateDer] = Right(
     new X509CertificateDer(der)
   )

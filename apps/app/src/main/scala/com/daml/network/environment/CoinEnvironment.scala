@@ -20,6 +20,8 @@ import com.digitalasset.canton.console.{
   ConsoleEnvironment,
   ConsoleGrpcAdminCommandRunner,
   ConsoleOutput,
+  GrpcAdminCommandRunner,
+  HealthDumpGenerator,
 }
 import com.digitalasset.canton.domain.DomainNodeBootstrap
 import com.digitalasset.canton.environment._
@@ -49,6 +51,7 @@ trait CoinEnvironment extends Environment {
       testingConfig,
       futureSupervisor,
       loggerFactory,
+      writeHealthDumpToFile,
     )
       .valueOr(err =>
         throw new RuntimeException(
@@ -79,6 +82,7 @@ trait CoinEnvironment extends Environment {
       testingConfig,
       futureSupervisor,
       loggerFactory,
+      writeHealthDumpToFile,
     )
       .valueOr(err =>
         throw new RuntimeException(
@@ -109,6 +113,7 @@ trait CoinEnvironment extends Environment {
       testingConfig,
       futureSupervisor,
       loggerFactory,
+      writeHealthDumpToFile,
     )
       .valueOr(err =>
         throw new RuntimeException(
@@ -139,6 +144,7 @@ trait CoinEnvironment extends Environment {
       testingConfig,
       futureSupervisor,
       loggerFactory,
+      writeHealthDumpToFile,
     )
       .valueOr(err =>
         throw new RuntimeException(
@@ -169,6 +175,7 @@ trait CoinEnvironment extends Environment {
       testingConfig,
       futureSupervisor,
       loggerFactory,
+      writeHealthDumpToFile,
     ).valueOr(err =>
       throw new RuntimeException(
         s"Failed to create participant bootstrap: $err"
@@ -198,6 +205,7 @@ trait CoinEnvironment extends Environment {
       testingConfig,
       futureSupervisor,
       loggerFactory,
+      writeHealthDumpToFile,
     )
       .valueOr(err =>
         throw new RuntimeException(
@@ -253,11 +261,17 @@ class CoinEnvironmentImpl(
 ) extends CoinEnvironment {
   override type Config = CoinConfig
 
-  override def createConsole(
+  override def _createConsole(
       consoleOutput: ConsoleOutput,
       createAdminCommandRunner: ConsoleEnvironment => ConsoleGrpcAdminCommandRunner,
   ): CoinConsoleEnvironment =
     new CoinConsoleEnvironment(this, consoleOutput, createAdminCommandRunner)
+
+  override protected def createHealthDumpGenerator(
+      commandRunner: GrpcAdminCommandRunner
+  ): HealthDumpGenerator[_] = {
+    new CoinHealthDumpGenerator(this, commandRunner)
+  }
 
   override protected val participantNodeFactory
       : ParticipantNodeBootstrap.Factory[Config#ParticipantConfigType] =

@@ -4,13 +4,14 @@
 package com.digitalasset.canton.util
 
 import cats.data.EitherT
-import cats.syntax.either._
+import cats.syntax.either.*
 import cats.{Applicative, Functor}
+import com.daml.metrics.MetricHandle.Timer
 import com.digitalasset.canton.DiscardOps
+import com.digitalasset.canton.lifecycle.UnlessShutdown.Outcome
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.metrics.MetricHandle.TimerM
-import com.digitalasset.canton.util.Thereafter.syntax._
+import com.digitalasset.canton.util.Thereafter.syntax.*
 import org.slf4j.event.Level
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -85,15 +86,35 @@ object EitherTUtil {
       loggingContext: ErrorLoggingContext,
   ): EitherT[Future, E, R] = {
 
-    def logError(v: Try[Either[E, R]]): Try[Either[E, R]] = {
+    def logError(v: Try[Either[E, R]]): Unit =
       v match {
         case Success(Left(err)) => LoggerUtil.logAtLevel(level, message + " " + err.toString)
         case Failure(NonFatal(err)) => LoggerUtil.logThrowableAtLevel(level, message, err)
-        case _ =>
+        case _ => ()
       }
-      v
-    }
-    EitherT(result.value.transform(logError))
+
+    result.thereafter(logError)
+  }
+
+  /** Log `message` if `result` fails with an exception or results in a `Left` */
+  def logOnErrorU[E, R](
+      result: EitherT[FutureUnlessShutdown, E, R],
+      message: String,
+      level: Level = Level.ERROR,
+  )(implicit
+      executionContext: ExecutionContext,
+      loggingContext: ErrorLoggingContext,
+  ): EitherT[FutureUnlessShutdown, E, R] = {
+
+    def logError(v: Try[UnlessShutdown[Either[E, R]]]): Unit =
+      v match {
+        case Success(Outcome(Left(err))) =>
+          LoggerUtil.logAtLevel(level, message + " " + err.toString)
+        case Failure(NonFatal(err)) => LoggerUtil.logThrowableAtLevel(level, message, err)
+        case _ => ()
+      }
+
+    result.thereafter(logError)
   }
 
   /** Discard `eitherT` and log an error if it does not result in a `Right`.
@@ -108,7 +129,7 @@ object EitherTUtil {
   }
 
   /** Measure time of EitherT-based calls, inspired by upstream com.daml.metrics.Timed.future */
-  def timed[E, R](timerMetric: TimerM)(
+  def timed[E, R](timerMetric: Timer)(
       code: => EitherT[Future, E, R]
   )(implicit executionContext: ExecutionContext): EitherT[Future, E, R] = {
     val timerContext = timerMetric.metric.time()

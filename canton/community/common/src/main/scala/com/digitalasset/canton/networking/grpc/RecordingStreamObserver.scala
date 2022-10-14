@@ -6,8 +6,8 @@ package com.digitalasset.canton.networking.grpc
 import io.grpc.stub.StreamObserver
 
 import java.util.concurrent.atomic.AtomicInteger
-import scala.concurrent.{Future, Promise}
-import scala.jdk.CollectionConverters._
+import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.jdk.CollectionConverters.*
 
 /** Stream observer that records all incoming events.
   */
@@ -21,6 +21,8 @@ class RecordingStreamObserver[RespT](completeAfter: Int = Int.MaxValue)
 
   private val completionP: Promise[Unit] = Promise[Unit]()
   val completion: Future[Unit] = completionP.future
+  def result(implicit executionContext: ExecutionContext): Future[Seq[RespT]] =
+    completionP.future.map(_ => responses)
 
   val responseCount: AtomicInteger = new AtomicInteger()
 

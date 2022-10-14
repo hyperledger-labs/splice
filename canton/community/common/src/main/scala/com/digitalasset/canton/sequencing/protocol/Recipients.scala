@@ -3,10 +3,10 @@
 
 package com.digitalasset.canton.sequencing.protocol
 
-import cats.syntax.reducible._
-import cats.syntax.traverse._
+import cats.syntax.reducible.*
+import cats.syntax.traverse.*
 import com.daml.nonempty.NonEmpty
-import com.daml.nonempty.catsinstances._
+import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.v0
@@ -16,7 +16,7 @@ import com.digitalasset.canton.topology.Member
 /** Recipients of a batch. Uses a list of [[com.digitalasset.canton.sequencing.protocol.RecipientsTree]]s
   * that define the members receiving a batch, and which members see which other recipients.
   */
-case class Recipients private (trees: NonEmpty[Seq[RecipientsTree]]) extends PrettyPrinting {
+final case class Recipients(trees: NonEmpty[Seq[RecipientsTree]]) extends PrettyPrinting {
 
   lazy val allRecipients: Set[Member] = {
     trees.flatMap(t => t.allRecipients).toSet

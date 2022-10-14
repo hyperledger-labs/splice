@@ -5,6 +5,7 @@ import cats.data.EitherT
 import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
 import com.daml.network.environment.CoinNodeBootstrapBase
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.svc.metrics.SvcAppMetrics
@@ -35,6 +36,7 @@ class SvcAppBootstrap(
     metrics: SvcAppMetrics,
     storageFactory: StorageFactory,
     parentLogger: NamedLoggerFactory,
+    writeHealthDumpToFile: HealthDumpFunction,
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     @nowarn("cat=unused")
@@ -53,6 +55,7 @@ class SvcAppBootstrap(
       metrics,
       storageFactory,
       parentLogger.append(SvcAppBootstrap.LoggerFactoryKeyName, name.unwrap),
+      writeHealthDumpToFile,
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
@@ -88,6 +91,7 @@ object SvcAppBootstrap {
       testingConfigInternal: TestingConfigInternal,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
+      writeHealthDumpToFile: HealthDumpFunction,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
       scheduler: ScheduledExecutorService,
@@ -106,6 +110,7 @@ object SvcAppBootstrap {
           svcMetrics,
           new CommunityStorageFactory(svcConfig.storage),
           loggerFactory,
+          writeHealthDumpToFile,
         )
       )
       .leftMap(_.toString)

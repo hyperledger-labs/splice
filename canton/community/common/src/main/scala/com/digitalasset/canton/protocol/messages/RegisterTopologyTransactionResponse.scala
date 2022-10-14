@@ -3,29 +3,24 @@
 
 package com.digitalasset.canton.protocol.messages
 
-import cats.syntax.traverse._
+import cats.syntax.traverse.*
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.config.RequireTypes.LengthLimitedString.TopologyRequestId
 import com.digitalasset.canton.config.RequireTypes.String255
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.protocol.v0.RegisterTopologyTransactionResponse.Result.{
-  State => ProtoStateV0
-}
-import com.digitalasset.canton.protocol.v1.RegisterTopologyTransactionResponse.Result.{
-  State => ProtoStateV1
-}
+import com.digitalasset.canton.protocol.v0.RegisterTopologyTransactionResponse.Result.State as ProtoStateV0
+import com.digitalasset.canton.protocol.v1.RegisterTopologyTransactionResponse.Result.State as ProtoStateV1
 import com.digitalasset.canton.protocol.{v0, v1}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.{DomainId, Member, ParticipantId, UniqueIdentifier}
-import com.digitalasset.canton.util.NoCopy
 import com.digitalasset.canton.version.{
   HasProtocolVersionedCompanion,
-  ProtobufVersion,
+  ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
 }
 
-sealed abstract case class RegisterTopologyTransactionResponse[
+final case class RegisterTopologyTransactionResponse[
     +Res <: RegisterTopologyTransactionResponseResult
 ](
     requestedBy: Member,
@@ -39,8 +34,7 @@ sealed abstract case class RegisterTopologyTransactionResponse[
     ]
 ) extends ProtocolMessage
     with ProtocolMessageV0
-    with ProtocolMessageV1
-    with NoCopy {
+    with ProtocolMessageV1 {
 
   override def toProtoEnvelopeContentV0: v0.EnvelopeContent =
     v0.EnvelopeContent(
@@ -75,19 +69,18 @@ object RegisterTopologyTransactionResponse
     extends HasProtocolVersionedCompanion[
       RegisterTopologyTransactionResponse[RegisterTopologyTransactionResponseResult]
     ] {
-  import RegisterTopologyTransactionResponseResult._
+  import RegisterTopologyTransactionResponseResult.*
 
   type Result = RegisterTopologyTransactionResponse[RegisterTopologyTransactionResponseResult]
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtobufVersion(0) -> VersionedProtoConverter(
+    ProtoVersion(0) -> VersionedProtoConverter(
       ProtocolVersion.v2,
       supportedProtoVersion(v0.RegisterTopologyTransactionResponse)(fromProtoV0),
       _.toProtoV0.toByteString,
     ),
-    // TODO(#9757) Migrate from dev
-    ProtobufVersion(1) -> VersionedProtoConverter(
-      ProtocolVersion.dev,
+    ProtoVersion(1) -> VersionedProtoConverter(
+      ProtocolVersion.v4,
       supportedProtoVersion(v1.RegisterTopologyTransactionResponse)(fromProtoV1),
       _.toProtoV0.toByteString,
     ),
@@ -109,9 +102,9 @@ object RegisterTopologyTransactionResponse
       domainId: DomainId,
       protocolVersion: ProtocolVersion,
   ): RegisterTopologyTransactionResponse[Res] =
-    new RegisterTopologyTransactionResponse(requestedBy, participant, requestId, results, domainId)(
+    RegisterTopologyTransactionResponse(requestedBy, participant, requestId, results, domainId)(
       protocolVersionRepresentativeFor(protocolVersion)
-    ) {}
+    )
 
   private[messages] def fromProtoV0(
       message: v0.RegisterTopologyTransactionResponse
@@ -122,13 +115,13 @@ object RegisterTopologyTransactionResponse
       domainUid <- UniqueIdentifier.fromProtoPrimitive(message.domainId, "domainId")
       requestId <- String255.fromProtoPrimitive(message.requestId, "requestId")
       results <- message.results.traverse(V0.fromProtoV0)
-    } yield new RegisterTopologyTransactionResponse(
+    } yield RegisterTopologyTransactionResponse(
       requestedBy,
       ParticipantId(participantUid),
       requestId,
       results,
       DomainId(domainUid),
-    )(protocolVersionRepresentativeFor(ProtobufVersion(0))) {}
+    )(protocolVersionRepresentativeFor(ProtoVersion(0)))
 
   private[messages] def fromProtoV1(
       message: v1.RegisterTopologyTransactionResponse
@@ -139,13 +132,13 @@ object RegisterTopologyTransactionResponse
       domainUid <- UniqueIdentifier.fromProtoPrimitive(message.domainId, "domainId")
       requestId <- String255.fromProtoPrimitive(message.requestId, "requestId")
       results <- message.results.traverse(V1.fromProtoV1)
-    } yield new RegisterTopologyTransactionResponse(
+    } yield RegisterTopologyTransactionResponse(
       requestedBy,
       ParticipantId(participantUid),
       requestId,
       results,
       DomainId(domainUid),
-    )(protocolVersionRepresentativeFor(ProtobufVersion(1))) {}
+    )(protocolVersionRepresentativeFor(ProtoVersion(1)))
 
   override protected def name: String = "RegisterTopologyTransactionResponse"
 
@@ -173,28 +166,24 @@ object RegisterTopologyTransactionResponse
   ]] = {
     splitResults(results) match {
       case (Nil, v1) =>
-        val response = new RegisterTopologyTransactionResponse(
+        val response = RegisterTopologyTransactionResponse(
           request.requestedBy,
           request.participant,
           request.requestId,
           v1,
           request.domainId,
-        )(
-          RegisterTopologyTransactionResponse.protocolVersionRepresentativeFor(protocolVersion)
-        ) {}
+        )(RegisterTopologyTransactionResponse.protocolVersionRepresentativeFor(protocolVersion))
 
         Right(response)
 
       case (v0, Nil) =>
-        val response = new RegisterTopologyTransactionResponse(
+        val response = RegisterTopologyTransactionResponse(
           request.requestedBy,
           request.participant,
           request.requestId,
           v0,
           request.domainId,
-        )(
-          RegisterTopologyTransactionResponse.protocolVersionRepresentativeFor(protocolVersion)
-        ) {}
+        )(RegisterTopologyTransactionResponse.protocolVersionRepresentativeFor(protocolVersion))
 
         Right(response)
 
@@ -362,8 +351,7 @@ object RegisterTopologyTransactionResponseResult {
       state: State,
       protocolVersion: ProtocolVersion,
   ): RegisterTopologyTransactionResponseResult =
-    // TODO(#9757) Migrate from dev
-    if (protocolVersion == ProtocolVersion.dev)
+    if (protocolVersion >= ProtocolVersion.v4)
       V1(state)
     else V0(uniquePathProtoPrimitive, state)
 }

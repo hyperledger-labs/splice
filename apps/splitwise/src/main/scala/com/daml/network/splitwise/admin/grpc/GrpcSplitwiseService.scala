@@ -207,6 +207,8 @@ class GrpcSplitwiseService(
 object GrpcSplitwiseService {
   implicit class ContractSyntax[T](private val contract: CodegenContract[T]) extends AnyVal {
     def hasStakeholder(party: Primitive.Party): Boolean =
-      contract.signatories.contains(party) || contract.observers.contains(party)
+      contract.signatories.contains(Primitive.Party.unwrap(party)) || contract.observers.contains(
+        Primitive.Party.unwrap(party)
+      )
   }
 }

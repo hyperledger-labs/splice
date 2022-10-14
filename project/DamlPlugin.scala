@@ -333,7 +333,7 @@ object DamlPlugin extends AutoPlugin {
       url = artifactoryUrl(damlVersion),
       artifactFilename =
         s"damlc-${damlVersion}-${if (System.getProperty("os.name").toLowerCase.startsWith("mac os x")) "macos"
-        else "linux"}.tar.gz",
+          else "linux"}.tar.gz",
       damlVersion = damlVersion,
       tarballPath = Seq("damlc", "damlc"),
     )

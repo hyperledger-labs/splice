@@ -81,12 +81,14 @@ class SvcApp(
         timeouts,
       )
     } yield {
-      adminServerRegistry.addService(
-        SvcServiceGrpc.bindService(
-          new GrpcSvcAppService(ledgerClient, config.damlUser, store.events, loggerFactory),
-          ec,
+      adminServerRegistry
+        .addService(
+          SvcServiceGrpc.bindService(
+            new GrpcSvcAppService(ledgerClient, config.damlUser, store.events, loggerFactory),
+            ec,
+          )
         )
-      )
+        .discard
       SvcApp.State(
         storage,
         store,

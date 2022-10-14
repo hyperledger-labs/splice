@@ -4,8 +4,9 @@
 package com.digitalasset.canton.participant.store.db
 
 import cats.data.{EitherT, OptionT}
-import cats.syntax.alternative._
-import cats.syntax.option._
+import cats.syntax.alternative.*
+import cats.syntax.option.*
+import com.daml.metrics.MetricHandle.Gauge
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.PositiveNumeric
 import com.digitalasset.canton.config.{BatchAggregatorConfig, ProcessingTimeout}
@@ -14,9 +15,8 @@ import com.digitalasset.canton.lifecycle.UnlessShutdown.{AbortedDueToShutdown, O
 import com.digitalasset.canton.lifecycle.{CloseContext, FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
-import com.digitalasset.canton.metrics.MetricHandle.GaugeM
 import com.digitalasset.canton.metrics.TimedLoadGauge
-import com.digitalasset.canton.participant.protocol.submission._
+import com.digitalasset.canton.participant.protocol.submission.*
 import com.digitalasset.canton.participant.store.InFlightSubmissionStore.{
   InFlightByMessageId,
   InFlightBySequencingInfo,
@@ -31,10 +31,10 @@ import com.digitalasset.canton.store.db.DbBulkUpdateProcessor.BulkUpdatePendingC
 import com.digitalasset.canton.store.db.{DbBulkUpdateProcessor, DbSerializationException}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.util.ShowUtil._
+import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.retry.RetryUtil.NoExnRetryable
 import com.digitalasset.canton.util.{BatchAggregator, ErrorUtil, OptionUtil, SingleUseCell, retry}
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.version.ReleaseProtocolVersion
 import io.functionmeta.functionFullName
 import slick.jdbc.SetParameter
 
@@ -46,20 +46,21 @@ class DbInFlightSubmissionStore(
     override protected val storage: DbStorage,
     maxItemsInSqlInClause: PositiveNumeric[Int],
     registerBatchAggregatorConfig: BatchAggregatorConfig,
+    releaseProtocolVersion: ReleaseProtocolVersion,
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
     extends InFlightSubmissionStore
     with DbStore {
 
-  import storage.api._
-  import storage.converters._
+  import storage.api.*
+  import storage.converters.*
 
-  private val processingTime: GaugeM[TimedLoadGauge, Double] =
+  private val processingTime: Gauge[TimedLoadGauge, Double] =
     storage.metrics.loadGaugeM("in-flight-submission-store")
 
   private implicit val setParameterSubmissionTrackingData: SetParameter[SubmissionTrackingData] =
-    SubmissionTrackingData.getVersionedSetParameter(ProtocolVersion.v2Todo_i8793)
+    SubmissionTrackingData.getVersionedSetParameter
 
   override def lookup(changeIdHash: ChangeIdHash)(implicit
       traceContext: TraceContext
@@ -143,6 +144,7 @@ class DbInFlightSubmissionStore(
       new DbInFlightSubmissionStore.RegisterProcessor(
         storage,
         maxItemsInSqlInClause,
+        releaseProtocolVersion,
         logger,
       )
     BatchAggregator(processor, registerBatchAggregatorConfig, processingTime.some)
@@ -287,6 +289,7 @@ object DbInFlightSubmissionStore {
   class RegisterProcessor(
       override protected val storage: DbStorage,
       maxItemsInSqlInClause: PositiveNumeric[Int],
+      releaseProtocolVersion: ReleaseProtocolVersion,
       override val logger: TracedLogger,
   )(
       override protected implicit val executionContext: ExecutionContext,
@@ -295,16 +298,15 @@ object DbInFlightSubmissionStore {
         UnsequencedSubmission
       ], RegisterProcessor.Result] {
     import RegisterProcessor.Result
-    import storage.api._
-    import storage.converters._
+    import storage.api.*
+    import storage.converters.*
 
     override def kind: String = "in-flight submission"
 
-    private val protocolVersion = ProtocolVersion.v2Todo_i8793
     private implicit val setParameterTraceContext: SetParameter[TraceContext] =
-      TraceContext.getVersionedSetParameter(protocolVersion)
+      TraceContext.getVersionedSetParameter(releaseProtocolVersion.v)
     private implicit val setParameterSubmissionTrackingData: SetParameter[SubmissionTrackingData] =
-      SubmissionTrackingData.getVersionedSetParameter(protocolVersion)
+      SubmissionTrackingData.getVersionedSetParameter
 
     override def executeBatch(
         submissions: NonEmpty[Seq[Traced[InFlightSubmission[UnsequencedSubmission]]]]
@@ -424,7 +426,7 @@ object DbInFlightSubmissionStore {
         submissions.map(_.value),
         storage.profile,
       ) { pp => submission =>
-        import DbStorage.Implicits._
+        import DbStorage.Implicits.*
         pp >> submission.changeIdHash
         pp >> submission.submissionId.map(SerializableSubmissionId(_))
         pp >> submission.submissionDomain
@@ -460,7 +462,7 @@ object DbInFlightSubmissionStore {
     ): Iterable[ReadOnly[Iterable[CheckData]]] = {
       DbStorage.toInClauses_("change_id_hash", submissionsToCheck, maxItemsInSqlInClause).map {
         inClause =>
-          import DbStorage.Implicits.BuilderChain._
+          import DbStorage.Implicits.BuilderChain.*
           val query = sql"""
               select change_id_hash, submission_id, submission_domain, message_id, sequencing_timeout, sequencer_counter, sequencing_time, tracking_data, trace_context
               from in_flight_submission where """ ++ inClause

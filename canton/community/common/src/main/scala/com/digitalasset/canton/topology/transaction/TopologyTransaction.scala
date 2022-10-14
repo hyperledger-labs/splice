@@ -4,21 +4,21 @@
 package com.digitalasset.canton.topology.transaction
 
 import com.digitalasset.canton.ProtoDeserializationError
-import com.digitalasset.canton.ProtoDeserializationError._
+import com.digitalasset.canton.ProtoDeserializationError.*
 import com.digitalasset.canton.config.RequireTypes.{
   LengthLimitedStringWrapper,
   LengthLimitedStringWrapperCompanion,
   String255,
 }
-import com.digitalasset.canton.crypto._
-import com.digitalasset.canton.logging.pretty.PrettyInstances._
+import com.digitalasset.canton.crypto.*
+import com.digitalasset.canton.logging.pretty.PrettyInstances.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.protocol.{v0, v1}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence
-import com.digitalasset.canton.topology._
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.store.StoredTopologyTransaction
-import com.digitalasset.canton.version._
+import com.digitalasset.canton.version.*
 import com.google.protobuf.ByteString
 import slick.jdbc.SetParameter
 
@@ -239,13 +239,13 @@ object TopologyTransaction
   override val name: String = "TopologyTransaction"
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtobufVersion(0) -> VersionedProtoConverter(
+    ProtoVersion(0) -> VersionedProtoConverter(
       ProtocolVersion.v2,
       supportedProtoVersionMemoized(v0.TopologyTransaction)(fromProtoV0),
       _.toProtoV0.toByteString,
     ),
     // TODO(#9694): Move topology transaction changes to PV4
-    ProtobufVersion(1) -> VersionedProtoConverter(
+    ProtoVersion(1) -> VersionedProtoConverter(
       ProtocolVersion.dev,
       supportedProtoVersionMemoized(v1.TopologyTransaction)(fromProtoV1),
       _.toProtoV1.toByteString,
@@ -275,7 +275,7 @@ object TopologyTransaction
       case (_: DomainGovernanceTransaction, _: TopologyStateUpdate[_]) => false
     }
 
-  def fromProtoV0(transactionP: v0.TopologyTransaction)(
+  private def fromProtoV0(transactionP: v0.TopologyTransaction)(
       bytes: ByteString
   ): ParsingResult[TopologyTransaction[TopologyChangeOp]] = transactionP.transaction match {
     case v0.TopologyTransaction.Transaction.Empty =>
@@ -286,7 +286,7 @@ object TopologyTransaction
       DomainGovernanceTransaction.fromProtoV0(domainGovernance, bytes)
   }
 
-  def fromProtoV1(transactionP: v1.TopologyTransaction)(
+  private def fromProtoV1(transactionP: v1.TopologyTransaction)(
       bytes: ByteString
   ): ParsingResult[TopologyTransaction[TopologyChangeOp]] = transactionP.transaction match {
     case v1.TopologyTransaction.Transaction.Empty =>
@@ -307,7 +307,7 @@ object TopologyTransaction
   * Element ids are uniqueness constraints. Once removed, they can't be re-added
   * (during a configurable time window)
   */
-sealed abstract case class TopologyStateUpdate[+Op <: AddRemoveChangeOp](
+final case class TopologyStateUpdate[+Op <: AddRemoveChangeOp] private (
     op: Op,
     element: TopologyStateUpdateElement,
 )(
@@ -375,10 +375,10 @@ sealed abstract case class TopologyStateUpdate[+Op <: AddRemoveChangeOp](
     * If this transaction is a Remove, we return an Add with a new transaction id.
     */
   def reverse: TopologyTransaction[TopologyChangeOp] = {
-    import TopologyChangeOp._
+    import TopologyChangeOp.*
 
     (op: AddRemoveChangeOp) match {
-      case Add => new TopologyStateUpdate(Remove, element)(representativeProtocolVersion) {}
+      case Add => TopologyStateUpdate(Remove, element)(representativeProtocolVersion)
       case Remove =>
         TopologyStateUpdate.createAdd(element.mapping, representativeProtocolVersion)
     }
@@ -390,9 +390,9 @@ sealed abstract case class TopologyStateUpdate[+Op <: AddRemoveChangeOp](
   override def asVersion(
       protocolVersion: ProtocolVersion
   ): TopologyTransaction[Op] = {
-    new TopologyStateUpdate[Op](op, element)(
+    TopologyStateUpdate[Op](op, element)(
       TopologyTransaction.protocolVersionRepresentativeFor(protocolVersion)
-    ) {}
+    )
   }
 }
 
@@ -400,10 +400,11 @@ object TopologyStateUpdate {
   def apply[Op <: AddRemoveChangeOp](
       op: Op,
       element: TopologyStateUpdateElement,
-  )(protocolVersion: ProtocolVersion): TopologyStateUpdate[Op] =
-    new TopologyStateUpdate(op, element)(
+      protocolVersion: ProtocolVersion,
+  ): TopologyStateUpdate[Op] =
+    TopologyStateUpdate(op, element)(
       TopologyTransaction.protocolVersionRepresentativeFor(protocolVersion)
-    ) {}
+    )
 
   def fromByteString(bytes: ByteString): ParsingResult[TopologyStateUpdate[AddRemoveChangeOp]] =
     for {
@@ -458,10 +459,10 @@ object TopologyStateUpdate {
       op <- AddRemoveChangeOp.fromProtoV0(protoTopologyTransaction.operation)
       mapping <- mappingRes
       id <- TopologyElementId.fromProtoPrimitive(protoTopologyTransaction.id)
-    } yield new TopologyStateUpdate(op, TopologyStateUpdateElement(id, mapping))(
-      TopologyTransaction.protocolVersionRepresentativeFor(ProtobufVersion(0)),
+    } yield TopologyStateUpdate(op, TopologyStateUpdateElement(id, mapping))(
+      TopologyTransaction.protocolVersionRepresentativeFor(ProtoVersion(0)),
       Some(bytes),
-    ) {}
+    )
   }
 
   def fromProtoV1(
@@ -502,10 +503,10 @@ object TopologyStateUpdate {
       op <- AddRemoveChangeOp.fromProtoV0(protoTopologyTransaction.operation)
       mapping <- mappingRes
       id <- TopologyElementId.fromProtoPrimitive(protoTopologyTransaction.id)
-    } yield new TopologyStateUpdate(op, TopologyStateUpdateElement(id, mapping))(
-      TopologyTransaction.protocolVersionRepresentativeFor(ProtobufVersion(1)),
+    } yield TopologyStateUpdate(op, TopologyStateUpdateElement(id, mapping))(
+      TopologyTransaction.protocolVersionRepresentativeFor(ProtoVersion(1)),
       Some(bytes),
-    ) {}
+    )
   }
 
   def createAdd(
@@ -515,19 +516,22 @@ object TopologyStateUpdate {
     TopologyStateUpdate(
       TopologyChangeOp.Add,
       TopologyStateUpdateElement(TopologyElementId.generate(), mapping),
-    )(protocolVersion)
+      protocolVersion,
+    )
 
   def createAdd(
       mapping: TopologyStateUpdateMapping,
       protocolVersion: RepresentativeProtocolVersion[TopologyTransaction[TopologyChangeOp]],
   ): TopologyStateUpdate[TopologyChangeOp.Add] =
-    new TopologyStateUpdate(
+    TopologyStateUpdate(
       TopologyChangeOp.Add,
       TopologyStateUpdateElement(TopologyElementId.generate(), mapping),
-    )(protocolVersion) {}
+    )(
+      protocolVersion
+    )
 }
 
-sealed abstract case class DomainGovernanceTransaction(
+final case class DomainGovernanceTransaction private (
     element: DomainGovernanceElement
 )(
     val representativeProtocolVersion: RepresentativeProtocolVersion[
@@ -576,9 +580,9 @@ sealed abstract case class DomainGovernanceTransaction(
   def reverse: TopologyTransaction[TopologyChangeOp.Replace] = this
 
   override def asVersion(protocolVersion: ProtocolVersion): DomainGovernanceTransaction =
-    new DomainGovernanceTransaction(element)(
+    DomainGovernanceTransaction(element)(
       TopologyTransaction.protocolVersionRepresentativeFor(protocolVersion)
-    ) {}
+    )
 }
 
 object DomainGovernanceTransaction {
@@ -586,16 +590,16 @@ object DomainGovernanceTransaction {
       mapping: DomainGovernanceMapping,
       protocolVersion: ProtocolVersion,
   ): DomainGovernanceTransaction =
-    new DomainGovernanceTransaction(DomainGovernanceElement(mapping))(
+    DomainGovernanceTransaction(DomainGovernanceElement(mapping))(
       TopologyTransaction.protocolVersionRepresentativeFor(protocolVersion)
-    ) {}
+    )
 
   def apply(
       element: DomainGovernanceElement,
       protocolVersion: ProtocolVersion,
-  ) = new DomainGovernanceTransaction(element)(
+  ): DomainGovernanceTransaction = DomainGovernanceTransaction(element)(
     TopologyTransaction.protocolVersionRepresentativeFor(protocolVersion)
-  ) {}
+  )
 
   private[transaction] def fromProtoV0(
       protoTopologyTransaction: v0.DomainGovernanceTransaction,
@@ -610,10 +614,10 @@ object DomainGovernanceTransaction {
     }
 
     mapping.map(mapping =>
-      new DomainGovernanceTransaction(DomainGovernanceElement(mapping))(
-        TopologyTransaction.protocolVersionRepresentativeFor(ProtobufVersion(0)),
+      DomainGovernanceTransaction(DomainGovernanceElement(mapping))(
+        TopologyTransaction.protocolVersionRepresentativeFor(ProtoVersion(0)),
         Some(bytes),
-      ) {}
+      )
     )
   }
 
@@ -630,10 +634,10 @@ object DomainGovernanceTransaction {
     }
 
     mapping.map(mapping =>
-      new DomainGovernanceTransaction(DomainGovernanceElement(mapping))(
-        TopologyTransaction.protocolVersionRepresentativeFor(ProtobufVersion(1)),
+      DomainGovernanceTransaction(DomainGovernanceElement(mapping))(
+        TopologyTransaction.protocolVersionRepresentativeFor(ProtoVersion(1)),
         Some(bytes),
-      ) {}
+      )
     )
   }
 

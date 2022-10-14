@@ -3,12 +3,11 @@
 
 package com.digitalasset.canton.crypto
 
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.serialization.{DeserializationError, DeterministicEncoding}
-import com.digitalasset.canton.util.NoCopy
+import com.digitalasset.canton.serialization.{DefaultDeserializationError, DeterministicEncoding}
 import com.google.protobuf.ByteString
 
 /** A seed to derive further salts from.
@@ -63,8 +62,7 @@ object SaltAlgorithm {
   * The algorithm that was used to generate/derive the salt is kept to support the verification of the salt generation.
   */
 final case class Salt private (private val salt: ByteString, private val algorithm: SaltAlgorithm)
-    extends PrettyPrinting
-    with NoCopy {
+    extends PrettyPrinting {
 
   require(!salt.isEmpty, "Salt must not be empty")
   require(
@@ -83,8 +81,6 @@ final case class Salt private (private val salt: ByteString, private val algorit
 }
 
 object Salt {
-  private[this] def apply(bytes: ByteString, algorithm: SaltAlgorithm): Salt =
-    throw new UnsupportedOperationException("Use the generate methods instead")
 
   private[crypto] def create(bytes: ByteString, algorithm: SaltAlgorithm): Either[SaltError, Salt] =
     Either.cond(
@@ -135,7 +131,7 @@ object Salt {
       saltAlgorithm <- SaltAlgorithm.fromProtoOneOf("algorithm", saltP.algorithm)
       salt <- create(saltP.salt, saltAlgorithm).leftMap(err =>
         ProtoDeserializationError.CryptoDeserializationError(
-          DeserializationError(err.toString, saltP.toByteString)
+          DefaultDeserializationError(err.toString)
         )
       )
     } yield salt

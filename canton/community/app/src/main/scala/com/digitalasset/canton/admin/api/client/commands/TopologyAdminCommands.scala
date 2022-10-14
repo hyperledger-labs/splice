@@ -3,18 +3,19 @@
 
 package com.digitalasset.canton.admin.api.client.commands
 
-import cats.syntax.either._
-import cats.syntax.traverse._
+import cats.syntax.either.*
+import cats.syntax.traverse.*
 import com.daml.lf.data.Ref.PackageId
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   DefaultUnboundedTimeout,
   TimeoutType,
 }
-import com.digitalasset.canton.admin.api.client.data._
+import com.digitalasset.canton.admin.api.client.data.*
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.{CertificateId, Fingerprint, KeyPurpose}
 import com.digitalasset.canton.protocol.{
-  DynamicDomainParameters => DynamicDomainParametersInternal,
-  v0 => idProto,
+  DynamicDomainParameters as DynamicDomainParametersInternal,
+  v0 as idProto,
 }
 import com.digitalasset.canton.topology.admin.grpc.BaseQuery
 import com.digitalasset.canton.topology.admin.v0
@@ -24,8 +25,8 @@ import com.digitalasset.canton.topology.admin.v0.TopologyAggregationServiceGrpc.
 import com.digitalasset.canton.topology.admin.v0.TopologyManagerReadServiceGrpc.TopologyManagerReadServiceStub
 import com.digitalasset.canton.topology.admin.v0.TopologyManagerWriteServiceGrpc.TopologyManagerWriteServiceStub
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions
-import com.digitalasset.canton.topology.transaction._
-import com.digitalasset.canton.topology.{DomainId, _}
+import com.digitalasset.canton.topology.transaction.*
+import com.digitalasset.canton.topology.{DomainId, *}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
@@ -50,7 +51,7 @@ object TopologyAdminCommands {
         filterParty: String,
         filterParticipant: String,
         asOf: Option[Instant],
-        limit: Int,
+        limit: PositiveInt,
     ) extends BaseCommand[v0.ListPartiesRequest, v0.ListPartiesResponse, Seq[ListPartiesResult]] {
 
       override def createRequest(): Either[String, v0.ListPartiesRequest] =
@@ -60,7 +61,7 @@ object TopologyAdminCommands {
             filterParty = filterParty,
             filterParticipant = filterParticipant,
             asOf = asOf.map(ts => Timestamp(ts.getEpochSecond)),
-            limit = limit,
+            limit = limit.value,
           )
         )
 
@@ -85,7 +86,7 @@ object TopologyAdminCommands {
         filterKeyOwnerType: Option[KeyOwnerCode],
         filterKeyOwnerUid: String,
         asOf: Option[Instant],
-        limit: Int,
+        limit: PositiveInt,
     ) extends BaseCommand[v0.ListKeyOwnersRequest, v0.ListKeyOwnersResponse, Seq[
           ListKeyOwnersResult
         ]] {
@@ -97,7 +98,7 @@ object TopologyAdminCommands {
             filterKeyOwnerType = filterKeyOwnerType.map(_.toProtoPrimitive).getOrElse(""),
             filterKeyOwnerUid = filterKeyOwnerUid,
             asOf = asOf.map(ts => Timestamp(ts.getEpochSecond)),
-            limit = limit,
+            limit = limit.value,
           )
         )
 
@@ -392,9 +393,9 @@ object TopologyAdminCommands {
         force: Boolean,
     ) extends BaseCommand[v0.DomainParametersChangeAuthorization] {
       override def createRequest(): Either[String, v0.DomainParametersChangeAuthorization] = {
-        val protobufVersion = newParameters.protobufVersion.v
+        val protoVersion = newParameters.protoVersion.v
 
-        val parameters = protobufVersion match {
+        val parameters = protoVersion match {
           case 0 =>
             Right(
               v0.DomainParametersChangeAuthorization.Parameters
@@ -406,7 +407,7 @@ object TopologyAdminCommands {
                 .ParametersV1(newParameters.toProtoV1)
             )
           case _ =>
-            Left(s"Unsupported protobuf version $protobufVersion for dynamic domain parameters")
+            Left(s"Unsupported Proto version $protoVersion for dynamic domain parameters")
         }
 
         parameters.map { parameters =>

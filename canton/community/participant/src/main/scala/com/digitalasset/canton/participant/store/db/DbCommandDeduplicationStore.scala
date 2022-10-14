@@ -4,12 +4,12 @@
 package com.digitalasset.canton.participant.store.db
 
 import cats.data.OptionT
-import cats.syntax.option._
+import cats.syntax.option.*
 import com.daml.ledger.participant.state.v2.ChangeId
+import com.daml.metrics.MetricHandle.Gauge
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.metrics.MetricHandle.GaugeM
 import com.digitalasset.canton.metrics.TimedLoadGauge
 import com.digitalasset.canton.participant.GlobalOffset
 import com.digitalasset.canton.participant.protocol.submission.ChangeIdHash
@@ -24,7 +24,7 @@ import com.digitalasset.canton.resource.{DbStorage, DbStore}
 import com.digitalasset.canton.store.db.DbSerializationException
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.version.ReleaseProtocolVersion
 import com.digitalasset.canton.{ApplicationId, CommandId}
 import io.functionmeta.functionFullName
 import slick.jdbc.SetParameter
@@ -34,23 +34,23 @@ import scala.concurrent.{ExecutionContext, Future}
 class DbCommandDeduplicationStore(
     override protected val storage: DbStorage,
     override protected val timeouts: ProcessingTimeout,
+    releaseProtocolVersion: ReleaseProtocolVersion,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends CommandDeduplicationStore
     with DbStore {
-  import storage.api._
-  import storage.converters._
+  import storage.api.*
+  import storage.converters.*
 
-  private val processingTime: GaugeM[TimedLoadGauge, Double] =
+  private val processingTime: Gauge[TimedLoadGauge, Double] =
     storage.metrics.loadGaugeM("command-deduplication-store")
 
-  private val protocolVersion = ProtocolVersion.v2Todo_i8793
   private implicit val setParameterStoredParties: SetParameter[StoredParties] =
-    StoredParties.getVersionedSetParameter(protocolVersion)
+    StoredParties.getVersionedSetParameter(releaseProtocolVersion.v)
   private implicit val setParameterTraceContext: SetParameter[TraceContext] =
-    TraceContext.getVersionedSetParameter(protocolVersion)
+    TraceContext.getVersionedSetParameter(releaseProtocolVersion.v)
   private implicit val setParameterTraceContextO: SetParameter[Option[TraceContext]] =
-    TraceContext.getVersionedSetParameterO(protocolVersion)
+    TraceContext.getVersionedSetParameterO(releaseProtocolVersion.v)
 
   override def lookup(
       changeIdHash: ChangeIdHash

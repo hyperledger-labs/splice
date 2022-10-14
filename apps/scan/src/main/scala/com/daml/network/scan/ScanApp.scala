@@ -62,12 +62,14 @@ class ScanApp(
         store,
       )
     } yield {
-      adminServerRegistry.addService(
-        ScanServiceGrpc.bindService(
-          new GrpcScanService(ledgerClient, config.svcUser, store, loggerFactory),
-          ec,
+      adminServerRegistry
+        .addService(
+          ScanServiceGrpc.bindService(
+            new GrpcScanService(ledgerClient, config.svcUser, store, loggerFactory),
+            ec,
+          )
         )
-      )
+        .discard
       ScanApp.State(
         storage,
         store,

@@ -1,4 +1,5 @@
 package com.daml.network.integration.tests
+
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{

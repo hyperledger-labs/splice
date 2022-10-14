@@ -7,6 +7,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.directory.metrics.DirectoryAppMetrics
+import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
 import com.daml.network.environment.CoinNodeBootstrapBase
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
@@ -35,6 +36,7 @@ class DirectoryAppBootstrap(
     metrics: DirectoryAppMetrics,
     storageFactory: StorageFactory,
     parentLogger: NamedLoggerFactory,
+    writeHealthDumpToFile: HealthDumpFunction,
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     @nowarn("cat=unused")
@@ -53,6 +55,7 @@ class DirectoryAppBootstrap(
       metrics,
       storageFactory,
       parentLogger.append(DirectoryAppBootstrap.LoggerFactoryKeyName, name.unwrap),
+      writeHealthDumpToFile,
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
@@ -88,6 +91,7 @@ object DirectoryAppBootstrap {
       testingConfigInternal: TestingConfigInternal,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
+      writeHealthDumpToFile: HealthDumpFunction,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
       scheduler: ScheduledExecutorService,
@@ -106,6 +110,7 @@ object DirectoryAppBootstrap {
           directoryMetrics,
           new CommunityStorageFactory(directoryConfig.storage),
           loggerFactory,
+          writeHealthDumpToFile,
         )
       )
       .leftMap(_.toString)

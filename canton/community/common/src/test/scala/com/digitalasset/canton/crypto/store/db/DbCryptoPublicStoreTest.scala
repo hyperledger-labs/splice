@@ -14,7 +14,7 @@ trait DbCryptoPublicStoreTest extends AsyncWordSpec with CryptoPublicStoreTest {
   this: DbTest =>
 
   override def cleanDb(storage: DbStorage): Future[Unit] = {
-    import storage.api._
+    import storage.api.*
 
     storage.update(
       DBIO.seq(
@@ -27,7 +27,7 @@ trait DbCryptoPublicStoreTest extends AsyncWordSpec with CryptoPublicStoreTest {
 
   "DbCryptoPublicStore" can {
     behave like cryptoPublicStore(
-      new DbCryptoPublicStore(storage, timeouts, loggerFactory),
+      new DbCryptoPublicStore(storage, testedReleaseProtocolVersion, timeouts, loggerFactory),
       backedByDatabase = true,
     )
   }

@@ -82,7 +82,7 @@ class DirectoryApp(
           loggerFactory,
         )
     } yield {
-      adminServerRegistry.addService(DirectoryServiceGrpc.bindService(grpcServer, ec))
+      adminServerRegistry.addService(DirectoryServiceGrpc.bindService(grpcServer, ec)).discard
       new DirectoryApp.State(
         automation,
         storage,

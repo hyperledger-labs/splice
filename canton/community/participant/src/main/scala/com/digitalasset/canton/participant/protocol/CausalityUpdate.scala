@@ -3,10 +3,9 @@
 
 package com.digitalasset.canton.participant.protocol
 
-import cats.syntax.traverse._
+import cats.syntax.traverse.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.participant.RequestCounter
 import com.digitalasset.canton.protocol.v0.CausalityUpdate.Tag
 import com.digitalasset.canton.protocol.{TransferId, v0}
 import com.digitalasset.canton.serialization.ProtoConverter
@@ -16,12 +15,12 @@ import com.digitalasset.canton.version.Transfer.{SourceProtocolVersion, TargetPr
 import com.digitalasset.canton.version.{
   HasProtocolVersionedCompanion,
   HasProtocolVersionedWrapper,
-  ProtobufVersion,
+  ProtoVersion,
   ProtocolVersion,
   ProtocolVersionedCompanionDbHelpers,
   RepresentativeProtocolVersion,
 }
-import com.digitalasset.canton.{LfPartyId, ProtoDeserializationError}
+import com.digitalasset.canton.{LfPartyId, ProtoDeserializationError, RequestCounter}
 
 /** Represents the causal dependencies of a given request.
   */
@@ -62,7 +61,7 @@ case class TransactionUpdate(
       hostedInformeeStakeholders.toList,
       Some(ts.toProtoPrimitive),
       domain.toProtoPrimitive,
-      rc,
+      rc.toProtoPrimitive,
       v0.CausalityUpdate.Tag.TransactionUpdate(v0.TransactionUpdate()),
     )
 }
@@ -105,7 +104,7 @@ case class TransferOutUpdate(
       hostedInformeeStakeholders.toList,
       Some(ts.toProtoPrimitive),
       domain.toProtoPrimitive,
-      rc,
+      rc.toProtoPrimitive,
       Tag.TransferOutUpdate(v0.TransferOutUpdate(Some(transferId.toProtoV0))),
     )
 }
@@ -147,7 +146,7 @@ case class TransferInUpdate(
       hostedInformeeStakeholders.toList,
       Some(ts.toProtoPrimitive),
       domain.toProtoPrimitive,
-      rc,
+      rc.toProtoPrimitive,
       Tag.TransferInUpdate(v0.TransferInUpdate(Some(transferId.toProtoV0))),
     )
 }
@@ -169,7 +168,7 @@ object CausalityUpdate
     extends HasProtocolVersionedCompanion[CausalityUpdate]
     with ProtocolVersionedCompanionDbHelpers[CausalityUpdate] {
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtobufVersion(0) -> VersionedProtoConverter(
+    ProtoVersion(0) -> VersionedProtoConverter(
       ProtocolVersion.v2,
       supportedProtoVersion(v0.CausalityUpdate)(fromProtoV0),
       _.toProtoV0.toByteString,
@@ -179,7 +178,7 @@ object CausalityUpdate
   override protected def name: String = "causality update"
 
   def fromProtoV0(p: v0.CausalityUpdate): ParsingResult[CausalityUpdate] = {
-    val representativeProtocolVersion = protocolVersionRepresentativeFor(ProtobufVersion(0))
+    val representativeProtocolVersion = protocolVersionRepresentativeFor(ProtoVersion(0))
 
     for {
       domainId <- DomainId.fromProtoPrimitive(p.domainId, "domain_id")
@@ -188,7 +187,7 @@ object CausalityUpdate
       }
       informeeStks = informeeStksL.toSet
       ts <- ProtoConverter.parseRequired(CantonTimestamp.fromProtoPrimitive, "ts", p.ts)
-      rc = p.requestCounter
+      rc = RequestCounter(p.requestCounter)
 
       updateE: Either[ProtoDeserializationError, CausalityUpdate] = p.tag match {
         case Tag.Empty => Left(ProtoDeserializationError.FieldNotSet(s"tag"))

@@ -375,7 +375,7 @@ class WalletIntegrationTest
       aliceRemoteWallet.acceptOnChannelPaymentRequest(request)
       eventually()(
         bobWallet.remoteParticipant.ledger_api.acs
-          .of_party(bobUserParty, None, true, Seq(coinCodegen.Coin.id))
+          .of_party(bobUserParty, filterTemplates = Seq(coinCodegen.Coin.id))
           should have size 2
       )
       checkWallet(aliceUserParty, aliceRemoteWallet, Seq((29, 30)))

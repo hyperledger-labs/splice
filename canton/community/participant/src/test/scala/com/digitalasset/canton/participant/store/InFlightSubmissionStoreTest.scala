@@ -3,10 +3,10 @@
 
 package com.digitalasset.canton.participant.store
 
-import cats.syntax.option._
+import cats.syntax.option.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.protocol.TransactionProcessor
-import com.digitalasset.canton.participant.protocol.submission._
+import com.digitalasset.canton.participant.protocol.submission.*
 import com.digitalasset.canton.participant.store.InFlightSubmissionStore.{
   InFlightByMessageId,
   InFlightBySequencingInfo,
@@ -14,8 +14,8 @@ import com.digitalasset.canton.participant.store.InFlightSubmissionStore.{
 import com.digitalasset.canton.sequencing.protocol.{DeliverErrorReason, MessageId}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil._
-import com.digitalasset.canton.{BaseTest, DefaultDamlValues}
+import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.{BaseTest, DefaultDamlValues, SequencerCounter}
 import org.scalatest.wordspec.AsyncWordSpec
 
 import java.util.UUID
@@ -43,6 +43,7 @@ trait InFlightSubmissionStoreTest extends AsyncWordSpec with BaseTest {
     TransactionSubmissionTrackingData(
       completionInfo,
       TransactionSubmissionTrackingData.TimeoutCause,
+      testedProtocolVersion,
     )
   lazy val trackingData3 = TransactionSubmissionTrackingData(
     completionInfo,
@@ -51,6 +52,7 @@ trait InFlightSubmissionStoreTest extends AsyncWordSpec with BaseTest {
         .Error(DeliverErrorReason.BatchInvalid("Some invalid batch"))
         .createRejection
     ),
+    testedProtocolVersion,
   )
   lazy val submission1 = InFlightSubmission(
     changeId1,
@@ -79,8 +81,10 @@ trait InFlightSubmissionStoreTest extends AsyncWordSpec with BaseTest {
     UnsequencedSubmission(CantonTimestamp.Epoch.plusSeconds(30), trackingData3),
     TraceContext.empty,
   )
-  lazy val sequencedSubmission1 = SequencedSubmission(10L, CantonTimestamp.Epoch.plusSeconds(1))
-  lazy val sequencedSubmission2 = SequencedSubmission(20L, CantonTimestamp.Epoch.plusSeconds(11))
+  lazy val sequencedSubmission1 =
+    SequencedSubmission(SequencerCounter(10), CantonTimestamp.Epoch.plusSeconds(1))
+  lazy val sequencedSubmission2 =
+    SequencedSubmission(SequencerCounter(20), CantonTimestamp.Epoch.plusSeconds(11))
 
   def inFlightSubmissionStore(mk: () => InFlightSubmissionStore): Unit = {
 

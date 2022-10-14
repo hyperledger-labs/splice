@@ -11,7 +11,7 @@ import org.scalatest.wordspec.FixtureAnyWordSpec
 import org.scalatest.{Outcome, SuiteMixin}
 
 import java.io.ByteArrayInputStream
-import scala.sys.process._
+import scala.sys.process.*
 
 /** The `CliIntegrationTest` tests Canton command line options by instantiating a Canton binary in a new process with
   * the to-be-tested CLI options as arguments.
@@ -104,6 +104,13 @@ class CliIntegrationTest extends FixtureAnyWordSpec with BaseTest with SuiteMixi
       )
     }
 
+    "not shadow bootstrap script variables with the bootstrap script file name" in {
+      processLogger =>
+        s"$cantonBin --config $simpleConf --no-tty --bootstrap $resourceDir/scripts/participant1.canton " ! processLogger
+
+        checkOutput(processLogger, shouldContain = Seq(successMsg))
+    }
+
     "change logging directory, log level and log format when using the appropriate CLI flags" in {
       processLogger =>
         s"$cantonBin --log-truncate --log-file-appender flat --config $simpleConf --no-tty --bootstrap $resourceDir/scripts/bootstrap.canton --log-file-name log/new-name.log --log-level-canton DEBUG --log-encoder json" ! processLogger
@@ -160,6 +167,14 @@ class CliIntegrationTest extends FixtureAnyWordSpec with BaseTest with SuiteMixi
         "final logging error",
       )
         .foreach(errorContents.contains)
+    }
+
+    "run with log file appender off" in { processLogger =>
+      s"$cantonBin --log-file-appender=off --config $simpleConf $cantonShouldStartFlags" ! processLogger
+      checkOutput(
+        processLogger,
+        shouldContain = Seq(successMsg),
+      )
     }
 
     "log number of threads at info level" in { processLogger =>

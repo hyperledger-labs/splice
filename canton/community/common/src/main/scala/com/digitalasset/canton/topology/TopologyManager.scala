@@ -4,17 +4,17 @@
 package com.digitalasset.canton.topology
 
 import cats.data.EitherT
-import cats.syntax.either._
-import cats.syntax.traverse._
-import cats.syntax.traverseFilter._
-import com.daml.error._
+import cats.syntax.either.*
+import cats.syntax.traverse.*
+import cats.syntax.traverseFilter.*
+import com.daml.error.*
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.crypto._
+import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.store.{CryptoPrivateStoreError, CryptoPublicStoreError}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.data.CantonTimestamp.now
 import com.digitalasset.canton.error.CantonErrorGroups.TopologyManagementErrorGroup.TopologyManagerErrorGroup
-import com.digitalasset.canton.error._
+import com.digitalasset.canton.error.*
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.DynamicDomainParameters
@@ -33,14 +33,12 @@ import com.digitalasset.canton.topology.store.{
   TopologyTransactionRejection,
   ValidatedTopologyTransaction,
 }
-import com.digitalasset.canton.topology.transaction.{SignedTopologyTransaction, _}
+import com.digitalasset.canton.topology.transaction.{SignedTopologyTransaction, *}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil._
+import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{MonadUtil, SimpleExecutionQueue}
 import com.digitalasset.canton.version.ProtocolVersion
-import org.slf4j.event.Level
 
-import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 import scala.math.Ordering.Implicits.infixOrderingOps
 
@@ -561,7 +559,6 @@ abstract class TopologyManager[E <: CantonError](
       transactions: Seq[SignedTopologyTransaction[TopologyChangeOp]],
   )(implicit traceContext: TraceContext): Future[Unit]
 
-  @nowarn("cat=unused")
   protected def preNotifyObservers(transactions: Seq[SignedTopologyTransaction[TopologyChangeOp]])(
       implicit traceContext: TraceContext
   ): Unit = {}
@@ -600,7 +597,7 @@ abstract class TopologyManager[E <: CantonError](
   )(implicit
       traceContext: TraceContext
   ): EitherT[Future, TopologyManagerError, TopologyTransaction[TopologyChangeOp]] = {
-    import TopologyChangeOp._
+    import TopologyChangeOp.*
     (op, mapping) match {
       case (Add, mapping: TopologyStateUpdateMapping) =>
         EitherT.rightT(TopologyStateUpdate.createAdd(mapping, protocolVersion))
@@ -629,7 +626,7 @@ abstract class TopologyManager[E <: CantonError](
   }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
-    import TraceContext.Implicits.Empty._
+    import TraceContext.Implicits.Empty.*
     Seq(
       sequentialQueue.asCloseable(
         "topology-manager-sequential-queue",
@@ -690,6 +687,17 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
 
   }
 
+  @Explanation("""The topology manager has received a malformed message from another node.""")
+  @Resolution("Inspect the error message for details.")
+  object TopologyManagerAlarm extends AlarmErrorCode(id = "TOPOLOGY_MANAGER_ALARM") {
+    case class Warn(override val cause: String)(implicit
+        override val loggingContext: ErrorLoggingContext
+    ) extends Alarm(cause)
+        with TopologyManagerError {
+      override lazy val logOnCreation: Boolean = false
+    }
+  }
+
   @Explanation(
     """This error indicates that the secret key with the respective fingerprint can not be found."""
   )
@@ -732,18 +740,11 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
   @Resolution(
     "Ensure that the transaction is valid and uses a crypto version understood by this participant."
   )
-  object InvalidSignatureError
-      extends ErrorCode(
-        id = "INVALID_TOPOLOGY_TX_SIGNATURE_ERROR",
-        ErrorCategory.InvalidIndependentOfSystemState,
-      ) {
+  object InvalidSignatureError extends AlarmErrorCode(id = "INVALID_TOPOLOGY_TX_SIGNATURE_ERROR") {
 
-    override def logLevel: Level = Level.WARN
-
-    case class Failure(error: SignatureCheckError)(implicit val loggingContext: ErrorLoggingContext)
-        extends CantonError.Impl(
-          cause = "Transaction signature verification failed"
-        )
+    case class Failure(error: SignatureCheckError)(implicit
+        override val loggingContext: ErrorLoggingContext
+    ) extends Alarm(cause = "Transaction signature verification failed")
         with TopologyManagerError
   }
 
@@ -827,15 +828,10 @@ object TopologyManagerError extends TopologyManagerErrorGroup {
   @Resolution(
     """Inspect the topology state and ensure that valid namespace or identifier delegations of the signing key exist or upload them before adding this transaction."""
   )
-  object UnauthorizedTransaction
-      extends ErrorCode(
-        id = "UNAUTHORIZED_TOPOLOGY_TRANSACTION",
-        ErrorCategory.InvalidGivenCurrentSystemStateOther,
-      ) {
-    case class Failure()(implicit val loggingContext: ErrorLoggingContext)
-        extends CantonError.Impl(
-          cause = "Topology transaction is not properly authorized"
-        )
+  object UnauthorizedTransaction extends AlarmErrorCode(id = "UNAUTHORIZED_TOPOLOGY_TRANSACTION") {
+
+    case class Failure()(implicit override val loggingContext: ErrorLoggingContext)
+        extends Alarm(cause = "Topology transaction is not properly authorized")
         with TopologyManagerError
   }
 

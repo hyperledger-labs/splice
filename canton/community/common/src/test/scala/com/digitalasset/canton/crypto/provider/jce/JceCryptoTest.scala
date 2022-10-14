@@ -5,7 +5,7 @@ package com.digitalasset.canton.crypto.provider.jce
 
 import com.digitalasset.canton.config.CryptoProvider.Jce
 import com.digitalasset.canton.config.{CommunityCryptoConfig, CryptoProvider}
-import com.digitalasset.canton.crypto._
+import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.store.CryptoPrivateStore.CommunityCryptoPrivateStoreFactory
 import com.digitalasset.canton.resource.MemoryStorage
 import org.scalatest.wordspec.AsyncWordSpec
@@ -28,6 +28,7 @@ class JceCryptoTest
           CommunityCryptoConfig(provider = CryptoProvider.Jce),
           new MemoryStorage,
           new CommunityCryptoPrivateStoreFactory,
+          testedReleaseProtocolVersion,
           timeouts,
           loggerFactory,
         )

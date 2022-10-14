@@ -3,7 +3,7 @@
 
 package com.digitalasset.canton.admin.api.client.commands
 
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.daml.ledger.api.DeduplicationPeriod
 import com.daml.ledger.api.v1.active_contracts_service.ActiveContractsServiceGrpc.ActiveContractsServiceStub
 import com.daml.ledger.api.v1.active_contracts_service.{
@@ -18,17 +18,19 @@ import com.daml.ledger.api.v1.admin.metering_report_service.{
   MeteringReportServiceGrpc,
 }
 import com.daml.ledger.api.v1.admin.package_management_service.PackageManagementServiceGrpc.PackageManagementServiceStub
-import com.daml.ledger.api.v1.admin.package_management_service._
+import com.daml.ledger.api.v1.admin.package_management_service.*
 import com.daml.ledger.api.v1.admin.participant_pruning_service.ParticipantPruningServiceGrpc.ParticipantPruningServiceStub
-import com.daml.ledger.api.v1.admin.participant_pruning_service._
+import com.daml.ledger.api.v1.admin.participant_pruning_service.*
 import com.daml.ledger.api.v1.admin.party_management_service.PartyManagementServiceGrpc.PartyManagementServiceStub
-import com.daml.ledger.api.v1.admin.party_management_service._
+import com.daml.ledger.api.v1.admin.party_management_service.*
 import com.daml.ledger.api.v1.admin.user_management_service.UserManagementServiceGrpc.UserManagementServiceStub
 import com.daml.ledger.api.v1.admin.user_management_service.{
   CreateUserRequest,
   CreateUserResponse,
   DeleteUserRequest,
   DeleteUserResponse,
+  GetUserRequest,
+  GetUserResponse,
   GrantUserRightsRequest,
   GrantUserRightsResponse,
   ListUserRightsRequest,
@@ -37,12 +39,12 @@ import com.daml.ledger.api.v1.admin.user_management_service.{
   ListUsersResponse,
   RevokeUserRightsRequest,
   RevokeUserRightsResponse,
-  Right => UserRight,
+  Right as UserRight,
   User,
   UserManagementServiceGrpc,
 }
 import com.daml.ledger.api.v1.command_completion_service.CommandCompletionServiceGrpc.CommandCompletionServiceStub
-import com.daml.ledger.api.v1.command_completion_service._
+import com.daml.ledger.api.v1.command_completion_service.*
 import com.daml.ledger.api.v1.command_service.CommandServiceGrpc.CommandServiceStub
 import com.daml.ledger.api.v1.command_service.{
   CommandServiceGrpc,
@@ -55,7 +57,7 @@ import com.daml.ledger.api.v1.command_submission_service.{
   CommandSubmissionServiceGrpc,
   SubmitRequest,
 }
-import com.daml.ledger.api.v1.commands.{Command, Commands => CommandsV1}
+import com.daml.ledger.api.v1.commands.{Command, Commands as CommandsV1}
 import com.daml.ledger.api.v1.completion.Completion
 import com.daml.ledger.api.v1.ledger_configuration_service.LedgerConfigurationServiceGrpc.LedgerConfigurationServiceStub
 import com.daml.ledger.api.v1.ledger_configuration_service.{
@@ -75,8 +77,8 @@ import com.daml.ledger.api.v1.testing.time_service.{
 import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree}
 import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
 import com.daml.ledger.api.v1.transaction_service.TransactionServiceGrpc.TransactionServiceStub
-import com.daml.ledger.api.v1.transaction_service._
-import com.daml.ledger.client.binding.{Primitive => P}
+import com.daml.ledger.api.v1.transaction_service.*
+import com.daml.ledger.client.binding.{Primitive as P}
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   DefaultUnboundedTimeout,
   ServerEnforcedTimeout,
@@ -91,16 +93,17 @@ import com.digitalasset.canton.admin.api.client.data.{
   UserRights,
 }
 import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.networking.grpc.{ForwardingStreamObserver, RecordingStreamObserver}
+import com.digitalasset.canton.networking.grpc.ForwardingStreamObserver
 import com.digitalasset.canton.participant.ledger.api.client.LedgerConnection
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.util.BinaryFileUtil
 import com.digitalasset.canton.{DiscardOps, LfPartyId}
 import com.google.protobuf.empty.Empty
-import io.grpc._
+import io.grpc.*
 import io.grpc.stub.StreamObserver
 
 import java.time.Instant
@@ -331,7 +334,7 @@ object LedgerApiCommands {
 
     }
 
-    final case class ListKnownPackages(limit: Option[Int])
+    final case class ListKnownPackages(limit: PositiveInt)
         extends BaseCommand[ListKnownPackagesRequest, ListKnownPackagesResponse, Seq[
           PackageDetails
         ]] {
@@ -349,7 +352,7 @@ object LedgerApiCommands {
       override def handleResponse(
           response: ListKnownPackagesResponse
       ): Either[String, Seq[PackageDetails]] =
-        Right(response.packageDetails.take(limit.getOrElse(Int.MaxValue)))
+        Right(response.packageDetails.take(limit.value))
     }
 
   }
@@ -398,7 +401,7 @@ object LedgerApiCommands {
           service: CommandCompletionServiceStub,
           request: CompletionStreamRequest,
       ): Future[Seq[Completion]] = {
-        import scala.jdk.DurationConverters._
+        import scala.jdk.DurationConverters.*
         streamedResponse[CompletionStreamRequest, CompletionStreamResponse, Completion](
           service.completionStream,
           _.completions.filter(filter),
@@ -715,15 +718,17 @@ object LedgerApiCommands {
 
     final case class GetActiveContracts(
         parties: Set[LfPartyId],
-        limit: Option[Int] = None,
+        limit: PositiveInt,
         templateFilter: Seq[P.TemplateId[_]] = Seq.empty,
         verbose: Boolean = true,
-    ) extends BaseCommand[GetActiveContractsRequest, Seq[GetActiveContractsResponse], Seq[
+        timeout: FiniteDuration,
+    )(scheduler: ScheduledExecutorService)
+        extends BaseCommand[GetActiveContractsRequest, Seq[WrappedCreatedEvent], Seq[
           WrappedCreatedEvent
         ]] {
 
       override def createRequest(): Either[String, GetActiveContractsRequest] = {
-        import scalaz.syntax.tag._
+        import scalaz.syntax.tag.*
         val filter =
           if (templateFilter.nonEmpty) {
             Filters(
@@ -743,26 +748,25 @@ object LedgerApiCommands {
       override def submitRequest(
           service: ActiveContractsServiceStub,
           request: GetActiveContractsRequest,
-      ): Future[Seq[GetActiveContractsResponse]] = {
-        val promise = Promise[Seq[GetActiveContractsResponse]]()
-
-        val observer =
-          new RecordingStreamObserver[GetActiveContractsResponse](limit.getOrElse(Int.MaxValue)) {
-            override def onCompleted(): Unit = promise.success(this.responses)
-            override def onError(t: Throwable): Unit = promise.tryFailure(t).discard
-          }
-
-        service.getActiveContracts(
+      ): Future[Seq[WrappedCreatedEvent]] = {
+        streamedResponse[
+          GetActiveContractsRequest,
+          GetActiveContractsResponse,
+          WrappedCreatedEvent,
+        ](
+          service.getActiveContracts,
+          _.activeContracts.map(WrappedCreatedEvent),
           request,
-          observer,
+          limit.value,
+          timeout,
+          scheduler,
         )
-        promise.future
       }
 
       override def handleResponse(
-          response: Seq[GetActiveContractsResponse]
+          response: Seq[WrappedCreatedEvent]
       ): Either[String, Seq[WrappedCreatedEvent]] = {
-        Right(response.flatMap(_.activeContracts).map(WrappedCreatedEvent))
+        Right(response)
       }
 
       // fetching ACS might take long if we fetch a lot of data
@@ -854,6 +858,29 @@ object LedgerApiCommands {
       )
 
       override def handleResponse(response: CreateUserResponse): Either[String, LedgerApiUser] =
+        ProtoConverter
+          .parseRequired(LedgerApiUser.fromProtoV0, "user", response.user)
+          .leftMap(_.toString)
+
+    }
+
+    final case class Get(
+        id: String
+    ) extends BaseCommand[GetUserRequest, GetUserResponse, LedgerApiUser] {
+
+      override def submitRequest(
+          service: UserManagementServiceStub,
+          request: GetUserRequest,
+      ): Future[GetUserResponse] =
+        service.getUser(request)
+
+      override def createRequest(): Either[String, GetUserRequest] = Right(
+        GetUserRequest(
+          userId = id
+        )
+      )
+
+      override def handleResponse(response: GetUserResponse): Either[String, LedgerApiUser] =
         ProtoConverter
           .parseRequired(LedgerApiUser.fromProtoV0, "user", response.user)
           .leftMap(_.toString)
@@ -989,7 +1016,7 @@ object LedgerApiCommands {
     ) extends BaseCommand[
           GetMeteringReportRequest,
           GetMeteringReportResponse,
-          LedgerMeteringReport,
+          String,
         ] {
 
       override def submitRequest(
@@ -1009,7 +1036,7 @@ object LedgerApiCommands {
 
       override def handleResponse(
           response: GetMeteringReportResponse
-      ): Either[String, LedgerMeteringReport] =
+      ): Either[String, String] =
         LedgerMeteringReport.fromProtoV0(response).leftMap(_.toString)
     }
   }

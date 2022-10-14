@@ -14,6 +14,7 @@ import com.digitalasset.canton.resource.DbStorage
 import com.digitalasset.canton.store.{IndexedDomain, IndexedStringStore}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.version.ReleaseProtocolVersion
 import io.functionmeta.functionFullName
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -22,6 +23,7 @@ class DbParticipantEventLog(
     id: ParticipantEventLogId,
     storage: DbStorage,
     indexedStringStore: IndexedStringStore,
+    releaseProtocolVersion: ReleaseProtocolVersion,
     override protected val timeouts: ProcessingTimeout,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit executionContext: ExecutionContext)
@@ -29,14 +31,15 @@ class DbParticipantEventLog(
       id,
       storage,
       indexedStringStore,
+      releaseProtocolVersion,
       timeouts,
       loggerFactory,
     )
     with ParticipantEventLog {
 
-  import storage.api._
-  import storage.converters._
-  import ParticipantStorageImplicits._
+  import storage.api.*
+  import storage.converters.*
+  import ParticipantStorageImplicits.*
 
   override def firstEventWithAssociatedDomainAtOrAfter(
       associatedDomain: DomainId,
@@ -83,7 +86,7 @@ class DbParticipantEventLog(
           sql"""select participant_event_publisher_local_offsets.nextval from (select level from dual connect by level <= #$count)"""
             .as[LocalOffset]
         case _: DbStorage.Profile.H2 =>
-          import DbStorage.Implicits.BuilderChain._
+          import DbStorage.Implicits.BuilderChain.*
           (sql"select nextval('participant_event_publisher_local_offsets') from (values " ++
             (1 to count).toList.map(i => sql"(#$i)").intercalate(sql", ") ++
             sql")")

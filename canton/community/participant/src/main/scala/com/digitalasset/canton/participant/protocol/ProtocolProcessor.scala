@@ -4,17 +4,16 @@
 package com.digitalasset.canton.participant.protocol
 
 import cats.data.{EitherT, NonEmptyChain}
-import cats.syntax.either._
-import cats.syntax.functor._
-import cats.syntax.functorFilter._
-import cats.syntax.traverse._
+import cats.syntax.either.*
+import cats.syntax.functor.*
+import cats.syntax.functorFilter.*
+import cats.syntax.traverse.*
 import com.daml.ledger.api.DeduplicationPeriod
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.crypto.{DomainSnapshotSyncCryptoApi, DomainSyncCryptoClient}
 import com.digitalasset.canton.data.{CantonTimestamp, ViewTree, ViewType}
 import com.digitalasset.canton.error.MediatorError
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
-import com.digitalasset.canton.lifecycle.FutureUnlessShutdown.syntax._
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.event.AcsChange
@@ -23,11 +22,7 @@ import com.digitalasset.canton.participant.protocol.ProcessingSteps.{
   WrapsProcessorError,
 }
 import com.digitalasset.canton.participant.protocol.RequestJournal.RequestState
-import com.digitalasset.canton.participant.protocol.conflictdetection.RequestTracker.{
-  RequestNotFound,
-  ResultAlreadyExists,
-  TimeoutResult,
-}
+import com.digitalasset.canton.participant.protocol.conflictdetection.RequestTracker.TimeoutResult
 import com.digitalasset.canton.participant.protocol.conflictdetection.{
   ActivenessSet,
   CommitSet,
@@ -39,21 +34,23 @@ import com.digitalasset.canton.participant.protocol.submission.{
   InFlightSubmissionTracker,
   UnsequencedSubmission,
 }
+import com.digitalasset.canton.participant.store
 import com.digitalasset.canton.participant.store.{StoredContract, SyncDomainEphemeralState}
+import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
 import com.digitalasset.canton.participant.sync.TimestampedEvent
-import com.digitalasset.canton.participant.{RequestCounter, store}
-import com.digitalasset.canton.protocol._
+import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.SignedProtocolMessageContent.SignedMessageContentCast
 import com.digitalasset.canton.protocol.messages.Verdict.Approve
-import com.digitalasset.canton.protocol.messages.{EncryptedViewMessageDecryptionError, _}
-import com.digitalasset.canton.sequencing.client._
-import com.digitalasset.canton.sequencing.protocol._
+import com.digitalasset.canton.protocol.messages.*
+import com.digitalasset.canton.sequencing.client.*
+import com.digitalasset.canton.sequencing.protocol.*
+import com.digitalasset.canton.sequencing.{AsyncResult, HandlerResult}
 import com.digitalasset.canton.topology.MediatorId
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.EitherTUtil.{condUnitET, ifThenET}
 import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil, FutureUtil}
-import com.digitalasset.canton.{DiscardOps, SequencerCounter, checked}
+import com.digitalasset.canton.{DiscardOps, RequestCounter, SequencerCounter, checked}
 import com.google.common.annotations.VisibleForTesting
 import io.functionmeta.functionFullName
 
@@ -99,13 +96,8 @@ abstract class ProtocolProcessor[
     )
     with RequestProcessor[RequestViewType] {
 
-  import ProtocolProcessor._
-  import com.digitalasset.canton.util.ShowUtil._
-
-  private val alarmer = new LoggingAlarmStreamer(logger)
-
-  private def alarm(message: String)(implicit traceContext: TraceContext): Future[Unit] =
-    alarmer.alarm(message)
+  import ProtocolProcessor.*
+  import com.digitalasset.canton.util.ShowUtil.*
 
   private[this] def withKind(message: String): String = s"${steps.requestKind}: $message"
 
@@ -691,8 +683,10 @@ abstract class ProtocolProcessor[
       timestamp: CantonTimestamp,
       sequencerCounter: SequencerCounter,
       signedResultBatch: SignedContent[Deliver[DefaultOpenEnvelope]],
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
-    performUnlessClosingF(functionFullName) {
+  )(implicit traceContext: TraceContext): HandlerResult = {
+    val ts = signedResultBatch.content.timestamp
+
+    val processedET = performUnlessClosingEitherU(functionFullName) {
       val malformedMediatorRequestEnvelopes = signedResultBatch.content.batch.envelopes
         .mapFilter(ProtocolMessage.select[SignedProtocolMessage[MalformedMediatorRequestResult]])
       require(
@@ -701,27 +695,44 @@ abstract class ProtocolProcessor[
       )
       val malformedMediatorRequest = malformedMediatorRequestEnvelopes(0).protocolMessage.message
       val requestId = malformedMediatorRequest.requestId
-      val ts = signedResultBatch.content.timestamp
       val sc = signedResultBatch.content.counter
 
       logger.info(
         show"Got malformed mediator result for ${steps.requestKind.unquoted} request at $requestId."
       )
-      val processedE = performResultProcessing(
+
+      performResultProcessing(
         signedResultBatch,
         Left(malformedMediatorRequest),
         requestId,
         ts,
         sc,
       )
-      logResultWarnings(timestamp, processedE)
     }
+
+    toHandlerResult(ts, processedET)
+  }
+
+  private def toHandlerResult(
+      ts: CantonTimestamp,
+      result: EitherT[
+        FutureUnlessShutdown,
+        steps.ResultError,
+        EitherT[FutureUnlessShutdown, steps.ResultError, Unit],
+      ],
+  )(implicit traceContext: TraceContext): HandlerResult = {
+    // We discard the lefts because they are logged by `logResultWarnings`
+    logResultWarnings(ts, result)
+      .map(innerAsync => AsyncResult(innerAsync.getOrElse(())))
+      .getOrElse(AsyncResult.immediate)
+  }
 
   override def processResult(
       signedResultBatch: SignedContent[Deliver[DefaultOpenEnvelope]]
-  )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] = {
+  )(implicit traceContext: TraceContext): HandlerResult = {
+    val ts = signedResultBatch.content.timestamp
 
-    performUnlessClosingF(functionFullName) {
+    val processedET = performUnlessClosingEitherU(functionFullName) {
       val resultEnvelopes =
         signedResultBatch.content.batch.envelopes
           .mapFilter(ProtocolMessage.select[SignedProtocolMessage[Result]])
@@ -732,39 +743,41 @@ abstract class ProtocolProcessor[
 
       val result = resultEnvelopes(0).protocolMessage.message
       val requestId = result.requestId
-      val ts = signedResultBatch.content.timestamp
+
       val sc = signedResultBatch.content.counter
 
       logger.debug(
         show"Got result for ${steps.requestKind.unquoted} request at $requestId: $resultEnvelopes"
       )
-      val processedE = performResultProcessing(signedResultBatch, Right(result), requestId, ts, sc)
-      logResultWarnings(ts, processedE)
+
+      performResultProcessing(signedResultBatch, Right(result), requestId, ts, sc)
     }
+
+    toHandlerResult(ts, processedET)
   }
 
   @VisibleForTesting
-  // TODO(#8744) avoid discarded future as part of AlarmStreamer design
-  @SuppressWarnings(Array("com.digitalasset.canton.DiscardedFuture"))
   private[protocol] def performResultProcessing(
       signedResultBatch: SignedContent[Deliver[DefaultOpenEnvelope]],
       result: Either[MalformedMediatorRequestResult, Result],
       requestId: RequestId,
-      ts: CantonTimestamp,
+      resultTs: CantonTimestamp,
       sc: SequencerCounter,
-  )(implicit traceContext: TraceContext): EitherT[Future, steps.ResultError, Unit] = {
-    ephemeral.recordOrderPublisher.tick(sc, ts)
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, steps.ResultError, EitherT[FutureUnlessShutdown, steps.ResultError, Unit]] = {
+    ephemeral.recordOrderPublisher.tick(sc, resultTs)
     for {
       snapshot <- EitherT.right(
-        crypto.ips.awaitSnapshotSupervised(s"await crypto snapshot $ts")(ts)
+        crypto.ips.awaitSnapshotSupervised(s"await crypto snapshot $resultTs")(resultTs)
       )
 
       domainParameters <- EitherT.right(snapshot.findDynamicDomainParametersOrDefault())
 
       _ <- condUnitET[Future](
-        ts <= domainParameters.decisionTimeFor(requestId.unwrap), {
-          ephemeral.requestTracker.tick(sc, ts)
-          steps.embedResultError(DecisionTimeElapsed(requestId, ts))
+        resultTs <= domainParameters.decisionTimeFor(requestId.unwrap), {
+          ephemeral.requestTracker.tick(sc, resultTs)
+          steps.embedResultError(DecisionTimeElapsed(requestId, resultTs))
           /* We must not evict the request from `pendingRequestData` or `pendingSubmissionMap`
            * because this will have been taken care of by `handleTimeout`
            * when the request tracker progresses to the decision time.
@@ -773,30 +786,48 @@ abstract class ProtocolProcessor[
       )
       _ <- result.merge.verdict match {
         case _: MediatorError.Timeout.Reject
-            if ts <= domainParameters.participantResponseDeadlineFor(requestId.unwrap) =>
-          alarmer.alarm(
-            s"Received mediator timeout message at $ts before response deadline for request ${requestId}"
-          )
-          ephemeral.requestTracker.tick(sc, ts)
+            if resultTs <= domainParameters.participantResponseDeadlineFor(requestId.unwrap) =>
+          SyncServiceAlarm
+            .Warn(
+              s"Received mediator timeout message at $resultTs before response deadline for request $requestId."
+            )
+            .report()
+          ephemeral.requestTracker.tick(sc, resultTs)
           EitherT.leftT[Future, Unit](steps.embedResultError(TimeoutResultTooEarly(requestId)))
         case _ => EitherT.rightT[Future, steps.ResultError](()) // everything ok
       }
 
-      _ <- EitherTUtil.ifThenET(!precedesCleanReplay(requestId)) {
-        performResultProcessing2(signedResultBatch, result, requestId, ts, sc, domainParameters)
-      }
-    } yield ()
+      asyncResult <-
+        if (!precedesCleanReplay(requestId))
+          performResultProcessing2(
+            signedResultBatch,
+            result,
+            requestId,
+            resultTs,
+            sc,
+            domainParameters,
+          )
+        else
+          EitherT.pure[Future, steps.ResultError](
+            EitherT.pure[FutureUnlessShutdown, steps.ResultError](())
+          )
+    } yield asyncResult
   }
 
+  /** This processing step corresponds to the end of the synchronous part of the processing
+    * of mediator result.
+    * The inner `EitherT` corresponds to the subsequent async stage.
+    */
   private[this] def performResultProcessing2(
       signedResultBatch: SignedContent[Deliver[DefaultOpenEnvelope]],
       result: Either[MalformedMediatorRequestResult, Result],
       requestId: RequestId,
-      ts: CantonTimestamp,
+      resultTs: CantonTimestamp,
       sc: SequencerCounter,
       domainParameters: DynamicDomainParameters,
-  )(implicit traceContext: TraceContext): EitherT[Future, steps.ResultError, Unit] = {
-    val verdict = result.merge.verdict
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, steps.ResultError, EitherT[FutureUnlessShutdown, steps.ResultError, Unit]] = {
     for {
       // Wait until we have processed the corresponding request
       //
@@ -818,20 +849,51 @@ abstract class ProtocolProcessor[
       // TODO(M99) This argument relies on the mediator sending a MalformedMediatorRequest only to participants
       //  that have also received a message with the request.
       //  A dishonest sequencer or mediator could break this assumption.
+
+      /*
+        TODO(M43)
+        This part is still in the synchronous processing stage. As a result, processing of mediator responses
+        can delay processing of subsequent messages.
+        Part of the processing of mediator responses was switched from asynchronous to synchronous
+        because several verdicts can be sent in case the mediator crashes (see #10345).
+        One possible improvement could be to synchronize per request instead of globally.
+       */
       _ <- EitherT.right(ephemeral.phase37Synchronizer.awaitConfirmed(requestId))
 
       pendingRequestDataOrReplayData <- EitherT.fromEither[Future](
         steps.pendingRequestMap(ephemeral).remove(requestId).toRight {
-          ephemeral.requestTracker.tick(sc, ts)
+          ephemeral.requestTracker.tick(sc, resultTs)
           steps.embedResultError(UnknownPendingRequest(requestId))
         }
       )
-      PendingRequestData(requestCounter, requestSequencerCounter, pendingContracts) =
-        pendingRequestDataOrReplayData
+    } yield performResultProcessing3(
+      signedResultBatch,
+      result,
+      requestId,
+      resultTs,
+      sc,
+      domainParameters,
+      pendingRequestDataOrReplayData,
+    )
+  }
 
-      cleanReplay = isCleanReplay(requestCounter, pendingRequestDataOrReplayData)
-      pendingSubmissionDataO = pendingSubmissionDataForRequest(pendingRequestDataOrReplayData)
+  private[this] def performResultProcessing3(
+      signedResultBatch: SignedContent[Deliver[DefaultOpenEnvelope]],
+      result: Either[MalformedMediatorRequestResult, Result],
+      requestId: RequestId,
+      resultTs: CantonTimestamp,
+      sc: SequencerCounter,
+      domainParameters: DynamicDomainParameters,
+      pendingRequestDataOrReplayData: PendingRequestDataOrReplayData[steps.PendingRequestData],
+  )(implicit traceContext: TraceContext): EitherT[FutureUnlessShutdown, steps.ResultError, Unit] = {
+    val verdict = result.merge.verdict
 
+    val PendingRequestData(requestCounter, requestSequencerCounter, pendingContracts) =
+      pendingRequestDataOrReplayData
+    val cleanReplay = isCleanReplay(requestCounter, pendingRequestDataOrReplayData)
+    val pendingSubmissionDataO = pendingSubmissionDataForRequest(pendingRequestDataOrReplayData)
+
+    lazy val processingResultET = for {
       commitAndEvent <- pendingRequestDataOrReplayData match {
         case WrappedPendingRequestData(pendingRequestData) =>
           for {
@@ -878,12 +940,12 @@ abstract class ProtocolProcessor[
       }
       (commitSetOF, contractsToBeStored, maybeEvent, updateO) = commitAndEvent
 
-      commitTime = ts
+      commitTime = resultTs
       commitSetF <- signalResultToRequestTracker(
         requestCounter,
         sc,
         requestId,
-        ts,
+        resultTs,
         commitTime,
         commitSetOF,
         domainParameters,
@@ -933,35 +995,56 @@ abstract class ProtocolProcessor[
         } yield pendingSubmissionDataO.foreach(steps.postProcessResult(verdict, _))
       }
     } yield ()
+
+    performUnlessClosingEitherU(functionFullName)(processingResultET)
+
   }
 
   private[this] def logResultWarnings(
       resultTimestamp: CantonTimestamp,
-      result: EitherT[Future, steps.ResultError, Unit],
-  )(implicit traceContext: TraceContext): Future[Unit] = {
+      result: EitherT[
+        FutureUnlessShutdown,
+        steps.ResultError,
+        EitherT[FutureUnlessShutdown, steps.ResultError, Unit],
+      ],
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[FutureUnlessShutdown, steps.ResultError, EitherT[
+    FutureUnlessShutdown,
+    steps.ResultError,
+    Unit,
+  ]] = {
 
-    val warningsLogged = EitherTUtil.leftSubflatMap(result) {
-      _.underlyingProcessorError() match {
-        case Some(DecisionTimeElapsed(requestId, _)) => {
-          logger.warn(
-            show"${steps.requestKind.unquoted} request at $requestId: Result arrived after the decision time (arrived at $resultTimestamp)"
-          )
-          Right(())
+    def logResultWarnings[T](
+        result: EitherT[FutureUnlessShutdown, steps.ResultError, T],
+        default: T,
+    ): EitherT[FutureUnlessShutdown, steps.ResultError, T] = {
+      val warningsLogged = EitherTUtil.leftSubflatMap(result) { processorError =>
+        processorError.underlyingProcessorError() match {
+          case Some(DecisionTimeElapsed(requestId, _)) => {
+            logger.warn(
+              show"${steps.requestKind.unquoted} request at $requestId: Result arrived after the decision time (arrived at $resultTimestamp)"
+            )
+            Right(default)
+          }
+          case Some(UnknownPendingRequest(requestId)) => {
+            // the mediator can send duplicate transaction results during crash recovery and fail over, triggering this error
+            logger.info(
+              show"${steps.requestKind.unquoted} request at $requestId: Received event at $resultTimestamp for request that is not pending"
+            )
+            Right(default)
+          }
+          case err => Left(processorError)
         }
-        case Some(UnknownPendingRequest(requestId)) => {
-          // the mediator can send duplicate transaction results during crash recovery and fail over, triggering this error
-          logger.info(
-            show"${steps.requestKind.unquoted} request at $requestId: Received event at $resultTimestamp for request that is not pending"
-          )
-          Right(())
-        }
-        case err => Left(err)
       }
+
+      EitherTUtil.logOnErrorU(warningsLogged, s"${steps.requestKind}: Failed to process result")
     }
 
-    val loggedE =
-      EitherTUtil.logOnError(warningsLogged, s"${steps.requestKind}: Failed to process result")
-    loggedE.value.void
+    logResultWarnings(
+      result.map(logResultWarnings(_, ())),
+      EitherT.pure[FutureUnlessShutdown, steps.ResultError](()),
+    )
   }
 
   private[this] def pendingSubmissionDataForRequest(
@@ -1009,52 +1092,25 @@ abstract class ProtocolProcessor[
     for {
       _ <- EitherT
         .fromEither[Future](ephemeral.requestTracker.addResult(rc, sc, resultTimestamp, commitTime))
-        .leftMap(handleRequestTrackerResultError(requestId))
+        .leftMap(e => {
+          SyncServiceAlarm.Warn(s"Failed to add result for $requestId. $e").report()
+          e
+        })
       commitSetF = commitSetOF.getOrElse(Future.successful(CommitSet.empty))
       commitSetT <- EitherT.right(commitSetF.transform(Success(_)))
       commitFuture <- EitherT
         .fromEither[Future](ephemeral.requestTracker.addCommitSet(rc, commitSetT))
-        .leftMap(handleCommitSetError(requestId))
-    } yield commitFuture.foldF(
-      irregularities =>
-        alarm(withRc(rc, s"Result message causes ACS irregularities: $irregularities")).map(_ =>
-          commitSetT.fold(throw _, identity)
-        ),
-      _ => Future.fromTry(commitSetT),
-    )
-  }
-
-  // TODO(#8744) avoid discarded future as part of AlarmStreamer design
-  @SuppressWarnings(Array("com.digitalasset.canton.DiscardedFuture"))
-  private def handleCommitSetError(requestId: RequestId)(
-      e: RequestTracker.CommitSetError
-  )(implicit traceContext: TraceContext): RequestTracker.RequestTrackerError = {
-    /* The request tracker must have evicted the request between the previous call to `addTransactionResult`
-     * and this call. Since `addTransactionResult` marks the request as not having timed out,
-     * eviction can only happen if another transaction result processing has been interleaved,
-     * so we must have received two transaction result messages.
-     */
-    alarm(s"Received a second result message for request $requestId")
-    e
-  }
-
-  // TODO(#8744) avoid discarded future as part of AlarmStreamer design
-  @SuppressWarnings(Array("com.digitalasset.canton.DiscardedFuture"))
-  private def handleRequestTrackerResultError(requestId: RequestId)(
-      error: RequestTracker.ResultError
-  )(implicit traceContext: TraceContext): RequestTracker.RequestTrackerError = {
-    error match {
-      case _: RequestNotFound =>
-        /* The request tracker evicts a request only when it times out or a commit set has been provided.
-         * So if the result timestamp is before the decision time, a commit set must have already been added with an
-         * earlier timestamp. So there must have been an earlier transaction result for the request.
-         */
-        alarm(s"Received a second result message for request $requestId.")
-
-      case _: ResultAlreadyExists =>
-        alarm(s"Received a second result message for request $requestId")
-    }
-    error
+        .leftMap(e => {
+          SyncServiceAlarm.Warn(s"Unexpected mediator result message for $requestId. $e").report()
+          e: RequestTracker.RequestTrackerError
+        })
+    } yield commitFuture
+      .valueOr(e =>
+        SyncServiceAlarm
+          .Warn(withRc(rc, s"An error occurred while persisting commit set: $e"))
+          .report()
+      )
+      .flatMap(_ => Future.fromTry(commitSetT))
   }
 
   private def handleTimeout(

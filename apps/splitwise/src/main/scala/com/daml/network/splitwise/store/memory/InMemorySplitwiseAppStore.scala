@@ -1,4 +1,5 @@
 package com.daml.network.splitwise.store.memory
+
 import com.daml.network.splitwise.store.SplitwiseAppStore
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 

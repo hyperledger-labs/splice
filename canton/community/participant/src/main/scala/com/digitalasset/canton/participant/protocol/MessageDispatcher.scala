@@ -4,11 +4,10 @@
 package com.digitalasset.canton.participant.protocol
 
 import cats.data.Chain
-import cats.syntax.alternative._
-import cats.syntax.functorFilter._
+import cats.syntax.alternative.*
+import cats.syntax.functorFilter.*
 import cats.{Foldable, Monoid}
 import com.daml.nonempty.NonEmpty
-import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.data.ViewType.{
   TransactionViewType,
   TransferInViewType,
@@ -18,7 +17,6 @@ import com.digitalasset.canton.data.{CantonTimestamp, ViewType}
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.RequestCounter
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
 import com.digitalasset.canton.participant.protocol.conflictdetection.RequestTracker
 import com.digitalasset.canton.participant.protocol.submission.{
@@ -30,21 +28,18 @@ import com.digitalasset.canton.participant.protocol.transfer.{
   TransferOutProcessor,
 }
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor
+import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
 import com.digitalasset.canton.protocol.messages.ProtocolMessage.select
-import com.digitalasset.canton.protocol.messages._
-import com.digitalasset.canton.protocol.{
-  LoggingAlarmStreamer,
-  RequestAndRootHashMessage,
-  RequestProcessor,
-  RootHash,
-}
-import com.digitalasset.canton.sequencing._
-import com.digitalasset.canton.sequencing.protocol._
+import com.digitalasset.canton.protocol.messages.*
+import com.digitalasset.canton.protocol.{RequestAndRootHashMessage, RequestProcessor, RootHash}
+import com.digitalasset.canton.sequencing.*
+import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.topology.processing.TopologyTransactionProcessor
 import com.digitalasset.canton.topology.{DomainId, MediatorId, Member, ParticipantId}
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
-import com.digitalasset.canton.util.ShowUtil._
+import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{Checked, ErrorUtil}
+import com.digitalasset.canton.{RequestCounter, SequencerCounter}
 import com.google.common.annotations.VisibleForTesting
 import io.opentelemetry.api.trace.Tracer
 
@@ -55,13 +50,11 @@ import scala.concurrent.{ExecutionContext, Future}
   * that are not processed by the [[TransactionProcessor]].
   */
 trait MessageDispatcher { this: NamedLogging =>
-  import MessageDispatcher._
+  import MessageDispatcher.*
 
   protected def domainId: DomainId
 
   protected def participantId: ParticipantId
-
-  protected lazy val alarmer = new LoggingAlarmStreamer(logger)
 
   protected type ProcessingResult
   protected def doProcess[A](
@@ -166,11 +159,11 @@ trait MessageDispatcher { this: NamedLogging =>
    *  The dishonest submitter of a transaction `tx1` involving `act` sends a root hash message only for `P1` but not for `P2`.
    *  `P2` thus does not process `tx1` at all, whereas `P1` does process `tx1` and locks `c` for deactivation.
    *  Then, another transaction `tx2`, which uses `c`, arrives before the mediator has rejected `tx1`.
-   *  `P1` approves `tx2` on behalf of `A` as `c` is not locked on `P1`.
-   *  In contrast, `P2` rejects `tx2` on behalf of `A` as `c` is locked on `P2`.
-   *  If `P1`'s approval arrives before `P2`'s rejection at the mediator, the mediator approves `tx2`.
-   *  When `P2` receives the mediator approval for `tx2`, it crashes because a request that failed the activeness check is to be committed.
-   *  Conversely, if `P2`'s rejection arrives before `P1`'s approval, the mediator may raise an alarm when it receives the approval.
+   *  `P2` approves `tx2` on behalf of `A` as `c` is not locked on `P2`.
+   *  In contrast, `P1` rejects `tx2` on behalf of `A` as `c` is locked on `P1`.
+   *  If `P2`'s approval arrives before `P1`'s rejection at the mediator, the mediator approves `tx2`.
+   *  When `P1` receives the mediator approval for `tx2`, it crashes because a request that failed the activeness check is to be committed.
+   *  Conversely, if `P1`'s rejection arrives before `P2`'s approval, the mediator may raise an alarm when it receives the approval.
    */
   protected def processBatch(
       event: SignedContent[Deliver[DefaultOpenEnvelope]]
@@ -189,14 +182,14 @@ trait MessageDispatcher { this: NamedLogging =>
         } else if (batch.envelopes.isEmpty) {
           doProcess(
             MalformedMessage,
-            FutureUnlessShutdown.outcomeF(alarm(sc, ts, "Received an empty batch.")),
+            FutureUnlessShutdown.pure(alarm(sc, ts, "Received an empty batch.")),
           )
         } else FutureUnlessShutdown.pure(processingResultMonoid.empty)
 
       identityResult <- processTopologyTransactions(sc, ts, envelopesWithCorrectDomainId)
       causalityProcessed <- processCausalityMessages(envelopesWithCorrectDomainId)
       acsCommitmentResult <- processAcsCommitmentEnvelope(envelopesWithCorrectDomainId, ts)
-      transactionTransferResult <- processTransactionTransferMessages(
+      transactionTransferResult <- processTransactionAndTransferMessages(
         event,
         sc,
         ts,
@@ -241,7 +234,7 @@ trait MessageDispatcher { this: NamedLogging =>
 
   }
 
-  private def processTransactionTransferMessages(
+  private def processTransactionAndTransferMessages(
       event: SignedContent[Deliver[DefaultOpenEnvelope]],
       sc: SequencerCounter,
       ts: CantonTimestamp,
@@ -554,11 +547,10 @@ trait MessageDispatcher { this: NamedLogging =>
 
   protected def alarm(sc: SequencerCounter, ts: CantonTimestamp, msg: String)(implicit
       traceContext: TraceContext
-  ): Future[Unit] =
-    alarmer.alarm(s"(sequencer counter: $sc, timestamp: $ts): $msg")
+  ): Unit = SyncServiceAlarm.Warn(s"(sequencer counter: $sc, timestamp: $ts): $msg").report()
 }
 
-object MessageDispatcher {
+private[participant] object MessageDispatcher {
 
   trait RequestProcessors {
     /* A bit of a round-about way to make the Scala compiler recognize that pattern matches on `viewType` refine
@@ -599,11 +591,11 @@ object MessageDispatcher {
   case class RequestKind(viewType: ViewType) extends MessageKind[Unit] {
     override def pretty: Pretty[RequestKind] = prettyOfParam(unnamedParam(_.viewType))
   }
-  case class ResultKind(viewType: ViewType) extends MessageKind[Unit] {
+  case class ResultKind(viewType: ViewType) extends MessageKind[AsyncResult] {
     override def pretty: Pretty[ResultKind] = prettyOfParam(unnamedParam(_.viewType))
   }
   case object AcsCommitment extends MessageKind[Unit]
-  case object MalformedMediatorRequestMessage extends MessageKind[Unit]
+  case object MalformedMediatorRequestMessage extends MessageKind[AsyncResult]
   case object MalformedMessage extends MessageKind[Unit]
   case object UnspecifiedMessageKind extends MessageKind[Unit]
   case object CausalityMessageKind extends MessageKind[Unit]
@@ -630,7 +622,7 @@ object MessageDispatcher {
         requestTracker: RequestTracker,
         requestProcessors: RequestProcessors,
         tracker: SingleDomainCausalTracker,
-        identityProcessor: (
+        topologyProcessor: (
             SequencerCounter,
             CantonTimestamp,
             Traced[List[DefaultOpenEnvelope]],
@@ -713,7 +705,7 @@ object MessageDispatcher {
         requestTracker: RequestTracker,
         requestProcessors: RequestProcessors,
         tracker: SingleDomainCausalTracker,
-        identityProcessor: (
+        topologyProcessor: (
             SequencerCounter,
             CantonTimestamp,
             Traced[List[DefaultOpenEnvelope]],
@@ -732,7 +724,7 @@ object MessageDispatcher {
         requestTracker,
         requestProcessors,
         tracker,
-        identityProcessor,
+        topologyProcessor,
         acsCommitmentProcessor,
         requestCounterAllocator,
         recordOrderPublisher,

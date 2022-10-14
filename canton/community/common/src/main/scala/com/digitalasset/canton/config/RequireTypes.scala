@@ -4,9 +4,9 @@
 package com.digitalasset.canton.config
 
 import cats.Order
-import cats.syntax.either._
-import cats.syntax.option._
-import cats.syntax.traverse._
+import cats.syntax.either.*
+import cats.syntax.option.*
+import cats.syntax.traverse.*
 import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
 import com.digitalasset.canton.checked
 import com.digitalasset.canton.config.RequireTypes.InstanceName.InvalidInstanceName
@@ -15,7 +15,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.util.NoCopy
-import com.digitalasset.canton.util.ShowUtil._
+import com.digitalasset.canton.util.ShowUtil.*
 import io.circe.{Decoder, Encoder, KeyEncoder}
 import io.scalaland.chimney.Transformer
 import pureconfig.error.{CannotConvert, FailureReason}
@@ -91,9 +91,9 @@ object RequireTypes {
     override def pretty: Pretty[RefinedNumeric[T]] = prettyOfString(_ => value.toString)
   }
 
-  sealed abstract case class NonNegativeNumeric[T](value: T)(implicit val num: Numeric[T])
+  final case class NonNegativeNumeric[T] private (value: T)(implicit val num: Numeric[T])
       extends RefinedNumeric[T] {
-    import num._
+    import num.*
 
     def +(other: NonNegativeNumeric[T]) = NonNegativeNumeric.tryCreate(value + other.value)
     def *(other: NonNegativeNumeric[T]) = NonNegativeNumeric.tryCreate(value * other.value)
@@ -111,7 +111,7 @@ object RequireTypes {
     )(implicit num: Numeric[T]): Either[InvariantViolation, NonNegativeNumeric[T]] = {
       Either.cond(
         num.compare(t, num.zero) >= 0,
-        new NonNegativeNumeric(t) {},
+        NonNegativeNumeric(t),
         InvariantViolation(
           s"Received the negative $t as argument, but we require a non-negative value here."
         ),
@@ -169,9 +169,9 @@ object RequireTypes {
     implicit val forgetNonNegativeIntRefinement: Transformer[NonNegativeInt, Int] = _.unwrap
   }
 
-  sealed abstract case class PositiveNumeric[T](value: T)(implicit val num: Numeric[T])
+  final case class PositiveNumeric[T] private (value: T)(implicit val num: Numeric[T])
       extends RefinedNumeric[T] {
-    import num._
+    import num.*
 
     def +(other: PositiveNumeric[T]) = PositiveNumeric.tryCreate(value + other.value)
     def tryAdd(other: T) = PositiveNumeric.tryCreate(value + other)
@@ -182,6 +182,9 @@ object RequireTypes {
   object PositiveInt {
     def create(n: Int): Either[InvariantViolation, PositiveInt] = PositiveNumeric.create(n)
     def tryCreate(n: Int): PositiveInt = PositiveNumeric.tryCreate(n)
+
+    lazy val MaxValue: PositiveInt = PositiveInt.tryCreate(Int.MaxValue)
+
   }
 
   object PositiveNumeric {
@@ -193,7 +196,7 @@ object RequireTypes {
     )(implicit num: Numeric[T]): Either[InvariantViolation, PositiveNumeric[T]] = {
       Either.cond(
         num.compare(t, num.zero) > 0,
-        new PositiveNumeric(t) {},
+        PositiveNumeric(t),
         InvariantViolation(
           s"Received the non-positive $t as argument, but we require a positive value here."
         ),
@@ -337,7 +340,7 @@ object RequireTypes {
     require(
       str.length <= maxLength,
       s"The given ${name.getOrElse("string")} has a maximum length of $maxLength but a ${name
-        .getOrElse("string")} of length ${str.length} ('$str') was given",
+          .getOrElse("string")} of length ${str.length} ('$str') was given",
     )
 
     def unwrap: String = str
@@ -400,7 +403,7 @@ object RequireTypes {
 
     def errorMsg(tooLongStr: String, maxLength: Int, name: Option[String] = None): String =
       s"The given ${name.getOrElse("string")} has a maximum length of $maxLength but a ${name
-        .getOrElse("string")} of length ${tooLongStr.length} ('${tooLongStr.limit(maxLength + 50)}.') was given"
+          .getOrElse("string")} of length ${tooLongStr.length} ('${tooLongStr.limit(maxLength + 50)}.') was given"
 
     val defaultMaxLength = 255
 
@@ -611,7 +614,7 @@ object RequireTypes {
   }
 
   /** Length limitation of a `TEXT` or unbounded `VARCHAR` field in postgres or `CLOB` in Oracle.
-    * - Postgres `TEXT` or `VARCHAR` support up to 1GB storage. That is at least `2 ^ 26` characters
+    * - Postgres `TEXT` or `VARCHAR` support up to 1GB storage. That is at least `2 ^ 28` characters
     *   in UTF8 encoding as each character needs at most 4 bytes.
     * - Oracle `CLOB` supports up to 4GB storage, i.e., at least `2 ^ 30` UTF8 characters
     *
@@ -774,7 +777,7 @@ object RequireTypes {
     }
   }
 
-  sealed abstract case class InstanceName(unwrap: String) extends NoCopy with PrettyPrinting {
+  final case class InstanceName private (unwrap: String) extends NoCopy with PrettyPrinting {
 
     if (!unwrap.matches("^[a-zA-Z0-9_-]*$")) {
       throw InvalidInstanceName(
@@ -807,11 +810,7 @@ object RequireTypes {
     def create(str: String): Either[InvalidInstanceName, InstanceName] = Either
       .catchOnly[InvalidInstanceName](tryCreate(str))
 
-    def tryCreate(str: String): InstanceName = new InstanceName(str) {}
-
-    def toStringMap[A](map: Map[InstanceName, A]): Map[String, A] = map.map { case (n, c) =>
-      n.unwrap -> c
-    }
+    def tryCreate(str: String): InstanceName = InstanceName(str)
 
     def tryFromStringMap[A](map: Map[String, A]): Map[InstanceName, A] = map.map { case (n, c) =>
       tryCreate(n) -> c

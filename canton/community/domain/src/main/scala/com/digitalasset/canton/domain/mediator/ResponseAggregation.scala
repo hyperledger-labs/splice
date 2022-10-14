@@ -4,10 +4,10 @@
 package com.digitalasset.canton.domain.mediator
 
 import cats.data.OptionT
-import cats.syntax.either._
-import cats.syntax.foldable._
-import cats.syntax.traverse._
-import cats.syntax.traverseFilter._
+import cats.syntax.either.*
+import cats.syntax.foldable.*
+import cats.syntax.traverse.*
+import cats.syntax.traverseFilter.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.data.{CantonTimestamp, ConfirmingParty}
@@ -19,12 +19,12 @@ import com.digitalasset.canton.error.MediatorError
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.Verdict.{Approve, ParticipantReject}
-import com.digitalasset.canton.protocol.messages._
+import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.{RequestId, RootHash, ViewHash, v0}
 import com.digitalasset.canton.topology.Member
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ShowUtil._
+import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 
@@ -102,10 +102,10 @@ private[mediator] object ResponseAggregation {
         },
       )
     } yield pending
-    new ResponseAggregation(requestId, request, version, initial)(
+    ResponseAggregation(requestId, request, version, initial)(
       protocolVersion = protocolVersion,
       requestTraceContext = traceContext,
-    )(loggerFactory) {}
+    )(loggerFactory)
   }
 
   def apply(
@@ -116,10 +116,10 @@ private[mediator] object ResponseAggregation {
       protocolVersion: ProtocolVersion,
       requestTraceContext: TraceContext,
   )(loggerFactory: NamedLoggerFactory): ResponseAggregation =
-    new ResponseAggregation(requestId, request, version, Left(verdict))(
+    ResponseAggregation(requestId, request, version, Left(verdict))(
       protocolVersion,
       requestTraceContext,
-    )(loggerFactory) {}
+    )(loggerFactory)
 
   def alarmMediatorRequestNotFound(
       requestId: RequestId,
@@ -148,7 +148,7 @@ private[mediator] object ResponseAggregation {
   *                            validated anywhere. Intentionally supplied in a separate parameter list to avoid being
   *                            included in equality checks.
   */
-private[mediator] sealed abstract case class ResponseAggregation(
+private[mediator] final case class ResponseAggregation private (
     requestId: RequestId,
     request: MediatorRequest,
     version: CantonTimestamp,
@@ -396,18 +396,18 @@ private[mediator] sealed abstract case class ResponseAggregation(
       request: MediatorRequest = request,
       version: CantonTimestamp = version,
       state: Either[Verdict, Map[ViewHash, ViewState]] = state,
-  ): ResponseAggregation = new ResponseAggregation(requestId, request, version, state)(
+  ): ResponseAggregation = ResponseAggregation(requestId, request, version, state)(
     protocolVersion,
     requestTraceContext,
-  )(loggerFactory) {}
+  )(loggerFactory)
 
   def timeout(version: CantonTimestamp) =
-    new ResponseAggregation(
+    ResponseAggregation(
       this.requestId,
       this.request,
       version,
       Left(MediatorError.Timeout.Reject.create(protocolVersion)),
-    )(this.protocolVersion, requestTraceContext)(loggerFactory) {}
+    )(this.protocolVersion, requestTraceContext)(loggerFactory)
 
   override def pretty: Pretty[ResponseAggregation] = prettyOfClass(
     param("id", _.requestId),

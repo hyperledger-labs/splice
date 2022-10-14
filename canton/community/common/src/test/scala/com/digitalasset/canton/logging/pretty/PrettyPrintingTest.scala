@@ -5,7 +5,7 @@ package com.digitalasset.canton.logging.pretty
 
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.config.ApiLoggingConfig
-import com.digitalasset.canton.util.ShowUtil._
+import com.digitalasset.canton.util.ShowUtil.*
 import org.mockito.exceptions.verification.SmartNullPointerException
 import org.scalatest.wordspec.AnyWordSpec
 
@@ -25,7 +25,7 @@ class PrettyPrintingTest extends AnyWordSpec with BaseTest {
   /** Enable pretty printing for [[ExampleAlienClass]].
     */
   implicit val prettyAlien: Pretty[ExampleAlienClass] = {
-    import Pretty._
+    import Pretty.*
     prettyOfClass(
       param("p1", _.p1.doubleQuoted),
       unnamedParam(_.p2.doubleQuoted),
@@ -72,14 +72,12 @@ class PrettyPrintingTest extends AnyWordSpec with BaseTest {
   val adHocObjectInst: ExampleAdHocObject.type = ExampleAdHocObject
   val adHocObjectStr: String = "ExampleAdHocObject"
 
-  sealed abstract case class ExampleAbstractCaseClass(content: Int) extends PrettyPrinting {
+  case class ExampleAbstractCaseClass(content: Int) extends PrettyPrinting {
     override def pretty: Pretty[ExampleAbstractCaseClass] = prettyOfClass(
       param("content", _.content)
     )
   }
-  object ExampleAbstractCaseClass {
-    def apply(content: Int): ExampleAbstractCaseClass = new ExampleAbstractCaseClass(content) {}
-  }
+
   val abstractCaseClass: ExampleAbstractCaseClass = ExampleAbstractCaseClass(42)
   val abstractCaseClassStr: String = "ExampleAbstractCaseClass(content = 42)"
 

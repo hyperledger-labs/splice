@@ -3,8 +3,8 @@
 
 package com.digitalasset.canton.data
 
-import cats.syntax.either._
-import cats.syntax.traverse._
+import cats.syntax.either.*
+import cats.syntax.traverse.*
 import com.daml.lf.CantonOnly
 import com.daml.lf.value.{Value, ValueCoder}
 import com.digitalasset.canton.ProtoDeserializationError.{
@@ -13,9 +13,9 @@ import com.digitalasset.canton.ProtoDeserializationError.{
   ValueDeserializationError,
 }
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.protocol.ContractIdSyntax._
-import com.digitalasset.canton.protocol.InterfaceIdSyntax._
-import com.digitalasset.canton.protocol.LfHashSyntax._
+import com.digitalasset.canton.protocol.ContractIdSyntax.*
+import com.digitalasset.canton.protocol.InterfaceIdSyntax.*
+import com.digitalasset.canton.protocol.LfHashSyntax.*
 import com.digitalasset.canton.protocol.{
   GlobalKeySerialization,
   InterfaceIdSyntax,
@@ -33,13 +33,13 @@ import com.digitalasset.canton.protocol.{
 }
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.util.ShowUtil._
+import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{LfTransactionUtil, NoCopy}
 import com.digitalasset.canton.version.{
   HasProtocolVersionedCompanion,
   HasProtocolVersionedWrapper,
   HasProtocolVersionedWrapperCompanion,
-  ProtobufVersion,
+  ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
 }
@@ -81,13 +81,13 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
   override lazy val name: String = "ActionDescription"
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtobufVersion(0) -> VersionedProtoConverter(
+    ProtoVersion(0) -> VersionedProtoConverter(
       ProtocolVersion.v2,
       supportedProtoVersion(v0.ActionDescription)(fromProtoV0),
       _.toProtoV0.toByteString,
     ),
     // TODO(#9910) migrate to stable
-    ProtobufVersion(1) -> VersionedProtoConverter(
+    ProtoVersion(1) -> VersionedProtoConverter(
       ProtocolVersion.dev,
       supportedProtoVersion(v1.ActionDescription)(fromProtoV1),
       _.toProtoV1.toByteString,
@@ -223,7 +223,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
       seed <- LfHash.fromProtoPrimitive("node_seed", seedP)
       version <- lfVersionFromProtoVersioned(versionP)
     } yield CreateActionDescription(contractId, seed, version)(
-      protocolVersionRepresentativeFor(ProtobufVersion(0))
+      protocolVersionRepresentativeFor(ProtoVersion(0))
     )
   }
 
@@ -267,7 +267,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
           seed,
           version,
           failed,
-          protocolVersionRepresentativeFor(ProtobufVersion(0)),
+          protocolVersionRepresentativeFor(ProtoVersion(0)),
         )
         .leftMap(err => OtherError(err.message))
     } yield actionDescription
@@ -309,7 +309,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
           seed,
           version,
           failed,
-          protocolVersionRepresentativeFor(ProtobufVersion(1)),
+          protocolVersionRepresentativeFor(ProtoVersion(1)),
         )
         .leftMap(err => OtherError(err.message))
     } yield actionDescription
@@ -324,7 +324,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
         .required("key", keyP)
         .flatMap(GlobalKeySerialization.fromProtoV0)
       actionDescription <- LookupByKeyActionDescription
-        .create(key.unversioned, key.version, protocolVersionRepresentativeFor(ProtobufVersion(0)))
+        .create(key.unversioned, key.version, protocolVersionRepresentativeFor(ProtoVersion(0)))
         .leftMap(err => OtherError(err.message))
     } yield actionDescription
   }
@@ -338,14 +338,14 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
       actors <- actorsP.traverse(ProtoConverter.parseLfPartyId).map(_.toSet)
       version <- lfVersionFromProtoVersioned(versionP)
     } yield FetchActionDescription(inputContractId, actors, byKey, version)(
-      protocolVersionRepresentativeFor(ProtobufVersion(0))
+      protocolVersionRepresentativeFor(ProtoVersion(0))
     )
   }
 
   private[data] def fromProtoV0(
       actionDescriptionP: v0.ActionDescription
   ): ParsingResult[ActionDescription] = {
-    import v0.ActionDescription.Description._
+    import v0.ActionDescription.Description.*
     val v0.ActionDescription(description) = actionDescriptionP
     description match {
       case Create(create) => fromCreateProtoV0(create)
@@ -359,7 +359,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
   private[data] def fromProtoV1(
       actionDescriptionP: v1.ActionDescription
   ): ParsingResult[ActionDescription] = {
-    import v1.ActionDescription.Description._
+    import v1.ActionDescription.Description.*
     val v1.ActionDescription(description) = actionDescriptionP
     description match {
       case Create(create) => fromCreateProtoV0(create)
@@ -413,7 +413,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
   }
 
   /** @throws InvalidActionDescription if the `chosen_value` cannot be serialized */
-  sealed abstract case class ExerciseActionDescription private (
+  final case class ExerciseActionDescription private (
       inputContractId: LfContractId,
       choice: LfChoiceName,
       interfaceId: Option[LfInterfaceId],
@@ -424,8 +424,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
       override val version: LfTransactionVersion,
       failed: Boolean,
   )(val representativeProtocolVersion: RepresentativeProtocolVersion[ActionDescription])
-      extends ActionDescription
-      with NoCopy {
+      extends ActionDescription {
 
     private val serializedChosenValue: ByteString = serializeChosenValue(chosenValue, version)
       .valueOr(err => throw InvalidActionDescription(s"Failed to serialize chosen value: ${err}"))
@@ -525,7 +524,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
         )
 
         action <- Either.catchOnly[InvalidActionDescription](
-          new ExerciseActionDescription(
+          ExerciseActionDescription(
             inputContractId,
             choice,
             interfaceId,
@@ -535,7 +534,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
             seed,
             version,
             failed,
-          )(protocolVersion) {}
+          )(protocolVersion)
         )
       } yield action
     }
@@ -577,8 +576,7 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
       key: LfGlobalKey,
       override val version: LfTransactionVersion,
   )(val representativeProtocolVersion: RepresentativeProtocolVersion[ActionDescription])
-      extends ActionDescription
-      with NoCopy {
+      extends ActionDescription {
 
     private val serializedKey =
       GlobalKeySerialization
@@ -606,12 +604,6 @@ object ActionDescription extends HasProtocolVersionedCompanion[ActionDescription
   }
 
   object LookupByKeyActionDescription {
-    private[this] def apply(
-        key: LfGlobalKey,
-        version: LfTransactionVersion,
-    ): LookupByKeyActionDescription =
-      throw new UnsupportedOperationException("Use the other factory methods")
-
     def tryCreate(
         key: LfGlobalKey,
         version: LfTransactionVersion,

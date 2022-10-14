@@ -1,4 +1,5 @@
 package com.daml.network.validator.store.memory
+
 import com.daml.network.store.{AcsStore, InMemoryAcsStore}
 import com.daml.network.validator.store.ValidatorStore
 import com.digitalasset.canton.logging.NamedLoggerFactory

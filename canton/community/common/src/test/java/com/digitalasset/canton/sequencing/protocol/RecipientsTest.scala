@@ -3,10 +3,10 @@
 
 package com.digitalasset.canton.sequencing.protocol
 
-import cats.syntax.option._
+import cats.syntax.option.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.sequencing.protocol.Recipients.cc
-import com.digitalasset.canton.sequencing.protocol.RecipientsTest._
+import com.digitalasset.canton.sequencing.protocol.RecipientsTest.*
 import com.digitalasset.canton.topology.ParticipantId
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import org.scalatest.wordspec.AnyWordSpec
@@ -107,6 +107,7 @@ object RecipientsTest {
   lazy val p5 = ParticipantId("participant5")
   lazy val p6 = ParticipantId("participant6")
   lazy val p7 = ParticipantId("participant7")
+  lazy val p8 = ParticipantId("participant8")
 
   lazy val t1 = RecipientsTree.leaf(NonEmpty.mk(Set, p1))
   lazy val t2 = RecipientsTree.leaf(NonEmpty.mk(Set, p2))

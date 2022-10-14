@@ -92,7 +92,7 @@ object AutomationService {
   )(implicit
       mat: Materializer
   ) extends FlagCloseableAsync
-      //TODO(#790): review logging
+      // TODO(#790): review logging
       with NamedLogging
       with NoTracing {
 

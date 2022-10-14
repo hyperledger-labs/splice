@@ -6,7 +6,7 @@ package com.digitalasset.canton.serialization
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.version.{
   HasProtocolVersionedSerializerCompanion,
-  ProtobufVersion,
+  ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
 }
@@ -108,7 +108,7 @@ object MemoizedEvidenceSUT extends HasProtocolVersionedSerializerCompanion[Memoi
   val name: String = "MemoizedEvidenceSUT"
 
   val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-    ProtobufVersion(0) -> VersionedProtoConverter(
+    ProtoVersion(0) -> VersionedProtoConverter(
       ProtocolVersion.v2,
       (),
       _ => throw new NotImplementedError("Serialization is not implemented"),
@@ -154,7 +154,7 @@ class MemoizedEvidenceWithFailureTest
   }
 }
 
-sealed case class MemoizedEvidenceWithFailureSUT private (b: Byte)(
+final case class MemoizedEvidenceWithFailureSUT private (b: Byte)(
     fail: Boolean,
     override val deserializedFrom: Option[ByteString],
 ) extends MemoizedEvidenceWithFailure[Unit] {
@@ -172,11 +172,6 @@ sealed case class MemoizedEvidenceWithFailureSUT private (b: Byte)(
 }
 
 object MemoizedEvidenceWithFailureSUT {
-  private[this] def apply(
-      b: Byte
-  )(fail: Boolean, deserializedFrom: Option[ByteString]): MemoizedEvidenceWithFailureSUT =
-    throw new UnsupportedOperationException("Use the public apply method instead")
-
   def apply(b: Byte)(fail: Boolean): MemoizedEvidenceWithFailureSUT =
     new MemoizedEvidenceWithFailureSUT(b)(fail, None)
 

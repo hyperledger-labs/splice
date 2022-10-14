@@ -3,17 +3,17 @@
 
 package com.digitalasset.canton.domain.sequencing.admin.protocol
 
-import cats.syntax.traverse._
+import cats.syntax.traverse.*
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.domain.admin.v0
 import com.digitalasset.canton.domain.sequencing.sequencer.SequencerSnapshot
-import com.digitalasset.canton.protocol.{StaticDomainParameters, v0 => protocolV0}
+import com.digitalasset.canton.protocol.{StaticDomainParameters, v0 as protocolV0}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.store.StoredTopologyTransactions
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp
 import com.digitalasset.canton.topology.{DomainId, UniqueIdentifier}
 
-case class InitRequest private (
+final case class InitRequest(
     domainId: DomainId,
     topologySnapshot: StoredTopologyTransactions[TopologyChangeOp.Positive],
     domainParameters: StaticDomainParameters,

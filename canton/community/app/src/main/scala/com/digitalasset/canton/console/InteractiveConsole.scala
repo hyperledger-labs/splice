@@ -2,17 +2,19 @@
 // SPDX-License-Identifier: Apache-2.0
 
 package com.digitalasset.canton.console
+
 import ammonite.compiler.Parsers
 import ammonite.interp.Watchable
-import ammonite.util.{Res, _}
+import ammonite.util.{Res, *}
 import com.digitalasset.canton.CantonScript
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.tracing.NoTracing
 import com.digitalasset.canton.util.ResourceUtil.withResource
 
-import java.io.InputStream
+import java.io.{File, InputStream}
 import java.lang.System.lineSeparator
 import scala.io.Source
+import scala.util.Try
 
 /** Will create a real REPL for interactive entry and evaluation of commands
   */
@@ -62,6 +64,26 @@ object InteractiveConsole extends NoTracing {
               // the lines here are stolen from Repl.warmup()
               logger.info(s"Running startup script $fname")
               val loadModuleCode = fname.path
+                .map { f: File =>
+                  // Try to move the script to a temp file, otherwise the name of the file can shadow scala variables in the script
+                  Try {
+                    val tmp = better.files.File.newTemporaryFile()
+                    better.files.File(f.getAbsolutePath).copyTo(tmp, overwrite = true)
+                    logger.debug(
+                      s"Copied ${f.getAbsolutePath} to temporary file ${tmp.pathAsString}"
+                    )
+                    tmp.toJava
+                  }.fold(
+                    { e =>
+                      logger.debug(
+                        s"Could not copy boostrap script to temp file, using original file",
+                        e,
+                      )
+                      f
+                    },
+                    identity,
+                  )
+                }
                 .map(p => "interp.load.module(os.Path(" + toStringLiteral(p.getAbsolutePath) + "))")
                 .getOrElse(fname.read().getOrElse(""))
               val stmts = Parsers
@@ -118,7 +140,7 @@ object InteractiveConsole extends NoTracing {
     */
   private def toStringLiteral(raw: String): String = {
     // uses the scala reflection primitives but doesn't actually do any reflection
-    import scala.reflect.runtime.universe._
+    import scala.reflect.runtime.universe.*
 
     Literal(Constant(raw)).toString()
   }

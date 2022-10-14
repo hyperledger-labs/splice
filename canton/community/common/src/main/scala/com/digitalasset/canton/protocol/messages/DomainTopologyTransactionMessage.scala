@@ -4,18 +4,17 @@
 package com.digitalasset.canton.protocol.messages
 
 import cats.data.EitherT
-import com.digitalasset.canton.crypto._
+import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.protocol.messages.ProtocolMessage.ProtocolMessageContentCast
 import com.digitalasset.canton.protocol.{v0, v1}
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.transaction.{SignedTopologyTransaction, TopologyChangeOp}
-import com.digitalasset.canton.topology.{DomainId, _}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.NoCopy
 import com.digitalasset.canton.version.{
   HasProtocolVersionedCompanion,
-  ProtobufVersion,
+  ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
 }
@@ -23,7 +22,7 @@ import com.google.protobuf.ByteString
 
 import scala.concurrent.{ExecutionContext, Future}
 
-sealed abstract case class DomainTopologyTransactionMessage private (
+case class DomainTopologyTransactionMessage private (
     domainTopologyManagerSignature: Signature,
     transactions: List[SignedTopologyTransaction[TopologyChangeOp]],
     override val domainId: DomainId,
@@ -33,8 +32,7 @@ sealed abstract case class DomainTopologyTransactionMessage private (
     ]
 ) extends ProtocolMessage
     with ProtocolMessageV0
-    with ProtocolMessageV1
-    with NoCopy {
+    with ProtocolMessageV1 {
   def hashToSign(hashOps: HashOps): Hash =
     DomainTopologyTransactionMessage.hash(transactions, domainId, hashOps)
 
@@ -67,7 +65,7 @@ object DomainTopologyTransactionMessage
   }
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtobufVersion(0) -> VersionedProtoConverter(
+    ProtoVersion(0) -> VersionedProtoConverter(
       ProtocolVersion.v2,
       supportedProtoVersion(v0.DomainTopologyTransactionMessage)(fromProtoV0),
       _.toProtoV0.toByteString,
@@ -99,11 +97,11 @@ object DomainTopologyTransactionMessage
     syncCrypto
       .sign(hashToSign)
       .map(signature =>
-        new DomainTopologyTransactionMessage(
+        DomainTopologyTransactionMessage(
           signature,
           transactions,
           domainId,
-        )(protocolVersionRepresentativeFor(protocolVersion)) {}
+        )(protocolVersionRepresentativeFor(protocolVersion))
       )
   }
 
@@ -127,7 +125,7 @@ object DomainTopologyTransactionMessage
   def fromProtoV0(
       message: v0.DomainTopologyTransactionMessage
   ): ParsingResult[DomainTopologyTransactionMessage] = {
-    import cats.syntax.traverse._
+    import cats.syntax.traverse.*
 
     def decodeTransactions(
         payload: List[ByteString]
@@ -142,11 +140,11 @@ object DomainTopologyTransactionMessage
         message.signature,
       )
       domainUid <- UniqueIdentifier.fromProtoPrimitive(message.domainId, "domainId")
-    } yield new DomainTopologyTransactionMessage(
+    } yield DomainTopologyTransactionMessage(
       signature,
       succeededContent,
       DomainId(domainUid),
-    )(protocolVersionRepresentativeFor(ProtobufVersion(0))) {}
+    )(protocolVersionRepresentativeFor(ProtoVersion(0)))
   }
 
   override protected def name: String = "DomainTopologyTransactionMessage"

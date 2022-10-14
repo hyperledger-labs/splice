@@ -3,32 +3,33 @@
 
 package com.digitalasset.canton.participant.config
 
+import com.daml.jwt.JwtTimestampLeeway
 import com.daml.ledger.api.tls.{SecretsUrl, TlsConfiguration, TlsVersion}
 import com.daml.platform.apiserver.SeedService.Seeding
 import com.daml.platform.apiserver.configuration.RateLimitingConfig
-import com.daml.platform.apiserver.{ApiServerConfig => DamlApiServerConfig}
+import com.daml.platform.apiserver.{ApiServerConfig as DamlApiServerConfig}
 import com.daml.platform.configuration.{
   CommandConfiguration,
-  IndexServiceConfig => DamlIndexServiceConfig,
+  IndexServiceConfig as DamlIndexServiceConfig,
 }
 import com.daml.platform.indexer.ha.HaConfig
 import com.daml.platform.indexer.{
-  IndexerConfig => DamlIndexerConfig,
+  IndexerConfig as DamlIndexerConfig,
   IndexerStartupMode,
   PackageMetadataViewConfig,
 }
-import com.daml.platform.store.DbSupport.{DataSourceProperties => DamlDataSourceProperties}
+import com.daml.platform.store.DbSupport.{DataSourceProperties as DamlDataSourceProperties}
 import com.daml.platform.store.backend.postgresql.{
-  PostgresDataSourceConfig => DamlPostgresDataSourceConfig
+  PostgresDataSourceConfig as DamlPostgresDataSourceConfig
 }
 import com.daml.platform.usermanagement.UserManagementConfig
 import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.DeprecatedConfigUtils.DeprecatedFieldsFor
 import com.digitalasset.canton.config.LocalNodeConfig.LocalNodeConfigDeprecationImplicits
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt._
-import com.digitalasset.canton.config.RequireTypes._
-import com.digitalasset.canton.config._
+import com.digitalasset.canton.config.RequireTypes.NonNegativeInt.*
+import com.digitalasset.canton.config.RequireTypes.*
+import com.digitalasset.canton.config.*
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.participant.admin.AdminWorkflowConfig
@@ -41,15 +42,15 @@ import com.digitalasset.canton.participant.config.PostgresDataSourceConfigCanton
 import com.digitalasset.canton.participant.ledger.api.CantonLedgerApiServerWrapper.IndexerLockIds
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.canton.time.NonNegativeFiniteDuration._
+import com.digitalasset.canton.time.NonNegativeFiniteDuration.*
 import com.digitalasset.canton.tracing.TracingConfig
 import com.digitalasset.canton.version.{ParticipantProtocolVersion, ProtocolVersion}
 import io.netty.handler.ssl.{ClientAuth, SslContext}
-import io.scalaland.chimney.dsl._
-import monocle.macros.syntax.lens._
+import io.scalaland.chimney.dsl.*
+import monocle.macros.syntax.lens.*
 
 import java.security.InvalidParameterException
-import scala.jdk.DurationConverters._
+import scala.jdk.DurationConverters.*
 
 /** Base for all participant configs - both local and remote */
 trait BaseParticipantConfig extends NodeConfig {
@@ -154,14 +155,15 @@ case class ParticipantNodeParameters(
     maxUnzippedDarSize: Int,
     stores: ParticipantStoreConfig,
     override val cachingConfigs: CachingConfigs,
-    contractIdSeeding: Seeding,
     override val sequencerClient: SequencerClientConfig,
-    indexer: IndexerConfig,
     transferTimeProofFreshnessProportion: NonNegativeInt,
     protocolConfig: ParticipantProtocolConfig,
     uniqueContractKeys: Boolean,
     enableCausalityTracking: Boolean,
     unsafeEnableDamlLfDevVersion: Boolean,
+    ledgerApiServerParameters: LedgerApiServerParametersConfig,
+    maxDbConnections: Int,
+    excludeInfrastructureTransactions: Boolean,
 ) extends LocalNodeParameters {
   override def devVersionSupport: Boolean = protocolConfig.devVersionSupport
   override def dontWarnOnDeprecatedPV: Boolean = protocolConfig.dontWarnOnDeprecatedPV
@@ -227,7 +229,6 @@ case class RemoteParticipantConfig(
   * @param internalPort              ledger api server port.
   * @param maxEventCacheWeight       ledger api server event cache maximum weight (caffeine cache size)
   * @param maxContractCacheWeight    ledger api server contract cache maximum weight (caffeine cache size)
-  * @param maxDeduplicationDuration  Deprecated. Use maxDeduplicationDuration in the `init` object of the participant config instead
   * @param tls                       tls configuration setting from ledger api server.
   * @param configurationLoadTimeout  ledger api server startup delay if no timemodel has been sent by canton via ReadService
   * @param eventsPageSize            database / akka page size for batching of ledger api server index ledger events queries.
@@ -345,7 +346,6 @@ object LedgerApiServerConfig {
       _initialLedgerConfiguration, // not used by canton - always None
       managementServiceTimeout,
       _maxInboundMessageSize, // configured via participant.maxInboundMessageSize
-      _party,
       port,
       _portFile,
       _rateLimitingConfig,
@@ -375,7 +375,7 @@ object LedgerApiServerConfig {
     ) = indexServiceConfig
 
     def fromClientAuth(clientAuth: ClientAuth): ServerAuthRequirementConfig = {
-      import ServerAuthRequirementConfig._
+      import ServerAuthRequirementConfig.*
       clientAuth match {
         case ClientAuth.REQUIRE =>
           None // not passing "require" as we need adminClientCerts in this case which are not available here
@@ -738,37 +738,32 @@ object TestingTimeServiceConfig {
 /** General participant node parameters
   *
   * @param adminWorkflow Configuration options for Canton admin workflows
-  * @param partyChangeNotification   Determines how eagerly the participant nodes notify the ledger api of party changes.
-  *                                  By default ensure that parties are added via at least one domain before ACKing party creation to ledger api server indexer.
-  *                                  This not only avoids flakiness in tests, but reflects that a party is not actually usable in canton until it's
-  *                                  available through at least one domain.
-  * @param maxUnzippedDarSize        maximum allowed size of unzipped DAR files (in bytes) the participant can accept for uploading. Defaults to 1GB.
-  * @param contractIdSeeding         test-only way to override the contract-id seeding scheme. Must be Strong in production (and Strong is the default).
-  *                                  Only configurable to reduce the amount of secure random numbers consumed by tests and to avoid flaky timeouts during continuous integration.
+  * @param partyChangeNotification Determines how eagerly the participant nodes notify the ledger api of party changes.
+  *                                By default ensure that parties are added via at least one domain before ACKing party creation to ledger api server indexer.
+  *                                This not only avoids flakiness in tests, but reflects that a party is not actually usable in canton until it's
+  *                                available through at least one domain.
+  * @param maxUnzippedDarSize maximum allowed size of unzipped DAR files (in bytes) the participant can accept for uploading. Defaults to 1GB.
+  * @param ledgerApiServerParameters ledger api server parameters
   *
   * The following specialized participant node performance tuning parameters may be grouped once a more final set of configs emerges.
-  * @param indexer                   parameters how the participant populates the index db used to serve the ledger api
   * @param transferTimeProofFreshnessProportion Proportion of the target domain exclusivity timeout that is used as a freshness bound when
   *                                             requesting a time proof. Setting to 3 means we'll take a 1/3 of the target domain exclusivity timeout
   *                                             and potentially we reuse a recent timeout if one exists within that bound, otherwise a new time proof
   *                                             will be requested.
   *                                             Setting to zero will disable reusing recent time proofs and will instead always fetch a new proof.
   * @param minimumProtocolVersion The minimum protocol version that this participant will speak when connecting to a domain
-  * @param uniqueContractKeys Deprecated. Use uniqueContractKeys in the `init` object of the participant config instead
-  * @param enableCausalityTracking Deprecated. Use unsafeEnableCausalityTracking in the `init` object of the participant config instead
   * @param unsafeEnableDamlLfDevVersion If set to true (default false), packages referring to the `dev` LF version can be used with Canton.
   * @param initialProtocolVersion The initial protocol version used by the participant (default latest), e.g., used to create the initial topology transactions.
   * @param willCorruptYourSystemDevVersionSupport If set to true, development protocol versions (and database schemas) will be supported. Do NOT use this in production, as it will break your system.
   * @param dontWarnOnDeprecatedPV If true, then this participant will not emit a warning when connecting to a sequencer using a deprecated protocol version (such as 2.0.0).
   * @param warnIfOverloadedFor If all incoming commands have been rejected due to PARTICIPANT_BACKPRESSURE during this interval, the participant will log a warning.
+  * @param excludeInfrastructureTransactions If set, infrastructure transactions (i.e. ping, bong and dar distribution) will be excluded from participant metering.
   */
 case class ParticipantNodeParameterConfig(
     adminWorkflow: AdminWorkflowConfig = AdminWorkflowConfig(),
     partyChangeNotification: PartyNotificationConfig = PartyNotificationConfig.ViaDomain,
     maxUnzippedDarSize: Int = 1024 * 1024 * 1024,
-    contractIdSeeding: Seeding = Seeding.Strong,
     stores: ParticipantStoreConfig = ParticipantStoreConfig(),
-    indexer: IndexerConfig = IndexerConfig(),
     transferTimeProofFreshnessProportion: NonNegativeInt = NonNegativeInt.tryCreate(3),
     minimumProtocolVersion: Option[ParticipantProtocolVersion] = Some(
       ParticipantProtocolVersion(
@@ -784,6 +779,8 @@ case class ParticipantNodeParameterConfig(
     warnIfOverloadedFor: Option[NonNegativeFiniteDuration] = Some(
       NonNegativeFiniteDuration.ofSeconds(20)
     ),
+    ledgerApiServerParameters: LedgerApiServerParametersConfig = LedgerApiServerParametersConfig(),
+    excludeInfrastructureTransactions: Boolean = true,
 )
 
 /** Parameters for the participant node's stores
@@ -802,4 +799,17 @@ case class ParticipantStoreConfig(
     maxPruningBatchSize: Int = 1000,
     acsPruningInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(60),
     dbBatchAggregationConfig: BatchAggregatorConfig = BatchAggregatorConfig.Batching(),
+)
+
+/** Parameters for the ledger api server
+  *
+  * @param contractIdSeeding  test-only way to override the contract-id seeding scheme. Must be Strong in production (and Strong is the default).
+  *                           Only configurable to reduce the amount of secure random numbers consumed by tests and to avoid flaky timeouts during continuous integration.
+  * @param indexer            parameters how the participant populates the index db used to serve the ledger api
+  * @param jwtTimestampLeeway leeway parameters for JWTs
+  */
+case class LedgerApiServerParametersConfig(
+    contractIdSeeding: Seeding = Seeding.Strong,
+    indexer: IndexerConfig = IndexerConfig(),
+    jwtTimestampLeeway: Option[JwtTimestampLeeway] = None,
 )

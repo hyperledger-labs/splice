@@ -10,7 +10,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.participant.protocol.submission._
+import com.digitalasset.canton.participant.protocol.submission.*
 import com.digitalasset.canton.participant.store.InFlightSubmissionStore.InFlightReference
 import com.digitalasset.canton.participant.store.db.DbInFlightSubmissionStore
 import com.digitalasset.canton.participant.store.memory.InMemoryInFlightSubmissionStore
@@ -18,6 +18,7 @@ import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.sequencing.protocol.MessageId
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.version.ReleaseProtocolVersion
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -135,6 +136,7 @@ object InFlightSubmissionStore {
       storage: Storage,
       maxItemsInSqlInClause: PositiveNumeric[Int],
       registerBatchAggregatorConfig: BatchAggregatorConfig,
+      releaseProtocolVersion: ReleaseProtocolVersion,
       timeouts: ProcessingTimeout,
       loggerFactory: NamedLoggerFactory,
   )(implicit
@@ -146,6 +148,7 @@ object InFlightSubmissionStore {
         jdbc,
         maxItemsInSqlInClause,
         registerBatchAggregatorConfig,
+        releaseProtocolVersion,
         timeouts,
         loggerFactory,
       )

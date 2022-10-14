@@ -13,14 +13,21 @@ import scala.concurrent.Future
 trait DbParticipantEventLogTest extends ParticipantEventLogTest { this: DbTest =>
 
   override def cleanDb(storage: DbStorage): Future[Unit] = {
-    import storage.api._
+    import storage.api.*
     storage.update_(
       sqlu"delete from event_log where log_id = $id", // table shared with other tests
       operationName = s"${this.getClass}: clean db",
     )
   }
   override def newStore: DbParticipantEventLog =
-    new DbParticipantEventLog(id, storage, InMemoryIndexedStringStore(), timeouts, loggerFactory)
+    new DbParticipantEventLog(
+      id,
+      storage,
+      InMemoryIndexedStringStore(),
+      testedReleaseProtocolVersion,
+      timeouts,
+      loggerFactory,
+    )
 }
 
 class ParticipantEventLogTestH2 extends DbParticipantEventLogTest with H2Test

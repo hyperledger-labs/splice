@@ -4,7 +4,7 @@
 package com.digitalasset.canton.topology
 
 import cats.data.EitherT
-import com.digitalasset.canton.crypto._
+import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.CantonError
@@ -13,7 +13,7 @@ import com.digitalasset.canton.time.{Clock, SimClock}
 import com.digitalasset.canton.topology.store.memory.InMemoryTopologyStore
 import com.digitalasset.canton.topology.store.{TopologyStore, TopologyStoreId}
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp.{Add, Remove}
-import com.digitalasset.canton.topology.transaction._
+import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.{BaseTest, HasExecutionContext}
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.wordspec.AnyWordSpec
@@ -74,7 +74,7 @@ trait TopologyManagerTest
     object MySetup {
 
       def create(str: String): Future[MySetup] = {
-        val crypto = SymbolicCrypto.create(timeouts, loggerFactory)
+        val crypto = SymbolicCrypto.create(testedReleaseProtocolVersion, timeouts, loggerFactory)
 
         def generateSigningKey(name: String): Future[SigningPublicKey] = {
           crypto
@@ -326,7 +326,7 @@ trait TopologyManagerTest
             setup.namespaceKey,
             root = true,
           )
-          removeRootCert = TopologyStateUpdate(Remove, rootCert.element)(testedProtocolVersion)
+          removeRootCert = TopologyStateUpdate(Remove, rootCert.element, testedProtocolVersion)
           invalidRev = removeRootCert.reverse.reverse
           _ = assert(
             invalidRev.element.id != rootCert.element.id
@@ -347,9 +347,7 @@ trait TopologyManagerTest
               (cert2, _) <- addCertNamespace(genr, setup.alphaKey, setup.namespaceKey, root = true)
               _ <- addCertNamespace(genr, setup.betaKey, setup.alphaKey, root = false)
 
-              removeRootCert = TopologyStateUpdate(Remove, cert2.element)(
-                testedProtocolVersion
-              )
+              removeRootCert = TopologyStateUpdate(Remove, cert2.element, testedProtocolVersion)
               authFail <- mgr
                 .authorize(
                   removeRootCert,
@@ -387,9 +385,7 @@ trait TopologyManagerTest
           (cert2, _) <- addCertIdentifier(genr, setup.alphaKey, setup.namespaceKey)
           _ <- addOwnerToKeyMapping(genr, setup.alphaKey, setup.alphaKey)
 
-          removeRootCert = TopologyStateUpdate(Remove, cert2.element)(
-            testedProtocolVersion
-          )
+          removeRootCert = TopologyStateUpdate(Remove, cert2.element, testedProtocolVersion)
           authFail <- mgr
             .authorize(removeRootCert, Some(setup.namespaceKey.fingerprint), testedProtocolVersion)
             .value

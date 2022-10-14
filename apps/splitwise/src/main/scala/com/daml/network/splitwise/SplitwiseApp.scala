@@ -62,17 +62,19 @@ class SplitwiseApp(
         loggerFactory,
       )
   } yield {
-    adminServerRegistry.addService(
-      SplitwiseServiceGrpc.bindService(
-        new GrpcSplitwiseService(
-          ledgerClient,
-          scanConnection,
-          party,
-          loggerFactory,
-        ),
-        ec,
+    adminServerRegistry
+      .addService(
+        SplitwiseServiceGrpc.bindService(
+          new GrpcSplitwiseService(
+            ledgerClient,
+            scanConnection,
+            party,
+            loggerFactory,
+          ),
+          ec,
+        )
       )
-    )
+      .discard
     SplitwiseApp.State(
       storage,
       store,

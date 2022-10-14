@@ -24,6 +24,7 @@ object JvmRulesPlugin extends AutoPlugin {
             "-Xlint:_,-unused",
             "-Xmacro-settings:materialize-derivations",
             "-Xfatal-warnings",
+            "-Wnonunit-statement", // Warns about any interesting expression whose value is ignored because it is followed by another expression
             "-Ywarn-dead-code",
             "-Ywarn-numeric-widen",
             "-Ywarn-value-discard", // Gives a warning for functions declared as returning Unit, but the body returns a value
@@ -33,9 +34,13 @@ object JvmRulesPlugin extends AutoPlugin {
             "-Wunused:imports",
             "-Wunused:locals",
             "-Wunused:nowarn",
+            "-Xsource:3",
           )
       },
-      Test / scalacOptions --= Seq("-Ywarn-value-discard"), // disable value discard check on tests
+      Test / scalacOptions --= Seq(
+        "-Ywarn-value-discard",
+        "-Wnonunit-statement",
+      ), // disable value discard and nonunit statement checks on tests
       addCompilerPlugin(
         "org.typelevel" % "kind-projector" % "0.13.2" cross CrossVersion.full
       ),
@@ -54,7 +59,7 @@ object JvmRulesPlugin extends AutoPlugin {
             Wart.Product,
             Wart.Return,
             Wart.Serializable,
-            Wart.TraversableOps,
+            Wart.IterableOps,
             Wart.TryPartial,
             Wart.Var,
             Wart.While,

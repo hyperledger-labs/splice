@@ -4,15 +4,16 @@
 package com.digitalasset.canton.crypto.store
 
 import cats.data.EitherT
-import cats.syntax.functor._
+import cats.syntax.functor.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.crypto.store.db.DbCryptoPublicStore
 import com.digitalasset.canton.crypto.store.memory.InMemoryCryptoPublicStore
-import com.digitalasset.canton.crypto.{KeyName, _}
+import com.digitalasset.canton.crypto.{KeyName, *}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.version.ReleaseProtocolVersion
 import com.google.common.annotations.VisibleForTesting
 
 import scala.collection.concurrent.TrieMap
@@ -170,12 +171,18 @@ trait CryptoPublicStore extends AutoCloseable {
 }
 
 object CryptoPublicStore {
-  def create(storage: Storage, timeouts: ProcessingTimeout, loggerFactory: NamedLoggerFactory)(
-      implicit ec: ExecutionContext
+  def create(
+      storage: Storage,
+      releaseProtocolVersion: ReleaseProtocolVersion,
+      timeouts: ProcessingTimeout,
+      loggerFactory: NamedLoggerFactory,
+  )(implicit
+      ec: ExecutionContext
   ): CryptoPublicStore = {
     storage match {
       case _: MemoryStorage => new InMemoryCryptoPublicStore
-      case dbStorage: DbStorage => new DbCryptoPublicStore(dbStorage, timeouts, loggerFactory)
+      case dbStorage: DbStorage =>
+        new DbCryptoPublicStore(dbStorage, releaseProtocolVersion, timeouts, loggerFactory)
     }
   }
 }

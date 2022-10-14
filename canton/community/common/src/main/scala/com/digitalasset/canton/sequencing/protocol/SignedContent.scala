@@ -5,8 +5,8 @@ package com.digitalasset.canton.sequencing.protocol
 
 import cats.Functor
 import cats.data.EitherT
-import cats.syntax.traverse._
-import com.digitalasset.canton.crypto._
+import cats.syntax.traverse.*
+import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.protocol.v0
@@ -21,7 +21,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.{
   HasProtocolVersionedWithContextCompanion,
   HasProtocolVersionedWrapper,
-  ProtobufVersion,
+  ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
 }
@@ -69,8 +69,9 @@ case class SignedContent[+A <: ProtocolVersionedMemoizedEvidence](
   def verifySignature(
       snapshot: SyncCryptoApi,
       member: Member,
+      purpose: HashPurpose,
   ): EitherT[Future, SignatureCheckError, Unit] = {
-    val hash = SignedContent.hashContent(snapshot.pureCrypto, content)
+    val hash = SignedContent.hashContent(snapshot.pureCrypto, content, purpose)
     snapshot.verifySignature(hash, member, signature)
   }
 }
@@ -91,36 +92,42 @@ object SignedContent {
       ], ContentDeserializer[SequencedEvent[ClosedEnvelope]]] =
     SignedContent.versionedProtoConverter[SequencedEvent[ClosedEnvelope]]("ClosedEnvelope")
 
-  def create[Env <: Envelope[_]](
+  def create[A <: ProtocolVersionedMemoizedEvidence](
       cryptoApi: CryptoPureApi,
       cryptoPrivateApi: SyncCryptoApi,
-      event: SequencedEvent[Env],
+      content: A,
       timestampOfSigningKey: Option[CantonTimestamp],
+      purpose: HashPurpose,
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
-  ): EitherT[Future, SyncCryptoError, SignedContent[SequencedEvent[Env]]] = {
+  ): EitherT[Future, SyncCryptoError, SignedContent[A]] = {
     // as deliverEvent implements MemoizedEvidence repeated calls to serialize will return the same bytes
     // so fine to call once for the hash here and then again when serializing to protobuf
-    val hash = hashContent(cryptoApi, event)
+    val hash = hashContent(cryptoApi, content, purpose)
     cryptoPrivateApi
       .sign(hash)
-      .map(signature => SignedContent(event, signature, timestampOfSigningKey))
+      .map(signature => SignedContent(content, signature, timestampOfSigningKey))
   }
 
-  private def hashContent(cryptoApi: CryptoPureApi, content: HasCryptographicEvidence): Hash =
-    cryptoApi.digest(HashPurpose.SequencedEventSignature, content.getCryptographicEvidence)
+  private def hashContent(
+      cryptoApi: CryptoPureApi,
+      content: HasCryptographicEvidence,
+      purpose: HashPurpose,
+  ): Hash =
+    cryptoApi.digest(purpose, content.getCryptographicEvidence)
 
-  def tryCreate[Env <: Envelope[_]](
+  def tryCreate[A <: ProtocolVersionedMemoizedEvidence](
       cryptoApi: CryptoPureApi,
       cryptoPrivateApi: SyncCryptoApi,
-      event: SequencedEvent[Env],
+      content: A,
       timestampOfSigningKey: Option[CantonTimestamp],
+      purpose: HashPurpose,
   )(implicit
       traceContext: TraceContext,
       ec: ExecutionContext,
-  ): Future[SignedContent[SequencedEvent[Env]]] =
-    create(cryptoApi, cryptoPrivateApi, event, timestampOfSigningKey)
+  ): Future[SignedContent[A]] =
+    create(cryptoApi, cryptoPrivateApi, content, timestampOfSigningKey, purpose)
       .fold(
         err => throw new IllegalStateException(s"Failed to create signed content: $err"),
         identity,
@@ -133,7 +140,7 @@ object SignedContent {
       override val name: String = s"SignedContent[$contentType]"
 
       val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-        ProtobufVersion(0) -> VersionedProtoConverter(
+        ProtoVersion(0) -> VersionedProtoConverter(
           ProtocolVersion.v2,
           supportedProtoVersion(v0.SignedContent)(fromProtoV0),
           _.toProtoV0.toByteString,
@@ -159,10 +166,20 @@ object SignedContent {
         } yield SignedContent(content, signature, ts)
     }
 
+  def fromByteString[A <: ProtocolVersionedMemoizedEvidence](
+      contentDeserializer: ContentDeserializer[A],
+      bytes: ByteString,
+  ): ParsingResult[SignedContent[A]] =
+    for {
+      signedContentP <- ProtoConverter
+        .protoParser(v0.SignedContent.parseFrom)(bytes)
+      result <- fromProtoV0[A](contentDeserializer, signedContentP)
+    } yield result
+
   implicit def prettySignedContent[A <: ProtocolVersionedMemoizedEvidence](implicit
       prettyA: Pretty[A]
   ): Pretty[SignedContent[A]] = {
-    import com.digitalasset.canton.logging.pretty.PrettyUtil._
+    import com.digitalasset.canton.logging.pretty.PrettyUtil.*
     prettyOfClass(
       unnamedParam(_.content),
       param("signature", _.signature),

@@ -5,7 +5,7 @@ package com.digitalasset.canton
 
 import cats.Functor
 import cats.data.{EitherT, OptionT}
-import cats.syntax.traverse._
+import cats.syntax.traverse.*
 import com.digitalasset.canton.concurrent.{DirectExecutionContext, Threading}
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTimeout}
@@ -17,13 +17,17 @@ import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.transaction.{SignedTopologyTransaction, TopologyChangeOp}
 import com.digitalasset.canton.tracing.{NoReportingTracerProvider, TraceContext, W3CTraceContext}
 import com.digitalasset.canton.util.CheckedT
-import com.digitalasset.canton.version.{ProtocolVersion, RepresentativeProtocolVersion}
+import com.digitalasset.canton.version.{
+  ProtocolVersion,
+  ReleaseProtocolVersion,
+  RepresentativeProtocolVersion,
+}
 import io.opentelemetry.api.trace.Tracer
 import org.mockito.{ArgumentMatchers, ArgumentMatchersSugar}
 import org.scalacheck.Test
 import org.scalactic.source.Position
 import org.scalactic.{Prettifier, source}
-import org.scalatest._
+import org.scalatest.*
 import org.scalatest.concurrent.ScalaFutures
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.matchers.should.Matchers
@@ -34,7 +38,7 @@ import org.scalatestplus.scalacheck.CheckerAsserting
 import org.slf4j.bridge.SLF4JBridgeHandler
 import org.typelevel.discipline.Laws
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
 
@@ -70,6 +74,8 @@ trait BaseTest
   protected def timeouts: ProcessingTimeout = DefaultProcessingTimeouts.testing
 
   protected lazy val testedProtocolVersion: ProtocolVersion = BaseTest.testedProtocolVersion
+  protected lazy val testedReleaseProtocolVersion: ReleaseProtocolVersion =
+    BaseTest.testedReleaseProtocolVersion
   protected lazy val defaultStaticDomainParameters: StaticDomainParameters =
     BaseTest.defaultStaticDomainParameters
 
@@ -352,6 +358,10 @@ object BaseTest {
 
   lazy val testedProtocolVersion: ProtocolVersion =
     ProtocolVersion.tryGetOptFromEnv.getOrElse(ProtocolVersion.latest)
+
+  lazy val testedReleaseProtocolVersion: ReleaseProtocolVersion = ReleaseProtocolVersion(
+    testedProtocolVersion
+  )
 
   lazy val CantonExamplesPath: String = getResourcePath("CantonExamples.dar")
   lazy val CantonTestsPath: String = getResourcePath("CantonTests.dar")

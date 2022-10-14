@@ -5,27 +5,37 @@ package com.digitalasset.canton.domain.sequencing.sequencer
 
 import akka.stream.Materializer
 import cats.data.EitherT
-import cats.syntax.functor._
+import cats.syntax.functor.*
 import com.digitalasset.canton.SequencerCounter
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.domain.sequencing.sequencer.errors._
-import com.digitalasset.canton.domain.sequencing.sequencer.store._
+import com.digitalasset.canton.domain.sequencing.sequencer.errors.*
+import com.digitalasset.canton.domain.sequencing.sequencer.store.*
 import com.digitalasset.canton.health.admin.data.SequencerHealthStatus
 import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.resource.Storage
-import com.digitalasset.canton.sequencing.protocol.{SendAsyncError, SubmissionRequest}
+import com.digitalasset.canton.sequencing.protocol.{
+  SendAsyncError,
+  SignedContent,
+  SubmissionRequest,
+}
 import com.digitalasset.canton.time.{Clock, NonNegativeFiniteDuration}
-import com.digitalasset.canton.topology.{DomainId, DomainTopologyManagerId, Member}
+import com.digitalasset.canton.topology.{
+  AuthenticatedMember,
+  DomainId,
+  DomainTopologyManagerId,
+  Member,
+  UnauthenticatedMemberId,
+}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.tracing.TraceContext.withNewTraceContext
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.FutureUtil.doNotAwait
-import com.digitalasset.canton.util.ShowUtil._
-import com.digitalasset.canton.util.Thereafter.syntax._
+import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.util.Thereafter.syntax.*
 import com.digitalasset.canton.version.ProtocolVersion
 import io.functionmeta.functionFullName
 import io.opentelemetry.api.trace.Tracer
@@ -99,7 +109,13 @@ class DatabaseSequencer(
     cryptoApi: DomainSyncCryptoClient,
     loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, tracer: Tracer, materializer: Materializer)
-    extends BaseSequencer(DomainTopologyManagerId(domainId), loggerFactory, health, clock)
+    extends BaseSequencer(
+      DomainTopologyManagerId(domainId),
+      loggerFactory,
+      health,
+      clock,
+      BaseSequencer.checkSignature(cryptoApi),
+    )
     with FlagCloseable {
   private val store: SequencerStore =
     SequencerStore(
@@ -199,6 +215,11 @@ class DatabaseSequencer(
   ): EitherT[Future, SendAsyncError, Unit] =
     writer.send(submission)
 
+  override protected def sendAsyncSignedInternal(
+      signedSubmission: SignedContent[SubmissionRequest]
+  )(implicit traceContext: TraceContext): EitherT[Future, SendAsyncError, Unit] =
+    sendAsyncInternal(signedSubmission.content)
+
   override def readInternal(member: Member, offset: SequencerCounter)(implicit
       traceContext: TraceContext
   ): EitherT[Future, CreateSubscriptionError, Sequencer.EventSource] =
@@ -217,7 +238,15 @@ class DatabaseSequencer(
 
   def disableMember(member: Member)(implicit traceContext: TraceContext): Future[Unit] = {
     logger.info(show"Disabling member at the sequencer: $member")
-    withExpectedRegisteredMember(member, "Disable member")(store.disableMember)
+    withExpectedRegisteredMember(member, "Disable member") { memberId =>
+      member match {
+        // Unauthenticated members being disabled get automatically unregistered
+        case unauthenticated: UnauthenticatedMemberId =>
+          store.unregisterUnauthenticatedMember(unauthenticated)
+        case _: AuthenticatedMember =>
+          store.disableMember(memberId)
+      }
+    }
   }
 
   /** helper for performing operations that are expected to be called with a registered member so will just throw if we

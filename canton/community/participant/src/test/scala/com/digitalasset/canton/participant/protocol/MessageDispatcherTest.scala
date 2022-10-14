@@ -3,26 +3,26 @@
 
 package com.digitalasset.canton.participant.protocol
 
-import cats.syntax.flatMap._
-import cats.syntax.option._
+import cats.syntax.flatMap.*
+import cats.syntax.option.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
 import com.digitalasset.canton.crypto.{Encrypted, HashPurpose, HashPurposeTest, TestHash}
-import com.digitalasset.canton.data._
+import com.digitalasset.canton.data.*
 import com.digitalasset.canton.error.MediatorError
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{LogEntry, NamedLoggerFactory}
-import com.digitalasset.canton.participant.RequestCounter
 import com.digitalasset.canton.participant.event.RecordOrderPublisher
-import com.digitalasset.canton.participant.protocol.MessageDispatcher.{AcsCommitment => _, _}
+import com.digitalasset.canton.participant.protocol.MessageDispatcher.{AcsCommitment as _, *}
 import com.digitalasset.canton.participant.protocol.conflictdetection.RequestTracker
 import com.digitalasset.canton.participant.protocol.submission.{
   InFlightSubmissionTracker,
   SequencedSubmission,
 }
 import com.digitalasset.canton.participant.pruning.AcsCommitmentProcessor
+import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceAlarm
 import com.digitalasset.canton.protocol.messages.EncryptedView.CompressedView
-import com.digitalasset.canton.protocol.messages._
+import com.digitalasset.canton.protocol.messages.*
 import com.digitalasset.canton.protocol.{
   RequestAndRootHashMessage,
   RequestId,
@@ -30,31 +30,31 @@ import com.digitalasset.canton.protocol.{
   RootHash,
   TransferId,
   ViewHash,
-  v0 => protocolv0,
+  v0 as protocolv0,
 }
-import com.digitalasset.canton.sequencing.protocol._
+import com.digitalasset.canton.sequencing.protocol.*
 import com.digitalasset.canton.sequencing.{
   HandlerResult,
   PossiblyIgnoredProtocolEvent,
   RawProtocolEvent,
   SequencerTestUtils,
 }
-import com.digitalasset.canton.serialization.HasCryptographicEvidence
 import com.digitalasset.canton.store.SequencedEventStore.OrdinarySequencedEvent
 import com.digitalasset.canton.time.TimeProof
 import com.digitalasset.canton.topology.{DomainId, MediatorId, ParticipantId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.Traced
-import com.digitalasset.canton.util.ShowUtil._
+import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, MonadUtil}
 import com.digitalasset.canton.version.{
   HasProtocolVersionedSerializerCompanion,
-  ProtobufVersion,
+  HasVersionedToByteString,
+  ProtoVersion,
   ProtocolVersion,
   RepresentativeProtocolVersion,
 }
-import com.digitalasset.canton.{BaseTest, DiscardOps, LfPartyId, SequencerCounter}
+import com.digitalasset.canton.{BaseTest, DiscardOps, LfPartyId, RequestCounter, SequencerCounter}
 import com.google.protobuf.ByteString
-import org.mockito.ArgumentMatchers.{eq => isEq}
+import org.mockito.ArgumentMatchers.eq as isEq
 import org.scalatest.Assertion
 import org.scalatest.wordspec.{AsyncWordSpec, AsyncWordSpecLike}
 
@@ -63,16 +63,13 @@ import scala.concurrent.Future
 
 trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
 
-  import MessageDispatcherTest._
+  import MessageDispatcherTest.*
 
   val domainId = DomainId.tryFromString("messageDispatcher::domain")
   val sourceDomain = DomainId.tryFromString("sourceDomain::sourceDomain")
   val participantId = ParticipantId.tryFromProtoPrimitive("PAR::messageDispatcher::participant")
   val mediatorId = MediatorId(domainId)
   val mediatorId2 = MediatorId(UniqueIdentifier.tryCreate("another", "mediator"))
-
-  private val protocolMessagePVRepresentative =
-    EncryptedViewMessage.protocolVersionRepresentativeFor(testedProtocolVersion)
 
   case class Fixture(
       messageDispatcher: MessageDispatcher,
@@ -110,10 +107,10 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
             InFlightSubmissionTracker,
             NamedLoggerFactory,
         ) => MessageDispatcher,
-        initRc: RequestCounter = 0L,
-        cleanReplaySequencerCounter: SequencerCounter = 0L,
+        initRc: RequestCounter = RequestCounter(0),
+        cleanReplaySequencerCounter: SequencerCounter = SequencerCounter(0),
         processingRequestF: => FutureUnlessShutdown[Unit] = FutureUnlessShutdown.unit,
-        processingResultF: => FutureUnlessShutdown[Unit] = FutureUnlessShutdown.unit,
+        processingResultF: => HandlerResult = HandlerResult.done,
     ): Fixture = {
       val requestTracker = mock[RequestTracker]
 
@@ -258,7 +255,7 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
 
   def mkDeliver(
       batch: Batch[DefaultOpenEnvelope],
-      sc: SequencerCounter = 0L,
+      sc: SequencerCounter = SequencerCounter(0),
       ts: CantonTimestamp = CantonTimestamp.Epoch,
       messageId: Option[MessageId] = None,
   ): Deliver[DefaultOpenEnvelope] =
@@ -352,8 +349,8 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
     type ProcessorOfFixture = Fixture => AnyProcessor
 
     def mk(
-        initRc: RequestCounter = 0L,
-        cleanReplaySequencerCounter: SequencerCounter = 0L,
+        initRc: RequestCounter = RequestCounter(0),
+        cleanReplaySequencerCounter: SequencerCounter = SequencerCounter(0),
     ): Fixture =
       Fixture.mk(mkMd, initRc, cleanReplaySequencerCounter)
 
@@ -384,7 +381,7 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
 
     def checkTickIdentityProcessor(
         sut: Fixture,
-        sc: SequencerCounter = 0L,
+        sc: SequencerCounter = SequencerCounter(0),
         ts: CantonTimestamp = CantonTimestamp.Epoch,
     ): Assertion = {
       verify(sut.identityProcessor).apply(
@@ -397,7 +394,7 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
 
     def checkTickRequestTracker(
         sut: Fixture,
-        sc: SequencerCounter = 0L,
+        sc: SequencerCounter = SequencerCounter(0),
         ts: CantonTimestamp = CantonTimestamp.Epoch,
     ): Assertion = {
       verify(sut.requestTracker).tick(isEq(sc), isEq(ts))(anyTraceContext)
@@ -430,7 +427,7 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
 
     def checkTicks(
         sut: Fixture,
-        sc: SequencerCounter = 0L,
+        sc: SequencerCounter = SequencerCounter(0),
         ts: CantonTimestamp = CantonTimestamp.Epoch,
     ): Assertion = {
       checkTickIdentityProcessor(sut, sc, ts)
@@ -485,11 +482,11 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
     "handling a deliver event" should {
       "call the transaction processor after having informed the identity processor and tick the request tracker" in {
         val sut = mk()
-        val sc = 1L
+        val sc = SequencerCounter(1)
         val ts = CantonTimestamp.Epoch
         val prefix = TimeProof.timeEventMessageIdPrefix
         val deliver = SequencerTestUtils.mockDeliver(
-          sc,
+          sc.v,
           ts,
           domainId,
           messageId = Some(
@@ -503,7 +500,7 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
           sut.recordOrderPublisher.scheduleEmptyAcsChangePublication(
             any[SequencerCounter],
             any[CantonTimestamp],
-          )(anyTraceContext)
+          )
         )
           .thenAnswer {
             checkTickIdentityProcessor(sut, sc, ts).discard
@@ -514,9 +511,7 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
           }
 
         handle(sut, deliver) {
-          verify(sut.recordOrderPublisher).scheduleEmptyAcsChangePublication(isEq(sc), isEq(ts))(
-            anyTraceContext
-          )
+          verify(sut.recordOrderPublisher).scheduleEmptyAcsChangePublication(isEq(sc), isEq(ts))
           checkTicks(sut, sc, ts)
         }
       }
@@ -525,7 +520,7 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
     "topology transactions" should {
       "be passed to the identity processor" in {
         val sut = mk()
-        val sc = 1L
+        val sc = SequencerCounter(1)
         val ts = CantonTimestamp.ofEpochSecond(1)
         val event =
           mkDeliver(Batch.of(testedProtocolVersion, idTx -> Recipients.cc(participantId)), sc, ts)
@@ -538,7 +533,7 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
     "causality messages" should {
       "be passed to the causality tracker" in {
         val sut = mk()
-        val sc = 1L
+        val sc = SequencerCounter(1)
         val ts = CantonTimestamp.ofEpochSecond(1)
         val event = mkDeliver(
           Batch.of(testedProtocolVersion, causalityMessage -> Recipients.cc(participantId)),
@@ -558,7 +553,7 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
     "ACS commitments" should {
       "be passed to the ACS commitment processor" in {
         val sut = mk()
-        val sc = 2L
+        val sc = SequencerCounter(2)
         val ts = CantonTimestamp.ofEpochSecond(2)
         val event = mkDeliver(
           Batch.of(testedProtocolVersion, commitment -> Recipients.cc(participantId)),
@@ -575,7 +570,7 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
 
     "synchronous shutdown propagates" in {
       val sut = mk()
-      val sc = 3L
+      val sc = SequencerCounter(3)
       val ts = CantonTimestamp.ofEpochSecond(3)
 
       // Overwrite the mocked identity processor so that it aborts synchronously
@@ -617,7 +612,7 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
 
     "asynchronous shutdown propagates" in {
       val sut = mk()
-      val sc = 3L
+      val sc = SequencerCounter(3)
       val ts = CantonTimestamp.ofEpochSecond(3)
 
       // Overwrite the mocked identity processor so that it aborts asynchronously
@@ -647,7 +642,7 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
     }
 
     "complain about unknown view types in a request" in {
-      val sut = mk(initRc = -12L)
+      val sut = mk(initRc = RequestCounter(-12))
       val encryptedUnknownTestView = EncryptedView(UnknownTestViewType)(mockEncryptedViewTree)
       val encryptedUnknownTestViewMessage =
         EncryptedViewMessageV0(
@@ -671,7 +666,7 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
           encryptedUnknownTestViewMessage -> Recipients.cc(participantId),
           rootHashMessage -> Recipients.cc(participantId, mediatorId),
         ),
-        11L,
+        SequencerCounter(11),
         CantonTimestamp.ofEpochSecond(11),
       )
       for {
@@ -689,7 +684,7 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
     }
 
     "complain about unknown view types in a result" in {
-      val sut = mk(initRc = -11L)
+      val sut = mk(initRc = RequestCounter(-11))
       val unknownTestMediatorResult =
         SignedProtocolMessage(
           TestRegularMediatorResult(
@@ -707,7 +702,7 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
             testedProtocolVersion,
             unknownTestMediatorResult -> Recipients.cc(participantId),
           ),
-          12L,
+          SequencerCounter(12),
           CantonTimestamp.ofEpochSecond(11),
         )
       for {
@@ -733,9 +728,9 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
       val wrongViewType = wrongView.viewType
 
       s"be passed to the $viewType processor" in {
-        val initRc = 2L
+        val initRc = RequestCounter(2)
         val sut = mk(initRc = initRc)
-        val sc = 2L
+        val sc = SequencerCounter(2)
         val ts = CantonTimestamp.ofEpochSecond(2)
         val rootHashMessage =
           RootHashMessage(
@@ -841,9 +836,9 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
         MonadUtil
           .sequentialTraverse_(badBatches.zipWithIndex) {
             case (((batch, alarms), reaction), index) =>
-              val initRc = index.toLong
+              val initRc = RequestCounter(index)
               val sut = mk(initRc = initRc)
-              val sc = index.toLong
+              val sc = SequencerCounter(index)
               val ts = CantonTimestamp.ofEpochSecond(index.toLong)
               withClueF(s"at batch $index") {
                 loggerFactory.assertLogsUnordered(
@@ -880,7 +875,10 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
                     succeed
                   },
                   alarms.map(alarm =>
-                    (logEntry: LogEntry) => logEntry.errorMessage should include(alarm)
+                    (entry: LogEntry) => {
+                      entry.shouldBeCantonErrorCode(SyncServiceAlarm)
+                      entry.warningMessage should include(alarm)
+                    }
                   ): _*
                 )
               }
@@ -925,9 +923,9 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
         // sequentially process the test cases so that the log messages don't interfere
         MonadUtil
           .sequentialTraverse_(fatalBatches.zipWithIndex) { case (batch, index) =>
-            val initRc = index.toLong
+            val initRc = RequestCounter(index.toLong)
             val sut = mk(initRc = initRc)
-            val sc = index.toLong
+            val sc = SequencerCounter(index.toLong)
             val ts = CantonTimestamp.ofEpochSecond(index.toLong)
             withClueF(s"at batch $index") {
               loggerFactory.assertThrowsAndLogsAsync[IllegalArgumentException](
@@ -985,9 +983,9 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
         // sequentially process the test cases so that the log messages don't interfere
         MonadUtil
           .sequentialTraverse_(badBatches.zipWithIndex) { case ((batch, alarms), index) =>
-            val initRc = index.toLong
+            val initRc = RequestCounter(index)
             val sut = mk(initRc = initRc)
-            val sc = index.toLong
+            val sc = SequencerCounter(index)
             val ts = CantonTimestamp.ofEpochSecond(index.toLong)
             withClueF(s"at batch $index") {
               loggerFactory.assertLogsUnordered(
@@ -999,7 +997,10 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
                   sut.requestCounterAllocator.peek shouldBe initRc + 1
                 },
                 alarms.map(alarm =>
-                  (logEntry: LogEntry) => logEntry.errorMessage should include(alarm)
+                  (entry: LogEntry) => {
+                    entry.shouldBeCantonErrorCode(SyncServiceAlarm)
+                    entry.warningMessage should include(alarm)
+                  }
                 ): _*
               )
             }
@@ -1008,8 +1009,8 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
       }
 
       "be skipped if they precede the clean replay starting point" in {
-        val initRc = 2L
-        val initSc = 50L
+        val initRc = RequestCounter(2)
+        val initSc = SequencerCounter(50)
         val sut = mk(initRc = initRc, cleanReplaySequencerCounter = initSc)
         val sc = initSc - 1L
         val ts = CantonTimestamp.ofEpochSecond(2)
@@ -1081,10 +1082,10 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
           handle(sut, mkDeliver(batch)) {
             checkTicks(sut)
           },
-          _.errorMessage should include(
+          _.warningMessage should include(
             show"Received unexpected ${RequestKind(TestViewType)} for $requestId"
           ),
-          _.errorMessage should include(
+          _.warningMessage should include(
             show"Received unexpected ${RequestKind(OtherTestViewType)} for $requestId"
           ),
         )
@@ -1112,7 +1113,7 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
             handle(sut, mkDeliver(batch)) {
               verify(processor(sut)).processMalformedMediatorRequestResult(
                 isEq(CantonTimestamp.Epoch),
-                isEq(0L),
+                isEq(SequencerCounter(0)),
                 any[SignedContent[Deliver[DefaultOpenEnvelope]]],
               )(anyTraceContext)
               checkTickIdentityProcessor(sut)
@@ -1139,11 +1140,17 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
           testedProtocolVersion,
           malformedMediatorRequestResult -> Recipients.cc(participantId),
         )
-        val deliver1 = mkDeliver(dummyBatch, 0L, CantonTimestamp.Epoch, messageId1.some)
-        val deliver2 = mkDeliver(dummyBatch, 1L, CantonTimestamp.ofEpochSecond(1), messageId2.some)
-        val deliver3 = mkDeliver(dummyBatch, 2L, CantonTimestamp.ofEpochSecond(2))
+        val deliver1 =
+          mkDeliver(dummyBatch, SequencerCounter(0), CantonTimestamp.Epoch, messageId1.some)
+        val deliver2 = mkDeliver(
+          dummyBatch,
+          SequencerCounter(1),
+          CantonTimestamp.ofEpochSecond(1),
+          messageId2.some,
+        )
+        val deliver3 = mkDeliver(dummyBatch, SequencerCounter(2), CantonTimestamp.ofEpochSecond(2))
         val deliverError4 = DeliverError.create(
-          3L,
+          SequencerCounter(3),
           CantonTimestamp.ofEpochSecond(3),
           domainId,
           messageId3,
@@ -1162,8 +1169,11 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
           checkObserveSequencing(
             sut,
             Map(
-              messageId1 -> SequencedSubmission(0L, CantonTimestamp.Epoch),
-              messageId2 -> SequencedSubmission(1L, CantonTimestamp.ofEpochSecond(1)),
+              messageId1 -> SequencedSubmission(SequencerCounter(0), CantonTimestamp.Epoch),
+              messageId2 -> SequencedSubmission(
+                SequencerCounter(1),
+                CantonTimestamp.ofEpochSecond(1),
+              ),
             ),
           )
           checkObserveDeliverError(sut, deliverError4)
@@ -1176,7 +1186,7 @@ trait MessageDispatcherTest { this: AsyncWordSpecLike with BaseTest =>
 private[protocol] object MessageDispatcherTest {
 
   // The message dispatcher only sees encrypted view trees, so there's no point in implementing the methods.
-  sealed trait MockViewTree extends ViewTree with HasCryptographicEvidence
+  sealed trait MockViewTree extends ViewTree with HasVersionedToByteString
 
   trait AbstractTestViewType extends ViewType {
     override type View = MockViewTree
@@ -1222,7 +1232,7 @@ private[protocol] object MessageDispatcherTest {
     val name: String = "TestRegularMediatorResult"
 
     val supportedProtoVersions: SupportedProtoVersions = SupportedProtoVersions(
-      ProtobufVersion(0) -> VersionedProtoConverter(
+      ProtoVersion(0) -> VersionedProtoConverter(
         ProtocolVersion.v2,
         (),
         _ => throw new NotImplementedError("Serialization is not implemented"),

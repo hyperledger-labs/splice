@@ -3,10 +3,8 @@
 
 package com.digitalasset.canton.participant.store
 
-import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.TracedLogger
-import com.digitalasset.canton.participant.RequestCounter
 import com.digitalasset.canton.participant.protocol.SingleDomainCausalTracker
 import com.digitalasset.canton.participant.protocol.SingleDomainCausalTracker.DomainPerPartyCausalState
 import com.digitalasset.canton.participant.store.SingleDomainCausalDependencyStore.{
@@ -16,6 +14,7 @@ import com.digitalasset.canton.participant.store.SingleDomainCausalDependencySto
 import com.digitalasset.canton.protocol.TransferId
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.{LfPartyId, RequestCounter}
 import com.google.common.annotations.VisibleForTesting
 
 import scala.collection.concurrent.TrieMap
@@ -56,7 +55,7 @@ trait SingleDomainCausalDependencyStore {
       val next = perPartyDeps.map { case (partyId, delta) =>
         val before: Map[DomainId, CantonTimestamp] = state.getOrElse(partyId, TrieMap.empty).toMap
         val updated = SingleDomainCausalTracker.bound(List(before, delta))
-        state.put(partyId, updated)
+        state.put(partyId, updated).discard
         partyId -> updated
       }
 

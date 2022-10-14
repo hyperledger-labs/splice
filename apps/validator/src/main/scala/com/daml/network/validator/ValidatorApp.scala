@@ -197,18 +197,20 @@ class ValidatorApp(
         walletServiceParty = walletServiceParty,
       )
       val store = ValidatorStore(key, storage, loggerFactory)
-      adminServerRegistry.addService(
-        ValidatorAppServiceGrpc.bindService(
-          new GrpcValidatorAppService(
-            ledgerClient,
-            store,
-            config.damlUser,
-            config.walletServiceUser,
-            loggerFactory,
-          ),
-          ec,
+      adminServerRegistry
+        .addService(
+          ValidatorAppServiceGrpc.bindService(
+            new GrpcValidatorAppService(
+              ledgerClient,
+              store,
+              config.damlUser,
+              config.walletServiceUser,
+              loggerFactory,
+            ),
+            ec,
+          )
         )
-      )
+        .discard
       val automation = new ValidatorAutomationService(
         store,
         ledgerClient,

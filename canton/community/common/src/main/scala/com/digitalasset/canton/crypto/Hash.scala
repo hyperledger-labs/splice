@@ -4,18 +4,19 @@
 package com.digitalasset.canton.crypto
 
 import cats.Order
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.ProtoDeserializationError.CryptoDeserializationError
 import com.digitalasset.canton.config.RequireTypes.String68
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{
+  DefaultDeserializationError,
   DeserializationError,
   DeterministicEncoding,
   HasCryptographicEvidence,
 }
-import com.digitalasset.canton.util.{HexString, NoCopy}
+import com.digitalasset.canton.util.HexString
 import com.google.protobuf.ByteString
 import slick.jdbc.{GetResult, SetParameter}
 
@@ -75,8 +76,7 @@ object HashAlgorithm {
 case class Hash private (private val hash: ByteString, private val algorithm: HashAlgorithm)
     extends HasCryptographicEvidence
     with Ordered[Hash]
-    with PrettyPrinting
-    with NoCopy {
+    with PrettyPrinting {
 
   require(!hash.isEmpty, "Hash must not be empty")
   require(
@@ -133,9 +133,6 @@ object Hash {
 
   }
 
-  private[this] def apply(hash: ByteString, algorithm: HashAlgorithm): Hash =
-    throw new UnsupportedOperationException("Use the create/build methods instead")
-
   private[crypto] def tryCreate(hash: ByteString, algorithm: HashAlgorithm): Hash =
     create(hash, algorithm).valueOr(err => throw new IllegalArgumentException(err))
 
@@ -175,8 +172,8 @@ object Hash {
       (length, hashBytes) = lengthAndBytes
       algorithm <- HashAlgorithm
         .lookup(index, length)
-        .leftMap(err => DeserializationError(s"Invalid hash algorithm: $err", bytes))
-      hash <- create(hashBytes, algorithm).leftMap(err => DeserializationError(err, bytes))
+        .leftMap(err => DefaultDeserializationError(s"Invalid hash algorithm: $err"))
+      hash <- create(hashBytes, algorithm).leftMap(err => DefaultDeserializationError(err))
     } yield hash
 
   /** Decode a serialized [[Hash]] using [[fromByteString]] except for the empty [[com.google.protobuf.ByteString]],
@@ -188,7 +185,7 @@ object Hash {
   def fromHexString(hexString: String): Either[DeserializationError, Hash] =
     HexString
       .parse(hexString)
-      .toRight(DeserializationError(s"Failed to parse hex string: $hexString", ByteString.EMPTY))
+      .toRight(DefaultDeserializationError(s"Failed to parse hex string: $hexString"))
       .map(ByteString.copyFrom)
       .flatMap(fromByteString)
 

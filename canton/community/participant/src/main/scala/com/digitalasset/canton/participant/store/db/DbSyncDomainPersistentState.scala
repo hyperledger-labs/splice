@@ -19,7 +19,7 @@ import com.digitalasset.canton.store.db.{
 import com.digitalasset.canton.store.memory.InMemorySendTrackerStore
 import com.digitalasset.canton.store.{IndexedDomain, IndexedStringStore}
 import com.digitalasset.canton.tracing.NoTracing
-import com.digitalasset.canton.version.ProtocolVersion
+import com.digitalasset.canton.version.{ProtocolVersion, ReleaseProtocolVersion}
 
 import scala.concurrent.ExecutionContext
 
@@ -30,6 +30,7 @@ class DbSyncDomainPersistentState(
     override val pureCryptoApi: CryptoPureApi,
     parameters: ParticipantStoreConfig,
     caching: CachingConfigs,
+    numDbConnections: Int,
     processingTimeouts: ProcessingTimeout,
     override val enableAdditionalConsistencyChecks: Boolean,
     indexedStringStore: IndexedStringStore,
@@ -39,26 +40,28 @@ class DbSyncDomainPersistentState(
     with AutoCloseable
     with NoTracing {
 
-  val eventLog = new DbSingleDimensionEventLog(
+  val eventLog: DbSingleDimensionEventLog[DomainEventLogId] = new DbSingleDimensionEventLog(
     DomainEventLogId(domainId),
     storage,
     indexedStringStore,
+    ReleaseProtocolVersion.latest,
     processingTimeouts,
     loggerFactory,
   )
 
-  val contractStore =
+  val contractStore: DbContractStore =
     new DbContractStore(
       storage,
       domainId,
       protocolVersion,
       parameters.maxItemsInSqlClause,
+      numDbConnections,
       caching.contractStore,
       parameters.dbBatchAggregationConfig,
       processingTimeouts,
       loggerFactory,
     )
-  val transferStore = new DbTransferStore(
+  val transferStore: DbTransferStore = new DbTransferStore(
     storage,
     domainId.item,
     protocolVersion,
@@ -66,7 +69,7 @@ class DbSyncDomainPersistentState(
     processingTimeouts,
     loggerFactory,
   )
-  val activeContractStore =
+  val activeContractStore: DbActiveContractStore =
     new DbActiveContractStore(
       storage,
       domainId,
@@ -76,7 +79,7 @@ class DbSyncDomainPersistentState(
       processingTimeouts,
       loggerFactory,
     )
-  val contractKeyJournal = new DbContractKeyJournal(
+  val contractKeyJournal: DbContractKeyJournal = new DbContractKeyJournal(
     storage,
     domainId,
     parameters.maxItemsInSqlClause,
@@ -91,7 +94,7 @@ class DbSyncDomainPersistentState(
     processingTimeouts,
     loggerFactory,
   )
-  val requestJournalStore = new DbRequestJournalStore(
+  val requestJournalStore: DbRequestJournalStore = new DbRequestJournalStore(
     domainId,
     storage,
     parameters.maxItemsInSqlClause,
@@ -110,13 +113,13 @@ class DbSyncDomainPersistentState(
     loggerFactory,
   )
 
-  val parameterStore =
+  val parameterStore: DbDomainParameterStore =
     new DbDomainParameterStore(domainId.item, storage, processingTimeouts, loggerFactory)
   val sequencerCounterTrackerStore =
     new DbSequencerCounterTrackerStore(client, storage, processingTimeouts, loggerFactory)
-  //TODO(i5660): Use the db-based send tracker store
+  // TODO(i5660): Use the db-based send tracker store
   val sendTrackerStore = new InMemorySendTrackerStore()
-  val causalDependencyStore =
+  val causalDependencyStore: DbSingleDomainCausalDependencyStore =
     new DbSingleDomainCausalDependencyStore(
       domainId.item,
       storage,

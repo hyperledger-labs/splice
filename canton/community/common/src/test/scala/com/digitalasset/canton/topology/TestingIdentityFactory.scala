@@ -4,15 +4,16 @@
 package com.digitalasset.canton.topology
 
 import cats.data.EitherT
-import cats.syntax.functor._
+import cats.syntax.functor.*
 import com.daml.lf.data.Ref.PackageId
+import com.digitalasset.canton.BaseTest.testedReleaseProtocolVersion
 import com.digitalasset.canton.concurrent.{
   DirectExecutionContext,
   FutureSupervisor,
   HasFutureSupervision,
 }
 import com.digitalasset.canton.config.{CachingConfigs, DefaultProcessingTimeouts}
-import com.digitalasset.canton.crypto._
+import com.digitalasset.canton.crypto.*
 import com.digitalasset.canton.crypto.provider.symbolic.{SymbolicCrypto, SymbolicPureCrypto}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
@@ -23,7 +24,7 @@ import com.digitalasset.canton.protocol.{
   TestDomainParameters,
 }
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.canton.topology.DefaultTestIdentities._
+import com.digitalasset.canton.topology.DefaultTestIdentities.*
 import com.digitalasset.canton.topology.client.{
   DomainTopologyClient,
   IdentityProvidingServiceClient,
@@ -35,12 +36,12 @@ import com.digitalasset.canton.topology.processing.{EffectiveTime, SequencedTime
 import com.digitalasset.canton.topology.store.TopologyStoreId
 import com.digitalasset.canton.topology.store.memory.InMemoryTopologyStore
 import com.digitalasset.canton.topology.transaction.TopologyChangeOp.Add
-import com.digitalasset.canton.topology.transaction._
+import com.digitalasset.canton.topology.transaction.*
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.{BaseTest, LfPartyId}
 import org.mockito.MockitoSugar.mock
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 import scala.concurrent.{Await, ExecutionContext, Future}
 
 /** Utility functions to setup identity & crypto apis for testing purposes
@@ -337,7 +338,8 @@ class TestingIdentityFactory(
     TopologyStateUpdate(
       TopologyChangeOp.Add,
       TopologyStateUpdateElement(TopologyElementId.generate(), mapping),
-    )(defaultProtocolVersion),
+      defaultProtocolVersion,
+    ),
     mock[SigningPublicKey],
     mock[Signature],
   )(signedTxProtocolRepresentative, None)
@@ -428,6 +430,7 @@ class TestingIdentityFactory(
     SymbolicCrypto.tryCreate(
       signingFingerprintsOrOwner,
       fingerprintSuffixesOrOwner,
+      testedReleaseProtocolVersion,
       DefaultProcessingTimeouts.testing,
       loggerFactory,
     )
@@ -470,7 +473,7 @@ class TestingOwnerWithKeys(
   }
 
   object TestingTransactions {
-    import SigningKeys._
+    import SigningKeys.*
     val namespaceKey = key1
     val uid2 = uid.copy(id = Identifier.tryCreate("second"))
     val ts = CantonTimestamp.Epoch

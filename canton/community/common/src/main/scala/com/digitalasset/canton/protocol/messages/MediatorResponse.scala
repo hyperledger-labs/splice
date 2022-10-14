@@ -3,21 +3,20 @@
 
 package com.digitalasset.canton.protocol.messages
 
-import cats.syntax.either._
-import cats.syntax.traverse._
+import cats.syntax.either.*
+import cats.syntax.traverse.*
 import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.ProtoDeserializationError.InvariantViolation
 import com.digitalasset.canton.crypto.HashPurpose
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.protocol._
+import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.MediatorResponse.InvalidMediatorResponse
 import com.digitalasset.canton.protocol.messages.SignedProtocolMessageContent.SignedMessageContentCast
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.topology.{DomainId, ParticipantId}
-import com.digitalasset.canton.util.NoCopy
-import com.digitalasset.canton.version._
+import com.digitalasset.canton.version.*
 import com.google.protobuf.ByteString
 
 /** Payload of a response sent to the mediator in reaction to a request.
@@ -47,7 +46,7 @@ then clients cannot create instances with an incorrect `deserializedFrom` field.
 
 Optional parameters are strongly discouraged, as each parameter needs to be consciously set in a production context.
  */
-sealed abstract case class MediatorResponse(
+case class MediatorResponse private (
     requestId: RequestId,
     sender: ParticipantId,
     viewHash: Option[ViewHash],
@@ -61,7 +60,6 @@ sealed abstract case class MediatorResponse(
 ) extends SignedProtocolMessageContent
     with HasProtocolVersionedWrapper[MediatorResponse]
     with HasDomainId
-    with NoCopy
     with PrettyPrinting {
 
   // If an object invariant is violated, throw an exception specific to the class.
@@ -131,13 +129,13 @@ object MediatorResponse extends HasMemoizedProtocolVersionedWrapperCompanion[Med
   override val name: String = "MediatorResponse"
 
   val supportedProtoVersions = SupportedProtoVersions(
-    ProtobufVersion(0) -> VersionedProtoConverter(
+    ProtoVersion(0) -> VersionedProtoConverter(
       ProtocolVersion.v2,
       supportedProtoVersionMemoized(v0.MediatorResponse)(fromProtoV0),
       _.toProtoV0.toByteString,
     ),
-    ProtobufVersion(1) -> VersionedProtoConverter(
-      ProtocolVersion.dev, // TODO(i10131): make stable
+    ProtoVersion(1) -> VersionedProtoConverter(
+      ProtocolVersion.v4,
       supportedProtoVersionMemoized(v1.MediatorResponse)(fromProtoV1),
       _.toProtoV1.toByteString,
     ),
@@ -195,7 +193,7 @@ object MediatorResponse extends HasMemoizedProtocolVersionedWrapperCompanion[Med
       domainId: DomainId,
       protocolVersion: ProtocolVersion,
   ): MediatorResponse =
-    new MediatorResponse(
+    MediatorResponse(
       requestId,
       sender,
       viewHash,
@@ -203,7 +201,7 @@ object MediatorResponse extends HasMemoizedProtocolVersionedWrapperCompanion[Med
       rootHash,
       confirmingParties,
       domainId,
-    )(protocolVersionRepresentativeFor(protocolVersion), None) {}
+    )(protocolVersionRepresentativeFor(protocolVersion), None)
 
   private def fromProtoV0(mediatorResponseP: v0.MediatorResponse)(
       bytes: ByteString
@@ -233,7 +231,7 @@ object MediatorResponse extends HasMemoizedProtocolVersionedWrapperCompanion[Med
       domainId <- DomainId.fromProtoPrimitive(domainIdP, "domain_id")
       response <- Either
         .catchOnly[InvalidMediatorResponse](
-          new MediatorResponse(
+          MediatorResponse(
             requestId,
             sender,
             viewHash,
@@ -242,9 +240,9 @@ object MediatorResponse extends HasMemoizedProtocolVersionedWrapperCompanion[Med
             confirmingParties.toSet,
             domainId,
           )(
-            supportedProtoVersions.protocolVersionRepresentativeFor(ProtobufVersion(0)),
+            supportedProtoVersions.protocolVersionRepresentativeFor(ProtoVersion(0)),
             Some(bytes),
-          ) {}
+          )
         )
         .leftMap(err => InvariantViolation(err.toString))
     } yield response
@@ -277,7 +275,7 @@ object MediatorResponse extends HasMemoizedProtocolVersionedWrapperCompanion[Med
       domainId <- DomainId.fromProtoPrimitive(domainIdP, "domain_id")
       response <- Either
         .catchOnly[InvalidMediatorResponse](
-          new MediatorResponse(
+          MediatorResponse(
             requestId,
             sender,
             viewHash,
@@ -286,9 +284,9 @@ object MediatorResponse extends HasMemoizedProtocolVersionedWrapperCompanion[Med
             confirmingParties.toSet,
             domainId,
           )(
-            supportedProtoVersions.protocolVersionRepresentativeFor(ProtobufVersion(1)),
+            supportedProtoVersions.protocolVersionRepresentativeFor(ProtoVersion(1)),
             Some(bytes),
-          ) {}
+          )
         )
         .leftMap(err => InvariantViolation(err.toString))
     } yield response

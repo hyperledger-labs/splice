@@ -6,6 +6,7 @@ import cats.implicits._
 import cats.syntax.either._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
 import com.daml.network.environment.CoinNodeBootstrapBase
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.validator.metrics.ValidatorAppMetrics
@@ -36,6 +37,7 @@ class ValidatorAppBootstrap(
     metrics: ValidatorAppMetrics,
     storageFactory: StorageFactory,
     parentLogger: NamedLoggerFactory,
+    writeHealthDumpToFile: HealthDumpFunction,
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     @nowarn("cat=unused")
@@ -54,6 +56,7 @@ class ValidatorAppBootstrap(
       metrics,
       storageFactory,
       parentLogger.append(ValidatorAppBootstrap.LoggerFactoryKeyName, name.unwrap),
+      writeHealthDumpToFile,
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {
@@ -89,6 +92,7 @@ object ValidatorAppBootstrap {
       testingConfigInternal: TestingConfigInternal,
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
+      writeHealthDumpToFile: HealthDumpFunction,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
       scheduler: ScheduledExecutorService,
@@ -107,6 +111,7 @@ object ValidatorAppBootstrap {
           validatorMetrics,
           new CommunityStorageFactory(validatorConfig.storage),
           loggerFactory,
+          writeHealthDumpToFile,
         )
       )
       .leftMap(_.toString)

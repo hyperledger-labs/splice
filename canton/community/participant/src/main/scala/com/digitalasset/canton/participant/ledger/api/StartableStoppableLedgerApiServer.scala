@@ -17,20 +17,17 @@ import com.daml.ledger.resources.{Resource, ResourceContext}
 import com.daml.logging.LoggingContext
 import com.daml.platform.LedgerApiServer
 import com.daml.platform.apiserver.{ApiServerConfig, ApiServiceOwner, LedgerFeatures}
-import com.daml.platform.configuration.{
-  IndexServiceConfig => LedgerIndexServiceConfig,
-  PartyConfiguration,
-  ServerRole,
-}
+import com.daml.platform.configuration.{IndexServiceConfig as LedgerIndexServiceConfig, ServerRole}
 import com.daml.platform.index.IndexServiceOwner
 import com.daml.platform.indexer.{
-  IndexerConfig => DamlIndexerConfig,
+  IndexerConfig as DamlIndexerConfig,
   IndexerServiceOwner,
   IndexerStartupMode,
 }
+import com.daml.platform.partymanagement.PersistentPartyRecordStore
 import com.daml.platform.services.time.TimeProviderType
+import com.daml.platform.store.DbSupport
 import com.daml.platform.store.DbSupport.ParticipantDataSourceConfig
-import com.daml.platform.store.{DbSupport, LfValueTranslationCache}
 import com.daml.platform.usermanagement.PersistentUserManagementStore
 import com.daml.ports.Port
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
@@ -46,7 +43,7 @@ import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.Future
-import scala.jdk.DurationConverters._
+import scala.jdk.DurationConverters.*
 
 /** The StartableStoppableLedgerApi enables a canton participant node to start and stop the ledger API server
   * depending on whether the participant node is a High Availability active or passive replica.
@@ -146,17 +143,6 @@ class StartableStoppableLedgerApiServer(
   private def buildLedgerApiServerOwner(
       overrideIndexerStartupMode: Option[IndexerStartupMode]
   )(implicit traceContext: TraceContext) = {
-    val lfValueTranslationCacheConfig = LfValueTranslationCache.Config(
-      eventsMaximumSize = config.serverConfig.maxEventCacheWeight,
-      contractsMaximumSize = config.serverConfig.maxContractCacheWeight,
-    )
-
-    val lfValueTranslationCache =
-      LfValueTranslationCache.Cache.newInstrumentedInstance(
-        config = lfValueTranslationCacheConfig,
-        metrics = config.metrics,
-      )
-
     val indexServiceConfig = LedgerIndexServiceConfig(
       eventsPageSize = config.serverConfig.eventsPageSize,
       eventsProcessingParallelism = config.serverConfig.eventsProcessingParallelism,
@@ -209,7 +195,6 @@ class StartableStoppableLedgerApiServer(
           .map(overrideStartupMode => indexerConfig.copy(startupMode = overrideStartupMode))
           .getOrElse(indexerConfig),
         config.metrics,
-        lfValueTranslationCache,
         inMemoryState,
         inMemoryStateUpdaterFlow,
         config.serverConfig.additionalMigrationPaths,
@@ -228,7 +213,6 @@ class StartableStoppableLedgerApiServer(
         participantId = config.participantId,
         metrics = config.metrics,
         servicesExecutionContext = executionContext,
-        lfValueTranslationCache = lfValueTranslationCache,
         engine = config.engine,
         inMemoryState = inMemoryState,
       )
@@ -242,6 +226,12 @@ class StartableStoppableLedgerApiServer(
           maxCacheSize = config.serverConfig.userManagementService.maxCacheSize,
           maxRightsPerUser = config.serverConfig.userManagementService.maxRightsPerUser,
         )(executionContext, loggingContext)
+      partyRecordStore = new PersistentPartyRecordStore(
+        dbSupport = dbSupport,
+        metrics = config.metrics,
+        timeProvider = TimeProvider.UTC,
+        executionContext = executionContext,
+      )
       ledgerApiServerConfig = ApiServerConfig(
         address = Some(config.serverConfig.address),
         apiStreamShutdownTimeout = config.serverConfig.apiStreamShutdownTimeout.unwrap.toScala,
@@ -251,11 +241,10 @@ class StartableStoppableLedgerApiServer(
           None, // CantonSyncService provides ledger configuration via ReadService bypassing the WriteService
         managementServiceTimeout = config.serverConfig.managementServiceTimeout.toScala,
         maxInboundMessageSize = config.serverConfig.maxInboundMessageSize.unwrap,
-        party = PartyConfiguration.Default,
         port = Port(config.serverConfig.port.unwrap),
         portFile = None,
         rateLimit = config.serverConfig.rateLimit,
-        seeding = config.cantonParameterConfig.contractIdSeeding,
+        seeding = config.cantonParameterConfig.ledgerApiServerParameters.contractIdSeeding,
         timeProviderType = config.testingTimeService match {
           case Some(_) => TimeProviderType.Static
           case None => TimeProviderType.WallClock
@@ -269,6 +258,7 @@ class StartableStoppableLedgerApiServer(
       _ <- ApiServiceOwner(
         indexService = indexService,
         userManagementStore = userManagementStore,
+        partyRecordStore = partyRecordStore,
         ledgerId = config.ledgerId,
         participantId = config.participantId,
         config = ledgerApiServerConfig,
@@ -311,9 +301,15 @@ class StartableStoppableLedgerApiServer(
         ),
         authService = new CantonAdminTokenAuthService(
           config.adminToken,
-          parent = config.serverConfig.authServices.map(_.create()),
+          parent = config.serverConfig.authServices.map(
+            _.create(
+              config.cantonParameterConfig.ledgerApiServerParameters.jwtTimestampLeeway
+            )
+          ),
         ),
-        jwtTimestampLeeway = None,
+        jwtTimestampLeeway =
+          config.cantonParameterConfig.ledgerApiServerParameters.jwtTimestampLeeway,
+        meteringReportKey = config.meteringReportKey,
       )
     } yield ()
   }

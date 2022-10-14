@@ -3,19 +3,20 @@
 
 package com.digitalasset.canton.protocol.messages
 
-import com.daml.error._
+import com.daml.error.*
 import com.digitalasset.canton.ProtoDeserializationError.{
   FieldNotSet,
   OtherError,
   ValueDeserializationError,
 }
 import com.digitalasset.canton.error.CantonErrorGroups.ParticipantErrorGroup.TransactionErrorGroup.LocalRejectionGroup
-import com.digitalasset.canton.error._
+import com.digitalasset.canton.error.*
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
+import com.digitalasset.canton.protocol.messages.LocalReject.MalformedRejects.CreatesExistingContracts
 import com.digitalasset.canton.protocol.messages.LocalVerdict.protocolVersionRepresentativeFor
 import com.digitalasset.canton.protocol.{messages, v0, v1}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
-import com.digitalasset.canton.version._
+import com.digitalasset.canton.version.*
 import com.google.protobuf.empty
 import org.slf4j.event.Level
 
@@ -47,13 +48,13 @@ object LocalVerdict extends HasProtocolVersionedCompanion[LocalVerdict] {
 
   override def supportedProtoVersions: messages.LocalVerdict.SupportedProtoVersions =
     SupportedProtoVersions(
-      ProtobufVersion(0) -> VersionedProtoConverter(
+      ProtoVersion(0) -> VersionedProtoConverter(
         ProtocolVersion.v2,
         supportedProtoVersion(v0.LocalVerdict)(fromProtoV0),
         _.toByteString,
       ),
-      ProtobufVersion(1) -> VersionedProtoConverter(
-        ProtocolVersion.dev, // TODO(i10131): make stable
+      ProtoVersion(1) -> VersionedProtoConverter(
+        ProtocolVersion.v4,
         supportedProtoVersion(v1.LocalVerdict)(fromProtoV1),
         _.toByteString,
       ),
@@ -62,8 +63,8 @@ object LocalVerdict extends HasProtocolVersionedCompanion[LocalVerdict] {
   private[messages] def fromProtoV0(
       localVerdictP: v0.LocalVerdict
   ): ParsingResult[LocalVerdict] = {
-    import v0.LocalVerdict.{SomeLocalVerdict => Lv}
-    val protocolVersion = protocolVersionRepresentativeFor(ProtobufVersion(0)).representative
+    import v0.LocalVerdict.{SomeLocalVerdict as Lv}
+    val protocolVersion = protocolVersionRepresentativeFor(ProtoVersion(0)).representative
     localVerdictP match {
       case v0.LocalVerdict(Lv.LocalApprove(empty.Empty(_))) =>
         Right(LocalApprove()(protocolVersion))
@@ -74,8 +75,8 @@ object LocalVerdict extends HasProtocolVersionedCompanion[LocalVerdict] {
   }
 
   private[messages] def fromProtoV1(localVerdictP: v1.LocalVerdict): ParsingResult[LocalVerdict] = {
-    import v1.LocalVerdict.{SomeLocalVerdict => Lv}
-    val protocolVersion = protocolVersionRepresentativeFor(ProtobufVersion(1)).representative
+    import v1.LocalVerdict.{SomeLocalVerdict as Lv}
+    val protocolVersion = protocolVersionRepresentativeFor(ProtoVersion(1)).representative
     val v1.LocalVerdict(someLocalVerdictP) = localVerdictP
     someLocalVerdictP match {
       case Lv.LocalApprove(empty.Empty(_)) => Right(LocalApprove()(protocolVersion))
@@ -214,9 +215,9 @@ object LocalReject extends LocalRejectionGroup {
   // if you add a new error below, you must add it to this list here as well
 
   private[messages] def fromProtoV0(v: v0.LocalReject): ParsingResult[LocalReject] = {
-    import ConsistencyRejections._
+    import ConsistencyRejections.*
     import v0.LocalReject.Code
-    val protocolVersion = protocolVersionRepresentativeFor(ProtobufVersion(0)).representative
+    val protocolVersion = protocolVersionRepresentativeFor(ProtoVersion(0)).representative
     v.code match {
       case Code.MissingCode => Left(FieldNotSet("LocalReject.code"))
       case Code.LockedContracts => Right(LockedContracts.Reject(v.resource)(protocolVersion))
@@ -259,9 +260,9 @@ object LocalReject extends LocalRejectionGroup {
   }
 
   private[messages] def fromProtoV1(localRejectP: v1.LocalReject): ParsingResult[LocalReject] = {
-    import ConsistencyRejections._
+    import ConsistencyRejections.*
     val v1.LocalReject(causePrefix, details, resource, errorCodeP, errorCategoryP) = localRejectP
-    val protocolVersion = protocolVersionRepresentativeFor(ProtobufVersion(0)).representative
+    val protocolVersion = protocolVersionRepresentativeFor(ProtoVersion(0)).representative
     errorCodeP match {
       case LockedContracts.id => Right(LockedContracts.Reject(resource)(protocolVersion))
       case LockedKeys.id => Right(LockedKeys.Reject(resource)(protocolVersion))
@@ -405,25 +406,6 @@ object LocalReject extends LocalRejectionGroup {
             _resourcesType = Some(CantonErrorResource.ContractKey),
           )
     }
-
-    @Explanation(
-      """This error indicates that the transaction would create already existing contracts."""
-    )
-    @Resolution("This error indicates either faulty or malicious behaviour.")
-    object CreatesExistingContracts
-        extends LocalRejectErrorCode(
-          id = "LOCAL_VERDICT_CREATES_EXISTING_CONTRACTS",
-          ErrorCategory.MaliciousOrFaultyBehaviour,
-          v0.LocalReject.Code.CreatesExistingContract,
-        ) {
-      case class Reject(override val _resources: Seq[String])(
-          override val protocolVersion: ProtocolVersion
-      ) extends LocalRejectImpl(
-            _causePrefix = "Rejected transaction would create contract(s) that already exist ",
-            _resourcesType = Some(CantonErrorResource.ContractKey),
-          )
-    }
-
   }
 
   object TimeRejects extends ErrorGroup() {
@@ -561,6 +543,23 @@ object LocalReject extends LocalRejectionGroup {
           override val protocolVersion: ProtocolVersion
       ) extends Malformed(
             _causePrefix = "Rejected transaction due to bad root hash error messages. "
+          )
+    }
+
+    @Explanation(
+      """This error indicates that the transaction would create already existing contracts."""
+    )
+    @Resolution("This error indicates either faulty or malicious behaviour.")
+    object CreatesExistingContracts
+        extends MalformedErrorCode(
+          id = "LOCAL_VERDICT_CREATES_EXISTING_CONTRACTS",
+          v0.LocalReject.Code.CreatesExistingContract,
+        ) {
+      case class Reject(override val _resources: Seq[String])(
+          override val protocolVersion: ProtocolVersion
+      ) extends Malformed(
+            _causePrefix = "Rejected transaction would create contract(s) that already exist ",
+            _resourcesType = Some(CantonErrorResource.ContractId),
           )
     }
   }

@@ -1,4 +1,5 @@
 package com.daml.network.directory.store.memory
+
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.store.{AcsStore, InMemoryAcsStore}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}

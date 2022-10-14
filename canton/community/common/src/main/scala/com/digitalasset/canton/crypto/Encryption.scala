@@ -6,8 +6,6 @@ package com.digitalasset.canton.crypto
 import cats.Order
 import cats.data.EitherT
 import com.digitalasset.canton.ProtoDeserializationError
-import com.digitalasset.canton.config.RequireTypes.String300
-import com.digitalasset.canton.crypto.store.db.StoredPrivateKey
 import com.digitalasset.canton.crypto.store.{
   CryptoPrivateStore,
   CryptoPrivateStoreError,
@@ -17,7 +15,7 @@ import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.serialization.ProtoConverter.ParsingResult
 import com.digitalasset.canton.serialization.{DeserializationError, ProtoConverter}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util._
+import com.digitalasset.canton.util.*
 import com.digitalasset.canton.version.{
   HasVersionedMessageCompanion,
   HasVersionedToByteString,
@@ -161,7 +159,7 @@ object Encrypted {
     Right(new Encrypted[M](byteString))
 }
 
-case class AsymmetricEncrypted[+M] private[crypto] (
+case class AsymmetricEncrypted[+M](
     ciphertext: ByteString,
     encryptedFor: Fingerprint,
 ) extends NoCopy {
@@ -240,6 +238,7 @@ final case class SymmetricKey(
 ) extends CryptoKey
     with HasVersionedWrapper[VersionedMessage[SymmetricKey]]
     with NoCopy {
+
   protected def toProtoVersioned(version: ProtocolVersion): VersionedMessage[SymmetricKey] =
     VersionedMessage(toProtoV0.toByteString, 0)
 
@@ -264,6 +263,7 @@ object SymmetricKey extends HasVersionedMessageCompanion[SymmetricKey] {
 final case class EncryptionKeyPair(publicKey: EncryptionPublicKey, privateKey: EncryptionPrivateKey)
     extends CryptoKeyPair[EncryptionPublicKey, EncryptionPrivateKey]
     with NoCopy {
+
   def toProtoV0: v0.EncryptionKeyPair =
     v0.EncryptionKeyPair(Some(publicKey.toProtoV0), Some(privateKey.toProtoV0))
 
@@ -389,17 +389,6 @@ final case class EncryptionPrivateKey private[crypto] (
 
   override def purpose: KeyPurpose = KeyPurpose.Encryption
 
-  def toStored(name: Option[KeyName], wrapperKeyId: Option[String300]): StoredPrivateKey = {
-    new StoredPrivateKey(
-      id,
-      //todo #9957: verify correctness of hardcoded protocol version
-      toByteString(ProtocolVersion.latest),
-      purpose,
-      name,
-      wrapperKeyId,
-    )
-  }
-
   override def toProtoVersioned(version: ProtocolVersion): VersionedMessage[EncryptionPrivateKey] =
     VersionedMessage(toProtoV0.toByteString, 0)
 
@@ -429,10 +418,6 @@ object EncryptionPrivateKey extends HasVersionedMessageCompanion[EncryptionPriva
       scheme: EncryptionKeyScheme,
   ): EncryptionPrivateKey =
     throw new UnsupportedOperationException("Use generate or deserialization methods")
-
-  def fromStored(storedKey: StoredPrivateKey): ParsingResult[EncryptionPrivateKey] = {
-    fromByteString(storedKey.data)
-  }
 
   def fromProtoV0(
       privateKeyP: v0.EncryptionPrivateKey

@@ -28,7 +28,7 @@ import org.scalatest.wordspec.AsyncWordSpec
 
 import scala.collection.immutable.SortedSet
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 trait CommitmentStoreBaseTest extends AsyncWordSpec with BaseTest {
   val domainId = DomainId(UniqueIdentifier.tryFromProtoPrimitive("domain::domain"))
@@ -36,7 +36,13 @@ trait CommitmentStoreBaseTest extends AsyncWordSpec with BaseTest {
 
   val symbolicVault =
     SymbolicCrypto
-      .tryCreate(Seq(Fingerprint.tryCreate("test")), Seq(), timeouts, loggerFactory)
+      .tryCreate(
+        Seq(Fingerprint.tryCreate("test")),
+        Seq(),
+        testedReleaseProtocolVersion,
+        timeouts,
+        loggerFactory,
+      )
       .privateCrypto
 
   val localId = ParticipantId(UniqueIdentifier.tryFromProtoPrimitive("localParticipant::domain"))

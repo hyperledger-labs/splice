@@ -10,7 +10,7 @@ import com.digitalasset.canton.DoNotDiscardLikeFuture
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.util.LoggerUtil.logOnThrow_
 import com.digitalasset.canton.util.Thereafter
-import com.digitalasset.canton.util.Thereafter.syntax._
+import com.digitalasset.canton.util.Thereafter.syntax.*
 
 import scala.concurrent.{Awaitable, ExecutionContext, Future}
 import scala.util.Try
@@ -58,17 +58,6 @@ object FutureUnlessShutdown {
 
   /** Analog to [[scala.concurrent.Future]]`.failed` */
   def failed[A](ex: Throwable): FutureUnlessShutdown[A] = FutureUnlessShutdown(Future.failed(ex))
-
-  object syntax {
-    implicit class EitherTOnShutdownSyntax[A, B](
-        private val eitherT: EitherT[FutureUnlessShutdown, A, B]
-    ) extends AnyVal {
-      def onShutdown[C >: A, D >: B](f: => Either[C, D])(implicit
-          ec: ExecutionContext
-      ): EitherT[Future, C, D] =
-        EitherT(eitherT.value.onShutdown(f))
-    }
-  }
 }
 
 /** Monad combination of `Future` and [[UnlessShutdown]]
@@ -243,4 +232,14 @@ object FutureUnlessShutdownImpl {
   implicit val thereafterFutureUnlessShutdown
       : Thereafter[FutureUnlessShutdown, FutureUnlessShutdownThereafterContent] =
     new FutureUnlessShutdownThereafter
+
+  /** Enable `onShutdown` syntax on [[cats.data.EitherT]]`[`[[FutureUnlessShutdown]]`...]`. */
+  implicit class EitherTOnShutdownSyntax[A, B](
+      private val eitherT: EitherT[FutureUnlessShutdown, A, B]
+  ) extends AnyVal {
+    def onShutdown[C >: A, D >: B](f: => Either[C, D])(implicit
+        ec: ExecutionContext
+    ): EitherT[Future, C, D] =
+      EitherT(eitherT.value.onShutdown(f))
+  }
 }

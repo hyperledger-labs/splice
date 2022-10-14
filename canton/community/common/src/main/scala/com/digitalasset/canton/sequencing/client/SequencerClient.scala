@@ -5,9 +5,9 @@ package com.digitalasset.canton.sequencing.client
 
 import akka.stream.Materializer
 import cats.data.EitherT
-import cats.syntax.bifunctor._
-import cats.syntax.either._
-import cats.syntax.option._
+import cats.syntax.bifunctor.*
+import cats.syntax.either.*
+import cats.syntax.option.*
 import com.daml.metrics.Timed
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.common.domain.ServiceAgreementId
@@ -18,10 +18,16 @@ import com.digitalasset.canton.config.{
   ProcessingTimeout,
   TestingConfigInternal,
 }
-import com.digitalasset.canton.crypto.{Crypto, SyncCryptoApi, SyncCryptoClient}
+import com.digitalasset.canton.crypto.{
+  Crypto,
+  DomainSyncCryptoClient,
+  HashPurpose,
+  SyncCryptoApi,
+  SyncCryptoClient,
+}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.Lifecycle.toCloseableOption
-import com.digitalasset.canton.lifecycle._
+import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.pretty.CantonPrettyPrinter
 import com.digitalasset.canton.logging.{
   ErrorLoggingContext,
@@ -33,15 +39,14 @@ import com.digitalasset.canton.metrics.SequencerClientMetrics
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
-import com.digitalasset.canton.protocol.v0.CompressedBatch
 import com.digitalasset.canton.resource.DbStorage.PassiveInstanceException
-import com.digitalasset.canton.sequencing._
+import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
 import com.digitalasset.canton.sequencing.client.ReplayAction.{SequencerEvents, SequencerSends}
-import com.digitalasset.canton.sequencing.client.SequencerClientSubscriptionError._
+import com.digitalasset.canton.sequencing.client.SequencerClientSubscriptionError.*
 import com.digitalasset.canton.sequencing.client.grpc.GrpcSequencerChannelBuilder
 import com.digitalasset.canton.sequencing.client.http.HttpSequencerClient
-import com.digitalasset.canton.sequencing.client.transports._
+import com.digitalasset.canton.sequencing.client.transports.*
 import com.digitalasset.canton.sequencing.client.transports.replay.{
   ReplayingEventsSequencerClientTransport,
   ReplayingSendsSequencerClientTransport,
@@ -51,32 +56,33 @@ import com.digitalasset.canton.sequencing.handlers.{
   StoreSequencedEvent,
 }
 import com.digitalasset.canton.sequencing.handshake.SequencerHandshake
-import com.digitalasset.canton.sequencing.protocol._
+import com.digitalasset.canton.sequencing.protocol.*
+import com.digitalasset.canton.store.CursorPrehead.SequencerCounterCursorPrehead
 import com.digitalasset.canton.store.SequencedEventStore.{
   OrdinarySequencedEvent,
   PossiblyIgnoredSequencedEvent,
 }
-import com.digitalasset.canton.store._
+import com.digitalasset.canton.store.*
 import com.digitalasset.canton.time.{Clock, DomainTimeTracker, NonNegativeFiniteDuration}
-import com.digitalasset.canton.topology._
+import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.{Spanning, TraceContext, Traced, TracingConfig}
-import com.digitalasset.canton.util.ShowUtil._
-import com.digitalasset.canton.util.Thereafter.syntax._
-import com.digitalasset.canton.util._
+import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.util.Thereafter.syntax.*
+import com.digitalasset.canton.util.*
 import com.digitalasset.canton.util.retry.RetryUtil.AllExnRetryable
 import com.digitalasset.canton.version.ProtocolVersion
-import com.digitalasset.canton.{GenesisSequencerCounter, SequencerCounter}
+import com.digitalasset.canton.{DiscardOps, SequencerCounter}
 import com.google.common.annotations.VisibleForTesting
 import io.functionmeta.functionFullName
 import io.grpc.CallOptions
 import io.opentelemetry.api.trace.Tracer
 
 import java.nio.file.Path
-import java.time.{Duration => JDuration}
+import java.time.Duration as JDuration
 import java.util.concurrent.atomic.AtomicReference
 import java.util.concurrent.{ArrayBlockingQueue, BlockingQueue, LinkedBlockingQueue}
-import scala.concurrent._
-import scala.concurrent.duration._
+import scala.concurrent.*
+import scala.concurrent.duration.*
 import scala.util.{Failure, Success, Try}
 
 /** Client configured options for how to connect to a sequencer
@@ -156,6 +162,9 @@ class SequencerClient(
     override val timeouts: ProcessingTimeout,
     eventValidatorFactory: SequencedEventValidatorFactory,
     clock: Clock,
+    signSubmission: TraceContext => SubmissionRequest => EitherT[Future, String, SignedContent[
+      SubmissionRequest
+    ]],
     private val sequencedEventStore: SequencedEventStore,
     sendTracker: SendTracker,
     metrics: SequencerClientMetrics,
@@ -273,6 +282,8 @@ class SequencerClient(
         callback,
       )
 
+  private def protocolVersion: ProtocolVersion = staticDomainParameters.protocolVersion
+
   private def sendAsyncInternal(
       batch: Batch[DefaultOpenEnvelope],
       requiresAuthentication: Boolean,
@@ -290,8 +301,9 @@ class SequencerClient(
         Batch.closeEnvelopes(batch),
         maxSequencingTime,
         timestampOfSigningKey,
-        staticDomainParameters.protocolVersion,
+        protocolVersion,
       )
+
       if (loggingConfig.eventDetails) {
         logger.debug(
           s"About to send async batch ${printer.printAdHoc(batch)} as request ${printer.printAdHoc(request)}"
@@ -302,12 +314,20 @@ class SequencerClient(
       span.setAttribute("message_id", messageId.unwrap)
 
       require(
-        Batch.supportedProtoVersions.protobufVersionsCount == 1,
-        "verifyBatchSize below assumes the batch is serialized with protocol version 0." +
+        Batch.supportedProtoVersions.protoVersionsCount == 1,
+        "verifyBatchSize below assumes the batch is serialized with Proto version 0." +
           " Update it if more versions are supported",
       )
 
-      val unitOrBatchSizeErr = verifyBatchSize(request.batchProtoV0)
+      val serializedRequestSize = request.toProtoV0.serializedSize
+      val maxInboundMessageSize = staticDomainParameters.maxInboundMessageSize.unwrap
+      val unitOrRequestSizeErr = Either.cond(
+        serializedRequestSize <= maxInboundMessageSize,
+        (),
+        SendAsyncClientError.RequestInvalid(
+          s"Batch size ($serializedRequestSize bytes) is exceeding maximum size (${maxInboundMessageSize} bytes) for domain $domainId"
+        ),
+      )
 
       def trackSend: EitherT[Future, SendAsyncClientError, Unit] =
         sendTracker
@@ -319,26 +339,26 @@ class SequencerClient(
 
       if (replayEnabled) {
         EitherT.fromEither(for {
-          _ <- unitOrBatchSizeErr
+          _ <- unitOrRequestSizeErr
         } yield {
           // Invoke the callback immediately, because it will not be triggered by replayed messages,
           // as they will very likely have mismatching message ids.
           val dummySendResult =
             SendResult.Success(
               Deliver.create(
-                GenesisSequencerCounter,
+                SequencerCounter.Genesis,
                 CantonTimestamp.now(),
                 domainId,
                 None,
-                Batch(List.empty, staticDomainParameters.protocolVersion),
-                staticDomainParameters.protocolVersion,
+                Batch(List.empty, protocolVersion),
+                protocolVersion,
               )
             )
           callback(dummySendResult)
         })
       } else {
         for {
-          _ <- EitherT.fromEither[Future](unitOrBatchSizeErr)
+          _ <- EitherT.fromEither[Future](unitOrRequestSizeErr)
           _ <- trackSend
           _ = recorderO.foreach(_.recordSubmission(request))
           _ <- performSend(messageId, request, requiresAuthentication)
@@ -356,13 +376,33 @@ class SequencerClient(
     EitherTUtil
       .timed(metrics.submissions.sends) {
         val timeout = timeouts.network.duration
-        if (requiresAuthentication)
-          transport.sendAsync(request, timeout, staticDomainParameters.protocolVersion)
-        else
+        if (requiresAuthentication) {
+          val sigCheckSupportSince = ProtocolVersion.dev
+          val sigCheckSupported = protocolVersion >= sigCheckSupportSince
+          if (sigCheckSupported) for {
+            signedContent <- signSubmission(traceContext)(request)
+              .leftMap { err =>
+                val message = s"Error signing submission request $err"
+                logger.error(message)
+                SendAsyncClientError.RequestRefused(SendAsyncError.RequestRefused(message))
+              }
+            _ <- transport.sendAsyncSigned(
+              signedContent,
+              timeout,
+              protocolVersion,
+            )
+          } yield ()
+          else
+            transport.sendAsync(
+              request,
+              timeout,
+              protocolVersion,
+            )
+        } else
           transport.sendAsyncUnauthenticated(
             request,
             timeout,
-            staticDomainParameters.protocolVersion,
+            protocolVersion,
           )
       }
       .leftSemiflatMap { err =>
@@ -377,20 +417,6 @@ class SequencerClient(
         logger.debug(s"Cancelling the pending send as the sequencer returned error: $err")
         sendTracker.cancelPendingSend(messageId).map(_ => err)
       }
-  }
-
-  private def verifyBatchSize(
-      compressedBatch: CompressedBatch
-  ): Either[SendAsyncClientError, Unit] = {
-    val batchSerializedSize = compressedBatch.serializedSize
-    val maxBatchMessageSize = staticDomainParameters.maxBatchMessageSize.unwrap
-    Either.cond(
-      batchSerializedSize <= maxBatchMessageSize,
-      (),
-      SendAsyncClientError.RequestInvalid(
-        s"Batch size ($batchSerializedSize bytes) is exceeding maximum size (${maxBatchMessageSize} bytes) for domain $domainId"
-      ),
-    )
   }
 
   override def generateMaxSequencingTime: CantonTimestamp =
@@ -412,7 +438,7 @@ class SequencerClient(
       eventHandler: PossiblyIgnoredApplicationHandler[ClosedEnvelope],
       timeTracker: DomainTimeTracker,
       timeoutHandler: SendTimeoutHandler = loggingTimeoutHandler,
-      onCleanHandler: Traced[CursorPrehead[SequencerCounter]] => Future[Unit] = _ => Future.unit,
+      onCleanHandler: Traced[SequencerCounterCursorPrehead] => Future[Unit] = _ => Future.unit,
   )(implicit traceContext: TraceContext): Future[Unit] = {
     sequencerCounterTrackerStore.preheadSequencerCounter.flatMap { cleanPrehead =>
       val priorTimestamp = cleanPrehead.fold(CantonTimestamp.MinValue)(
@@ -445,7 +471,7 @@ class SequencerClient(
     * starting at the last event found in the [[com.digitalasset.canton.store.SequencedEventStore]].
     *
     * @param priorTimestamp The timestamp of the event prior to where the event processing starts.
-    *                       If [[scala.None$]], the subscription starts at the [[com.digitalasset.canton.GenesisSequencerCounter]].
+    *                       If [[scala.None$]], the subscription starts at the [[com.digitalasset.canton.data.CounterCompanion.Genesis]].
     * @param cleanPreheadTsO The timestamp of the clean prehead sequencer counter, if known.
     * @param eventHandler A function handling the events.
     * @param timeTracker Tracker for operations requiring the current domain time. Only updated with received events and not previously stored events.
@@ -564,7 +590,7 @@ class SequencerClient(
         val preSubscriptionEvent = lastEvent.orElse(initialPriorEventO)
 
         val nextCounter = initialCounter
-          .getOrElse(preSubscriptionEvent.fold(GenesisSequencerCounter)(_.counter))
+          .getOrElse(preSubscriptionEvent.fold(SequencerCounter.Genesis)(_.counter))
 
         val eventValidator = eventValidatorFactory.create(
           // We validate events before we persist them in the SequencedEventStore
@@ -706,11 +732,12 @@ class SequencerClient(
           logger.debug(
             show"Storing event in the event inbox.\n${serializedEvent.signedEvent.content}"
           )
-
           if (!receivedEvents.offer(serializedEvent)) {
-            blocking {
-              receivedEvents.put(serializedEvent)
-            }
+            logger.debug(
+              s"Event inbox is full. Blocking sequenced event with timestamp ${serializedEvent.timestamp}."
+            )
+            blocking { receivedEvents.put(serializedEvent) }
+            logger.debug(s"Unblocked sequenced event with timestamp ${serializedEvent.timestamp}.")
           }
           signalHandler(applicationHandler)
         }
@@ -788,7 +815,7 @@ class SequencerClient(
       val inboxSize = config.eventInboxSize.unwrap
       val javaEventList = new java.util.ArrayList[OrdinarySerializedEvent](inboxSize)
       if (receivedEvents.drainTo(javaEventList, inboxSize) > 0) {
-        import scala.jdk.CollectionConverters._
+        import scala.jdk.CollectionConverters.*
         val handlerEvents = javaEventList.asScala
 
         def stopHandler(): Unit = blocking {
@@ -907,9 +934,13 @@ class SequencerClient(
                     // record errors and shutdown in `applicationHandlerFailure` and move on
                     result match {
                       case Success(outcome) =>
-                        outcome.onShutdown(putApplicationHandlerFailure(ApplicationHandlerShutdown))
+                        outcome
+                          .onShutdown(
+                            putApplicationHandlerFailure(ApplicationHandlerShutdown).discard
+                          )
+                          .discard
                       case Failure(error) =>
-                        handleException(error, syncProcessing = false)
+                        handleException(error, syncProcessing = false).discard
                     }
                     Success(UnlessShutdown.unit)
                   }.unwrap
@@ -920,7 +951,7 @@ class SequencerClient(
                   // we do not wait for the async results to finish, we are done here once the synchronous part is done
                   Right(())
                 case UnlessShutdown.AbortedDueToShutdown =>
-                  putApplicationHandlerFailure(ApplicationHandlerShutdown)
+                  putApplicationHandlerFailure(ApplicationHandlerShutdown).discard
                   Left(ApplicationHandlerShutdown)
               }
 
@@ -1001,7 +1032,7 @@ class SequencerClient(
 
   def closeSubscription(): Unit = {
     currentSubscription.getAndSet(None).foreach { subscription =>
-      import TraceContext.Implicits.Empty._
+      import TraceContext.Implicits.Empty.*
       logger.debug(s"Closing sequencer subscription...")
       subscription.close()
       logger.trace(s"Wait for the subscription to complete")
@@ -1054,6 +1085,9 @@ trait SequencerClientFactory {
       member: Member,
       sequencedEventStore: SequencedEventStore,
       sendTrackerStore: SendTrackerStore,
+      signSubmission: TraceContext => SubmissionRequest => EitherT[Future, String, SignedContent[
+        SubmissionRequest
+      ]],
   )(implicit
       executionContext: ExecutionContextExecutor,
       materializer: Materializer,
@@ -1102,6 +1136,13 @@ object SequencerClient {
           member: Member,
           sequencedEventStore: SequencedEventStore,
           sendTrackerStore: SendTrackerStore,
+          signSubmission: TraceContext => SubmissionRequest => EitherT[
+            Future,
+            String,
+            SignedContent[
+              SubmissionRequest
+            ],
+          ],
       )(implicit
           executionContext: ExecutionContextExecutor,
           materializer: Materializer,
@@ -1163,6 +1204,7 @@ object SequencerClient {
           processingTimeout,
           validatorFactory,
           clock,
+          signSubmission,
           sequencedEventStore,
           sendTracker,
           metrics,
@@ -1361,5 +1403,22 @@ object SequencerClient {
     retry
       .Pause(loggingContext.logger, flagCloseable, maxRetries, delay, sendDescription)
       .apply(doSend(), AllExnRetryable)(retry.Success.always, ec, loggingContext.traceContext)
+  }
+
+  def signSubmissionRequest(topologyClient: DomainSyncCryptoClient)(implicit
+      ec: ExecutionContext
+  ): TraceContext => SubmissionRequest => EitherT[Future, String, SignedContent[
+    SubmissionRequest
+  ]] = { implicit traceContext => request =>
+    val snapshot = topologyClient.headSnapshot
+    SignedContent
+      .create(
+        topologyClient.pureCrypto,
+        snapshot,
+        request,
+        Some(snapshot.ipsSnapshot.timestamp),
+        HashPurpose.SubmissionRequestSignature,
+      )
+      .leftMap(_.toString)
   }
 }

@@ -5,8 +5,11 @@ package com.digitalasset.canton.participant.store.db
 
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.participant.LedgerSyncEvent
-import com.digitalasset.canton.participant.store.{CausalityStoresTest, EventLogId}
+import com.digitalasset.canton.participant.store.{
+  CausalityStoresTest,
+  EventLogId,
+  SerializableLedgerSyncEvent,
+}
 import com.digitalasset.canton.participant.sync.TimestampedEvent
 import com.digitalasset.canton.resource.{DbStorage, IdempotentInsert}
 import com.digitalasset.canton.store.db.{DbTest, H2Test, PostgresTest}
@@ -35,7 +38,7 @@ trait DbCausalityStoresTest extends CausalityStoresTest with DbTest {
   }
 
   override def cleanDb(storage: DbStorage): Future[Unit] = {
-    import storage.api._
+    import storage.api.*
 
     storage
       .update(
@@ -54,13 +57,14 @@ trait DbCausalityStoresTest extends CausalityStoresTest with DbTest {
       events: Seq[(EventLogId, TimestampedEvent, Boolean)]
   ): Future[Unit] = {
     val theStorage = storage
-    import theStorage.api._
-    import theStorage.converters._
+    import theStorage.api.*
+    import theStorage.converters.*
 
     @nowarn("cat=unused") implicit val setParameterTraceContext: SetParameter[TraceContext] =
       TraceContext.getVersionedSetParameter(testedProtocolVersion)
-    @nowarn("cat=unused") implicit val setParameterLedgerSyncEvent: SetParameter[LedgerSyncEvent] =
-      ParticipantStorageImplicits.setLedgerSyncEvent(testedProtocolVersion)
+    @nowarn("cat=unused") implicit val setParameterSerializableLedgerSyncEvent
+        : SetParameter[SerializableLedgerSyncEvent] =
+      SerializableLedgerSyncEvent.getVersionedSetParameter
 
     val queries = events.flatMap {
       case (
@@ -68,13 +72,15 @@ trait DbCausalityStoresTest extends CausalityStoresTest with DbTest {
             tsEvent @ TimestampedEvent(event, localOffset, requestSequencerCounter, eventId),
             persistToMultiDomainEventLog,
           ) =>
+        val serializableLedgerSyncEvent = SerializableLedgerSyncEvent(event, testedProtocolVersion)
+
         val writeEventLog = IdempotentInsert.insertIgnoringConflicts(
           storage,
           "event_log pk_event_log",
           sql"""
                             event_log (log_id, local_offset, ts, request_sequencer_counter, event_id, content, trace_context)
                             values ($id, $localOffset, ${tsEvent.timestamp}, $requestSequencerCounter,
-                            $eventId, $event, ${tsEvent.traceContext})""",
+                            $eventId, $serializableLedgerSyncEvent, ${tsEvent.traceContext})""",
         )
 
         val writeMultiDomainEventLog =
@@ -84,7 +90,7 @@ trait DbCausalityStoresTest extends CausalityStoresTest with DbTest {
             sql""" 
                             linearized_event_log (log_id, local_offset, publication_time)
                             values (${id.index}, $localOffset, ${CantonTimestamp
-              .now()})
+                .now()})
             """,
           )
 

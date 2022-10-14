@@ -5,9 +5,12 @@ package com.digitalasset.canton.participant.store.db
 
 import com.digitalasset.canton.config.DefaultProcessingTimeouts
 import com.digitalasset.canton.logging.ErrorLoggingContext
-import com.digitalasset.canton.participant.LedgerSyncEvent
 import com.digitalasset.canton.participant.metrics.ParticipantTestMetrics
-import com.digitalasset.canton.participant.store.{EventLogId, MultiDomainEventLogTest}
+import com.digitalasset.canton.participant.store.{
+  EventLogId,
+  MultiDomainEventLogTest,
+  SerializableLedgerSyncEvent,
+}
 import com.digitalasset.canton.participant.sync.TimestampedEvent
 import com.digitalasset.canton.resource.{DbStorage, IdempotentInsert}
 import com.digitalasset.canton.store.db.{DbTest, H2Test, PostgresTest}
@@ -42,7 +45,7 @@ trait DbMultiDomainEventLogTest extends MultiDomainEventLogTest with DbTest {
   // then the second run would find the requests from the first run and fail.
   override protected def cleanUpEventLogs(): Unit = {
     val theStorage = storage
-    import theStorage.api._
+    import theStorage.api.*
 
     val cleanupF = theStorage.update(
       DBIO.seq(
@@ -62,22 +65,25 @@ trait DbMultiDomainEventLogTest extends MultiDomainEventLogTest with DbTest {
       events: Seq[(EventLogId, TimestampedEvent)]
   ): Future[Unit] = {
     val theStorage = storage
-    import theStorage.api._
-    import theStorage.converters._
+    import theStorage.api.*
+    import theStorage.converters.*
 
     @nowarn("cat=unused") implicit val setParameterTraceContext: SetParameter[TraceContext] =
       TraceContext.getVersionedSetParameter(testedProtocolVersion)
-    @nowarn("cat=unused") implicit val setParameterLedgerSyncEvent: SetParameter[LedgerSyncEvent] =
-      ParticipantStorageImplicits.setLedgerSyncEvent(testedProtocolVersion)
+    @nowarn("cat=unused") implicit val setParameterSerializableLedgerSyncEvent
+        : SetParameter[SerializableLedgerSyncEvent] =
+      SerializableLedgerSyncEvent.getVersionedSetParameter
 
     val queries = events.map {
       case (id, tsEvent @ TimestampedEvent(event, localOffset, requestSequencerCounter, eventId)) =>
+        val serializableLedgerSyncEvent = SerializableLedgerSyncEvent(event, testedProtocolVersion)
+
         IdempotentInsert.insertIgnoringConflicts(
           storage,
           "event_log pk_event_log",
           sql"""event_log (log_id, local_offset, ts, request_sequencer_counter, event_id, content, trace_context)
                values (${id.index}, $localOffset, ${tsEvent.timestamp}, $requestSequencerCounter, 
-                 $eventId, $event, ${tsEvent.traceContext})""",
+                 $eventId, $serializableLedgerSyncEvent, ${tsEvent.traceContext})""",
         )
     }
 
