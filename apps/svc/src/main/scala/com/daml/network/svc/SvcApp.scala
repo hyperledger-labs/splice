@@ -54,7 +54,7 @@ class SvcApp(
       tracerProvider,
     ) {
 
-  override val allocateServiceUser = true
+  override lazy val allocateServiceUser = true
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
@@ -98,7 +98,7 @@ class SvcApp(
       )
     }
 
-  override val ports = Map("admin" -> config.adminApi.port)
+  override lazy val ports = Map("admin" -> config.adminApi.port)
 
   // SVC app uploads package so no dep.
   override val requiredTemplates = Set.empty

@@ -92,7 +92,7 @@ class DirectoryApp(
       )
     }
 
-  override val ports =
+  override lazy val ports =
     Map("admin" -> config.adminApi.port)
 
   override val requiredTemplates = Set(directoryCodegen.DirectoryInstall)

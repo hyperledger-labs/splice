@@ -48,7 +48,7 @@ class SplitwiseApp(
       tracerProvider,
     ) {
 
-  override val ports = Map("admin" -> config.adminApi.port)
+  override lazy val ports = Map("admin" -> config.adminApi.port)
 
   override def initialize(
       ledgerClient: CoinLedgerClient,

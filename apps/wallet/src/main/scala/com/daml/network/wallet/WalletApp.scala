@@ -118,7 +118,7 @@ class WalletApp(
     }
   }
 
-  override val ports =
+  override lazy val ports =
     Map("admin" -> config.adminApi.port)
 
   override val requiredTemplates = Set(walletCodegen.WalletAppInstall)

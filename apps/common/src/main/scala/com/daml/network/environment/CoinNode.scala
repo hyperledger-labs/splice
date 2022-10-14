@@ -48,13 +48,13 @@ abstract class CoinNode[State <: AutoCloseable](
 
   protected def isActive: Boolean = isInitialized
 
-  protected val ports: Map[String, Port]
+  protected def ports: Map[String, Port]
 
   /** Templates whose packages must be available before init will run.
     * It it save to omit a template if there is another template in the same
     * package in the set.
     */
-  protected val requiredTemplates: Set[TemplateCompanion[_]]
+  protected def requiredTemplates: Set[TemplateCompanion[_]]
 
   // TODO(i736): fork or generalize status definition.
   override def status: Future[NodeStatus.Status] = {
@@ -70,7 +70,7 @@ abstract class CoinNode[State <: AutoCloseable](
 
   // Whether the service user should be allocated by the app itself.
   // We use that in the SVC app at the moment.
-  protected val allocateServiceUser: Boolean = false
+  protected lazy val allocateServiceUser: Boolean = false
 
   def initialize(ledgerClient: CoinLedgerClient, party: PartyId): Future[State]
 

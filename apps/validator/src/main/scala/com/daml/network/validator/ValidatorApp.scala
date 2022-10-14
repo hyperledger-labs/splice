@@ -227,7 +227,7 @@ class ValidatorApp(
       )
     }
 
-  override val ports = Map("admin" -> config.adminApi.port)
+  override lazy val ports = Map("admin" -> config.adminApi.port)
 
   // Validator actually uploads packages so no dep.
   override val requiredTemplates = Set.empty
