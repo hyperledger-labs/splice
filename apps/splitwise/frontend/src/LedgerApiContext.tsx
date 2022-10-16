@@ -7,13 +7,16 @@ import { SubmitAndWaitRequest } from 'common-protobuf/com/daml/ledger/api/v1/com
 import {
   Command,
   Commands,
+  CreateCommand,
   ExerciseByKeyCommand,
 } from 'common-protobuf/com/daml/ledger/api/v1/commands_pb';
+import { CreatedEvent } from 'common-protobuf/com/daml/ledger/api/v1/event_pb';
 import {
   Filters,
   InclusiveFilters,
   TransactionFilter,
 } from 'common-protobuf/com/daml/ledger/api/v1/transaction_filter_pb';
+import { TransactionTree } from 'common-protobuf/com/daml/ledger/api/v1/transaction_pb';
 import { GroupKey } from 'common-protobuf/com/daml/network/splitwise/v0/splitwise_service_pb';
 import React, { useContext } from 'react';
 import { v4 as uuidv4 } from 'uuid';
@@ -30,6 +33,7 @@ import { Choice, ContractId, Template } from '@daml/types';
 
 import { Contract } from './Contract';
 
+// TODO(#1172) Move shared code into common
 class LedgerApiClient {
   ActiveContractsServicePromiseClient: ActiveContractsServicePromiseClient;
   CommandServicePromiseClient: CommandServicePromiseClient;
@@ -51,6 +55,40 @@ class LedgerApiClient {
     this.userId = userId;
   }
 
+  templateIdToIdentifier(templateId: string): Identifier {
+    const [packageId, moduleName, entityName] = templateId.split(':');
+    return new Identifier()
+      .setPackageId(packageId)
+      .setModuleName(moduleName)
+      .setEntityName(entityName);
+  }
+
+  decodeCreateEvent<T extends object, K>(template: Template<T, K>, ev: CreatedEvent): Contract<T> {
+    return {
+      contractId: ev.getContractId() as ContractId<T>,
+      payload: template.decodeProto(new Value().setRecord(ev.getCreateArguments())),
+    };
+  }
+
+  async create<T extends object, K>(
+    actAs: string[],
+    template: Template<T, K>,
+    payload: T
+  ): Promise<Contract<T>> {
+    const templateId = this.templateIdToIdentifier(template.templateId);
+    const cmd = new Command().setCreate(
+      new CreateCommand()
+        .setTemplateId(templateId)
+        .setCreateArguments(template.encodeProto(payload).getRecord())
+    );
+    const transaction = await this.submitCommand(actAs, [], cmd);
+    const createdEv = transaction
+      .getEventsByIdMap()
+      .get(transaction.getRootEventIdsList()[0])
+      ?.getCreated()!;
+    return this.decodeCreateEvent(template, createdEv);
+  }
+
   async exerciseByKey<T extends object, C, R, K>(
     actAs: string[],
     readAs: string[],
@@ -60,11 +98,7 @@ class LedgerApiClient {
   ): Promise<R> {
     const encodedKey = choice.template().keyEncodeProto(key);
     const encodedArg = choice.argumentSerializable().encodeProto(argument);
-    const [packageId, moduleName, entityName] = choice.template().templateId.split(':');
-    const templateId = new Identifier()
-      .setPackageId(packageId)
-      .setModuleName(moduleName)
-      .setEntityName(entityName);
+    const templateId = this.templateIdToIdentifier(choice.template().templateId);
     const cmd = new Command().setExercisebykey(
       new ExerciseByKeyCommand()
         .setTemplateId(templateId)
@@ -72,8 +106,22 @@ class LedgerApiClient {
         .setContractKey(encodedKey)
         .setChoiceArgument(encodedArg)
     );
+    const transaction = await this.submitCommand(actAs, readAs, cmd);
+    const exerciseEv = transaction
+      .getEventsByIdMap()
+      .get(transaction.getRootEventIdsList()[0])
+      ?.getExercised()!;
+    const exerciseResult = choice.resultSerializable().decodeProto(exerciseEv.getExerciseResult()!);
+    return exerciseResult;
+  }
+
+  async submitCommand(
+    actAs: string[],
+    readAs: string[],
+    command: Command
+  ): Promise<TransactionTree> {
     const cmds = new Commands()
-      .setCommandsList([cmd])
+      .setCommandsList([command])
       .setActAsList(actAs)
       .setReadAsList(readAs)
       .setApplicationId(this.userId)
@@ -83,13 +131,7 @@ class LedgerApiClient {
       request,
       undefined
     );
-    const transaction = response.getTransaction()!;
-    const exerciseEv = transaction
-      .getEventsByIdMap()
-      .get(transaction.getRootEventIdsList()[0])
-      ?.getExercised()!;
-    const exerciseResult = choice.resultSerializable().decodeProto(exerciseEv.getExerciseResult()!);
-    return exerciseResult;
+    return response.getTransaction()!;
   }
 
   async queryAcs<T extends object, K, I extends string>(
@@ -254,6 +296,11 @@ class LedgerApiClient {
     // TODO(M1-92) Improve filtering
     const contracts = await this.queryAcs(user, AcceptedAppPayment);
     return contracts;
+  }
+
+  async querySplitwiseInstall(user: string, provider: string) {
+    const response = await this.queryAcs(user, SplitwiseInstall);
+    return response.find(c => c.payload.user === user && c.payload.provider === provider);
   }
 
   async getValidatorPartyId(user: string): Promise<string> {

@@ -5,18 +5,16 @@ import { ScanServicePromiseClient } from 'common-protobuf/com/daml/network/scan/
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
-import { AppBar, Box, Container, CssBaseline, Stack, Toolbar, Typography } from '@mui/material';
+import { AppBar, Box, CssBaseline, Toolbar, Typography } from '@mui/material';
 
 import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 
 import './App.css';
 import { Contract } from './Contract';
 import DirectoryEntries from './DirectoryEntries';
-import GroupSetup from './GroupSetup';
-import Groups from './Groups';
-import { LedgerApiClientProvider, useLedgerApiClient } from './LedgerApiContext';
+import Home from './Home';
 import Login from './Login';
-import { SplitwiseClientProvider, useSplitwiseClient } from './SplitwiseServiceContext';
+import { SplitwiseClientProvider } from './SplitwiseServiceContext';
 
 const App: React.FC = () => {
   const [directoryEntries, setDirectoryEntries] = useState<Contract<DirectoryEntry>[]>([]);
@@ -46,52 +44,6 @@ const App: React.FC = () => {
 
   const [userId, setUserId] = useState<string | undefined>();
 
-  const LoggedInBody: React.FC<{ userId: string }> = ({ userId }) => {
-    const splitwiseClient = useSplitwiseClient();
-    const ledgerApiClient = useLedgerApiClient();
-
-    const [provider, setProvider] = useState<string | undefined>();
-    const [party, setParty] = useState<string | undefined>();
-
-    useEffect(() => {
-      const fetchProvider = async () => {
-        const provider = await splitwiseClient.getProviderPartyId(new Empty(), undefined);
-        setProvider(provider.getPartyId());
-      };
-      fetchProvider();
-    }, [splitwiseClient]);
-
-    useEffect(() => {
-      const fetchParty = async () => {
-        const party = await ledgerApiClient.getPrimaryParty(userId);
-        setParty(party);
-      };
-      fetchParty();
-    }, [userId, ledgerApiClient]);
-
-    if (provider && party && svc) {
-      return (
-        <Container>
-          <Stack spacing={3}>
-            <GroupSetup directoryEntries={dirEntries} party={party} provider={provider} svc={svc} />
-            <Groups directoryEntries={dirEntries} party={party} provider={provider} />
-          </Stack>
-        </Container>
-      );
-    } else {
-      return <Typography>Loading …</Typography>;
-    }
-  };
-
-  const LoggedIn: React.FC<{ userId: string }> = ({ userId }) => (
-    <LedgerApiClientProvider
-      url={process.env.REACT_APP_LEDGER_API_GRPC_URL || 'http://localhost:8085'}
-      userId={userId}
-    >
-      <LoggedInBody userId={userId} />
-    </LedgerApiClientProvider>
-  );
-
   return (
     <SplitwiseClientProvider url={process.env.REACT_APP_GRPC_URL || 'http://localhost:8082'}>
       <ErrorBoundary>
@@ -102,7 +54,11 @@ const App: React.FC = () => {
               <Typography variant="h6">CN Splitwise</Typography>
             </Toolbar>
           </AppBar>
-          {userId ? <LoggedIn userId={userId} /> : <Login onLogin={setUserId} />}
+          {userId ? (
+            <Home userId={userId} svc={svc} dirEntries={dirEntries} />
+          ) : (
+            <Login onLogin={setUserId} />
+          )}
         </Box>
       </ErrorBoundary>
     </SplitwiseClientProvider>

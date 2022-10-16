@@ -7,11 +7,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.daml.network.integration.tests.CoinTests.{CoinTestConsoleEnvironment}
 import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
 import com.daml.network.codegen.CN.{Directory => dirCodegen}
-import com.daml.network.console.{
-  RemoteDirectoryAppReference,
-  RemoteWalletAppReference,
-  RemoteSplitwiseAppReference,
-}
+import com.daml.network.console.{RemoteDirectoryAppReference, RemoteWalletAppReference}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import scala.concurrent.duration.DurationInt
 import org.openqa.selenium.Keys
@@ -49,14 +45,6 @@ class SplitwiseFrontendIntegrationTest
     )
   }
 
-  def initialiseSplitwiseApp(
-      splitwise: RemoteSplitwiseAppReference,
-      party: PartyId,
-  ): Unit = {
-    splitwise.createInstallRequest()
-    splitwise.ledgerApi.ledger_api.acs.await(party, splitwiseCodegen.SplitwiseInstall)
-  }
-
   /** The `<TextInput>` in ts code is converted by react into a deep tree. This returns the input field. */
   private def reactTextInput(textField: Element): TextField = new TextField(
     textField.childElement(className("MuiInputBase-input")).underlying
@@ -79,8 +67,6 @@ class SplitwiseFrontendIntegrationTest
 
       initialiseDirectoryApp("alice.cns", aliceUserParty, aliceDirectory, aliceRemoteWallet)
       initialiseDirectoryApp("bob.cns", bobUserParty, bobDirectory, bobRemoteWallet)
-      initialiseSplitwiseApp(aliceSplitwise, aliceUserParty)
-      initialiseSplitwiseApp(bobSplitwise, bobUserParty)
 
       withFrontEnd("aliceSplitwise") { implicit webDriver =>
         go to "http://localhost:3002"
