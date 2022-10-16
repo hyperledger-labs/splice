@@ -2,7 +2,6 @@ package com.daml.network.integration.tests
 
 import com.daml.network.environment.{CoinEnvironmentImpl, CoinConsoleEnvironment}
 import com.daml.network.integration.CoinEnvironmentDefinition
-import com.digitalasset.canton.integration.TestEnvironment
 import com.digitalasset.canton.console.ConsoleMacros
 import com.digitalasset.canton.topology.PartyId
 import com.daml.network.integration.tests.CoinTests.{CoinTestConsoleEnvironment}
@@ -15,7 +14,6 @@ import com.daml.network.console.{
 }
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import scala.concurrent.duration.DurationInt
-import com.daml.lf.value.Value.ContractId
 import org.openqa.selenium.Keys
 
 class SplitwiseFrontendIntegrationTest
@@ -52,13 +50,11 @@ class SplitwiseFrontendIntegrationTest
   }
 
   def initialiseSplitwiseApp(
-      splitwise: RemoteSplitwiseAppReference
-  )(implicit env: CoinConsoleEnvironment with TestEnvironment[CoinEnvironmentImpl]): Unit = {
-    val providerParty = providerSplitwiseBackend.getProviderPartyId()
-    val proposal = splitwise.createInstallProposal()
-    providerSplitwiseBackend.remoteParticipant.ledger_api.acs
-      .await_active_contract(providerParty, ContractId.assertFromString(proposal.toString))
-    providerSplitwiseBackend.acceptInstallProposal(proposal)
+      splitwise: RemoteSplitwiseAppReference,
+      party: PartyId,
+  ): Unit = {
+    splitwise.createInstallRequest()
+    splitwise.ledgerApi.ledger_api.acs.await(party, splitwiseCodegen.SplitwiseInstall)
   }
 
   /** The `<TextInput>` in ts code is converted by react into a deep tree. This returns the input field. */
@@ -83,8 +79,8 @@ class SplitwiseFrontendIntegrationTest
 
       initialiseDirectoryApp("alice.cns", aliceUserParty, aliceDirectory, aliceRemoteWallet)
       initialiseDirectoryApp("bob.cns", bobUserParty, bobDirectory, bobRemoteWallet)
-      initialiseSplitwiseApp(aliceSplitwise)
-      initialiseSplitwiseApp(bobSplitwise)
+      initialiseSplitwiseApp(aliceSplitwise, aliceUserParty)
+      initialiseSplitwiseApp(bobSplitwise, bobUserParty)
 
       withFrontEnd("aliceSplitwise") { implicit webDriver =>
         go to "http://localhost:3002"

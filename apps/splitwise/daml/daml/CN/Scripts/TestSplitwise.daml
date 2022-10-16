@@ -17,8 +17,8 @@ import CN.Wallet
 
 createInstall : CCApp -> Party -> Party -> Script (ContractId SplitwiseInstall)
 createInstall app user provider = do
-  proposal <- submit user $ createCmd SplitwiseInstallProposal with ..
-  submit provider $ exerciseCmd proposal SplitwiseInstallProposal_Accept
+  request <- submit user $ createCmd SplitwiseInstallRequest with ..
+  submit provider $ exerciseCmd request SplitwiseInstallRequest_Accept
 
 createGroup : CCApp -> Party -> Party -> Text -> Script (ContractId Group)
 createGroup app p provider id =

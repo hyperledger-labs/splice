@@ -42,12 +42,13 @@ class SplitwiseIntegrationTest
       val bobUserParty = bobValidator.onboardUser(bobSplitwise.config.damlUser)
 
       // Setup install contracts
-      val providerParty = providerSplitwiseBackend.getProviderPartyId()
-      Seq(aliceSplitwise, bobSplitwise, charlieSplitwise).foreach { splitwise =>
-        val proposal = splitwise.createInstallProposal()
-        providerSplitwiseBackend.remoteParticipant.ledger_api.acs
-          .await(providerParty, splitwiseCodegen.SplitwiseInstallProposal)
-        providerSplitwiseBackend.acceptInstallProposal(proposal)
+      Seq(
+        (aliceSplitwise, aliceValidator, aliceUserParty),
+        (bobSplitwise, bobValidator, bobUserParty),
+        (charlieSplitwise, aliceValidator, charlieUserParty),
+      ).foreach { case (splitwise, validator, party) =>
+        splitwise.createInstallRequest()
+        splitwise.ledgerApi.ledger_api.acs.await(party, splitwiseCodegen.SplitwiseInstall)
       }
 
       aliceSplitwise.createGroup("group1")

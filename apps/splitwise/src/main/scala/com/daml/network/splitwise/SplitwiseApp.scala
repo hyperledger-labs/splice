@@ -1,5 +1,6 @@
 package com.daml.network.splitwise
 
+import com.daml.network.splitwise.automation.SplitwiseAutomationService
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
@@ -7,7 +8,7 @@ import com.daml.network.environment.{CoinLedgerClient, CoinNode}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.admin.grpc.GrpcSplitwiseService
 import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
-import com.daml.network.splitwise.store.SplitwiseAppStore
+import com.daml.network.splitwise.store.SplitwiseStore
 import com.daml.network.splitwise.v0.SplitwiseServiceGrpc
 import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
 import com.digitalasset.canton.config.RequireTypes.InstanceName
@@ -54,7 +55,14 @@ class SplitwiseApp(
       ledgerClient: CoinLedgerClient,
       party: PartyId,
   ): Future[SplitwiseApp.State] = for {
-    store <- Future.successful(SplitwiseAppStore(storage, loggerFactory))
+    store <- Future.successful(SplitwiseStore(party, storage, loggerFactory))
+    automation = new SplitwiseAutomationService(
+      store,
+      ledgerClient,
+      retryProvider = this,
+      loggerFactory,
+      timeouts,
+    )
     scanConnection =
       new ScanConnection(
         config.remoteScan.clientAdminApi,
@@ -76,6 +84,7 @@ class SplitwiseApp(
       )
       .discard
     SplitwiseApp.State(
+      automation,
       storage,
       store,
       scanConnection,
@@ -88,13 +97,15 @@ class SplitwiseApp(
 
 object SplitwiseApp {
   case class State(
+      automation: SplitwiseAutomationService,
       storage: Storage,
-      store: SplitwiseAppStore,
+      store: SplitwiseStore,
       scanConnection: ScanConnection,
       logger: TracedLogger,
   ) extends AutoCloseable {
     override def close() =
       Lifecycle.close(
+        automation,
         storage,
         store,
         scanConnection,

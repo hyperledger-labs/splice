@@ -28,7 +28,7 @@ newtype GroupId = GroupId Text
 groupMembers : Group -> [Party]
 groupMembers Group{..} = owner :: members
 
-template SplitwiseInstallProposal
+template SplitwiseInstallRequest
   with
     provider : Party
     user : Party
@@ -37,9 +37,14 @@ template SplitwiseInstallProposal
     -- Workaround for lack of explicit disclosure.
     observer provider
 
-    choice SplitwiseInstallProposal_Accept : ContractId SplitwiseInstall
+    choice SplitwiseInstallRequest_Accept : ContractId SplitwiseInstall
       controller provider
       do create SplitwiseInstall with ..
+
+
+    choice SplitwiseInstallRequest_Reject : ()
+      controller provider
+      do pure ()
 
 -- Assert that the given party is the owner of the group.
 -- This is used to avoid leaking authorization from the provider.

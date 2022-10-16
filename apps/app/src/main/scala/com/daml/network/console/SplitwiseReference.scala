@@ -37,7 +37,7 @@ abstract class SplitwiseAppReference(
   // We go through BaseLedgerApiAdministration here rather than creating a
   // ledger connection since that one is already setup to be easily used
   // from the console.
-  protected def ledgerApi: BaseLedgerApiAdministration
+  def ledgerApi: BaseLedgerApiAdministration
 
   protected val remoteScanConfig: RemoteScanAppConfig
 
@@ -78,7 +78,7 @@ final class RemoteSplitwiseAppReference(
 
   override protected val instanceType = "Remote Splitwise"
 
-  override protected lazy val ledgerApi =
+  override lazy val ledgerApi =
     new ExternalLedgerApiClient(
       config.ledgerApi.address,
       config.ledgerApi.port,
@@ -114,16 +114,16 @@ final class RemoteSplitwiseAppReference(
 
   // Commands for managing installs
 
-  @Help.Summary("Create splitwise install proposal for given provider party")
-  def createInstallProposal(
-  ): Primitive.ContractId[splitwiseCodegen.SplitwiseInstallProposal] = {
+  @Help.Summary("Create splitwise install request for given provider party")
+  def createInstallRequest(
+  ): Primitive.ContractId[splitwiseCodegen.SplitwiseInstallRequest] = {
     val party = getUserPrimaryParty()
     val provider = getProviderPartyId()
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
       splitwiseCodegen
-        .SplitwiseInstallProposal(
+        .SplitwiseInstallRequest(
           user = party.toPrim,
           provider = provider.toPrim,
         )
@@ -388,23 +388,11 @@ final class LocalSplitwiseAppReference(
 
   override protected val nodes = consoleEnvironment.environment.splitwises
 
-  override protected lazy val ledgerApi = remoteParticipant
+  override lazy val ledgerApi = remoteParticipant
 
   @Help.Summary("Return local splitwise app config")
   def config: LocalSplitwiseAppConfig =
     consoleEnvironment.environment.config.splitwisesByString(name)
-
-  @Help.Summary("Accept splitwise install proposal")
-  def acceptInstallProposal(
-      proposal: Primitive.ContractId[splitwiseCodegen.SplitwiseInstallProposal]
-  ): Primitive.ContractId[splitwiseCodegen.SplitwiseInstall] = {
-    val provider = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.providerUser)
-    submitWithResult(
-      actAs = Seq(provider),
-      readAs = Seq.empty,
-      proposal.exerciseSplitwiseInstallProposal_Accept(),
-    )
-  }
 
   override val remoteScanConfig = config.remoteScan
 
