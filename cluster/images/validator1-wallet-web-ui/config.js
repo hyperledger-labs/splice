@@ -8,5 +8,13 @@ window.canton_network_config = {
     wallet: {
         // URL of the gRPC-Web envoy proxy, proxying to the wallet app gRPC API
         grpcUrl: 'http://' + window.location.hostname + ':6104',
+    },
+    validator: {
+        // URL of the gRPC-Web envoy proxy, proxying to the validator app gRPC API
+        grpcUrl: 'http://' + window.location.hostname + ':6103',
+    },
+    directory: {
+        // URL of the gRPC-Web envoy proxy, proxying to the directory app gRPC API
+        grpcUrl: 'http://' + window.location.hostname + ':6010',
     }
 }

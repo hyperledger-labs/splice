@@ -714,6 +714,39 @@
                               "memory": "1024Mi"
                            }
                         }
+                     },
+                     {
+                        "env": [
+                           {
+                              "name": "GRPC_ADDRESS",
+                              "value": "127.0.0.1"
+                           },
+                           {
+                              "name": "GRPC_PORT",
+                              "value": "5103"
+                           },
+                           {
+                              "name": "GRPC_WEB_PORT",
+                              "value": "6103"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/envoy-proxy:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "envoy-proxy",
+                        "ports": [
+                           {
+                              "containerPort": 6103,
+                              "name": "grpc-web"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "256Mi"
+                           },
+                           "requests": {
+                              "memory": "256Mi"
+                           }
+                        }
                      }
                   ]
                }
@@ -731,6 +764,11 @@
                {
                   "name": "val1-val-api",
                   "port": 5103,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-val-gweb",
+                  "port": 6103,
                   "protocol": "TCP"
                }
             ],
@@ -1481,6 +1519,10 @@
                               "name": "val1-val-api"
                            },
                            {
+                              "containerPort": 6103,
+                              "name": "val1-val-gweb"
+                           },
+                           {
                               "containerPort": 5104,
                               "name": "val1-wal-api"
                            },
@@ -1603,6 +1645,11 @@
                {
                   "name": "val1-val-api",
                   "port": 5103,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-val-gweb",
+                  "port": 6103,
                   "protocol": "TCP"
                },
                {
@@ -1739,6 +1786,11 @@
                {
                   "name": "val1-val-api",
                   "port": 5103,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-val-gweb",
+                  "port": 6103,
                   "protocol": "TCP"
                },
                {

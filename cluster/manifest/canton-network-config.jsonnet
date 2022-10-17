@@ -96,6 +96,11 @@ local VALIDATOR1_VALIDATOR_PORTS = [
   },
 ];
 
+local VALIDATOR1_VALIDATOR_PORT_PROXIED_TO_GRPC_WEB = {
+  name: 'val1-val-gweb',
+  grpcPort: 5103,
+};
+
 local VALIDATOR1_WALLET_PORTS = [
   {
     name: 'val1-wal-api',
@@ -198,6 +203,7 @@ local ALL_PORTS = flatten([
   CANTON_DOMAIN_PORTS,
   CANTON_PARTICIPANT_PORTS,
   VALIDATOR1_VALIDATOR_PORTS,
+  toGrpcWebPort(VALIDATOR1_VALIDATOR_PORT_PROXIED_TO_GRPC_WEB),
   VALIDATOR1_WALLET_PORTS,
   toGrpcWebPort(VALIDATOR1_WALLET_PORT_PROXIED_TO_GRPC_WEB),
   VALIDATOR1_PARTICIPANT_PORTS,
@@ -370,7 +376,7 @@ local cantonNetwork(config) = objects(
     ),
     deployment(config, 'canton-participant', CANTON_PARTICIPANT_PORTS, memoryLimitMiB=1536),
     deployment(config, 'validator1-participant', VALIDATOR1_PARTICIPANT_PORTS, memoryLimitMiB=1536, proxyToGrpcWeb=VALIDATOR1_LEDGER_API_PORT_PROXIED_TO_GRPC_WEB),
-    deployment(config, 'validator1-validator-app', VALIDATOR1_VALIDATOR_PORTS),
+    deployment(config, 'validator1-validator-app', VALIDATOR1_VALIDATOR_PORTS, proxyToGrpcWeb=VALIDATOR1_VALIDATOR_PORT_PROXIED_TO_GRPC_WEB),
     deployment(config, 'validator1-wallet-app', VALIDATOR1_WALLET_PORTS, proxyToGrpcWeb=VALIDATOR1_WALLET_PORT_PROXIED_TO_GRPC_WEB),
     deployment(config, 'validator1-wallet-web-ui', VALIDATOR1_WALLET_UI_PORTS_INTERNAL),
     deployment(config, 'validator1-directory-web-ui', VALIDATOR1_DIRECTORY_UI_PORTS_INTERNAL),
