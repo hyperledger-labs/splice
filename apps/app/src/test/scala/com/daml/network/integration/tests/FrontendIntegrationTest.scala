@@ -12,12 +12,11 @@ import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.openqa.selenium.{OutputType, TakesScreenshot, WebDriver}
-import org.openqa.selenium.firefox.{FirefoxDriver, FirefoxOptions}
+import org.openqa.selenium.firefox.{FirefoxDriver, FirefoxDriverLogLevel, FirefoxOptions}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatestplus.selenium.WebBrowser
 
 import scala.collection.mutable
-
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.io.File
@@ -39,7 +38,8 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
     FirefoxDriver.SystemProperty.BROWSER_LOGFILE,
     Paths.get("log", "browser.log").toString,
   )
-  val options: FirefoxOptions = new FirefoxOptions().setHeadless(true)
+  val options: FirefoxOptions =
+    new FirefoxOptions().setHeadless(true).setLogLevel(FirefoxDriverLogLevel.DEBUG)
 
   protected val webDrivers: mutable.Map[String, WebDriver with TakesScreenshot] = mutable.Map.empty
 
