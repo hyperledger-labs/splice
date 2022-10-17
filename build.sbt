@@ -54,7 +54,12 @@ lazy val root = (project in file("."))
     `canton-community-domain`,
     `canton-community-participant`,
   )
-  .settings(BuildCommon.sharedSettings, scalacOptions += "-Wconf:src=src_managed/.*:silent")
+  .settings(
+    BuildCommon.sharedSettings,
+    scalacOptions += "-Wconf:src=src_managed/.*:silent",
+    // Needed to be able to resolve scalafmt snapshot versions
+    resolvers += Resolver.sonatypeRepo("snapshots"),
+  )
 
 lazy val `apps-common` =
   project
