@@ -841,6 +841,7 @@ jobs:
                               --keep DOCKER_TLS_VERIFY \
                               --keep NO_PROXY"
          cmd: |
+           export PATH=$HOME/.daml/bin:$PATH
            (cd $REPO_ROOT/cluster && make docker-build)
 
       - run_bash_command_in_nix:
