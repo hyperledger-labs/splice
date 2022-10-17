@@ -2,9 +2,8 @@ ARG base_version
 
 FROM --platform=linux/amd64 cn-app:${base_version}
 
-EXPOSE 5103
+EXPOSE 5201
+EXPOSE 5202
 
 COPY coin.conf .
 COPY bootstrap.scala .
-COPY target/directory-service-0.1.0.dar .
-COPY target/splitwise-0.1.0.dar .

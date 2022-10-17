@@ -147,6 +147,41 @@ local VALIDATOR1_PARTICIPANT_PORTS = [
   },
 ];
 
+local SPLITWISE_PARTICIPANT_PORTS = [
+  {
+    name: 'sw-adm-api',
+    port: 5202,
+  },
+  {
+    name: 'sw-ledger-api',
+    port: 5201,
+  },
+];
+
+local SPLITWISE_LEDGER_API_PORT_PROXIED_TO_GRPC_WEB = {
+  name: 'sw-lapi-gweb',
+  grpcPort: 5201,
+};
+
+local SPLITWISE_VALIDATOR_PORTS = [
+  {
+    name: 'sw-val-api',
+    port: 5203,
+  },
+];
+
+local SPLITWISE_PORTS = [
+  {
+    name: 'sw-api',
+    port: 5213,
+  },
+];
+
+local SPLITWISE_PORT_PROXIED_TO_GRPC_WEB = {
+  name: 'sw-gweb',
+  grpcPort: 5213,
+};
+
 
 local VALIDATOR1_LEDGER_API_PORT_PROXIED_TO_GRPC_WEB = {
   name: 'val1-lapi-gweb',
@@ -169,6 +204,12 @@ local ALL_PORTS = flatten([
   VALIDATOR1_WALLET_UI_PORTS_EXTERNAL,
   VALIDATOR1_DIRECTORY_UI_PORTS_EXTERNAL,
   toGrpcWebPort(VALIDATOR1_LEDGER_API_PORT_PROXIED_TO_GRPC_WEB),
+  SPLITWISE_PARTICIPANT_PORTS,
+  toGrpcWebPort(SPLITWISE_LEDGER_API_PORT_PROXIED_TO_GRPC_WEB),
+  SPLITWISE_VALIDATOR_PORTS,
+  SPLITWISE_PORTS,
+  toGrpcWebPort(SPLITWISE_PORT_PROXIED_TO_GRPC_WEB),
+
 ]);
 
 local deployment(config, name, ports, memoryLimitMiB=1024, ext={}, proxyToGrpcWeb=null) = [
@@ -333,6 +374,9 @@ local cantonNetwork(config) = objects(
     deployment(config, 'validator1-wallet-app', VALIDATOR1_WALLET_PORTS, proxyToGrpcWeb=VALIDATOR1_WALLET_PORT_PROXIED_TO_GRPC_WEB),
     deployment(config, 'validator1-wallet-web-ui', VALIDATOR1_WALLET_UI_PORTS_INTERNAL),
     deployment(config, 'validator1-directory-web-ui', VALIDATOR1_DIRECTORY_UI_PORTS_INTERNAL),
+    deployment(config, 'splitwise-participant', SPLITWISE_PARTICIPANT_PORTS, memoryLimitMiB=1536, proxyToGrpcWeb=SPLITWISE_LEDGER_API_PORT_PROXIED_TO_GRPC_WEB),
+    deployment(config, 'splitwise-validator-app', SPLITWISE_VALIDATOR_PORTS),
+    deployment(config, 'splitwise-app', SPLITWISE_PORTS, proxyToGrpcWeb=SPLITWISE_PORT_PROXIED_TO_GRPC_WEB),
     deployment(config, 'gcs-proxy', GCS_PROXY_PORTS, memoryLimitMiB=512),
     deployment(config, 'external-proxy', ALL_PORTS, memoryLimitMiB=512),
     externalService(config, ALL_PORTS),

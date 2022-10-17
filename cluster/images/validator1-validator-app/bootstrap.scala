@@ -10,7 +10,8 @@ validator1_validator_backend.onboardUser("bob")
 validator1_validator_backend.onboardUser("charlie")
 
 // TODO (M1-92): This will later be replaced by the app manager
-println("Uploading directory DAR")
+println("Uploading DARs")
 validator1_validator_backend.remoteParticipant.dars.upload("directory-service-0.1.0.dar")
+validator1_validator_backend.remoteParticipant.dars.upload("splitwise-0.1.0.dar")
 
 println("Bootstrapped validator1 validator.")

@@ -17,7 +17,10 @@ apps := \
 	images/validator1-validator-app \
 	images/validator1-wallet-app \
 	images/validator1-wallet-web-ui \
-	images/validator1-directory-web-ui
+	images/validator1-directory-web-ui \
+	images/splitwise-participant \
+	images/splitwise-validator-app \
+	images/splitwise-app
 
 define make_apps
   for app in $(apps); do \
