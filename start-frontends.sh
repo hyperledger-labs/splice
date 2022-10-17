@@ -2,15 +2,14 @@
 set -eou pipefail
 
 function build_dependencies() {
-  script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-  cd "${script_dir}/apps"
+  cd "${REPO_ROOT}/apps"
 
   if [[ -z "$(ls ../target/scala* 2>/dev/null)" ]]; then
     echo "No compilation artifacts found in app ${app}. Please compile the repo before starting frontends" 1>&2
     exit 1
   fi
 
-  "${script_dir}/build-tools/npm-install.sh"
+  "${REPO_ROOT}/build-tools/npm-install.sh"
 
   # build dependencies
   npm run build --workspace common-protobuf
@@ -19,8 +18,7 @@ function build_dependencies() {
 }
 
 function start_envoy() {
-  script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-  cd "${script_dir}/envoy-proxy-dev"
+  cd "${REPO_ROOT}/envoy-proxy-dev"
   ./start-envoy.sh
   cd -
 }
@@ -48,10 +46,14 @@ function start_frontend() {
   validator_grpc=$5
   user=$6
 
-  script_dir=$( cd -- "$( dirname -- "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )
-  frontend_dir="${script_dir}/apps/${app}/frontend"
+  frontend_dir="${REPO_ROOT}/apps/${app}/frontend"
 
-  tmux_cmd "${app}-${user}" "${frontend_dir}" "BROWSER=none PORT=$port REACT_APP_GRPC_URL=http://localhost:${app_grpc} REACT_APP_VALIDATOR_API_GRPC_URL=http://localhost:${validator_grpc} REACT_APP_LEDGER_API_GRPC_URL=http://localhost:${ledger_grpc} npm start"
+  tmux_cmd "${app}-${user}" "${frontend_dir}" \
+    "BROWSER=none PORT=$port \
+    REACT_APP_GRPC_URL=http://localhost:${app_grpc} \
+    REACT_APP_VALIDATOR_API_GRPC_URL=http://localhost:${validator_grpc} \
+    REACT_APP_LEDGER_API_GRPC_URL=http://localhost:${ledger_grpc} \
+    npm start 2>&1 | tee ${LOG_DIR}/npm-${app}-${user}.log"
 }
 
 function usage() {
@@ -81,6 +83,8 @@ done
 tmux_session="cn-frontends"
 tmux_window=0
 
+LOG_DIR="${REPO_ROOT}/log"
+
 # TODO(i711): Move build steps into sbt
 build_dependencies
 
@@ -89,7 +93,7 @@ start_envoy
 tmux new-session -d -s "${tmux_session}"
 
 # listen & auto-rebuild common-frontend code when its src changes
-tmux_cmd "common-frontend" "$REPO_ROOT/apps" "npm run start --workspace common-frontend"
+tmux_cmd "common-frontend" "$REPO_ROOT/apps" "npm run start --workspace common-frontend 2>&1 | tee ${LOG_DIR}/npm-common.log"
 
 start_frontend wallet 3000 6204 NA 6203 alice
 start_frontend wallet 3001 6304 NA 6303 bob
