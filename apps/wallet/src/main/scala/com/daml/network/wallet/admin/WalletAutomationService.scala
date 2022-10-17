@@ -5,10 +5,12 @@ import akka.stream.Materializer
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.wallet.store.WalletStore
+import com.daml.network.wallet.treasury.TreasuryServices
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.collection.concurrent.TrieMap
@@ -18,6 +20,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
   */
 class WalletAutomationService(
     walletStore: WalletStore,
+    treasuryServices: TreasuryServices,
     ledgerClient: CoinLedgerClient,
     retryProvider: CoinRetries,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -45,13 +48,12 @@ class WalletAutomationService(
   // TODO(#763): not handling archive events, uninstalling wallets without a restart is not supported yet
   registerRequestHandler("WalletAppInstall", walletStore.streamInstalls)(
     install => install.toString,
-    (install, traceContext) =>
+    (install, traceContext) => {
+      implicit val tc = traceContext
       Future {
         val endUserName = install.payload.endUserName
-        val endUserStore = walletStore.getOrCreateEndUserStore(
-          endUserName,
-          PartyId.tryFromPrim(install.payload.endUserParty),
-        )
+        val endUserParty = PartyId.tryFromPrim(install.payload.endUserParty)
+        val endUserStore = walletStore.getOrCreateEndUserStore(endUserName, endUserParty)
         val ingestionService = new AcsIngestionService(
           s"EndUserWalletStore($endUserName)",
           endUserStore.acsIngestionSink,
@@ -59,24 +61,29 @@ class WalletAutomationService(
           loggerFactory,
           timeouts,
         )
-        val autoCloseable =
-          SyncCloseable(
-            s"EndUserWalletStore($endUserName) - ingestion and store",
-            Lifecycle.close(ingestionService, endUserStore)(logger),
-          )
-        ingestionServices.putIfAbsent(endUserName, autoCloseable) match {
-          case None =>
-            "onboarded wallet end-user"
-          case Some(_) =>
-            logger.warn(
-              s"Unexpected duplicate on-boarding of wallet user '$endUserName'"
-              // TODO(#790): how would we enable the implicit passing of the traceContext?
-            )(traceContext)
-            autoCloseable.close()
-            "skipped duplicate on-boarding wallet end-user"
-        }
-      },
+        treasuryServices.addOrCreateTreasuryService(install, walletStore.key, endUserStore): Unit
+        registerService(ingestionServices, endUserName, ingestionService)
+      }
+    },
   )
+
+  private def registerService(
+      services: TrieMap[String, AutoCloseable],
+      endUserName: String,
+      service: AutoCloseable,
+  )(implicit tc: TraceContext): String = {
+    services.putIfAbsent(endUserName, service) match {
+      case None =>
+        s"onboarded wallet end-user '$endUserName'"
+      case Some(_) =>
+        logger.warn(
+          s"Unexpected duplicate on-boarding of wallet user '$endUserName'"
+          // TODO(#790): how would we enable the implicit passing of the traceContext?
+        )
+        service.close()
+        s"skipped duplicate on-boarding wallet end-user '$endUserName'"
+    }
+  }
 
   override def closeAsync(): Seq[AsyncOrSyncCloseable] =
     Seq(

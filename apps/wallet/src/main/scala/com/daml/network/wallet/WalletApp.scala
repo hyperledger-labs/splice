@@ -21,8 +21,9 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
-import com.daml.network.codegen.CN.{Wallet => walletCodegen}
-import io.grpc.{ServerInterceptors}
+import com.daml.network.codegen.CN.Wallet as walletCodegen
+import com.daml.network.wallet.treasury.TreasuryServices
+import io.grpc.ServerInterceptors
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -82,6 +83,8 @@ class WalletApp(
         svcParty = svcParty,
       )
       val walletStore = WalletStore(walletStoreKey, storage, loggerFactory)
+      val treasuries =
+        new TreasuryServices(ledgerClient.connection("TreasuryServices"), loggerFactory)
 
       adminServerRegistry
         .addService(
@@ -89,6 +92,7 @@ class WalletApp(
             WalletServiceGrpc.bindService(
               new GrpcWalletService(
                 walletStore,
+                treasuries,
                 ledgerClient,
                 scanConnection,
                 loggerFactory = loggerFactory,
@@ -102,6 +106,7 @@ class WalletApp(
 
       val automation = new WalletAutomationService(
         walletStore,
+        treasuries,
         ledgerClient,
         retryProvider = this,
         loggerFactory,
@@ -111,6 +116,7 @@ class WalletApp(
         automation,
         storage,
         walletStore,
+        treasuries,
         scanConnection,
         validatorConnection,
         loggerFactory.getTracedLogger(WalletApp.State.getClass),
@@ -129,15 +135,17 @@ object WalletApp {
       automation: WalletAutomationService,
       storage: Storage,
       walletStore: WalletStore,
+      treasuryServices: TreasuryServices,
       scanConnection: ScanConnection,
       validatorConnection: ValidatorConnection,
       logger: TracedLogger,
   ) extends AutoCloseable {
-    override def close() =
+    override def close(): Unit =
       Lifecycle.close(
         automation,
         storage,
         walletStore,
+        treasuryServices,
         scanConnection,
         validatorConnection,
       )(logger)

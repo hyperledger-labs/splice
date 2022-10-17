@@ -1,12 +1,12 @@
 package com.daml.network.wallet.admin.grpc
 
-import cats.implicits._
+import cats.implicits.*
 import com.daml.ledger.client.binding.{Primitive, TemplateCompanion}
 import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
-import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
+import com.daml.network.codegen.CC.{Coin as coinCodegen, CoinRules as coinRulesCodegen}
 import com.daml.network.codegen.CN.Wallet.CoinOperationOutcome.COO_AcceptedAppMultiPayment
 import com.daml.network.codegen.CN.Wallet.{CoinOperation, CoinOperationOutcome}
-import com.daml.network.codegen.CN.{Wallet => walletCodegen}
+import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.codegen.DA
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -16,11 +16,12 @@ import com.daml.network.util.{CoinUtil, Contract, Proto, Value}
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.{CollectRewardsRequest, WalletServiceGrpc}
-import com.daml.network.{v0 => networkV0}
+import com.daml.network.v0 as networkV0
+import com.daml.network.wallet.treasury.TreasuryServices
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
-import com.digitalasset.canton.util.ShowUtil._
+import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.empty.Empty
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
@@ -30,6 +31,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcWalletService(
     store: WalletStore,
+    treasuries: TreasuryServices,
     ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
     protected val loggerFactory: NamedLoggerFactory,
@@ -92,6 +94,16 @@ class GrpcWalletService(
       )
   }
 
+  private[this] def getUserTreasury(user: String): Future[EndUserTreasuryService] = Future {
+    treasuries
+      .lookupEndUserTreasury(user)
+      .getOrElse(
+        throw new StatusRuntimeException(
+          Status.NOT_FOUND.withDescription(s"User ${user.singleQuoted}")
+        )
+      )
+  }
+
   private def listContracts[T, ResponseT](
       context: v0.WalletContext,
       templateCompanion: TemplateCompanion[T],
@@ -139,7 +151,7 @@ class GrpcWalletService(
       )(
         user,
         {
-          case Seq(outcome: CoinOperationOutcome.COO_Tap) =>
+          case outcome: CoinOperationOutcome.COO_Tap =>
             v0.TapResponse(Proto.encode(outcome.body))
           case other => sys.error(s"unexpected coin operation outcome: $other")
         },
@@ -206,7 +218,7 @@ class GrpcWalletService(
     )(
       user,
       {
-        case Seq(outcome: COO_AcceptedAppMultiPayment) =>
+        case outcome: COO_AcceptedAppMultiPayment =>
           v0.AcceptAppMultiPaymentRequestResponse(
             Proto.encode(outcome.body)
           )
@@ -227,7 +239,7 @@ class GrpcWalletService(
     )(
       user,
       {
-        case Seq(outcome: CoinOperationOutcome.COO_AcceptedAppPayment) =>
+        case outcome: CoinOperationOutcome.COO_AcceptedAppPayment =>
           v0.AcceptAppPaymentRequestResponse(
             Proto.encode(outcome.body)
           )
@@ -693,6 +705,20 @@ class GrpcWalletService(
     }
   }
 
+  private def getUserInstallContract(
+      userWalletStore: EndUserWalletStore,
+      userParty: PartyId,
+  ): Future[Contract[walletCodegen.WalletAppInstall]] = for {
+    installO <- userWalletStore.lookupInstall()
+    install = installO match {
+      case QueryResult(_, None) =>
+        throw new StatusRuntimeException(
+          Status.NOT_FOUND.withDescription(s"WalletAppInstall contract of user $userParty")
+        )
+      case QueryResult(_, Some(install)) => install
+    }
+  } yield install
+
   /** Executes a wallet action by calling the `WalletAppInstall_ExecuteBatch` choice on the WalletAppInstall
     * contract of the end user specified in the given WalletContext.
     *
@@ -705,52 +731,27 @@ class GrpcWalletService(
     * Note: curried syntax helps with type inference
     */
   private def exerciseWalletAction[Response](
-      choice: TraceContext => (
+      constructCoinOperation: TraceContext => (
           Primitive.ContractId[walletCodegen.WalletAppInstall],
           EndUserWalletStore,
           // TODO(#756): also require quantity to reject commands early?
       ) => Future[CoinOperation]
   )(
       user: String,
-      // TODO(#756): Likely adjust the return type here depending on the caller
-      response: Primitive.List[CoinOperationOutcome] => Response,
+      // TODO(#756): possibly adjust the return type here depending on the caller
+      processResponse: CoinOperationOutcome => Response,
   ): Future[Response] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
-      getUserStore(user).flatMap(userStore => {
-        val userParty = userStore.key.endUserParty
-        userStore.lookupInstall().flatMap {
-          case QueryResult(_, None) =>
-            throw new StatusRuntimeException(
-              Status.NOT_FOUND.withDescription(s"WalletAppInstall contract of user $userParty")
-            )
-          case QueryResult(_, Some(install)) =>
-            choice(traceContext)(install.contractId, userStore).flatMap { operation =>
-              {
-                for {
-                  // TODO(#756): smarter coin/input selection?
-                  inputs <- userStore
-                    .listContracts(coinCodegen.Coin)
-                    .map(cs =>
-                      cs.value.map(c => coinRulesCodegen.TransferInput.InputCoin(c.contractId))
-                    )
-                  // TODO(#756): queue requests and only execute them once the previous call has finished.
-                  cmd = install.contractId
-                    .exerciseWalletAppInstall_ExecuteBatch(inputs, Primitive.List(operation))
-                  res <- connection
-                    .submitWithResult(
-                      Seq(walletServiceParty),
-                      Seq(validatorParty, userParty),
-                      cmd,
-                    )
-                    .map(response)
-                } yield {
-                  res
-                }
-
-              }
-            }
-        }
-      })
+      for {
+        userStore <- getUserStore(user)
+        userTreasury <- getUserTreasury(user)
+        userParty = userStore.key.endUserParty
+        install <- getUserInstallContract(userStore, userParty)
+        operation <- constructCoinOperation(traceContext)(install.contractId, userStore)
+        res <- userTreasury
+          .enqueueCoinOperation(operation)
+          .map(processResponse)
+      } yield res
     }
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
