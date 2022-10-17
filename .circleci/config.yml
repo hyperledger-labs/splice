@@ -610,23 +610,11 @@ jobs:
       - execute_sbt_command:
           cmd: "protocGenerate damlBuild"
       - run_bash_command_in_nix:
-          cmd_name: Build wallet web frontend
+          cmd_name: Build frontends
           cmd: |
             cd apps
             npm ci
-            npm run build --workspace common-protobuf
-            npm run build --workspace common-frontend
-
-            npm run build --workspace wallet-frontend
-      - run_bash_command_in_nix:
-          cmd_name: Build directory web frontend
-          cmd: |
-            cd apps
-            npm ci
-            npm run build --workspace common-protobuf
-            npm run build --workspace common-frontend
-
-            npm run build --workspace directory-frontend
+            npm run build -ws
       - execute_sbt_command:
           cmd: "bundle"
       - run:

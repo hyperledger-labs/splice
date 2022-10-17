@@ -272,7 +272,11 @@ lazy val bundleTask = {
     val assemblyJar = assembly.value
     val examples = Seq("-c", "apps/app/src/pack")
     val webUis =
-      Seq(("apps/wallet/frontend/build", "wallet"), ("apps/directory/frontend/build", "directory"))
+      Seq(
+        ("apps/wallet/frontend/build", "wallet"),
+        ("apps/directory/frontend/build", "directory"),
+        ("apps/splitwise/frontend/build", "splitwise"),
+      )
     val args = examples ++ webUis.flatMap({ case (source, name) =>
       Seq("-r", source, s"web-uis/$name")
     })
