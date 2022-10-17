@@ -828,6 +828,12 @@ jobs:
       - setup_nix
       - install_daml_sdk
       - run_bash_command_in_nix:
+         cmd_name: build app
+         cmd: |
+           export PATH=$HOME/.daml/bin:$PATH
+           make build
+
+      - run_bash_command_in_nix:
          cmd_name: build images
          additional_nix_args: "--keep DOCKER_CERT_PATH \
                               --keep DOCKER_HOST \
@@ -835,9 +841,7 @@ jobs:
                               --keep DOCKER_TLS_VERIFY \
                               --keep NO_PROXY"
          cmd: |
-           export PATH=$HOME/.daml/bin:$PATH
-           make docker-build
-
+           (cd $REPO_ROOT/cluster && make docker-build)
 
       - run_bash_command_in_nix:
          cmd_name: push images
