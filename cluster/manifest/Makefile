@@ -4,7 +4,8 @@ test-vars=\
 	--tla-str gcpRegion=region \
     --tla-str gcpRepoName=project/repo \
     --tla-str imageTag=tag \
-    --tla-str ipAddr=ipaddr
+    --tla-str ipAddr=ipaddr \
+    --tla-str clusterName=cluster
 
 .PHONY: format
 format:

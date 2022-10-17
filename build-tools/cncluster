@@ -45,6 +45,7 @@ function _cluster_apply() {
             --tla-str gcpRepoName=${GCP_REPO_NAME} \
             --tla-str imageTag=${SOURCE_IMAGE_TAG} \
             --tla-str ipAddr=$(cluster_ip) \
+            --tla-str clusterName=${GCP_CLUSTER_NAME} \
             $REPO_ROOT/cluster/manifest/canton-network-config.jsonnet \
         | kubectl apply -f -
 }

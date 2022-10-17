@@ -226,6 +226,7 @@ local deployment(config, name, ports, memoryLimitMiB=1024, ext={}, proxyToGrpcWe
       name: name,
       labels: {
         app: name,
+        clusterName: config.clusterName
       },
     },
     spec: {
@@ -242,7 +243,7 @@ local deployment(config, name, ports, memoryLimitMiB=1024, ext={}, proxyToGrpcWe
         metadata: {
           labels: {
             app: name,
-            external: 'true',
+            clusterName: config.clusterName,
           },
         },
         spec: {
@@ -309,6 +310,7 @@ local deployment(config, name, ports, memoryLimitMiB=1024, ext={}, proxyToGrpcWe
     kind: 'Service',
     metadata: {
       name: name,
+      clusterName: config.clusterName,
     },
     spec: {
       selector: {
@@ -324,6 +326,7 @@ local externalService(config, ports) = {
   kind: 'Service',
   metadata: {
     name: 'external',
+    clusterName: config.clusterName,
   },
   spec: {
     type: 'LoadBalancer',
@@ -389,9 +392,10 @@ local cantonNetwork(config) = objects(
   ],
 );
 
-function(gcpRegion, gcpRepoName, imageTag, ipAddr) cantonNetwork(networkDefaults {
+function(gcpRegion, gcpRepoName, imageTag, ipAddr, clusterName) cantonNetwork(networkDefaults {
   gcpRegion: gcpRegion,
   gcpRepoName: gcpRepoName,
   imageTag: imageTag,
   ipAddr: ipAddr,
+  clusterName: clusterName
 })
