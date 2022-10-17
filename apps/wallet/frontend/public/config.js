@@ -1,8 +1,8 @@
 window.canton_network_config = {
     // Auth0 client configuration, see https://github.com/auth0/auth0-spa-js
     auth: {
-        domain: 'canton-network-dev.us.auth0.com',
-        clientId: '5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK',
+        domain: '',
+        clientId: '',
         redirectUri: window.location.origin,
     },
     wallet: {

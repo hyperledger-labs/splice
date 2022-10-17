@@ -19,6 +19,7 @@ Prerequisites
 -------------
 
 To locally start a validator node that connects against the DevNet domain, you will need to run
+
 1) a Canton participant node, in order to host:
 2) the Daml validator app and
 3) the Daml wallet app
@@ -42,7 +43,7 @@ repository from GitHub.)
 
 
 Please now extract the downloaded bundle and change into the resulting
-root directory. The commands will look similar to these: ::
+root directory. The commands will look similar to these:
 
 .. parsed-literal::
 
@@ -86,7 +87,7 @@ Now, onboard a new user called "alice" via the validator app: ::
   @ val aliceParty = validatorApp.onboardUser("alice")
 
 You are now registered as a validator on the Canton network. You've also configured a user that can transact through a wallet. Congratulations!
-  
+
 Tapping some Canton Coin from the Dev Faucet
 --------------------------------------------
 
@@ -101,7 +102,7 @@ Creating free coins will only be possible in temporary test- and devnets.
 
 Listing your Canton Coins
 -------------------------
-  
+
 You can list your balances with the following command: ::
 
   @ aliceWallet.list()
@@ -116,7 +117,7 @@ You can list your balances with the following command: ::
     )
   )
 
-  
+
 If you've followed the previous instructions, you should already see one coin.
 If not, try calling ``aliceWallet.tap(100.0)`` and then rerunning this command.
 
@@ -150,7 +151,7 @@ Payment channels by default allow direct transfers (transfers that do not requir
 
   @ aliceWallet.executeDirectTransfer(bobParty, 10, coinId)
 
-Check Alice and Bob's wallets to see that Alice now has slightly less than 990 coins (due to transfer fees), and Bob has 10: ::
+Check Alice and Bob's wallets to see that Alice now has slightly less than 90 coins (due to transfer fees), and Bob has 10: ::
 
   @ aliceWallet.list()
   res12: Seq[...] = Vector(
@@ -217,6 +218,47 @@ file server for that, e.g., `NGINX <https://www.nginx.com/>`_. To keep
 things simple, we use the builtin HTTP Server in Python. Start another terminal and run: ::
 
   cd web-uis/wallet
-  python3 -m http.server 8080
+  python3 -m http.server 3000
 
-The Wallet Web UI is now accessible on port 8080, where you can login as alice and see the coins you tapped earlier in this tutorial.
+The Wallet Web UI is now accessible on port 3000, where you can login as alice and see the coins you tapped earlier in this tutorial.
+
+Configuring a Custom IAM Provider
+---------------------------------
+
+.. warning::
+
+  The following section is incomplete
+
+So far we've worked with users Alice and Bob, whose wallets were statically configured in the validator configuration file used to start the node.
+
+However, as a validator operator, you will likely want to integrate an IAM provider that allows end-users from external systems to authenticate and use your node.
+
+For the purposes of this tutorial, we will be using `Auth0 <https://auth0.com>`_, but any IAM provider that is OAuth 2.0 compliant and capable of vending JWT tokens should work.
+
+To add custom IAM, perform the following:
+
+1. Create an Auth0 tenant for your validator
+2. Create an Application in the tenant using the "Single Page Application" template
+3. Note your app's "Domain" and "Client ID" values
+4. Determine the URL for your validator's wallet UI (if you've been following this runbook guide, it will be ``http://localhost:3000``)
+5. In the Auth0 application settings, add the wallet URL to the following:
+
+   - "Allowed Callback URLs"
+   - "Allowed Logout URLs"
+   - "Allowed Web Origins"
+   - "Allowed Origins (CORS)"
+
+6. Save your application settings
+7. In the extracted release bundle on your machine, navigate to ``web-uis/wallet``
+8. Edit ``config.js`` with your custom tenant domain and client ID
+9. Refresh your browser with the wallet UI, and click the "Log in with Auth0" button
+
+This will kick off an interactive log-in flow where the user is redirected from the locally running wallet UI to auth0's login portal, then upon a successful authentication back to the local wallet UI.
+
+If this user is logging in for the first time, a page will appear in the wallet UI prompting the user to onboard themselves. This creates the Daml user & its primary party on the ledger, associated with the external account.
+
+.. todo::
+
+  - Describe how to set `aud` claims on tokens on a per-API basis
+  - Describe how to load the IAM provider's JWKS (by url in config?) so the validator can verify JWT signatures correctly
+  - Describe how the wallet backend can get a machine-to-machine token for authenticated ledger access

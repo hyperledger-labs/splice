@@ -53,6 +53,8 @@ function start_frontend() {
     REACT_APP_GRPC_URL=http://localhost:${app_grpc} \
     REACT_APP_VALIDATOR_API_GRPC_URL=http://localhost:${validator_grpc} \
     REACT_APP_LEDGER_API_GRPC_URL=http://localhost:${ledger_grpc} \
+    REACT_APP_OAUTH_DOMAIN=canton-network-test.us.auth0.com \
+    REACT_APP_OAUTH_CLIENT_ID=Ob8YZSBvbZR3vsM2vGKllg3KRlRgLQSw \
     npm start 2>&1 | tee ${LOG_DIR}/npm-${app}-${user}.log"
 }
 

@@ -1,9 +1,9 @@
-import { Auth0Provider } from '@auth0/auth0-react';
 import { DirectoryClientProvider } from 'common-frontend';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
 import App from './App';
+import AuthProvider from './components/AuthProvider';
 import { ValidatorClientProvider } from './contexts/ValidatorServiceContext';
 import { WalletClientProvider } from './contexts/WalletServiceContext';
 import './index.css';
@@ -16,16 +16,9 @@ root.render(
     <WalletClientProvider url={config.wallet.grpcUrl}>
       <ValidatorClientProvider url={config.validator.grpcUrl}>
         <DirectoryClientProvider url={config.directory.grpcUrl}>
-          {
-            // TODO(i988) Remove hack where we don't use Auth0Provider if the website doesn't run on a secure origin
-            crypto.subtle !== undefined ? (
-              <Auth0Provider {...config.auth}>
-                <App />
-              </Auth0Provider>
-            ) : (
-              <App />
-            )
-          }
+          <AuthProvider>
+            <App />
+          </AuthProvider>
         </DirectoryClientProvider>
       </ValidatorClientProvider>
     </WalletClientProvider>
