@@ -19,6 +19,9 @@ export type Config = {
   validator: {
     grpcUrl: string;
   };
+  directory: {
+    grpcUrl: string;
+  };
 };
 
 export const config: Config = {
@@ -28,5 +31,8 @@ export const config: Config = {
   },
   validator: {
     grpcUrl: process.env.REACT_APP_VALIDATOR_API_GRPC_URL || externalConfig.validator.grpcUrl,
+  },
+  directory: {
+    grpcUrl: process.env.REACT_APP_DIRECTORY_API_GRPC_URL || externalConfig.directory.grpcUrl,
   },
 };

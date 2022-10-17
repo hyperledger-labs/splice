@@ -1,12 +1,12 @@
-import { DirectoryServicePromiseClient } from 'common-protobuf/com/daml/network/directory/v0/directory_service_grpc_web_pb';
 import { LookupEntryByPartyRequest } from 'common-protobuf/com/daml/network/directory/v0/directory_service_pb';
 import { RpcError, StatusCode } from 'grpc-web';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 
 import Tooltip from '@mui/material/Tooltip';
 
 import { DirectoryEntry as damlDirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 
+import { useDirectoryClient } from '../contexts/DirectoryServiceContext';
 import { Contract } from '../utils';
 
 interface Entry {
@@ -15,10 +15,7 @@ interface Entry {
 }
 
 const DirectoryEntry: React.FC<{ partyId: string }> = ({ partyId }) => {
-  const directoryClient = useMemo(
-    () => new DirectoryServicePromiseClient('http://localhost:8084'),
-    []
-  );
+  const directoryClient = useDirectoryClient();
 
   const [entry, setParty] = useState<Entry | undefined>(undefined); // undefined state represents the directory lookup still being pending
   useEffect(() => {

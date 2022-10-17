@@ -1,4 +1,5 @@
 import { Auth0Provider } from '@auth0/auth0-react';
+import { DirectoryClientProvider } from 'common-frontend';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
@@ -14,16 +15,18 @@ root.render(
   <React.StrictMode>
     <WalletClientProvider url={config.wallet.grpcUrl}>
       <ValidatorClientProvider url={config.validator.grpcUrl}>
-        {
-          // TODO(i988) Remove hack where we don't use Auth0Provider if the website doesn't run on a secure origin
-          crypto.subtle !== undefined ? (
-            <Auth0Provider {...config.auth}>
+        <DirectoryClientProvider url={config.directory.grpcUrl}>
+          {
+            // TODO(i988) Remove hack where we don't use Auth0Provider if the website doesn't run on a secure origin
+            crypto.subtle !== undefined ? (
+              <Auth0Provider {...config.auth}>
+                <App />
+              </Auth0Provider>
+            ) : (
               <App />
-            </Auth0Provider>
-          ) : (
-            <App />
-          )
-        }
+            )
+          }
+        </DirectoryClientProvider>
       </ValidatorClientProvider>
     </WalletClientProvider>
   </React.StrictMode>
