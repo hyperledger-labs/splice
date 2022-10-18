@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { TabPanel, TabContext } from '@mui/lab';
 import { Box, Tab, Tabs } from '@mui/material';
 
+import AppMultiPaymentRequests from './AppMultiPaymentRequests';
 import AppPaymentRequests from './AppPaymentRequests';
 import Coins from './Coins';
 import PaymentChannels from './PaymentChannels';
@@ -32,6 +33,7 @@ const Home: React.FC<{ userId: string }> = ({ userId }) => {
         </TabPanel>
         <TabPanel value="app_payment_requests">
           <AppPaymentRequests userId={userId} />
+          <AppMultiPaymentRequests userId={userId} />
         </TabPanel>
       </TabContext>
     </>

@@ -6,20 +6,26 @@ Seq(aliceValidator.remoteParticipant, bobValidator.remoteParticipant).foreach { 
   p.dars.upload("apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar")
 }
 
+val charlieValidator = aliceValidator
+
 val aliceUserParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
 val auth0testUser = "auth0|632de6b067ec7e396a03262d"
 aliceValidator.remoteParticipant.ledger_api.users.lookup(auth0testUser)
     .getOrElse(aliceValidator.onboardUser(auth0testUser))
 val bobUserParty = bobValidator.onboardUser(bobRemoteWallet.config.damlUser)
+val charlieUserParty = charlieValidator.onboardUser(charlieRemoteWallet.config.damlUser)
 
 val aliceRequestCid = aliceDirectory.requestDirectoryInstall()
 val bobRequestCid = bobDirectory.requestDirectoryInstall()
+val charlieRequestCid = charlieDirectory.requestDirectoryInstall()
 
 aliceValidator.remoteParticipant.ledger_api.acs.await(aliceUserParty, codegen.DirectoryInstall)
 bobValidator.remoteParticipant.ledger_api.acs.await(bobUserParty, codegen.DirectoryInstall)
+charlieValidator.remoteParticipant.ledger_api.acs.await(charlieUserParty, codegen.DirectoryInstall)
 
 aliceDirectory.requestDirectoryEntry("alice.cns")
 bobDirectory.requestDirectoryEntry("bob.cns")
+charlieDirectory.requestDirectoryEntry("charlie.cns")
 
 val aliceCoin = aliceRemoteWallet.tap(5.0)
 utils.retry_until_true { aliceRemoteWallet.listAppPaymentRequests().length == 1 }
@@ -27,10 +33,15 @@ val aliceAccepted = aliceRemoteWallet.acceptAppPaymentRequest(aliceRemoteWallet.
 val bobCoin = bobRemoteWallet.tap(5.0)
 utils.retry_until_true { bobRemoteWallet.listAppPaymentRequests().length == 1 }
 val bobAccepted = bobRemoteWallet.acceptAppPaymentRequest(bobRemoteWallet.listAppPaymentRequests()(0).contractId)
+val charlieCoin = charlieRemoteWallet.tap(5.0)
+utils.retry_until_true { charlieRemoteWallet.listAppPaymentRequests().length == 1 }
+val charlieAccepted = charlieRemoteWallet.acceptAppPaymentRequest(charlieRemoteWallet.listAppPaymentRequests()(0).contractId)
 
 val providerParty = providerSplitwiseBackend.getProviderPartyId()
 
-Seq((aliceSplitwise, aliceUserParty), (bobSplitwise, bobUserParty)).foreach { case (splitwise, party) =>
+Seq(aliceSplitwise -> aliceUserParty,
+    bobSplitwise -> bobUserParty,
+    charlieSplitwise -> charlieUserParty).foreach { case (splitwise, party) =>
   splitwise.createInstallRequest()
   splitwise.ledgerApi.ledger_api.acs.await(party, splitwiseCodegen.SplitwiseInstall)
 }

@@ -102,6 +102,7 @@ start_frontend wallet 3001 6304 NA 6303 bob
 start_frontend splitwise 3002 8082 8085 NA alice
 start_frontend splitwise 3003 8082 8086 NA bob
 start_frontend directory 3004 8084 8085 NA alice
+start_frontend splitwise 3005 8082 8085 NA charlie
 
 if [ $daemon -eq 0 ]; then
   tmux attach -t ${tmux_session}

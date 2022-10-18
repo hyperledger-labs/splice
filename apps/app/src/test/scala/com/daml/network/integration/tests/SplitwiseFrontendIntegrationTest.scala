@@ -13,7 +13,7 @@ import scala.concurrent.duration.DurationInt
 import org.openqa.selenium.Keys
 
 class SplitwiseFrontendIntegrationTest
-    extends FrontendIntegrationTest("aliceSplitwise", "bobSplitwise") {
+    extends FrontendIntegrationTest("aliceSplitwise", "bobSplitwise", "charlieSplitwise") {
 
   private val darPath = "apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar"
 
@@ -52,17 +52,129 @@ class SplitwiseFrontendIntegrationTest
 
   "A splitwise UI" should {
 
-    "settle debts with another party" in { implicit env =>
+    "settle debts with multiple parties" in { implicit env =>
       val aliceDamlUser = aliceSplitwise.config.damlUser
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
       val bobDamlUser = bobSplitwise.config.damlUser
       val bobUserParty = bobValidator.onboardUser(bobDamlUser)
-      /* TODO(i880) Multi-party settlement
-      val charlieDamlUser = charlieRemoteWallet.config.damlUser
-      val charlieValidator =
-        aliceValidator // we re-use alice's validator here to save some resources
-      charlieValidator.onboardUser(charlieDamlUser)
-       */
+      val charlieDamlUser = charlieSplitwise.config.damlUser
+      // we re-use alice's validator here to save some resources
+      val charlieValidator = aliceValidator
+      val charlieUserParty = charlieValidator.onboardUser(charlieDamlUser)
+      val groupName = "troika"
+
+      initialiseDirectoryApp("alice.cns", aliceUserParty, aliceDirectory, aliceRemoteWallet)
+      initialiseDirectoryApp("bob.cns", bobUserParty, bobDirectory, bobRemoteWallet)
+      initialiseDirectoryApp("charlie.cns", charlieUserParty, charlieDirectory, charlieRemoteWallet)
+
+      withFrontEnd("aliceSplitwise") { implicit webDriver =>
+        go to "http://localhost:3002"
+        click on "user-id-field"
+        textField("user-id-field").value = aliceDamlUser
+        click on "login-button"
+        click on "group-id-field"
+        textField("group-id-field").value = groupName
+        click on "create-group-button"
+        click on "create-invite-link"
+      }
+
+      withFrontEnd("bobSplitwise") { implicit webDriver =>
+        go to "http://localhost:3003"
+        click on "user-id-field"
+        textField("user-id-field").value = bobDamlUser
+        click on "login-button"
+        bobValidator.remoteParticipant.ledger_api.acs
+          .await(bobUserParty, splitwiseCodegen.GroupInvite)
+        click on "request-membership-link"
+      }
+
+      withFrontEnd("aliceSplitwise") { implicit webDriver =>
+        click on className("add-user-link")
+      }
+
+      withFrontEnd("charlieSplitwise") { implicit webDriver =>
+        go to "http://localhost:3005"
+        click on "user-id-field"
+        textField("user-id-field").value = charlieDamlUser
+        click on "login-button"
+        charlieValidator.remoteParticipant.ledger_api.acs
+          .await(charlieUserParty, splitwiseCodegen.GroupInvite)
+        click on "request-membership-link"
+      }
+
+      withFrontEnd("aliceSplitwise") { implicit webDriver =>
+        click on className("add-user-link")
+
+        inside(find(className("enter-payment-quantity-field"))) { case Some(field) =>
+          field.underlying.click()
+          reactTextInput(field).value = "1200.0"
+        }
+        inside(find(className("enter-payment-description-field"))) { case Some(field) =>
+          field.underlying.click()
+          reactTextInput(field).value = "Team lunch"
+        }
+        click on className("enter-payment-link")
+      }
+
+      withFrontEnd("charlieSplitwise") { implicit webDriver =>
+        inside(find(className("enter-payment-quantity-field"))) { case Some(field) =>
+          field.underlying.click()
+          reactTextInput(field).value = "333.0"
+        }
+        inside(find(className("enter-payment-description-field"))) { case Some(field) =>
+          field.underlying.click()
+          reactTextInput(field).value = "Digestivs"
+        }
+        click on className("enter-payment-link")
+      }
+
+      withFrontEnd("bobSplitwise") { implicit webDriver =>
+        eventually() {
+          inside(findAll(className("balances-table-row")).toSeq) {
+            case Seq(r1, r2) => // Need to sync here on the actual values (size not enough)
+              r1.childElement(className("balances-table-receiver")).text shouldBe "alice.cns"
+              r1.childElement(className("balances-table-quantity")).text shouldBe "-400.0000000000"
+              r2.childElement(className("balances-table-receiver")).text shouldBe "charlie.cns"
+              r2.childElement(className("balances-table-quantity")).text shouldBe "-111.0000000000"
+          }
+        }
+        click on className("settle-my-debts-link")
+      }
+
+      ConsoleMacros.utils.retry_until_true {
+        bobRemoteWallet.listAppMultiPaymentRequests().length == 1
+      }
+      inside(bobRemoteWallet.listAppMultiPaymentRequests()) { case Seq(request) =>
+        bobRemoteWallet.tap(550)
+        bobRemoteWallet.acceptAppMultiPaymentRequest(request.contractId)
+      }
+
+      withFrontEnd("bobSplitwise") { implicit webDriver =>
+        // TODO(i1149) Confusing terminology. Change redeem -> collect
+        click on className("redeem-button")
+        eventually() {
+          inside(findAll(className("balances-table-row")).toSeq) { case Seq(row1, row2) =>
+            row1.childElement(className("balances-table-receiver")).text shouldBe "alice.cns"
+            row1.childElement(className("balances-table-quantity")).text shouldBe "0.0000000000"
+            row2.childElement(className("balances-table-receiver")).text shouldBe "charlie.cns"
+            row2.childElement(className("balances-table-quantity")).text shouldBe "0.0000000000"
+          }
+          inside(findAll(className("balance-updates-list-item")).toSeq) {
+            case Seq(row1, row2, row3, row4) =>
+              row1.text shouldBe "bob.cns sent 111.0000000000 CC to charlie.cns"
+              row2.text shouldBe "bob.cns sent 400.0000000000 CC to alice.cns"
+              row3.text shouldBe "charlie.cns paid 333.0000000000 CC for Digestivs"
+              row4.text shouldBe "alice.cns paid 1200.0000000000 CC for Team lunch"
+          }
+        }
+      }
+    }
+
+    "settle debts with a single party" in { implicit env =>
+      val aliceDamlUser = aliceSplitwise.config.damlUser
+      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+      val bobDamlUser = bobSplitwise.config.damlUser
+      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
       val groupName = "troika"
 
       initialiseDirectoryApp("alice.cns", aliceUserParty, aliceDirectory, aliceRemoteWallet)

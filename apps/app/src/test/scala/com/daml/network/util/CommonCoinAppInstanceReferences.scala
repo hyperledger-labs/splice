@@ -53,6 +53,9 @@ trait CommonCoinAppInstanceReferences {
   def bobWallet(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference = w(
     "bobWallet"
   )
+  def charlieWallet(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference = w(
+    "charlieWallet"
+  )
   def bobRemoteWallet(implicit env: CoinTestConsoleEnvironment): RemoteWalletAppReference = rw(
     "bobRemoteWallet"
   )
@@ -88,6 +91,12 @@ trait CommonCoinAppInstanceReferences {
       env: CoinTestConsoleEnvironment
   ): RemoteDirectoryAppReference = rdp(
     "bobDirectory"
+  )
+
+  def charlieDirectory(implicit
+      env: CoinTestConsoleEnvironment
+  ): RemoteDirectoryAppReference = rdp(
+    "charlieDirectory"
   )
 
   def aliceSplitwise(implicit

@@ -27,7 +27,11 @@ import {
   GroupInvite,
   SplitwiseInstall,
 } from '@daml.js/splitwise/lib/CN/Splitwise';
-import { AcceptedAppPayment } from '@daml.js/wallet/lib/CN/Wallet';
+import {
+  AcceptedAppPayment,
+  AcceptedAppMultiPayment,
+  ReceiverQuantity,
+} from '@daml.js/wallet/lib/CN/Wallet';
 import { Identifier, Value } from '@daml/ledger-api';
 import { Choice, ContractId, Template } from '@daml/types';
 
@@ -289,12 +293,71 @@ class LedgerApiClient {
       }
     );
   }
+  async initiateMultiTransfer(
+    sender: string,
+    provider: string,
+    key: GroupKey,
+    receivers: Map<string, string>
+  ) {
+    // TODO(#1199) use numeric instead of text fields in UI
+    const qs: ReceiverQuantity[] = Array.from(receivers)
+      .filter(([_, v]) => v.at(0) === '-')
+      .map(([k, v]) => {
+        return { receiver: k, quantity: v.substring(1, v.length - 1) };
+      });
+    await this.exerciseByKey(
+      [sender],
+      [],
+      SplitwiseInstall.SplitwiseInstall_InitiateMultiTransfer,
+      { _1: sender, _2: provider },
+      {
+        groupKey: {
+          owner: key.getOwnerPartyId(),
+          provider: key.getProviderPartyId(),
+          id: { unpack: key.getId() },
+        },
+        receiverQuantities: qs,
+      }
+    );
+  }
+  async completeMultiTransfer(
+    sender: string,
+    provider: string,
+    validator: string,
+    key: GroupKey,
+    acceptedPaymentContractId: ContractId<AcceptedAppMultiPayment>
+  ) {
+    await this.exerciseByKey(
+      [sender],
+      [validator],
+      SplitwiseInstall.SplitwiseInstall_CompleteMultiTransfer,
+      { _1: sender, _2: provider },
+      {
+        groupKey: {
+          owner: key.getOwnerPartyId(),
+          provider: key.getProviderPartyId(),
+          id: { unpack: key.getId() },
+        },
+        acceptedPaymentCid: acceptedPaymentContractId,
+      }
+    );
+  }
+
   async listAcceptedAppPayments(
     user: string,
     key: GroupKey
   ): Promise<Contract<AcceptedAppPayment>[]> {
     // TODO(M1-92) Improve filtering
     const contracts = await this.queryAcs(user, AcceptedAppPayment);
+    return contracts;
+  }
+
+  async listAcceptedAppMultiPayments(
+    user: string,
+    key: GroupKey
+  ): Promise<Contract<AcceptedAppMultiPayment>[]> {
+    // TODO(M1-92) Improve filtering
+    const contracts = await this.queryAcs(user, AcceptedAppMultiPayment);
     return contracts;
   }
 

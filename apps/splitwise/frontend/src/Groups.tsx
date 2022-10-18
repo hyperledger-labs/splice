@@ -32,7 +32,7 @@ import {
   BalanceUpdate,
   Group as CodegenGroup,
 } from '@daml.js/splitwise/lib/CN/Splitwise';
-import { AcceptedAppPayment } from '@daml.js/wallet/lib/CN/Wallet';
+import { AcceptedAppPayment, AcceptedAppMultiPayment } from '@daml.js/wallet/lib/CN/Wallet';
 
 import { Contract } from './Contract';
 import DirectoryEntries, { Entry as DirectoryEntry } from './DirectoryEntries';
@@ -63,8 +63,9 @@ const balanceEqual = (a: Map<string, string>, b: Map<string, string>): boolean =
   return true;
 };
 
-const Balances: React.FC<BalancesProps> = ({ directoryEntries, group, party }) => {
+const Balances: React.FC<BalancesProps> = ({ directoryEntries, group, party, provider }) => {
   const splitwiseClient = useSplitwiseClient();
+  const ledgerApiClient = useLedgerApiClient();
   const [balances, setBalances] = useState<Map<string, string>>(new Map());
   const fetchBalances = useCallback(async () => {
     const balanceMap = (
@@ -89,27 +90,37 @@ const Balances: React.FC<BalancesProps> = ({ directoryEntries, group, party }) =
     setBalances(prev => (balanceEqual(prev, balances) ? prev : balances));
   }, [splitwiseClient, setBalances, group, party]);
   useInterval(fetchBalances, 500);
+  const onSettleMyDebts = async () => {
+    ledgerApiClient.initiateMultiTransfer(party, provider, key(group), balances);
+  };
   return (
-    <Stack sx={{ px: 2, py: 1 }}>
-      <Typography variant="button">Balances</Typography>
-      <Table
-        sx={{
-          [`& .${tableCellClasses.root}`]: {
-            borderBottom: 'none',
-          },
-        }}
-      >
-        <TableBody>
-          {Array.from(balances).map(([party, balance]) => (
-            <TableRow key={party} className="balances-table-row">
-              <TableCell className="balances-table-receiver">
-                {directoryEntries.resolveParty(party)}
-              </TableCell>
-              <TableCell className="balances-table-quantity">{balance}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <Stack>
+      <Stack sx={{ px: 2, py: 1 }}>
+        <Typography variant="button">Balances</Typography>
+        <Table
+          sx={{
+            [`& .${tableCellClasses.root}`]: {
+              borderBottom: 'none',
+            },
+          }}
+        >
+          <TableBody>
+            {Array.from(balances).map(([party, balance]) => (
+              <TableRow key={party} className="balances-table-row">
+                <TableCell className="balances-table-receiver">
+                  {directoryEntries.resolveParty(party)}
+                </TableCell>
+                <TableCell className="balances-table-quantity">{balance}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </Stack>
+      <Stack justifyContent="stretch">
+        <Button className="settle-my-debts-link" onClick={onSettleMyDebts}>
+          Settle My Debts
+        </Button>
+      </Stack>
     </Stack>
   );
 };
@@ -319,15 +330,34 @@ const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({
   const [acceptedAppPayments, setAcceptedAppPayments] = useState<Contract<AcceptedAppPayment>[]>(
     []
   );
+  const [acceptedAppMultiPayments, setAcceptedAppMultiPayments] = useState<
+    Contract<AcceptedAppMultiPayment>[]
+  >([]);
   const fetchAcceptedAppPayments = useCallback(async () => {
     const decoded = await ledgerApiClient.listAcceptedAppPayments(party, key(group));
     setAcceptedAppPayments(prev => (sameContracts(prev, decoded) ? prev : decoded));
   }, [ledgerApiClient, party, group]);
   useInterval(fetchAcceptedAppPayments, 500);
+  const fetchAcceptedAppMultiPayments = useCallback(async () => {
+    const decoded = await ledgerApiClient.listAcceptedAppMultiPayments(party, key(group));
+    setAcceptedAppMultiPayments(prev => (sameContracts(prev, decoded) ? prev : decoded));
+  }, [ledgerApiClient, party, group]);
+  useInterval(fetchAcceptedAppMultiPayments, 500);
 
   const onRedeem = async (acceptedAppPayment: Contract<AcceptedAppPayment>) => {
     const validator = await ledgerApiClient.getValidatorPartyId(party);
     await ledgerApiClient.completeTransfer(
+      party,
+      provider,
+      validator,
+      key(group),
+      acceptedAppPayment.contractId
+    );
+  };
+
+  const onMultiRedeem = async (acceptedAppPayment: Contract<AcceptedAppMultiPayment>) => {
+    const validator = await ledgerApiClient.getValidatorPartyId(party);
+    await ledgerApiClient.completeMultiTransfer(
       party,
       provider,
       validator,
@@ -348,6 +378,20 @@ const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({
       </ListItem>
     );
   };
+
+  const AcceptedMultiPayment: React.FC<{
+    acceptedAppMultiPayment: Contract<AcceptedAppMultiPayment>;
+  }> = ({ acceptedAppMultiPayment }) => {
+    return (
+      <ListItem>
+        Accepted multi-transfer
+        <Button className="redeem-button" onClick={() => onMultiRedeem(acceptedAppMultiPayment)}>
+          Redeem
+        </Button>
+      </ListItem>
+    );
+  };
+
   return (
     <Stack sx={{ px: 2, py: 1 }}>
       <Typography variant="button">Open transfers</Typography>
@@ -355,6 +399,12 @@ const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({
         {acceptedAppPayments.map(acceptedAppPayment => (
           <AcceptedPayment
             acceptedAppPayment={acceptedAppPayment}
+            key={acceptedAppPayment.contractId}
+          />
+        ))}
+        {acceptedAppMultiPayments.map(acceptedAppPayment => (
+          <AcceptedMultiPayment
+            acceptedAppMultiPayment={acceptedAppPayment}
             key={acceptedAppPayment.contractId}
           />
         ))}
