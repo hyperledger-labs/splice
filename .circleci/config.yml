@@ -49,6 +49,7 @@ commands:
         command: |
           set -eou pipefail
           curl -sSL https://get.daml.com/ | sh -s << pipeline.parameters.sdk-version >>
+          printf "auto-install: false\nupdate-check: never\n" >> $HOME/.daml/daml-config.yaml
   setup_nix:
     description: Set up Nix
     steps:
@@ -533,16 +534,6 @@ commands:
 
            exit $success
 
-  install_daml_dependencies:
-    steps:
-      - run:
-          name: install Daml deps
-          command: |
-            set -eoux pipefail
-            apt-get update && apt-get install -y make curl
-            curl https://get.daml.com | sh -s $SDK_VERSION
-            printf "auto-install: false\nupdate-check: never\n" >> $HOME/.daml/daml-config.yaml
-
   run_todo_script:
     steps:
       - run_bash_command_in_nix:
@@ -552,6 +543,19 @@ commands:
           name: Store todos as artifacts
           path: todo-out/todos
           destination: todos
+
+  docker_build:
+    steps:
+      - run_bash_command_in_nix:
+         cmd_name: build images
+         additional_nix_args: "--keep DOCKER_CERT_PATH \
+                              --keep DOCKER_HOST \
+                              --keep DOCKER_MACHINE_NAME \
+                              --keep DOCKER_TLS_VERIFY \
+                              --keep NO_PROXY"
+         cmd: |
+           export PATH=$HOME/.daml/bin:$PATH
+           (cd $REPO_ROOT/cluster && make docker-build)
 
 jobs:
   # Inspired by Canton, we put the lint-like checks into their own CI job
@@ -825,25 +829,14 @@ jobs:
       <<: *env
     steps:
       - checkout
-      - setup_nix
+      - setup_sbt_test_job
       - install_daml_sdk
       - run_bash_command_in_nix:
          cmd_name: build app
          cmd: |
            export PATH=$HOME/.daml/bin:$PATH
            make build
-
-      - run_bash_command_in_nix:
-         cmd_name: build images
-         additional_nix_args: "--keep DOCKER_CERT_PATH \
-                              --keep DOCKER_HOST \
-                              --keep DOCKER_MACHINE_NAME \
-                              --keep DOCKER_TLS_VERIFY \
-                              --keep NO_PROXY"
-         cmd: |
-           export PATH=$HOME/.daml/bin:$PATH
-           (cd $REPO_ROOT/cluster && make docker-build)
-
+      - docker_build
       - run_bash_command_in_nix:
          cmd_name: push images
          additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
@@ -857,7 +850,24 @@ jobs:
            (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
            export PATH=$HOME/.daml/bin:$PATH
            make -C cluster docker-push
+      - cleanup_sbt_test_job
 
+  docker_images_build:
+    machine:
+      image: ubuntu-2004:202010-01
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_sbt_test_job
+      - install_daml_sdk
+      - run_bash_command_in_nix:
+         cmd_name: build app
+         cmd: |
+           export PATH=$HOME/.daml/bin:$PATH
+           make build
+      - docker_build
+      - cleanup_sbt_test_job
 
 workflows:
   version: 2
@@ -883,6 +893,8 @@ workflows:
         <<: *notify-fail
         <<: *main-branch-only
     - deployment_test:
+        <<: *notify-fail
+    - docker_images_build:
         <<: *notify-fail
 
   deploy_staging:
