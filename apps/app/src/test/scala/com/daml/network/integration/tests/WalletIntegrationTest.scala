@@ -597,21 +597,18 @@ class WalletIntegrationTest
   }
 
   "accepts an optional JWT token with user in subject" in { implicit env =>
+    import com.auth0.jwt.JWT
+    import com.auth0.jwt.algorithms.Algorithm
     import com.daml.network.wallet.v0
     import com.daml.network.auth.{JwtCallCredential}
     import com.daml.network.util.Contract
     import io.grpc.ManagedChannelBuilder
     import cats.syntax.either._
-    import pdi.jwt.{JwtCirce, JwtClaim, JwtAlgorithm}
 
     val aliceDamlUser = aliceRemoteWallet.config.damlUser
     val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
-    val token = JwtCirce.encode(
-      new JwtClaim("", None, Some(aliceDamlUser), None, None, None, None, None),
-      "some-secret",
-      JwtAlgorithm.HS256,
-    )
+    val token = JWT.create().withSubject(aliceDamlUser).sign(Algorithm.HMAC256("secret"))
 
     // using grpc client directly rather than console refs, as token handling isn't threaded through to console command layer (yet)
     val channel =

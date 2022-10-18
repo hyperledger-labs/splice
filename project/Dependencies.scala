@@ -22,6 +22,6 @@ object Dependencies {
   lazy val daml_bindings_scala =
     "com.daml" %% "bindings-scala" % CantonDependencies.daml_libraries_version
 
-  lazy val jwt_scala =
-    "com.github.jwt-scala" %% "jwt-circe" % "9.1.1"
+  lazy val java_jwt =
+    "com.auth0" % "java-jwt" % "4.1.0"
 }

@@ -6,7 +6,8 @@ package com.daml.network.auth
 import io.grpc._
 import io.grpc.Metadata
 
-import pdi.jwt.{JwtCirce, JwtClaim, JwtAlgorithm, JwtOptions}
+import com.auth0.jwt.JWT
+import scala.util.Try
 
 final class AuthInterceptor() extends ServerInterceptor {
   override def interceptCall[ReqT, RespT](
@@ -17,21 +18,14 @@ final class AuthInterceptor() extends ServerInterceptor {
     // TODO(i1012) - switch to "Bearer $token" format for the value of AUTHORIZATION_KEY
     val token = headers.get(AuthInterceptor.AUTHORIZATION_KEY)
 
-    // TODO(i1114) - switch to auth0's jwt library
-    val jwtDec = JwtCirce.decode(
-      token,
-      "this-key-does-nothing",
-      Seq(JwtAlgorithm.HS256),
-      JwtOptions(signature = false), // TODO(i1011) - verify token signature,
-    )
-
-    val jwtOpt: Option[JwtClaim] = jwtDec.toOption
+    // TODO(i1011) - use JWT.require for sig verification
+    val jwtOpt = Try(JWT.decode(token)).toOption
 
     val ctx = Context.current
 
     jwtOpt match {
       case Some(jwt) => {
-        val newCtx = ctx.withValue(AuthInterceptor.SUBJECT_KEY, jwt.subject)
+        val newCtx = ctx.withValue(AuthInterceptor.SUBJECT_KEY, Option(jwt.getSubject()))
 
         Contexts.interceptCall(
           newCtx,
