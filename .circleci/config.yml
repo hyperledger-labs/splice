@@ -29,10 +29,31 @@ parameters:
 notify-fail: &notify-fail
   context: slack-context
   post-steps:
-  - slack/notify:
-      branch_pattern: main
-      event: fail
-      template: basic_fail_1
+    # Slack force-wraps too-long lines within "blocks", and thus we need to send the long text of the second message
+    # below as a "text message". Hence, we split up the Slack notification into two block messages and one text message
+    # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
+    - slack/notify:
+        branch_pattern: main
+        event: fail
+        custom: |
+          { "blocks": [ {
+                "type": "header",
+                "text": { "type": "plain_text", "text": "Job ${CIRCLE_JOB} failed. :red_circle:", "emoji": true }
+                  } ]
+            }
+    - slack/notify:
+        branch_pattern: main
+        event: fail
+        custom: |
+          { "text": "*$CIRCLE_BRANCH*: <${CIRCLE_PULL_REQUEST}|$(git log -1 --oneline --no-color)> ($(git log -1 --pretty='%an'))" }
+    - slack/notify:
+        branch_pattern: main
+        event: fail
+        custom: |
+          { "blocks": [ { "type": "actions", "elements": [
+                          { "type": "button", "text": { "type": "plain_text", "text": "View Job" }, "url": "${CIRCLE_BUILD_URL}" } ]
+                  } ]
+            }
 
 main-branch-only: &main-branch-only
   filters:
@@ -544,6 +565,40 @@ commands:
           path: todo-out/todos
           destination: todos
 
+  # Cannot be defined as a mix-in (like `<<: notify-fail`) because we need to pass the current cluster as parameter
+  notify-cluster-fail:
+    parameters:
+      cluster:
+        type: enum
+        enum: ["staging", "dev", "test", "devnet", "testnet"]
+    steps:
+      # Slack force-wraps too-long lines within "blocks", and thus we need to send the long text of the second message
+      # below as a "text message". Hence, we split up the Slack notification into two block messages and one text message
+      # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
+      - slack/notify:
+          branch_pattern: main
+          event: fail
+          custom: |
+            { "blocks": [ {
+                      "type": "header",
+                      "text": { "type": "plain_text", "text": "Job ${CIRCLE_JOB} failed on cluster '<< parameters.cluster >>' :dumpster-fire:",
+                          "emoji": true }
+                  } ]
+            }
+      - slack/notify:
+          branch_pattern: main
+          event: fail
+          custom: |
+            { "text": "*$CIRCLE_BRANCH*: <${CIRCLE_PULL_REQUEST}|$(git log -1 --oneline --no-color)> ($(git log -1 --pretty='%an'))" }
+      - slack/notify:
+          branch_pattern: main
+          event: fail
+          custom: |
+            { "blocks": [ { "type": "actions", "elements": [
+                          { "type": "button", "text": { "type": "plain_text", "text": "View Job" }, "url": "${CIRCLE_BUILD_URL}" } ]
+              } ]
+            }
+
   docker_build:
     steps:
       - run_bash_command_in_nix:
@@ -695,39 +750,8 @@ jobs:
             . $REPO_ROOT/cluster/deployment/<< parameters.cluster >>/.envrc.vars
             cncluster activate
             cncluster ciapply
-      # TODO(#1059): Generalise as mix-in
-      - slack/notify:
-          event: fail
-          custom: |
-            {
-            	"blocks": [
-            		{
-            			"type": "header",
-            			"text": {
-            				"type": "plain_text",
-            				"text": "Deploying cluster << parameters.cluster >> failed. :red_circle:",
-            				"emoji": true
-            			}
-            		},
-                    {
-                    	"type": "section",
-                    	"fields": [
-                    		{ "type": "mrkdwn", "text": "*Branch*: $CIRCLE_BRANCH" },
-                            { "type": "mrkdwn", "text": "*Commit*: $(git log -1 --oneline --no-color)" },
-                            { "type": "mrkdwn", "text": "*Author*: $(git log -1 --pretty='%an')" }
-                    	]
-                    },
-            		{
-            			"type": "actions",
-            			"elements": [
-            				{ "type": "button",
-            					"text": { "type": "plain_text", "text": "View Job" },
-            					"url": "${CIRCLE_BUILD_URL}"
-            				}
-            			]
-            		}
-            	]
-            }
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
 
   preflight_check:
     parameters:
@@ -755,39 +779,8 @@ jobs:
           extra_parameters: -DDOMAIN_URL=http://<<parameters.cluster>>.network.canton.global:5008 -DNETWORK_APPS_ADDRESS=<<parameters.cluster>>.network.canton.global
           timeout: "10m"
       - stop_vpn
-      # # TODO(#1059): Generalise as mix-in
-      - slack/notify:
-          event: fail
-          custom: |
-            {
-            	"blocks": [
-            		{
-            			"type": "header",
-            			"text": {
-            				"type": "plain_text",
-            				"text": "Pre-flight validator check on the '<< parameters.cluster >>' cluster failed. :red_circle:",
-            				"emoji": true
-            			}
-            		},
-                    {
-                    	"type": "section",
-                    	"fields": [
-                    		{ "type": "mrkdwn", "text": "*Branch*: $CIRCLE_BRANCH" },
-                            { "type": "mrkdwn", "text": "*Commit*: $(git log -1 --oneline --no-color)" },
-                            { "type": "mrkdwn", "text": "*Author*: $(git log -1 --pretty='%an')" }
-                    	]
-                    },
-            		{
-            			"type": "actions",
-            			"elements": [
-            				{ "type": "button",
-            					"text": { "type": "plain_text", "text": "View Job" },
-            					"url": "${CIRCLE_BUILD_URL}"
-            				}
-            			]
-            		}
-            	]
-            }
+      - notify-cluster-fail:
+          cluster: << parameters.cluster >>
       - cleanup_sbt_test_job
 
   update_pipeline_schedule:
