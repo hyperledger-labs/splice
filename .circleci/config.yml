@@ -29,31 +29,13 @@ parameters:
 notify-fail: &notify-fail
   context: slack-context
   post-steps:
-    # Slack force-wraps too-long lines within "blocks", and thus we need to send the long text of the second message
-    # below as a "text message". Hence, we split up the Slack notification into two block messages and one text message
+    # Note that Slack force-wraps too-long lines within "blocks", and thus we don't use Slack message "blocks"
     # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
     - slack/notify:
         branch_pattern: main
         event: fail
         custom: |
-          { "blocks": [ {
-                "type": "header",
-                "text": { "type": "plain_text", "text": "Job ${CIRCLE_JOB} failed. :red_circle:", "emoji": true }
-                  } ]
-            }
-    - slack/notify:
-        branch_pattern: main
-        event: fail
-        custom: |
-          { "text": "*$CIRCLE_BRANCH*: <${CIRCLE_PULL_REQUEST}|$(git log -1 --oneline --no-color)> ($(git log -1 --pretty='%an'))" }
-    - slack/notify:
-        branch_pattern: main
-        event: fail
-        custom: |
-          { "blocks": [ { "type": "actions", "elements": [
-                          { "type": "button", "text": { "type": "plain_text", "text": "View Job" }, "url": "${CIRCLE_BUILD_URL}" } ]
-                  } ]
-            }
+          { "text": "*Job '${CIRCLE_JOB}' failed.* :red_circle:\n*$CIRCLE_BRANCH*: <${CIRCLE_PULL_REQUEST:-$CIRCLE_BUILD_URL}|$(git log -1 --oneline --no-color)> ($(git log -1 --pretty='%an'), <${CIRCLE_BUILD_URL}|CI Build>)" }
 
 main-branch-only: &main-branch-only
   filters:
@@ -573,32 +555,13 @@ commands:
         type: enum
         enum: ["staging", "dev", "test", "devnet", "testnet"]
     steps:
-      # Slack force-wraps too-long lines within "blocks", and thus we need to send the long text of the second message
-      # below as a "text message". Hence, we split up the Slack notification into two block messages and one text message
+      # Note that Slack force-wraps too-long lines within "blocks", and thus we don't use Slack message "blocks"
       # see stackoverflow.com/questions/57438097/how-to-make-slack-api-block-kit-take-up-the-entire-width-of-the-slack-window
       - slack/notify:
           branch_pattern: main
           event: fail
           custom: |
-            { "blocks": [ {
-                      "type": "header",
-                      "text": { "type": "plain_text", "text": "Job ${CIRCLE_JOB} failed on cluster '<< parameters.cluster >>' :dumpster-fire:",
-                          "emoji": true }
-                  } ]
-            }
-      - slack/notify:
-          branch_pattern: main
-          event: fail
-          custom: |
-            { "text": "*$CIRCLE_BRANCH*: <${CIRCLE_PULL_REQUEST}|$(git log -1 --oneline --no-color)> ($(git log -1 --pretty='%an'))" }
-      - slack/notify:
-          branch_pattern: main
-          event: fail
-          custom: |
-            { "blocks": [ { "type": "actions", "elements": [
-                          { "type": "button", "text": { "type": "plain_text", "text": "View Job" }, "url": "${CIRCLE_BUILD_URL}" } ]
-              } ]
-            }
+            { "text": "*Job '${CIRCLE_JOB}' failed on cluster '<< parameters.cluster >>'* :dumpster-fire:.\n*$CIRCLE_BRANCH*: <${CIRCLE_PULL_REQUEST:-$CIRCLE_BUILD_URL}|$(git log -1 --oneline --no-color)> ($(git log -1 --pretty='%an'), <${CIRCLE_BUILD_URL}|CI Build>)" }
 
   docker_build:
     steps:
