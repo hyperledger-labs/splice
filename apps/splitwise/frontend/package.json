@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "dependencies": {
-    "@daml.js/canton-coin": "file:daml.js/canton-coin-0.1.0",
-    "@daml.js/directory": "file:daml.js/directory-service-0.1.0",
-    "@daml.js/splitwise": "file:daml.js/splitwise-0.1.0",
-    "@daml.js/wallet": "file:daml.js/wallet-0.1.0",
+    "@daml.js/canton-coin": "file:../../common/frontend/daml.js/canton-coin-0.1.0",
+    "@daml.js/directory": "file:../../common/frontend/daml.js/directory-service-0.1.0",
+    "@daml.js/wallet": "file:../../common/frontend/daml.js/wallet-0.1.0",
+    "@daml.js/splitwise": "file:../../common/frontend/daml.js/splitwise-0.1.0",
     "@daml/ledger": "file:../../../nix/vendored/daml-ledger-0.0.0.tgz",
     "@daml/ledger-api": "file:../../../nix/vendored/daml-ledger-api-0.0.0.tgz",
     "@daml/types": "file:../../../nix/vendored/daml-types-0.0.0.tgz",
@@ -43,8 +43,7 @@
     "format:fix": "prettier --write src",
     "format:check": "prettier --check src",
     "lint:fix": "eslint src --ignore-pattern src/com/* --fix",
-    "lint:check": "eslint src --ignore-pattern src/com/* --max-warnings=0",
-    "preinstall": "./codegen.sh"
+    "lint:check": "eslint src --ignore-pattern src/com/* --max-warnings=0"
   },
   "eslintConfig": {
     "extends": [

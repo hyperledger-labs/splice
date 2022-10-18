@@ -322,7 +322,8 @@ lazy val `apps-app` =
       `canton-community-app` % "compile->compile;test->test",
     )
     .settings(
-      libraryDependencies += "org.scalatestplus" %% "selenium-4-1" % "3.2.12.1" % "test",
+      libraryDependencies += "org.scalatestplus" %% "selenium-4-4" % "3.2.14.0" % "test",
+      libraryDependencies += "org.seleniumhq.selenium" % "selenium-java" % "4.5.0" % "test",
       BuildCommon.sharedAppSettings,
       BuildCommon.cantonWarts,
       bundleTask,

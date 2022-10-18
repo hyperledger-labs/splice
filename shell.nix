@@ -35,7 +35,7 @@ in pkgs.mkShell {
     nix
     nodejs
     openjdk11
-    protobuf
+    protobuf3_19
     protoc-gen-grpc-web
     postgresql_11
     python3
