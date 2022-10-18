@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.auth.AuthInterceptor
+import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode}
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -12,6 +13,7 @@ import com.daml.network.wallet.admin.WalletAutomationService
 import com.daml.network.wallet.admin.grpc.GrpcWalletService
 import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.daml.network.wallet.store.WalletStore
+import com.daml.network.wallet.treasury.TreasuryServices
 import com.daml.network.wallet.v0.WalletServiceGrpc
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
@@ -21,8 +23,6 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
-import com.daml.network.codegen.CN.Wallet as walletCodegen
-import com.daml.network.wallet.treasury.TreasuryServices
 import io.grpc.ServerInterceptors
 import io.opentelemetry.api.trace.Tracer
 

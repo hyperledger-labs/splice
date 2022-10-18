@@ -1,26 +1,26 @@
 package com.daml.network.integration.tests
 
-import java.nio.file.Paths
-import java.time.Duration
+import com.daml.network.environment.CoinEnvironmentImpl
+import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
   IsolatedCoinEnvironments,
 }
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import org.openqa.selenium.{OutputType, TakesScreenshot, WebDriver}
+import org.apache.commons.io.FileUtils
 import org.openqa.selenium.firefox.{FirefoxDriver, FirefoxDriverLogLevel, FirefoxOptions}
+import org.openqa.selenium.{OutputType, TakesScreenshot, WebDriver}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatestplus.selenium.WebBrowser
 
-import scala.collection.mutable
-import java.text.SimpleDateFormat
-import java.util.Calendar
 import java.io.File
-import org.apache.commons.io.FileUtils
+import java.nio.file.Paths
+import java.text.SimpleDateFormat
+import java.time.Duration
+import java.util.Calendar
+import scala.collection.mutable
 
 abstract class FrontendIntegrationTest(frontendNames: String*)
     extends CoinIntegrationTest

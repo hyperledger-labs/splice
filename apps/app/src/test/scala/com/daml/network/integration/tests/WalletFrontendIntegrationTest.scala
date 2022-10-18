@@ -9,7 +9,6 @@ import org.openqa.selenium.WebDriver
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-
 import scala.util.Try
 
 class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {

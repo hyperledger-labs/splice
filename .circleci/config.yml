@@ -612,6 +612,8 @@ jobs:
       - execute_sbt_command:
           cmd: "Test/compile"
       - execute_sbt_command:
+          cmd: "scalafixCheck" # This requires artifacts to be built first
+      - execute_sbt_command:
           # run all tests except the live cluster ones
           pre_sbt_cmd: ./start-canton.sh external && ./start-frontends.sh -d
           cmd: "\"testOnly * -- -l LiveDevNetTest\""
@@ -838,7 +840,7 @@ workflows:
     # Linting and formatting
     - static_tests:
         <<: *notify-fail
-    # Scala
+    # Scala ; incl. scalafix
     - test:
         <<: *notify-fail
     - bundle:

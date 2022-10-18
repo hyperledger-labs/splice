@@ -1,6 +1,5 @@
 package com.daml.network.environment
 
-import com.digitalasset.canton.util.ShowUtil._
 import com.daml.error.ErrorCategory
 import com.daml.error.utils.ErrorDetails
 import com.daml.grpc.{GrpcException, GrpcStatus}
@@ -8,7 +7,7 @@ import com.digitalasset.canton.error.ErrorCodeUtils
 import com.digitalasset.canton.lifecycle.{FlagCloseable, FutureUnlessShutdown}
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.retry.Backoff
+import com.digitalasset.canton.util.ShowUtil._
 import com.digitalasset.canton.util.retry.RetryUtil.{
   ErrorKind,
   ExceptionRetryable,
@@ -16,7 +15,7 @@ import com.digitalasset.canton.util.retry.RetryUtil.{
   NoErrorKind,
   TransientErrorKind,
 }
-import com.digitalasset.canton.util.retry.Success
+import com.digitalasset.canton.util.retry.{Backoff, Success}
 import io.grpc.Status
 import io.grpc.protobuf.StatusProto
 

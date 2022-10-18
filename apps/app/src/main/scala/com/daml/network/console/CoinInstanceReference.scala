@@ -1,26 +1,26 @@
 package com.daml.network.console
 
-import com.digitalasset.canton.config.NonNegativeDuration
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
+import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.commands.{
+  HealthAdministration,
   LedgerApiAdministration,
   ParticipantAdministration,
-  HealthAdministration,
   ParticipantPartiesAdministrationGroup,
   ParticipantPruningAdministrationGroup,
   ParticipantTestingGroup,
   TopologyAdministrationGroup,
 }
 import com.digitalasset.canton.console.{
-  ConsoleEnvironment,
   ConsoleCommandResult,
+  ConsoleEnvironment,
   ConsoleMacros,
   FeatureFlag,
   Help,
-  LocalInstanceReference,
   InstanceReference,
   LedgerApiCommandRunner,
+  LocalInstanceReference,
   RemoteParticipantReference,
 }
 import com.digitalasset.canton.environment.CantonNodeBootstrap

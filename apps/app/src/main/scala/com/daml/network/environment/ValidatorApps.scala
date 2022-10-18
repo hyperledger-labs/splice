@@ -2,7 +2,7 @@ package com.daml.network.environment
 
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.validator.config.LocalValidatorAppConfig
-import com.daml.network.validator.{ValidatorAppBootstrap, ValidatorApp}
+import com.daml.network.validator.{ValidatorApp, ValidatorAppBootstrap}
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.environment.ManagedNodes

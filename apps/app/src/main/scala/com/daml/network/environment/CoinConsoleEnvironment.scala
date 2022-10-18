@@ -1,9 +1,9 @@
 package com.daml.network.environment
 
 import com.daml.network.console.{
-  LocalCoinAppReference,
   CoinAppReference,
   DirectoryAppReference,
+  LocalCoinAppReference,
   LocalDirectoryAppReference,
   LocalScanAppReference,
   LocalSplitwiseAppReference,

@@ -2,6 +2,7 @@ package com.daml.network.wallet.admin.grpc
 
 import cats.implicits.*
 import com.daml.ledger.client.binding.{Primitive, TemplateCompanion}
+import com.daml.network.auth.AuthInterceptor
 import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
 import com.daml.network.codegen.CC.{Coin as coinCodegen, CoinRules as coinRulesCodegen}
 import com.daml.network.codegen.CN.Wallet.CoinOperationOutcome.COO_AcceptedAppMultiPayment
@@ -11,13 +12,12 @@ import com.daml.network.codegen.DA
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.auth.AuthInterceptor
 import com.daml.network.util.{CoinUtil, Contract, Proto, Value}
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
+import com.daml.network.wallet.treasury.TreasuryServices
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.{CollectRewardsRequest, WalletServiceGrpc}
 import com.daml.network.v0 as networkV0
-import com.daml.network.wallet.treasury.TreasuryServices
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}

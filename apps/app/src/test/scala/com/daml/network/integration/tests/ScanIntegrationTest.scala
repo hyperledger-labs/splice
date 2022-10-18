@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.CC.Round.{ClosedMiningRound, Round}
+import com.daml.network.codegen.DA
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.history._
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -13,7 +14,6 @@ import com.daml.network.util.{CommonCoinAppInstanceReferences, ExerciseNode, Pay
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.concurrent.duration._
-import com.daml.network.codegen.DA
 
 // TODO(M1-92): Add tests that cover all possible CoinEvents
 class ScanIntegrationTest

@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen, Wallet => walletCodegen}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -10,8 +11,6 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.splitwise.admin.api.client.commands.GrpcSplitwiseAppClient
 import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
-import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 
 class SplitwiseIntegrationTest
     extends CoinIntegrationTest

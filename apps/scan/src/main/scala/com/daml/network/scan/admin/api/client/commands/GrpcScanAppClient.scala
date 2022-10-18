@@ -8,7 +8,7 @@ import com.daml.network.history.CoinTransaction
 import com.daml.network.scan.v0
 import com.daml.network.scan.v0.GetClosedRoundsResponse
 import com.daml.network.scan.v0.ScanServiceGrpc.ScanServiceStub
-import com.daml.network.util.{Contract}
+import com.daml.network.util.Contract
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.empty.Empty

@@ -3,9 +3,9 @@ package com.daml.network.splitwise.store
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
-import com.daml.network.util.Contract
-import com.daml.network.store.AcsStore
 import com.daml.network.splitwise.store.memory.InMemorySplitwiseStore
+import com.daml.network.store.AcsStore
+import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId

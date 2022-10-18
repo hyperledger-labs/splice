@@ -4,6 +4,7 @@ import com.daml.network.config.{LocalCoinConfig, RemoteCoinConfig}
 import com.daml.network.scan.config.RemoteScanAppConfig
 import com.digitalasset.canton.config._
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
+
 import java.nio.file.Path
 
 case class AppInstance(

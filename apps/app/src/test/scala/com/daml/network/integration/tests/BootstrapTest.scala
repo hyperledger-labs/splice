@@ -9,8 +9,8 @@ import com.daml.network.integration.tests.CoinTests.{
   IsolatedCoinEnvironments,
 }
 import com.daml.network.util.CommonCoinAppInstanceReferences
-import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 
 class BootstrapTest
     extends CoinIntegrationTest

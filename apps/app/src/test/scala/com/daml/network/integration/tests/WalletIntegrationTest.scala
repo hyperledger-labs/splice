@@ -3,6 +3,12 @@ package com.daml.network.integration.tests
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding
 import com.daml.ledger.client.binding.Primitive
+import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
+import com.daml.network.codegen.CN.Scripts.{TestWallet => testWalletCodegen}
+import com.daml.network.codegen.CN.{Wallet => walletCodegen}
+import com.daml.network.codegen.DA
+import com.daml.network.codegen.DA.Time.Types.RelTime
+import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 import com.daml.network.console.{LocalWalletAppReference, WalletAppReference}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -17,22 +23,14 @@ import com.daml.network.util.{
   PaymentChannelTestUtil,
   Proto,
 }
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.topology.PartyId
-import com.daml.network.codegen.CC.{Coin => coinCodegen}
-import com.daml.network.codegen.CC.{CoinRules => coinRulesCodegen}
-import com.daml.network.codegen.CN.Scripts.{TestWallet => testWalletCodegen}
-import com.daml.network.codegen.CN.{Wallet => walletCodegen}
-import com.daml.network.codegen.DA
-import com.daml.network.codegen.DA.Time.Types.RelTime
-import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.{Balance, ListResponse}
-
-import java.time.temporal.ChronoUnit
 import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.PartyId
 
+import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
 import scala.concurrent.duration._
 

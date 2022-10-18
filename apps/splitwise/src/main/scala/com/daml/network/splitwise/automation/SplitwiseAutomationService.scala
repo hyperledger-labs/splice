@@ -3,8 +3,8 @@ package com.daml.network.splitwise.automation
 import akka.stream.Materializer
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
-import com.daml.network.splitwise.store.SplitwiseStore
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.splitwise.store.SplitwiseStore
 import com.daml.network.store.AcsStore.QueryResult
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory

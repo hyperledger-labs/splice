@@ -5,7 +5,7 @@ import com.daml.ledger.api.v1
 import com.daml.ledger.api.v1.event.ExercisedEvent
 import com.daml.ledger.api.v1.transaction.TreeEvent.Kind.Exercised
 import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree}
-import com.daml.ledger.client.binding.{Primitive, ValueDecoder, Value => CodegenValue}
+import com.daml.ledger.client.binding.{Primitive, Value => CodegenValue, ValueDecoder}
 import com.daml.network.admin.LedgerAutomationService
 import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
 import com.daml.network.codegen.CC.CoinRules.{CoinRules, TransferResult}

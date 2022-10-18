@@ -1,7 +1,7 @@
 package com.daml.network.wallet.admin.grpc
 
-import akka.stream.{BoundedSourceQueue, Materializer}
 import akka.stream.scaladsl.{Keep, Sink, Source}
+import akka.stream.{BoundedSourceQueue, Materializer}
 import com.daml.network.codegen.CC.{Coin as coinCodegen, CoinRules as coinRulesCodegen}
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.environment.CoinLedgerConnection

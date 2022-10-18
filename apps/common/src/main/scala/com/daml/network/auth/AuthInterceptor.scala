@@ -3,10 +3,9 @@
 
 package com.daml.network.auth
 
-import io.grpc._
-import io.grpc.Metadata
-
 import com.auth0.jwt.JWT
+import io.grpc.{Metadata, _}
+
 import scala.util.Try
 
 final class AuthInterceptor() extends ServerInterceptor {

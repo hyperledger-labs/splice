@@ -2,6 +2,7 @@ package com.daml.network.scan
 
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.network.codegen.{CC => coinCodegen}
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode}
 import com.daml.network.scan.admin.ScanAutomationService
@@ -18,7 +19,6 @@ import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.api.trace.Tracer
-import com.daml.network.codegen.{CC => coinCodegen}
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 

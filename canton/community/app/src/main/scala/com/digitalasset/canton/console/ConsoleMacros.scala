@@ -19,8 +19,6 @@ import com.daml.ledger.api.v1.value.{
   RecordField,
   Value,
 }
-import com.digitalasset.canton.DiscardOps
-import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.ContractData
 import com.digitalasset.canton.admin.api.client.data.ListPartiesResult
 import com.digitalasset.canton.concurrent.Threading
@@ -36,6 +34,7 @@ import com.digitalasset.canton.protocol.{LfContractId, SerializableContract}
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.{BinaryFileUtil, ErrorUtil}
+import com.digitalasset.canton.{DiscardOps, DomainAlias}
 import com.google.protobuf.ByteString
 import com.typesafe.scalalogging.LazyLogging
 import io.circe.Encoder

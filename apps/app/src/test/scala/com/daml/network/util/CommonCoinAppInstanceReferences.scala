@@ -8,9 +8,9 @@ import com.daml.network.console.{
   LocalValidatorAppReference,
   LocalWalletAppReference,
   RemoteDirectoryAppReference,
+  RemoteSplitwiseAppReference,
   RemoteSvcAppReference,
   RemoteWalletAppReference,
-  RemoteSplitwiseAppReference,
 }
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.topology.PartyId

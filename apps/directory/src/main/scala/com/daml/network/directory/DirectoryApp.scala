@@ -3,6 +3,7 @@ package com.daml.network.directory
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.network.codegen.CN.{Directory => directoryCodegen}
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.directory.admin.grpc.GrpcDirectoryService
 import com.daml.network.directory.automation.DirectoryAutomationService
@@ -19,8 +20,8 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
-import com.daml.network.codegen.CN.{Directory => directoryCodegen}
 import io.opentelemetry.api.trace.Tracer
+
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** Class representing a Directory app instance.

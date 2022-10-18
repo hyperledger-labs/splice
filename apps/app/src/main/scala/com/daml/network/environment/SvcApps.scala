@@ -2,7 +2,7 @@ package com.daml.network.environment
 
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.svc.config.LocalSvcAppConfig
-import com.daml.network.svc.{SvcAppBootstrap, SvcApp}
+import com.daml.network.svc.{SvcApp, SvcAppBootstrap}
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.environment.ManagedNodes

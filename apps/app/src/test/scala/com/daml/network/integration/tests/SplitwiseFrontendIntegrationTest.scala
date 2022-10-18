@@ -1,16 +1,16 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.environment.{CoinEnvironmentImpl, CoinConsoleEnvironment}
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.digitalasset.canton.console.ConsoleMacros
-import com.digitalasset.canton.topology.PartyId
-import com.daml.network.integration.tests.CoinTests.{CoinTestConsoleEnvironment}
-import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
-import com.daml.network.codegen.CN.{Directory => dirCodegen}
+import com.daml.network.codegen.CN.{Directory => dirCodegen, Splitwise => splitwiseCodegen}
 import com.daml.network.console.{RemoteDirectoryAppReference, RemoteWalletAppReference}
+import com.daml.network.environment.{CoinConsoleEnvironment, CoinEnvironmentImpl}
+import com.daml.network.integration.CoinEnvironmentDefinition
+import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
+import com.digitalasset.canton.console.ConsoleMacros
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import scala.concurrent.duration.DurationInt
+import com.digitalasset.canton.topology.PartyId
 import org.openqa.selenium.Keys
+
+import scala.concurrent.duration.DurationInt
 
 class SplitwiseFrontendIntegrationTest
     extends FrontendIntegrationTest("aliceSplitwise", "bobSplitwise", "charlieSplitwise") {

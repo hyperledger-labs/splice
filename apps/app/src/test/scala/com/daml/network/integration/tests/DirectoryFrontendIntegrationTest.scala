@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.integration.CoinEnvironmentDefinition
+
 import scala.concurrent.duration.DurationInt
 
 class DirectoryFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
