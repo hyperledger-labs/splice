@@ -144,11 +144,9 @@ class SplitwiseIntegrationTest
     }
 
     "return the primary party of the user" in { implicit env =>
-      val users = providerSplitwiseBackend.remoteParticipant.ledger_api.users
-        .list(filterUser = providerSplitwiseBackend.config.providerUser)
-      inside(users.users) { case Seq(user) =>
-        Some(providerSplitwiseBackend.getProviderPartyId().toLf) shouldBe user.primaryParty
-      }
+      val user = providerSplitwiseBackend.remoteParticipant.ledger_api.users
+        .get(providerSplitwiseBackend.config.providerUser)
+      Some(providerSplitwiseBackend.getProviderPartyId().toLf) shouldBe user.primaryParty
     }
   }
 }

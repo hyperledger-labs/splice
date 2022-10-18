@@ -809,6 +809,19 @@ trait BaseLedgerApiAdministration extends NoTracing {
           ledgerApiCommand(LedgerApiCommands.Users.Get(id))
         })
 
+      @Help.Summary("Lookup the user data of the user with the given id", FeatureFlag.Testing)
+      @Help.Description(
+        """Lookup the data associated with the given user id returning None if there is no such user.
+          |This can be used to get the primary party associated with a given user.
+          |If you need the full user rights, use rights.list instead."""
+      )
+      def lookup(
+          id: String
+      ): Option[LedgerApiUser] =
+        check(FeatureFlag.Testing)(consoleEnvironment.run {
+          ledgerApiCommand(LedgerApiCommands.Users.Lookup(id))
+        })
+
       @Help.Summary("Delete user", FeatureFlag.Testing)
       @Help.Description("""Delete a user.""")
       def delete(id: String): Unit =
