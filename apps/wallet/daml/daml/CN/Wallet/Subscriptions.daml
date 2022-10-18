@@ -1,0 +1,333 @@
+module CN.Wallet.Subscriptions where
+
+import DA.Time
+import DA.Optional
+
+import CC.Coin
+import CC.CoinRules
+
+import CC.Scripts.Util (CCUserHostedAt(..))
+
+
+-- Subscriptions flow (happy path) for reference:
+--
+--       ┌─────────────────────┐                     ┌─────────────────────┐
+--       │ SubscriptionRequest │-------------------->│ interface           │
+--       └──────────┬──────────┘                     │ SubscriptionContext │
+--                  │AcceptAndMakePayment (sender)   └─────────────────────┘
+--                  │                                       ^  ^
+--    ┌─────────────▼──────────────┐                        '  '
+--    │ SubscriptionInitialPayment │------------------------'  '
+--    └─────────────┬──────────────┘                           '
+--                  │Collect (receiver)                        '
+--                  ├────────────────────────────────────┐     '
+--                  │                                    │     '
+--                  │                                    │     '
+--    ┌─────────────▼──────────────┐             ┌───────▼────────┐
+--    │   SubscriptionIdleState    │------------>│  Subscription  │
+--    └┬──────────────────────▲────┘             └────────────────┘
+--     │MakePayment (sender)  │                          ^
+--     │                      │Collect (receiver)        '
+--    ┌▼──────────────────────┴────┐                     '
+--    │   SubscriptionPayment      │---------------------'
+--    └────────────────────────────┘
+
+data SubscriptionContextView = SubscriptionContextView
+  with
+    description : Text
+
+-- | The description of what a subscription actually is for / what the user can expect to get in return.
+-- Contracts implementing this interface are used to carry extra data along all kinds of subscription-related flows.
+-- Their lifetime is bound 1-1 to the lifetime of the subscription contract referencing them.
+interface SubscriptionContext
+  where
+    viewtype SubscriptionContextView
+
+    choice SubscriptionContext_Archive : ()
+      controller (signatory this)
+      do pure ()
+
+
+-- | Main subscription object.
+--   Usually created in `SubscriptionInitialPayment_Collect`.
+--   Immutable per subscription and passed around from state to state for convenience.
+--   Can be nicely expired via the `SubscriptionIdleState`.
+--   Can be used as a stable reference to a subscription.
+
+template Subscription
+  with
+    sender: Party -- ^ The party that pays.
+    receiver: Party -- ^ The party that receives payment.
+    provider: Party -- ^ The app provider.
+    svc: Party
+    context: ContractId SubscriptionContext -- ^ What this subscription is for.
+  where
+    signatory sender, receiver, provider
+
+    choice Subscription_Archive : ()
+      controller sender, receiver
+      do
+        exercise context SubscriptionContext_Archive
+
+assertSubscriptionMatches: ContractId Subscription -> Subscription -> Update ()
+assertSubscriptionMatches subscription subscriptionData = do
+  actualSubscriptionData <- fetch subscription
+  assertMsg "Subscription data matches referenced subscription" (actualSubscriptionData == subscriptionData)
+  pure ()
+
+assertContextValid: Subscription -> Update ()
+assertContextValid subscriptionData = do
+  fetchResult <- fetchFromInterface @SubscriptionContext subscriptionData.context
+  assertMsg "Context is active and has correct interface" (isSome fetchResult)
+  pure ()
+
+
+-- | Payment-related properties. Expected to be mutated rarely.
+data SubscriptionPayData = SubscriptionPayData
+  with
+    paymentQuantity: Decimal -- ^ What quantity of coin is due on each interval.
+    paymentInterval: RelTime -- ^ At which intervals payments should be made.
+    paymentDuration: RelTime -- ^ The time available to the sender to initiate a payment; they can initiate the payment this much before the end of the current interval.
+    collectionDuration : RelTime -- ^ The time available to the receiver to collect a payment.
+  deriving (Eq, Show)
+
+-- for ensure assertions
+payDataIsValid: SubscriptionPayData -> Bool
+payDataIsValid payData =
+  payData.paymentQuantity > 0.0 && payData.paymentInterval > aunit && payData.paymentDuration > aunit && payData.collectionDuration > aunit
+
+
+-- | A request for establishing a subscription.
+template SubscriptionRequest
+  with
+    subscriptionData: Subscription
+    payData: SubscriptionPayData
+  where
+    signatory signatory subscriptionData
+    ensure payDataIsValid payData
+
+    choice SubscriptionRequest_AcceptAndMakePayment : (ContractId SubscriptionInitialPayment, ContractId Coin)
+      with
+        inputs: [TransferInput]
+      controller subscriptionData.sender
+      do
+        assertContextValid subscriptionData
+
+        now <- getTime
+        (lockedCoin, senderChange) <- lockAndMakeChange
+          subscriptionData.sender subscriptionData.receiver subscriptionData.provider subscriptionData.svc
+          inputs payData.paymentQuantity payData.collectionDuration now
+
+        subscriptionPayment <- create SubscriptionInitialPayment with ..
+
+        return (subscriptionPayment, senderChange)
+
+    choice SubscriptionRequest_Withdraw : ()
+      controller subscriptionData.receiver
+      do exercise subscriptionData.context SubscriptionContext_Archive
+
+    choice SubscriptionRequest_Reject : ()
+      controller subscriptionData.sender
+      do exercise subscriptionData.context SubscriptionContext_Archive
+
+
+-- | The initial payment on a subscription.
+--   Implicitly, this is also the "accept" of the preceding `SubscriptionRequest`.
+--   Collecting this payments creates the subscription and thereby enables all follow-up payments.
+template SubscriptionInitialPayment
+  with
+    subscriptionData: Subscription
+    payData: SubscriptionPayData
+    lockedCoin: ContractId LockedCoin
+  where
+    signatory signatory subscriptionData, subscriptionData.provider
+    ensure payDataIsValid payData
+
+    choice SubscriptionInitialPayment_Collect : (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
+      with
+        submitter: Party
+      controller subscriptionData.sender, subscriptionData.receiver
+      do
+        assertContextValid subscriptionData
+
+        now <- getTime
+        subscription <- create subscriptionData
+        state <- create SubscriptionIdleState with
+          nextPaymentDueAt = now `addRelTime` payData.paymentInterval
+          ..
+
+        coin <- unlockAndTransfer
+          submitter subscriptionData.sender subscriptionData.receiver subscriptionData.provider subscriptionData.svc
+          lockedCoin
+
+        pure (subscription, state, coin)
+
+    choice SubscriptionInitialPayment_Reject : ContractId Coin
+      controller subscriptionData.receiver
+      do
+        exercise subscriptionData.context SubscriptionContext_Archive
+        exercise lockedCoin Coin_Unlock
+
+    choice SubscriptionInititalPayment_Expire : ContractId Coin
+      with
+        actor : Party
+      controller actor
+      do
+        assertMsg ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
+        exercise subscriptionData.context SubscriptionContext_Archive
+        exercise lockedCoin Coin_OwnerExpireLock -- would fail if we can't expire yet
+
+
+-- | The base state in our subscription flow.
+-- Here, we are typically waiting for the time for the next payment to arrive.
+-- If that time has passed, we are waiting for someone to expire the subscription.
+template SubscriptionIdleState
+  with
+    subscription: ContractId Subscription -- ^ The subscription this belongs to.
+    subscriptionData: Subscription -- ^ Copy of the subscription contract for easier access to its field.
+    payData: SubscriptionPayData -- ^ Payment-related properties.
+    nextPaymentDueAt: Time -- ^ After which time the next payment can and should be paid.
+  where
+    signatory signatory subscriptionData
+    ensure payDataIsValid payData
+
+    choice SubscriptionIdleState_MakePayment : (ContractId SubscriptionPayment, ContractId Coin)
+      with
+        inputs: [TransferInput]
+      controller subscriptionData.sender
+      do
+        assertSubscriptionMatches subscription subscriptionData
+        assertContextValid subscriptionData
+
+        now <- getTime
+        assertMsg "The next due date is close enough to make the next payment." (now `addRelTime` payData.paymentDuration >= nextPaymentDueAt)
+        -- We deliberately don't check whether it's "too late" to pay. In this way, providers can implement a "grace period".
+
+        (lockedCoin, senderChange) <- lockAndMakeChange
+          subscriptionData.sender subscriptionData.receiver subscriptionData.provider subscriptionData.svc
+          inputs payData.paymentQuantity payData.collectionDuration now
+
+        payment <- create SubscriptionPayment with
+          thisPaymentDueAt = nextPaymentDueAt
+          ..
+
+        return (payment, senderChange)
+
+    -- Any of the signatories can expire a subscription if one or more due payments is missing.
+    choice SubscriptionIdleState_ExpireSubscription : ()
+      with
+        actor : Party
+      controller actor
+      do
+        time <- getTime
+        assertMsg ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
+        assertMsg "Last subscription payment was missed" (nextPaymentDueAt < time)
+        exercise subscription Subscription_Archive
+
+    -- The sender can cancel a subscription at any time (unless there is an in-flight payment).
+    choice SubscriptionIdleState_CancelSubscription : ()
+      controller subscriptionData.sender
+      do
+        exercise subscription Subscription_Archive
+
+
+-- | An in-flight (yet to be colllected) payment on an existing subscription.
+--   Doubles as a "payment in progress" state.
+template SubscriptionPayment
+  with
+    subscription: ContractId Subscription -- ^ The subscription this belongs to.
+    subscriptionData: Subscription -- ^ Copy of the base subscription properties; for convenience.
+    payData: SubscriptionPayData -- ^ Payment-related properties.
+    thisPaymentDueAt: Time -- ^ After which time the next payment can and should be paid.
+    lockedCoin : ContractId LockedCoin
+  where
+    signatory signatory subscriptionData, subscriptionData.provider
+    ensure payDataIsValid payData
+
+    choice SubscriptionPayment_Collect : (ContractId SubscriptionIdleState, ContractId Coin)
+      with
+        submitter : Party
+      controller subscriptionData.sender, subscriptionData.receiver
+      do
+        assertSubscriptionMatches subscription subscriptionData
+        state <- create SubscriptionIdleState with
+          nextPaymentDueAt = thisPaymentDueAt `addRelTime` payData.paymentInterval
+          ..
+        coin <- unlockAndTransfer
+          submitter subscriptionData.sender subscriptionData.receiver subscriptionData.provider subscriptionData.svc
+          lockedCoin
+        pure (state, coin)
+
+    choice SubscriptionPayment_Reject : (ContractId SubscriptionIdleState, ContractId Coin)
+      controller subscriptionData.receiver
+      do
+        state <- create SubscriptionIdleState with
+          nextPaymentDueAt = thisPaymentDueAt
+          ..
+        coin <- exercise lockedCoin Coin_Unlock
+        pure (state, coin)
+
+    choice SubscriptionPayment_Expire : (ContractId SubscriptionIdleState, ContractId Coin)
+      with
+        actor : Party
+      controller actor
+      do
+        assertMsg ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
+        state <- create SubscriptionIdleState with
+          nextPaymentDueAt = thisPaymentDueAt
+          ..
+        coin <- exercise lockedCoin Coin_OwnerExpireLock -- would fail if we can't expire yet
+        pure (state, coin)
+
+
+lockAndMakeChange: Party -> Party -> Party -> Party -> [TransferInput] -> Decimal -> RelTime -> Time -> Update (ContractId LockedCoin, ContractId Coin)
+lockAndMakeChange sender receiver provider svc inputs lockQuantity lockDuration now = do
+
+  let transfer = Transfer with
+       sender
+       provider
+       inputs
+       outputs =
+         [ OutputSenderCoin with
+             exactQuantity = Some lockQuantity
+             lock = Some TimeLock with
+               holder = receiver
+               expiresAt = now `addRelTime` lockDuration
+         , OutputSenderCoin with
+             exactQuantity = None
+             lock = None
+         ]
+       payload = "lock payment"
+
+  (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt sender
+  Right result <- exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
+  let [TransferResultLockedCoin lockedCoin, TransferResultCoin senderChange] = result.createdCoins
+
+  pure(lockedCoin, senderChange)
+
+
+unlockAndTransfer: Party -> Party -> Party -> Party -> Party -> ContractId LockedCoin -> Update (ContractId Coin)
+unlockAndTransfer submitter sender receiver provider svc lockedCoin = do
+
+  -- To make our workarounds for lack of explicit disclosure work
+  -- we need to fetch the right CCUserHostedAt contract so we
+  -- allow passing in the submitter.
+  assertMsg ("Submitter must be sender or receiver") (submitter `elem` [sender, receiver])
+
+  -- unlock coin and transfer the remainder to the receiver
+  coin <- exercise lockedCoin Coin_Unlock
+  let transfer = Transfer with
+        sender
+        provider
+        inputs = [InputCoin coin]
+        outputs =
+          [ OutputReceiverCoin with
+              receiver
+              coinType = FloatingReceiverCoin
+          ]
+        payload = "transfer locked payment"
+  (_, CCUserHostedAt { validator }) <- fetchByKey @CCUserHostedAt submitter
+  Right result <- exerciseByKey @CoinRules (svc, validator) (CoinRules_Transfer transfer)
+  let [TransferResultCoin coinCid] = result.createdCoins
+
+  pure coinCid

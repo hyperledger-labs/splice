@@ -1,0 +1,142 @@
+module CN.Scripts.Wallet.TestSubscriptions where
+
+import DA.Assert
+import DA.Time
+import Daml.Script
+
+import CC.Coin
+import CC.CoinRules
+import CN.Wallet.Subscriptions
+
+import CC.Scripts.Util
+
+
+template TestSubscriptionContext
+  with
+    user : Party
+    service : Party
+    description : Text
+  where
+    signatory user, service
+    interface instance SubscriptionContext for TestSubscriptionContext where
+      view = SubscriptionContextView with description
+
+
+testSubscription : Script ()
+testSubscription = script do
+  app <- setupApp
+  runNextIssuance app 1.0
+  runCoinDepositBots app
+
+  validator <- setupValidator app "validator1"
+  alice <- setupUser app "alice" validator
+  pizzeria <- setupUser app "pizzeria" validator
+  provider <- setupUser app "la_famiglia" validator
+
+  coin <- tap app alice 42.0
+  let payData = SubscriptionPayData 12.0 (days 28) (days 1) (minutes 5)
+
+  context <- submitMulti [alice, pizzeria] [] $ createCmd (TestSubscriptionContext alice pizzeria "all-you-can-eat pasta")
+  let subscriptionData = Subscription alice pizzeria provider app.svc (toInterfaceContractId context)
+
+  subscriptionRequestCid <- submitMulti [alice, pizzeria, provider] [] $ createCmd (SubscriptionRequest subscriptionData payData)
+
+  -- reject...
+  submitMulti [alice] [validator] $ exerciseCmd subscriptionRequestCid SubscriptionRequest_Reject
+  None <- queryContractId pizzeria context
+  -- ...and retry
+  context <- submitMulti [alice, pizzeria] [] $ createCmd (TestSubscriptionContext alice pizzeria "all-you-can-eat pizza")
+  let subscriptionData = Subscription alice pizzeria provider app.svc (toInterfaceContractId context)
+  subscriptionRequestCid <- submitMulti [alice, pizzeria, provider] [] $ createCmd (SubscriptionRequest subscriptionData payData)
+
+  (initialPaymentCid, change) <- acceptSubscriptionRequestAndMakePayment app alice subscriptionRequestCid coin
+  None <- queryContractId alice subscriptionRequestCid
+
+  -- expire...
+  passTime (minutes 6)
+  _ <- submitMulti [alice] [validator] $ exerciseCmd initialPaymentCid SubscriptionInititalPayment_Expire with actor = alice
+  -- ..and retry
+  context <- submitMulti [alice, pizzeria] [] $ createCmd (TestSubscriptionContext alice pizzeria "all-you-can-eat pizza")
+  let subscriptionData = Subscription alice pizzeria provider app.svc (toInterfaceContractId context)
+  subscriptionRequestCid <- submitMulti [alice, pizzeria, provider] [] $ createCmd (SubscriptionRequest subscriptionData payData)
+  (initialPaymentCid, change) <- acceptSubscriptionRequestAndMakePayment app alice subscriptionRequestCid change
+
+  (subscriptionCid, subscriptionStateCid, pizzeriasCoin) <- collectInitialSubscriptionPayment app pizzeria alice initialPaymentCid
+
+  Some subscription <- queryContractId alice subscriptionCid
+  subscription === subscriptionData
+
+  t <- getTime
+  Some subscriptionState <- queryContractId alice subscriptionStateCid
+  subscriptionState === SubscriptionIdleState with
+    subscription = subscriptionCid
+    subscriptionData
+    payData
+    nextPaymentDueAt = t `addRelTime` (days 28)
+
+  -- fails because: too soon
+  failMakeSubscriptionPayment app alice subscriptionStateCid coin
+
+  -- we can pay for the nex period starting from 1 day before the last period ends, as per the config above
+  passTime (days 27)
+  (payment2Cid, change2) <- makeSubscriptionPayment app alice subscriptionStateCid change
+
+  (subscriptionState2Cid, pizzeriasCoin2) <- collectSubscriptionPayment app pizzeria alice payment2Cid
+
+  t <- getTime
+  Some subscriptionState2 <- queryContractId alice subscriptionState2Cid
+  subscriptionState2 === SubscriptionIdleState with
+    subscription = subscriptionCid
+    subscriptionData
+    payData
+    nextPaymentDueAt = t `addRelTime` (days 29)
+
+  -- we can't expire yet
+  submitMultiMustFail [pizzeria] [validator] $ exerciseCmd subscriptionState2Cid SubscriptionIdleState_ExpireSubscription with actor = pizzeria
+
+  -- didn't pay in time! We can expire and archive the subscription now
+  passTime (days 30)
+  submitMulti [pizzeria] [validator] $ exerciseCmd subscriptionState2Cid SubscriptionIdleState_ExpireSubscription with actor = pizzeria
+  None <- queryContractId pizzeria subscriptionState2Cid
+  None <- queryContractId pizzeria subscriptionCid
+  None <- queryContractId pizzeria context
+
+  pure ()
+
+
+acceptSubscriptionRequestAndMakePayment : CCApp -> Party -> ContractId SubscriptionRequest -> ContractId Coin -> Script (ContractId SubscriptionInitialPayment, ContractId Coin)
+acceptSubscriptionRequestAndMakePayment app sender request coin = do
+  validator <- getHostingValidator sender
+  submitMulti [sender] [validator] $ exerciseCmd request SubscriptionRequest_AcceptAndMakePayment with
+    inputs = [InputCoin coin]
+
+
+makeSubscriptionPayment : CCApp -> Party -> ContractId SubscriptionIdleState -> ContractId Coin -> Script (ContractId SubscriptionPayment, ContractId Coin)
+makeSubscriptionPayment app sender state coin = do
+  validator <- getHostingValidator sender
+  (payment, change) <- submitMulti [sender] [validator] $ exerciseCmd state SubscriptionIdleState_MakePayment with
+    inputs = [InputCoin coin]
+  return (payment, change)
+
+
+failMakeSubscriptionPayment : CCApp -> Party -> ContractId SubscriptionIdleState -> ContractId Coin -> Script ()
+failMakeSubscriptionPayment app sender state coin = do
+  validator <- getHostingValidator sender
+  submitMultiMustFail [sender] [validator] $ exerciseCmd state SubscriptionIdleState_MakePayment with
+    inputs = [InputCoin coin]
+
+
+collectInitialSubscriptionPayment : CCApp -> Party -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
+collectInitialSubscriptionPayment app receiver sender payment = do
+  validator <- getHostingValidator sender
+  (subscription, state, coin) <- submitMulti [receiver, sender] [validator] $ exerciseCmd payment SubscriptionInitialPayment_Collect with
+    submitter = receiver
+  return (subscription, state, coin)
+
+
+collectSubscriptionPayment : CCApp -> Party -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId Coin)
+collectSubscriptionPayment app receiver sender payment = do
+  validator <- getHostingValidator sender
+  (state, coin) <- submitMulti [receiver, sender] [validator] $ exerciseCmd payment SubscriptionPayment_Collect with
+    submitter = receiver
+  return (state, coin)
