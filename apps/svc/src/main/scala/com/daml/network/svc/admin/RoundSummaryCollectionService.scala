@@ -1,11 +1,10 @@
 package com.daml.network.svc.admin
 
 import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.api.v1
 import com.daml.ledger.api.v1.event.ExercisedEvent
 import com.daml.ledger.api.v1.transaction.TreeEvent.Kind.Exercised
 import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree}
-import com.daml.ledger.client.binding.{Primitive, Value => CodegenValue, ValueDecoder}
+import com.daml.ledger.client.binding.Primitive
 import com.daml.network.admin.LedgerAutomationService
 import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
 import com.daml.network.codegen.CC.CoinRules.{CoinRules, TransferResult}
@@ -13,12 +12,11 @@ import com.daml.network.codegen.DA
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history._
 import com.daml.network.svc.store.SvcEventsStore
-import com.daml.network.util.{ExerciseNode, ExerciseNodeCompanion, Trees}
+import com.daml.network.util.{ExerciseNode, Trees}
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ErrorUtil
 
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
@@ -56,7 +54,7 @@ class RoundSummaryCollectionService(
         onCreate = (_, _) => {},
         onExercise = (exercised: Exercised, _) => {
           if (isTransfer(exercised.value)) {
-            val tf = Transfer(tryDecodeEvent(Transfer)(exercised)).node
+            val tf = ExerciseNode.tryFromProtoEvent(Transfer)(exercised)
             tf.result match {
               case DA.Types.Either.Left(errorMsg) =>
                 logger.debug(
@@ -73,29 +71,6 @@ class RoundSummaryCollectionService(
     }
 
   override def close(): Unit = Lifecycle.close(connection)(logger)
-
-  // TODO(i844) all code below has been copied over from scan's ReadCoinTransactionService. Move it to some shared util place instead - potentially to ExerciseNodeCompanion.
-
-  private def tryDecode[A](
-      value: v1.value.Value
-  )(implicit A: ValueDecoder[A]): A = {
-    CodegenValue.decode[A](value) match {
-      case None =>
-        ErrorUtil.invalidState(
-          s"Unexpectedly couldn't decode LF-value $value to $A. Did you specify the wrong type to decode to?"
-        )
-      case Some(value) => value
-    }
-  }
-
-  private def tryDecodeEvent(companion: ExerciseNodeCompanion)(exercised: Exercised)(implicit
-      decArg: ValueDecoder[companion.Arg],
-      decRes: ValueDecoder[companion.Res],
-  ): ExerciseNode[companion.Arg, companion.Res] =
-    ExerciseNode(
-      tryDecode[companion.Arg](exercised.value.getChoiceArgument),
-      tryDecode[companion.Res](exercised.value.getExerciseResult),
-    )
 
   private val rulesTemplate = ApiTypes.TemplateId.unwrap(CoinRules.id)
   private def isTransfer(event: ExercisedEvent) =

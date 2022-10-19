@@ -1,19 +1,18 @@
 package com.daml.network.scan.admin
 
 import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.api.v1
 import com.daml.ledger.api.v1.event.ExercisedEvent
 import com.daml.ledger.api.v1.transaction.TreeEvent.Kind.{Created, Empty, Exercised}
 import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree, TreeEvent}
 import com.daml.ledger.client.binding
-import com.daml.ledger.client.binding.{Primitive, Value => CodegenValue, ValueDecoder}
+import com.daml.ledger.client.binding.Primitive
 import com.daml.network.admin.LedgerAutomationService
 import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
 import com.daml.network.codegen.CC.CoinRules.CoinRules
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history._
 import com.daml.network.scan.store.ScanCCHistoryStore
-import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion, Trees}
+import com.daml.network.util.{Contract, ExerciseNode, Trees}
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
@@ -158,43 +157,22 @@ class ReadCoinTransactionsService(
   private def isStartIssuing(event: ExercisedEvent) =
     event.choice == "CoinRules_MiningRound_StartIssuing" && isCoinRules(event)
 
-  private def tryDecode[A](
-      value: v1.value.Value
-  )(implicit A: ValueDecoder[A]): A = {
-    CodegenValue.decode[A](value) match {
-      case None =>
-        ErrorUtil.invalidState(
-          s"Unexpectedly couldn't decode LF-value $value to $A. Did you specify the wrong type to decode to?"
-        )
-      case Some(value) => value
-    }
-  }
-
   import cats.syntax.option._
-
-  private def tryDecodeEvent(companion: ExerciseNodeCompanion)(exercised: Exercised)(implicit
-      decArg: ValueDecoder[companion.Arg],
-      decRes: ValueDecoder[companion.Res],
-  ): ExerciseNode[companion.Arg, companion.Res] =
-    ExerciseNode(
-      tryDecode[companion.Arg](exercised.value.getChoiceArgument),
-      tryDecode[companion.Res](exercised.value.getExerciseResult),
-    )
 
   private def parseEvent(event: TreeEvent.Kind): Option[ParentNode] = {
     event match {
       case exercised: Exercised if isTransfer(exercised.value) =>
-        Transfer(tryDecodeEvent(Transfer)(exercised)).some
+        Transfer(ExerciseNode.tryFromProtoEvent(Transfer)(exercised)).some
       case exercised: Exercised if isTap(exercised.value) =>
-        Tap(tryDecodeEvent(Tap)(exercised)).some
+        Tap(ExerciseNode.tryFromProtoEvent(Tap)(exercised)).some
       case exercised: Exercised if isStartIssuing(exercised.value) =>
-        StartIssuing(tryDecodeEvent(StartIssuing)(exercised)).some
+        StartIssuing(ExerciseNode.tryFromProtoEvent(StartIssuing)(exercised)).some
       case exercised: Exercised if isCoinUnlock(exercised.value) =>
-        CoinUnlock(tryDecodeEvent(CoinUnlock)(exercised)).some
+        CoinUnlock(ExerciseNode.tryFromProtoEvent(CoinUnlock)(exercised)).some
       case exercised: Exercised if isSvcExpireLock(exercised.value) =>
-        SvcExpireLock(tryDecodeEvent(SvcExpireLock)(exercised)).some
+        SvcExpireLock(ExerciseNode.tryFromProtoEvent(SvcExpireLock)(exercised)).some
       case exercised: Exercised if isOwnerExpireLock(exercised.value) =>
-        OwnerExpireLock(tryDecodeEvent(OwnerExpireLock)(exercised)).some
+        OwnerExpireLock(ExerciseNode.tryFromProtoEvent(OwnerExpireLock)(exercised)).some
       case _ => None
     }
   }
