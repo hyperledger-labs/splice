@@ -600,7 +600,7 @@ jobs:
           POSTGRES_INITDB_ARGS: -A scram-sha-256
           POSTGRES_PASSWORD: postgres
           POSTGRES_USER: postgres
-    resource_class: xlarge
+    resource_class: 2xlarge
     environment:
       <<: *env
       POSTGRES_HOST: localhost
