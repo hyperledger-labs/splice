@@ -85,6 +85,397 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
+               "app": "gcs-proxy",
+               "clusterName": "cluster"
+            },
+            "name": "gcs-proxy"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "gcs-proxy"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "gcs-proxy",
+                     "clusterName": "cluster"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms256M -Xmx256M"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/gcs-proxy:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "gcs-proxy",
+                        "ports": [
+                           {
+                              "containerPort": 8080,
+                              "name": "http"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "512Mi"
+                           },
+                           "requests": {
+                              "memory": "512Mi"
+                           }
+                        }
+                     }
+                  ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "name": "gcs-proxy"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "http",
+                  "port": 8080,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "gcs-proxy"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "canton-domain",
+               "clusterName": "cluster"
+            },
+            "name": "canton-domain"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "canton-domain"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "canton-domain",
+                     "clusterName": "cluster"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms768M -Xmx768M"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/canton-domain:tag",
+                        "imagePullPolicy": "Always",
+                        "livenessProbe": {
+                           "failureThreshold": 5,
+                           "periodSeconds": 10,
+                           "tcpSocket": {
+                              "port": "canton-pub-api"
+                           }
+                        },
+                        "name": "canton-domain",
+                        "ports": [
+                           {
+                              "containerPort": 5008,
+                              "name": "canton-pub-api"
+                           },
+                           {
+                              "containerPort": 5009,
+                              "name": "canton-adm-api"
+                           }
+                        ],
+                        "readinessProbe": {
+                           "tcpSocket": {
+                              "port": "canton-pub-api"
+                           }
+                        },
+                        "resources": {
+                           "limits": {
+                              "memory": "1024Mi"
+                           },
+                           "requests": {
+                              "memory": "1024Mi"
+                           }
+                        },
+                        "startupPrope": {
+                           "failureThreshold": 20,
+                           "periodSeconds": 10,
+                           "tcpSocket": {
+                              "port": "canton-pub-api"
+                           }
+                        }
+                     }
+                  ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "name": "canton-domain"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "canton-pub-api",
+                  "port": 5008,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "canton-adm-api",
+                  "port": 5009,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "canton-domain"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "canton-participant",
+               "clusterName": "cluster"
+            },
+            "name": "canton-participant"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "canton-participant"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "canton-participant",
+                     "clusterName": "cluster"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms1280M -Xmx1280M"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "canton-participant",
+                        "ports": [
+                           {
+                              "containerPort": 5002,
+                              "name": "cp-adm-api"
+                           },
+                           {
+                              "containerPort": 5001,
+                              "name": "cp-lg-api"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1536Mi"
+                           },
+                           "requests": {
+                              "memory": "1536Mi"
+                           }
+                        }
+                     }
+                  ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "name": "canton-participant"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "cp-adm-api",
+                  "port": 5002,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "cp-lg-api",
+                  "port": 5001,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "canton-participant"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
+               "app": "directory-app",
+               "clusterName": "cluster"
+            },
+            "name": "directory-app"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "directory-app"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "directory-app",
+                     "clusterName": "cluster"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms768M -Xmx768M"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/directory-app:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "directory-app",
+                        "ports": [
+                           {
+                              "containerPort": 5010,
+                              "name": "dir-api"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1024Mi"
+                           },
+                           "requests": {
+                              "memory": "1024Mi"
+                           }
+                        }
+                     },
+                     {
+                        "env": [
+                           {
+                              "name": "GRPC_ADDRESS",
+                              "value": "127.0.0.1"
+                           },
+                           {
+                              "name": "GRPC_PORT",
+                              "value": "5010"
+                           },
+                           {
+                              "name": "GRPC_WEB_PORT",
+                              "value": "6010"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/envoy-proxy:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "envoy-proxy",
+                        "ports": [
+                           {
+                              "containerPort": 6010,
+                              "name": "dir-api-gw"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "256Mi"
+                           },
+                           "requests": {
+                              "memory": "256Mi"
+                           }
+                        }
+                     }
+                  ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "name": "directory-app"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "dir-api",
+                  "port": 5010,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "dir-api-gw",
+                  "port": 6010,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "directory-app"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
                "app": "svc-app",
                "clusterName": "cluster"
             },
@@ -243,318 +634,6 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
-               "app": "directory-app",
-               "clusterName": "cluster"
-            },
-            "name": "directory-app"
-         },
-         "spec": {
-            "replicas": 1,
-            "selector": {
-               "matchLabels": {
-                  "app": "directory-app"
-               }
-            },
-            "strategy": {
-               "type": "Recreate"
-            },
-            "template": {
-               "metadata": {
-                  "labels": {
-                     "app": "directory-app",
-                     "clusterName": "cluster"
-                  }
-               },
-               "spec": {
-                  "containers": [
-                     {
-                        "env": [
-                           {
-                              "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms768M -Xmx768M"
-                           }
-                        ],
-                        "image": "region-docker.pkg.dev/project/repo/directory-app:tag",
-                        "imagePullPolicy": "Always",
-                        "name": "directory-app",
-                        "ports": [
-                           {
-                              "containerPort": 5010,
-                              "name": "directory-api"
-                           }
-                        ],
-                        "resources": {
-                           "limits": {
-                              "memory": "1024Mi"
-                           },
-                           "requests": {
-                              "memory": "1024Mi"
-                           }
-                        }
-                     },
-                     {
-                        "env": [
-                           {
-                              "name": "GRPC_ADDRESS",
-                              "value": "127.0.0.1"
-                           },
-                           {
-                              "name": "GRPC_PORT",
-                              "value": "5010"
-                           },
-                           {
-                              "name": "GRPC_WEB_PORT",
-                              "value": "6010"
-                           }
-                        ],
-                        "image": "region-docker.pkg.dev/project/repo/envoy-proxy:tag",
-                        "imagePullPolicy": "Always",
-                        "name": "envoy-proxy",
-                        "ports": [
-                           {
-                              "containerPort": 6010,
-                              "name": "grpc-web"
-                           }
-                        ],
-                        "resources": {
-                           "limits": {
-                              "memory": "256Mi"
-                           },
-                           "requests": {
-                              "memory": "256Mi"
-                           }
-                        }
-                     }
-                  ]
-               }
-            }
-         }
-      },
-      {
-         "apiVersion": "v1",
-         "kind": "Service",
-         "metadata": {
-            "clusterName": "cluster",
-            "name": "directory-app"
-         },
-         "spec": {
-            "ports": [
-               {
-                  "name": "directory-api",
-                  "port": 5010,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "grpc-web",
-                  "port": 6010,
-                  "protocol": "TCP"
-               }
-            ],
-            "selector": {
-               "app": "directory-app"
-            }
-         }
-      },
-      {
-         "apiVersion": "apps/v1",
-         "kind": "Deployment",
-         "metadata": {
-            "labels": {
-               "app": "canton-domain",
-               "clusterName": "cluster"
-            },
-            "name": "canton-domain"
-         },
-         "spec": {
-            "replicas": 1,
-            "selector": {
-               "matchLabels": {
-                  "app": "canton-domain"
-               }
-            },
-            "strategy": {
-               "type": "Recreate"
-            },
-            "template": {
-               "metadata": {
-                  "labels": {
-                     "app": "canton-domain",
-                     "clusterName": "cluster"
-                  }
-               },
-               "spec": {
-                  "containers": [
-                     {
-                        "env": [
-                           {
-                              "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms768M -Xmx768M"
-                           }
-                        ],
-                        "image": "region-docker.pkg.dev/project/repo/canton-domain:tag",
-                        "imagePullPolicy": "Always",
-                        "livenessProbe": {
-                           "failureThreshold": 5,
-                           "periodSeconds": 10,
-                           "tcpSocket": {
-                              "port": "canton-pub-api"
-                           }
-                        },
-                        "name": "canton-domain",
-                        "ports": [
-                           {
-                              "containerPort": 5008,
-                              "name": "canton-pub-api"
-                           },
-                           {
-                              "containerPort": 5009,
-                              "name": "canton-adm-api"
-                           }
-                        ],
-                        "readinessProbe": {
-                           "tcpSocket": {
-                              "port": "canton-pub-api"
-                           }
-                        },
-                        "resources": {
-                           "limits": {
-                              "memory": "1024Mi"
-                           },
-                           "requests": {
-                              "memory": "1024Mi"
-                           }
-                        },
-                        "startupPrope": {
-                           "failureThreshold": 20,
-                           "periodSeconds": 10,
-                           "tcpSocket": {
-                              "port": "canton-pub-api"
-                           }
-                        }
-                     }
-                  ]
-               }
-            }
-         }
-      },
-      {
-         "apiVersion": "v1",
-         "kind": "Service",
-         "metadata": {
-            "clusterName": "cluster",
-            "name": "canton-domain"
-         },
-         "spec": {
-            "ports": [
-               {
-                  "name": "canton-pub-api",
-                  "port": 5008,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "canton-adm-api",
-                  "port": 5009,
-                  "protocol": "TCP"
-               }
-            ],
-            "selector": {
-               "app": "canton-domain"
-            }
-         }
-      },
-      {
-         "apiVersion": "apps/v1",
-         "kind": "Deployment",
-         "metadata": {
-            "labels": {
-               "app": "canton-participant",
-               "clusterName": "cluster"
-            },
-            "name": "canton-participant"
-         },
-         "spec": {
-            "replicas": 1,
-            "selector": {
-               "matchLabels": {
-                  "app": "canton-participant"
-               }
-            },
-            "strategy": {
-               "type": "Recreate"
-            },
-            "template": {
-               "metadata": {
-                  "labels": {
-                     "app": "canton-participant",
-                     "clusterName": "cluster"
-                  }
-               },
-               "spec": {
-                  "containers": [
-                     {
-                        "env": [
-                           {
-                              "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms1280M -Xmx1280M"
-                           }
-                        ],
-                        "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
-                        "imagePullPolicy": "Always",
-                        "name": "canton-participant",
-                        "ports": [
-                           {
-                              "containerPort": 5002,
-                              "name": "cp-adm-api"
-                           },
-                           {
-                              "containerPort": 5001,
-                              "name": "cp-ledger-api"
-                           }
-                        ],
-                        "resources": {
-                           "limits": {
-                              "memory": "1536Mi"
-                           },
-                           "requests": {
-                              "memory": "1536Mi"
-                           }
-                        }
-                     }
-                  ]
-               }
-            }
-         }
-      },
-      {
-         "apiVersion": "v1",
-         "kind": "Service",
-         "metadata": {
-            "clusterName": "cluster",
-            "name": "canton-participant"
-         },
-         "spec": {
-            "ports": [
-               {
-                  "name": "cp-adm-api",
-                  "port": 5002,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "cp-ledger-api",
-                  "port": 5001,
-                  "protocol": "TCP"
-               }
-            ],
-            "selector": {
-               "app": "canton-participant"
-            }
-         }
-      },
-      {
-         "apiVersion": "apps/v1",
-         "kind": "Deployment",
-         "metadata": {
-            "labels": {
                "app": "validator1-participant",
                "clusterName": "cluster"
             },
@@ -596,7 +675,7 @@
                            },
                            {
                               "containerPort": 5101,
-                              "name": "val1-ledger-api"
+                              "name": "val1-lg-api"
                            }
                         ],
                         "resources": {
@@ -629,7 +708,7 @@
                         "ports": [
                            {
                               "containerPort": 6101,
-                              "name": "grpc-web"
+                              "name": "val1-lg-api-gw"
                            }
                         ],
                         "resources": {
@@ -661,12 +740,12 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "val1-ledger-api",
+                  "name": "val1-lg-api",
                   "port": 5101,
                   "protocol": "TCP"
                },
                {
-                  "name": "val1-lapi-gweb",
+                  "name": "val1-lg-api-gw",
                   "port": 6101,
                   "protocol": "TCP"
                }
@@ -751,7 +830,7 @@
                         "ports": [
                            {
                               "containerPort": 6103,
-                              "name": "grpc-web"
+                              "name": "val1-val-api-gw"
                            }
                         ],
                         "resources": {
@@ -783,7 +862,7 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "val1-val-gweb",
+                  "name": "val1-val-api-gw",
                   "port": 6103,
                   "protocol": "TCP"
                }
@@ -868,7 +947,7 @@
                         "ports": [
                            {
                               "containerPort": 6104,
-                              "name": "grpc-web"
+                              "name": "val1-wal-api-gw"
                            }
                         ],
                         "resources": {
@@ -900,7 +979,7 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "val1-wal-gweb",
+                  "name": "val1-wal-api-gw",
                   "port": 6104,
                   "protocol": "TCP"
                }
@@ -1114,7 +1193,7 @@
                            },
                            {
                               "containerPort": 5201,
-                              "name": "sw-ledger-api"
+                              "name": "sw-lg-api"
                            }
                         ],
                         "resources": {
@@ -1147,7 +1226,7 @@
                         "ports": [
                            {
                               "containerPort": 6201,
-                              "name": "grpc-web"
+                              "name": "sw-lg-api-gw"
                            }
                         ],
                         "resources": {
@@ -1179,12 +1258,12 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "sw-ledger-api",
+                  "name": "sw-lg-api",
                   "port": 5201,
                   "protocol": "TCP"
                },
                {
-                  "name": "sw-lapi-gweb",
+                  "name": "sw-lg-api-gw",
                   "port": 6201,
                   "protocol": "TCP"
                }
@@ -1348,7 +1427,7 @@
                         "ports": [
                            {
                               "containerPort": 6213,
-                              "name": "grpc-web"
+                              "name": "sw-api-gw"
                            }
                         ],
                         "resources": {
@@ -1380,92 +1459,13 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "sw-gweb",
+                  "name": "sw-api-gw",
                   "port": 6213,
                   "protocol": "TCP"
                }
             ],
             "selector": {
                "app": "splitwise-app"
-            }
-         }
-      },
-      {
-         "apiVersion": "apps/v1",
-         "kind": "Deployment",
-         "metadata": {
-            "labels": {
-               "app": "gcs-proxy",
-               "clusterName": "cluster"
-            },
-            "name": "gcs-proxy"
-         },
-         "spec": {
-            "replicas": 1,
-            "selector": {
-               "matchLabels": {
-                  "app": "gcs-proxy"
-               }
-            },
-            "strategy": {
-               "type": "Recreate"
-            },
-            "template": {
-               "metadata": {
-                  "labels": {
-                     "app": "gcs-proxy",
-                     "clusterName": "cluster"
-                  }
-               },
-               "spec": {
-                  "containers": [
-                     {
-                        "env": [
-                           {
-                              "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms256M -Xmx256M"
-                           }
-                        ],
-                        "image": "region-docker.pkg.dev/project/repo/gcs-proxy:tag",
-                        "imagePullPolicy": "Always",
-                        "name": "gcs-proxy",
-                        "ports": [
-                           {
-                              "containerPort": 8080,
-                              "name": "http"
-                           }
-                        ],
-                        "resources": {
-                           "limits": {
-                              "memory": "512Mi"
-                           },
-                           "requests": {
-                              "memory": "512Mi"
-                           }
-                        }
-                     }
-                  ]
-               }
-            }
-         }
-      },
-      {
-         "apiVersion": "v1",
-         "kind": "Service",
-         "metadata": {
-            "clusterName": "cluster",
-            "name": "gcs-proxy"
-         },
-         "spec": {
-            "ports": [
-               {
-                  "name": "http",
-                  "port": 8080,
-                  "protocol": "TCP"
-               }
-            ],
-            "selector": {
-               "app": "gcs-proxy"
             }
          }
       },
@@ -1514,22 +1514,6 @@
                               "name": "http"
                            },
                            {
-                              "containerPort": 5005,
-                              "name": "svc-app-adm-api"
-                           },
-                           {
-                              "containerPort": 5012,
-                              "name": "scan-api"
-                           },
-                           {
-                              "containerPort": 5010,
-                              "name": "directory-api"
-                           },
-                           {
-                              "containerPort": 6010,
-                              "name": "grpc-web"
-                           },
-                           {
                               "containerPort": 5008,
                               "name": "canton-pub-api"
                            },
@@ -1543,23 +1527,23 @@
                            },
                            {
                               "containerPort": 5001,
-                              "name": "cp-ledger-api"
+                              "name": "cp-lg-api"
                            },
                            {
-                              "containerPort": 5103,
-                              "name": "val1-val-api"
+                              "containerPort": 5010,
+                              "name": "dir-api"
                            },
                            {
-                              "containerPort": 6103,
-                              "name": "val1-val-gweb"
+                              "containerPort": 6010,
+                              "name": "dir-api-gw"
                            },
                            {
-                              "containerPort": 5104,
-                              "name": "val1-wal-api"
+                              "containerPort": 5005,
+                              "name": "svc-app-adm-api"
                            },
                            {
-                              "containerPort": 6104,
-                              "name": "val1-wal-gweb"
+                              "containerPort": 5012,
+                              "name": "scan-api"
                            },
                            {
                               "containerPort": 5102,
@@ -1567,19 +1551,27 @@
                            },
                            {
                               "containerPort": 5101,
-                              "name": "val1-ledger-api"
-                           },
-                           {
-                              "containerPort": 7104,
-                              "name": "val1-wal-ui"
-                           },
-                           {
-                              "containerPort": 7010,
-                              "name": "val1-dir-ui"
+                              "name": "val1-lg-api"
                            },
                            {
                               "containerPort": 6101,
-                              "name": "val1-lapi-gweb"
+                              "name": "val1-lg-api-gw"
+                           },
+                           {
+                              "containerPort": 5103,
+                              "name": "val1-val-api"
+                           },
+                           {
+                              "containerPort": 6103,
+                              "name": "val1-val-api-gw"
+                           },
+                           {
+                              "containerPort": 5104,
+                              "name": "val1-wal-api"
+                           },
+                           {
+                              "containerPort": 6104,
+                              "name": "val1-wal-api-gw"
                            },
                            {
                               "containerPort": 5202,
@@ -1587,11 +1579,11 @@
                            },
                            {
                               "containerPort": 5201,
-                              "name": "sw-ledger-api"
+                              "name": "sw-lg-api"
                            },
                            {
                               "containerPort": 6201,
-                              "name": "sw-lapi-gweb"
+                              "name": "sw-lg-api-gw"
                            },
                            {
                               "containerPort": 5203,
@@ -1603,7 +1595,7 @@
                            },
                            {
                               "containerPort": 6213,
-                              "name": "sw-gweb"
+                              "name": "sw-api-gw"
                            }
                         ],
                         "resources": {
@@ -1635,26 +1627,6 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "svc-app-adm-api",
-                  "port": 5005,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "scan-api",
-                  "port": 5012,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "directory-api",
-                  "port": 5010,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "grpc-web",
-                  "port": 6010,
-                  "protocol": "TCP"
-               },
-               {
                   "name": "canton-pub-api",
                   "port": 5008,
                   "protocol": "TCP"
@@ -1670,8 +1642,43 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "cp-ledger-api",
+                  "name": "cp-lg-api",
                   "port": 5001,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "dir-api",
+                  "port": 5010,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "dir-api-gw",
+                  "port": 6010,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "svc-app-adm-api",
+                  "port": 5005,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "scan-api",
+                  "port": 5012,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-adm-api",
+                  "port": 5102,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-lg-api",
+                  "port": 5101,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-lg-api-gw",
+                  "port": 6101,
                   "protocol": "TCP"
                },
                {
@@ -1680,7 +1687,7 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "val1-val-gweb",
+                  "name": "val1-val-api-gw",
                   "port": 6103,
                   "protocol": "TCP"
                },
@@ -1690,33 +1697,8 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "val1-wal-gweb",
+                  "name": "val1-wal-api-gw",
                   "port": 6104,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "val1-adm-api",
-                  "port": 5102,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "val1-ledger-api",
-                  "port": 5101,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "val1-wal-ui",
-                  "port": 7104,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "val1-dir-ui",
-                  "port": 7010,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "val1-lapi-gweb",
-                  "port": 6101,
                   "protocol": "TCP"
                },
                {
@@ -1725,12 +1707,12 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "sw-ledger-api",
+                  "name": "sw-lg-api",
                   "port": 5201,
                   "protocol": "TCP"
                },
                {
-                  "name": "sw-lapi-gweb",
+                  "name": "sw-lg-api-gw",
                   "port": 6201,
                   "protocol": "TCP"
                },
@@ -1745,7 +1727,7 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "sw-gweb",
+                  "name": "sw-api-gw",
                   "port": 6213,
                   "protocol": "TCP"
                }
@@ -1777,26 +1759,6 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "svc-app-adm-api",
-                  "port": 5005,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "scan-api",
-                  "port": 5012,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "directory-api",
-                  "port": 5010,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "grpc-web",
-                  "port": 6010,
-                  "protocol": "TCP"
-               },
-               {
                   "name": "canton-pub-api",
                   "port": 5008,
                   "protocol": "TCP"
@@ -1812,8 +1774,43 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "cp-ledger-api",
+                  "name": "cp-lg-api",
                   "port": 5001,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "dir-api",
+                  "port": 5010,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "dir-api-gw",
+                  "port": 6010,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "svc-app-adm-api",
+                  "port": 5005,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "scan-api",
+                  "port": 5012,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-adm-api",
+                  "port": 5102,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-lg-api",
+                  "port": 5101,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "val1-lg-api-gw",
+                  "port": 6101,
                   "protocol": "TCP"
                },
                {
@@ -1822,7 +1819,7 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "val1-val-gweb",
+                  "name": "val1-val-api-gw",
                   "port": 6103,
                   "protocol": "TCP"
                },
@@ -1832,33 +1829,8 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "val1-wal-gweb",
+                  "name": "val1-wal-api-gw",
                   "port": 6104,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "val1-adm-api",
-                  "port": 5102,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "val1-ledger-api",
-                  "port": 5101,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "val1-wal-ui",
-                  "port": 7104,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "val1-dir-ui",
-                  "port": 7010,
-                  "protocol": "TCP"
-               },
-               {
-                  "name": "val1-lapi-gweb",
-                  "port": 6101,
                   "protocol": "TCP"
                },
                {
@@ -1867,12 +1839,12 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "sw-ledger-api",
+                  "name": "sw-lg-api",
                   "port": 5201,
                   "protocol": "TCP"
                },
                {
-                  "name": "sw-lapi-gweb",
+                  "name": "sw-lg-api-gw",
                   "port": 6201,
                   "protocol": "TCP"
                },
@@ -1887,7 +1859,7 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "sw-gweb",
+                  "name": "sw-api-gw",
                   "port": 6213,
                   "protocol": "TCP"
                }
