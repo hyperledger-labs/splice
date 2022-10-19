@@ -5,6 +5,7 @@ import qualified DA.Foldable as F
 import DA.Time
 import DA.Assert
 import DA.Traversable
+import DA.Exception
 
 import CC.Coin
 import CC.CoinRules
@@ -407,6 +408,23 @@ template AcceptedAppMultiPayment
       do exercise deliveryOffer DeliveryOffer_Archive
          exercise lockedCoin Coin_OwnerExpireLock
 
+-- Evaluates an update, catches any exceptions it throws and converts them into an Either
+catchAll: Update a -> Update (Either Text a)
+catchAll operation =
+  try do 
+    fmap (\res -> Right res) operation
+  catch (ex : AnyException) -> return $ Left $ message ex  
+
+-- Same as `catchAll` except the update already returns an Either
+catchAllE: (Update (Either Text a)) -> Update (Either Text a)
+catchAllE operation =
+  try do
+    operation
+  catch (ex : AnyException) -> return $ Left $ message ex
+
+-- Main function for batched execution of multiple coin operations. 
+-- Given multiple coin operations and transfer inputs, it executes the operations sequentially while 
+-- stringing along the remaining inputs. Returns all outcomes. 
 executeCoinOperationRec : [TransferInput] -> [CoinOperationOutcome] -> [CoinOperation] -> Update ([CoinOperationOutcome])
 executeCoinOperationRec inputs prevResults (operation::rest) = do
   case operation of
@@ -414,22 +432,29 @@ executeCoinOperationRec inputs prevResults (operation::rest) = do
     CO_AppMultiPayment cid -> handle AppMultiPaymentRequest_Accept COO_AcceptedAppMultiPayment cid
     CO_ChannelPayment cid -> handle OnChannelPaymentRequest_Accept COO_AcceptedChannelPayment cid
     CO_ChannelTransfer endUser receiver svcUser quantity payload -> do
-      resultE <- exerciseByKey @PaymentChannel (endUser, receiver, svcUser) (PaymentChannel_ExecuteDirectTransfer inputs quantity payload)
+      resultE <- catchAllE $ exerciseByKey @PaymentChannel (endUser, receiver, svcUser) (PaymentChannel_ExecuteDirectTransfer inputs quantity payload)
       handleResult COO_AcceptedChannelTransfer resultE
     CO_Tap svc validator endUser quantity -> do
-      coin <- exerciseByKey @CoinRules (svc, validator) (CoinRules_Tap endUser quantity)
-      executeCoinOperationRec (InputCoin coin :: inputs) (COO_Tap coin :: prevResults) rest
+      coin <- catchAll (exerciseByKey @CoinRules (svc, validator) (CoinRules_Tap endUser quantity))
+      handleResultTap coin
   where
     handle : Choice t c (Either Text (r, ContractId Coin)) => ([TransferInput] -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
     handle choiceConstructor resultConstructor cid = do
-      resultE <- exercise cid (choiceConstructor inputs)
+      resultE <- catchAllE $ exercise cid (choiceConstructor inputs)
       handleResult resultConstructor resultE
 
     handleResult : (r -> CoinOperationOutcome) -> Either Text (r, ContractId Coin) -> Update [CoinOperationOutcome]
     handleResult resultConstructor = \case
-      Left errorMsg -> return $ map COO_NotExecuted rest ++ [COO_TransferError errorMsg] ++ prevResults
-      Right (result, change) ->   executeCoinOperationRec [InputCoin change] (resultConstructor result :: prevResults) rest
+      Left errorMsg -> handleLeft errorMsg
+      Right (result, change) -> executeCoinOperationRec [InputCoin change] (resultConstructor result :: prevResults) rest
 
+    handleResultTap : Either Text (ContractId Coin) -> Update [CoinOperationOutcome]
+    handleResultTap = \case
+      Left errorMsg -> handleLeft errorMsg
+      Right tappedCoin -> executeCoinOperationRec (InputCoin tappedCoin :: inputs) (COO_Tap tappedCoin :: prevResults) rest
+
+    handleLeft : Text -> Update [CoinOperationOutcome]
+    handleLeft errorMsg = return $ map COO_NotExecuted rest ++ [COO_TransferError errorMsg] ++ prevResults
 
 executeCoinOperationRec inputs prevResults [] = do
   return prevResults
@@ -463,7 +488,7 @@ data CoinOperationOutcome
   | COO_AcceptedChannelTransfer TransferResult
   | COO_Tap (ContractId Coin)
   | COO_TransferError Text
-  -- when a batched command fails, the following commands in the batch aren't executed. 
+  -- when a batched command fails, the subsequent commands in the batch aren't executed. 
   -- TODO(#756) - Consider removing this case 
   | COO_NotExecuted CoinOperation
   deriving (Eq, Show)
