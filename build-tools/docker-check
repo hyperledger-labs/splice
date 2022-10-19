@@ -4,9 +4,18 @@ script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 source "${script_dir}/lib/libcli.source"
 
 if [ -z "$1" ]; then
-    _error "Usage: $0 <image-tag>"
+    _error "Usage: $0 <image-tag> [--optional]"
 else
     image=$1
+fi
+
+if [ -n "$2" ]; then
+    if [ "$2" = "--optional" ]; then
+        optional=yes
+    else
+        _error "Invalid command line option: $2"
+        exit 1
+    fi
 fi
 
 # check if docker is running
@@ -20,7 +29,11 @@ if [ "${IMAGE_CHECK}" -eq 0 ] ; then
   _log "Image exists in repo: ${image}"
   exit 0
 else
-  _error "Image does not exist in repo: ${image}"
+  if [ -z "${optional}" ]; then
+    _error "Image does not exist in repo: ${image}"
+  else
+    _log "Image does not exist in repo: ${image}"
+  fi
   exit 1
 fi
 

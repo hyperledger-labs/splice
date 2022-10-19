@@ -278,16 +278,21 @@ function cluster_push() {
         exit 1
     fi
 
-    tagfile="${REPO_ROOT}/cluster/images/${module}/target/docker.push"
+    pushStateFile="${REPO_ROOT}/cluster/images/${module}/target/docker.push"
 
-    if [ ! -f ${tagfile} ]; then
+    if [ ! -f ${pushStateFile} ]; then
         _error "Module not built: $1"
         exit 1
     fi
 
-    image=$(<${tagfile})
+    imageTag=$(gawk -F '::' '{ print $2; }' < ${pushStateFile})
 
-    kubectl set image "deployment/${module}" "${module}=${image}"
+    if docker-check "${imageTag}"; then
+        _error "Cannot find expected image tag: ${imageTag}"
+        exit 1
+    fi
+
+    kubectl set image "deployment/${module}" "${module}=${imageTag}"
 }
 
 function cluster_reset() {
