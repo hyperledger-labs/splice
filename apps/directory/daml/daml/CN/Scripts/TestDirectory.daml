@@ -1,16 +1,18 @@
 module CN.Scripts.TestDirectory where
 
+import DA.Assert
 import DA.Time
 import Daml.Script
 
 import CC.CoinRules
 import CN.Directory
 import CN.Wallet
+import CN.Wallet.Subscriptions
 
 import CC.Scripts.Util
 
-test : Script ()
-test = script do
+testWithSubscription : Script ()
+testWithSubscription = script do
   app <- setupApp
 
   runNextIssuance app 1.0
@@ -30,6 +32,101 @@ test = script do
     entryFee = 1.0
     collectionDuration = minutes 5
     acceptDuration = minutes 5
+    renewalDuration = days 30
+    entryLifetime = days 90
+
+  -- user requests entry via app install
+  -- how: UI of directory service via write-delegation on app manager & call to
+  -- user’s participant.
+  subscriptionRequest <- submitMulti [user] [provider, app.svc] $ exerciseCmd directoryInstall DirectoryInstall_RequestEntryWithSubscription with
+    name = "cns.darth.vader"
+
+  -- cc wallet selects a large enough coin
+  -- how: cc wallet
+  -- note: privacy is no concern here as coin holdings are public
+  coin <- tap app user 1.5
+  -- cc wallet accepts sbuscription and first payment and locks coin to provider
+  -- how: cc wallet
+  (initialPaymentCid, _) <- submitMulti [user] [app.svc] $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
+    inputs = [InputCoin coin]
+
+  -- directory provider transactionally unlocks & transfer coins and creates directory entry and a subscription in return.
+  -- how: provider on their own participant
+  (entryCid, subscriptionStateCid, _) <- submitMulti [provider] [app.svc] $ exerciseCmd directoryInstall DirectoryInstall_CollectInitialEntryPaymentWithSubscription with
+    paymentCid = initialPaymentCid
+
+  Some entry <- queryContractId user entryCid
+  Some subscriptionState <- queryContractId user subscriptionStateCid
+  Some install <- queryContractId user directoryInstall
+
+  entry.name === "cns.darth.vader"
+  entry.user === user
+  subscriptionState.nextPaymentDueAt === entry.expiresAt
+  subscriptionState.payData.paymentInterval === install.entryLifetime
+
+  -- cc wallet automatically selects a large enough coin and initiates a subscription payment during the scheduled renewal period
+  -- how: cc wallet
+  passTime (days 60)
+  coin <- tap app user 1.5
+  (paymentCid, _) <- submitMulti [user] [app.svc] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+    inputs = [InputCoin coin]
+
+  -- directory provider transactionally unlocks & transfer coins and renews directory entry in return
+  -- how: provider on their own participant
+  (entryCid, subscriptionStateCid, _) <- submitMulti [provider] [app.svc] $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryRenewalPaymentWithSubscription with
+    paymentCid
+    entryCid
+
+  submitMustFail provider $ exerciseCmd entryCid (DirectoryEntry_Expire provider)
+
+  -- user can't pay earlier than `renewalDuration` from the next due date
+  coin <- tap app user 1.5
+  submitMultiMustFail [user] [app.svc] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+    inputs = [InputCoin coin]
+
+  passTime (days 90)
+
+  -- cc wallet and provider can repeat the "payment and collect" cycle indefinitely
+  (paymentCid, _) <- submitMulti [user] [app.svc] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+    inputs = [InputCoin coin]
+  (entryCid, subscriptionStateCid, _) <- submitMulti [provider] [app.svc] $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryRenewalPaymentWithSubscription with
+    paymentCid
+    entryCid
+
+  submitMustFail provider $ exerciseCmd entryCid (DirectoryEntry_Expire provider)
+
+  -- directory provider can eventually expire an unfunded entry
+  passTime (days 121)
+  submit provider $ exerciseCmd entryCid (DirectoryEntry_Expire provider)
+
+  -- directory provider can then also terminate the subscription
+  submit provider $ exerciseCmd subscriptionStateCid (SubscriptionIdleState_ExpireSubscription provider)
+
+  pure ()
+
+
+testWithRegularPayment : Script ()
+testWithRegularPayment = script do
+  app <- setupApp
+
+  runNextIssuance app 1.0
+  runCoinDepositBots app
+
+  provider <- setupUser app "provider" app.svc
+  user <- setupUser app "user" app.svc
+
+  -- provider creates directory rules
+  -- how: up to app provider
+  directoryInstallRequest <- submit user $ createCmd DirectoryInstallRequest with
+    provider = provider
+    user = user
+
+  directoryInstall <- submit provider $ exerciseCmd directoryInstallRequest DirectoryInstallRequest_Accept with
+    svc = app.svc
+    entryFee = 1.0
+    collectionDuration = minutes 5
+    acceptDuration = minutes 5
+    renewalDuration = days 30 -- not relevant to the flow we test here
     entryLifetime = days 90
 
   -- user requests entry via app install
@@ -58,22 +155,11 @@ test = script do
   (entryCid, _) <- submitMulti [provider] [app.svc] $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryPayment with
     acceptedAppPaymentCid
 
-  (_, renewalPaymentRequest) <- submit user $ exerciseCmd directoryInstall DirectoryInstall_RequestRenewal with
-    entryCid = entryCid
-
-  coin <- tap app user 1.5
-
-  Right (acceptedAppPaymentCid, _) <- submitMulti [user] [app.svc] $ exerciseCmd renewalPaymentRequest AppPaymentRequest_Accept with
-    inputs = [InputCoin coin]
-
-  (entryCid, _) <- submitMulti [provider] [app.svc] $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryRenewalPayment with
-    acceptedAppPaymentCid
-
-  passTime (days 91)
+  -- we can't renew using regular payments; in the future, it won't be possible to register entries using regular payments either
 
   submitMustFail provider $ exerciseCmd entryCid (DirectoryEntry_Expire provider)
 
-  passTime (days 90)
+  passTime (days 91)
 
   submit provider $ exerciseCmd entryCid (DirectoryEntry_Expire provider)
 

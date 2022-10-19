@@ -5,13 +5,32 @@ import DA.Time
 
 import CC.Coin
 import CN.Wallet
+import CN.Wallet.Subscriptions
 
+
+-- | Context to be referenced in a `Subscription` contract.
+-- Archived by the wallet models once a subscription is archived.
+-- Can be used as a stable reference.
+template DirectoryEntryContext
+  with
+    provider : Party
+    user : Party
+    name : Text
+  where
+    signatory provider, user
+
+    interface instance SubscriptionContext for DirectoryEntryContext where
+      view = SubscriptionContextView with description = "Directory entry: " <> show name
+
+
+-- | A directory entry that needs to be renewed continuously.
+-- Renewal recreates this contract with an updated `expiresAt` field.
 template DirectoryEntry
   with
     user : Party
     provider : Party
     name : Text
-    expiresAt: Time
+    expiresAt : Time
   where
     signatory user, provider
 
@@ -31,6 +50,7 @@ template DirectoryEntry
          create this with
            expiresAt = this.expiresAt `addRelTime` extension
 
+
 -- A request for a directory entry
 template DirectoryEntryRequest
   with
@@ -45,6 +65,7 @@ template DirectoryEntryRequest
       controller provider
       do pure ()
 
+
 template DirectoryEntryOffer
   with
     entryRequest : DirectoryEntryRequest
@@ -54,15 +75,6 @@ template DirectoryEntryOffer
     interface instance DeliveryOffer for DirectoryEntryOffer where
       view = DeliveryOfferView with description = "Directory entry request: " <> show entryRequest
 
-template DirectoryEntryRenewalOffer
-  with
-    entry : DirectoryEntry
-    entryCid : ContractId DirectoryEntry
-  where
-    signatory signatory entry
-
-    interface instance DeliveryOffer for DirectoryEntryRenewalOffer where
-      view = DeliveryOfferView with description = "Directory entry renewal request: " <> show entry
 
 template DirectoryInstall with
     provider : Party
@@ -71,6 +83,7 @@ template DirectoryInstall with
     entryFee : Decimal
     collectionDuration : RelTime -- Time provider has to collect accepted payment
     acceptDuration : RelTime -- Time user has to accept a payment request
+    renewalDuration : RelTime -- Length of interval within which user can renew. At the end the entry expires
     entryLifetime : RelTime -- Duration until an entry expires
   where
     signatory provider, user
@@ -83,6 +96,75 @@ template DirectoryInstall with
         actor : Party
       controller actor
       do assertMsg ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
+
+    -- Request a directory entry, to be paid and renewed via subscription payments.
+    -- The request is answered by requesting from the user to agree on establishing subscription payments.
+    -- The SubscriptionRequest is accepted (or rejected) via the user's wallet by offering the initial payment.
+    nonconsuming choice DirectoryInstall_RequestEntryWithSubscription : ContractId SubscriptionRequest
+      with
+        name : Text
+      controller user
+      do
+        context <- create DirectoryEntryContext with ..
+        let subscriptionData = Subscription with
+              sender = user
+              receiver = provider
+              context = toInterfaceContractId context
+              ..
+        let payData = SubscriptionPayData with
+              paymentQuantity = entryFee
+              paymentInterval = entryLifetime
+              paymentDuration = renewalDuration
+              collectionDuration
+        create SubscriptionRequest with
+          subscriptionData
+          payData
+
+    -- Collect a user's initial payment for a directory entry allocation.
+    -- By collecting the initial payment, the directory service provider ultimately agrees to both
+    -- the creation of the directory entry and the establishment of subscription payments for renewing it.
+    nonconsuming choice DirectoryInstall_CollectInitialEntryPaymentWithSubscription : (ContractId DirectoryEntry, ContractId SubscriptionIdleState, ContractId Coin)
+      with
+        paymentCid : ContractId SubscriptionInitialPayment
+      controller provider
+      do
+        payment <- fetch paymentCid
+        Some (_, context) <- fetchFromInterface @DirectoryEntryContext payment.subscriptionData.context
+        -- accept payment which creates the subscription
+        (_, subscriptionStateCid, coinCid) <- exercise paymentCid SubscriptionInitialPayment_Collect with
+          submitter = provider
+        subscriptionState <- fetch subscriptionStateCid
+        -- deliver the promised good: create the directory entry
+        entryCid <- case context of
+          DirectoryEntryContext{..} -> create DirectoryEntry with
+            expiresAt = subscriptionState.nextPaymentDueAt
+            ..
+        -- return the created contracts
+        pure (entryCid, subscriptionStateCid, coinCid)
+
+    -- Collect a recurring entry renewal payment, renewing the entry.
+    nonconsuming choice DirectoryInstall_CollectEntryRenewalPaymentWithSubscription : (ContractId DirectoryEntry, ContractId SubscriptionIdleState, ContractId Coin)
+      with
+        paymentCid : ContractId SubscriptionPayment
+        entryCid : ContractId DirectoryEntry -- ^ The currently active entry.
+      controller provider
+      do
+        payment <- fetch paymentCid
+        Some (_, context) <- fetchFromInterface @DirectoryEntryContext payment.subscriptionData.context
+        entry <- fetch entryCid
+        -- sanity checks
+        assertMsg "Current entry matches subscription context"
+          ((DirectoryEntryContext entry.provider entry.user entry.name) == context)
+        assertMsg "Subscription intervals and entry renewal times are in sync"
+          (payment.payData.paymentInterval == entryLifetime && payment.thisPaymentDueAt == entry.expiresAt)
+        -- accept payment
+        (subscriptionStateCid, coinCid) <- exercise paymentCid SubscriptionPayment_Collect with
+          submitter = provider
+        -- renew the entry
+        entryCid <- exercise entryCid DirectoryEntry_Renew with
+          extension = entryLifetime
+        -- return the created contracts
+        pure (entryCid, subscriptionStateCid, coinCid)
 
     nonconsuming choice DirectoryInstall_RequestEntry
       : ContractId DirectoryEntryRequest
@@ -131,42 +213,6 @@ template DirectoryInstall with
          -- return the created contracts
          pure (entryCid, coinCid)
 
-    nonconsuming choice DirectoryInstall_RequestRenewal : (ContractId DirectoryEntryRenewalOffer, ContractId AppPaymentRequest)
-      with
-        entryCid : ContractId DirectoryEntry
-      controller user
-      do entry <- fetch entryCid
-         assertMsg "User matches" (entry.user == user)
-         assertMsg "Provider matches" (entry.provider == provider)
-         renewalOffer <- create DirectoryEntryRenewalOffer with ..
-         now <- getTime
-         appPaymentRequest <- create AppPaymentRequest with
-           receiver = provider
-           sender = user
-           provider
-           svc = svc
-           quantity = entryFee
-           deliveryOffer = toInterfaceContractId renewalOffer
-           collectionDuration = collectionDuration
-           expiresAt = now `addRelTime` acceptDuration
-         pure (renewalOffer, appPaymentRequest)
-
-    nonconsuming choice DirectoryInstall_CollectEntryRenewalPayment : (ContractId DirectoryEntry, ContractId Coin)
-      with
-        acceptedAppPaymentCid : ContractId AcceptedAppPayment
-      controller provider
-      do -- deliver the promised good: the entry referenced in the payment
-         acceptedAppPayment <- fetch acceptedAppPaymentCid
-         Some (_, offer) <- fetchFromInterface @DirectoryEntryRenewalOffer acceptedAppPayment.deliveryOffer
-         now <- getTime
-         entryCid <- exercise offer.entryCid DirectoryEntry_Renew with
-           extension = entryLifetime
-         -- accept payment, which archives the offer
-         coinCid <- exercise acceptedAppPaymentCid (AcceptedAppPayment_Collect provider)
-         -- return the created contracts
-         pure (entryCid, coinCid)
-
-
 
 -- | A request from a user to a directory service provider for an installation.
 -- Used to mock the actuall installation process until we have
@@ -187,9 +233,11 @@ template DirectoryInstallRequest with
         entryFee : Decimal
         collectionDuration : RelTime -- Time provider has to collect accepted payment
         acceptDuration : RelTime -- Time user has to accept a payment request
-        entryLifetime : RelTime
+        renewalDuration : RelTime -- Time user has available to make a renewal payment, before the entry expires.
+        entryLifetime : RelTime -- Duration until an entry expires
       controller provider
-      do create DirectoryInstall with ..
+      do
+        create DirectoryInstall with ..
 
     choice DirectoryInstallRequest_Reject : ()
       controller provider

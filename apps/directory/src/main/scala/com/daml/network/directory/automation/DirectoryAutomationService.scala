@@ -37,6 +37,10 @@ class DirectoryAutomationService(
   private val acceptDuration = RelTime(
     60_000_000
   )
+  private val renewalDuration = RelTime(
+    // 30 days
+    30 * 24 * 60 * 1_000_000
+  )
   private val entryLifetime = RelTime(
     // 90 days
     90 * 24 * 60 * 1_000_000
@@ -91,6 +95,7 @@ class DirectoryAutomationService(
             entryFee = entryFee,
             collectionDuration = collectionDuration,
             acceptDuration = acceptDuration,
+            renewalDuration = renewalDuration,
             entryLifetime = entryLifetime,
           )
           val commandId =
