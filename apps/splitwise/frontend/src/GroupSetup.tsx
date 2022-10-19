@@ -12,7 +12,7 @@ import { GroupInvite } from '@daml.js/splitwise/lib/CN/Splitwise';
 import { Contract } from './Contract';
 import DirectoryEntries from './DirectoryEntries';
 import { useLedgerApiClient } from './LedgerApiContext';
-import { useSplitwiseClient } from './SplitwiseServiceContext';
+import { useSplitwiseClient } from './contexts/SplitwiseServiceContext';
 
 interface GroupSetupProps {
   directoryEntries: DirectoryEntries;

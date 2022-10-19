@@ -10,7 +10,8 @@ import DirectoryEntries from './DirectoryEntries';
 import GroupSetup from './GroupSetup';
 import Groups from './Groups';
 import { useLedgerApiClient, LedgerApiClientProvider } from './LedgerApiContext';
-import { useSplitwiseClient } from './SplitwiseServiceContext';
+import { useSplitwiseClient } from './contexts/SplitwiseServiceContext';
+import { config } from './utils';
 
 const HomeWithContext: React.FC<{
   userId: string;
@@ -100,10 +101,7 @@ const Home: React.FC<{ userId: string; svc: string | undefined; dirEntries: Dire
   svc,
   dirEntries,
 }) => (
-  <LedgerApiClientProvider
-    url={process.env.REACT_APP_LEDGER_API_GRPC_URL || 'http://localhost:8085'}
-    userId={userId}
-  >
+  <LedgerApiClientProvider url={config.ledgerApi.grpcUrl} userId={userId}>
     <HomeWithContext userId={userId} svc={svc} dirEntries={dirEntries} />
   </LedgerApiClientProvider>
 );

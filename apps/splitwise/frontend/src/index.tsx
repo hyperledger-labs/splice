@@ -1,14 +1,24 @@
+import { DirectoryClientProvider } from 'common-frontend';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
 import App from './App';
+import { ScanClientProvider } from './contexts/ScanServiceContext';
+import { SplitwiseClientProvider } from './contexts/SplitwiseServiceContext';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
+import { config } from './utils';
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 root.render(
   <React.StrictMode>
-    <App />
+    <SplitwiseClientProvider url={config.splitwise.grpcUrl}>
+      <DirectoryClientProvider url={config.directory.grpcUrl}>
+        <ScanClientProvider url={config.scan.grpcUrl}>
+          <App />
+        </ScanClientProvider>
+      </DirectoryClientProvider>
+    </SplitwiseClientProvider>
   </React.StrictMode>
 );
 
