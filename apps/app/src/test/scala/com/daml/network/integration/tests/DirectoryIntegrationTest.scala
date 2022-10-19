@@ -82,11 +82,7 @@ class DirectoryIntegrationTest
         loggerFactory.assertLogs(
           {
             val n = 3
-            // loggerFactory.assertLogs() assertThrowsAndLogs({
-            for (_ <- 1 to n)
-              Future {
-                aliceDirectory.requestDirectoryInstall()
-              }
+            (1 to 3).foreach(_ => Future(aliceDirectory.requestDirectoryInstall()))
 
             // Wait until 2*n transactions have been received (one each: create request + handle request)
             val tx = aliceValidator.remoteParticipant.ledger_api.transactions

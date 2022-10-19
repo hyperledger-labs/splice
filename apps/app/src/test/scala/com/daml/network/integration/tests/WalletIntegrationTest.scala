@@ -3,9 +3,9 @@ package com.daml.network.integration.tests
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding
 import com.daml.ledger.client.binding.Primitive
-import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
-import com.daml.network.codegen.CN.Scripts.{TestWallet => testWalletCodegen}
-import com.daml.network.codegen.CN.{Wallet => walletCodegen}
+import com.daml.network.codegen.CC.{Coin as coinCodegen, CoinRules as coinRulesCodegen}
+import com.daml.network.codegen.CN.Scripts.TestWallet as testWalletCodegen
+import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.codegen.DA
 import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
@@ -26,13 +26,13 @@ import com.daml.network.util.{
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.{Balance, ListResponse}
 import com.digitalasset.canton.HasExecutionContext
-import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.topology.PartyId
 
 import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class WalletIntegrationTest
     extends CoinIntegrationTest
@@ -581,17 +581,51 @@ class WalletIntegrationTest
     checkWallet(aliceUserParty, aliceRemoteWallet, Seq((74.0, 75.0)))
   }
 
-  "succeeds when trying to execute concurrent-coin manipulating operations" in { implicit env =>
-    // TODO(#756): make this testing more robust, e.g., actually ensure that the same batch is used.
+  "batches concurrent coin-operations" in { implicit env =>
     val (alice, bob) = setupAliceAndBobAndChannel
     aliceRemoteWallet.tap(50)
-    val _ = Future({
-      // ensure that this transfer is executed after the following transfer, but not too late after it,
-      // such that they are both run as part of the same batch
-      Threading.sleep(20)
-      aliceRemoteWallet.executeDirectTransfer(bob, 15)
-    })
-    aliceRemoteWallet.executeDirectTransfer(bob, 20)
+    aliceValidator.remoteParticipant.ledger_api.acs.await(alice, coinCodegen.Coin)
+    val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
+    // sending three commands in short succession to the idle wallet should lead to two transactions being executed
+    // tx 1: first command that arrived is immediately executed
+    // tx 2: other commands that arrived after the first command was started are executed in one batch
+    (1 to 3).foreach(i => Future(aliceRemoteWallet.executeDirectTransfer(bob, i)))
+    // Wait until 2 transactions have been received
+    val txs = aliceValidator.remoteParticipant.ledger_api.transactions
+      .trees(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
+    val coinsInTx = txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin)(_))
+
+    // create change + transferred coin
+    coinsInTx(0) should have size 2
+    // (create change + transferred coin) x2
+    coinsInTx(1) should have size 2 * 2
+  }
+
+  "batches up to `batchSize` concurrent coin-operations" in { implicit env =>
+    val defaultBatchSize = 10
+    val (alice, bob) = setupAliceAndBobAndChannel
+    aliceRemoteWallet.tap(50)
+    aliceValidator.remoteParticipant.ledger_api.acs.await(alice, coinCodegen.Coin)
+    val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
+
+    val _ = Future(aliceRemoteWallet.executeDirectTransfer(bob, 10))
+    (1 to defaultBatchSize + 1).foreach(_ =>
+      Future(aliceRemoteWallet.executeDirectTransfer(bob, 1))
+    )
+    // 3 txs;
+    // tx 1: initial transfer
+    // tx 2: 10 subsequent batched transfers
+    // tx 3: single transfer that was not picked due to the batch size limit
+    val txs = aliceValidator.remoteParticipant.ledger_api.transactions
+      .trees(Set(alice), completeAfter = 3, beginOffset = offsetBefore)
+    val coinsInTx = txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin)(_))
+
+    // create change + transferred coin
+    coinsInTx(0) should have size 2
+    // (create change + transferred coin) x10
+    coinsInTx(1) should have size 10 * 2
+    // create change + transferred coin
+    coinsInTx(2) should have size 2
   }
 
   "accepts an optional JWT token with user in subject" in { implicit env =>
