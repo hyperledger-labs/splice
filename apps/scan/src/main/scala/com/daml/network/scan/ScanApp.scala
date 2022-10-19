@@ -80,7 +80,7 @@ class ScanApp(
 
   override lazy val ports = Map("admin" -> config.adminApi.port)
 
-  override val requiredTemplates = Set(coinCodegen.Coin.Coin)
+  override lazy val requiredTemplates = Set(coinCodegen.Coin.Coin)
 }
 
 object ScanApp {

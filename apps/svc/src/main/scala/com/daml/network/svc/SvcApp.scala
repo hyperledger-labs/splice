@@ -101,7 +101,7 @@ class SvcApp(
   override lazy val ports = Map("admin" -> config.adminApi.port)
 
   // SVC app uploads package so no dep.
-  override val requiredTemplates = Set.empty
+  override lazy val requiredTemplates = Set.empty
 }
 
 object SvcApp {

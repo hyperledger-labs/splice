@@ -92,7 +92,7 @@ class SplitwiseApp(
     )
   }
 
-  override val requiredTemplates = Set(splitwiseCodegen.SplitwiseInstall)
+  override lazy val requiredTemplates = Set(splitwiseCodegen.SplitwiseInstall)
 }
 
 object SplitwiseApp {
