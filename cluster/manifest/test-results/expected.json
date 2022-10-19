@@ -603,6 +603,39 @@
                               "memory": "1024Mi"
                            }
                         }
+                     },
+                     {
+                        "env": [
+                           {
+                              "name": "GRPC_ADDRESS",
+                              "value": "127.0.0.1"
+                           },
+                           {
+                              "name": "GRPC_PORT",
+                              "value": "5012"
+                           },
+                           {
+                              "name": "GRPC_WEB_PORT",
+                              "value": "6012"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/envoy-proxy:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "envoy-proxy",
+                        "ports": [
+                           {
+                              "containerPort": 6012,
+                              "name": "scan-api-gw"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "256Mi"
+                           },
+                           "requests": {
+                              "memory": "256Mi"
+                           }
+                        }
                      }
                   ]
                }
@@ -621,6 +654,11 @@
                {
                   "name": "scan-api",
                   "port": 5012,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "scan-api-gw",
+                  "port": 6012,
                   "protocol": "TCP"
                }
             ],
@@ -1152,6 +1190,85 @@
          "kind": "Deployment",
          "metadata": {
             "labels": {
+               "app": "validator1-splitwise-web-ui",
+               "clusterName": "cluster"
+            },
+            "name": "validator1-splitwise-web-ui"
+         },
+         "spec": {
+            "replicas": 1,
+            "selector": {
+               "matchLabels": {
+                  "app": "validator1-splitwise-web-ui"
+               }
+            },
+            "strategy": {
+               "type": "Recreate"
+            },
+            "template": {
+               "metadata": {
+                  "labels": {
+                     "app": "validator1-splitwise-web-ui",
+                     "clusterName": "cluster"
+                  }
+               },
+               "spec": {
+                  "containers": [
+                     {
+                        "env": [
+                           {
+                              "name": "JAVA_TOOL_OPTIONS",
+                              "value": "-Xms768M -Xmx768M"
+                           }
+                        ],
+                        "image": "region-docker.pkg.dev/project/repo/validator1-splitwise-web-ui:tag",
+                        "imagePullPolicy": "Always",
+                        "name": "validator1-splitwise-web-ui",
+                        "ports": [
+                           {
+                              "containerPort": 80,
+                              "name": "val1-sw-ui"
+                           }
+                        ],
+                        "resources": {
+                           "limits": {
+                              "memory": "1024Mi"
+                           },
+                           "requests": {
+                              "memory": "1024Mi"
+                           }
+                        }
+                     }
+                  ]
+               }
+            }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "kind": "Service",
+         "metadata": {
+            "clusterName": "cluster",
+            "name": "validator1-splitwise-web-ui"
+         },
+         "spec": {
+            "ports": [
+               {
+                  "name": "val1-sw-ui",
+                  "port": 80,
+                  "protocol": "TCP"
+               }
+            ],
+            "selector": {
+               "app": "validator1-splitwise-web-ui"
+            }
+         }
+      },
+      {
+         "apiVersion": "apps/v1",
+         "kind": "Deployment",
+         "metadata": {
+            "labels": {
                "app": "splitwise-participant",
                "clusterName": "cluster"
             },
@@ -1546,6 +1663,10 @@
                               "name": "scan-api"
                            },
                            {
+                              "containerPort": 6012,
+                              "name": "scan-api-gw"
+                           },
+                           {
                               "containerPort": 5102,
                               "name": "val1-adm-api"
                            },
@@ -1664,6 +1785,11 @@
                {
                   "name": "scan-api",
                   "port": 5012,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "scan-api-gw",
+                  "port": 6012,
                   "protocol": "TCP"
                },
                {
@@ -1796,6 +1922,11 @@
                {
                   "name": "scan-api",
                   "port": 5012,
+                  "protocol": "TCP"
+               },
+               {
+                  "name": "scan-api-gw",
+                  "port": 6012,
                   "protocol": "TCP"
                },
                {

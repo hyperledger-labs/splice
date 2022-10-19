@@ -18,6 +18,7 @@ apps := \
 	images/validator1-wallet-app \
 	images/validator1-wallet-web-ui \
 	images/validator1-directory-web-ui \
+	images/validator1-splitwise-web-ui \
 	images/splitwise-participant \
 	images/splitwise-validator-app \
 	images/splitwise-app

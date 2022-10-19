@@ -75,7 +75,7 @@ local svcDeployments(config) = [
       name: 'scan-api',
       port: 5012,
     },
-  ]),
+  ], proxyToGrpcWeb='scan-api'),
 ];
 
 local validator1Deployments(config) = [
@@ -115,6 +115,14 @@ local validator1Deployments(config) = [
   c.deployment(config, 'validator1-directory-web-ui', [
     {
       name: 'val1-dir-ui',
+      port: 80,
+      internalOnly: true,
+    },
+  ]),
+
+  c.deployment(config, 'validator1-splitwise-web-ui', [
+    {
+      name: 'val1-sw-ui',
       port: 80,
       internalOnly: true,
     },
