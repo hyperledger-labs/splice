@@ -6,11 +6,13 @@ import com.daml.ledger.api.v1.commands.Command
 import com.daml.ledger.client.binding
 import com.daml.network.codegen.CC.Coin.Coin
 import com.daml.network.codegen.{CC, OpenBusiness}
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
+import com.daml.network.store.AcsStore.QueryResult
+import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 object CoinUtil {
 
@@ -113,15 +115,35 @@ object CoinUtil {
     def recordUserHostedAt(
         user: PartyId,
         validator: PartyId,
+        logger: TracedLogger,
         connection: CoinLedgerConnection,
-    )(implicit traceContext: TraceContext): Future[Unit] = {
-      connection.ignoreDuplicateKeyErrors(
-        connection.submitCommand(
-          actAs = Seq(user),
-          readAs = Seq.empty,
-          command = Seq(recordUserHostedAtCommand(user, validator)),
-        ),
-        s"CCUserHostedAt($user, $validator)",
+        retryProvider: CoinRetries,
+        lookupCCUserHostedAtByParty: (
+            PartyId
+        ) => Future[QueryResult[Option[Contract[CC.Scripts.Util.CCUserHostedAt]]]],
+    )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
+      logger.debug("Querying store for CCUserHostedAt")
+      retryProvider.retry(
+        "recordUserHostedAt",
+        lookupCCUserHostedAtByParty(user).flatMap {
+          case QueryResult(off, None) =>
+            logger.debug("Store contained None")
+            // TODO(#790) Switch to the generalized version of mkCommandId once it has been added
+            val commandId = s"com.daml.network.validator.CCUserHostedAt_$user"
+            connection
+              .submitCommandWithDedup(
+                actAs = Seq(user),
+                readAs = Seq.empty,
+                command = Seq(recordUserHostedAtCommand(user, validator)),
+                commandId = commandId,
+                deduplicationOffset = off,
+              )
+              .map(_ => ())
+          case QueryResult(_, Some(_)) =>
+            logger.debug("Store contained Some")
+            logger.info(s"CCUserHostedAt contract for $user already exists, skipping.")
+            Future.successful(())
+        },
       )
     }
   }

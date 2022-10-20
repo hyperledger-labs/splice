@@ -9,6 +9,7 @@ import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode}
 import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, UploadablePackage}
 import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
 import com.daml.network.validator.automation.ValidatorAutomationService
@@ -90,6 +91,7 @@ class ValidatorApp(
 
   private def createWalletAppInstallAndValidatorRight(
       connection: CoinLedgerConnection,
+      store: ValidatorStore,
       svcParty: PartyId,
       validatorParty: PartyId,
       validatorUser: String,
@@ -100,27 +102,26 @@ class ValidatorApp(
       s"Attempting to create wallet install and validator right for validator party $validatorParty..."
     )
     for {
-      _ <- retry(
-        "install wallet for validator",
-        ValidatorUtil.installWalletForUser(
-          validatorServiceParty = validatorParty,
-          walletServiceParty = walletServiceParty,
-          walletServiceUser = walletServiceUser,
-          endUserName = validatorUser,
-          endUserParty = validatorParty,
-          svcParty = svcParty,
-          connection = connection,
-          logger = logger,
-        ),
+      _ <- ValidatorUtil.installWalletForUser(
+        validatorServiceParty = validatorParty,
+        walletServiceParty = walletServiceParty,
+        walletServiceUser = walletServiceUser,
+        endUserName = validatorUser,
+        endUserParty = validatorParty,
+        svcParty = svcParty,
+        connection = connection,
+        store = store,
+        retryProvider = this,
+        logger = logger,
       )
-      _ <- retry(
-        "create validator right",
-        ValidatorUtil.createValidatorRight(
-          user = validatorParty,
-          validator = validatorParty,
-          svc = svcParty,
-          connection = connection,
-        ),
+      _ <- ValidatorUtil.createValidatorRight(
+        user = validatorParty,
+        validator = validatorParty,
+        svc = svcParty,
+        connection = connection,
+        store = store,
+        retryProvider = this,
+        logger = logger,
       )
     } yield {
       logger.info(
@@ -129,37 +130,58 @@ class ValidatorApp(
     }
   }
 
-  private def createRulesRequestAndUserHostedAtContracts(
+  private def createCoinRulesRequest(
       connection: CoinLedgerConnection,
+      store: ValidatorStore,
       svcParty: PartyId,
       validatorParty: PartyId,
   ): Future[Unit] = {
-    logger.info("Attempting to create rules request and userHostedAt.")
+    logger.info("Attempting to create CoinRulesRequest")
     val coinRulesReq = CoinRulesRequest(user = validatorParty.toPrim, svc = svcParty.toPrim)
-    for {
-      _ <- retry(
-        "Create CoinRulesRequest",
-        connection.ignoreDuplicateKeyErrors(
-          connection
-            .submitCommand(
-              actAs = Seq(validatorParty),
-              readAs = Seq(validatorParty),
-              command = Seq(coinRulesReq.create.command),
-            ),
-          s"CoinRulesRequest($validatorParty, $svcParty)",
-        ),
+    retry(
+      "Create CoinRulesRequest",
+      for {
+        coinRulesResult <- store.lookupCoinRules()
+        coinRulesRequestResult <- store.lookupCoinRulesRequest()
+        _ <- (coinRulesResult, coinRulesRequestResult) match {
+          case (QueryResult(off1, None), QueryResult(off2, None)) =>
+            // TODO(#790) Switch to the generalized version of mkCommandId once it has been added
+            val commandId = s"com.daml.network.validator.CoinRulesRequest_$validatorParty"
+            connection
+              .submitCommandWithDedup(
+                actAs = Seq(validatorParty),
+                readAs = Seq.empty,
+                command = Seq(coinRulesReq.create.command),
+                commandId = commandId,
+                deduplicationOffset = Ordering.String.min(off1, off2),
+              )
+          case (QueryResult(_, Some(_)), _) =>
+            logger.info("CoinRulesRequest already exists, skipping")
+            Future.successful(())
+          case (_, QueryResult(_, Some(_))) =>
+            logger.info("CoinRules already exists, skipping")
+            Future.successful(())
+        }
+      } yield (),
+    ).map(_ => logger.info("Created CoinRulesRequest"))
+  }
+
+  private def createUserHostedAt(
+      connection: CoinLedgerConnection,
+      store: ValidatorStore,
+      validatorParty: PartyId,
+  ): Future[Unit] = {
+    logger.info("Attempting to create CCUserHostedAt")
+    CoinUtil.ExplicitDisclosureWorkaround
+      .recordUserHostedAt(
+        validatorParty,
+        validatorParty,
+        logger,
+        connection,
+        this,
+        store.lookupCCUserHostedAtByParty,
       )
-      _ <- retry(
-        "Create UserHostedAt for validator",
-        CoinUtil.ExplicitDisclosureWorkaround.recordUserHostedAt(
-          validatorParty,
-          validatorParty,
-          connection,
-        ),
-      )
-    } yield {
-      logger.info("Created rules request and userHostedAt.")
-    }
+      .map(_ => logger.info("Created rules request and userHostedAt."))
   }
 
   override def initialize(
@@ -178,25 +200,34 @@ class ValidatorApp(
       connection = ledgerClient.connection("ValidatorAppBootstrap")
       svcParty <- retry("getSvcPartyId", scanConnection.getSvcPartyId())
       (walletServiceParty, walletServiceUser) <- setupWallet(connection)
+      key = ValidatorStore.Key(
+        validatorParty = validatorParty,
+        svcParty = svcParty,
+        walletServiceParty = walletServiceParty,
+      )
+      store = ValidatorStore(key, storage, loggerFactory)
+      automation = new ValidatorAutomationService(
+        store,
+        ledgerClient,
+        this,
+        loggerFactory,
+        timeouts,
+      )
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>
         setupAppInstance(connection, name, instance)
       })
       _ <- createWalletAppInstallAndValidatorRight(
         connection,
+        store,
         svcParty = svcParty,
         validatorParty = validatorParty,
         validatorUser = config.damlUser,
         walletServiceParty = walletServiceParty,
         walletServiceUser = walletServiceUser,
       )
-      _ <- createRulesRequestAndUserHostedAtContracts(connection, svcParty, validatorParty)
+      _ <- createCoinRulesRequest(connection, store, svcParty, validatorParty)
+      _ <- createUserHostedAt(connection, store, validatorParty)
     } yield {
-      val key = ValidatorStore.Key(
-        validatorParty = validatorParty,
-        svcParty = svcParty,
-        walletServiceParty = walletServiceParty,
-      )
-      val store = ValidatorStore(key, storage, loggerFactory)
       adminServerRegistry
         .addService(
           ValidatorAppServiceGrpc.bindService(
@@ -205,19 +236,13 @@ class ValidatorApp(
               store,
               config.damlUser,
               config.walletServiceUser,
+              this,
               loggerFactory,
             ),
             ec,
           )
         )
         .discard
-      val automation = new ValidatorAutomationService(
-        store,
-        ledgerClient,
-        this,
-        loggerFactory,
-        timeouts,
-      )
       ValidatorApp.State(
         storage,
         store,

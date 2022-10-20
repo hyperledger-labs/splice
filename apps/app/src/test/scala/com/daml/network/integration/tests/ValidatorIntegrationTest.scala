@@ -30,13 +30,7 @@ class ValidatorIntegrationTest
     scan.startSync()
     aliceValidator.startSync()
     aliceValidator.stop()
-    loggerFactory.assertLogs(
-      aliceValidator.startSync(),
-      _.warningMessage should include(
-        // TODO(M1-51): remove this once we use explicit disclosure, and onboarding does no longer use CoinRulesRequest
-        "Rejecting duplicate CoinRulesRequest from alice_validator_user"
-      ),
-    )
+    aliceValidator.startSync()
   }
 
   "initialize svc and validator apps" in { implicit env =>
@@ -88,5 +82,15 @@ class ValidatorIntegrationTest
     partyIdFromGoodUserId.toString
       .split("::")
       .head should fullyMatch regex (s"other-_us:er-${randomId}")
+  }
+
+  "onboard user multiple times" in { implicit env =>
+    svc.start()
+    scan.start()
+    aliceValidator.startSync()
+
+    val party1 = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
+    val party2 = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
+    party1 shouldBe party2
   }
 }

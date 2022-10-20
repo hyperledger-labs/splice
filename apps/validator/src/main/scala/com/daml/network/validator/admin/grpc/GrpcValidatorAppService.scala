@@ -1,6 +1,6 @@
 package com.daml.network.validator.admin.grpc
 
-import com.daml.network.environment.CoinLedgerClient
+import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.util.{CoinUtil, Proto}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
@@ -17,6 +17,7 @@ class GrpcValidatorAppService(
     store: ValidatorStore,
     validatorUserName: String,
     walletServiceUser: String,
+    retryProvider: CoinRetries,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -40,11 +41,13 @@ class GrpcValidatorAppService(
 
       for {
         userPartyId <- connection.getOrAllocateParty(name)
-        // TODO(#1139): use a single command submission to create all three contracts, so dedup works and intermediate states won't have to be handled
         _ <- CoinUtil.ExplicitDisclosureWorkaround.recordUserHostedAt(
           userPartyId,
           store.key.validatorParty,
+          logger,
           connection,
+          retryProvider,
+          store.lookupCCUserHostedAtByParty,
         )
         // Workaround for the lack of "act-as-any-party" rights
         _ <- connection.grantUserRights(validatorUserName, Seq(userPartyId), Seq.empty)
@@ -56,6 +59,8 @@ class GrpcValidatorAppService(
           validatorServiceParty = store.key.validatorParty,
           svcParty = store.key.svcParty,
           connection = connection,
+          store = store,
+          retryProvider = retryProvider,
           logger = logger,
         )
         // Create validator right contract so validator can collect validator rewards
@@ -64,6 +69,9 @@ class GrpcValidatorAppService(
           validator = store.key.validatorParty,
           svc = store.key.svcParty,
           connection = connection,
+          store = store,
+          retryProvider = retryProvider,
+          logger = logger,
         )
       } yield OnboardUserResponse(Proto.encode(userPartyId))
     }

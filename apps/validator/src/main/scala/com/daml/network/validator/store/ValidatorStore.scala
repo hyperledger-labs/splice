@@ -1,6 +1,7 @@
 package com.daml.network.validator.store
 
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
+import com.daml.network.codegen.{CC => coinCodegen}
 import com.daml.network.store.AcsStore
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.Contract
@@ -29,6 +30,24 @@ trait ValidatorStore extends AutoCloseable with NamedLogging {
       co.payload.endUserName == endUserName
     )
 
+  def lookupCCUserHostedAtByParty(
+      party: PartyId
+  ): Future[QueryResult[Option[Contract[coinCodegen.Scripts.Util.CCUserHostedAt]]]] =
+    acsStore.findContract(coinCodegen.Scripts.Util.CCUserHostedAt)(co =>
+      co.payload.user == party.toPrim
+    )
+
+  def lookupCoinRules(): Future[QueryResult[Option[Contract[coinCodegen.CoinRules.CoinRules]]]] =
+    acsStore.findContract(coinCodegen.CoinRules.CoinRules)(_ => true)
+
+  def lookupCoinRulesRequest()
+      : Future[QueryResult[Option[Contract[coinCodegen.CoinRules.CoinRulesRequest]]]] =
+    acsStore.findContract(coinCodegen.CoinRules.CoinRulesRequest)(_ => true)
+
+  def lookupValidatorRightByParty(
+      party: PartyId
+  ): Future[QueryResult[Option[Contract[coinCodegen.Coin.ValidatorRight]]]] =
+    acsStore.findContract(coinCodegen.Coin.ValidatorRight)(co => co.payload.user == party.toPrim)
 }
 
 object ValidatorStore {
@@ -66,13 +85,26 @@ object ValidatorStore {
     val svc = key.svcParty.toPrim
 
     AcsStore.SimpleContractFilter(
-      key.walletServiceParty,
+      key.validatorParty,
       Map(
         mkFilter(walletCodegen.WalletAppInstall)(co =>
           co.payload.walletServiceParty == walletService &&
             co.payload.validatorParty == validator &&
             co.payload.svcParty == svc
-        )
+        ),
+        mkFilter(coinCodegen.Scripts.Util.CCUserHostedAt)(co => co.payload.validator == validator),
+        mkFilter(coinCodegen.CoinRules.CoinRules)(co =>
+          co.payload.obs == validator &&
+            co.payload.svc == svc
+        ),
+        mkFilter(coinCodegen.CoinRules.CoinRulesRequest)(co =>
+          co.payload.user == validator &&
+            co.payload.svc == svc
+        ),
+        mkFilter(coinCodegen.Coin.ValidatorRight)(co =>
+          co.payload.validator == validator &&
+            co.payload.svc == svc
+        ),
       ),
     )
   }
