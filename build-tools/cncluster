@@ -395,7 +395,7 @@ case "${SUBCOMMAND_NAME}" in
         ;;
 
     *)
-	    _error "Usage: $SCRIPTNAME {activate|apply|create|check|delete|deploy|ipaddr|push|reset}" >&2
+	    _error "Usage: $SCRIPTNAME {activate|apply|create|check|delete|deploy|ipaddr|push|reset|wait}" >&2
 	    exit 3
 	    ;;
 esac

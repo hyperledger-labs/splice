@@ -339,8 +339,6 @@ commands:
             run_sbt
             << parameters.post_sbt_cmd >>
 
-
-
   run_bash_command_in_nix:
     parameters:
       cmd:
@@ -348,7 +346,10 @@ commands:
       cmd_name:
         type: string
         default: "Executing bash command << parameters.cmd >> in the nix shell"
-      cluster_authentication:
+      cluster_authenticate:
+        type: boolean
+        default: false
+      cluster:
         type: enum
         enum: ["staging", "devnet", "testnet", "none"]
         default: "none"
@@ -363,10 +364,10 @@ commands:
             . /home/circleci/.nix-profile/etc/profile.d/nix.sh
             ADDITIONAL_NIX_ARGS="<< parameters.additional_nix_args >>"
 
-            if [[ << parameters.cluster_authentication >> =~ (dev|test)net  ]]; then
+            if [[ << parameters.cluster >> =~ (dev|test)net  ]]; then
               ADDITIONAL_NIX_ARGS+=" --keep GCP_DA_CN_DEVNET_KEY"
             fi
-            if [[ << parameters.cluster_authentication >> == staging ]]; then
+            if [[ << parameters.cluster >> == staging ]]; then
               ADDITIONAL_NIX_ARGS+=" --keep GCP_DA_CN_SCRATCHNET_KEY"
             fi
 
@@ -374,18 +375,24 @@ commands:
               --pure \
               --keep CI $ADDITIONAL_NIX_ARGS \
               --run bash \<<'EOF'
-              set -euo pipefail
-              . .envrc.vars
 
-              if [[ << parameters.cluster_authentication >> =~ (dev|test)net ]]; then
-                echo $GCP_DA_CN_DEVNET_KEY | gcloud auth activate-service-account --key-file=-
+              set -euo pipefail
+
+              . .envrc.vars
+              if [[ << parameters.cluster >> != none ]]; then
+                . $REPO_ROOT/cluster/deployment/<< parameters.cluster >>/.envrc.vars
               fi
-              if [[ << parameters.cluster_authentication >> == staging ]]; then
-                echo $GCP_DA_CN_SCRATCHNET_KEY | gcloud auth activate-service-account --key-file=-
+
+              if [[ << parameters.cluster_authenticate >> == true ]]; then
+                if [[ << parameters.cluster >> =~ (dev|test)net ]]; then
+                  echo $GCP_DA_CN_DEVNET_KEY | gcloud auth activate-service-account --key-file=-
+                fi
+                if [[ << parameters.cluster >> == staging ]]; then
+                  echo $GCP_DA_CN_SCRATCHNET_KEY | gcloud auth activate-service-account --key-file=-
+                fi
               fi
 
               << parameters.cmd >>
-
             EOF
 
   cleanup_sbt_test_job:
@@ -708,10 +715,10 @@ jobs:
       - setup_nix
       - run_bash_command_in_nix:
           cmd_name: apply cluster manifest
-          cluster_authentication: << parameters.cluster >>
+          cluster: << parameters.cluster >>
+          cluster_authenticate: true
           cmd: |
             set -eou pipefail
-            . $REPO_ROOT/cluster/deployment/<< parameters.cluster >>/.envrc.vars
             cncluster activate
             cncluster ciapply
       - notify-cluster-fail:

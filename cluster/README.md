@@ -283,6 +283,7 @@ Available operations include:
 * `cncluster reset` - Delete all `Pod`s, forcing all memory state to
   be reset.
 * `cncluster stats` - Show memory and CPU usage across the cluster.
+* `cncluster wait` - Wait for the cluster's pods to all be noted as in a ready state.
 
 Internally, these operations rely on the following environment
 variables. As stated above, these are usually populated via `.envrc`.
