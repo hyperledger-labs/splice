@@ -3,6 +3,7 @@
 
 package com.digitalasset.canton.console
 
+import com.daml.ledger.api.auth.client.LedgerCallCredentials
 import com.digitalasset.canton.*
 import com.digitalasset.canton.admin.api.client.commands.{GrpcAdminCommand, HttpAdminCommand}
 import com.digitalasset.canton.config.RequireTypes.{Port, PositiveInt}
@@ -28,6 +29,7 @@ import com.digitalasset.canton.sequencing.SequencerConnection
 import com.digitalasset.canton.topology.{DomainId, Identity, ParticipantId}
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import com.digitalasset.canton.util.ErrorUtil
+import io.grpc.CallCredentials
 
 import scala.util.hashing.MurmurHash3
 
@@ -176,10 +178,11 @@ trait LocalInstanceReference extends InstanceReference with NoTracing {
   override protected[console] def adminCommand[Result](
       grpcCommand: GrpcAdminCommand[_, _, Result],
       httpCommand: HttpAdminCommand[_, _, Result],
+      credentials: Option[CallCredentials],
   ): ConsoleCommandResult[Result] =
     runCommandIfRunning(
       consoleEnvironment.grpcAdminCommandRunner
-        .runCommand(name, grpcCommand, config.clientAdminApi, None)
+        .runCommand(name, grpcCommand, config.clientAdminApi, credentials)
     )
 
 }
@@ -197,12 +200,13 @@ trait GrpcRemoteInstanceReference extends RemoteInstanceReference {
   override protected[console] def adminCommand[Result](
       grpcCommand: GrpcAdminCommand[_, _, Result],
       httpCommand: HttpAdminCommand[_, _, Result],
+      credentials: Option[CallCredentials],
   ): ConsoleCommandResult[Result] =
     consoleEnvironment.grpcAdminCommandRunner.runCommand(
       name,
       grpcCommand,
       config.clientAdminApi,
-      None,
+      credentials,
     )
 }
 
@@ -364,6 +368,8 @@ class ExternalLedgerApiClient(
     with FeatureFlagFilter
     with NamedLogging {
 
+  private val callCredentials = token.map(new LedgerCallCredentials(_))
+
   override protected val name: String = s"$hostname:${port.unwrap}"
 
   override val loggerFactory: NamedLoggerFactory =
@@ -376,7 +382,7 @@ class ExternalLedgerApiClient(
       command: GrpcAdminCommand[_, _, Result]
   ): ConsoleCommandResult[Result] =
     consoleEnvironment.grpcAdminCommandRunner
-      .runCommand("sourceLedger", command, ClientConfig(hostname, port, tls), token)
+      .runCommand("sourceLedger", command, ClientConfig(hostname, port, tls), callCredentials)
 
   override protected def optionallyAwait[Tx](
       tx: Tx,
@@ -469,6 +475,8 @@ class RemoteParticipantReference(environment: ConsoleEnvironment, override val n
   def config: RemoteParticipantConfig =
     consoleEnvironment.environment.config.remoteParticipantsByString(name)
 
+  private def callCredentials = config.token.map(new LedgerCallCredentials(_))
+
   override def equals(obj: Any): Boolean = {
     obj match {
       case x: RemoteParticipantReference =>
@@ -484,7 +492,7 @@ class RemoteParticipantReference(environment: ConsoleEnvironment, override val n
       name,
       command,
       config.ledgerApi,
-      config.token,
+      callCredentials,
     )
 
   @Help.Summary("Inspect and manage parties")
@@ -729,6 +737,8 @@ class LocalParticipantReference(override val consoleEnvironment: ConsoleEnvironm
   /** secret, not publicly documented way to get the admin token */
   def adminToken: Option[String] = underlying.map(_.adminToken.secret)
 
+  private def callCredentials = adminToken.map(new LedgerCallCredentials(_))
+
   override def equals(obj: Any): Boolean = {
     obj match {
       case x: LocalParticipantReference =>
@@ -745,7 +755,7 @@ class LocalParticipantReference(override val consoleEnvironment: ConsoleEnvironm
   ): ConsoleCommandResult[Result] =
     runCommandIfRunning(
       consoleEnvironment.grpcAdminCommandRunner
-        .runCommand(name, command, config.clientLedgerApi, adminToken)
+        .runCommand(name, command, config.clientLedgerApi, callCredentials)
     )
 
 }

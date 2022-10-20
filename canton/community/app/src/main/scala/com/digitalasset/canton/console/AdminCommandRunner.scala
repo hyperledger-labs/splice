@@ -10,6 +10,7 @@ import com.digitalasset.canton.console.CommandErrors.ConsoleTimeout
 import com.digitalasset.canton.crypto.Crypto
 import com.digitalasset.canton.environment.{CantonNode, CantonNodeBootstrap}
 import com.digitalasset.canton.logging.{NamedLogging, TracedLogger}
+import io.grpc.CallCredentials
 
 import scala.annotation.tailrec
 
@@ -23,6 +24,7 @@ trait AdminCommandRunner {
   protected[console] def adminCommand[Result](
       grpcCommand: GrpcAdminCommand[_, _, Result],
       httpCommand: HttpAdminCommand[_, _, Result],
+      credentials: Option[CallCredentials],
   ): ConsoleCommandResult[Result]
 
   /** Run a GRPC admin command and return its result.
@@ -30,9 +32,10 @@ trait AdminCommandRunner {
     * if the command is called for a node configured with an HTTP interface.
     */
   protected[console] def adminCommand[Result](
-      command: GrpcAdminCommand[_, _, Result]
+      command: GrpcAdminCommand[_, _, Result],
+      credentials: Option[CallCredentials] = None,
   ): ConsoleCommandResult[Result] =
-    adminCommand(command, new HttpAdminCommand.NotSupported[Result](command.fullName))
+    adminCommand(command, new HttpAdminCommand.NotSupported[Result](command.fullName), credentials)
 
   protected[console] def tracedLogger: TracedLogger
 

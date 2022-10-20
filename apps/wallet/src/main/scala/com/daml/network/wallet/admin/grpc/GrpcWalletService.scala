@@ -79,9 +79,13 @@ class GrpcWalletService(
       Proto.encode(CoinUtil.currentQuantity(lockedCoin.payload.coin, round)),
     )
 
-  private def withAuth[A](ctx: v0.WalletContext)(f: String => A): A = {
+  private def withAuth[A](ctx: v0.WalletContext)(f: String => A)(implicit tc: TraceContext): A = {
     // TODO(i1012) - remove wallet context and enforce auth token
-    f(AuthInterceptor.extractSubjectFromContext().getOrElse(ctx.userName))
+    val user = AuthInterceptor.extractSubjectFromContext().getOrElse(ctx.userName)
+    if (user.isEmpty) {
+      logger.warn(s"No user defined in token or context")
+    }
+    f(user)
   }
 
   private[this] def getUserStore(user: String): Future[EndUserWalletStore] = Future {
@@ -108,12 +112,15 @@ class GrpcWalletService(
       context: v0.WalletContext,
       templateCompanion: TemplateCompanion[T],
       mkResponse: Seq[networkV0.Contract] => ResponseT,
-  ): Future[ResponseT] = withAuth(context) { user =>
-    for {
-      userStore <- getUserStore(user)
-      QueryResult(_, contracts) <- userStore.listContracts(templateCompanion)
-    } yield mkResponse(contracts.map(_.toProtoV0))
-  }
+  ): Future[ResponseT] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      withAuth(context) { user =>
+        for {
+          userStore <- getUserStore(user)
+          QueryResult(_, contracts) <- userStore.listContracts(templateCompanion)
+        } yield mkResponse(contracts.map(_.toProtoV0))
+      }
+    }
 
   override def list(request: v0.ListRequest): Future[v0.ListResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
@@ -132,10 +139,10 @@ class GrpcWalletService(
       }
     }
 
-  override def tap(request: v0.TapRequest): Future[v0.TapResponse] = {
-    withAuth(request.getWalletCtx) { user =>
-      exerciseWalletAction(implicit tc =>
-        (c, endUserWalletStore) => {
+  override def tap(request: v0.TapRequest): Future[v0.TapResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      withAuth(request.getWalletCtx) { user =>
+        exerciseWalletAction((c, endUserWalletStore) => {
           val quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
           for {
             svcParty <- scanConnection.getSvcPartyId()
@@ -147,17 +154,16 @@ class GrpcWalletService(
               quantity,
             )
           }
-        }
-      )(
-        user,
-        {
-          case outcome: CoinOperationOutcome.COO_Tap =>
-            v0.TapResponse(Proto.encode(outcome.body))
-          case other => sys.error(s"unexpected coin operation outcome: $other")
-        },
-      )
+        })(
+          user,
+          {
+            case outcome: CoinOperationOutcome.COO_Tap =>
+              v0.TapResponse(Proto.encode(outcome.body))
+            case other => sys.error(s"unexpected coin operation outcome: $other")
+          },
+        )
+      }
     }
-  }
 
   override def listAppMultiPaymentRequests(
       request: v0.ListAppMultiPaymentRequestsRequest
@@ -207,46 +213,48 @@ class GrpcWalletService(
 
   override def acceptAppMultiPaymentRequest(
       request: v0.AcceptAppMultiPaymentRequestRequest
-  ): Future[v0.AcceptAppMultiPaymentRequestResponse] = withAuth(request.getWalletCtx) { user =>
-    exerciseWalletAction(_ =>
-      (installCid, userStore) => {
-        val requestCid = Proto.tryDecodeContractId[walletCodegen.AppMultiPaymentRequest](
-          request.requestContractId
-        )
-        Future.successful(CoinOperation.CO_AppMultiPayment(requestCid))
-      }
-    )(
-      user,
-      {
-        case outcome: COO_AcceptedAppMultiPayment =>
-          v0.AcceptAppMultiPaymentRequestResponse(
-            Proto.encode(outcome.body)
+  ): Future[v0.AcceptAppMultiPaymentRequestResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      withAuth(request.getWalletCtx) { user =>
+        exerciseWalletAction((installCid, userStore) => {
+          val requestCid = Proto.tryDecodeContractId[walletCodegen.AppMultiPaymentRequest](
+            request.requestContractId
           )
-        case other => sys.error(s"unexpected coin operation outcome: $other")
-      },
-    )
-  }
+          Future.successful(CoinOperation.CO_AppMultiPayment(requestCid))
+        })(
+          user,
+          {
+            case outcome: COO_AcceptedAppMultiPayment =>
+              v0.AcceptAppMultiPaymentRequestResponse(
+                Proto.encode(outcome.body)
+              )
+            case other => sys.error(s"unexpected coin operation outcome: $other")
+          },
+        )
+      }
+    }
 
   override def acceptAppPaymentRequest(
       request: v0.AcceptAppPaymentRequestRequest
-  ): Future[v0.AcceptAppPaymentRequestResponse] = withAuth(request.getWalletCtx) { user =>
-    exerciseWalletAction(traceContext =>
-      (installCid, userStore) => {
-        val requestCid =
-          Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](request.requestContractId)
-        Future.successful(CoinOperation.CO_AppPayment(requestCid))
+  ): Future[v0.AcceptAppPaymentRequestResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      withAuth(request.getWalletCtx) { user =>
+        exerciseWalletAction((installCid, userStore) => {
+          val requestCid =
+            Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](request.requestContractId)
+          Future.successful(CoinOperation.CO_AppPayment(requestCid))
+        })(
+          user,
+          {
+            case outcome: CoinOperationOutcome.COO_AcceptedAppPayment =>
+              v0.AcceptAppPaymentRequestResponse(
+                Proto.encode(outcome.body)
+              )
+            case other => sys.error(s"unexpected coin operation outcome: $other")
+          },
+        )
       }
-    )(
-      user,
-      {
-        case outcome: CoinOperationOutcome.COO_AcceptedAppPayment =>
-          v0.AcceptAppPaymentRequestResponse(
-            Proto.encode(outcome.body)
-          )
-        case other => sys.error(s"unexpected coin operation outcome: $other")
-      },
-    )
-  }
+    }
 
   override def rejectAppMultiPaymentRequest(
       request: v0.RejectAppMultiPaymentRequestRequest
@@ -446,28 +454,29 @@ class GrpcWalletService(
 
   override def executeDirectTransfer(
       request: v0.ExecuteDirectTransferRequest
-  ): Future[Empty] = withAuth(request.getWalletCtx) { user =>
-    exerciseWalletAction(implicit traceContext =>
-      (c, userStore) => {
-        val quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
-        for {
-          svcUser <- scanConnection.getSvcPartyId()
-        } yield {
-          val receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
-          CoinOperation.CO_ChannelTransfer(
-            userStore.key.endUserParty.toPrim,
-            receiverParty.toPrim,
-            svcUser.toPrim,
-            quantity,
-            "wallet: execute direct transfer",
-          )
-        }
+  ): Future[Empty] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      withAuth(request.getWalletCtx) { user =>
+        exerciseWalletAction((c, userStore) => {
+          val quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
+          for {
+            svcUser <- scanConnection.getSvcPartyId()
+          } yield {
+            val receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
+            CoinOperation.CO_ChannelTransfer(
+              userStore.key.endUserParty.toPrim,
+              receiverParty.toPrim,
+              svcUser.toPrim,
+              quantity,
+              "wallet: execute direct transfer",
+            )
+          }
+        })(
+          user,
+          _ => Empty(),
+        )
       }
-    )(
-      user,
-      _ => Empty(),
-    )
-  }
+    }
 
   override def listAppRewards(
       request: v0.ListAppRewardsRequest
@@ -589,19 +598,20 @@ class GrpcWalletService(
 
   override def acceptOnChannelPaymentRequest(
       request: v0.AcceptOnChannelPaymentRequestRequest
-  ): Future[Empty] = withAuth(request.getWalletCtx) { user =>
-    exerciseWalletAction(traceContext =>
-      (installCid, userStore) => {
-        val requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](
-          request.requestContractId
+  ): Future[Empty] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      withAuth(request.getWalletCtx) { user =>
+        exerciseWalletAction((installCid, userStore) => {
+          val requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](
+            request.requestContractId
+          )
+          Future.successful(CoinOperation.CO_ChannelPayment(requestCid))
+        })(
+          user,
+          _ => Empty(),
         )
-        Future.successful(CoinOperation.CO_ChannelPayment(requestCid))
       }
-    )(
-      user,
-      _ => Empty(),
-    )
-  }
+    }
 
   override def rejectOnChannelPaymentRequest(
       request: v0.RejectOnChannelPaymentRequestRequest
@@ -731,7 +741,7 @@ class GrpcWalletService(
     * Note: curried syntax helps with type inference
     */
   private def exerciseWalletAction[Response](
-      constructCoinOperation: TraceContext => (
+      constructCoinOperation: (
           Primitive.ContractId[walletCodegen.WalletAppInstall],
           EndUserWalletStore,
           // TODO(#756): also require quantity to reject commands early?
@@ -740,19 +750,17 @@ class GrpcWalletService(
       user: String,
       // TODO(#756): possibly adjust the return type here depending on the caller
       processResponse: CoinOperationOutcome => Response,
-  ): Future[Response] =
-    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
-      for {
-        userStore <- getUserStore(user)
-        userTreasury <- getUserTreasury(user)
-        userParty = userStore.key.endUserParty
-        install <- getUserInstallContract(userStore, userParty)
-        operation <- constructCoinOperation(traceContext)(install.contractId, userStore)
-        res <- userTreasury
-          .enqueueCoinOperation(operation)
-          .map(processResponse)
-      } yield res
-    }
+  )(implicit tc: TraceContext): Future[Response] =
+    for {
+      userStore <- getUserStore(user)
+      userTreasury <- getUserTreasury(user)
+      userParty = userStore.key.endUserParty
+      install <- getUserInstallContract(userStore, userParty)
+      operation <- constructCoinOperation(install.contractId, userStore)
+      res <- userTreasury
+        .enqueueCoinOperation(operation)
+        .map(processResponse)
+    } yield res
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   private def selectCoin(

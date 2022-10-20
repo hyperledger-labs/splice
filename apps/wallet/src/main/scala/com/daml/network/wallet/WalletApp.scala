@@ -99,7 +99,7 @@ class WalletApp(
               ),
               ec,
             ),
-            new AuthInterceptor(),
+            new AuthInterceptor(loggerFactory),
           )
         )
         .discard

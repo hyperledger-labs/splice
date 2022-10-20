@@ -8,7 +8,7 @@ import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.util.{Contract, Proto, Value}
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.WalletServiceGrpc.WalletServiceStub
-import com.daml.network.wallet.v0.{GetBalanceRequest, GetBalanceResponse, WalletContext}
+import com.daml.network.wallet.v0.{GetBalanceRequest, GetBalanceResponse}
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.empty.Empty
@@ -43,7 +43,7 @@ object GrpcWalletAppClient {
       lockedCoins: Seq[LockedCoinPosition],
   )
 
-  case class List(walletCtx: WalletContext)
+  case class List()
       extends BaseCommand[
         v0.ListRequest,
         v0.ListResponse,
@@ -51,9 +51,7 @@ object GrpcWalletAppClient {
       ] {
 
     override def createRequest(): Either[String, v0.ListRequest] = Right(
-      v0.ListRequest(
-        walletCtx = Some(walletCtx)
-      )
+      v0.ListRequest()
     )
 
     override def submitRequest(
@@ -105,12 +103,12 @@ object GrpcWalletAppClient {
     }
   }
 
-  case class Tap(quantity: BigDecimal, walletCtx: WalletContext)
+  case class Tap(quantity: BigDecimal)
       extends BaseCommand[v0.TapRequest, v0.TapResponse, Primitive.ContractId[coinCodegen.Coin]] {
 
     override def createRequest(): Either[String, v0.TapRequest] = {
       Right(
-        v0.TapRequest(quantity = Proto.encode(quantity), walletCtx = Some(walletCtx))
+        v0.TapRequest(quantity = Proto.encode(quantity))
       )
     }
 
@@ -132,12 +130,12 @@ object GrpcWalletAppClient {
       holdingFees: BigDecimal,
   )
 
-  case class GetBalance(walletCtx: WalletContext)
+  case class GetBalance()
       extends BaseCommand[v0.GetBalanceRequest, v0.GetBalanceResponse, Balance] {
 
     override def createRequest(): Either[String, v0.GetBalanceRequest] = {
       Right(
-        v0.GetBalanceRequest(walletCtx = Some(walletCtx))
+        v0.GetBalanceRequest()
       )
     }
 
@@ -162,7 +160,7 @@ object GrpcWalletAppClient {
     }
   }
 
-  case class ListAppMultiPaymentRequests(walletCtx: WalletContext)
+  case class ListAppMultiPaymentRequests()
       extends BaseCommand[
         v0.ListAppMultiPaymentRequestsRequest,
         v0.ListAppMultiPaymentRequestsResponse,
@@ -172,7 +170,7 @@ object GrpcWalletAppClient {
       ] {
 
     override def createRequest(): Either[String, v0.ListAppMultiPaymentRequestsRequest] = Right(
-      v0.ListAppMultiPaymentRequestsRequest(Some(walletCtx))
+      v0.ListAppMultiPaymentRequestsRequest()
     )
 
     override def submitRequest(
@@ -188,13 +186,13 @@ object GrpcWalletAppClient {
         .leftMap(_.toString)
   }
 
-  case class ListAppPaymentRequests(walletCtx: WalletContext)
+  case class ListAppPaymentRequests()
       extends BaseCommand[v0.ListAppPaymentRequestsRequest, v0.ListAppPaymentRequestsResponse, Seq[
         Contract[walletCodegen.AppPaymentRequest]
       ]] {
 
     override def createRequest(): Either[String, v0.ListAppPaymentRequestsRequest] = Right(
-      v0.ListAppPaymentRequestsRequest(Some(walletCtx))
+      v0.ListAppPaymentRequestsRequest()
     )
 
     override def submitRequest(
@@ -211,8 +209,7 @@ object GrpcWalletAppClient {
   }
 
   case class AcceptAppMultiPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.AppMultiPaymentRequest],
-      walletCtx: WalletContext,
+      requestId: Primitive.ContractId[walletCodegen.AppMultiPaymentRequest]
   ) extends BaseCommand[
         v0.AcceptAppMultiPaymentRequestRequest,
         v0.AcceptAppMultiPaymentRequestResponse,
@@ -222,8 +219,7 @@ object GrpcWalletAppClient {
     override def createRequest(): Either[String, v0.AcceptAppMultiPaymentRequestRequest] =
       Right(
         v0.AcceptAppMultiPaymentRequestRequest(
-          Proto.encode(requestId),
-          Some(walletCtx),
+          requestContractId = Proto.encode(requestId)
         )
       )
 
@@ -242,8 +238,7 @@ object GrpcWalletAppClient {
   }
 
   case class AcceptAppPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest],
-      walletCtx: WalletContext,
+      requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest]
   ) extends BaseCommand[
         v0.AcceptAppPaymentRequestRequest,
         v0.AcceptAppPaymentRequestResponse,
@@ -253,8 +248,7 @@ object GrpcWalletAppClient {
     override def createRequest(): Either[String, v0.AcceptAppPaymentRequestRequest] =
       Right(
         v0.AcceptAppPaymentRequestRequest(
-          Proto.encode(requestId),
-          Some(walletCtx),
+          requestContractId = Proto.encode(requestId)
         )
       )
 
@@ -271,7 +265,7 @@ object GrpcWalletAppClient {
       )
   }
 
-  case class CancelPaymentChannelByReceiver(receiverPartyId: PartyId, walletCtx: WalletContext)
+  case class CancelPaymentChannelByReceiver(receiverPartyId: PartyId)
       extends BaseCommand[
         v0.CancelPaymentChannelByReceiverRequest,
         Empty,
@@ -279,7 +273,7 @@ object GrpcWalletAppClient {
       ] {
     override def createRequest(): Either[String, v0.CancelPaymentChannelByReceiverRequest] =
       Right(
-        v0.CancelPaymentChannelByReceiverRequest(Proto.encode(receiverPartyId), Some(walletCtx))
+        v0.CancelPaymentChannelByReceiverRequest(receiverPartyId = Proto.encode(receiverPartyId))
       )
 
     override def submitRequest(
@@ -290,14 +284,14 @@ object GrpcWalletAppClient {
     override def handleResponse(response: Empty): Either[String, Unit] = Right(())
   }
 
-  case class CancelPaymentChannelBySender(senderPartyId: PartyId, walletCtx: WalletContext)
+  case class CancelPaymentChannelBySender(senderPartyId: PartyId)
       extends BaseCommand[
         v0.CancelPaymentChannelBySenderRequest,
         Empty,
         Unit,
       ] {
     override def createRequest(): Either[String, v0.CancelPaymentChannelBySenderRequest] =
-      Right(v0.CancelPaymentChannelBySenderRequest(Proto.encode(senderPartyId), Some(walletCtx)))
+      Right(v0.CancelPaymentChannelBySenderRequest(senderPartyId = Proto.encode(senderPartyId)))
 
     override def submitRequest(
         service: WalletServiceStub,
@@ -308,8 +302,7 @@ object GrpcWalletAppClient {
   }
 
   case class RejectAppMultiPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.AppMultiPaymentRequest],
-      walletCtx: WalletContext,
+      requestId: Primitive.ContractId[walletCodegen.AppMultiPaymentRequest]
   ) extends BaseCommand[
         v0.RejectAppMultiPaymentRequestRequest,
         Empty,
@@ -319,8 +312,7 @@ object GrpcWalletAppClient {
     override def createRequest(): Either[String, v0.RejectAppMultiPaymentRequestRequest] =
       Right(
         v0.RejectAppMultiPaymentRequestRequest(
-          Proto.encode(requestId),
-          Some(walletCtx),
+          requestContractId = Proto.encode(requestId)
         )
       )
 
@@ -336,8 +328,7 @@ object GrpcWalletAppClient {
   }
 
   case class RejectAppPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest],
-      walletCtx: WalletContext,
+      requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest]
   ) extends BaseCommand[
         v0.RejectAppPaymentRequestRequest,
         Empty,
@@ -347,8 +338,7 @@ object GrpcWalletAppClient {
     override def createRequest(): Either[String, v0.RejectAppPaymentRequestRequest] =
       Right(
         v0.RejectAppPaymentRequestRequest(
-          Proto.encode(requestId),
-          Some(walletCtx),
+          requestContractId = Proto.encode(requestId)
         )
       )
 
@@ -363,7 +353,7 @@ object GrpcWalletAppClient {
       Right(())
   }
 
-  case class ListAcceptedAppMultiPayments(walletCtx: WalletContext)
+  case class ListAcceptedAppMultiPayments()
       extends BaseCommand[
         v0.ListAcceptedAppMultiPaymentsRequest,
         v0.ListAcceptedAppMultiPaymentsResponse,
@@ -373,7 +363,7 @@ object GrpcWalletAppClient {
       ] {
 
     override def createRequest(): Either[String, v0.ListAcceptedAppMultiPaymentsRequest] =
-      Right(v0.ListAcceptedAppMultiPaymentsRequest(Some(walletCtx)))
+      Right(v0.ListAcceptedAppMultiPaymentsRequest())
 
     override def submitRequest(
         service: WalletServiceStub,
@@ -389,7 +379,7 @@ object GrpcWalletAppClient {
         .leftMap(_.toString)
   }
 
-  case class ListAcceptedAppPayments(walletCtx: WalletContext)
+  case class ListAcceptedAppPayments()
       extends BaseCommand[
         v0.ListAcceptedAppPaymentsRequest,
         v0.ListAcceptedAppPaymentsResponse,
@@ -399,7 +389,7 @@ object GrpcWalletAppClient {
       ] {
 
     override def createRequest(): Either[String, v0.ListAcceptedAppPaymentsRequest] =
-      Right(v0.ListAcceptedAppPaymentsRequest(Some(walletCtx)))
+      Right(v0.ListAcceptedAppPaymentsRequest())
 
     override def submitRequest(
         service: WalletServiceStub,
@@ -421,7 +411,6 @@ object GrpcWalletAppClient {
       allowOffers: Boolean,
       allowDirectTransfers: Boolean,
       senderTransferFeeRatio: BigDecimal,
-      walletCtx: WalletContext,
   ) extends BaseCommand[
         v0.ProposePaymentChannelRequest,
         v0.ProposePaymentChannelResponse,
@@ -437,7 +426,6 @@ object GrpcWalletAppClient {
           allowOffers = allowOffers,
           allowDirectTransfers = allowDirectTransfers,
           senderTransferFeeRatio = Proto.encode(senderTransferFeeRatio),
-          Some(walletCtx),
         )
       )
 
@@ -453,7 +441,7 @@ object GrpcWalletAppClient {
       Proto.decodeContractId[walletCodegen.PaymentChannelProposal](response.proposalContractId)
   }
 
-  case class ListPaymentChannelProposals(walletCtx: WalletContext)
+  case class ListPaymentChannelProposals()
       extends BaseCommand[
         v0.ListPaymentChannelProposalsRequest,
         v0.ListPaymentChannelProposalsResponse,
@@ -462,7 +450,7 @@ object GrpcWalletAppClient {
 
     override def createRequest(): Either[String, v0.ListPaymentChannelProposalsRequest] =
       Right(
-        v0.ListPaymentChannelProposalsRequest(Some(walletCtx))
+        v0.ListPaymentChannelProposalsRequest()
       )
 
     override def submitRequest(
@@ -478,7 +466,7 @@ object GrpcWalletAppClient {
         .leftMap(_.toString)
   }
 
-  case class ListPaymentChannels(walletCtx: WalletContext)
+  case class ListPaymentChannels()
       extends BaseCommand[
         v0.ListPaymentChannelsRequest,
         v0.ListPaymentChannelsResponse,
@@ -487,7 +475,7 @@ object GrpcWalletAppClient {
 
     override def createRequest(): Either[String, v0.ListPaymentChannelsRequest] =
       Right(
-        v0.ListPaymentChannelsRequest(Some(walletCtx))
+        v0.ListPaymentChannelsRequest()
       )
 
     override def submitRequest(
@@ -504,8 +492,7 @@ object GrpcWalletAppClient {
   }
 
   case class AcceptPaymentChannelProposal(
-      requestId: Primitive.ContractId[walletCodegen.PaymentChannelProposal],
-      walletCtx: WalletContext,
+      requestId: Primitive.ContractId[walletCodegen.PaymentChannelProposal]
   ) extends BaseCommand[
         v0.AcceptPaymentChannelProposalRequest,
         v0.AcceptPaymentChannelProposalResponse,
@@ -515,8 +502,7 @@ object GrpcWalletAppClient {
     override def createRequest(): Either[String, v0.AcceptPaymentChannelProposalRequest] =
       Right(
         v0.AcceptPaymentChannelProposalRequest(
-          Proto.encode(requestId),
-          Some(walletCtx),
+          proposalContractId = Proto.encode(requestId)
         )
       )
 
@@ -535,7 +521,6 @@ object GrpcWalletAppClient {
   case class ExecuteDirectTransfer(
       receiver: PartyId,
       quantity: BigDecimal,
-      walletCtx: WalletContext,
   ) extends BaseCommand[
         v0.ExecuteDirectTransferRequest,
         Empty,
@@ -547,7 +532,6 @@ object GrpcWalletAppClient {
         v0.ExecuteDirectTransferRequest(
           receiverPartyId = Proto.encode(receiver),
           quantity = Proto.encode(quantity),
-          walletCtx = Some(walletCtx),
         )
       )
 
@@ -568,7 +552,6 @@ object GrpcWalletAppClient {
       sender: PartyId,
       quantity: BigDecimal,
       description: String,
-      walletCtx: WalletContext,
   ) extends BaseCommand[
         v0.CreateOnChannelPaymentRequestRequest,
         v0.CreateOnChannelPaymentRequestResponse,
@@ -580,7 +563,6 @@ object GrpcWalletAppClient {
           senderPartyId = Proto.encode(sender),
           quantity = Proto.encode(quantity),
           description = description,
-          walletCtx = Some(walletCtx),
         )
       )
 
@@ -596,7 +578,7 @@ object GrpcWalletAppClient {
       Proto.decodeContractId[walletCodegen.OnChannelPaymentRequest](response.requestContractId)
   }
 
-  case class ListOnChannelPaymentRequests(walletCtx: WalletContext)
+  case class ListOnChannelPaymentRequests()
       extends BaseCommand[
         v0.ListOnChannelPaymentRequestsRequest,
         v0.ListOnChannelPaymentRequestsResponse,
@@ -606,7 +588,7 @@ object GrpcWalletAppClient {
       ] {
 
     override def createRequest(): Either[String, v0.ListOnChannelPaymentRequestsRequest] =
-      Right(v0.ListOnChannelPaymentRequestsRequest(Some(walletCtx)))
+      Right(v0.ListOnChannelPaymentRequestsRequest())
 
     override def submitRequest(
         service: WalletServiceStub,
@@ -623,8 +605,7 @@ object GrpcWalletAppClient {
   }
 
   case class AcceptOnChannelPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest],
-      walletCtx: WalletContext,
+      requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]
   ) extends BaseCommand[
         v0.AcceptOnChannelPaymentRequestRequest,
         Empty,
@@ -633,8 +614,7 @@ object GrpcWalletAppClient {
     override def createRequest(): Either[String, v0.AcceptOnChannelPaymentRequestRequest] =
       Right(
         v0.AcceptOnChannelPaymentRequestRequest(
-          requestContractId = Proto.encode(requestId),
-          walletCtx = Some(walletCtx),
+          requestContractId = Proto.encode(requestId)
         )
       )
 
@@ -651,8 +631,7 @@ object GrpcWalletAppClient {
   }
 
   case class RejectOnChannelPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest],
-      walletCtx: WalletContext,
+      requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]
   ) extends BaseCommand[
         v0.RejectOnChannelPaymentRequestRequest,
         Empty,
@@ -661,8 +640,7 @@ object GrpcWalletAppClient {
     override def createRequest(): Either[String, v0.RejectOnChannelPaymentRequestRequest] =
       Right(
         v0.RejectOnChannelPaymentRequestRequest(
-          requestContractId = Proto.encode(requestId),
-          walletCtx = Some(walletCtx),
+          requestContractId = Proto.encode(requestId)
         )
       )
 
@@ -679,8 +657,7 @@ object GrpcWalletAppClient {
   }
 
   case class WithdrawOnChannelPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest],
-      walletCtx: WalletContext,
+      requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]
   ) extends BaseCommand[
         v0.WithdrawOnChannelPaymentRequestRequest,
         Empty,
@@ -689,8 +666,7 @@ object GrpcWalletAppClient {
     override def createRequest(): Either[String, v0.WithdrawOnChannelPaymentRequestRequest] =
       Right(
         v0.WithdrawOnChannelPaymentRequestRequest(
-          requestContractId = Proto.encode(requestId),
-          walletCtx = Some(walletCtx),
+          requestContractId = Proto.encode(requestId)
         )
       )
 
@@ -706,13 +682,13 @@ object GrpcWalletAppClient {
       Right(())
   }
 
-  case class ListAppRewards(walletCtx: WalletContext)
+  case class ListAppRewards()
       extends BaseCommand[v0.ListAppRewardsRequest, v0.ListAppRewardsResponse, Seq[
         Contract[coinCodegen.AppReward]
       ]] {
 
     override def createRequest(): Either[String, v0.ListAppRewardsRequest] =
-      Right(v0.ListAppRewardsRequest(Some(walletCtx)))
+      Right(v0.ListAppRewardsRequest())
 
     override def submitRequest(
         service: WalletServiceStub,
@@ -727,13 +703,13 @@ object GrpcWalletAppClient {
         .leftMap(_.toString)
   }
 
-  case class ListValidatorRewards(walletCtx: WalletContext)
+  case class ListValidatorRewards()
       extends BaseCommand[v0.ListValidatorRewardsRequest, v0.ListValidatorRewardsResponse, Seq[
         Contract[coinCodegen.ValidatorReward]
       ]] {
 
     override def createRequest(): Either[String, v0.ListValidatorRewardsRequest] =
-      Right(v0.ListValidatorRewardsRequest(Some(walletCtx)))
+      Right(v0.ListValidatorRewardsRequest())
 
     override def submitRequest(
         service: WalletServiceStub,
@@ -748,11 +724,11 @@ object GrpcWalletAppClient {
         .leftMap(_.toString)
   }
 
-  case class CollectRewards(round: Long, walletCtx: WalletContext)
+  case class CollectRewards(round: Long)
       extends BaseCommand[v0.CollectRewardsRequest, Empty, Unit] {
 
     override def createRequest(): Either[String, v0.CollectRewardsRequest] =
-      Right(v0.CollectRewardsRequest(Some(walletCtx)))
+      Right(v0.CollectRewardsRequest())
 
     override def submitRequest(
         service: WalletServiceStub,
@@ -778,7 +754,6 @@ object GrpcWalletAppClient {
   case class Redistribute(
       inputs: Seq[Value[coinRulesCodegen.TransferInput]],
       outputs: Seq[RedistributeOutput],
-      walletCtx: WalletContext,
   ) extends BaseCommand[v0.RedistributeRequest, v0.RedistributeResponse, Seq[
         Primitive.ContractId[coinCodegen.Coin]
       ]] {
@@ -788,7 +763,6 @@ object GrpcWalletAppClient {
         v0.RedistributeRequest(
           inputs = inputs.map(_.toProtoV0),
           outputs = outputs.map(_.toProtoV0),
-          walletCtx = Some(walletCtx),
         )
       )
 

@@ -110,11 +110,13 @@ class HealthAdministration[S <: data.NodeStatus.Status](
     adminCommand(
       StatusAdminCommands.IsRunning,
       new HttpAdminCommand.Stub[Boolean]("running-stub", true),
+      None,
     )
   private def initializedCommand =
     adminCommand(
       StatusAdminCommands.IsInitialized,
       new HttpAdminCommand.Stub[Boolean]("initialized-stub", true),
+      None,
     )
 
   def falseIfUnreachable(command: ConsoleCommandResult[Boolean]): Boolean =

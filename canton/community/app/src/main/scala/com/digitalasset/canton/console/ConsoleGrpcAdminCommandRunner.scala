@@ -18,6 +18,7 @@ import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.Spanning
+import io.grpc.CallCredentials
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.TimeUnit
@@ -50,7 +51,7 @@ class GrpcAdminCommandRunner(
       instanceName: String,
       command: GrpcAdminCommand[_, _, Result],
       clientConfig: ClientConfig,
-      token: Option[String],
+      credentials: Option[CallCredentials],
   ): ConsoleCommandResult[Result] =
     withNewTrace[ConsoleCommandResult[Result]](command.fullName) { implicit traceContext => span =>
       span.setAttribute("instance_name", instanceName)
@@ -73,7 +74,9 @@ class GrpcAdminCommandRunner(
       )
       val apiResult =
         awaitTimeout.await()(
-          grpcRunner.run(instanceName, command, closeableChannel.channel, token, callTimeout).value
+          grpcRunner
+            .run(instanceName, command, closeableChannel.channel, credentials, callTimeout)
+            .value
         )
       // convert to a console command result
       apiResult.toResult

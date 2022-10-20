@@ -4,44 +4,54 @@
 package com.daml.network.auth
 
 import com.auth0.jwt.JWT
-import io.grpc.{Metadata, _}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.tracing.NoTracing
+import io.grpc.{Metadata, *}
 
 import scala.util.Try
 
-final class AuthInterceptor() extends ServerInterceptor {
+/** Inspects authorization header, and stores information from decoded access tokens
+  *
+  * Uses NoTracing, as its called directly by the gRPC library when handing network requests,
+  * where we can't inject a tracing context.
+  */
+final class AuthInterceptor(override protected val loggerFactory: NamedLoggerFactory)
+    extends ServerInterceptor
+    with NamedLogging
+    with NoTracing {
   override def interceptCall[ReqT, RespT](
       call: ServerCall[ReqT, RespT],
       headers: Metadata,
       nextListener: ServerCallHandler[ReqT, RespT],
   ): ServerCall.Listener[ReqT] = {
-    // TODO(i1012) - switch to "Bearer $token" format for the value of AUTHORIZATION_KEY
-    val tokenOpt = Option(headers.get(AuthInterceptor.AUTHORIZATION_KEY))
+
+    val tokenPayloadE = for {
+      authHeaderValue <- Option(headers.get(AuthInterceptor.AUTHORIZATION_KEY))
+        .toRight(s"No ${AuthInterceptor.AUTHORIZATION_KEY} header found")
+      // TODO(i1012) - make "Bearer $token" format mandatory
+      encodedToken = authHeaderValue.stripPrefix("Bearer ")
+      // TODO(i1011) - use JWT.require for sig verification
+      decodedToken <- Try(JWT.decode(encodedToken)).toEither.left.map(_.toString)
+    } yield decodedToken
+
     val ctx = Context.current
 
-    tokenOpt match {
-      case Some(token) => {
-        // TODO(i1011) - use JWT.require for sig verification
-        val jwtE = Try(JWT.decode(token)).toEither
+    tokenPayloadE match {
+      case Right(jwt) => {
+        val subject = Option(jwt.getSubject)
+        logger.debug(s"Decoded token with subject = $subject")
+        val newCtx = ctx.withValue(AuthInterceptor.SUBJECT_KEY, subject)
 
-        jwtE match {
-          case Right(jwt) => {
-            val newCtx = ctx.withValue(AuthInterceptor.SUBJECT_KEY, Option(jwt.getSubject))
-
-            Contexts.interceptCall(
-              newCtx,
-              call,
-              headers,
-              nextListener,
-            )
-          };
-          case Left(error) => {
-            // TODO(i1012) - strictly enforce token decoding errors
-            Contexts.interceptCall(ctx, call, headers, nextListener)
-          }
-        }
-      }
-      case None => {
-        // TODO(i1012) - make token existence always required, instead of optional
+        Contexts.interceptCall(
+          newCtx,
+          call,
+          headers,
+          nextListener,
+        )
+      };
+      case Left(error) => {
+        logger.debug(s"Could not decode token: $error")
+        // TODO(i1012) - strictly enforce token decoding errors
         Contexts.interceptCall(ctx, call, headers, nextListener)
       }
     }
