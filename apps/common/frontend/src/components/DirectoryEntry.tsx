@@ -54,7 +54,7 @@ const DirectoryEntry: React.FC<{ partyId: string }> = ({ partyId }) => {
         </Tooltip>{' '}
         (
         <Tooltip title="Party ID">
-          <span className="party-id">{entry.user}</span>
+          <span style={{ fontWeight: 'lighter' }}>{entry.user}</span>
         </Tooltip>
         )
       </div>
