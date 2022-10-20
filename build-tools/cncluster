@@ -274,6 +274,8 @@ function cluster_ipaddr() {
 }
 
 function cluster_preflight() {
+    _log "Starting preflight"
+
     (cd ${REPO_ROOT} && \
          sbt -DDOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 \
              -DNETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global \
@@ -332,6 +334,12 @@ function cluster_stats() {
     kubectl top pod
 }
 
+function cluster_wait() {
+    cluster_show
+
+    _log "Waiting for all pods to become ready"
+    kubectl wait --for=condition=Ready --all pod --timeout=5m
+}
 
 case "${SUBCOMMAND_NAME}" in
     activate)
@@ -380,6 +388,10 @@ case "${SUBCOMMAND_NAME}" in
 
     stats)
         cluster_stats $@
+        ;;
+
+    wait)
+        cluster_wait $@
         ;;
 
     *)
