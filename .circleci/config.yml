@@ -959,11 +959,3 @@ workflows:
           context:
             - canton-network-vpn
             - slack-context
-
-  staging_health_check:
-    jobs:
-      - preflight_check:
-          cluster: "staging"
-          context:
-            - canton-network-vpn
-            - slack-context
