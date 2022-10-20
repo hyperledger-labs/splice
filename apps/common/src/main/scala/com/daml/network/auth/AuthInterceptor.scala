@@ -15,26 +15,33 @@ final class AuthInterceptor() extends ServerInterceptor {
       nextListener: ServerCallHandler[ReqT, RespT],
   ): ServerCall.Listener[ReqT] = {
     // TODO(i1012) - switch to "Bearer $token" format for the value of AUTHORIZATION_KEY
-    val token = headers.get(AuthInterceptor.AUTHORIZATION_KEY)
-
-    // TODO(i1011) - use JWT.require for sig verification
-    val jwtOpt = Try(JWT.decode(token)).toOption
-
+    val tokenOpt = Option(headers.get(AuthInterceptor.AUTHORIZATION_KEY))
     val ctx = Context.current
 
-    jwtOpt match {
-      case Some(jwt) => {
-        val newCtx = ctx.withValue(AuthInterceptor.SUBJECT_KEY, Option(jwt.getSubject()))
+    tokenOpt match {
+      case Some(token) => {
+        // TODO(i1011) - use JWT.require for sig verification
+        val jwtE = Try(JWT.decode(token)).toEither
 
-        Contexts.interceptCall(
-          newCtx,
-          call,
-          headers,
-          nextListener,
-        )
-      };
+        jwtE match {
+          case Right(jwt) => {
+            val newCtx = ctx.withValue(AuthInterceptor.SUBJECT_KEY, Option(jwt.getSubject))
+
+            Contexts.interceptCall(
+              newCtx,
+              call,
+              headers,
+              nextListener,
+            )
+          };
+          case Left(error) => {
+            // TODO(i1012) - strictly enforce token decoding errors
+            Contexts.interceptCall(ctx, call, headers, nextListener)
+          }
+        }
+      }
       case None => {
-        // TODO(i1012) - strictly enforce token decoding errors
+        // TODO(i1012) - make token existence always required, instead of optional
         Contexts.interceptCall(ctx, call, headers, nextListener)
       }
     }

@@ -2,6 +2,10 @@ import com.daml.lf.value.Value.ContractId
 import com.daml.network.codegen.CN.{Directory => codegen}
 import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
 
+println("Waiting for validator initialization...")
+aliceValidator.waitForInitialization()
+bobValidator.waitForInitialization()
+
 Seq(aliceValidator.remoteParticipant, bobValidator.remoteParticipant).foreach { p =>
   p.dars.upload("apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar")
 }

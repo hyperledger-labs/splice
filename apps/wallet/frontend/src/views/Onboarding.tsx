@@ -2,13 +2,20 @@ import { OnboardUserRequest } from 'common-protobuf/com/daml/network/validator/v
 
 import { Button, Grid, Typography } from '@mui/material';
 
+import { useUserState } from '../contexts/UserContext';
 import { useValidatorClient } from '../contexts/ValidatorServiceContext';
 
-const Onboarding: React.FC<{ userId: string }> = ({ userId }) => {
+const Onboarding: React.FC<{ onOnboard: () => Promise<void> }> = ({ onOnboard }) => {
   const validatorClient = useValidatorClient();
+  const { userId } = useUserState();
+
+  if (!userId) {
+    return <div>Loading...</div>;
+  }
 
   const onOnboardUser = async () => {
     await validatorClient.onboardUser(new OnboardUserRequest().setName(userId), undefined);
+    await onOnboard();
   };
 
   return (

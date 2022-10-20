@@ -1,11 +1,12 @@
-import { useAuth0 } from '@auth0/auth0-react';
 import { useState } from 'react';
 
 import { Button, Chip, Grid, TextField, Typography } from '@mui/material';
 
-const Login: React.FC<{ onLogin: (userId: string) => void }> = ({ onLogin }) => {
+import { useUserState } from '../contexts/UserContext';
+
+const Login: React.FC = () => {
   const [userId, setUserId] = useState<string>('');
-  const { loginWithRedirect } = useAuth0();
+  const { loginWithId, loginWithAuth0 } = useUserState();
 
   return (
     <Grid
@@ -31,7 +32,7 @@ const Login: React.FC<{ onLogin: (userId: string) => void }> = ({ onLogin }) => 
         sx={{ marginTop: '15px' }}
         onClick={e => {
           e.preventDefault();
-          onLogin(userId);
+          loginWithId(userId);
         }}
         id="login-button"
       >
@@ -40,7 +41,7 @@ const Login: React.FC<{ onLogin: (userId: string) => void }> = ({ onLogin }) => 
 
       <Chip label="OR" sx={{ margin: '25px 0px' }} />
 
-      <Button variant="outlined" onClick={loginWithRedirect}>
+      <Button variant="outlined" onClick={loginWithAuth0}>
         Log in with auth0
       </Button>
     </Grid>

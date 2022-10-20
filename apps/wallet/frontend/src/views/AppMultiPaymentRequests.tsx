@@ -1,9 +1,4 @@
 import { DirectoryEntry, sameContracts, useInterval, Contract } from 'common-frontend';
-import {
-  AcceptAppMultiPaymentRequestRequest,
-  ListAppMultiPaymentRequestsRequest,
-  WalletContext,
-} from 'common-protobuf/com/daml/network/wallet/v0/wallet_service_pb';
 import React, { useCallback, useState } from 'react';
 
 import { Button, Stack, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
@@ -13,23 +8,19 @@ import { AppMultiPaymentRequest, ReceiverQuantity } from '@daml.js/wallet/lib/CN
 import { useWalletClient } from '../contexts/WalletServiceContext';
 
 // TODO(i1196) Improve multi-party settlement control
-const AppMultiPaymentRequests: React.FC<{ userId: string }> = ({ userId }) => {
-  const walletClient = useWalletClient();
-  const walletRequestCtx = new WalletContext().setUserName(userId);
+const AppMultiPaymentRequests: React.FC = () => {
+  const { listAppMultiPaymentRequests, acceptAppMultiPaymentRequests } = useWalletClient();
 
   const [appPaymentRequests, setAppMultiPaymentRequests] = useState<
     Contract<AppMultiPaymentRequest>[]
   >([]);
   const fetchAppMultiPaymentRequests = useCallback(async () => {
-    const newAppMultiPaymentRequests = (
-      await walletClient.listAppMultiPaymentRequests(
-        new ListAppMultiPaymentRequestsRequest().setWalletCtx(walletRequestCtx),
-        undefined
-      )
-    ).getPaymentRequestsList();
-    const decoded = newAppMultiPaymentRequests.map(c => Contract.decode(c, AppMultiPaymentRequest));
-    setAppMultiPaymentRequests(prev => (sameContracts(decoded, prev) ? prev : decoded));
-  }, [walletClient, walletRequestCtx, setAppMultiPaymentRequests]);
+    const { paymentRequestsList } = await listAppMultiPaymentRequests();
+    setAppMultiPaymentRequests(prev =>
+      sameContracts(paymentRequestsList, prev) ? prev : paymentRequestsList
+    );
+  }, [listAppMultiPaymentRequests, setAppMultiPaymentRequests]);
+
   useInterval(fetchAppMultiPaymentRequests, 500);
 
   const Request: React.FC<{ request: ReceiverQuantity; provider: string; cid: string }> = ({
@@ -37,14 +28,6 @@ const AppMultiPaymentRequests: React.FC<{ userId: string }> = ({ userId }) => {
     provider,
     cid,
   }) => {
-    const onAccept = async () => {
-      await walletClient.acceptAppMultiPaymentRequest(
-        new AcceptAppMultiPaymentRequestRequest()
-          .setRequestContractId(cid)
-          .setWalletCtx(walletRequestCtx),
-        undefined
-      );
-    };
     return (
       <TableRow className="app-requests-table-row">
         <TableCell className="app-request-receiver">
@@ -55,7 +38,7 @@ const AppMultiPaymentRequests: React.FC<{ userId: string }> = ({ userId }) => {
           <DirectoryEntry partyId={provider} />
         </TableCell>
         <TableCell>
-          <Button type="submit" onClick={onAccept}>
+          <Button type="submit" onClick={() => acceptAppMultiPaymentRequests(cid)}>
             Accept
           </Button>
         </TableCell>

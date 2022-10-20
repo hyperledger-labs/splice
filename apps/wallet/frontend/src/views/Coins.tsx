@@ -1,9 +1,4 @@
 import { sameContracts, useInterval, Contract } from 'common-frontend';
-import {
-  ListRequest,
-  TapRequest,
-  WalletContext,
-} from 'common-protobuf/com/daml/network/wallet/v0/wallet_service_pb';
 import { useCallback, useState } from 'react';
 
 import {
@@ -22,17 +17,14 @@ import { Coin } from '@daml.js/canton-coin/lib/CC/Coin';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 
-const Coins: React.FC<{ userId: string }> = ({ userId }) => {
+const Coins: React.FC = () => {
   const [coins, setCoins] = useState<Contract<Coin>[]>([]);
   const [tapValue, setTapValue] = useState<string>('');
 
-  const walletClient = useWalletClient();
-  const walletRequestCtx = new WalletContext().setUserName(userId);
+  const { tap, list } = useWalletClient();
 
   const fetchCoins = useCallback(async () => {
-    const newCoins = (
-      await walletClient.list(new ListRequest().setWalletCtx(walletRequestCtx), undefined)
-    ).getCoinsList();
+    const newCoins = (await list()).coins;
 
     const decoded = newCoins.reduce((accumulator, c) => {
       const contractData = c.getContract();
@@ -40,16 +32,9 @@ const Coins: React.FC<{ userId: string }> = ({ userId }) => {
     }, [] as Contract<Coin>[]);
 
     setCoins(prev => (sameContracts(prev, decoded) ? prev : decoded));
-  }, [walletClient, walletRequestCtx, setCoins]);
+  }, [list, setCoins]);
 
   useInterval(fetchCoins, 500);
-
-  const onTap = async () => {
-    await walletClient.tap(
-      new TapRequest().setQuantity(tapValue).setWalletCtx(walletRequestCtx),
-      undefined
-    );
-  };
 
   const copyToClipboard = async (text: string) => {
     await navigator.clipboard.writeText(text);
@@ -64,7 +49,7 @@ const Coins: React.FC<{ userId: string }> = ({ userId }) => {
           onChange={event => setTapValue(event.target.value)}
           id="tap-amount-field"
         ></TextField>
-        <Button variant="contained" onClick={() => onTap()} id="tap-button">
+        <Button variant="contained" onClick={() => tap(tapValue)} id="tap-button">
           Tap
         </Button>
       </FormGroup>
