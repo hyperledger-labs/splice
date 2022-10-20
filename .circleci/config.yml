@@ -48,7 +48,7 @@ commands:
     description: Install Daml SDK
     steps:
     - run:
-        name: install daml sdk
+        name: Install Daml SDK
         command: |
           set -eou pipefail
           curl -sSL https://get.daml.com/ | sh -s << pipeline.parameters.sdk-version >>
@@ -57,18 +57,18 @@ commands:
     description: Set up Nix
     steps:
     - run:
-        name: make_cache_key
+        name: Make Nix cache key
         command: |
           set -euo pipefail
           git log -n1 --format=%H nix shell.nix > /tmp/nix-cache-key
           sudo mkdir /nix
           sudo chown $USER /nix
     - restore_cache:
-        name: Restore nix cache
+        name: Restore Nix cache
         keys:
         - nix-{{ checksum "/tmp/nix-cache-key" }}
     - run:
-       name: setup_nix
+       name: Setup Nix
        command: |
          set -euo pipefail
          if [ -f ~/.config/nix/nix.conf ]; then
@@ -437,12 +437,12 @@ commands:
   setup_vpn:
     steps:
       - run:
-          name: install vpn client
+          name: Install VPN client
           command: |
             sudo apt-get update
             sudo apt-get install -y expect charon-cmd
       - run:
-          name: start vpn client
+          name: Start VPN connection
           # the charon-cmd process must remain running throughout the whole job,
           # so run this step in the background to allow subsequent steps to continue
           background: true
@@ -469,7 +469,7 @@ commands:
             chmod +x route
             ./route $VPN_HOST_NAME $VPN_USER $VPN_PASSWORD
       - run:
-          name: verify vpn connection
+          name: Verify VPN connection
           command: |
             set +e
 
@@ -494,7 +494,7 @@ commands:
   stop_vpn:
     steps:
       - run:
-          name: stop vpn
+          name: Stop VPN connection
           command: |
             sudo killall charon-cmd
 
@@ -504,7 +504,7 @@ commands:
         type: string
     steps:
       - run:
-          name: Checkout Cluster Version
+          name: Checkout cluster version
           command: |
            set +e
 
@@ -521,7 +521,7 @@ commands:
              else
                echo "Failed to retrieve cluster version. Retry count $count"
                (( count++ ))
-               sleep 1
+               sleep 3
              fi
            done
 
@@ -549,7 +549,7 @@ commands:
           cmd: ./scripts/check-todos.sh
           additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_PULL_REQUEST"
       - store_artifacts:
-          name: Store todos as artifacts
+          name: Store To-dos as artifacts
           path: todo-out/todos
           destination: todos
 
@@ -571,7 +571,7 @@ commands:
   docker_build:
     steps:
       - run_bash_command_in_nix:
-         cmd_name: build images
+         cmd_name: Build docker images
          additional_nix_args: "--keep DOCKER_CERT_PATH \
                               --keep DOCKER_HOST \
                               --keep DOCKER_MACHINE_NAME \
@@ -648,7 +648,7 @@ jobs:
       - execute_sbt_command:
           cmd: "bundle"
       - run:
-          name: copy bundle
+          name: Copy bundle
           command: |
             set -eou pipefail
             mkdir -p /tmp/artifacts
@@ -657,7 +657,7 @@ jobs:
           path: /tmp/artifacts
           destination: release-artifacts
       - run_bash_command_in_nix:
-         cmd_name: publish release bundles
+         cmd_name: Publish release bundles
          additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY"
          cmd: |
            echo $GCP_DA_CN_IMAGES_KEY | gcloud auth activate-service-account --key-file=-
@@ -696,7 +696,7 @@ jobs:
       - checkout
       - setup_nix
       - run_bash_command_in_nix:
-         cmd_name: deployment test
+         cmd_name: Deployment Test
          cmd: make -C cluster test
 
   deploy_cluster:
@@ -714,7 +714,7 @@ jobs:
       - checkout
       - setup_nix
       - run_bash_command_in_nix:
-          cmd_name: apply cluster manifest
+          cmd_name: Apply Kubernetes manifest to cluster
           cluster: << parameters.cluster >>
           cluster_authenticate: true
           cmd: |
@@ -762,7 +762,7 @@ jobs:
     steps:
       - checkout
       - run:
-         name: update pipeline schedule
+         name: Update CircleCI pipeline configuration (incl. schedule triggers)
          command: |
            set -euo pipefail
 
@@ -779,7 +779,7 @@ jobs:
       - setup_nix
       - install_daml_sdk
       - run_bash_command_in_nix:
-         cmd_name: build
+         cmd_name: Build docs
          cmd: |
            cd cluster/images/docs
            export PATH=$HOME/.daml/bin:$PATH
@@ -796,13 +796,13 @@ jobs:
       - setup_sbt_test_job
       - install_daml_sdk
       - run_bash_command_in_nix:
-         cmd_name: build app
+         cmd_name: Build app
          cmd: |
            export PATH=$HOME/.daml/bin:$PATH
            make build
       - docker_build
       - run_bash_command_in_nix:
-         cmd_name: push images
+         cmd_name: Push Docker images
          additional_nix_args: "--keep GCP_DA_CN_IMAGES_KEY \
            --keep DOCKER_CERT_PATH \
            --keep DOCKER_HOST \
@@ -826,7 +826,7 @@ jobs:
       - setup_sbt_test_job
       - install_daml_sdk
       - run_bash_command_in_nix:
-         cmd_name: build app
+         cmd_name: Build app
          cmd: |
            export PATH=$HOME/.daml/bin:$PATH
            make build
@@ -956,6 +956,14 @@ workflows:
       - preflight_check:
           <<: *main-branch-only
           cluster: test
+          context:
+            - canton-network-vpn
+            - slack-context
+
+  staging_health_check:
+    jobs:
+      - preflight_check:
+          cluster: "staging"
           context:
             - canton-network-vpn
             - slack-context
