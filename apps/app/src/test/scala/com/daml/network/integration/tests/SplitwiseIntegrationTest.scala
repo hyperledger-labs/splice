@@ -56,14 +56,12 @@ class SplitwiseIntegrationTest
         Seq(bobUserParty, charlieUserParty),
       )
 
-      bobValidator.remoteParticipant.ledger_api.acs
-        .await(bobUserParty, splitwiseCodegen.GroupInvite)
+      eventually() { bobSplitwise.listGroupInvites() should not be empty }
       inside(bobSplitwise.listGroupInvites()) { case Seq(invite) =>
         bobSplitwise.acceptInvite(invite.contractId)
       }
-      aliceValidator.remoteParticipant.ledger_api.acs
-        .await(aliceUserParty, splitwiseCodegen.AcceptedGroupInvite)
 
+      eventually() { aliceSplitwise.listAcceptedGroupInvites("group1") should not be empty }
       inside(aliceSplitwise.listAcceptedGroupInvites("group1")) { case Seq(accepted) =>
         aliceSplitwise.joinGroup(accepted.contractId)
       }
