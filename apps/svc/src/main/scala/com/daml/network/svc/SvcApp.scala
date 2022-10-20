@@ -6,7 +6,8 @@ import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.network.codegen.CC
 import com.daml.network.codegen.CC.Coin.Coin
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode}
+import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
+import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.svc.admin.SvcLogCollectionService
 import com.daml.network.svc.admin.grpc.GrpcSvcAppService
 import com.daml.network.svc.automation.SvcAutomationService
@@ -15,8 +16,8 @@ import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0.SvcServiceGrpc
 import com.daml.network.util.CoinUtil.{
   ExplicitDisclosureWorkaround,
+  createValidatorRight,
   defaultCoinConfig,
-  recordValidatorOfCommand,
 }
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.config.RequireTypes.InstanceName
@@ -64,7 +65,14 @@ class SvcApp(
       store <- Future.successful(SvcStore(svcPartyId, storage, loggerFactory))
       connection = ledgerClient.connection("SvcAppBootstrap")
       _ <- connection.uploadDarFile(SvcApp.coinPackage)
-      _ <- SvcApp.setupApp(svcPartyId, connection)
+      automation = new SvcAutomationService(
+        store,
+        ledgerClient,
+        this,
+        loggerFactory,
+        timeouts,
+      )
+      _ <- SvcApp.setupApp(svcPartyId, connection, logger, store, this)
       _ = logger.info(s"SVC App is initialized")
       logCollection = new SvcLogCollectionService(
         svcPartyId,
@@ -72,13 +80,6 @@ class SvcApp(
         loggerFactory,
         timeouts,
         store,
-      )
-      automation = new SvcAutomationService(
-        store,
-        ledgerClient,
-        this,
-        loggerFactory,
-        timeouts,
       )
     } yield {
       adminServerRegistry
@@ -133,12 +134,10 @@ object SvcApp {
   private def setupApp(
       svc: PartyId,
       connection: CoinLedgerConnection,
+      logger: TracedLogger,
+      store: SvcStore,
+      retryProvider: CoinRetries,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
-    // Needed for ED workaround
-    val recordUserHostedAtCmd = ExplicitDisclosureWorkaround.recordUserHostedAtCommand(svc, svc)
-    // The SVC is its own validator
-    val recordValidatorOfCmd = recordValidatorOfCommand(svc, svc, svc)
-
     // Create an IssuanceState
     val createIssuanceStateCmd =
       CC.Coin
@@ -162,41 +161,45 @@ object SvcApp {
         .exerciseCoinRules_MiningRound_Open(coinPrice = 1.0)
         .command
     for {
-      _ <- connection.ignoreDuplicateKeyErrors(
-        connection.submitCommand(
-          actAs = Seq(svc),
-          readAs = Seq.empty,
-          command = Seq(recordUserHostedAtCmd),
-        ),
-        s"SVC.setupApp($svc, ...)",
+      _ <-
+        ExplicitDisclosureWorkaround.recordUserHostedAt(
+          user = svc,
+          validator = svc,
+          logger = logger,
+          connection = connection,
+          retryProvider = retryProvider,
+          lookupCCUserHostedAtByParty = store.lookupCCUserHostedAtByParty,
+        )
+      _ <- createValidatorRight(
+        svc = svc,
+        validator = svc,
+        user = svc,
+        logger = logger,
+        connection = connection,
+        retryProvider = retryProvider,
+        lookupValidatorRightByParty = store.lookupValidatorRightByParty,
       )
-      _ <- connection.ignoreDuplicateKeyErrors(
-        //
-        connection
-          .submitCommand(
-            actAs = Seq(svc),
-            readAs = Seq.empty,
-            command = Seq(recordValidatorOfCmd),
-          ),
-        s"SVC.setupApp($svc, ...)",
-      )
-      _ <- connection.ignoreDuplicateKeyErrors(
-        connection.submitCommand(
-          actAs = Seq(svc),
-          readAs = Seq.empty,
-          command = Seq(createIssuanceStateCmd),
-        ),
-        s"SVC.setupApp($svc, ...)",
-      )
-      // NOTE: this must be the last initialization to perform, as otherwise validators might be onboarded too early
-      // in the SvcAutomationService's CoinRulesRequest handler
-      _ <- connection.ignoreDuplicateKeyErrors(
-        connection.submitCommand(
-          actAs = Seq(svc),
-          readAs = Seq.empty,
-          command = Seq(createCoinRulesCmd),
-        ),
-        s"SVC.setupApp($svc, ...)",
+      _ <- retryProvider.retry(
+        "create coinrules and issuance state",
+        store.lookupCoinRulesForValidator(svc).flatMap {
+          case QueryResult(off, None) =>
+            // TODO(#790) Switch to the generalized version of mkCommandId once it has been added
+            val commandId = s"com.daml.network.svc.CoinRules"
+            connection
+              .submitCommandWithDedup(
+                actAs = Seq(svc),
+                readAs = Seq.empty,
+                command = Seq(
+                  createIssuanceStateCmd,
+                  createCoinRulesCmd,
+                ),
+                commandId = commandId,
+                deduplicationOffset = off,
+              )
+          case QueryResult(_, Some(_)) =>
+            logger.info("CoinRules already exists, skipping")
+            Future.successful(())
+        },
       )
     } yield ()
   }

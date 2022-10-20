@@ -45,7 +45,7 @@ class SvcAutomationService(
       implicit val tc: TraceContext = traceContext
       // Guard the action by a lookup for the SVC's own CoinRules to ensure that all of the dependent state
       // has already been created.
-      store.lookupCoinRulesForValidator(store.svcParty).flatMap {
+      store.lookupCoinRulesForValidator(store.svcParty).map(_.value).flatMap {
         case None =>
           // SCV setup is not yet complete: throw a StatusRuntimeException as that properly triggers the retry loop
           Future.failed(
@@ -58,7 +58,7 @@ class SvcAutomationService(
         case Some(_) =>
           // SCV setup is complete: check whether the CoinRules for the requesting validator already exist
           val validatorParty = PartyId.tryFromPrim(req.payload.user)
-          store.lookupCoinRulesForValidator(validatorParty).flatMap {
+          store.lookupCoinRulesForValidator(validatorParty).map(_.value).flatMap {
             case Some(_) =>
               // They do: reject
               val cmd = req.contractId.exerciseCoinRulesRequest_Reject().command

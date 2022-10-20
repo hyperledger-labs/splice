@@ -96,7 +96,8 @@ object CoinRetries {
             TransientErrorKind
           // TODO (#1066) Remove the need to retry on UNIMPLEMENTED.
           case None
-              if Seq(Status.Code.UNIMPLEMENTED, Status.Code.UNAVAILABLE).contains(statusCode) =>
+              if Seq(Status.Code.UNIMPLEMENTED, Status.Code.UNAVAILABLE, Status.Code.NOT_FOUND)
+                .contains(statusCode) =>
             logger.info(
               s"The operation ${operationName.singleQuoted} failed with a retryable error:",
               ex,

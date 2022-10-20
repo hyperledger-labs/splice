@@ -4,7 +4,6 @@ import akka.actor.ActorSystem
 import akka.stream.KillSwitches
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
-import com.daml.error.definitions.LedgerApiErrors
 import com.daml.error.definitions.groups.UserManagementServiceErrorGroup
 import com.daml.error.utils.ErrorDetails
 import com.daml.ledger.api.domain.UserRight
@@ -83,9 +82,6 @@ trait CoinLedgerSubscription extends FlagCloseableAsync with NamedLogging {
 }
 
 trait CoinLedgerConnection extends CoinLedgerSubmit {
-  def ignoreDuplicateKeyErrors[T](task: => Future[T], name: String)(implicit
-      traceContext: TraceContext
-  ): Future[Unit]
   def ledgerEnd: Future[LedgerOffset]
   def activeContractsWithOffset(
       filter: TransactionFilter
@@ -229,20 +225,6 @@ object CoinLedgerConnection {
           val active = responseSequence.flatMap(_.activeContracts)
           (active, LedgerOffset(value = LedgerOffset.Value.Absolute(offset)))
         }
-      }
-
-      // TODO(#1094): we can't rely on unique contract keys in multi-domain.
-      //  Use a different mechanism for idempotent app initialization.
-      override def ignoreDuplicateKeyErrors[T](
-          task: => Future[T],
-          name: String,
-      )(implicit traceContext: TraceContext): Future[Unit] = task.transform {
-        case Success(_) => Success(())
-        case Failure(e: StatusRuntimeException)
-            if ErrorDetails.matches(e, LedgerApiErrors.ConsistencyErrors.DuplicateContractKey) =>
-          logger.info(s"Ignoring duplicate contract key error for $name.")
-          Success(())
-        case Failure(e) => Failure(e)
       }
 
       override def activeContracts(

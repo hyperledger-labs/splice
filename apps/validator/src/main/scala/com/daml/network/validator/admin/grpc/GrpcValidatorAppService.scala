@@ -64,12 +64,12 @@ class GrpcValidatorAppService(
           logger = logger,
         )
         // Create validator right contract so validator can collect validator rewards
-        _ <- ValidatorUtil.createValidatorRight(
+        _ <- CoinUtil.createValidatorRight(
           user = userPartyId,
           validator = store.key.validatorParty,
           svc = store.key.svcParty,
           connection = connection,
-          store = store,
+          lookupValidatorRightByParty = store.lookupValidatorRightByParty,
           retryProvider = retryProvider,
           logger = logger,
         )

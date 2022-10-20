@@ -5,6 +5,7 @@ import akka.stream.scaladsl.Source
 import com.daml.ledger.client.binding.TemplateCompanion
 import com.daml.network.codegen.CC
 import com.daml.network.store.AcsStore
+import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.svc.store.memory.InMemorySvcStore
 import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -29,12 +30,21 @@ trait SvcStore extends AutoCloseable {
   /** The [[com.daml.network.store.AcsStore]] used to back the default implementation of the queries. */
   protected val acsStore: AcsStore
 
-  def lookupCoinRulesForValidator(validatorParty: PartyId)(implicit
-      ec: ExecutionContext
-  ): Future[Option[Contract[CC.CoinRules.CoinRules]]] =
+  def lookupCoinRulesForValidator(
+      validatorParty: PartyId
+  ): Future[QueryResult[Option[Contract[CC.CoinRules.CoinRules]]]] =
     acsStore
       .findContract(CC.CoinRules.CoinRules)(co => co.payload.obs == validatorParty.toPrim)
-      .map(_.value)
+
+  def lookupCCUserHostedAtByParty(
+      party: PartyId
+  ): Future[QueryResult[Option[Contract[CC.Scripts.Util.CCUserHostedAt]]]] =
+    acsStore.findContract(CC.Scripts.Util.CCUserHostedAt)(co => co.payload.user == party.toPrim)
+
+  def lookupValidatorRightByParty(
+      party: PartyId
+  ): Future[QueryResult[Option[Contract[CC.Coin.ValidatorRight]]]] =
+    acsStore.findContract(CC.Coin.ValidatorRight)(co => co.payload.user == party.toPrim)
 
   def listContracts[T](
       templateCompanion: TemplateCompanion[T]

@@ -20,7 +20,7 @@ object CoinUtil {
     TemplateId(ApiTypes.TemplateId.unwrap(id))
 
   /** Creates a contract that gives the given validator the right to claim coin issuances for the given user's burns. */
-  def recordValidatorOfCommand(
+  private def createValidatorRightCommand(
       svc: PartyId,
       validator: PartyId,
       user: PartyId,
@@ -33,6 +33,40 @@ object CoinUtil {
       )
       .create
       .command
+
+  def createValidatorRight(
+      svc: PartyId,
+      validator: PartyId,
+      user: PartyId,
+      logger: TracedLogger,
+      connection: CoinLedgerConnection,
+      retryProvider: CoinRetries,
+      lookupValidatorRightByParty: (
+          PartyId
+      ) => Future[QueryResult[Option[Contract[CC.Coin.ValidatorRight]]]],
+  )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] =
+    retryProvider.retry(
+      "createValidatorRight",
+      lookupValidatorRightByParty(user).flatMap {
+        case QueryResult(off, None) =>
+          // TODO(#790) Switch to the generalized version of mkCommandId once it has been added
+          val commandId = s"com.daml.network.validator.ValidatorRight_$user"
+          connection
+            .submitCommandWithDedup(
+              actAs = Seq(validator, user),
+              readAs = Seq.empty,
+              command = Seq(
+                createValidatorRightCommand(svc, validator, user)
+              ),
+              commandId = commandId,
+              deduplicationOffset = off,
+            )
+            .map(_ => ())
+        case QueryResult(_, Some(_)) =>
+          logger.info(s"ValidatorRight for $user already exists, skipping")
+          Future.successful(())
+      },
+    )
 
   lazy val defaultHoldingFee =
     OpenBusiness.Fees.RatePerRound(damlNumeric(1.0 / 360.0 / (24.0 * 60.0 / 2.5)))
@@ -127,7 +161,6 @@ object CoinUtil {
         "recordUserHostedAt",
         lookupCCUserHostedAtByParty(user).flatMap {
           case QueryResult(off, None) =>
-            logger.debug("Store contained None")
             // TODO(#790) Switch to the generalized version of mkCommandId once it has been added
             val commandId = s"com.daml.network.validator.CCUserHostedAt_$user"
             connection
@@ -140,7 +173,6 @@ object CoinUtil {
               )
               .map(_ => ())
           case QueryResult(_, Some(_)) =>
-            logger.debug("Store contained Some")
             logger.info(s"CCUserHostedAt contract for $user already exists, skipping.")
             Future.successful(())
         },

@@ -114,12 +114,12 @@ class ValidatorApp(
         retryProvider = this,
         logger = logger,
       )
-      _ <- ValidatorUtil.createValidatorRight(
+      _ <- CoinUtil.createValidatorRight(
         user = validatorParty,
         validator = validatorParty,
         svc = svcParty,
         connection = connection,
-        store = store,
+        lookupValidatorRightByParty = store.lookupValidatorRightByParty,
         retryProvider = this,
         logger = logger,
       )
