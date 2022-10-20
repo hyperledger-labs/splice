@@ -45,7 +45,7 @@ object GrpcSplitwiseAppClient {
         Contract[splitwiseCodegen.Group]
       ]] {
     override def createRequest(): Either[String, v0.ListGroupsRequest] =
-      Right(v0.ListGroupsRequest())
+      Right(v0.ListGroupsRequest(Some(context.toProtoV0)))
 
     override def submitRequest(
         service: SplitwiseServiceStub,

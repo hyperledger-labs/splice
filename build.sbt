@@ -277,8 +277,16 @@ lazy val bundleTask = {
         ("apps/directory/frontend/build", "directory"),
         ("apps/splitwise/frontend/build", "splitwise"),
       )
+    val dars =
+      Seq(
+        (`apps-common` / Compile / damlBuild).value,
+        (`apps-wallet-daml` / Compile / damlBuild).value,
+        (`apps-aaa-splitwise` / Compile / damlBuild).value,
+      )
     val args = examples ++ webUis.flatMap({ case (source, name) =>
       Seq("-r", source, s"web-uis/$name")
+    }) ++ dars.flatten.flatMap({ case dar =>
+      Seq("-r", dar, s"dars/${dar.getName}")
     })
     runCommand(s"bash ./create-bundle.sh $assemblyJar ${args.mkString(" ")}", log)
   }

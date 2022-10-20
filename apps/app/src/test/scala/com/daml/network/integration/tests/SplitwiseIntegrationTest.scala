@@ -51,6 +51,9 @@ class SplitwiseIntegrationTest
       }
 
       aliceSplitwise.createGroup("group1")
+      eventually() {
+        aliceSplitwise.listGroups() should have size 1
+      }
       aliceSplitwise.createGroupInvite(
         "group1",
         Seq(bobUserParty, charlieUserParty),

@@ -22,6 +22,8 @@ Deployment
     * deploy a web-server hosting the app user UI
     * instruct your validator node to host your app Daml package
 
+A concrete example of hosting an application can be found in :doc:`./deployment_example`.
+
 .. TODO(M1-41): add instructions on how to set up auth & IAM integration
 
 
