@@ -24,7 +24,7 @@ in pkgs.mkShell {
     evans
     geckodriver
     git
-    google-cloud-sdk
+    (google-cloud-sdk.withExtraComponents ([google-cloud-sdk.components.gke-gcloud-auth-plugin ]))
     grpcurl
     haskellPackages.daml2ts
     hub # Github CLI for todo checker
