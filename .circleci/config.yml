@@ -19,7 +19,7 @@ parameters:
   # old files don’t pollute your build.
   cache-version:
     type: string
-    default: "4"
+    default: "5"
   run-job:
     type: enum
     enum: [build, deploy-devnet, deploy-testnet, healthcheck-testnet]
@@ -102,12 +102,10 @@ commands:
           name: Creating archive of compiled classes
           command: |
             mkdir -p /tmp/classes
-            # Excluding ./track, as its contents may change while the archive is created.
-            # Excluding ./log, as its large and we don't need it.
-            # Excluding frontend & node_modules since caching NPM is a terrible idea and we should not do it or Moritz will cry.
-            # Excluding .daml to avoid any issues where package ids might not be reliable on incremental builds.
-            # Excluding cluster to avoid caching docker builds
-            tar -czf /tmp/classes/classes.tar.gz --exclude-vcs --exclude=./track --exclude=./log --exclude frontend --exclude node_modules --exclude .daml --exclude cluster -H posix .
+            # We cache */target/scala/* files and */target/streams/* which
+            # includes everything that is required for SBT to do fast rebuilds
+            # while avoiding issues arising from caching typescript, daml files or anything else.
+            find . -type f -a \( -path '*/target/scala*' -o -path '*/target/streams/*' \) | tar -czf /tmp/classes/classes.tar.gz --exclude-vcs -T -
       - save_cache:
           name: Uploading archive with compiled classes to cache
           # Key components:
