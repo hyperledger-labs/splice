@@ -12,6 +12,8 @@ import CC.CoinRules
 
 import CC.Scripts.Util (CCUserHostedAt(..))
 
+import CN.Wallet.Subscriptions
+
 -- | A one-directional payment channel governing transfers of CC from the sender to the reciever.
 template PaymentChannel
   with
@@ -428,18 +430,25 @@ catchAllE operation =
 executeCoinOperationRec : [TransferInput] -> [CoinOperationOutcome] -> [CoinOperation] -> Update ([CoinOperationOutcome])
 executeCoinOperationRec inputs prevResults (operation::rest) = do
   case operation of
-    CO_AppPayment cid -> handle AppPaymentRequest_Accept COO_AcceptedAppPayment cid
-    CO_AppMultiPayment cid -> handle AppMultiPaymentRequest_Accept COO_AcceptedAppMultiPayment cid
-    CO_ChannelPayment cid -> handle OnChannelPaymentRequest_Accept COO_AcceptedChannelPayment cid
+    CO_AppPayment cid -> handleE AppPaymentRequest_Accept COO_AcceptedAppPayment cid
+    CO_AppMultiPayment cid -> handleE AppMultiPaymentRequest_Accept COO_AcceptedAppMultiPayment cid
+    CO_ChannelPayment cid -> handleE OnChannelPaymentRequest_Accept COO_AcceptedChannelPayment cid
     CO_ChannelTransfer endUser receiver svcUser quantity payload -> do
       resultE <- catchAllE $ exerciseByKey @PaymentChannel (endUser, receiver, svcUser) (PaymentChannel_ExecuteDirectTransfer inputs quantity payload)
       handleResult COO_AcceptedChannelTransfer resultE
+    CO_SubscriptionAcceptAndMakeInitialPayment cid -> handle SubscriptionRequest_AcceptAndMakePayment COO_SubscriptionInitialPayment cid
+    CO_SubscriptionMakePayment cid -> handle SubscriptionIdleState_MakePayment COO_SubscriptionPayment cid
     CO_Tap svc validator endUser quantity -> do
       coin <- catchAll (exerciseByKey @CoinRules (svc, validator) (CoinRules_Tap endUser quantity))
       handleResultTap coin
   where
-    handle : Choice t c (Either Text (r, ContractId Coin)) => ([TransferInput] -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
+    handle : Choice t c (r, ContractId Coin) => ([TransferInput] -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
     handle choiceConstructor resultConstructor cid = do
+      resultE <- catchAll $ exercise cid (choiceConstructor inputs)
+      handleResult resultConstructor resultE
+
+    handleE : Choice t c (Either Text (r, ContractId Coin)) => ([TransferInput] -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
+    handleE choiceConstructor resultConstructor cid = do
       resultE <- catchAllE $ exercise cid (choiceConstructor inputs)
       handleResult resultConstructor resultE
 
@@ -471,6 +480,8 @@ data CoinOperation
     svcUser: Party
     quantity: Decimal
     payload: Text
+  | CO_SubscriptionAcceptAndMakeInitialPayment (ContractId SubscriptionRequest)
+  | CO_SubscriptionMakePayment (ContractId SubscriptionIdleState)
   | CO_Tap with
     svc: Party
     validator: Party
@@ -486,6 +497,8 @@ data CoinOperationOutcome
   | COO_AcceptedAppMultiPayment (ContractId AcceptedAppMultiPayment)
   | COO_AcceptedChannelPayment TransferResult
   | COO_AcceptedChannelTransfer TransferResult
+  | COO_SubscriptionInitialPayment (ContractId SubscriptionInitialPayment)
+  | COO_SubscriptionPayment (ContractId SubscriptionPayment)
   | COO_Tap (ContractId Coin)
   | COO_TransferError Text
   -- when a batched command fails, the subsequent commands in the batch aren't executed. 
