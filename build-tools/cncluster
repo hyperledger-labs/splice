@@ -158,6 +158,13 @@ function cluster_create() {
            --ttl=60 \
            --rrdatas="${IPADDR}"
 
+    gcloud dns record-sets create "*.${CLUSTER_DNS_NAME}" \
+           --project="${GCP_DNS_PROJECT}" \
+           --zone="canton-global" \
+           --type=A \
+           --ttl=60 \
+           --rrdatas="${IPADDR}"
+
     echo "Cluster at IP ${IPADDR}, applying configuration."
 
     _cluster_apply
@@ -236,6 +243,16 @@ function cluster_delete() {
             _log "DNS record deleted for ${CLUSTER_DNS_NAME}"
         else
             _warning "No DNS record to delete for ${CLUSTER_DNS_NAME}"
+        fi
+
+        if gcloud dns record-sets delete \
+                  --project="${GCP_DNS_PROJECT}" \
+                  --zone="canton-global" \
+                  --type=A \
+                  "*.${CLUSTER_DNS_NAME}"; then
+            _log "DNS record deleted for *.${CLUSTER_DNS_NAME}"
+        else
+            _warning "No DNS record to delete for *.${CLUSTER_DNS_NAME}"
         fi
 
         yes | gcloud container clusters delete ${GCP_CLUSTER_NAME}
