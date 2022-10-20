@@ -9,7 +9,6 @@ import Home from './views/Home';
 import Login from './views/Login';
 
 const App: React.FC = () => {
-  // TODO(i701) -- create a React context to manage auth state
   const [damlUserId, setDamlUserId] = useState<string>();
   const { user, logout } = useAuth0();
 
