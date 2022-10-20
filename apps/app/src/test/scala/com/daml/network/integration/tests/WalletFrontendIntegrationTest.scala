@@ -16,6 +16,11 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
   private val directoryDarPath =
     "apps/directory/daml/.daml/dist/directory-service-0.1.0.dar"
 
+  private def expectedName(partyId: PartyId, entry: String) = {
+    val full = partyId.toProtoPrimitive
+    s"${entry} (${full.substring(0, 4)}...${full.substring(full.length - 4)})"
+  }
+
   "A wallet UI" should {
 
     "allow tapping coins and then list the created coins" in { implicit env =>
@@ -121,8 +126,7 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
         // Check that alice is shown as the user, and her party ID has been resolved to its directory entry correctly.
         // We do this in another eventually() as a "..." text might appear momentarily, until the directory service responds.
         eventually() {
-          val expected = s"alice.cns (${aliceParty.toProtoPrimitive})"
-          find(id("logged-in-user")).value.text shouldBe expected
+          find(id("logged-in-user")).value.text shouldBe expectedName(aliceParty, "alice.cns")
         }
       }
     }
@@ -180,7 +184,7 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
         // We do this in another eventually() as a "..." text might appear momentarily, until the directory service responds.
         eventually() {
           inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
-            val expected = s"directory.cns (${dirPartyId.toProtoPrimitive})"
+            val expected = expectedName(dirPartyId, "directory.cns")
             row.childElement(className("app-request-receiver")).text shouldBe expected
             row.childElement(className("app-request-provider")).text shouldBe expected
             row

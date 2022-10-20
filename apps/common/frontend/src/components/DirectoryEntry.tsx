@@ -42,6 +42,14 @@ const DirectoryEntry: React.FC<{ partyId: string }> = ({ partyId }) => {
     getEntry();
   }, [directoryClient, partyId]);
 
+  const truncate = (s: string) => {
+    if (s.length > 10) {
+      return s.substring(0, 4) + '...' + s.substring(s.length - 4);
+    } else {
+      return s;
+    }
+  };
+
   if (entry === undefined) {
     return <div>...</div>;
   } else if (entry.entry === undefined) {
@@ -53,8 +61,8 @@ const DirectoryEntry: React.FC<{ partyId: string }> = ({ partyId }) => {
           <span className="dir-entry">{entry.entry.name}</span>
         </Tooltip>{' '}
         (
-        <Tooltip title="Party ID">
-          <span style={{ fontWeight: 'lighter' }}>{entry.user}</span>
+        <Tooltip title={'Party ID: ' + entry.user}>
+          <span style={{ fontWeight: 'lighter' }}>{truncate(entry.user)}</span>
         </Tooltip>
         )
       </div>
