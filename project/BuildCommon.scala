@@ -122,8 +122,12 @@ object BuildCommon {
           s"; scalafmt ; Test / scalafmt ; scalafmtSbt",
         ) ++
         addCommandAlias(
+          "formatFix",
+          s"; format ; scalafixAll",
+        ) ++
+        addCommandAlias(
           "lint",
-          "; protobufLint ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck",
+          "; protobufLint ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll",
         ) ++
         // it might happen that some DARs remain dangling on build config changes,
         // so we explicitly remove all CN DARs here, just in case

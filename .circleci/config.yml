@@ -277,9 +277,14 @@ commands:
       post_sbt_cmd:
         type: string
         default: ""
+      when:
+        type: enum
+        enum: ["on_success", "always", "on_fail"]
+        default: "on_success"
     steps:
       - run_bash_command_in_nix:
           cmd_name: Executing "sbt << parameters.cmd >>"
+          when: << parameters.when >>
           cmd: |
             on_exit() {
               local CODE="$?"
@@ -356,9 +361,14 @@ commands:
       additional_nix_args:
         type: string
         default: ""
+      when:
+        type: enum
+        enum: ["on_success", "always", "on_fail"]
+        default: "on_success"
     steps:
       - run:
           name: << parameters.cmd_name >>
+          when: << parameters.when >>
           command: |
             set -euo pipefail
             . /home/circleci/.nix-profile/etc/profile.d/nix.sh
@@ -546,10 +556,12 @@ commands:
   run_todo_script:
     steps:
       - run_bash_command_in_nix:
+          when: always
           cmd: ./scripts/check-todos.sh
           additional_nix_args: "--keep GITHUB_TOKEN --keep CIRCLE_BRANCH --keep CIRCLE_PULL_REQUEST"
       - store_artifacts:
           name: Store To-dos as artifacts
+          when: always
           path: todo-out/todos
           destination: todos
 
@@ -591,6 +603,9 @@ jobs:
     steps:
       - checkout
       - setup_sbt_test_job
+      # Surprisingly, running "Test/compile" before speeds up the "scalafixCheck", is a lot faster than just running "scalafixCheck"
+      - execute_sbt_command:
+          cmd: "Test/compile"
       - execute_sbt_command:
           cmd: "lint"
       - run_todo_script
@@ -616,8 +631,6 @@ jobs:
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "Test/compile"
-      - execute_sbt_command:
-          cmd: "scalafixCheck" # This requires artifacts to be built first
       - execute_sbt_command:
           # run all tests except the live cluster ones
           pre_sbt_cmd: ./start-canton.sh external && ./start-frontends.sh -d
@@ -845,7 +858,7 @@ workflows:
     # Linting and formatting
     - static_tests:
         <<: *notify-fail
-    # Scala ; incl. scalafix
+    # Scala
     - test:
         <<: *notify-fail
     - bundle:
