@@ -381,6 +381,10 @@ Many tests use the topology and base configuration defined in [`/apps/app/src/te
 Adjusting these configurations can sometimes help with debugging.
 See for example https://docs.daml.com/canton/usermanual/monitoring.html on how to adjust logging and monitoring for Canton nodes.
 
+Frontend tests use selenium for launching a (usually headless) browser (currently we use Firefox), and interacting with it as a user would.
+To make it run with a UI, for debugging - turn the headless flag in [`FrontendIntegrationTest.scala`](/apps/app/src/test/scala/com/daml/network/integration/tests/FrontendIntegrationTest.scala) to false.
+To take screenshots (also in headless mode) of the browser at certain points of the tests - call `screenshot()` from [`FrontendIntegrationTest.scala`](/apps/app/src/test/scala/com/daml/network/integration/tests/FrontendIntegrationTest.scala) in your test.
+
 You can run integration tests from IntelliJ by navigating to the file and clicking the little green "run-triangle"
 in the gutter at the start of the test definition.
 You can also run them from `sbt` as explained in the section on `sbt` below.

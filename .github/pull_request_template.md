@@ -1,5 +1,5 @@
 ### Pull Request Checklist
 
 - [ ] Specify fixed issues with `Fixes #n`, and mention issues worked on using `#n`
-- [ ] Include a screenshot for frontend-related PRs
+- [ ] Include a screenshot for frontend-related PRs - see [README](https://github.com/DACH-NY/the-real-canton-coin#running-and-debugging-integration-tests) or use your favorite screenshot tool
 - [ ] Add changes to Canton code to CANTON_CODE_CHANGES.md
