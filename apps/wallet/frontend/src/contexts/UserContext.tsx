@@ -1,11 +1,13 @@
 import { RedirectLoginOptions, useAuth0 } from '@auth0/auth0-react';
+import { SignJWT } from 'jose';
 import React, { useContext, useEffect, useState } from 'react';
 
 import { UserStatusResponse } from './WalletServiceContext';
 
 interface UserState {
-  userId?: string; // undefined when not logged in
-  userAccessToken?: string; // undefined when not logged in via auth0
+  // undefined when not logged in
+  userId?: string;
+  userAccessToken?: string;
 
   isOnboarded: boolean;
   primaryPartyId?: string; // undefined when not onboarded
@@ -57,9 +59,17 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsOnboarded(userOnboarded);
           setPrimaryPartyId(partyId);
         },
-        loginWithId: (id: string) => {
+        loginWithId: async (id: string) => {
           setAuthMethod('id');
           setUserId(id);
+
+          // TODO(i988) Drop if-guard after enabling TLS in cluster
+          if (crypto.subtle === undefined) {
+            console.warn('Could not find browser crypto implementation, not generating user token');
+          } else {
+            const token = await generateToken(id);
+            setUserAccessToken(token);
+          }
         },
         loginWithAuth0: auth0.loginWithRedirect,
         logout: () => {
@@ -86,4 +96,23 @@ export const useUserState: () => UserState = () => {
     throw new Error('User context not initialized');
   }
   return user;
+};
+
+// Generate a local token for test purposes. Only acceptable by the
+// wallet service if it is running in unsafe mode
+const generateToken = async (userId: string): Promise<string> => {
+  const secret = new TextEncoder().encode('test');
+  const key = await crypto.subtle.importKey(
+    'raw',
+    secret,
+    { name: 'HMAC', hash: { name: 'SHA-256' } },
+    false,
+    ['sign']
+  );
+
+  return new SignJWT({})
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setSubject(userId)
+    .sign(key);
 };
