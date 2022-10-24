@@ -414,7 +414,7 @@ class GrpcWalletService(
               request.requestContractId
             )
 
-          def lookups = (_: Unit) =>
+          def lookups = () =>
             for {
               subscriptionRequestO <- userStore.lookupSubscriptionRequestById(requestCid)
               subscriptionRequest = getQueryResult(
@@ -480,7 +480,7 @@ class GrpcWalletService(
               request.idleStateContractId
             )
 
-          def lookups = (_: Unit) =>
+          def lookups = () =>
             for {
               subscriptionStateO <- userStore.lookupSubscriptionIdleStateById(stateCid)
               subscriptionState = getQueryResult(
