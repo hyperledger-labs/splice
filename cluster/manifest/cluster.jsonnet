@@ -45,7 +45,7 @@ local toContainerPortDefn(p) = {
 local JVM_SYSTEM_MEMORY_MIB = 256;
 
 
-local deployment(config, name, ports, memoryLimitMiB=1024, ext={}, proxyToGrpcWeb=null) =
+local deployment(config, name, ports, memoryLimitMiB=1024, ext={}, proxyToGrpcWeb=null, mountConfig=null) =
   local proxyPort =
     if proxyToGrpcWeb == null then null
     else findPort(ports, proxyToGrpcWeb);
@@ -107,6 +107,12 @@ local deployment(config, name, ports, memoryLimitMiB=1024, ext={}, proxyToGrpcWe
                       memory: memoryLimitMiB + 'Mi',
                     },
                   },
+                  volumeMounts: if mountConfig == null then [] else [
+                    {
+                      mountPath: '/config',
+                      name: name + '-config-vol',
+                    },
+                  ],
                 } + ext,
               ] + (
                 if proxyPort != null then
@@ -141,6 +147,14 @@ local deployment(config, name, ports, memoryLimitMiB=1024, ext={}, proxyToGrpcWe
                     },
                   ] else []
               ),
+              volumes: if mountConfig == null then [] else [
+                {
+                  name: name + '-config-vol',
+                  configMap: {
+                    name: mountConfig,
+                  },
+                },
+              ],
             },
           },
         },
@@ -161,6 +175,23 @@ local deployment(config, name, ports, memoryLimitMiB=1024, ext={}, proxyToGrpcWe
       },
     ],
   };
+
+local configMap(config, name, fileName, data) = {
+  ports: [],
+  deploymentObjects: [
+    {
+      apiVersion: 'v1',
+      kind: 'ConfigMap',
+      metadata: {
+        name: name,
+      },
+      data: {
+        version: config.imageTag,
+        [ fileName ]: std.manifestJsonEx(data, '  ', '\n', ': '),
+      },
+    },
+  ],
+};
 
 local externalService(config, ports) = {
   ports: [],
@@ -193,7 +224,10 @@ local cluster(config, clusterDeployments) =
                flatten(std.map(function(i) i.ports, deployments)));
 
   objects(deployments + [
-    deployment(config, 'external-proxy', allPorts, memoryLimitMiB=512),
+    configMap(config, 'cluster-manifest', 'manifest.json', {
+      'ports': allPorts
+    }),
+    deployment(config, 'external-proxy', allPorts, memoryLimitMiB=512, mountConfig='cluster-manifest'),
     externalService(config, allPorts),
   ]);
 

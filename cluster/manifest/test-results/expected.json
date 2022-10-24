@@ -53,9 +53,11 @@
                            "requests": {
                               "memory": "1024Mi"
                            }
-                        }
+                        },
+                        "volumeMounts": [ ]
                      }
-                  ]
+                  ],
+                  "volumes": [ ]
                }
             }
          }
@@ -132,9 +134,11 @@
                            "requests": {
                               "memory": "512Mi"
                            }
-                        }
+                        },
+                        "volumeMounts": [ ]
                      }
-                  ]
+                  ],
+                  "volumes": [ ]
                }
             }
          }
@@ -234,9 +238,11 @@
                            "tcpSocket": {
                               "port": "canton-pub-api"
                            }
-                        }
+                        },
+                        "volumeMounts": [ ]
                      }
-                  ]
+                  ],
+                  "volumes": [ ]
                }
             }
          }
@@ -322,9 +328,11 @@
                            "requests": {
                               "memory": "1536Mi"
                            }
-                        }
+                        },
+                        "volumeMounts": [ ]
                      }
-                  ]
+                  ],
+                  "volumes": [ ]
                }
             }
          }
@@ -406,7 +414,8 @@
                            "requests": {
                               "memory": "1024Mi"
                            }
-                        }
+                        },
+                        "volumeMounts": [ ]
                      },
                      {
                         "env": [
@@ -441,7 +450,8 @@
                            }
                         }
                      }
-                  ]
+                  ],
+                  "volumes": [ ]
                }
             }
          }
@@ -523,9 +533,11 @@
                            "requests": {
                               "memory": "1024Mi"
                            }
-                        }
+                        },
+                        "volumeMounts": [ ]
                      }
-                  ]
+                  ],
+                  "volumes": [ ]
                }
             }
          }
@@ -602,7 +614,8 @@
                            "requests": {
                               "memory": "1024Mi"
                            }
-                        }
+                        },
+                        "volumeMounts": [ ]
                      },
                      {
                         "env": [
@@ -637,7 +650,8 @@
                            }
                         }
                      }
-                  ]
+                  ],
+                  "volumes": [ ]
                }
             }
          }
@@ -723,7 +737,8 @@
                            "requests": {
                               "memory": "1536Mi"
                            }
-                        }
+                        },
+                        "volumeMounts": [ ]
                      },
                      {
                         "env": [
@@ -758,7 +773,8 @@
                            }
                         }
                      }
-                  ]
+                  ],
+                  "volumes": [ ]
                }
             }
          }
@@ -845,7 +861,8 @@
                            "requests": {
                               "memory": "1024Mi"
                            }
-                        }
+                        },
+                        "volumeMounts": [ ]
                      },
                      {
                         "env": [
@@ -880,7 +897,8 @@
                            }
                         }
                      }
-                  ]
+                  ],
+                  "volumes": [ ]
                }
             }
          }
@@ -962,7 +980,8 @@
                            "requests": {
                               "memory": "1024Mi"
                            }
-                        }
+                        },
+                        "volumeMounts": [ ]
                      },
                      {
                         "env": [
@@ -997,7 +1016,8 @@
                            }
                         }
                      }
-                  ]
+                  ],
+                  "volumes": [ ]
                }
             }
          }
@@ -1079,9 +1099,11 @@
                            "requests": {
                               "memory": "1024Mi"
                            }
-                        }
+                        },
+                        "volumeMounts": [ ]
                      }
-                  ]
+                  ],
+                  "volumes": [ ]
                }
             }
          }
@@ -1158,9 +1180,11 @@
                            "requests": {
                               "memory": "1024Mi"
                            }
-                        }
+                        },
+                        "volumeMounts": [ ]
                      }
-                  ]
+                  ],
+                  "volumes": [ ]
                }
             }
          }
@@ -1237,9 +1261,11 @@
                            "requests": {
                               "memory": "1024Mi"
                            }
-                        }
+                        },
+                        "volumeMounts": [ ]
                      }
-                  ]
+                  ],
+                  "volumes": [ ]
                }
             }
          }
@@ -1320,7 +1346,8 @@
                            "requests": {
                               "memory": "1536Mi"
                            }
-                        }
+                        },
+                        "volumeMounts": [ ]
                      },
                      {
                         "env": [
@@ -1355,7 +1382,8 @@
                            }
                         }
                      }
-                  ]
+                  ],
+                  "volumes": [ ]
                }
             }
          }
@@ -1442,9 +1470,11 @@
                            "requests": {
                               "memory": "1024Mi"
                            }
-                        }
+                        },
+                        "volumeMounts": [ ]
                      }
-                  ]
+                  ],
+                  "volumes": [ ]
                }
             }
          }
@@ -1521,7 +1551,8 @@
                            "requests": {
                               "memory": "1024Mi"
                            }
-                        }
+                        },
+                        "volumeMounts": [ ]
                      },
                      {
                         "env": [
@@ -1556,7 +1587,8 @@
                            }
                         }
                      }
-                  ]
+                  ],
+                  "volumes": [ ]
                }
             }
          }
@@ -1584,6 +1616,17 @@
             "selector": {
                "app": "splitwise-app"
             }
+         }
+      },
+      {
+         "apiVersion": "v1",
+         "data": {
+            "manifest.json": "{\n  \"ports\": [\n    {\n      \"name\": \"http\",\n      \"port\": 80\n    },\n    {\n      \"name\": \"canton-pub-api\",\n      \"port\": 5008\n    },\n    {\n      \"name\": \"canton-adm-api\",\n      \"port\": 5009\n    },\n    {\n      \"name\": \"cp-adm-api\",\n      \"port\": 5002\n    },\n    {\n      \"name\": \"cp-lg-api\",\n      \"port\": 5001\n    },\n    {\n      \"name\": \"dir-api\",\n      \"port\": 5010\n    },\n    {\n      \"name\": \"dir-api-gw\",\n      \"port\": 6010\n    },\n    {\n      \"name\": \"svc-app-adm-api\",\n      \"port\": 5005\n    },\n    {\n      \"name\": \"scan-api\",\n      \"port\": 5012\n    },\n    {\n      \"name\": \"scan-api-gw\",\n      \"port\": 6012\n    },\n    {\n      \"name\": \"val1-adm-api\",\n      \"port\": 5102\n    },\n    {\n      \"name\": \"val1-lg-api\",\n      \"port\": 5101\n    },\n    {\n      \"name\": \"val1-lg-api-gw\",\n      \"port\": 6101\n    },\n    {\n      \"name\": \"val1-val-api\",\n      \"port\": 5103\n    },\n    {\n      \"name\": \"val1-val-api-gw\",\n      \"port\": 6103\n    },\n    {\n      \"name\": \"val1-wal-api\",\n      \"port\": 5104\n    },\n    {\n      \"name\": \"val1-wal-api-gw\",\n      \"port\": 6104\n    },\n    {\n      \"name\": \"sw-adm-api\",\n      \"port\": 5202\n    },\n    {\n      \"name\": \"sw-lg-api\",\n      \"port\": 5201\n    },\n    {\n      \"name\": \"sw-lg-api-gw\",\n      \"port\": 6201\n    },\n    {\n      \"name\": \"sw-val-api\",\n      \"port\": 5203\n    },\n    {\n      \"name\": \"sw-api\",\n      \"port\": 5213\n    },\n    {\n      \"name\": \"sw-api-gw\",\n      \"port\": 6213\n    }\n  ]\n}",
+            "version": "tag"
+         },
+         "kind": "ConfigMap",
+         "metadata": {
+            "name": "cluster-manifest"
          }
       },
       {
@@ -1726,7 +1769,21 @@
                            "requests": {
                               "memory": "512Mi"
                            }
-                        }
+                        },
+                        "volumeMounts": [
+                           {
+                              "mountPath": "/config",
+                              "name": "external-proxy-config-vol"
+                           }
+                        ]
+                     }
+                  ],
+                  "volumes": [
+                     {
+                        "configMap": {
+                           "name": "cluster-manifest"
+                        },
+                        "name": "external-proxy-config-vol"
                      }
                   ]
                }
