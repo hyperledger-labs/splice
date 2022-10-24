@@ -373,7 +373,7 @@ It can be stopped via `./stop-frontends.sh`.
 ### Running and Debugging Integration Tests
 
 The integration tests are located at [`/apps/app/src/test/scala/com/daml/network/integration/tests/`](/apps/app/src/test/scala/com/daml/network/integration/tests).
-They work by standing up by defining and starting a Canton network topology and running Canton console commands against that topology,
+They work by defining and starting a Canton network topology and running Canton console commands against that topology,
 see for example the [`DirectoryIntegrationTest.scala`](/apps/app/src/test/scala/com/daml/network/integration/tests/DirectoryIntegrationTest.scala).
 Also see the Scaladocs on Canton's [`BaseIntegrationTest.scala`](/canton/community/app/src/test/scala/com/digitalasset/canton/integration/BaseIntegrationTest.scala) for more information about the intended usage of the test framework.
 
@@ -395,8 +395,9 @@ No installation of `lnav` is required, as it is provided by default by our `dire
 ### Testing App Behaviour Outside of Tests Without Running Bundle
 
 Sometimes, you may need to debug startup behaviour of the Canton coin apps that is causing issues for the
-initialization of the [[com.daml.network.environment.CoinEnvironment]]. You usually can't debug this behaviour
-via our integration tests because the integration tests require an initialized CoinEnvironment.
+initialization of the [`CoinEnvironment`](apps/app/src/main/scala/com/daml/network/environment/CoinEnvironment.scala).
+You usually can't debug this behaviour
+via our integration tests because the integration tests require an initialized `CoinEnvironment`.
 At other times, you may want to start an interactive console without having to run `sbt bundle`.
 
 You can achieve this by using the ['Simple topology' runtime configuration](https://i.imgur.com/dPgUd2Q.png) from IntelliJ.
