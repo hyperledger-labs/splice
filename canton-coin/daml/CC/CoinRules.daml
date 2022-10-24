@@ -347,7 +347,7 @@ executeTransfer config0 svc validator t = do
   -- open mining round that is disclosed when the command is being interpreted.
   (_, issuanceState) <- fetchByKey @IssuanceState (svc, validator)
   -- check that the current mining round is open
-  (_, openRound) <- fetchByKey @OpenMiningRound (svc, validator, issuanceState.currentRound )
+  (_, openRound) <- fetchByKey @OpenMiningRound (svc, validator, issuanceState.currentRound)
   let config = scaleConfig openRound config0
   -- compute summaries
   isum <- summarizeAndValidateInputs openRound.round config svc t.sender validator t.inputs

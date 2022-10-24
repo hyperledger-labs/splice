@@ -49,7 +49,8 @@ trait AcsStore extends AutoCloseable {
   /** List all active contracts of the given template. */
   // TODO(#790): add a limit parameter
   def listContracts[T](
-      templateCompanion: TemplateCompanion[T]
+      templateCompanion: TemplateCompanion[T],
+      filter: Contract[T] => Boolean = (_: Contract[T]) => true,
   ): Future[QueryResult[Seq[Contract[T]]]]
 
   /** A stream of contracts of the given template.
@@ -126,7 +127,9 @@ object AcsStore {
     override val transactionFilter: TransactionFilter = {
       val templateIds = contractFilters.keys.toSeq
       val partyString: String = Primitive.Party.unwrap(primaryParty.toPrim)
-      TransactionFilter(Map(partyString -> Filters(Some(InclusiveFilters(templateIds)))))
+      TransactionFilter(
+        Map(partyString -> Filters(Some(InclusiveFilters().withTemplateIds(templateIds))))
+      )
     }
 
     override def contains(ev: CreatedEvent): Boolean =

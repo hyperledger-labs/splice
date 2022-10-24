@@ -25,10 +25,11 @@ import com.daml.network.util.{
 }
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.{Balance, ListResponse}
-import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.{DiscardOps, HasExecutionContext}
 
 import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
@@ -581,51 +582,95 @@ class WalletIntegrationTest
     checkWallet(aliceUserParty, aliceRemoteWallet, Seq((74.0, 75.0)))
   }
 
-  "batches concurrent coin-operations" in { implicit env =>
-    val (alice, bob) = setupAliceAndBobAndChannel
-    aliceRemoteWallet.tap(50)
-    aliceValidator.remoteParticipant.ledger_api.acs.await(alice, coinCodegen.Coin)
-    val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
-    // sending three commands in short succession to the idle wallet should lead to two transactions being executed
-    // tx 1: first command that arrived is immediately executed
-    // tx 2: other commands that arrived after the first command was started are executed in one batch
-    (1 to 3).foreach(i => Future(aliceRemoteWallet.executeDirectTransfer(bob, i)))
-    // Wait until 2 transactions have been received
-    val txs = aliceValidator.remoteParticipant.ledger_api.transactions
-      .trees(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
-    val coinsInTx = txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin)(_))
+  "concurrent coin-operations" should {
+    "be batched" in { implicit env =>
+      val (alice, bob) = setupAliceAndBobAndChannel
+      aliceRemoteWallet.tap(50)
+      aliceValidator.remoteParticipant.ledger_api.acs.await(alice, coinCodegen.Coin)
+      val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
+      // sending three commands in short succession to the idle wallet should lead to two transactions being executed
+      // tx 1: first command that arrived is immediately executed
+      // tx 2: other commands that arrived after the first command was started are executed in one batch
+      (1 to 3).foreach(i => Future(aliceRemoteWallet.executeDirectTransfer(bob, i)))
+      // Wait until 2 transactions have been received
+      val txs = aliceValidator.remoteParticipant.ledger_api.transactions
+        .trees(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
+      val createdCoinsInTx = txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin)(_))
 
-    // create change + transferred coin
-    coinsInTx(0) should have size 2
-    // (create change + transferred coin) x2
-    coinsInTx(1) should have size 2 * 2
-  }
+      // create change + transferred coin
+      createdCoinsInTx(0) should have size 2
+      // (create change + transferred coin) x2
+      createdCoinsInTx(1) should have size 2 * 2
+    }
 
-  "batches up to `batchSize` concurrent coin-operations" in { implicit env =>
-    val defaultBatchSize = 10
-    val (alice, bob) = setupAliceAndBobAndChannel
-    aliceRemoteWallet.tap(50)
-    aliceValidator.remoteParticipant.ledger_api.acs.await(alice, coinCodegen.Coin)
-    val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
+    "be batched up to `batchSize` concurrent coin-operations" in { implicit env =>
+      val defaultBatchSize = 10
+      val (alice, bob) = setupAliceAndBobAndChannel
+      aliceRemoteWallet.tap(50)
+      aliceValidator.remoteParticipant.ledger_api.acs.await(alice, coinCodegen.Coin)
+      val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
 
-    val _ = Future(aliceRemoteWallet.executeDirectTransfer(bob, 10))
-    (1 to defaultBatchSize + 1).foreach(_ =>
-      Future(aliceRemoteWallet.executeDirectTransfer(bob, 1))
-    )
-    // 3 txs;
-    // tx 1: initial transfer
-    // tx 2: 10 subsequent batched transfers
-    // tx 3: single transfer that was not picked due to the batch size limit
-    val txs = aliceValidator.remoteParticipant.ledger_api.transactions
-      .trees(Set(alice), completeAfter = 3, beginOffset = offsetBefore)
-    val coinsInTx = txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin)(_))
+      val _ = Future(aliceRemoteWallet.executeDirectTransfer(bob, 10))
+      (1 to defaultBatchSize + 1).foreach(_ =>
+        Future(aliceRemoteWallet.executeDirectTransfer(bob, 1))
+      )
+      // 3 txs;
+      // tx 1: initial transfer
+      // tx 2: 10 subsequent batched transfers
+      // tx 3: single transfer that was not picked due to the batch size limit
+      val txs = aliceValidator.remoteParticipant.ledger_api.transactions
+        .trees(Set(alice), completeAfter = 3, beginOffset = offsetBefore)
+      val createdCoinsInTx = txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin)(_))
 
-    // create change + transferred coin
-    coinsInTx(0) should have size 2
-    // (create change + transferred coin) x10
-    coinsInTx(1) should have size 10 * 2
-    // create change + transferred coin
-    coinsInTx(2) should have size 2
+      // create change + transferred coin
+      createdCoinsInTx(0) should have size 2
+      // (create change + transferred coin) x10
+      createdCoinsInTx(1) should have size 10 * 2
+      // create change + transferred coin
+      createdCoinsInTx(2) should have size 2
+    }
+
+    "fail operations early and independently that don't pass the activeness lookup checks" in {
+      implicit env =>
+        val alice = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
+        val bob = bobValidator.onboardUser(bobRemoteWallet.config.damlUser)
+
+        // tapping some coin & waiting for it to appear as a way to synchronize on the initialization of the apps.
+        aliceRemoteWallet.tap(10)
+        aliceValidator.remoteParticipant.ledger_api.acs.await(alice, coinCodegen.Coin)
+        // ... such that we don't grab the ledger offset when some init txs are still occurring
+        val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
+
+        // solo tap will kick off batch with only one coin operation
+        Future(aliceRemoteWallet.tap(10)).discard
+
+        // following three commands will be in one batch
+        Future(aliceRemoteWallet.tap(10)).discard
+        // fails because we don't have a channel - so removed from batch & error is reported back
+        Future(
+          loggerFactory.assertThrowsAndLogs[CommandFailure](
+            aliceRemoteWallet
+              .executeDirectTransfer(bob, 10),
+            _.errorMessage should include regex ("NOT_FOUND/Payment channel between"),
+          )
+        ).discard
+        Future(aliceRemoteWallet.tap(10)).discard
+
+        eventually() {
+          val coins = aliceRemoteWallet.list().coins
+          // all four taps went through
+          coins should have size 4
+          // but no money was deducted due to the transfer
+          checkWallet(alice, aliceRemoteWallet, Seq((9, 10), (9, 10), (9, 10), (9, 10)))
+        }
+
+        val txs = aliceValidator.remoteParticipant.ledger_api.transactions
+          .trees(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
+        val createdCoinsInTx = txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin)(_))
+        createdCoinsInTx(0) should have size 1
+        // two taps went through, even though transfer in same batch failed.
+        createdCoinsInTx(1) should have size 2
+    }
   }
 
   "accepts an optional JWT token with user in subject" in { implicit env =>

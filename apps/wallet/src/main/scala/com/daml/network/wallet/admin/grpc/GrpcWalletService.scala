@@ -1,7 +1,8 @@
 package com.daml.network.wallet.admin.grpc
 
 import cats.implicits.*
-import com.daml.ledger.client.binding.{Primitive, TemplateCompanion}
+import com.daml.ledger.client.binding.Primitive
+import com.daml.ledger.client.binding.{Primitive => P, TemplateCompanion}
 import com.daml.network.auth.AuthInterceptor
 import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
 import com.daml.network.codegen.CC.{Coin as coinCodegen, CoinRules as coinRulesCodegen}
@@ -9,7 +10,7 @@ import com.daml.network.codegen.CN.Wallet.CoinOperationOutcome.COO_AcceptedAppMu
 import com.daml.network.codegen.CN.Wallet.{CoinOperation, CoinOperationOutcome}
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.codegen.DA
-import com.daml.network.environment.CoinLedgerClient
+import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, Contract, Proto, Value}
@@ -147,11 +148,14 @@ class GrpcWalletService(
           for {
             svcParty <- scanConnection.getSvcPartyId()
           } yield {
-            CoinOperation.CO_Tap(
-              svcParty.toPrim,
-              validatorParty.toPrim,
-              endUserWalletStore.key.endUserParty.toPrim,
-              quantity,
+            CoinOperationWithLookups(
+              CoinOperation.CO_Tap(
+                svcParty.toPrim,
+                validatorParty.toPrim,
+                endUserWalletStore.key.endUserParty.toPrim,
+                quantity,
+              ),
+              (_: Unit) => Future.successful(()),
             )
           }
         })(
@@ -211,6 +215,17 @@ class GrpcWalletService(
       }
     }
 
+  private def getQueryResult[T](
+      result: QueryResult[Option[Contract[T]]],
+      errorMsg: String,
+  ): Contract[T] = result match {
+    case QueryResult(_, None) =>
+      throw new StatusRuntimeException(
+        Status.NOT_FOUND.withDescription(errorMsg)
+      )
+    case QueryResult(_, Some(install)) => install
+  }
+
   override def acceptAppMultiPaymentRequest(
       request: v0.AcceptAppMultiPaymentRequestRequest
   ): Future[v0.AcceptAppMultiPaymentRequestResponse] =
@@ -220,7 +235,23 @@ class GrpcWalletService(
           val requestCid = Proto.tryDecodeContractId[walletCodegen.AppMultiPaymentRequest](
             request.requestContractId
           )
-          Future.successful(CoinOperation.CO_AppMultiPayment(requestCid))
+
+          def lookups = (_: Unit) =>
+            for {
+              paymentRequestO <- userStore.lookupAppMultiPaymentRequestById(requestCid)
+              paymentRequest = getQueryResult(
+                paymentRequestO,
+                s"app multi payment request with cid $requestCid",
+              )
+              _ <- lookupDeliveryOffer(
+                userStore.key.endUserParty,
+                paymentRequest.payload.deliveryOffer,
+              )
+            } yield ()
+
+          Future.successful(
+            CoinOperationWithLookups(CoinOperation.CO_AppMultiPayment(requestCid), lookups)
+          )
         })(
           user,
           {
@@ -242,7 +273,23 @@ class GrpcWalletService(
         exerciseWalletAction((installCid, userStore) => {
           val requestCid =
             Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](request.requestContractId)
-          Future.successful(CoinOperation.CO_AppPayment(requestCid))
+
+          def lookups = (_: Unit) =>
+            for {
+              paymentRequestO <- userStore.lookupAppPaymentRequestById(requestCid)
+              paymentRequest = getQueryResult(
+                paymentRequestO,
+                s"app payment request with cid $requestCid",
+              )
+              _ <- lookupDeliveryOffer(
+                userStore.key.endUserParty,
+                paymentRequest.payload.deliveryOffer,
+              )
+            } yield ()
+
+          Future.successful(
+            CoinOperationWithLookups(CoinOperation.CO_AppPayment(requestCid), lookups)
+          )
         })(
           user,
           {
@@ -458,17 +505,21 @@ class GrpcWalletService(
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth(request.getWalletCtx) { user =>
         exerciseWalletAction((c, userStore) => {
+          val endUserParty = userStore.key.endUserParty
           val quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
+          val receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
           for {
             svcUser <- scanConnection.getSvcPartyId()
           } yield {
-            val receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
-            CoinOperation.CO_ChannelTransfer(
-              userStore.key.endUserParty.toPrim,
-              receiverParty.toPrim,
-              svcUser.toPrim,
-              quantity,
-              "wallet: execute direct transfer",
+            CoinOperationWithLookups(
+              CoinOperation.CO_ChannelTransfer(
+                endUserParty.toPrim,
+                receiverParty.toPrim,
+                svcUser.toPrim,
+                quantity,
+                "wallet: execute direct transfer",
+              ),
+              (_: Unit) => lookupPaymentChannel(userStore, svcUser.toPrim, receiverParty.toPrim),
             )
           }
         })(
@@ -598,20 +649,36 @@ class GrpcWalletService(
 
   override def acceptOnChannelPaymentRequest(
       request: v0.AcceptOnChannelPaymentRequestRequest
-  ): Future[Empty] =
-    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
-      withAuth(request.getWalletCtx) { user =>
-        exerciseWalletAction((installCid, userStore) => {
-          val requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](
-            request.requestContractId
-          )
-          Future.successful(CoinOperation.CO_ChannelPayment(requestCid))
-        })(
-          user,
-          _ => Empty(),
+  ): Future[Empty] = withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+    withAuth(request.getWalletCtx) { user =>
+      exerciseWalletAction((installCid, userStore) => {
+        val requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](
+          request.requestContractId
         )
-      }
+
+        def lookups = (_: Unit) =>
+          for {
+            paymentRequestO <- userStore.lookupOnChannelPaymentRequestById(requestCid)
+            paymentRequest = getQueryResult(
+              paymentRequestO,
+              s"channel payment request with cid $requestCid",
+            )
+            _ <- lookupPaymentChannel(
+              userStore,
+              paymentRequest.payload.svc,
+              paymentRequest.payload.receiver,
+            )
+          } yield ()
+
+        Future.successful(
+          CoinOperationWithLookups(CoinOperation.CO_ChannelPayment(requestCid), lookups)
+        )
+      })(
+        user,
+        _ => Empty(),
+      )
     }
+  }
 
   override def rejectOnChannelPaymentRequest(
       request: v0.RejectOnChannelPaymentRequestRequest
@@ -745,7 +812,7 @@ class GrpcWalletService(
           Primitive.ContractId[walletCodegen.WalletAppInstall],
           EndUserWalletStore,
           // TODO(#756): also require quantity to reject commands early?
-      ) => Future[CoinOperation]
+      ) => Future[CoinOperationWithLookups]
   )(
       user: String,
       // TODO(#756): possibly adjust the return type here depending on the caller
@@ -796,4 +863,53 @@ class GrpcWalletService(
       }
     }
   }
+
+  /** Verifies that exactly one delivery offer with the given contract id is active and returns a failed future with
+    * an [[io.grpc.StatusRuntimeException]] otherwise.
+    */
+  private def lookupDeliveryOffer(
+      endUserParty: PartyId,
+      contractId: P.ContractId[walletCodegen.DeliveryOffer],
+  ): Future[Unit] = {
+    for {
+      // TODO(#1267): use store instead
+      activeDeliveryOffers <- connection.activeContracts(
+        CoinLedgerConnection.transactionInterfaceFilterByParty(
+          Map(endUserParty -> Seq(walletCodegen.DeliveryOffer.id))
+        )
+      )
+      _ = if (
+        activeDeliveryOffers
+          .count(event => event.contractId == contractId) != 1
+      )
+        throw new StatusRuntimeException(
+          Status.FAILED_PRECONDITION.withDescription(
+            s"exactly one DeliveryOffer for multi payment request with cid $contractId."
+          )
+        )
+    } yield ()
+  }
+
+  /** Verifies that the given payment channel is active and returns a failed future with
+    * an [[io.grpc.StatusRuntimeException]] otherwise.
+    */
+  private def lookupPaymentChannel(
+      userStore: EndUserWalletStore,
+      svcP: P.Party,
+      receiverP: P.Party,
+  ): Future[Unit] = for {
+    channel <- userStore
+      .findContract(
+        walletCodegen.PaymentChannel,
+        filter = { c: Contract[walletCodegen.PaymentChannel] =>
+          c.payload.svc == svcP && c.payload.receiver == receiverP && c.payload.sender == userStore.key.endUserParty.toPrim
+        },
+      )
+    _ = if (channel.value.isEmpty)
+      throw new StatusRuntimeException(
+        Status.NOT_FOUND.withDescription(
+          s"PaymentChannel between $svcP, $receiverP and ${userStore.key.endUserParty}."
+        )
+      )
+  } yield ()
 }

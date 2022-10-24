@@ -32,9 +32,15 @@ trait EndUserWalletStore extends AutoCloseable {
   def lookupInstall(): Future[QueryResult[Option[Contract[walletCodegen.WalletAppInstall]]]] =
     acsStore.findContract(walletCodegen.WalletAppInstall)(_ => true)
 
+  def findContract[T](
+      templateCompanion: TemplateCompanion[T],
+      filter: Contract[T] => Boolean = (_: Contract[T]) => true,
+  ): Future[QueryResult[Option[Contract[T]]]] = acsStore.findContract(templateCompanion)(filter)
+
   def listContracts[T](
-      templateCompanion: TemplateCompanion[T]
-  ): Future[QueryResult[Seq[Contract[T]]]] = acsStore.listContracts(templateCompanion)
+      templateCompanion: TemplateCompanion[T],
+      filter: Contract[T] => Boolean = (_: Contract[T]) => true,
+  ): Future[QueryResult[Seq[Contract[T]]]] = acsStore.listContracts(templateCompanion, filter)
 
   def lookupOnChannelPaymentRequestById(
       cid: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]

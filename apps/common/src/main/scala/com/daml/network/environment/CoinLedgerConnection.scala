@@ -19,7 +19,12 @@ import com.daml.ledger.api.v1.commands.{Command, Commands}
 import com.daml.ledger.api.v1.event.CreatedEvent
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
 import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree, TreeEvent}
-import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, TransactionFilter}
+import com.daml.ledger.api.v1.transaction_filter.{
+  Filters,
+  InclusiveFilters,
+  InterfaceFilter,
+  TransactionFilter,
+}
 import com.daml.ledger.api.v1.value.Identifier
 import com.daml.ledger.client.binding.{
   Contract,
@@ -44,7 +49,7 @@ import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.AkkaUtil
 import com.google.protobuf.ByteString
 import io.grpc.StatusRuntimeException
-import scalaz.syntax.tag._
+import scalaz.syntax.tag.*
 
 import java.nio.file.{Files, Path}
 import java.util.UUID
@@ -705,7 +710,22 @@ object CoinLedgerConnection {
   def transactionFilterByParty(filter: Map[PartyId, Seq[TemplateId]]): TransactionFilter =
     TransactionFilter(filter.map {
       case (p, Nil) => p.toPrim.unwrap -> Filters.defaultInstance
-      case (p, ts) => p.toPrim.unwrap -> Filters(Some(InclusiveFilters(ts.map(_.unwrap))))
+      case (p, ts) =>
+        p.toPrim.unwrap -> Filters(Some(InclusiveFilters().withTemplateIds(ts.map(_.unwrap))))
+    })
+
+  /** Same as [[transactionFilterByParty]] but for interfaces. */
+  def transactionInterfaceFilterByParty(filter: Map[PartyId, Seq[TemplateId]]): TransactionFilter =
+    TransactionFilter(filter.map {
+      case (p, Nil) => p.toPrim.unwrap -> Filters.defaultInstance
+      case (p, interfaces) =>
+        p.toPrim.unwrap -> Filters(
+          Some(
+            InclusiveFilters().withInterfaceFilters(
+              interfaces.map(i => InterfaceFilter(Some(i.unwrap)))
+            )
+          )
+        )
     })
 
   def mapTemplateIds(id: P.TemplateId[_]): TemplateId = {

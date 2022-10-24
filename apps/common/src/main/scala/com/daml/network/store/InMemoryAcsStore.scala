@@ -121,7 +121,8 @@ class InMemoryAcsStore(
   }
 
   def listContracts[T](
-      templateCompanion: TemplateCompanion[T]
+      templateCompanion: TemplateCompanion[T],
+      filter: Contract[T] => Boolean = (_: Contract[T]) => true,
   ): Future[QueryResult[Seq[Contract[T]]]] = {
     requireInScope(templateCompanion)
     offsetAndStateAfterIngestingAcs().map { case (off, st) =>

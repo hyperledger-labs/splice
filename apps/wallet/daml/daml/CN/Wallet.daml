@@ -202,7 +202,7 @@ template AppPaymentRequest
       controller sender
       do now <- getTime
          -- check that the delivery offer is active and implements DeliveryOffer
-         void $ fetchFromInterface @DeliveryOffer deliveryOffer
+         Some _offer <- fetchFromInterface @DeliveryOffer deliveryOffer
          assertMsg "AppPaymentRequest has not expired" (now < expiresAt)
          -- lock the coin and create an accepted payment
          let transfer = Transfer with

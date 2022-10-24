@@ -47,9 +47,10 @@ trait SvcStore extends AutoCloseable {
     acsStore.findContract(CC.Coin.ValidatorRight)(co => co.payload.user == party.toPrim)
 
   def listContracts[T](
-      templateCompanion: TemplateCompanion[T]
+      templateCompanion: TemplateCompanion[T],
+      filter: Contract[T] => Boolean = (_: Contract[T]) => true,
   ): Future[AcsStore.QueryResult[Seq[Contract[T]]]] =
-    acsStore.listContracts(templateCompanion)
+    acsStore.listContracts(templateCompanion, filter)
 
   /** All requests to the SVC for creating validator-specific coin rules. */
   def streamCoinRulesRequests(): Source[Contract[CC.CoinRules.CoinRulesRequest], NotUsed] =
