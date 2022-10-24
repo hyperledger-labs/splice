@@ -155,7 +155,7 @@ class GrpcWalletService(
                 endUserWalletStore.key.endUserParty.toPrim,
                 quantity,
               ),
-              (_: Unit) => Future.successful(()),
+              () => Future.successful(()),
             )
           }
         })(
@@ -236,7 +236,7 @@ class GrpcWalletService(
             request.requestContractId
           )
 
-          def lookups = (_: Unit) =>
+          def lookups = () =>
             for {
               paymentRequestO <- userStore.lookupAppMultiPaymentRequestById(requestCid)
               paymentRequest = getQueryResult(
@@ -274,7 +274,7 @@ class GrpcWalletService(
           val requestCid =
             Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](request.requestContractId)
 
-          def lookups = (_: Unit) =>
+          def lookups = () =>
             for {
               paymentRequestO <- userStore.lookupAppPaymentRequestById(requestCid)
               paymentRequest = getQueryResult(
@@ -684,7 +684,7 @@ class GrpcWalletService(
                 quantity,
                 "wallet: execute direct transfer",
               ),
-              (_: Unit) => lookupPaymentChannel(userStore, svcUser.toPrim, receiverParty.toPrim),
+              () => lookupPaymentChannel(userStore, svcUser.toPrim, receiverParty.toPrim),
             )
           }
         })(
@@ -821,7 +821,7 @@ class GrpcWalletService(
           request.requestContractId
         )
 
-        def lookups = (_: Unit) =>
+        def lookups = () =>
           for {
             paymentRequestO <- userStore.lookupOnChannelPaymentRequestById(requestCid)
             paymentRequest = getQueryResult(

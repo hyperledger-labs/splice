@@ -38,7 +38,7 @@ import scala.util.{Failure, Success}
   */
 case class CoinOperationWithLookups(
     operation: walletCodegen.CoinOperation,
-    tryLookups: Unit => Future[Unit],
+    tryLookups: () => Future[Unit],
 )
 
 /** Wrapper helper class. */
@@ -115,7 +115,7 @@ case class EndUserTreasuryService(
     batch
       .traverse(coinOperation =>
         coinOperation.operationWithLookups
-          .tryLookups(())
+          .tryLookups()
           .transform { lookupResult =>
             lookupResult match {
               case Failure(ex) =>
