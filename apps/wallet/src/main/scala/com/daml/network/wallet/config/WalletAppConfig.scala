@@ -2,7 +2,7 @@ package com.daml.network.wallet.config
 
 import com.daml.network.config.{LocalCoinConfig, RemoteCoinConfig}
 import com.daml.network.scan.config.RemoteScanAppConfig
-import com.digitalasset.canton.config._
+import com.digitalasset.canton.config.*
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 
 case class LocalWalletAppConfig(

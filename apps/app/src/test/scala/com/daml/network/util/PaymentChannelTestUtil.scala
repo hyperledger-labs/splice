@@ -20,7 +20,6 @@ trait PaymentChannelTestUtil { this: CommonCoinAppInstanceReferences =>
     val bobDamlUser = bobRemoteWallet.config.damlUser
     val bobUserParty = bobValidator.onboardUser(bobDamlUser)
 
-    // ensure the participants see the CoinRules
     val proposalId = aliceRemoteWallet.proposePaymentChannel(bobUserParty)
     // Bob monitors proposals and accepts the one
     eventually()(bobRemoteWallet.listPaymentChannelProposals() should have size 1)

@@ -65,7 +65,7 @@ trait CoinRetries extends FlagCloseable {
 object CoinRetries {
   case class RetryableError(operationName: String) extends ExceptionRetryable {
 
-    // Additional categories that are not marked as retriable but we
+    // Additional categories that are not marked as retryable but we
     // can safely retry since we know there are other apps or
     // processes that change the system state.
     private val extraRetryableCategories: Set[ErrorCategory] =

@@ -428,7 +428,7 @@ catchAllE operation =
 -- Given multiple coin operations and transfer inputs, it executes the operations sequentially while 
 -- stringing along the remaining inputs. Returns all outcomes. 
 executeCoinOperationRec : [TransferInput] -> [CoinOperationOutcome] -> [CoinOperation] -> Update ([CoinOperationOutcome])
-executeCoinOperationRec inputs prevResults (operation::rest) = do
+executeCoinOperationRec inputs prevResults (operation::remainingOperations) = do
   case operation of
     CO_AppPayment cid -> handleE AppPaymentRequest_Accept COO_AcceptedAppPayment cid
     CO_AppMultiPayment cid -> handleE AppMultiPaymentRequest_Accept COO_AcceptedAppMultiPayment cid
@@ -455,15 +455,15 @@ executeCoinOperationRec inputs prevResults (operation::rest) = do
     handleResult : (r -> CoinOperationOutcome) -> Either Text (r, ContractId Coin) -> Update [CoinOperationOutcome]
     handleResult resultConstructor = \case
       Left errorMsg -> handleLeft errorMsg
-      Right (result, change) -> executeCoinOperationRec [InputCoin change] (resultConstructor result :: prevResults) rest
+      Right (result, change) -> executeCoinOperationRec [InputCoin change] (resultConstructor result :: prevResults) remainingOperations
 
     handleResultTap : Either Text (ContractId Coin) -> Update [CoinOperationOutcome]
     handleResultTap = \case
       Left errorMsg -> handleLeft errorMsg
-      Right tappedCoin -> executeCoinOperationRec (InputCoin tappedCoin :: inputs) (COO_Tap tappedCoin :: prevResults) rest
+      Right tappedCoin -> executeCoinOperationRec (InputCoin tappedCoin :: inputs) (COO_Tap tappedCoin :: prevResults) remainingOperations
 
     handleLeft : Text -> Update [CoinOperationOutcome]
-    handleLeft errorMsg = return $ map COO_NotExecuted rest ++ [COO_TransferError errorMsg] ++ prevResults
+    handleLeft errorMsg = executeCoinOperationRec inputs (COO_TransferError errorMsg :: prevResults) remainingOperations
 
 executeCoinOperationRec inputs prevResults [] = do
   return prevResults
@@ -501,9 +501,6 @@ data CoinOperationOutcome
   | COO_SubscriptionPayment (ContractId SubscriptionPayment)
   | COO_Tap (ContractId Coin)
   | COO_TransferError Text
-  -- when a batched command fails, the subsequent commands in the batch aren't executed. 
-  -- TODO(#756) - Consider removing this case 
-  | COO_NotExecuted CoinOperation
   deriving (Eq, Show)
 
 

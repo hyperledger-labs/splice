@@ -12,7 +12,7 @@ import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 import com.daml.network.console.{LocalWalletAppReference, WalletAppReference}
 import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
+import com.daml.network.integration.{CoinEnvironmentDefinition}
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
@@ -26,6 +26,7 @@ import com.daml.network.util.{
 }
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.{Balance, ListResponse}
+import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
@@ -806,6 +807,45 @@ class WalletIntegrationTest
         // two taps went through, even though transfer in same batch failed.
         createdCoinsInTx(1) should have size 2
     }
+
+    "retry a batch if it fails due to contention" in { implicit env =>
+      val (alice, bob) = setupAliceAndBobAndChannel
+      aliceRemoteWallet.tap(10)
+      aliceValidator.remoteParticipant.ledger_api.acs.await(alice, coinCodegen.Coin)
+      val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
+
+      // same as in EndUserTreasuryStore
+      val waitTimeForStore = 300.millis
+      // wait until the treasury service is ready to process requests again after the initial tap
+      Threading.sleep(waitTimeForStore.toMillis)
+
+      val cancelF = Future(bobRemoteWallet.cancelPaymentChannelBySender(alice))
+      // to simulate contention, submit a transfer on the channel immediately after cancelling the channel such
+      // that the activeness lookup on the channel still goes through but the lookup inside the ledger fails
+      // this leads to a retry
+      val transferF = Future(aliceRemoteWallet.executeDirectTransfer(bob, 5))
+
+      // eventually, the cancel goes through
+      eventually()(cancelF.isCompleted shouldBe true)
+      eventually()(aliceRemoteWallet.listPaymentChannels() should have size 0)
+      eventually()(bobRemoteWallet.listPaymentChannels() should have size 0)
+      // now reestablish the payment channel
+      val proposalId = aliceRemoteWallet.proposePaymentChannel(bob)
+      eventually()(bobRemoteWallet.listPaymentChannelProposals() should have size 1)
+      bobRemoteWallet.acceptPaymentChannelProposal(proposalId)
+
+      // such that on the retry, the transfer goes through.
+      eventually()(transferF.isCompleted shouldBe true)
+      checkWallet(alice, aliceRemoteWallet, Seq((4, 5)))
+      checkWallet(bob, bobRemoteWallet, Seq((4, 5)))
+      val txs = aliceValidator.remoteParticipant.ledger_api.transactions
+        .trees(Set(alice), completeAfter = 4, beginOffset = offsetBefore)
+      val createdCoinsInTx = txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin)(_))
+      // after the cancel, propose & accept of the payment channel, the fourth transaction should lead to the creation of
+      // two coins (change, transferred coin)
+      createdCoinsInTx(3) should have size 2
+
+    }
   }
 
   "accepts an optional JWT token with user in subject" in { implicit env =>
@@ -852,25 +892,21 @@ class WalletIntegrationTest
       walletParty: PartyId,
       wallet: WalletAppReference,
       expectedQuantityRanges: Seq[(BigDecimal, BigDecimal)],
-  ): Unit = {
+  ): Unit = clue(s"checking wallet with $expectedQuantityRanges") {
     eventually(10.seconds, 500.millis) {
       val coins = wallet.list().coins.sortBy(coin => coin.contract.payload.quantity.initialQuantity)
       coins should have size (expectedQuantityRanges.size.toLong)
-      clue(
-        s"Comparing ${coins.map(_.contract.payload.quantity.initialQuantity)} with $expectedQuantityRanges"
-      ) {
-        coins
-          .zip(expectedQuantityRanges)
-          .foreach { case (coin, quantityBounds) =>
-            coin.contract.payload.owner shouldBe walletParty.toPrim
-            val ExpiringQuantity(initialQuantity, createdAt, ratePerRound) =
-              coin.contract.payload.quantity
-            assertInRange(initialQuantity, quantityBounds)
-            ratePerRound shouldBe RatePerRound(
-              CoinUtil.defaultHoldingFee.rate.doubleValue
-            )
-          }
-      }
+      coins
+        .zip(expectedQuantityRanges)
+        .foreach { case (coin, quantityBounds) =>
+          coin.contract.payload.owner shouldBe walletParty.toPrim
+          val ExpiringQuantity(initialQuantity, createdAt, ratePerRound) =
+            coin.contract.payload.quantity
+          assertInRange(initialQuantity, quantityBounds)
+          ratePerRound shouldBe RatePerRound(
+            CoinUtil.defaultHoldingFee.rate.doubleValue
+          )
+        }
     }
   }
 

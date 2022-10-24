@@ -5,20 +5,22 @@ import akka.stream.{BoundedSourceQueue, Materializer}
 import cats.syntax.traverse.*
 import com.daml.network.codegen.CC.{Coin as coinCodegen, CoinRules as coinRulesCodegen}
 import com.daml.network.codegen.CN.Wallet as walletCodegen
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.util.Contract
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
 import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.ErrorUtil
+import com.digitalasset.canton.util.retry
+import com.digitalasset.canton.util.retry.Backoff
+import EndUserTreasuryService.*
 
 import java.util.UUID
-import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
-
 // TODO(#756): Add PrettyPrinting
 
 /** Wrapper helper class.
@@ -41,12 +43,6 @@ case class CoinOperationWithLookups(
     tryLookups: () => Future[Unit],
 )
 
-/** Wrapper helper class. */
-case class CoinOperationWithIdAndLookups(
-    id: String,
-    operationWithLookups: CoinOperationWithLookups,
-)
-
 /** This class encapsulates the logic that takes operations changing the coin holdings of an user and sequences them
   * such that concurrent manipulations don't conflict.
   *
@@ -57,29 +53,24 @@ case class EndUserTreasuryService(
     install: Contract[walletCodegen.WalletAppInstall],
     walletStoreKey: WalletStore.Key,
     userStore: EndUserWalletStore,
-    protected val loggerFactory: NamedLoggerFactory,
+    override protected val loggerFactory: NamedLoggerFactory,
+    override protected val timeouts: ProcessingTimeout,
 )(implicit ec: ExecutionContext, mat: Materializer)
     extends NamedLogging
-    with AutoCloseable {
-
-  // Maps from an unique identifier for each coin operation to a promise for completing the coin operation.
-  // Once an operation is completed, it is removed from the map
-  private val outstandingOperations
-      : scala.collection.concurrent.Map[String, Promise[walletCodegen.CoinOperationOutcome]] =
-    TrieMap()
+    with FlagCloseable {
 
   // Magic numbers
   private val batchSize = 10L
   private val bufferSize = 1000
   private val waitTimeForStore = 300.millis
-  private val queue: BoundedSourceQueue[CoinOperationWithIdAndLookups] = Source
-    .queue[CoinOperationWithIdAndLookups](bufferSize)
+
+  private val queue: BoundedSourceQueue[CoinOperationAndPromise] = Source
+    .queue[CoinOperationAndPromise](bufferSize)
     // TODO(#756): Possible extension: re-order commands according to urgency
     .batch(batchSize, operation => Seq(operation))((operations, operation) =>
       operations :+ operation
     )
-    // TODO(#756): add retries
-    .mapAsync(1)(runBatch)
+    .mapAsync(1)(executeBatchWithRetry)
     .toMat(Sink.foreach(res => {
       // TODO(#756): Add synchronization that uses the store's state instead of an arbitrary wait
       logger.debug(s"Waiting for $waitTimeForStore ms to get the store time to catch-up")(
@@ -95,13 +86,12 @@ case class EndUserTreasuryService(
   def enqueueCoinOperation(
       operation: CoinOperationWithLookups
   )(implicit tc: TraceContext): Future[walletCodegen.CoinOperationOutcome] = {
-    // TODO(#756): possibly allow callers to assign semantically meaningful ids (see also discussion
+    // TODO(#756): possibly allow callers to assign semantically meaningful ids (see the discussion
     //  at https://github.com/DACH-NY/the-real-canton-coin/pull/1145#discussion_r994508807)
     val id = UUID.randomUUID().toString
     // TODO(#756): error handling
-    queue.offer(CoinOperationWithIdAndLookups(id, operation)): Unit
     val p = Promise[walletCodegen.CoinOperationOutcome]()
-    outstandingOperations.addOne((id, p))
+    queue.offer(CoinOperationAndPromise(CoinOperationWithIdAndLookups(id, operation), p)): Unit
     logger.trace(s"received ${operation}, queue now: ${queue.size()}")
     p.future
   }
@@ -110,75 +100,102 @@ case class EndUserTreasuryService(
     * the coin operations with failed lookups.
     */
   private def runLookups(
-      batch: Seq[CoinOperationWithIdAndLookups]
-  )(implicit tc: TraceContext): Future[Seq[CoinOperationWithIdAndLookups]] = {
+      batch: Seq[CoinOperationAndPromise]
+  ): Future[Seq[CoinOperationAndPromise]] = {
     batch
-      .traverse(coinOperation =>
+      .traverse { case CoinOperationAndPromise(coinOperation, p) =>
         coinOperation.operationWithLookups
           .tryLookups()
           .transform { lookupResult =>
             lookupResult match {
               case Failure(ex) =>
-                val p = outstandingOperations
-                  .remove(coinOperation.id)
-                  .getOrElse(
-                    ErrorUtil.invalidState(
-                      s"couldn't find a promise for operation with id ${coinOperation.id}"
-                    )
-                  )
                 // if the lookup fails, complete the promise with the failed future
-                // TODO(#756): test that exceptions are returned correctly.
                 p.failure(ex)
                 // but still run the rest of the operations whose lookup didn't fail
                 Success(None)
-              case Success(operation) => Success(Some(coinOperation))
+              case Success(operation) => Success(Some(CoinOperationAndPromise(coinOperation, p)))
             }
           }
-      )
+      }
       .map(_.flatten)
   }
 
-  private def runBatch(batch: Seq[CoinOperationWithIdAndLookups]): Future[Unit] = {
+  /** In case of contention, the `executeBatch` function may fail. This function adds retries so that a single coin
+    * operation, that failed due to contention, does not require a whole batch of coin operations to be resubmitted
+    * to the wallet app.
+    */
+  private def executeBatchWithRetry(
+      batch: Seq[CoinOperationAndPromise]
+  ): Future[Unit] =
     TraceContext.withNewTraceContext { implicit tc =>
-      logger.debug(
-        s"Running batch of coin operations for user ${userStore.key.endUserParty} with length ${batch.size}: $batch"
-      )
+      val maxRetries: Int = 3
+      val initialDelay: FiniteDuration = 1.seconds
+      val maxDelay: Duration = 5.seconds
 
-      val res = for {
-        validOperations <- runLookups(batch)
-        // TODO(#756): smarter coin/input selection?
-        inputs <- userStore
-          .listContracts(coinCodegen.Coin)
-          .map(cs => cs.value.map(c => coinRulesCodegen.TransferInput.InputCoin(c.contractId)))
-        cmd =
-          install.contractId.exerciseWalletAppInstall_ExecuteBatch(
-            inputs,
-            validOperations.map(_.operationWithLookups.operation),
-          )
-        outcomes <- connection
-          .submitWithResult(
-            Seq(walletStoreKey.walletServiceParty),
-            Seq(walletStoreKey.validatorParty, userStore.key.endUserParty),
-            cmd,
-          )
-        _ = (outcomes zip validOperations).map { case (outcome, operation) =>
-          val p = outstandingOperations
-            .remove(operation.id)
-            .getOrElse(
-              ErrorUtil.invalidState(
-                s"couldn't find a promise for operation with id ${operation.id} and value: ${operation.operationWithLookups.operation}"
-              )
-            )
-          p.success(outcome)
-        }
-      } yield ()
+      implicit val success: retry.Success[Unit] = retry.Success.always
+      val res = Backoff(
+        logger,
+        this,
+        maxRetries,
+        initialDelay,
+        maxDelay,
+        "coin operation batch",
+      ).apply(executeBatch(batch), CoinRetries.RetryableError("coin operation batch"))
       res
     }
+
+  private def executeBatch(
+      batch: Seq[CoinOperationAndPromise]
+  )(implicit tc: TraceContext): Future[Unit] = {
+
+    logger.debug(
+      s"Running batch of coin operations for user ${userStore.key.endUserParty} with length ${batch.size}: $batch"
+    )
+
+    for {
+      validOperations <- runLookups(batch)
+      _ = logger.debug(
+        s"After lookups, the batch contains ${validOperations.size} coin operations."
+      )
+      // TODO(#756): smarter coin/input selection?
+      inputs <- userStore
+        .listContracts(coinCodegen.Coin)
+        .map(cs => cs.value.map(c => coinRulesCodegen.TransferInput.InputCoin(c.contractId)))
+      cmd =
+        install.contractId.exerciseWalletAppInstall_ExecuteBatch(
+          inputs,
+          validOperations.map(_.operationWithIdAndLookups.operationWithLookups.operation),
+        )
+      outcomes <- connection
+        .submitWithResult(
+          Seq(walletStoreKey.walletServiceParty),
+          Seq(walletStoreKey.validatorParty, userStore.key.endUserParty),
+          cmd,
+        )
+      _ = (outcomes zip validOperations).map {
+        case (outcome, CoinOperationAndPromise(operation, p)) =>
+          p.success(outcome)
+      }
+    } yield ()
   }
 
-  override def close(): Unit = {
+  override def onClosed(): Unit = {
     // TODO(M1-92 - Tech Debt): add more robust shutdown, e.g., similar to shutdown for ledger subscriptions
     queue.complete()
   }
+}
+
+object EndUserTreasuryService {
+
+  /** Wrapper helper classes. */
+  private case class CoinOperationWithIdAndLookups(
+      id: String,
+      operationWithLookups: CoinOperationWithLookups,
+  )
+
+  private case class CoinOperationAndPromise(
+      operationWithIdAndLookups: CoinOperationWithIdAndLookups,
+      promise: Promise[walletCodegen.CoinOperationOutcome],
+  )
 
 }

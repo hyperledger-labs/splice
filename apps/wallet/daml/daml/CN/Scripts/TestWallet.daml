@@ -272,11 +272,19 @@ testBatchPaymentRequests = script do
     inputs = [InputCoin coin]
     operations = [CO_AppPayment transferRequest3, CO_AppMultiPayment transferRequest4]
 
-  -- first command errors, others are not executed
-  let [COO_TransferError errorMsg, COO_NotExecuted notExecuted] = outcomes
-  case notExecuted of
-    CO_AppMultiPayment request -> request === transferRequest4
-    _ -> error "expected a multi-payment request"
+  -- first command errors, second command is still executed
+  let [COO_TransferError errorMsg, COO_AcceptedAppMultiPayment payment3Cid] = outcomes
+  Some acceptedPayment4 <- queryContractId alice payment3Cid
+  lockedCoins <- query @LockedCoin alice
+  let [_, _, (lockedCoin4, _)] = sortOn (\(_, lockedCoin) -> lockedCoin.coin.quantity.initialQuantity) lockedCoins
+
+  acceptedPayment4 === AcceptedAppMultiPayment with
+    sender = alice
+    receivers = [bob, alice]
+    provider = alice
+    svc = app.svc
+    lockedCoin = lockedCoin4
+    deliveryOffer = toInterfaceContractId deliveryOffer4
   
   pure ()
 

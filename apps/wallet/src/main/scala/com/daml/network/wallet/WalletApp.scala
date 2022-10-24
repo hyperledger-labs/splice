@@ -84,7 +84,11 @@ class WalletApp(
       )
       val walletStore = WalletStore(walletStoreKey, storage, loggerFactory)
       val treasuries =
-        new TreasuryServices(ledgerClient.connection("TreasuryServices"), loggerFactory)
+        new TreasuryServices(
+          ledgerClient.connection("TreasuryServices"),
+          loggerFactory,
+          timeouts,
+        )
 
       adminServerRegistry
         .addService(

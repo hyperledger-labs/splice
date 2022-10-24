@@ -6,6 +6,7 @@ import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.util.Contract
 import com.daml.network.wallet.admin.grpc.EndUserTreasuryService
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 
@@ -16,6 +17,7 @@ import scala.concurrent.ExecutionContext
 class TreasuryServices(
     connection: CoinLedgerConnection,
     override val loggerFactory: NamedLoggerFactory,
+    timeouts: ProcessingTimeout,
 )(implicit ec: ExecutionContext, mat: Materializer)
     extends AutoCloseable
     with NamedLogging {
@@ -36,6 +38,7 @@ class TreasuryServices(
       walletStoreKey,
       userStore,
       loggerFactory,
+      timeouts,
     ),
   )
 

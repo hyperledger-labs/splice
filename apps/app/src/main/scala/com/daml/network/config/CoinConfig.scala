@@ -1,7 +1,7 @@
 package com.daml.network.config
 
 import cats.data.Validated
-import cats.syntax.functor._
+import cats.syntax.functor.*
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.scan.config.{LocalScanAppConfig, RemoteScanAppConfig}
 import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
