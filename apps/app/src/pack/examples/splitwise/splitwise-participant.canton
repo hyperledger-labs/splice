@@ -1,0 +1,15 @@
+val domainUrl = System.getProperty("DOMAIN_URL", "http://dev.network.canton.global:5008")
+
+println("Starting participant node")
+splitwiseParticipant.start()
+println(s"Connecting self-hosted validator to the domain $domainUrl")
+splitwiseParticipant.domains.connect("canton-network", domainUrl)
+println(s"Creating validator user")
+val validatorParty = splitwiseParticipant.parties.enable("validator_user")
+splitwiseParticipant.ledger_api.users.create(
+    id = "validator_user",
+    actAs = Set(validatorParty.toLf),
+    readAs = Set.empty,
+    primaryParty = Some(validatorParty.toLf),
+    participantAdmin = true,
+)

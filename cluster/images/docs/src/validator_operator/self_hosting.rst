@@ -69,7 +69,7 @@ The Canton participant is responsible for hosting your Daml apps; i.e. interpret
 
 First off, you will need to start the validator participant and connect it to the devnet domain: ::
 
-  bin/coin -c examples/validator/validator-participant.conf \
+  bin/coin --config examples/validator/validator-participant.conf \
       --bootstrap examples/validator/validator-participant.canton
 
 For convenience, this uses the coin binary at the moment. At a later point, the participant will need to be

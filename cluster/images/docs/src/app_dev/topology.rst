@@ -17,6 +17,7 @@ Default Application Topology
 
 .. TODO(M1-90): [polish] And link to a chapter that explains the standard components of CN, otherwise things like "app users have their own validator node" don't make sense to the reader.
 
+.. _topology_image:
 
 .. image:: images/provider-centric-topology.png
    :alt: Topology of a provider-centric app
