@@ -4,7 +4,7 @@
   "description": "Collection of codegenned protos for typescript",
   "main": "index.js",
   "scripts": {
-    "build": "./setup.sh",
+    "build": "echo '[common-protobuf] no-op'",
     "fix": "echo '[common-protobuf] no-op'",
     "check": "echo '[common-protobuf] no-op'"
   },

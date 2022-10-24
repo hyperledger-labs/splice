@@ -179,8 +179,30 @@ lazy val `apps-directory-frontend` = {
     .settings()
 }
 
+lazy val `apps-common-frontend-protobuf` = {
+  project
+    .in(file("apps/common/frontend-protobuf"))
+    .dependsOn(
+      `apps-common` % "compile->protocGenerate",
+      `apps-directory` % "compile->protocGenerate",
+      `apps-wallet` % "compile->protocGenerate",
+      `apps-aaa-splitwise` % "compile->protocGenerate",
+      `apps-validator` % "compile->protocGenerate",
+      `apps-scan` % "compile->protocGenerate",
+    )
+    .settings(
+      Compile / sourceGenerators += Def.task {
+        val log = streams.value.log
+        runCommand(s"bash ${baseDirectory.value}/gen-ledger-api-proto.sh", log)
+        Seq()
+      }.taskValue,
+      cleanFiles += baseDirectory.value / "com",
+    )
+}
+
 lazy val `apps-frontends` = {
   project.aggregate(
+    `apps-common-frontend-protobuf`,
     `apps-common-frontend`,
     `apps-wallet-frontend`,
     `apps-directory-frontend`,
