@@ -630,7 +630,7 @@ jobs:
       - checkout
       - setup_sbt_test_job
       - execute_sbt_command:
-          cmd: "Test/compile"
+          cmd: "Test/compile apps-frontends/compile"
       - execute_sbt_command:
           # run all tests except the live cluster ones
           pre_sbt_cmd: ./start-canton.sh external && ./start-frontends.sh -d
@@ -651,7 +651,7 @@ jobs:
       - checkout
       - setup_sbt_test_job
       - execute_sbt_command:
-          cmd: "protocGenerate damlBuild"
+          cmd: "protocGenerate apps-frontends/compile"
       - run_bash_command_in_nix:
           cmd_name: Build frontends
           cmd: |
@@ -690,7 +690,7 @@ jobs:
       - checkout
       - setup_sbt_test_job
       - execute_sbt_command:
-          cmd: "protocGenerate damlBuild"
+          cmd: "protocGenerate apps-frontends/compile"
       - run_bash_command_in_nix:
           cmd_name: Build all web frontends
           cmd: |

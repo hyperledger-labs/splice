@@ -456,10 +456,10 @@ To build the wallet frontend you first need to generate the TypeScript
 files based on our protobuf files as well as run the Daml codegen on
 our daml models.
 
-1. Generating protobuf files:
+1. Generating files:
 
 ```
-sbt protocGenerate damlBuild # Generate typescript for our own protobufs
+sbt protocGenerate apps-frontends/compile # Generate typescript for our own protobufs and daml models
 ```
 
 2. Build the frontend code:

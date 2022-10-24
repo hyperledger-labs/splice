@@ -44,6 +44,7 @@ lazy val root = (project in file("."))
     `apps-wallet`,
     `apps-wallet-daml`,
     `apps-directory`,
+    // `apps-frontends`, // For now we are not auto-compiling frontends, until there is proper caching there
     `canton-community-common`,
     `canton-blake2b`,
     `canton-slick-fork`,
@@ -118,6 +119,74 @@ lazy val `apps-scan` =
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
     )
+
+lazy val tsCodegen = taskKey[Seq[File]]("generate typescript for the daml models")
+
+// Returns a Seq[File] so that it can be reused both in tsCodegen and in sourceGenerators.
+// However, we return an empty Seq because we don't want sbt to be smart and actually do anything with these generated files.
+lazy val tsCodegenTask: Def.Initialize[Task[Seq[File]]] = Def.task {
+  val log = streams.value.log
+  val dars =
+    Seq(
+      (`apps-common` / Compile / damlBuild).value,
+      (`apps-wallet-daml` / Compile / damlBuild).value,
+      (`apps-directory` / Compile / damlBuild).value,
+      (`apps-aaa-splitwise` / Compile / damlBuild).value,
+    )
+  val damlJs = s"${baseDirectory.value}/daml.js"
+  new java.io.File(damlJs).delete()
+  val args = dars.flatten ++ Seq("-o", damlJs)
+  val _ = runCommand(s"daml2ts ${args.mkString(" ")}", log)
+  Seq()
+}
+
+lazy val `apps-common-frontend` = {
+  project
+    .in(file("apps/common/frontend"))
+    .dependsOn(
+      `apps-common`,
+      `apps-directory`,
+      `apps-wallet`,
+      `apps-aaa-splitwise`,
+    )
+    .settings(
+      // TODO(i1216): Leaving for now both tsCodegen and compile. If they end up remaining identical, then tsCodegen will be removed.
+      tsCodegen := tsCodegenTask.value,
+      Compile / sourceGenerators += tsCodegen.taskValue,
+      cleanFiles += baseDirectory.value / "daml.js",
+    )
+}
+
+// TODO(i1216): The frontend val's below ended up being not required for now, but they will be, so leaving them as placeholders for now
+lazy val `apps-wallet-frontend` = {
+  project
+    .in(file(s"apps/wallet/frontend"))
+    .dependsOn(`apps-common-frontend`)
+    .settings()
+}
+
+lazy val `apps-splitwise-frontend` = {
+  project
+    .in(file(s"apps/splitwise/frontend"))
+    .dependsOn(`apps-common-frontend`)
+    .settings()
+}
+
+lazy val `apps-directory-frontend` = {
+  project
+    .in(file(s"apps/directory/frontend"))
+    .dependsOn(`apps-common-frontend`)
+    .settings()
+}
+
+lazy val `apps-frontends` = {
+  project.aggregate(
+    `apps-common-frontend`,
+    `apps-wallet-frontend`,
+    `apps-directory-frontend`,
+    `apps-splitwise-frontend`,
+  )
+}
 
 lazy val `apps-wallet-daml` =
   project

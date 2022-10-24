@@ -21,23 +21,26 @@ $(directory-daml):
 	sbt protocGenerate damlBuild
 
 $(wallet-frontend): $(wallet-daml)
+	sbt apps-frontends/compile
 	cd ${REPO_ROOT}/apps && ${REPO_ROOT}/build-tools/npm-install.sh
 	cd ${REPO_ROOT}/apps && npm run build -w common-protobuf
 	cd ${REPO_ROOT}/apps && npm run build -w common-frontend
 	cd ${REPO_ROOT}/apps && npm run build -w wallet-frontend
 
 $(directory-frontend): $(directory-daml)
+	sbt apps-frontends/compile
 	cd ${REPO_ROOT}/apps && ${REPO_ROOT}/build-tools/npm-install.sh
 	cd ${REPO_ROOT}/apps && npm run build -w common-protobuf
 	cd ${REPO_ROOT}/apps && npm run build -w common-frontend
 	cd ${REPO_ROOT}/apps && npm run build -w directory-frontend
 
-
 $(splitwise-frontend): $(splitwise-daml)
+	sbt apps-frontends/compile
 	cd ${REPO_ROOT}/apps && ${REPO_ROOT}/build-tools/npm-install.sh
 	cd ${REPO_ROOT}/apps && npm run build -w common-protobuf
 	cd ${REPO_ROOT}/apps && npm run build -w common-frontend
 	cd ${REPO_ROOT}/apps && npm run build -w splitwise-frontend
+
 
 .PHONY: docker-build
 docker-build: $(app-bundle)
