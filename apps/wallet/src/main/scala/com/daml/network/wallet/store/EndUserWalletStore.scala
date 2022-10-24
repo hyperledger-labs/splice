@@ -56,6 +56,16 @@ trait EndUserWalletStore extends AutoCloseable {
       cid: Primitive.ContractId[walletCodegen.AppMultiPaymentRequest]
   ): Future[QueryResult[Option[Contract[walletCodegen.AppMultiPaymentRequest]]]] =
     acsStore.lookupContractById(walletCodegen.AppMultiPaymentRequest)(cid)
+
+  def lookupSubscriptionRequestById(
+      cid: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionRequest]
+  ): Future[QueryResult[Option[Contract[walletCodegen.Subscriptions.SubscriptionRequest]]]] =
+    acsStore.lookupContractById(walletCodegen.Subscriptions.SubscriptionRequest)(cid)
+
+  def lookupSubscriptionIdleStateById(
+      cid: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionIdleState]
+  ): Future[QueryResult[Option[Contract[walletCodegen.Subscriptions.SubscriptionIdleState]]]] =
+    acsStore.lookupContractById(walletCodegen.Subscriptions.SubscriptionIdleState)(cid)
 }
 
 object EndUserWalletStore {
@@ -149,6 +159,23 @@ object EndUserWalletStore {
         mkFilter(walletCodegen.AcceptedAppMultiPayment)(co =>
           co.payload.svc == svc &&
             co.payload.sender == endUser
+        ),
+        // Subscriptions
+        mkFilter(walletCodegen.Subscriptions.SubscriptionRequest)(co =>
+          co.payload.subscriptionData.svc == svc &&
+            co.payload.subscriptionData.sender == endUser
+        ),
+        mkFilter(walletCodegen.Subscriptions.SubscriptionIdleState)(co =>
+          co.payload.subscriptionData.svc == svc &&
+            co.payload.subscriptionData.sender == endUser
+        ),
+        mkFilter(walletCodegen.Subscriptions.SubscriptionInitialPayment)(co =>
+          co.payload.subscriptionData.svc == svc &&
+            co.payload.subscriptionData.sender == endUser
+        ),
+        mkFilter(walletCodegen.Subscriptions.SubscriptionPayment)(co =>
+          co.payload.subscriptionData.svc == svc &&
+            co.payload.subscriptionData.sender == endUser
         ),
       ),
     )

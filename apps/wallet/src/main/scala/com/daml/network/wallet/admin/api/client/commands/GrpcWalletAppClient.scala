@@ -404,6 +404,203 @@ object GrpcWalletAppClient {
         .leftMap(_.toString)
   }
 
+  case class ListSubscriptionRequests()
+      extends BaseCommand[
+        v0.ListSubscriptionRequestsRequest,
+        v0.ListSubscriptionRequestsResponse,
+        Seq[
+          Contract[walletCodegen.Subscriptions.SubscriptionRequest]
+        ],
+      ] {
+
+    override def createRequest(): Either[String, v0.ListSubscriptionRequestsRequest] =
+      Right(v0.ListSubscriptionRequestsRequest())
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.ListSubscriptionRequestsRequest,
+    ): Future[v0.ListSubscriptionRequestsResponse] = service.listSubscriptionRequests(request)
+
+    override def handleResponse(
+        response: v0.ListSubscriptionRequestsResponse
+    ): Either[String, Seq[Contract[walletCodegen.Subscriptions.SubscriptionRequest]]] =
+      response.subscriptionRequests
+        .traverse(req => Contract.fromProto(walletCodegen.Subscriptions.SubscriptionRequest)(req))
+        .leftMap(_.toString)
+  }
+
+  case class ListSubscriptionIdleStates()
+      extends BaseCommand[
+        v0.ListSubscriptionIdleStatesRequest,
+        v0.ListSubscriptionIdleStatesResponse,
+        Seq[
+          Contract[walletCodegen.Subscriptions.SubscriptionIdleState]
+        ],
+      ] {
+
+    override def createRequest(): Either[String, v0.ListSubscriptionIdleStatesRequest] =
+      Right(v0.ListSubscriptionIdleStatesRequest())
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.ListSubscriptionIdleStatesRequest,
+    ): Future[v0.ListSubscriptionIdleStatesResponse] = service.listSubscriptionIdleStates(request)
+
+    override def handleResponse(
+        response: v0.ListSubscriptionIdleStatesResponse
+    ): Either[String, Seq[Contract[walletCodegen.Subscriptions.SubscriptionIdleState]]] =
+      response.idleStates
+        .traverse(req => Contract.fromProto(walletCodegen.Subscriptions.SubscriptionIdleState)(req))
+        .leftMap(_.toString)
+  }
+
+  case class ListSubscriptionInitialPayments()
+      extends BaseCommand[
+        v0.ListSubscriptionInitialPaymentsRequest,
+        v0.ListSubscriptionInitialPaymentsResponse,
+        Seq[
+          Contract[walletCodegen.Subscriptions.SubscriptionInitialPayment]
+        ],
+      ] {
+
+    override def createRequest(): Either[String, v0.ListSubscriptionInitialPaymentsRequest] =
+      Right(v0.ListSubscriptionInitialPaymentsRequest())
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.ListSubscriptionInitialPaymentsRequest,
+    ): Future[v0.ListSubscriptionInitialPaymentsResponse] =
+      service.listSubscriptionInitialPayments(request)
+
+    override def handleResponse(
+        response: v0.ListSubscriptionInitialPaymentsResponse
+    ): Either[String, Seq[Contract[walletCodegen.Subscriptions.SubscriptionInitialPayment]]] =
+      response.initialPayments
+        .traverse(req =>
+          Contract.fromProto(walletCodegen.Subscriptions.SubscriptionInitialPayment)(req)
+        )
+        .leftMap(_.toString)
+  }
+
+  case class ListSubscriptionPayments()
+      extends BaseCommand[
+        v0.ListSubscriptionPaymentsRequest,
+        v0.ListSubscriptionPaymentsResponse,
+        Seq[
+          Contract[walletCodegen.Subscriptions.SubscriptionPayment]
+        ],
+      ] {
+
+    override def createRequest(): Either[String, v0.ListSubscriptionPaymentsRequest] =
+      Right(v0.ListSubscriptionPaymentsRequest())
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.ListSubscriptionPaymentsRequest,
+    ): Future[v0.ListSubscriptionPaymentsResponse] = service.listSubscriptionPayments(request)
+
+    override def handleResponse(
+        response: v0.ListSubscriptionPaymentsResponse
+    ): Either[String, Seq[Contract[walletCodegen.Subscriptions.SubscriptionPayment]]] =
+      response.payments
+        .traverse(req => Contract.fromProto(walletCodegen.Subscriptions.SubscriptionPayment)(req))
+        .leftMap(_.toString)
+  }
+
+  case class AcceptSubscriptionRequest(
+      requestId: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionRequest]
+  ) extends BaseCommand[
+        v0.AcceptSubscriptionRequestRequest,
+        v0.AcceptSubscriptionRequestResponse,
+        Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionInitialPayment],
+      ] {
+
+    override def createRequest(): Either[String, v0.AcceptSubscriptionRequestRequest] =
+      Right(v0.AcceptSubscriptionRequestRequest(Proto.encode(requestId)))
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.AcceptSubscriptionRequestRequest,
+    ): Future[v0.AcceptSubscriptionRequestResponse] = service.acceptSubscriptionRequest(request)
+
+    override def handleResponse(
+        response: v0.AcceptSubscriptionRequestResponse
+    ): Either[String, Primitive.ContractId[
+      walletCodegen.Subscriptions.SubscriptionInitialPayment
+    ]] =
+      Proto.decodeContractId[walletCodegen.Subscriptions.SubscriptionInitialPayment](
+        response.initialPaymentContractId
+      )
+  }
+
+  case class RejectSubscriptionRequest(
+      requestId: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionRequest]
+  ) extends BaseCommand[
+        v0.RejectSubscriptionRequestRequest,
+        Empty,
+        Unit,
+      ] {
+
+    override def createRequest(): Either[String, v0.RejectSubscriptionRequestRequest] =
+      Right(v0.RejectSubscriptionRequestRequest(Proto.encode(requestId)))
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.RejectSubscriptionRequestRequest,
+    ): Future[Empty] = service.rejectSubscriptionRequest(request)
+
+    override def handleResponse(
+        response: Empty
+    ): Either[String, Unit] =
+      Right(())
+  }
+
+  case class MakeSubscriptionPayment(
+      stateId: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionIdleState]
+  ) extends BaseCommand[
+        v0.MakeSubscriptionPaymentRequest,
+        v0.MakeSubscriptionPaymentResponse,
+        Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionPayment],
+      ] {
+
+    override def createRequest(): Either[String, v0.MakeSubscriptionPaymentRequest] =
+      Right(v0.MakeSubscriptionPaymentRequest(Proto.encode(stateId)))
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.MakeSubscriptionPaymentRequest,
+    ): Future[v0.MakeSubscriptionPaymentResponse] = service.makeSubscriptionPayment(request)
+
+    override def handleResponse(
+        response: v0.MakeSubscriptionPaymentResponse
+    ): Either[String, Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionPayment]] =
+      Proto.decodeContractId[walletCodegen.Subscriptions.SubscriptionPayment](
+        response.paymentContractId
+      )
+  }
+
+  case class CancelSubscription(
+      stateId: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionIdleState]
+  ) extends BaseCommand[
+        v0.CancelSubscriptionRequest,
+        Empty,
+        Unit,
+      ] {
+
+    override def createRequest(): Either[String, v0.CancelSubscriptionRequest] =
+      Right(v0.CancelSubscriptionRequest(Proto.encode(stateId)))
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.CancelSubscriptionRequest,
+    ): Future[Empty] = service.cancelSubscription(request)
+
+    override def handleResponse(
+        response: Empty
+    ): Either[String, Unit] =
+      Right(())
+  }
+
   case class ProposePaymentChannel(
       receiver: PartyId,
       replacesChannelId: Option[Primitive.ContractId[walletCodegen.PaymentChannel]],

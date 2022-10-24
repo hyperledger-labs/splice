@@ -21,6 +21,15 @@ service WalletService {
   rpc RejectAppMultiPaymentRequest (RejectAppMultiPaymentRequestRequest) returns (google.protobuf.Empty);
   rpc ListAcceptedAppMultiPayments (ListAcceptedAppMultiPaymentsRequest) returns (ListAcceptedAppMultiPaymentsResponse);
 
+  rpc ListSubscriptionRequests (ListSubscriptionRequestsRequest) returns (ListSubscriptionRequestsResponse);
+  rpc ListSubscriptionIdleStates (ListSubscriptionIdleStatesRequest) returns (ListSubscriptionIdleStatesResponse);
+  rpc ListSubscriptionInitialPayments (ListSubscriptionInitialPaymentsRequest) returns (ListSubscriptionInitialPaymentsResponse);
+  rpc ListSubscriptionPayments (ListSubscriptionPaymentsRequest) returns (ListSubscriptionPaymentsResponse);
+  rpc AcceptSubscriptionRequest (AcceptSubscriptionRequestRequest) returns (AcceptSubscriptionRequestResponse);
+  rpc RejectSubscriptionRequest (RejectSubscriptionRequestRequest) returns (google.protobuf.Empty);
+  rpc MakeSubscriptionPayment (MakeSubscriptionPaymentRequest) returns (MakeSubscriptionPaymentResponse);
+  rpc CancelSubscription (CancelSubscriptionRequest) returns (google.protobuf.Empty);
+
   rpc ProposePaymentChannel (ProposePaymentChannelRequest) returns (ProposePaymentChannelResponse);
   rpc ListPaymentChannelProposals (ListPaymentChannelProposalsRequest) returns (ListPaymentChannelProposalsResponse);
   rpc ListPaymentChannels (ListPaymentChannelsRequest) returns (ListPaymentChannelsResponse);
@@ -155,6 +164,70 @@ message ListAcceptedAppMultiPaymentsResponse {
 
 message ListAcceptedAppPaymentsResponse {
   repeated com.daml.network.v0.Contract accepted_app_payments = 1;
+}
+
+message ListSubscriptionRequestsRequest {
+  WalletContext wallet_ctx = 1;
+}
+
+message ListSubscriptionRequestsResponse {
+  repeated com.daml.network.v0.Contract subscription_requests = 1;
+}
+
+message ListSubscriptionIdleStatesRequest {
+  WalletContext wallet_ctx = 1;
+}
+
+message ListSubscriptionIdleStatesResponse {
+  repeated com.daml.network.v0.Contract idle_states = 1;
+}
+
+message ListSubscriptionInitialPaymentsRequest {
+  WalletContext wallet_ctx = 1;
+}
+
+message ListSubscriptionInitialPaymentsResponse {
+  repeated com.daml.network.v0.Contract initial_payments = 1;
+}
+
+message ListSubscriptionPaymentsRequest {
+  WalletContext wallet_ctx = 1;
+}
+
+message ListSubscriptionPaymentsResponse {
+  repeated com.daml.network.v0.Contract payments = 1;
+}
+
+message AcceptSubscriptionRequestRequest {
+  string request_contract_id = 1;
+
+  WalletContext wallet_ctx = 2;
+}
+
+message AcceptSubscriptionRequestResponse {
+  string initial_payment_contract_id = 1;
+}
+
+message RejectSubscriptionRequestRequest {
+  string request_contract_id = 1;
+
+  WalletContext wallet_ctx = 2;
+}
+
+message MakeSubscriptionPaymentRequest {
+  string idle_state_contract_id = 1;
+
+  WalletContext wallet_ctx = 2;
+}
+
+message MakeSubscriptionPaymentResponse {
+  string payment_contract_id = 1;
+}
+
+message CancelSubscriptionRequest {
+  string idle_state_contract_id = 1;
+
+  WalletContext wallet_ctx = 2;
 }
 
 // NOTE: we only support sender-initiated proposals for now.

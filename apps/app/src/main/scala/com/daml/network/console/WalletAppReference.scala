@@ -152,6 +152,102 @@ abstract class WalletAppReference(
       adminCommand(GrpcWalletAppClient.ListAcceptedAppPayments(), callCredentials)
     }
 
+  @Help.Summary("List all subscription requests of the configured user")
+  @Help.Description(
+    "Queries the configured remote participant for the SubscriptionRequests of the configured user. " +
+      "Returns all found subscription requests."
+  )
+  def listSubscriptionRequests(): Seq[Contract[walletCodegen.Subscriptions.SubscriptionRequest]] = {
+    consoleEnvironment.run {
+      adminCommand(GrpcWalletAppClient.ListSubscriptionRequests(), callCredentials)
+    }
+  }
+
+  @Help.Summary("List initial subscription payments of the configured user")
+  @Help.Description(
+    "Queries the configured remote participant for the SubscriptionInitialPayments of the configured user. " +
+      "Returns all found payments."
+  )
+  def listSubscriptionInitialPayments()
+      : Seq[Contract[walletCodegen.Subscriptions.SubscriptionInitialPayment]] = {
+    consoleEnvironment.run {
+      adminCommand(GrpcWalletAppClient.ListSubscriptionInitialPayments(), callCredentials)
+    }
+  }
+
+  @Help.Summary("List subscription payments of the configured user")
+  @Help.Description(
+    "Queries the configured remote participant for the SubscriptionPayments of the configured user. " +
+      "Returns all found payments."
+  )
+  def listSubscriptionPayments(): Seq[Contract[walletCodegen.Subscriptions.SubscriptionPayment]] = {
+    consoleEnvironment.run {
+      adminCommand(GrpcWalletAppClient.ListSubscriptionPayments(), callCredentials)
+    }
+  }
+
+  @Help.Summary("List all idle subscriptions of the configured user")
+  @Help.Description(
+    "Queries the configured remote participant for all instances of SubscriptionIdleState of the configured user. " +
+      "Returns all found subscription state contracts."
+  )
+  def listSubscriptionIdleStates()
+      : Seq[Contract[walletCodegen.Subscriptions.SubscriptionIdleState]] = {
+    consoleEnvironment.run {
+      adminCommand(GrpcWalletAppClient.ListSubscriptionIdleStates(), callCredentials)
+    }
+  }
+
+  @Help.Summary("Accept a subscription request")
+  @Help.Description(
+    "Accept a payment request and deliver the coin to be locked into the initial subscription payment." +
+      " Returns the contract ID of the initial subscription payment."
+  )
+  def acceptSubscriptionRequest(
+      requestId: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionRequest]
+  ): Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionInitialPayment] = {
+    consoleEnvironment.run {
+      adminCommand(GrpcWalletAppClient.AcceptSubscriptionRequest(requestId), callCredentials)
+    }
+  }
+
+  @Help.Summary("Reject a subscription request")
+  @Help.Description(
+    "Reject a subscription request."
+  )
+  def rejectSubscriptionRequest(
+      requestId: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionRequest]
+  ): Unit = {
+    consoleEnvironment.run {
+      adminCommand(GrpcWalletAppClient.RejectSubscriptionRequest(requestId), callCredentials)
+    }
+  }
+
+  @Help.Summary("Make a subscription payment")
+  @Help.Description(
+    "Initiate a subscription payment and deliver the coin to be locked into that payment." +
+      " Returns the contract ID of the subscription payment."
+  )
+  def makeSubscriptionPayment(
+      stateId: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionIdleState]
+  ): Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionPayment] = {
+    consoleEnvironment.run {
+      adminCommand(GrpcWalletAppClient.MakeSubscriptionPayment(stateId), callCredentials)
+    }
+  }
+
+  @Help.Summary("Cancel a subscription")
+  @Help.Description(
+    "Cancels a subscription that is in idle state."
+  )
+  def cancelSubscription(
+      stateId: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionIdleState]
+  ): Unit = {
+    consoleEnvironment.run {
+      adminCommand(GrpcWalletAppClient.CancelSubscription(stateId), callCredentials)
+    }
+  }
+
   @Help.Summary("Propose the creation of a payment channel")
   @Help.Description(
     "Propose the creation of a uni-directional payment channel with a specific receiver." +

@@ -367,6 +367,171 @@ class GrpcWalletService(
       v0.ListAcceptedAppPaymentsResponse(_),
     )
 
+  override def listSubscriptionRequests(
+      request: v0.ListSubscriptionRequestsRequest
+  ): Future[v0.ListSubscriptionRequestsResponse] =
+    listContracts(
+      request.getWalletCtx,
+      walletCodegen.Subscriptions.SubscriptionRequest,
+      v0.ListSubscriptionRequestsResponse(_),
+    )
+
+  override def listSubscriptionIdleStates(
+      request: v0.ListSubscriptionIdleStatesRequest
+  ): Future[v0.ListSubscriptionIdleStatesResponse] =
+    listContracts(
+      request.getWalletCtx,
+      walletCodegen.Subscriptions.SubscriptionIdleState,
+      v0.ListSubscriptionIdleStatesResponse(_),
+    )
+
+  override def listSubscriptionInitialPayments(
+      request: v0.ListSubscriptionInitialPaymentsRequest
+  ): Future[v0.ListSubscriptionInitialPaymentsResponse] =
+    listContracts(
+      request.getWalletCtx,
+      walletCodegen.Subscriptions.SubscriptionInitialPayment,
+      v0.ListSubscriptionInitialPaymentsResponse(_),
+    )
+
+  override def listSubscriptionPayments(
+      request: v0.ListSubscriptionPaymentsRequest
+  ): Future[v0.ListSubscriptionPaymentsResponse] =
+    listContracts(
+      request.getWalletCtx,
+      walletCodegen.Subscriptions.SubscriptionPayment,
+      v0.ListSubscriptionPaymentsResponse(_),
+    )
+
+  override def acceptSubscriptionRequest(
+      request: v0.AcceptSubscriptionRequestRequest
+  ): Future[v0.AcceptSubscriptionRequestResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      withAuth(request.getWalletCtx) { user =>
+        exerciseWalletAction((installCid, userStore) => {
+          val requestCid =
+            Proto.tryDecodeContractId[walletCodegen.Subscriptions.SubscriptionRequest](
+              request.requestContractId
+            )
+
+          def lookups = (_: Unit) =>
+            for {
+              subscriptionRequestO <- userStore.lookupSubscriptionRequestById(requestCid)
+              subscriptionRequest = getQueryResult(
+                subscriptionRequestO,
+                s"subscription request with cid $requestCid",
+              )
+              _ <- lookupSubscriptionContext(
+                userStore.key.endUserParty,
+                subscriptionRequest.payload.subscriptionData.context,
+              )
+            } yield ()
+
+          Future.successful(
+            CoinOperationWithLookups(
+              CoinOperation.CO_SubscriptionAcceptAndMakeInitialPayment(requestCid),
+              lookups,
+            )
+          )
+        })(
+          user,
+          {
+            case outcome: CoinOperationOutcome.COO_SubscriptionInitialPayment =>
+              v0.AcceptSubscriptionRequestResponse(
+                Proto.encode(outcome.body)
+              )
+            case other => sys.error(s"unexpected coin operation outcome: $other")
+          },
+        )
+      }
+    }
+
+  override def rejectSubscriptionRequest(
+      request: v0.RejectSubscriptionRequestRequest
+  ): Future[Empty] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      withAuth(request.getWalletCtx) { user =>
+        for {
+          userStore <- getUserStore(user)
+          arg = walletCodegen.Subscriptions.SubscriptionRequest_Reject()
+          requestCid = Proto.tryDecodeContractId[walletCodegen.Subscriptions.SubscriptionRequest](
+            request.requestContractId
+          )
+          cmd = requestCid
+            .exerciseSubscriptionRequest_Reject(arg)
+            .command
+          _ <- connection.submitCommand(
+            Seq(userStore.key.endUserParty),
+            Seq(),
+            Seq(cmd),
+          )
+        } yield Empty()
+      }
+    }
+
+  override def makeSubscriptionPayment(
+      request: v0.MakeSubscriptionPaymentRequest
+  ): Future[v0.MakeSubscriptionPaymentResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      withAuth(request.getWalletCtx) { user =>
+        exerciseWalletAction((installCid, userStore) => {
+          val stateCid =
+            Proto.tryDecodeContractId[walletCodegen.Subscriptions.SubscriptionIdleState](
+              request.idleStateContractId
+            )
+
+          def lookups = (_: Unit) =>
+            for {
+              subscriptionStateO <- userStore.lookupSubscriptionIdleStateById(stateCid)
+              subscriptionState = getQueryResult(
+                subscriptionStateO,
+                s"subscription idle state cid $stateCid",
+              )
+              _ <- lookupSubscriptionContext(
+                userStore.key.endUserParty,
+                subscriptionState.payload.subscriptionData.context,
+              )
+            } yield ()
+
+          Future.successful(
+            CoinOperationWithLookups(CoinOperation.CO_SubscriptionMakePayment(stateCid), lookups)
+          )
+        })(
+          user,
+          {
+            case outcome: CoinOperationOutcome.COO_SubscriptionPayment =>
+              v0.MakeSubscriptionPaymentResponse(
+                Proto.encode(outcome.body)
+              )
+            case other => sys.error(s"unexpected coin operation outcome: $other")
+          },
+        )
+      }
+    }
+
+  override def cancelSubscription(
+      request: v0.CancelSubscriptionRequest
+  ): Future[Empty] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      withAuth(request.getWalletCtx) { user =>
+        for {
+          userStore <- getUserStore(user)
+          arg = walletCodegen.Subscriptions.SubscriptionIdleState_CancelSubscription()
+          requestCid = Proto.tryDecodeContractId[walletCodegen.Subscriptions.SubscriptionIdleState](
+            request.idleStateContractId
+          )
+          cmd = requestCid
+            .exerciseSubscriptionIdleState_CancelSubscription(arg)
+            .command
+          _ <- connection.submitCommand(
+            Seq(userStore.key.endUserParty),
+            Seq(),
+            Seq(cmd),
+          )
+        } yield Empty()
+      }
+    }
+
   override def listPaymentChannelProposals(
       request: v0.ListPaymentChannelProposalsRequest
   ): Future[v0.ListPaymentChannelProposalsResponse] =
@@ -885,6 +1050,32 @@ class GrpcWalletService(
         throw new StatusRuntimeException(
           Status.FAILED_PRECONDITION.withDescription(
             s"exactly one DeliveryOffer for multi payment request with cid $contractId."
+          )
+        )
+    } yield ()
+  }
+
+  /** Verifies that exactly one subscription context with the given contract id is active and returns a failed future with
+    * an [[io.grpc.StatusRuntimeException]] otherwise.
+    */
+  private def lookupSubscriptionContext(
+      endUserParty: PartyId,
+      contractId: P.ContractId[walletCodegen.Subscriptions.SubscriptionContext],
+  ): Future[Unit] = {
+    for {
+      // TODO(#1267): use store instead
+      activeSubscriptionContexts <- connection.activeContracts(
+        CoinLedgerConnection.transactionInterfaceFilterByParty(
+          Map(endUserParty -> Seq(walletCodegen.Subscriptions.SubscriptionContext.id))
+        )
+      )
+      _ = if (
+        activeSubscriptionContexts
+          .count(event => event.contractId == contractId) != 1
+      )
+        throw new StatusRuntimeException(
+          Status.FAILED_PRECONDITION.withDescription(
+            s"exactly one SubscriptionContext with cid $contractId."
           )
         )
     } yield ()

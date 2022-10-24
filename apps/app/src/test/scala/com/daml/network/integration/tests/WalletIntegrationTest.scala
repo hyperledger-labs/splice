@@ -4,6 +4,7 @@ import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.CC.{Coin as coinCodegen, CoinRules as coinRulesCodegen}
+import com.daml.network.codegen.CN.Scripts.Wallet.TestSubscriptions as testSubscriptionsCodegen
 import com.daml.network.codegen.CN.Scripts.TestWallet as testWalletCodegen
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.codegen.DA
@@ -148,7 +149,7 @@ class WalletIntegrationTest
       assertInRange(aliceRemoteWallet.list().lockedCoins.head.effectiveQuantity, (24.0, 25.0))
     }
 
-    "allow a user to create, list, and reject app payment requests" in { implicit env =>
+    "allow a user to list, and reject app payment requests" in { implicit env =>
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
@@ -204,7 +205,7 @@ class WalletIntegrationTest
       requests2 shouldBe empty
     }
 
-    "allow a user to create, list, and accept app payment requests" in { implicit env =>
+    "allow a user to list and accept app payment requests" in { implicit env =>
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
@@ -302,6 +303,140 @@ class WalletIntegrationTest
         checkWallet(aliceUserParty, aliceRemoteWallet, Seq((11, 12)))
       }
     }
+
+    "allow a user to list and reject subscription requests" in { implicit env =>
+      val aliceDamlUser = aliceRemoteWallet.config.damlUser
+      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+      val (subscriptionData, payData) = subscriptionTestData(aliceUserParty);
+
+      aliceRemoteWallet.listSubscriptionRequests() shouldBe empty
+
+      val request = clue("Create a subscription request to self") {
+        val request = walletCodegen.Subscriptions.SubscriptionRequest(
+          subscriptionData,
+          payData,
+        )
+        aliceWallet.remoteParticipant.ledger_api.commands.submit(
+          actAs = Seq(aliceUserParty),
+          optTimeout = None,
+          commands = Seq(request.create.command),
+        )
+        request
+      }
+      val requestId = clue("List subscription requests to find out request ID") {
+        inside(aliceRemoteWallet.listSubscriptionRequests()) { case Seq(r) =>
+          r.payload shouldBe request
+          r.contractId
+        }
+      }
+      clue("Reject the subscription request") {
+        aliceRemoteWallet.rejectSubscriptionRequest(requestId)
+        aliceRemoteWallet.listSubscriptionRequests() shouldBe empty
+      }
+    }
+
+    // We put all of this in one test because assembling valid subscription instances
+    // is cumbersome and it's easier to just reuse the results of the "accept" flow.
+    "allow a user to list and accept subscription requests, " +
+      "to list idle subscriptions, to initiate subscription payments, " +
+      "and to cancel a subscription" in { implicit env =>
+        val aliceDamlUser = aliceRemoteWallet.config.damlUser
+        val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+        val aliceValidatorParty = aliceValidator.getValidatorPartyId()
+        val (subscriptionData, payData) = subscriptionTestData(aliceUserParty);
+
+        aliceRemoteWallet.listSubscriptionRequests() shouldBe empty
+        aliceRemoteWallet.listSubscriptionIdleStates() shouldBe empty
+
+        val request = clue("Create a subscription request to self") {
+          val request = walletCodegen.Subscriptions.SubscriptionRequest(
+            subscriptionData,
+            payData,
+          )
+          aliceWallet.remoteParticipant.ledger_api.commands.submit(
+            actAs = Seq(aliceUserParty),
+            optTimeout = None,
+            commands = Seq(request.create.command),
+          )
+          request
+        }
+        val requestId = clue("List subscription requests to find out request ID") {
+          inside(aliceRemoteWallet.listSubscriptionRequests()) { case Seq(r) =>
+            r.payload shouldBe request
+            r.contractId
+          }
+        }
+        clue("Alice gets some coins") {
+          aliceRemoteWallet.tap(50)
+        }
+        val initialPaymentId =
+          clue("Accept the subscription request, initiating the first subscription payment") {
+            aliceRemoteWallet.acceptSubscriptionRequest(requestId)
+          }
+        clue("Check that initial payment contract was created successfully") {
+          aliceRemoteWallet.listSubscriptionRequests() shouldBe empty
+          inside(aliceRemoteWallet.listSubscriptionInitialPayments()) { case Seq(r) =>
+            r.contractId shouldBe initialPaymentId
+            r.payload.subscriptionData should equal(subscriptionData)
+            r.payload.payData should equal(payData)
+          }
+        }
+        clue("Collect the initial payment (as the receiver), which creates the subscription") {
+          val collectCommand = initialPaymentId
+            .exerciseSubscriptionInitialPayment_Collect(submitter = aliceUserParty.toPrim)
+            .command
+          aliceWallet.remoteParticipant.ledger_api.commands.submit(
+            actAs = Seq(aliceUserParty),
+            readAs = Seq(aliceValidatorParty),
+            optTimeout = None,
+            commands = Seq(collectCommand),
+          )
+        }
+        val subscriptionStateId = clue("List idle subscriptions to find out state ID") {
+          inside(aliceRemoteWallet.listSubscriptionIdleStates()) { case Seq(r) =>
+            r.payload.subscriptionData should equal(subscriptionData)
+            r.payload.payData should equal(payData)
+            r.contractId
+          }
+        }
+        val paymentId = clue("Initiate a subscription payment") {
+          aliceRemoteWallet.makeSubscriptionPayment(subscriptionStateId)
+        }
+        clue("Check that payment contract was created successfully") {
+          aliceRemoteWallet.listSubscriptionIdleStates() shouldBe empty
+          inside(aliceRemoteWallet.listSubscriptionPayments()) { case Seq(r) =>
+            r.contractId shouldBe paymentId
+            r.payload.subscriptionData should equal(subscriptionData)
+            r.payload.payData should equal(payData)
+          }
+          paymentId
+        }
+        clue(
+          "Collect the second payment (as the receiver), which sets the subscription back to idle"
+        ) {
+          val collectCommand2 = paymentId
+            .exerciseSubscriptionPayment_Collect(submitter = aliceUserParty.toPrim)
+            .command
+          aliceWallet.remoteParticipant.ledger_api.commands.submit(
+            actAs = Seq(aliceUserParty),
+            readAs = Seq(aliceValidatorParty),
+            optTimeout = None,
+            commands = Seq(collectCommand2),
+          )
+        }
+        val subscriptionStateId2 = clue("List idle subscriptions to find out the new state ID") {
+          inside(aliceRemoteWallet.listSubscriptionIdleStates()) { case Seq(r) =>
+            r.payload.subscriptionData should equal(subscriptionData)
+            r.payload.payData should equal(payData)
+            r.contractId
+          }
+        }
+        clue("Cancel the subscription") {
+          aliceRemoteWallet.cancelSubscription(subscriptionStateId2);
+          aliceRemoteWallet.listSubscriptionIdleStates() shouldBe empty
+          aliceRemoteWallet.listSubscriptionPayments() shouldBe empty
+        }
+      }
 
     "allow two users to create a payment channel and use it for a transfer" in { implicit env =>
       // Onboard alice on her self-hosted validator
@@ -817,5 +952,44 @@ class WalletIntegrationTest
     svc.startIssuingRound(0)
     svc.closeRound(0)
     svc.openRound(1)
+  }
+
+  def subscriptionTestData(aliceUserParty: PartyId)(implicit
+      env: CoinTestConsoleEnvironment
+  ): (walletCodegen.Subscriptions.Subscription, walletCodegen.Subscriptions.SubscriptionPayData) = {
+    // Create a subscription context
+    aliceWallet.remoteParticipant.ledger_api.commands.submit(
+      Seq(aliceUserParty),
+      optTimeout = None,
+      commands = Seq(
+        testSubscriptionsCodegen
+          .TestSubscriptionContext(
+            user = aliceUserParty.toPrim,
+            service = aliceUserParty.toPrim,
+            description = "description",
+          )
+          .create
+          .command
+      ),
+    )
+    val referenceId =
+      aliceWallet.remoteParticipant.ledger_api.acs
+        .await(aliceUserParty, testSubscriptionsCodegen.TestSubscriptionContext)
+        .contractId
+    // Assemble actual test data
+    val subscriptionData = walletCodegen.Subscriptions.Subscription(
+      sender = aliceUserParty.toPrim,
+      receiver = aliceUserParty.toPrim,
+      provider = aliceUserParty.toPrim,
+      svc = svcParty.toPrim,
+      context = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
+    )
+    val payData = walletCodegen.Subscriptions.SubscriptionPayData(
+      paymentQuantity = BigDecimal(10: Int),
+      paymentInterval = RelTime(microseconds = 60 * 60 * 1000000L),
+      paymentDuration = RelTime(microseconds = 60 * 60 * 1000000L),
+      collectionDuration = RelTime(microseconds = 60 * 1000000L),
+    ) // paymentDuration == paymenInterval, so we can make a second payment immediately
+    (subscriptionData, payData)
   }
 }
