@@ -30,13 +30,6 @@ trait ValidatorStore extends AutoCloseable with NamedLogging {
       co.payload.endUserName == endUserName
     )
 
-  def lookupCCUserHostedAtByParty(
-      party: PartyId
-  ): Future[QueryResult[Option[Contract[coinCodegen.Scripts.Util.CCUserHostedAt]]]] =
-    acsStore.findContract(coinCodegen.Scripts.Util.CCUserHostedAt)(co =>
-      co.payload.user == party.toPrim
-    )
-
   def lookupCoinRules(): Future[QueryResult[Option[Contract[coinCodegen.CoinRules.CoinRules]]]] =
     acsStore.findContract(coinCodegen.CoinRules.CoinRules)(_ => true)
 
@@ -92,7 +85,6 @@ object ValidatorStore {
             co.payload.validatorParty == validator &&
             co.payload.svcParty == svc
         ),
-        mkFilter(coinCodegen.Scripts.Util.CCUserHostedAt)(co => co.payload.validator == validator),
         mkFilter(coinCodegen.CoinRules.CoinRules)(co => co.payload.svc == svc),
         mkFilter(coinCodegen.CoinRules.CoinRulesRequest)(co =>
           co.payload.user == validator &&

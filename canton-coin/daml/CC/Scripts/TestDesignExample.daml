@@ -75,25 +75,25 @@ test = do
   alice <- setupUser app "alice" app.svc
   arbiter <- setupUser app "arbiter" app.svc
 
-  pay app app.svc alice 1500.0 "init"
+  pay app app.svcUser alice.primaryParty 1500.0 "init"
 
-  escrow <- submit arbiter $ createCmd (Escrow app.svc arbiter alice)
+  escrow <- submitUser arbiter.userId $ createCmd (Escrow app.svc arbiter.primaryParty alice.primaryParty)
 
   t0 <- getTime
   c0 <- activeRound app
 
-  lockTo app alice arbiter 1000.25 (days 90) "lock"
+  lockTo app alice arbiter.primaryParty 1000.25 (days 90) "lock"
 
-  [(lockedCoin, _)] <- query @LockedCoin alice
+  [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
   -- advance 40k rounds
   runNextIssuance app 1.0
   skipNRounds app 39_999
   c1 <- activeRound app
 
-  pay app alice alice 5.0 "split"
+  pay app alice alice.primaryParty 5.0 "split"
   archiveTransferDebugNotes app
 
-  [(paymentCoin, _)] <- queryFilter @Coin alice (\c -> c.quantity.initialQuantity == 5.0)
+  [(paymentCoin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.quantity.initialQuantity == 5.0)
 
 
   -- advance 10k rounds
@@ -105,7 +105,7 @@ test = do
   prevCoinCids <- map fst <$> query @Coin app.svc
   prevLockedCoinCids <- map fst <$> query @LockedCoin app.svc
 
-  submitMulti [alice] [app.svc] $ exerciseCmd escrow Refresh with ..
+  submitUser alice.userId $ exerciseCmd escrow Refresh with ..
 
   [(_, note)] <- query @TransferDebugNote app.svc
   note.isum === TransferInputsSummary with
@@ -147,19 +147,19 @@ test = do
   Some (_, CoinRules{config = coinConfig}) <- queryCoinRulesByKey app.svc
 
   let Some newLocked = head newLockedCoins
-      Some change = find (\c -> c.owner == alice) newCoins
-      Some payment = find (\c -> c.owner == arbiter) newCoins
+      Some change = find (\c -> c.owner == alice.primaryParty) newCoins
+      Some payment = find (\c -> c.owner == arbiter.primaryParty) newCoins
   newLocked === LockedCoin with
     lock = TimeLock with
-      holder = arbiter
+      holder = arbiter.primaryParty
       expiresAt = t0 `addRelTime` days 180
     coin = Coin with
       svc = app.svc
-      owner = alice
+      owner = alice.primaryParty
       quantity = expiringQuantity coinConfig.holdingFee 1000.25 c2.round
   change === Coin with
     svc = app.svc
-    owner = alice
+    owner = alice.primaryParty
     quantity =
       let quantity =
             5.0
@@ -172,7 +172,7 @@ test = do
 
   payment === Coin with
     svc = app.svc
-    owner = arbiter
+    owner = arbiter.primaryParty
     quantity =
       let quantity = 1.0 - chargeSteppedRate coinConfig.transferFee 1.0
       in expiringQuantity coinConfig.holdingFee quantity c2.round

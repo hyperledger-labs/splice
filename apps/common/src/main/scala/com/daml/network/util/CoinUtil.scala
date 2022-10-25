@@ -122,64 +122,6 @@ object CoinUtil {
     maxPayloadLength = 32,
   )
 
-  // TODO(M1-51): Remove workaround for explicit disclosure
-  object ExplicitDisclosureWorkaround {
-
-    /** Like recordUserHostedAt but only builds the command.
-      */
-    def recordUserHostedAtCommand(
-        user: PartyId,
-        validator: PartyId,
-    ): Command =
-      CC.Scripts.Util
-        .CCUserHostedAt(
-          user = user.toPrim,
-          validator = validator.toPrim,
-        )
-        .create
-        .command
-
-    /** Records that the given user is hosted at the given validator
-      * by creating a CCUserHostedAt contract.
-      *
-      * Unlike `ValidatorRight` (which is part of the core model and can be added/removed at any time),
-      * the `CCUserHostedAt` contract needs to be created immediately after allocating a user,
-      * as otherwise the user won't be able to transfer any coins.
-      */
-    def recordUserHostedAt(
-        user: PartyId,
-        validator: PartyId,
-        logger: TracedLogger,
-        connection: CoinLedgerConnection,
-        retryProvider: CoinRetries,
-        lookupCCUserHostedAtByParty: (
-            PartyId
-        ) => Future[QueryResult[Option[Contract[CC.Scripts.Util.CCUserHostedAt]]]],
-    )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
-      logger.debug("Querying store for CCUserHostedAt")
-      retryProvider.retry(
-        "recordUserHostedAt",
-        lookupCCUserHostedAtByParty(user).flatMap {
-          case QueryResult(off, None) =>
-            // TODO(#790) Switch to the generalized version of mkCommandId once it has been added
-            val commandId = s"com.daml.network.validator.CCUserHostedAt_$user"
-            connection
-              .submitCommandWithDedup(
-                actAs = Seq(user),
-                readAs = Seq.empty,
-                command = Seq(recordUserHostedAtCommand(user, validator)),
-                commandId = commandId,
-                deduplicationOffset = off,
-              )
-              .map(_ => ())
-          case QueryResult(_, Some(_)) =>
-            logger.info(s"CCUserHostedAt contract for $user already exists, skipping.")
-            Future.successful(())
-        },
-      )
-    }
-  }
-
   def holdingFee(
       coin: Coin,
       currentRound: Long,

@@ -1,7 +1,10 @@
 import { ActiveContractsServicePromiseClient } from 'common-protobuf/com/daml/ledger/api/v1/active_contracts_service_grpc_web_pb';
 import { GetActiveContractsRequest } from 'common-protobuf/com/daml/ledger/api/v1/active_contracts_service_pb';
 import { UserManagementServicePromiseClient } from 'common-protobuf/com/daml/ledger/api/v1/admin/user_management_service_grpc_web_pb';
-import { GetUserRequest } from 'common-protobuf/com/daml/ledger/api/v1/admin/user_management_service_pb';
+import {
+  GetUserRequest,
+  ListUserRightsRequest,
+} from 'common-protobuf/com/daml/ledger/api/v1/admin/user_management_service_pb';
 import { CommandServicePromiseClient } from 'common-protobuf/com/daml/ledger/api/v1/command_service_grpc_web_pb';
 import { SubmitAndWaitRequest } from 'common-protobuf/com/daml/ledger/api/v1/command_service_pb';
 import {
@@ -21,7 +24,6 @@ import { Identifier, Value } from 'common-protobuf/com/daml/ledger/api/v1/value_
 import React, { useContext } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
-import { CCUserHostedAt } from '@daml.js/canton-coin/lib/CC/Scripts/Util';
 import { Choice, ContractId, Template } from '@daml/types';
 
 import { Contract } from '..';
@@ -158,10 +160,15 @@ export class LedgerApiClient {
     return contracts;
   }
 
-  async getValidatorPartyId(user: string): Promise<string> {
-    const contracts = await this.queryAcs(user, CCUserHostedAt);
-    const r = contracts.find(c => c.payload.user === user)!;
-    return r.payload.validator;
+  async getUserReadAs(userId: string): Promise<string[]> {
+    const userRightsResponse = await this.userManagementServiceClient.listUserRights(
+      new ListUserRightsRequest().setUserId(this.userId),
+      undefined
+    );
+    return userRightsResponse.getRightsList().flatMap(right => {
+      const readAs = right.getCanReadAs();
+      return readAs ? [readAs.getParty()] : [];
+    });
   }
 
   async getPrimaryParty(): Promise<string> {

@@ -6,9 +6,7 @@ import Daml.Script
 
 import DA.Action (void, when)
 import DA.Date
-import DA.Exception
 import DA.Foldable (forA_)
-import DA.List (dedup)
 import DA.Time
 
 import CC.Coin
@@ -23,8 +21,9 @@ import CC.Scripts.Parameters
 
 
 -- | A type to hold the off-ledger information required to interact with CC.
-newtype CCApp = CCApp with
+data CCApp = CCApp with
     svc : Party
+    svcUser : CCUser
   deriving (Eq, Ord, Show)
 
 
@@ -39,11 +38,12 @@ setupApp = do
 
   -- In this model the SV Consortium is not decentralized.
   svc <- allocateParty "SVC"
-  let app =  CCApp with svc
+  svcUser <- validateUserId "svc"
+  _ <- createUser (User svcUser (Some svc)) []
+  let app =  CCApp with svc, svcUser = CCUser svcUser svc
 
   -- the SVC is its own validator
   recordValidatorOf app app.svc app.svc
-  _ <- submit app.svc $ createCmd CCUserHostedAt with user=app.svc; validator=app.svc
 
   -- TOOD: reintroduce the price oracle
 
@@ -72,33 +72,35 @@ setupValidator app name = do
   user <- allocatePartyWithHint name (PartyIdHint name)
   userId <- validateUserId name
   createUser (User userId (Some user)) [CanActAs user, CanReadAs user]
-  _ <- submit user $ createCmd CCUserHostedAt with user; validator=user
   onboardUser app user
   requestCoinRules app user
   runCoinRulesAcceptBot app
   return user
 
-setupUser : CCApp -> Text -> Party -> Script Party
+data CCUser = CCUser 
+  with
+    userId : UserId
+    primaryParty : Party
+  deriving (Show, Eq, Ord)
+
+setupUser : CCApp -> Text -> Party -> Script CCUser
 setupUser app name validator = do
   user <- allocatePartyWithHint name (PartyIdHint name)
   userId <- validateUserId name
   createUser (User userId (Some user)) [CanActAs user, CanReadAs validator]
-  _ <- submit user $ createCmd CCUserHostedAt with user; validator
   onboardUser app user
-  return user
+  return (CCUser userId user)
 
 -- | onboardUser simply sets up public read for a user party
 onboardUser : CCApp -> Party -> Script ()
 onboardUser app user = do
   -- This is a hack - to simplify later merge-bot flows that require a first coin to be present
-  pay app app.svc user 1.0 "Welcome!"
+  pay app app.svcUser user 1.0 "Welcome!"
 
-getAllUserParties : CCApp -> Script [Party]
-getAllUserParties app = do
+getAllValidatorRights : CCApp -> Script [ValidatorRight]
+getAllValidatorRights app = do
   parties <- listKnownParties
-  accounts <- query @Coin app.svc
-  rights <- query @ValidatorRight (map party parties)
-  return $ dedup $ [account.owner | (_, account) <- accounts] ++ [ right.validator | (_, right) <- rights]
+  map snd <$> query @ValidatorRight (map party parties)
 
 recordValidatorOf : CCApp -> Party -> Party -> Script ()
 recordValidatorOf app u v =
@@ -114,26 +116,10 @@ activeRound app = do
 -- Workaround for explicit disclosure
 -------------------------------------
 
--- For the workaround for explicit disclosure, we need to know at which validator node a user is hosted.
--- This is so that we can set the correct readAs party for all coin transfer commands submitted by the user.
---
--- TODO(M1-51): remove workaround for explicit disclosure
-template CCUserHostedAt
-  with
-    user : Party
-    validator : Party
-  where
-    signatory user
-    observer validator
-    key user : Party
-    maintainer key
-
-getHostingValidator : Party -> Script Party
-getHostingValidator user = do
-  maybeResult <- queryContractKey @CCUserHostedAt user user
-  case maybeResult of
-    Some (_, result) -> pure result.validator
-    None -> throw (GeneralError ("No CCUserHostedAt for " <> show user))
+getUserReadAs : UserId -> Script [Party]
+getUserReadAs user = do
+  rights <- listUserRights user
+  pure [p | CanReadAs p <- rights]
 
 -- TODO(M1-51): remove workaround for explicit disclosure
 requestCoinRules : CCApp -> Party -> Script ()
@@ -238,6 +224,10 @@ submitExerciseCoinRulesByKey : Choice CoinRules c r => CCApp -> [Party] -> [Part
 submitExerciseCoinRulesByKey app actors readers arg = do
   submitMulti actors readers $ exerciseByKeyCmd @CoinRules app.svc arg
 
+submitExerciseCoinRulesByKey' : Choice CoinRules c r => CCApp -> CCUser -> c -> Script r
+submitExerciseCoinRulesByKey' app user arg = do
+  submitUser user.userId $ exerciseByKeyCmd @CoinRules app.svc arg
+
 queryCoinRulesByKey : Party -> Script (Optional (ContractId CoinRules, CoinRules))
 queryCoinRulesByKey svc =
   queryContractKey @CoinRules svc svc
@@ -245,13 +235,13 @@ queryCoinRulesByKey svc =
 -- | A simple and slightly hacky-way to test payment: it just gathers all coins from
 -- the sender and transfer's the desired quantity off of them to the receiver.
 -- The left-over quantity is kept.
-pay : CCApp -> Party -> Party -> Decimal -> Text -> Script ()
+pay : CCApp -> CCUser -> Party -> Decimal -> Text -> Script ()
 pay app sender recipient coinQuantity msg = do
   -- TODO(M1-92): create payment pre-approval flow and use that here instead of submitMulti
-  validator <- getHostingValidator sender
-  coins <- unlockedCoins sender
+  readAs <- getUserReadAs sender.userId
+  coins <- unlockedCoins sender.primaryParty
   let transfer = Transfer with
-        sender
+        sender = sender.primaryParty
         provider = recipient
         payload = msg
         inputs = map InputCoin coins
@@ -265,19 +255,19 @@ pay app sender recipient coinQuantity msg = do
                 quantity = coinQuantity
                 senderTransferFeeRatio = 1.0
           ]
-  void $ submitExerciseCoinRulesByKey app [sender, recipient] [validator] (CoinRules_Transfer with transfer)
+  void $ submitExerciseCoinRulesByKey app [sender.primaryParty, recipient] readAs (CoinRules_Transfer with transfer)
 
 -- | Locks a coin of the given quantity to the given lock holder
 -- for the given time starting at the current time
 -- It gathers all coints of the sender as input coins.
-lockTo : CCApp -> Party -> Party -> Decimal -> RelTime -> Text -> Script ()
+lockTo : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Text -> Script ()
 lockTo app sender lockHolder coinQuantity lockDuration msg = do
   now <- getTime
-  validator <- getHostingValidator sender
+  readAs <- getUserReadAs sender.userId
   -- TODO(M1-92): create payment pre-approval flow and use that here instead of submitMulti
-  coins <- unlockedCoins sender
+  coins <- unlockedCoins sender.primaryParty
   let transfer = Transfer with
-        sender
+        sender = sender.primaryParty
         provider = lockHolder
         payload = msg
         inputs = map InputCoin coins
@@ -291,14 +281,14 @@ lockTo app sender lockHolder coinQuantity lockDuration msg = do
                 holder = lockHolder
                 expiresAt = now `addRelTime` lockDuration
           ]
-  void $ submitExerciseCoinRulesByKey app [sender, lockHolder] [validator] (CoinRules_Transfer with transfer)
+  void $ submitExerciseCoinRulesByKey app [sender.primaryParty, lockHolder] readAs (CoinRules_Transfer with transfer)
 
 
 -- | Deposit all coins together with new issuances into a single coin.
 runCoinDepositBots : CCApp -> Script ()
 runCoinDepositBots app = do
-  users <- getAllUserParties app
-  forA_ users $ \user -> do
+  validatorRights <- getAllValidatorRights app
+  forA_ validatorRights $ \ValidatorRight{..} -> do
     -- get all burns for this user
     hostedUsers <- getValidatorUsers user
     rounds <- getIssuingRounds app
@@ -312,7 +302,6 @@ runCoinDepositBots app = do
     coins <- queryFilter @Coin user (\coin -> coin.owner == user)
     -- Need readAs rights for all hosted users to collect their validator rewards,
     -- and readAs rights for the validator to see mining round state contracts
-    validator <- getHostingValidator user
     let readAs = hostedUsers ++ [validator]
     -- merge multiple of them into a single coin to minimize the holding fees
     let transfer = Transfer with
@@ -343,11 +332,10 @@ getValidatorUsers validator = do
   rights <- queryFilter @ValidatorRight validator (\right -> right.validator == validator)
   return [ right.user | (_, right) <- rights ]
 
-tap : CCApp -> Party -> Decimal -> Script (ContractId Coin)
-tap app p quantity = do
-  validator <- getHostingValidator p
-  submitExerciseCoinRulesByKey app [p] [validator] CoinRules_Tap with
-    receiver = p
+tap : CCApp -> CCUser -> Decimal -> Script (ContractId Coin)
+tap app user quantity = do
+  submitExerciseCoinRulesByKey' app user CoinRules_Tap with
+    receiver = user.primaryParty
     quantity = quantity
 
 

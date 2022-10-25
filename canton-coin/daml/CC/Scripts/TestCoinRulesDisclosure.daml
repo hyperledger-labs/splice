@@ -21,16 +21,16 @@ test = do
   
   -- -- -- -- bootstrap users
   user1 <- setupUser app "user1" validator1
-  recordValidatorOf app user1 validator1
+  recordValidatorOf app user1.primaryParty validator1
 
   user2 <- setupUser app "user2" validator2
-  recordValidatorOf app user2 validator2
+  recordValidatorOf app user2.primaryParty validator2
 
   -- user1 transfers 0.01 coins to user2
   mapA_ (\i -> do
     runNextIssuance app 1.0
     runCoinDepositBots app
-    pay app user1 user2 0.01 ("pay in round " <> show i)
+    pay app user1 user2.primaryParty 0.01 ("pay in round " <> show i)
     ) [1,2,3,4,5]
 
 

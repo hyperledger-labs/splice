@@ -14,11 +14,7 @@ import com.daml.network.svc.automation.SvcAutomationService
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0.SvcServiceGrpc
-import com.daml.network.util.CoinUtil.{
-  ExplicitDisclosureWorkaround,
-  createValidatorRight,
-  defaultCoinConfig,
-}
+import com.daml.network.util.CoinUtil.{createValidatorRight, defaultCoinConfig}
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
@@ -161,15 +157,6 @@ object SvcApp {
         .exerciseCoinRules_MiningRound_Open(coinPrice = 1.0)
         .command
     for {
-      _ <-
-        ExplicitDisclosureWorkaround.recordUserHostedAt(
-          user = svc,
-          validator = svc,
-          logger = logger,
-          connection = connection,
-          retryProvider = retryProvider,
-          lookupCCUserHostedAtByParty = store.lookupCCUserHostedAtByParty,
-        )
       _ <- createValidatorRight(
         svc = svc,
         validator = svc,

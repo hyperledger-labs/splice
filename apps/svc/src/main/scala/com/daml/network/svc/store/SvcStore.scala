@@ -35,11 +35,6 @@ trait SvcStore extends AutoCloseable {
     acsStore
       .findContract(CC.CoinRules.CoinRules)(_ => true)
 
-  def lookupCCUserHostedAtByParty(
-      party: PartyId
-  ): Future[QueryResult[Option[Contract[CC.Scripts.Util.CCUserHostedAt]]]] =
-    acsStore.findContract(CC.Scripts.Util.CCUserHostedAt)(co => co.payload.user == party.toPrim)
-
   def lookupValidatorRightByParty(
       party: PartyId
   ): Future[QueryResult[Option[Contract[CC.Coin.ValidatorRight]]]] =
@@ -83,9 +78,6 @@ object SvcStore {
         mkFilter(CC.Round.IssuanceState)(co => co.payload.svc == svc),
         mkFilter(CC.Coin.ValidatorRight)(co =>
           co.payload.svc == svc && co.payload.validator == svc && co.payload.user == svc
-        ),
-        mkFilter(CC.Scripts.Util.CCUserHostedAt)(co =>
-          co.payload.validator == svc && co.payload.user == svc
         ),
         mkFilter(CC.Round.OpenMiningRound)(co => co.payload.svc == svc),
         mkFilter(CC.Round.ClosedMiningRound)(co => co.payload.svc == svc),

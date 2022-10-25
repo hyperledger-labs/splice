@@ -128,13 +128,13 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
   async completeTransfer(
     user: string,
     provider: string,
-    validator: string,
     key: GroupKey,
     acceptedPaymentContractId: ContractId<AcceptedAppPayment>
   ) {
+    const readAs = await this.getUserReadAs(this.userId);
     await this.exerciseByKey(
       [user],
-      [validator],
+      readAs,
       SplitwiseInstall.SplitwiseInstall_CompleteTransfer,
       { _1: user, _2: provider },
       {
@@ -179,13 +179,13 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
   async completeMultiTransfer(
     sender: string,
     provider: string,
-    validator: string,
     key: GroupKey,
     acceptedPaymentContractId: ContractId<AcceptedAppMultiPayment>
   ) {
+    const readAs = await this.getUserReadAs(this.userId);
     await this.exerciseByKey(
       [sender],
-      [validator],
+      readAs,
       SplitwiseInstall.SplitwiseInstall_CompleteMultiTransfer,
       { _1: sender, _2: provider },
       {

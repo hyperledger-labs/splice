@@ -166,24 +166,6 @@ class ValidatorApp(
     ).map(_ => logger.info("Created CoinRulesRequest"))
   }
 
-  private def createUserHostedAt(
-      connection: CoinLedgerConnection,
-      store: ValidatorStore,
-      validatorParty: PartyId,
-  ): Future[Unit] = {
-    logger.info("Attempting to create CCUserHostedAt")
-    CoinUtil.ExplicitDisclosureWorkaround
-      .recordUserHostedAt(
-        validatorParty,
-        validatorParty,
-        logger,
-        connection,
-        this,
-        store.lookupCCUserHostedAtByParty,
-      )
-      .map(_ => logger.info("Created rules request and userHostedAt."))
-  }
-
   override def initialize(
       ledgerClient: CoinLedgerClient,
       validatorParty: PartyId,
@@ -226,7 +208,6 @@ class ValidatorApp(
         walletServiceUser = walletServiceUser,
       )
       _ <- createCoinRulesRequest(connection, store, svcParty, validatorParty)
-      _ <- createUserHostedAt(connection, store, validatorParty)
     } yield {
       adminServerRegistry
         .addService(

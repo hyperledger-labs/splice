@@ -14,7 +14,7 @@ testTap = do
     validator <- setupValidator app "validator"
     pat <- setupUser app "pat" validator
     cid <- tap app pat 100.0
-    Some coin <- queryContractId @Coin pat cid
+    Some coin <- queryContractId @Coin pat.primaryParty cid
     coin.quantity.initialQuantity === 100.0
     Some (_, coinRules) <- queryCoinRulesByKey app.svc
     coin.quantity.ratePerRound.rate === coinRules.config.holdingFee.rate
@@ -22,7 +22,7 @@ testTap = do
     runNextIssuance app 2.0
     runCoinDepositBots app
     cid <- tap app pat 100.0
-    Some coin <- queryContractId @Coin pat cid
+    Some coin <- queryContractId @Coin pat.primaryParty cid
     coin.quantity.initialQuantity === 100.0
     Some (_, coinRules) <- queryCoinRulesByKey app.svc
     coin.quantity.ratePerRound.rate === coinRules.config.holdingFee.rate / 2.0

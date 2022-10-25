@@ -1,12 +1,6 @@
 package com.daml.network.console
 
-import com.daml.ledger.client.binding.{
-  Contract => CodegenContract,
-  Primitive,
-  Template,
-  ValueDecoder,
-}
-import com.daml.network.codegen.CC.Scripts.Util.CCUserHostedAt
+import com.daml.ledger.client.binding.{Primitive, Template, ValueDecoder}
 import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen, Wallet => walletCodegen}
 import com.daml.network.codegen.DA
 import com.daml.network.codegen.DA.Time.Types.RelTime
@@ -107,6 +101,7 @@ final class RemoteSplitwiseAppReference(
   }
 
   private def getUserPrimaryParty() = LedgerApiUtils.getUserPrimaryParty(ledgerApi, userId)
+  private def getUserReadAs() = LedgerApiUtils.getUserReadAs(ledgerApi, userId)
 
   @Help.Summary("Return remote splitwise app config")
   def config: RemoteSplitwiseAppConfig =
@@ -251,15 +246,10 @@ final class RemoteSplitwiseAppReference(
       acceptedPayment: Primitive.ContractId[walletCodegen.AcceptedAppPayment],
   ): Primitive.ContractId[splitwiseCodegen.BalanceUpdate] = {
     val party = getUserPrimaryParty()
-    // TODO(M1-51) Explicit disclosure workaround
-    val hostedAt = ledgerApi.ledger_api.acs.await(
-      party,
-      CCUserHostedAt,
-      predicate = (c: CodegenContract[CCUserHostedAt]) => c.value.user == party.toPrim,
-    )
+    val readAs = getUserReadAs()
     submitWithResult(
       actAs = Seq(party),
-      readAs = Seq(PartyId.tryFromPrim(hostedAt.value.validator)),
+      readAs = readAs.toSeq,
       installKey(party).exerciseSplitwiseInstall_CompleteTransfer(
         key.toPrim,
         acceptedPayment,
@@ -291,15 +281,10 @@ final class RemoteSplitwiseAppReference(
       acceptedPayment: Primitive.ContractId[walletCodegen.AcceptedAppMultiPayment],
   ): Seq[Primitive.ContractId[splitwiseCodegen.BalanceUpdate]] = {
     val party = getUserPrimaryParty()
-    // TODO(M1-06) Explicit disclosure workaround
-    val hostedAt = ledgerApi.ledger_api.acs.await(
-      party,
-      CCUserHostedAt,
-      predicate = (c: CodegenContract[CCUserHostedAt]) => c.value.user == party.toPrim,
-    )
+    val readAs = getUserReadAs()
     submitWithResult(
       actAs = Seq(party),
-      readAs = Seq(PartyId.tryFromPrim(hostedAt.value.validator)),
+      readAs = readAs.toSeq,
       installKey(party).exerciseSplitwiseInstall_CompleteMultiTransfer(
         key.toPrim,
         acceptedPayment,

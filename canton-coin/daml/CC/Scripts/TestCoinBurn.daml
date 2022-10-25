@@ -28,12 +28,12 @@ testCoinBurn = do
   runCoinDepositBots app
 
   -- svc transfers 20 coin to user
-  pay app app.svc user 20.0 "starter pack!"
+  pay app app.svcUser user.primaryParty 20.0 "starter pack!"
   archiveTransferDebugNotes app
   runCoinDepositBots app
 
   -- -- user pays provider 1
-  pay app user provider1 5.0 "otc"
+  pay app user provider1.primaryParty 5.0 "otc"
   runCoinDepositBots app
 
   runNextIssuance app 1.2
@@ -41,9 +41,11 @@ testCoinBurn = do
 
   -- -- test declaration of validator rights after the fact
   recordValidatorOf app validator1 validator1
-  recordValidatorOf app user validator1
-  recordValidatorOf app provider1 validator1
-  recordValidatorOf app provider2 provider2
+  recordValidatorOf app user.primaryParty validator1
+  recordValidatorOf app provider1.primaryParty validator1
+  recordValidatorOf app provider2.primaryParty provider2.primaryParty
+  requestCoinRules app provider2.primaryParty
+  runCoinRulesAcceptBot app
 
   archiveTransferDebugNotes app
   -- uncomment the following line to see how 'Validator1' can gather his rewards
@@ -61,7 +63,7 @@ testCoinBurn = do
   runNextIssuance app 1.5
   runCoinDepositBots app
 
-  pay app app.svc provider2 75.0 "starter pack!"
+  pay app app.svcUser provider2.primaryParty 75.0 "starter pack!"
   runCoinDepositBots app
 
   runNextIssuance app 1.6

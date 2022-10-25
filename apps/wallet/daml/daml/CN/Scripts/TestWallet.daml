@@ -20,80 +20,80 @@ test = script do
   sender <- setupUser app "sender" app.svc
   receiver <- setupUser app "receiver" app.svc
 
-  pay app app.svc sender 15.0 ""
+  pay app app.svcUser sender.primaryParty 15.0 ""
 
   -- setup payment channel
-  proposalId <- submit sender $ createCmd PaymentChannelProposal with
-    proposer = sender
+  proposalId <- submit sender.primaryParty $ createCmd PaymentChannelProposal with
+    proposer = sender.primaryParty
     replacesChannel = None
     channel = PaymentChannel with
-      sender
-      receiver
+      sender = sender.primaryParty
+      receiver = receiver.primaryParty
       svc = app.svc
       allowRequests = True
       allowOffers = True
       allowDirectTransfers = True
       senderTransferFeeRatio = 0.0
 
-  channelId <- submit receiver $ exerciseCmd proposalId PaymentChannelProposal_Accept
+  channelId <- submit receiver.primaryParty $ exerciseCmd proposalId PaymentChannelProposal_Accept
 
   -- send some CC
-  [(coin, _)] <- queryFilter @Coin sender (\c -> c.quantity.initialQuantity > 2.5)
-  let exerciseTransfer coin = exerciseByKeyCmd @PaymentChannel (sender, receiver, app.svc)
+  [(coin, _)] <- queryFilter @Coin sender.primaryParty (\c -> c.quantity.initialQuantity > 2.5)
+  let exerciseTransfer coin = exerciseByKeyCmd @PaymentChannel (sender.primaryParty, receiver.primaryParty, app.svc)
             PaymentChannel_ExecuteDirectTransfer with
               inputs = [InputCoin coin]
               quantity = 2.0
               payload = "direct transfer test"
   let transfer coin =
-        submitMulti [sender] [app.svc] $ exerciseTransfer coin
+        submitUser sender.userId $ exerciseTransfer coin
 
   transfer coin
-  [(coin, _)] <- queryFilter @Coin sender (\c -> c.quantity.initialQuantity > 2.5)
+  [(coin, _)] <- queryFilter @Coin sender.primaryParty (\c -> c.quantity.initialQuantity > 2.5)
   transfer coin
 
   -- ask for some more CC
-  paymentRequest <- submit receiver $ exerciseByKeyCmd @PaymentChannel (sender, receiver, app.svc)
+  paymentRequest <- submit receiver.primaryParty $ exerciseByKeyCmd @PaymentChannel (sender.primaryParty, receiver.primaryParty, app.svc)
     PaymentChannel_CreatePaymentRequest with
       quantity = 1.5
       description = "A very good reason to pay me"
 
   -- accept request
-  [(coin, _)] <- queryFilter @Coin sender (\c -> c.quantity.initialQuantity > 1.5)
-  submitMulti [sender] [app.svc] $ exerciseCmd paymentRequest OnChannelPaymentRequest_Accept with
+  [(coin, _)] <- queryFilter @Coin sender.primaryParty (\c -> c.quantity.initialQuantity > 1.5)
+  submitUser sender.userId $ exerciseCmd paymentRequest OnChannelPaymentRequest_Accept with
     inputs = [InputCoin coin]
 
   -- ask for more CC, to be rejected
-  paymentRequest <- submit receiver $ exerciseByKeyCmd @PaymentChannel (sender, receiver, app.svc)
+  paymentRequest <- submit receiver.primaryParty $ exerciseByKeyCmd @PaymentChannel (sender.primaryParty, receiver.primaryParty, app.svc)
     PaymentChannel_CreatePaymentRequest with
       quantity = 1500.0
       description = "Not a good reason to pay"
 
-  submit sender $ exerciseCmd paymentRequest OnChannelPaymentRequest_Reject
+  submit sender.primaryParty $ exerciseCmd paymentRequest OnChannelPaymentRequest_Reject
 
   -- ask for more CC, and withdraw
-  paymentRequest <- submit receiver $ exerciseByKeyCmd @PaymentChannel (sender, receiver, app.svc)
+  paymentRequest <- submit receiver.primaryParty $ exerciseByKeyCmd @PaymentChannel (sender.primaryParty, receiver.primaryParty, app.svc)
     PaymentChannel_CreatePaymentRequest with
       quantity = 1500.0
       description = "Going to withdraw this"
 
-  submit receiver $ exerciseCmd paymentRequest OnChannelPaymentRequest_Withdraw
+  submit receiver.primaryParty $ exerciseCmd paymentRequest OnChannelPaymentRequest_Withdraw
 
 
   -- disallow transfers
-  proposalId <- submit sender $ createCmd PaymentChannelProposal with
-    proposer = sender
+  proposalId <- submit sender.primaryParty $ createCmd PaymentChannelProposal with
+    proposer = sender.primaryParty
     replacesChannel = Some channelId
     channel = PaymentChannel with
-      sender
-      receiver
+      sender = sender.primaryParty
+      receiver = receiver.primaryParty
       svc = app.svc
       allowRequests = True
       allowOffers = True
       allowDirectTransfers = False
       senderTransferFeeRatio = 0.0
 
-  channelId <- submit receiver $ exerciseCmd proposalId PaymentChannelProposal_Accept
-  submitMultiMustFail [sender] [app.svc] $ exerciseTransfer coin
+  channelId <- submit receiver.primaryParty $ exerciseCmd proposalId PaymentChannelProposal_Accept
+  submitMultiMustFail [sender.primaryParty] [app.svc] $ exerciseTransfer coin
 
   pure ()
 
@@ -140,17 +140,15 @@ createPaymentRequest app sender receiver quantity = do
     collectionDuration = minutes 5
   return (res, deliveryOffer)
 
-acceptPaymentRequest : CCApp -> Party -> ContractId AppPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppPayment)
-acceptPaymentRequest app p transferRequest coin = do
-  validator <- getHostingValidator p
-  Right (accept, change) <- submitMulti [p] [validator] $ exerciseCmd transferRequest AppPaymentRequest_Accept with
+acceptPaymentRequest : CCApp -> CCUser -> ContractId AppPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppPayment)
+acceptPaymentRequest app user transferRequest coin = do
+  Right (accept, change) <- submitUser user.userId $ exerciseCmd transferRequest AppPaymentRequest_Accept with
     inputs = [InputCoin coin]
   return accept
 
-acceptMultiPaymentRequest : CCApp -> Party -> ContractId AppMultiPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppMultiPayment)
+acceptMultiPaymentRequest : CCApp -> CCUser -> ContractId AppMultiPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppMultiPayment)
 acceptMultiPaymentRequest app sender transferRequest coin = do
-  validator <- getHostingValidator sender
-  Right (accept, change) <- submitMulti [sender] [validator] $ exerciseCmd transferRequest AppMultiPaymentRequest_Accept with
+  Right (accept, change) <- submitUser sender.userId $ exerciseCmd transferRequest AppMultiPaymentRequest_Accept with
     inputs = [InputCoin coin]
   return accept
 
@@ -165,16 +163,16 @@ testPaymentRequest = script do
   bob <- setupUser app "bob" validator
 
   coin <- tap app alice 42.0
-  (transferRequest, offerCid) <- createPaymentRequest app alice bob 30.0
+  (transferRequest, offerCid) <- createPaymentRequest app alice.primaryParty bob.primaryParty 30.0
 
   acceptedPaymentCid <- acceptPaymentRequest app alice transferRequest coin
-  Some acceptedPayment <- queryContractId alice acceptedPaymentCid
-  [(lockedCoin, _)] <- query @LockedCoin alice
-  [(aliceChange, _), _] <- query @Coin alice
+  Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
+  [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
+  [(aliceChange, _), _] <- query @Coin alice.primaryParty
   acceptedPayment === AcceptedAppPayment with
-    sender = alice
-    receiver = bob
-    provider = alice
+    sender = alice.primaryParty
+    receiver = bob.primaryParty
+    provider = alice.primaryParty
     svc = app.svc
     lockedCoin = lockedCoin
     deliveryOffer = toInterfaceContractId offerCid
@@ -193,14 +191,14 @@ testMultiPaymentRequest = script do
 
   coin <- tap app alice 75.0
   t <- getTime
-  (transferRequest, deliveryOffer) <- createMultiPaymentRequest app alice bob charlie 10.0 
+  (transferRequest, deliveryOffer) <- createMultiPaymentRequest app alice.primaryParty bob.primaryParty charlie.primaryParty 10.0 
   acceptedPaymentCid <- acceptMultiPaymentRequest app alice transferRequest coin
-  Some acceptedPayment <- queryContractId alice acceptedPaymentCid
-  [(lockedCoin, _)] <- query @LockedCoin alice
+  Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
+  [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
   acceptedPayment === AcceptedAppMultiPayment with
-    sender = alice
-    receivers = [bob, charlie]
-    provider = alice
+    sender = alice.primaryParty
+    receivers = [bob.primaryParty, charlie.primaryParty]
+    provider = alice.primaryParty
     svc = app.svc
     lockedCoin = lockedCoin
     deliveryOffer = toInterfaceContractId deliveryOffer
@@ -222,41 +220,41 @@ testBatchPaymentRequests = script do
   -- ----------------------
 
   coin <- tap app alice 42.0
-  (transferRequest, deliveryOffer) <- createPaymentRequest app alice bob 1.0
-  (transferRequest2, deliveryOffer2) <- createMultiPaymentRequest app alice bob alice 2.0
+  (transferRequest, deliveryOffer) <- createPaymentRequest app alice.primaryParty bob.primaryParty 1.0
+  (transferRequest2, deliveryOffer2) <- createMultiPaymentRequest app alice.primaryParty bob.primaryParty alice.primaryParty 2.0
 
-  install <- submitMulti [alice, validator] [] $ createCmd $ WalletAppInstall with
+  install <- submitMulti [alice.primaryParty, validator] [] $ createCmd $ WalletAppInstall with
     -- for simplicity, alice is service and end-user
-    walletServiceParty = alice
-    endUserParty = alice
+    walletServiceParty = alice.primaryParty
+    endUserParty = alice.primaryParty
     endUserName = "wallet_service_participant_user"
     svcParty = app.svc
     validatorParty = validator
 
-  acceptedPaymentsCid <- submitMulti [alice] [validator] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  acceptedPaymentsCid <- submitUser alice.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputCoin coin]
     operations = [CO_AppPayment transferRequest, CO_AppMultiPayment transferRequest2]
 
   let [COO_AcceptedAppPayment payment1Cid, COO_AcceptedAppMultiPayment payment2Cid] = acceptedPaymentsCid
-  Some acceptedPayment <- queryContractId alice payment1Cid
-  Some acceptedPayment2 <- queryContractId alice payment2Cid
-  lockedCoins <- query @LockedCoin alice
+  Some acceptedPayment <- queryContractId alice.primaryParty payment1Cid
+  Some acceptedPayment2 <- queryContractId alice.primaryParty payment2Cid
+  lockedCoins <- query @LockedCoin alice.primaryParty
   let [(lockedCoin, _), (lockedCoin2, _)] = sortOn (\(_, lockedCoin) -> lockedCoin.coin.quantity.initialQuantity) lockedCoins
-  [(aliceChange, _), _] <- query @Coin alice
+  [(aliceChange, _), _] <- query @Coin alice.primaryParty
 
   -- check results
   acceptedPayment === AcceptedAppPayment with
-    sender = alice
-    receiver = bob
-    provider = alice
+    sender = alice.primaryParty
+    receiver = bob.primaryParty
+    provider = alice.primaryParty
     svc = app.svc
     lockedCoin = lockedCoin
     deliveryOffer = toInterfaceContractId deliveryOffer
 
   acceptedPayment2 === AcceptedAppMultiPayment with
-    sender = alice
-    receivers = [bob, alice]
-    provider = alice
+    sender = alice.primaryParty
+    receivers = [bob.primaryParty, alice.primaryParty]
+    provider = alice.primaryParty
     svc = app.svc
     lockedCoin = lockedCoin2
     deliveryOffer = toInterfaceContractId deliveryOffer2
@@ -265,23 +263,23 @@ testBatchPaymentRequests = script do
   -- test insufficent funds
   -- ----------------------
   coin <- tap app alice 42.0
-  (transferRequest3, deliveryOffer3) <- createPaymentRequest app alice bob 10000.0
-  (transferRequest4, deliveryOffer4) <- createMultiPaymentRequest app alice bob alice 3.0
+  (transferRequest3, deliveryOffer3) <- createPaymentRequest app alice.primaryParty bob.primaryParty 10000.0
+  (transferRequest4, deliveryOffer4) <- createMultiPaymentRequest app alice.primaryParty bob.primaryParty alice.primaryParty 3.0
   -- trying to fulfill the request for 10,000 CC will fail
-  outcomes <- submitMulti [alice] [validator] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  outcomes <- submitUser alice.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputCoin coin]
     operations = [CO_AppPayment transferRequest3, CO_AppMultiPayment transferRequest4]
 
   -- first command errors, second command is still executed
   let [COO_TransferError errorMsg, COO_AcceptedAppMultiPayment payment3Cid] = outcomes
-  Some acceptedPayment4 <- queryContractId alice payment3Cid
-  lockedCoins <- query @LockedCoin alice
+  Some acceptedPayment4 <- queryContractId alice.primaryParty payment3Cid
+  lockedCoins <- query @LockedCoin alice.primaryParty
   let [_, _, (lockedCoin4, _)] = sortOn (\(_, lockedCoin) -> lockedCoin.coin.quantity.initialQuantity) lockedCoins
 
   acceptedPayment4 === AcceptedAppMultiPayment with
-    sender = alice
-    receivers = [bob, alice]
-    provider = alice
+    sender = alice.primaryParty
+    receivers = [bob.primaryParty, alice.primaryParty]
+    provider = alice.primaryParty
     svc = app.svc
     lockedCoin = lockedCoin4
     deliveryOffer = toInterfaceContractId deliveryOffer4

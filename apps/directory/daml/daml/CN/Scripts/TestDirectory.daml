@@ -23,11 +23,11 @@ testWithSubscription = script do
 
   -- provider creates directory rules
   -- how: up to app provider
-  directoryInstallRequest <- submit user $ createCmd DirectoryInstallRequest with
-    provider = provider
-    user = user
+  directoryInstallRequest <- submit user.primaryParty $ createCmd DirectoryInstallRequest with
+    provider = provider.primaryParty
+    user = user.primaryParty
 
-  directoryInstall <- submit provider $ exerciseCmd directoryInstallRequest DirectoryInstallRequest_Accept with
+  directoryInstall <- submit provider.primaryParty $ exerciseCmd directoryInstallRequest DirectoryInstallRequest_Accept with
     svc = app.svc
     entryFee = 1.0
     collectionDuration = minutes 5
@@ -38,7 +38,7 @@ testWithSubscription = script do
   -- user requests entry via app install
   -- how: UI of directory service via write-delegation on app manager & call to
   -- user’s participant.
-  subscriptionRequest <- submitMulti [user] [provider, app.svc] $ exerciseCmd directoryInstall DirectoryInstall_RequestEntryWithSubscription with
+  subscriptionRequest <- submit user.primaryParty $ exerciseCmd directoryInstall DirectoryInstall_RequestEntryWithSubscription with
     name = "cns.darth.vader"
 
   -- cc wallet selects a large enough coin
@@ -47,20 +47,20 @@ testWithSubscription = script do
   coin <- tap app user 1.5
   -- cc wallet accepts sbuscription and first payment and locks coin to provider
   -- how: cc wallet
-  (initialPaymentCid, _) <- submitMulti [user] [app.svc] $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
+  (initialPaymentCid, _) <- submitUser user.userId $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
     inputs = [InputCoin coin]
 
   -- directory provider transactionally unlocks & transfer coins and creates directory entry and a subscription in return.
   -- how: provider on their own participant
-  (entryCid, subscriptionStateCid, _) <- submitMulti [provider] [app.svc] $ exerciseCmd directoryInstall DirectoryInstall_CollectInitialEntryPaymentWithSubscription with
+  (entryCid, subscriptionStateCid, _) <- submitUser provider.userId $ exerciseCmd directoryInstall DirectoryInstall_CollectInitialEntryPaymentWithSubscription with
     paymentCid = initialPaymentCid
 
-  Some entry <- queryContractId user entryCid
-  Some subscriptionState <- queryContractId user subscriptionStateCid
-  Some install <- queryContractId user directoryInstall
+  Some entry <- queryContractId user.primaryParty entryCid
+  Some subscriptionState <- queryContractId user.primaryParty subscriptionStateCid
+  Some install <- queryContractId user.primaryParty directoryInstall
 
   entry.name === "cns.darth.vader"
-  entry.user === user
+  entry.user === user.primaryParty
   subscriptionState.nextPaymentDueAt === entry.expiresAt
   subscriptionState.payData.paymentInterval === install.entryLifetime
 
@@ -68,39 +68,39 @@ testWithSubscription = script do
   -- how: cc wallet
   passTime (days 60)
   coin <- tap app user 1.5
-  (paymentCid, _) <- submitMulti [user] [app.svc] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+  (paymentCid, _) <- submitUser user.userId $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputCoin coin]
 
   -- directory provider transactionally unlocks & transfer coins and renews directory entry in return
   -- how: provider on their own participant
-  (entryCid, subscriptionStateCid, _) <- submitMulti [provider] [app.svc] $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryRenewalPaymentWithSubscription with
+  (entryCid, subscriptionStateCid, _) <- submitUser provider.userId $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryRenewalPaymentWithSubscription with
     paymentCid
     entryCid
 
-  submitMustFail provider $ exerciseCmd entryCid (DirectoryEntry_Expire provider)
+  submitMustFail provider.primaryParty $ exerciseCmd entryCid (DirectoryEntry_Expire provider.primaryParty)
 
   -- user can't pay earlier than `renewalDuration` from the next due date
   coin <- tap app user 1.5
-  submitMultiMustFail [user] [app.svc] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+  submitMultiMustFail [user.primaryParty] [app.svc] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputCoin coin]
 
   passTime (days 90)
 
   -- cc wallet and provider can repeat the "payment and collect" cycle indefinitely
-  (paymentCid, _) <- submitMulti [user] [app.svc] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
+  (paymentCid, _) <- submitUser user.userId $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputCoin coin]
-  (entryCid, subscriptionStateCid, _) <- submitMulti [provider] [app.svc] $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryRenewalPaymentWithSubscription with
+  (entryCid, subscriptionStateCid, _) <- submitUser provider.userId $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryRenewalPaymentWithSubscription with
     paymentCid
     entryCid
 
-  submitMustFail provider $ exerciseCmd entryCid (DirectoryEntry_Expire provider)
+  submitMustFail provider.primaryParty $ exerciseCmd entryCid (DirectoryEntry_Expire provider.primaryParty)
 
   -- directory provider can eventually expire an unfunded entry
   passTime (days 121)
-  submit provider $ exerciseCmd entryCid (DirectoryEntry_Expire provider)
+  submit provider.primaryParty $ exerciseCmd entryCid (DirectoryEntry_Expire provider.primaryParty)
 
   -- directory provider can then also terminate the subscription
-  submit provider $ exerciseCmd subscriptionStateCid (SubscriptionIdleState_ExpireSubscription provider)
+  submit provider.primaryParty $ exerciseCmd subscriptionStateCid (SubscriptionIdleState_ExpireSubscription provider.primaryParty)
 
   pure ()
 
@@ -117,11 +117,11 @@ testWithRegularPayment = script do
 
   -- provider creates directory rules
   -- how: up to app provider
-  directoryInstallRequest <- submit user $ createCmd DirectoryInstallRequest with
-    provider = provider
-    user = user
+  directoryInstallRequest <- submit user.primaryParty $ createCmd DirectoryInstallRequest with
+    provider = provider.primaryParty
+    user = user.primaryParty
 
-  directoryInstall <- submit provider $ exerciseCmd directoryInstallRequest DirectoryInstallRequest_Accept with
+  directoryInstall <- submit provider.primaryParty $ exerciseCmd directoryInstallRequest DirectoryInstallRequest_Accept with
     svc = app.svc
     entryFee = 1.0
     collectionDuration = minutes 5
@@ -132,12 +132,12 @@ testWithRegularPayment = script do
   -- user requests entry via app install
   -- how: UI of directory service via write-delegation on app manager & call to
   -- user’s participant.
-  entryRequest <- submitMulti [user] [provider, app.svc] $ exerciseCmd directoryInstall DirectoryInstall_RequestEntry with
+  entryRequest <- submitUser user.userId $ exerciseCmd directoryInstall DirectoryInstall_RequestEntry with
     name = "cns.darth.vader"
 
   -- provider requests payment for entry via app install
   -- how: provider on their own participant.
-  appPaymentRequest <- submit provider $ exerciseCmd directoryInstall DirectoryInstall_RequestEntryPayment with
+  appPaymentRequest <- submit provider.primaryParty $ exerciseCmd directoryInstall DirectoryInstall_RequestEntryPayment with
     requestCid = entryRequest
 
   -- cc wallet selects a large enough coin
@@ -146,22 +146,22 @@ testWithRegularPayment = script do
   coin <- tap app user 1.5
   -- cc wallet accepts payment and locks coin to provider
   -- how: cc wallet
-  Right (acceptedAppPaymentCid, _) <- submitMulti [user] [app.svc] $ exerciseCmd appPaymentRequest AppPaymentRequest_Accept with
+  Right (acceptedAppPaymentCid, _) <- submitUser user.userId $ exerciseCmd appPaymentRequest AppPaymentRequest_Accept with
     inputs = [InputCoin coin]
 
   -- directory providers transactionally unlocks & transfer coins
   -- and creates directory entry in return.
   -- how: provider on their own participant
-  (entryCid, _) <- submitMulti [provider] [app.svc] $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryPayment with
+  (entryCid, _) <- submitUser provider.userId $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryPayment with
     acceptedAppPaymentCid
 
   -- we can't renew using regular payments; in the future, it won't be possible to register entries using regular payments either
 
-  submitMustFail provider $ exerciseCmd entryCid (DirectoryEntry_Expire provider)
+  submitMustFail provider.primaryParty $ exerciseCmd entryCid (DirectoryEntry_Expire provider.primaryParty)
 
   passTime (days 91)
 
-  submit provider $ exerciseCmd entryCid (DirectoryEntry_Expire provider)
+  submit provider.primaryParty $ exerciseCmd entryCid (DirectoryEntry_Expire provider.primaryParty)
 
   pure ()
 

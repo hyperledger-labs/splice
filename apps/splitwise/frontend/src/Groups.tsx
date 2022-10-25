@@ -344,22 +344,18 @@ const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({
   useInterval(fetchAcceptedAppMultiPayments, 500);
 
   const onRedeem = async (acceptedAppPayment: Contract<AcceptedAppPayment>) => {
-    const validator = await ledgerApiClient.getValidatorPartyId(party);
     await ledgerApiClient.completeTransfer(
       party,
       provider,
-      validator,
       key(group),
       acceptedAppPayment.contractId
     );
   };
 
   const onMultiRedeem = async (acceptedAppPayment: Contract<AcceptedAppMultiPayment>) => {
-    const validator = await ledgerApiClient.getValidatorPartyId(party);
     await ledgerApiClient.completeMultiTransfer(
       party,
       provider,
-      validator,
       key(group),
       acceptedAppPayment.contractId
     );

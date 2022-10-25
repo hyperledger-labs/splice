@@ -1,5 +1,6 @@
 package com.daml.network.validator.admin.grpc
 
+import com.daml.ledger.api.domain.UserRight.CanReadAs
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.util.{CoinUtil, Proto}
 import com.daml.network.validator.store.ValidatorStore
@@ -40,14 +41,9 @@ class GrpcValidatorAppService(
       span.setAttribute("name", name)
 
       for {
-        userPartyId <- connection.getOrAllocateParty(name)
-        _ <- CoinUtil.ExplicitDisclosureWorkaround.recordUserHostedAt(
-          userPartyId,
-          store.key.validatorParty,
-          logger,
-          connection,
-          retryProvider,
-          store.lookupCCUserHostedAtByParty,
+        userPartyId <- connection.getOrAllocateParty(
+          name,
+          Seq(CanReadAs(store.key.validatorParty.toLf)),
         )
         // Workaround for the lack of "act-as-any-party" rights
         _ <- connection.grantUserRights(validatorUserName, Seq(userPartyId), Seq.empty)

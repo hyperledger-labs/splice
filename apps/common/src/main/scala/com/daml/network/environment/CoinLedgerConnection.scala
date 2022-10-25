@@ -162,10 +162,11 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
 
   def getOptionalPrimaryParty(user: String): Future[Option[PartyId]]
 
-  def createPartyAndUser(user: String): Future[PartyId]
+  def createPartyAndUser(user: String, userRights: Seq[UserRight]): Future[PartyId]
 
   def getOrAllocateParty(
-      username: String
+      username: String,
+      userRights: Seq[UserRight] = Seq.empty,
   )(implicit traceContext: TraceContext): Future[PartyId]
 
   def listPackages()(implicit traceContext: TraceContext): Future[Set[String]]
@@ -482,14 +483,14 @@ object CoinLedgerConnection {
         } yield partyId
       }
 
-      override def createPartyAndUser(user: String): Future[PartyId] = {
+      override def createPartyAndUser(user: String, userRights: Seq[UserRight]): Future[PartyId] = {
         for {
           party <- allocatePartyViaLedgerApi(Some(sanitizePartyHint(user)), Some(user))
           userId = com.daml.lf.data.Ref.UserId.assertFromString(user)
           userLf = com.daml.ledger.api.domain.User(userId, Some(party.toLf))
 
           user <- client.userManagementClient
-            .createUser(userLf, List(CanActAs(party.toLf)), coinLedgerClient.token)
+            .createUser(userLf, CanActAs(party.toLf) +: userRights, coinLedgerClient.token)
           partyId =
             PartyId.tryFromLfParty(
               user.primaryParty
@@ -500,7 +501,8 @@ object CoinLedgerConnection {
 
       // TODO(M1-92): Factor out user/party allocation and make it robust (current implementation is racy)
       override def getOrAllocateParty(
-          username: String
+          username: String,
+          userRights: Seq[UserRight] = Seq.empty,
       )(implicit traceContext: TraceContext): Future[PartyId] = {
         for {
           existingPartyId <- getOptionalPrimaryParty(username).recover {
@@ -508,7 +510,9 @@ object CoinLedgerConnection {
                 if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
               None
           }
-          partyId <- existingPartyId.fold[Future[PartyId]](createPartyAndUser(username))(
+          partyId <- existingPartyId.fold[Future[PartyId]](
+            createPartyAndUser(username, userRights)
+          )(
             Future.successful
           )
         } yield partyId

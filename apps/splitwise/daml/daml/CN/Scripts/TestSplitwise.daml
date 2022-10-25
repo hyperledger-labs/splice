@@ -15,15 +15,15 @@ import CC.Scripts.Util
 import CN.Wallet
 
 
-createInstall : CCApp -> Party -> Party -> Script (ContractId SplitwiseInstall)
+createInstall : CCApp -> CCUser -> Party -> Script (ContractId SplitwiseInstall)
 createInstall app user provider = do
-  request <- submit user $ createCmd SplitwiseInstallRequest with ..
+  request <- submit user.primaryParty $ createCmd SplitwiseInstallRequest with user = user.primaryParty, ..
   submit provider $ exerciseCmd request SplitwiseInstallRequest_Accept
 
-createGroup : CCApp -> Party -> Party -> Text -> Script (ContractId Group)
+createGroup : CCApp -> CCUser -> Party -> Text -> Script (ContractId Group)
 createGroup app p provider id =
-  submit p $ exerciseByKeyCmd @SplitwiseInstall (p, provider) $ SplitwiseInstall_CreateGroup Group with
-    owner = p
+  submit p.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (p.primaryParty, provider) $ SplitwiseInstall_CreateGroup Group with
+    owner = p.primaryParty
     provider = provider
     members = []
     id = GroupId id
@@ -31,13 +31,13 @@ createGroup app p provider id =
     collectionDuration = minutes 5
     acceptDuration = minutes 5
 
-createInvite : Party -> Party -> GroupKey -> [Party] -> Script (ContractId GroupInvite)
+createInvite : CCUser -> Party -> GroupKey -> [Party] -> Script (ContractId GroupInvite)
 createInvite owner provider groupKey observers = do
-  submit owner $ exerciseByKeyCmd @SplitwiseInstall (owner, provider) SplitwiseInstall_CreateInvite with ..
+  submit owner.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (owner.primaryParty, provider) SplitwiseInstall_CreateInvite with ..
 
-acceptInvite : Party -> Party -> ContractId GroupInvite ->  Script (ContractId AcceptedGroupInvite)
+acceptInvite : CCUser -> Party -> ContractId GroupInvite ->  Script (ContractId AcceptedGroupInvite)
 acceptInvite invitee provider inviteCid =
-  submit invitee $ exerciseByKeyCmd @SplitwiseInstall (invitee, provider) (SplitwiseInstall_AcceptInvite inviteCid)
+  submit invitee.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (invitee.primaryParty, provider) (SplitwiseInstall_AcceptInvite inviteCid)
 
 joinAllInvites : Party -> Party -> Script ()
 joinAllInvites owner provider = do
@@ -45,33 +45,33 @@ joinAllInvites owner provider = do
   submit owner $
     mapA_ (\(cid, _) -> exerciseByKeyCmd @ SplitwiseInstall (owner, provider) (SplitwiseInstall_Join cid)) acceptedInvites
 
-net : Party -> Party -> GroupKey -> Map Party (Map Party Decimal) -> Script (ContractId BalanceUpdate)
+net : CCUser -> Party -> GroupKey -> Map Party (Map Party Decimal) -> Script (ContractId BalanceUpdate)
 net owner provider groupKey balanceChanges =
-  submit owner $ exerciseByKeyCmd @SplitwiseInstall (owner, provider) SplitwiseInstall_Net with ..
+  submit owner.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (owner.primaryParty, provider) SplitwiseInstall_Net with ..
 
 
 -- | Query all balances for the current party in the given group.
 -- Returns a map from parties to their balance in relation to the given party.
 -- Positive: They owe you, negative: you owe them.
-queryBalances : Party -> GroupKey -> Script (Map Party Decimal)
+queryBalances : CCUser -> GroupKey -> Script (Map Party Decimal)
 queryBalances p k = do
-    updates <- queryFilter @BalanceUpdate p (\u -> key u.group == k)
+    updates <- queryFilter @BalanceUpdate p.primaryParty (\u -> key u.group == k)
     pure $ M.filter (/= 0.0) $ foldl f M.empty (map snd updates)
   where
     f acc BalanceUpdate{..} = case update of
       ExternalPayment {..} ->
         let split = quantity / intToNumeric (length group.members + 1) -- TODO(M1-90) Make sure nothing gets lost here.
-        in if payer == p
+        in if payer == p.primaryParty
              then let g acc x
                         | x == payer = acc
                         | otherwise = insertWith (+) x split acc
                   in foldl g acc (group.owner :: group.members)
              else insertWith (+) payer (-split) acc
       Transfer {..}
-        | p == sender -> insertWith (+) receiver quantity acc
-        | p == receiver -> insertWith (+) sender (- quantity) acc
+        | p.primaryParty == sender -> insertWith (+) receiver quantity acc
+        | p.primaryParty == receiver -> insertWith (+) sender (- quantity) acc
         | otherwise -> acc
-      Netting {..} -> case M.lookup p balanceChanges of
+      Netting {..} -> case M.lookup p.primaryParty balanceChanges of
         None -> acc
         Some changes -> foldl (\acc (p', v) -> insertWith (+) p' v acc) acc (M.toList changes)
 
@@ -82,28 +82,26 @@ insertWith f k v m =
     None -> M.insert k v m
     Some v' -> M.insert k (f v v') m
 
-enterPayment : Party -> Party -> GroupKey -> Decimal -> Text -> Script ()
+enterPayment : CCUser -> Party -> GroupKey -> Decimal -> Text -> Script ()
 enterPayment payer provider groupKey quantity description =
-  void $ submit payer $ exerciseByKeyCmd @SplitwiseInstall (payer, provider) SplitwiseInstall_EnterPayment with ..
+  void $ submit payer.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (payer.primaryParty, provider) SplitwiseInstall_EnterPayment with ..
 
-initiateTransfer : Party -> Party -> GroupKey -> Party -> Decimal -> Script (ContractId AppPaymentRequest)
+initiateTransfer : CCUser -> Party -> GroupKey -> Party -> Decimal -> Script (ContractId AppPaymentRequest)
 initiateTransfer sender provider groupKey receiver quantity =
-  submit sender $ exerciseByKeyCmd @SplitwiseInstall (sender, provider) SplitwiseInstall_InitiateTransfer with ..
+  submit sender.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider) SplitwiseInstall_InitiateTransfer with ..
 
-completeTransfer : Party -> Party -> GroupKey -> ContractId AcceptedAppPayment -> Script ()
+completeTransfer : CCUser -> Party -> GroupKey -> ContractId AcceptedAppPayment -> Script ()
 completeTransfer sender provider groupKey acceptedPaymentCid = do
-  validator <- getHostingValidator sender
-  void $ submitMulti [sender] [validator] $ exerciseByKeyCmd @SplitwiseInstall (sender, provider) SplitwiseInstall_CompleteTransfer with ..
+  void $ submitUser sender.userId $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider) SplitwiseInstall_CompleteTransfer with ..
 
 
-initiateMultiTransfer : Party -> Party -> GroupKey -> [ReceiverQuantity] -> Script (ContractId AppMultiPaymentRequest)
+initiateMultiTransfer : CCUser -> Party -> GroupKey -> [ReceiverQuantity] -> Script (ContractId AppMultiPaymentRequest)
 initiateMultiTransfer sender provider groupKey receiverQuantities =
-  submit sender $ exerciseByKeyCmd @SplitwiseInstall (sender, provider) SplitwiseInstall_InitiateMultiTransfer with ..
+  submit sender.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider) SplitwiseInstall_InitiateMultiTransfer with ..
 
-completeMultiTransfer : Party -> Party -> GroupKey -> ContractId AcceptedAppMultiPayment -> Script ()
+completeMultiTransfer : CCUser -> Party -> GroupKey -> ContractId AcceptedAppMultiPayment -> Script ()
 completeMultiTransfer sender provider groupKey acceptedPaymentCid = do
-  validator <- getHostingValidator sender
-  void $ submitMulti [sender] [validator] $ exerciseByKeyCmd @SplitwiseInstall (sender, provider) SplitwiseInstall_CompleteMultiTransfer with ..
+  void $ submitUser sender.userId $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider) SplitwiseInstall_CompleteMultiTransfer with ..
 
 testSelfHosted = script do
   app <- setupApp
@@ -115,7 +113,7 @@ testSelfHosted = script do
   bob <- setupUser app "bob" validator
   charlie <- setupUser app "charlie" validator
   testCase app Parties with
-    getProvider = identity
+    getProvider = \x -> x.primaryParty
     ..
 
 testProviderHosted = script do
@@ -129,7 +127,7 @@ testProviderHosted = script do
   charlie <- setupUser app "charlie" validator
   provider <- setupUser app "provider" validator
   testCase app Parties with
-    getProvider = const provider
+    getProvider = const provider.primaryParty
     ..
 
 -- | Parties used in the test.
@@ -139,10 +137,10 @@ testProviderHosted = script do
 -- to the user.
 data Parties = Parties
   with
-    alice : Party
-    bob : Party
-    charlie : Party
-    getProvider : Party -> Party
+    alice : CCUser
+    bob : CCUser
+    charlie : CCUser
+    getProvider : CCUser -> Party
 
 testCase : CCApp -> Parties -> Script ()
 testCase app Parties{..} = do
@@ -151,17 +149,17 @@ testCase app Parties{..} = do
   createInstall app charlie (getProvider charlie)
 
   groupCid <- createGroup app alice (getProvider alice) "group0"
-  let groupKey = GroupKey alice (getProvider alice) (GroupId "group0")
-  groupInviteCid <- createInvite alice (getProvider alice) groupKey [bob, charlie]
+  let groupKey = GroupKey alice.primaryParty (getProvider alice) (GroupId "group0")
+  groupInviteCid <- createInvite alice (getProvider alice) groupKey [bob.primaryParty, charlie.primaryParty]
 
   acceptInvite bob (getProvider bob) groupInviteCid
-  joinAllInvites alice (getProvider alice)
+  joinAllInvites alice.primaryParty (getProvider alice)
 
   acceptInvite charlie (getProvider charlie) groupInviteCid
-  joinAllInvites alice (getProvider alice)
+  joinAllInvites alice.primaryParty (getProvider alice)
 
-  Some (_, group) <- queryContractKey @Group alice groupKey
-  sort group.members === [bob, charlie]
+  Some (_, group) <- queryContractKey @Group alice.primaryParty groupKey
+  sort group.members === [bob.primaryParty, charlie.primaryParty]
 
   balance <- queryBalances alice (key group)
   balance === M.empty
@@ -173,59 +171,59 @@ testCase app Parties{..} = do
   enterPayment alice (getProvider alice) (key group) 63.0 "foo"
 
   balance <- queryBalances alice (key group)
-  balance === M.fromList [(bob, 21.0), (charlie, 21.0)]
+  balance === M.fromList [(bob.primaryParty, 21.0), (charlie.primaryParty, 21.0)]
   balance <- queryBalances bob (key group)
-  balance === M.fromList [(alice, -21.0)]
+  balance === M.fromList [(alice.primaryParty, -21.0)]
   balance <- queryBalances charlie (key group)
-  balance === M.fromList [(alice, -21.0)]
+  balance === M.fromList [(alice.primaryParty, -21.0)]
 
   enterPayment bob (getProvider bob) (key group) 33.0 "foo"
   balance <- queryBalances alice (key group)
-  balance === M.fromList [(bob, 10.0), (charlie, 21.0)]
+  balance === M.fromList [(bob.primaryParty, 10.0), (charlie.primaryParty, 21.0)]
   balance <- queryBalances bob (key group)
-  balance === M.fromList [(alice, -10.0), (charlie, 11.0)]
+  balance === M.fromList [(alice.primaryParty, -10.0), (charlie.primaryParty, 11.0)]
   balance <- queryBalances charlie (key group)
-  balance === M.fromList [(alice, -21.0), (bob, -11.0)]
+  balance === M.fromList [(alice.primaryParty, -21.0), (bob.primaryParty, -11.0)]
 
-  request <- initiateTransfer alice (getProvider alice) (key group) bob 8.0
+  request <- initiateTransfer alice (getProvider alice) (key group) bob.primaryParty 8.0
   coin <- tap app alice 63.0
   receipt <- acceptPaymentRequest app alice request coin
 
   completeTransfer alice (getProvider alice) (key group) receipt
 
   balance <- queryBalances alice (key group)
-  balance === M.fromList [(bob, 18.0), (charlie, 21.0)]
+  balance === M.fromList [(bob.primaryParty, 18.0), (charlie.primaryParty, 21.0)]
   balance <- queryBalances bob (key group)
-  balance === M.fromList [(alice, -18.0), (charlie, 11.0)]
+  balance === M.fromList [(alice.primaryParty, -18.0), (charlie.primaryParty, 11.0)]
   balance <- queryBalances charlie (key group)
-  balance === M.fromList [(alice, -21.0), (bob, -11.0)]
+  balance === M.fromList [(alice.primaryParty, -21.0), (bob.primaryParty, -11.0)]
 
   request <- initiateMultiTransfer charlie (getProvider charlie) (key group) [
-      ReceiverQuantity alice 39.0,
-      ReceiverQuantity bob 11.0
+      ReceiverQuantity alice.primaryParty 39.0,
+      ReceiverQuantity bob.primaryParty 11.0
     ]
   coin <- tap app charlie 55.0
   receipt <- acceptMultiPaymentRequest app charlie request coin
   completeMultiTransfer charlie (getProvider charlie) (key group) receipt
 
   balance <- queryBalances alice (key group)
-  balance === M.fromList [(bob, 18.0), (charlie, -18.0)]
+  balance === M.fromList [(bob.primaryParty, 18.0), (charlie.primaryParty, -18.0)]
   balance <- queryBalances bob (key group)
-  balance === M.fromList [(alice, -18.0)]
+  balance === M.fromList [(alice.primaryParty, -18.0)]
   balance <- queryBalances charlie (key group)
-  balance === M.fromList [(alice, 18.0)]
+  balance === M.fromList [(alice.primaryParty, 18.0)]
 
   net alice (getProvider alice) (key group) $ M.fromList
-    [ (alice, M.fromList [(bob, -18.0), (charlie, 18.0)])
-    , (bob, M.fromList [(alice, 18.0), (charlie, -18.0)])
-    , (charlie, M.fromList [(alice, -18.0), (bob, 18.0)])
+    [ (alice.primaryParty, M.fromList [(bob.primaryParty, -18.0), (charlie.primaryParty, 18.0)])
+    , (bob.primaryParty, M.fromList [(alice.primaryParty, 18.0), (charlie.primaryParty, -18.0)])
+    , (charlie.primaryParty, M.fromList [(alice.primaryParty, -18.0), (bob.primaryParty, 18.0)])
     ]
 
   balance <- queryBalances alice (key group)
   balance === M.empty
   balance <- queryBalances bob (key group)
-  balance === M.fromList [(charlie, -18.0)]
+  balance === M.fromList [(charlie.primaryParty, -18.0)]
   balance <- queryBalances charlie (key group)
-  balance === M.fromList [(bob, 18.0)]
+  balance === M.fromList [(bob.primaryParty, 18.0)]
 
   pure ()
