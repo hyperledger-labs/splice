@@ -4,7 +4,6 @@ import akka.stream.Materializer
 import com.daml.network.codegen.CN.Wallet.WalletAppInstall
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.util.Contract
-import com.daml.network.wallet.admin.grpc.EndUserTreasuryService
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.Lifecycle

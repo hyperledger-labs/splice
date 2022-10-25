@@ -15,7 +15,11 @@ import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, Contract, Proto, Value}
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
-import com.daml.network.wallet.treasury.TreasuryServices
+import com.daml.network.wallet.treasury.{
+  CoinOperationRequest,
+  EndUserTreasuryService,
+  TreasuryServices,
+}
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.{CollectRewardsRequest, WalletServiceGrpc}
 import com.daml.network.v0 as networkV0
@@ -148,7 +152,7 @@ class GrpcWalletService(
           for {
             svcParty <- scanConnection.getSvcPartyId()
           } yield {
-            CoinOperationWithLookups(
+            CoinOperationRequest(
               CoinOperation.CO_Tap(
                 svcParty.toPrim,
                 validatorParty.toPrim,
@@ -250,7 +254,7 @@ class GrpcWalletService(
             } yield ()
 
           Future.successful(
-            CoinOperationWithLookups(CoinOperation.CO_AppMultiPayment(requestCid), lookups)
+            CoinOperationRequest(CoinOperation.CO_AppMultiPayment(requestCid), lookups)
           )
         })(
           user,
@@ -288,7 +292,7 @@ class GrpcWalletService(
             } yield ()
 
           Future.successful(
-            CoinOperationWithLookups(CoinOperation.CO_AppPayment(requestCid), lookups)
+            CoinOperationRequest(CoinOperation.CO_AppPayment(requestCid), lookups)
           )
         })(
           user,
@@ -428,7 +432,7 @@ class GrpcWalletService(
             } yield ()
 
           Future.successful(
-            CoinOperationWithLookups(
+            CoinOperationRequest(
               CoinOperation.CO_SubscriptionAcceptAndMakeInitialPayment(requestCid),
               lookups,
             )
@@ -494,7 +498,7 @@ class GrpcWalletService(
             } yield ()
 
           Future.successful(
-            CoinOperationWithLookups(CoinOperation.CO_SubscriptionMakePayment(stateCid), lookups)
+            CoinOperationRequest(CoinOperation.CO_SubscriptionMakePayment(stateCid), lookups)
           )
         })(
           user,
@@ -676,7 +680,7 @@ class GrpcWalletService(
           for {
             svcUser <- scanConnection.getSvcPartyId()
           } yield {
-            CoinOperationWithLookups(
+            CoinOperationRequest(
               CoinOperation.CO_ChannelTransfer(
                 endUserParty.toPrim,
                 receiverParty.toPrim,
@@ -836,7 +840,7 @@ class GrpcWalletService(
           } yield ()
 
         Future.successful(
-          CoinOperationWithLookups(CoinOperation.CO_ChannelPayment(requestCid), lookups)
+          CoinOperationRequest(CoinOperation.CO_ChannelPayment(requestCid), lookups)
         )
       })(
         user,
@@ -977,7 +981,7 @@ class GrpcWalletService(
           Primitive.ContractId[walletCodegen.WalletAppInstall],
           EndUserWalletStore,
           // TODO(#756): also require quantity to reject commands early?
-      ) => Future[CoinOperationWithLookups]
+      ) => Future[CoinOperationRequest]
   )(
       user: String,
       // TODO(#756): possibly adjust the return type here depending on the caller

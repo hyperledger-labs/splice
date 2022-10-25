@@ -1,13 +1,15 @@
-package com.daml.network.wallet.admin.grpc
+package com.daml.network.wallet.treasury
 
+import akka.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import akka.stream.scaladsl.{Keep, Sink, Source}
-import akka.stream.{BoundedSourceQueue, Materializer}
+import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import cats.syntax.traverse.*
 import com.daml.network.codegen.CC.{Coin as coinCodegen, CoinRules as coinRulesCodegen}
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.util.Contract
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
+import com.daml.network.wallet.treasury.EndUserTreasuryService.*
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FlagCloseable
@@ -15,20 +17,20 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.retry
 import com.digitalasset.canton.util.retry.Backoff
+import io.grpc.{Status, StatusRuntimeException}
 
-import java.util.UUID
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
-
-import EndUserTreasuryService.*
 // TODO(#756): Add PrettyPrinting
 
-/** Wrapper helper class.
-  * We want to avoid a batch being aborted for anything other than contention errors. Some errors can be caught
-  * within Daml to avoid aborting the transaction. However, contract activeness cannot be caught in Daml. Therefore,
-  * we check that certain contracts required for the operation are active. That way, a batch can only fail
-  * due to contention and we can retry it (including retrying the lookups).
+/** Wrapper class for the treasury service.
+  *
+  * Inside the treasury service, we want to avoid a batch being aborted for anything other
+  * than contention errors. Some errors can be caught within Daml to avoid aborting the transaction. However, contract
+  * activeness cannot be caught in Daml. Therefore, we check that certain contracts required for the operation
+  * are active via lookups. That way, we know that if a batch failed it can only be due to contention and
+  * we can safely resubmit it.
   *
   * Note that we don't check that contracts managed by the SVC (CoinRules, IssuanceState, OpenMiningRound etc.) are
   * active. These contracts should always be active (even under contention) and a non-SVC CN user isn't able
@@ -39,15 +41,16 @@ import EndUserTreasuryService.*
   * [[io.grpc.StatusRuntimeException]]. We execute `tryLookups` run on every submission of the corresponding
   * coin operation (also for retries).
   */
-case class CoinOperationWithLookups(
+case class CoinOperationRequest(
     operation: walletCodegen.CoinOperation,
     tryLookups: () => Future[Unit],
 )
 
-/** This class encapsulates the logic that takes operations changing the coin holdings of an user and sequences them
-  * such that concurrent manipulations don't conflict.
+/** This class encapsulates the logic that sequences all operations which change the coin holdings of an user such
+  * that concurrent manipulations don't conflict.
   *
-  * For the design, please see https://github.com/DACH-NY/the-real-canton-coin/issues/913.
+  * For the design, please see https://github.com/DACH-NY/the-real-canton-coin/issues/913 and the documentation on
+  * [[CoinOperationRequest]].
   */
 case class EndUserTreasuryService(
     connection: CoinLedgerConnection,
@@ -65,8 +68,8 @@ case class EndUserTreasuryService(
   private val bufferSize = 1000
   private val waitTimeForStore = 300.millis
 
-  private val queue: BoundedSourceQueue[CoinOperationAndPromise] = Source
-    .queue[CoinOperationAndPromise](bufferSize)
+  private val queue: BoundedSourceQueue[EnqueuedCoinOperation] = Source
+    .queue[EnqueuedCoinOperation](bufferSize)
     // TODO(#756): Possible extension: re-order commands according to urgency
     .batch(batchSize, operation => Seq(operation))((operations, operation) =>
       operations :+ operation
@@ -85,27 +88,45 @@ case class EndUserTreasuryService(
     * The [[EndUserTreasuryService]] will schedule the operation and then complete the returned with its result.
     */
   def enqueueCoinOperation(
-      operation: CoinOperationWithLookups
+      operation: CoinOperationRequest
   )(implicit tc: TraceContext): Future[walletCodegen.CoinOperationOutcome] = {
     // TODO(#756): possibly allow callers to assign semantically meaningful ids (see the discussion
     //  at https://github.com/DACH-NY/the-real-canton-coin/pull/1145#discussion_r994508807)
-    val id = UUID.randomUUID().toString
-    // TODO(#756): error handling
     val p = Promise[walletCodegen.CoinOperationOutcome]()
-    queue.offer(CoinOperationAndPromise(CoinOperationWithIdAndLookups(id, operation), p)): Unit
-    logger.trace(s"received ${operation}, queue now: ${queue.size()}")
-    p.future
+    queue.offer(EnqueuedCoinOperation(operation, p)) match {
+      case Enqueued =>
+        logger.trace(s"received ${operation}, queue now: ${queue.size()}")
+        p.future
+      // TODO(M3-90): add tests for the failure cases.
+      case Dropped =>
+        Future.failed(
+          new StatusRuntimeException(
+            Status.ABORTED.withDescription(
+              s"operation $operation was aborted, probably as there are too many (${queue.size()}) already in flight"
+            )
+          )
+        )
+      case QueueOfferResult.Failure(cause) => Future.failed(cause)
+      case QueueClosed =>
+        Future.failed(
+          new StatusRuntimeException(
+            Status.RESOURCE_EXHAUSTED.withDescription(
+              s"operation $operation was rejected because the queue is already closed. This indicates a shutdown."
+            )
+          )
+        )
+    }
   }
 
   /** Runs the lookups, only returns the operation whose lookup succeeded and completes the promises for
     * the coin operations with failed lookups.
     */
   private def runLookups(
-      batch: Seq[CoinOperationAndPromise]
-  ): Future[Seq[CoinOperationAndPromise]] = {
+      batch: Seq[EnqueuedCoinOperation]
+  ): Future[Seq[EnqueuedCoinOperation]] = {
     batch
-      .traverse { case CoinOperationAndPromise(coinOperation, p) =>
-        coinOperation.operationWithLookups
+      .traverse { case EnqueuedCoinOperation(coinOperation, p) =>
+        coinOperation
           .tryLookups()
           .transform { lookupResult =>
             lookupResult match {
@@ -114,7 +135,8 @@ case class EndUserTreasuryService(
                 p.failure(ex)
                 // but still run the rest of the operations whose lookup didn't fail
                 Success(None)
-              case Success(operation) => Success(Some(CoinOperationAndPromise(coinOperation, p)))
+              case Success(operation) =>
+                Success(Some(EnqueuedCoinOperation(coinOperation, p)))
             }
           }
       }
@@ -126,7 +148,7 @@ case class EndUserTreasuryService(
     * to the wallet app.
     */
   private def executeBatchWithRetry(
-      batch: Seq[CoinOperationAndPromise]
+      batch: Seq[EnqueuedCoinOperation]
   ): Future[Unit] =
     TraceContext.withNewTraceContext { implicit tc =>
       val maxRetries: Int = 3
@@ -146,7 +168,7 @@ case class EndUserTreasuryService(
     }
 
   private def executeBatch(
-      batch: Seq[CoinOperationAndPromise]
+      batch: Seq[EnqueuedCoinOperation]
   )(implicit tc: TraceContext): Future[Unit] = {
 
     logger.debug(
@@ -165,7 +187,7 @@ case class EndUserTreasuryService(
       cmd =
         install.contractId.exerciseWalletAppInstall_ExecuteBatch(
           inputs,
-          validOperations.map(_.operationWithIdAndLookups.operationWithLookups.operation),
+          validOperations.map(_.operationWithLookups.operation),
         )
       outcomes <- connection
         .submitWithResult(
@@ -174,7 +196,7 @@ case class EndUserTreasuryService(
           cmd,
         )
       _ = (outcomes zip validOperations).map {
-        case (outcome, CoinOperationAndPromise(operation, p)) =>
+        case (outcome, EnqueuedCoinOperation(operation, p)) =>
           p.success(outcome)
       }
     } yield ()
@@ -188,14 +210,9 @@ case class EndUserTreasuryService(
 
 object EndUserTreasuryService {
 
-  /** Wrapper helper classes. */
-  private case class CoinOperationWithIdAndLookups(
-      id: String,
-      operationWithLookups: CoinOperationWithLookups,
-  )
-
-  private case class CoinOperationAndPromise(
-      operationWithIdAndLookups: CoinOperationWithIdAndLookups,
+  /** Wrapper helper class. */
+  private case class EnqueuedCoinOperation(
+      operationWithLookups: CoinOperationRequest,
       promise: Promise[walletCodegen.CoinOperationOutcome],
   )
 
