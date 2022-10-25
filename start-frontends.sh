@@ -2,17 +2,16 @@
 set -eou pipefail
 
 function build_dependencies() {
-  cd "${REPO_ROOT}/apps"
 
-  if [[ -z "$(ls ../target/scala* 2>/dev/null)" ]]; then
-    echo "No compilation artifacts found in app ${app}. Please compile the repo before starting frontends" 1>&2
-    exit 1
-  fi
+  cd "${REPO_ROOT}"
+  sbt apps-frontends/compile
+  cd -
+
+  cd "${REPO_ROOT}/apps"
 
   "${REPO_ROOT}/build-tools/npm-install.sh"
 
   # build dependencies
-  npm run build --workspace common-protobuf
   npm run build --workspace common-frontend
   cd -
 }
