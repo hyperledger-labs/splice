@@ -1,8 +1,9 @@
-package com.daml.network.svc.admin
+package com.daml.network.scan.automation
 
 import com.daml.network.admin.LedgerAutomationServiceOrchestrator
 import com.daml.network.environment.CoinLedgerClient
-import com.daml.network.svc.store.SvcStore
+import com.daml.network.scan.admin.{ReadCoinTransactionsService, ReadReferenceDataService}
+import com.daml.network.scan.store.ScanCCHistoryStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -11,16 +12,14 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContextExecutor
 
-/** Background automation to collect audit log entries, which currently consists of only
-  * the collection of all transfers results, for summary when closing the round.
+/** Manages background automation that runs on a CC Scan app.
   */
-// TODO(M1-52): integrate log collection into our store infrastructure as part of the work on automating rewards issuance
-class SvcLogCollectionService(
+class ScanAutomationService(
     svcParty: PartyId,
     ledgerClient: CoinLedgerClient,
     loggerFactory: NamedLoggerFactory,
     processingTimeouts: ProcessingTimeout,
-    store: SvcStore,
+    store: ScanCCHistoryStore,
 )(implicit
     ec: ExecutionContextExecutor,
     tracer: Tracer,
@@ -30,15 +29,20 @@ class SvcLogCollectionService(
     ) {
   override protected def timeouts: ProcessingTimeout = processingTimeouts
 
-  val roundSummaryCollection =
-    createService("svcRoundSummaryCollectionService", ledgerClient, Seq(svcParty)) { connection =>
-      new RoundSummaryCollectionService(svcParty, connection, store.events, loggerFactory)
+  val readCoinTransactions =
+    createService("Scan:ReadCoinTransactionsService", ledgerClient, Seq(svcParty)) { connection =>
+      new ReadCoinTransactionsService(svcParty, connection, store, loggerFactory)
+    }
+
+  val readReferenceData =
+    createService("Scan:ReadReferenceData", ledgerClient, Seq(svcParty)) { connection =>
+      new ReadReferenceDataService(svcParty, connection, store, loggerFactory)
     }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq[AsyncOrSyncCloseable](
     SyncCloseable(
-      "SVC automation services",
-      Lifecycle.close(roundSummaryCollection)(logger),
+      "Scan automation services",
+      Lifecycle.close(readCoinTransactions, readReferenceData)(logger),
     )
   )
 }

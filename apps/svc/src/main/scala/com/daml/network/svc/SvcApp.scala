@@ -8,9 +8,8 @@ import com.daml.network.codegen.CC.Coin.Coin
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.svc.admin.SvcLogCollectionService
 import com.daml.network.svc.admin.grpc.GrpcSvcAppService
-import com.daml.network.svc.automation.SvcAutomationService
+import com.daml.network.svc.automation.{SvcAutomationService, SvcLogCollectionService}
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0.SvcServiceGrpc

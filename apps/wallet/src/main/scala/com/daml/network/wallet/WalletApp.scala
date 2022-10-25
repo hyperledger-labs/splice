@@ -9,8 +9,8 @@ import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.validator.admin.api.client.ValidatorConnection
-import com.daml.network.wallet.admin.WalletAutomationService
 import com.daml.network.wallet.admin.grpc.GrpcWalletService
+import com.daml.network.wallet.automation.WalletAutomationService
 import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.daml.network.wallet.store.WalletStore
 import com.daml.network.wallet.treasury.TreasuryServices

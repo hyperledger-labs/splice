@@ -1,5 +1,4 @@
-// TODO(#790): move to 'wallet.automation'
-package com.daml.network.wallet.admin
+package com.daml.network.wallet.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{AcsIngestionService, AutomationService}

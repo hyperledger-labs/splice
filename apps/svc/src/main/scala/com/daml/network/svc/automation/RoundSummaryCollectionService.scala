@@ -1,4 +1,4 @@
-package com.daml.network.svc.admin
+package com.daml.network.svc.automation
 
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.v1.event.ExercisedEvent
@@ -10,7 +10,7 @@ import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
 import com.daml.network.codegen.CC.CoinRules.{CoinRules, TransferResult}
 import com.daml.network.codegen.DA
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.history._
+import com.daml.network.history.*
 import com.daml.network.svc.store.SvcEventsStore
 import com.daml.network.util.{ExerciseNode, Trees}
 import com.digitalasset.canton.lifecycle.Lifecycle

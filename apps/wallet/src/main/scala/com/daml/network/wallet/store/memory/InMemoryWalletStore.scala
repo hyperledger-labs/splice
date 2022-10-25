@@ -1,10 +1,11 @@
-package com.daml.network.wallet.store
+package com.daml.network.wallet.store.memory
 
 import com.daml.network.store.{AcsStore, InMemoryAcsStore}
+import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 
-import scala.concurrent._
+import scala.concurrent.*
 
 class InMemoryWalletStore(
     override val key: WalletStore.Key,

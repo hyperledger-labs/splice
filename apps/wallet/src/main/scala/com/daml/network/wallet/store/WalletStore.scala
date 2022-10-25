@@ -2,12 +2,13 @@ package com.daml.network.wallet.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.network.codegen.CN.{Wallet => walletCodegen}
+import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.store.AcsStore
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.Contract
+import com.daml.network.wallet.store.memory.InMemoryWalletStore
 import com.digitalasset.canton.lifecycle.Lifecycle
-import com.digitalasset.canton.logging.pretty._
+import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId

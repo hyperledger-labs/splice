@@ -2,11 +2,11 @@ package com.daml.network.scan
 
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.codegen.{CC => coinCodegen}
+import com.daml.network.codegen.CC as coinCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode}
-import com.daml.network.scan.admin.ScanAutomationService
 import com.daml.network.scan.admin.grpc.GrpcScanService
+import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.config.LocalScanAppConfig
 import com.daml.network.scan.store.ScanCCHistoryStore
 import com.daml.network.scan.v0.ScanServiceGrpc
