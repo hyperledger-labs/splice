@@ -1,6 +1,6 @@
-import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
+import { Contract } from 'common-frontend';
 
-import { Contract } from './Contract';
+import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 
 export interface Entry {
   user: string;

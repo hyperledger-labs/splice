@@ -1,4 +1,4 @@
-import { sameContracts, useDirectoryClient, useInterval } from 'common-frontend';
+import { Contract, sameContracts, useDirectoryClient, useInterval } from 'common-frontend';
 import { ErrorBoundary } from 'common-frontend';
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useCallback, useEffect, useState } from 'react';
@@ -8,7 +8,6 @@ import { AppBar, Box, CssBaseline, Toolbar, Typography } from '@mui/material';
 import { DirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 
 import './App.css';
-import { Contract } from './Contract';
 import DirectoryEntries from './DirectoryEntries';
 import Home from './Home';
 import Login from './Login';

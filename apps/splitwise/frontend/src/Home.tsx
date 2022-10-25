@@ -9,7 +9,10 @@ import { SplitwiseInstall, SplitwiseInstallRequest } from '@daml.js/splitwise/li
 import DirectoryEntries from './DirectoryEntries';
 import GroupSetup from './GroupSetup';
 import Groups from './Groups';
-import { useLedgerApiClient, LedgerApiClientProvider } from './LedgerApiContext';
+import {
+  useSplitwiseLedgerApiClient,
+  SplitwiseLedgerApiClientProvider,
+} from './contexts/SplitwiseLedgerApiContext';
 import { useSplitwiseClient } from './contexts/SplitwiseServiceContext';
 import { config } from './utils';
 
@@ -19,7 +22,7 @@ const HomeWithContext: React.FC<{
   dirEntries: DirectoryEntries;
 }> = ({ userId, svc, dirEntries }) => {
   const splitwiseClient = useSplitwiseClient();
-  const ledgerApiClient = useLedgerApiClient();
+  const ledgerApiClient = useSplitwiseLedgerApiClient();
 
   const [provider, setProvider] = useState<string | undefined>();
   const [party, setParty] = useState<string | undefined>();
@@ -35,7 +38,7 @@ const HomeWithContext: React.FC<{
 
   useEffect(() => {
     const fetchParty = async () => {
-      const party = await ledgerApiClient.getPrimaryParty(userId);
+      const party = await ledgerApiClient.getPrimaryParty();
       setParty(party);
     };
     fetchParty();
@@ -101,9 +104,9 @@ const Home: React.FC<{ userId: string; svc: string | undefined; dirEntries: Dire
   svc,
   dirEntries,
 }) => (
-  <LedgerApiClientProvider url={config.ledgerApi.grpcUrl} userId={userId}>
+  <SplitwiseLedgerApiClientProvider url={config.ledgerApi.grpcUrl} userId={userId}>
     <HomeWithContext userId={userId} svc={svc} dirEntries={dirEntries} />
-  </LedgerApiClientProvider>
+  </SplitwiseLedgerApiClientProvider>
 );
 
 export default Home;

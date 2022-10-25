@@ -1,4 +1,3 @@
-import { Contract } from 'common-frontend';
 import { ActiveContractsServicePromiseClient } from 'common-protobuf/com/daml/ledger/api/v1/active_contracts_service_grpc_web_pb';
 import { GetActiveContractsRequest } from 'common-protobuf/com/daml/ledger/api/v1/active_contracts_service_pb';
 import { UserManagementServicePromiseClient } from 'common-protobuf/com/daml/ledger/api/v1/admin/user_management_service_grpc_web_pb';
@@ -22,17 +21,17 @@ import { Identifier, Value } from 'common-protobuf/com/daml/ledger/api/v1/value_
 import React, { useContext } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
-import { DirectoryEntry, DirectoryInstall } from '@daml.js/directory/lib/CN/Directory';
+import { CCUserHostedAt } from '@daml.js/canton-coin/lib/CC/Scripts/Util';
 import { Choice, ContractId, Template } from '@daml/types';
 
-class LedgerApiClient {
+import { Contract } from '..';
+
+// exported so it can be extended by apps
+export class LedgerApiClient {
   activeContractsServiceClient: ActiveContractsServicePromiseClient;
   commandServiceClient: CommandServicePromiseClient;
   userManagementServiceClient: UserManagementServicePromiseClient;
   userId: string;
-
-  collectionDuration: string = (5 * 60 * 1000000).toString();
-  acceptDuration: string = (5 * 60 * 1000000).toString();
 
   constructor(
     activeContractsServiceClient: ActiveContractsServicePromiseClient,
@@ -159,16 +158,10 @@ class LedgerApiClient {
     return contracts;
   }
 
-  async queryDirectoryInstall(user: string, provider: string) {
-    const response = await this.queryAcs(user, DirectoryInstall);
-    return response.find(c => c.payload.user === user && c.payload.provider === provider);
-  }
-
-  async queryOwnedDirectoryEntries(user: string, provider: string) {
-    // We query through our own participant here so we get filtering to entries visible only to us.
-    // Alternatively, we could add a filtered API on the provider.
-    const response = await this.queryAcs(user, DirectoryEntry);
-    return response.filter(c => c.payload.user === user && c.payload.provider === provider);
+  async getValidatorPartyId(user: string): Promise<string> {
+    const contracts = await this.queryAcs(user, CCUserHostedAt);
+    const r = contracts.find(c => c.payload.user === user)!;
+    return r.payload.validator;
   }
 
   async getPrimaryParty(): Promise<string> {
@@ -180,38 +173,49 @@ class LedgerApiClient {
   }
 }
 
-const LedgerApiClientContext = React.createContext<LedgerApiClient | undefined>(undefined);
-
-interface LedgerApiClientProps {
+export interface LedgerApiClientProps {
   url: string;
   userId: string;
 }
 
-export const LedgerApiClientProvider: React.FC<React.PropsWithChildren<LedgerApiClientProps>> = ({
-  children,
-  url,
-  userId,
-}) => {
-  const activeContractsClient = new ActiveContractsServicePromiseClient(url);
-  const commandServiceClient = new CommandServicePromiseClient(url);
-  const userManagementClient = new UserManagementServicePromiseClient(url);
-  const splitwiseClient = new LedgerApiClient(
-    activeContractsClient,
-    commandServiceClient,
-    userManagementClient,
-    userId
-  );
-  return (
-    <LedgerApiClientContext.Provider value={splitwiseClient}>
-      {children}
-    </LedgerApiClientContext.Provider>
-  );
+// use this to create a Provider component and a use function in case you extended LedgerApiClient
+export const buildLedgerApiClientInterface = <T extends LedgerApiClient>(c: {
+  new (
+    activeContractsServiceClient: ActiveContractsServicePromiseClient,
+    commandServiceClient: CommandServicePromiseClient,
+    userManagementServiceClient: UserManagementServicePromiseClient,
+    userId: string
+  ): T;
+}): [React.FC<React.PropsWithChildren<LedgerApiClientProps>>, () => T] => {
+  const context = React.createContext<T | undefined>(undefined);
+
+  const LedgerApiClientProvider: React.FC<React.PropsWithChildren<LedgerApiClientProps>> = ({
+    children,
+    url,
+    userId,
+  }) => {
+    const activeContractsClient = new ActiveContractsServicePromiseClient(url);
+    const commandServiceClient = new CommandServicePromiseClient(url);
+    const userManagementClient = new UserManagementServicePromiseClient(url);
+    const apiClient = new c(
+      activeContractsClient,
+      commandServiceClient,
+      userManagementClient,
+      userId
+    );
+    return <context.Provider value={apiClient}>{children}</context.Provider>;
+  };
+
+  const useLedgerApiClient: () => T = () => {
+    const client = useContext(context);
+    if (!client) {
+      throw new Error('Ledger API client not initialized');
+    }
+    return client;
+  };
+
+  return [LedgerApiClientProvider, useLedgerApiClient];
 };
 
-export const useLedgerApiClient: () => LedgerApiClient = () => {
-  const client = useContext(LedgerApiClientContext);
-  if (!client) {
-    throw new Error('Ledger API client not initialized');
-  }
-  return client;
-};
+export const [LedgerApiClientProvider, useLedgerApiClient] =
+  buildLedgerApiClientInterface(LedgerApiClient);

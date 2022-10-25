@@ -1,3 +1,8 @@
-import { DirectoryClientProvider, useDirectoryClient } from './DirectoryServiceContext';
+export { DirectoryClientProvider, useDirectoryClient } from './DirectoryServiceContext';
 
-export { DirectoryClientProvider, useDirectoryClient };
+export {
+  buildLedgerApiClientInterface,
+  LedgerApiClient,
+  LedgerApiClientProvider,
+  useLedgerApiClient,
+} from './LedgerApiContext';

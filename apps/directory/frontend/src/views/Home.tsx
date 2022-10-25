@@ -4,8 +4,11 @@ import { useEffect, useState } from 'react';
 
 import { DirectoryInstall, DirectoryInstallRequest } from '@daml.js/directory/lib/CN/Directory';
 
+import {
+  DirectoryLedgerApiClientProvider,
+  useDirectoryLedgerApiClient,
+} from '../contexts/DirectoryLedgerApiContext';
 import { DirectoryClientProvider, useDirectoryClient } from '../contexts/DirectoryServiceContext';
-import { LedgerApiClientProvider, useLedgerApiClient } from '../contexts/LedgerApiContext';
 import { config } from '../utils';
 import DirectoryEntries from './DirectoryEntries';
 import RequestDirectoryEntry from './RequestDirectoryEntry';
@@ -14,7 +17,7 @@ const Home: React.FC<{ userId: string }> = ({ userId }) => {
   const [primaryParty, setPrimaryParty] = useState<string | undefined>();
   const [providerParty, setProviderParty] = useState<string | undefined>();
   const [install, setInstall] = useState<Contract<DirectoryInstall> | undefined>();
-  const ledgerApiClient = useLedgerApiClient();
+  const ledgerApiClient = useDirectoryLedgerApiClient();
   const directoryClient = useDirectoryClient();
   useEffect(() => {
     const fetchPrimaryParty = async () => {
@@ -84,11 +87,11 @@ const Home: React.FC<{ userId: string }> = ({ userId }) => {
 
 const HomeWithContexts: React.FC<{ userId: string }> = ({ userId }) => {
   return (
-    <LedgerApiClientProvider url={config.ledgerApi.grpcUrl} userId={userId}>
+    <DirectoryLedgerApiClientProvider url={config.ledgerApi.grpcUrl} userId={userId}>
       <DirectoryClientProvider url={config.directory.grpcUrl}>
         <Home userId={userId} />
       </DirectoryClientProvider>
-    </LedgerApiClientProvider>
+    </DirectoryLedgerApiClientProvider>
   );
 };
 

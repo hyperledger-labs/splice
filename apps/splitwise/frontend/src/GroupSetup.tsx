@@ -1,4 +1,4 @@
-import { sameContracts, useInterval } from 'common-frontend';
+import { Contract, sameContracts, useInterval } from 'common-frontend';
 import {
   ListGroupInvitesRequest,
   SplitwiseContext,
@@ -9,9 +9,8 @@ import { Button, FormGroup, List, ListItem, Stack, TextField, Typography } from 
 
 import { GroupInvite } from '@daml.js/splitwise/lib/CN/Splitwise';
 
-import { Contract } from './Contract';
 import DirectoryEntries from './DirectoryEntries';
-import { useLedgerApiClient } from './LedgerApiContext';
+import { useSplitwiseLedgerApiClient } from './contexts/SplitwiseLedgerApiContext';
 import { useSplitwiseClient } from './contexts/SplitwiseServiceContext';
 
 interface GroupSetupProps {
@@ -23,7 +22,7 @@ interface GroupSetupProps {
 
 const GroupSetup: React.FC<GroupSetupProps> = ({ directoryEntries, party, provider, svc }) => {
   const splitwiseClient = useSplitwiseClient();
-  const ledgerApiClient = useLedgerApiClient();
+  const ledgerApiClient = useSplitwiseLedgerApiClient();
   const [groupId, setGroupId] = useState<string>('');
   const onCreateGroup = async () => {
     await ledgerApiClient.createGroup(party, provider, svc, groupId);
