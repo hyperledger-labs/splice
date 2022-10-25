@@ -79,22 +79,16 @@ class DirectoryIntegrationTest
         val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
 
         // Request installs and wait for provider to auto-accept
-        loggerFactory.assertLogs(
-          {
-            val n = 3
-            (1 to 3).foreach(_ => Future(aliceDirectory.requestDirectoryInstall()))
+        val n = 3
+        (1 to n).foreach(_ => Future(aliceDirectory.requestDirectoryInstall()))
 
-            // Wait until 2*n transactions have been received (one each: create request + handle request)
-            val tx = aliceValidator.remoteParticipant.ledger_api.transactions
-              .flat(Set(aliceUserParty), completeAfter = 2 * n, beginOffset = offsetBefore)
-            logger.info(
-              Seq("Received transactions:")
-                .appendedAll(tx.map(_.toString))
-                .mkString(System.lineSeparator())
-            )
-          },
-          _.warningMessage should include("Rejecting duplicate install request from user party"),
-          _.warningMessage should include("Rejecting duplicate install request from user party"),
+        // Wait until 2*n transactions have been received (one each: create request + handle request)
+        val tx = aliceValidator.remoteParticipant.ledger_api.transactions
+          .flat(Set(aliceUserParty), completeAfter = 2 * n, beginOffset = offsetBefore)
+        logger.info(
+          Seq("Received transactions:")
+            .appendedAll(tx.map(_.toString))
+            .mkString(System.lineSeparator())
         )
 
         // check that there is only one install

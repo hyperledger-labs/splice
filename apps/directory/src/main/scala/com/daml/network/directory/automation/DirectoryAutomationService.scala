@@ -83,7 +83,7 @@ class DirectoryAutomationService(
       val user = PartyId.tryFromPrim(req.payload.user)
       store.lookupInstall(user).flatMap {
         case QueryResult(_, Some(_)) =>
-          logger.warn(s"Rejecting duplicate install request from user party $user")
+          logger.info(s"Rejecting duplicate install request from user party $user")
           val cmd = req.contractId.exerciseDirectoryInstallRequest_Reject()
           connection
             .submitWithResult(Seq(provider), Seq(), cmd)
