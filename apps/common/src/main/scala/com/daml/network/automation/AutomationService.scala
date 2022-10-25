@@ -5,11 +5,12 @@ import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{KillSwitches, Materializer}
 import com.daml.network.environment.CoinRetries
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.lifecycle._
+import com.digitalasset.canton.lifecycle.*
+import com.digitalasset.canton.logging.pretty.PrettyPrinting
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.{NoTracing, Spanning, TraceContext}
 import com.digitalasset.canton.util.AkkaUtil
-import com.digitalasset.canton.util.ShowUtil._
+import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.atomic.AtomicReference
@@ -36,18 +37,20 @@ abstract class AutomationService(retryProvider: CoinRetries)(implicit
   }
 
   /** Register a task handler driven from a source of tasks. */
-  final protected def registerRequestHandler[T](name: String, source: Source[T, NotUsed])(
-      // TODO(#790): remove the need for this by requiring all tasks to be pretty-printable
-      pretty: T => String,
-      handler0: (T, TraceContext) => Future[String],
+  final protected def registerRequestHandler[T <: PrettyPrinting](
+      name: String,
+      source: Source[T, NotUsed],
+  )(
+      handler0: T => TraceContext => Future[String]
   ): Unit = {
     def handler(req: T): Future[Unit] = {
-      lazy val prettiedReq = pretty(req)
+      lazy val prettiedReq = (req: PrettyPrinting).toString
       withNewTrace(name) { implicit traceContext => _ =>
+        // TODO(#790): try out switching to show"my $prettyReq" interpolator
         logger.info(s"Running operation ${name.singleQuoted} for\n$prettiedReq")
         // TODO(#790): retryProvider should take an explicit logger as the argument to provide better precision as to who initiated the logging
         retryProvider
-          .retryUnlessShutdown(name, performUnlessClosingF(name)(handler0(req, traceContext)))
+          .retryUnlessShutdown(name, performUnlessClosingF(name)(handler0(req)(traceContext)))
           .onShutdown("aborted due to shutdown")
           .transform {
             case Success(outcome) =>

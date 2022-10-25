@@ -45,10 +45,8 @@ class WalletAutomationService(
   private val ingestionServices: TrieMap[String, AutoCloseable] = TrieMap.empty
 
   // TODO(#763): not handling archive events, uninstalling wallets without a restart is not supported yet
-  registerRequestHandler("WalletAppInstall", walletStore.streamInstalls)(
-    install => install.toString,
-    (install, traceContext) => {
-      implicit val tc = traceContext
+  registerRequestHandler("WalletAppInstall", walletStore.streamInstalls)(install => {
+    implicit traceContext =>
       Future {
         val endUserName = install.payload.endUserName
         val endUserParty = PartyId.tryFromPrim(install.payload.endUserParty)
@@ -63,8 +61,7 @@ class WalletAutomationService(
         treasuryServices.addOrCreateTreasuryService(install, walletStore.key, endUserStore): Unit
         registerService(ingestionServices, endUserName, ingestionService)
       }
-    },
-  )
+  })
 
   private def registerService(
       services: TrieMap[String, AutoCloseable],
@@ -75,10 +72,7 @@ class WalletAutomationService(
       case None =>
         s"onboarded wallet end-user '$endUserName'"
       case Some(_) =>
-        logger.warn(
-          s"Unexpected duplicate on-boarding of wallet user '$endUserName'"
-          // TODO(#790): how would we enable the implicit passing of the traceContext?
-        )
+        logger.warn(s"Unexpected duplicate on-boarding of wallet user '$endUserName'")
         service.close()
         s"skipped duplicate on-boarding wallet end-user '$endUserName'"
     }
