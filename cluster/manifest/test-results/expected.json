@@ -205,23 +205,23 @@
                            "failureThreshold": 5,
                            "periodSeconds": 10,
                            "tcpSocket": {
-                              "port": "canton-pub-api"
+                              "port": "cd-pub-api"
                            }
                         },
                         "name": "canton-domain",
                         "ports": [
                            {
                               "containerPort": 5008,
-                              "name": "canton-pub-api"
+                              "name": "cd-pub-api"
                            },
                            {
                               "containerPort": 5009,
-                              "name": "canton-adm-api"
+                              "name": "cd-adm-api"
                            }
                         ],
                         "readinessProbe": {
                            "tcpSocket": {
-                              "port": "canton-pub-api"
+                              "port": "cd-pub-api"
                            }
                         },
                         "resources": {
@@ -232,11 +232,11 @@
                               "memory": "1024Mi"
                            }
                         },
-                        "startupPrope": {
+                        "startupProbe": {
                            "failureThreshold": 20,
                            "periodSeconds": 10,
                            "tcpSocket": {
-                              "port": "canton-pub-api"
+                              "port": "cd-pub-api"
                            }
                         },
                         "volumeMounts": [ ]
@@ -257,12 +257,12 @@
          "spec": {
             "ports": [
                {
-                  "name": "canton-pub-api",
+                  "name": "cd-pub-api",
                   "port": 5008,
                   "protocol": "TCP"
                },
                {
-                  "name": "canton-adm-api",
+                  "name": "cd-adm-api",
                   "port": 5009,
                   "protocol": "TCP"
                }
@@ -1621,7 +1621,7 @@
       {
          "apiVersion": "v1",
          "data": {
-            "manifest.json": "{\n  \"ports\": [\n    {\n      \"name\": \"http\",\n      \"port\": 80\n    },\n    {\n      \"name\": \"canton-pub-api\",\n      \"port\": 5008\n    },\n    {\n      \"name\": \"canton-adm-api\",\n      \"port\": 5009\n    },\n    {\n      \"name\": \"cp-adm-api\",\n      \"port\": 5002\n    },\n    {\n      \"name\": \"cp-lg-api\",\n      \"port\": 5001\n    },\n    {\n      \"name\": \"dir-api\",\n      \"port\": 5010\n    },\n    {\n      \"name\": \"dir-api-gw\",\n      \"port\": 6010\n    },\n    {\n      \"name\": \"svc-app-adm-api\",\n      \"port\": 5005\n    },\n    {\n      \"name\": \"scan-api\",\n      \"port\": 5012\n    },\n    {\n      \"name\": \"scan-api-gw\",\n      \"port\": 6012\n    },\n    {\n      \"name\": \"val1-adm-api\",\n      \"port\": 5102\n    },\n    {\n      \"name\": \"val1-lg-api\",\n      \"port\": 5101\n    },\n    {\n      \"name\": \"val1-lg-api-gw\",\n      \"port\": 6101\n    },\n    {\n      \"name\": \"val1-val-api\",\n      \"port\": 5103\n    },\n    {\n      \"name\": \"val1-val-api-gw\",\n      \"port\": 6103\n    },\n    {\n      \"name\": \"val1-wal-api\",\n      \"port\": 5104\n    },\n    {\n      \"name\": \"val1-wal-api-gw\",\n      \"port\": 6104\n    },\n    {\n      \"name\": \"sw-adm-api\",\n      \"port\": 5202\n    },\n    {\n      \"name\": \"sw-lg-api\",\n      \"port\": 5201\n    },\n    {\n      \"name\": \"sw-lg-api-gw\",\n      \"port\": 6201\n    },\n    {\n      \"name\": \"sw-val-api\",\n      \"port\": 5203\n    },\n    {\n      \"name\": \"sw-api\",\n      \"port\": 5213\n    },\n    {\n      \"name\": \"sw-api-gw\",\n      \"port\": 6213\n    }\n  ]\n}",
+            "manifest.json": "{\n  \"ports\": [\n    {\n      \"name\": \"http\",\n      \"port\": 80,\n      \"service\": \"docs\"\n    },\n    {\n      \"name\": \"cd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"canton-domain\"\n    },\n    {\n      \"name\": \"cd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"canton-domain\"\n    },\n    {\n      \"name\": \"cp-adm-api\",\n      \"port\": 5002,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"name\": \"cp-lg-api\",\n      \"port\": 5001,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"name\": \"dir-api\",\n      \"port\": 5010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"dir-api-gw\",\n      \"port\": 6010,\n      \"proxyToGrpc\": 5010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"svc-app-adm-api\",\n      \"port\": 5005,\n      \"service\": \"svc-app\"\n    },\n    {\n      \"name\": \"scan-api\",\n      \"port\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"name\": \"scan-api-gw\",\n      \"port\": 6012,\n      \"proxyToGrpc\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"name\": \"val1-adm-api\",\n      \"port\": 5102,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"name\": \"val1-lg-api\",\n      \"port\": 5101,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"name\": \"val1-lg-api-gw\",\n      \"port\": 6101,\n      \"proxyToGrpc\": 5101,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"name\": \"val1-val-api\",\n      \"port\": 5103,\n      \"service\": \"validator1-validator-app\"\n    },\n    {\n      \"name\": \"val1-val-api-gw\",\n      \"port\": 6103,\n      \"proxyToGrpc\": 5103,\n      \"service\": \"validator1-validator-app\"\n    },\n    {\n      \"name\": \"val1-wal-api\",\n      \"port\": 5104,\n      \"service\": \"validator1-wallet-app\"\n    },\n    {\n      \"name\": \"val1-wal-api-gw\",\n      \"port\": 6104,\n      \"proxyToGrpc\": 5104,\n      \"service\": \"validator1-wallet-app\"\n    },\n    {\n      \"name\": \"sw-adm-api\",\n      \"port\": 5202,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"name\": \"sw-lg-api\",\n      \"port\": 5201,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"name\": \"sw-lg-api-gw\",\n      \"port\": 6201,\n      \"proxyToGrpc\": 5201,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"name\": \"sw-val-api\",\n      \"port\": 5203,\n      \"service\": \"splitwise-validator-app\"\n    },\n    {\n      \"name\": \"sw-api\",\n      \"port\": 5213,\n      \"service\": \"splitwise-app\"\n    },\n    {\n      \"name\": \"sw-api-gw\",\n      \"port\": 6213,\n      \"proxyToGrpc\": 5213,\n      \"service\": \"splitwise-app\"\n    }\n  ]\n}",
             "version": "tag"
          },
          "kind": "ConfigMap",
@@ -1675,11 +1675,11 @@
                            },
                            {
                               "containerPort": 5008,
-                              "name": "canton-pub-api"
+                              "name": "cd-pub-api"
                            },
                            {
                               "containerPort": 5009,
-                              "name": "canton-adm-api"
+                              "name": "cd-adm-api"
                            },
                            {
                               "containerPort": 5002,
@@ -1805,12 +1805,12 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "canton-pub-api",
+                  "name": "cd-pub-api",
                   "port": 5008,
                   "protocol": "TCP"
                },
                {
-                  "name": "canton-adm-api",
+                  "name": "cd-adm-api",
                   "port": 5009,
                   "protocol": "TCP"
                },
@@ -1942,12 +1942,12 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "canton-pub-api",
+                  "name": "cd-pub-api",
                   "port": 5008,
                   "protocol": "TCP"
                },
                {
-                  "name": "canton-adm-api",
+                  "name": "cd-adm-api",
                   "port": 5009,
                   "protocol": "TCP"
                },

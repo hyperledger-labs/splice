@@ -31,6 +31,7 @@ local validPortName(name) =
 local toGrpcWebPort(port) = {
   name: validPortName(port.name + '-gw'),
   port: port.port + 1000,
+  proxyToGrpc: port.port,
 };
 
 local toContainerPortDefn(p) = {
@@ -57,7 +58,7 @@ local deployment(config, name, ports, memoryLimitMiB=1024, ext={}, proxyToGrpcWe
   );
 
   {
-    ports: allPorts,
+    ports: std.map(function(p) (p + { service: name }) , allPorts),
     deploymentObjects: [
       {
         apiVersion: 'apps/v1',

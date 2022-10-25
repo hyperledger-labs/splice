@@ -14,30 +14,30 @@ local svcDeployments(config) = [
     'canton-domain',
     [
       {
-        name: 'canton-pub-api',
+        name: 'cd-pub-api',
         port: 5008,
       },
       {
-        name: 'canton-adm-api',
+        name: 'cd-adm-api',
         port: 5009,
       },
     ],
     ext={
       readinessProbe: {
         tcpSocket: {
-          port: 'canton-pub-api',
+          port: 'cd-pub-api',
         },
       },
       livenessProbe: {
         tcpSocket: {
-          port: 'canton-pub-api',
+          port: 'cd-pub-api',
         },
         failureThreshold: 5,
         periodSeconds: 10,
       },
-      startupPrope: {
+      startupProbe: {
         tcpSocket: {
-          port: 'canton-pub-api',
+          port: 'cd-pub-api',
         },
         failureThreshold: 20,
         periodSeconds: 10,

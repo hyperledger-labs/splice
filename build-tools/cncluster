@@ -320,8 +320,18 @@ function cluster_reset() {
     _cluster_reset
 }
 
+function _show_ports() {
+    curl http://scratch.network.canton.global/manifest.json 2> /dev/null \
+        | jq -r '(["SERVICE","PORT NAME","PORT","AS GRPC"],(.ports|.[]|[.service, .name, .port, .proxyToGrpc]))|@csv' \
+        | column -s ',' -t
+}
+
 function cluster_stats() {
     cluster_show
+
+    _log ""
+    _log "Available Ports:"
+    _show_ports
 
     _log ""
     _log "Node Usage:"
