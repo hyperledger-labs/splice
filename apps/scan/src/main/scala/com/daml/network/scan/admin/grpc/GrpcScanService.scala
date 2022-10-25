@@ -81,9 +81,6 @@ class GrpcScanService(
         rounds <- connection.activeContracts(svc, roundCodegen.ClosedMiningRound)
       } yield {
         val filteredRounds = rounds
-          .filter(r =>
-            r.value.obs == r.value.svc
-          ) // TODO(M1-51): this filter is needed only due to the explicit disclosure workaround
           .sortWith(_.value.round.number > _.value.round.number)
         v0.GetClosedRoundsResponse(
           filteredRounds.map(r =>

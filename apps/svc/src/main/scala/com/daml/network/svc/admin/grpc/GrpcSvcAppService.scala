@@ -3,7 +3,7 @@ package com.daml.network.svc.admin.grpc
 import cats.implicits._
 import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionResponse
 import com.daml.ledger.client.binding.{Contract, Primitive, TemplateCompanion}
-import com.daml.network.codegen.{CC, DA}
+import com.daml.network.codegen.CC
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.svc.store.SvcEventsStore
 import com.daml.network.svc.v0.SvcServiceGrpc
@@ -62,24 +62,12 @@ class GrpcSvcAppService(
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
         svc <- connection.getPrimaryParty(svcUserName)
-        validators <- getValidators(svc)
         price = Proto.tryDecode(Proto.BigDecimal)(request.coinPrice)
-        cmds = validators.toList.map(v =>
-          CC.CoinRules.CoinRules
-            .key(DA.Types.Tuple2(svc.toPrim, v.toPrim))
-            .exerciseCoinRules_MiningRound_Open(price)
-            .command
-        )
-        // For now we submit one command per validator. We could do some batching here but given
-        // that this is only a workaround that doesn’t seem worth worrying about.
-        submitResults <- cmds.traverse { cmd =>
-          connection.submitCommand(Seq(svc), Seq.empty, Seq(cmd))
-        }
-      } yield v0.OpenRoundResponse(
-        roundResultsToProto(
-          decodeRoundResults(CC.Round.OpenMiningRound)(_.obs)(submitResults)
-        )
-      )
+        cmd = CC.CoinRules.CoinRules
+          .key(svc.toPrim)
+          .exerciseCoinRules_MiningRound_Open(price)
+        cid <- connection.submitWithResult(Seq(svc), Seq.empty, cmd)
+      } yield v0.OpenRoundResponse(Proto.encode(cid))
     }
 
   override def startClosingRound(
@@ -88,21 +76,14 @@ class GrpcSvcAppService(
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
         svc <- connection.getPrimaryParty(svcUserName)
-        openRounds <- getRounds(CC.Round.OpenMiningRound)(_.round, _.obs)(svc, request.round)
-        cmds = openRounds.toList.map { case (v, cid) =>
+        openRound <- getRound(CC.Round.OpenMiningRound)(_.round)(svc, request.round)
+        cmd =
           CC.CoinRules.CoinRules
-            .key(DA.Types.Tuple2(svc.toPrim, v))
-            .exerciseCoinRules_MiningRound_StartClosing(cid)
-            .command
-        }
-        submitResults <- cmds.traverse { cmd =>
-          connection.submitCommand(Seq(svc), Seq.empty, Seq(cmd))
-        }
-      } yield v0.StartClosingRoundResponse(
-        roundResultsToProto(
-          decodeRoundResults(CC.Round.ClosingMiningRound)(_.obs)(submitResults)
-        )
-      )
+            .key(svc.toPrim)
+            .exerciseCoinRules_MiningRound_StartClosing(openRound)
+        cid <-
+          connection.submitWithResult(Seq(svc), Seq.empty, cmd)
+      } yield v0.StartClosingRoundResponse(Proto.encode(cid))
     }
 
   override def startIssuingRound(
@@ -111,37 +92,29 @@ class GrpcSvcAppService(
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
         svc <- connection.getPrimaryParty(svcUserName)
-        openRounds <- getRounds(CC.Round.ClosingMiningRound)(_.round, _.obs)(svc, request.round)
+        closingRound <- getRound(CC.Round.ClosingMiningRound)(_.round)(svc, request.round)
         rewards <- queryRewards(svc, request.round)
         totalBurn = rewards.totalBurn
-        cmds = openRounds.toList.map { case (v, cid) =>
+        cmd =
           CC.CoinRules.CoinRules
-            .key(DA.Types.Tuple2(svc.toPrim, v))
-            .exerciseCoinRules_MiningRound_StartIssuing(cid, totalBurn)
-            .command
-        }
-        submitResults <- cmds.traverse { cmd =>
-          connection.submitCommand(Seq(svc), Seq.empty, Seq(cmd))
-        }
-      } yield v0.StartIssuingRoundResponse(
-        Proto.encode(totalBurn),
-        roundResultsToProto(
-          decodeRoundResults(CC.Round.IssuingMiningRound)(_.obs)(submitResults)
-        ),
-      )
+            .key(svc.toPrim)
+            .exerciseCoinRules_MiningRound_StartIssuing(closingRound, totalBurn)
+        cid <-
+          connection.submitWithResult(Seq(svc), Seq.empty, cmd)
+      } yield v0.StartIssuingRoundResponse(Proto.encode(totalBurn), Proto.encode(cid))
     }
 
   override def closeRound(request: v0.CloseRoundRequest): Future[v0.CloseRoundResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
         svc <- connection.getPrimaryParty(svcUserName)
-        openRounds <- getRounds(CC.Round.IssuingMiningRound)(_.round, _.obs)(svc, request.round)
+        issuingRound <- getRound(CC.Round.IssuingMiningRound)(_.round)(svc, request.round)
         totals = getTotalsPerRound(request.round)
-        cmds = openRounds.toList.map { case (v, cid) =>
+        cmd =
           CC.CoinRules.CoinRules
-            .key(DA.Types.Tuple2(svc.toPrim, v))
+            .key(svc.toPrim)
             .exerciseCoinRules_MiningRound_Close(
-              cid,
+              issuingRound,
               totals.transferFees,
               totals.adminFees,
               totals.holdingFees,
@@ -149,16 +122,9 @@ class GrpcSvcAppService(
               totals.nonSelfTransferOutputs,
               totals.selfTransferOutputs,
             )
-            .command
-        }
-        submitResults <- cmds.traverse { cmd =>
-          connection.submitCommand(Seq(svc), Seq.empty, Seq(cmd))
-        }
-      } yield v0.CloseRoundResponse(
-        roundResultsToProto(
-          decodeRoundResults(CC.Round.ClosedMiningRound)(_.obs)(submitResults)
-        )
-      )
+        cid <-
+          connection.submitWithResult(Seq(svc), Seq.empty, cmd)
+      } yield v0.CloseRoundResponse(Proto.encode(cid))
     }
 
   private case class RoundTotals(
@@ -188,37 +154,22 @@ class GrpcSvcAppService(
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
         svc <- connection.getPrimaryParty(svcUserName)
-        openRounds <- getRounds(CC.Round.ClosedMiningRound)(_.round, _.obs)(svc, request.round)
-        cmds = openRounds.toList.map { case (v, cid) =>
+        closedRound <- getRound(CC.Round.ClosedMiningRound)(_.round)(svc, request.round)
+        cmd =
           CC.CoinRules.CoinRules
-            .key(DA.Types.Tuple2(svc.toPrim, v))
-            .exerciseCoinRules_MiningRound_Archive(cid)
-            .command
-        }
-        _ <- cmds.traverse_ { cmd =>
-          connection.submitCommand(Seq(svc), Seq.empty, Seq(cmd))
-        }
+            .key(svc.toPrim)
+            .exerciseCoinRules_MiningRound_Archive(closedRound)
+        _ <- connection.submitWithResult(Seq(svc), Seq.empty, cmd)
       } yield Empty()
-    }
-
-  // Note that this assumes we do not concurrently onboard validators, otherwise this starts to become racy
-  // and we might miss out on validators. Given that this is only a workaround until we have explicit disclosure
-  // we accept this for now.
-  private def getValidators(svc: PartyId): Future[Set[PartyId]] =
-    for {
-      coinRules <- connection.activeContracts(svc, CC.CoinRules.CoinRules)
-    } yield {
-      coinRules.map(c => PartyId.tryFromPrim(c.value.obs)).toSet
     }
 
   /** Query the ACS for the given template and filter by round. Returns a map from the validator party
     * to the corresponding contract id.
     * Fails if there is more than one round for a given validator.
     */
-  private def getRounds[T](companion: TemplateCompanion[T])(
-      getRound: T => CC.Round.Round,
-      getValidator: T => Primitive.Party,
-  )(svc: PartyId, round: Long): Future[Map[Primitive.Party, Primitive.ContractId[T]]] =
+  private def getRound[T](companion: TemplateCompanion[T])(
+      getRound: T => CC.Round.Round
+  )(svc: PartyId, round: Long): Future[Primitive.ContractId[T]] =
     for {
       allRounds <- connection.activeContracts(svc, companion)
     } yield {
@@ -226,13 +177,11 @@ class GrpcSvcAppService(
         val roundId = getRound(roundContract.value)
         roundId.number === round
       }
-      filteredRounds.groupBy(round => getValidator(round.value)).map { case (v, rs) =>
-        require(
-          rs.length == 1,
-          s"Expected one round for validator $v but got ${rs.length} rounds $rs",
-        )
-        v -> rs(0).contractId
-      }
+      require(
+        filteredRounds.length == 1,
+        s"Expected one round but got ${filteredRounds.length} rounds $filteredRounds",
+      )
+      filteredRounds(0).contractId
     }
 
   private def roundResultsToProto[T](

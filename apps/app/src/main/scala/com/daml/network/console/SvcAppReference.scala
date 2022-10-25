@@ -7,7 +7,6 @@ import com.daml.network.svc.admin.api.client.commands.GrpcSvcAppClient
 import com.daml.network.svc.config.{LocalSvcAppConfig, RemoteSvcAppConfig}
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.PartyId
 
 abstract class SvcAppReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
@@ -23,7 +22,7 @@ abstract class SvcAppReference(
   @Help.Summary("Open a new mining round for all validators")
   def openRound(
       coinPrice: BigDecimal
-  ): Map[PartyId, ContractId[roundCodegen.OpenMiningRound]] =
+  ): ContractId[roundCodegen.OpenMiningRound] =
     consoleEnvironment.run {
       adminCommand(GrpcSvcAppClient.OpenRound(coinPrice))
     }
@@ -31,7 +30,7 @@ abstract class SvcAppReference(
   @Help.Summary("Start closing the mining round for all validators")
   def startClosingRound(
       round: Long
-  ): Map[PartyId, ContractId[roundCodegen.ClosingMiningRound]] =
+  ): ContractId[roundCodegen.ClosingMiningRound] =
     consoleEnvironment.run {
       adminCommand(GrpcSvcAppClient.StartClosingRound(round))
     }
@@ -47,7 +46,7 @@ abstract class SvcAppReference(
   @Help.Summary("Close the given mining round for all validators")
   def closeRound(
       round: Long
-  ): Map[PartyId, ContractId[roundCodegen.ClosedMiningRound]] =
+  ): ContractId[roundCodegen.ClosedMiningRound] =
     consoleEnvironment.run {
       adminCommand(GrpcSvcAppClient.CloseRound(round))
     }

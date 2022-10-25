@@ -27,14 +27,24 @@ template OpenMiningRound
     svc : Party
     round : Round
     coinPrice : Decimal
-    obs : Party -- TODO(M1-51): remove workaround for explicit disclosure
+    observers : [Party] -- TODO(M1-51): remove workaround for explicit disclosure
   where
     signatory svc
-    observer obs
+    observer observers
     ensure isDefinedRound round
 
-    key (svc, obs, round) : (Party, Party, Round)
+    key (svc, round) : (Party, Round)
     maintainer key._1
+
+
+    choice OpenMiningRound_AddObserver : ContractId OpenMiningRound
+      with
+        obs : Party
+      controller svc
+      do assertMsg ("New observer " <> show obs  <> " is not a member of existing observers " <> show observers) (obs `notElem` observers)
+         create this with
+           observers = obs :: observers
+
 
 -- | A mining round for which the total sum of registered rewards
 -- is being computed. Rewards can no longer be registered aginst such a round.
@@ -42,12 +52,12 @@ template ClosingMiningRound
   with
     svc : Party
     round : Round
-    obs : Party -- TODO(M1-51): remove workaround for explicit disclosure
+    observers : [Party] -- TODO(M1-51): remove workaround for explicit disclosure
   where
     signatory svc
     ensure isDefinedRound round
 
-    key (svc, obs, round) : (Party, Party, Round)
+    key (svc, round) : (Party, Round)
     maintainer key._1
 
 -- | A mining round for whose rewards coins are being issued.
@@ -56,14 +66,23 @@ template IssuingMiningRound
     svc : Party
     round : Round
     issuancePerCoin : Decimal
-    obs : Party -- TODO(M1-51): remove workaround for explicit disclosure
+    observers : [Party] -- TODO(M1-51): remove workaround for explicit disclosure
   where
     signatory svc
-    observer obs
+    observer observers
     ensure isDefinedRound round
 
-    key (svc, obs, round) : (Party, Party, Round)
+    key (svc, round) : (Party, Round)
     maintainer key._1
+
+
+    choice IssuingMiningRound_AddObserver : ContractId IssuingMiningRound
+      with
+        obs : Party
+      controller svc
+      do assertMsg ("New observer " <> show obs  <> " is not a member of existing observers " <> show observers) (obs `notElem` observers)
+         create this with
+           observers = obs :: observers
 
 -- | A record that a specific mining round has been closed, which can
 -- be used to archive expired rewards.
@@ -77,11 +96,31 @@ template ClosedMiningRound
     totalTransferInputs : Decimal -- after deducting holding fees
     totalNonSelfTransferOutputs : Decimal -- sum of outputs where receiver != sender
     totalSelfTransferOutputs : Decimal -- sum of outputs where receiver == sender
-    obs : Party -- TODO(M1-51): remove workaround for explicit disclosure
+    observers : [Party] -- TODO(M1-51): remove workaround for explicit disclosure
   where
     signatory svc
-    observer obs
+    observer observers
     ensure isDefinedRound round
 
-    key (svc, obs, round) : (Party, Party, Round)
+    key (svc, round) : (Party, Round)
     maintainer key._1
+
+template IssuanceState
+  with
+    svc : Party
+    currentRound : Round -- ^ The most recent open round
+    observers : [Party]
+  where
+    signatory svc
+    observer observers
+
+    key svc : Party
+    maintainer key
+
+    choice IssuanceState_AddObserver : ContractId IssuanceState
+      with
+        obs : Party
+      controller svc
+      do assertMsg ("New observer " <> show obs  <> " is not a member of existing observers " <> show observers) (obs `notElem` observers)
+         create this with
+           observers = obs :: observers

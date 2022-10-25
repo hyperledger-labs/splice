@@ -30,11 +30,10 @@ trait SvcStore extends AutoCloseable {
   /** The [[com.daml.network.store.AcsStore]] used to back the default implementation of the queries. */
   protected val acsStore: AcsStore
 
-  def lookupCoinRulesForValidator(
-      validatorParty: PartyId
+  def lookupCoinRules(
   ): Future[QueryResult[Option[Contract[CC.CoinRules.CoinRules]]]] =
     acsStore
-      .findContract(CC.CoinRules.CoinRules)(co => co.payload.obs == validatorParty.toPrim)
+      .findContract(CC.CoinRules.CoinRules)(_ => true)
 
   def lookupCCUserHostedAtByParty(
       party: PartyId
@@ -81,7 +80,7 @@ object SvcStore {
       Map(
         mkFilter(CC.CoinRules.CoinRules)(co => co.payload.svc == svc),
         mkFilter(CC.CoinRules.CoinRulesRequest)(co => co.payload.svc == svc),
-        mkFilter(CC.Coin.IssuanceState)(co => co.payload.svc == svc),
+        mkFilter(CC.Round.IssuanceState)(co => co.payload.svc == svc),
         mkFilter(CC.Coin.ValidatorRight)(co =>
           co.payload.svc == svc && co.payload.validator == svc && co.payload.user == svc
         ),

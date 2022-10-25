@@ -144,32 +144,33 @@ class ScanIntegrationTest
     svc.closeRound(1)
 
     val closed = scan.getClosedRounds()
-    closed.size shouldBe 2
-    val expected0 = ClosedMiningRound(
-      svc = svcParty.toPrim,
-      round = Round(number = 0),
-      totalTransferFees = BigDecimal(0.58),
-      totalAdminFees = BigDecimal(0.2),
-      totalHoldingFees = BigDecimal(0.0),
-      totalTransferInputs = BigDecimal(360.51),
-      totalNonSelfTransferOutputs = BigDecimal(39 + 19),
-      totalSelfTransferOutputs = BigDecimal(360.51 - 0.2 - 0.58 - (39 + 19)),
-      obs = svcParty.toPrim,
-    )
-    val expected1 = ClosedMiningRound(
-      svc = svcParty.toPrim,
-      round = Round(number = 1),
-      totalTransferFees = BigDecimal(0.39),
-      totalAdminFees = BigDecimal(0.3),
-      totalHoldingFees = BigDecimal(0.0000048225),
-      totalTransferInputs = BigDecimal(355.6899855325),
-      totalNonSelfTransferOutputs = BigDecimal(29 + 9 + 1),
-      totalSelfTransferOutputs = BigDecimal(355.6899855325 - 0.3 - 0.39 - (29 + 9 + 1)),
-      obs = svcParty.toPrim,
-    )
     inside(closed) { case Seq(round1, round0) =>
-      round0.payload should be(expected0)
-      round1.payload should be(expected1)
+      round0.payload should be(
+        ClosedMiningRound(
+          svc = svcParty.toPrim,
+          round = Round(number = 0),
+          totalTransferFees = BigDecimal(0.58),
+          totalAdminFees = BigDecimal(0.2),
+          totalHoldingFees = BigDecimal(0.0),
+          totalTransferInputs = BigDecimal(360.51),
+          totalNonSelfTransferOutputs = BigDecimal(39 + 19),
+          totalSelfTransferOutputs = BigDecimal(360.51 - 0.2 - 0.58 - (39 + 19)),
+          observers = round0.payload.observers,
+        )
+      )
+      round1.payload should be(
+        ClosedMiningRound(
+          svc = svcParty.toPrim,
+          round = Round(number = 1),
+          totalTransferFees = BigDecimal(0.39),
+          totalAdminFees = BigDecimal(0.3),
+          totalHoldingFees = BigDecimal(0.0000048225),
+          totalTransferInputs = BigDecimal(355.6899855325),
+          totalNonSelfTransferOutputs = BigDecimal(29 + 9 + 1),
+          totalSelfTransferOutputs = BigDecimal(355.6899855325 - 0.3 - 0.39 - (29 + 9 + 1)),
+          observers = round1.payload.observers,
+        )
+      )
 
     // TODO(i832): do the math and verify that the values above are correct
     }

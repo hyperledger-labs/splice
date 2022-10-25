@@ -1,6 +1,5 @@
 package com.daml.network.svc.admin.api.client.commands
 
-import cats.implicits._
 import com.daml.ledger.client.binding.Primitive.ContractId
 import com.daml.network.codegen.CC.{Round => roundCodegen}
 import com.daml.network.svc.v0
@@ -62,22 +61,10 @@ object GrpcSvcAppClient {
       }
   }
 
-  private object RoundCommand {
-    def decodeRoundMap[T](m: Map[String, String]): Either[String, Map[PartyId, ContractId[T]]] =
-      m.toList
-        .traverse { case (k, v) =>
-          for {
-            party <- Proto.decode(Proto.Party)(k)
-            contractId <- Proto.decodeContractId[T](v)
-          } yield party -> contractId
-        }
-        .map(_.toMap)
-  }
-
   case class OpenRound(coinPrice: BigDecimal)
-      extends BaseCommand[v0.OpenRoundRequest, v0.OpenRoundResponse, Map[PartyId, ContractId[
+      extends BaseCommand[v0.OpenRoundRequest, v0.OpenRoundResponse, ContractId[
         roundCodegen.OpenMiningRound
-      ]]] {
+      ]] {
     override def createRequest(): Either[String, v0.OpenRoundRequest] = Right(
       v0.OpenRoundRequest(Proto.encode(coinPrice))
     )
@@ -88,15 +75,15 @@ object GrpcSvcAppClient {
       service.openRound(request)
     override def handleResponse(
         response: v0.OpenRoundResponse
-    ): Either[String, Map[PartyId, ContractId[roundCodegen.OpenMiningRound]]] =
-      RoundCommand.decodeRoundMap(response.openMiningRoundContractIds)
+    ): Either[String, ContractId[roundCodegen.OpenMiningRound]] =
+      Proto.decodeContractId[roundCodegen.OpenMiningRound](response.openMiningRoundContractId)
   }
 
   case class StartClosingRound(round: Long)
       extends BaseCommand[
         v0.StartClosingRoundRequest,
         v0.StartClosingRoundResponse,
-        Map[PartyId, ContractId[roundCodegen.ClosingMiningRound]],
+        ContractId[roundCodegen.ClosingMiningRound],
       ] {
     override def createRequest(): Either[String, v0.StartClosingRoundRequest] = Right(
       v0.StartClosingRoundRequest(round)
@@ -108,13 +95,13 @@ object GrpcSvcAppClient {
       service.startClosingRound(request)
     override def handleResponse(
         response: v0.StartClosingRoundResponse
-    ): Either[String, Map[PartyId, ContractId[roundCodegen.ClosingMiningRound]]] =
-      RoundCommand.decodeRoundMap(response.closingMiningRoundContractIds)
+    ): Either[String, ContractId[roundCodegen.ClosingMiningRound]] =
+      Proto.decodeContractId[roundCodegen.ClosingMiningRound](response.closingMiningRoundContractId)
   }
 
   case class StartIssuingRoundResponse(
       totalBurnQuantity: BigDecimal,
-      validatorRounds: Map[PartyId, ContractId[roundCodegen.IssuingMiningRound]],
+      issuingRound: ContractId[roundCodegen.IssuingMiningRound],
   )
 
   case class StartIssuingRound(round: Long)
@@ -135,14 +122,16 @@ object GrpcSvcAppClient {
         response: v0.StartIssuingRoundResponse
     ): Either[String, StartIssuingRoundResponse] = for {
       totalBurnQuantity <- Proto.decode(Proto.BigDecimal)(response.totalBurnQuantity)
-      validatorRounds <- RoundCommand.decodeRoundMap(response.issuingMiningRoundContractIds)
-    } yield StartIssuingRoundResponse(totalBurnQuantity, validatorRounds)
+      round <- Proto.decodeContractId[roundCodegen.IssuingMiningRound](
+        response.issuingMiningRoundContractId
+      )
+    } yield StartIssuingRoundResponse(totalBurnQuantity, round)
   }
 
   case class CloseRound(round: Long)
-      extends BaseCommand[v0.CloseRoundRequest, v0.CloseRoundResponse, Map[PartyId, ContractId[
+      extends BaseCommand[v0.CloseRoundRequest, v0.CloseRoundResponse, ContractId[
         roundCodegen.ClosedMiningRound
-      ]]] {
+      ]] {
     override def createRequest(): Either[String, v0.CloseRoundRequest] = Right(
       v0.CloseRoundRequest(round)
     )
@@ -153,8 +142,8 @@ object GrpcSvcAppClient {
       service.closeRound(request)
     override def handleResponse(
         response: v0.CloseRoundResponse
-    ): Either[String, Map[PartyId, ContractId[roundCodegen.ClosedMiningRound]]] =
-      RoundCommand.decodeRoundMap(response.closedMiningRoundContractIds)
+    ): Either[String, ContractId[roundCodegen.ClosedMiningRound]] =
+      Proto.decodeContractId[roundCodegen.ClosedMiningRound](response.closedMiningRoundContractId)
   }
 
   case class ArchiveRound(round: Long) extends BaseCommand[v0.ArchiveRoundRequest, Empty, Unit] {

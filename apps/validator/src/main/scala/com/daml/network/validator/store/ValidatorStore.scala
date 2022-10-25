@@ -93,10 +93,7 @@ object ValidatorStore {
             co.payload.svcParty == svc
         ),
         mkFilter(coinCodegen.Scripts.Util.CCUserHostedAt)(co => co.payload.validator == validator),
-        mkFilter(coinCodegen.CoinRules.CoinRules)(co =>
-          co.payload.obs == validator &&
-            co.payload.svc == svc
-        ),
+        mkFilter(coinCodegen.CoinRules.CoinRules)(co => co.payload.svc == svc),
         mkFilter(coinCodegen.CoinRules.CoinRulesRequest)(co =>
           co.payload.user == validator &&
             co.payload.svc == svc

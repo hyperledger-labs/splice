@@ -52,7 +52,7 @@ template Escrow
                        quantity = 1.0
                        senderTransferFeeRatio = 0.0
                  ]
-         exerciseByKey @CoinRules (svc,svc) (CoinRules_Transfer transfer)
+         exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
          pure ()
 
 -- | This matches the example in the design doc
@@ -64,7 +64,7 @@ test = do
 
   -- Change issuance per round so we can get Alice 1k without running through lots of rounds
   -- which slows down the test significantly.
-  Some (rulesCid, rules) <- queryContractKey @CoinRules app.svc (app.svc, app.svc)
+  Some (rulesCid, rules) <- queryContractKey @CoinRules app.svc app.svc
   submit app.svc $ archiveCmd rulesCid
   submit app.svc $ createCmd rules with
     config.coinsIssuedPerRound = 5000.0

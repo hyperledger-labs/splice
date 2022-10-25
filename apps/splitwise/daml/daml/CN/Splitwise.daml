@@ -277,7 +277,7 @@ template Group
       controller sender
       do acceptedPayment <- fetch acceptedPaymentCid
          Some (refCid, ref) <- fetchFromInterface @MultiTransferInProgress acceptedPayment.deliveryOffer
-         exercise acceptedPaymentCid (AcceptedAppMultiPayment_Collect sender)
+         exercise acceptedPaymentCid AcceptedAppMultiPayment_Collect
          acceptedPayment.sender === sender
          archive refCid
          let  (receivers, _) = unzipReceiverQuantities ref.receiverQuantities

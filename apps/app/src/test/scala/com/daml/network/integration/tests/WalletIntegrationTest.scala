@@ -7,7 +7,6 @@ import com.daml.network.codegen.CC.{Coin as coinCodegen, CoinRules as coinRulesC
 import com.daml.network.codegen.CN.Scripts.Wallet.TestSubscriptions as testSubscriptionsCodegen
 import com.daml.network.codegen.CN.Scripts.TestWallet as testWalletCodegen
 import com.daml.network.codegen.CN.Wallet as walletCodegen
-import com.daml.network.codegen.DA
 import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 import com.daml.network.console.{LocalWalletAppReference, WalletAppReference}
@@ -78,7 +77,7 @@ class WalletIntegrationTest
 
         checkBalance(aliceRemoteWallet.balance(), 0, exactly(110), exactly(0), exactly(0))
 
-        nextRound()
+        nextRound(0)
         lockCoins(
           aliceWallet,
           aliceUserParty,
@@ -95,7 +94,7 @@ class WalletIntegrationTest
           (0.000004, 0.000005),
         )
 
-        nextRound()
+        nextRound(1)
 
         checkBalance(
           aliceRemoteWallet.balance(),
@@ -136,7 +135,7 @@ class WalletIntegrationTest
       aliceRemoteWallet.list().lockedCoins.head.accruedHoldingFee shouldBe 0
       assertInRange(aliceRemoteWallet.list().lockedCoins.head.effectiveQuantity, (24.0, 25.0))
 
-      nextRound()
+      nextRound(0)
 
       aliceRemoteWallet.list().coins.head.round shouldBe 1
       assertInRange(aliceRemoteWallet.list().coins.head.accruedHoldingFee, (0.000004, 0.000005))
@@ -946,7 +945,7 @@ class WalletIntegrationTest
           optTimeout = None,
           commands = Seq(
             coinRulesCodegen.CoinRules
-              .key(DA.Types.Tuple2(svcParty.toPrim, validatorParty.toPrim))
+              .key(svcParty.toPrim)
               .exerciseCoinRules_Transfer(
                 coinRulesCodegen.Transfer(
                   sender = userParty.toPrim,
@@ -983,11 +982,11 @@ class WalletIntegrationTest
     }
   }
 
-  def nextRound()(implicit env: CoinTestConsoleEnvironment): Unit = {
-    svc.startClosingRound(0)
-    svc.startIssuingRound(0)
-    svc.closeRound(0)
-    svc.openRound(1)
+  def nextRound(i: Long)(implicit env: CoinTestConsoleEnvironment): Unit = {
+    svc.startClosingRound(i)
+    svc.startIssuingRound(i)
+    svc.closeRound(i)
+    svc.openRound(i + 1)
   }
 
   def subscriptionTestData(aliceUserParty: PartyId)(implicit

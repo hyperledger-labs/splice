@@ -34,38 +34,38 @@ class SvcIntegrationTest
     eventually()({
       val requests = svc.remoteParticipant.ledger_api.acs
         .filter(svcParty, OpenMiningRound)
-      requests should have length 5
+      inside(requests) { case Seq(request) =>
+        request.value.observers should have length 4
+      }
     })
 
-    val closingRounds = svc.startClosingRound(0)
-    closingRounds should have size 5
+    val closingRound = svc.startClosingRound(0)
     svc.remoteParticipant.ledger_api.acs
       .filter(svcParty, ClosingMiningRound)
-      .map(_.contractId) should contain theSameElementsAs closingRounds.values
+      .map(_.contractId) shouldBe Seq(closingRound)
     svc.remoteParticipant.ledger_api.acs.filter(svcParty, OpenMiningRound) shouldBe empty
 
     val issuingRoundResponse = svc.startIssuingRound(0)
-    issuingRoundResponse.validatorRounds should have size 5
     svc.remoteParticipant.ledger_api.acs
       .filter(svcParty, IssuingMiningRound)
       .map(
         _.contractId
-      ) should contain theSameElementsAs issuingRoundResponse.validatorRounds.values
+      ) shouldBe Seq(issuingRoundResponse.issuingRound)
     svc.remoteParticipant.ledger_api.acs.filter(svcParty, ClosingMiningRound) shouldBe empty
 
-    val closedRounds = svc.closeRound(0)
-    closedRounds should have size 5
+    val closedRound = svc.closeRound(0)
     svc.remoteParticipant.ledger_api.acs
       .filter(svcParty, ClosedMiningRound)
-      .map(_.contractId) should contain theSameElementsAs closedRounds.values
+      .map(_.contractId) shouldBe Seq(closedRound)
     svc.remoteParticipant.ledger_api.acs.filter(svcParty, IssuingMiningRound) shouldBe empty
 
     svc.archiveRound(0)
     svc.remoteParticipant.ledger_api.acs.filter(svcParty, ClosedMiningRound) shouldBe empty
 
     remoteSvc.openRound(coinPrice)
-    svc.remoteParticipant.ledger_api.acs.filter(svcParty, OpenMiningRound) should have length 5
-
+    inside(svc.remoteParticipant.ledger_api.acs.filter(svcParty, OpenMiningRound)) {
+      case Seq(round) => round.value.round == Round(1)
+    }
   }
 
   "total burn calculation" in { implicit env =>

@@ -899,7 +899,7 @@ class GrpcWalletService(
     val svcParty = userStore.key.svcParty
     val party = userStore.key.endUserParty
     val cmd = coinRulesCodegen.CoinRules
-      .key(DA.Types.Tuple2(svcParty.toPrim, validatorParty.toPrim))
+      .key(svcParty.toPrim)
       .exerciseCoinRules_TryTransfer(
         coinRulesCodegen.Transfer(
           sender = party.toPrim,

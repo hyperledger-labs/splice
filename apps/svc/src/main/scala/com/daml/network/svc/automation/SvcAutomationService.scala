@@ -45,7 +45,7 @@ class SvcAutomationService(
       implicit val tc: TraceContext = traceContext
       // Guard the action by a lookup for the SVC's own CoinRules to ensure that all of the dependent state
       // has already been created.
-      store.lookupCoinRulesForValidator(store.svcParty).map(_.value).flatMap {
+      store.lookupCoinRules().map(_.value).flatMap {
         case None =>
           // SCV setup is not yet complete: throw a StatusRuntimeException as that properly triggers the retry loop
           Future.failed(
@@ -55,43 +55,36 @@ class SvcAutomationService(
             )
           )
 
-        case Some(_) =>
-          // SCV setup is complete: check whether the CoinRules for the requesting validator already exist
+        // SCV setup is complete: check whether CoinRules already contains the requesting validator is already in the list of observers
+        case Some(coinRulesContract) =>
           val validatorParty = PartyId.tryFromPrim(req.payload.user)
-          store.lookupCoinRulesForValidator(validatorParty).map(_.value).flatMap {
-            case Some(_) =>
-              // They do: reject
-              val cmd = req.contractId.exerciseCoinRulesRequest_Reject().command
-              logger.warn(s"Rejecting duplicate CoinRulesRequest from $validatorParty")
-              connection
-                .submitCommand(Seq(store.svcParty), Seq(), Seq(cmd))
-                .map(_ => "rejected request for already existing rules")
-
-            case None =>
-              // They don't: accept
-              val svc = store.svcParty.toPrim
-              for {
-                // NOTE: this is NOT SAFE under concurrent changes to the XXXMiningRounds contracts
-                // That is OK here, as we assume that on-boarding of validators happens before.
-                QueryResult(_, openMiningRounds0) <- store.listContracts(CC.Round.OpenMiningRound)
-                QueryResult(_, issuingMiningRounds0) <- store
-                  .listContracts(CC.Round.IssuingMiningRound)
-                // Filter to only the ones issued for the svc itself and use them as a template
-                openMiningRounds = openMiningRounds0
-                  .filter(co => co.payload.obs == svc)
-                  .map(_.payload)
-                issuingMiningRounds = issuingMiningRounds0
-                  .filter(co => co.payload.obs == svc)
-                  .map(_.payload)
-                cmd = req.contractId
-                  .exerciseCoinRulesRequest_Accept(openMiningRounds, issuingMiningRounds)
-                  .command
-                // NOTE: not caring about command-dedup here, as we're going to replace this code with explicit disclosure
-                _ <- connection.submitCommand(Seq(store.svcParty), Seq(), Seq(cmd))
-              } yield s"accepted coin rules request from $validatorParty"
+          if (coinRulesContract.payload.observers.contains(validatorParty.toPrim)) {
+            // They are: reject
+            val cmd = req.contractId.exerciseCoinRulesRequest_Reject().command
+            logger.warn(s"Rejecting duplicate CoinRulesRequest from $validatorParty")
+            connection
+              .submitCommand(Seq(store.svcParty), Seq(), Seq(cmd))
+              .map(_ => "rejected request for already existing rules")
+          } else {
+            // They are not: accept
+            for {
+              // NOTE: this is NOT SAFE under concurrent changes to the XXXMiningRounds contracts
+              // That is OK here, as we assume that on-boarding of validators happens before.
+              // TODO(M3-90): make this safe under concurrent round management and onboarding
+              QueryResult(_, openMiningRounds) <- store.listContracts(CC.Round.OpenMiningRound)
+              QueryResult(_, issuingMiningRounds) <- store
+                .listContracts(CC.Round.IssuingMiningRound)
+              cmd = req.contractId
+                .exerciseCoinRulesRequest_Accept(
+                  openMiningRounds.map(_.contractId),
+                  issuingMiningRounds.map(_.contractId),
+                )
+                .command
+              // No command-dedup required, as the CoinRules contract is archived and recreated
+              _ <- connection.submitCommand(Seq(store.svcParty), Seq(), Seq(cmd))
+            } yield s"accepted coin rules request from $validatorParty"
           }
       }
     },
   )
-
 }

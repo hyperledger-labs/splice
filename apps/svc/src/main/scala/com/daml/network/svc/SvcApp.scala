@@ -140,10 +140,10 @@ object SvcApp {
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
     // Create an IssuanceState
     val createIssuanceStateCmd =
-      CC.Coin
+      CC.Round
         .IssuanceState(
           svc = svc.toPrim,
-          obs = svc.toPrim,
+          observers = Seq.empty,
           currentRound = CC.Round.Round(-1),
         )
         .create
@@ -154,7 +154,7 @@ object SvcApp {
       CC.CoinRules
         .CoinRules(
           svc = svc.toPrim,
-          obs = svc.toPrim,
+          observers = Seq.empty,
           config = defaultCoinConfig,
         )
         .createAnd
@@ -181,7 +181,7 @@ object SvcApp {
       )
       _ <- retryProvider.retry(
         "create coinrules and issuance state",
-        store.lookupCoinRulesForValidator(svc).flatMap {
+        store.lookupCoinRules().flatMap {
           case QueryResult(off, None) =>
             // TODO(#790) Switch to the generalized version of mkCommandId once it has been added
             val commandId = s"com.daml.network.svc.CoinRules"

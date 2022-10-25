@@ -206,15 +206,3 @@ template BurnOracle
 
     key (svc, round) : (Party, Round)
     maintainer key._1
-
-template IssuanceState
-  with
-    svc : Party
-    currentRound : Round -- ^ The most recent open round
-    obs : Party
-  where
-    signatory svc
-    observer obs
-
-    key (svc, obs) : (Party, Party)
-    maintainer key._1
