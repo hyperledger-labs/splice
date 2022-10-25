@@ -96,12 +96,13 @@ tmux new-session -d -s "${tmux_session}"
 # listen & auto-rebuild common-frontend code when its src changes
 tmux_cmd "common-frontend" "$REPO_ROOT/apps" "npm run start --workspace common-frontend 2>&1 | tee ${LOG_DIR}/npm-common.log"
 
-start_frontend wallet 3000 6204 NA 6203 alice
-start_frontend wallet 3001 6304 NA 6303 bob
-start_frontend splitwise 3002 8082 8085 NA alice
-start_frontend splitwise 3003 8082 8086 NA bob
-start_frontend directory 3004 8084 8085 NA alice
-start_frontend splitwise 3005 8082 8085 NA charlie
+# start_frontend <app> <ui-http-port> <app-grpc-port> <ledgerapi-grpc-port> <validator-app-grpc-port> <user-display-name>
+start_frontend wallet    3000 6204 NA   6203 alice
+start_frontend wallet    3001 6304 NA   6303 bob
+start_frontend splitwise 3002 6113 6201 NA   alice
+start_frontend splitwise 3003 6113 6301 NA   bob
+start_frontend directory 3004 6110 6201 NA   alice
+start_frontend splitwise 3005 6113 6201 NA   charlie
 
 if [ $daemon -eq 0 ]; then
   tmux attach -t ${tmux_session}

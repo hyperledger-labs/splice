@@ -64,3 +64,8 @@ At time of writing, the following test indices have been used by integration tes
 
 For tests that do not need a known static port, the `CoinConfigTransforms.globallyUniquePorts` configuration transform
 can be used to allocate a unique port within a test run (this is done by default).
+
+## Envoy grpc-web proxy
+
+We use an envoy proxy to allow web applications to communicate with gRPC services using gRPC-web.
+A gRPC service running on port `N` is proxied to a gRPC-web server running on port `N + 1000`.
