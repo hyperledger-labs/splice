@@ -89,7 +89,7 @@ const HomeWithContext: React.FC<{
     return (
       <Container>
         <Stack spacing={3}>
-          <GroupSetup directoryEntries={dirEntries} party={party} provider={provider} svc={svc} />
+          <GroupSetup party={party} provider={provider} svc={svc} />
           <Groups directoryEntries={dirEntries} party={party} provider={provider} />
         </Stack>
       </Container>

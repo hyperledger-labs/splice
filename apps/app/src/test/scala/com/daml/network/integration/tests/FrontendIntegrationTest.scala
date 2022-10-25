@@ -9,11 +9,13 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.PartyId
 import org.apache.commons.io.FileUtils
 import org.openqa.selenium.bidi.log.{Log, LogEntry}
 import org.openqa.selenium.firefox.{FirefoxDriver, FirefoxDriverLogLevel, FirefoxOptions}
 import org.openqa.selenium.{JavascriptExecutor, OutputType, TakesScreenshot, WebDriver}
 import org.scalatest.BeforeAndAfterEach
+import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatestplus.selenium.WebBrowser
 
 import java.io.File
@@ -25,12 +27,30 @@ import scala.collection.mutable
 import scala.jdk.OptionConverters.*
 import scala.util.Try
 
+trait CustomMatchers {
+
+  /** Matches strings while considering all whitespaces to be equal.
+    * Useful when asserting a certain sentence in the web ui to be as expected,
+    * independently of whitespace characters that are ignored during rendering.
+    */
+  class TextMatcher(sentence: String) extends Matcher[String] {
+    def apply(left: String) =
+      MatchResult(
+        left.split("\\s+").sameElements(sentence.split("\\s+")),
+        s"words in ${left} did not match those in ${sentence}",
+        s"words in ${left} matched those in ${sentence}",
+      )
+  }
+  def matchText(sentence: String) = new TextMatcher(sentence)
+}
+
 abstract class FrontendIntegrationTest(frontendNames: String*)
     extends CoinIntegrationTest
     with BeforeAndAfterEach
     with IsolatedCoinEnvironments
     with CommonCoinAppInstanceReferences
-    with WebBrowser {
+    with WebBrowser
+    with CustomMatchers {
 
   type WebDriverType = WebDriver with TakesScreenshot with JavascriptExecutor
 
@@ -136,4 +156,10 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
         .toString
     ).fold(e => s"Failed to get network requests: $e", x => x)
   }
+
+  protected def expectedCns(partyId: PartyId, entry: String) = {
+    val full = partyId.toProtoPrimitive
+    s"${entry} (${full.substring(0, 4)}...${full.substring(full.length - 4)})"
+  }
+
 }

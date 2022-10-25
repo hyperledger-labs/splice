@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.CN.{Directory => dirCodegen, Splitwise => splitwiseCodegen}
+import com.daml.network.codegen.CN.{Directory as dirCodegen, Splitwise as splitwiseCodegen}
 import com.daml.network.console.{RemoteDirectoryAppReference, RemoteWalletAppReference}
 import com.daml.network.environment.{CoinConsoleEnvironment, CoinEnvironmentImpl}
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -66,6 +66,9 @@ class SplitwiseFrontendIntegrationTest
       initialiseDirectoryApp("alice.cns", aliceUserParty, aliceDirectory, aliceRemoteWallet)
       initialiseDirectoryApp("bob.cns", bobUserParty, bobDirectory, bobRemoteWallet)
       initialiseDirectoryApp("charlie.cns", charlieUserParty, charlieDirectory, charlieRemoteWallet)
+      val aliceCns = expectedCns(aliceUserParty, "alice.cns")
+      val bobCns = expectedCns(bobUserParty, "bob.cns")
+      val charlieCns = expectedCns(charlieUserParty, "charlie.cns")
 
       withFrontEnd("aliceSplitwise") { implicit webDriver =>
         go to "http://localhost:3002"
@@ -132,10 +135,15 @@ class SplitwiseFrontendIntegrationTest
         eventually() {
           inside(findAll(className("balances-table-row")).toSeq) {
             case Seq(r1, r2) => // Need to sync here on the actual values (size not enough)
-              r1.childElement(className("balances-table-receiver")).text shouldBe "alice.cns"
+              r1.childElement(className("balances-table-receiver")).text should matchText(
+                aliceCns
+              )
               r1.childElement(className("balances-table-quantity")).text shouldBe "-400.0000000000"
-              r2.childElement(className("balances-table-receiver")).text shouldBe "charlie.cns"
+              r2.childElement(className("balances-table-receiver")).text should matchText(
+                charlieCns
+              )
               r2.childElement(className("balances-table-quantity")).text shouldBe "-111.0000000000"
+              screenshot()
           }
         }
         click on className("settle-my-debts-link")
@@ -154,18 +162,23 @@ class SplitwiseFrontendIntegrationTest
         click on className("redeem-button")
         eventually() {
           inside(findAll(className("balances-table-row")).toSeq) { case Seq(row1, row2) =>
-            row1.childElement(className("balances-table-receiver")).text shouldBe "alice.cns"
+            row1.childElement(className("balances-table-receiver")).text should matchText(
+              aliceCns
+            )
             row1.childElement(className("balances-table-quantity")).text shouldBe "0.0000000000"
-            row2.childElement(className("balances-table-receiver")).text shouldBe "charlie.cns"
+            row2.childElement(className("balances-table-receiver")).text should matchText(
+              charlieCns
+            )
             row2.childElement(className("balances-table-quantity")).text shouldBe "0.0000000000"
           }
           inside(findAll(className("balance-updates-list-item")).toSeq) {
             case Seq(row1, row2, row3, row4) =>
-              row1.text shouldBe "bob.cns sent 111.0000000000 CC to charlie.cns"
-              row2.text shouldBe "bob.cns sent 400.0000000000 CC to alice.cns"
-              row3.text shouldBe "charlie.cns paid 333.0000000000 CC for Digestivs"
-              row4.text shouldBe "alice.cns paid 1200.0000000000 CC for Team lunch"
+              row1.text should matchText(s"${bobCns} sent 111.0000000000 CC to ${charlieCns}")
+              row2.text should matchText(s"${bobCns} sent 400.0000000000 CC to ${aliceCns}")
+              row3.text should matchText(s"${charlieCns} paid 333.0000000000 CC for Digestivs")
+              row4.text should matchText(s"${aliceCns} paid 1200.0000000000 CC for Team lunch")
           }
+          screenshot()
         }
       }
     }
@@ -179,6 +192,8 @@ class SplitwiseFrontendIntegrationTest
 
       initialiseDirectoryApp("alice.cns", aliceUserParty, aliceDirectory, aliceRemoteWallet)
       initialiseDirectoryApp("bob.cns", bobUserParty, bobDirectory, bobRemoteWallet)
+      val aliceCns = expectedCns(aliceUserParty, "alice.cns")
+      val bobCns = expectedCns(bobUserParty, "bob.cns")
 
       withFrontEnd("aliceSplitwise") { implicit webDriver =>
         go to "http://localhost:3002"
@@ -240,13 +255,14 @@ class SplitwiseFrontendIntegrationTest
           "redeem-button"
         ) // I find terminology very confusing - shouldn't alice redeem the payment? I expect this is 'complete/confirm transfer'
         eventually(scaled(5 seconds)) {
+          screenshot()
           inside(findAll(className("balances-table-row")).toSeq) { case Seq(row) =>
-            row.childElement(className("balances-table-receiver")).text shouldBe "alice.cns"
+            row.childElement(className("balances-table-receiver")).text should matchText(aliceCns)
             row.childElement(className("balances-table-quantity")).text.toDouble shouldBe 0.0
           }
           inside(findAll(className("balance-updates-list-item")).toSeq) { case Seq(row1, row2) =>
-            row1.text shouldBe "bob.cns sent 500.0000000000 CC to alice.cns"
-            row2.text shouldBe "alice.cns paid 1000.0000000000 CC for Team lunch"
+            row1.text should matchText(s"${bobCns} sent 500.0000000000 CC to ${aliceCns}")
+            row2.text should matchText(s"${aliceCns} paid 1000.0000000000 CC for Team lunch")
           }
         }
       }

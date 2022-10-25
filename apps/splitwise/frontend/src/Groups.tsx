@@ -1,4 +1,5 @@
 import { Contract, sameContracts, useInterval } from 'common-frontend';
+import { DirectoryEntry as DirectoryEntryComponent } from 'common-frontend';
 import {
   GroupKey,
   ListAcceptedGroupInvitesRequest,
@@ -45,7 +46,6 @@ const key = (group: Contract<CodegenGroup>) =>
     .setProviderPartyId(group.payload.provider);
 
 interface BalancesProps {
-  directoryEntries: DirectoryEntries;
   group: Contract<CodegenGroup>;
   party: string;
   provider: string;
@@ -62,7 +62,7 @@ const balanceEqual = (a: Map<string, string>, b: Map<string, string>): boolean =
   return true;
 };
 
-const Balances: React.FC<BalancesProps> = ({ directoryEntries, group, party, provider }) => {
+const Balances: React.FC<BalancesProps> = ({ group, party, provider }) => {
   const splitwiseClient = useSplitwiseClient();
   const ledgerApiClient = useSplitwiseLedgerApiClient();
   const [balances, setBalances] = useState<Map<string, string>>(new Map());
@@ -107,7 +107,7 @@ const Balances: React.FC<BalancesProps> = ({ directoryEntries, group, party, pro
             {Array.from(balances).map(([party, balance]) => (
               <TableRow key={party} className="balances-table-row">
                 <TableCell className="balances-table-receiver">
-                  {directoryEntries.resolveParty(party)}
+                  <DirectoryEntryComponent partyId={party} />
                 </TableCell>
                 <TableCell className="balances-table-quantity">{balance}</TableCell>
               </TableRow>
@@ -125,18 +125,12 @@ const Balances: React.FC<BalancesProps> = ({ directoryEntries, group, party, pro
 };
 
 interface MembershipRequestsProps {
-  directoryEntries: DirectoryEntries;
   group: Contract<CodegenGroup>;
   provider: string;
   party: string;
 }
 
-const MembershipRequests: React.FC<MembershipRequestsProps> = ({
-  directoryEntries,
-  group,
-  party,
-  provider,
-}) => {
+const MembershipRequests: React.FC<MembershipRequestsProps> = ({ group, party, provider }) => {
   const splitwiseClient = useSplitwiseClient();
   const ledgerApiClient = useSplitwiseLedgerApiClient();
   const [acceptedInvites, setAcceptedInvites] = useState<Contract<AcceptedGroupInvite>[]>([]);
@@ -164,7 +158,7 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({
           {acceptedInvites.map(invite => (
             <ListItem key={invite.contractId}>
               <Button className="add-user-link" onClick={() => onAddMember(invite)}>
-                Add {directoryEntries.resolveParty(invite.payload.invitee)}
+                Add <DirectoryEntryComponent partyId={invite.payload.invitee} />
               </Button>
             </ListItem>
           ))}
@@ -257,12 +251,11 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider 
 };
 
 interface BalanceUpdatesProps {
-  directoryEntries: DirectoryEntries;
   group: Contract<CodegenGroup>;
   party: string;
 }
 
-const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ directoryEntries, group, party }) => {
+const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ group, party }) => {
   const splitwiseClient = useSplitwiseClient();
   const [balanceUpdates, setBalanceUpdates] = useState<Contract<BalanceUpdate>[]>([]);
   const fetchBalanceUpdates = useCallback(async () => {
@@ -284,7 +277,7 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ directoryEntries, group
       const value = update.payload.update.value;
       return (
         <ListItem className="balance-updates-list-item">
-          {directoryEntries.resolveParty(value.payer)} paid {value.quantity} CC for{' '}
+          <DirectoryEntryComponent partyId={value.payer} /> paid {value.quantity} {'CC for '}
           {value.description}
         </ListItem>
       );
@@ -292,8 +285,8 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ directoryEntries, group
       const value = update.payload.update.value;
       return (
         <ListItem className="balance-updates-list-item">
-          {directoryEntries.resolveParty(value.sender)} sent {value.quantity} CC to{' '}
-          {directoryEntries.resolveParty(value.receiver)}
+          <DirectoryEntryComponent partyId={value.sender} /> sent {value.quantity} {'CC to '}
+          <DirectoryEntryComponent partyId={value.receiver} />
         </ListItem>
       );
     } else {
@@ -313,18 +306,12 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ directoryEntries, group
 };
 
 interface AcceptedAppPaymentsProps {
-  directoryEntries: DirectoryEntries;
   group: Contract<CodegenGroup>;
   provider: string;
   party: string;
 }
 
-const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({
-  directoryEntries,
-  group,
-  party,
-  provider,
-}) => {
+const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({ group, party, provider }) => {
   const ledgerApiClient = useSplitwiseLedgerApiClient();
   const [acceptedAppPayments, setAcceptedAppPayments] = useState<Contract<AcceptedAppPayment>[]>(
     []
@@ -366,7 +353,8 @@ const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({
   }) => {
     return (
       <ListItem>
-        Accepted transfer to {directoryEntries.resolveParty(acceptedAppPayment.payload.receiver)}
+        {'Accepted transfer to '}
+        <DirectoryEntryComponent partyId={acceptedAppPayment.payload.receiver} />
         <Button className="redeem-button" onClick={() => onRedeem(acceptedAppPayment)}>
           Redeem
         </Button>
@@ -442,35 +430,18 @@ const Group: React.FC<GroupProps> = ({ directoryEntries, group, party, provider 
           </Button>
         )}
         <Typography variant="button">
-          owned by {directoryEntries.resolveParty(group.payload.owner)}
+          owned by <DirectoryEntryComponent partyId={group.payload.owner} />
         </Typography>
       </Stack>
       <Divider />
-      {isOwner && (
-        <MembershipRequests
-          group={group}
-          directoryEntries={directoryEntries}
-          party={party}
-          provider={provider}
-        />
-      )}
+      {isOwner && <MembershipRequests group={group} party={party} provider={provider} />}
       <Entry group={group} directoryEntries={directoryEntries} party={party} provider={provider} />
       <Divider />
-      <AcceptedAppPayments
-        group={group}
-        directoryEntries={directoryEntries}
-        party={party}
-        provider={provider}
-      />
+      <AcceptedAppPayments group={group} party={party} provider={provider} />
       <Divider />
-      <Balances
-        group={group}
-        directoryEntries={directoryEntries}
-        party={party}
-        provider={provider}
-      />
+      <Balances group={group} party={party} provider={provider} />
       <Divider />
-      <BalanceUpdates directoryEntries={directoryEntries} group={group} party={party} />
+      <BalanceUpdates group={group} party={party} />
       <Divider />
     </Paper>
   );

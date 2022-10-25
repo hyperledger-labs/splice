@@ -1,4 +1,4 @@
-import { Contract, sameContracts, useInterval } from 'common-frontend';
+import { DirectoryEntry, Contract, sameContracts, useInterval } from 'common-frontend';
 import {
   ListGroupInvitesRequest,
   SplitwiseContext,
@@ -9,18 +9,16 @@ import { Button, FormGroup, List, ListItem, Stack, TextField, Typography } from 
 
 import { GroupInvite } from '@daml.js/splitwise/lib/CN/Splitwise';
 
-import DirectoryEntries from './DirectoryEntries';
 import { useSplitwiseLedgerApiClient } from './contexts/SplitwiseLedgerApiContext';
 import { useSplitwiseClient } from './contexts/SplitwiseServiceContext';
 
 interface GroupSetupProps {
-  directoryEntries: DirectoryEntries;
   svc: string;
   provider: string;
   party: string;
 }
 
-const GroupSetup: React.FC<GroupSetupProps> = ({ directoryEntries, party, provider, svc }) => {
+const GroupSetup: React.FC<GroupSetupProps> = ({ party, provider, svc }) => {
   const splitwiseClient = useSplitwiseClient();
   const ledgerApiClient = useSplitwiseLedgerApiClient();
   const [groupId, setGroupId] = useState<string>('');
@@ -66,7 +64,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({ directoryEntries, party, provid
             <Stack direction="row" alignItems="baseline">
               <div>
                 <Typography variant="button">
-                  {directoryEntries.resolveParty(invite.payload.group.owner)}
+                  <DirectoryEntry partyId={invite.payload.group.owner} />
                 </Typography>{' '}
                 is inviting you to join{' '}
                 <Typography variant="button">{invite.payload.group.id.unpack}</Typography>

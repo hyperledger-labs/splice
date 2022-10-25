@@ -19,9 +19,6 @@ class DirectoryEntries {
   getAllEntries(): Entry[] {
     return this.entries.map(e => e.payload);
   }
-  resolveParty(p: string): string {
-    return this.entries.find(e => e.payload.user === p)?.payload.name ?? p;
-  }
 }
 
 export default DirectoryEntries;
