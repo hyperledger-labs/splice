@@ -351,7 +351,7 @@ commands:
       cmd_name:
         type: string
         default: "Executing bash command << parameters.cmd >> in the nix shell"
-      cluster_authenticate:
+      gce_authenticate:
         type: boolean
         default: false
       cluster:
@@ -393,7 +393,7 @@ commands:
                 . $REPO_ROOT/cluster/deployment/<< parameters.cluster >>/.envrc.vars
               fi
 
-              if [[ << parameters.cluster_authenticate >> == true ]]; then
+              if [[ << parameters.gce_authenticate >> == true ]]; then
                 if [[ << parameters.cluster >> =~ (dev|test)net ]]; then
                   echo $GCP_DA_CN_DEVNET_KEY | gcloud auth activate-service-account --key-file=-
                 fi
@@ -499,24 +499,54 @@ commands:
               fi
             done
 
-            exit $success
+            # We want to activate the VPN only for our k8s admin API
+            # and for the k8s egress. Therefore, we drop the default route.
+            sudo ip route del default table 220
 
-  stop_vpn:
+  # This is separate from setup_vpn since we need to interleave the step that sets up
+  # nix for this to work
+  setup_vpn_routes:
+    parameters:
+      cluster:
+        type: enum
+        enum: ["staging", "devnet", "testnet"]
     steps:
+      - run_bash_command_in_nix:
+          cmd_name: Setup VPN Routes - Fetching kube config
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          cmd: |
+            set -eou pipefail
+            export KUBECONFIG=$PWD/.kubecfg
+            cncluster activate
       - run:
-          name: Stop VPN connection
+          # Separate command since running this outside of nix is easier.
+          name: Setup VPN Routes - Adding new routes
           command: |
-            sudo killall charon-cmd
+            set -eou pipefail
+            . cluster/deployment/<< parameters.cluster >>/.envrc.vars
+            ADDRS=( $(sudo ip --json addr show dev ens5 | jq -r '.[0].addr_info|.[].local') )
+            # Virtual IP setup by charon-cmd
+            VPN_IP=${ADDRS[1]}
+            GATEWAY=$(sudo ip --json route list | jq -r '.[]|select(.gateway)|.gateway')
+            EGRESS_IP=$(getent hosts $GCP_CLUSTER_BASENAME.network.canton.global | awk '{ print $1 }')
+            sudo ip route add $EGRESS_IP via $GATEWAY table 220 src $VPN_IP
+            KUBE_IP=$(sed -E -n 's|^.*server: https://(.*)$|\1|p' .kubecfg)
+            sudo ip route add $KUBE_IP via $GATEWAY table 220 src $VPN_IP
 
   checkout_cluster_version:
     parameters:
       cluster:
-        type: string
+        type: enum
+        enum: ["staging", "devnet", "testnet"]
     steps:
       - run:
           name: Checkout cluster version
           command: |
            set +e
+
+           . .envrc.vars
+           . $REPO_ROOT/cluster/deployment/<< parameters.cluster >>/.envrc.vars
 
            echo "Retrieving Cluster Version of Source"
 
@@ -524,7 +554,7 @@ commands:
            success=42
            while [ ${count} -lt 10 ]; do
 
-             if cluster_version=$(curl http://<< parameters.cluster >>.network.canton.global/version --connect-timeout 2); then
+             if cluster_version=$(curl http://${GCP_CLUSTER_BASENAME}.network.canton.global/version --connect-timeout 2); then
                echo "Cluster version: ${cluster_version}"
                success=0
                break
@@ -729,7 +759,7 @@ jobs:
       - run_bash_command_in_nix:
           cmd_name: Apply Kubernetes manifest to cluster
           cluster: << parameters.cluster >>
-          cluster_authenticate: true
+          gce_authenticate: true
           cmd: |
             set -eou pipefail
             cncluster activate
@@ -741,7 +771,7 @@ jobs:
     parameters:
       cluster:
         type: enum
-        enum: ["staging", "dev", "test"]
+        enum: ["staging", "devnet", "testnet"]
     machine:
       image: ubuntu-2004:202010-01
     environment:
@@ -751,18 +781,26 @@ jobs:
     steps:
       - checkout
       - setup_vpn
+      - setup_sbt_test_job
+      - setup_vpn_routes:
+          cluster: << parameters.cluster >>
+      - run_bash_command_in_nix:
+          cmd_name: wait for cluster to be ready
+          cluster: << parameters.cluster >>
+          gce_authenticate: true
+          cmd: |
+            cncluster activate
+            cncluster wait
       - checkout_cluster_version:
           cluster: <<parameters.cluster>>
-      - stop_vpn # vpn connection can be somewhat flaky so we only enable it where it is required.
-      - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "Test/compile"
-      - setup_vpn
       - execute_sbt_command:
+          pre_sbt_cmd: |
+            . cluster/deployment/<< parameters.cluster >>/.envrc.vars
           cmd: "\"testOnly *PreflightIntegrationTest\""
-          extra_parameters: -DDOMAIN_URL=http://<<parameters.cluster>>.network.canton.global:5008 -DNETWORK_APPS_ADDRESS=<<parameters.cluster>>.network.canton.global
+          extra_parameters: -DDOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 -DNETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global
           timeout: "10m"
-      - stop_vpn
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
       - cleanup_sbt_test_job
@@ -923,7 +961,7 @@ workflows:
            - deployment_test
            - docker_images_push
     - preflight_check:
-        cluster: dev
+        cluster: "devnet"
         <<: *main-branch-only
         context:
           - canton-network-vpn
@@ -952,7 +990,7 @@ workflows:
            - deployment_test
            - docker_images_push
     - preflight_check:
-        cluster: test
+        cluster: "testnet"
         <<: *main-branch-only
         context:
           - canton-network-vpn
@@ -968,7 +1006,7 @@ workflows:
     jobs:
       - preflight_check:
           <<: *main-branch-only
-          cluster: test
+          cluster: "testnet"
           context:
             - canton-network-vpn
             - slack-context
