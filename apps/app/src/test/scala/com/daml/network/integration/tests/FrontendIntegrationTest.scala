@@ -12,7 +12,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import org.apache.commons.io.FileUtils
 import org.openqa.selenium.bidi.log.{Log, LogEntry}
 import org.openqa.selenium.firefox.{FirefoxDriver, FirefoxDriverLogLevel, FirefoxOptions}
-import org.openqa.selenium.{OutputType, TakesScreenshot, WebDriver}
+import org.openqa.selenium.{JavascriptExecutor, OutputType, TakesScreenshot, WebDriver}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatestplus.selenium.WebBrowser
 
@@ -22,7 +22,8 @@ import java.text.SimpleDateFormat
 import java.time.Duration
 import java.util.Calendar
 import scala.collection.mutable
-import scala.jdk.OptionConverters._
+import scala.jdk.OptionConverters.*
+import scala.util.Try
 
 abstract class FrontendIntegrationTest(frontendNames: String*)
     extends CoinIntegrationTest
@@ -30,6 +31,8 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
     with IsolatedCoinEnvironments
     with CommonCoinAppInstanceReferences
     with WebBrowser {
+
+  type WebDriverType = WebDriver with TakesScreenshot with JavascriptExecutor
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
@@ -44,9 +47,9 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
     new FirefoxOptions().setHeadless(true).setLogLevel(FirefoxDriverLogLevel.DEBUG)
   options.setCapability("webSocketUrl", true: Any);
 
-  protected val webDrivers: mutable.Map[String, WebDriver with TakesScreenshot] = mutable.Map.empty
+  protected val webDrivers: mutable.Map[String, WebDriverType] = mutable.Map.empty
 
-  def withFrontEnd[A](driverName: String)(implicit f: WebDriver with TakesScreenshot => A): A =
+  def withFrontEnd[A](driverName: String)(implicit f: WebDriverType => A): A =
     f(
       webDrivers
         .get(driverName)
@@ -111,11 +114,26 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
   /** Takes a screenshot of the current browser state, into a timestamped png file in log directory.
     * Currently intended only for manual use during development and debugging.
     */
-  protected def screenshot()(implicit webDriver: WebDriver with TakesScreenshot): Unit = {
+  protected def screenshot()(implicit webDriver: WebDriverType): Unit = {
     val screenshotFile = webDriver.getScreenshotAs(OutputType.FILE)
     val time = Calendar.getInstance.getTime
     val timestamp = new SimpleDateFormat("yy-MM-dd-H:m:s.S").format(time)
     val filename = Paths.get("log", s"screenshot-${timestamp}.png").toString
     FileUtils.copyFile(screenshotFile, new File(filename))
+  }
+
+  /** Returns a list of network requests performed by the frontend since the beginning of the test.
+    * The result is JSON-encoded and human readable.
+    * Currently intended only for manual use during development and debugging.
+    *
+    * Note that the Resource Timing API only returns timing information, it does not contain the status
+    * of requests (e.g., HTTP 200 or HTTP 404).
+    */
+  protected def getNetworkRequests()(implicit webDriver: WebDriverType): String = {
+    Try(
+      webDriver
+        .executeScript("return JSON.stringify(performance.getEntriesByType(\"resource\"))")
+        .toString
+    ).fold(e => s"Failed to get network requests: $e", x => x)
   }
 }
