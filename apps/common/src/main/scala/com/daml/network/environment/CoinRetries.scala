@@ -25,8 +25,8 @@ import scala.util.{Failure, Try}
 
 trait CoinRetries extends FlagCloseable {
 
-  protected val maxRetries: Int = 40
-  protected val initialDelay: FiniteDuration = 10.millis
+  protected val maxRetries: Int = 35
+  protected val initialDelay: FiniteDuration = 200.millis
   protected val maxDelay: Duration = 5.seconds
 
   def retry[T](operationName: String, task: => Future[T])(implicit
@@ -63,8 +63,8 @@ trait CoinRetries extends FlagCloseable {
 }
 
 object CoinRetries {
-  case class RetryableError(operationName: String) extends ExceptionRetryable {
 
+  case class RetryableError(operationName: String) extends ExceptionRetryable {
     // Additional categories that are not marked as retryable but we
     // can safely retry since we know there are other apps or
     // processes that change the system state.
@@ -87,21 +87,22 @@ object CoinRetries {
         val errorDetails = ErrorDetails.from(statusProto)
         errorCategory match {
           case Some(cat) if cat.retryable.nonEmpty || extraRetryableCategories.contains(cat) =>
-            logger.info(
-              Seq(s"The operation ${operationName.singleQuoted}  failed with a retryable error:")
+            //  don't log the stack traces of transient gRPC exceptions to make the logs less noisy.
+            val msg =
+              Seq(
+                s"The operation ${operationName.singleQuoted} failed with a retryable error (full stack trace omitted):"
+              )
+                // the message of the exception is already in the error details, so we don't need to append it
                 .appendedAll(errorDetails.map(_.toString))
-                .mkString(System.lineSeparator()),
-              ex,
-            )
+            logger.info(msg.mkString(System.lineSeparator()))
             TransientErrorKind
           // TODO (#1066) Remove the need to retry on UNIMPLEMENTED.
           case None
               if Seq(Status.Code.UNIMPLEMENTED, Status.Code.UNAVAILABLE, Status.Code.NOT_FOUND)
                 .contains(statusCode) =>
-            logger.info(
-              s"The operation ${operationName.singleQuoted} failed with a retryable error:",
-              ex,
-            )
+            val msg =
+              s"The operation ${operationName.singleQuoted} failed with a retryable error (full stack trace omitted): "
+            logger.info(msg + ex.getMessage)
             TransientErrorKind
           case _ =>
             logger.warn(

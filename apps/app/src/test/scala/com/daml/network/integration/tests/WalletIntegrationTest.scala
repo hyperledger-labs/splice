@@ -11,7 +11,7 @@ import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 import com.daml.network.console.{LocalWalletAppReference, WalletAppReference}
 import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.{CoinEnvironmentDefinition}
+import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,

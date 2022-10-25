@@ -74,7 +74,10 @@ class WalletApp(
           loggerFactory,
         )
       }
-      validatorParty <- retry("getValidatorPartyId", validatorConnection.getValidatorPartyId())
+      validatorParty <- retry(
+        "getValidatorPartyId",
+        validatorConnection.getValidatorPartyId(),
+      )
       svcParty <- retry("getSvcPartyId", scanConnection.getSvcPartyId())
     } yield {
       val walletStoreKey = WalletStore.Key(

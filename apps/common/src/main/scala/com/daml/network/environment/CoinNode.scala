@@ -110,8 +110,15 @@ abstract class CoinNode[State <: AutoCloseable](
     _ = logger.info(s"Acquiring primary party of service user $serviceUser")
     serviceParty <-
       if (allocateServiceUser)
-        retry("Allocating user and party", connection.getOrAllocateParty(serviceUser))
-      else retry("Querying primary party of user", connection.getPrimaryParty(serviceUser))
+        retry(
+          "Allocating user and party",
+          connection.getOrAllocateParty(serviceUser),
+        )
+      else
+        retry(
+          "Querying primary party of user",
+          connection.getPrimaryParty(serviceUser),
+        )
     _ = logger.info(s"Acquired primary party of user $serviceUser: $serviceParty")
     _ = logger.info(s"Waiting for templates to be uploaded: ${requiredTemplates.map(_.id)}")
     _ <- waitForPackages(connection)

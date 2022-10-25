@@ -15,12 +15,13 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.retry
 import com.digitalasset.canton.util.retry.Backoff
-import EndUserTreasuryService.*
 
 import java.util.UUID
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
+
+import EndUserTreasuryService.*
 // TODO(#756): Add PrettyPrinting
 
 /** Wrapper helper class.
