@@ -7,6 +7,7 @@ import AppMultiPaymentRequests from './AppMultiPaymentRequests';
 import AppPaymentRequests from './AppPaymentRequests';
 import Coins from './Coins';
 import PaymentChannels from './PaymentChannels';
+import Subscriptions from './Subscriptions';
 
 const Home: React.FC = () => {
   const [tabValue, setTabValue] = useState<string>('coins');
@@ -22,6 +23,7 @@ const Home: React.FC = () => {
             value="app_payment_requests"
             id="payment-requests-tab"
           />
+          <Tab label="Subscriptions" value="subscriptions" id="subscriptions-tab" />
         </Tabs>
       </Box>
       <TabContext value={tabValue}>
@@ -34,6 +36,9 @@ const Home: React.FC = () => {
         <TabPanel value="app_payment_requests">
           <AppPaymentRequests />
           <AppMultiPaymentRequests />
+        </TabPanel>
+        <TabPanel value="subscriptions">
+          <Subscriptions />
         </TabPanel>
       </TabContext>
     </>

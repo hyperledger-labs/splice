@@ -9,6 +9,7 @@ import {
   AppPaymentRequest,
   PaymentChannelProposal,
 } from '@daml.js/wallet/lib/CN/Wallet';
+import { SubscriptionRequest } from '@daml.js/wallet/lib/CN/Wallet/Subscriptions';
 
 import { useUserState } from './UserContext';
 
@@ -33,6 +34,10 @@ export interface ListAppPaymentRequestsResponse {
 
 export interface ListAppMultiPaymentRequestsResponse {
   paymentRequestsList: Contract<AppMultiPaymentRequest>[];
+}
+
+export interface ListSubscriptionRequestsResponse {
+  subscriptionRequestsList: Contract<SubscriptionRequest>[];
 }
 
 export interface UserStatusResponse {
@@ -60,6 +65,9 @@ export interface WalletClient {
 
   listAppMultiPaymentRequests: () => Promise<ListAppMultiPaymentRequestsResponse>;
   acceptAppMultiPaymentRequests: (requestContractId: string) => Promise<void>;
+
+  listSubscriptionRequests: () => Promise<ListSubscriptionRequestsResponse>;
+  acceptSubscriptionRequest: (requestContractId: string) => Promise<void>;
 
   userStatus: () => Promise<UserStatusResponse>;
 }
@@ -181,6 +189,26 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       acceptAppMultiPaymentRequests: async requestContractId => {
         await walletClient.acceptAppMultiPaymentRequest(
           new v0.AcceptAppMultiPaymentRequestRequest()
+            .setRequestContractId(requestContractId)
+            .setWalletCtx(wctx),
+          creds
+        );
+      },
+
+      listSubscriptionRequests: async (): Promise<ListSubscriptionRequestsResponse> => {
+        const res = await walletClient.listSubscriptionRequests(
+          new v0.ListSubscriptionRequestsRequest().setWalletCtx(wctx),
+          creds
+        );
+        return {
+          subscriptionRequestsList: res
+            .getSubscriptionRequestsList()
+            .map(c => Contract.decode(c, SubscriptionRequest)),
+        };
+      },
+      acceptSubscriptionRequest: async requestContractId => {
+        await walletClient.acceptSubscriptionRequest(
+          new v0.AcceptSubscriptionRequestRequest()
             .setRequestContractId(requestContractId)
             .setWalletCtx(wctx),
           creds

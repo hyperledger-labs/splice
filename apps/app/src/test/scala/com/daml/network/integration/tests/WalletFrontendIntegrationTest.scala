@@ -1,7 +1,12 @@
 package com.daml.network.integration.tests
 
+import com.daml.ledger.api.refinements.ApiTypes
+import com.daml.ledger.client.binding
 import com.daml.ledger.client.binding.Primitive
+import com.daml.network.codegen.CN.Scripts.Wallet.{TestSubscriptions => testSubsCodegen}
+import com.daml.network.codegen.CN.Wallet.{Subscriptions => subsCodegen}
 import com.daml.network.codegen.CN.{Directory => dirCodegen}
+import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.console.{LocalValidatorAppReference, RemoteDirectoryAppReference}
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.topology.PartyId
@@ -189,6 +194,30 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
         }
       }
     }
+
+    "show subscription requests and allow users to accept them" in { implicit env =>
+      val aliceDamlUser = aliceRemoteWallet.config.damlUser
+      val aliceUserParty = setupForTestWithDirectory(aliceDamlUser, aliceValidator)
+      aliceRemoteWallet.tap(50) // she'll need this for accepting the subscription request
+      createSelfSubscriptionRequest(aliceUserParty);
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToSubscriptions(aliceDamlUser)
+        eventually() {
+          inside(findAll(className("sub-requests-table-row")).toList) { case Seq(row) =>
+            clue("Check that the subscription request is listed") {
+              val expected = aliceUserParty.toProtoPrimitive
+              row.childElement(className("sub-request-receiver")).text should matchText(expected)
+              row.childElement(className("sub-request-provider")).text should matchText(expected)
+            }
+          }
+        }
+        click on className("sub-request-accept-button")
+        eventually() {
+          findAll(className("sub-requests-table-row")) shouldBe empty
+        }
+      }
+    }
   }
 
   private def setupForTestWithDirectory(damlUser: String, validator: LocalValidatorAppReference) = {
@@ -209,6 +238,54 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
     aliceDirectory.requestDirectoryEntry(dirEntry)
   }
 
+  private def createSelfSubscriptionRequest(
+      aliceUserParty: PartyId
+  )(implicit env: CoinTestConsoleEnvironment) = {
+    // Create a subscription context
+    aliceWallet.remoteParticipant.ledger_api.commands.submit(
+      Seq(aliceUserParty),
+      optTimeout = None,
+      commands = Seq(
+        testSubsCodegen
+          .TestSubscriptionContext(
+            user = aliceUserParty.toPrim,
+            service = aliceUserParty.toPrim,
+            description = "description",
+          )
+          .create
+          .command
+      ),
+    )
+    val referenceId =
+      aliceWallet.remoteParticipant.ledger_api.acs
+        .await(aliceUserParty, testSubsCodegen.TestSubscriptionContext)
+        .contractId
+    // Assemble actual test data
+    val subscriptionData = subsCodegen.Subscription(
+      sender = aliceUserParty.toPrim,
+      receiver = aliceUserParty.toPrim,
+      provider = aliceUserParty.toPrim,
+      svc = svcParty.toPrim,
+      context = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
+    )
+    val payData = subsCodegen.SubscriptionPayData(
+      paymentQuantity = BigDecimal(10: Int),
+      paymentInterval = RelTime(microseconds = 60 * 60 * 1000000L),
+      paymentDuration = RelTime(microseconds = 60 * 60 * 1000000L),
+      collectionDuration = RelTime(microseconds = 60 * 1000000L),
+    ) // paymentDuration == paymenInterval, so we can make a second payment immediately
+    (subscriptionData, payData)
+    val request = subsCodegen.SubscriptionRequest(
+      subscriptionData,
+      payData,
+    )
+    aliceWallet.remoteParticipant.ledger_api.commands.submit(
+      actAs = Seq(aliceUserParty),
+      optTimeout = None,
+      commands = Seq(request.create.command),
+    )
+  }
+
   private def browseToPaymentRequests(damlUser: String)(implicit webDriver: WebDriver) = {
     // Go to app payment requests tab in alice's wallet
     go to "http://localhost:3000"
@@ -216,5 +293,14 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
     textField("user-id-field").value = damlUser
     click on "login-button"
     click on "payment-requests-tab"
+  }
+
+  private def browseToSubscriptions(damlUser: String)(implicit webDriver: WebDriver) = {
+    // Go to subscriptions tab in alice's wallet
+    go to "http://localhost:3000"
+    click on "user-id-field"
+    textField("user-id-field").value = damlUser
+    click on "login-button"
+    click on "subscriptions-tab"
   }
 }
