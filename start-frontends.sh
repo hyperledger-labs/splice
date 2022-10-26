@@ -41,15 +41,17 @@ function start_frontend() {
   app=$1
   port=$2
   app_grpc=$3
-  ledger_grpc=$4
-  validator_grpc=$5
-  user=$6
+  wallet_port=$4
+  ledger_grpc=$5
+  validator_grpc=$6
+  user=$7
 
   frontend_dir="${REPO_ROOT}/apps/${app}/frontend"
 
   tmux_cmd "${app}-${user}" "${frontend_dir}" \
     "BROWSER=none PORT=$port \
     REACT_APP_GRPC_URL=http://localhost:${app_grpc} \
+    REACT_APP_WALLET_UI_URL=http://localhost:${wallet_port} \
     REACT_APP_VALIDATOR_API_GRPC_URL=http://localhost:${validator_grpc} \
     REACT_APP_LEDGER_API_GRPC_URL=http://localhost:${ledger_grpc} \
     REACT_APP_OAUTH_DOMAIN=canton-network-test.us.auth0.com \
@@ -96,13 +98,13 @@ tmux new-session -d -s "${tmux_session}"
 # listen & auto-rebuild common-frontend code when its src changes
 tmux_cmd "common-frontend" "$REPO_ROOT/apps" "npm run start --workspace common-frontend 2>&1 | tee ${LOG_DIR}/npm-common.log"
 
-# start_frontend <app> <ui-http-port> <app-grpc-port> <ledgerapi-grpc-port> <validator-app-grpc-port> <user-display-name>
-start_frontend wallet    3000 6204 NA   6203 alice
-start_frontend wallet    3001 6304 NA   6303 bob
-start_frontend splitwise 3002 6113 6201 NA   alice
-start_frontend splitwise 3003 6113 6301 NA   bob
-start_frontend directory 3004 6110 6201 NA   alice
-start_frontend splitwise 3005 6113 6201 NA   charlie
+# start_frontend <app> <ui-http-port> <app-wallet-ui-port> <app-grpc-port> <ledgerapi-grpc-port> <validator-app-grpc-port> <user-display-name>
+start_frontend wallet    3000 6204 NA   NA   6203 alice
+start_frontend wallet    3001 6304 NA   NA   6303 bob
+start_frontend splitwise 3002 6113 3000 6201 NA   alice
+start_frontend splitwise 3003 6113 3001 6301 NA   bob
+start_frontend directory 3004 6110 NA   6201 NA   alice
+start_frontend splitwise 3005 6113 NA   6201 NA   charlie
 
 if [ $daemon -eq 0 ]; then
   tmux attach -t ${tmux_session}

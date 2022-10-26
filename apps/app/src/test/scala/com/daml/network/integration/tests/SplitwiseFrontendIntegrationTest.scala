@@ -70,6 +70,8 @@ class SplitwiseFrontendIntegrationTest
       val bobCns = expectedCns(bobUserParty, "bob.cns")
       val charlieCns = expectedCns(charlieUserParty, "charlie.cns")
 
+      bobRemoteWallet.tap(550)
+
       withFrontEnd("aliceSplitwise") { implicit webDriver =>
         go to "http://localhost:3002"
         click on "user-id-field"
@@ -147,17 +149,19 @@ class SplitwiseFrontendIntegrationTest
           }
         }
         click on className("settle-my-debts-link")
-      }
 
-      ConsoleMacros.utils.retry_until_true {
-        bobRemoteWallet.listAppMultiPaymentRequests().length == 1
-      }
-      inside(bobRemoteWallet.listAppMultiPaymentRequests()) { case Seq(request) =>
-        bobRemoteWallet.tap(550)
-        bobRemoteWallet.acceptAppMultiPaymentRequest(request.contractId)
-      }
+        // Bob is redirected to wallet ..
+        click on "user-id-field"
+        textField("user-id-field").value = bobDamlUser
+        click on "login-button"
 
-      withFrontEnd("bobSplitwise") { implicit webDriver =>
+        click on className("accept-button")
+
+        // And then back to splitwise
+        click on "user-id-field"
+        textField("user-id-field").value = bobDamlUser
+        click on "login-button"
+
         // TODO(i1149) Confusing terminology. Change redeem -> collect
         click on className("redeem-button")
         eventually() {

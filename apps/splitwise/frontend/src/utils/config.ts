@@ -13,6 +13,9 @@ const authConfig: Auth0ProviderOptions = {
 
 export type Config = {
   auth: Auth0ProviderOptions;
+  wallet: {
+    uiUrl: string;
+  };
   splitwise: {
     grpcUrl: string;
   };
@@ -29,6 +32,9 @@ export type Config = {
 
 export const config: Config = {
   auth: authConfig,
+  wallet: {
+    uiUrl: process.env.REACT_APP_WALLET_UI_URL || externalConfig.wallet.uiUrl,
+  },
   splitwise: {
     grpcUrl: process.env.REACT_APP_GRPC_URL || externalConfig.splitwise.grpcUrl,
   },

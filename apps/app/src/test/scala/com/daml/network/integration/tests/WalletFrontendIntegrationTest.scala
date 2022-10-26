@@ -292,7 +292,7 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
     click on "user-id-field"
     textField("user-id-field").value = damlUser
     click on "login-button"
-    click on "payment-requests-tab"
+    click on "app-payment-requests-button"
   }
 
   private def browseToSubscriptions(damlUser: String)(implicit webDriver: WebDriver) = {
@@ -301,6 +301,6 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
     click on "user-id-field"
     textField("user-id-field").value = damlUser
     click on "login-button"
-    click on "subscriptions-tab"
+    click on "subscriptions-button"
   }
 }

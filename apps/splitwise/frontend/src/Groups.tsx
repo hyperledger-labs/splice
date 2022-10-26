@@ -38,6 +38,7 @@ import { AcceptedAppPayment, AcceptedAppMultiPayment } from '@daml.js/wallet/lib
 import DirectoryEntries, { Entry as DirectoryEntry } from './DirectoryEntries';
 import { useSplitwiseLedgerApiClient } from './contexts/SplitwiseLedgerApiContext';
 import { useSplitwiseClient } from './contexts/SplitwiseServiceContext';
+import { config } from './utils';
 
 const key = (group: Contract<CodegenGroup>) =>
   new GroupKey()
@@ -90,7 +91,12 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider }) => {
   }, [splitwiseClient, setBalances, group, party]);
   useInterval(fetchBalances, 500);
   const onSettleMyDebts = async () => {
-    ledgerApiClient.initiateMultiTransfer(party, provider, key(group), balances);
+    const cid = await ledgerApiClient.initiateMultiTransfer(party, provider, key(group), balances);
+    const here = window.location.origin.toString();
+    const walletPath = config.wallet.uiUrl;
+    window.location.assign(
+      `${walletPath}/app-multi-payment-requests/${cid}/?redirect=${encodeURIComponent(here)}`
+    );
   };
   return (
     <Stack>
@@ -232,7 +238,7 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider 
           options={directoryEntries.getAllEntries()}
           getOptionLabel={option => (typeof option === 'string' ? option : option.name)}
           value={transferReceiverEntry}
-          onChange={(e, newValue) => {
+          onChange={(_, newValue) => {
             if (typeof newValue === 'string') {
               setTransferReceiverEntry({ user: newValue, name: newValue });
             } else {

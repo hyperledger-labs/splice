@@ -1,5 +1,6 @@
 import { DirectoryEntry, sameContracts, useInterval, Contract } from 'common-frontend';
 import React, { useCallback, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 
 import { Button, Stack, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
 
@@ -10,17 +11,22 @@ import { useWalletClient } from '../contexts/WalletServiceContext';
 // TODO(i1196) Improve multi-party settlement control
 const AppMultiPaymentRequests: React.FC = () => {
   const { listAppMultiPaymentRequests, acceptAppMultiPaymentRequests } = useWalletClient();
+  const { cid } = useParams();
+  const [searchParams] = useSearchParams();
 
   const [appPaymentRequests, setAppMultiPaymentRequests] = useState<
     Contract<AppMultiPaymentRequest>[]
   >([]);
   const fetchAppMultiPaymentRequests = useCallback(async () => {
     const { paymentRequestsList } = await listAppMultiPaymentRequests();
+    const filteredReqs = () => {
+      if (!cid) return paymentRequestsList;
+      else return paymentRequestsList.filter(c => c.contractId === cid);
+    };
     setAppMultiPaymentRequests(prev =>
-      sameContracts(paymentRequestsList, prev) ? prev : paymentRequestsList
+      sameContracts(filteredReqs(), prev) ? prev : filteredReqs()
     );
-  }, [listAppMultiPaymentRequests, setAppMultiPaymentRequests]);
-
+  }, [listAppMultiPaymentRequests, setAppMultiPaymentRequests, cid]);
   useInterval(fetchAppMultiPaymentRequests, 500);
 
   const Request: React.FC<{ request: ReceiverQuantity; provider: string; cid: string }> = ({
@@ -28,6 +34,13 @@ const AppMultiPaymentRequests: React.FC = () => {
     provider,
     cid,
   }) => {
+    const onAccept = async (cid: string) => {
+      await acceptAppMultiPaymentRequests(cid);
+      const target = searchParams.get('redirect');
+      if (target) {
+        window.location.replace(target);
+      }
+    };
     return (
       <TableRow className="app-requests-table-row">
         <TableCell className="app-request-receiver">
@@ -38,7 +51,7 @@ const AppMultiPaymentRequests: React.FC = () => {
           <DirectoryEntry partyId={provider} />
         </TableCell>
         <TableCell>
-          <Button type="submit" onClick={() => acceptAppMultiPaymentRequests(cid)}>
+          <Button className="accept-button" type="submit" onClick={() => onAccept(cid)}>
             Accept
           </Button>
         </TableCell>
@@ -63,7 +76,7 @@ const AppMultiPaymentRequests: React.FC = () => {
                 request={rc}
                 provider={c.payload.provider}
                 cid={c.contractId}
-                key={c.contractId}
+                key={`${c.contractId}|${rc.receiver}|${rc.quantity}`}
               />
             ))
           )}

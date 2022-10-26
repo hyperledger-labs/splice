@@ -1,5 +1,11 @@
 import { ErrorBoundary, DirectoryEntry } from 'common-frontend';
 import { useCallback, useEffect, useState } from 'react';
+import {
+  createBrowserRouter,
+  createRoutesFromElements,
+  Route,
+  RouterProvider,
+} from 'react-router-dom';
 
 import {
   AppBar,
@@ -15,9 +21,14 @@ import {
 import './App.css';
 import { useUserState } from './contexts/UserContext';
 import { useWalletClient } from './contexts/WalletServiceContext';
+import AppMultiPaymentRequests from './views/AppMultiPaymentRequests';
+import AppPaymentRequests from './views/AppPaymentRequests';
+import Coins from './views/Coins';
 import Home from './views/Home';
 import Login from './views/Login';
 import Onboarding from './views/Onboarding';
+import PaymentChannels from './views/PaymentChannels';
+import Subscriptions from './views/Subscriptions';
 
 const App: React.FC = () => {
   const { userId, primaryPartyId, logout } = useUserState();
@@ -58,6 +69,21 @@ const Content = () => {
 
   // show a loading spinner until we fully determine user status
   const [loading, setLoading] = useState(true);
+
+  const routes = createBrowserRouter(
+    createRoutesFromElements(
+      <Route path="/" element={<Home />}>
+        <Route index element={<Coins />} />
+        <Route path="coins" element={<Coins />} />
+        <Route path="app-payment-channels" element={<PaymentChannels />} />
+        <Route path="subscriptions" element={<Subscriptions />} />
+        <Route path="app-payment-requests" element={<AppPaymentRequests />} />
+        <Route path="app-multi-payment-requests" element={<AppMultiPaymentRequests />}>
+          <Route path=":cid/" element={<AppMultiPaymentRequests />} />
+        </Route>
+      </Route>
+    )
+  );
 
   const getUserStatus = useCallback(
     async (userId: string | undefined) => {
@@ -101,7 +127,11 @@ const Content = () => {
     );
   }
 
-  return isOnboarded ? <Home /> : <Onboarding onOnboard={() => getUserStatus(userId)} />;
+  return isOnboarded ? (
+    <RouterProvider router={routes} />
+  ) : (
+    <Onboarding onOnboard={() => getUserStatus(userId)} />
+  );
 };
 
 export default App;

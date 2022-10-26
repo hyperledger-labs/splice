@@ -160,7 +160,7 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
       .map(([k, v]) => {
         return { receiver: k, quantity: v.substring(1, v.length - 1) };
       });
-    await this.exerciseByKey(
+    return await this.exerciseByKey(
       [sender],
       [],
       SplitwiseInstall.SplitwiseInstall_InitiateMultiTransfer,
