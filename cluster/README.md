@@ -276,9 +276,6 @@ Available operations include:
 * `cncluster delete` - Delete the currently running CN cluster from GCE.
 * `cncluster deploy` - Build a set of images, push them, and deploy to the cluster.
 * `cncluster ipaddr` - Return the toplevel IP address of the cluster.
-* `cncluster push` - Update the deployment tag for a single running
-  module in the cluster. (This allows individual modules to be tested
-  in the context of an existing cluster.)
 * `cncluster preflight` - Run the preflight check against the cluster.
 * `cncluster reset` - Delete all `Pod`s, forcing all memory state to
   be reset.
