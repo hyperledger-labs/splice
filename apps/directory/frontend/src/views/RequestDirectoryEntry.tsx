@@ -23,6 +23,16 @@ const RequestDirectoryEntry: React.FC<{ primaryParty: string; provider: string }
     );
     console.debug('Created DirectoryEntryRequest');
   };
+  const onRequestEntryWithSubscription = async () => {
+    await ledgerApiClient.exerciseByKey(
+      [primaryParty],
+      [],
+      DirectoryInstall.DirectoryInstall_RequestEntryWithSubscription,
+      { _1: provider, _2: primaryParty },
+      { name: entryName }
+    );
+    console.debug('Created SubscriptionRequest');
+  };
   return (
     <div>
       <Typography variant="h6">Request New Directory Entry</Typography>
@@ -35,6 +45,13 @@ const RequestDirectoryEntry: React.FC<{ primaryParty: string; provider: string }
         ></TextField>
         <Button variant="contained" onClick={() => onRequestEntry()} id="request-entry-button">
           Request
+        </Button>
+        <Button
+          variant="contained"
+          onClick={() => onRequestEntryWithSubscription()}
+          id="request-entry-with-sub-button"
+        >
+          Request with subscription
         </Button>
       </FormGroup>
     </div>
