@@ -5,6 +5,7 @@ package com.digitalasset.canton.util
 
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.ErrorLoggingContext
+import io.grpc.{Status, StatusRuntimeException}
 
 import java.io.{PrintWriter, StringWriter}
 import scala.concurrent.Future
@@ -44,6 +45,12 @@ object ErrorUtil {
 
   /** Throws a throwable and logs it at ERROR level with proper formatting. */
   def internalError(t: Throwable)(implicit loggingContext: ErrorLoggingContext): Nothing = {
+    logInternalError(t)
+    throw t
+  }
+
+  def internalErrorGrpc(msg: String)(implicit loggingContext: ErrorLoggingContext): Nothing = {
+    val t = new StatusRuntimeException(Status.INTERNAL.withDescription(msg))
     logInternalError(t)
     throw t
   }

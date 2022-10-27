@@ -53,6 +53,8 @@ case class CoinOperationRequest(
   */
 case class EndUserTreasuryService(
     connection: CoinLedgerConnection,
+    // TODO(#756): don't pass this along but look it up before each batch submission to support users updating their
+    // WalletAppInstall contract
     install: Contract[walletCodegen.WalletAppInstall],
     walletStoreKey: WalletStore.Key,
     userStore: EndUserWalletStore,

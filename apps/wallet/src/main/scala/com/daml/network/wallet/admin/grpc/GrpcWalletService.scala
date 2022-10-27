@@ -1,7 +1,6 @@
 package com.daml.network.wallet.admin.grpc
 
 import cats.implicits.*
-import com.daml.ledger.client.binding.Primitive
 import com.daml.ledger.client.binding.{Primitive => P, TemplateCompanion}
 import com.daml.network.auth.AuthInterceptor
 import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
@@ -26,6 +25,7 @@ import com.daml.network.v0 as networkV0
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.protobuf.empty.Empty
 import io.grpc.{Status, StatusRuntimeException}
@@ -33,6 +33,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
+import scala.reflect.ClassTag
 
 class GrpcWalletService(
     store: WalletStore,
@@ -59,7 +60,7 @@ class GrpcWalletService(
         QueryResult(_, optInstall) <- store.lookupInstallByName(request.getWalletCtx.userName)
       } yield {
         v0.UserStatusResponse(
-          partyId = optInstall.fold("")(co => Primitive.Party.unwrap(co.payload.endUserParty)),
+          partyId = optInstall.fold("")(co => P.Party.unwrap(co.payload.endUserParty)),
           userOnboarded = optInstall.isDefined,
         )
       }
@@ -164,11 +165,7 @@ class GrpcWalletService(
           }
         })(
           user,
-          {
-            case outcome: CoinOperationOutcome.COO_Tap =>
-              v0.TapResponse(Proto.encode(outcome.body))
-            case other => sys.error(s"unexpected coin operation outcome: $other")
-          },
+          (outcome: CoinOperationOutcome.COO_Tap) => v0.TapResponse(Proto.encode(outcome.body)),
         )
       }
     }
@@ -258,13 +255,10 @@ class GrpcWalletService(
           )
         })(
           user,
-          {
-            case outcome: COO_AcceptedAppMultiPayment =>
-              v0.AcceptAppMultiPaymentRequestResponse(
-                Proto.encode(outcome.body)
-              )
-            case other => sys.error(s"unexpected coin operation outcome: $other")
-          },
+          (outcome: COO_AcceptedAppMultiPayment) =>
+            v0.AcceptAppMultiPaymentRequestResponse(
+              Proto.encode(outcome.body)
+            ),
         )
       }
     }
@@ -296,13 +290,10 @@ class GrpcWalletService(
           )
         })(
           user,
-          {
-            case outcome: CoinOperationOutcome.COO_AcceptedAppPayment =>
-              v0.AcceptAppPaymentRequestResponse(
-                Proto.encode(outcome.body)
-              )
-            case other => sys.error(s"unexpected coin operation outcome: $other")
-          },
+          (outcome: CoinOperationOutcome.COO_AcceptedAppPayment) =>
+            v0.AcceptAppPaymentRequestResponse(
+              Proto.encode(outcome.body)
+            ),
         )
       }
     }
@@ -439,13 +430,10 @@ class GrpcWalletService(
           )
         })(
           user,
-          {
-            case outcome: CoinOperationOutcome.COO_SubscriptionInitialPayment =>
-              v0.AcceptSubscriptionRequestResponse(
-                Proto.encode(outcome.body)
-              )
-            case other => sys.error(s"unexpected coin operation outcome: $other")
-          },
+          (outcome: CoinOperationOutcome.COO_SubscriptionInitialPayment) =>
+            v0.AcceptSubscriptionRequestResponse(
+              Proto.encode(outcome.body)
+            ),
         )
       }
     }
@@ -502,13 +490,10 @@ class GrpcWalletService(
           )
         })(
           user,
-          {
-            case outcome: CoinOperationOutcome.COO_SubscriptionPayment =>
-              v0.MakeSubscriptionPaymentResponse(
-                Proto.encode(outcome.body)
-              )
-            case other => sys.error(s"unexpected coin operation outcome: $other")
-          },
+          (outcome: CoinOperationOutcome.COO_SubscriptionPayment) =>
+            v0.MakeSubscriptionPaymentResponse(
+              Proto.encode(outcome.body)
+            ),
         )
       }
     }
@@ -693,7 +678,7 @@ class GrpcWalletService(
           }
         })(
           user,
-          _ => Empty(),
+          (_: CoinOperationOutcome.COO_AcceptedChannelTransfer) => Empty(),
         )
       }
     }
@@ -842,10 +827,7 @@ class GrpcWalletService(
         Future.successful(
           CoinOperationRequest(CoinOperation.CO_ChannelPayment(requestCid), lookups)
         )
-      })(
-        user,
-        _ => Empty(),
-      )
+      })(user, (_: CoinOperationOutcome.COO_AcceptedChannelPayment) => Empty())
     }
   }
 
@@ -976,17 +958,19 @@ class GrpcWalletService(
     *
     * Note: curried syntax helps with type inference
     */
-  private def exerciseWalletAction[Response](
+  private def exerciseWalletAction[
+      ExpectedCOO <: CoinOperationOutcome: ClassTag,
+      ProtoResponse <: scalapb.GeneratedMessage,
+  ](
       constructCoinOperation: (
-          Primitive.ContractId[walletCodegen.WalletAppInstall],
+          P.ContractId[walletCodegen.WalletAppInstall],
           EndUserWalletStore,
           // TODO(#756): also require quantity to reject commands early?
       ) => Future[CoinOperationRequest]
   )(
       user: String,
-      // TODO(#756): possibly adjust the return type here depending on the caller
-      processResponse: CoinOperationOutcome => Response,
-  )(implicit tc: TraceContext): Future[Response] =
+      processResponse: ExpectedCOO => ProtoResponse,
+  )(implicit tc: TraceContext): Future[ProtoResponse] =
     for {
       userStore <- getUserStore(user)
       userTreasury <- getUserTreasury(user)
@@ -995,14 +979,46 @@ class GrpcWalletService(
       operation <- constructCoinOperation(install.contractId, userStore)
       res <- userTreasury
         .enqueueCoinOperation(operation)
-        .map(processResponse)
+        .map(processCOO[ExpectedCOO, ProtoResponse](processResponse))
     } yield res
+
+  /** Helper function to process a CoinOperationOutcome.
+    * Ensures that the outcome is of the expected type and throws an appropriate exception if it isn't.
+    */
+  private def processCOO[
+      ExpectedCOO <: CoinOperationOutcome: ClassTag,
+      ProtoReturnType <: scalapb.GeneratedMessage,
+  ](
+      process: ExpectedCOO => ProtoReturnType
+  )(
+      actual: walletCodegen.CoinOperationOutcome
+  )(implicit tc: TraceContext): ProtoReturnType = {
+    // I (Arne) did not find a way to avoid ClassTag usage (or passing along a partial function) here
+    // For example, passing along the `ExpectedCOO` type to the treasury service doesn't work
+    // because inside the EndUserTreasuryService we have a Queue of
+    // different coin operation outcomes and thus the type of that Queue needs to be CoinOperationOutcome
+    // and it can't be the type of a particular coin operation outcome (like `ExpectedCOO`)
+    val clazz = implicitly[ClassTag[ExpectedCOO]].runtimeClass
+    actual match {
+      case result: ExpectedCOO if clazz.isInstance(result) => process(result)
+      case failedOperation: CoinOperationOutcome.COO_TransferError =>
+        throw new StatusRuntimeException(
+          Status.FAILED_PRECONDITION.withDescription(
+            s"the coin operation failed with a Daml exception: ${failedOperation.body}."
+          )
+        )
+      case other =>
+        ErrorUtil.internalErrorGrpc(
+          s"expected to receive a coin operation outcome of type $clazz or `COO_TransferError` but received type ${actual.getClass} with value: $actual"
+        )
+    }
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   private def selectCoin(
       userStore: EndUserWalletStore,
       quantity: BigDecimal,
-  )(implicit tc: TraceContext): Future[Primitive.ContractId[coinCodegen.Coin]] = {
+  )(implicit tc: TraceContext): Future[P.ContractId[coinCodegen.Coin]] = {
     val owner = userStore.key.endUserParty
     for {
       currentRound <- scanConnection.getCurrentRound()

@@ -21,6 +21,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Added `com.daml.network.integration.CoinEnvironmentDefinition` to `LogEntry.scala`
 * Added `DecodeUtil.decodeArchivedExercise` 
 * Support `readAs` in `commands.submit`, should be upstreamed
+* Added `internalErrorGrpc` to `ErrorUtil`
 ## Build system
 * Added refs to GH issues in project/DamlPlugin.sbt for two bugs
 * Added support for `damlDependencies` in SBT DamlPlugin

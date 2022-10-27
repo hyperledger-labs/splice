@@ -540,12 +540,11 @@ class WalletIntegrationTest
       eventually()(
         aliceRemoteWallet.listPaymentChannels().map(_.contractId) should contain(updatedProposal)
       )
-      // TODO(#756): reenable once error handling has been improved.
-//      loggerFactory.assertThrowsAndLogs[CommandFailure](
-//        aliceRemoteWallet
-//          .executeDirectTransfer(bobUserParty, 10),
-//        _.errorMessage should include regex ("Unhandled Daml exception.*Direct transfers are allowed"),
-//      )
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        aliceRemoteWallet
+          .executeDirectTransfer(bobUserParty, 10),
+        _.errorMessage should include regex ("Daml exception.*Direct transfers are allowed"),
+      )
     }
 
     "allow two remote wallets to connect to one local wallet and tap" in { implicit env =>
