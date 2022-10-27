@@ -1,21 +1,6 @@
 #!/usr/bin/env bash
 set -eou pipefail
 
-function build_dependencies() {
-
-  cd "${REPO_ROOT}"
-  sbt apps-frontends/compile
-  cd -
-
-  cd "${REPO_ROOT}/apps"
-
-  "${REPO_ROOT}/build-tools/npm-install.sh"
-
-  # build dependencies
-  npm run build --workspace common-frontend
-  cd -
-}
-
 function start_envoy() {
   cd "${REPO_ROOT}/envoy-proxy-dev"
   ./start-envoy.sh
@@ -87,16 +72,20 @@ tmux_session="cn-frontends"
 tmux_window=0
 
 LOG_DIR="${REPO_ROOT}/log"
-
-# TODO(i711): Move build steps into sbt
-build_dependencies
-
 start_envoy
+
+(cd $REPO_ROOT && sbt apps-frontends/compile)
 
 tmux new-session -d -s "${tmux_session}"
 
 # listen & auto-rebuild common-frontend code when its src changes
 tmux_cmd "common-frontend" "$REPO_ROOT/apps" "npm run start --workspace common-frontend 2>&1 | tee ${LOG_DIR}/npm-common.log"
+
+while [ ! -f "$REPO_ROOT/apps/common/frontend/lib/index.js" ]
+do
+    echo "Waiting for common-frontend to start..."
+    sleep 1
+done
 
 # start_frontend <app> <ui-http-port> <app-wallet-ui-port> <app-grpc-port> <ledgerapi-grpc-port> <validator-app-grpc-port> <user-display-name>
 start_frontend wallet    3000 6204 NA   NA   6203 alice

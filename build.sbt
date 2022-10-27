@@ -1,6 +1,7 @@
 import BuildCommon.{runCommand, sharedCantonSettings}
 import Dependencies._
 import DamlPlugin.autoImport._
+import BuildCommon.defs._
 import sbtassembly.{AssemblyUtils, MergeStrategy, PathList}
 
 /*
@@ -44,7 +45,7 @@ lazy val root = (project in file("."))
     `apps-wallet`,
     `apps-wallet-daml`,
     `apps-directory`,
-    // `apps-frontends`, // For now we are not auto-compiling frontends, until there is proper caching there
+    `apps-frontends`,
     `canton-community-common`,
     `canton-blake2b`,
     `canton-slick-fork`,
@@ -120,26 +121,6 @@ lazy val `apps-scan` =
       BuildCommon.sharedAppSettings,
     )
 
-lazy val tsCodegen = taskKey[Seq[File]]("generate typescript for the daml models")
-
-// Returns a Seq[File] so that it can be reused both in tsCodegen and in sourceGenerators.
-// However, we return an empty Seq because we don't want sbt to be smart and actually do anything with these generated files.
-lazy val tsCodegenTask: Def.Initialize[Task[Seq[File]]] = Def.task {
-  val log = streams.value.log
-  val dars =
-    Seq(
-      (`apps-common` / Compile / damlBuild).value,
-      (`apps-wallet-daml` / Compile / damlBuild).value,
-      (`apps-directory` / Compile / damlBuild).value,
-      (`apps-aaa-splitwise` / Compile / damlBuild).value,
-    )
-  val damlJs = s"${baseDirectory.value}/daml.js"
-  new java.io.File(damlJs).delete()
-  val args = dars.flatten ++ Seq("-o", damlJs)
-  val _ = runCommand(s"daml2ts ${args.mkString(" ")}", log)
-  Seq()
-}
-
 lazy val `apps-common-frontend` = {
   project
     .in(file("apps/common/frontend"))
@@ -150,33 +131,79 @@ lazy val `apps-common-frontend` = {
       `apps-aaa-splitwise`,
     )
     .settings(
-      // TODO(i1216): Leaving for now both tsCodegen and compile. If they end up remaining identical, then tsCodegen will be removed.
-      tsCodegen := tsCodegenTask.value,
-      Compile / sourceGenerators += tsCodegen.taskValue,
-      cleanFiles += baseDirectory.value / "daml.js",
+      // daml typescript code generation settings:
+      damlTsCodegenSources :=
+        (`apps-common` / Compile / damlBuild).value ++
+          (`apps-wallet-daml` / Compile / damlBuild).value ++
+          (`apps-directory` / Compile / damlBuild).value ++
+          (`apps-aaa-splitwise` / Compile / damlBuild).value,
+      damlTsCodegenDir := baseDirectory.value / "daml.js",
+      damlTsCodegen := BuildCommon.damlTsCodegenTask.value,
+      // npm install settings:
+      npmPackageFiles := Seq(baseDirectory.value / "package.json"),
+      npmInstall := BuildCommon.npmInstallTask.value,
+      npmRootDir := baseDirectory.value / "../..",
+      Compile / compile := {
+        damlTsCodegen.value
+        npmInstall.value
+        (Compile / compile).value
+      },
+      bundle := {
+        (Compile / compile).value
+        (`apps-common-frontend-protobuf` / Compile / compile).value
+        val log = streams.value.log
+        runCommand(
+          s"npm run build --workspace common-frontend",
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+        baseDirectory.value / "lib"
+      },
+      cleanFiles += damlTsCodegenDir.value,
+      cleanFiles += baseDirectory.value / "lib",
+      cleanFiles += baseDirectory.value / "../../node_modules",
     )
 }
 
-// TODO(i1216): The frontend val's below ended up being not required for now, but they will be, so leaving them as placeholders for now
+/** Common settings to be used for frontends. Requires settings commonFrontendBundle and frontendWorkspace to be specified.
+  */
+lazy val sharedFrontendSettings: Seq[Setting[_]] = Seq(
+  (`apps-common-frontend` / npmPackageFiles) += baseDirectory.value / "package.json",
+  bundle := BuildCommon.bundleFrontend.value,
+  cleanFiles += baseDirectory.value / "build",
+)
 lazy val `apps-wallet-frontend` = {
   project
-    .in(file(s"apps/wallet/frontend"))
+    .in(file("apps/wallet/frontend"))
     .dependsOn(`apps-common-frontend`)
-    .settings()
+    .settings(
+      commonFrontendBundle := (`apps-common-frontend` / bundle).value,
+      frontendWorkspace := "wallet-frontend",
+      sharedFrontendSettings,
+    )
 }
 
 lazy val `apps-splitwise-frontend` = {
   project
-    .in(file(s"apps/splitwise/frontend"))
+    .in(file("apps/splitwise/frontend"))
     .dependsOn(`apps-common-frontend`)
-    .settings()
+    .settings(
+      commonFrontendBundle := (`apps-common-frontend` / bundle).value,
+      frontendWorkspace := "splitwise-frontend",
+      sharedFrontendSettings,
+    )
 }
 
 lazy val `apps-directory-frontend` = {
   project
-    .in(file(s"apps/directory/frontend"))
+    .in(file("apps/directory/frontend"))
     .dependsOn(`apps-common-frontend`)
-    .settings()
+    .settings(
+      commonFrontendBundle := (`apps-common-frontend` / bundle).value,
+      frontendWorkspace := "directory-frontend",
+      sharedFrontendSettings,
+    )
 }
 
 lazy val `apps-common-frontend-protobuf` = {
@@ -357,16 +384,15 @@ import sbtassembly.AssemblyPlugin.autoImport.assembly
 
 /** Generate a release bundle. Simplified versions of Canton's release bundling (see Canton's code base / issue #147) */
 lazy val bundleTask = {
-  lazy val bundle = taskKey[Unit]("create a release bundle")
   bundle := {
     val log = streams.value.log
     val assemblyJar = assembly.value
     val examples = Seq("-c", "apps/app/src/pack")
     val webUis =
       Seq(
-        ("apps/wallet/frontend/build", "wallet"),
-        ("apps/directory/frontend/build", "directory"),
-        ("apps/splitwise/frontend/build", "splitwise"),
+        ((`apps-wallet-frontend` / bundle).value, "wallet"),
+        ((`apps-directory-frontend` / bundle).value, "directory"),
+        ((`apps-splitwise-frontend` / bundle).value, "splitwise"),
       )
     val dars =
       Seq(
@@ -380,6 +406,7 @@ lazy val bundleTask = {
       Seq("-r", dar, s"dars/${dar.getName}")
     })
     runCommand(s"bash ./create-bundle.sh $assemblyJar ${args.mkString(" ")}", log)
+    assemblyJar
   }
 }
 

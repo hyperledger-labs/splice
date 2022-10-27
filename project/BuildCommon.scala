@@ -13,6 +13,22 @@ import sbt.internal.util.ManagedLogger
 
 object BuildCommon {
 
+  object defs {
+    lazy val bundle = taskKey[File]("create a release bundle")
+    lazy val damlTsCodegen = taskKey[Seq[File]]("generate typescript for the daml models")
+    lazy val damlTsCodegenDir =
+      settingKey[File]("directory for auto-generated typescript for the daml models")
+    lazy val damlTsCodegenSources = taskKey[Seq[File]]("dars to generate ts code from")
+
+    lazy val npmPackageFiles = settingKey[Seq[File]]("package.json file for npm")
+    lazy val npmRootDir = settingKey[File]("npm workspaces root directory")
+    lazy val npmInstall = taskKey[Seq[File]]("install npm dependencies")
+
+    lazy val frontendWorkspace = settingKey[String]("npm workspace to bundle")
+    lazy val commonFrontendBundle =
+      taskKey[File]("common frontend bundle task to run before the app frontend bundle")
+  }
+
   val grpcWebGen = {
     // While the error claims that being in PATH is sufficient, the error is lying. It really
     // needs to be an absolute path. Since some people also like starting
@@ -633,6 +649,58 @@ object BuildCommon {
         //      coverageEnabled := false,
         //      JvmRulesPlugin.damlRepoHeaderSettings,
       )
+  }
+
+  import defs._
+
+  /** Typescript code generation from daml models.
+    * Generates code for all models given in damlTsCodegenSources into the directory specified in damlTsCodegenDir.
+    */
+  lazy val damlTsCodegenTask: Def.Initialize[Task[Seq[File]]] = Def.task {
+    val log = streams.value.log
+    val dars = damlTsCodegenSources.value
+    val args = dars ++ Seq("-o", damlTsCodegenDir.value)
+    val cacheDir = streams.value.cacheDirectory
+    val cache =
+      FileFunction.cached(cacheDir) { _ =>
+        damlTsCodegenDir.value.delete()
+        runCommand(s"daml2ts ${args.mkString(" ")}", log)
+        Set(damlTsCodegenDir.value)
+      }
+    cache(dars.toSet).toSeq
+  }
+
+  /** Runs npm-install.sh script, which in turn runs 'npm install' in a dev environment, or
+    * 'npm ci' in ci. The source package.json file should be specified in pkg. Rerunning this
+    * task will re-execute 'npm install' only if the package file has been modified.
+    */
+  lazy val npmInstallTask: Def.Initialize[Task[Seq[File]]] = Def.task {
+    val pkgs = npmPackageFiles.value
+    val log = streams.value.log
+    val npmInstallScript = npmRootDir.value / "../build-tools/npm-install.sh"
+    val cacheDir = streams.value.cacheDirectory
+    val cache =
+      FileFunction.cached(cacheDir) { _ =>
+        runCommand(npmInstallScript.getAbsolutePath, log, None, Some(npmRootDir.value))
+        Set(npmRootDir.value / "node_modules")
+      }
+    cache(pkgs.toSet).toSeq
+  }
+
+  /** Builds frontend code for production by running 'npm run build -w $workspace' for the workspace
+    * specified in the frontendWorkspace setting. Will also build the common frontend directory if needed,
+    * by calling the task specified in setting commonFrontendBundle.
+    */
+  lazy val bundleFrontend: Def.Initialize[Task[File]] = Def.task {
+    commonFrontendBundle.value
+    val log = streams.value.log
+    runCommand(
+      s"npm run build -w ${frontendWorkspace.value}",
+      log,
+      None,
+      Some(baseDirectory.value / "../../"),
+    )
+    baseDirectory.value / "build"
   }
 
 }

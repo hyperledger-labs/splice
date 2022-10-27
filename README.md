@@ -105,6 +105,7 @@ More commands can be found in build.sbt and BuildCommon.scala.
 - `compile`: compile production code (excluding test code)
 - `Test/compile`: compile production and test code
 - `apps-common/compile`: compile production code of the `apps-common` subproject
+- `apps-frontends/compile`: compile and codegen only frontend code
 - `scalafixAll`: invoke scalafix across all configurations where scalafix is enabled.
     `scalafix` is a linting and rewrite tool we use to organize imports. This may run for a long time as it needs to do a full compile.
 - `format`: apply `scalafmt` to format source files
@@ -327,6 +328,7 @@ Frontend code projects are managed via [`npm workspaces`](https://docs.npmjs.com
 - One local monorepo package can be installed as a dependency of another, enabling "easy" code-sharing.
 - With `npm install`, all dependencies of all workspace projects are installed in the root `node_modules` folders, giving us de-deduplication.
 - If all workspace projects share common scripts, you can easily run that script across all workspaces in one command.
+- All required `npm` commands are issued from `sbt compile`, so there should not be a need to run e.g. `npm install` directly. 
 
 #### New Packages
 
@@ -334,9 +336,11 @@ In this section only, the term "root-level directory" will describe the workspac
 
 If you want to add a new package to the workspace, first register its directory in the root-level `apps/package.json` workspaces key. The directory referenced here must contain a `package.json` of its own defining the workspace package itself -- name, dependencies, etc.
 
-Running `npm install` from the root installs the dependencies of all registered workspace packages.
+Then add the new package to `build.sbt` following the examples from the existing frontend packages.
 
-Make sure your package contains at least the scripts `build`, `fix`, `check`, and `start`. This enables the use of (e.g.) `npm run build --workspaces` to run the build script for all packages in the workspace at once.
+Running `sbt compile` (or manually `npm install` from the root) installs the dependencies of all registered workspace packages.
+
+Make sure your package contains at least the scripts `build`, `fix`, `check`, and `start`. This enables the use of (e.g.) `npm run build --workspaces` to run the build script for all packages in the workspace at once, as well as proper integration with `sbt`.
 
 Your new package will need its own `tsconfig.json` file that inherits from the root tsconfig. See any existing workspace package for an example.
 
@@ -352,7 +356,7 @@ There is also a package available named `common-protobuf`, located in `apps/comm
 
 ### Managing Canton for Tests
 
-To speed up our tests our tests run against a long-running Canton instance.
+To speed up our tests run against a long-running Canton instance.
 To start the instance run `./start-canton.sh`. It can be stopped via `./stop-canton.sh`.
 
 You should only need to restart it if you change
@@ -452,29 +456,16 @@ If you don't find an usage of a given method within the CN network repo, you can
 
 ### Building the Wallet and Splitwise Frontend
 
-To build the wallet frontend you first need to generate the TypeScript
-files based on our protobuf files as well as run the Daml codegen on
-our daml models.
+Run `sbt app-frontends/compile`, or the more general `sbt compile` to generate all auto-generated code required for the frontends 
+(specifically, all ts code for our daml models and protobuf definitions), and build anything required for the frontends (e.g. install dependencies in `node_modules`).
 
-1. Generating files:
-
-```
-sbt protocGenerate apps-frontends/compile # Generate typescript for our own protobufs and daml models
-```
-
-2. Build the frontend code:
-```
-cd apps
-npm install
-npm run build -ws
-```
-
-3. In order to pass in CI, source code must be formatted:
+In order to pass in CI, source code must be formatted:
 
 ```
 # in "apps/"
 npm run fix -ws
 ```
+<!-- TODO(i1216): migrate `npm run fix` into sbt, then remove this ^^ part, and ensure we have a generic one on running formatFix -->
 
 ### Running the Wallet and Splitwise Frontend
 
@@ -516,7 +507,5 @@ produce the same package id. This will be fixed in later versions.
 To make sure your lock files match CI, run the following steps:
 
 1. `find . -name '.daml' | xargs rm -r`
-2. `sbt damlBuild`
-3. The setup script for the broken project, e.g.,
-   `cd apps/wallet/frontend && ./setup.sh`
-4. Check-in the updated lock file which should now match CI.
+2. `sbt compile`
+3. Check-in the updated lock file which should now match CI.

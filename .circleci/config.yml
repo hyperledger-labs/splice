@@ -660,7 +660,7 @@ jobs:
       - checkout
       - setup_sbt_test_job
       - execute_sbt_command:
-          cmd: "Test/compile apps-frontends/compile"
+          cmd: "Test/compile"
       - execute_sbt_command:
           # run all tests except the live cluster ones
           pre_sbt_cmd: ./start-canton.sh external && ./start-frontends.sh -d
@@ -675,19 +675,12 @@ jobs:
   bundle:
     docker:
       - image: cimg/base:2021.04
+    resource_class: xlarge
     environment:
       <<: *env
     steps:
       - checkout
       - setup_sbt_test_job
-      - execute_sbt_command:
-          cmd: "protocGenerate apps-frontends/compile"
-      - run_bash_command_in_nix:
-          cmd_name: Build frontends
-          cmd: |
-            cd apps
-            npm ci
-            npm run build -ws
       - execute_sbt_command:
           cmd: "bundle"
       - run:
@@ -711,6 +704,7 @@ jobs:
 
       - cleanup_sbt_test_job
 
+  # TODO(i1216): migrate run check into sbt - and then consider removing the web_frontends command altogether
   web_frontends:
     docker:
       - image: cimg/base:2021.04
@@ -720,7 +714,7 @@ jobs:
       - checkout
       - setup_sbt_test_job
       - execute_sbt_command:
-          cmd: "protocGenerate apps-frontends/compile"
+          cmd: "apps-frontends/compile"
       - run_bash_command_in_nix:
           cmd_name: Build all web frontends
           cmd: |
