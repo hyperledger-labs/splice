@@ -1,0 +1,35 @@
+// Commands needed to initialize the CN apps, tap some coins and make some transfers. Can be run as a bootstrap script.
+import com.daml.network.codegen.CC.CoinRules.CoinRules
+
+// Onboard test parties.
+val aliceUserName = aliceWallet.config.damlUser
+val bobUserName = bobWallet.config.damlUser
+
+println(s"Onboarding Alice user: " + aliceUserName)
+val aliceParty = validator1App.onboardUser(aliceUserName)
+
+println(s"Onboarding Bob user: " + aliceUserName)
+val bobParty = validator1App.onboardUser(bobUserName)
+
+// Get some CC to test with
+aliceValidator1Wallet.tap(100.0)
+utils.retry_until_true(aliceValidator1Wallet.list().coins.length == 1)
+
+// Bob starts out broke.
+require(bobValidator1Wallet.list().coins.length == 0)
+
+val aliceProposal = aliceValidator1Wallet.proposePaymentChannel(bobParty)
+utils.retry_until_true(bobValidator1Wallet.listPaymentChannelProposals().length == 1)
+val channelId = bobValidator1Wallet.acceptPaymentChannelProposal(aliceProposal)
+
+aliceValidator1Wallet.executeDirectTransfer(bobParty, 10)
+utils.retry_until_true(bobValidator1Wallet.list().coins.length == 1)
+bobValidator1Wallet.list().coins.foreach(coin => require(coin.contract.payload.quantity.initialQuantity == 10))
+
+val paymentReq = bobValidator1Wallet.createOnChannelPaymentRequest(aliceParty, 10, "Please transfer coins")
+utils.retry_until_true(aliceValidator1Wallet.listOnChannelPaymentRequests().length == 1)
+aliceValidator1Wallet.acceptOnChannelPaymentRequest(paymentReq)
+utils.retry_until_true(bobValidator1Wallet.list().coins.length == 2)
+bobValidator1Wallet.list().coins.foreach(coin => require(coin.contract.payload.quantity.initialQuantity == 10))
+utils.retry_until_true(aliceValidator1Wallet.list().coins.length == 1)
+aliceValidator1Wallet.list().coins.foreach(coin => require(coin.contract.payload.quantity.initialQuantity < 80 && coin.contract.payload.quantity.initialQuantity > 79.5))

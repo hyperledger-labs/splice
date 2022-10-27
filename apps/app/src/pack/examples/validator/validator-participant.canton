@@ -2,16 +2,22 @@ val domainUrl = System.getProperty("DOMAIN_URL", "http://dev.network.canton.glob
 
 println("Starting participant node")
 validatorParticipant.start()
+
 println(s"Connecting self-hosted validator to the domain $domainUrl")
 validatorParticipant.domains.connect("canton-network", domainUrl)
-println(s"Creating validator user")
-val validatorParty = validatorParticipant.parties.enable("validator_user")
+
+val validatorUserName = validatorApp.config.damlUser
+
+println(s"Creating validator user: " + validatorUserName)
+val validatorParty = validatorParticipant.parties.enable(validatorUserName)
+
 validatorParticipant.ledger_api.users.create(
-    id = "validator_user",
+    id = validatorUserName,
     actAs = Set(validatorParty.toLf),
     readAs = Set.empty,
     primaryParty = Some(validatorParty.toLf),
     participantAdmin = true,
 )
-println("Starting all first-party apps of the self-hosted validator")
+
+println("Starting all first-party apps of the self-hosted validator: " + coinNodes)
 coinNodes.local.foreach(_.startSync())

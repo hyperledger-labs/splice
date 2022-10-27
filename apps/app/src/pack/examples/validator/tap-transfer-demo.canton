@@ -1,8 +1,16 @@
 // Commands needed to initialize the CN apps, tap some coins and make some transfers. Can be run as a bootstrap script.
 import com.daml.network.codegen.CC.CoinRules.CoinRules
 
-val aliceParty = validatorApp.onboardUser("alice")
-val bobParty = validatorApp.onboardUser("bob")
+
+// Onboard Test Parties
+val aliceUserName = aliceWallet.config.damlUser
+val bobUserName = bobWallet.config.damlUser
+
+println(s"Onboarding Alice user: " + aliceUserName)
+val aliceParty = validatorApp.onboardUser(aliceUserName)
+
+println(s"Onboarding Bob user: " + aliceUserName)
+val bobParty = validatorApp.onboardUser(bobUserName)
 
 aliceWallet.tap(100.0)
 utils.retry_until_true(aliceWallet.list().coins.length == 1)

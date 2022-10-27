@@ -20,8 +20,11 @@ class PreflightIntegrationTest
     extends CoinIntegrationTest
     with IsolatedCoinEnvironments
     with HasConsoleScriptRunner {
+
   val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
   val validatorPath: File = examplesPath / "validator"
+
+  val resourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
@@ -29,17 +32,25 @@ class PreflightIntegrationTest
       .fromFiles(
         this.getClass.getSimpleName,
         validatorPath / "validator.conf",
+        resourcesPath / "validator1.conf",
         validatorPath / "validator-participant.conf",
       )
       .clearConfigTransforms()
+      .addConfigTransforms((_, conf) => CoinConfigTransforms.ensureUniqueNames("preflight")(conf))
       .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy1000(conf))
       // Disable autostart, because our apps require the participant to be connected to a domain
       // when the app starts. The apps are started manually in `validator-participant.canton` below.
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
 
-  // when running locally, this test may fail if the CC DAR deployed to DevNet differs from the latest one on your branch
-  "run through runbook against devnet SVC" taggedAs LiveDevNetTest in { implicit env =>
+  // when running locally, these tesst may fail if the CC DAR deployed to DevNet
+  // differs from the latest one on your branch
+
+  "run through runbook against cluster SVC" taggedAs LiveDevNetTest in { implicit env =>
     runScript(validatorPath / "validator-participant.canton")(env.environment)
     runScript(validatorPath / "tap-transfer-demo.canton")(env.environment)
+  }
+
+  "run through runbook against cluster validator1" taggedAs LiveDevNetTest in { implicit env =>
+    runScript(resourcesPath / "tap-transfer-validator1.canton")(env.environment)
   }
 }

@@ -35,49 +35,65 @@ object CoinConfigTransforms {
       .replace(NonNegativeDuration.tryFromDuration(10.seconds))
   }
 
+  /* Ensure that all usernames in a configuration have a common and unique
+   * suffix. Note that this only adds the suffix to names in a '.conf' file.
+   * Any '.canton' file built against a given configuration must inspect
+   * the configured objects at runtime to determine what the names are.
+   *
+   * An example of this is as follows:
+   *
+   * val validatorUserName = validatorApp.config.damlUser
+   *
+   * println(s"Creating validator user: " + validatorUserName)
+   * val validatorParty = validatorParticipant.parties.enable(validatorUserName)
+   */
+  def ensureUniqueNames(context: String): CoinConfigTransform = { config =>
+    {
+      val suffix = s"${context.toLowerCase}-${UUID.randomUUID()}"
+      val config1 = updateSvcConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config)
+      val config2 = updateCcScanConfig(c => c.copy(svcUser = s"${c.svcUser}-$suffix"))(config1)
+      val config3 =
+        updateAllValidatorConfigs_(c =>
+          c.copy(
+            damlUser = s"${c.damlUser}-$suffix",
+            walletServiceUser = s"${c.walletServiceUser}-$suffix",
+            appInstances = c.appInstances.view
+              .mapValues(i => i.copy(serviceUser = s"${i.serviceUser}-$suffix"))
+              .toMap,
+          )
+        )(config2)
+      val config4 =
+        updateAllWalletAppConfigs_(c => c.copy(serviceUser = s"${c.serviceUser}-$suffix"))(
+          config3
+        )
+      val config5 =
+        updateAllRemoteWalletAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
+          config4
+        )
+      val config6 =
+        updateAllDirectoryAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config5)
+      val config7 =
+        updateAllSplitwiseAppConfigs_(c => c.copy(providerUser = s"${c.providerUser}-$suffix"))(
+          config6
+        )
+      val config8 =
+        updateAllRemoteSplitwiseAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
+          config7
+        )
+      val config9 = updateAllRemoteDirectoryAppConfigs_(c =>
+        c.copy(damlUser = s"${c.damlUser}-$suffix")
+      )(config8)
+      config9
+    }
+  }
+
   /** Default transforms to apply to tests using a [[CoinEnvironmentDefinition]].
     * Covers the primary ways that distinct concurrent environments may unintentionally collide.
     */
   def defaults(context: String): Seq[CoinConfigTransform] = {
     Seq(
       makeAllTimeoutsBounded,
-      config0 => {
-        val suffix = s"${context.toLowerCase}-${UUID.randomUUID()}"
-        val config1 = updateSvcConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config0)
-        val config2 = updateCcScanConfig(c => c.copy(svcUser = s"${c.svcUser}-$suffix"))(config1)
-        val config3 =
-          updateAllValidatorConfigs_(c =>
-            c.copy(
-              damlUser = s"${c.damlUser}-$suffix",
-              walletServiceUser = s"${c.walletServiceUser}-$suffix",
-              appInstances = c.appInstances.view
-                .mapValues(i => i.copy(serviceUser = s"${i.serviceUser}-$suffix"))
-                .toMap,
-            )
-          )(config2)
-        val config4 =
-          updateAllWalletAppConfigs_(c => c.copy(serviceUser = s"${c.serviceUser}-$suffix"))(
-            config3
-          )
-        val config5 =
-          updateAllRemoteWalletAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
-            config4
-          )
-        val config6 =
-          updateAllDirectoryAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config5)
-        val config7 =
-          updateAllSplitwiseAppConfigs_(c => c.copy(providerUser = s"${c.providerUser}-$suffix"))(
-            config6
-          )
-        val config8 =
-          updateAllRemoteSplitwiseAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
-            config7
-          )
-        val config9 = updateAllRemoteDirectoryAppConfigs_(c =>
-          c.copy(damlUser = s"${c.damlUser}-$suffix")
-        )(config8)
-        config9
-      },
+      ensureUniqueNames(context),
     )
   }
 
