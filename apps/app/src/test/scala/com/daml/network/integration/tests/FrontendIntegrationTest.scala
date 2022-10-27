@@ -59,10 +59,6 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
     CoinEnvironmentDefinition
       .simpleTopology(this.getClass.getSimpleName)
 
-  System.setProperty(
-    FirefoxDriver.SystemProperty.BROWSER_LOGFILE,
-    Paths.get("log", "browser.log").toString,
-  )
   val options: FirefoxOptions =
     new FirefoxOptions().setHeadless(true).setLogLevel(FirefoxDriverLogLevel.DEBUG)
   options.setCapability("webSocketUrl", true: Any);
@@ -82,6 +78,10 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
 
   override def beforeEach() = {
     for { name <- frontendNames.toSeq } {
+      System.setProperty(
+        FirefoxDriver.SystemProperty.BROWSER_LOGFILE,
+        Paths.get("log", s"browser.${this.getClass.getName}.${name}.log").toString,
+      )
       val webDriver = new FirefoxDriver(options)
       webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
       webDrivers += (name -> webDriver)
