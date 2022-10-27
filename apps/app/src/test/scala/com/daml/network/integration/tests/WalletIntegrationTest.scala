@@ -25,7 +25,6 @@ import com.daml.network.util.{
 }
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.{Balance, ListResponse}
-import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
@@ -813,11 +812,6 @@ class WalletIntegrationTest
       aliceValidator.remoteParticipant.ledger_api.acs.await(alice, coinCodegen.Coin)
       val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
 
-      // same as in EndUserTreasuryStore
-      val waitTimeForStore = 300.millis
-      // wait until the treasury service is ready to process requests again after the initial tap
-      Threading.sleep(waitTimeForStore.toMillis)
-
       val cancelF = Future(bobRemoteWallet.cancelPaymentChannelBySender(alice))
       // to simulate contention, submit a transfer on the channel immediately after cancelling the channel such
       // that the activeness lookup on the channel still goes through but the lookup inside the ledger fails
@@ -848,13 +842,13 @@ class WalletIntegrationTest
   }
 
   "accepts an optional JWT token with user in subject" in { implicit env =>
+    import cats.syntax.either.*
     import com.auth0.jwt.JWT
     import com.auth0.jwt.algorithms.Algorithm
-    import com.daml.network.wallet.v0
-    import com.daml.network.auth.{JwtCallCredential}
+    import com.daml.network.auth.JwtCallCredential
     import com.daml.network.util.Contract
+    import com.daml.network.wallet.v0
     import io.grpc.ManagedChannelBuilder
-    import cats.syntax.either._
 
     val aliceDamlUser = aliceRemoteWallet.config.damlUser
     val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)

@@ -103,6 +103,10 @@ object AcsStore {
 
     /** Ingest a transaction served by the transaction stream. */
     def ingestTransaction(tx: Transaction): Future[Unit]
+
+    /** Signal when the sink has finished ingesting ledger data from the given offset or a larger one.
+      */
+    def signalWhenIngested(offset: String): Future[Unit]
   }
 
   /** Static specification of a set of create events in scope for ingestion into an AcsStore. */

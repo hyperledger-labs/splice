@@ -1,11 +1,11 @@
 package com.daml.network.directory.store
 
 import akka.actor.ActorSystem
-import akka.stream.scaladsl._
+import akka.stream.scaladsl.*
 import com.daml.ledger.api.v1.event.{ArchivedEvent, CreatedEvent, Event}
 import com.daml.ledger.api.v1.transaction.Transaction
 import com.daml.ledger.client.binding.Primitive
-import com.daml.network.codegen.CN.{Directory => directoryCodegen}
+import com.daml.network.codegen.CN.Directory as directoryCodegen
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.Contract
 import com.digitalasset.canton.BaseTest
@@ -86,16 +86,14 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
   }
 
   // test values
-  val (reqs, txReqs) = Seq(0, 1, 2, 3)
-    .map(i =>
-      directoryEntryRequest(
-        i,
-        providerParty,
-        userParty(i),
-        "the-one",
-      )
-    )
-    .splitAt(2)
+  val (requests, txRequests) = Seq(0, 1, 2, 3).map(i => mkEntryRequest(i, "the-one")).splitAt(2)
+
+  private def mkEntryRequest(i: Int, entry: String) = directoryEntryRequest(
+    i,
+    providerParty,
+    userParty(i),
+    entry,
+  )
 
   val expiry: Primitive.Timestamp =
     Primitive.Timestamp.discardNanos(Instant.EPOCH).getOrElse(fail("Failed to convert timestamp"))
@@ -121,22 +119,27 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
   val tx1Offset = "011"
   val tx2Offset = "012"
   val tx3Offset = "013"
+  val tx4Offset = "014"
+  val tx5Offset = "015"
 
   val tx1: Transaction = Transaction(
     offset = tx1Offset,
     events = entriesToArchive.map(co => Event.of(Event.Event.Archived(toArchivedEvent(co))))
-      ++ reqs.map(co => Event.of(Event.Event.Created(toCreatedEvent(co)))),
+      ++ requests.map(co => Event.of(Event.Event.Created(toCreatedEvent(co)))),
   )
 
-  val tx2: Transaction = Transaction(
-    offset = tx2Offset,
-    events = nonIngestedEntries.map(co => Event.of(Event.Event.Created(toCreatedEvent(co)))),
+  private def createCreateTx[T](
+      offset: String,
+      createRequests: Seq[Contract[T]],
+  ) = Transaction(
+    offset = offset,
+    events = createRequests.map(req => Event.of(Event.Event.Created(toCreatedEvent(req)))),
   )
 
-  val tx3: Transaction = Transaction(
-    offset = tx3Offset,
-    events = txReqs.map(co => Event.of(Event.Event.Created(toCreatedEvent(co)))),
-  )
+  val tx2: Transaction = createCreateTx(tx2Offset, nonIngestedEntries)
+  val tx3: Transaction = createCreateTx(tx3Offset, txRequests)
+  val tx4: Transaction = createCreateTx(tx4Offset, Seq(mkEntryRequest(5, "smth")))
+  val tx5: Transaction = createCreateTx(tx5Offset, Seq(mkEntryRequest(6, "smth-else")))
 
   def mkStore(): Future[DirectoryStore] = {
     val store = DirectoryStore(
@@ -164,10 +167,10 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
     "lookup ingested entry requests by id" in {
       for {
         store <- mkStore()
-        results <- Future.sequence(reqs.map(req => {
+        results <- Future.sequence(requests.map(req => {
           store.lookupEntryRequestById(req.contractId)
         }))
-      } yield results shouldBe reqs.map(req => QueryResult(tx2Offset, Some(req)))
+      } yield results shouldBe requests.map(req => QueryResult(tx2Offset, Some(req)))
     }
 
     "lookup a non-ingested entry by id" in {
@@ -208,8 +211,8 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
     "stream all ingested entry requests" in {
       for {
         store <- mkStore()
-        streamedReqs <- store.streamEntryRequests().take(reqs.length.toLong).runWith(Sink.seq)
-      } yield streamedReqs shouldBe reqs
+        streamedReqs <- store.streamEntryRequests().take(requests.length.toLong).runWith(Sink.seq)
+      } yield streamedReqs shouldBe requests
     }
 
     "stream ingested entry requests and wait for new ones to come in" in {
@@ -224,8 +227,8 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
           .runForeach(co => {
             val cos = acc.get().appended(co)
             acc.set(cos)
-            if (cos.length == reqs.length) reqsPromise.success(())
-            if (cos.length == reqs.length + txReqs.length) extraReqsPromise.success(())
+            if (cos.length == requests.length) reqsPromise.success(())
+            if (cos.length == requests.length + txRequests.length) extraReqsPromise.success(())
           })
         () <- reqsPromise.future
         // sleep for 10 millis so the source had a chance to produce extra elements if it was buggy
@@ -235,8 +238,28 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
         () <- extraReqsPromise.future
         reqsAfterIngestion = acc.get()
       } yield {
-        reqsBeforeIngestion shouldBe reqs
-        reqsAfterIngestion shouldBe (reqs ++ txReqs)
+        reqsBeforeIngestion shouldBe requests
+        reqsAfterIngestion shouldBe (requests ++ txRequests)
+      }
+    }
+
+    "signal when offsets have been ingested" in {
+      for {
+        store <- mkStore()
+        acsOffsetIngestedF = store.acsIngestionSink.signalWhenIngested(acsOffset)
+        tx2OffsetIngestedF = store.acsIngestionSink.signalWhenIngested(tx2Offset)
+        tx3OffsetIngestedF = store.acsIngestionSink.signalWhenIngested(tx3Offset)
+        tx4OffsetIngestedF = store.acsIngestionSink.signalWhenIngested(tx4Offset)
+        tx5OffsetIngestedF = store.acsIngestionSink.signalWhenIngested(tx5Offset)
+        _ <- store.acsIngestionSink.ingestTransaction(tx4)
+      } yield {
+        acsOffsetIngestedF.isCompleted shouldBe true
+        tx2OffsetIngestedF.isCompleted shouldBe true
+        // tx 3 is never directly ingested, however, since tx4 with the higher offset is ingested, it should still be signalled as
+        tx3OffsetIngestedF.isCompleted shouldBe true
+        tx4OffsetIngestedF.isCompleted shouldBe true
+        // never ingested.
+        tx5OffsetIngestedF.isCompleted shouldBe false
       }
     }
 

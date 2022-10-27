@@ -11,9 +11,11 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
+import monocle.macros.syntax.lens.*
 
 import scala.collection.immutable
-import scala.concurrent._
+import scala.collection.immutable.SortedMap
+import scala.concurrent.*
 
 /** In-memory implementation of an [[AcsStore]] intended to be embedded in the
   * in-memory implementations of application-specific stores.
@@ -42,6 +44,7 @@ class InMemoryAcsStore(
       immutable.SortedMap.empty,
       immutable.Map.empty,
       Promise(),
+      SortedMap.empty,
     )
 
   val ingestionSink: AcsStore.IngestionSink = new AcsStore.IngestionSink with NoTracing {
@@ -75,15 +78,33 @@ class InMemoryAcsStore(
     ): Future[Unit] =
       updateState(
         _.switchToIngestingTransactions(acsOffset)
-      ).map(offsetChanged => {
-        offsetChanged.success(())
-        finishedAcsIngestion.success(())
-      })
+      ).map {
+        case (offsetChanged, offsetIngestionsToSignal) => {
+          offsetIngestionsToSignal.foreach(_.success(()))
+          offsetChanged.success(())
+          finishedAcsIngestion.success(())
+        }
+      }
 
     override def ingestTransaction(tx: Transaction): Future[Unit] =
       updateState(
         _.ingestTransaction(tx, contractFilter.contains)
-      ).map(offsetChanged => offsetChanged.success(()))
+      ).map {
+        case (offsetChanged, offsetIngestionsToSignal) => {
+          offsetIngestionsToSignal.foreach(_.success(()))
+          offsetChanged.success(())
+        }
+      }
+
+    /** The implementation is idempotent. */
+    override def signalWhenIngested(offset: String): Future[Unit] = {
+      val alreadyIngested = stateVar.offset.exists(_ >= offset)
+      if (alreadyIngested) {
+        Future.successful(())
+      } else {
+        updateState(_.addOffsetToSignal(offset)).flatMap(p => p.future)
+      }
+    }
   }
 
   private def offsetAndStateAfterIngestingAcs(): Future[(String, InMemoryAcsStore.State)] =
@@ -192,12 +213,16 @@ class InMemoryAcsStore(
 
 object InMemoryAcsStore {
 
+  /**  Internal state of the InMemoryAcsStore
+    * @param offsetIngestionsToSignal we assume that the underlying map is sorted to efficiently remove elements from it.
+    */
   private case class State(
       offset: Option[String],
       nextEventNumber: Long,
       createEvents: immutable.SortedMap[Long, CreatedEvent],
       createEventsById: immutable.Map[String, Long],
       offsetChanged: Promise[Unit],
+      offsetIngestionsToSignal: SortedMap[String, Promise[Unit]],
   ) {
 
     def pretty: String = {
@@ -220,6 +245,7 @@ object InMemoryAcsStore {
         createEvents = createEvents + (nextEventNumber -> ev),
         createEventsById = createEventsById + (ev.contractId -> nextEventNumber),
         offsetChanged = offsetChanged,
+        offsetIngestionsToSignal = offsetIngestionsToSignal,
       )
     }
 
@@ -236,6 +262,7 @@ object InMemoryAcsStore {
             createEvents = createEvents - eventNumber,
             createEventsById = createEventsById - ev.contractId,
             offsetChanged = offsetChanged,
+            offsetIngestionsToSignal = offsetIngestionsToSignal,
           )
         }
       }
@@ -245,8 +272,11 @@ object InMemoryAcsStore {
       evs.foldLeft(this)((st, ev) => st.ingestCreatedEvent(ev))
     }
 
-    def switchToIngestingTransactions(acsOffset: String): (State, Promise[Unit]) = {
+    def switchToIngestingTransactions(
+        acsOffset: String
+    ): (State, (Promise[Unit], Iterable[Promise[Unit]])) = {
       assert(offset.isEmpty, "state was not switched to tx ingestion yet")
+      val offsetsToRemove = computeOffsetsToRemove(acsOffset)
       (
         State(
           offset = Some(acsOffset),
@@ -254,13 +284,23 @@ object InMemoryAcsStore {
           createEvents = createEvents,
           createEventsById = createEventsById,
           offsetChanged = Promise(),
+          offsetIngestionsToSignal = offsetIngestionsToSignal.removedAll(offsetsToRemove.keys),
         ),
-        offsetChanged,
+        (offsetChanged, offsetsToRemove.values),
       )
     }
 
+    // since the ACS store subscribes to the flat transaction stream, it may not see
+    // offsets assigned to the transaction tree stream and thus we cannot only check for exact matches
+    private def computeOffsetsToRemove(offset: String): Map[String, Promise[Unit]] =
+      // because we use a SortedMap, we can use takeWhile.
+      offsetIngestionsToSignal.takeWhile(_._1 <= offset)
+
     /** Ingest a transaction while filtering out create events that do not satisfy the given predicate. */
-    def ingestTransaction(tx: Transaction, p: CreatedEvent => Boolean): (State, Promise[Unit]) = {
+    def ingestTransaction(
+        tx: Transaction,
+        p: CreatedEvent => Boolean,
+    ): (State, (Promise[Unit], Iterable[Promise[Unit]])) = {
       val stNew = tx.events.foldLeft(this)((st, ev) =>
         ev.event match {
           case Event.Event.Created(ev) => if (p(ev)) st.ingestCreatedEvent(ev) else st
@@ -269,6 +309,7 @@ object InMemoryAcsStore {
             throw new IllegalArgumentException(s"Encountered unknown event: $ev")
         }
       )
+      val offsetsToRemove = stNew.computeOffsetsToRemove(tx.offset)
       (
         State(
           offset = Some(tx.offset),
@@ -276,9 +317,22 @@ object InMemoryAcsStore {
           createEvents = stNew.createEvents,
           createEventsById = stNew.createEventsById,
           offsetChanged = Promise(),
+          offsetIngestionsToSignal = stNew.offsetIngestionsToSignal.removedAll(offsetsToRemove.keys),
         ),
-        offsetChanged,
+        (offsetChanged, offsetsToRemove.values),
       )
+    }
+
+    /** Update the state by adding another offset whose ingestion should be signalled. If the signalling of that
+      * offset has already been requested, don't change the state.
+      */
+    def addOffsetToSignal(offset: String): (State, Promise[Unit]) = {
+      offsetIngestionsToSignal.get(offset) match {
+        case None =>
+          val p = Promise[Unit]()
+          (this.focus(_.offsetIngestionsToSignal).modify(_ + (offset -> p)), p)
+        case Some(existingP) => (this, existingP)
+      }
     }
   }
 }

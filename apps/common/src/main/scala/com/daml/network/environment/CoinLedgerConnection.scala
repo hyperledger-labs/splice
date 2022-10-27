@@ -79,6 +79,12 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       update: P.Update[T],
   )(implicit traceContext: TraceContext, decoder: ValueDecoder[T]): Future[T]
 
+  def submitWithResultAndOffset[T](
+      actAs: Seq[PartyId],
+      readAs: Seq[PartyId],
+      update: P.Update[T],
+  )(implicit traceContext: TraceContext, decoder: ValueDecoder[T]): Future[(String, T)]
+
 }
 
 /** Subscription for reading the ledger */
@@ -321,12 +327,19 @@ object CoinLedgerConnection {
         submitCommand(fullCommand)
       }
 
-      @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
       override def submitWithResult[T](
           actAs: Seq[PartyId],
           readAs: Seq[PartyId],
           update: P.Update[T],
-      )(implicit traceContext: TraceContext, decoder: ValueDecoder[T]): Future[T] = {
+      )(implicit traceContext: TraceContext, decoder: ValueDecoder[T]): Future[T] =
+        submitWithResultAndOffset(actAs, readAs, update).map(_._2)
+
+      @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
+      override def submitWithResultAndOffset[T](
+          actAs: Seq[PartyId],
+          readAs: Seq[PartyId],
+          update: P.Update[T],
+      )(implicit traceContext: TraceContext, decoder: ValueDecoder[T]): Future[(String, T)] = {
         val fullCommand =
           commandsOf(
             actAs,
@@ -338,9 +351,9 @@ object CoinLedgerConnection {
           )
 
         submitCommandTree(fullCommand)
-          .map { case result =>
+          .map { result =>
             val transaction = result.getTransaction
-            decodeExerciseResult(update.toString, transaction)
+            (result.completionOffset, decodeExerciseResult(update.toString, transaction))
           }
       }
 

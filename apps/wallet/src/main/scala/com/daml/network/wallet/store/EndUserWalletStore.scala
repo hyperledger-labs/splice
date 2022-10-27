@@ -33,6 +33,8 @@ trait EndUserWalletStore extends AutoCloseable {
   def lookupInstall(): Future[QueryResult[Option[Contract[walletCodegen.WalletAppInstall]]]] =
     acsStore.findContract(walletCodegen.WalletAppInstall)(_ => true)
 
+  def signalWhenIngested(offset: String): Future[Unit] = acsIngestionSink.signalWhenIngested(offset)
+
   def findContract[T](
       templateCompanion: TemplateCompanion[T],
       filter: Contract[T] => Boolean = (_: Contract[T]) => true,

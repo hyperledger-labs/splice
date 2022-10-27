@@ -10,7 +10,6 @@ import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.util.Contract
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
 import com.daml.network.wallet.treasury.EndUserTreasuryService.*
-import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -74,14 +73,18 @@ case class EndUserTreasuryService(
     .batch(batchSize, operation => Seq(operation))((operations, operation) =>
       operations :+ operation
     )
-    .mapAsync(1)(executeBatchWithRetry)
-    .toMat(Sink.foreach(res => {
-      // TODO(#756): Add synchronization that uses the store's state instead of an arbitrary wait
-      logger.debug(s"Waiting for $waitTimeForStore ms to get the store time to catch-up")(
-        TraceContext.empty
+    .toMat(
+      Sink.foreachAsync(1)(batch =>
+        executeBatchWithRetry(batch).flatMap(offset => {
+          userStore
+            .signalWhenIngested(offset)
+            .map(_ =>
+              logger
+                .debug(s"Finished waiting for store to ingest offset $offset")(TraceContext.empty)
+            )
+        })
       )
-      Threading.sleep(waitTimeForStore.toMillis)
-    }))(Keep.left)
+    )(Keep.left)
     .run()
 
   /** Enqueues a coin operation into an internal task queue.
@@ -149,13 +152,13 @@ case class EndUserTreasuryService(
     */
   private def executeBatchWithRetry(
       batch: Seq[EnqueuedCoinOperation]
-  ): Future[Unit] =
+  ): Future[String] =
     TraceContext.withNewTraceContext { implicit tc =>
       val maxRetries: Int = 3
       val initialDelay: FiniteDuration = 1.seconds
       val maxDelay: Duration = 5.seconds
 
-      implicit val success: retry.Success[Unit] = retry.Success.always
+      implicit val success: retry.Success[String] = retry.Success.always
       val res = Backoff(
         logger,
         this,
@@ -169,7 +172,7 @@ case class EndUserTreasuryService(
 
   private def executeBatch(
       batch: Seq[EnqueuedCoinOperation]
-  )(implicit tc: TraceContext): Future[Unit] = {
+  )(implicit tc: TraceContext): Future[String] = {
 
     logger.debug(
       s"Running batch of coin operations for user ${userStore.key.endUserParty} with length ${batch.size}: $batch"
@@ -189,8 +192,8 @@ case class EndUserTreasuryService(
           inputs,
           validOperations.map(_.operationWithLookups.operation),
         )
-      outcomes <- connection
-        .submitWithResult(
+      (offset, outcomes) <- connection
+        .submitWithResultAndOffset(
           Seq(walletStoreKey.walletServiceParty),
           Seq(walletStoreKey.validatorParty, userStore.key.endUserParty),
           cmd,
@@ -199,7 +202,7 @@ case class EndUserTreasuryService(
         case (outcome, EnqueuedCoinOperation(operation, p)) =>
           p.success(outcome)
       }
-    } yield ()
+    } yield offset
   }
 
   override def onClosed(): Unit = {
