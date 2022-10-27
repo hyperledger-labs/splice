@@ -44,6 +44,7 @@ in pkgs.mkShell {
     scala
     selenium-server-standalone
     sphinx
+    toxiproxy
     tmux
     unzip
     which

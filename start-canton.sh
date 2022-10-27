@@ -35,3 +35,8 @@ while [ ! -f canton.ports ]; do
     sleep 1;
 done
 echo "Canton started"
+
+# Start toxiproxy server
+toxiproxy-server > log/toxi.log 2>&1 &
+PID=$!
+echo "$PID" > toxi.pid

@@ -3,6 +3,12 @@ set -eou pipefail
 
 POSTGRES_MODE=${1:-docker}
 
+if [ -f "toxi.pid" ]; then
+  PID=$(cat toxi.pid)
+  kill "$PID" || true
+  rm toxi.pid
+fi
+
 if [ -f "canton.pid" ]; then
     PID=$(cat canton.pid)
     kill "$PID" || true
