@@ -1,5 +1,7 @@
 module CC.Round where
 
+import CC.Assert
+
 newtype Round = Round with number : Int
   deriving (Eq, Ord, Show)
 
@@ -41,7 +43,7 @@ template OpenMiningRound
       with
         obs : Party
       controller svc
-      do assertMsg ("New observer " <> show obs  <> " is not a member of existing observers " <> show observers) (obs `notElem` observers)
+      do require ("New observer " <> show obs  <> " is not a member of existing observers " <> show observers) (obs `notElem` observers)
          create this with
            observers = obs :: observers
 
@@ -80,7 +82,7 @@ template IssuingMiningRound
       with
         obs : Party
       controller svc
-      do assertMsg ("New observer " <> show obs  <> " is not a member of existing observers " <> show observers) (obs `notElem` observers)
+      do require ("New observer " <> show obs  <> " is not a member of existing observers " <> show observers) (obs `notElem` observers)
          create this with
            observers = obs :: observers
 
@@ -121,6 +123,6 @@ template IssuanceState
       with
         obs : Party
       controller svc
-      do assertMsg ("New observer " <> show obs  <> " is not a member of existing observers " <> show observers) (obs `notElem` observers)
+      do require ("New observer " <> show obs  <> " is not a member of existing observers " <> show observers) (obs `notElem` observers)
          create this with
            observers = obs :: observers

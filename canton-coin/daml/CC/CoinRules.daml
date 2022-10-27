@@ -9,6 +9,7 @@ import DA.Text
 import DA.Time
 import DA.Traversable qualified as F
 
+import CC.Assert
 import CC.Coin
 import CC.Round
 
@@ -117,7 +118,7 @@ template CoinRules
         -- archive open mining round
         miningRound <- fetch miningRoundCid
         archive miningRoundCid
-        assertMsg "SVC matches" (miningRound.svc == svc)
+        require "SVC matches" (miningRound.svc == svc)
         -- create closing round
         create ClosingMiningRound with
           svc
@@ -134,8 +135,8 @@ template CoinRules
         -- archive closing mining round
         miningRound <- fetch miningRoundCid
         archive miningRoundCid
-        assertMsg "SVC matches" (miningRound.svc == svc)
-        assertMsg "Positive total burn quantity" (totalBurnQuantity >= 0.0)
+        require "SVC matches" (miningRound.svc == svc)
+        require "Positive total burn quantity" (totalBurnQuantity >= 0.0)
 
         let svcCoinsPerIssuance = config.coinsIssuedPerRound * config.svcIssuanceRatio
             userIssuanceRatio = 1.0 - config.svcIssuanceRatio
@@ -172,13 +173,13 @@ template CoinRules
         -- archive issuing mining round
         miningRound <- fetch miningRoundCid
         archive miningRoundCid
-        assertMsg "SVC matches" (miningRound.svc == svc)
-        assertMsg "Non-negative transfer fees" (totalTransferFees >= 0.0)
-        assertMsg "Non-negative admin fees" (totalAdminFees >= 0.0)
-        assertMsg "Non-negative holding fees" (totalHoldingFees >= 0.0)
-        assertMsg "Fees cannot exceed transfer inputs" (totalAdminFees + totalHoldingFees <= totalTransferInputs)
-        assertMsg "transfer outputs cannot exceed transfer inputs" (totalSelfTransferOutputs + totalNonSelfTransferOutputs <= totalTransferInputs)
-        assertMsg "transfer inputs - fees must match outputs" ((totalTransferInputs - totalTransferFees - totalAdminFees) == (totalSelfTransferOutputs + totalNonSelfTransferOutputs))
+        require "SVC matches" (miningRound.svc == svc)
+        require "Non-negative transfer fees" (totalTransferFees >= 0.0)
+        require "Non-negative admin fees" (totalAdminFees >= 0.0)
+        require "Non-negative holding fees" (totalHoldingFees >= 0.0)
+        require "Fees cannot exceed transfer inputs" (totalAdminFees + totalHoldingFees <= totalTransferInputs)
+        require "transfer outputs cannot exceed transfer inputs" (totalSelfTransferOutputs + totalNonSelfTransferOutputs <= totalTransferInputs)
+        require "transfer inputs - fees must match outputs" ((totalTransferInputs - totalTransferFees - totalAdminFees) == (totalSelfTransferOutputs + totalNonSelfTransferOutputs))
 
         -- create closing round
         create ClosedMiningRound with
@@ -201,7 +202,7 @@ template CoinRules
         -- archive closed mining round
         miningRound <- fetch miningRoundCid
         archive miningRoundCid
-        assertMsg "SVC matches" (miningRound.svc == svc)
+        require "SVC matches" (miningRound.svc == svc)
 
     -- This allows fetchByKey-style fetches if you have readAs
     -- but not actAs claims.
@@ -215,7 +216,7 @@ template CoinRules
       with
         obs : Party
       controller svc
-      do assertMsg ("New observer " <> show obs  <> " is not a member of existing observers " <> show observers) (obs `notElem` observers)
+      do require ("New observer " <> show obs  <> " is not a member of existing observers " <> show observers) (obs `notElem` observers)
          create this with
            observers = obs :: observers
 
@@ -470,8 +471,8 @@ summarizeAndValidateInputs now config svc sender inps = do
 
     summarizeInput now s (InputCoin coinCid) = do
       coin <- fetch coinCid
-      assertMsg "SVC matches" (svc == coin.svc)
-      assertMsg "Sender matches owner" (sender == coin.owner)
+      require "SVC matches" (svc == coin.svc)
+      require "Sender matches owner" (sender == coin.owner)
       let quantity = actualQuantity now coin.quantity
           holdingFee = coin.quantity.initialQuantity - quantity
       return TransferInputsSummary with
@@ -484,9 +485,9 @@ summarizeAndValidateInputs now config svc sender inps = do
 
     summarizeInput now s (InputAppReward rewardCid) = do
       reward <- fetch rewardCid
-      assertMsg "SVC matches" (svc == reward.svc)
+      require "SVC matches" (svc == reward.svc)
       (_, miningRound) <- fetchByKey @IssuingMiningRound (svc, reward.round)
-      assertMsg "Sender matches app provider" (sender == reward.provider)
+      require "Sender matches app provider" (sender == reward.provider)
       return TransferInputsSummary with
         numBurnInputs = s.numBurnInputs + 1
         numCoinInputs = s.numCoinInputs
@@ -495,7 +496,7 @@ summarizeAndValidateInputs now config svc sender inps = do
 
     summarizeInput now s (InputValidatorReward rewardCid) = do
       reward <- fetch rewardCid
-      assertMsg "SVC matches" (svc == reward.svc)
+      require "SVC matches" (svc == reward.svc)
       (_, miningRound) <- fetchByKey @IssuingMiningRound (svc, reward.round)
       return TransferInputsSummary with
         numBurnInputs = s.numBurnInputs + 1
@@ -549,7 +550,7 @@ preprocessAndSummarizeOutputs config sender outs = do
       -- check validity of locking request
       now <- getTime
       let lockDuration = optional (days 0) (\l -> subTime l.expiresAt now) lock
-      assertMsg "Positive lock duration" (days 0 <= lockDuration)
+      require "Positive lock duration" (days 0 <= lockDuration)
       -- compute output
       let output = PreprocessedTransferOutput with
             owner = sender

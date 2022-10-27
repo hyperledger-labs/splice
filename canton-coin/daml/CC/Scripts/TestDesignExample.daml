@@ -5,6 +5,7 @@ import DA.List.Total
 import DA.Time
 import Daml.Script
 
+import CC.Assert
 import CC.Coin
 import CC.CoinRules
 import CC.Round
@@ -25,12 +26,12 @@ template Escrow
         paymentCoin : ContractId Coin
       controller p
       do LockedCoin{lock,coin=locked} <- fetch lockedCoin
-         assertMsg "SVC matches locked coin" (locked.svc == this.svc)
-         assertMsg "owner matches locked coin" (locked.owner == this.p)
-         assertMsg "lock holder matches locked coin " (arbiter == lock.holder)
+         require "SVC matches locked coin" (locked.svc == this.svc)
+         require "owner matches locked coin" (locked.owner == this.p)
+         require "lock holder matches locked coin " (arbiter == lock.holder)
          payment <- fetch paymentCoin
-         assertMsg "SVC matches payment coin" (payment.svc == this.svc)
-         assertMsg "owner matches payment coin" (payment.owner == this.p)
+         require "SVC matches payment coin" (payment.svc == this.svc)
+         require "owner matches payment coin" (payment.owner == this.p)
          cid <- exercise lockedCoin Coin_Unlock
          let transfer = Transfer with
                sender = p

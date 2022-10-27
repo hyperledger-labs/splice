@@ -6,6 +6,7 @@ import DA.Assert
 import DA.Foldable (forA_)
 import DA.Time
 import DA.Set qualified as Set
+import CC.Assert
 import CN.Wallet
 
 -- TODO(i592)
@@ -186,7 +187,7 @@ template Group
       with
         invitee : Party
       controller owner, invitee
-      do assertMsg "Invitee is not a member" (invitee `notElem` groupMembers this)
+      do require "Invitee is not a member" (invitee `notElem` groupMembers this)
          create this with
            members = invitee :: members
 
@@ -196,7 +197,7 @@ template Group
         quantity : Decimal
         description : Text
       controller payer
-      do assertMsg "payer is a member" (payer `elem` groupMembers this)
+      do require "payer is a member" (payer `elem` groupMembers this)
          create BalanceUpdate with
            group = this
            update = ExternalPayment with
@@ -208,8 +209,8 @@ template Group
         receiver : Party
         quantity : Decimal
       controller sender
-      do assertMsg "sender is a member" (sender `elem` groupMembers this)
-         assertMsg "receiver is a member" (receiver `elem` groupMembers this)
+      do require "sender is a member" (sender `elem` groupMembers this)
+         require "receiver is a member" (receiver `elem` groupMembers this)
          deliveryOffer <- create TransferInProgress
            with
              group = this
@@ -239,8 +240,8 @@ template Group
                lockedCoin = acceptedPayment.lockedCoin
          acceptedPayment === expectedAcceptedPayment
          -- Check that sender and receiver are both still members.
-         assertMsg "Sender is member" (ref.sender `elem` groupMembers this)
-         assertMsg "Receiver is member" (ref.receiver `elem` groupMembers this)
+         require "Sender is member" (ref.sender `elem` groupMembers this)
+         require "Receiver is member" (ref.receiver `elem` groupMembers this)
          -- Check that this belongs to the right group.
          key ref.group === key this
          create BalanceUpdate with
@@ -256,8 +257,8 @@ template Group
         sender : Party
         receiverQuantities : [ReceiverQuantity]
       controller sender
-      do assertMsg "sender is a member" (sender `elem` groupMembers this)
-         assertMsg "receiver is a member" (fmap (\x -> x.receiver) receiverQuantities `subset` groupMembers this)
+      do require "sender is a member" (sender `elem` groupMembers this)
+         require "receiver is a member" (fmap (\x -> x.receiver) receiverQuantities `subset` groupMembers this)
          deliveryOffer <- create MultiTransferInProgress
            with
              group = this
@@ -290,8 +291,8 @@ template Group
                deliveryOffer = acceptedPayment.deliveryOffer
          acceptedPayment === expectedAcceptedPayment
          -- Check that sender and receiver are both still members.
-         assertMsg "Sender is member" (ref.sender `elem` groupMembers this)
-         assertMsg "Receivers are members" (receivers `subset` groupMembers this)
+         require "Sender is member" (ref.sender `elem` groupMembers this)
+         require "Receivers are members" (receivers `subset` groupMembers this)
          -- Check that this belongs to the right group.
          key ref.group === key this
          forA ref.receiverQuantities \ReceiverQuantity{receiver, quantity} -> 
@@ -307,14 +308,14 @@ template Group
         balanceChanges : Map Party (Map Party Decimal) -- Map of Party to map of balance changes for each party. The balance changes for each party must add up to zero.
       controller owner
       do forA_ (M.toList balanceChanges) $ \(p, balances) -> do
-           assertMsg (show p <> " is a member of group: " <> show (groupMembers this)) (p `elem` groupMembers this)
+           require (show p <> " is a member of group: " <> show (groupMembers this)) (p `elem` groupMembers this)
            let total = sum (M.values balances)
-           assertMsg ("Balance change for " <> show p <> " must be 0 but was " <> show total) (total == 0.0)
+           require ("Balance change for " <> show p <> " must be 0 but was " <> show total) (total == 0.0)
            forA_ (M.toList balances) $ \(p', change) -> do
              -- Note that this also covers the membership change for p'
              case M.lookup p =<< M.lookup p' balanceChanges of
                None -> abort $ "No symmetric entry for balance change of " <> show (p, p')
-               Some change' -> assertMsg ("Balance change for " <> show (p, p') <> " must be symmetric: " <> show (change, change')) (change == -change')
+               Some change' -> require ("Balance change for " <> show (p, p') <> " must be symmetric: " <> show (change, change')) (change == -change')
          create BalanceUpdate with
            group = this
            update = Netting with balanceChanges

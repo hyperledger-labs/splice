@@ -7,6 +7,7 @@ import DA.Assert
 import DA.Traversable
 import DA.Exception
 
+import CC.Assert
 import CC.Coin
 import CC.CoinRules
 
@@ -35,7 +36,7 @@ template PaymentChannel
         payload : Text
       controller sender
       do
-        assertMsg "Direct transfers are allowed" allowDirectTransfers
+        require "Direct transfers are allowed" allowDirectTransfers
         let
           transfer = Transfer with
             sender
@@ -61,7 +62,7 @@ template PaymentChannel
         description : Text
       controller receiver
       do
-        assertMsg "Payment requests are allowed in this channel" allowRequests
+        require "Payment requests are allowed in this channel" allowRequests
         create OnChannelPaymentRequest with
           sender
           receiver
@@ -199,7 +200,7 @@ template AppPaymentRequest
       do now <- getTime
          -- check that the delivery offer is active and implements DeliveryOffer
          Some _offer <- fetchFromInterface @DeliveryOffer deliveryOffer
-         assertMsg "AppPaymentRequest has not expired" (now < expiresAt)
+         require "AppPaymentRequest has not expired" (now < expiresAt)
          -- lock the coin and create an accepted payment
          let transfer = Transfer with
               sender
@@ -256,7 +257,7 @@ template AcceptedAppPayment
         -- To make our workarounds for lack of explicit disclosure work
         -- we need to fetch the right CCUserHostedAt contract so we
         -- allow passing in the submitter.
-        assertMsg ("Submitter must be sender or receiver") (submitter `elem` [sender, receiver])
+        require ("Submitter must be sender or receiver") (submitter `elem` [sender, receiver])
 
         -- unlock coin and transfer the remainder to the receiver
         coin <- exercise lockedCoin Coin_Unlock
@@ -312,7 +313,7 @@ template AppMultiPaymentRequest
       do now <- getTime
          -- check that the reference is active and implements DeliveryOffer
          void $ fetch deliveryOffer
-         assertMsg "AppMultiPaymentRequest has not expired" (now < expiresAt)
+         require "AppMultiPaymentRequest has not expired" (now < expiresAt)
          -- lock the coin and create an accepted payment
          let transfer = Transfer with
               sender

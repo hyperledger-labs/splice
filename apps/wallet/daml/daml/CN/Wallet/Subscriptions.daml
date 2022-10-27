@@ -3,6 +3,7 @@ module CN.Wallet.Subscriptions where
 import DA.Time
 import DA.Optional
 
+import CC.Assert
 import CC.Coin
 import CC.CoinRules
 
@@ -71,13 +72,13 @@ template Subscription
 assertSubscriptionMatches: ContractId Subscription -> Subscription -> Update ()
 assertSubscriptionMatches subscription subscriptionData = do
   actualSubscriptionData <- fetch subscription
-  assertMsg "Subscription data matches referenced subscription" (actualSubscriptionData == subscriptionData)
+  require "Subscription data matches referenced subscription" (actualSubscriptionData == subscriptionData)
   pure ()
 
 assertContextValid: Subscription -> Update ()
 assertContextValid subscriptionData = do
   fetchResult <- fetchFromInterface @SubscriptionContext subscriptionData.context
-  assertMsg "Context is active and has correct interface" (isSome fetchResult)
+  require "Context is active and has correct interface" (isSome fetchResult)
   pure ()
 
 
@@ -168,7 +169,7 @@ template SubscriptionInitialPayment
         actor : Party
       controller actor
       do
-        assertMsg ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
+        require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
         exercise subscriptionData.context SubscriptionContext_Archive
         exercise lockedCoin Coin_OwnerExpireLock -- would fail if we can't expire yet
 
@@ -195,7 +196,7 @@ template SubscriptionIdleState
         assertContextValid subscriptionData
 
         now <- getTime
-        assertMsg "The next due date is close enough to make the next payment." (now `addRelTime` payData.paymentDuration >= nextPaymentDueAt)
+        require "The next due date is close enough to make the next payment." (now `addRelTime` payData.paymentDuration >= nextPaymentDueAt)
         -- We deliberately don't check whether it's "too late" to pay. In this way, providers can implement a "grace period".
 
         (lockedCoin, senderChange) <- lockAndMakeChange subscriptionData payData inputs now
@@ -213,9 +214,9 @@ template SubscriptionIdleState
       controller actor
       do
         time <- getTime
-        assertMsg ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
+        require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
         assertSubscriptionMatches subscription subscriptionData
-        assertMsg "Last subscription payment was missed" (nextPaymentDueAt < time)
+        require "Last subscription payment was missed" (nextPaymentDueAt < time)
         exercise subscription Subscription_Archive
 
     -- The sender can cancel a subscription at any time (unless there is an in-flight payment).
@@ -266,7 +267,7 @@ template SubscriptionPayment
         actor : Party
       controller actor
       do
-        assertMsg ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
+        require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
         assertSubscriptionMatches subscription subscriptionData
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
@@ -309,7 +310,7 @@ unlockAndTransfer submitter subscriptionData lockedCoin = do
   -- To make our workarounds for lack of explicit disclosure work
   -- we need to fetch the right CCUserHostedAt contract so we
   -- allow passing in the submitter.
-  assertMsg ("Submitter must be sender or receiver") (submitter `elem` [sender, receiver])
+  require ("Submitter must be sender or receiver") (submitter `elem` [sender, receiver])
 
   -- unlock coin and transfer the remainder to the receiver
   coin <- exercise lockedCoin Coin_Unlock

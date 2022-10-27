@@ -3,6 +3,7 @@ module CN.Directory where
 import DA.Assert
 import DA.Time
 
+import CC.Assert
 import CC.Coin
 import CN.Wallet
 import CN.Wallet.Subscriptions
@@ -39,14 +40,14 @@ template DirectoryEntry
         actor : Party
       controller actor
       do time <- getTime
-         assertMsg ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
-         assertMsg "Contract expired" (expiresAt < time)
+         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
+         require "Contract expired" (expiresAt < time)
 
     choice DirectoryEntry_Renew : ContractId DirectoryEntry
       with
         extension : RelTime
       controller user, provider
-      do assertMsg "Extension positive" (extension > aunit)
+      do require "Extension positive" (extension > aunit)
          create this with
            expiresAt = this.expiresAt `addRelTime` extension
 
@@ -95,7 +96,7 @@ template DirectoryInstall with
       with
         actor : Party
       controller actor
-      do assertMsg ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
+      do require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
 
     -- Request a directory entry, to be paid and renewed via subscription payments.
     -- The request is answered by requesting from the user to agree on establishing subscription payments.
@@ -153,9 +154,9 @@ template DirectoryInstall with
         Some (_, context) <- fetchFromInterface @DirectoryEntryContext payment.subscriptionData.context
         entry <- fetch entryCid
         -- sanity checks
-        assertMsg "Current entry matches subscription context"
+        require "Current entry matches subscription context"
           ((DirectoryEntryContext entry.provider entry.user entry.name) == context)
-        assertMsg "Subscription intervals and entry renewal times are in sync"
+        require "Subscription intervals and entry renewal times are in sync"
           (payment.payData.paymentInterval == entryLifetime && payment.thisPaymentDueAt == entry.expiresAt)
         -- accept payment
         (subscriptionStateCid, coinCid) <- exercise paymentCid SubscriptionPayment_Collect with

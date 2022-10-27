@@ -1,6 +1,7 @@
 -- | The contracts representing the long-term state of CC.
 module CC.Coin where
 
+import CC.Assert
 import CC.Round
 -- import OpenBusiness.Expiry
 import OpenBusiness.Fees
@@ -56,7 +57,7 @@ template LockedCoin
     let tryExpireLock : Update (ContractId Coin)
         tryExpireLock = do
             t <- getTime
-            assertMsg "Lock not expired" (lock.expiresAt <= t)
+            require "Lock not expired" (lock.expiresAt <= t)
             create coin
 
     choice Coin_OwnerExpireLock : ContractId Coin
@@ -113,14 +114,14 @@ template AppReward
         miningRoundCid : ContractId ClosedMiningRound
       controller svc
       do miningRound <- fetch miningRoundCid
-         assertMsg "Mining round > expiry round" (round <= miningRound.round)
+         require "Mining round > expiry round" (round <= miningRound.round)
 
     choice AppReward_ProviderExpire : ()
       with
         miningRoundCid : ContractId ClosedMiningRound
       controller provider
       do miningRound <- fetch miningRoundCid
-         assertMsg "Mining round > expiry round" (round <= miningRound.round)
+         require "Mining round > expiry round" (round <= miningRound.round)
 
     choice AppReward_Merge : ContractId AppReward
       -- ^ This choice is used by the SVC to merge all burned coins per validator.
@@ -130,11 +131,11 @@ template AppReward
         cids : [ContractId AppReward]
       controller svc
       do
-        assertMsg "Merge with at least one burned coin" (not (null cids))
+        require "Merge with at least one burned coin" (not (null cids))
         quantities <- forA cids $ \cid -> do
           burnedCoin <- fetch cid
           archive cid
-          assertMsg ("Burned coins must match") (this == burnedCoin with quantity)
+          require ("Burned coins must match") (this == burnedCoin with quantity)
           return burnedCoin.quantity
         create this with quantity = this.quantity + sum quantities
 
@@ -156,7 +157,7 @@ template ValidatorReward
         miningRoundCid : ContractId ClosedMiningRound
       controller svc
       do miningRound <- fetch miningRoundCid
-         assertMsg "Mining round > expiry round" (round <= miningRound.round)
+         require "Mining round > expiry round" (round <= miningRound.round)
 
     choice ValidatorReward_UserExpire : ()
       with
@@ -164,7 +165,7 @@ template ValidatorReward
       controller user
       -- TODO(M3-90): consider whether we should use time-based expiry so that the user can expire it unilaterally after let's say 24h
       do miningRound <- fetch miningRoundCid
-         assertMsg "Mining round > expiry round" (round <= miningRound.round)
+         require "Mining round > expiry round" (round <= miningRound.round)
 
 
     choice ValidatorReward_Merge : ContractId ValidatorReward
@@ -175,11 +176,11 @@ template ValidatorReward
         cids : [ContractId ValidatorReward]
       controller svc
       do
-        assertMsg "Merge with at least one burned coin" (not (null cids))
+        require "Merge with at least one burned coin" (not (null cids))
         quantities <- forA cids $ \cid -> do
           burnedCoin <- fetch cid
           archive cid
-          assertMsg ("Burned coins must match") (this == burnedCoin with quantity)
+          require ("Burned coins must match") (this == burnedCoin with quantity)
           return burnedCoin.quantity
         create this with quantity = this.quantity + sum quantities
 
@@ -191,7 +192,7 @@ template ValidatorReward
       controller svc, validator
       do
         right <- fetch rightCid
-        assertMsg "Right must match" (right == ValidatorRight with svc; validator, user)
+        require "Right must match" (right == ValidatorRight with svc; validator, user)
 
 
 -- | BurnOracle records the result of a process to determine the quantity of coin burned
