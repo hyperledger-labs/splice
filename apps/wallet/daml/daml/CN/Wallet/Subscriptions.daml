@@ -142,8 +142,7 @@ template SubscriptionInitialPayment
     ensure payDataIsValid payData
 
     choice SubscriptionInitialPayment_Collect : (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
-      with
-        submitter : Party
+      -- TODO(M1-42): consider why we don't have the provider as a controller here as well
       controller subscriptionData.sender, subscriptionData.receiver
       do
         assertContextValid subscriptionData
@@ -154,7 +153,7 @@ template SubscriptionInitialPayment
           nextPaymentDueAt = now `addRelTime` payData.paymentInterval
           ..
 
-        coin <- unlockAndTransfer submitter subscriptionData lockedCoin
+        coin <- unlockAndTransfer subscriptionData lockedCoin
 
         pure (subscription, state, coin)
 
@@ -241,15 +240,14 @@ template SubscriptionPayment
     ensure payDataIsValid payData
 
     choice SubscriptionPayment_Collect : (ContractId SubscriptionIdleState, ContractId Coin)
-      with
-        submitter : Party
+      -- TODO(M1-42): consider why we don't have the provider as a controller here as well
       controller subscriptionData.sender, subscriptionData.receiver
       do
         assertSubscriptionMatches subscription subscriptionData
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt `addRelTime` payData.paymentInterval
           ..
-        coin <- unlockAndTransfer submitter subscriptionData lockedCoin
+        coin <- unlockAndTransfer subscriptionData lockedCoin
         pure (state, coin)
 
     choice SubscriptionPayment_Reject : (ContractId SubscriptionIdleState, ContractId Coin)
@@ -303,14 +301,9 @@ lockAndMakeChange subscriptionData payData inputs now = do
   pure(lockedCoin, senderChange)
 
 
-unlockAndTransfer: Party -> Subscription -> ContractId LockedCoin -> Update (ContractId Coin)
-unlockAndTransfer submitter subscriptionData lockedCoin = do
+unlockAndTransfer: Subscription -> ContractId LockedCoin -> Update (ContractId Coin)
+unlockAndTransfer subscriptionData lockedCoin = do
   let Subscription { sender; receiver; provider; svc; .. } = subscriptionData
-
-  -- To make our workarounds for lack of explicit disclosure work
-  -- we need to fetch the right CCUserHostedAt contract so we
-  -- allow passing in the submitter.
-  require ("Submitter must be sender or receiver") (submitter `elem` [sender, receiver])
 
   -- unlock coin and transfer the remainder to the receiver
   coin <- exercise lockedCoin Coin_Unlock

@@ -229,7 +229,7 @@ template Group
       controller sender
       do acceptedPayment <- fetch acceptedPaymentCid
          Some (refCid, ref) <- fetchFromInterface @TransferInProgress acceptedPayment.deliveryOffer
-         exercise acceptedPaymentCid (AcceptedAppPayment_Collect sender)
+         exercise acceptedPaymentCid AcceptedAppPayment_Collect
          acceptedPayment.sender === sender
          let expectedAcceptedPayment = AcceptedAppPayment with
                sender = ref.sender
@@ -295,7 +295,7 @@ template Group
          require "Receivers are members" (receivers `subset` groupMembers this)
          -- Check that this belongs to the right group.
          key ref.group === key this
-         forA ref.receiverQuantities \ReceiverQuantity{receiver, quantity} -> 
+         forA ref.receiverQuantities \ReceiverQuantity{receiver, quantity} ->
            create BalanceUpdate with
              group = this
              update = Transfer with

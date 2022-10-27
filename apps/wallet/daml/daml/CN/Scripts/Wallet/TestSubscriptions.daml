@@ -127,14 +127,12 @@ failMakeSubscriptionPayment app sender state coin = do
 collectInitialSubscriptionPayment : CCApp -> CCUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
 collectInitialSubscriptionPayment app receiver sender payment = do
   readAs <- getUserReadAs receiver.userId
-  (subscription, state, coin) <- submitMulti [receiver.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionInitialPayment_Collect with
-    submitter = receiver.primaryParty
+  (subscription, state, coin) <- submitMulti [receiver.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionInitialPayment_Collect
   return (subscription, state, coin)
 
 
 collectSubscriptionPayment : CCApp -> CCUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId Coin)
 collectSubscriptionPayment app receiver sender payment = do
   readAs <- getUserReadAs receiver.userId
-  (state, coin) <- submitMulti [receiver.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionPayment_Collect with
-    submitter = receiver.primaryParty
+  (state, coin) <- submitMulti [receiver.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionPayment_Collect
   return (state, coin)

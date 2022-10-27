@@ -382,7 +382,7 @@ class WalletIntegrationTest
         }
         clue("Collect the initial payment (as the receiver), which creates the subscription") {
           val collectCommand = initialPaymentId
-            .exerciseSubscriptionInitialPayment_Collect(submitter = aliceUserParty.toPrim)
+            .exerciseSubscriptionInitialPayment_Collect()
             .command
           aliceWallet.remoteParticipant.ledger_api.commands.submit(
             actAs = Seq(aliceUserParty),
@@ -414,7 +414,7 @@ class WalletIntegrationTest
           "Collect the second payment (as the receiver), which sets the subscription back to idle"
         ) {
           val collectCommand2 = paymentId
-            .exerciseSubscriptionPayment_Collect(submitter = aliceUserParty.toPrim)
+            .exerciseSubscriptionPayment_Collect()
             .command
           aliceWallet.remoteParticipant.ledger_api.commands.submit(
             actAs = Seq(aliceUserParty),

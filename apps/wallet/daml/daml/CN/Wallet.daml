@@ -158,7 +158,7 @@ template OnChannelPaymentRequest
 
 -- Utility function to help get the sender change from a TransferResult
 extractSenderChange: TransferResult -> (TransferResult, ContractId Coin)
-extractSenderChange result = 
+extractSenderChange result =
   let [TransferResultCoin lockedCoin, TransferResultCoin senderChange] = result.createdCoins
   in (result, senderChange)
 
@@ -246,18 +246,11 @@ template AcceptedAppPayment
     signatory sender, provider, receiver
 
     choice AcceptedAppPayment_Collect : ContractId Coin
-      with
-        submitter : Party
       -- TODO(M1-42): consider why we don't have the provider as a controller here as well
       controller sender, receiver
       do
         -- archive delivery offer
         exercise deliveryOffer DeliveryOffer_Archive
-
-        -- To make our workarounds for lack of explicit disclosure work
-        -- we need to fetch the right CCUserHostedAt contract so we
-        -- allow passing in the submitter.
-        require ("Submitter must be sender or receiver") (submitter `elem` [sender, receiver])
 
         -- unlock coin and transfer the remainder to the receiver
         coin <- exercise lockedCoin Coin_Unlock
@@ -331,7 +324,7 @@ template AppMultiPaymentRequest
                 ]
               payload = "lock payment"
          result <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
-         case result of 
+         case result of
           Left errorMsg -> return $ Left errorMsg
           Right result -> do
             let [TransferResultLockedCoin lockedCoin, TransferResultCoin senderChange] = result.createdCoins
@@ -398,9 +391,9 @@ template AcceptedAppMultiPayment
 -- Evaluates an update, catches any exceptions it throws and converts them into an Either
 catchAll: Update a -> Update (Either Text a)
 catchAll operation =
-  try do 
+  try do
     fmap (\res -> Right res) operation
-  catch (ex : AnyException) -> return $ Left $ message ex  
+  catch (ex : AnyException) -> return $ Left $ message ex
 
 -- Same as `catchAll` except the update already returns an Either
 catchAllE: (Update (Either Text a)) -> Update (Either Text a)
@@ -409,9 +402,9 @@ catchAllE operation =
     operation
   catch (ex : AnyException) -> return $ Left $ message ex
 
--- Main function for batched execution of multiple coin operations. 
--- Given multiple coin operations and transfer inputs, it executes the operations sequentially while 
--- stringing along the remaining inputs. Returns all outcomes. 
+-- Main function for batched execution of multiple coin operations.
+-- Given multiple coin operations and transfer inputs, it executes the operations sequentially while
+-- stringing along the remaining inputs. Returns all outcomes.
 executeCoinOperationRec : [TransferInput] -> [CoinOperationOutcome] -> [CoinOperation] -> Update ([CoinOperationOutcome])
 executeCoinOperationRec inputs prevResults (operation::remainingOperations) = do
   case operation of
@@ -523,4 +516,3 @@ template WalletAppInstall
       do
         Right (accepted, change) <- exercise requestCid (AppMultiPaymentRequest_Accept transferInput)
         return accepted
-

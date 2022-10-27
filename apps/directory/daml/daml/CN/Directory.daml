@@ -132,8 +132,7 @@ template DirectoryInstall with
         payment <- fetch paymentCid
         Some (_, context) <- fetchFromInterface @DirectoryEntryContext payment.subscriptionData.context
         -- accept payment which creates the subscription
-        (_, subscriptionStateCid, coinCid) <- exercise paymentCid SubscriptionInitialPayment_Collect with
-          submitter = provider
+        (_, subscriptionStateCid, coinCid) <- exercise paymentCid SubscriptionInitialPayment_Collect
         subscriptionState <- fetch subscriptionStateCid
         -- deliver the promised good: create the directory entry
         entryCid <- case context of
@@ -159,8 +158,7 @@ template DirectoryInstall with
         require "Subscription intervals and entry renewal times are in sync"
           (payment.payData.paymentInterval == entryLifetime && payment.thisPaymentDueAt == entry.expiresAt)
         -- accept payment
-        (subscriptionStateCid, coinCid) <- exercise paymentCid SubscriptionPayment_Collect with
-          submitter = provider
+        (subscriptionStateCid, coinCid) <- exercise paymentCid SubscriptionPayment_Collect
         -- renew the entry
         entryCid <- exercise entryCid DirectoryEntry_Renew with
           extension = entryLifetime
@@ -210,7 +208,7 @@ template DirectoryInstall with
              expiresAt = now `addRelTime` entryLifetime
              ..
          -- accept payment, which archives the offer
-         coinCid <- exercise acceptedAppPaymentCid (AcceptedAppPayment_Collect provider)
+         coinCid <- exercise acceptedAppPaymentCid AcceptedAppPayment_Collect
          -- return the created contracts
          pure (entryCid, coinCid)
 
