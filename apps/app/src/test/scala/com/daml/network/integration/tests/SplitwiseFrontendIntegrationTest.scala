@@ -162,7 +162,6 @@ class SplitwiseFrontendIntegrationTest
         textField("user-id-field").value = bobDamlUser
         click on "login-button"
 
-        // TODO(i1149) Confusing terminology. Change redeem -> collect
         click on className("redeem-button")
         eventually() {
           inside(findAll(className("balances-table-row")).toSeq) { case Seq(row1, row2) =>
