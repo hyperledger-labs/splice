@@ -38,7 +38,7 @@ const AppMultiPaymentRequests: React.FC = () => {
       await acceptAppMultiPaymentRequests(cid);
       const target = searchParams.get('redirect');
       if (target) {
-        window.location.replace(target);
+        window.location.assign(target);
       }
     };
     return (
