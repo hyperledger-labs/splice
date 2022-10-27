@@ -246,8 +246,7 @@ template AcceptedAppPayment
     signatory sender, provider, receiver
 
     choice AcceptedAppPayment_Collect : ContractId Coin
-      -- TODO(M1-42): consider why we don't have the provider as a controller here as well
-      controller sender, receiver
+      controller signatory this
       do
         -- archive delivery offer
         exercise deliveryOffer DeliveryOffer_Archive
@@ -359,7 +358,7 @@ template AcceptedAppMultiPayment
     signatory sender, provider, receivers
 
     choice AcceptedAppMultiPayment_Collect : ContractId DeliveryOffer
-      controller sender, provider, receivers
+      controller signatory this
       do
         -- unlock coin and transfer the remainder to the receiver
         coin <- exercise lockedCoin Coin_Unlock

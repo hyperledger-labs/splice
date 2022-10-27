@@ -61,7 +61,7 @@ testSubscription = script do
   subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
   (initialPaymentCid, change) <- acceptSubscriptionRequestAndMakePayment app alice subscriptionRequestCid change
 
-  (subscriptionCid, subscriptionStateCid, pizzeriasCoin) <- collectInitialSubscriptionPayment app pizzeria alice.primaryParty initialPaymentCid
+  (subscriptionCid, subscriptionStateCid, pizzeriasCoin) <- collectInitialSubscriptionPayment app provider.primaryParty pizzeria alice.primaryParty initialPaymentCid
 
   Some subscription <- queryContractId alice.primaryParty subscriptionCid
   subscription === subscriptionData
@@ -81,7 +81,7 @@ testSubscription = script do
   passTime (days 27)
   (payment2Cid, change2) <- makeSubscriptionPayment app alice subscriptionStateCid change
 
-  (subscriptionState2Cid, pizzeriasCoin2) <- collectSubscriptionPayment app pizzeria alice.primaryParty payment2Cid
+  (subscriptionState2Cid, pizzeriasCoin2) <- collectSubscriptionPayment app provider.primaryParty pizzeria alice.primaryParty payment2Cid
 
   t <- getTime
   Some subscriptionState2 <- queryContractId alice.primaryParty subscriptionState2Cid
@@ -124,15 +124,15 @@ failMakeSubscriptionPayment app sender state coin = do
     inputs = [InputCoin coin]
 
 
-collectInitialSubscriptionPayment : CCApp -> CCUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
-collectInitialSubscriptionPayment app receiver sender payment = do
+collectInitialSubscriptionPayment : CCApp -> Party -> CCUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
+collectInitialSubscriptionPayment app provider receiver sender payment = do
   readAs <- getUserReadAs receiver.userId
-  (subscription, state, coin) <- submitMulti [receiver.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionInitialPayment_Collect
+  (subscription, state, coin) <- submitMulti [receiver.primaryParty, provider, sender] readAs $ exerciseCmd payment SubscriptionInitialPayment_Collect
   return (subscription, state, coin)
 
 
-collectSubscriptionPayment : CCApp -> CCUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId Coin)
-collectSubscriptionPayment app receiver sender payment = do
+collectSubscriptionPayment : CCApp -> Party -> CCUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId Coin)
+collectSubscriptionPayment app provider receiver sender payment = do
   readAs <- getUserReadAs receiver.userId
-  (state, coin) <- submitMulti [receiver.primaryParty, sender] readAs $ exerciseCmd payment SubscriptionPayment_Collect
+  (state, coin) <- submitMulti [receiver.primaryParty, provider, sender] readAs $ exerciseCmd payment SubscriptionPayment_Collect
   return (state, coin)

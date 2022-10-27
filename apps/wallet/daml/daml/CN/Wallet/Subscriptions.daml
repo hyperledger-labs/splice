@@ -138,12 +138,11 @@ template SubscriptionInitialPayment
     payData : SubscriptionPayData
     lockedCoin : ContractId LockedCoin
   where
-    signatory signatory subscriptionData, subscriptionData.provider
+    signatory signatory subscriptionData
     ensure payDataIsValid payData
 
     choice SubscriptionInitialPayment_Collect : (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
-      -- TODO(M1-42): consider why we don't have the provider as a controller here as well
-      controller subscriptionData.sender, subscriptionData.receiver
+      controller signatory this
       do
         assertContextValid subscriptionData
 
@@ -236,12 +235,11 @@ template SubscriptionPayment
     thisPaymentDueAt : Time -- ^ After which time the next payment can and should be paid.
     lockedCoin : ContractId LockedCoin
   where
-    signatory signatory subscriptionData, subscriptionData.provider
+    signatory signatory subscriptionData
     ensure payDataIsValid payData
 
     choice SubscriptionPayment_Collect : (ContractId SubscriptionIdleState, ContractId Coin)
-      -- TODO(M1-42): consider why we don't have the provider as a controller here as well
-      controller subscriptionData.sender, subscriptionData.receiver
+      controller signatory this
       do
         assertSubscriptionMatches subscription subscriptionData
         state <- create SubscriptionIdleState with
