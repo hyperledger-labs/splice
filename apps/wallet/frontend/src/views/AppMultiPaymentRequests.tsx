@@ -2,13 +2,22 @@ import { DirectoryEntry, sameContracts, useInterval, Contract } from 'common-fro
 import React, { useCallback, useState } from 'react';
 import { useParams, useSearchParams } from 'react-router-dom';
 
-import { Button, Stack, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
+import {
+  Button,
+  Collapse,
+  IconButton,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+} from '@mui/material';
 
-import { AppMultiPaymentRequest, ReceiverQuantity } from '@daml.js/wallet/lib/CN/Wallet';
+import { AppMultiPaymentRequest } from '@daml.js/wallet/lib/CN/Wallet';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 
-// TODO(i1196) Improve multi-party settlement control
 const AppMultiPaymentRequests: React.FC = () => {
   const { listAppMultiPaymentRequests, acceptAppMultiPaymentRequests } = useWalletClient();
   const { cid } = useParams();
@@ -29,7 +38,7 @@ const AppMultiPaymentRequests: React.FC = () => {
   }, [listAppMultiPaymentRequests, setAppMultiPaymentRequests, cid]);
   useInterval(fetchAppMultiPaymentRequests, 500);
 
-  const Request: React.FC<{ request: ReceiverQuantity; provider: string; cid: string }> = ({
+  const Request: React.FC<{ request: AppMultiPaymentRequest; provider: string; cid: string }> = ({
     request,
     provider,
     cid,
@@ -41,21 +50,57 @@ const AppMultiPaymentRequests: React.FC = () => {
         window.location.assign(target);
       }
     };
+
+    const [visible, setVisible] = useState(true);
+
+    const totQuantity = request.receiverQuantities.reduce(
+      (sum, { quantity }) => sum + parseFloat(quantity),
+      0.0
+    );
+
     return (
-      <TableRow className="app-requests-table-row">
-        <TableCell className="app-request-receiver">
-          <DirectoryEntry partyId={request.receiver} />
-        </TableCell>
-        <TableCell>{request.quantity}</TableCell>
-        <TableCell className="app-request-provider">
-          <DirectoryEntry partyId={provider} />
-        </TableCell>
-        <TableCell>
-          <Button className="accept-button" type="submit" onClick={() => onAccept(cid)}>
-            Accept
-          </Button>
-        </TableCell>
-      </TableRow>
+      <>
+        <TableRow className="app-requests-table-row">
+          <TableCell>
+            <IconButton aria-label="expand-row" size="small" onClick={() => setVisible(!visible)}>
+              {visible ? '↓' : '→'}
+            </IconButton>
+          </TableCell>
+          <TableCell className="app-request-provider">
+            <DirectoryEntry partyId={provider} />
+          </TableCell>
+          <TableCell align="right">{totQuantity}</TableCell>
+          <TableCell>
+            <Button className="accept-button" type="submit" onClick={() => onAccept(cid)}>
+              Accept
+            </Button>
+          </TableCell>
+        </TableRow>
+        <TableRow className="app-request-breakdown-table-row">
+          <TableCell style={{ paddingBottom: 0, paddingTop: 0 }} colSpan={3}>
+            <Collapse in={visible}>
+              <Table size="small" aria-label="receivers">
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Receiver</TableCell>
+                    <TableCell align="right">Quantity</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {request.receiverQuantities.map(({ receiver, quantity }, index) => (
+                    <TableRow key={index}>
+                      <TableCell>
+                        <DirectoryEntry partyId={receiver} />
+                      </TableCell>
+                      <TableCell align="right">{quantity}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </Collapse>
+          </TableCell>
+        </TableRow>
+      </>
     );
   };
 
@@ -64,22 +109,20 @@ const AppMultiPaymentRequests: React.FC = () => {
       <Table>
         <TableHead>
           <TableRow>
-            <TableCell>Receiver</TableCell>
-            <TableCell>Quantity</TableCell>
+            <TableCell />
             <TableCell>Provider</TableCell>
+            <TableCell>Total Quantity</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
-          {appPaymentRequests.flatMap(c =>
-            c.payload.receiverQuantities.map(rc => (
-              <Request
-                request={rc}
-                provider={c.payload.provider}
-                cid={c.contractId}
-                key={`${c.contractId}|${rc.receiver}|${rc.quantity}`}
-              />
-            ))
-          )}
+          {appPaymentRequests.map(c => (
+            <Request
+              request={c.payload}
+              provider={c.payload.provider}
+              cid={c.contractId}
+              key={c.contractId}
+            />
+          ))}
         </TableBody>
       </Table>
     </Stack>

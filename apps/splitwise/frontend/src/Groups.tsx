@@ -362,7 +362,7 @@ const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({ group, party,
         {'Accepted transfer to '}
         <DirectoryEntryComponent partyId={acceptedAppPayment.payload.receiver} />
         <Button className="redeem-button" onClick={() => onRedeem(acceptedAppPayment)}>
-          Redeem
+          Execute
         </Button>
       </ListItem>
     );
@@ -375,7 +375,7 @@ const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({ group, party,
       <ListItem>
         Accepted multi-transfer
         <Button className="redeem-button" onClick={() => onMultiRedeem(acceptedAppMultiPayment)}>
-          Redeem
+          Execute
         </Button>
       </ListItem>
     );
