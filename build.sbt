@@ -160,6 +160,26 @@ lazy val `apps-common-frontend` = {
         )
         baseDirectory.value / "lib"
       },
+      // We could support npmLint and npmFix at the individual project level, but right now that doesn't seem very useful
+      // so we just do it once for all workspaces here.
+      npmLint := {
+        val log = streams.value.log
+        runCommand(
+          s"npm run check --workspaces",
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
+      npmFix := {
+        val log = streams.value.log
+        runCommand(
+          s"npm run fix --workspaces",
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
+      },
       cleanFiles += damlTsCodegenDir.value,
       cleanFiles += baseDirectory.value / "lib",
       cleanFiles += baseDirectory.value / "../../node_modules",

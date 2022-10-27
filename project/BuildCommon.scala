@@ -23,6 +23,9 @@ object BuildCommon {
     lazy val npmPackageFiles = settingKey[Seq[File]]("package.json file for npm")
     lazy val npmRootDir = settingKey[File]("npm workspaces root directory")
     lazy val npmInstall = taskKey[Seq[File]]("install npm dependencies")
+    lazy val npmLint =
+      taskKey[Unit]("checks formatting of frontend code, but does not fix anything")
+    lazy val npmFix = taskKey[Unit]("fixes formatting of frontend code")
 
     lazy val frontendWorkspace = settingKey[String]("npm workspace to bundle")
     lazy val commonFrontendBundle =
@@ -146,11 +149,11 @@ object BuildCommon {
         ) ++
         addCommandAlias(
           "formatFix",
-          s"; format ; scalafixAll",
+          s"; format ; scalafixAll ; apps-frontends/npmFix",
         ) ++
         addCommandAlias(
           "lint",
-          "; protobufLint ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll",
+          "; protobufLint ; scalafmtCheck ; Test / scalafmtCheck ; scalafmtSbtCheck ; scalafixAll ; apps-frontends/npmLint",
         ) ++
         // it might happen that some DARs remain dangling on build config changes,
         // so we explicitly remove all CN DARs here, just in case

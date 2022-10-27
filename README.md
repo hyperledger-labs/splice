@@ -106,11 +106,13 @@ More commands can be found in build.sbt and BuildCommon.scala.
 - `Test/compile`: compile production and test code
 - `apps-common/compile`: compile production code of the `apps-common` subproject
 - `apps-frontends/compile`: compile and codegen only frontend code
+- `apps-frontends/npmLint`: checks formatting of frontend code, but does not fix anything
+- `apps-frontends/npmFix`: fixes formatting of frontend code
 - `scalafixAll`: invoke scalafix across all configurations where scalafix is enabled.
     `scalafix` is a linting and rewrite tool we use to organize imports. This may run for a long time as it needs to do a full compile.
 - `format`: apply `scalafmt` to format source files
-- `formatFix`: apply `scalafmt` and `sbt scalafixAll` to format source files
-- `lint`: lint-check. Does not apply any fixes. Checks enforcement of `scalafmt`, `buf` and `scalafix` rules
+- `formatFix`: apply `scalafmt`, `sbt scalafixAll` and `sbt apps-frontends/npmFix` to format source files
+- `lint`: lint-check. Does not apply any fixes. Checks enforcement of `scalafmt`, `buf`, `scalafix` and `apps-frontends/npmLint` rules
 - `damlBuild`: create `.dar` files for all Daml projects
 - `protobufLint`: to lint our protobuf files using `buf`
 - `bundle`: create a release bundle in `apps/app/target/release/<version>`. The release binary is loaded into your PATH automatically via `direnv`. Simply run `coin` to call it.
@@ -136,6 +138,8 @@ We thus use [Canton's Contributing Guide](https://github.com/DACH-NY/canton/blob
 as a baseline, and list below only the points where we differ.
 
 Please read the above guide in particular to learn about metrics, logging, tracing, Scala guidelines, Protobuf guidelines, TODO notes, formatting and git hooks.
+
+Committed code must adhere to our formatting guidelines. To automatically reformat all code, run `sbt formatFix`. 
 
 ### Unused Import Warnings
 
@@ -458,14 +462,6 @@ If you don't find an usage of a given method within the CN network repo, you can
 
 Run `sbt app-frontends/compile`, or the more general `sbt compile` to generate all auto-generated code required for the frontends 
 (specifically, all ts code for our daml models and protobuf definitions), and build anything required for the frontends (e.g. install dependencies in `node_modules`).
-
-In order to pass in CI, source code must be formatted:
-
-```
-# in "apps/"
-npm run fix -ws
-```
-<!-- TODO(i1216): migrate `npm run fix` into sbt, then remove this ^^ part, and ensure we have a generic one on running formatFix -->
 
 ### Running the Wallet and Splitwise Frontend
 

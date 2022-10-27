@@ -704,26 +704,6 @@ jobs:
 
       - cleanup_sbt_test_job
 
-  # TODO(i1216): migrate run check into sbt - and then consider removing the web_frontends command altogether
-  web_frontends:
-    docker:
-      - image: cimg/base:2021.04
-    environment:
-      <<: *env
-    steps:
-      - checkout
-      - setup_sbt_test_job
-      - execute_sbt_command:
-          cmd: "apps-frontends/compile"
-      - run_bash_command_in_nix:
-          cmd_name: Build all web frontends
-          cmd: |
-            cd apps
-            npm ci
-            npm run check --workspaces
-            npm run build --workspaces
-      - cleanup_sbt_test_job
-
   deployment_test:
     docker:
       - image: cimg/base:2021.04
@@ -894,8 +874,6 @@ workflows:
     - test:
         <<: *notify-fail
     - bundle:
-        <<: *notify-fail
-    - web_frontends:
         <<: *notify-fail
     # Ops
     - update_pipeline_schedule:

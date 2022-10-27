@@ -58,5 +58,7 @@ com\.daml\.platform\.apiserver\.error\.ErrorListener
 .*\[.*warn.*\].*Negative time
 .*\[.*warn.*\].*Ignored unknown package option FixedTimestamp\(Some\([0-9]*\)\)
 
+# npm linting command
+.*eslint.*--max-warnings=0.*
 
 # Make sure to have a trailing newline
