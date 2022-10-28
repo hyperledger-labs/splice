@@ -666,7 +666,8 @@ jobs:
           pre_sbt_cmd: ./start-canton.sh external && ./start-frontends.sh -d
           cmd: "\"testOnly * -- -l LiveDevNetTest\""
           post_sbt_cmd: ./stop-canton.sh external && ./stop-frontends.sh
-          timeout: "10m"
+          # TODO(#1318) Reduce this once our tests are faster again.
+          timeout: "15m"
       - execute_sbt_command:
           cmd: "damlTest"
           timeout: "10m"
