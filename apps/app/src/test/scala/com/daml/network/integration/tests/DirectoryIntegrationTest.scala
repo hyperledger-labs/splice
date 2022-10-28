@@ -148,8 +148,8 @@ class DirectoryIntegrationTest
           refs.wallet.tap(5.0)
 
           // Accept first payment request that becomes visible
-          eventually()(inside(refs.wallet.listAppPaymentRequests()) { case reqId +: _ =>
-            refs.wallet.acceptAppPaymentRequest(reqId.contractId)
+          eventually()(inside(refs.wallet.listAppMultiPaymentRequests()) { case reqId +: _ =>
+            refs.wallet.acceptAppMultiPaymentRequest(reqId.contractId)
           })
 
           // Wait until create entry-request, request payment, accept payment, and collect payment  have been processed

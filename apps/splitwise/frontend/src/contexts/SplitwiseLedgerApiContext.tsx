@@ -1,4 +1,4 @@
-import { Contract, LedgerApiClient, buildLedgerApiClientInterface } from 'common-frontend';
+import { LedgerApiClient, buildLedgerApiClientInterface } from 'common-frontend';
 import { GroupKey } from 'common-protobuf/com/daml/network/splitwise/v0/splitwise_service_pb';
 
 import {
@@ -6,11 +6,7 @@ import {
   GroupInvite,
   SplitwiseInstall,
 } from '@daml.js/splitwise/lib/CN/Splitwise';
-import {
-  AcceptedAppPayment,
-  AcceptedAppMultiPayment,
-  ReceiverQuantity,
-} from '@daml.js/wallet/lib/CN/Wallet';
+import { ReceiverQuantity } from '@daml.js/wallet/lib/CN/Wallet';
 import { ContractId } from '@daml/types';
 
 class SplitwiseLedgerApiClient extends LedgerApiClient {
@@ -101,42 +97,12 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
     );
   }
 
-  async initiateTransfer(
-    user: string,
-    provider: string,
-    key: GroupKey,
-    receiver: string,
-    quantity: string
-  ) {
-    await this.exerciseByKey(
-      [user],
-      [],
-      SplitwiseInstall.SplitwiseInstall_InitiateTransfer,
-      { _1: user, _2: provider },
-      {
-        groupKey: {
-          owner: key.getOwnerPartyId(),
-          provider: key.getProviderPartyId(),
-          id: { unpack: key.getId() },
-        },
-        receiver: receiver,
-        quantity: quantity,
-      }
-    );
-  }
-
   async initiateMultiTransfer(
     sender: string,
     provider: string,
     key: GroupKey,
-    receivers: Map<string, string>
+    receiverQuantities: ReceiverQuantity[]
   ) {
-    // TODO(#1199) use numeric instead of text fields in UI
-    const qs: ReceiverQuantity[] = Array.from(receivers)
-      .filter(([_, v]) => v.at(0) === '-')
-      .map(([k, v]) => {
-        return { receiver: k, quantity: v.substring(1, v.length - 1) };
-      });
     return await this.exerciseByKey(
       [sender],
       [],
@@ -148,27 +114,9 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
           provider: key.getProviderPartyId(),
           id: { unpack: key.getId() },
         },
-        receiverQuantities: qs,
+        receiverQuantities: receiverQuantities,
       }
     );
-  }
-
-  async listAcceptedAppPayments(
-    user: string,
-    key: GroupKey
-  ): Promise<Contract<AcceptedAppPayment>[]> {
-    // TODO(M1-92) Improve filtering
-    const contracts = await this.queryAcs(user, AcceptedAppPayment);
-    return contracts;
-  }
-
-  async listAcceptedAppMultiPayments(
-    user: string,
-    key: GroupKey
-  ): Promise<Contract<AcceptedAppMultiPayment>[]> {
-    // TODO(M1-92) Improve filtering
-    const contracts = await this.queryAcs(user, AcceptedAppMultiPayment);
-    return contracts;
   }
 
   async querySplitwiseInstall(user: string, provider: string) {

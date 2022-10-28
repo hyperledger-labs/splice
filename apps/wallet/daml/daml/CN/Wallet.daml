@@ -4,7 +4,6 @@ import DA.Action
 import qualified DA.Foldable as F
 import DA.Time
 import DA.Assert
-import DA.Traversable
 import DA.Exception
 
 import CC.Assert
@@ -172,7 +171,7 @@ data DeliveryOfferView = DeliveryOfferView
 -- | The description of an offer of delivery for payment.
 --
 -- Contracts implementing this interface are used to carry extra data along the payment request and approval flow.
--- Their lifetime is bound 1-1 with the lifetime of the 'AppPaymentRequest' and 'AcceptedAppPayment' referencing them.
+-- Their lifetime is bound 1-1 with the lifetime of the 'AppMultiPaymentRequest' and 'AcceptedAppMultiPayment' referencing them.
 interface DeliveryOffer
   where
     viewtype DeliveryOfferView
@@ -180,107 +179,6 @@ interface DeliveryOffer
     choice DeliveryOffer_Archive : ()
       controller (signatory this)
       do pure ()
-
-template AppPaymentRequest
-  with
-    sender : Party -- ^ The party that should pay.
-    receiver : Party -- ^ The party requesting to be paid.
-    provider : Party -- ^ The app provider; receives usage rewards.
-    svc : Party -- ^ The issuer of CC that should be used to make the payment.
-    quantity : Decimal -- ^ The amount of CC to be paid.
-    expiresAt : Time -- ^ When the payment request expires.
-    collectionDuration : RelTime -- ^ The time available to the provider to collect a payment.
-    deliveryOffer : ContractId DeliveryOffer -- ^ The reference to delivery offered for successful payment.
-  where
-    signatory sender, receiver, provider
-    ensure (collectionDuration > aunit && quantity > 0.0)
-
-    choice AppPaymentRequest_Accept : Either Text (ContractId AcceptedAppPayment, ContractId Coin)
-      with
-        inputs : [TransferInput]
-        context : PaymentTransferContext
-      controller sender
-      do now <- getTime
-         -- check that the delivery offer is active and implements DeliveryOffer
-         Some _offer <- fetchFromInterface @DeliveryOffer deliveryOffer
-         require "AppPaymentRequest has not expired" (now < expiresAt)
-         -- lock the coin and create an accepted payment
-         let transfer = Transfer with
-              sender
-              provider
-              inputs
-              outputs =
-                [ OutputSenderCoin with
-                    exactQuantity = Some quantity
-                    lock = Some TimeLock with
-                      holder = provider
-                      expiresAt = now `addRelTime` collectionDuration
-                , OutputSenderCoin with
-                    exactQuantity = None
-                    lock = None
-                ]
-              payload = "lock payment"
-         result <- exercisePaymentTransfer context transfer
-         DA.Traversable.forA result $ \result -> do
-            let [TransferResultLockedCoin lockedCoin, TransferResultCoin senderChange] = result.createdCoins
-            acceptedPayment <- create AcceptedAppPayment
-                with
-                  svc, provider, receiver, sender, deliveryOffer, lockedCoin
-            return (acceptedPayment, senderChange)
-
-    choice AppPaymentRequest_Withdraw : ()
-      controller receiver
-      do exercise deliveryOffer DeliveryOffer_Archive
-
-
-    choice AppPaymentRequest_Reject : ()
-      controller sender
-      do exercise deliveryOffer DeliveryOffer_Archive
-
-template AcceptedAppPayment
-  with
-    sender : Party
-    receiver : Party
-    provider : Party
-    svc : Party
-    lockedCoin : ContractId LockedCoin
-    deliveryOffer : ContractId DeliveryOffer
-  where
-    signatory sender, provider, receiver
-
-    choice AcceptedAppPayment_Collect : ContractId Coin
-      with
-        transferContext : AppTransferContext
-      controller sender, receiver, provider
-      do
-        -- check the delivery offer is still active
-        _ <- fetchFromInterface @DeliveryOffer deliveryOffer
-        -- unlock coin and transfer the remainder to the receiver
-        coin <- exercise lockedCoin Coin_Unlock
-        let transfer = Transfer with
-              sender
-              provider
-              inputs = [InputCoin coin]
-              outputs =
-                [ OutputReceiverCoin with
-                    receiver
-                    coinType = FloatingReceiverCoin
-                ]
-              payload = "transfer locked payment"
-        Right result <- exerciseAppTransfer transferContext transfer
-        let [TransferResultCoin coinCid] = result.createdCoins
-        pure coinCid
-
-    choice AcceptedAppPayment_Reject : ContractId Coin
-      controller receiver
-      do exercise deliveryOffer DeliveryOffer_Archive
-         exercise lockedCoin Coin_Unlock
-
-    -- TODO(M3-90): allow all signatories to expire the payment
-    choice AcceptedAppPayment_Expire : ContractId Coin
-      controller sender
-      do exercise deliveryOffer DeliveryOffer_Archive
-         exercise lockedCoin Coin_OwnerExpireLock
 
 data ReceiverQuantity = ReceiverQuantity with receiver : Party, quantity : Decimal
   deriving (Show, Eq)
@@ -362,7 +260,7 @@ template AcceptedAppMultiPayment
   where
     signatory sender, provider, receivers
 
-    choice AcceptedAppMultiPayment_Collect : ContractId DeliveryOffer
+    choice AcceptedAppMultiPayment_Collect : (ContractId DeliveryOffer, [(Party, ContractId Coin)])
       with
         context : AppTransferContext
       controller signatory this
@@ -379,10 +277,11 @@ template AcceptedAppMultiPayment
                   coinType = FloatingReceiverCoin
                 ) receivers
               payload = "transfer locked payment"
-        void $ exerciseAppTransfer context transfer
+        Right result <-exerciseAppTransfer context transfer
+        let coins = map (\(TransferResultCoin coinCid) -> coin) result.createdCoins
         -- defensive check that the reference is still active
         void $ fetch deliveryOffer
-        pure deliveryOffer
+        pure (deliveryOffer, zip receivers coins)
 
     choice AcceptedAppMultiPayment_Reject : ContractId Coin
       controller receivers
@@ -414,7 +313,6 @@ catchAllE operation =
 executeCoinOperationRec : PaymentTransferContext -> [TransferInput] -> [CoinOperationOutcome] -> [CoinOperation] -> Update ([CoinOperationOutcome])
 executeCoinOperationRec context inputs prevResults (operation::remainingOperations) = do
   case operation of
-    CO_AppPayment cid -> handleE AppPaymentRequest_Accept COO_AcceptedAppPayment cid
     CO_AppMultiPayment cid -> handleE AppMultiPaymentRequest_Accept COO_AcceptedAppMultiPayment cid
     CO_ChannelPayment cid -> handleE OnChannelPaymentRequest_Accept COO_AcceptedChannelPayment cid
     CO_ChannelTransfer endUser receiver svcUser quantity payload -> do
@@ -455,8 +353,7 @@ executeCoinOperationRec _context _inputs prevResults [] = do
 
 -- Enum of the possible ways coins can be manipulated through the wallet.
 data CoinOperation
-  = CO_AppPayment (ContractId AppPaymentRequest)
-  | CO_AppMultiPayment (ContractId AppMultiPaymentRequest)
+  = CO_AppMultiPayment (ContractId AppMultiPaymentRequest)
   | CO_ChannelPayment (ContractId OnChannelPaymentRequest)
   | CO_ChannelTransfer with
     endUser: Party
@@ -477,8 +374,7 @@ data CoinOperation
 
 -- Enum of the possible outcomes of operating on a Canton coin through the wallet.
 data CoinOperationOutcome
-  = COO_AcceptedAppPayment (ContractId AcceptedAppPayment)
-  | COO_AcceptedAppMultiPayment (ContractId AcceptedAppMultiPayment)
+  = COO_AcceptedAppMultiPayment (ContractId AcceptedAppMultiPayment)
   | COO_AcceptedChannelPayment TransferResult
   | COO_AcceptedChannelTransfer TransferResult
   | COO_SubscriptionInitialPayment (ContractId SubscriptionInitialPayment)

@@ -91,54 +91,6 @@ class SplitwiseAutomationService(
       }
   })
 
-  registerRequestHandler("handleAcceptedAppPaymentRequests", store.streamAcceptedAppPayments())(
-    payment => { implicit traceContext =>
-      val sender = PartyId.tryFromPrim(payment.payload.sender)
-      val transferInProgressId = payment.payload.deliveryOffer
-        .unsafeToTemplate[splitwiseCodegen.TransferInProgress]
-      store.lookupInstall(sender).flatMap {
-        case QueryResult(_, None) =>
-          val msg = s"Install contract not found for sender party $sender"
-          logger.warn(msg)
-          val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject()
-          connection
-            .submitCommand(
-              actAs = Seq(provider),
-              readAs = Seq.empty,
-              command = Seq(cmd.command),
-            )
-            .map(_ => s"rejected accepted app payment: $msg")
-        case QueryResult(_, Some(install)) =>
-          for {
-            transferContext <- scanConnection.getAppTransferContext()
-            transferInProgress <- store
-              .lookupTransferInProgressById(transferInProgressId)
-              .map(
-                _.value.getOrElse(
-                  throw new IllegalStateException(
-                    s"Invariant violation: transfer in progress $transferInProgressId not known"
-                  )
-                )
-              )
-            cmd = install.contractId.exerciseSplitwiseInstall_CompleteTransfer(
-              groupKey = splitwiseCodegen.GroupKey(
-                owner = transferInProgress.payload.group.owner,
-                provider = provider.toPrim,
-                id = transferInProgress.payload.group.id,
-              ),
-              acceptedPaymentCid = payment.contractId,
-              transferContext = transferContext,
-            )
-            _ <- connection.submitCommand(
-              actAs = Seq(provider),
-              readAs = readAs.toSeq,
-              command = Seq(cmd.command),
-            )
-          } yield "Completed transfer"
-      }
-    }
-  )
-
   registerRequestHandler(
     "handleAcceptedAppMultiPaymentRequests",
     store.streamAcceptedAppMultiPayments(),

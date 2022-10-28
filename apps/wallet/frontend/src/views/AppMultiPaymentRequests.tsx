@@ -89,7 +89,7 @@ const AppMultiPaymentRequests: React.FC = () => {
                 <TableBody>
                   {request.receiverQuantities.map(({ receiver, quantity }, index) => (
                     <TableRow key={index}>
-                      <TableCell>
+                      <TableCell className="app-request-receiver">
                         <DirectoryEntry partyId={receiver} />
                       </TableCell>
                       <TableCell align="right">{quantity}</TableCell>

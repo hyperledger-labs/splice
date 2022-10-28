@@ -86,16 +86,6 @@ enterPayment : CCUser -> CCUser -> GroupKey -> Decimal -> Text -> Script ()
 enterPayment payer provider groupKey quantity description =
   void $ submit payer.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (payer.primaryParty, provider.primaryParty) SplitwiseInstall_EnterPayment with ..
 
-initiateTransfer : CCUser -> CCUser -> GroupKey -> Party -> Decimal -> Script (ContractId AppPaymentRequest)
-initiateTransfer sender provider groupKey receiver quantity =
-  submit sender.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider.primaryParty) SplitwiseInstall_InitiateTransfer with ..
-
-completeTransfer : CCApp -> CCUser -> CCUser -> GroupKey -> ContractId AcceptedAppPayment -> Script ()
-completeTransfer app sender provider groupKey acceptedPaymentCid = do
-  transferContext <- getAppTransferContext app
-  void $ submitUser provider.userId $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider.primaryParty) SplitwiseInstall_CompleteTransfer with ..
-
-
 initiateMultiTransfer : CCUser -> CCUser -> GroupKey -> [ReceiverQuantity] -> Script (ContractId AppMultiPaymentRequest)
 initiateMultiTransfer sender provider groupKey receiverQuantities =
   submit sender.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider.primaryParty) SplitwiseInstall_InitiateMultiTransfer with ..
@@ -174,11 +164,11 @@ testCase app Parties{..} = do
   balance <- queryBalances charlie (key group)
   balance === M.fromList [(alice.primaryParty, -21.0), (bob.primaryParty, -11.0)]
 
-  request <- initiateTransfer alice (getProvider alice) (key group) bob.primaryParty 8.0
+  request <- initiateMultiTransfer alice (getProvider alice) (key group) [ReceiverQuantity bob.primaryParty 8.0]
   coin <- tap app alice 63.0
-  receipt <- acceptPaymentRequest app alice request coin
+  receipt <- acceptMultiPaymentRequest app alice request coin
 
-  completeTransfer app alice (getProvider alice) (key group) receipt
+  completeMultiTransfer app alice (getProvider alice) (key group) receipt
 
   balance <- queryBalances alice (key group)
   balance === M.fromList [(bob.primaryParty, 18.0), (charlie.primaryParty, 21.0)]

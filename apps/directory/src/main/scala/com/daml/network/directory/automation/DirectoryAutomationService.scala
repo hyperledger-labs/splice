@@ -151,69 +151,70 @@ class DirectoryAutomationService(
       }
   })
 
-  registerRequestHandler("handleAcceptedAppPaymentRequests", store.streamAcceptedAppPayments())(
-    payment => { implicit traceContext =>
-      {
-        val offerId = payment.payload.deliveryOffer
-          .unsafeToTemplate[directoryCodegen.DirectoryEntryOffer]
-        def rejectPayment(reason: String) = {
-          logger.warn(s"rejecting accepted app payment: $reason")
-          val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject()
-          connection
-            .submitWithResult(Seq(provider), Seq(), cmd)
-            .map(_ => s"rejected accepted app payment: $reason")
-        }
-        def collectPayment(
-            offer: Contract[directoryCodegen.DirectoryEntryOffer],
-            entryName: String,
-            offset: String,
-        ) = {
-          val commandId = mkCommandId(
-            "com.daml.network.directory.DirectoryEntry",
-            Seq(provider),
-            entryName,
-          )
-          for {
-            transferContext <- scanConnection.getAppTransferContext()
-            cmd =
-              offer.contractId
-                .exerciseDirectoryEntryOffer_CollectPayment(
-                  payment.contractId,
-                  transferContext,
-                )
-                .command
-            _ <- connection
-              .submitCommandWithDedup(
-                actAs = Seq(provider),
-                readAs = Seq.empty,
-                command = Seq(cmd),
-                commandId = commandId,
-                deduplicationOffset = offset,
-              )
-          } yield "created directory entry."
-        }
+  registerRequestHandler(
+    "handleAcceptedAppMultiPaymentRequests",
+    store.streamAcceptedAppMultiPayments(),
+  )(payment => { implicit traceContext =>
+    {
+      val offerId = payment.payload.deliveryOffer
+        .unsafeToTemplate[directoryCodegen.DirectoryEntryOffer]
+      def rejectPayment(reason: String) = {
+        logger.warn(s"rejecting accepted app payment: $reason")
+        val cmd = payment.contractId.exerciseAcceptedAppMultiPayment_Reject()
+        connection
+          .submitWithResult(Seq(provider), Seq(), cmd)
+          .map(_ => s"rejected accepted app payment: $reason")
+      }
+      def collectPayment(
+          offer: Contract[directoryCodegen.DirectoryEntryOffer],
+          entryName: String,
+          offset: String,
+      ) = {
+        val commandId = mkCommandId(
+          "com.daml.network.directory.DirectoryEntry",
+          Seq(provider),
+          entryName,
+        )
         for {
-          offer <- store
-            .lookupEntryOfferById(offerId)
-            .map(
-              _.value.getOrElse(
-                throw new IllegalStateException(
-                  s"Invariant violation: reference offer $offerId not known"
-                )
+          transferContext <- scanConnection.getAppTransferContext()
+          cmd =
+            offer.contractId
+              .exerciseDirectoryEntryOffer_CollectPayment(
+                payment.contractId,
+                transferContext,
+              )
+              .command
+          _ <- connection
+            .submitCommandWithDedup(
+              actAs = Seq(provider),
+              readAs = Seq.empty,
+              command = Seq(cmd),
+              commandId = commandId,
+              deduplicationOffset = offset,
+            )
+        } yield "created directory entry."
+      }
+      for {
+        offer <- store
+          .lookupEntryOfferById(offerId)
+          .map(
+            _.value.getOrElse(
+              throw new IllegalStateException(
+                s"Invariant violation: reference offer $offerId not known"
               )
             )
-          // TODO(M3-90): understand what kind of assertions are worth checking here for defensive programming
-          entryName = offer.payload.entryRequest.name
-          // check whether the entry already exists
-          result <- store.lookupEntryByName(entryName).flatMap {
-            case QueryResult(_, Some(entry)) =>
-              rejectPayment(s"entry already exists and owned by ${entry.payload.user}.")
-            case QueryResult(off, None) =>
-              // collect the payment and create the entry
-              collectPayment(offer, entryName, off)
-          }
-        } yield result
-      }
+          )
+        // TODO(M3-90): understand what kind of assertions are worth checking here for defensive programming
+        entryName = offer.payload.entryRequest.name
+        // check whether the entry already exists
+        result <- store.lookupEntryByName(entryName).flatMap {
+          case QueryResult(_, Some(entry)) =>
+            rejectPayment(s"entry already exists and owned by ${entry.payload.user}.")
+          case QueryResult(off, None) =>
+            // collect the payment and create the entry
+            collectPayment(offer, entryName, off)
+        }
+      } yield result
     }
-  )
+  })
 }

@@ -33,6 +33,7 @@ import {
   BalanceUpdate,
   Group as CodegenGroup,
 } from '@daml.js/splitwise/lib/CN/Splitwise';
+import { ReceiverQuantity } from '@daml.js/wallet/lib/CN/Wallet';
 
 import DirectoryEntries, { Entry as DirectoryEntry } from './DirectoryEntries';
 import { useSplitwiseLedgerApiClient } from './contexts/SplitwiseLedgerApiContext';
@@ -90,7 +91,18 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider }) => {
   }, [splitwiseClient, setBalances, group, party]);
   useInterval(fetchBalances, 500);
   const onSettleMyDebts = async () => {
-    const cid = await ledgerApiClient.initiateMultiTransfer(party, provider, key(group), balances);
+    // TODO(#1199) use numeric instead of text fields in UI
+    const quantities: ReceiverQuantity[] = Array.from(balances)
+      .filter(([_, v]) => v.at(0) === '-')
+      .map(([k, v]) => {
+        return { receiver: k, quantity: v.substring(1, v.length - 1) };
+      });
+    const cid = await ledgerApiClient.initiateMultiTransfer(
+      party,
+      provider,
+      key(group),
+      quantities
+    );
     const here = window.location.origin.toString();
     const walletPath = config.wallet.uiUrl;
     window.location.assign(
@@ -197,13 +209,9 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider 
   const [transferQuantity, setTransferQuantity] = useState<string>('');
   const [transferReceiverEntry, setTransferReceiverEntry] = useState<DirectoryEntry | null>(null);
   const onInitiateTransfer = async () => {
-    await ledgerApiClient.initiateTransfer(
-      party,
-      provider,
-      key(group),
-      transferReceiverEntry!.user,
-      transferQuantity
-    );
+    await ledgerApiClient.initiateMultiTransfer(party, provider, key(group), [
+      { receiver: transferReceiverEntry!.user, quantity: transferQuantity },
+    ]);
   };
   return (
     <Stack>

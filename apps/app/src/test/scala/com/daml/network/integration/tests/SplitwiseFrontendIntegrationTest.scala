@@ -39,9 +39,9 @@ class SplitwiseFrontendIntegrationTest
     directory.requestDirectoryEntry(userName)
 
     wallet.tap(5.0)
-    ConsoleMacros.utils.retry_until_true(wallet.listAppPaymentRequests().length == 1)
-    wallet.acceptAppPaymentRequest(
-      wallet.listAppPaymentRequests().head.contractId
+    ConsoleMacros.utils.retry_until_true(wallet.listAppMultiPaymentRequests().length == 1)
+    wallet.acceptAppMultiPaymentRequest(
+      wallet.listAppMultiPaymentRequests().head.contractId
     )
   }
 
@@ -246,10 +246,12 @@ class SplitwiseFrontendIntegrationTest
         click on className("transfer-link")
       }
 
-      ConsoleMacros.utils.retry_until_true { bobRemoteWallet.listAppPaymentRequests().length == 1 }
-      inside(bobRemoteWallet.listAppPaymentRequests()) { case Seq(request) =>
+      ConsoleMacros.utils.retry_until_true {
+        bobRemoteWallet.listAppMultiPaymentRequests().length == 1
+      }
+      inside(bobRemoteWallet.listAppMultiPaymentRequests()) { case Seq(request) =>
         bobRemoteWallet.tap(510)
-        bobRemoteWallet.acceptAppPaymentRequest(request.contractId)
+        bobRemoteWallet.acceptAppMultiPaymentRequest(request.contractId)
       }
 
       withFrontEnd("bobSplitwise") { implicit webDriver =>

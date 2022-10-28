@@ -40,9 +40,6 @@ trait SplitwiseStore extends AutoCloseable {
   def streamInstallRequests(): Source[Contract[splitwiseCodegen.SplitwiseInstallRequest], NotUsed] =
     acsStore.streamContracts(splitwiseCodegen.SplitwiseInstallRequest)
 
-  def streamAcceptedAppPayments(): Source[Contract[walletCodegen.AcceptedAppPayment], NotUsed] =
-    acsStore.streamContracts(walletCodegen.AcceptedAppPayment)
-
   def streamAcceptedAppMultiPayments()
       : Source[Contract[walletCodegen.AcceptedAppMultiPayment], NotUsed] =
     acsStore.streamContracts(walletCodegen.AcceptedAppMultiPayment)
@@ -70,7 +67,6 @@ object SplitwiseStore {
         mkFilter(splitwiseCodegen.MultiTransferInProgress)(co =>
           co.payload.group.provider == provider
         ),
-        mkFilter(walletCodegen.AcceptedAppPayment)(co => co.payload.provider == provider),
         mkFilter(walletCodegen.AcceptedAppMultiPayment)(co => co.payload.provider == provider),
       ),
     )

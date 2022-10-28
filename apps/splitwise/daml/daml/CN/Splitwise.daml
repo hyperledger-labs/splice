@@ -104,26 +104,6 @@ template SplitwiseInstall
            payer = user
            ..
 
-    nonconsuming choice SplitwiseInstall_InitiateTransfer : ContractId AppPaymentRequest
-      with
-        groupKey : GroupKey
-        receiver : Party
-        quantity : Decimal
-      controller user
-      do exerciseByKey @Group groupKey Group_InitiateTransfer with
-           sender = user
-           ..
-
-    nonconsuming choice SplitwiseInstall_CompleteTransfer : ContractId BalanceUpdate
-      with
-        groupKey : GroupKey
-        acceptedPaymentCid : ContractId AcceptedAppPayment
-        transferContext : AppTransferContext
-      controller provider
-      do exerciseByKey @Group groupKey Group_CompleteTransfer with
-           sender = user
-           ..
-
     nonconsuming choice SplitwiseInstall_InitiateMultiTransfer : ContractId AppMultiPaymentRequest
       with
         groupKey : GroupKey
@@ -205,56 +185,6 @@ template Group
            group = this
            update = ExternalPayment with
              payer, quantity, description
-
-    nonconsuming choice Group_InitiateTransfer : ContractId AppPaymentRequest
-      with
-        sender : Party
-        receiver : Party
-        quantity : Decimal
-      controller sender
-      do require "sender is a member" (sender `elem` groupMembers this)
-         require "receiver is a member" (receiver `elem` groupMembers this)
-         deliveryOffer <- create TransferInProgress
-           with
-             group = this
-             sender, receiver, quantity
-         now <- getTime
-         create AppPaymentRequest with
-           sender, provider, receiver, svc, quantity
-           expiresAt = now `addRelTime` acceptDuration
-           collectionDuration = collectionDuration
-           deliveryOffer = toInterfaceContractId deliveryOffer
-
-    nonconsuming choice Group_CompleteTransfer : ContractId BalanceUpdate
-      with
-        acceptedPaymentCid : ContractId AcceptedAppPayment
-        sender : Party
-        transferContext : AppTransferContext
-      controller provider
-      do acceptedPayment <- fetch acceptedPaymentCid
-         Some (refCid, ref) <- fetchFromInterface @TransferInProgress acceptedPayment.deliveryOffer
-         exercise acceptedPaymentCid (AcceptedAppPayment_Collect transferContext)
-         acceptedPayment.sender === sender
-         let expectedAcceptedPayment = AcceptedAppPayment with
-               sender = ref.sender
-               provider
-               receiver = ref.receiver
-               svc
-               deliveryOffer = acceptedPayment.deliveryOffer
-               lockedCoin = acceptedPayment.lockedCoin
-         acceptedPayment === expectedAcceptedPayment
-         -- Check that sender and receiver are both still members.
-         require "Sender is member" (ref.sender `elem` groupMembers this)
-         require "Receiver is member" (ref.receiver `elem` groupMembers this)
-         -- Check that this belongs to the right group.
-         key ref.group === key this
-         create BalanceUpdate with
-           group = this
-           update = Transfer with
-             sender = ref.sender
-             receiver = ref.receiver
-             quantity = ref.quantity
-
 
     nonconsuming choice Group_InitiateMultiTransfer : ContractId AppMultiPaymentRequest
       with

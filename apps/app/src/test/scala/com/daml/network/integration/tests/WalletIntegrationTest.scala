@@ -8,8 +8,8 @@ import com.daml.network.codegen.CC.{
   CoinRules as coinRulesCodegen,
   Round as roundCodegen,
 }
-import com.daml.network.codegen.CN.Scripts.TestWallet as testWalletCodegen
 import com.daml.network.codegen.CN.Scripts.Wallet.TestSubscriptions as testSubscriptionsCodegen
+import com.daml.network.codegen.CN.Scripts.TestWallet as testWalletCodegen
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
@@ -40,6 +40,7 @@ import org.slf4j.event.Level
 import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
 import scala.concurrent.duration.*
+import scala.util.{Try, Success}
 
 class WalletIntegrationTest
     extends CoinIntegrationTest
@@ -67,7 +68,17 @@ class WalletIntegrationTest
         val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
         val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
-        aliceRemoteWallet.list() shouldBe ListResponse(Seq(), Seq())
+        // TODO(M1-92) Consider if there is a better option to handle this.
+        // Wrapped in eventually because we need to wait for the mining round to be ingested.
+        eventually() {
+          val r = loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+            Try(aliceRemoteWallet.list()),
+            entries => forAll(entries)(_.message should include("No active OpenMiningRound")),
+          )
+          inside(r) { case Success(response) =>
+            response shouldBe ListResponse(Seq(), Seq())
+          }
+        }
 
         val exactly = (x: BigDecimal) => (x, x)
         val ranges1 = Seq(exactly(50))
@@ -162,7 +173,7 @@ class WalletIntegrationTest
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
       // Check that no payment requests exist
-      aliceRemoteWallet.listAppPaymentRequests() shouldBe empty
+      aliceRemoteWallet.listAppMultiPaymentRequests() shouldBe empty
 
       aliceWallet.remoteParticipant.ledger_api.commands.submit(
         Seq(aliceUserParty),
@@ -183,12 +194,11 @@ class WalletIntegrationTest
           .contractId
 
       // Create a payment request to self.
-      val reqC = walletCodegen.AppPaymentRequest(
+      val reqC = walletCodegen.AppMultiPaymentRequest(
         sender = aliceUserParty.toPrim,
         provider = aliceUserParty.toPrim,
-        receiver = aliceUserParty.toPrim,
+        receiverQuantities = Seq(walletCodegen.ReceiverQuantity(aliceUserParty.toPrim, 10)),
         svc = svcParty.toPrim,
-        quantity = BigDecimal(10: Int),
         expiresAt = binding.Primitive.Timestamp
           .discardNanos(java.time.Instant.now().plus(1, ChronoUnit.MINUTES))
           .getOrElse(sys.error("Invalid instant")),
@@ -202,14 +212,14 @@ class WalletIntegrationTest
       )
 
       // Check that we can see the created payment request
-      val reqFound = aliceRemoteWallet.listAppPaymentRequests().headOption.value
+      val reqFound = aliceRemoteWallet.listAppMultiPaymentRequests().headOption.value
       reqFound.payload shouldBe reqC
 
       // Reject the payment request
-      aliceRemoteWallet.rejectAppPaymentRequest(reqFound.contractId)
+      aliceRemoteWallet.rejectAppMultiPaymentRequest(reqFound.contractId)
 
       // Check that there are no more payment requests
-      val requests2 = aliceRemoteWallet.listAppPaymentRequests()
+      val requests2 = aliceRemoteWallet.listAppMultiPaymentRequests()
       requests2 shouldBe empty
     }
 
@@ -236,12 +246,11 @@ class WalletIntegrationTest
           .contractId
 
       // Create a payment request to self.
-      val reqC = walletCodegen.AppPaymentRequest(
+      val reqC = walletCodegen.AppMultiPaymentRequest(
         sender = aliceUserParty.toPrim,
         provider = aliceUserParty.toPrim,
-        receiver = aliceUserParty.toPrim,
+        receiverQuantities = Seq(walletCodegen.ReceiverQuantity(aliceUserParty.toPrim, 10)),
         svc = svcParty.toPrim,
-        quantity = BigDecimal(10: Int),
         expiresAt = binding.Primitive.Timestamp
           .discardNanos(java.time.Instant.now().plus(1, ChronoUnit.MINUTES))
           .getOrElse(sys.error("Invalid instant")),
@@ -254,19 +263,19 @@ class WalletIntegrationTest
         commands = Seq(reqC.create.command),
       )
 
-      val cid = inside(aliceRemoteWallet.listAppPaymentRequests()) { case Seq(r) =>
+      val cid = inside(aliceRemoteWallet.listAppMultiPaymentRequests()) { case Seq(r) =>
         r.payload shouldBe reqC
         r.contractId
       }
 
       aliceRemoteWallet.tap(50)
-      val acceptedPaymentId = aliceRemoteWallet.acceptAppPaymentRequest(cid)
-      aliceRemoteWallet.listAppPaymentRequests() shouldBe empty
-      inside(aliceRemoteWallet.listAcceptedAppPayments()) { case Seq(r) =>
+      val acceptedPaymentId = aliceRemoteWallet.acceptAppMultiPaymentRequest(cid)
+      aliceRemoteWallet.listAppMultiPaymentRequests() shouldBe empty
+      inside(aliceRemoteWallet.listAcceptedAppMultiPayments()) { case Seq(r) =>
         r.contractId shouldBe acceptedPaymentId
-        r.payload shouldBe walletCodegen.AcceptedAppPayment(
+        r.payload shouldBe walletCodegen.AcceptedAppMultiPayment(
           sender = aliceUserParty.toPrim,
-          receiver = aliceUserParty.toPrim,
+          receivers = Seq(aliceUserParty.toPrim),
           provider = aliceUserParty.toPrim,
           svc = svcParty.toPrim,
           lockedCoin = r.payload.lockedCoin,

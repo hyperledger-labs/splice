@@ -104,54 +104,6 @@ abstract class WalletAppReference(
       adminCommand(GrpcWalletAppClient.ListAcceptedAppMultiPayments(), callCredentials)
     }
 
-  @Help.Summary("List all payment requests of the configured user")
-  @Help.Description(
-    "Queries the configured remote participant for the PaymentRequests of the configured user. " +
-      "Returns all found payment requests."
-  )
-  def listAppPaymentRequests(): Seq[Contract[walletCodegen.AppPaymentRequest]] = {
-    consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.ListAppPaymentRequests(), callCredentials)
-    }
-  }
-
-  @Help.Summary("Accept a payment request")
-  @Help.Description(
-    "Accept a payment request and deliver the coin to be locked into the accepted payment." +
-      " Returns the contract ID of the accepted payment."
-  )
-  def acceptAppPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest]
-  ): Primitive.ContractId[walletCodegen.AcceptedAppPayment] = {
-    consoleEnvironment.run {
-      adminCommand(
-        GrpcWalletAppClient.AcceptAppPaymentRequest(requestId),
-        callCredentials,
-      )
-    }
-  }
-
-  @Help.Summary("Reject a payment request")
-  @Help.Description(
-    "Reject a payment request."
-  )
-  def rejectAppPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest]
-  ): Unit = {
-    consoleEnvironment.run {
-      adminCommand(
-        GrpcWalletAppClient.RejectAppPaymentRequest(requestId),
-        callCredentials,
-      )
-    }
-  }
-
-  @Help.Summary("List all accepted app payments the user is a sender on")
-  def listAcceptedAppPayments(): Seq[Contract[walletCodegen.AcceptedAppPayment]] =
-    consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.ListAcceptedAppPayments(), callCredentials)
-    }
-
   @Help.Summary("List all subscription requests of the configured user")
   @Help.Description(
     "Queries the configured remote participant for the SubscriptionRequests of the configured user. " +

@@ -178,15 +178,6 @@ class GrpcWalletService(
       v0.ListAppMultiPaymentRequestsResponse(_),
     )
 
-  override def listAppPaymentRequests(
-      request: v0.ListAppPaymentRequestsRequest
-  ): Future[v0.ListAppPaymentRequestsResponse] =
-    listContracts(
-      request.getWalletCtx,
-      walletCodegen.AppPaymentRequest,
-      v0.ListAppPaymentRequestsResponse(_),
-    )
-
   override def getBalance(
       request: v0.GetBalanceRequest
   ): Future[v0.GetBalanceResponse] =
@@ -265,41 +256,6 @@ class GrpcWalletService(
       }
     }
 
-  override def acceptAppPaymentRequest(
-      request: v0.AcceptAppPaymentRequestRequest
-  ): Future[v0.AcceptAppPaymentRequestResponse] =
-    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
-      withAuth(request.getWalletCtx) { user =>
-        exerciseWalletAction((installCid, userStore) => {
-          val requestCid =
-            Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](request.requestContractId)
-
-          def lookups = () =>
-            for {
-              paymentRequestO <- userStore.lookupAppPaymentRequestById(requestCid)
-              paymentRequest = getQueryResult(
-                paymentRequestO,
-                s"app payment request with cid $requestCid",
-              )
-              _ <- lookupDeliveryOffer(
-                userStore.key.endUserParty,
-                paymentRequest.payload.deliveryOffer,
-              )
-            } yield ()
-
-          Future.successful(
-            CoinOperationRequest(CoinOperation.CO_AppPayment(requestCid), lookups)
-          )
-        })(
-          user,
-          (outcome: CoinOperationOutcome.COO_AcceptedAppPayment) =>
-            v0.AcceptAppPaymentRequestResponse(
-              Proto.encode(outcome.body)
-            ),
-        )
-      }
-    }
-
   override def rejectAppMultiPaymentRequest(
       request: v0.RejectAppMultiPaymentRequestRequest
   ): Future[Empty] =
@@ -323,29 +279,6 @@ class GrpcWalletService(
       }
     }
 
-  override def rejectAppPaymentRequest(
-      request: v0.RejectAppPaymentRequestRequest
-  ): Future[Empty] =
-    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
-      withAuth(request.getWalletCtx) { user =>
-        for {
-          userStore <- getUserStore(user)
-          arg = walletCodegen.AppPaymentRequest_Reject()
-          requestCid = Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](
-            request.requestContractId
-          )
-          cmd = requestCid
-            .exerciseAppPaymentRequest_Reject(arg)
-            .command
-          _ <- connection.submitCommand(
-            Seq(userStore.key.endUserParty),
-            Seq(),
-            Seq(cmd),
-          )
-        } yield Empty()
-      }
-    }
-
   override def listAcceptedAppMultiPayments(
       request: v0.ListAcceptedAppMultiPaymentsRequest
   ): Future[v0.ListAcceptedAppMultiPaymentsResponse] =
@@ -353,15 +286,6 @@ class GrpcWalletService(
       request.getWalletCtx,
       walletCodegen.AcceptedAppMultiPayment,
       v0.ListAcceptedAppMultiPaymentsResponse(_),
-    )
-
-  override def listAcceptedAppPayments(
-      request: v0.ListAcceptedAppPaymentsRequest
-  ): Future[v0.ListAcceptedAppPaymentsResponse] =
-    listContracts(
-      request.getWalletCtx,
-      walletCodegen.AcceptedAppPayment,
-      v0.ListAcceptedAppPaymentsResponse(_),
     )
 
   override def listSubscriptionRequests(

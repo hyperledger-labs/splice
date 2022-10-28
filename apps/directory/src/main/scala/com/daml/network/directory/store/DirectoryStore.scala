@@ -94,10 +94,11 @@ trait DirectoryStore extends AutoCloseable {
 
   /** All accepted app payments whose receiver is the provider.
     *
-    * Analogous to [[streamInstallRequests]], but for `AcceptedAppPayment`
+    * Analogous to [[streamInstallRequests]], but for `AcceptedMultiAppPayment`
     */
-  def streamAcceptedAppPayments(): Source[Contract[walletCodegen.AcceptedAppPayment], NotUsed] =
-    acsStore.streamContracts(walletCodegen.AcceptedAppPayment)
+  def streamAcceptedAppMultiPayments()
+      : Source[Contract[walletCodegen.AcceptedAppMultiPayment], NotUsed] =
+    acsStore.streamContracts(walletCodegen.AcceptedAppMultiPayment)
 
   // TODO(M1-92): only added for tests (in DirectoryStoreTest)
   def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
@@ -137,7 +138,7 @@ object DirectoryStore {
         mkFilter(directoryCodegen.DirectoryEntryOffer)(co =>
           co.payload.entryRequest.provider == provider
         ),
-        mkFilter(walletCodegen.AcceptedAppPayment)(co => co.payload.receiver == provider),
+        mkFilter(walletCodegen.AcceptedAppMultiPayment)(co => co.payload.provider == provider),
         mkFilter(directoryCodegen.DirectoryInstallRequest)(co => co.payload.provider == provider),
         mkFilter(directoryCodegen.DirectoryInstall)(co => co.payload.provider == provider),
       ),

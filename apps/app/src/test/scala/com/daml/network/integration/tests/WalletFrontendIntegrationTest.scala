@@ -100,13 +100,13 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
       val aliceParty = setupForTestWithDirectory(aliceDamlUser, aliceValidator)
       submitDirectoryEntryRequest(aliceParty, aliceDirectory, entryName)
 
-      def getPaymentRequest() = aliceRemoteWallet.listAppPaymentRequests().headOption
+      def getPaymentRequest() = aliceRemoteWallet.listAppMultiPaymentRequests().headOption
 
       aliceRemoteWallet.tap(5.0)
       val walletPaymentRequest = eventually()(
         getPaymentRequest().getOrElse(fail("Payment request is unexpectedly not defined"))
       )
-      val _ = aliceRemoteWallet.acceptAppPaymentRequest(walletPaymentRequest.contractId)
+      val _ = aliceRemoteWallet.acceptAppMultiPaymentRequest(walletPaymentRequest.contractId)
 
       def tryGetEntry() =
         Try(loggerFactory.suppressErrors(directory.lookupEntryByName(entryName)))
@@ -146,7 +146,7 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
 
         // Check that the directory party ID not been resolved has been handled properly, and the party ID is shown instead.
         eventually() {
-          inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
+          inside(findAll(className("app-request-breakdown-table-row")).toList) { case Seq(row) =>
             row.childElement(className("app-request-receiver")).text shouldBe dirPartyId
           }
         }
@@ -184,10 +184,12 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
         browseToPaymentRequests(aliceDamlUser)
         // Check that the directory party ID has been resolved to its directory entry correctly.
         // We do this in another eventually() as a "..." text might appear momentarily, until the directory service responds.
+        val expected = expectedCns(dirPartyId, "directory.cns")
         eventually() {
-          inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
-            val expected = expectedCns(dirPartyId, "directory.cns")
+          inside(findAll(className("app-request-breakdown-table-row")).toList) { case Seq(row) =>
             row.childElement(className("app-request-receiver")).text should matchText(expected)
+          }
+          inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
             row.childElement(className("app-request-provider")).text should matchText(expected)
             row
           }
@@ -292,7 +294,7 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
     click on "user-id-field"
     textField("user-id-field").value = damlUser
     click on "login-button"
-    click on "app-payment-requests-button"
+    click on "app-multi-payment-requests-button"
   }
 
   private def browseToSubscriptions(damlUser: String)(implicit webDriver: WebDriver) = {

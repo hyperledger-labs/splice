@@ -32,14 +32,14 @@ bobDirectory.requestDirectoryEntry("bob.cns")
 charlieDirectory.requestDirectoryEntry("charlie.cns")
 
 val aliceCoin = aliceRemoteWallet.tap(5.0)
-utils.retry_until_true { aliceRemoteWallet.listAppPaymentRequests().length == 1 }
-val aliceAccepted = aliceRemoteWallet.acceptAppPaymentRequest(aliceRemoteWallet.listAppPaymentRequests()(0).contractId)
+utils.retry_until_true { aliceRemoteWallet.listAppMultiPaymentRequests().length == 1 }
+val aliceAccepted = aliceRemoteWallet.acceptAppMultiPaymentRequest(aliceRemoteWallet.listAppMultiPaymentRequests()(0).contractId)
 val bobCoin = bobRemoteWallet.tap(5.0)
-utils.retry_until_true { bobRemoteWallet.listAppPaymentRequests().length == 1 }
-val bobAccepted = bobRemoteWallet.acceptAppPaymentRequest(bobRemoteWallet.listAppPaymentRequests()(0).contractId)
+utils.retry_until_true { bobRemoteWallet.listAppMultiPaymentRequests().length == 1 }
+val bobAccepted = bobRemoteWallet.acceptAppMultiPaymentRequest(bobRemoteWallet.listAppMultiPaymentRequests()(0).contractId)
 val charlieCoin = charlieRemoteWallet.tap(5.0)
-utils.retry_until_true { charlieRemoteWallet.listAppPaymentRequests().length == 1 }
-val charlieAccepted = charlieRemoteWallet.acceptAppPaymentRequest(charlieRemoteWallet.listAppPaymentRequests()(0).contractId)
+utils.retry_until_true { charlieRemoteWallet.listAppMultiPaymentRequests().length == 1 }
+val charlieAccepted = charlieRemoteWallet.acceptAppMultiPaymentRequest(charlieRemoteWallet.listAppMultiPaymentRequests()(0).contractId)
 
 val providerParty = providerSplitwiseBackend.getProviderPartyId()
 

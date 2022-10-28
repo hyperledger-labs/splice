@@ -159,7 +159,7 @@ testWithRegularPayment = script do
   coin <- tap app user 1.5
   -- cc wallet accepts payment and locks coin to provider
   -- how: cc wallet
-  Right (acceptedAppPaymentCid, _) <- submitUser user.userId $ exerciseCmd appPaymentRequest AppPaymentRequest_Accept with
+  Right (acceptedAppPaymentCid, _) <- submitUser user.userId $ exerciseCmd appPaymentRequest AppMultiPaymentRequest_Accept with
     inputs = [InputCoin coin]
     context = paymentContext
 

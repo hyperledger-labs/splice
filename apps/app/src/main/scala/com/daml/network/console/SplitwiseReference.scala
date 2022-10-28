@@ -220,24 +220,6 @@ final class RemoteSplitwiseAppReference(
     )
   }
 
-  @Help.Summary("Initiate a transfer to the receiver. Must be confirmed in the wallet.")
-  def initiateTransfer(
-      key: GrpcSplitwiseAppClient.GroupKey,
-      receiver: PartyId,
-      quantity: BigDecimal,
-  ): Primitive.ContractId[walletCodegen.AppPaymentRequest] = {
-    val party = getUserPrimaryParty()
-    submitWithResult(
-      actAs = Seq(party),
-      readAs = Seq.empty,
-      installKey(party).exerciseSplitwiseInstall_InitiateTransfer(
-        key.toPrim,
-        receiver.toPrim,
-        quantity,
-      ),
-    )
-  }
-
   @Help.Summary("Initiate a transfer to multiple receiver. Must be confirmed in the wallet.")
   def initiateMultiTransfer(
       key: GrpcSplitwiseAppClient.GroupKey,

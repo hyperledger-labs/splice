@@ -57,11 +57,6 @@ trait EndUserWalletStore extends AutoCloseable {
   ): Future[QueryResult[Option[Contract[walletCodegen.OnChannelPaymentRequest]]]] =
     acsStore.lookupContractById(walletCodegen.OnChannelPaymentRequest)(cid)
 
-  def lookupAppPaymentRequestById(
-      cid: Primitive.ContractId[walletCodegen.AppPaymentRequest]
-  ): Future[QueryResult[Option[Contract[walletCodegen.AppPaymentRequest]]]] =
-    acsStore.lookupContractById(walletCodegen.AppPaymentRequest)(cid)
-
   def lookupAppMultiPaymentRequestById(
       cid: Primitive.ContractId[walletCodegen.AppMultiPaymentRequest]
   ): Future[QueryResult[Option[Contract[walletCodegen.AppMultiPaymentRequest]]]] =
@@ -216,14 +211,6 @@ object EndUserWalletStore {
         // We only ingest app (multi) payment contracts where the user is the sender,
         // as app (multi) payments the user is a receiver or a provider are handled by
         // the provider's app
-        mkFilter(walletCodegen.AppPaymentRequest)(co =>
-          co.payload.svc == svc &&
-            co.payload.sender == endUser
-        ),
-        mkFilter(walletCodegen.AcceptedAppPayment)(co =>
-          co.payload.svc == svc &&
-            co.payload.sender == endUser
-        ),
         mkFilter(walletCodegen.AppMultiPaymentRequest)(co =>
           co.payload.svc == svc &&
             co.payload.sender == endUser

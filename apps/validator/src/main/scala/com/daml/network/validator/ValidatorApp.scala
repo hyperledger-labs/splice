@@ -58,7 +58,7 @@ class ValidatorApp(
     for {
       _ <- connection.uploadDarFile(new UploadablePackage {
         lazy val walletTemplateId: com.daml.ledger.api.v1.value.Identifier =
-          ApiTypes.TemplateId.unwrap(walletCodegen.AppPaymentRequest.id)
+          ApiTypes.TemplateId.unwrap(walletCodegen.AppMultiPaymentRequest.id)
 
         lazy val packageId: String = walletTemplateId.packageId
 
