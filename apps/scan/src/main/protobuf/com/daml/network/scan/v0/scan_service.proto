@@ -8,20 +8,22 @@ import "com/daml/network/v0/contract.proto";
 
 service ScanService {
   rpc GetSvcPartyId (google.protobuf.Empty) returns (GetSvcPartyIdResponse);
-  rpc GetReferenceData (google.protobuf.Empty) returns (GetReferenceDataResponse);
   rpc GetHistory (google.protobuf.Empty) returns (GetHistoryResponse);
   rpc GetCoinTransactionDetails (GetCoinTransactionDetailsRequest) returns (GetCoinTransactionDetailsResponse);
   rpc GetClosedRounds (google.protobuf.Empty) returns (GetClosedRoundsResponse);
+  rpc GetTransferContext (google.protobuf.Empty) returns (GetTransferContextResponse);
 }
 
 message GetSvcPartyIdResponse {
   string svc_party_id = 1;
 }
 
-message GetReferenceDataResponse {
-  // TODO(i483): Support overlapping rounds
-  // Index of the current open round
-  uint64 current_round = 1;
+// Note that this is intended for third-party applications not for the
+// wallet, so it only includes what third-party apps need to
+// set in the transfer context.
+message GetTransferContextResponse {
+  repeated com.daml.network.v0.Contract open_mining_rounds = 1;
+  com.daml.network.v0.Contract latest_open_mining_round = 2;
 }
 
 message GetHistoryResponse {

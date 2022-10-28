@@ -1,5 +1,6 @@
 package com.daml.network.directory.automation
 
+import com.daml.network.scan.admin.api.client.ScanConnection
 import akka.stream.Materializer
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
@@ -8,18 +9,20 @@ import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.util.Contract
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
 
 import java.security.MessageDigest
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.ExecutionContextExecutor
 
 /** Manages background automation that runs on an directory app. */
 class DirectoryAutomationService(
     store: DirectoryStore,
     ledgerClient: CoinLedgerClient,
+    scanConnection: ScanConnection,
     retryProvider: CoinRetries,
     protected val loggerFactory: NamedLoggerFactory,
     processingTimeouts: ProcessingTimeout,
@@ -153,59 +156,72 @@ class DirectoryAutomationService(
       {
         val offerId = payment.payload.deliveryOffer
           .unsafeToTemplate[directoryCodegen.DirectoryEntryOffer]
-        store.lookupEntryOfferById(offerId).flatMap {
-          case QueryResult(_, None) =>
-            Future.failed(
-              new IllegalStateException(s"Invariant violation: reference offer $offerId not known")
-            )
-
-          case QueryResult(_, Some(offer)) =>
-            // shared values
-            val user = PartyId.tryFromPrim(offer.payload.entryRequest.user)
-            // TODO(M3-90): understand what kind of assertions are worth checking here for defensive programming
-            val entryName = offer.payload.entryRequest.name
-            def rejectPayment(reason: String) = {
-              logger.warn(s"rejecting accepted app payment: $reason")
-              val arg = walletCodegen.AcceptedAppPayment_Reject()
-              val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject(arg)
-              connection
-                .submitWithResult(Seq(provider), Seq(), cmd)
-                .map(_ => s"rejected accepted app payment: $reason")
-            }
-
-            // retrieve install for the user
-            store.lookupInstall(user).flatMap {
-              case QueryResult(_, None) => rejectPayment("directory install contract not found.")
-
-              case QueryResult(_, Some(install)) =>
-                // check whether the entry already exists
-                store.lookupEntryByName(entryName).flatMap {
-                  case QueryResult(_, Some(entry)) =>
-                    rejectPayment(s"entry already exists and owned by ${entry.payload.user}.")
-
-                  case QueryResult(off, None) =>
-                    // collect the payment and create the entry
-                    val arg =
-                      directoryCodegen.DirectoryInstall_CollectEntryPayment(payment.contractId)
-                    val cmd =
-                      install.contractId.exerciseDirectoryInstall_CollectEntryPayment(arg).command
-                    val commandId = mkCommandId(
-                      "com.daml.network.directory.DirectoryEntry",
-                      Seq(provider),
-                      entryName,
-                    )
-                    connection
-                      .submitCommandWithDedup(
-                        actAs = Seq(provider),
-                        readAs = Seq.empty,
-                        command = Seq(cmd),
-                        commandId = commandId,
-                        deduplicationOffset = off,
-                      )
-                      .map(_ => s"created directory entry.")
-                }
-            }
+        def rejectPayment(reason: String) = {
+          logger.warn(s"rejecting accepted app payment: $reason")
+          val arg = walletCodegen.AcceptedAppPayment_Reject()
+          val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject(arg)
+          connection
+            .submitWithResult(Seq(provider), Seq(), cmd)
+            .map(_ => s"rejected accepted app payment: $reason")
         }
+        def collectPayment(
+            install: Contract[directoryCodegen.DirectoryInstall],
+            entryName: String,
+            offset: String,
+        ) = {
+          val commandId = mkCommandId(
+            "com.daml.network.directory.DirectoryEntry",
+            Seq(provider),
+            entryName,
+          )
+          for {
+            openRound <- scanConnection.getLatestOpenMiningRound()
+            cmd =
+              install.contractId
+                .exerciseDirectoryInstall_CollectEntryPayment(
+                  payment.contractId,
+                  openRound.contractId,
+                )
+                .command
+            _ <- connection
+              .submitCommandWithDedup(
+                actAs = Seq(provider),
+                readAs = Seq.empty,
+                command = Seq(cmd),
+                commandId = commandId,
+                deduplicationOffset = offset,
+              )
+          } yield "created directory entry."
+        }
+        for {
+          offer <- store
+            .lookupEntryOfferById(offerId)
+            .map(
+              _.value.getOrElse(
+                throw new IllegalStateException(
+                  s"Invariant violation: reference offer $offerId not known"
+                )
+              )
+            )
+          // shared values
+          user = PartyId.tryFromPrim(offer.payload.entryRequest.user)
+          // TODO(M3-90): understand what kind of assertions are worth checking here for defensive programming
+          entryName = offer.payload.entryRequest.name
+          // retrieve install for the user
+          result <- store.lookupInstall(user).flatMap {
+            case QueryResult(_, None) => rejectPayment("directory install contract not found.")
+
+            case QueryResult(_, Some(install)) =>
+              // check whether the entry already exists
+              store.lookupEntryByName(entryName).flatMap {
+                case QueryResult(_, Some(entry)) =>
+                  rejectPayment(s"entry already exists and owned by ${entry.payload.user}.")
+                case QueryResult(off, None) =>
+                  // collect the payment and create the entry
+                  collectPayment(install, entryName, off)
+              }
+          }
+        } yield result
       }
     }
   )

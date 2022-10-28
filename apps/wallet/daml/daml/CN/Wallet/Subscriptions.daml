@@ -6,6 +6,7 @@ import DA.Optional
 import CC.Assert
 import CC.Coin
 import CC.CoinRules
+import CC.Round
 
 -- Subscriptions flow (happy path) for reference;
 -- solid arrows represent state transitions via exercising a choice,
@@ -109,12 +110,13 @@ template SubscriptionRequest
     choice SubscriptionRequest_AcceptAndMakePayment : (ContractId SubscriptionInitialPayment, ContractId Coin)
       with
         inputs : [TransferInput]
+        context : TransferContext
       controller subscriptionData.sender
       do
         assertContextValid subscriptionData
 
         now <- getTime
-        (lockedCoin, senderChange) <- lockAndMakeChange subscriptionData payData inputs now
+        (lockedCoin, senderChange) <- lockAndMakeChange context subscriptionData payData inputs now
 
         subscriptionPayment <- create SubscriptionInitialPayment with ..
 
@@ -142,6 +144,8 @@ template SubscriptionInitialPayment
     ensure payDataIsValid payData
 
     choice SubscriptionInitialPayment_Collect : (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
+      with
+        openRound : ContractId OpenMiningRound
       controller signatory this
       do
         assertContextValid subscriptionData
@@ -152,7 +156,7 @@ template SubscriptionInitialPayment
           nextPaymentDueAt = now `addRelTime` payData.paymentInterval
           ..
 
-        coin <- unlockAndTransfer subscriptionData lockedCoin
+        coin <- unlockAndTransfer openRound subscriptionData lockedCoin
 
         pure (subscription, state, coin)
 
@@ -188,6 +192,7 @@ template SubscriptionIdleState
     choice SubscriptionIdleState_MakePayment : (ContractId SubscriptionPayment, ContractId Coin)
       with
         inputs : [TransferInput]
+        context : TransferContext
       controller subscriptionData.sender
       do
         assertSubscriptionMatches subscription subscriptionData
@@ -197,7 +202,7 @@ template SubscriptionIdleState
         require "The next due date is close enough to make the next payment." (now `addRelTime` payData.paymentDuration >= nextPaymentDueAt)
         -- We deliberately don't check whether it's "too late" to pay. In this way, providers can implement a "grace period".
 
-        (lockedCoin, senderChange) <- lockAndMakeChange subscriptionData payData inputs now
+        (lockedCoin, senderChange) <- lockAndMakeChange context subscriptionData payData inputs now
 
         payment <- create SubscriptionPayment with
           thisPaymentDueAt = nextPaymentDueAt
@@ -239,13 +244,15 @@ template SubscriptionPayment
     ensure payDataIsValid payData
 
     choice SubscriptionPayment_Collect : (ContractId SubscriptionIdleState, ContractId Coin)
+      with
+        openRound : ContractId OpenMiningRound
       controller signatory this
       do
         assertSubscriptionMatches subscription subscriptionData
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt `addRelTime` payData.paymentInterval
           ..
-        coin <- unlockAndTransfer subscriptionData lockedCoin
+        coin <- unlockAndTransfer openRound subscriptionData lockedCoin
         pure (state, coin)
 
     choice SubscriptionPayment_Reject : (ContractId SubscriptionIdleState, ContractId Coin)
@@ -272,9 +279,9 @@ template SubscriptionPayment
         pure (state, coin)
 
 
-lockAndMakeChange: Subscription -> SubscriptionPayData -> [TransferInput] -> Time -> Update (ContractId LockedCoin, ContractId Coin)
-lockAndMakeChange subscriptionData payData inputs now = do
-  let Subscription { sender; receiver; provider; svc; .. } = subscriptionData
+lockAndMakeChange: TransferContext -> Subscription -> SubscriptionPayData -> [TransferInput] -> Time -> Update (ContractId LockedCoin, ContractId Coin)
+lockAndMakeChange context subscriptionData payData inputs now = do
+  let Subscription { sender; receiver; provider; svc } = subscriptionData
   let SubscriptionPayData { paymentQuantity = lockQuantity; collectionDuration = lockDuration; .. } = payData
 
   let transfer = Transfer with
@@ -293,15 +300,15 @@ lockAndMakeChange subscriptionData payData inputs now = do
          ]
        payload = "lock payment"
 
-  Right result <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
+  Right result <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer context)
   let [TransferResultLockedCoin lockedCoin, TransferResultCoin senderChange] = result.createdCoins
 
   pure(lockedCoin, senderChange)
 
 
-unlockAndTransfer: Subscription -> ContractId LockedCoin -> Update (ContractId Coin)
-unlockAndTransfer subscriptionData lockedCoin = do
-  let Subscription { sender; receiver; provider; svc; .. } = subscriptionData
+unlockAndTransfer: ContractId OpenMiningRound -> Subscription -> ContractId LockedCoin -> Update (ContractId Coin)
+unlockAndTransfer openRound subscriptionData lockedCoin = do
+  let Subscription { sender; receiver; provider; svc } = subscriptionData
 
   -- unlock coin and transfer the remainder to the receiver
   coin <- exercise lockedCoin Coin_Unlock
@@ -315,7 +322,7 @@ unlockAndTransfer subscriptionData lockedCoin = do
               coinType = FloatingReceiverCoin
           ]
         payload = "transfer locked payment"
-  Right result <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
+  Right result <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer $ appTransferContext openRound)
   let [TransferResultCoin coinCid] = result.createdCoins
 
   pure coinCid

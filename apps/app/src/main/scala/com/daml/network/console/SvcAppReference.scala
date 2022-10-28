@@ -21,10 +21,11 @@ abstract class SvcAppReference(
 
   @Help.Summary("Open a new mining round for all validators")
   def openRound(
-      coinPrice: BigDecimal
+      round: Long,
+      coinPrice: BigDecimal,
   ): ContractId[roundCodegen.OpenMiningRound] =
     consoleEnvironment.run {
-      adminCommand(GrpcSvcAppClient.OpenRound(coinPrice))
+      adminCommand(GrpcSvcAppClient.OpenRound(round, coinPrice))
     }
 
   @Help.Summary("Start closing the mining round for all validators")

@@ -62,7 +62,7 @@ class SvcIntegrationTest
     svc.archiveRound(0)
     svc.remoteParticipant.ledger_api.acs.filter(svcParty, ClosedMiningRound) shouldBe empty
 
-    remoteSvc.openRound(coinPrice)
+    remoteSvc.openRound(1, coinPrice)
     inside(svc.remoteParticipant.ledger_api.acs.filter(svcParty, OpenMiningRound)) {
       case Seq(round) => round.value.round == Round(1)
     }

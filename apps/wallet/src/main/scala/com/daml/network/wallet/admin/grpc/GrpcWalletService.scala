@@ -133,7 +133,7 @@ class GrpcWalletService(
       withAuth(request.getWalletCtx) { user =>
         for {
           userStore <- getUserStore(user)
-          currentRound <- scanConnection.getCurrentRound()
+          currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
           QueryResult(_, coins) <- userStore.listContracts(coinCodegen.Coin)
           QueryResult(_, lockedCoins) <- userStore.listContracts(coinCodegen.LockedCoin)
         } yield {
@@ -197,7 +197,7 @@ class GrpcWalletService(
           userStore <- getUserStore(user)
           QueryResult(_, coins) <- userStore.listContracts(coinCodegen.Coin)
           QueryResult(_, lockedCoins) <- userStore.listContracts(coinCodegen.LockedCoin)
-          currentRound <- scanConnection.getCurrentRound()
+          currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
         } yield {
           val unlockedHoldingFees =
             coins.view.map(c => CoinUtil.holdingFee(c.payload, currentRound)).sum
@@ -739,6 +739,7 @@ class GrpcWalletService(
       withAuth(request.getWalletCtx) { user =>
         for {
           userStore <- getUserStore(user)
+          validatorStore <- getUserStore(store.key.validatorUserName)
           validatorRewards <- listValidatorRewardsCollectableBy(userStore)
           validatorRewardInputs = validatorRewards
             .filter(c => c.payload.round.number == request.round)
@@ -753,7 +754,7 @@ class GrpcWalletService(
           outputs = Seq(
             coinRulesCodegen.TransferOutput.OutputSenderCoin(exactQuantity = None, lock = None)
           )
-          coins <- redistribute(userStore, inputs, outputs)
+          coins <- redistribute(userStore, validatorStore, inputs, outputs)
         } yield {
           require(coins.size == 1, "Expected exactly one coin")
           Empty()
@@ -768,6 +769,7 @@ class GrpcWalletService(
       withAuth(request.getWalletCtx) { user =>
         for {
           userStore <- getUserStore(user)
+          validatorStore <- getUserStore(user)
           svcParty = userStore.key.svcParty
           senderParty = Proto.tryDecode(Proto.Party)(request.senderPartyId)
           quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
@@ -879,23 +881,26 @@ class GrpcWalletService(
 
   private def redistribute(
       userStore: EndUserWalletStore,
+      validatorStore: EndUserWalletStore,
       inputs: Seq[coinRulesCodegen.TransferInput],
       outputs: Seq[coinRulesCodegen.TransferOutput],
   )(implicit tc: TraceContext) = {
     val svcParty = userStore.key.svcParty
     val party = userStore.key.endUserParty
-    val cmd = coinRulesCodegen.CoinRules
-      .key(svcParty.toPrim)
-      .exerciseCoinRules_TryTransfer(
-        coinRulesCodegen.Transfer(
-          sender = party.toPrim,
-          provider = party.toPrim,
-          inputs = inputs,
-          outputs = outputs,
-          payload = "redistribute",
-        )
-      )
     for {
+      transferContext <- validatorStore.getTransferContext()
+      cmd = coinRulesCodegen.CoinRules
+        .key(svcParty.toPrim)
+        .exerciseCoinRules_TryTransfer(
+          coinRulesCodegen.Transfer(
+            sender = party.toPrim,
+            provider = party.toPrim,
+            inputs = inputs,
+            outputs = outputs,
+            payload = "redistribute",
+          ),
+          transferContext,
+        )
       transferResults <- connection.submitWithResult(
         Seq(party),
         Seq(validatorParty),
@@ -921,11 +926,12 @@ class GrpcWalletService(
       withAuth(request.getWalletCtx) { user =>
         for {
           userStore <- getUserStore(user)
+          validatorStore <- getUserStore(store.key.validatorUserName)
           inputs = request.inputs
             .traverse(Value.fromProto[coinRulesCodegen.TransferInput](_).map(_.value))
             .valueOr(err => throw err.toAdminError.asGrpcError)
           outputs = request.outputs.map(toOutput)
-          createdCoins <- redistribute(userStore, inputs, outputs)
+          createdCoins <- redistribute(userStore, validatorStore, inputs, outputs)
         } yield {
           v0.RedistributeResponse(createdCoins.map(cid => Proto.encode(cid)))
         }
@@ -1021,7 +1027,7 @@ class GrpcWalletService(
   )(implicit tc: TraceContext): Future[P.ContractId[coinCodegen.Coin]] = {
     val owner = userStore.key.endUserParty
     for {
-      currentRound <- scanConnection.getCurrentRound()
+      currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
       QueryResult(_, coins) <- userStore.listContracts(coinCodegen.Coin)
       candidates = coins
         .filter(c => CoinUtil.currentQuantity(c.payload, currentRound) >= quantity)

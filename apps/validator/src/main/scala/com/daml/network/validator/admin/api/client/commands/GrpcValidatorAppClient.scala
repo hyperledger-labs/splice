@@ -1,6 +1,7 @@
 package com.daml.network.validator.admin.api.client.commands
 
 import com.daml.network.util.Proto
+import com.daml.network.validator.admin.api.client.UserInfo
 import com.daml.network.validator.v0
 import com.daml.network.validator.v0.ValidatorAppServiceGrpc.ValidatorAppServiceStub
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
@@ -18,8 +19,8 @@ object GrpcValidatorAppClient {
       v0.ValidatorAppServiceGrpc.stub(channel)
   }
 
-  case class GetValidatorPartyId()
-      extends BaseCommand[Empty, v0.GetValidatorPartyIdResponse, PartyId] {
+  case class GetValidatorUserInfo()
+      extends BaseCommand[Empty, v0.GetValidatorUserInfoResponse, UserInfo] {
 
     override def createRequest(): Either[String, Empty] =
       Right(Empty())
@@ -27,12 +28,17 @@ object GrpcValidatorAppClient {
     override def submitRequest(
         service: ValidatorAppServiceStub,
         request: Empty,
-    ): Future[v0.GetValidatorPartyIdResponse] = service.getValidatorPartyId(request)
+    ): Future[v0.GetValidatorUserInfoResponse] = service.getValidatorUserInfo(request)
 
     override def handleResponse(
-        response: v0.GetValidatorPartyIdResponse
-    ): Either[String, PartyId] =
-      Proto.decode(Proto.Party)(response.partyId)
+        response: v0.GetValidatorUserInfoResponse
+    ): Either[String, UserInfo] =
+      for {
+        party <- Proto.decode(Proto.Party)(response.partyId)
+      } yield UserInfo(
+        party,
+        response.userName,
+      )
   }
 
   case class OnboardUserCommand(name: String)

@@ -15,6 +15,7 @@ import scala.concurrent.ExecutionContext
 /** Wrapper around a map that holds all of the treasury services for each on-boarded wallet end user. */
 class TreasuryServices(
     connection: CoinLedgerConnection,
+    walletStore: WalletStore,
     override val loggerFactory: NamedLoggerFactory,
     timeouts: ProcessingTimeout,
 )(implicit ec: ExecutionContext, mat: Materializer)
@@ -36,6 +37,7 @@ class TreasuryServices(
       install,
       walletStoreKey,
       userStore,
+      walletStore,
       loggerFactory,
       timeouts,
     ),

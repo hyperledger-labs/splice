@@ -3,7 +3,11 @@ package com.daml.network.integration.tests
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding
 import com.daml.ledger.client.binding.Primitive
-import com.daml.network.codegen.CC.{Coin as coinCodegen, CoinRules as coinRulesCodegen}
+import com.daml.network.codegen.CC.{
+  Coin as coinCodegen,
+  CoinRules as coinRulesCodegen,
+  Round => roundCodegen,
+}
 import com.daml.network.codegen.CN.Scripts.Wallet.TestSubscriptions as testSubscriptionsCodegen
 import com.daml.network.codegen.CN.Scripts.TestWallet as testWalletCodegen
 import com.daml.network.codegen.CN.Wallet as walletCodegen
@@ -77,12 +81,14 @@ class WalletIntegrationTest
         checkBalance(aliceRemoteWallet.balance(), 0, exactly(110), exactly(0), exactly(0))
 
         nextRound(0)
+
         lockCoins(
           aliceWallet,
           aliceUserParty,
           aliceValidatorParty,
           aliceRemoteWallet.list().coins,
           10,
+          scan.getLatestOpenMiningRound().contractId,
         ) // Lock away 10 coins in a payment request to the same party
 
         checkBalance(
@@ -121,6 +127,7 @@ class WalletIntegrationTest
         aliceValidatorParty,
         aliceRemoteWallet.list().coins,
         25,
+        scan.getLatestOpenMiningRound().contractId,
       )
 
       aliceRemoteWallet.list().coins.length shouldBe 1
@@ -339,6 +346,7 @@ class WalletIntegrationTest
     "allow a user to list and accept subscription requests, " +
       "to list idle subscriptions, to initiate subscription payments, " +
       "and to cancel a subscription" in { implicit env =>
+        val openRound = scan.getLatestOpenMiningRound()
         val aliceDamlUser = aliceRemoteWallet.config.damlUser
         val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
         val aliceValidatorParty = aliceValidator.getValidatorPartyId()
@@ -382,7 +390,7 @@ class WalletIntegrationTest
         }
         clue("Collect the initial payment (as the receiver), which creates the subscription") {
           val collectCommand = initialPaymentId
-            .exerciseSubscriptionInitialPayment_Collect()
+            .exerciseSubscriptionInitialPayment_Collect(openRound.contractId)
             .command
           aliceWallet.remoteParticipant.ledger_api.commands.submit(
             actAs = Seq(aliceUserParty),
@@ -414,7 +422,7 @@ class WalletIntegrationTest
           "Collect the second payment (as the receiver), which sets the subscription back to idle"
         ) {
           val collectCommand2 = paymentId
-            .exerciseSubscriptionPayment_Collect()
+            .exerciseSubscriptionPayment_Collect(openRound.contractId)
             .command
           aliceWallet.remoteParticipant.ledger_api.commands.submit(
             actAs = Seq(aliceUserParty),
@@ -673,7 +681,7 @@ class WalletIntegrationTest
 
       // Bob collects/realizes rewards
       val prevCoins = bobRemoteWallet.list().coins
-      svc.openRound(1)
+      svc.openRound(1, 1)
       svc.startClosingRound(0)
       svc.startIssuingRound(0)
       bobRemoteWallet.collectRewards(0)
@@ -925,6 +933,7 @@ class WalletIntegrationTest
       validatorParty: PartyId,
       coins: Seq[GrpcWalletAppClient.CoinPosition],
       quantity: Int,
+      openRound: Primitive.ContractId[roundCodegen.OpenMiningRound],
   )(implicit
       env: CoinTestConsoleEnvironment
   ): Unit = {
@@ -962,7 +971,15 @@ class WalletIntegrationTest
                     ),
                   ),
                   payload = "lock coins",
-                )
+                ),
+                coinRulesCodegen.TransferContext(
+                  openMiningRound = openRound,
+                  issuingMiningRounds = Map.empty[roundCodegen.Round, Primitive.ContractId[
+                    roundCodegen.IssuingMiningRound
+                  ]],
+                  validatorRights =
+                    Map.empty[Primitive.Party, Primitive.ContractId[coinCodegen.ValidatorRight]],
+                ),
               )
               .command
           ),
@@ -979,7 +996,7 @@ class WalletIntegrationTest
     svc.startClosingRound(i)
     svc.startIssuingRound(i)
     svc.closeRound(i)
-    svc.openRound(i + 1)
+    svc.openRound(i + 1, 1)
   }
 
   def subscriptionTestData(aliceUserParty: PartyId)(implicit

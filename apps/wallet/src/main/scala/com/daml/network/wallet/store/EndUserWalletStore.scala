@@ -1,7 +1,11 @@
 package com.daml.network.wallet.store
 
 import com.daml.ledger.client.binding.{Primitive, TemplateCompanion}
-import com.daml.network.codegen.CC.Coin as coinCodegen
+import com.daml.network.codegen.CC.{
+  Coin => coinCodegen,
+  CoinRules => coinRulesCodegen,
+  Round => roundCodegen,
+}
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.store.AcsStore
 import com.daml.network.util.Contract
@@ -10,6 +14,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
+import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -69,6 +74,48 @@ trait EndUserWalletStore extends AutoCloseable {
       cid: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionIdleState]
   ): Future[QueryResult[Option[Contract[walletCodegen.Subscriptions.SubscriptionIdleState]]]] =
     acsStore.lookupContractById(walletCodegen.Subscriptions.SubscriptionIdleState)(cid)
+
+  def lookupLatestOpenMiningRound(
+  ): Future[QueryResult[Option[Contract[roundCodegen.OpenMiningRound]]]]
+
+  /** Wrapper around lookupLatestOpenMiningRound that fails with a grpc exception status
+    * FAILED_PRECONDITION for the common case where we just want to fail and retry
+    * if there is no active round.
+    */
+  def getLatestOpenMiningRound()(implicit
+      ec: ExecutionContext
+  ): Future[QueryResult[Contract[roundCodegen.OpenMiningRound]]] =
+    lookupLatestOpenMiningRound().map { result =>
+      result.map(
+        _.getOrElse(
+          throw new StatusRuntimeException(
+            Status.FAILED_PRECONDITION.withDescription("No active OpenMiningRound contract")
+          )
+        )
+      )
+    }
+
+  /** Get the context required for executing a transfer. This must be run
+    * on the store of the validator user since the primary party of end users
+    * is not a stakeholder on the contracts used here.
+    */
+  def getTransferContext()(implicit
+      ec: ExecutionContext
+  ): Future[coinRulesCodegen.TransferContext] =
+    for {
+      openRound <- getLatestOpenMiningRound()
+      issuingMiningRounds <- listContracts(roundCodegen.IssuingMiningRound)
+      validatorRights <- listContracts(coinCodegen.ValidatorRight)
+    } yield coinRulesCodegen.TransferContext(
+      openRound.value.contractId,
+      validatorRights = validatorRights.value
+        .map(r => (r.payload.user, r.contractId))
+        .toMap[Primitive.Party, Primitive.ContractId[coinCodegen.ValidatorRight]],
+      issuingMiningRounds = issuingMiningRounds.value
+        .map(r => (r.payload.round, r.contractId))
+        .toMap[roundCodegen.Round, Primitive.ContractId[roundCodegen.IssuingMiningRound]],
+    )
+
 }
 
 object EndUserWalletStore {
@@ -180,6 +227,8 @@ object EndUserWalletStore {
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
         ),
+        mkFilter(roundCodegen.OpenMiningRound)(co => co.payload.svc == svc),
+        mkFilter(roundCodegen.IssuingMiningRound)(co => co.payload.svc == svc),
       ),
     )
   }

@@ -74,21 +74,23 @@ class WalletApp(
           loggerFactory,
         )
       }
-      validatorParty <- retry(
+      validatorUserInfo <- retry(
         "getValidatorPartyId",
-        validatorConnection.getValidatorPartyId(),
+        validatorConnection.getValidatorUserInfo(),
       )
       svcParty <- retry("getSvcPartyId", scanConnection.getSvcPartyId())
     } yield {
       val walletStoreKey = WalletStore.Key(
         walletServiceParty = walletServiceParty,
-        validatorParty = validatorParty,
+        validatorParty = validatorUserInfo.primaryParty,
+        validatorUserName = validatorUserInfo.userName,
         svcParty = svcParty,
       )
       val walletStore = WalletStore(walletStoreKey, storage, loggerFactory)
       val treasuries =
         new TreasuryServices(
           ledgerClient.connection("TreasuryServices"),
+          walletStore,
           loggerFactory,
           timeouts,
         )

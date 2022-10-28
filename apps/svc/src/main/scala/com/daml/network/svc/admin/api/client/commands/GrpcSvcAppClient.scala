@@ -61,12 +61,12 @@ object GrpcSvcAppClient {
       }
   }
 
-  case class OpenRound(coinPrice: BigDecimal)
+  case class OpenRound(round: Long, coinPrice: BigDecimal)
       extends BaseCommand[v0.OpenRoundRequest, v0.OpenRoundResponse, ContractId[
         roundCodegen.OpenMiningRound
       ]] {
     override def createRequest(): Either[String, v0.OpenRoundRequest] = Right(
-      v0.OpenRoundRequest(Proto.encode(coinPrice))
+      v0.OpenRoundRequest(round, Proto.encode(coinPrice))
     )
     override def submitRequest(
         service: SvcServiceStub,

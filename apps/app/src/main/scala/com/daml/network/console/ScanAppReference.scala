@@ -1,7 +1,7 @@
 package com.daml.network.console
 
+import com.daml.network.codegen.CC.{Round => roundCodegen}
 import com.daml.ledger.api.v1.transaction.TransactionTree
-import com.daml.network.codegen.CC.Round.ClosedMiningRound
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.history.{CoinTransaction, CoinTransactionTreeView}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
@@ -34,12 +34,19 @@ abstract class ScanAppReference(
     }
 
   @Help.Summary(
-    "Returns reference data (e.g., mining rounds or coin rules) of the Canton network."
+    "Returns contracts required as inputs for a transfer."
   )
-  def getReferenceData(): GrpcScanAppClient.ReferenceData =
+  def getTransferContext(): GrpcScanAppClient.TransferContext =
     consoleEnvironment.run {
-      adminCommand(GrpcScanAppClient.GetReferenceData())
+      adminCommand(GrpcScanAppClient.GetTransferContext())
     }
+
+  @Help.Summary(
+    "Returns the latest open mining round."
+  )
+  def getLatestOpenMiningRound(): Contract[roundCodegen.OpenMiningRound] =
+    getTransferContext().latestOpenMiningRound
+      .getOrElse(throw new IllegalStateException("No open mining round"))
 
   @Help.Summary(
     """Returns the Daml transaction tree for a Coin transaction as visible to the SVC. """
@@ -61,7 +68,7 @@ abstract class ScanAppReference(
   @Help.Summary(
     "Lists all closed rounds with their collected statistics"
   )
-  def getClosedRounds(): Seq[Contract[ClosedMiningRound]] =
+  def getClosedRounds(): Seq[Contract[roundCodegen.ClosedMiningRound]] =
     consoleEnvironment.run {
       adminCommand(GrpcScanAppClient.GetClosedRounds())
     }

@@ -35,10 +35,6 @@ template OpenMiningRound
     observer observers
     ensure isDefinedRound round
 
-    key (svc, round) : (Party, Round)
-    maintainer key._1
-
-
     choice OpenMiningRound_AddObserver : ContractId OpenMiningRound
       with
         obs : Party
@@ -58,9 +54,6 @@ template ClosingMiningRound
   where
     signatory svc
     ensure isDefinedRound round
-
-    key (svc, round) : (Party, Round)
-    maintainer key._1
 
 -- | A mining round for whose rewards coins are being issued.
 template IssuingMiningRound
@@ -103,26 +96,3 @@ template ClosedMiningRound
     signatory svc
     observer observers
     ensure isDefinedRound round
-
-    key (svc, round) : (Party, Round)
-    maintainer key._1
-
-template IssuanceState
-  with
-    svc : Party
-    currentRound : Round -- ^ The most recent open round
-    observers : [Party]
-  where
-    signatory svc
-    observer observers
-
-    key svc : Party
-    maintainer key
-
-    choice IssuanceState_AddObserver : ContractId IssuanceState
-      with
-        obs : Party
-      controller svc
-      do require ("New observer " <> show obs  <> " is not a member of existing observers " <> show observers) (obs `notElem` observers)
-         create this with
-           observers = obs :: observers

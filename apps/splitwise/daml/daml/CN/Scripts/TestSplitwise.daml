@@ -90,8 +90,9 @@ initiateTransfer : CCUser -> Party -> GroupKey -> Party -> Decimal -> Script (Co
 initiateTransfer sender provider groupKey receiver quantity =
   submit sender.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider) SplitwiseInstall_InitiateTransfer with ..
 
-completeTransfer : CCUser -> Party -> GroupKey -> ContractId AcceptedAppPayment -> Script ()
-completeTransfer sender provider groupKey acceptedPaymentCid = do
+completeTransfer : CCApp -> CCUser -> Party -> GroupKey -> ContractId AcceptedAppPayment -> Script ()
+completeTransfer app sender provider groupKey acceptedPaymentCid = do
+  (openRound, _) <- getLatestOpenRound app
   void $ submitUser sender.userId $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider) SplitwiseInstall_CompleteTransfer with ..
 
 
@@ -99,8 +100,9 @@ initiateMultiTransfer : CCUser -> Party -> GroupKey -> [ReceiverQuantity] -> Scr
 initiateMultiTransfer sender provider groupKey receiverQuantities =
   submit sender.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider) SplitwiseInstall_InitiateMultiTransfer with ..
 
-completeMultiTransfer : CCUser -> Party -> GroupKey -> ContractId AcceptedAppMultiPayment -> Script ()
-completeMultiTransfer sender provider groupKey acceptedPaymentCid = do
+completeMultiTransfer : CCApp -> CCUser -> Party -> GroupKey -> ContractId AcceptedAppMultiPayment -> Script ()
+completeMultiTransfer app sender provider groupKey acceptedPaymentCid = do
+  (openRound, _) <- getLatestOpenRound app
   void $ submitUser sender.userId $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider) SplitwiseInstall_CompleteMultiTransfer with ..
 
 testSelfHosted = script do
@@ -189,7 +191,7 @@ testCase app Parties{..} = do
   coin <- tap app alice 63.0
   receipt <- acceptPaymentRequest app alice request coin
 
-  completeTransfer alice (getProvider alice) (key group) receipt
+  completeTransfer app alice (getProvider alice) (key group) receipt
 
   balance <- queryBalances alice (key group)
   balance === M.fromList [(bob.primaryParty, 18.0), (charlie.primaryParty, 21.0)]
@@ -204,7 +206,7 @@ testCase app Parties{..} = do
     ]
   coin <- tap app charlie 55.0
   receipt <- acceptMultiPaymentRequest app charlie request coin
-  completeMultiTransfer charlie (getProvider charlie) (key group) receipt
+  completeMultiTransfer app charlie (getProvider charlie) (key group) receipt
 
   balance <- queryBalances alice (key group)
   balance === M.fromList [(bob.primaryParty, 18.0), (charlie.primaryParty, -18.0)]

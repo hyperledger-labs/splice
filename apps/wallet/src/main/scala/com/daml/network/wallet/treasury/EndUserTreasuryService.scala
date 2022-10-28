@@ -58,6 +58,7 @@ case class EndUserTreasuryService(
     install: Contract[walletCodegen.WalletAppInstall],
     walletStoreKey: WalletStore.Key,
     userStore: EndUserWalletStore,
+    walletStore: WalletStore,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
 )(implicit ec: ExecutionContext, mat: Materializer)
@@ -189,8 +190,10 @@ case class EndUserTreasuryService(
       inputs <- userStore
         .listContracts(coinCodegen.Coin)
         .map(cs => cs.value.map(c => coinRulesCodegen.TransferInput.InputCoin(c.contractId)))
+      transferContext <- getValidatorStore().getTransferContext()
       cmd =
         install.contractId.exerciseWalletAppInstall_ExecuteBatch(
+          transferContext,
           inputs,
           validOperations.map(_.operationWithLookups.operation),
         )
@@ -206,6 +209,17 @@ case class EndUserTreasuryService(
       }
     } yield offset
   }
+
+  // We fetch this on demand here to avoid a dependency of the validator store being
+  // setup before other user’s stores.
+  private def getValidatorStore(): EndUserWalletStore =
+    walletStore
+      .lookupEndUserStore(walletStore.key.validatorUserName)
+      .getOrElse(
+        throw new StatusRuntimeException(
+          Status.FAILED_PRECONDITION.withDescription("Validator store not setup yet")
+        )
+      )
 
   override def onClosed(): Unit = {
     // TODO(M1-92 - Tech Debt): add more robust shutdown, e.g., similar to shutdown for ledger subscriptions

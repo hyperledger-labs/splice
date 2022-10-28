@@ -247,12 +247,14 @@ final class RemoteSplitwiseAppReference(
   ): Primitive.ContractId[splitwiseCodegen.BalanceUpdate] = {
     val party = getUserPrimaryParty()
     val readAs = getUserReadAs()
+    val openRound = remoteScan.getLatestOpenMiningRound()
     submitWithResult(
       actAs = Seq(party),
       readAs = readAs.toSeq,
       installKey(party).exerciseSplitwiseInstall_CompleteTransfer(
         key.toPrim,
         acceptedPayment,
+        openRound.contractId,
       ),
     )
   }
@@ -282,12 +284,14 @@ final class RemoteSplitwiseAppReference(
   ): Seq[Primitive.ContractId[splitwiseCodegen.BalanceUpdate]] = {
     val party = getUserPrimaryParty()
     val readAs = getUserReadAs()
+    val openRound = remoteScan.getLatestOpenMiningRound()
     submitWithResult(
       actAs = Seq(party),
       readAs = readAs.toSeq,
       installKey(party).exerciseSplitwiseInstall_CompleteMultiTransfer(
         key.toPrim,
         acceptedPayment,
+        openRound.contractId,
       ),
     )
   }

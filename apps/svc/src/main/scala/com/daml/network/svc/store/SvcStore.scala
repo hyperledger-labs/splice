@@ -75,7 +75,6 @@ object SvcStore {
       Map(
         mkFilter(CC.CoinRules.CoinRules)(co => co.payload.svc == svc),
         mkFilter(CC.CoinRules.CoinRulesRequest)(co => co.payload.svc == svc),
-        mkFilter(CC.Round.IssuanceState)(co => co.payload.svc == svc),
         mkFilter(CC.Coin.ValidatorRight)(co =>
           co.payload.svc == svc && co.payload.validator == svc && co.payload.user == svc
         ),

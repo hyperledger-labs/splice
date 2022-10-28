@@ -43,13 +43,19 @@ class GrpcScanService(
       } yield v0.GetSvcPartyIdResponse(party.toProtoPrimitive)
     }
 
-  override def getReferenceData(request: Empty): Future[v0.GetReferenceDataResponse] =
+  override def getTransferContext(request: Empty): Future[v0.GetTransferContextResponse] =
     withSpanFromGrpcContext("GrpcScanService") { traceContext => span =>
       for {
-        round <- store.getCurrentRound
-      } yield v0.GetReferenceDataResponse(
-        currentRound = round
-      )
+        svc <- connection.getPrimaryParty(svcUser)
+        rounds <- connection.activeContracts(svc, roundCodegen.OpenMiningRound)
+      } yield {
+        val decodedRounds: Seq[Contract[roundCodegen.OpenMiningRound]] =
+          rounds.map(r => Contract.fromCodegenContract[roundCodegen.OpenMiningRound](r))
+        v0.GetTransferContextResponse(
+          openMiningRounds = decodedRounds.map(_.toProtoV0),
+          latestOpenMiningRound = decodedRounds.maxByOption(_.payload.round.number).map(_.toProtoV0),
+        )
+      }
     }
 
   override def getHistory(request: Empty): Future[GetHistoryResponse] =

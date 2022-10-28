@@ -1,5 +1,6 @@
 import { Contract, sameContracts, useInterval } from 'common-frontend';
 import { DirectoryEntry as DirectoryEntryComponent } from 'common-frontend';
+import { ScanServicePromiseClient } from 'common-protobuf/com/daml/network/scan/v0/scan_service_grpc_web_pb';
 import {
   GroupKey,
   ListAcceptedGroupInvitesRequest,
@@ -8,6 +9,7 @@ import {
   ListGroupsRequest,
   SplitwiseContext,
 } from 'common-protobuf/com/daml/network/splitwise/v0/splitwise_service_pb';
+import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useCallback, useState } from 'react';
 
 import {
@@ -28,6 +30,7 @@ import {
   Typography,
 } from '@mui/material';
 
+import { OpenMiningRound } from '@daml.js/canton-coin/lib/CC/Round';
 import {
   AcceptedGroupInvite,
   BalanceUpdate,
@@ -36,6 +39,7 @@ import {
 import { AcceptedAppPayment, AcceptedAppMultiPayment } from '@daml.js/wallet/lib/CN/Wallet';
 
 import DirectoryEntries, { Entry as DirectoryEntry } from './DirectoryEntries';
+import { useScanClient } from './contexts/ScanServiceContext';
 import { useSplitwiseLedgerApiClient } from './contexts/SplitwiseLedgerApiContext';
 import { useSplitwiseClient } from './contexts/SplitwiseServiceContext';
 import { config } from './utils';
@@ -317,8 +321,20 @@ interface AcceptedAppPaymentsProps {
   party: string;
 }
 
+const getLatestOpenMiningRound = async (
+  scanClient: ScanServicePromiseClient
+): Promise<Contract<OpenMiningRound>> => {
+  const transferContext = await scanClient.getTransferContext(new Empty(), undefined);
+  const openMiningRound = transferContext.getLatestOpenMiningRound();
+  if (!openMiningRound) {
+    throw new Error('No active OpenMiningRound');
+  }
+  return Contract.decode(openMiningRound, OpenMiningRound);
+};
+
 const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({ group, party, provider }) => {
   const ledgerApiClient = useSplitwiseLedgerApiClient();
+  const scanClient = useScanClient();
   const [acceptedAppPayments, setAcceptedAppPayments] = useState<Contract<AcceptedAppPayment>[]>(
     []
   );
@@ -337,20 +353,24 @@ const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({ group, party,
   useInterval(fetchAcceptedAppMultiPayments, 500);
 
   const onRedeem = async (acceptedAppPayment: Contract<AcceptedAppPayment>) => {
+    const openMiningRound = await getLatestOpenMiningRound(scanClient);
     await ledgerApiClient.completeTransfer(
       party,
       provider,
       key(group),
-      acceptedAppPayment.contractId
+      acceptedAppPayment.contractId,
+      openMiningRound.contractId
     );
   };
 
   const onMultiRedeem = async (acceptedAppPayment: Contract<AcceptedAppMultiPayment>) => {
+    const openMiningRound = await getLatestOpenMiningRound(scanClient);
     await ledgerApiClient.completeMultiTransfer(
       party,
       provider,
       key(group),
-      acceptedAppPayment.contractId
+      acceptedAppPayment.contractId,
+      openMiningRound.contractId
     );
   };
 

@@ -83,9 +83,6 @@ template ValidatorRight with
   where
     signatory user, validator
 
-    key this : ValidatorRight
-    maintainer key.user, key.validator
-
     choice ValidatorRight_ArchiveAsValidator : ()
       controller validator
       do pure ()

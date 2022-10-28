@@ -97,7 +97,6 @@ trait DirectoryStore extends AutoCloseable {
     */
   def streamAcceptedAppPayments(): Source[Contract[walletCodegen.AcceptedAppPayment], NotUsed] =
     acsStore.streamContracts(walletCodegen.AcceptedAppPayment)
-
 }
 
 object DirectoryStore {

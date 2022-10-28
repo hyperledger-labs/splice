@@ -52,28 +52,34 @@ object GrpcScanAppClient {
 
   }
 
-  case class ReferenceData(
-      currentRound: Long
+  case class TransferContext(
+      openMiningRounds: Seq[Contract[roundCodegen.OpenMiningRound]],
+      latestOpenMiningRound: Option[Contract[roundCodegen.OpenMiningRound]],
   )
 
-  final case class GetReferenceData()
-      extends BaseCommand[Empty, v0.GetReferenceDataResponse, ReferenceData] {
+  final case class GetTransferContext()
+      extends BaseCommand[Empty, v0.GetTransferContextResponse, TransferContext] {
     override def createRequest(): Either[String, Empty] =
       Right(Empty())
     override def submitRequest(
         service: ScanServiceStub,
         req: Empty,
-    ): Future[v0.GetReferenceDataResponse] =
-      service.getReferenceData(req)
+    ): Future[v0.GetTransferContextResponse] =
+      service.getTransferContext(req)
     override def handleResponse(
-        response: v0.GetReferenceDataResponse
-    ): Either[String, ReferenceData] =
-      Right(
-        ReferenceData(
-          currentRound = response.currentRound
-        )
+        response: v0.GetTransferContextResponse
+    ): Either[String, TransferContext] =
+      for {
+        openMiningRounds <- response.openMiningRounds
+          .traverse(round => Contract.fromProto(roundCodegen.OpenMiningRound)(round))
+          .leftMap(_.toString)
+        latestOpenMiningRound <- response.latestOpenMiningRound
+          .traverse(round => Contract.fromProto(roundCodegen.OpenMiningRound)(round))
+          .leftMap(_.toString)
+      } yield TransferContext(
+        openMiningRounds,
+        latestOpenMiningRound,
       )
-
   }
 
   final case class GetCoinTransactionDetails(transactionId: String)

@@ -29,9 +29,11 @@ class GrpcValidatorAppService(
 
   private val connection = ledgerClient.connection("GrpcValidatorAppService")
 
-  override def getValidatorPartyId(request: Empty): Future[GetValidatorPartyIdResponse] =
+  override def getValidatorUserInfo(request: Empty): Future[GetValidatorUserInfoResponse] =
     withSpanFromGrpcContext("GrpcValidatorAppService") { _ => _ =>
-      Future.successful(GetValidatorPartyIdResponse(Proto.encode(store.key.validatorParty)))
+      Future.successful(
+        GetValidatorUserInfoResponse(Proto.encode(store.key.validatorParty), validatorUserName)
+      )
     }
 
   override def onboardUser(request: OnboardUserRequest): Future[OnboardUserResponse] =

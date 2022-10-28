@@ -24,6 +24,7 @@ template Escrow
       with
         lockedCoin : ContractId LockedCoin
         paymentCoin : ContractId Coin
+        openRound : ContractId OpenMiningRound
       controller p
       do LockedCoin{lock,coin=locked} <- fetch lockedCoin
          require "SVC matches locked coin" (locked.svc == this.svc)
@@ -53,7 +54,7 @@ template Escrow
                        quantity = 1.0
                        senderTransferFeeRatio = 0.0
                  ]
-         exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
+         exerciseByKey @CoinRules svc (CoinRules_Transfer transfer $ appTransferContext openRound)
          pure ()
 
 -- | This matches the example in the design doc
@@ -81,7 +82,7 @@ test = do
   escrow <- submitUser arbiter.userId $ createCmd (Escrow app.svc arbiter.primaryParty alice.primaryParty)
 
   t0 <- getTime
-  c0 <- activeRound app
+  (_, c0) <- getLatestOpenRound app
 
   lockTo app alice arbiter.primaryParty 1000.25 (days 90) "lock"
 
@@ -89,7 +90,7 @@ test = do
   -- advance 40k rounds
   runNextIssuance app 1.0
   skipNRounds app 39_999
-  c1 <- activeRound app
+  (_, c1) <- getLatestOpenRound app
 
   pay app alice alice.primaryParty 5.0 "split"
   archiveTransferDebugNotes app
@@ -101,11 +102,12 @@ test = do
   runNextIssuance app 1.0
   skipNRounds app 9_999
 
-  c2 <- activeRound app
+  (_, c2) <- getLatestOpenRound app
 
   prevCoinCids <- map fst <$> query @Coin app.svc
   prevLockedCoinCids <- map fst <$> query @LockedCoin app.svc
 
+  (openRound, _) <- getLatestOpenRound app
   submitUser alice.userId $ exerciseCmd escrow Refresh with ..
 
   [(_, note)] <- query @TransferDebugNote app.svc

@@ -1,6 +1,7 @@
 package com.daml.network.console
 
 import com.daml.network.environment.CoinConsoleEnvironment
+import com.daml.network.validator.admin.api.client.UserInfo
 import com.daml.network.validator.admin.api.client.commands.GrpcValidatorAppClient
 import com.daml.network.validator.config.{LocalValidatorAppConfig, RemoteValidatorAppConfig}
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
@@ -17,13 +18,18 @@ abstract class ValidatorAppReference(
 
   override protected val instanceType = "Validator"
 
-  @Help.Summary("Get validator party id")
-  @Help.Description("Return the party id of the validator operator")
-  def getValidatorPartyId(): PartyId = {
+  @Help.Summary("Get validator user info")
+  @Help.Description("Return the user info of the validator operator")
+  def getValidatorUserInfo(): UserInfo = {
     consoleEnvironment.run {
-      adminCommand(GrpcValidatorAppClient.GetValidatorPartyId())
+      adminCommand(GrpcValidatorAppClient.GetValidatorUserInfo())
     }
   }
+
+  @Help.Summary("Get validator party id")
+  @Help.Description("Return the party id of the validator operator")
+  def getValidatorPartyId(): PartyId =
+    getValidatorUserInfo().primaryParty
 
   @Help.Summary("Onboard a new user")
   @Help.Description("""Onboard individual canton-coin user for the given validator party.

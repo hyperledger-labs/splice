@@ -97,6 +97,8 @@ object WalletStore {
       walletServiceParty: PartyId,
       /** The validator party. */
       validatorParty: PartyId,
+      /** The validator user name. */
+      validatorUserName: String,
       /** The party-id of the SVC issuing CC managed by this wallet. */
       svcParty: PartyId,
   ) extends PrettyPrinting {

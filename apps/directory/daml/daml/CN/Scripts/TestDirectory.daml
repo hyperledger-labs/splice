@@ -21,6 +21,8 @@ testWithSubscription = script do
   provider <- setupUser app "provider" app.svc
   user <- setupUser app "user" app.svc
 
+  (openRound, _) <- getLatestOpenRound app
+
   -- provider creates directory rules
   -- how: up to app provider
   directoryInstallRequest <- submit user.primaryParty $ createCmd DirectoryInstallRequest with
@@ -47,13 +49,17 @@ testWithSubscription = script do
   coin <- tap app user 1.5
   -- cc wallet accepts sbuscription and first payment and locks coin to provider
   -- how: cc wallet
+
+  context <- getTransferContext app user
   (initialPaymentCid, _) <- submitUser user.userId $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
     inputs = [InputCoin coin]
+    context
 
   -- directory provider transactionally unlocks & transfer coins and creates directory entry and a subscription in return.
   -- how: provider on their own participant
   (entryCid, subscriptionStateCid, _) <- submitUser provider.userId $ exerciseCmd directoryInstall DirectoryInstall_CollectInitialEntryPaymentWithSubscription with
     paymentCid = initialPaymentCid
+    openRound
 
   Some entry <- queryContractId user.primaryParty entryCid
   Some subscriptionState <- queryContractId user.primaryParty subscriptionStateCid
@@ -70,12 +76,14 @@ testWithSubscription = script do
   coin <- tap app user 1.5
   (paymentCid, _) <- submitUser user.userId $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputCoin coin]
+    context
 
   -- directory provider transactionally unlocks & transfer coins and renews directory entry in return
   -- how: provider on their own participant
   (entryCid, subscriptionStateCid, _) <- submitUser provider.userId $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryRenewalPaymentWithSubscription with
     paymentCid
     entryCid
+    openRound
 
   submitMustFail provider.primaryParty $ exerciseCmd entryCid (DirectoryEntry_Expire provider.primaryParty)
 
@@ -83,15 +91,18 @@ testWithSubscription = script do
   coin <- tap app user 1.5
   submitMultiMustFail [user.primaryParty] [app.svc] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputCoin coin]
+    context
 
   passTime (days 90)
 
   -- cc wallet and provider can repeat the "payment and collect" cycle indefinitely
   (paymentCid, _) <- submitUser user.userId $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputCoin coin]
+    context
   (entryCid, subscriptionStateCid, _) <- submitUser provider.userId $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryRenewalPaymentWithSubscription with
     paymentCid
     entryCid
+    openRound
 
   submitMustFail provider.primaryParty $ exerciseCmd entryCid (DirectoryEntry_Expire provider.primaryParty)
 
@@ -114,6 +125,8 @@ testWithRegularPayment = script do
 
   provider <- setupUser app "provider" app.svc
   user <- setupUser app "user" app.svc
+
+  context <- getTransferContext app user
 
   -- provider creates directory rules
   -- how: up to app provider
@@ -148,12 +161,14 @@ testWithRegularPayment = script do
   -- how: cc wallet
   Right (acceptedAppPaymentCid, _) <- submitUser user.userId $ exerciseCmd appPaymentRequest AppPaymentRequest_Accept with
     inputs = [InputCoin coin]
+    context
 
   -- directory providers transactionally unlocks & transfer coins
   -- and creates directory entry in return.
   -- how: provider on their own participant
   (entryCid, _) <- submitUser provider.userId $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryPayment with
     acceptedAppPaymentCid
+    openRound = context.openMiningRound
 
   -- we can't renew using regular payments; in the future, it won't be possible to register entries using regular payments either
 

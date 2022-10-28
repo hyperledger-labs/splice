@@ -1,5 +1,8 @@
 package com.daml.network.scan.admin.api.client
 
+import io.grpc.{Status, StatusRuntimeException}
+import com.daml.network.codegen.CC.{Round => roundCodegen}
+import com.daml.network.util.Contract
 import com.daml.network.admin.api.client.AppConnection
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
@@ -42,7 +45,20 @@ final class ScanConnection(
     }
   }
 
-  def getCurrentRound()(implicit traceContext: TraceContext): Future[Long] = {
-    runCmd(GrpcScanAppClient.GetReferenceData()).map(_.currentRound)
+  def getTransferContext()(implicit
+      traceContext: TraceContext
+  ): Future[GrpcScanAppClient.TransferContext] = {
+    runCmd(GrpcScanAppClient.GetTransferContext())
   }
+
+  def getLatestOpenMiningRound()(implicit
+      traceContext: TraceContext
+  ): Future[Contract[roundCodegen.OpenMiningRound]] =
+    getTransferContext().map(
+      _.latestOpenMiningRound.getOrElse(
+        throw new StatusRuntimeException(
+          Status.FAILED_PRECONDITION.withDescription("No open mining round")
+        )
+      )
+    )
 }

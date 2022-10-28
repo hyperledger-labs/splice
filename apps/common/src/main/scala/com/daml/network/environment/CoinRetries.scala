@@ -98,7 +98,12 @@ object CoinRetries {
             TransientErrorKind
           // TODO (#1066) Remove the need to retry on UNIMPLEMENTED.
           case None
-              if Seq(Status.Code.UNIMPLEMENTED, Status.Code.UNAVAILABLE, Status.Code.NOT_FOUND)
+              if Seq(
+                Status.Code.UNIMPLEMENTED,
+                Status.Code.UNAVAILABLE,
+                Status.Code.NOT_FOUND,
+                Status.Code.FAILED_PRECONDITION,
+              )
                 .contains(statusCode) =>
             val msg =
               s"The operation ${operationName.singleQuoted} failed with a retryable error (full stack trace omitted): "

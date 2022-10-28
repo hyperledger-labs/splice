@@ -10,6 +10,7 @@ import DA.Exception
 import CC.Assert
 import CC.Coin
 import CC.CoinRules
+import CC.Round
 
 import CN.Wallet.Subscriptions
 
@@ -34,6 +35,7 @@ template PaymentChannel
         inputs : [TransferInput]
         quantity : Decimal
         payload : Text
+        context : TransferContext
       controller sender
       do
         require "Direct transfers are allowed" allowDirectTransfers
@@ -53,7 +55,7 @@ template PaymentChannel
                   lock = None
               ]
             payload
-        result <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
+        result <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer context)
         return $ fmap extractSenderChange result
 
     nonconsuming choice PaymentChannel_CreatePaymentRequest : ContractId OnChannelPaymentRequest
@@ -127,6 +129,7 @@ template OnChannelPaymentRequest
     choice OnChannelPaymentRequest_Accept : Either Text (TransferResult, ContractId Coin)
       with
         inputs : [TransferInput]
+        context : TransferContext
       controller sender
       do
         -- create the transfer
@@ -145,7 +148,7 @@ template OnChannelPaymentRequest
                     lock = None
                 ]
               payload = "Accepted payment request"
-        result <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
+        result <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer context)
         return $ fmap extractSenderChange result
 
     choice OnChannelPaymentRequest_Withdraw : ()
@@ -196,6 +199,7 @@ template AppPaymentRequest
     choice AppPaymentRequest_Accept : Either Text (ContractId AcceptedAppPayment, ContractId Coin)
       with
         inputs : [TransferInput]
+        context : TransferContext
       controller sender
       do now <- getTime
          -- check that the delivery offer is active and implements DeliveryOffer
@@ -217,7 +221,7 @@ template AppPaymentRequest
                     lock = None
                 ]
               payload = "lock payment"
-         result <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
+         result <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer context)
          DA.Traversable.forA result $ \result -> do
             let [TransferResultLockedCoin lockedCoin, TransferResultCoin senderChange] = result.createdCoins
             acceptedPayment <- create AcceptedAppPayment
@@ -246,7 +250,9 @@ template AcceptedAppPayment
     signatory sender, provider, receiver
 
     choice AcceptedAppPayment_Collect : ContractId Coin
-      controller signatory this
+      with
+        openRound : ContractId OpenMiningRound
+      controller sender, receiver, provider
       do
         -- archive delivery offer
         exercise deliveryOffer DeliveryOffer_Archive
@@ -263,7 +269,7 @@ template AcceptedAppPayment
                     coinType = FloatingReceiverCoin
                 ]
               payload = "transfer locked payment"
-        Right result <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
+        Right result <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer $ appTransferContext openRound)
         let [TransferResultCoin coinCid] = result.createdCoins
         pure coinCid
 
@@ -301,6 +307,7 @@ template AppMultiPaymentRequest
     choice AppMultiPaymentRequest_Accept : Either Text (ContractId AcceptedAppMultiPayment, ContractId Coin)
       with
         inputs : [TransferInput]
+        context : TransferContext
       controller sender
       do now <- getTime
          -- check that the reference is active and implements DeliveryOffer
@@ -322,7 +329,7 @@ template AppMultiPaymentRequest
                     lock = None
                 ]
               payload = "lock payment"
-         result <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
+         result <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer context)
          case result of
           Left errorMsg -> return $ Left errorMsg
           Right result -> do
@@ -358,6 +365,8 @@ template AcceptedAppMultiPayment
     signatory sender, provider, receivers
 
     choice AcceptedAppMultiPayment_Collect : ContractId DeliveryOffer
+      with
+        openRound : ContractId OpenMiningRound
       controller signatory this
       do
         -- unlock coin and transfer the remainder to the receiver
@@ -372,7 +381,7 @@ template AcceptedAppMultiPayment
                   coinType = FloatingReceiverCoin
                 ) receivers
               payload = "transfer locked payment"
-        void $ exerciseByKey @CoinRules svc (CoinRules_Transfer transfer)
+        void $ exerciseByKey @CoinRules svc (CoinRules_Transfer transfer $ appTransferContext openRound)
         -- defensive check that the reference is still active
         void $ fetch deliveryOffer
         pure deliveryOffer
@@ -404,45 +413,45 @@ catchAllE operation =
 -- Main function for batched execution of multiple coin operations.
 -- Given multiple coin operations and transfer inputs, it executes the operations sequentially while
 -- stringing along the remaining inputs. Returns all outcomes.
-executeCoinOperationRec : [TransferInput] -> [CoinOperationOutcome] -> [CoinOperation] -> Update ([CoinOperationOutcome])
-executeCoinOperationRec inputs prevResults (operation::remainingOperations) = do
+executeCoinOperationRec : TransferContext -> [TransferInput] -> [CoinOperationOutcome] -> [CoinOperation] -> Update ([CoinOperationOutcome])
+executeCoinOperationRec context inputs prevResults (operation::remainingOperations) = do
   case operation of
     CO_AppPayment cid -> handleE AppPaymentRequest_Accept COO_AcceptedAppPayment cid
     CO_AppMultiPayment cid -> handleE AppMultiPaymentRequest_Accept COO_AcceptedAppMultiPayment cid
     CO_ChannelPayment cid -> handleE OnChannelPaymentRequest_Accept COO_AcceptedChannelPayment cid
     CO_ChannelTransfer endUser receiver svcUser quantity payload -> do
-      resultE <- catchAllE $ exerciseByKey @PaymentChannel (endUser, receiver, svcUser) (PaymentChannel_ExecuteDirectTransfer inputs quantity payload)
+      resultE <- catchAllE $ exerciseByKey @PaymentChannel (endUser, receiver, svcUser) (PaymentChannel_ExecuteDirectTransfer inputs quantity payload context)
       handleResult COO_AcceptedChannelTransfer resultE
     CO_SubscriptionAcceptAndMakeInitialPayment cid -> handle SubscriptionRequest_AcceptAndMakePayment COO_SubscriptionInitialPayment cid
     CO_SubscriptionMakePayment cid -> handle SubscriptionIdleState_MakePayment COO_SubscriptionPayment cid
     CO_Tap svc validator endUser quantity -> do
-      coin <- catchAll (exerciseByKey @CoinRules svc (CoinRules_Tap endUser quantity))
+      coin <- catchAll (exerciseByKey @CoinRules svc (CoinRules_Tap endUser quantity context.openMiningRound))
       handleResultTap coin
   where
-    handle : Choice t c (r, ContractId Coin) => ([TransferInput] -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
+    handle : Choice t c (r, ContractId Coin) => ([TransferInput] -> TransferContext -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
     handle choiceConstructor resultConstructor cid = do
-      resultE <- catchAll $ exercise cid (choiceConstructor inputs)
+      resultE <- catchAll $ exercise cid (choiceConstructor inputs context)
       handleResult resultConstructor resultE
 
-    handleE : Choice t c (Either Text (r, ContractId Coin)) => ([TransferInput] -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
+    handleE : Choice t c (Either Text (r, ContractId Coin)) => ([TransferInput] -> TransferContext -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
     handleE choiceConstructor resultConstructor cid = do
-      resultE <- catchAllE $ exercise cid (choiceConstructor inputs)
+      resultE <- catchAllE $ exercise cid (choiceConstructor inputs context)
       handleResult resultConstructor resultE
 
     handleResult : (r -> CoinOperationOutcome) -> Either Text (r, ContractId Coin) -> Update [CoinOperationOutcome]
     handleResult resultConstructor = \case
       Left errorMsg -> handleLeft errorMsg
-      Right (result, change) -> executeCoinOperationRec [InputCoin change] (resultConstructor result :: prevResults) remainingOperations
+      Right (result, change) -> executeCoinOperationRec context [InputCoin change] (resultConstructor result :: prevResults) remainingOperations
 
     handleResultTap : Either Text (ContractId Coin) -> Update [CoinOperationOutcome]
     handleResultTap = \case
       Left errorMsg -> handleLeft errorMsg
-      Right tappedCoin -> executeCoinOperationRec (InputCoin tappedCoin :: inputs) (COO_Tap tappedCoin :: prevResults) remainingOperations
+      Right tappedCoin -> executeCoinOperationRec context (InputCoin tappedCoin :: inputs) (COO_Tap tappedCoin :: prevResults) remainingOperations
 
     handleLeft : Text -> Update [CoinOperationOutcome]
-    handleLeft errorMsg = executeCoinOperationRec inputs (COO_TransferError errorMsg :: prevResults) remainingOperations
+    handleLeft errorMsg = executeCoinOperationRec context inputs (COO_TransferError errorMsg :: prevResults) remainingOperations
 
-executeCoinOperationRec inputs prevResults [] = do
+executeCoinOperationRec _context _inputs prevResults [] = do
   return prevResults
 
 
@@ -499,19 +508,10 @@ template WalletAppInstall
     -- Takes a batch of commands manipulating coins, and tries to execute them sequentially in one large Daml transaction.
     nonconsuming choice WalletAppInstall_ExecuteBatch: [CoinOperationOutcome]
       with
+        context : TransferContext
         inputs: [TransferInput]
         operations : [CoinOperation]
       controller walletServiceParty
       do
-        accepted <- executeCoinOperationRec inputs [] operations
+        accepted <- executeCoinOperationRec context inputs [] operations
         return $ reverse accepted
-
-    -- TODO(M1-92 Tech Debt): consider adding an interface for payment requests
-    nonconsuming choice WalletAppInstall_AcceptAppMultiPaymentRequest : ContractId AcceptedAppMultiPayment
-      with
-        requestCid : ContractId AppMultiPaymentRequest
-        transferInput : [TransferInput]
-      controller walletServiceParty
-      do
-        Right (accepted, change) <- exercise requestCid (AppMultiPaymentRequest_Accept transferInput)
-        return accepted

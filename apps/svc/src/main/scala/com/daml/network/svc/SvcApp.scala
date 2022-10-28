@@ -133,16 +133,6 @@ object SvcApp {
       store: SvcStore,
       retryProvider: CoinRetries,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
-    // Create an IssuanceState
-    val createIssuanceStateCmd =
-      CC.Round
-        .IssuanceState(
-          svc = svc.toPrim,
-          observers = Seq.empty,
-          currentRound = CC.Round.Round(-1),
-        )
-        .create
-        .command
 
     // Create CoinRules and open a first mining round
     val createCoinRulesCmd =
@@ -153,7 +143,7 @@ object SvcApp {
           config = defaultCoinConfig,
         )
         .createAnd
-        .exerciseCoinRules_MiningRound_Open(coinPrice = 1.0)
+        .exerciseCoinRules_MiningRound_Open(coinPrice = 1.0, CC.Round.Round(0))
         .command
     for {
       _ <- createValidatorRight(
@@ -176,8 +166,7 @@ object SvcApp {
                 actAs = Seq(svc),
                 readAs = Seq.empty,
                 command = Seq(
-                  createIssuanceStateCmd,
-                  createCoinRulesCmd,
+                  createCoinRulesCmd
                 ),
                 commandId = commandId,
                 deduplicationOffset = off,

@@ -5,11 +5,12 @@ import "google/protobuf/empty.proto";
 
 service ValidatorAppService {
   rpc OnboardUser (OnboardUserRequest) returns (OnboardUserResponse);
-  rpc GetValidatorPartyId (google.protobuf.Empty) returns (GetValidatorPartyIdResponse);
+  rpc GetValidatorUserInfo (google.protobuf.Empty) returns (GetValidatorUserInfoResponse);
 }
 
-message GetValidatorPartyIdResponse {
+message GetValidatorUserInfoResponse {
   string party_id= 1;
+  string user_name = 2;
 }
 
 message OnboardUserRequest {

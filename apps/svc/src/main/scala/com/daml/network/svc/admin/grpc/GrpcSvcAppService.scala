@@ -65,7 +65,7 @@ class GrpcSvcAppService(
         price = Proto.tryDecode(Proto.BigDecimal)(request.coinPrice)
         cmd = CC.CoinRules.CoinRules
           .key(svc.toPrim)
-          .exerciseCoinRules_MiningRound_Open(price)
+          .exerciseCoinRules_MiningRound_Open(price, CC.Round.Round(request.round))
         cid <- connection.submitWithResult(Seq(svc), Seq.empty, cmd)
       } yield v0.OpenRoundResponse(Proto.encode(cid))
     }
