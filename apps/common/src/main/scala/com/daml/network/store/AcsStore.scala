@@ -13,6 +13,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.collection.immutable
 import scala.concurrent.{ExecutionContext, Future}
@@ -67,6 +68,10 @@ trait AcsStore extends AutoCloseable {
   def streamContracts[T](
       templateCompanion: TemplateCompanion[T]
   ): Source[Contract[T], NotUsed]
+
+  /** Signal when the store has finished ingesting ledger data from the given offset or a larger one.
+    */
+  def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit]
 }
 
 object AcsStore {
@@ -108,10 +113,6 @@ object AcsStore {
 
     /** Ingest a transaction served by the transaction stream. */
     def ingestTransaction(tx: Transaction): Future[Unit]
-
-    /** Signal when the sink has finished ingesting ledger data from the given offset or a larger one.
-      */
-    def signalWhenIngested(offset: String): Future[Unit]
   }
 
   /** Static specification of a set of create events in scope for ingestion into an AcsStore. */

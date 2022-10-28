@@ -3,13 +3,14 @@ package com.daml.network.directory.store
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.ledger.client.binding.Primitive
-import com.daml.network.codegen.CN.{Directory => directoryCodegen, Wallet => walletCodegen}
+import com.daml.network.codegen.CN.{Directory as directoryCodegen, Wallet as walletCodegen}
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.store.AcsStore
 import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -97,6 +98,11 @@ trait DirectoryStore extends AutoCloseable {
     */
   def streamAcceptedAppPayments(): Source[Contract[walletCodegen.AcceptedAppPayment], NotUsed] =
     acsStore.streamContracts(walletCodegen.AcceptedAppPayment)
+
+  // TODO(M1-92): only added for tests (in DirectoryStoreTest)
+  def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
+    acsStore.signalWhenIngested(offset)
+
 }
 
 object DirectoryStore {

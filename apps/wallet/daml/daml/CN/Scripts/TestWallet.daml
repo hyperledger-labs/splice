@@ -283,7 +283,7 @@ testBatchPaymentRequests = script do
     context
 
   -- first command errors, second command is still executed
-  let [COO_TransferError errorMsg, COO_AcceptedAppMultiPayment payment3Cid] = outcomes
+  let [COO_Error errorMsg, COO_AcceptedAppMultiPayment payment3Cid] = outcomes
   Some acceptedPayment4 <- queryContractId alice.primaryParty payment3Cid
   lockedCoins <- query @LockedCoin alice.primaryParty
   let [_, _, (lockedCoin4, _)] = sortOn (\(_, lockedCoin) -> lockedCoin.coin.quantity.initialQuantity) lockedCoins

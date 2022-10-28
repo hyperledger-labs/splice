@@ -22,7 +22,7 @@ object SuppressionRule {
       eventLevel.toInt >= level.toInt
   }
 
-  /** Supress only this level of events */
+  /** Suppress only this level of events */
   case class Level(level: event.Level) extends SuppressionRule {
     def isSuppressed(loggerName: String, eventLevel: event.Level): Boolean =
       eventLevel.toInt == level.toInt

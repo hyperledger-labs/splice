@@ -1,6 +1,5 @@
 package com.daml.network.directory.automation
 
-import com.daml.network.scan.admin.api.client.ScanConnection
 import akka.stream.Materializer
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
@@ -8,6 +7,7 @@ import com.daml.network.codegen.CN.{Directory as directoryCodegen, Wallet as wal
 import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.Contract
 import com.digitalasset.canton.config.ProcessingTimeout

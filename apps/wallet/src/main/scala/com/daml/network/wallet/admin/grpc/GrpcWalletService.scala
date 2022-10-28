@@ -733,7 +733,7 @@ class GrpcWalletService(
       }
     }
 
-  // TODO(#756) - Make this a `CoinOperation` too
+  // TODO(#1351) - Make this a `CoinOperation` too
   override def collectRewards(request: CollectRewardsRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth(request.getWalletCtx) { user =>
@@ -971,7 +971,7 @@ class GrpcWalletService(
       constructCoinOperation: (
           P.ContractId[walletCodegen.WalletAppInstall],
           EndUserWalletStore,
-          // TODO(#756): also require quantity to reject commands early?
+          // TODO(#1351): also require quantity to reject commands early?
       ) => Future[CoinOperationRequest]
   )(
       user: String,
@@ -1007,7 +1007,7 @@ class GrpcWalletService(
     val clazz = implicitly[ClassTag[ExpectedCOO]].runtimeClass
     actual match {
       case result: ExpectedCOO if clazz.isInstance(result) => process(result)
-      case failedOperation: CoinOperationOutcome.COO_TransferError =>
+      case failedOperation: CoinOperationOutcome.COO_Error =>
         throw new StatusRuntimeException(
           Status.FAILED_PRECONDITION.withDescription(
             s"the coin operation failed with a Daml exception: ${failedOperation.body}."
@@ -1015,7 +1015,7 @@ class GrpcWalletService(
         )
       case other =>
         ErrorUtil.internalErrorGrpc(
-          s"expected to receive a coin operation outcome of type $clazz or `COO_TransferError` but received type ${actual.getClass} with value: $actual"
+          s"expected to receive a coin operation outcome of type $clazz or `COO_Error` but received type ${actual.getClass} with value: $actual"
         )
     }
   }

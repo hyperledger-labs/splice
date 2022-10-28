@@ -1,7 +1,7 @@
 package com.daml.network.console
 
-import com.daml.network.codegen.CC.{Round => roundCodegen}
 import com.daml.ledger.api.v1.transaction.TransactionTree
+import com.daml.network.codegen.CC.{Round => roundCodegen}
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.history.{CoinTransaction, CoinTransactionTreeView}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient

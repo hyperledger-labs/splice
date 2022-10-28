@@ -47,26 +47,26 @@ class InMemoryAcsStore(
       SortedMap.empty,
     )
 
-  val ingestionSink: AcsStore.IngestionSink = new AcsStore.IngestionSink with NoTracing {
-
-    override def transactionFilter: TransactionFilter = contractFilter.transactionFilter
-
-    private def updateState[T](
-        f: InMemoryAcsStore.State => (InMemoryAcsStore.State, T)
-    )(implicit traceContext: TraceContext): Future[T] = {
-      Future {
-        blocking {
-          synchronized {
-            val stOld = stateVar
-            val (stNew, result) = f(stateVar)
-            stateVar = stNew
-            if (logAllStateUpdates)
-              logger.debug(s"Updated state\nstOld=\n${stOld.pretty}\nstNew=\n${stNew.pretty}")
-            result
-          }
+  private def updateState[T](
+      f: InMemoryAcsStore.State => (InMemoryAcsStore.State, T)
+  )(implicit traceContext: TraceContext): Future[T] = {
+    Future {
+      blocking {
+        synchronized {
+          val stOld = stateVar
+          val (stNew, result) = f(stateVar)
+          stateVar = stNew
+          if (logAllStateUpdates)
+            logger.debug(s"Updated state\nstOld=\n${stOld.pretty}\nstNew=\n${stNew.pretty}")
+          result
         }
       }
     }
+  }
+
+  val ingestionSink: AcsStore.IngestionSink = new AcsStore.IngestionSink with NoTracing {
+
+    override def transactionFilter: TransactionFilter = contractFilter.transactionFilter
 
     override def ingestActiveContracts(
         evs: Seq[CreatedEvent]
@@ -95,15 +95,15 @@ class InMemoryAcsStore(
           offsetChanged.success(())
         }
       }
+  }
 
-    /** The implementation is idempotent. */
-    override def signalWhenIngested(offset: String): Future[Unit] = {
-      val alreadyIngested = stateVar.offset.exists(_ >= offset)
-      if (alreadyIngested) {
-        Future.successful(())
-      } else {
-        updateState(_.addOffsetToSignal(offset)).flatMap(p => p.future)
-      }
+  /** The implementation is idempotent. */
+  override def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] = {
+    val alreadyIngested = stateVar.offset.exists(_ >= offset)
+    if (alreadyIngested) {
+      Future.successful(())
+    } else {
+      updateState(_.addOffsetToSignal(offset)).flatMap(p => p.future)
     }
   }
 

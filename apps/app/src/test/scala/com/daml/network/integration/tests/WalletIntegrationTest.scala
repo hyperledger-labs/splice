@@ -6,10 +6,10 @@ import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.CC.{
   Coin as coinCodegen,
   CoinRules as coinRulesCodegen,
-  Round => roundCodegen,
+  Round as roundCodegen,
 }
-import com.daml.network.codegen.CN.Scripts.Wallet.TestSubscriptions as testSubscriptionsCodegen
 import com.daml.network.codegen.CN.Scripts.TestWallet as testWalletCodegen
+import com.daml.network.codegen.CN.Scripts.Wallet.TestSubscriptions as testSubscriptionsCodegen
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
@@ -31,9 +31,11 @@ import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.{Balance, ListResponse}
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.{DiscardOps, HasExecutionContext}
+import org.slf4j.event.Level
 
 import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
@@ -817,33 +819,39 @@ class WalletIntegrationTest
       val (alice, bob) = setupAliceAndBobAndChannel
       aliceRemoteWallet.tap(10)
       aliceValidator.remoteParticipant.ledger_api.acs.await(alice, coinCodegen.Coin)
-      val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
 
       val cancelF = Future(bobRemoteWallet.cancelPaymentChannelBySender(alice))
-      // to simulate contention, submit a transfer on the channel immediately after cancelling the channel such
-      // that the activeness lookup on the channel still goes through but the lookup inside the ledger fails
-      // this leads to a retry
-      val transferF = Future(aliceRemoteWallet.executeDirectTransfer(bob, 5))
+
+      val transferF = loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+        // to simulate contention, submit a transfer on the channel immediately after cancelling the channel such
+        // that the activeness lookup on the channel still goes through but the lookup inside the ledger fails.
+        // this leads to a retry..
+        Future(aliceRemoteWallet.executeDirectTransfer(bob, 5))
+          // that fails on the second execution
+          .recover { case cmdFailure: CommandFailure =>
+            // need to recover as logs are only checked for successful futures
+            ()
+          },
+        entries => {
+          forAtLeast(1, entries)( // however, before failing, we see one retry in the logs
+            _.message should include(
+              "The operation 'execute coin operation batch' has failed with an exception. Retrying after 200 milliseconds."
+            )
+          )
+          forAtLeast(1, entries)( // fails
+            _.message should include("GrpcRequestRefusedByServer: NOT_FOUND/PaymentChannel between")
+          )
+        },
+      )
 
       // eventually, the cancel goes through
-      eventually()(cancelF.isCompleted shouldBe true)
+      eventually()((cancelF.isCompleted && !transferF.isCompleted) shouldBe true)
       eventually()(aliceRemoteWallet.listPaymentChannels() should have size 0)
       eventually()(bobRemoteWallet.listPaymentChannels() should have size 0)
-      // now reestablish the payment channel
-      val proposalId = aliceRemoteWallet.proposePaymentChannel(bob)
-      eventually()(bobRemoteWallet.listPaymentChannelProposals() should have size 1)
-      bobRemoteWallet.acceptPaymentChannelProposal(proposalId)
 
-      // such that on the retry, the transfer goes through.
+      // such that on the retry, the transfer fails on the activeness check.
       eventually()(transferF.isCompleted shouldBe true)
-      checkWallet(alice, aliceRemoteWallet, Seq((4, 5)))
-      checkWallet(bob, bobRemoteWallet, Seq((4, 5)))
-      val txs = aliceValidator.remoteParticipant.ledger_api.transactions
-        .trees(Set(alice), completeAfter = 4, beginOffset = offsetBefore)
-      val createdCoinsInTx = txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin)(_))
-      // after the cancel, propose & accept of the payment channel, the fourth transaction should lead to the creation of
-      // two coins (change, transferred coin)
-      createdCoinsInTx(3) should have size 2
+      checkWallet(alice, aliceRemoteWallet, Seq((10, 10)))
 
     }
   }

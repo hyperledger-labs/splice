@@ -246,11 +246,11 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
     "signal when offsets have been ingested" in {
       for {
         store <- mkStore()
-        acsOffsetIngestedF = store.acsIngestionSink.signalWhenIngested(acsOffset)
-        tx2OffsetIngestedF = store.acsIngestionSink.signalWhenIngested(tx2Offset)
-        tx3OffsetIngestedF = store.acsIngestionSink.signalWhenIngested(tx3Offset)
-        tx4OffsetIngestedF = store.acsIngestionSink.signalWhenIngested(tx4Offset)
-        tx5OffsetIngestedF = store.acsIngestionSink.signalWhenIngested(tx5Offset)
+        acsOffsetIngestedF = store.signalWhenIngested(acsOffset)
+        tx2OffsetIngestedF = store.signalWhenIngested(tx2Offset)
+        tx3OffsetIngestedF = store.signalWhenIngested(tx3Offset)
+        tx4OffsetIngestedF = store.signalWhenIngested(tx4Offset)
+        tx5OffsetIngestedF = store.signalWhenIngested(tx5Offset)
         _ <- store.acsIngestionSink.ingestTransaction(tx4)
       } yield {
         acsOffsetIngestedF.isCompleted shouldBe true

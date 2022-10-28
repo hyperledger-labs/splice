@@ -91,6 +91,7 @@ class WalletApp(
         new TreasuryServices(
           ledgerClient.connection("TreasuryServices"),
           walletStore,
+          retryProvider = this,
           loggerFactory,
           timeouts,
         )

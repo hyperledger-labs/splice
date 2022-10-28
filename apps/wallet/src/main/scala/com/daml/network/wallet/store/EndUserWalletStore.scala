@@ -14,6 +14,7 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -38,7 +39,8 @@ trait EndUserWalletStore extends AutoCloseable {
   def lookupInstall(): Future[QueryResult[Option[Contract[walletCodegen.WalletAppInstall]]]] =
     acsStore.findContract(walletCodegen.WalletAppInstall)(_ => true)
 
-  def signalWhenIngested(offset: String): Future[Unit] = acsIngestionSink.signalWhenIngested(offset)
+  def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
+    acsStore.signalWhenIngested(offset)
 
   def findContract[T](
       templateCompanion: TemplateCompanion[T],

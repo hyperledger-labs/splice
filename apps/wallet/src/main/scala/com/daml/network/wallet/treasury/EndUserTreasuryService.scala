@@ -14,14 +14,12 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
-import com.digitalasset.canton.util.retry
-import com.digitalasset.canton.util.retry.Backoff
 import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Success}
-// TODO(#756): Add PrettyPrinting
+// TODO(#1351): Add PrettyPrinting
 
 /** Wrapper class for the treasury service.
   *
@@ -53,12 +51,13 @@ case class CoinOperationRequest(
   */
 case class EndUserTreasuryService(
     connection: CoinLedgerConnection,
-    // TODO(#756): don't pass this along but look it up before each batch submission to support users updating their
+    // TODO(#1351): don't pass WalletAppInstall contract along but look it up before each batch submission to support users updating their
     // WalletAppInstall contract
     install: Contract[walletCodegen.WalletAppInstall],
     walletStoreKey: WalletStore.Key,
     userStore: EndUserWalletStore,
     walletStore: WalletStore,
+    retryProvider: CoinRetries,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
 )(implicit ec: ExecutionContext, mat: Materializer)
@@ -72,7 +71,7 @@ case class EndUserTreasuryService(
 
   private val queue: BoundedSourceQueue[EnqueuedCoinOperation] = Source
     .queue[EnqueuedCoinOperation](bufferSize)
-    // TODO(#756): Possible extension: re-order commands according to urgency
+    // TODO(#1351): Possible extension: re-order commands according to urgency
     .batch(batchSize, operation => Seq(operation))((operations, operation) =>
       operations :+ operation
     )
@@ -80,7 +79,7 @@ case class EndUserTreasuryService(
       Sink.foreachAsync(1)(batch =>
         executeBatchWithRetry(batch).flatMap(offset => {
           userStore
-            .signalWhenIngested(offset)
+            .signalWhenIngested(offset)(TraceContext.empty)
             .map(_ =>
               logger
                 .debug(s"Finished waiting for store to ingest offset $offset")(TraceContext.empty)
@@ -96,7 +95,7 @@ case class EndUserTreasuryService(
   def enqueueCoinOperation(
       operation: CoinOperationRequest
   )(implicit tc: TraceContext): Future[walletCodegen.CoinOperationOutcome] = {
-    // TODO(#756): possibly allow callers to assign semantically meaningful ids (see the discussion
+    // TODO(#1351): possibly allow callers to assign semantically meaningful ids (see the discussion
     //  at https://github.com/DACH-NY/the-real-canton-coin/pull/1145#discussion_r994508807)
     val p = Promise[walletCodegen.CoinOperationOutcome]()
     queue.offer(EnqueuedCoinOperation(operation, p)) match {
@@ -157,20 +156,7 @@ case class EndUserTreasuryService(
       batch: Seq[EnqueuedCoinOperation]
   ): Future[String] =
     TraceContext.withNewTraceContext { implicit tc =>
-      val maxRetries: Int = 3
-      val initialDelay: FiniteDuration = 1.seconds
-      val maxDelay: Duration = 5.seconds
-
-      implicit val success: retry.Success[String] = retry.Success.always
-      val res = Backoff(
-        logger,
-        this,
-        maxRetries,
-        initialDelay,
-        maxDelay,
-        "coin operation batch",
-      ).apply(executeBatch(batch), CoinRetries.RetryableError("coin operation batch"))
-      res
+      retryProvider.retry("execute coin operation batch", executeBatch(batch))
     }
 
   private def executeBatch(
@@ -186,7 +172,7 @@ case class EndUserTreasuryService(
       _ = logger.debug(
         s"After lookups, the batch contains ${validOperations.size} coin operations."
       )
-      // TODO(#756): smarter coin/input selection?
+      // TODO(#1351): smarter coin/input selection?
       inputs <- userStore
         .listContracts(coinCodegen.Coin)
         .map(cs => cs.value.map(c => coinRulesCodegen.TransferInput.InputCoin(c.contractId)))

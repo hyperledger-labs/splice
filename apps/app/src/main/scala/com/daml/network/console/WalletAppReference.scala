@@ -460,7 +460,7 @@ abstract class WalletAppReference(
   @Help.Description(
     "Redistributes value from a given set of coins. The outputs declare the number of outputs and for each output the desired quantity or None for a floating output."
   )
-  // TODO(#756) - Make this a `CoinOperation` too or remove
+  // TODO(#1351) - Make this a `CoinOperation` too or remove
   def redistribute(
       inputCoins: Seq[Primitive.ContractId[coinCodegen.Coin]],
       outputQuantities: Seq[Option[BigDecimal]],

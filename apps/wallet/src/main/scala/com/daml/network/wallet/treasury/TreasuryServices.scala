@@ -2,7 +2,7 @@ package com.daml.network.wallet.treasury
 
 import akka.stream.Materializer
 import com.daml.network.codegen.CN.Wallet.WalletAppInstall
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.util.Contract
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -16,6 +16,7 @@ import scala.concurrent.ExecutionContext
 class TreasuryServices(
     connection: CoinLedgerConnection,
     walletStore: WalletStore,
+    retryProvider: CoinRetries,
     override val loggerFactory: NamedLoggerFactory,
     timeouts: ProcessingTimeout,
 )(implicit ec: ExecutionContext, mat: Materializer)
@@ -38,6 +39,7 @@ class TreasuryServices(
       walletStoreKey,
       userStore,
       walletStore,
+      retryProvider,
       loggerFactory,
       timeouts,
     ),

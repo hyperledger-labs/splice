@@ -1,14 +1,14 @@
 package com.daml.network.scan.admin.api.client
 
-import io.grpc.{Status, StatusRuntimeException}
-import com.daml.network.codegen.CC.{Round => roundCodegen}
-import com.daml.network.util.Contract
 import com.daml.network.admin.api.client.AppConnection
+import com.daml.network.codegen.CC.{Round => roundCodegen}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
+import com.daml.network.util.Contract
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.{Status, StatusRuntimeException}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContextExecutor, Future}
