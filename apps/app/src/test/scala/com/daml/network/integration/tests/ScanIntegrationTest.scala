@@ -111,19 +111,25 @@ class ScanIntegrationTest
 
   "report correct reference data" in { implicit env =>
     setupAliceAndBobAndChannel(env)
-    eventually(1.seconds) { scan.getLatestOpenMiningRound().payload.round.number shouldBe 0 }
+    eventually(1.seconds) {
+      scan.getTransferContext().latestOpenMiningRound.map(_.payload.round.number) shouldBe Some(0)
+    }
 
     svc.startClosingRound(0)
     svc.startIssuingRound(0)
     svc.closeRound(0)
     svc.openRound(1, 1.0)
 
-    eventually(1.seconds) { scan.getLatestOpenMiningRound().payload.round.number shouldBe 1 }
+    eventually(1.seconds) {
+      scan.getTransferContext().latestOpenMiningRound.map(_.payload.round.number) shouldBe Some(1)
+    }
   }
 
   "list closed rounds" in { implicit env =>
     val (aliceUserParty, bobUserParty) = setupAliceAndBobAndChannel(env)
-    eventually(1.seconds) { scan.getLatestOpenMiningRound().payload.round.number shouldBe 0 }
+    eventually(1.seconds) {
+      scan.getTransferContext().latestOpenMiningRound.map(_.payload.round.number) shouldBe Some(0)
+    }
 
     aliceRemoteWallet.tap(200)
     aliceRemoteWallet.executeDirectTransfer(bobUserParty, 39)

@@ -30,6 +30,7 @@ import {
   Typography,
 } from '@mui/material';
 
+import { AppTransferContext, CoinRules } from '@daml.js/canton-coin/lib/CC/CoinRules';
 import { OpenMiningRound } from '@daml.js/canton-coin/lib/CC/Round';
 import {
   AcceptedGroupInvite,
@@ -321,15 +322,22 @@ interface AcceptedAppPaymentsProps {
   party: string;
 }
 
-const getLatestOpenMiningRound = async (
+const getTransferContext = async (
   scanClient: ScanServicePromiseClient
-): Promise<Contract<OpenMiningRound>> => {
+): Promise<AppTransferContext> => {
   const transferContext = await scanClient.getTransferContext(new Empty(), undefined);
+  const coinRules = transferContext.getCoinRules();
+  if (!coinRules) {
+    throw new Error('No active CoinRules contract');
+  }
   const openMiningRound = transferContext.getLatestOpenMiningRound();
   if (!openMiningRound) {
-    throw new Error('No active OpenMiningRound');
+    throw new Error('No active OpenMiningRound contract');
   }
-  return Contract.decode(openMiningRound, OpenMiningRound);
+  return {
+    coinRules: Contract.decode(coinRules, CoinRules).contractId,
+    openMiningRound: Contract.decode(openMiningRound, OpenMiningRound).contractId,
+  };
 };
 
 const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({ group, party, provider }) => {
@@ -353,24 +361,24 @@ const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({ group, party,
   useInterval(fetchAcceptedAppMultiPayments, 500);
 
   const onRedeem = async (acceptedAppPayment: Contract<AcceptedAppPayment>) => {
-    const openMiningRound = await getLatestOpenMiningRound(scanClient);
+    const transferContext = await getTransferContext(scanClient);
     await ledgerApiClient.completeTransfer(
       party,
       provider,
       key(group),
       acceptedAppPayment.contractId,
-      openMiningRound.contractId
+      transferContext
     );
   };
 
   const onMultiRedeem = async (acceptedAppPayment: Contract<AcceptedAppMultiPayment>) => {
-    const openMiningRound = await getLatestOpenMiningRound(scanClient);
+    const transferContext = await getTransferContext(scanClient);
     await ledgerApiClient.completeMultiTransfer(
       party,
       provider,
       key(group),
       acceptedAppPayment.contractId,
-      openMiningRound.contractId
+      transferContext
     );
   };
 

@@ -5,7 +5,7 @@ import DA.Time
 
 import CC.Assert
 import CC.Coin
-import CC.Round
+import CC.CoinRules
 import CN.Wallet
 import CN.Wallet.Subscriptions
 
@@ -81,7 +81,7 @@ template DirectoryEntryOffer
     postconsuming choice DirectoryEntryOffer_CollectPayment : (ContractId DirectoryEntry, ContractId Coin)
       with
         acceptedAppPaymentCid : ContractId AcceptedAppPayment
-        openRound : ContractId OpenMiningRound
+        transferContext : AppTransferContext
       controller entryRequest.provider
       do -- deliver the promised good: the entry referenced in the payment
          acceptedAppPayment <- fetch acceptedAppPaymentCid
@@ -92,7 +92,7 @@ template DirectoryEntryOffer
              expiresAt = now `addRelTime` entryLifetime
              ..
          -- collect payment
-         coinCid <- exercise acceptedAppPaymentCid (AcceptedAppPayment_Collect openRound)
+         coinCid <- exercise acceptedAppPaymentCid (AcceptedAppPayment_Collect transferContext)
          -- return the created contracts
          pure (entryCid, coinCid)
 
@@ -147,14 +147,14 @@ template DirectoryInstall with
     nonconsuming choice DirectoryInstall_CollectInitialEntryPaymentWithSubscription : (ContractId DirectoryEntry, ContractId SubscriptionIdleState, ContractId Coin)
       with
         paymentCid : ContractId SubscriptionInitialPayment
-        openRound : ContractId OpenMiningRound
+        transferContext : AppTransferContext
       controller provider
       do
         payment <- fetch paymentCid
         Some (_, context) <- fetchFromInterface @DirectoryEntryContext payment.subscriptionData.context
         -- accept payment which creates the subscription
         (_, subscriptionStateCid, coinCid) <- exercise paymentCid SubscriptionInitialPayment_Collect with
-          openRound
+          transferContext
         subscriptionState <- fetch subscriptionStateCid
         -- deliver the promised good: create the directory entry
         entryCid <- case context of
@@ -169,7 +169,7 @@ template DirectoryInstall with
       with
         paymentCid : ContractId SubscriptionPayment
         entryCid : ContractId DirectoryEntry -- ^ The currently active entry.
-        openRound : ContractId OpenMiningRound
+        transferContext : AppTransferContext
       controller provider
       do
         payment <- fetch paymentCid
@@ -182,7 +182,7 @@ template DirectoryInstall with
           (payment.payData.paymentInterval == entryLifetime && payment.thisPaymentDueAt == entry.expiresAt)
         -- accept payment
         (subscriptionStateCid, coinCid) <- exercise paymentCid SubscriptionPayment_Collect with
-          openRound
+          transferContext
         -- renew the entry
         entryCid <- exercise entryCid DirectoryEntry_Renew with
           extension = entryLifetime

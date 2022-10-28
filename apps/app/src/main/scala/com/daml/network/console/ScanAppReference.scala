@@ -1,7 +1,7 @@
 package com.daml.network.console
 
 import com.daml.ledger.api.v1.transaction.TransactionTree
-import com.daml.network.codegen.CC.{Round => roundCodegen}
+import com.daml.network.codegen.CC.{CoinRules => coinRulesCodegen, Round => roundCodegen}
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.history.{CoinTransaction, CoinTransactionTreeView}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
@@ -42,11 +42,20 @@ abstract class ScanAppReference(
     }
 
   @Help.Summary(
-    "Returns the latest open mining round."
+    "Returns the transfer context required for third-party apps."
   )
-  def getLatestOpenMiningRound(): Contract[roundCodegen.OpenMiningRound] =
-    getTransferContext().latestOpenMiningRound
-      .getOrElse(throw new IllegalStateException("No open mining round"))
+  def getAppTransferContext(): coinRulesCodegen.AppTransferContext = {
+    def notFound(description: String) = new IllegalStateException(description)
+    val openMiningRound = getTransferContext().latestOpenMiningRound.getOrElse(
+      throw notFound("No active OpenMiningRound contract")
+    )
+    val coinRules =
+      getTransferContext().coinRules.getOrElse(throw notFound("No active CoinRules contract"))
+    coinRulesCodegen.AppTransferContext(
+      coinRules.contractId,
+      openMiningRound.contractId,
+    )
+  }
 
   @Help.Summary(
     """Returns the Daml transaction tree for a Coin transaction as visible to the SVC. """

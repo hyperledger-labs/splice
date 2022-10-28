@@ -176,7 +176,7 @@ case class EndUserTreasuryService(
       inputs <- userStore
         .listContracts(coinCodegen.Coin)
         .map(cs => cs.value.map(c => coinRulesCodegen.TransferInput.InputCoin(c.contractId)))
-      transferContext <- getValidatorStore().getTransferContext()
+      transferContext <- getValidatorStore().getPaymentTransferContext()
       cmd =
         install.contractId.exerciseWalletAppInstall_ExecuteBatch(
           transferContext,

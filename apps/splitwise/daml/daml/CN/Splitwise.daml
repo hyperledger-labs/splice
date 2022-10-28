@@ -7,7 +7,7 @@ import DA.Foldable (forA_)
 import DA.Time
 import DA.Set qualified as Set
 import CC.Assert
-import CC.Round
+import CC.CoinRules (AppTransferContext)
 import CN.Wallet
 
 -- TODO(i592)
@@ -118,7 +118,7 @@ template SplitwiseInstall
       with
         groupKey : GroupKey
         acceptedPaymentCid : ContractId AcceptedAppPayment
-        openRound : ContractId OpenMiningRound
+        transferContext : AppTransferContext
       controller user
       do exerciseByKey @Group groupKey Group_CompleteTransfer with
            sender = user
@@ -137,7 +137,7 @@ template SplitwiseInstall
       with
         groupKey : GroupKey
         acceptedPaymentCid : ContractId AcceptedAppMultiPayment
-        openRound : ContractId OpenMiningRound
+        transferContext : AppTransferContext
       controller user
       do exerciseByKey @Group groupKey Group_CompleteMultiTransfer with
            sender = user
@@ -229,11 +229,11 @@ template Group
       with
         acceptedPaymentCid : ContractId AcceptedAppPayment
         sender : Party
-        openRound : ContractId OpenMiningRound
+        transferContext : AppTransferContext
       controller sender
       do acceptedPayment <- fetch acceptedPaymentCid
          Some (refCid, ref) <- fetchFromInterface @TransferInProgress acceptedPayment.deliveryOffer
-         exercise acceptedPaymentCid (AcceptedAppPayment_Collect openRound)
+         exercise acceptedPaymentCid (AcceptedAppPayment_Collect transferContext)
          acceptedPayment.sender === sender
          let expectedAcceptedPayment = AcceptedAppPayment with
                sender = ref.sender
@@ -279,11 +279,11 @@ template Group
       with
         acceptedPaymentCid : ContractId AcceptedAppMultiPayment
         sender : Party
-        openRound : ContractId OpenMiningRound
+        transferContext : AppTransferContext
       controller sender
       do acceptedPayment <- fetch acceptedPaymentCid
          Some (refCid, ref) <- fetchFromInterface @MultiTransferInProgress acceptedPayment.deliveryOffer
-         exercise acceptedPaymentCid (AcceptedAppMultiPayment_Collect openRound)
+         exercise acceptedPaymentCid (AcceptedAppMultiPayment_Collect transferContext)
          acceptedPayment.sender === sender
          archive refCid
          let  (receivers, _) = unzipReceiverQuantities ref.receiverQuantities

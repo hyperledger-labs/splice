@@ -39,13 +39,13 @@ test = script do
 
   -- send some CC
   [(coin, _)] <- queryFilter @Coin sender.primaryParty (\c -> c.quantity.initialQuantity > 2.5)
-  context <- getTransferContext app sender
+  transferContext <- getPaymentTransferContext app sender
   let exerciseTransfer coin = exerciseByKeyCmd @PaymentChannel (sender.primaryParty, receiver.primaryParty, app.svc)
             PaymentChannel_ExecuteDirectTransfer with
               inputs = [InputCoin coin]
               quantity = 2.0
               payload = "direct transfer test"
-              context
+              transferContext
   let transfer coin =
         submitUser sender.userId $ exerciseTransfer coin
 
@@ -61,10 +61,10 @@ test = script do
 
   -- accept request
   [(coin, _)] <- queryFilter @Coin sender.primaryParty (\c -> c.quantity.initialQuantity > 1.5)
-  context <- getTransferContext app sender
+  transferContext <- getPaymentTransferContext app sender
   submitUser sender.userId $ exerciseCmd paymentRequest OnChannelPaymentRequest_Accept with
     inputs = [InputCoin coin]
-    context
+    transferContext
 
   -- ask for more CC, to be rejected
   paymentRequest <- submit receiver.primaryParty $ exerciseByKeyCmd @PaymentChannel (sender.primaryParty, receiver.primaryParty, app.svc)
@@ -146,7 +146,7 @@ createPaymentRequest app sender receiver quantity = do
 
 acceptPaymentRequest : CCApp -> CCUser -> ContractId AppPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppPayment)
 acceptPaymentRequest app user transferRequest coin = do
-  context <- getTransferContext app user
+  context <- getPaymentTransferContext app user
   Right (accept, change) <- submitUser user.userId $ exerciseCmd transferRequest AppPaymentRequest_Accept with
     inputs = [InputCoin coin]
     context
@@ -154,7 +154,7 @@ acceptPaymentRequest app user transferRequest coin = do
 
 acceptMultiPaymentRequest : CCApp -> CCUser -> ContractId AppMultiPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppMultiPayment)
 acceptMultiPaymentRequest app sender transferRequest coin = do
-  context <- getTransferContext app sender
+  context <- getPaymentTransferContext app sender
   Right (accept, change) <- submitUser sender.userId $ exerciseCmd transferRequest AppMultiPaymentRequest_Accept with
     inputs = [InputCoin coin]
     context
@@ -239,7 +239,7 @@ testBatchPaymentRequests = script do
     svcParty = app.svc
     validatorParty = validator
 
-  context <- getTransferContext app alice
+  context <- getPaymentTransferContext app alice
   acceptedPaymentsCid <- submitUser alice.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     context
     inputs = [InputCoin coin]
@@ -276,7 +276,7 @@ testBatchPaymentRequests = script do
   (transferRequest3, deliveryOffer3) <- createPaymentRequest app alice.primaryParty bob.primaryParty 10000.0
   (transferRequest4, deliveryOffer4) <- createMultiPaymentRequest app alice.primaryParty bob.primaryParty alice.primaryParty 3.0
   -- trying to fulfill the request for 10,000 CC will fail
-  context <- getTransferContext app alice
+  context <- getPaymentTransferContext app alice
   outcomes <- submitUser alice.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
     inputs = [InputCoin coin]
     operations = [CO_AppPayment transferRequest3, CO_AppMultiPayment transferRequest4]

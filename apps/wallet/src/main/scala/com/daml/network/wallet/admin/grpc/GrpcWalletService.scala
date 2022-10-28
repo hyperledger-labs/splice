@@ -10,7 +10,6 @@ import com.daml.network.codegen.CN.Wallet.{CoinOperation, CoinOperationOutcome}
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.codegen.DA
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection}
-import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, Contract, Proto, Value}
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
@@ -39,7 +38,6 @@ class GrpcWalletService(
     store: WalletStore,
     treasuries: TreasuryServices,
     ledgerClient: CoinLedgerClient,
-    scanConnection: ScanConnection,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -133,7 +131,10 @@ class GrpcWalletService(
       withAuth(request.getWalletCtx) { user =>
         for {
           userStore <- getUserStore(user)
-          currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
+          validatorStore <- getUserStore(store.key.validatorUserName)
+          currentRound <- validatorStore
+            .getLatestOpenMiningRound()
+            .map(_.value.payload.round.number)
           QueryResult(_, coins) <- userStore.listContracts(coinCodegen.Coin)
           QueryResult(_, lockedCoins) <- userStore.listContracts(coinCodegen.LockedCoin)
         } yield {
@@ -150,19 +151,17 @@ class GrpcWalletService(
       withAuth(request.getWalletCtx) { user =>
         exerciseWalletAction((c, endUserWalletStore) => {
           val quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
-          for {
-            svcParty <- scanConnection.getSvcPartyId()
-          } yield {
+          Future.successful(
             CoinOperationRequest(
               CoinOperation.CO_Tap(
-                svcParty.toPrim,
+                store.key.svcParty.toPrim,
                 validatorParty.toPrim,
                 endUserWalletStore.key.endUserParty.toPrim,
                 quantity,
               ),
               () => Future.successful(()),
             )
-          }
+          )
         })(
           user,
           (outcome: CoinOperationOutcome.COO_Tap) => v0.TapResponse(Proto.encode(outcome.body)),
@@ -195,9 +194,12 @@ class GrpcWalletService(
       withAuth(request.getWalletCtx) { user =>
         for {
           userStore <- getUserStore(user)
+          validatorStore <- getUserStore(store.key.validatorUserName)
           QueryResult(_, coins) <- userStore.listContracts(coinCodegen.Coin)
           QueryResult(_, lockedCoins) <- userStore.listContracts(coinCodegen.LockedCoin)
-          currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
+          currentRound <- validatorStore
+            .getLatestOpenMiningRound()
+            .map(_.value.payload.round.number)
         } yield {
           val unlockedHoldingFees =
             coins.view.map(c => CoinUtil.holdingFee(c.payload, currentRound)).sum
@@ -662,20 +664,18 @@ class GrpcWalletService(
           val endUserParty = userStore.key.endUserParty
           val quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
           val receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
-          for {
-            svcUser <- scanConnection.getSvcPartyId()
-          } yield {
+          Future.successful(
             CoinOperationRequest(
               CoinOperation.CO_ChannelTransfer(
                 endUserParty.toPrim,
                 receiverParty.toPrim,
-                svcUser.toPrim,
+                store.key.svcParty.toPrim,
                 quantity,
                 "wallet: execute direct transfer",
               ),
-              () => lookupPaymentChannel(userStore, svcUser.toPrim, receiverParty.toPrim),
+              () => lookupPaymentChannel(userStore, store.key.svcParty.toPrim, receiverParty.toPrim),
             )
-          }
+          )
         })(
           user,
           (_: CoinOperationOutcome.COO_AcceptedChannelTransfer) => Empty(),
@@ -885,12 +885,10 @@ class GrpcWalletService(
       inputs: Seq[coinRulesCodegen.TransferInput],
       outputs: Seq[coinRulesCodegen.TransferOutput],
   )(implicit tc: TraceContext) = {
-    val svcParty = userStore.key.svcParty
     val party = userStore.key.endUserParty
     for {
-      transferContext <- validatorStore.getTransferContext()
-      cmd = coinRulesCodegen.CoinRules
-        .key(svcParty.toPrim)
+      transferContext <- validatorStore.getPaymentTransferContext()
+      cmd = transferContext.coinRules
         .exerciseCoinRules_TryTransfer(
           coinRulesCodegen.Transfer(
             sender = party.toPrim,
@@ -899,7 +897,7 @@ class GrpcWalletService(
             outputs = outputs,
             payload = "redistribute",
           ),
-          transferContext,
+          transferContext.context,
         )
       transferResults <- connection.submitWithResult(
         Seq(party),
@@ -1027,7 +1025,8 @@ class GrpcWalletService(
   )(implicit tc: TraceContext): Future[P.ContractId[coinCodegen.Coin]] = {
     val owner = userStore.key.endUserParty
     for {
-      currentRound <- scanConnection.getLatestOpenMiningRound().map(_.payload.round.number)
+      validatorStore <- getUserStore(store.key.validatorUserName)
+      currentRound <- validatorStore.getLatestOpenMiningRound().map(_.value.payload.round.number)
       QueryResult(_, coins) <- userStore.listContracts(coinCodegen.Coin)
       candidates = coins
         .filter(c => CoinUtil.currentQuantity(c.payload, currentRound) >= quantity)

@@ -1,7 +1,7 @@
 import { Contract, LedgerApiClient, buildLedgerApiClientInterface } from 'common-frontend';
 import { GroupKey } from 'common-protobuf/com/daml/network/splitwise/v0/splitwise_service_pb';
 
-import { OpenMiningRound } from '@daml.js/canton-coin/lib/CC/Round';
+import { AppTransferContext } from '@daml.js/canton-coin/lib/CC/CoinRules';
 import {
   AcceptedGroupInvite,
   GroupInvite,
@@ -131,7 +131,7 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
     provider: string,
     key: GroupKey,
     acceptedPaymentContractId: ContractId<AcceptedAppPayment>,
-    openRound: ContractId<OpenMiningRound>
+    transferContext: AppTransferContext
   ) {
     const readAs = await this.getUserReadAs(this.userId);
     await this.exerciseByKey(
@@ -146,7 +146,7 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
           id: { unpack: key.getId() },
         },
         acceptedPaymentCid: acceptedPaymentContractId,
-        openRound: openRound,
+        transferContext: transferContext,
       }
     );
   }
@@ -184,7 +184,7 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
     provider: string,
     key: GroupKey,
     acceptedPaymentContractId: ContractId<AcceptedAppMultiPayment>,
-    openRound: ContractId<OpenMiningRound>
+    transferContext: AppTransferContext
   ) {
     const readAs = await this.getUserReadAs(this.userId);
     await this.exerciseByKey(
@@ -199,7 +199,7 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
           id: { unpack: key.getId() },
         },
         acceptedPaymentCid: acceptedPaymentContractId,
-        openRound: openRound,
+        transferContext: transferContext,
       }
     );
   }

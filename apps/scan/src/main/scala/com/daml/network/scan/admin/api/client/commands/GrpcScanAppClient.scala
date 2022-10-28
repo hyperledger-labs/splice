@@ -3,7 +3,7 @@ package com.daml.network.scan.admin.api.client.commands
 import cats.syntax.either._
 import cats.syntax.traverse._
 import com.daml.ledger.api.v1.transaction.TransactionTree
-import com.daml.network.codegen.CC.{Round => roundCodegen}
+import com.daml.network.codegen.CC.{CoinRules => coinRulesCodegen, Round => roundCodegen}
 import com.daml.network.history.CoinTransaction
 import com.daml.network.scan.v0
 import com.daml.network.scan.v0.GetClosedRoundsResponse
@@ -53,8 +53,9 @@ object GrpcScanAppClient {
   }
 
   case class TransferContext(
-      openMiningRounds: Seq[Contract[roundCodegen.OpenMiningRound]],
+      coinRules: Option[Contract[coinRulesCodegen.CoinRules]],
       latestOpenMiningRound: Option[Contract[roundCodegen.OpenMiningRound]],
+      openMiningRounds: Seq[Contract[roundCodegen.OpenMiningRound]],
   )
 
   final case class GetTransferContext()
@@ -70,6 +71,9 @@ object GrpcScanAppClient {
         response: v0.GetTransferContextResponse
     ): Either[String, TransferContext] =
       for {
+        coinRules <- response.coinRules
+          .traverse(coinRules => Contract.fromProto(coinRulesCodegen.CoinRules)(coinRules))
+          .leftMap(_.toString)
         openMiningRounds <- response.openMiningRounds
           .traverse(round => Contract.fromProto(roundCodegen.OpenMiningRound)(round))
           .leftMap(_.toString)
@@ -77,8 +81,9 @@ object GrpcScanAppClient {
           .traverse(round => Contract.fromProto(roundCodegen.OpenMiningRound)(round))
           .leftMap(_.toString)
       } yield TransferContext(
-        openMiningRounds,
+        coinRules,
         latestOpenMiningRound,
+        openMiningRounds,
       )
   }
 

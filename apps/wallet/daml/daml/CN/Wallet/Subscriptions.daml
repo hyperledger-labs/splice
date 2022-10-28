@@ -6,7 +6,6 @@ import DA.Optional
 import CC.Assert
 import CC.Coin
 import CC.CoinRules
-import CC.Round
 
 -- Subscriptions flow (happy path) for reference;
 -- solid arrows represent state transitions via exercising a choice,
@@ -110,7 +109,7 @@ template SubscriptionRequest
     choice SubscriptionRequest_AcceptAndMakePayment : (ContractId SubscriptionInitialPayment, ContractId Coin)
       with
         inputs : [TransferInput]
-        context : TransferContext
+        context : PaymentTransferContext
       controller subscriptionData.sender
       do
         assertContextValid subscriptionData
@@ -145,7 +144,7 @@ template SubscriptionInitialPayment
 
     choice SubscriptionInitialPayment_Collect : (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
       with
-        openRound : ContractId OpenMiningRound
+        transferContext : AppTransferContext
       controller signatory this
       do
         assertContextValid subscriptionData
@@ -156,7 +155,7 @@ template SubscriptionInitialPayment
           nextPaymentDueAt = now `addRelTime` payData.paymentInterval
           ..
 
-        coin <- unlockAndTransfer openRound subscriptionData lockedCoin
+        coin <- unlockAndTransfer transferContext subscriptionData lockedCoin
 
         pure (subscription, state, coin)
 
@@ -192,7 +191,7 @@ template SubscriptionIdleState
     choice SubscriptionIdleState_MakePayment : (ContractId SubscriptionPayment, ContractId Coin)
       with
         inputs : [TransferInput]
-        context : TransferContext
+        context : PaymentTransferContext
       controller subscriptionData.sender
       do
         assertSubscriptionMatches subscription subscriptionData
@@ -245,14 +244,14 @@ template SubscriptionPayment
 
     choice SubscriptionPayment_Collect : (ContractId SubscriptionIdleState, ContractId Coin)
       with
-        openRound : ContractId OpenMiningRound
+        transferContext : AppTransferContext
       controller signatory this
       do
         assertSubscriptionMatches subscription subscriptionData
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt `addRelTime` payData.paymentInterval
           ..
-        coin <- unlockAndTransfer openRound subscriptionData lockedCoin
+        coin <- unlockAndTransfer transferContext subscriptionData lockedCoin
         pure (state, coin)
 
     choice SubscriptionPayment_Reject : (ContractId SubscriptionIdleState, ContractId Coin)
@@ -279,7 +278,7 @@ template SubscriptionPayment
         pure (state, coin)
 
 
-lockAndMakeChange: TransferContext -> Subscription -> SubscriptionPayData -> [TransferInput] -> Time -> Update (ContractId LockedCoin, ContractId Coin)
+lockAndMakeChange: PaymentTransferContext -> Subscription -> SubscriptionPayData -> [TransferInput] -> Time -> Update (ContractId LockedCoin, ContractId Coin)
 lockAndMakeChange context subscriptionData payData inputs now = do
   let Subscription { sender; receiver; provider; svc } = subscriptionData
   let SubscriptionPayData { paymentQuantity = lockQuantity; collectionDuration = lockDuration; .. } = payData
@@ -300,14 +299,14 @@ lockAndMakeChange context subscriptionData payData inputs now = do
          ]
        payload = "lock payment"
 
-  Right result <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer context)
+  Right result <- exercisePaymentTransfer context transfer
   let [TransferResultLockedCoin lockedCoin, TransferResultCoin senderChange] = result.createdCoins
 
   pure(lockedCoin, senderChange)
 
 
-unlockAndTransfer: ContractId OpenMiningRound -> Subscription -> ContractId LockedCoin -> Update (ContractId Coin)
-unlockAndTransfer openRound subscriptionData lockedCoin = do
+unlockAndTransfer: AppTransferContext -> Subscription -> ContractId LockedCoin -> Update (ContractId Coin)
+unlockAndTransfer transferContext subscriptionData lockedCoin = do
   let Subscription { sender; receiver; provider; svc } = subscriptionData
 
   -- unlock coin and transfer the remainder to the receiver
@@ -322,7 +321,7 @@ unlockAndTransfer openRound subscriptionData lockedCoin = do
               coinType = FloatingReceiverCoin
           ]
         payload = "transfer locked payment"
-  Right result <- exerciseByKey @CoinRules svc (CoinRules_Transfer transfer $ appTransferContext openRound)
+  Right result <- exerciseAppTransfer transferContext transfer
   let [TransferResultCoin coinCid] = result.createdCoins
 
   pure coinCid

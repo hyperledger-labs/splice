@@ -104,7 +104,6 @@ class WalletApp(
                 walletStore,
                 treasuries,
                 ledgerClient,
-                scanConnection,
                 loggerFactory = loggerFactory,
               ),
               ec,

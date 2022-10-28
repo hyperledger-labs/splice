@@ -190,17 +190,3 @@ template ValidatorReward
       do
         right <- fetch rightCid
         require "Right must match" (right == ValidatorRight with svc; validator, user)
-
-
--- | BurnOracle records the result of a process to determine the quantity of coin burned
--- in a specific issuance round.
-template BurnOracle
-  with
-    svc : Party
-    round : Round
-    quantity : Decimal
-  where
-    signatory svc
-
-    key (svc, round) : (Party, Round)
-    maintainer key._1

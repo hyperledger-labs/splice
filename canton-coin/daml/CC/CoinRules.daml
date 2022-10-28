@@ -50,9 +50,7 @@ template CoinRules
   where
     signatory svc
     observer observers -- TODO(M1-51): remove workaround for explicit disclosure
-    key svc : Party
-    maintainer key
-
+    
     nonconsuming choice CoinRules_Transfer : Either Text TransferResult
       -- ^ Execute a transfer.
       --
@@ -235,11 +233,11 @@ template CoinRulesRequest
 
     choice CoinRulesRequest_Accept : ()
       with
+        coinRules : ContractId CoinRules
         openRounds : [ContractId OpenMiningRound]
         issuingRounds : [ContractId IssuingMiningRound]
       controller svc
-      do (_, rules) <- fetchByKey @CoinRules svc
-         exerciseByKey @CoinRules svc (CoinRules_AddObserver user)
+      do exercise coinRules (CoinRules_AddObserver user)
          forA_ openRounds \round -> exercise round (OpenMiningRound_AddObserver user)
          forA_ issuingRounds \round -> exercise round (IssuingMiningRound_AddObserver user)
          pure ()
@@ -296,12 +294,36 @@ data TransferContext = TransferContext
     validatorRights : Map Party (ContractId ValidatorRight) -- ^ Map from user to ValidatorRight contract.
   deriving (Show, Eq)
 
--- Helper to construct transfer context for third-party apps.
-appTransferContext : ContractId OpenMiningRound -> TransferContext
-appTransferContext openMiningRound = TransferContext with
+data PaymentTransferContext = PaymentTransferContext
+  with
+    coinRules : ContractId CoinRules
+    context : TransferContext
+  deriving (Eq, Show)
+
+exercisePaymentTransfer : PaymentTransferContext -> Transfer -> Update (Either Text TransferResult)
+exercisePaymentTransfer PaymentTransferContext{..} transfer =
+  exercise coinRules CoinRules_Transfer with
+    transfer
+    context
+
+data AppTransferContext = AppTransferContext
+  with
+    coinRules : ContractId CoinRules
+    openMiningRound : ContractId OpenMiningRound
+  deriving (Show, Eq)
+
+-- | Helper to construct transfer context with only coin inputs
+coinTransferContext : ContractId OpenMiningRound -> TransferContext
+coinTransferContext openMiningRound = TransferContext with
   openMiningRound
   issuingMiningRounds = Map.empty
   validatorRights = Map.empty
+
+exerciseAppTransfer : AppTransferContext -> Transfer -> Update (Either Text TransferResult)
+exerciseAppTransfer AppTransferContext{..} transfer =
+  exercise coinRules CoinRules_Transfer with
+    transfer
+    context = coinTransferContext openMiningRound
 
 -- | A way to store some debug info on the ledger.
 --

@@ -175,12 +175,12 @@ class DirectoryAutomationService(
             entryName,
           )
           for {
-            openRound <- scanConnection.getLatestOpenMiningRound()
+            transferContext <- scanConnection.getAppTransferContext()
             cmd =
               offer.contractId
                 .exerciseDirectoryEntryOffer_CollectPayment(
                   payment.contractId,
-                  openRound.contractId,
+                  transferContext,
                 )
                 .command
             _ <- connection

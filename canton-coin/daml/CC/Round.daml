@@ -67,10 +67,6 @@ template IssuingMiningRound
     observer observers
     ensure isDefinedRound round
 
-    key (svc, round) : (Party, Round)
-    maintainer key._1
-
-
     choice IssuingMiningRound_AddObserver : ContractId IssuingMiningRound
       with
         obs : Party

@@ -92,7 +92,7 @@ initiateTransfer sender provider groupKey receiver quantity =
 
 completeTransfer : CCApp -> CCUser -> Party -> GroupKey -> ContractId AcceptedAppPayment -> Script ()
 completeTransfer app sender provider groupKey acceptedPaymentCid = do
-  (openRound, _) <- getLatestOpenRound app
+  transferContext <- getAppTransferContext app
   void $ submitUser sender.userId $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider) SplitwiseInstall_CompleteTransfer with ..
 
 
@@ -102,7 +102,7 @@ initiateMultiTransfer sender provider groupKey receiverQuantities =
 
 completeMultiTransfer : CCApp -> CCUser -> Party -> GroupKey -> ContractId AcceptedAppMultiPayment -> Script ()
 completeMultiTransfer app sender provider groupKey acceptedPaymentCid = do
-  (openRound, _) <- getLatestOpenRound app
+  transferContext <- getAppTransferContext app
   void $ submitUser sender.userId $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider) SplitwiseInstall_CompleteMultiTransfer with ..
 
 testSelfHosted = script do

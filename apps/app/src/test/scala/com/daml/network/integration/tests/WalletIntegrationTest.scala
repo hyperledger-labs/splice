@@ -90,7 +90,7 @@ class WalletIntegrationTest
           aliceValidatorParty,
           aliceRemoteWallet.list().coins,
           10,
-          scan.getLatestOpenMiningRound().contractId,
+          scan.getAppTransferContext(),
         ) // Lock away 10 coins in a payment request to the same party
 
         checkBalance(
@@ -129,7 +129,7 @@ class WalletIntegrationTest
         aliceValidatorParty,
         aliceRemoteWallet.list().coins,
         25,
-        scan.getLatestOpenMiningRound().contractId,
+        scan.getAppTransferContext(),
       )
 
       aliceRemoteWallet.list().coins.length shouldBe 1
@@ -348,7 +348,7 @@ class WalletIntegrationTest
     "allow a user to list and accept subscription requests, " +
       "to list idle subscriptions, to initiate subscription payments, " +
       "and to cancel a subscription" in { implicit env =>
-        val openRound = scan.getLatestOpenMiningRound()
+        val transferContext = scan.getAppTransferContext()
         val aliceDamlUser = aliceRemoteWallet.config.damlUser
         val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
         val aliceValidatorParty = aliceValidator.getValidatorPartyId()
@@ -392,7 +392,7 @@ class WalletIntegrationTest
         }
         clue("Collect the initial payment (as the receiver), which creates the subscription") {
           val collectCommand = initialPaymentId
-            .exerciseSubscriptionInitialPayment_Collect(openRound.contractId)
+            .exerciseSubscriptionInitialPayment_Collect(transferContext)
             .command
           aliceWallet.remoteParticipant.ledger_api.commands.submit(
             actAs = Seq(aliceUserParty),
@@ -424,7 +424,7 @@ class WalletIntegrationTest
           "Collect the second payment (as the receiver), which sets the subscription back to idle"
         ) {
           val collectCommand2 = paymentId
-            .exerciseSubscriptionPayment_Collect(openRound.contractId)
+            .exerciseSubscriptionPayment_Collect(transferContext)
             .command
           aliceWallet.remoteParticipant.ledger_api.commands.submit(
             actAs = Seq(aliceUserParty),
@@ -941,9 +941,7 @@ class WalletIntegrationTest
       validatorParty: PartyId,
       coins: Seq[GrpcWalletAppClient.CoinPosition],
       quantity: Int,
-      openRound: Primitive.ContractId[roundCodegen.OpenMiningRound],
-  )(implicit
-      env: CoinTestConsoleEnvironment
+      transferContext: coinRulesCodegen.AppTransferContext,
   ): Unit = {
     val coinOpt = coins.find(_.effectiveQuantity >= quantity)
     val expirationOpt = Proto.decode(Proto.Timestamp)(20000000000000000L) // Wed May 18 2033
@@ -954,8 +952,7 @@ class WalletIntegrationTest
           Seq(userParty, validatorParty),
           optTimeout = None,
           commands = Seq(
-            coinRulesCodegen.CoinRules
-              .key(svcParty.toPrim)
+            transferContext.coinRules
               .exerciseCoinRules_Transfer(
                 coinRulesCodegen.Transfer(
                   sender = userParty.toPrim,
@@ -981,7 +978,7 @@ class WalletIntegrationTest
                   payload = "lock coins",
                 ),
                 coinRulesCodegen.TransferContext(
-                  openMiningRound = openRound,
+                  openMiningRound = transferContext.openMiningRound,
                   issuingMiningRounds = Map.empty[roundCodegen.Round, Primitive.ContractId[
                     roundCodegen.IssuingMiningRound
                   ]],

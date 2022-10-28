@@ -8,7 +8,7 @@ import DA.Action (void, when)
 import DA.Date
 import DA.Foldable (forA_)
 import qualified DA.Map as Map
-import DA.List
+import DA.List.Total
 import DA.Time
 
 import CC.Coin
@@ -125,11 +125,12 @@ requestCoinRules app user = do
 -- Note: this must not run concurrently with commands that modify the mining rounds (e.g., runNextIssuance)
 runCoinRulesAcceptBot : CCApp -> Script ()
 runCoinRulesAcceptBot app = do
+  [(coinRulesCid, _)] <- query @CoinRules app.svc
   openRounds <- query @OpenMiningRound app.svc
   issuingRounds <- query @IssuingMiningRound app.svc
   requests <- query @CoinRulesRequest app.svc
   forA_ requests $ \(requestCid, request) -> do
-    submit app.svc $ exerciseCmd requestCid $ CoinRulesRequest_Accept (fmap fst openRounds) (fmap fst issuingRounds)
+    submit app.svc $ exerciseCmd requestCid $ CoinRulesRequest_Accept coinRulesCid (fmap fst openRounds) (fmap fst issuingRounds)
   pure ()
 
 -- Issuance automation
@@ -211,15 +212,27 @@ unlockedCoins p = map fst <$> queryFilter @Coin p (\c -> c.owner == p)
 
 submitExerciseCoinRulesByKey : Choice CoinRules c r => CCApp -> [Party] -> [Party] -> c -> Script r
 submitExerciseCoinRulesByKey app actors readers arg = do
-  submitMulti actors readers $ exerciseByKeyCmd @CoinRules app.svc arg
+  (rules, _) <- fetchCoinRulesByKey app.svc
+  submitMulti actors readers $ exerciseCmd rules arg
 
 submitExerciseCoinRulesByKey' : Choice CoinRules c r => CCApp -> CCUser -> c -> Script r
 submitExerciseCoinRulesByKey' app user arg = do
-  submitUser user.userId $ exerciseByKeyCmd @CoinRules app.svc arg
+  (rules, _) <- fetchCoinRulesByKey app.svc
+  submitUser user.userId $ exerciseCmd rules arg
+
+fetchCoinRulesByKey : Party -> Script (ContractId CoinRules, CoinRules)
+fetchCoinRulesByKey svc =
+  queryCoinRulesByKey svc >>= \case
+    None -> abort "No active CoinRules contract"
+    Some rules -> pure rules
 
 queryCoinRulesByKey : Party -> Script (Optional (ContractId CoinRules, CoinRules))
-queryCoinRulesByKey svc =
-  queryContractKey @CoinRules svc svc
+queryCoinRulesByKey svc = do
+  coinRules <- query @CoinRules svc
+  case coinRules of
+    [] -> pure None
+    [coinRules] -> pure (Some coinRules)
+    rules -> abort $ "Expected 0 or 1 CoinRules contracts but got " <> show rules
 
 -- | A simple and slightly hacky-way to test payment: it just gathers all coins from
 -- the sender and transfer's the desired quantity off of them to the receiver.
@@ -245,7 +258,7 @@ pay app sender recipient coinQuantity msg = do
                 senderTransferFeeRatio = 1.0
           ]
   (openRound, _) <- getLatestOpenRound app
-  void $ submitExerciseCoinRulesByKey app [sender.primaryParty, recipient] readAs (CoinRules_Transfer with transfer, context = appTransferContext openRound)
+  void $ submitExerciseCoinRulesByKey app [sender.primaryParty, recipient] readAs (CoinRules_Transfer with transfer, context = coinTransferContext openRound)
 
 -- | Locks a coin of the given quantity to the given lock holder
 -- for the given time starting at the current time
@@ -272,7 +285,7 @@ lockTo app sender lockHolder coinQuantity lockDuration msg = do
                 expiresAt = now `addRelTime` lockDuration
           ]
   (openRound, _) <- getLatestOpenRound app
-  void $ submitExerciseCoinRulesByKey app [sender.primaryParty, lockHolder] readAs (CoinRules_Transfer with transfer, context = appTransferContext openRound)
+  void $ submitExerciseCoinRulesByKey app [sender.primaryParty, lockHolder] readAs (CoinRules_Transfer with transfer, context = coinTransferContext openRound)
 
 -- | Deposit all coins together with new issuances into a single coin.
 runCoinDepositBots : CCApp -> Script ()
@@ -331,9 +344,21 @@ getValidatorUsers validator = do
 getLatestOpenRound : CCApp -> Script (ContractId OpenMiningRound, OpenMiningRound)
 getLatestOpenRound app = do
   rounds <- query @OpenMiningRound app.svc
-  case reverse $ sortOn (\(_, r )-> r.round) rounds of
-    [] -> abort "No open mining rounds"
-    (r :: _) -> pure r
+  case maximumOn (\(_, r) -> r.round) rounds of
+    None -> abort "No open mining rounds"
+    Some r-> pure r
+
+getAppTransferContext : CCApp -> Script AppTransferContext
+getAppTransferContext app = do
+  (openMiningRound, _) <- getLatestOpenRound app
+  (coinRules, _) <- fetchCoinRulesByKey app.svc
+  pure AppTransferContext with ..
+
+getPaymentTransferContext : CCApp -> CCUser -> Script PaymentTransferContext
+getPaymentTransferContext app user = do
+  context <- getTransferContext app user
+  (coinRules, _) <- fetchCoinRulesByKey app.svc
+  pure PaymentTransferContext with ..  
 
 getTransferContext : CCApp -> CCUser -> Script TransferContext
 getTransferContext app user = do

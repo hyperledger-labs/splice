@@ -106,7 +106,7 @@ testSubscription = script do
 
 acceptSubscriptionRequestAndMakePayment : CCApp -> CCUser -> ContractId SubscriptionRequest -> ContractId Coin -> Script (ContractId SubscriptionInitialPayment, ContractId Coin)
 acceptSubscriptionRequestAndMakePayment app sender request coin = do
-  context <- getTransferContext app sender
+  context <- getPaymentTransferContext app sender
   submitUser sender.userId $ exerciseCmd request SubscriptionRequest_AcceptAndMakePayment with
     inputs = [InputCoin coin]
     context
@@ -114,7 +114,7 @@ acceptSubscriptionRequestAndMakePayment app sender request coin = do
 
 makeSubscriptionPayment : CCApp -> CCUser -> ContractId SubscriptionIdleState -> ContractId Coin -> Script (ContractId SubscriptionPayment, ContractId Coin)
 makeSubscriptionPayment app sender state coin = do
-  context <- getTransferContext app sender
+  context <- getPaymentTransferContext app sender
   (payment, change) <- submitUser sender.userId $ exerciseCmd state SubscriptionIdleState_MakePayment with
     inputs = [InputCoin coin]
     context
@@ -124,7 +124,7 @@ makeSubscriptionPayment app sender state coin = do
 failMakeSubscriptionPayment : CCApp -> CCUser -> ContractId SubscriptionIdleState -> ContractId Coin -> Script ()
 failMakeSubscriptionPayment app sender state coin = do
   readAs <- getUserReadAs sender.userId
-  context <- getTransferContext app sender
+  context <- getPaymentTransferContext app sender
   submitMultiMustFail [sender.primaryParty] readAs $ exerciseCmd state SubscriptionIdleState_MakePayment with
     inputs = [InputCoin coin]
     context
@@ -133,16 +133,16 @@ failMakeSubscriptionPayment app sender state coin = do
 collectInitialSubscriptionPayment : CCApp -> Party -> CCUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
 collectInitialSubscriptionPayment app provider receiver sender payment = do
   readAs <- getUserReadAs receiver.userId
-  (openRound, _) <- getLatestOpenRound app
+  transferContext <- getAppTransferContext app
   (subscription, state, coin) <- submitMulti [receiver.primaryParty, provider, sender] readAs $ exerciseCmd payment SubscriptionInitialPayment_Collect with
-    openRound
+    transferContext
   return (subscription, state, coin)
 
 
 collectSubscriptionPayment : CCApp -> Party -> CCUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId Coin)
 collectSubscriptionPayment app provider receiver sender payment = do
   readAs <- getUserReadAs receiver.userId
-  (openRound, _) <- getLatestOpenRound app
+  transferContext <- getAppTransferContext app
   (state, coin) <- submitMulti [receiver.primaryParty, provider, sender] readAs $ exerciseCmd payment SubscriptionPayment_Collect with
-    openRound
+    transferContext
   return (state, coin)

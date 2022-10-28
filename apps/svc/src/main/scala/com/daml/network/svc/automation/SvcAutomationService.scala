@@ -72,8 +72,10 @@ class SvcAutomationService(
                 QueryResult(_, openMiningRounds) <- store.listContracts(CC.Round.OpenMiningRound)
                 QueryResult(_, issuingMiningRounds) <- store
                   .listContracts(CC.Round.IssuingMiningRound)
+                QueryResult(_, coinRules) <- store.getCoinRules()
                 cmd = req.contractId
                   .exerciseCoinRulesRequest_Accept(
+                    coinRules.contractId,
                     openMiningRounds.map(_.contractId),
                     issuingMiningRounds.map(_.contractId),
                   )

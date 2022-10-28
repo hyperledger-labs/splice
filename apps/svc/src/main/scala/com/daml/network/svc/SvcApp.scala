@@ -80,7 +80,7 @@ class SvcApp(
       adminServerRegistry
         .addService(
           SvcServiceGrpc.bindService(
-            new GrpcSvcAppService(ledgerClient, config.damlUser, store.events, loggerFactory),
+            new GrpcSvcAppService(ledgerClient, config.damlUser, store, loggerFactory),
             ec,
           )
         )

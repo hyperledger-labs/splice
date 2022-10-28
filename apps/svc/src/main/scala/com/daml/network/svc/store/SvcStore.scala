@@ -11,6 +11,7 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
+import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -34,6 +35,18 @@ trait SvcStore extends AutoCloseable {
   ): Future[QueryResult[Option[Contract[CC.CoinRules.CoinRules]]]] =
     acsStore
       .findContract(CC.CoinRules.CoinRules)(_ => true)
+
+  def getCoinRules(
+  )(implicit ec: ExecutionContext): Future[QueryResult[Contract[CC.CoinRules.CoinRules]]] =
+    lookupCoinRules().map(
+      _.map(
+        _.getOrElse(
+          throw new StatusRuntimeException(
+            Status.NOT_FOUND.withDescription("No active CoinRules contract")
+          )
+        )
+      )
+    )
 
   def lookupValidatorRightByParty(
       party: PartyId

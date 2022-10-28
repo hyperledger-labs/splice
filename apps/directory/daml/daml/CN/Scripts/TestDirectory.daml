@@ -21,8 +21,6 @@ testWithSubscription = script do
   provider <- setupUser app "provider" app.svc
   user <- setupUser app "user" app.svc
 
-  (openRound, _) <- getLatestOpenRound app
-
   -- provider creates directory rules
   -- how: up to app provider
   directoryInstallRequest <- submit user.primaryParty $ createCmd DirectoryInstallRequest with
@@ -50,16 +48,17 @@ testWithSubscription = script do
   -- cc wallet accepts sbuscription and first payment and locks coin to provider
   -- how: cc wallet
 
-  context <- getTransferContext app user
+  paymentContext <- getPaymentTransferContext app user
+  appContext <- getAppTransferContext app
   (initialPaymentCid, _) <- submitUser user.userId $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
     inputs = [InputCoin coin]
-    context
+    context = paymentContext
 
   -- directory provider transactionally unlocks & transfer coins and creates directory entry and a subscription in return.
   -- how: provider on their own participant
   (entryCid, subscriptionStateCid, _) <- submitUser provider.userId $ exerciseCmd directoryInstall DirectoryInstall_CollectInitialEntryPaymentWithSubscription with
     paymentCid = initialPaymentCid
-    openRound
+    transferContext = appContext
 
   Some entry <- queryContractId user.primaryParty entryCid
   Some subscriptionState <- queryContractId user.primaryParty subscriptionStateCid
@@ -76,14 +75,14 @@ testWithSubscription = script do
   coin <- tap app user 1.5
   (paymentCid, _) <- submitUser user.userId $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputCoin coin]
-    context
+    context = paymentContext
 
   -- directory provider transactionally unlocks & transfer coins and renews directory entry in return
   -- how: provider on their own participant
   (entryCid, subscriptionStateCid, _) <- submitUser provider.userId $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryRenewalPaymentWithSubscription with
     paymentCid
     entryCid
-    openRound
+    transferContext = appContext
 
   submitMustFail provider.primaryParty $ exerciseCmd entryCid (DirectoryEntry_Expire provider.primaryParty)
 
@@ -91,18 +90,18 @@ testWithSubscription = script do
   coin <- tap app user 1.5
   submitMultiMustFail [user.primaryParty] [app.svc] $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputCoin coin]
-    context
+    context = paymentContext
 
   passTime (days 90)
 
   -- cc wallet and provider can repeat the "payment and collect" cycle indefinitely
   (paymentCid, _) <- submitUser user.userId $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputCoin coin]
-    context
+    context = paymentContext
   (entryCid, subscriptionStateCid, _) <- submitUser provider.userId $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryRenewalPaymentWithSubscription with
     paymentCid
     entryCid
-    openRound
+    transferContext = appContext
 
   submitMustFail provider.primaryParty $ exerciseCmd entryCid (DirectoryEntry_Expire provider.primaryParty)
 
@@ -126,7 +125,8 @@ testWithRegularPayment = script do
   provider <- setupUser app "provider" app.svc
   user <- setupUser app "user" app.svc
 
-  context <- getTransferContext app user
+  paymentContext <- getPaymentTransferContext app user
+  appContext <- getAppTransferContext app
 
   -- provider creates directory rules
   -- how: up to app provider
@@ -161,14 +161,14 @@ testWithRegularPayment = script do
   -- how: cc wallet
   Right (acceptedAppPaymentCid, _) <- submitUser user.userId $ exerciseCmd appPaymentRequest AppPaymentRequest_Accept with
     inputs = [InputCoin coin]
-    context
+    context = paymentContext
 
   -- directory providers transactionally unlocks & transfer coins
   -- and creates directory entry in return.
   -- how: provider on their own participant
   (entryCid, _) <- submitUser provider.userId $ exerciseCmd offerCid DirectoryEntryOffer_CollectPayment with
     acceptedAppPaymentCid
-    openRound = context.openMiningRound
+    transferContext = appContext
 
   -- we can't renew using regular payments; in the future, it won't be possible to register entries using regular payments either
 

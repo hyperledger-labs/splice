@@ -1,9 +1,8 @@
 package com.daml.network.scan.admin.api.client
 
 import com.daml.network.admin.api.client.AppConnection
-import com.daml.network.codegen.CC.{Round => roundCodegen}
+import com.daml.network.codegen.CC.{CoinRules as coinRulesCodegen}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
-import com.daml.network.util.Contract
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
@@ -51,14 +50,21 @@ final class ScanConnection(
     runCmd(GrpcScanAppClient.GetTransferContext())
   }
 
-  def getLatestOpenMiningRound()(implicit
+  def getAppTransferContext()(implicit
       traceContext: TraceContext
-  ): Future[Contract[roundCodegen.OpenMiningRound]] =
-    getTransferContext().map(
-      _.latestOpenMiningRound.getOrElse(
-        throw new StatusRuntimeException(
-          Status.FAILED_PRECONDITION.withDescription("No open mining round")
-        )
+  ): Future[coinRulesCodegen.AppTransferContext] =
+    getTransferContext().map { context =>
+      val coinRules = context.coinRules.getOrElse(throw notFound("No active CoinRules contract"))
+      val openMiningRound = context.latestOpenMiningRound.getOrElse(
+        throw notFound("No active OpenMiningRound contract")
       )
-    )
+      coinRulesCodegen.AppTransferContext(
+        coinRules.contractId,
+        openMiningRound.contractId,
+      )
+    }
+
+  private def notFound(description: String) = new StatusRuntimeException(
+    Status.NOT_FOUND.withDescription(description)
+  )
 }

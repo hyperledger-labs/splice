@@ -5,7 +5,7 @@ import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionRespons
 import com.daml.ledger.client.binding.{Contract, Primitive, TemplateCompanion}
 import com.daml.network.codegen.CC
 import com.daml.network.environment.CoinLedgerClient
-import com.daml.network.svc.store.SvcEventsStore
+import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0.SvcServiceGrpc
 import com.daml.network.svc.{SvcApp, v0}
 import com.daml.network.util.Proto
@@ -21,7 +21,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class GrpcSvcAppService(
     ledgerClient: CoinLedgerClient,
     svcUserName: String,
-    store: SvcEventsStore,
+    store: SvcStore,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -63,8 +63,8 @@ class GrpcSvcAppService(
       for {
         svc <- connection.getPrimaryParty(svcUserName)
         price = Proto.tryDecode(Proto.BigDecimal)(request.coinPrice)
-        cmd = CC.CoinRules.CoinRules
-          .key(svc.toPrim)
+        coinRules <- store.getCoinRules()
+        cmd = coinRules.value.contractId
           .exerciseCoinRules_MiningRound_Open(price, CC.Round.Round(request.round))
         cid <- connection.submitWithResult(Seq(svc), Seq.empty, cmd)
       } yield v0.OpenRoundResponse(Proto.encode(cid))
@@ -77,10 +77,9 @@ class GrpcSvcAppService(
       for {
         svc <- connection.getPrimaryParty(svcUserName)
         openRound <- getRound(CC.Round.OpenMiningRound)(_.round)(svc, request.round)
-        cmd =
-          CC.CoinRules.CoinRules
-            .key(svc.toPrim)
-            .exerciseCoinRules_MiningRound_StartClosing(openRound)
+        coinRules <- store.getCoinRules()
+        cmd = coinRules.value.contractId
+          .exerciseCoinRules_MiningRound_StartClosing(openRound)
         cid <-
           connection.submitWithResult(Seq(svc), Seq.empty, cmd)
       } yield v0.StartClosingRoundResponse(Proto.encode(cid))
@@ -95,10 +94,9 @@ class GrpcSvcAppService(
         closingRound <- getRound(CC.Round.ClosingMiningRound)(_.round)(svc, request.round)
         rewards <- queryRewards(svc, request.round)
         totalBurn = rewards.totalBurn
-        cmd =
-          CC.CoinRules.CoinRules
-            .key(svc.toPrim)
-            .exerciseCoinRules_MiningRound_StartIssuing(closingRound, totalBurn)
+        coinRules <- store.getCoinRules()
+        cmd = coinRules.value.contractId
+          .exerciseCoinRules_MiningRound_StartIssuing(closingRound, totalBurn)
         cid <-
           connection.submitWithResult(Seq(svc), Seq.empty, cmd)
       } yield v0.StartIssuingRoundResponse(Proto.encode(totalBurn), Proto.encode(cid))
@@ -110,9 +108,9 @@ class GrpcSvcAppService(
         svc <- connection.getPrimaryParty(svcUserName)
         issuingRound <- getRound(CC.Round.IssuingMiningRound)(_.round)(svc, request.round)
         totals = getTotalsPerRound(request.round)
+        coinRules <- store.getCoinRules()
         cmd =
-          CC.CoinRules.CoinRules
-            .key(svc.toPrim)
+          coinRules.value.contractId
             .exerciseCoinRules_MiningRound_Close(
               issuingRound,
               totals.transferFees,
@@ -137,7 +135,7 @@ class GrpcSvcAppService(
   )
 
   private def getTotalsPerRound(round: Long): RoundTotals = {
-    val transfers = store.getTransferSummariesPerRound(round)
+    val transfers = store.events.getTransferSummariesPerRound(round)
     transfers.foldLeft(RoundTotals())((t, transfer) => {
       RoundTotals(
         t.transferFees + transfer.totalTransferFees,
@@ -155,9 +153,9 @@ class GrpcSvcAppService(
       for {
         svc <- connection.getPrimaryParty(svcUserName)
         closedRound <- getRound(CC.Round.ClosedMiningRound)(_.round)(svc, request.round)
+        coinRules <- store.getCoinRules()
         cmd =
-          CC.CoinRules.CoinRules
-            .key(svc.toPrim)
+          coinRules.value.contractId
             .exerciseCoinRules_MiningRound_Archive(closedRound)
         _ <- connection.submitWithResult(Seq(svc), Seq.empty, cmd)
       } yield Empty()

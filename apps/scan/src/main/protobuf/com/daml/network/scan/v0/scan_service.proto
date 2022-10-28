@@ -22,8 +22,9 @@ message GetSvcPartyIdResponse {
 // wallet, so it only includes what third-party apps need to
 // set in the transfer context.
 message GetTransferContextResponse {
-  repeated com.daml.network.v0.Contract open_mining_rounds = 1;
-  com.daml.network.v0.Contract latest_open_mining_round = 2;
+  com.daml.network.v0.Contract coin_rules = 1;
+  com.daml.network.v0.Contract latest_open_mining_round = 3;
+  repeated com.daml.network.v0.Contract open_mining_rounds = 2;
 }
 
 message GetHistoryResponse {

@@ -91,32 +91,52 @@ trait EndUserWalletStore extends AutoCloseable {
       result.map(
         _.getOrElse(
           throw new StatusRuntimeException(
-            Status.FAILED_PRECONDITION.withDescription("No active OpenMiningRound contract")
+            Status.NOT_FOUND.withDescription("No active OpenMiningRound contract")
           )
         )
       )
     }
 
+  def getCoinRules()(implicit
+      ec: ExecutionContext
+  ): Future[QueryResult[Contract[coinRulesCodegen.CoinRules]]] =
+    findContract(coinRulesCodegen.CoinRules).map(
+      _.map(
+        _.getOrElse(
+          throw new StatusRuntimeException(
+            Status.NOT_FOUND.withDescription("No active CoinRules contract")
+          )
+        )
+      )
+    )
+
   /** Get the context required for executing a transfer. This must be run
     * on the store of the validator user since the primary party of end users
     * is not a stakeholder on the contracts used here.
     */
-  def getTransferContext()(implicit
+  def getPaymentTransferContext()(implicit
       ec: ExecutionContext
-  ): Future[coinRulesCodegen.TransferContext] =
+  ): Future[coinRulesCodegen.PaymentTransferContext] =
     for {
+      coinRules <- getCoinRules()
       openRound <- getLatestOpenMiningRound()
       issuingMiningRounds <- listContracts(roundCodegen.IssuingMiningRound)
       validatorRights <- listContracts(coinCodegen.ValidatorRight)
-    } yield coinRulesCodegen.TransferContext(
-      openRound.value.contractId,
-      validatorRights = validatorRights.value
-        .map(r => (r.payload.user, r.contractId))
-        .toMap[Primitive.Party, Primitive.ContractId[coinCodegen.ValidatorRight]],
-      issuingMiningRounds = issuingMiningRounds.value
-        .map(r => (r.payload.round, r.contractId))
-        .toMap[roundCodegen.Round, Primitive.ContractId[roundCodegen.IssuingMiningRound]],
-    )
+    } yield {
+      val transferContext = coinRulesCodegen.TransferContext(
+        openRound.value.contractId,
+        validatorRights = validatorRights.value
+          .map(r => (r.payload.user, r.contractId))
+          .toMap[Primitive.Party, Primitive.ContractId[coinCodegen.ValidatorRight]],
+        issuingMiningRounds = issuingMiningRounds.value
+          .map(r => (r.payload.round, r.contractId))
+          .toMap[roundCodegen.Round, Primitive.ContractId[roundCodegen.IssuingMiningRound]],
+      )
+      coinRulesCodegen.PaymentTransferContext(
+        coinRules.value.contractId,
+        transferContext,
+      )
+    }
 
 }
 
@@ -231,6 +251,7 @@ object EndUserWalletStore {
         ),
         mkFilter(roundCodegen.OpenMiningRound)(co => co.payload.svc == svc),
         mkFilter(roundCodegen.IssuingMiningRound)(co => co.payload.svc == svc),
+        mkFilter(coinRulesCodegen.CoinRules)(co => co.payload.svc == svc),
       ),
     )
   }
