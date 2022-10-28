@@ -254,9 +254,8 @@ template AcceptedAppPayment
         openRound : ContractId OpenMiningRound
       controller sender, receiver, provider
       do
-        -- archive delivery offer
-        exercise deliveryOffer DeliveryOffer_Archive
-
+        -- check the delivery offer is still active
+        _ <- fetchFromInterface @DeliveryOffer deliveryOffer
         -- unlock coin and transfer the remainder to the receiver
         coin <- exercise lockedCoin Coin_Unlock
         let transfer = Transfer with

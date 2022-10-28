@@ -71,11 +71,30 @@ template DirectoryEntryRequest
 template DirectoryEntryOffer
   with
     entryRequest : DirectoryEntryRequest
+    entryLifetime : RelTime
   where
     signatory signatory entryRequest
 
     interface instance DeliveryOffer for DirectoryEntryOffer where
       view = DeliveryOfferView with description = "Directory entry request: " <> show entryRequest
+
+    postconsuming choice DirectoryEntryOffer_CollectPayment : (ContractId DirectoryEntry, ContractId Coin)
+      with
+        acceptedAppPaymentCid : ContractId AcceptedAppPayment
+        openRound : ContractId OpenMiningRound
+      controller entryRequest.provider
+      do -- deliver the promised good: the entry referenced in the payment
+         acceptedAppPayment <- fetch acceptedAppPaymentCid
+         assertMsg "Payment is for this offer" (toInterfaceContractId self == acceptedAppPayment.deliveryOffer)
+         now <- getTime
+         entryCid <- case entryRequest of
+           DirectoryEntryRequest{..} -> create DirectoryEntry with
+             expiresAt = now `addRelTime` entryLifetime
+             ..
+         -- collect payment
+         coinCid <- exercise acceptedAppPaymentCid (AcceptedAppPayment_Collect openRound)
+         -- return the created contracts
+         pure (entryCid, coinCid)
 
 
 template DirectoryInstall with
@@ -180,7 +199,7 @@ template DirectoryInstall with
           with
             ..
 
-    nonconsuming choice DirectoryInstall_RequestEntryPayment : ContractId AppPaymentRequest
+    nonconsuming choice DirectoryInstall_RequestEntryPayment : (ContractId AppPaymentRequest, ContractId DirectoryEntryOffer)
       with
         requestCid : ContractId DirectoryEntryRequest
       controller provider
@@ -189,8 +208,8 @@ template DirectoryInstall with
          request.provider === provider
          request.user === user
          now <- getTime
-         offerCid <- create DirectoryEntryOffer with entryRequest = request
-         create AppPaymentRequest with
+         offerCid <- create DirectoryEntryOffer with entryRequest = request; entryLifetime
+         reqCid <- create AppPaymentRequest with
            receiver = provider
            sender = user
            provider
@@ -199,24 +218,7 @@ template DirectoryInstall with
            deliveryOffer = toInterfaceContractId offerCid
            collectionDuration = collectionDuration
            expiresAt = now `addRelTime` acceptDuration
-
-    nonconsuming choice DirectoryInstall_CollectEntryPayment : (ContractId DirectoryEntry, ContractId Coin)
-      with
-        acceptedAppPaymentCid : ContractId AcceptedAppPayment
-        openRound : ContractId OpenMiningRound
-      controller provider
-      do -- deliver the promised good: the entry referenced in the payment
-         acceptedAppPayment <- fetch acceptedAppPaymentCid
-         Some (_, offer) <- fetchFromInterface @DirectoryEntryOffer acceptedAppPayment.deliveryOffer
-         now <- getTime
-         entryCid <- case offer.entryRequest of
-           DirectoryEntryRequest{..} -> create DirectoryEntry with
-             expiresAt = now `addRelTime` entryLifetime
-             ..
-         -- accept payment, which archives the offer
-         coinCid <- exercise acceptedAppPaymentCid (AcceptedAppPayment_Collect openRound)
-         -- return the created contracts
-         pure (entryCid, coinCid)
+         pure (reqCid, offerCid)
 
 
 -- | A request from a user to a directory service provider for an installation.

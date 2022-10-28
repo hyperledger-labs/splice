@@ -165,7 +165,7 @@ class DirectoryAutomationService(
             .map(_ => s"rejected accepted app payment: $reason")
         }
         def collectPayment(
-            install: Contract[directoryCodegen.DirectoryInstall],
+            offer: Contract[directoryCodegen.DirectoryEntryOffer],
             entryName: String,
             offset: String,
         ) = {
@@ -177,8 +177,8 @@ class DirectoryAutomationService(
           for {
             openRound <- scanConnection.getLatestOpenMiningRound()
             cmd =
-              install.contractId
-                .exerciseDirectoryInstall_CollectEntryPayment(
+              offer.contractId
+                .exerciseDirectoryEntryOffer_CollectPayment(
                   payment.contractId,
                   openRound.contractId,
                 )
@@ -203,23 +203,15 @@ class DirectoryAutomationService(
                 )
               )
             )
-          // shared values
-          user = PartyId.tryFromPrim(offer.payload.entryRequest.user)
           // TODO(M3-90): understand what kind of assertions are worth checking here for defensive programming
           entryName = offer.payload.entryRequest.name
-          // retrieve install for the user
-          result <- store.lookupInstall(user).flatMap {
-            case QueryResult(_, None) => rejectPayment("directory install contract not found.")
-
-            case QueryResult(_, Some(install)) =>
-              // check whether the entry already exists
-              store.lookupEntryByName(entryName).flatMap {
-                case QueryResult(_, Some(entry)) =>
-                  rejectPayment(s"entry already exists and owned by ${entry.payload.user}.")
-                case QueryResult(off, None) =>
-                  // collect the payment and create the entry
-                  collectPayment(install, entryName, off)
-              }
+          // check whether the entry already exists
+          result <- store.lookupEntryByName(entryName).flatMap {
+            case QueryResult(_, Some(entry)) =>
+              rejectPayment(s"entry already exists and owned by ${entry.payload.user}.")
+            case QueryResult(off, None) =>
+              // collect the payment and create the entry
+              collectPayment(offer, entryName, off)
           }
         } yield result
       }
