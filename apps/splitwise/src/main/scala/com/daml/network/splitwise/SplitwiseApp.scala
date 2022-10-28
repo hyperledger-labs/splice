@@ -56,19 +56,23 @@ class SplitwiseApp(
       party: PartyId,
   ): Future[SplitwiseApp.State] = for {
     store <- Future.successful(SplitwiseStore(party, storage, loggerFactory))
-    automation = new SplitwiseAutomationService(
-      store,
-      ledgerClient,
-      retryProvider = this,
-      loggerFactory,
-      timeouts,
-    )
+    connection = ledgerClient.connection("SplitwiseApp init")
+    readAs <- connection.getUserReadAs(config.providerUser)
     scanConnection =
       new ScanConnection(
         config.remoteScan.clientAdminApi,
         coinAppParameters.processingTimeouts,
         loggerFactory,
       )
+    automation = new SplitwiseAutomationService(
+      store,
+      ledgerClient,
+      readAs,
+      scanConnection,
+      retryProvider = this,
+      loggerFactory,
+      timeouts,
+    )
   } yield {
     adminServerRegistry
       .addService(

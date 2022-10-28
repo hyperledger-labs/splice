@@ -162,7 +162,6 @@ class SplitwiseFrontendIntegrationTest
         textField("user-id-field").value = bobDamlUser
         click on "login-button"
 
-        click on className("redeem-button")
         eventually() {
           inside(findAll(className("balances-table-row")).toSeq) { case Seq(row1, row2) =>
             row1.childElement(className("balances-table-receiver")).text should matchText(
@@ -254,11 +253,7 @@ class SplitwiseFrontendIntegrationTest
       }
 
       withFrontEnd("bobSplitwise") { implicit webDriver =>
-        click on className(
-          "redeem-button"
-        ) // I find terminology very confusing - shouldn't alice redeem the payment? I expect this is 'complete/confirm transfer'
         eventually(scaled(5 seconds)) {
-          screenshot()
           inside(findAll(className("balances-table-row")).toSeq) { case Seq(row) =>
             row.childElement(className("balances-table-receiver")).text should matchText(aliceCns)
             row.childElement(className("balances-table-quantity")).text.toDouble shouldBe 0.0

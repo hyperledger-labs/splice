@@ -4,6 +4,7 @@ import akka.stream.Materializer
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.codegen.CN.Splitwise as splitwiseCodegen
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.store.SplitwiseStore
 import com.daml.network.store.AcsStore.QueryResult
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -18,6 +19,8 @@ import scala.concurrent.ExecutionContextExecutor
 class SplitwiseAutomationService(
     store: SplitwiseStore,
     ledgerClient: CoinLedgerClient,
+    readAs: Set[PartyId],
+    scanConnection: ScanConnection,
     retryProvider: CoinRetries,
     protected val loggerFactory: NamedLoggerFactory,
     processingTimeouts: ProcessingTimeout,
@@ -86,5 +89,102 @@ class SplitwiseAutomationService(
               .map(_ => "accepted install request.")
         }
       }
+  })
+
+  registerRequestHandler("handleAcceptedAppPaymentRequests", store.streamAcceptedAppPayments())(
+    payment => { implicit traceContext =>
+      val sender = PartyId.tryFromPrim(payment.payload.sender)
+      val transferInProgressId = payment.payload.deliveryOffer
+        .unsafeToTemplate[splitwiseCodegen.TransferInProgress]
+      store.lookupInstall(sender).flatMap {
+        case QueryResult(_, None) =>
+          val msg = s"Install contract not found for sender party $sender"
+          logger.warn(msg)
+          val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject()
+          connection
+            .submitCommand(
+              actAs = Seq(provider),
+              readAs = Seq.empty,
+              command = Seq(cmd.command),
+            )
+            .map(_ => s"rejected accepted app payment: $msg")
+        case QueryResult(_, Some(install)) =>
+          for {
+            transferContext <- scanConnection.getAppTransferContext()
+            transferInProgress <- store
+              .lookupTransferInProgressById(transferInProgressId)
+              .map(
+                _.value.getOrElse(
+                  throw new IllegalStateException(
+                    s"Invariant violation: transfer in progress $transferInProgressId not known"
+                  )
+                )
+              )
+            cmd = install.contractId.exerciseSplitwiseInstall_CompleteTransfer(
+              groupKey = splitwiseCodegen.GroupKey(
+                owner = transferInProgress.payload.group.owner,
+                provider = provider.toPrim,
+                id = transferInProgress.payload.group.id,
+              ),
+              acceptedPaymentCid = payment.contractId,
+              transferContext = transferContext,
+            )
+            _ <- connection.submitCommand(
+              actAs = Seq(provider),
+              readAs = readAs.toSeq,
+              command = Seq(cmd.command),
+            )
+          } yield "Completed transfer"
+      }
+    }
+  )
+
+  registerRequestHandler(
+    "handleAcceptedAppMultiPaymentRequests",
+    store.streamAcceptedAppMultiPayments(),
+  )(payment => { implicit traceContext =>
+    val sender = PartyId.tryFromPrim(payment.payload.sender)
+    val transferInProgressId = payment.payload.deliveryOffer
+      .unsafeToTemplate[splitwiseCodegen.MultiTransferInProgress]
+    store.lookupInstall(sender).flatMap {
+      case QueryResult(_, None) =>
+        val msg = s"Install contract not found for sender party $sender"
+        logger.warn(msg)
+        val cmd = payment.contractId.exerciseAcceptedAppMultiPayment_Reject()
+        connection
+          .submitCommand(
+            actAs = Seq(provider),
+            readAs = Seq.empty,
+            command = Seq(cmd.command),
+          )
+          .map(_ => s"rejected accepted app payment: $msg")
+      case QueryResult(_, Some(install)) =>
+        for {
+          transferContext <- scanConnection.getAppTransferContext()
+          transferInProgress <- store
+            .lookupMultiTransferInProgressById(transferInProgressId)
+            .map(
+              _.value.getOrElse(
+                throw new IllegalStateException(
+                  s"Invariant violation: multi transfer in progress $transferInProgressId not known"
+                )
+              )
+            )
+          cmd = install.contractId.exerciseSplitwiseInstall_CompleteMultiTransfer(
+            groupKey = splitwiseCodegen.GroupKey(
+              owner = transferInProgress.payload.group.owner,
+              provider = provider.toPrim,
+              id = transferInProgress.payload.group.id,
+            ),
+            acceptedPaymentCid = payment.contractId,
+            transferContext = transferContext,
+          )
+          _ <- connection.submitCommand(
+            actAs = Seq(provider),
+            readAs = readAs.toSeq,
+            command = Seq(cmd.command),
+          )
+        } yield "Completed transfer"
+    }
   })
 }

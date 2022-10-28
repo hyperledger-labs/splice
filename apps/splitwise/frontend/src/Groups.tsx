@@ -1,6 +1,5 @@
 import { Contract, sameContracts, useInterval } from 'common-frontend';
 import { DirectoryEntry as DirectoryEntryComponent } from 'common-frontend';
-import { ScanServicePromiseClient } from 'common-protobuf/com/daml/network/scan/v0/scan_service_grpc_web_pb';
 import {
   GroupKey,
   ListAcceptedGroupInvitesRequest,
@@ -9,7 +8,6 @@ import {
   ListGroupsRequest,
   SplitwiseContext,
 } from 'common-protobuf/com/daml/network/splitwise/v0/splitwise_service_pb';
-import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useCallback, useState } from 'react';
 
 import {
@@ -30,17 +28,13 @@ import {
   Typography,
 } from '@mui/material';
 
-import { AppTransferContext, CoinRules } from '@daml.js/canton-coin/lib/CC/CoinRules';
-import { OpenMiningRound } from '@daml.js/canton-coin/lib/CC/Round';
 import {
   AcceptedGroupInvite,
   BalanceUpdate,
   Group as CodegenGroup,
 } from '@daml.js/splitwise/lib/CN/Splitwise';
-import { AcceptedAppPayment, AcceptedAppMultiPayment } from '@daml.js/wallet/lib/CN/Wallet';
 
 import DirectoryEntries, { Entry as DirectoryEntry } from './DirectoryEntries';
-import { useScanClient } from './contexts/ScanServiceContext';
 import { useSplitwiseLedgerApiClient } from './contexts/SplitwiseLedgerApiContext';
 import { useSplitwiseClient } from './contexts/SplitwiseServiceContext';
 import { config } from './utils';
@@ -316,120 +310,6 @@ const BalanceUpdates: React.FC<BalanceUpdatesProps> = ({ group, party }) => {
   );
 };
 
-interface AcceptedAppPaymentsProps {
-  group: Contract<CodegenGroup>;
-  provider: string;
-  party: string;
-}
-
-const getTransferContext = async (
-  scanClient: ScanServicePromiseClient
-): Promise<AppTransferContext> => {
-  const transferContext = await scanClient.getTransferContext(new Empty(), undefined);
-  const coinRules = transferContext.getCoinRules();
-  if (!coinRules) {
-    throw new Error('No active CoinRules contract');
-  }
-  const openMiningRound = transferContext.getLatestOpenMiningRound();
-  if (!openMiningRound) {
-    throw new Error('No active OpenMiningRound contract');
-  }
-  return {
-    coinRules: Contract.decode(coinRules, CoinRules).contractId,
-    openMiningRound: Contract.decode(openMiningRound, OpenMiningRound).contractId,
-  };
-};
-
-const AcceptedAppPayments: React.FC<AcceptedAppPaymentsProps> = ({ group, party, provider }) => {
-  const ledgerApiClient = useSplitwiseLedgerApiClient();
-  const scanClient = useScanClient();
-  const [acceptedAppPayments, setAcceptedAppPayments] = useState<Contract<AcceptedAppPayment>[]>(
-    []
-  );
-  const [acceptedAppMultiPayments, setAcceptedAppMultiPayments] = useState<
-    Contract<AcceptedAppMultiPayment>[]
-  >([]);
-  const fetchAcceptedAppPayments = useCallback(async () => {
-    const decoded = await ledgerApiClient.listAcceptedAppPayments(party, key(group));
-    setAcceptedAppPayments(prev => (sameContracts(prev, decoded) ? prev : decoded));
-  }, [ledgerApiClient, party, group]);
-  useInterval(fetchAcceptedAppPayments, 500);
-  const fetchAcceptedAppMultiPayments = useCallback(async () => {
-    const decoded = await ledgerApiClient.listAcceptedAppMultiPayments(party, key(group));
-    setAcceptedAppMultiPayments(prev => (sameContracts(prev, decoded) ? prev : decoded));
-  }, [ledgerApiClient, party, group]);
-  useInterval(fetchAcceptedAppMultiPayments, 500);
-
-  const onRedeem = async (acceptedAppPayment: Contract<AcceptedAppPayment>) => {
-    const transferContext = await getTransferContext(scanClient);
-    await ledgerApiClient.completeTransfer(
-      party,
-      provider,
-      key(group),
-      acceptedAppPayment.contractId,
-      transferContext
-    );
-  };
-
-  const onMultiRedeem = async (acceptedAppPayment: Contract<AcceptedAppMultiPayment>) => {
-    const transferContext = await getTransferContext(scanClient);
-    await ledgerApiClient.completeMultiTransfer(
-      party,
-      provider,
-      key(group),
-      acceptedAppPayment.contractId,
-      transferContext
-    );
-  };
-
-  const AcceptedPayment: React.FC<{ acceptedAppPayment: Contract<AcceptedAppPayment> }> = ({
-    acceptedAppPayment,
-  }) => {
-    return (
-      <ListItem>
-        {'Accepted transfer to '}
-        <DirectoryEntryComponent partyId={acceptedAppPayment.payload.receiver} />
-        <Button className="redeem-button" onClick={() => onRedeem(acceptedAppPayment)}>
-          Execute
-        </Button>
-      </ListItem>
-    );
-  };
-
-  const AcceptedMultiPayment: React.FC<{
-    acceptedAppMultiPayment: Contract<AcceptedAppMultiPayment>;
-  }> = ({ acceptedAppMultiPayment }) => {
-    return (
-      <ListItem>
-        Accepted multi-transfer
-        <Button className="redeem-button" onClick={() => onMultiRedeem(acceptedAppMultiPayment)}>
-          Execute
-        </Button>
-      </ListItem>
-    );
-  };
-
-  return (
-    <Stack sx={{ px: 2, py: 1 }}>
-      <Typography variant="button">Open transfers</Typography>
-      <List>
-        {acceptedAppPayments.map(acceptedAppPayment => (
-          <AcceptedPayment
-            acceptedAppPayment={acceptedAppPayment}
-            key={acceptedAppPayment.contractId}
-          />
-        ))}
-        {acceptedAppMultiPayments.map(acceptedAppPayment => (
-          <AcceptedMultiPayment
-            acceptedAppMultiPayment={acceptedAppPayment}
-            key={acceptedAppPayment.contractId}
-          />
-        ))}
-      </List>
-    </Stack>
-  );
-};
-
 interface GroupProps {
   directoryEntries: DirectoryEntries;
   group: Contract<CodegenGroup>;
@@ -470,8 +350,6 @@ const Group: React.FC<GroupProps> = ({ directoryEntries, group, party, provider 
       <Divider />
       {isOwner && <MembershipRequests group={group} party={party} provider={provider} />}
       <Entry group={group} directoryEntries={directoryEntries} party={party} provider={provider} />
-      <Divider />
-      <AcceptedAppPayments group={group} party={party} provider={provider} />
       <Divider />
       <Balances group={group} party={party} provider={provider} />
       <Divider />

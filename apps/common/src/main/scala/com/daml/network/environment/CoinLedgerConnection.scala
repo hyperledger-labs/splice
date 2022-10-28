@@ -175,6 +175,8 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
       userRights: Seq[UserRight] = Seq.empty,
   )(implicit traceContext: TraceContext): Future[PartyId]
 
+  def getUserReadAs(username: String): Future[Set[PartyId]]
+
   def listPackages()(implicit traceContext: TraceContext): Future[Set[String]]
 
   def uploadDarFile(pkg: UploadablePackage)(implicit traceContext: TraceContext): Future[Unit]
@@ -529,6 +531,17 @@ object CoinLedgerConnection {
             Future.successful
           )
         } yield partyId
+      }
+
+      override def getUserReadAs(
+          username: String
+      ): Future[Set[PartyId]] = {
+        val userId = com.daml.lf.data.Ref.UserId.assertFromString(username)
+        for {
+          userRights <- client.userManagementClient.listUserRights(userId)
+        } yield userRights.collect { case UserRight.CanReadAs(p) =>
+          PartyId.tryFromLfParty(p)
+        }.toSet
       }
 
       override def grantUserRights(

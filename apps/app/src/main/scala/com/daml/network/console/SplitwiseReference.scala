@@ -238,27 +238,6 @@ final class RemoteSplitwiseAppReference(
     )
   }
 
-  @Help.Summary(
-    "Complete the transfer by actually transferring the coins and creating a balance update."
-  )
-  def completeTransfer(
-      key: GrpcSplitwiseAppClient.GroupKey,
-      acceptedPayment: Primitive.ContractId[walletCodegen.AcceptedAppPayment],
-  ): Primitive.ContractId[splitwiseCodegen.BalanceUpdate] = {
-    val party = getUserPrimaryParty()
-    val readAs = getUserReadAs()
-    val transferContext = remoteScan.getAppTransferContext()
-    submitWithResult(
-      actAs = Seq(party),
-      readAs = readAs.toSeq,
-      installKey(party).exerciseSplitwiseInstall_CompleteTransfer(
-        key.toPrim,
-        acceptedPayment,
-        transferContext,
-      ),
-    )
-  }
-
   @Help.Summary("Initiate a transfer to multiple receiver. Must be confirmed in the wallet.")
   def initiateMultiTransfer(
       key: GrpcSplitwiseAppClient.GroupKey,
@@ -271,27 +250,6 @@ final class RemoteSplitwiseAppReference(
       installKey(party).exerciseSplitwiseInstall_InitiateMultiTransfer(
         key.toPrim,
         receiverQuantities,
-      ),
-    )
-  }
-
-  @Help.Summary(
-    "Complete the multi-transfer by actually transferring the coins and creating a balance update."
-  )
-  def completeMultiTransfer(
-      key: GrpcSplitwiseAppClient.GroupKey,
-      acceptedPayment: Primitive.ContractId[walletCodegen.AcceptedAppMultiPayment],
-  ): Seq[Primitive.ContractId[splitwiseCodegen.BalanceUpdate]] = {
-    val party = getUserPrimaryParty()
-    val readAs = getUserReadAs()
-    val transferContext = remoteScan.getAppTransferContext()
-    submitWithResult(
-      actAs = Seq(party),
-      readAs = readAs.toSeq,
-      installKey(party).exerciseSplitwiseInstall_CompleteMultiTransfer(
-        key.toPrim,
-        acceptedPayment,
-        transferContext,
       ),
     )
   }

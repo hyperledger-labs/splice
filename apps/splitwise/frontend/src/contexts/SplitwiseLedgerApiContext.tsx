@@ -1,7 +1,6 @@
 import { Contract, LedgerApiClient, buildLedgerApiClientInterface } from 'common-frontend';
 import { GroupKey } from 'common-protobuf/com/daml/network/splitwise/v0/splitwise_service_pb';
 
-import { AppTransferContext } from '@daml.js/canton-coin/lib/CC/CoinRules';
 import {
   AcceptedGroupInvite,
   GroupInvite,
@@ -126,31 +125,6 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
     );
   }
 
-  async completeTransfer(
-    user: string,
-    provider: string,
-    key: GroupKey,
-    acceptedPaymentContractId: ContractId<AcceptedAppPayment>,
-    transferContext: AppTransferContext
-  ) {
-    const readAs = await this.getUserReadAs(this.userId);
-    await this.exerciseByKey(
-      [user],
-      readAs,
-      SplitwiseInstall.SplitwiseInstall_CompleteTransfer,
-      { _1: user, _2: provider },
-      {
-        groupKey: {
-          owner: key.getOwnerPartyId(),
-          provider: key.getProviderPartyId(),
-          id: { unpack: key.getId() },
-        },
-        acceptedPaymentCid: acceptedPaymentContractId,
-        transferContext: transferContext,
-      }
-    );
-  }
-
   async initiateMultiTransfer(
     sender: string,
     provider: string,
@@ -175,31 +149,6 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
           id: { unpack: key.getId() },
         },
         receiverQuantities: qs,
-      }
-    );
-  }
-
-  async completeMultiTransfer(
-    sender: string,
-    provider: string,
-    key: GroupKey,
-    acceptedPaymentContractId: ContractId<AcceptedAppMultiPayment>,
-    transferContext: AppTransferContext
-  ) {
-    const readAs = await this.getUserReadAs(this.userId);
-    await this.exerciseByKey(
-      [sender],
-      readAs,
-      SplitwiseInstall.SplitwiseInstall_CompleteMultiTransfer,
-      { _1: sender, _2: provider },
-      {
-        groupKey: {
-          owner: key.getOwnerPartyId(),
-          provider: key.getProviderPartyId(),
-          id: { unpack: key.getId() },
-        },
-        acceptedPaymentCid: acceptedPaymentContractId,
-        transferContext: transferContext,
       }
     );
   }

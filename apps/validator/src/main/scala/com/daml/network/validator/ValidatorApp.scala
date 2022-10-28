@@ -3,6 +3,7 @@ package com.daml.network.validator
 import akka.actor.ActorSystem
 import cats.implicits._
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.ledger.api.domain.UserRight.CanReadAs
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.network.codegen.CC.CoinRules.CoinRulesRequest
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
@@ -77,11 +78,15 @@ class ValidatorApp(
       connection: CoinLedgerConnection,
       name: String,
       instance: AppInstance,
+      validatorParty: PartyId,
   ): Future[Unit] = {
     logger.info(s"Attempting to setup app $name...")
     for {
       _ <- instance.dars.traverse_(dar => connection.uploadDarFile(dar))
-      party <- connection.getOrAllocateParty(instance.serviceUser)
+      party <- connection.getOrAllocateParty(
+        instance.serviceUser,
+        Seq(CanReadAs(validatorParty.toLf)),
+      )
     } yield {
       logger.info(
         s"Setup app $name with service user ${instance.serviceUser},  primary party $party, and uploaded ${instance.dars}."
@@ -196,7 +201,7 @@ class ValidatorApp(
         timeouts,
       )
       _ <- config.appInstances.toList.traverse({ case (name, instance) =>
-        setupAppInstance(connection, name, instance)
+        setupAppInstance(connection, name, instance, validatorParty)
       })
       _ <- createWalletAppInstallAndValidatorRight(
         connection,

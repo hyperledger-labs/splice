@@ -213,7 +213,7 @@ template AppPaymentRequest
                 [ OutputSenderCoin with
                     exactQuantity = Some quantity
                     lock = Some TimeLock with
-                      holder = receiver
+                      holder = provider
                       expiresAt = now `addRelTime` collectionDuration
                 , OutputSenderCoin with
                     exactQuantity = None

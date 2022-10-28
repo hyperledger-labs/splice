@@ -2,7 +2,8 @@ package com.daml.network.splitwise.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
+import com.daml.ledger.client.binding.Primitive
+import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen, Wallet => walletCodegen}
 import com.daml.network.splitwise.store.memory.InMemorySplitwiseStore
 import com.daml.network.store.AcsStore
 import com.daml.network.util.Contract
@@ -26,8 +27,25 @@ trait SplitwiseStore extends AutoCloseable {
   ): Future[QueryResult[Option[Contract[splitwiseCodegen.SplitwiseInstall]]]] =
     acsStore.findContract(splitwiseCodegen.SplitwiseInstall)(co => co.payload.user == user.toPrim)
 
+  def lookupTransferInProgressById(
+      id: Primitive.ContractId[splitwiseCodegen.TransferInProgress]
+  ): Future[QueryResult[Option[Contract[splitwiseCodegen.TransferInProgress]]]] =
+    acsStore.lookupContractById(splitwiseCodegen.TransferInProgress)(id)
+
+  def lookupMultiTransferInProgressById(
+      id: Primitive.ContractId[splitwiseCodegen.MultiTransferInProgress]
+  ): Future[QueryResult[Option[Contract[splitwiseCodegen.MultiTransferInProgress]]]] =
+    acsStore.lookupContractById(splitwiseCodegen.MultiTransferInProgress)(id)
+
   def streamInstallRequests(): Source[Contract[splitwiseCodegen.SplitwiseInstallRequest], NotUsed] =
     acsStore.streamContracts(splitwiseCodegen.SplitwiseInstallRequest)
+
+  def streamAcceptedAppPayments(): Source[Contract[walletCodegen.AcceptedAppPayment], NotUsed] =
+    acsStore.streamContracts(walletCodegen.AcceptedAppPayment)
+
+  def streamAcceptedAppMultiPayments()
+      : Source[Contract[walletCodegen.AcceptedAppMultiPayment], NotUsed] =
+    acsStore.streamContracts(walletCodegen.AcceptedAppMultiPayment)
 }
 
 object SplitwiseStore {
@@ -48,6 +66,12 @@ object SplitwiseStore {
       Map(
         mkFilter(splitwiseCodegen.SplitwiseInstallRequest)(co => co.payload.provider == provider),
         mkFilter(splitwiseCodegen.SplitwiseInstall)(co => co.payload.provider == provider),
+        mkFilter(splitwiseCodegen.TransferInProgress)(co => co.payload.group.provider == provider),
+        mkFilter(splitwiseCodegen.MultiTransferInProgress)(co =>
+          co.payload.group.provider == provider
+        ),
+        mkFilter(walletCodegen.AcceptedAppPayment)(co => co.payload.provider == provider),
+        mkFilter(walletCodegen.AcceptedAppMultiPayment)(co => co.payload.provider == provider),
       ),
     )
   }

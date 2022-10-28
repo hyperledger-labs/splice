@@ -3,7 +3,7 @@ package com.daml.network.directory.automation
 import akka.stream.Materializer
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
-import com.daml.network.codegen.CN.{Directory as directoryCodegen, Wallet as walletCodegen}
+import com.daml.network.codegen.CN.{Directory as directoryCodegen}
 import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
@@ -158,8 +158,7 @@ class DirectoryAutomationService(
           .unsafeToTemplate[directoryCodegen.DirectoryEntryOffer]
         def rejectPayment(reason: String) = {
           logger.warn(s"rejecting accepted app payment: $reason")
-          val arg = walletCodegen.AcceptedAppPayment_Reject()
-          val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject(arg)
+          val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject()
           connection
             .submitWithResult(Seq(provider), Seq(), cmd)
             .map(_ => s"rejected accepted app payment: $reason")

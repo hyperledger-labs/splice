@@ -94,7 +94,7 @@ trait DirectoryStore extends AutoCloseable {
 
   /** All accepted app payments whose receiver is the provider.
     *
-    * Analogous to [[streamInstallRequests]], but for `DirectoryEntryRequest`
+    * Analogous to [[streamInstallRequests]], but for `AcceptedAppPayment`
     */
   def streamAcceptedAppPayments(): Source[Contract[walletCodegen.AcceptedAppPayment], NotUsed] =
     acsStore.streamContracts(walletCodegen.AcceptedAppPayment)

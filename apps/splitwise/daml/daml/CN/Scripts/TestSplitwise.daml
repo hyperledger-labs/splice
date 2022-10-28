@@ -15,39 +15,39 @@ import CC.Scripts.Util
 import CN.Wallet
 
 
-createInstall : CCApp -> CCUser -> Party -> Script (ContractId SplitwiseInstall)
+createInstall : CCApp -> CCUser -> CCUser -> Script (ContractId SplitwiseInstall)
 createInstall app user provider = do
-  request <- submit user.primaryParty $ createCmd SplitwiseInstallRequest with user = user.primaryParty, ..
-  submit provider $ exerciseCmd request SplitwiseInstallRequest_Accept
+  request <- submit user.primaryParty $ createCmd SplitwiseInstallRequest with user = user.primaryParty, provider = provider.primaryParty, ..
+  submit provider.primaryParty $ exerciseCmd request SplitwiseInstallRequest_Accept
 
-createGroup : CCApp -> CCUser -> Party -> Text -> Script (ContractId Group)
+createGroup : CCApp -> CCUser -> CCUser -> Text -> Script (ContractId Group)
 createGroup app p provider id =
-  submit p.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (p.primaryParty, provider) $ SplitwiseInstall_CreateGroup Group with
+  submit p.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (p.primaryParty, provider.primaryParty) $ SplitwiseInstall_CreateGroup Group with
     owner = p.primaryParty
-    provider = provider
+    provider = provider.primaryParty
     members = []
     id = GroupId id
     svc = app.svc
     collectionDuration = minutes 5
     acceptDuration = minutes 5
 
-createInvite : CCUser -> Party -> GroupKey -> [Party] -> Script (ContractId GroupInvite)
+createInvite : CCUser -> CCUser -> GroupKey -> [Party] -> Script (ContractId GroupInvite)
 createInvite owner provider groupKey observers = do
-  submit owner.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (owner.primaryParty, provider) SplitwiseInstall_CreateInvite with ..
+  submit owner.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (owner.primaryParty, provider.primaryParty) SplitwiseInstall_CreateInvite with ..
 
-acceptInvite : CCUser -> Party -> ContractId GroupInvite ->  Script (ContractId AcceptedGroupInvite)
+acceptInvite : CCUser -> CCUser -> ContractId GroupInvite ->  Script (ContractId AcceptedGroupInvite)
 acceptInvite invitee provider inviteCid =
-  submit invitee.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (invitee.primaryParty, provider) (SplitwiseInstall_AcceptInvite inviteCid)
+  submit invitee.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (invitee.primaryParty, provider.primaryParty) (SplitwiseInstall_AcceptInvite inviteCid)
 
-joinAllInvites : Party -> Party -> Script ()
+joinAllInvites : CCUser -> CCUser -> Script ()
 joinAllInvites owner provider = do
-  acceptedInvites <- queryFilter @AcceptedGroupInvite owner (\c -> c.groupKey.owner == owner)
-  submit owner $
-    mapA_ (\(cid, _) -> exerciseByKeyCmd @ SplitwiseInstall (owner, provider) (SplitwiseInstall_Join cid)) acceptedInvites
+  acceptedInvites <- queryFilter @AcceptedGroupInvite owner.primaryParty (\c -> c.groupKey.owner == owner.primaryParty)
+  submit owner.primaryParty $
+    mapA_ (\(cid, _) -> exerciseByKeyCmd @ SplitwiseInstall (owner.primaryParty, provider.primaryParty) (SplitwiseInstall_Join cid)) acceptedInvites
 
-net : CCUser -> Party -> GroupKey -> Map Party (Map Party Decimal) -> Script (ContractId BalanceUpdate)
+net : CCUser -> CCUser -> GroupKey -> Map Party (Map Party Decimal) -> Script (ContractId BalanceUpdate)
 net owner provider groupKey balanceChanges =
-  submit owner.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (owner.primaryParty, provider) SplitwiseInstall_Net with ..
+  submit owner.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (owner.primaryParty, provider.primaryParty) SplitwiseInstall_Net with ..
 
 
 -- | Query all balances for the current party in the given group.
@@ -82,41 +82,28 @@ insertWith f k v m =
     None -> M.insert k v m
     Some v' -> M.insert k (f v v') m
 
-enterPayment : CCUser -> Party -> GroupKey -> Decimal -> Text -> Script ()
+enterPayment : CCUser -> CCUser -> GroupKey -> Decimal -> Text -> Script ()
 enterPayment payer provider groupKey quantity description =
-  void $ submit payer.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (payer.primaryParty, provider) SplitwiseInstall_EnterPayment with ..
+  void $ submit payer.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (payer.primaryParty, provider.primaryParty) SplitwiseInstall_EnterPayment with ..
 
-initiateTransfer : CCUser -> Party -> GroupKey -> Party -> Decimal -> Script (ContractId AppPaymentRequest)
+initiateTransfer : CCUser -> CCUser -> GroupKey -> Party -> Decimal -> Script (ContractId AppPaymentRequest)
 initiateTransfer sender provider groupKey receiver quantity =
-  submit sender.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider) SplitwiseInstall_InitiateTransfer with ..
+  submit sender.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider.primaryParty) SplitwiseInstall_InitiateTransfer with ..
 
-completeTransfer : CCApp -> CCUser -> Party -> GroupKey -> ContractId AcceptedAppPayment -> Script ()
+completeTransfer : CCApp -> CCUser -> CCUser -> GroupKey -> ContractId AcceptedAppPayment -> Script ()
 completeTransfer app sender provider groupKey acceptedPaymentCid = do
   transferContext <- getAppTransferContext app
-  void $ submitUser sender.userId $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider) SplitwiseInstall_CompleteTransfer with ..
+  void $ submitUser provider.userId $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider.primaryParty) SplitwiseInstall_CompleteTransfer with ..
 
 
-initiateMultiTransfer : CCUser -> Party -> GroupKey -> [ReceiverQuantity] -> Script (ContractId AppMultiPaymentRequest)
+initiateMultiTransfer : CCUser -> CCUser -> GroupKey -> [ReceiverQuantity] -> Script (ContractId AppMultiPaymentRequest)
 initiateMultiTransfer sender provider groupKey receiverQuantities =
-  submit sender.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider) SplitwiseInstall_InitiateMultiTransfer with ..
+  submit sender.primaryParty $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider.primaryParty) SplitwiseInstall_InitiateMultiTransfer with ..
 
-completeMultiTransfer : CCApp -> CCUser -> Party -> GroupKey -> ContractId AcceptedAppMultiPayment -> Script ()
+completeMultiTransfer : CCApp -> CCUser -> CCUser -> GroupKey -> ContractId AcceptedAppMultiPayment -> Script ()
 completeMultiTransfer app sender provider groupKey acceptedPaymentCid = do
   transferContext <- getAppTransferContext app
-  void $ submitUser sender.userId $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider) SplitwiseInstall_CompleteMultiTransfer with ..
-
-testSelfHosted = script do
-  app <- setupApp
-  runNextIssuance app 1.0
-  runCoinDepositBots app
-
-  validator <- setupValidator app "validator1"
-  alice <- setupUser app "alice" validator
-  bob <- setupUser app "bob" validator
-  charlie <- setupUser app "charlie" validator
-  testCase app Parties with
-    getProvider = \x -> x.primaryParty
-    ..
+  void $ submitUser provider.userId $ exerciseByKeyCmd @SplitwiseInstall (sender.primaryParty, provider.primaryParty) SplitwiseInstall_CompleteMultiTransfer with ..
 
 testProviderHosted = script do
   app <- setupApp
@@ -129,7 +116,7 @@ testProviderHosted = script do
   charlie <- setupUser app "charlie" validator
   provider <- setupUser app "provider" validator
   testCase app Parties with
-    getProvider = const provider.primaryParty
+    getProvider = const provider
     ..
 
 -- | Parties used in the test.
@@ -142,7 +129,7 @@ data Parties = Parties
     alice : CCUser
     bob : CCUser
     charlie : CCUser
-    getProvider : CCUser -> Party
+    getProvider : CCUser -> CCUser
 
 testCase : CCApp -> Parties -> Script ()
 testCase app Parties{..} = do
@@ -151,14 +138,14 @@ testCase app Parties{..} = do
   createInstall app charlie (getProvider charlie)
 
   groupCid <- createGroup app alice (getProvider alice) "group0"
-  let groupKey = GroupKey alice.primaryParty (getProvider alice) (GroupId "group0")
+  let groupKey = GroupKey alice.primaryParty (getProvider alice).primaryParty (GroupId "group0")
   groupInviteCid <- createInvite alice (getProvider alice) groupKey [bob.primaryParty, charlie.primaryParty]
 
   acceptInvite bob (getProvider bob) groupInviteCid
-  joinAllInvites alice.primaryParty (getProvider alice)
+  joinAllInvites alice (getProvider alice)
 
   acceptInvite charlie (getProvider charlie) groupInviteCid
-  joinAllInvites alice.primaryParty (getProvider alice)
+  joinAllInvites alice (getProvider alice)
 
   Some (_, group) <- queryContractKey @Group alice.primaryParty groupKey
   sort group.members === [bob.primaryParty, charlie.primaryParty]
