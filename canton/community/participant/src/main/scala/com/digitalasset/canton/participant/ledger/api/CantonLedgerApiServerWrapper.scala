@@ -35,7 +35,7 @@ import com.digitalasset.canton.tracing.{NoTracing, TracerProvider}
 import com.digitalasset.canton.util.EitherTUtil
 import com.digitalasset.canton.{LedgerParticipantId, checked}
 
-import java.time.{Duration as JDuration}
+import java.time.Duration as JDuration
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
@@ -71,6 +71,7 @@ object CantonLedgerApiServerWrapper extends NoTracing {
     * @param loggerFactory         canton logger factory
     * @param tracerProvider        tracer provider for open telemetry grpc injection
     * @param metrics               upstream metrics module
+    * @param envQueueSize          method to read the environment execution context queue size
     */
   case class Config(
       serverConfig: LedgerApiServerConfig,
@@ -88,6 +89,8 @@ object CantonLedgerApiServerWrapper extends NoTracing {
       tracerProvider: TracerProvider,
       metrics: Metrics,
       meteringReportKey: MeteringReportKey,
+      envQueueName: String,
+      envQueueSize: () => Long,
   ) extends NamedLogging {
     override def logger: TracedLogger = super.logger
 

@@ -17,11 +17,15 @@ import com.digitalasset.canton.metrics.MetricsConfig.MetricsFilterConfig
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.typesafe.scalalogging.LazyLogging
+import io.opentelemetry.api.metrics.Meter
+import io.opentelemetry.exporter.prometheus.PrometheusCollector
+import io.opentelemetry.sdk.metrics.{SdkMeterProvider, SdkMeterProviderBuilder}
 import io.prometheus.client.dropwizard.DropwizardExports
 
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.TimeUnit
+import scala.annotation.nowarn
 import scala.collection.concurrent
 import scala.collection.concurrent.TrieMap
 
@@ -92,10 +96,15 @@ object MetricsConfig {
 
 trait MetricsFactoryBase extends AutoCloseable {
   def reporters: Seq[metrics.Reporter]
+
   def registry: metrics.MetricRegistry
+
   def reportJVMMetrics: Boolean
 
+  def meter: Meter
+
   protected def allNodeMetrics: Seq[concurrent.Map[String, _]]
+
   protected def nodeMetricsExcept(
       toExclude: concurrent.Map[String, _]
   ): Seq[concurrent.Map[String, _]] =
@@ -130,10 +139,57 @@ trait MetricsFactoryBase extends AutoCloseable {
   override def close(): Unit = reporters.foreach(_.close())
 }
 
+//case class MetricsFactory(
+//    reporters: Seq[metrics.Reporter],
+//    registry: metrics.MetricRegistry,
+//    reportJVMMetrics: Boolean,
+//    meter: Meter,
+//) extends AutoCloseable {
+//
+//  private val envMetrics = new EnvMetrics(registry)
+//  private val participants = TrieMap[String, ParticipantMetrics]()
+//  private val domains = TrieMap[String, DomainMetrics]()
+//  private val sequencers = TrieMap[String, SequencerMetrics]()
+//  private val mediators = TrieMap[String, MediatorNodeMetrics]()
+//  private val allNodeMetrics: Seq[TrieMap[String, _]] =
+//    Seq(participants, domains, sequencers, mediators)
+//  private def nodeMetricsExcept(toExclude: TrieMap[String, _]): Seq[TrieMap[String, _]] =
+//    allNodeMetrics filterNot (_ eq toExclude)
+//
+//  object benchmark extends MetricsGroup(MetricName(MetricsFactory.prefix :+ "benchmark"), registry)
+//
+//  object health extends HealthMetrics(MetricName(MetricsFactory.prefix :+ "health"), registry)
+//
+//  // add default, system wide metrics to the metrics reporter
+//  if (reportJVMMetrics) {
+//    registry.registerAll(new JvmMetricSet) // register Daml repo JvmMetricSet
+//  }
+//
+//  protected def newRegistry(prefix: String): metrics.MetricRegistry = {
+//    val nested = new metrics.MetricRegistry()
+//    registry.register(prefix, nested)
+//    nested
+//  }
+//
+//  /** de-duplicate name if there is someone using the same name for another type of node (not sure that will ever happen)
+//    */
+//  protected def deduplicateName(
+//      name: String,
+//      nodeType: String,
+//      nodesToExclude: TrieMap[String, _],
+//  ): String =
+//    if (nodeMetricsExcept(nodesToExclude).exists(_.keySet.contains(name)))
+//      s"$nodeType-$name"
+//    else name
+//
+//  override def close(): Unit = reporters.foreach(_.close())
+//}
+
 case class MetricsFactory(
     reporters: Seq[metrics.Reporter],
     registry: metrics.MetricRegistry,
     reportJVMMetrics: Boolean,
+    meter: Meter,
 ) extends AutoCloseable
     with MetricsFactoryBase {
 
@@ -149,12 +205,12 @@ case class MetricsFactory(
     participants.getOrElseUpdate(
       name, {
         val metricName = deduplicateName(name, "participant", participants)
-        new ParticipantMetrics(MetricsFactory.prefix, newRegistry(metricName))
+        new ParticipantMetrics(MetricsFactory.prefix, newRegistry(metricName), meter)
       },
     )
   }
 
-  def forJvm: EnvMetrics = envMetrics
+  def forEnv: EnvMetrics = envMetrics
 
   def forDomain(name: String): DomainMetrics = {
     domains.getOrElseUpdate(
@@ -216,13 +272,22 @@ object MetricsFactory extends LazyLogging {
 
   def forConfig(config: MetricsConfig): MetricsFactory = {
     val registry = new metrics.MetricRegistry()
-    val reporter = registerReporter(config, registry)
-    new MetricsFactory(reporter, registry, config.reportJvmMetrics)
+    val meterProviderBuilder = SdkMeterProvider.builder()
+    val reporter = registerReporter(config, registry, meterProviderBuilder)
+    val meterProvider = meterProviderBuilder.build()
+    new MetricsFactory(
+      reporter,
+      registry,
+      config.reportJvmMetrics,
+      meterProvider.meterBuilder("daml").build(),
+    )
   }
 
+  @nowarn("msg=deprecated")
   def registerReporter(
       config: MetricsConfig,
       registry: metrics.MetricRegistry,
+      meterProviderBuilder: SdkMeterProviderBuilder,
   ): Seq[metrics.Reporter] = {
     config.reporters.map {
 
@@ -258,6 +323,7 @@ object MetricsFactory extends LazyLogging {
 
       case Prometheus(hostname, port) =>
         logger.debug(s"Exposing metrics for Prometheus on port $hostname:$port")
+        meterProviderBuilder.registerMetricReader(PrometheusCollector.create())
         new DropwizardExports(registry).register[DropwizardExports]()
         val reporter = new Reporters.Prometheus(hostname, port)
         reporter

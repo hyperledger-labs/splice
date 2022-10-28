@@ -207,10 +207,10 @@ Try forcing a clean rebuild by cleaning via SBT, e.g., `apps-common/clean` and s
 
 ### Bumping Our Canton fork
 
-Current Canton commit: `6ae6d752adf4fbf984c01c5b45e95445af0876a9`
+Current Canton commit: `c6d8cfd13267547a23c542d2c4c45e53ec2b8459`
 
 1. Check out the [Canton Open Source repo](https://github.com/digital-asset/canton) at the current Canton commit listed above.
-   NOTE: if you can't find the the comment, then you are probably using the closed source https://github.com/DACH-NY/canton repo.
+   NOTE: if you can't find the commit, then you are probably using the closed source https://github.com/DACH-NY/canton repo.
    That won't work. You need the Canton OSS repo linked above.
 2. Create a branch named `canton-bump-<sprintnr>`
 3. Define the environment variable used in the commands below using `export PATH_TO_CANTON_OSS=<your-canton-oss-repo-path>`
@@ -227,9 +227,8 @@ Current Canton commit: `6ae6d752adf4fbf984c01c5b45e95445af0876a9`
 12. Learn Canton's SDK version from `head -n15 $PATH_TO_CANTON_OSS/project/project/DamlVersions.scala`
 13. Bump the SDK/Canton versions in the following places:
     1. The current Canton commit in this `README.md`
-    2. `releaseVersionToProtocolVersion` in `ReleaseVersionToProtocolVersions.scala`
-    3. `version` in `CantonDependencies`
-    4. In `nix/canton.nix`:
+    2. `version` in `CantonDependencies`
+    3. In `nix/canton.nix`:
        1. Bump `version` to the desired canton version. You can find
           that version by looking at the corresponding SDK
           release. E.g.,
@@ -237,12 +236,14 @@ Current Canton commit: `6ae6d752adf4fbf984c01c5b45e95445af0876a9`
           lists `canton-open-source-20221011.tar.gz` under the
           artifacts so `20221011` is the Canton version.
        2. Bump `sdk_version` to the associated sdk snapshot version
-       3. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.
+       3. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation (change
+             a digit of the hash to make it fail and then `cd ..` and `cd -` out of the repo).
 14. Bump the sdk version in our own daml.yaml files via `./set-sdk.sh $sdkversion` to the same version.
 15. Create another commit, `git add -A && git commit -m"Bump Canton commit and Canton/SDK versions"`
 16. Make a PR with your changes, so CI starts churning.
-17. Test whether things compile using `sbt test:compile`.
+17. Test whether things compile using `sbt Test/compile`.
     In case of problems, find the related change in the **closed source Canton repo** and use the change and its commit message to adjust our code.
+    If there are any, remove all `*.rej` files.
 
 You can refer to https://github.com/DACH-NY/the-real-canton-coin/pull/446/commits for an example of how the update PR should look like.
 

@@ -80,12 +80,12 @@ import com.daml.ledger.api.v1.transaction_filter.{Filters, InclusiveFilters, Tra
 import com.daml.ledger.api.v1.transaction_service.TransactionServiceGrpc.TransactionServiceStub
 import com.daml.ledger.api.v1.transaction_service.*
 import com.daml.ledger.client.binding.{Primitive as P}
+import com.digitalasset.canton.LfPartyId
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand.{
   DefaultUnboundedTimeout,
   ServerEnforcedTimeout,
   TimeoutType,
 }
-import com.digitalasset.canton.admin.api.client.commands.LedgerApiCommands.CommandCompletionService.GrpcErrorStatus
 import com.digitalasset.canton.admin.api.client.commands.LedgerApiTypeWrappers.WrappedCreatedEvent
 import com.digitalasset.canton.admin.api.client.data.{
   LedgerApiUser,
@@ -102,17 +102,15 @@ import com.digitalasset.canton.networking.grpc.ForwardingStreamObserver
 import com.digitalasset.canton.participant.ledger.api.client.LedgerConnection
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.util.BinaryFileUtil
-import com.digitalasset.canton.{DiscardOps, LfPartyId}
 import com.google.protobuf.empty.Empty
 import io.grpc.*
 import io.grpc.stub.StreamObserver
 
 import java.time.Instant
 import java.util.UUID
-import java.util.concurrent.{ScheduledExecutorService, TimeUnit}
-import scala.collection.mutable.ListBuffer
+import java.util.concurrent.ScheduledExecutorService
 import scala.concurrent.duration.FiniteDuration
-import scala.concurrent.{ExecutionContext, Future, Promise, blocking}
+import scala.concurrent.{ExecutionContext, Future}
 
 object LedgerApiCommands {
 
@@ -403,14 +401,15 @@ object LedgerApiCommands {
           request: CompletionStreamRequest,
       ): Future[Seq[Completion]] = {
         import scala.jdk.DurationConverters.*
-        streamedResponse[CompletionStreamRequest, CompletionStreamResponse, Completion](
-          service.completionStream,
-          _.completions.filter(filter),
-          request,
-          expectedCompletions,
-          timeout.toScala,
-          scheduler,
-        )
+        GrpcAdminCommand
+          .streamedResponse[CompletionStreamRequest, CompletionStreamResponse, Completion](
+            service.completionStream,
+            _.completions.filter(filter),
+            request,
+            expectedCompletions,
+            timeout.toScala,
+            scheduler,
+          )
       }
 
       override def handleResponse(response: Seq[Completion]): Either[String, Seq[Completion]] =
@@ -448,7 +447,7 @@ object LedgerApiCommands {
           response.completions.filter(filter).map(_ -> checkpoint)
         }
 
-        streamedResponse[
+        GrpcAdminCommand.streamedResponse[
           CompletionStreamRequest,
           CompletionStreamResponse,
           (Completion, Option[Checkpoint]),
@@ -504,14 +503,6 @@ object LedgerApiCommands {
         response
       )
     }
-
-    object GrpcErrorStatus {
-      def unapply(ex: Throwable): Option[Status] = ex match {
-        case e: StatusException => Some(e.getStatus)
-        case re: StatusRuntimeException => Some(re.getStatus)
-        case _ => None
-      }
-    }
   }
 
   object LedgerConfigurationService {
@@ -536,7 +527,7 @@ object LedgerApiCommands {
           service: LedgerConfigurationServiceStub,
           request: GetLedgerConfigurationRequest,
       ): Future[Seq[LedgerConfiguration]] =
-        streamedResponse[
+        GrpcAdminCommand.streamedResponse[
           GetLedgerConfigurationRequest,
           GetLedgerConfigurationResponse,
           LedgerConfiguration,
@@ -750,7 +741,7 @@ object LedgerApiCommands {
           service: ActiveContractsServiceStub,
           request: GetActiveContractsRequest,
       ): Future[Seq[WrappedCreatedEvent]] = {
-        streamedResponse[
+        GrpcAdminCommand.streamedResponse[
           GetActiveContractsRequest,
           GetActiveContractsResponse,
           WrappedCreatedEvent,
@@ -1094,7 +1085,7 @@ object LedgerApiCommands {
           service: TimeServiceStub,
           request: GetTimeRequest,
       ): Future[Seq[Either[String, CantonTimestamp]]] =
-        streamedResponse[
+        GrpcAdminCommand.streamedResponse[
           GetTimeRequest,
           GetTimeResponse,
           Either[String, CantonTimestamp],
@@ -1148,64 +1139,5 @@ object LedgerApiCommands {
 
     }
 
-  }
-
-  private def streamedResponse[Request, Response, Result](
-      service: (Request, StreamObserver[Response]) => Unit,
-      extract: Response => Seq[Result],
-      request: Request,
-      expected: Int,
-      timeout: FiniteDuration,
-      scheduler: ScheduledExecutorService,
-  ): Future[Seq[Result]] = {
-    val promise = Promise[Seq[Result]]()
-    val buffer = ListBuffer[Result]()
-    val context = Context.ROOT.withCancellation()
-    def success(): Unit = blocking(buffer.synchronized {
-      context.close()
-      promise.trySuccess(buffer.toList).discard[Boolean]
-    })
-
-    context.run(() =>
-      service(
-        request,
-        new StreamObserver[Response]() {
-          override def onNext(value: Response): Unit = {
-            val extracted = extract(value)
-            blocking(buffer.synchronized {
-              if (buffer.lengthCompare(expected) < 0) {
-                buffer ++= extracted
-                if (buffer.lengthCompare(expected) >= 0) {
-                  success()
-                }
-              }
-            })
-          }
-
-          override def onError(t: Throwable): Unit = {
-            t match {
-              case GrpcErrorStatus(status) if status.getCode == Status.CANCELLED.getCode =>
-                success()
-              case _ =>
-                val _ = promise.tryFailure(t)
-            }
-          }
-
-          override def onCompleted(): Unit = {
-            success()
-          }
-        },
-      )
-    )
-    scheduler.schedule(
-      new Runnable() {
-        override def run(): Unit = {
-          val _ = context.cancel(Status.CANCELLED.asException())
-        }
-      },
-      timeout.toMillis,
-      TimeUnit.MILLISECONDS,
-    )
-    promise.future
   }
 }

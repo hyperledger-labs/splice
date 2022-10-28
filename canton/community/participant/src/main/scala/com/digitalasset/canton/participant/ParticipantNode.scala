@@ -113,6 +113,8 @@ class ParticipantNodeBootstrap(
     parentLogger: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
     meteringReportKey: MeteringReportKey,
+    envQueueName: String,
+    envQueueSize: () => Long,
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     scheduler: ScheduledExecutorService,
@@ -214,6 +216,8 @@ class ParticipantNodeBootstrap(
             tracerProvider,
             metrics.ledgerApiServer,
             meteringReportKey,
+            envQueueName,
+            envQueueSize,
           ),
           // start ledger API server iff participant replica is active
           startLedgerApiServer = sync.isActive(),
@@ -673,6 +677,8 @@ object ParticipantNodeBootstrap {
         futureSupervisor: FutureSupervisor,
         loggerFactory: NamedLoggerFactory,
         writeHealthDumpToFile: HealthDumpFunction,
+        envQueueName: String,
+        envQueueSize: () => Long,
     )(implicit
         executionContext: ExecutionContextIdlenessExecutorService,
         scheduler: ScheduledExecutorService,
@@ -693,6 +699,8 @@ object ParticipantNodeBootstrap {
         futureSupervisor: FutureSupervisor,
         loggerFactory: NamedLoggerFactory,
         writeHealthDumpToFile: HealthDumpFunction,
+        envQueueName: String,
+        envQueueSize: () => Long,
     )(implicit
         executionContext: ExecutionContextIdlenessExecutorService,
         scheduler: ScheduledExecutorService,
@@ -734,6 +742,8 @@ object ParticipantNodeBootstrap {
             loggerFactory,
             writeHealthDumpToFile,
             meteringReportKey = CommunityKey,
+            envQueueName,
+            envQueueSize,
           )
         )
         .leftMap(_.toString)

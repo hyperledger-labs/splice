@@ -9,6 +9,8 @@ import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.daml.network.wallet.metrics.WalletAppMetrics
 import com.digitalasset.canton.metrics.MetricsFactory.registerReporter
 import com.digitalasset.canton.metrics.{MetricsConfig, MetricsFactory, MetricsFactoryBase}
+import io.opentelemetry.api.metrics.Meter
+import io.opentelemetry.sdk.metrics.SdkMeterProvider
 
 import scala.collection.concurrent.TrieMap
 
@@ -16,6 +18,7 @@ case class CoinMetricsFactory(
     reporters: Seq[metrics.Reporter],
     registry: metrics.MetricRegistry,
     reportJVMMetrics: Boolean,
+    meter: Meter,
 ) extends AutoCloseable
     with MetricsFactoryBase {
   private val validators = TrieMap[String, ValidatorAppMetrics]()
@@ -85,7 +88,14 @@ case class CoinMetricsFactory(
 object CoinMetricsFactory {
   def forConfig(config: MetricsConfig): CoinMetricsFactory = {
     val registry = new metrics.MetricRegistry()
-    val reporter = registerReporter(config, registry)
-    new CoinMetricsFactory(reporter, registry, config.reportJvmMetrics)
+    val meterProviderBuilder = SdkMeterProvider.builder()
+    val reporter = registerReporter(config, registry, meterProviderBuilder)
+    val meterProvider = meterProviderBuilder.build()
+    new CoinMetricsFactory(
+      reporter,
+      registry,
+      config.reportJvmMetrics,
+      meterProvider.meterBuilder("daml").build(),
+    )
   }
 }
