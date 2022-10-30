@@ -4,6 +4,8 @@ import com.daml.network.codegen.CC.Round as roundCodegen
 import com.daml.network.store.{AcsStore, InMemoryAcsStore}
 import com.daml.network.util.Contract
 import com.daml.network.wallet.store.EndUserWalletStore
+import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 
 import scala.concurrent.*
@@ -11,6 +13,7 @@ import scala.concurrent.*
 class InMemoryEndUserWalletStore(
     override val key: EndUserWalletStore.Key,
     override protected val loggerFactory: NamedLoggerFactory,
+    override protected val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContext
 ) extends EndUserWalletStore
@@ -36,5 +39,5 @@ class InMemoryEndUserWalletStore(
       .listContracts(roundCodegen.OpenMiningRound)
       .map(_.map(contracts => contracts.sortBy(r => r.payload.round.number).lastOption))
 
-  override def close(): Unit = ()
+  override def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq()
 }

@@ -79,7 +79,7 @@ case class EndUserTreasuryService(
       Sink.foreachAsync(1)(batch =>
         executeBatchWithRetry(batch).flatMap(offset => {
           userStore
-            .signalWhenIngested(offset)(TraceContext.empty)
+            .signalWhenIngested(offset)
             .map(_ =>
               logger
                 .debug(s"Finished waiting for store to ingest offset $offset")(TraceContext.empty)

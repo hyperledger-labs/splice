@@ -28,7 +28,7 @@ import com.daml.network.util.{
   Proto,
 }
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
-import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.{Balance, ListResponse}
+import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.Balance
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
@@ -40,7 +40,7 @@ import org.slf4j.event.Level
 import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
 import scala.concurrent.duration.*
-import scala.util.{Try, Success}
+import scala.util.{Success, Try}
 
 class WalletIntegrationTest
     extends CoinIntegrationTest
@@ -67,18 +67,6 @@ class WalletIntegrationTest
 
         val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
         val aliceValidatorParty = aliceValidator.getValidatorPartyId()
-
-        // TODO(M1-92) Consider if there is a better option to handle this.
-        // Wrapped in eventually because we need to wait for the mining round to be ingested.
-        eventually() {
-          val r = loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
-            Try(aliceRemoteWallet.list()),
-            entries => forAll(entries)(_.message should include("No active OpenMiningRound")),
-          )
-          inside(r) { case Success(response) =>
-            response shouldBe ListResponse(Seq(), Seq())
-          }
-        }
 
         val exactly = (x: BigDecimal) => (x, x)
         val ranges1 = Seq(exactly(50))
@@ -695,7 +683,13 @@ class WalletIntegrationTest
       svc.openRound(1, 1)
       svc.startClosingRound(0)
       svc.startIssuingRound(0)
-      bobRemoteWallet.collectRewards(0)
+      eventually() {
+        val r = loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
+          Try(bobRemoteWallet.collectRewards(0)),
+          entries => forAll(entries)(_.message should include("No issuing mining round found")),
+        )
+        inside(r) { case Success(_) => }
+      }
       bobRemoteWallet.listValidatorRewards() shouldBe empty
       // We just check that we have a coin roughly in the right range, in particular higher than the input, rather than trying to repeat the calculation
       // for rewards.

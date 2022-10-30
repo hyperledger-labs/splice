@@ -50,7 +50,7 @@ class WalletAutomationService(
       Future {
         val endUserName = install.payload.endUserName
         val endUserParty = PartyId.tryFromPrim(install.payload.endUserParty)
-        val endUserStore = walletStore.getOrCreateEndUserStore(endUserName, endUserParty)
+        val endUserStore = walletStore.getOrCreateEndUserStore(endUserName, endUserParty, timeouts)
         val ingestionService = new AcsIngestionService(
           s"EndUserWalletStore($endUserName)",
           endUserStore.acsIngestionSink,

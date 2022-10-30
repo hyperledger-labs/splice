@@ -86,7 +86,8 @@ class WalletApp(
         validatorUserName = validatorUserInfo.userName,
         svcParty = svcParty,
       )
-      val walletStore = WalletStore(walletStoreKey, storage, loggerFactory)
+      val walletStore =
+        WalletStore(walletStoreKey, storage, loggerFactory, coinAppParameters.processingTimeouts)
       val treasuries =
         new TreasuryServices(
           ledgerClient.connection("TreasuryServices"),

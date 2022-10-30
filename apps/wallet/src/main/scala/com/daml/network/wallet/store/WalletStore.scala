@@ -7,6 +7,7 @@ import com.daml.network.store.AcsStore
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.Contract
 import com.daml.network.wallet.store.memory.InMemoryWalletStore
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -62,8 +63,9 @@ trait WalletStore extends AutoCloseable with NamedLogging {
   final def getOrCreateEndUserStore(
       endUserName: String,
       endUserParty: PartyId,
+      timeouts: ProcessingTimeout,
   ): EndUserWalletStore = {
-    val store = createEndUserStore(endUserName, endUserParty: PartyId)
+    val store = createEndUserStore(endUserName, endUserParty: PartyId, timeouts)
     endUserStores
       .putIfAbsent(endUserName, store)
       .fold(store)(existingStore => {
@@ -77,18 +79,27 @@ trait WalletStore extends AutoCloseable with NamedLogging {
     endUserStores.remove(endUserName).fold(())(store => store.close())
 
   /** Abstract method to create an end-users store. */
-  protected def createEndUserStore(endUserName: String, endUserParty: PartyId): EndUserWalletStore
+  protected def createEndUserStore(
+      endUserName: String,
+      endUserParty: PartyId,
+      timeouts: ProcessingTimeout,
+  ): EndUserWalletStore
 
   override def close(): Unit =
     Lifecycle.close(endUserStores.values.toSeq: _*)(logger)
 }
 
 object WalletStore {
-  def apply(key: Key, storage: Storage, loggerFactory: NamedLoggerFactory)(implicit
+  def apply(
+      key: Key,
+      storage: Storage,
+      loggerFactory: NamedLoggerFactory,
+      timeouts: ProcessingTimeout,
+  )(implicit
       ec: ExecutionContext
   ): WalletStore =
     storage match {
-      case _: MemoryStorage => new InMemoryWalletStore(key, loggerFactory)
+      case _: MemoryStorage => new InMemoryWalletStore(key, loggerFactory, timeouts)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

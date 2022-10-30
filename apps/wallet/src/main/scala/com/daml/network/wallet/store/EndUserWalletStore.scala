@@ -2,25 +2,30 @@ package com.daml.network.wallet.store
 
 import com.daml.ledger.client.binding.{Primitive, TemplateCompanion}
 import com.daml.network.codegen.CC.{
-  Coin => coinCodegen,
-  CoinRules => coinRulesCodegen,
-  Round => roundCodegen,
+  Coin as coinCodegen,
+  CoinRules as coinRulesCodegen,
+  Round as roundCodegen,
 }
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.store.AcsStore
 import com.daml.network.util.Contract
 import com.daml.network.wallet.store.memory.InMemoryEndUserWalletStore
-import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.lifecycle.FlagCloseableAsync
 import com.digitalasset.canton.logging.pretty.*
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.NoTracing
+import com.digitalasset.canton.util.retry
+import com.digitalasset.canton.util.retry.RetryUtil.AllExnRetryable
 import io.grpc.{Status, StatusRuntimeException}
 
+import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 
 /** A store for serving all queries for a specific wallet end-user. */
-trait EndUserWalletStore extends AutoCloseable {
+trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLogging {
   import AcsStore.QueryResult
 
   /** The sink to use for ingesting data from the ledger into this store. */
@@ -39,7 +44,7 @@ trait EndUserWalletStore extends AutoCloseable {
   def lookupInstall(): Future[QueryResult[Option[Contract[walletCodegen.WalletAppInstall]]]] =
     acsStore.findContract(walletCodegen.WalletAppInstall)(_ => true)
 
-  def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
+  def signalWhenIngested(offset: String): Future[Unit] =
     acsStore.signalWhenIngested(offset)
 
   def findContract[T](
@@ -75,26 +80,43 @@ trait EndUserWalletStore extends AutoCloseable {
   def lookupLatestOpenMiningRound(
   ): Future[QueryResult[Option[Contract[roundCodegen.OpenMiningRound]]]]
 
-  /** Wrapper around lookupLatestOpenMiningRound that fails with a grpc exception status
-    * FAILED_PRECONDITION for the common case where we just want to fail and retry
-    * if there is no active round.
+  implicit val success: retry.Success[Any] = retry.Success.always
+  val policy = (msg: String) =>
+    retry.Backoff(
+      logger,
+      this,
+      retry.Forever,
+      1.seconds,
+      10.seconds,
+      msg,
+    )
+
+  /** Wrapper around lookupLatestOpenMiningRound that retries if no open round is found,
+    * which may happen if the wallet is used before its automation starts ingesting the round contracts.
+    * TODO(M1-52): once round automation is implemented, we may want to consider replacing this with
+    *              the wallet initialization synchronizing on the first round being ingested instead.
     */
   def getLatestOpenMiningRound()(implicit
       ec: ExecutionContext
-  ): Future[QueryResult[Contract[roundCodegen.OpenMiningRound]]] =
-    lookupLatestOpenMiningRound().map { result =>
-      result.map(
-        _.getOrElse(
-          throw new StatusRuntimeException(
-            Status.NOT_FOUND.withDescription("No active OpenMiningRound contract")
+  ): Future[QueryResult[Contract[roundCodegen.OpenMiningRound]]] = {
+    policy("Waiting for open mining round to be ingested")(
+      lookupLatestOpenMiningRound().map { result =>
+        result.map(
+          _.getOrElse(
+            throw new StatusRuntimeException(
+              Status.NOT_FOUND.withDescription("No active OpenMiningRound contract")
+            )
           )
         )
-      )
-    }
+      },
+      AllExnRetryable,
+    )
+  }
 
   def getCoinRules()(implicit
       ec: ExecutionContext
-  ): Future[QueryResult[Contract[coinRulesCodegen.CoinRules]]] =
+  ): Future[QueryResult[Contract[coinRulesCodegen.CoinRules]]] = {
+
     findContract(coinRulesCodegen.CoinRules).map(
       _.map(
         _.getOrElse(
@@ -104,6 +126,7 @@ trait EndUserWalletStore extends AutoCloseable {
         )
       )
     )
+  }
 
   /** Get the context required for executing a transfer. This must be run
     * on the store of the validator user since the primary party of end users
@@ -136,11 +159,16 @@ trait EndUserWalletStore extends AutoCloseable {
 }
 
 object EndUserWalletStore {
-  def apply(key: Key, storage: Storage, loggerFactory: NamedLoggerFactory)(implicit
+  def apply(
+      key: Key,
+      storage: Storage,
+      loggerFactory: NamedLoggerFactory,
+      timeouts: ProcessingTimeout,
+  )(implicit
       ec: ExecutionContext
   ): EndUserWalletStore =
     storage match {
-      case _: MemoryStorage => new InMemoryEndUserWalletStore(key, loggerFactory)
+      case _: MemoryStorage => new InMemoryEndUserWalletStore(key, loggerFactory, timeouts)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 
