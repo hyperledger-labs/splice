@@ -20,7 +20,7 @@ test = script do
   sender <- setupUser app "sender" app.svc
   receiver <- setupUser app "receiver" app.svc
 
-  pay app app.svcUser sender.primaryParty 15.0 ""
+  tap app sender 15.0
 
   -- setup payment channel
   proposalId <- submit sender.primaryParty $ createCmd PaymentChannelProposal with
@@ -274,6 +274,5 @@ testBatchPaymentRequests = script do
     svc = app.svc
     lockedCoin = lockedCoin4
     deliveryOffer = toInterfaceContractId deliveryOffer4
-  
-  pure ()
 
+  pure ()

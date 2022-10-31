@@ -78,7 +78,7 @@ test = do
   alice <- setupUser app "alice" app.svc
   arbiter <- setupUser app "arbiter" app.svc
 
-  pay app app.svcUser alice.primaryParty 1500.0 "init"
+  tap app alice 1500.0
 
   escrow <- submitUser arbiter.userId $ createCmd (Escrow app.svc arbiter.primaryParty alice.primaryParty)
 

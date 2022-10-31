@@ -70,9 +70,9 @@ setupValidator app name = do
   user <- allocatePartyWithHint name (PartyIdHint name)
   userId <- validateUserId name
   createUser (User userId (Some user)) [CanActAs user, CanReadAs user]
-  onboardUser app user
   requestCoinRules app user
   runCoinRulesAcceptBot app
+  tap app (CCUser userId user) 1.0
   return user
 
 data CCUser = CCUser
@@ -86,14 +86,11 @@ setupUser app name validator = do
   user <- allocatePartyWithHint name (PartyIdHint name)
   userId <- validateUserId name
   createUser (User userId (Some user)) [CanActAs user, CanReadAs validator]
-  onboardUser app user
-  return (CCUser userId user)
+  let u = CCUser userId user
+  tap app u 1.0
+  return u
 
--- | onboardUser simply sets up public read for a user party
-onboardUser : CCApp -> Party -> Script ()
-onboardUser app user = do
-  -- This is a hack - to simplify later merge-bot flows that require a first coin to be present
-  pay app app.svcUser user 1.0 "Welcome!"
+
 
 getAllValidatorRights : CCApp -> Script [(ContractId ValidatorRight, ValidatorRight)]
 getAllValidatorRights app = do

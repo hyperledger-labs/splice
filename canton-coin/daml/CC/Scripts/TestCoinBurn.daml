@@ -28,7 +28,7 @@ testCoinBurn = do
   runCoinDepositBots app
 
   -- svc transfers 20 coin to user
-  pay app app.svcUser user.primaryParty 20.0 "starter pack!"
+  tap app user 20.0
   archiveTransferDebugNotes app
   runCoinDepositBots app
 
@@ -63,7 +63,7 @@ testCoinBurn = do
   runNextIssuance app 1.5
   runCoinDepositBots app
 
-  pay app app.svcUser provider2.primaryParty 75.0 "starter pack!"
+  tap app provider2 75.0
   runCoinDepositBots app
 
   runNextIssuance app 1.6

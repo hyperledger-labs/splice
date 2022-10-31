@@ -50,7 +50,7 @@ template CoinRules
   where
     signatory svc
     observer observers -- TODO(M1-51): remove workaround for explicit disclosure
-    
+
     nonconsuming choice CoinRules_Transfer : Either Text TransferResult
       -- ^ Execute a transfer.
       --
@@ -137,11 +137,11 @@ template CoinRules
             userIssuanceRatio = 1.0 - config.svcIssuanceRatio
             userCoinsPerIssuance = config.coinsIssuedPerRound * userIssuanceRatio
 
-        -- issue coin to SVC
-        create Coin with
+        -- record reward for the SVC
+        create SvcReward with
           svc
-          owner = svc
-          quantity = expiringQuantity config.holdingFee svcCoinsPerIssuance miningRound.round
+          round = miningRound.round
+          quantity = svcCoinsPerIssuance
 
         -- create issuing round
         create IssuingMiningRound with
