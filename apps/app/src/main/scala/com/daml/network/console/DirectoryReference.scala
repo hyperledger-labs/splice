@@ -1,6 +1,7 @@
 package com.daml.network.console
 
 import com.daml.ledger.client.binding.Primitive
+import com.daml.network.codegen.CN.Wallet.{Subscriptions => subsCodegen}
 import com.daml.network.codegen.CN.{Directory => codegen}
 import com.daml.network.codegen.DA
 import com.daml.network.directory.admin.api.client.commands.GrpcDirectoryAppClient
@@ -116,6 +117,24 @@ class RemoteDirectoryAppReference(
       update = codegen.DirectoryInstall
         .key(DA.Types.Tuple2(providerParty.toPrim, userParty.toPrim))
         .exerciseDirectoryInstall_RequestEntry(
+          name = name
+        ),
+    )
+  }
+
+  @Help.Summary("Request DirectoryEntry with the given name, financed via subscription payments")
+  def requestDirectoryEntryWithSubscription(
+      name: String
+  ): Primitive.ContractId[subsCodegen.SubscriptionRequest] = {
+    val providerParty = getProviderPartyId()
+    val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.damlUser)
+    LedgerApiUtils.submitWithResult(
+      ledgerApi,
+      actAs = Seq(userParty),
+      readAs = Seq.empty,
+      update = codegen.DirectoryInstall
+        .key(DA.Types.Tuple2(providerParty.toPrim, userParty.toPrim))
+        .exerciseDirectoryInstall_RequestEntryWithSubscription(
           name = name
         ),
     )

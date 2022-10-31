@@ -52,7 +52,7 @@ class DirectoryFrontendIntegrationTest extends FrontendIntegrationTest("alice") 
       }
     }
 
-    "allow requesting an entry with subscription payments" in { implicit env =>
+    "allow requesting an entry with subscription payments and then list it" in { implicit env =>
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
       aliceValidator.onboardUser(aliceDamlUser)
       aliceRemoteWallet.tap(100.0)
@@ -74,9 +74,17 @@ class DirectoryFrontendIntegrationTest extends FrontendIntegrationTest("alice") 
         eventually(scaled(5 seconds)) {
           aliceRemoteWallet.listSubscriptionRequests() should have size 1
         }
-      // The backend automation to collect initial subscription payments is
-      // not implemented yet; our requests will currently never result in
-      // actual directory entries.
+        inside(aliceRemoteWallet.listSubscriptionRequests()) { case Seq(subscriptionRequest) =>
+          aliceRemoteWallet.acceptSubscriptionRequest(subscriptionRequest.contractId)
+        }
+        eventually(scaled(10 seconds)) {
+          findAll(className("entries-table-row")) should have size 1
+        }
+        val row: Element = inside(findAll(className("entries-table-row")).toList) { case Seq(row) =>
+          row
+        }
+        val name = row.childElement(className("entries-table-name"))
+        name.text should be(entryName)
       }
     }
   }

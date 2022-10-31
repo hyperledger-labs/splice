@@ -3,6 +3,7 @@ package com.daml.network.directory.store
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.ledger.client.binding.Primitive
+import com.daml.network.codegen.CN.Wallet.Subscriptions as subsCodegen
 import com.daml.network.codegen.CN.{Directory as directoryCodegen, Wallet as walletCodegen}
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.store.AcsStore
@@ -63,6 +64,12 @@ trait DirectoryStore extends AutoCloseable {
   ): Future[QueryResult[Option[Contract[directoryCodegen.DirectoryEntryOffer]]]] =
     acsStore.lookupContractById(directoryCodegen.DirectoryEntryOffer)(id)
 
+  /** Lookup a directory entry subscription context by its id. */
+  def lookupEntryContextById(
+      id: Primitive.ContractId[directoryCodegen.DirectoryEntryContext]
+  ): Future[QueryResult[Option[Contract[directoryCodegen.DirectoryEntryContext]]]] =
+    acsStore.lookupContractById(directoryCodegen.DirectoryEntryContext)(id)
+
   /** Lookup a directory entry request by its id. */
   def lookupEntryRequestById(
       id: Primitive.ContractId[directoryCodegen.DirectoryEntryRequest]
@@ -99,6 +106,21 @@ trait DirectoryStore extends AutoCloseable {
   def streamAcceptedAppMultiPayments()
       : Source[Contract[walletCodegen.AcceptedAppMultiPayment], NotUsed] =
     acsStore.streamContracts(walletCodegen.AcceptedAppMultiPayment)
+
+  /** All accepted initial subscription payments whose receiver is the provider.
+    *
+    * Analogous to [[streamInstallRequests]], but for `SubscriptionInitialPayment`
+    */
+  def streamSubscriptionInitialPayments()
+      : Source[Contract[subsCodegen.SubscriptionInitialPayment], NotUsed] =
+    acsStore.streamContracts(subsCodegen.SubscriptionInitialPayment)
+
+  /** All accepted subscription payments whose receiver is the provider.
+    *
+    * Analogous to [[streamInstallRequests]], but for `SubscriptionPayment`
+    */
+  def streamSubscriptionPayments(): Source[Contract[subsCodegen.SubscriptionPayment], NotUsed] =
+    acsStore.streamContracts(subsCodegen.SubscriptionPayment)
 
   // TODO(M1-92): only added for tests (in DirectoryStoreTest)
   def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
@@ -139,6 +161,13 @@ object DirectoryStore {
           co.payload.entryRequest.provider == provider
         ),
         mkFilter(walletCodegen.AcceptedAppMultiPayment)(co => co.payload.provider == provider),
+        mkFilter(directoryCodegen.DirectoryEntryContext)(co => co.payload.provider == provider),
+        mkFilter(subsCodegen.SubscriptionInitialPayment)(co =>
+          co.payload.subscriptionData.provider == provider
+        ),
+        mkFilter(subsCodegen.SubscriptionPayment)(co =>
+          co.payload.subscriptionData.provider == provider
+        ),
         mkFilter(directoryCodegen.DirectoryInstallRequest)(co => co.payload.provider == provider),
         mkFilter(directoryCodegen.DirectoryInstall)(co => co.payload.provider == provider),
       ),

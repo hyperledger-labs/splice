@@ -15,9 +15,11 @@ import com.daml.network.integration.tests.CoinTests.{
   IsolatedCoinEnvironments,
 }
 import com.daml.network.util.{CommonCoinAppInstanceReferences, Proto}
+import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 
+import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
 import scala.util.Try
 
@@ -129,16 +131,6 @@ class DirectoryIntegrationTest
         // The provider of the directory service
         val providerParty = directory.getProviderPartyId()
 
-        def setupUser(refs: StaticUserRefs): DynamicUserRefs = {
-          val userParty = refs.validator.onboardUser(refs.wallet.config.damlUser)
-
-          // Request install and wait for provider to auto-accept
-          refs.directory.requestDirectoryInstall()
-          refs.validator.remoteParticipant.ledger_api.acs.await(userParty, codegen.DirectoryInstall)
-
-          DynamicUserRefs(userParty, refs)
-        }
-
         def requestAndPayForEntry(refs: DynamicUserRefs, entryName: String) = {
           // Grab the current offset
           val offsetBefore = refs.validator.remoteParticipant.ledger_api.transactions.end()
@@ -217,6 +209,71 @@ class DirectoryIntegrationTest
           directory.lookupEntryByName("nonexistentname"),
           _.errorMessage should include("nonexistentname"),
         )
+    }
+    "allocate directory entries following an initial subscription payment and renew entries on follow-up payments" in {
+      implicit env =>
+        val aliceUserParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
+        val providerParty = directory.getProviderPartyId()
+
+        val aliceRefs = clue("Setup Alice") {
+          val aliceStaticRefs = StaticUserRefs(aliceValidator, aliceDirectory, aliceRemoteWallet)
+          setupUser(aliceStaticRefs)
+        }
+        val subReqId = clue("Alice requests a directory entry") {
+          aliceRefs.directory.requestDirectoryEntryWithSubscription(testEntryName)
+        }
+        clue("Alice obtains some coins and accepts the subscription") {
+          aliceRefs.wallet.tap(50.0)
+          aliceRefs.wallet.acceptSubscriptionRequest(subReqId)
+        }
+        val entry = clue("Getting Alice's new entry") {
+          def tryGetEntry() =
+            Try(loggerFactory.suppressErrors(directory.lookupEntryByName(testEntryName)))
+          eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $testEntryName")))
+        }
+        clue("Checking payload of new entry") {
+          val expectedPayload = codegen.DirectoryEntry(
+            aliceUserParty.toPrim,
+            providerParty.toPrim,
+            testEntryName,
+            entry.payload.expiresAt,
+          )
+          entry.payload shouldBe expectedPayload
+        }
+        clue("Alice makes a follow-up subscription payment") {
+          val subscriptionStateId = inside(aliceRefs.wallet.listSubscriptions()) { case Seq(sub) =>
+            inside(sub.state) { case GrpcWalletAppClient.SubscriptionIdleState(state) =>
+              state.contractId
+            }
+          }
+          aliceRefs.wallet.makeSubscriptionPayment(subscriptionStateId)
+        }
+        val renewedEntry = clue("Getting Alice's renewed entry") {
+          eventually()(
+            directory
+              .lookupEntryByName(testEntryName)
+              .contractId should not equal entry.contractId
+          )
+          directory.lookupEntryByName(testEntryName)
+        }
+        clue("Checking payload of renewed entry") {
+          renewedEntry.payload shouldBe entry.payload.copy(expiresAt =
+            Primitive.Timestamp
+              .discardNanos(entry.payload.expiresAt.plus(90, ChronoUnit.DAYS))
+              .getOrElse(sys.error("Invalid instant"))
+          )
+        }
+    }
+
+    def setupUser(refs: StaticUserRefs): DynamicUserRefs = {
+      val userParty = refs.validator.onboardUser(refs.wallet.config.damlUser)
+
+      clue("Request install and wait for provider to auto-accept") {
+        refs.directory.requestDirectoryInstall()
+        refs.validator.remoteParticipant.ledger_api.acs.await(userParty, codegen.DirectoryInstall)
+      }
+
+      DynamicUserRefs(userParty, refs)
     }
   }
 }
