@@ -75,7 +75,7 @@ setupValidator app name = do
   runCoinRulesAcceptBot app
   return user
 
-data CCUser = CCUser 
+data CCUser = CCUser
   with
     userId : UserId
     primaryParty : Party
@@ -258,7 +258,7 @@ pay app sender recipient coinQuantity msg = do
                 senderTransferFeeRatio = 1.0
           ]
   (openRound, _) <- getLatestOpenRound app
-  void $ submitExerciseCoinRulesByKey app [sender.primaryParty, recipient] readAs (CoinRules_Transfer with transfer, context = coinTransferContext openRound)
+  void $ submitExerciseCoinRulesByKey app [sender.primaryParty, recipient] readAs (CoinRules_TryTransfer with transfer, context = coinTransferContext openRound)
 
 -- | Locks a coin of the given quantity to the given lock holder
 -- for the given time starting at the current time
@@ -285,7 +285,7 @@ lockTo app sender lockHolder coinQuantity lockDuration msg = do
                 expiresAt = now `addRelTime` lockDuration
           ]
   (openRound, _) <- getLatestOpenRound app
-  void $ submitExerciseCoinRulesByKey app [sender.primaryParty, lockHolder] readAs (CoinRules_Transfer with transfer, context = coinTransferContext openRound)
+  void $ submitExerciseCoinRulesByKey app [sender.primaryParty, lockHolder] readAs (CoinRules_TryTransfer with transfer, context = coinTransferContext openRound)
 
 -- | Deposit all coins together with new issuances into a single coin.
 runCoinDepositBots : CCApp -> Script ()
@@ -327,7 +327,7 @@ runCoinDepositBots app = do
                 lock = None
             ]
     when (not (null appRewards) || not (null validatorRewards) || length coins > 1) $ void $
-      submitExerciseCoinRulesByKey app [user] readAs CoinRules_Transfer with transfer, context
+      submitExerciseCoinRulesByKey app [user] readAs CoinRules_TryTransfer with transfer, context
 
 -- | Retrieve a list of all issuances that have happened.
 getIssuingRounds : CCApp -> Script [Round]
@@ -358,7 +358,7 @@ getPaymentTransferContext : CCApp -> CCUser -> Script PaymentTransferContext
 getPaymentTransferContext app user = do
   context <- getTransferContext app user
   (coinRules, _) <- fetchCoinRulesByKey app.svc
-  pure PaymentTransferContext with ..  
+  pure PaymentTransferContext with ..
 
 getTransferContext : CCApp -> CCUser -> Script TransferContext
 getTransferContext app user = do
