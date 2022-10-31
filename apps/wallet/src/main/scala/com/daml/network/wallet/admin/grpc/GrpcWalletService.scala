@@ -638,35 +638,6 @@ class GrpcWalletService(
       v0.ListAppRewardsResponse(_),
     )
 
-  // TODO(M1-52): this function probably needs restructuring to integrate it with automation rewards collection; e.g., move it to the stores and make it streaming
-  private def listValidatorRewardsCollectableBy(
-      validatorUserStore: EndUserWalletStore
-  )(implicit tc: TraceContext): Future[Seq[Contract[coinCodegen.ValidatorReward]]] = for {
-    QueryResult(_, validatorRights) <- validatorUserStore.listContracts(coinCodegen.ValidatorRight)
-    users = validatorRights.map(c => PartyId.tryFromPrim(c.payload.user)).toSet
-    validatorRewardsFs: Seq[Future[Seq[Contract[coinCodegen.ValidatorReward]]]] = users.toSeq
-      .map(u =>
-        store.lookupInstallByParty(u).flatMap {
-          case QueryResult(_, None) =>
-            logger.warn(
-              s"ValidatorRight of ${validatorUserStore.key.endUserParty} for end-user party $u has no associated WalletAppInstall contract."
-            )
-            Future.successful(Seq.empty)
-          case QueryResult(_, Some(install)) =>
-            store.lookupEndUserStore(install.payload.endUserName) match {
-              case None =>
-                logger.warn(
-                  s"Might miss validator rewards as the EndUserWalletStore for end-user name ${install.payload.endUserName} is not (yet) setup."
-                )
-                Future.successful(Seq.empty)
-              case Some(userStore) =>
-                userStore.listContracts(coinCodegen.ValidatorReward).map(_.value)
-            }
-        }
-      )
-    validatorRewards <- Future.sequence(validatorRewardsFs)
-  } yield validatorRewards.flatten
-
   override def listValidatorRewards(
       request: v0.ListValidatorRewardsRequest
   ): Future[v0.ListValidatorRewardsResponse] =
@@ -674,7 +645,7 @@ class GrpcWalletService(
       withAuth(request.getWalletCtx) { user =>
         for {
           userStore <- getUserStore(user)
-          validatorRewards <- listValidatorRewardsCollectableBy(userStore)
+          validatorRewards <- store.listValidatorRewardsCollectableBy(userStore)
         } yield v0.ListValidatorRewardsResponse(validatorRewards.map(_.toProtoV0))
       }
     }
@@ -686,7 +657,7 @@ class GrpcWalletService(
         for {
           userStore <- getUserStore(user)
           validatorStore <- getUserStore(store.key.validatorUserName)
-          validatorRewards <- listValidatorRewardsCollectableBy(userStore)
+          validatorRewards <- store.listValidatorRewardsCollectableBy(userStore)
           validatorRewardInputs = validatorRewards
             .filter(c => c.payload.round.number == request.round)
             .map(c => coinRulesCodegen.TransferInput.InputValidatorReward(c.contractId))

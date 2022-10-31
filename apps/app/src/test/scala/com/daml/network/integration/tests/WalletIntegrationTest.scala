@@ -624,28 +624,51 @@ class WalletIntegrationTest
       eventually()(bobRemoteWallet.listPaymentChannels() shouldBe empty)
     }
 
-    "list and collect app & validator rewards" in { implicit env =>
-      // Onboard alice on her self-hosted validator
-      val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
-
-      // Onboard bob on his self-hosted validator
-      val bobDamlUser = bobRemoteWallet.config.damlUser
-      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
-
-      // Setup payment channel between alice and bob
-      val aliceProposalId =
-        aliceRemoteWallet.proposePaymentChannel(bobUserParty, senderTransferFeeRatio = 0.5)
-      eventually()(bobRemoteWallet.listPaymentChannelProposals() should have size 1)
-      bobRemoteWallet.acceptPaymentChannelProposal(aliceProposalId)
-      eventually()(aliceRemoteWallet.listPaymentChannels() should have size 1)
-
-      // Setup payment channel between bob and alice
-      val bobProposalId =
-        bobRemoteWallet.proposePaymentChannel(aliceUserParty, senderTransferFeeRatio = 0.5)
+    "automatically collect app & validator rewards on coin operations" in { implicit env =>
+      val (aliceUserParty, bobUserParty) = setupAliceAndBobAndChannel
+      // Set-up payment channel between alice and her validator
+      val proposalId =
+        aliceValidatorRemoteWallet.proposePaymentChannel(
+          aliceUserParty,
+          senderTransferFeeRatio = 0.5,
+        )
       eventually()(aliceRemoteWallet.listPaymentChannelProposals() should have size 1)
-      aliceRemoteWallet.acceptPaymentChannelProposal(bobProposalId)
-      eventually()(bobRemoteWallet.listPaymentChannels() should have size 2)
+      aliceRemoteWallet.acceptPaymentChannelProposal(proposalId)
+      eventually()(aliceValidatorRemoteWallet.listPaymentChannels() should have size 1)
+
+      aliceRemoteWallet.tap(50)
+      aliceValidatorRemoteWallet.tap(50)
+      eventually()(aliceRemoteWallet.list().coins should have size 1)
+
+      // Execute a transfer in round -> leads to rewards being generated
+      aliceRemoteWallet.executeDirectTransfer(bobUserParty, 40)
+      eventually()(aliceRemoteWallet.listAppRewards() should have size 1)
+      eventually()(aliceValidatorRemoteWallet.listValidatorRewards() should have size 1)
+
+      // next round.
+      svc.openRound(1, 1)
+      svc.startClosingRound(0)
+      svc.startIssuingRound(0)
+      aliceWallet.remoteParticipant.ledger_api.acs
+        .await(aliceValidator.getValidatorPartyId(), roundCodegen.IssuingMiningRound)
+
+      // alice uses her reward
+      aliceRemoteWallet.executeDirectTransfer(bobUserParty, 1)
+      eventually()(aliceRemoteWallet.listAppRewards() should have size 0)
+
+      // 2 validator rewards due to two transfers
+      eventually()(aliceValidatorRemoteWallet.listValidatorRewards() should have size 2)
+      aliceValidatorRemoteWallet.executeDirectTransfer(aliceUserParty, 1)
+      // +1 for the transfer, -1 due to the reward from round 0 being used
+      eventually()(aliceValidatorRemoteWallet.listValidatorRewards() should have size 2 + 1 - 1)
+      // no rewards are used, since all other rewards are from round 1
+      aliceValidatorRemoteWallet.executeDirectTransfer(aliceUserParty, 1)
+      eventually()(aliceValidatorRemoteWallet.listValidatorRewards() should have size 3)
+
+    }
+
+    "list and manually collect app & validator rewards" in { implicit env =>
+      val (aliceUserParty, bobUserParty) = setupAliceAndBobAndChannel
 
       // Tap coin and do a transfer from alice to bob
       aliceRemoteWallet.tap(50)
@@ -841,8 +864,8 @@ class WalletIntegrationTest
 
       // eventually, the cancel goes through
       eventually()((cancelF.isCompleted && !transferF.isCompleted) shouldBe true)
-      eventually()(aliceRemoteWallet.listPaymentChannels() should have size 0)
-      eventually()(bobRemoteWallet.listPaymentChannels() should have size 0)
+      eventually()(aliceRemoteWallet.listPaymentChannels() should have size 1)
+      eventually()(bobRemoteWallet.listPaymentChannels() should have size 1)
 
       // such that on the retry, the transfer fails on the activeness check.
       eventually()(transferF.isCompleted shouldBe true)

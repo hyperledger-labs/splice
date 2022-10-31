@@ -4,7 +4,11 @@ import akka.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import cats.syntax.traverse.*
-import com.daml.network.codegen.CC.{Coin as coinCodegen, CoinRules as coinRulesCodegen}
+import com.daml.network.codegen.CC.{
+  Coin as coinCodegen,
+  CoinRules as coinRulesCodegen,
+  Round as roundCodegen,
+}
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.util.Contract
@@ -177,6 +181,8 @@ case class EndUserTreasuryService(
         .listContracts(coinCodegen.Coin)
         .map(cs => cs.value.map(c => coinRulesCodegen.TransferInput.InputCoin(c.contractId)))
       transferContext <- getValidatorStore().getPaymentTransferContext()
+      activeIssuingRounds = transferContext.context.issuingMiningRounds.keys.toSet
+      inputs <- selectTransferInputs(activeIssuingRounds)
       cmd =
         install.contractId.exerciseWalletAppInstall_ExecuteBatch(
           transferContext,
@@ -195,6 +201,29 @@ case class EndUserTreasuryService(
       }
     } yield offset
   }
+
+  /** Select transfer inputs to satisfy the coin operations.
+    * Currently, this function selects all unlocked coins and all currently redeemable app- and validator rewards.
+    */
+  private def selectTransferInputs(
+      activeIssuingRounds: Set[roundCodegen.Round]
+  )(implicit tc: TraceContext): Future[Seq[coinRulesCodegen.TransferInput]] = for {
+    coins <- userStore
+      .listContracts(coinCodegen.Coin)
+      .map(cs => cs.value.map(c => coinRulesCodegen.TransferInput.InputCoin(c.contractId)))
+    validatorRewardsRaw <- walletStore
+      .listValidatorRewardsCollectableBy(userStore)
+    validatorRewards = validatorRewardsRaw
+      .filter(rw => activeIssuingRounds.contains(rw.payload.round))
+      .map(rw => coinRulesCodegen.TransferInput.InputValidatorReward(rw.contractId))
+    appRewards <- userStore
+      .listContracts(coinCodegen.AppReward)
+      .map(rws =>
+        rws.value
+          .filter(rw => activeIssuingRounds.contains(rw.payload.round))
+          .map(rw => coinRulesCodegen.TransferInput.InputAppReward(rw.contractId))
+      )
+  } yield coins ++ validatorRewards ++ appRewards
 
   // We fetch this on demand here to avoid a dependency of the validator store being
   // setup before other user’s stores.

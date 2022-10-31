@@ -75,7 +75,8 @@ class ScanIntegrationTest
           aliceOld should matchPattern { case CoinArchive(_) => }
 
           inside(bob) { case CoinCreate(coin: CoinContract) =>
-            coin.contract.payload.quantity.initialQuantity shouldBe BigDecimal(10)
+            // -0.05 as sender needs to pay half of the transfer fee (0.1)
+            coin.contract.payload.quantity.initialQuantity shouldBe BigDecimal(9.95)
           }
       }
     }
@@ -151,6 +152,7 @@ class ScanIntegrationTest
 
     val closed = scan.getClosedRounds()
     inside(closed) { case Seq(round1, round0) =>
+      // TODO(M1-92): make this more robust or don't care about exact values at all
       round0.payload should be(
         ClosedMiningRound(
           svc = svcParty.toPrim,
@@ -158,9 +160,9 @@ class ScanIntegrationTest
           totalTransferFees = BigDecimal(0.58),
           totalAdminFees = BigDecimal(0.2),
           totalHoldingFees = BigDecimal(0.0),
-          totalTransferInputs = BigDecimal(360.51),
-          totalNonSelfTransferOutputs = BigDecimal(39 + 19),
-          totalSelfTransferOutputs = BigDecimal(360.51 - 0.2 - 0.58 - (39 + 19)),
+          totalTransferInputs = BigDecimal(360.705),
+          totalNonSelfTransferOutputs = BigDecimal(57.71),
+          totalSelfTransferOutputs = BigDecimal(302.215),
           observers = round0.payload.observers,
         )
       )
@@ -171,9 +173,9 @@ class ScanIntegrationTest
           totalTransferFees = BigDecimal(0.39),
           totalAdminFees = BigDecimal(0.3),
           totalHoldingFees = BigDecimal(0.0000048225),
-          totalTransferInputs = BigDecimal(355.6899855325),
-          totalNonSelfTransferOutputs = BigDecimal(29 + 9 + 1),
-          totalSelfTransferOutputs = BigDecimal(355.6899855325 - 0.3 - 0.39 - (29 + 9 + 1)),
+          totalTransferInputs = BigDecimal(356.8949855325),
+          totalNonSelfTransferOutputs = BigDecimal(29 + 9 + 1 - 0.195),
+          totalSelfTransferOutputs = BigDecimal(317.3999855325),
           observers = round1.payload.observers,
         )
       )

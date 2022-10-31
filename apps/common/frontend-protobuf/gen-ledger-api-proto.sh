@@ -3,7 +3,6 @@
 set -eou pipefail
 
 SDK_VERSION=2.4.0-snapshot.20220801.10312.0.d2c7be9d
-
 # Generate protobuf sources for ledger API proto files.
 
 rm -rf src/com/daml/ledger

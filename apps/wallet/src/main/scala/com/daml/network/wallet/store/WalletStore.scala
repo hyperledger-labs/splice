@@ -2,6 +2,7 @@ package com.daml.network.wallet.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
+import com.daml.network.codegen.CC.{Coin as coinCodegen}
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.store.AcsStore
 import com.daml.network.store.AcsStore.QueryResult
@@ -13,6 +14,7 @@ import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
@@ -84,6 +86,35 @@ trait WalletStore extends AutoCloseable with NamedLogging {
       endUserParty: PartyId,
       timeouts: ProcessingTimeout,
   ): EndUserWalletStore
+
+  // TODO(M1-52): this function probably needs restructuring to integrate it with automation rewards collection; e.g., make it streaming
+  def listValidatorRewardsCollectableBy(
+      validatorUserStore: EndUserWalletStore
+  )(implicit tc: TraceContext): Future[Seq[Contract[coinCodegen.ValidatorReward]]] = for {
+    QueryResult(_, validatorRights) <- validatorUserStore.listContracts(coinCodegen.ValidatorRight)
+    users = validatorRights.map(c => PartyId.tryFromPrim(c.payload.user)).toSet
+    validatorRewardsFs: Seq[Future[Seq[Contract[coinCodegen.ValidatorReward]]]] = users.toSeq
+      .map(u =>
+        this.lookupInstallByParty(u).flatMap {
+          case QueryResult(_, None) =>
+            logger.warn(
+              s"ValidatorRight of ${validatorUserStore.key.endUserParty} for end-user party $u has no associated WalletAppInstall contract."
+            )
+            Future.successful(Seq.empty)
+          case QueryResult(_, Some(install)) =>
+            this.lookupEndUserStore(install.payload.endUserName) match {
+              case None =>
+                logger.warn(
+                  s"Might miss validator rewards as the EndUserWalletStore for end-user name ${install.payload.endUserName} is not (yet) setup."
+                )
+                Future.successful(Seq.empty)
+              case Some(userStore) =>
+                userStore.listContracts(coinCodegen.ValidatorReward).map(_.value)
+            }
+        }
+      )
+    validatorRewards <- Future.sequence(validatorRewardsFs)
+  } yield validatorRewards.flatten
 
   override def close(): Unit =
     Lifecycle.close(endUserStores.values.toSeq: _*)(logger)
