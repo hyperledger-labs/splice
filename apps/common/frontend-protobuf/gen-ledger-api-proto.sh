@@ -2,15 +2,14 @@
 
 set -eou pipefail
 
-SDK_VERSION=2.4.0-snapshot.20220801.10312.0.d2c7be9d
 # Generate protobuf sources for ledger API proto files.
 
 rm -rf src/com/daml/ledger
 DIR=$(mktemp -d)
 trap "rm -rf $DIR" EXIT
 
-curl -sSL https://github.com/digital-asset/daml/releases/download/v$SDK_VERSION/protobufs-$SDK_VERSION.zip --output $DIR/protobufs.zip
-unzip -q $DIR/protobufs.zip -d $DIR
+cp -r ${DAML_PROTOBUFS}/* $DIR
+chmod -R +w $DIR/*
 cp -r ${REPO_ROOT}/3rdparty/protobuf/google $DIR/protos-$SDK_VERSION/google
 mkdir $DIR/ts
 rm -rf $DIR/protos-$SDK_VERSION/com/daml/daml_lf_1_14

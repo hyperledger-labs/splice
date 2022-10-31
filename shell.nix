@@ -1,10 +1,23 @@
 let
-  inherit (pkgs) stdenv;
+  inherit (pkgs) stdenv fetchzip;
   pkgs = import ./nix/default.nix {};
   # pyopenssl is currently broken on M1 due to
   # https://github.com/NixOS/nixpkgs/issues/174457#issuecomment-1137385758
   # To work around this we fetch some packages via rosetta.
   x86Pkgs = if builtins.currentSystem == "aarch64-darwin" then import ./nix/default.nix { system = "x86_64-darwin"; } else pkgs;
+
+  daml_pbs = stdenv.mkDerivation rec {
+    name = "daml-protobufs";
+    sdk_version = "2.5.0-snapshot.20221024.10827.0.c8adc54a";
+    src = fetchzip {
+      url = "https://github.com/digital-asset/daml/releases/download/v${sdk_version}/protobufs-${sdk_version}.zip";
+      sha256="0ehAkBRHmlh5TSzqAw7bS52R0cJS98JevdG1Ncfs4sA=";
+    };
+    installPhase = ''
+      mkdir -p $out/protos-${sdk_version}
+      cp -r * $out/protos-${sdk_version}
+    '';
+  };
 
   # No macOS support for firefox
   linuxOnly = if stdenv.isDarwin then [ ] else with pkgs; [ envoy firefox ];
@@ -20,6 +33,7 @@ in pkgs.mkShell {
     canton
     circleci-cli
     curl
+    daml_pbs
     docker
     evans
     geckodriver
@@ -51,4 +65,7 @@ in pkgs.mkShell {
     x86Pkgs.sphinx-autobuild
     zip
   ] ++ linuxOnly;
+
+  DAML_PROTOBUFS = "${daml_pbs}";
+  SDK_VERSION = "${daml_pbs.sdk_version}";
 }
