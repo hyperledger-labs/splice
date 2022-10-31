@@ -5,6 +5,10 @@ window.canton_network_config = {
         clientId: '5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK',
         redirectUri: window.location.origin,
     },
+    wallet: {
+        // URL of the web-ui, used to forward payment workflows to wallet
+        uiUrl: window.location.toString().replace('splitwise','wallet')
+    },
     splitwise: {
         // URL of the gRPC-Web envoy proxy, proxying the splitwise gRPC API
         grpcUrl: 'http://' + window.location.hostname + ':6213',
