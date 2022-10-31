@@ -6,6 +6,7 @@ import com.daml.network.codegen.CC.{
   CoinRules as coinRulesCodegen,
   Round as roundCodegen,
 }
+import com.daml.network.codegen.CN.Wallet.Subscriptions as subsCodegen
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.store.AcsStore
 import com.daml.network.util.Contract
@@ -68,14 +69,14 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
     acsStore.lookupContractById(walletCodegen.AppMultiPaymentRequest)(cid)
 
   def lookupSubscriptionRequestById(
-      cid: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionRequest]
-  ): Future[QueryResult[Option[Contract[walletCodegen.Subscriptions.SubscriptionRequest]]]] =
-    acsStore.lookupContractById(walletCodegen.Subscriptions.SubscriptionRequest)(cid)
+      cid: Primitive.ContractId[subsCodegen.SubscriptionRequest]
+  ): Future[QueryResult[Option[Contract[subsCodegen.SubscriptionRequest]]]] =
+    acsStore.lookupContractById(subsCodegen.SubscriptionRequest)(cid)
 
   def lookupSubscriptionIdleStateById(
-      cid: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionIdleState]
-  ): Future[QueryResult[Option[Contract[walletCodegen.Subscriptions.SubscriptionIdleState]]]] =
-    acsStore.lookupContractById(walletCodegen.Subscriptions.SubscriptionIdleState)(cid)
+      cid: Primitive.ContractId[subsCodegen.SubscriptionIdleState]
+  ): Future[QueryResult[Option[Contract[subsCodegen.SubscriptionIdleState]]]] =
+    acsStore.lookupContractById(subsCodegen.SubscriptionIdleState)(cid)
 
   def lookupLatestOpenMiningRound(
   ): Future[QueryResult[Option[Contract[roundCodegen.OpenMiningRound]]]]
@@ -248,19 +249,23 @@ object EndUserWalletStore {
             co.payload.sender == endUser
         ),
         // Subscriptions
-        mkFilter(walletCodegen.Subscriptions.SubscriptionRequest)(co =>
+        mkFilter(subsCodegen.Subscription)(co =>
+          co.payload.svc == svc &&
+            co.payload.sender == endUser
+        ),
+        mkFilter(subsCodegen.SubscriptionRequest)(co =>
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
         ),
-        mkFilter(walletCodegen.Subscriptions.SubscriptionIdleState)(co =>
+        mkFilter(subsCodegen.SubscriptionIdleState)(co =>
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
         ),
-        mkFilter(walletCodegen.Subscriptions.SubscriptionInitialPayment)(co =>
+        mkFilter(subsCodegen.SubscriptionInitialPayment)(co =>
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
         ),
-        mkFilter(walletCodegen.Subscriptions.SubscriptionPayment)(co =>
+        mkFilter(subsCodegen.SubscriptionPayment)(co =>
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
         ),

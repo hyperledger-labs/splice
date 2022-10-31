@@ -3,7 +3,7 @@ package com.daml.network.console
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.auth.{AuthUtil, JwtCallCredential}
 import com.daml.network.codegen.CC.{Coin as coinCodegen, CoinRules as coinRulesCodegen}
-import com.daml.network.codegen.CN.Wallet.PaymentChannel
+import com.daml.network.codegen.CN.Wallet.{PaymentChannel, Subscriptions => subsCodegen}
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.util.{Contract, Value}
@@ -109,7 +109,7 @@ abstract class WalletAppReference(
     "Queries the configured remote participant for the SubscriptionRequests of the configured user. " +
       "Returns all found subscription requests."
   )
-  def listSubscriptionRequests(): Seq[Contract[walletCodegen.Subscriptions.SubscriptionRequest]] = {
+  def listSubscriptionRequests(): Seq[Contract[subsCodegen.SubscriptionRequest]] = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.ListSubscriptionRequests(), callCredentials)
     }
@@ -120,33 +120,20 @@ abstract class WalletAppReference(
     "Queries the configured remote participant for the SubscriptionInitialPayments of the configured user. " +
       "Returns all found payments."
   )
-  def listSubscriptionInitialPayments()
-      : Seq[Contract[walletCodegen.Subscriptions.SubscriptionInitialPayment]] = {
+  def listSubscriptionInitialPayments(): Seq[Contract[subsCodegen.SubscriptionInitialPayment]] = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.ListSubscriptionInitialPayments(), callCredentials)
     }
   }
 
-  @Help.Summary("List subscription payments of the configured user")
+  @Help.Summary("List subscriptions of the configured user")
   @Help.Description(
-    "Queries the configured remote participant for the SubscriptionPayments of the configured user. " +
-      "Returns all found payments."
+    "Queries the configured remote participant for all Subscription contracts of the configured user. " +
+      "Returns them, joining each of them with its current state contract."
   )
-  def listSubscriptionPayments(): Seq[Contract[walletCodegen.Subscriptions.SubscriptionPayment]] = {
+  def listSubscriptions(): Seq[GrpcWalletAppClient.Subscription] = {
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.ListSubscriptionPayments(), callCredentials)
-    }
-  }
-
-  @Help.Summary("List all idle subscriptions of the configured user")
-  @Help.Description(
-    "Queries the configured remote participant for all instances of SubscriptionIdleState of the configured user. " +
-      "Returns all found subscription state contracts."
-  )
-  def listSubscriptionIdleStates()
-      : Seq[Contract[walletCodegen.Subscriptions.SubscriptionIdleState]] = {
-    consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.ListSubscriptionIdleStates(), callCredentials)
+      adminCommand(GrpcWalletAppClient.ListSubscriptions(), callCredentials)
     }
   }
 
@@ -156,8 +143,8 @@ abstract class WalletAppReference(
       " Returns the contract ID of the initial subscription payment."
   )
   def acceptSubscriptionRequest(
-      requestId: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionRequest]
-  ): Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionInitialPayment] = {
+      requestId: Primitive.ContractId[subsCodegen.SubscriptionRequest]
+  ): Primitive.ContractId[subsCodegen.SubscriptionInitialPayment] = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.AcceptSubscriptionRequest(requestId), callCredentials)
     }
@@ -168,7 +155,7 @@ abstract class WalletAppReference(
     "Reject a subscription request."
   )
   def rejectSubscriptionRequest(
-      requestId: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionRequest]
+      requestId: Primitive.ContractId[subsCodegen.SubscriptionRequest]
   ): Unit = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.RejectSubscriptionRequest(requestId), callCredentials)
@@ -181,8 +168,8 @@ abstract class WalletAppReference(
       " Returns the contract ID of the subscription payment."
   )
   def makeSubscriptionPayment(
-      stateId: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionIdleState]
-  ): Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionPayment] = {
+      stateId: Primitive.ContractId[subsCodegen.SubscriptionIdleState]
+  ): Primitive.ContractId[subsCodegen.SubscriptionPayment] = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.MakeSubscriptionPayment(stateId), callCredentials)
     }
@@ -193,7 +180,7 @@ abstract class WalletAppReference(
     "Cancels a subscription that is in idle state."
   )
   def cancelSubscription(
-      stateId: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionIdleState]
+      stateId: Primitive.ContractId[subsCodegen.SubscriptionIdleState]
   ): Unit = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.CancelSubscription(stateId), callCredentials)

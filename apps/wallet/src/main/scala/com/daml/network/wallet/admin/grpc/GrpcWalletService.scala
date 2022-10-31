@@ -6,7 +6,11 @@ import com.daml.network.auth.AuthInterceptor
 import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
 import com.daml.network.codegen.CC.{Coin as coinCodegen, CoinRules as coinRulesCodegen}
 import com.daml.network.codegen.CN.Wallet.CoinOperationOutcome.COO_AcceptedAppMultiPayment
-import com.daml.network.codegen.CN.Wallet.{CoinOperation, CoinOperationOutcome}
+import com.daml.network.codegen.CN.Wallet.{
+  CoinOperation,
+  CoinOperationOutcome,
+  Subscriptions => subsCodegen,
+}
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.codegen.DA
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection}
@@ -293,17 +297,8 @@ class GrpcWalletService(
   ): Future[v0.ListSubscriptionRequestsResponse] =
     listContracts(
       request.getWalletCtx,
-      walletCodegen.Subscriptions.SubscriptionRequest,
+      subsCodegen.SubscriptionRequest,
       v0.ListSubscriptionRequestsResponse(_),
-    )
-
-  override def listSubscriptionIdleStates(
-      request: v0.ListSubscriptionIdleStatesRequest
-  ): Future[v0.ListSubscriptionIdleStatesResponse] =
-    listContracts(
-      request.getWalletCtx,
-      walletCodegen.Subscriptions.SubscriptionIdleState,
-      v0.ListSubscriptionIdleStatesResponse(_),
     )
 
   override def listSubscriptionInitialPayments(
@@ -311,18 +306,45 @@ class GrpcWalletService(
   ): Future[v0.ListSubscriptionInitialPaymentsResponse] =
     listContracts(
       request.getWalletCtx,
-      walletCodegen.Subscriptions.SubscriptionInitialPayment,
+      subsCodegen.SubscriptionInitialPayment,
       v0.ListSubscriptionInitialPaymentsResponse(_),
     )
 
-  override def listSubscriptionPayments(
-      request: v0.ListSubscriptionPaymentsRequest
-  ): Future[v0.ListSubscriptionPaymentsResponse] =
-    listContracts(
-      request.getWalletCtx,
-      walletCodegen.Subscriptions.SubscriptionPayment,
-      v0.ListSubscriptionPaymentsResponse(_),
-    )
+  override def listSubscriptions(
+      request: v0.ListSubscriptionsRequest
+  ): Future[v0.ListSubscriptionsResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      withAuth(request.getWalletCtx) { user =>
+        for {
+          userStore <- getUserStore(user)
+          QueryResult(_, subscriptions) <- userStore.listContracts(
+            subsCodegen.Subscription
+          )
+          QueryResult(_, subscriptionIdleStates) <- userStore.listContracts(
+            subsCodegen.SubscriptionIdleState
+          )
+          QueryResult(_, subscriptionPayments) <- userStore.listContracts(
+            subsCodegen.SubscriptionPayment
+          )
+        } yield {
+          val mainMap = subscriptions.map(sub => (sub.contractId -> Some(sub.toProtoV0))).toMap
+          val idleStates = subscriptionIdleStates.map(state =>
+            (state.payload.subscription, v0.Subscription.State.Idle(state.toProtoV0))
+          )
+          val payments = subscriptionPayments.map(state =>
+            (state.payload.subscription, v0.Subscription.State.Payment(state.toProtoV0))
+          )
+          v0.ListSubscriptionsResponse(
+            for {
+              (mainId, state) <- idleStates ++ payments
+              main <- mainMap.get(mainId)
+            } yield {
+              v0.Subscription(main, state)
+            }
+          )
+        }
+      }
+    }
 
   override def acceptSubscriptionRequest(
       request: v0.AcceptSubscriptionRequestRequest
@@ -331,7 +353,7 @@ class GrpcWalletService(
       withAuth(request.getWalletCtx) { user =>
         exerciseWalletAction((installCid, userStore) => {
           val requestCid =
-            Proto.tryDecodeContractId[walletCodegen.Subscriptions.SubscriptionRequest](
+            Proto.tryDecodeContractId[subsCodegen.SubscriptionRequest](
               request.requestContractId
             )
 
@@ -371,8 +393,8 @@ class GrpcWalletService(
       withAuth(request.getWalletCtx) { user =>
         for {
           userStore <- getUserStore(user)
-          arg = walletCodegen.Subscriptions.SubscriptionRequest_Reject()
-          requestCid = Proto.tryDecodeContractId[walletCodegen.Subscriptions.SubscriptionRequest](
+          arg = subsCodegen.SubscriptionRequest_Reject()
+          requestCid = Proto.tryDecodeContractId[subsCodegen.SubscriptionRequest](
             request.requestContractId
           )
           cmd = requestCid
@@ -394,7 +416,7 @@ class GrpcWalletService(
       withAuth(request.getWalletCtx) { user =>
         exerciseWalletAction((installCid, userStore) => {
           val stateCid =
-            Proto.tryDecodeContractId[walletCodegen.Subscriptions.SubscriptionIdleState](
+            Proto.tryDecodeContractId[subsCodegen.SubscriptionIdleState](
               request.idleStateContractId
             )
 
@@ -431,8 +453,8 @@ class GrpcWalletService(
       withAuth(request.getWalletCtx) { user =>
         for {
           userStore <- getUserStore(user)
-          arg = walletCodegen.Subscriptions.SubscriptionIdleState_CancelSubscription()
-          requestCid = Proto.tryDecodeContractId[walletCodegen.Subscriptions.SubscriptionIdleState](
+          arg = subsCodegen.SubscriptionIdleState_CancelSubscription()
+          requestCid = Proto.tryDecodeContractId[subsCodegen.SubscriptionIdleState](
             request.idleStateContractId
           )
           cmd = requestCid
@@ -1009,13 +1031,13 @@ class GrpcWalletService(
     */
   private def lookupSubscriptionContext(
       endUserParty: PartyId,
-      contractId: P.ContractId[walletCodegen.Subscriptions.SubscriptionContext],
+      contractId: P.ContractId[subsCodegen.SubscriptionContext],
   ): Future[Unit] = {
     for {
       // TODO(#1267): use store instead
       activeSubscriptionContexts <- connection.activeContracts(
         CoinLedgerConnection.transactionInterfaceFilterByParty(
-          Map(endUserParty -> Seq(walletCodegen.Subscriptions.SubscriptionContext.id))
+          Map(endUserParty -> Seq(subsCodegen.SubscriptionContext.id))
         )
       )
       _ = if (

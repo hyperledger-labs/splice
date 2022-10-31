@@ -18,9 +18,8 @@ service WalletService {
   rpc ListAcceptedAppMultiPayments (ListAcceptedAppMultiPaymentsRequest) returns (ListAcceptedAppMultiPaymentsResponse);
 
   rpc ListSubscriptionRequests (ListSubscriptionRequestsRequest) returns (ListSubscriptionRequestsResponse);
-  rpc ListSubscriptionIdleStates (ListSubscriptionIdleStatesRequest) returns (ListSubscriptionIdleStatesResponse);
   rpc ListSubscriptionInitialPayments (ListSubscriptionInitialPaymentsRequest) returns (ListSubscriptionInitialPaymentsResponse);
-  rpc ListSubscriptionPayments (ListSubscriptionPaymentsRequest) returns (ListSubscriptionPaymentsResponse);
+  rpc ListSubscriptions (ListSubscriptionsRequest) returns (ListSubscriptionsResponse);
   rpc AcceptSubscriptionRequest (AcceptSubscriptionRequestRequest) returns (AcceptSubscriptionRequestResponse);
   rpc RejectSubscriptionRequest (RejectSubscriptionRequestRequest) returns (google.protobuf.Empty);
   rpc MakeSubscriptionPayment (MakeSubscriptionPaymentRequest) returns (MakeSubscriptionPaymentResponse);
@@ -137,14 +136,6 @@ message ListSubscriptionRequestsResponse {
   repeated com.daml.network.v0.Contract subscription_requests = 1;
 }
 
-message ListSubscriptionIdleStatesRequest {
-  WalletContext wallet_ctx = 1;
-}
-
-message ListSubscriptionIdleStatesResponse {
-  repeated com.daml.network.v0.Contract idle_states = 1;
-}
-
 message ListSubscriptionInitialPaymentsRequest {
   WalletContext wallet_ctx = 1;
 }
@@ -153,12 +144,24 @@ message ListSubscriptionInitialPaymentsResponse {
   repeated com.daml.network.v0.Contract initial_payments = 1;
 }
 
-message ListSubscriptionPaymentsRequest {
+message Subscription {
+  // The long-lived, immutable `Subscription` contract.
+  com.daml.network.v0.Contract main = 1;
+  // The contract representing it's current state.
+  oneof state {
+    // `SubscriptionIdleState`
+    com.daml.network.v0.Contract idle = 2;
+    // `SubscriptionPayment`
+    com.daml.network.v0.Contract payment = 3;
+  }
+}
+
+message ListSubscriptionsRequest {
   WalletContext wallet_ctx = 1;
 }
 
-message ListSubscriptionPaymentsResponse {
-  repeated com.daml.network.v0.Contract payments = 1;
+message ListSubscriptionsResponse {
+  repeated Subscription subscriptions = 1;
 }
 
 message AcceptSubscriptionRequestRequest {

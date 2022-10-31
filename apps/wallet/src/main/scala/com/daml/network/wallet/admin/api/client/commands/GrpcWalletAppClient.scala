@@ -4,11 +4,13 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.CC.{Coin => coinCodegen, CoinRules => coinRulesCodegen}
+import com.daml.network.codegen.CN.Wallet.{Subscriptions => subsCodegen}
 import com.daml.network.codegen.CN.{Wallet => walletCodegen}
 import com.daml.network.util.{Contract, Proto, Value}
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.WalletServiceGrpc.WalletServiceStub
 import com.daml.network.wallet.v0.{GetBalanceRequest, GetBalanceResponse}
+import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.empty.Empty
@@ -308,7 +310,7 @@ object GrpcWalletAppClient {
         v0.ListSubscriptionRequestsRequest,
         v0.ListSubscriptionRequestsResponse,
         Seq[
-          Contract[walletCodegen.Subscriptions.SubscriptionRequest]
+          Contract[subsCodegen.SubscriptionRequest]
         ],
       ] {
 
@@ -322,34 +324,9 @@ object GrpcWalletAppClient {
 
     override def handleResponse(
         response: v0.ListSubscriptionRequestsResponse
-    ): Either[String, Seq[Contract[walletCodegen.Subscriptions.SubscriptionRequest]]] =
+    ): Either[String, Seq[Contract[subsCodegen.SubscriptionRequest]]] =
       response.subscriptionRequests
-        .traverse(req => Contract.fromProto(walletCodegen.Subscriptions.SubscriptionRequest)(req))
-        .leftMap(_.toString)
-  }
-
-  case class ListSubscriptionIdleStates()
-      extends BaseCommand[
-        v0.ListSubscriptionIdleStatesRequest,
-        v0.ListSubscriptionIdleStatesResponse,
-        Seq[
-          Contract[walletCodegen.Subscriptions.SubscriptionIdleState]
-        ],
-      ] {
-
-    override def createRequest(): Either[String, v0.ListSubscriptionIdleStatesRequest] =
-      Right(v0.ListSubscriptionIdleStatesRequest())
-
-    override def submitRequest(
-        service: WalletServiceStub,
-        request: v0.ListSubscriptionIdleStatesRequest,
-    ): Future[v0.ListSubscriptionIdleStatesResponse] = service.listSubscriptionIdleStates(request)
-
-    override def handleResponse(
-        response: v0.ListSubscriptionIdleStatesResponse
-    ): Either[String, Seq[Contract[walletCodegen.Subscriptions.SubscriptionIdleState]]] =
-      response.idleStates
-        .traverse(req => Contract.fromProto(walletCodegen.Subscriptions.SubscriptionIdleState)(req))
+        .traverse(req => Contract.fromProto(subsCodegen.SubscriptionRequest)(req))
         .leftMap(_.toString)
   }
 
@@ -358,7 +335,7 @@ object GrpcWalletAppClient {
         v0.ListSubscriptionInitialPaymentsRequest,
         v0.ListSubscriptionInitialPaymentsResponse,
         Seq[
-          Contract[walletCodegen.Subscriptions.SubscriptionInitialPayment]
+          Contract[subsCodegen.SubscriptionInitialPayment]
         ],
       ] {
 
@@ -373,45 +350,78 @@ object GrpcWalletAppClient {
 
     override def handleResponse(
         response: v0.ListSubscriptionInitialPaymentsResponse
-    ): Either[String, Seq[Contract[walletCodegen.Subscriptions.SubscriptionInitialPayment]]] =
+    ): Either[String, Seq[Contract[subsCodegen.SubscriptionInitialPayment]]] =
       response.initialPayments
-        .traverse(req =>
-          Contract.fromProto(walletCodegen.Subscriptions.SubscriptionInitialPayment)(req)
-        )
+        .traverse(req => Contract.fromProto(subsCodegen.SubscriptionInitialPayment)(req))
         .leftMap(_.toString)
   }
 
-  case class ListSubscriptionPayments()
+  final case class Subscription(
+      main: Contract[subsCodegen.Subscription],
+      state: SubscriptionState,
+  )
+  sealed trait SubscriptionState extends Product with Serializable;
+  final case class SubscriptionIdleState(
+      contract: Contract[subsCodegen.SubscriptionIdleState]
+  ) extends SubscriptionState;
+  final case class SubscriptionPayment(
+      contract: Contract[subsCodegen.SubscriptionPayment]
+  ) extends SubscriptionState;
+
+  case class ListSubscriptions()
       extends BaseCommand[
-        v0.ListSubscriptionPaymentsRequest,
-        v0.ListSubscriptionPaymentsResponse,
-        Seq[
-          Contract[walletCodegen.Subscriptions.SubscriptionPayment]
-        ],
+        v0.ListSubscriptionsRequest,
+        v0.ListSubscriptionsResponse,
+        Seq[Subscription],
       ] {
 
-    override def createRequest(): Either[String, v0.ListSubscriptionPaymentsRequest] =
-      Right(v0.ListSubscriptionPaymentsRequest())
+    override def createRequest(): Either[String, v0.ListSubscriptionsRequest] =
+      Right(v0.ListSubscriptionsRequest())
 
     override def submitRequest(
         service: WalletServiceStub,
-        request: v0.ListSubscriptionPaymentsRequest,
-    ): Future[v0.ListSubscriptionPaymentsResponse] = service.listSubscriptionPayments(request)
+        request: v0.ListSubscriptionsRequest,
+    ): Future[v0.ListSubscriptionsResponse] = service.listSubscriptions(request)
 
     override def handleResponse(
-        response: v0.ListSubscriptionPaymentsResponse
-    ): Either[String, Seq[Contract[walletCodegen.Subscriptions.SubscriptionPayment]]] =
-      response.payments
-        .traverse(req => Contract.fromProto(walletCodegen.Subscriptions.SubscriptionPayment)(req))
-        .leftMap(_.toString)
+        response: v0.ListSubscriptionsResponse
+    ): Either[String, Seq[Subscription]] =
+      response.subscriptions
+        .traverse(sub =>
+          for {
+            main <- sub.main
+              .toRight("Could not find main subscription contract")
+              .flatMap(
+                Contract.fromProto(subsCodegen.Subscription)(_).leftMap(_.toString)
+              )
+            state <- (sub.state match {
+              case v0.Subscription.State.Empty =>
+                Left(ProtoDeserializationError.FieldNotSet("Subscription.state"))
+              case v0.Subscription.State.Idle(state) =>
+                Contract
+                  .fromProto(subsCodegen.SubscriptionIdleState)(state)
+                  .map(SubscriptionIdleState)
+              case v0.Subscription.State.Payment(state) =>
+                Contract
+                  .fromProto(subsCodegen.SubscriptionPayment)(state)
+                  .map(SubscriptionPayment)
+              case other =>
+                Left(
+                  ProtoDeserializationError.UnrecognizedField(
+                    s"Subscription.state with value $other"
+                  )
+                )
+            }).leftMap(_.toString)
+          } yield Subscription(main, state)
+        )
   }
 
   case class AcceptSubscriptionRequest(
-      requestId: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionRequest]
+      requestId: Primitive.ContractId[subsCodegen.SubscriptionRequest]
   ) extends BaseCommand[
         v0.AcceptSubscriptionRequestRequest,
         v0.AcceptSubscriptionRequestResponse,
-        Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionInitialPayment],
+        Primitive.ContractId[subsCodegen.SubscriptionInitialPayment],
       ] {
 
     override def createRequest(): Either[String, v0.AcceptSubscriptionRequestRequest] =
@@ -425,15 +435,15 @@ object GrpcWalletAppClient {
     override def handleResponse(
         response: v0.AcceptSubscriptionRequestResponse
     ): Either[String, Primitive.ContractId[
-      walletCodegen.Subscriptions.SubscriptionInitialPayment
+      subsCodegen.SubscriptionInitialPayment
     ]] =
-      Proto.decodeContractId[walletCodegen.Subscriptions.SubscriptionInitialPayment](
+      Proto.decodeContractId[subsCodegen.SubscriptionInitialPayment](
         response.initialPaymentContractId
       )
   }
 
   case class RejectSubscriptionRequest(
-      requestId: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionRequest]
+      requestId: Primitive.ContractId[subsCodegen.SubscriptionRequest]
   ) extends BaseCommand[
         v0.RejectSubscriptionRequestRequest,
         Empty,
@@ -455,11 +465,11 @@ object GrpcWalletAppClient {
   }
 
   case class MakeSubscriptionPayment(
-      stateId: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionIdleState]
+      stateId: Primitive.ContractId[subsCodegen.SubscriptionIdleState]
   ) extends BaseCommand[
         v0.MakeSubscriptionPaymentRequest,
         v0.MakeSubscriptionPaymentResponse,
-        Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionPayment],
+        Primitive.ContractId[subsCodegen.SubscriptionPayment],
       ] {
 
     override def createRequest(): Either[String, v0.MakeSubscriptionPaymentRequest] =
@@ -472,14 +482,14 @@ object GrpcWalletAppClient {
 
     override def handleResponse(
         response: v0.MakeSubscriptionPaymentResponse
-    ): Either[String, Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionPayment]] =
-      Proto.decodeContractId[walletCodegen.Subscriptions.SubscriptionPayment](
+    ): Either[String, Primitive.ContractId[subsCodegen.SubscriptionPayment]] =
+      Proto.decodeContractId[subsCodegen.SubscriptionPayment](
         response.paymentContractId
       )
   }
 
   case class CancelSubscription(
-      stateId: Primitive.ContractId[walletCodegen.Subscriptions.SubscriptionIdleState]
+      stateId: Primitive.ContractId[subsCodegen.SubscriptionIdleState]
   ) extends BaseCommand[
         v0.CancelSubscriptionRequest,
         Empty,
