@@ -2,10 +2,9 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.CN.{Directory as dirCodegen, Splitwise as splitwiseCodegen}
 import com.daml.network.console.{RemoteDirectoryAppReference, RemoteWalletAppReference}
-import com.daml.network.environment.{CoinConsoleEnvironment, CoinEnvironmentImpl}
+import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
-import com.digitalasset.canton.console.ConsoleMacros
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import org.openqa.selenium.Keys
@@ -32,14 +31,14 @@ class SplitwiseFrontendIntegrationTest
       userParty: PartyId,
       directory: RemoteDirectoryAppReference,
       wallet: RemoteWalletAppReference,
-  )(implicit env: CoinConsoleEnvironment): Unit = {
+  ): Unit = {
     directory.requestDirectoryInstall()
     directory.ledgerApi.ledger_api.acs.await(userParty, dirCodegen.DirectoryInstall)
 
     directory.requestDirectoryEntry(userName)
 
     wallet.tap(5.0)
-    ConsoleMacros.utils.retry_until_true(wallet.listAppMultiPaymentRequests().length == 1)
+    eventually() { wallet.listAppMultiPaymentRequests().length shouldBe 1 }
     wallet.acceptAppMultiPaymentRequest(
       wallet.listAppMultiPaymentRequests().head.contractId
     )
@@ -145,7 +144,6 @@ class SplitwiseFrontendIntegrationTest
                 charlieCns
               )
               r2.childElement(className("balances-table-quantity")).text shouldBe "-111.0000000000"
-              screenshot()
           }
         }
         click on className("settle-my-debts-link")
@@ -180,7 +178,6 @@ class SplitwiseFrontendIntegrationTest
               row3.text should matchText(s"${charlieCns} paid 333.0000000000 CC for Digestivs")
               row4.text should matchText(s"${aliceCns} paid 1200.0000000000 CC for Team lunch")
           }
-          screenshot()
         }
       }
     }
@@ -246,8 +243,8 @@ class SplitwiseFrontendIntegrationTest
         click on className("transfer-link")
       }
 
-      ConsoleMacros.utils.retry_until_true {
-        bobRemoteWallet.listAppMultiPaymentRequests().length == 1
+      eventually() {
+        bobRemoteWallet.listAppMultiPaymentRequests().length shouldBe 1
       }
       inside(bobRemoteWallet.listAppMultiPaymentRequests()) { case Seq(request) =>
         bobRemoteWallet.tap(510)
