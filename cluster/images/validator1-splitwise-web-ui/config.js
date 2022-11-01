@@ -7,7 +7,7 @@ window.canton_network_config = {
     },
     wallet: {
         // URL of the web-ui, used to forward payment workflows to wallet
-        uiUrl: window.location.toString().replace('splitwise','wallet')
+        uiUrl: window.location.origin.replace('splitwise','wallet')
     },
     splitwise: {
         // URL of the gRPC-Web envoy proxy, proxying the splitwise gRPC API
