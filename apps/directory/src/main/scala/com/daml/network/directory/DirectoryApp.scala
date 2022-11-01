@@ -3,14 +3,14 @@ package com.daml.network.directory
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.codegen.CN.{Directory => directoryCodegen}
+import com.daml.network.codegen.CN.Directory as directoryCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.directory.admin.grpc.GrpcDirectoryService
 import com.daml.network.directory.automation.DirectoryAutomationService
 import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.directory.v0.DirectoryServiceGrpc
-import com.daml.network.environment.{CoinLedgerClient, CoinNode}
+import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
@@ -37,6 +37,7 @@ class DirectoryApp(
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
     adminServerRegistry: CantonMutableHandlerRegistry,
+    retryProvider: CoinRetries,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -49,6 +50,7 @@ class DirectoryApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
+      retryProvider,
     ) {
 
   override def initialize(
@@ -63,7 +65,11 @@ class DirectoryApp(
           loggerFactory,
         )
       )
-      svcParty <- retry("getSvcPartyId", scanConnection.getSvcPartyId())
+      svcParty <- retryProvider.retryForAutomationWithUncleanShutdown(
+        "getSvcPartyId",
+        scanConnection.getSvcPartyId(),
+        this,
+      )
       store = DirectoryStore(
         providerParty = providerPartyId,
         svcParty = svcParty,
@@ -74,7 +80,7 @@ class DirectoryApp(
         store,
         ledgerClient,
         scanConnection,
-        retryProvider = this,
+        retryProvider,
         loggerFactory,
         timeouts,
       )

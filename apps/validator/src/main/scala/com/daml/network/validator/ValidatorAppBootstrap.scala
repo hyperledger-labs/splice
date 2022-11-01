@@ -2,12 +2,12 @@ package com.daml.network.validator
 
 import akka.actor.ActorSystem
 import cats.data.EitherT
-import cats.implicits._
-import cats.syntax.either._
+import cats.implicits.*
+import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.CoinNodeBootstrapBase
+import com.daml.network.environment.{CoinNodeBootstrapBase, CoinRetries}
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.digitalasset.canton.concurrent.{
@@ -17,8 +17,8 @@ import com.digitalasset.canton.concurrent.{
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource._
-import com.digitalasset.canton.time._
+import com.digitalasset.canton.resource.*
+import com.digitalasset.canton.time.*
 
 import java.util.concurrent.ScheduledExecutorService
 import scala.annotation.nowarn
@@ -38,6 +38,7 @@ class ValidatorAppBootstrap(
     storageFactory: StorageFactory,
     parentLogger: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
+    retryProvider: CoinRetries,
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     @nowarn("cat=unused")
@@ -71,6 +72,7 @@ class ValidatorAppBootstrap(
           loggerFactory,
           tracerProvider,
           adminServerRegistry,
+          retryProvider,
         )
       )
     )
@@ -93,6 +95,7 @@ object ValidatorAppBootstrap {
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
       writeHealthDumpToFile: HealthDumpFunction,
+      retryProvider: CoinRetries,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
       scheduler: ScheduledExecutorService,
@@ -112,6 +115,7 @@ object ValidatorAppBootstrap {
           new CommunityStorageFactory(validatorConfig.storage),
           loggerFactory,
           writeHealthDumpToFile,
+          retryProvider,
         )
       )
       .leftMap(_.toString)

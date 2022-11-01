@@ -1,9 +1,10 @@
 package com.daml.network.validator.util
 
-import com.daml.network.codegen.CN.{Wallet => walletCodegen}
+import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.validator.store.ValidatorStore
+import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -22,6 +23,7 @@ private[validator] object ValidatorUtil {
       connection: CoinLedgerConnection,
       store: ValidatorStore,
       retryProvider: CoinRetries,
+      flagCloseable: FlagCloseable,
       logger: TracedLogger,
   )(implicit
       ec: ExecutionContext,
@@ -33,7 +35,7 @@ private[validator] object ValidatorUtil {
     for {
       // TODO (i713): remove this workaround for missing `read-as-any-party` rights
       _ <- connection.grantUserRights(walletServiceUser, Seq.empty, Seq(endUserParty))
-      _ <- retryProvider.retry(
+      _ <- retryProvider.retryForAutomationWithUncleanShutdown(
         "installWalletForUser",
         store.lookupWalletInstallByName(endUserName).flatMap {
           case QueryResult(off, None) =>
@@ -64,6 +66,7 @@ private[validator] object ValidatorUtil {
             logger.info(s"WalletAppInstall for $endUserName already exists, skipping")
             Future.successful(())
         },
+        flagCloseable,
       )
     } yield ()
   }

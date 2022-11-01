@@ -8,6 +8,7 @@ import com.daml.network.codegen.CC.{
 }
 import com.daml.network.codegen.CN.Wallet.Subscriptions as subsCodegen
 import com.daml.network.codegen.CN.Wallet as walletCodegen
+import com.daml.network.environment.CoinRetries
 import com.daml.network.store.AcsStore
 import com.daml.network.util.Contract
 import com.daml.network.wallet.store.memory.InMemoryEndUserWalletStore
@@ -18,11 +19,8 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.NoTracing
-import com.digitalasset.canton.util.retry
-import com.digitalasset.canton.util.retry.RetryUtil.AllExnRetryable
 import io.grpc.{Status, StatusRuntimeException}
 
-import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 
 /** A store for serving all queries for a specific wallet end-user. */
@@ -81,26 +79,17 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
   def lookupLatestOpenMiningRound(
   ): Future[QueryResult[Option[Contract[roundCodegen.OpenMiningRound]]]]
 
-  implicit val success: retry.Success[Any] = retry.Success.always
-  val policy = (msg: String) =>
-    retry.Backoff(
-      logger,
-      this,
-      retry.Forever,
-      1.seconds,
-      10.seconds,
-      msg,
-    )
-
   /** Wrapper around lookupLatestOpenMiningRound that retries if no open round is found,
     * which may happen if the wallet is used before its automation starts ingesting the round contracts.
     * TODO(M1-52): once round automation is implemented, we may want to consider replacing this with
     *              the wallet initialization synchronizing on the first round being ingested instead.
     */
-  def getLatestOpenMiningRound()(implicit
+  def getLatestOpenMiningRound(retryProvider: CoinRetries)(implicit
       ec: ExecutionContext
   ): Future[QueryResult[Contract[roundCodegen.OpenMiningRound]]] = {
-    policy("Waiting for open mining round to be ingested")(
+
+    retryProvider.retryForClientCallsWithUncleanShutdowns(
+      "Waiting for open mining round to be ingested",
       lookupLatestOpenMiningRound().map { result =>
         result.map(
           _.getOrElse(
@@ -110,7 +99,7 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
           )
         )
       },
-      AllExnRetryable,
+      this,
     )
   }
 
@@ -133,12 +122,12 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
     * on the store of the validator user since the primary party of end users
     * is not a stakeholder on the contracts used here.
     */
-  def getPaymentTransferContext()(implicit
+  def getPaymentTransferContext(retryProvider: CoinRetries)(implicit
       ec: ExecutionContext
   ): Future[coinRulesCodegen.PaymentTransferContext] =
     for {
       coinRules <- getCoinRules()
-      openRound <- getLatestOpenMiningRound()
+      openRound <- getLatestOpenMiningRound(retryProvider)
       issuingMiningRounds <- listContracts(roundCodegen.IssuingMiningRound)
       validatorRights <- listContracts(coinCodegen.ValidatorRight)
     } yield {

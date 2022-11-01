@@ -6,7 +6,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.auth.AuthInterceptor
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinNode}
+import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.validator.admin.api.client.ValidatorConnection
 import com.daml.network.wallet.admin.grpc.GrpcWalletService
@@ -41,6 +41,7 @@ class WalletApp(
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
     adminServerRegistry: CantonMutableHandlerRegistry,
+    retryProvider: CoinRetries,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -53,6 +54,7 @@ class WalletApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
+      CoinRetries(loggerFactory),
     ) {
 
   override def initialize(
@@ -74,11 +76,16 @@ class WalletApp(
           loggerFactory,
         )
       }
-      validatorUserInfo <- retry(
+      validatorUserInfo <- retryProvider.retryForAutomationWithUncleanShutdown(
         "getValidatorPartyId",
         validatorConnection.getValidatorUserInfo(),
+        this,
       )
-      svcParty <- retry("getSvcPartyId", scanConnection.getSvcPartyId())
+      svcParty <- retryProvider.retryForAutomationWithUncleanShutdown(
+        "getSvcPartyId",
+        scanConnection.getSvcPartyId(),
+        this,
+      )
     } yield {
       val walletStoreKey = WalletStore.Key(
         walletServiceParty = walletServiceParty,
@@ -92,7 +99,7 @@ class WalletApp(
         new TreasuryServices(
           ledgerClient.connection("TreasuryServices"),
           walletStore,
-          retryProvider = this,
+          retryProvider,
           loggerFactory,
           timeouts,
         )
@@ -105,7 +112,8 @@ class WalletApp(
                 walletStore,
                 treasuries,
                 ledgerClient,
-                loggerFactory = loggerFactory,
+                loggerFactory,
+                retryProvider,
               ),
               ec,
             ),
@@ -118,7 +126,7 @@ class WalletApp(
         walletStore,
         treasuries,
         ledgerClient,
-        retryProvider = this,
+        retryProvider = retryProvider,
         loggerFactory,
         timeouts,
       )

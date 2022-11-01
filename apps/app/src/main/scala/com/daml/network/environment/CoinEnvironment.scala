@@ -52,6 +52,7 @@ trait CoinEnvironment extends Environment {
       futureSupervisor,
       loggerFactory,
       writeHealthDumpToFile,
+      CoinRetries(loggerFactory),
     )
       .valueOr(err =>
         throw new RuntimeException(
@@ -83,6 +84,7 @@ trait CoinEnvironment extends Environment {
       futureSupervisor,
       loggerFactory,
       writeHealthDumpToFile,
+      CoinRetries(loggerFactory),
     )
       .valueOr(err =>
         throw new RuntimeException(
@@ -145,6 +147,7 @@ trait CoinEnvironment extends Environment {
       futureSupervisor,
       loggerFactory,
       writeHealthDumpToFile,
+      CoinRetries(loggerFactory),
     )
       .valueOr(err =>
         throw new RuntimeException(
@@ -176,6 +179,7 @@ trait CoinEnvironment extends Environment {
       futureSupervisor,
       loggerFactory,
       writeHealthDumpToFile,
+      CoinRetries(loggerFactory),
     ).valueOr(err =>
       throw new RuntimeException(
         s"Failed to create participant bootstrap: $err"
@@ -206,6 +210,7 @@ trait CoinEnvironment extends Environment {
       futureSupervisor,
       loggerFactory,
       writeHealthDumpToFile,
+      CoinRetries(loggerFactory),
     )
       .valueOr(err =>
         throw new RuntimeException(

@@ -50,7 +50,11 @@ abstract class AutomationService(retryProvider: CoinRetries)(implicit
         logger.info(s"Running operation ${name.singleQuoted} for\n$prettiedReq")
         // TODO(#790): retryProvider should take an explicit logger as the argument to provide better precision as to who initiated the logging
         retryProvider
-          .retryUnlessShutdown(name, performUnlessClosingF(name)(handler0(req)(traceContext)))
+          .retryForAutomation(
+            name,
+            performUnlessClosingF(name)(handler0(req)(traceContext)),
+            flagCloseable = this,
+          )
           .onShutdown("aborted due to shutdown")
           .transform {
             case Success(outcome) =>

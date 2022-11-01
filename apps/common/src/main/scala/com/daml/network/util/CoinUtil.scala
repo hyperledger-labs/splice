@@ -8,6 +8,7 @@ import com.daml.network.codegen.CC.Coin.Coin
 import com.daml.network.codegen.{CC, OpenBusiness}
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
+import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -41,11 +42,12 @@ object CoinUtil {
       logger: TracedLogger,
       connection: CoinLedgerConnection,
       retryProvider: CoinRetries,
+      flagCloseable: FlagCloseable,
       lookupValidatorRightByParty: (
           PartyId
       ) => Future[QueryResult[Option[Contract[CC.Coin.ValidatorRight]]]],
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] =
-    retryProvider.retry(
+    retryProvider.retryForAutomationWithUncleanShutdown(
       "createValidatorRight",
       lookupValidatorRightByParty(user).flatMap {
         case QueryResult(off, None) =>
@@ -66,6 +68,7 @@ object CoinUtil {
           logger.info(s"ValidatorRight for $user already exists, skipping")
           Future.successful(())
       },
+      flagCloseable,
     )
 
   lazy val defaultHoldingFee =

@@ -9,11 +9,11 @@ import com.daml.network.codegen.CN.Wallet.CoinOperationOutcome.COO_AcceptedAppMu
 import com.daml.network.codegen.CN.Wallet.{
   CoinOperation,
   CoinOperationOutcome,
-  Subscriptions => subsCodegen,
+  Subscriptions as subsCodegen,
 }
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.codegen.DA
-import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection}
+import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, Contract, Proto, Value}
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
@@ -43,6 +43,7 @@ class GrpcWalletService(
     treasuries: TreasuryServices,
     ledgerClient: CoinLedgerClient,
     protected val loggerFactory: NamedLoggerFactory,
+    retryProvider: CoinRetries,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
@@ -137,7 +138,7 @@ class GrpcWalletService(
           userStore <- getUserStore(user)
           validatorStore <- getUserStore(store.key.validatorUserName)
           currentRound <- validatorStore
-            .getLatestOpenMiningRound()
+            .getLatestOpenMiningRound(retryProvider)
             .map(_.value.payload.round.number)
           QueryResult(_, coins) <- userStore.listContracts(coinCodegen.Coin)
           QueryResult(_, lockedCoins) <- userStore.listContracts(coinCodegen.LockedCoin)
@@ -193,7 +194,7 @@ class GrpcWalletService(
           QueryResult(_, coins) <- userStore.listContracts(coinCodegen.Coin)
           QueryResult(_, lockedCoins) <- userStore.listContracts(coinCodegen.LockedCoin)
           currentRound <- validatorStore
-            .getLatestOpenMiningRound()
+            .getLatestOpenMiningRound(retryProvider)
             .map(_.value.payload.round.number)
         } yield {
           val unlockedHoldingFees =
@@ -804,7 +805,7 @@ class GrpcWalletService(
   )(implicit tc: TraceContext) = {
     val party = userStore.key.endUserParty
     for {
-      transferContext <- validatorStore.getPaymentTransferContext()
+      transferContext <- validatorStore.getPaymentTransferContext(retryProvider)
       cmd = transferContext.coinRules
         .exerciseCoinRules_TryTransfer(
           coinRulesCodegen.Transfer(
@@ -943,7 +944,9 @@ class GrpcWalletService(
     val owner = userStore.key.endUserParty
     for {
       validatorStore <- getUserStore(store.key.validatorUserName)
-      currentRound <- validatorStore.getLatestOpenMiningRound().map(_.value.payload.round.number)
+      currentRound <- validatorStore
+        .getLatestOpenMiningRound(retryProvider)
+        .map(_.value.payload.round.number)
       QueryResult(_, coins) <- userStore.listContracts(coinCodegen.Coin)
       candidates = coins
         .filter(c => CoinUtil.currentQuantity(c.payload, currentRound) >= quantity)

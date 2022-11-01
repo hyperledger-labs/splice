@@ -16,7 +16,7 @@ import com.daml.network.svc.v0.SvcServiceGrpc
 import com.daml.network.util.CoinUtil.{createValidatorRight, defaultCoinConfig}
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.config.RequireTypes.InstanceName
-import com.digitalasset.canton.lifecycle.Lifecycle
+import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
@@ -37,6 +37,7 @@ class SvcApp(
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
     adminServerRegistry: CantonMutableHandlerRegistry,
+    val retryProvider: CoinRetries,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -48,6 +49,7 @@ class SvcApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
+      CoinRetries(loggerFactory),
     ) {
 
   override lazy val allocateServiceUser = true
@@ -63,11 +65,11 @@ class SvcApp(
       automation = new SvcAutomationService(
         store,
         ledgerClient,
-        this,
+        retryProvider,
         loggerFactory,
         timeouts,
       )
-      _ <- SvcApp.setupApp(svcPartyId, connection, logger, store, this)
+      _ <- SvcApp.setupApp(svcPartyId, connection, logger, store, retryProvider, this)
       _ = logger.info(s"SVC App is initialized")
       logCollection = new SvcLogCollectionService(
         svcPartyId,
@@ -132,6 +134,7 @@ object SvcApp {
       logger: TracedLogger,
       store: SvcStore,
       retryProvider: CoinRetries,
+      flagCloseable: FlagCloseable,
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] = {
 
     // Create CoinRules and open a first mining round
@@ -153,9 +156,10 @@ object SvcApp {
         logger = logger,
         connection = connection,
         retryProvider = retryProvider,
+        flagCloseable = flagCloseable,
         lookupValidatorRightByParty = store.lookupValidatorRightByParty,
       )
-      _ <- retryProvider.retry(
+      _ <- retryProvider.retryForAutomationWithUncleanShutdown(
         "create coinrules and issuance state",
         store.lookupCoinRules().flatMap {
           case QueryResult(off, None) =>
@@ -175,6 +179,7 @@ object SvcApp {
             logger.info("CoinRules already exists, skipping")
             Future.successful(())
         },
+        flagCloseable,
       )
     } yield ()
   }

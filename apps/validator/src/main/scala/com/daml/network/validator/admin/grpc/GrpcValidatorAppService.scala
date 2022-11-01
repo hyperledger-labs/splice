@@ -5,7 +5,8 @@ import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.util.{CoinUtil, Proto}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
-import com.daml.network.validator.v0._
+import com.daml.network.validator.v0.*
+import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
 import com.google.protobuf.empty.Empty
@@ -19,6 +20,7 @@ class GrpcValidatorAppService(
     validatorUserName: String,
     walletServiceUser: String,
     retryProvider: CoinRetries,
+    flagCloseable: FlagCloseable,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -59,6 +61,7 @@ class GrpcValidatorAppService(
           connection = connection,
           store = store,
           retryProvider = retryProvider,
+          flagCloseable = flagCloseable,
           logger = logger,
         )
         // Create validator right contract so validator can collect validator rewards
@@ -69,6 +72,7 @@ class GrpcValidatorAppService(
           connection = connection,
           lookupValidatorRightByParty = store.lookupValidatorRightByParty,
           retryProvider = retryProvider,
+          flagCloseable = flagCloseable,
           logger = logger,
         )
       } yield OnboardUserResponse(Proto.encode(userPartyId))

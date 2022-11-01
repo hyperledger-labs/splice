@@ -2,11 +2,11 @@ package com.daml.network.wallet
 
 import akka.actor.ActorSystem
 import cats.data.EitherT
-import cats.syntax.either._
+import cats.syntax.either.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
-import com.daml.network.environment.CoinNodeBootstrapBase
+import com.daml.network.environment.{CoinNodeBootstrapBase, CoinRetries}
 import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.daml.network.wallet.metrics.WalletAppMetrics
 import com.digitalasset.canton.concurrent.{
@@ -16,8 +16,8 @@ import com.digitalasset.canton.concurrent.{
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.resource._
-import com.digitalasset.canton.time._
+import com.digitalasset.canton.resource.*
+import com.digitalasset.canton.time.*
 
 import java.util.concurrent.ScheduledExecutorService
 import scala.annotation.nowarn
@@ -37,6 +37,7 @@ class WalletAppBootstrap(
     storageFactory: StorageFactory,
     parentLogger: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
+    retryProvider: CoinRetries,
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     @nowarn("cat=unused")
@@ -72,6 +73,7 @@ class WalletAppBootstrap(
           loggerFactory,
           tracerProvider,
           adminServerRegistry,
+          retryProvider,
         )
       )
     )
@@ -93,6 +95,7 @@ object WalletAppBootstrap {
       futureSupervisor: FutureSupervisor,
       loggerFactory: NamedLoggerFactory,
       writeHealthDumpToFile: HealthDumpFunction,
+      retryProvider: CoinRetries,
   )(implicit
       executionContext: ExecutionContextIdlenessExecutorService,
       scheduler: ScheduledExecutorService,
@@ -112,6 +115,7 @@ object WalletAppBootstrap {
           new CommunityStorageFactory(walletConfig.storage),
           loggerFactory,
           writeHealthDumpToFile,
+          retryProvider,
         )
       )
       .leftMap(_.toString)

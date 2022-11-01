@@ -15,8 +15,7 @@ import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.time.HasUptime
 import com.digitalasset.canton.topology.{PartyId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.{NoTracing, TracerProvider}
-import com.digitalasset.canton.util.retry.RetryUtil.AllExnRetryable
-import com.digitalasset.canton.util.retry.{Backoff, Success}
+import io.grpc.{Status, StatusRuntimeException}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -28,12 +27,12 @@ abstract class CoinNode[State <: AutoCloseable](
     parameters: SharedCoinAppParameters,
     loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
+    retryProvider: CoinRetries,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
     esf: ExecutionSequencerFactory,
 ) extends CantonNode
-    with CoinRetries
     with FlagCloseableAsync
     with NamedLogging
     with HasUptime
@@ -86,21 +85,22 @@ abstract class CoinNode[State <: AutoCloseable](
       if (missing.isEmpty) {
         ()
       } else {
-        throw new RuntimeException(s"Missing packages $missing, got $actual")
+        throw new StatusRuntimeException(
+          Status.NOT_FOUND.withDescription(s"Missing packages $missing, got $actual")
+        )
       }
     }
 
-    implicit val success = Success.always
-    val policy = Backoff(logger, this, maxRetries, initialDelay, maxDelay, "waitForPackages")
-    policy(
-      query(),
-      AllExnRetryable,
-    )
+    retryProvider.retryForAutomationWithUncleanShutdown("Wait for packages", query(), this)
 
   }
 
   val ledgerClientF: Future[CoinLedgerClient] =
-    retry("Acquiring coin ledger client", createLedgerClient(remoteParticipant))
+    retryProvider.retryForAutomationWithUncleanShutdown(
+      "Acquiring coin ledger client",
+      createLedgerClient(remoteParticipant),
+      this,
+    )
 
   val initializeF: Future[State] = for {
     _ <- Future.successful(logger.info(s"Starting initialization"))
@@ -110,14 +110,16 @@ abstract class CoinNode[State <: AutoCloseable](
     _ = logger.info(s"Acquiring primary party of service user $serviceUser")
     serviceParty <-
       if (allocateServiceUser)
-        retry(
+        retryProvider.retryForAutomationWithUncleanShutdown(
           "Allocating user and party",
           connection.getOrAllocateParty(serviceUser),
+          this,
         )
       else
-        retry(
+        retryProvider.retryForAutomationWithUncleanShutdown(
           "Querying primary party of user",
           connection.getPrimaryParty(serviceUser),
+          this,
         )
     _ = logger.info(s"Acquired primary party of user $serviceUser: $serviceParty")
     _ = logger.info(s"Waiting for templates to be uploaded: ${requiredTemplates.map(_.id)}")

@@ -160,7 +160,11 @@ case class EndUserTreasuryService(
       batch: Seq[EnqueuedCoinOperation]
   ): Future[String] =
     TraceContext.withNewTraceContext { implicit tc =>
-      retryProvider.retry("execute coin operation batch", executeBatch(batch))
+      retryProvider.retryForAutomationWithUncleanShutdown(
+        "execute coin operation batch",
+        executeBatch(batch),
+        this,
+      )
     }
 
   private def executeBatch(
@@ -180,7 +184,7 @@ case class EndUserTreasuryService(
       inputs <- userStore
         .listContracts(coinCodegen.Coin)
         .map(cs => cs.value.map(c => coinRulesCodegen.TransferInput.InputCoin(c.contractId)))
-      transferContext <- getValidatorStore().getPaymentTransferContext()
+      transferContext <- getValidatorStore().getPaymentTransferContext(retryProvider)
       activeIssuingRounds = transferContext.context.issuingMiningRounds.keys.toSet
       inputs <- selectTransferInputs(activeIssuingRounds)
       cmd =

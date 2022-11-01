@@ -2,9 +2,9 @@ package com.daml.network.splitwise
 
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
+import com.daml.network.codegen.CN.Splitwise as splitwiseCodegen
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinNode}
+import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.admin.grpc.GrpcSplitwiseService
 import com.daml.network.splitwise.automation.SplitwiseAutomationService
@@ -36,6 +36,7 @@ class SplitwiseApp(
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
     adminServerRegistry: CantonMutableHandlerRegistry,
+    retryProvider: CoinRetries,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -47,6 +48,7 @@ class SplitwiseApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
+      retryProvider,
     ) {
 
   override lazy val ports = Map("admin" -> config.adminApi.port)
@@ -69,7 +71,7 @@ class SplitwiseApp(
       ledgerClient,
       readAs,
       scanConnection,
-      retryProvider = this,
+      retryProvider,
       loggerFactory,
       timeouts,
     )

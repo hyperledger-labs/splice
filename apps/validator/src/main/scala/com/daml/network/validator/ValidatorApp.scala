@@ -1,14 +1,14 @@
 package com.daml.network.validator
 
 import akka.actor.ActorSystem
-import cats.implicits._
+import cats.implicits.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.api.domain.UserRight.CanReadAs
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.network.codegen.CC.CoinRules.CoinRulesRequest
-import com.daml.network.codegen.CN.{Wallet => walletCodegen}
+import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode}
+import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, UploadablePackage}
@@ -40,6 +40,7 @@ class ValidatorApp(
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
     adminServerRegistry: CantonMutableHandlerRegistry,
+    retryProvider: CoinRetries,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -51,6 +52,7 @@ class ValidatorApp(
       coinAppParameters,
       loggerFactory,
       tracerProvider,
+      retryProvider,
     ) {
 
   private def setupWallet(connection: CoinLedgerConnection): Future[(PartyId, String)] = {
@@ -116,7 +118,8 @@ class ValidatorApp(
         svcParty = svcParty,
         connection = connection,
         store = store,
-        retryProvider = this,
+        retryProvider = retryProvider,
+        flagCloseable = this,
         logger = logger,
       )
       _ <- CoinUtil.createValidatorRight(
@@ -125,7 +128,8 @@ class ValidatorApp(
         svc = svcParty,
         connection = connection,
         lookupValidatorRightByParty = store.lookupValidatorRightByParty,
-        retryProvider = this,
+        retryProvider = retryProvider,
+        flagCloseable = this,
         logger = logger,
       )
     } yield {
@@ -143,32 +147,35 @@ class ValidatorApp(
   ): Future[Unit] = {
     logger.info("Attempting to create CoinRulesRequest")
     val coinRulesReq = CoinRulesRequest(user = validatorParty.toPrim, svc = svcParty.toPrim)
-    retry(
-      "Create CoinRulesRequest",
-      for {
-        coinRulesResult <- store.lookupCoinRules()
-        coinRulesRequestResult <- store.lookupCoinRulesRequest()
-        _ <- (coinRulesResult, coinRulesRequestResult) match {
-          case (QueryResult(off1, None), QueryResult(off2, None)) =>
-            // TODO(#790) Switch to the generalized version of mkCommandId once it has been added
-            val commandId = s"com.daml.network.validator.CoinRulesRequest_$validatorParty"
-            connection
-              .submitCommandWithDedup(
-                actAs = Seq(validatorParty),
-                readAs = Seq.empty,
-                command = Seq(coinRulesReq.create.command),
-                commandId = commandId,
-                deduplicationOffset = Ordering.String.min(off1, off2),
-              )
-          case (QueryResult(_, Some(_)), _) =>
-            logger.info("CoinRulesRequest already exists, skipping")
-            Future.successful(())
-          case (_, QueryResult(_, Some(_))) =>
-            logger.info("CoinRules already exists, skipping")
-            Future.successful(())
-        }
-      } yield (),
-    ).map(_ => logger.info("Created CoinRulesRequest"))
+    retryProvider
+      .retryForAutomationWithUncleanShutdown(
+        "Create CoinRulesRequest",
+        for {
+          coinRulesResult <- store.lookupCoinRules()
+          coinRulesRequestResult <- store.lookupCoinRulesRequest()
+          _ <- (coinRulesResult, coinRulesRequestResult) match {
+            case (QueryResult(off1, None), QueryResult(off2, None)) =>
+              // TODO(#790) Switch to the generalized version of mkCommandId once it has been added
+              val commandId = s"com.daml.network.validator.CoinRulesRequest_$validatorParty"
+              connection
+                .submitCommandWithDedup(
+                  actAs = Seq(validatorParty),
+                  readAs = Seq.empty,
+                  command = Seq(coinRulesReq.create.command),
+                  commandId = commandId,
+                  deduplicationOffset = Ordering.String.min(off1, off2),
+                )
+            case (QueryResult(_, Some(_)), _) =>
+              logger.info("CoinRulesRequest already exists, skipping")
+              Future.successful(())
+            case (_, QueryResult(_, Some(_))) =>
+              logger.info("CoinRules already exists, skipping")
+              Future.successful(())
+          }
+        } yield (),
+        this,
+      )
+      .map(_ => logger.info("Created CoinRulesRequest"))
   }
 
   override def initialize(
@@ -185,7 +192,11 @@ class ValidatorApp(
           )
         )
       connection = ledgerClient.connection("ValidatorAppBootstrap")
-      svcParty <- retry("getSvcPartyId", scanConnection.getSvcPartyId())
+      svcParty <- retryProvider.retryForAutomationWithUncleanShutdown(
+        "getSvcPartyId",
+        scanConnection.getSvcPartyId(),
+        this,
+      )
       (walletServiceParty, walletServiceUser) <- setupWallet(connection)
       key = ValidatorStore.Key(
         validatorParty = validatorParty,
@@ -196,7 +207,7 @@ class ValidatorApp(
       automation = new ValidatorAutomationService(
         store,
         ledgerClient,
-        this,
+        retryProvider,
         loggerFactory,
         timeouts,
       )
@@ -222,6 +233,7 @@ class ValidatorApp(
               store,
               config.damlUser,
               config.walletServiceUser,
+              retryProvider,
               this,
               loggerFactory,
             ),
