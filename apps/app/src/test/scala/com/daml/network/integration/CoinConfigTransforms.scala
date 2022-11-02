@@ -48,7 +48,7 @@ object CoinConfigTransforms {
     */
   def addDamlNameSuffix(context: String): CoinConfigTransform = { config =>
     {
-      val suffix = s"${context}-${UUID.randomUUID().toString()}".toLowerCase
+      val suffix = s"${context}".toLowerCase
 
       val config1 = updateSvcConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config)
       val config2 = updateCcScanConfig(c => c.copy(svcUser = s"${c.svcUser}-$suffix"))(config1)
@@ -101,8 +101,8 @@ object CoinConfigTransforms {
     * // validatorUserName will have the name with the suffix applied
     * val validatorParty = validatorParticipant.parties.enable(validatorUserName)
     */
-  def ensureNovelDamlNames(): CoinConfigTransform = {
-    addDamlNameSuffix(UUID.randomUUID().toString())
+  def ensureNovelDamlNames(): CoinConfigTransform = { config =>
+    addDamlNameSuffix(UUID.randomUUID().toString())(config)
   }
 
   /** Default transforms to apply to tests using a [[CoinEnvironmentDefinition]].
@@ -114,7 +114,7 @@ object CoinConfigTransforms {
     Seq(
       makeAllTimeoutsBounded,
       addDamlNameSuffix(testContextNameSuffix),
-      // ,ensureNovelDamlNames(),
+      ensureNovelDamlNames(),
     )
   }
 
