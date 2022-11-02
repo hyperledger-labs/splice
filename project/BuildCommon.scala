@@ -159,7 +159,7 @@ object BuildCommon {
         // so we explicitly remove all CN DARs here, just in case
         addCommandAlias(
           "clean-cn",
-          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-aaa-splitwise/clean; apps-svc/clean; apps-wallet/clean; apps-directory/clean; apps-app/clean; apps-wallet-daml/clean; cleanCnDars",
+          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-aaa-splitwise/clean; apps-svc/clean; apps-wallet/clean; apps-directory/clean; apps-app/clean; apps-wallet-daml/clean; apps-frontends/clean; cleanCnDars",
         )
     val buildSettings = inThisBuild(
       Seq(

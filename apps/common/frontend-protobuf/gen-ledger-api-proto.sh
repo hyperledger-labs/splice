@@ -12,8 +12,7 @@ cp -r ${DAML_PROTOBUFS}/* $DIR
 chmod -R +w $DIR/*
 cp -r ${REPO_ROOT}/3rdparty/protobuf/google $DIR/protos-$SDK_VERSION/google
 mkdir $DIR/ts
-rm -rf $DIR/protos-$SDK_VERSION/com/daml/daml_lf_1_14
-rm -rf $DIR/protos-$SDK_VERSION/com/daml/daml_lf_dev
+rm -rf $DIR/protos-$SDK_VERSION/com/daml/daml_lf_*
 PROTOS=$(cd $DIR/protos-$SDK_VERSION && find . -name '*.proto' | sed 's|^\./||')
 # We only generate sources for the subset we use.
 protoc -I $DIR/protos-$SDK_VERSION $PROTOS \
