@@ -152,7 +152,8 @@ abstract class CoinNode[State <: AutoCloseable](
   ): Future[CoinLedgerClient] =
     CoinLedgerClient.create(
       remoteParticipant.ledgerApi,
-      ApiTypes.ApplicationId(name.unwrap),
+      // Note: Ledger API auth tokens require that the application id is equal to the user id
+      ApiTypes.ApplicationId(serviceUser),
       CommandClientConfiguration.default,
       remoteParticipant.token,
       parameters.processingTimeouts,
