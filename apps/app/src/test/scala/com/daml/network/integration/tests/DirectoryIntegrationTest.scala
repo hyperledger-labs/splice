@@ -241,11 +241,12 @@ class DirectoryIntegrationTest
           entry.payload shouldBe expectedPayload
         }
         clue("Alice makes a follow-up subscription payment") {
-          val subscriptionStateId = inside(aliceRefs.wallet.listSubscriptions()) { case Seq(sub) =>
-            inside(sub.state) { case GrpcWalletAppClient.SubscriptionIdleState(state) =>
-              state.contractId
-            }
-          }
+          val subscriptionStateId =
+            eventually()(inside(aliceRefs.wallet.listSubscriptions()) { case Seq(sub) =>
+              inside(sub.state) { case GrpcWalletAppClient.SubscriptionIdleState(state) =>
+                state.contractId
+              }
+            })
           aliceRefs.wallet.makeSubscriptionPayment(subscriptionStateId)
         }
         val renewedEntry = clue("Getting Alice's renewed entry") {
