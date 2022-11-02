@@ -49,7 +49,7 @@ class GrpcValidatorAppService(
           name,
           Seq(CanReadAs(store.key.validatorParty.toLf)),
         )
-        // Workaround for the lack of "act-as-any-party" rights
+        // TODO(i713) Workaround for the lack of "act-as-any-party" rights
         _ <- connection.grantUserRights(validatorUserName, Seq(userPartyId), Seq.empty)
         _ <- ValidatorUtil.installWalletForUser(
           endUserParty = userPartyId,

@@ -68,6 +68,9 @@ class ValidatorApp(
         lazy val resourcePath: String = "dar/wallet-0.1.0.dar"
       })
       party <- connection.getOrAllocateParty(config.walletServiceUser)
+      // Note: need to immediately grant right to act as wallet service user in order to install wallet install contract
+      // TODO(i713): remove this workaround for missing act-as-any-party rights
+      _ <- connection.grantUserRights(config.damlUser, Seq(party), Seq.empty)
     } yield {
       logger.info(
         s"Setup wallet with service user ${config.walletServiceUser} and primary party $party"
