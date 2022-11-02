@@ -25,9 +25,6 @@ template PaymentChannel
   where
     signatory sender, receiver
 
-    key (sender, receiver, svc) : (Party, Party, Party)
-    maintainer key._1, key._2
-
     nonconsuming choice PaymentChannel_ExecuteDirectTransfer : Either Text (TransferResult, ContractId Coin)
       with
         inputs : [TransferInput]
@@ -82,6 +79,11 @@ template PaymentChannel
       do pure ()
 
 
+-- Stable identifier for a payment channel. We avoid use of contract keys
+-- so we define this as a top-level function instead.
+paymentChannelKey : PaymentChannel -> (Party, Party, Party)
+paymentChannelKey PaymentChannel{..} = (sender, receiver, svc)
+
 template PaymentChannelProposal
   with
     proposer : Party
@@ -100,7 +102,7 @@ template PaymentChannelProposal
         F.forA_ replacesChannel $ \chId -> do
           ch <- fetch chId
           archive chId
-          key ch === key this.channel
+          paymentChannelKey ch === paymentChannelKey this.channel
 
         create channel
 
@@ -315,8 +317,8 @@ executeCoinOperationRec context inputs prevResults (operation::remainingOperatio
   case operation of
     CO_AppPayment cid -> handleE AppPaymentRequest_Accept COO_AcceptedAppPayment cid
     CO_ChannelPayment cid -> handleE OnChannelPaymentRequest_Accept COO_AcceptedChannelPayment cid
-    CO_ChannelTransfer endUser receiver svcUser quantity payload -> do
-      resultE <- catchAllE $ exerciseByKey @PaymentChannel (endUser, receiver, svcUser) (PaymentChannel_ExecuteDirectTransfer inputs quantity payload context)
+    CO_ChannelTransfer channel quantity payload -> do
+      resultE <- catchAllE $ exercise channel (PaymentChannel_ExecuteDirectTransfer inputs quantity payload context)
       handleResult COO_AcceptedChannelTransfer resultE
     CO_SubscriptionAcceptAndMakeInitialPayment cid -> handle SubscriptionRequest_AcceptAndMakePayment COO_SubscriptionInitialPayment cid
     CO_SubscriptionMakePayment cid -> handle SubscriptionIdleState_MakePayment COO_SubscriptionPayment cid
@@ -356,9 +358,7 @@ data CoinOperation
   = CO_AppPayment (ContractId AppPaymentRequest)
   | CO_ChannelPayment (ContractId OnChannelPaymentRequest)
   | CO_ChannelTransfer with
-    endUser: Party
-    receiver: Party
-    svcUser: Party
+    channel : ContractId PaymentChannel
     quantity: Decimal
     payload: Text
   | CO_SubscriptionAcceptAndMakeInitialPayment (ContractId SubscriptionRequest)
@@ -395,9 +395,6 @@ template WalletAppInstall
     endUserParty : Party -- The primary party of the end-user
   where
     signatory walletServiceParty, endUserParty, validatorParty
-
-    key (endUserParty, walletServiceParty) : (Party, Party)
-    maintainer key._2
 
     -- Takes a batch of commands manipulating coins, and tries to execute them sequentially in one large Daml transaction.
     nonconsuming choice WalletAppInstall_ExecuteBatch: [CoinOperationOutcome]

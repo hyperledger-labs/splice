@@ -42,9 +42,9 @@ import scala.util.{Failure, Success}
   * [[io.grpc.StatusRuntimeException]]. We execute `tryLookups` run on every submission of the corresponding
   * coin operation (also for retries).
   */
-case class CoinOperationRequest(
-    operation: walletCodegen.CoinOperation,
-    tryLookups: () => Future[Unit],
+case class CoinOperationRequest[T](
+    operation: T => walletCodegen.CoinOperation,
+    tryLookups: () => Future[T],
 )
 
 /** This class encapsulates the logic that sequences all operations which change the coin holdings of an user such
@@ -73,8 +73,8 @@ case class EndUserTreasuryService(
   private val bufferSize = 1000
   private val waitTimeForStore = 300.millis
 
-  private val queue: BoundedSourceQueue[EnqueuedCoinOperation] = Source
-    .queue[EnqueuedCoinOperation](bufferSize)
+  private val queue: BoundedSourceQueue[AnyEnqueuedCoinOperation] = Source
+    .queue[AnyEnqueuedCoinOperation](bufferSize)
     // TODO(#1351): Possible extension: re-order commands according to urgency
     .batch(batchSize, operation => Seq(operation))((operations, operation) =>
       operations :+ operation
@@ -96,8 +96,8 @@ case class EndUserTreasuryService(
   /** Enqueues a coin operation into an internal task queue.
     * The [[EndUserTreasuryService]] will schedule the operation and then complete the returned with its result.
     */
-  def enqueueCoinOperation(
-      operation: CoinOperationRequest
+  def enqueueCoinOperation[T](
+      operation: CoinOperationRequest[T]
   )(implicit tc: TraceContext): Future[walletCodegen.CoinOperationOutcome] = {
     // TODO(#1351): possibly allow callers to assign semantically meaningful ids (see the discussion
     //  at https://github.com/DACH-NY/the-real-canton-coin/pull/1145#discussion_r994508807)
@@ -131,8 +131,8 @@ case class EndUserTreasuryService(
     * the coin operations with failed lookups.
     */
   private def runLookups(
-      batch: Seq[EnqueuedCoinOperation]
-  ): Future[Seq[EnqueuedCoinOperation]] = {
+      batch: Seq[AnyEnqueuedCoinOperation]
+  ): Future[Seq[ValidCoinOperation]] = {
     batch
       .traverse { case EnqueuedCoinOperation(coinOperation, p) =>
         coinOperation
@@ -144,8 +144,8 @@ case class EndUserTreasuryService(
                 p.failure(ex)
                 // but still run the rest of the operations whose lookup didn't fail
                 Success(None)
-              case Success(operation) =>
-                Success(Some(EnqueuedCoinOperation(coinOperation, p)))
+              case Success(r) =>
+                Success(Some(ValidCoinOperation(coinOperation.operation(r), p)))
             }
           }
       }
@@ -157,7 +157,7 @@ case class EndUserTreasuryService(
     * to the wallet app.
     */
   private def executeBatchWithRetry(
-      batch: Seq[EnqueuedCoinOperation]
+      batch: Seq[AnyEnqueuedCoinOperation]
   ): Future[String] =
     TraceContext.withNewTraceContext { implicit tc =>
       retryProvider.retryForAutomationWithUncleanShutdown(
@@ -168,7 +168,7 @@ case class EndUserTreasuryService(
     }
 
   private def executeBatch(
-      batch: Seq[EnqueuedCoinOperation]
+      batch: Seq[AnyEnqueuedCoinOperation]
   )(implicit tc: TraceContext): Future[String] = {
 
     logger.debug(
@@ -191,7 +191,7 @@ case class EndUserTreasuryService(
         install.contractId.exerciseWalletAppInstall_ExecuteBatch(
           transferContext,
           inputs,
-          validOperations.map(_.operationWithLookups.operation),
+          validOperations.map(_.operation),
         )
       (offset, outcomes) <- connection
         .submitWithResultAndOffset(
@@ -199,9 +199,8 @@ case class EndUserTreasuryService(
           Seq(walletStoreKey.validatorParty, userStore.key.endUserParty),
           cmd,
         )
-      _ = (outcomes zip validOperations).map {
-        case (outcome, EnqueuedCoinOperation(operation, p)) =>
-          p.success(outcome)
+      _ = (outcomes zip validOperations).map { case (outcome, ValidCoinOperation(operation, p)) =>
+        p.success(outcome)
       }
     } yield offset
   }
@@ -249,9 +248,24 @@ case class EndUserTreasuryService(
 object EndUserTreasuryService {
 
   /** Wrapper helper class. */
-  private case class EnqueuedCoinOperation(
-      operationWithLookups: CoinOperationRequest,
+  private case class EnqueuedCoinOperation[T](
+      override val operationWithLookups: CoinOperationRequest[T],
+      override val promise: Promise[walletCodegen.CoinOperationOutcome],
+  ) extends AnyEnqueuedCoinOperation {
+    override type LookupResult = T
+  }
+
+  // Existential trait that hides the type parameter.
+  // We cannot use EnqueuedCOinOperation[Any] since the type param
+  // is invariant.
+  sealed trait AnyEnqueuedCoinOperation {
+    type LookupResult
+    def operationWithLookups: CoinOperationRequest[LookupResult]
+    def promise: Promise[walletCodegen.CoinOperationOutcome]
+  }
+
+  private case class ValidCoinOperation(
+      operation: walletCodegen.CoinOperation,
       promise: Promise[walletCodegen.CoinOperationOutcome],
   )
-
 }

@@ -40,7 +40,7 @@ test = script do
   -- send some CC
   [(coin, _)] <- queryFilter @Coin sender.primaryParty (\c -> c.quantity.initialQuantity > 2.5)
   transferContext <- getPaymentTransferContext app sender
-  let exerciseTransfer coin = exerciseByKeyCmd @PaymentChannel (sender.primaryParty, receiver.primaryParty, app.svc)
+  let exerciseTransfer coin = exerciseCmd channelId
             PaymentChannel_ExecuteDirectTransfer with
               inputs = [InputCoin coin]
               quantity = 2.0
@@ -54,7 +54,7 @@ test = script do
   transfer coin
 
   -- ask for some more CC
-  paymentRequest <- submit receiver.primaryParty $ exerciseByKeyCmd @PaymentChannel (sender.primaryParty, receiver.primaryParty, app.svc)
+  paymentRequest <- submit receiver.primaryParty $ exerciseCmd channelId
     PaymentChannel_CreatePaymentRequest with
       quantity = 1.5
       description = "A very good reason to pay me"
@@ -67,7 +67,7 @@ test = script do
     transferContext
 
   -- ask for more CC, to be rejected
-  paymentRequest <- submit receiver.primaryParty $ exerciseByKeyCmd @PaymentChannel (sender.primaryParty, receiver.primaryParty, app.svc)
+  paymentRequest <- submit receiver.primaryParty $ exerciseCmd channelId
     PaymentChannel_CreatePaymentRequest with
       quantity = 1500.0
       description = "Not a good reason to pay"
@@ -75,7 +75,7 @@ test = script do
   submit sender.primaryParty $ exerciseCmd paymentRequest OnChannelPaymentRequest_Reject
 
   -- ask for more CC, and withdraw
-  paymentRequest <- submit receiver.primaryParty $ exerciseByKeyCmd @PaymentChannel (sender.primaryParty, receiver.primaryParty, app.svc)
+  paymentRequest <- submit receiver.primaryParty $ exerciseCmd channelId
     PaymentChannel_CreatePaymentRequest with
       quantity = 1500.0
       description = "Going to withdraw this"

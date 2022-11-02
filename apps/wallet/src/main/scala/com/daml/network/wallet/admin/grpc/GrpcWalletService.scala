@@ -12,7 +12,6 @@ import com.daml.network.codegen.CN.Wallet.{
   Subscriptions as subsCodegen,
 }
 import com.daml.network.codegen.CN.Wallet as walletCodegen
-import com.daml.network.codegen.DA
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, Contract, Proto, Value}
@@ -158,12 +157,13 @@ class GrpcWalletService(
           val quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
           Future.successful(
             CoinOperationRequest(
-              CoinOperation.CO_Tap(
-                store.key.svcParty.toPrim,
-                validatorParty.toPrim,
-                endUserWalletStore.key.endUserParty.toPrim,
-                quantity,
-              ),
+              (_: Unit) =>
+                CoinOperation.CO_Tap(
+                  store.key.svcParty.toPrim,
+                  validatorParty.toPrim,
+                  endUserWalletStore.key.endUserParty.toPrim,
+                  quantity,
+                ),
               () => Future.successful(()),
             )
           )
@@ -249,7 +249,7 @@ class GrpcWalletService(
             } yield ()
 
           Future.successful(
-            CoinOperationRequest(CoinOperation.CO_AppPayment(requestCid), lookups)
+            CoinOperationRequest((_: Unit) => CoinOperation.CO_AppPayment(requestCid), lookups)
           )
         })(
           user,
@@ -373,7 +373,7 @@ class GrpcWalletService(
 
           Future.successful(
             CoinOperationRequest(
-              CoinOperation.CO_SubscriptionAcceptAndMakeInitialPayment(requestCid),
+              (_: Unit) => CoinOperation.CO_SubscriptionAcceptAndMakeInitialPayment(requestCid),
               lookups,
             )
           )
@@ -435,7 +435,10 @@ class GrpcWalletService(
             } yield ()
 
           Future.successful(
-            CoinOperationRequest(CoinOperation.CO_SubscriptionMakePayment(stateCid), lookups)
+            CoinOperationRequest(
+              (_: Unit) => CoinOperation.CO_SubscriptionMakePayment(stateCid),
+              lookups,
+            )
           )
         })(
           user,
@@ -561,11 +564,13 @@ class GrpcWalletService(
           userStore <- getUserStore(user)
           svcParty = userStore.key.svcParty
           senderParty = Proto.tryDecode(Proto.Party)(request.senderPartyId)
-          cmd = walletCodegen.PaymentChannel
-            .key(
-              DA.Types
-                .Tuple3(senderParty.toPrim, userStore.key.endUserParty.toPrim, svcParty.toPrim)
-            )
+          channel <- lookupPaymentChannel(
+            userStore,
+            svcParty.toPrim,
+            senderP = senderParty.toPrim,
+            receiverP = userStore.key.endUserParty.toPrim,
+          )
+          cmd = channel
             .exercisePaymentChannel_Cancel_By_Sender()
             .command
           _ <- connection.submitCommand(
@@ -586,11 +591,13 @@ class GrpcWalletService(
           userStore <- getUserStore(user)
           svcParty = userStore.key.svcParty
           receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
-          cmd = walletCodegen.PaymentChannel
-            .key(
-              DA.Types
-                .Tuple3(userStore.key.endUserParty.toPrim, receiverParty.toPrim, svcParty.toPrim)
-            )
+          channel <- lookupPaymentChannel(
+            userStore,
+            svcParty.toPrim,
+            senderP = userStore.key.endUserParty.toPrim,
+            receiverP = receiverParty.toPrim,
+          )
+          cmd = channel
             .exercisePaymentChannel_Cancel_By_Receiver()
             .command
           _ <- connection.submitCommand(
@@ -613,14 +620,19 @@ class GrpcWalletService(
           val receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
           Future.successful(
             CoinOperationRequest(
-              CoinOperation.CO_ChannelTransfer(
-                endUserParty.toPrim,
-                receiverParty.toPrim,
-                store.key.svcParty.toPrim,
-                quantity,
-                "wallet: execute direct transfer",
-              ),
-              () => lookupPaymentChannel(userStore, store.key.svcParty.toPrim, receiverParty.toPrim),
+              (channelId) =>
+                CoinOperation.CO_ChannelTransfer(
+                  channelId,
+                  quantity,
+                  "wallet: execute direct transfer",
+                ),
+              () =>
+                lookupPaymentChannel(
+                  userStore,
+                  store.key.svcParty.toPrim,
+                  receiverP = receiverParty.toPrim,
+                  senderP = endUserParty.toPrim,
+                ),
             )
           )
         })(
@@ -695,11 +707,13 @@ class GrpcWalletService(
             quantity = quantity,
             description = request.description,
           )
-          cmd = walletCodegen.PaymentChannel
-            .key(
-              DA.Types
-                .Tuple3(senderParty.toPrim, userStore.key.endUserParty.toPrim, svcParty.toPrim)
-            )
+          channel <- lookupPaymentChannel(
+            userStore,
+            svcParty.toPrim,
+            senderP = senderParty.toPrim,
+            receiverP = userStore.key.endUserParty.toPrim,
+          )
+          cmd = channel
             .exercisePaymentChannel_CreatePaymentRequest(arg)
           requestCid <- connection.submitWithResult(
             Seq(userStore.key.endUserParty),
@@ -740,12 +754,13 @@ class GrpcWalletService(
             _ <- lookupPaymentChannel(
               userStore,
               paymentRequest.payload.svc,
-              paymentRequest.payload.receiver,
+              receiverP = paymentRequest.payload.receiver,
+              senderP = userStore.key.endUserParty.toPrim,
             )
           } yield ()
 
         Future.successful(
-          CoinOperationRequest(CoinOperation.CO_ChannelPayment(requestCid), lookups)
+          CoinOperationRequest((_: Unit) => CoinOperation.CO_ChannelPayment(requestCid), lookups)
         )
       })(user, (_: CoinOperationOutcome.COO_AcceptedChannelPayment) => Empty())
     }
@@ -881,6 +896,7 @@ class GrpcWalletService(
     * Note: curried syntax helps with type inference
     */
   private def exerciseWalletAction[
+      LookupResult,
       ExpectedCOO <: CoinOperationOutcome: ClassTag,
       ProtoResponse <: scalapb.GeneratedMessage,
   ](
@@ -888,7 +904,7 @@ class GrpcWalletService(
           P.ContractId[walletCodegen.WalletAppInstall],
           EndUserWalletStore,
           // TODO(#1351): also require quantity to reject commands early?
-      ) => Future[CoinOperationRequest]
+      ) => Future[CoinOperationRequest[LookupResult]]
   )(
       user: String,
       processResponse: ExpectedCOO => ProtoResponse,
@@ -1032,20 +1048,22 @@ class GrpcWalletService(
   private def lookupPaymentChannel(
       userStore: EndUserWalletStore,
       svcP: P.Party,
+      senderP: P.Party,
       receiverP: P.Party,
-  ): Future[Unit] = for {
-    channel <- userStore
+  ): Future[P.ContractId[walletCodegen.PaymentChannel]] = for {
+    channelO <- userStore
       .findContract(
         walletCodegen.PaymentChannel,
         filter = { c: Contract[walletCodegen.PaymentChannel] =>
-          c.payload.svc == svcP && c.payload.receiver == receiverP && c.payload.sender == userStore.key.endUserParty.toPrim
+          c.payload.svc == svcP && c.payload.receiver == receiverP && c.payload.sender == senderP
         },
       )
-    _ = if (channel.value.isEmpty)
+    channel = channelO.value.getOrElse(
       throw new StatusRuntimeException(
         Status.NOT_FOUND.withDescription(
           s"PaymentChannel between $svcP, $receiverP and ${userStore.key.endUserParty}."
         )
       )
-  } yield ()
+    )
+  } yield channel.contractId
 }
