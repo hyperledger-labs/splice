@@ -400,9 +400,82 @@ template WalletAppInstall
     nonconsuming choice WalletAppInstall_ExecuteBatch: [CoinOperationOutcome]
       with
         context : PaymentTransferContext
-        inputs: [TransferInput]
+        inputs : [TransferInput]
         operations : [CoinOperation]
       controller walletServiceParty
       do
         accepted <- executeCoinOperationRec context inputs [] operations
         return $ reverse accepted
+
+    nonconsuming choice WalletAppInstall_AppPaymentRequest_Reject : ()
+      with
+        cid : ContractId AppPaymentRequest
+      controller walletServiceParty
+      do exercise cid AppPaymentRequest_Reject
+
+    nonconsuming choice WalletAppInstall_SubscriptionRequest_Reject : ()
+      with
+        cid : ContractId SubscriptionRequest
+      controller walletServiceParty
+      do exercise cid SubscriptionRequest_Reject
+
+    nonconsuming choice WalletAppInstall_SubscriptionIdleState_CancelSubscription : ()
+      with
+        cid : ContractId SubscriptionIdleState
+      controller walletServiceParty
+      do exercise cid SubscriptionIdleState_CancelSubscription
+
+    nonconsuming choice WalletAppInstall_CreatePaymentChannelProposal : ContractId PaymentChannelProposal
+      with
+        proposer : Party
+        channel : PaymentChannel
+        replacesChannel : Optional (ContractId PaymentChannel)
+      controller walletServiceParty
+      do create PaymentChannelProposal with ..
+
+    nonconsuming choice WalletAppInstall_PaymentChannelProposal_Accept : ContractId PaymentChannel
+      with
+        cid : ContractId PaymentChannelProposal
+      controller walletServiceParty
+      do exercise cid PaymentChannelProposal_Accept
+
+    nonconsuming choice WalletAppInstall_PaymentChannel_Cancel_By_Sender : ()
+      with
+        cid : ContractId PaymentChannel
+      controller walletServiceParty
+      do exercise cid PaymentChannel_Cancel_By_Sender
+
+    nonconsuming choice WalletAppInstall_PaymentChannel_Cancel_By_Receiver : ()
+      with
+        cid : ContractId PaymentChannel
+      controller walletServiceParty
+      do exercise cid PaymentChannel_Cancel_By_Receiver
+
+    nonconsuming choice WalletAppInstall_PaymentChannel_CreatePaymentRequest : ContractId OnChannelPaymentRequest
+      with
+        cid : ContractId PaymentChannel
+        quantity : Decimal
+        description : Text
+      controller walletServiceParty
+      do exercise cid (PaymentChannel_CreatePaymentRequest quantity description)
+
+    nonconsuming choice WalletAppInstall_OnChannelPaymentRequest_Withdraw : ()
+      with
+        cid : ContractId OnChannelPaymentRequest
+      controller walletServiceParty
+      do exercise cid OnChannelPaymentRequest_Withdraw
+
+    nonconsuming choice WalletAppInstall_OnChannelPaymentRequest_Reject : ()
+      with
+        cid : ContractId OnChannelPaymentRequest
+      controller walletServiceParty
+      do exercise cid OnChannelPaymentRequest_Reject
+
+    -- TODO(#1351): Remove this
+    nonconsuming choice WalletAppInstall_CoinRules_TryTransfer : TransferResult
+      with
+        cid : ContractId CoinRules
+        transfer : Transfer
+        context : TransferContext
+      controller walletServiceParty
+      do exercise cid (CoinRules_TryTransfer transfer context)

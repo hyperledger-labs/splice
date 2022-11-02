@@ -1,7 +1,7 @@
 package com.daml.network.wallet.admin.grpc
 
 import cats.implicits.*
-import com.daml.ledger.client.binding.{Primitive => P, TemplateCompanion}
+import com.daml.ledger.client.binding.{TemplateCompanion, ValueDecoder, Primitive as P}
 import com.daml.network.auth.AuthInterceptor
 import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
 import com.daml.network.codegen.CC.{Coin as coinCodegen, CoinRules as coinRulesCodegen}
@@ -153,7 +153,7 @@ class GrpcWalletService(
   override def tap(request: v0.TapRequest): Future[v0.TapResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth(request.getWalletCtx) { user =>
-        exerciseWalletAction((c, endUserWalletStore) => {
+        exerciseWalletCoinAction((c, endUserWalletStore) => {
           val quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
           Future.successful(
             CoinOperationRequest(
@@ -230,7 +230,7 @@ class GrpcWalletService(
   ): Future[v0.AcceptAppPaymentRequestResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth(request.getWalletCtx) { user =>
-        exerciseWalletAction((installCid, userStore) => {
+        exerciseWalletCoinAction((installCid, userStore) => {
           val requestCid = Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](
             request.requestContractId
           )
@@ -266,21 +266,16 @@ class GrpcWalletService(
   ): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth(request.getWalletCtx) { user =>
-        for {
-          userStore <- getUserStore(user)
-          arg = walletCodegen.AppPaymentRequest_Reject()
-          requestCid = Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](
+        exerciseWalletAction((installCid, _) => {
+          val requestCid = Proto.tryDecodeContractId[walletCodegen.AppPaymentRequest](
             request.requestContractId
           )
-          cmd = requestCid
-            .exerciseAppPaymentRequest_Reject(arg)
-            .command
-          _ <- connection.submitCommand(
-            Seq(userStore.key.endUserParty),
-            Seq(),
-            Seq(cmd),
+          Future.successful(
+            installCid.exerciseWalletAppInstall_AppPaymentRequest_Reject(
+              requestCid
+            )
           )
-        } yield Empty()
+        })(user, _ => Empty())
       }
     }
 
@@ -352,7 +347,7 @@ class GrpcWalletService(
   ): Future[v0.AcceptSubscriptionRequestResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth(request.getWalletCtx) { user =>
-        exerciseWalletAction((installCid, userStore) => {
+        exerciseWalletCoinAction((installCid, userStore) => {
           val requestCid =
             Proto.tryDecodeContractId[subsCodegen.SubscriptionRequest](
               request.requestContractId
@@ -392,21 +387,16 @@ class GrpcWalletService(
   ): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth(request.getWalletCtx) { user =>
-        for {
-          userStore <- getUserStore(user)
-          arg = subsCodegen.SubscriptionRequest_Reject()
-          requestCid = Proto.tryDecodeContractId[subsCodegen.SubscriptionRequest](
+        exerciseWalletAction((installCid, _) => {
+          val requestCid = Proto.tryDecodeContractId[subsCodegen.SubscriptionRequest](
             request.requestContractId
           )
-          cmd = requestCid
-            .exerciseSubscriptionRequest_Reject(arg)
-            .command
-          _ <- connection.submitCommand(
-            Seq(userStore.key.endUserParty),
-            Seq(),
-            Seq(cmd),
+          Future.successful(
+            installCid.exerciseWalletAppInstall_SubscriptionRequest_Reject(
+              requestCid
+            )
           )
-        } yield Empty()
+        })(user, _ => Empty())
       }
     }
 
@@ -415,7 +405,7 @@ class GrpcWalletService(
   ): Future[v0.MakeSubscriptionPaymentResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth(request.getWalletCtx) { user =>
-        exerciseWalletAction((installCid, userStore) => {
+        exerciseWalletCoinAction((installCid, userStore) => {
           val stateCid =
             Proto.tryDecodeContractId[subsCodegen.SubscriptionIdleState](
               request.idleStateContractId
@@ -455,21 +445,16 @@ class GrpcWalletService(
   ): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth(request.getWalletCtx) { user =>
-        for {
-          userStore <- getUserStore(user)
-          arg = subsCodegen.SubscriptionIdleState_CancelSubscription()
-          requestCid = Proto.tryDecodeContractId[subsCodegen.SubscriptionIdleState](
+        exerciseWalletAction((installCid, _) => {
+          val requestCid = Proto.tryDecodeContractId[subsCodegen.SubscriptionIdleState](
             request.idleStateContractId
           )
-          cmd = requestCid
-            .exerciseSubscriptionIdleState_CancelSubscription(arg)
-            .command
-          _ <- connection.submitCommand(
-            Seq(userStore.key.endUserParty),
-            Seq(),
-            Seq(cmd),
+          Future.successful(
+            installCid.exerciseWalletAppInstall_SubscriptionIdleState_CancelSubscription(
+              requestCid
+            )
           )
-        } yield Empty()
+        })(user, _ => Empty())
       }
     }
 
@@ -496,37 +481,30 @@ class GrpcWalletService(
   ): Future[v0.ProposePaymentChannelResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth(request.getWalletCtx) { user =>
-        for {
-          userStore <- getUserStore(user)
-          svcParty = userStore.key.svcParty
-          // TODO(Mx-90): guard making the proposal by a check that a like channel does not yet exist
-          receiver = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
-          cmd = walletCodegen
-            .PaymentChannelProposal(
-              proposer = userStore.key.endUserParty.toPrim,
-              channel = walletCodegen.PaymentChannel(
-                sender = userStore.key.endUserParty.toPrim,
-                receiver = receiver.toPrim,
-                svc = svcParty.toPrim,
-                allowRequests = request.allowRequests,
-                allowOffers = request.allowOffers,
-                allowDirectTransfers = request.allowDirectTransfers,
-                senderTransferFeeRatio =
-                  Proto.tryDecode(Proto.BigDecimal)(request.senderTransferFeeRatio),
-              ),
-              replacesChannel = request.replacesChannelId.map(
-                Proto.tryDecodeContractId[walletCodegen.PaymentChannel]
-              ),
-            )
-            .create
-          proposalCid <- connection.submitWithResult(
-            Seq(userStore.key.endUserParty),
-            Seq(),
-            cmd,
+        exerciseWalletAction((installCid, userStore) => {
+          val receiver = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
+          val proposer = userStore.key.endUserParty.toPrim
+          val channel = walletCodegen.PaymentChannel(
+            sender = userStore.key.endUserParty.toPrim,
+            receiver = receiver.toPrim,
+            svc = userStore.key.svcParty.toPrim,
+            allowRequests = request.allowRequests,
+            allowOffers = request.allowOffers,
+            allowDirectTransfers = request.allowDirectTransfers,
+            senderTransferFeeRatio =
+              Proto.tryDecode(Proto.BigDecimal)(request.senderTransferFeeRatio),
           )
-        } yield v0.ProposePaymentChannelResponse(
-          proposalContractId = Proto.encode(proposalCid)
-        )
+          val replacesChannel = request.replacesChannelId.map(
+            Proto.tryDecodeContractId[walletCodegen.PaymentChannel]
+          )
+          Future.successful(
+            installCid.exerciseWalletAppInstall_CreatePaymentChannelProposal(
+              proposer,
+              channel,
+              replacesChannel,
+            )
+          )
+        })(user, cid => v0.ProposePaymentChannelResponse(Proto.encode(cid)))
       }
     }
 
@@ -535,23 +513,16 @@ class GrpcWalletService(
   ): Future[v0.AcceptPaymentChannelProposalResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth(request.getWalletCtx) { user =>
-        for {
-          userStore <- getUserStore(user)
-          arg = walletCodegen.PaymentChannelProposal_Accept()
-          // TODO(M3-01): guard accepting the proposal by a check that a channel with the same key does not yet exist
-          proposalCid = Proto.tryDecodeContractId[walletCodegen.PaymentChannelProposal](
+        exerciseWalletAction((installCid, _) => {
+          val requestCid = Proto.tryDecodeContractId[walletCodegen.PaymentChannelProposal](
             request.proposalContractId
           )
-          cmd = proposalCid
-            .exercisePaymentChannelProposal_Accept(arg)
-          channelCid <- connection.submitWithResult(
-            Seq(userStore.key.endUserParty),
-            Seq(),
-            cmd,
+          Future.successful(
+            installCid.exerciseWalletAppInstall_PaymentChannelProposal_Accept(
+              requestCid
+            )
           )
-        } yield v0.AcceptPaymentChannelProposalResponse(
-          channelContractId = Proto.encode(channelCid)
-        )
+        })(user, cid => v0.AcceptPaymentChannelProposalResponse(Proto.encode(cid)))
       }
     }
 
@@ -560,25 +531,20 @@ class GrpcWalletService(
   ): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth(request.getWalletCtx) { user =>
-        for {
-          userStore <- getUserStore(user)
-          svcParty = userStore.key.svcParty
-          senderParty = Proto.tryDecode(Proto.Party)(request.senderPartyId)
-          channel <- lookupPaymentChannel(
-            userStore,
-            svcParty.toPrim,
-            senderP = senderParty.toPrim,
-            receiverP = userStore.key.endUserParty.toPrim,
+        exerciseWalletAction((installCid, userStore) => {
+          val senderParty = Proto.tryDecode(Proto.Party)(request.senderPartyId)
+          val svcParty = userStore.key.svcParty
+          for {
+            channel <- lookupPaymentChannel(
+              userStore,
+              svcParty.toPrim,
+              senderP = senderParty.toPrim,
+              receiverP = userStore.key.endUserParty.toPrim,
+            )
+          } yield installCid.exerciseWalletAppInstall_PaymentChannel_Cancel_By_Sender(
+            channel
           )
-          cmd = channel
-            .exercisePaymentChannel_Cancel_By_Sender()
-            .command
-          _ <- connection.submitCommand(
-            Seq(userStore.key.endUserParty),
-            Seq(validatorParty),
-            Seq(cmd),
-          )
-        } yield Empty()
+        })(user, _ => Empty())
       }
     }
 
@@ -587,25 +553,20 @@ class GrpcWalletService(
   ): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth(request.getWalletCtx) { user =>
-        for {
-          userStore <- getUserStore(user)
-          svcParty = userStore.key.svcParty
-          receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
-          channel <- lookupPaymentChannel(
-            userStore,
-            svcParty.toPrim,
-            senderP = userStore.key.endUserParty.toPrim,
-            receiverP = receiverParty.toPrim,
+        exerciseWalletAction((installCid, userStore) => {
+          val receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
+          val svcParty = userStore.key.svcParty
+          for {
+            channel <- lookupPaymentChannel(
+              userStore,
+              svcParty.toPrim,
+              senderP = userStore.key.endUserParty.toPrim,
+              receiverP = receiverParty.toPrim,
+            )
+          } yield installCid.exerciseWalletAppInstall_PaymentChannel_Cancel_By_Receiver(
+            channel
           )
-          cmd = channel
-            .exercisePaymentChannel_Cancel_By_Receiver()
-            .command
-          _ <- connection.submitCommand(
-            Seq(userStore.key.endUserParty),
-            Seq(validatorParty),
-            Seq(cmd),
-          )
-        } yield Empty()
+        })(user, _ => Empty())
       }
     }
 
@@ -614,7 +575,7 @@ class GrpcWalletService(
   ): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth(request.getWalletCtx) { user =>
-        exerciseWalletAction((c, userStore) => {
+        exerciseWalletCoinAction((c, userStore) => {
           val endUserParty = userStore.key.endUserParty
           val quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
           val receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
@@ -697,31 +658,26 @@ class GrpcWalletService(
   ): Future[v0.CreateOnChannelPaymentRequestResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth(request.getWalletCtx) { user =>
-        for {
-          userStore <- getUserStore(user)
-          validatorStore <- getUserStore(user)
-          svcParty = userStore.key.svcParty
-          senderParty = Proto.tryDecode(Proto.Party)(request.senderPartyId)
-          quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
-          arg = walletCodegen.PaymentChannel_CreatePaymentRequest(
-            quantity = quantity,
-            description = request.description,
+        exerciseWalletAction((installCid, userStore) => {
+          val senderParty = Proto.tryDecode(Proto.Party)(request.senderPartyId)
+          val svcParty = userStore.key.svcParty
+          val quantity = Proto.tryDecode(Proto.BigDecimal)(request.quantity)
+          val description = request.description
+          for {
+            channel <- lookupPaymentChannel(
+              userStore,
+              svcParty.toPrim,
+              senderP = senderParty.toPrim,
+              receiverP = userStore.key.endUserParty.toPrim,
+            )
+          } yield installCid.exerciseWalletAppInstall_PaymentChannel_CreatePaymentRequest(
+            channel,
+            quantity,
+            description,
           )
-          channel <- lookupPaymentChannel(
-            userStore,
-            svcParty.toPrim,
-            senderP = senderParty.toPrim,
-            receiverP = userStore.key.endUserParty.toPrim,
-          )
-          cmd = channel
-            .exercisePaymentChannel_CreatePaymentRequest(arg)
-          requestCid <- connection.submitWithResult(
-            Seq(userStore.key.endUserParty),
-            Seq(),
-            cmd,
-          )
-        } yield v0.CreateOnChannelPaymentRequestResponse(
-          requestContractId = Proto.encode(requestCid)
+        })(
+          user,
+          cid => v0.CreateOnChannelPaymentRequestResponse(requestContractId = Proto.encode(cid)),
         )
       }
     }
@@ -739,7 +695,7 @@ class GrpcWalletService(
       request: v0.AcceptOnChannelPaymentRequestRequest
   ): Future[Empty] = withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
     withAuth(request.getWalletCtx) { user =>
-      exerciseWalletAction((installCid, userStore) => {
+      exerciseWalletCoinAction((installCid, userStore) => {
         val requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](
           request.requestContractId
         )
@@ -771,21 +727,16 @@ class GrpcWalletService(
   ): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth(request.getWalletCtx) { user =>
-        for {
-          userStore <- getUserStore(user)
-          arg = walletCodegen.OnChannelPaymentRequest_Reject()
-          requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](
+        exerciseWalletAction((installCid, _) => {
+          val requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](
             request.requestContractId
           )
-          cmd = requestCid
-            .exerciseOnChannelPaymentRequest_Reject(arg)
-            .command
-          _ <- connection.submitCommand(
-            Seq(userStore.key.endUserParty),
-            Seq(),
-            Seq(cmd),
+          Future.successful(
+            installCid.exerciseWalletAppInstall_OnChannelPaymentRequest_Reject(
+              requestCid
+            )
           )
-        } yield Empty()
+        })(user, _ => Empty())
       }
     }
 
@@ -794,56 +745,52 @@ class GrpcWalletService(
   ): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth(request.getWalletCtx) { user =>
-        for {
-          userStore <- getUserStore(user)
-          arg = walletCodegen.OnChannelPaymentRequest_Withdraw()
-          requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](
+        exerciseWalletAction((installCid, _) => {
+          val requestCid = Proto.tryDecodeContractId[walletCodegen.OnChannelPaymentRequest](
             request.requestContractId
           )
-          cmd = requestCid
-            .exerciseOnChannelPaymentRequest_Withdraw(arg)
-            .command
-          _ <- connection.submitCommand(
-            Seq(userStore.key.endUserParty),
-            Seq(),
-            Seq(cmd),
+          Future.successful(
+            installCid.exerciseWalletAppInstall_OnChannelPaymentRequest_Withdraw(
+              requestCid
+            )
           )
-        } yield Empty()
+        })(user, _ => Empty())
       }
     }
 
+  // TODO(#1351) - Remove this
   private def redistribute(
       userStore: EndUserWalletStore,
       validatorStore: EndUserWalletStore,
       inputs: Seq[coinRulesCodegen.TransferInput],
       outputs: Seq[coinRulesCodegen.TransferOutput],
-  )(implicit tc: TraceContext) = {
+  )(implicit tc: TraceContext): Future[Seq[P.ContractId[coinCodegen.Coin]]] = {
+    val user = userStore.key.endUserName
     val party = userStore.key.endUserParty
-    for {
-      transferContext <- validatorStore.getPaymentTransferContext(retryProvider)
-      cmd = transferContext.coinRules
-        .exerciseCoinRules_TryTransfer(
-          coinRulesCodegen.Transfer(
-            sender = party.toPrim,
-            provider = party.toPrim,
-            inputs = inputs,
-            outputs = outputs,
-            payload = "redistribute",
-          ),
-          transferContext.context,
-        )
-      transferResults <- connection.submitWithResult(
-        Seq(party),
-        Seq(validatorParty),
-        cmd,
+    exerciseWalletAction((installCid, _) => {
+      val transfer = coinRulesCodegen.Transfer(
+        sender = party.toPrim,
+        provider = party.toPrim,
+        inputs = inputs,
+        outputs = outputs,
+        payload = "redistribute",
       )
-    } yield {
-      transferResults.createdCoins.collect {
-        case coinRulesCodegen.CreatedCoin.TransferResultCoin(cid) => cid
-      }
-    }
+      for {
+        transferContext <- validatorStore.getPaymentTransferContext(retryProvider)
+      } yield installCid.exerciseWalletAppInstall_CoinRules_TryTransfer(
+        transferContext.coinRules,
+        transfer,
+        transferContext.context,
+      )
+    })(
+      user,
+      _.createdCoins.collect { case coinRulesCodegen.CreatedCoin.TransferResultCoin(cid) =>
+        cid
+      },
+    )
   }
 
+  // TODO(#1351) - Remove this
   override def redistribute(request: v0.RedistributeRequest): Future[v0.RedistributeResponse] = {
     def toOutput(output: v0.RedistributeOutput): coinRulesCodegen.TransferOutput =
       coinRulesCodegen.TransferOutput.OutputSenderCoin(
@@ -885,7 +832,7 @@ class GrpcWalletService(
   } yield install
 
   /** Executes a wallet action by calling the `WalletAppInstall_ExecuteBatch` choice on the WalletAppInstall
-    * contract of the end user specified in the given WalletContext.
+    * contract of the given end user.
     *
     * The choice is always executed with the wallet service party as the submitter, and the
     * wallet user party as a readAs party.
@@ -895,7 +842,7 @@ class GrpcWalletService(
     *
     * Note: curried syntax helps with type inference
     */
-  private def exerciseWalletAction[
+  private def exerciseWalletCoinAction[
       LookupResult,
       ExpectedCOO <: CoinOperationOutcome: ClassTag,
       ProtoResponse <: scalapb.GeneratedMessage,
@@ -951,6 +898,41 @@ class GrpcWalletService(
         )
     }
   }
+
+  /** Executes a wallet action by calling a choice on the WalletInstall contract for the given user.
+    *
+    * The choice is always executed with the wallet service party as the submitter, and the
+    * wallet user party as a readAs party.
+    *
+    * Additionally, the validator service party is also a readAs party (workaround for lack
+    * of explicit disclosure for CoinRules).
+    *
+    * Note: curried syntax helps with type inference
+    */
+  private def exerciseWalletAction[Response, ChoiceResult](
+      getUpdate: (
+          P.ContractId[walletCodegen.WalletAppInstall],
+          EndUserWalletStore,
+      ) => Future[P.Update[ChoiceResult]]
+  )(
+      user: String,
+      getResponse: ChoiceResult => Response,
+  )(implicit
+      valueDecoder: ValueDecoder[ChoiceResult],
+      traceContext: TraceContext,
+  ): Future[Response] =
+    for {
+      userStore <- getUserStore(user)
+      userParty = userStore.key.endUserParty
+      install <- getUserInstallContract(userStore, userParty)
+      update <- getUpdate(install.contractId, userStore)
+      result <- connection
+        .submitWithResult(
+          Seq(walletServiceParty),
+          Seq(validatorParty, userParty),
+          update,
+        )
+    } yield getResponse(result)
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   private def selectCoin(
