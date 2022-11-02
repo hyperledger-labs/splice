@@ -451,6 +451,22 @@ checkErrors := {
   }
 }
 
+// https://tanin.nanakorn.com/technical/2018/09/10/parallelise-tests-in-sbt-on-circle-ci.html
+// also used by Canton team
+lazy val printTests = taskKey[Unit](
+  "write full class names of `apps-app` tests to `test-full-class-names.log`; used for CI test splitting"
+)
+printTests := {
+  import java.io._
+  println("Appending full class names of tests to the file `test-full-class-names.log`.")
+  val pw = new PrintWriter(new FileWriter(s"test-full-class-names.log", true))
+  val tmp = (`apps-app` / Test / definedTests).value
+  tmp.sortBy(_.name).foreach { t =>
+    pw.println(t.name)
+  }
+  pw.close()
+}
+
 lazy val `apps-app` =
   project
     .in(file("apps/app"))

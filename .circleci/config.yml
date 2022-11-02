@@ -384,6 +384,7 @@ commands:
             nix-shell shell.nix \
               --pure \
               --keep CI $ADDITIONAL_NIX_ARGS \
+              --keep RUN_SPLITTED_TESTS_CMD \
               --run bash \<<'EOF'
 
               set -euo pipefail
@@ -443,6 +444,42 @@ commands:
       - setup_nix
       - restore_sbt_cache
       - restore_precompiled_classes
+
+  # Adapted from Canton's CI definition
+  split_tests_for_parallel_run:
+    description: split tests for parallel execution
+    steps:
+      - execute_sbt_command:
+          cmd: printTests
+          retry_fetch: "50"
+          fail_on_error_in_output: false
+      - run:
+          name: Splitting tests
+          command: |
+            echo "[fix negative test times]"
+            # scalatest actually reported occassionally test times with negative numbers
+            # this confused the circleci test runner. the easiest fix (suggested by circleci)
+            # is to use sed to adapt any such time and set it to 0
+            TIMING_DATA_FILE="$CIRCLE_INTERNAL_TASK_DATA/circle-test-results/results.json"
+            if [[ -e $TIMING_DATA_FILE ]]; then
+              sed -ri 's/"run_time": ?\-[0-9]+\.?[0-9]+,/"run_time":0.0,/g' "$TIMING_DATA_FILE"
+              cp "$TIMING_DATA_FILE" timing-data.json
+            fi
+            echo "[split tests]"
+            # Set time-default to 1 minute so that tests with unknown duration get distributed evenly.
+            # (The default for tests with unknown duration would be 1s.)
+            splitted=$(cat test-full-class-names.log | circleci tests split --split-by=timings --timings-type=classname --time-default=1m)
+            tests=$(echo $splitted | tr '\n' ' ')
+            count=$(echo $tests | wc -w)
+            echo "We are running $count tests in this batch:"
+            cat \<<< "$splitted"
+            echo "export RUN_SPLITTED_TESTS_CMD=\"testOnly $tests\"" >> "$BASH_ENV"
+            mkdir tests
+            for t in $tests; do echo " " > tests/$t; done # CircleCI refuses to upload empty files
+      - store_artifacts:
+          name: Upload list of tests executed in this run (as empty files)
+          path: tests
+          destination: _tests # the _ is so this appears on top in the artifacts list
 
   setup_vpn:
     steps:
@@ -641,7 +678,23 @@ jobs:
       - run_todo_script
       - cleanup_sbt_test_job
 
-  test:
+  # We put our Daml tests in their own job for more parallelization
+  daml_test:
+    docker:
+      - image: cimg/base:2021.04
+    environment:
+      <<: *env
+    steps:
+      - checkout
+      - setup_sbt_test_job
+      - execute_sbt_command:
+          cmd: "damlTest"
+          timeout: "10m"
+      - cleanup_sbt_test_job
+
+  # We want to run our Scala tests with parallelism and therefore put them in their own job with no other tests in it;
+  # work on anything but the Scala tests is duplicated across all parallel runs of this job
+  scala_test:
     docker:
       - image: cimg/base:2021.04
       - image: postgres:11
@@ -656,20 +709,18 @@ jobs:
       POSTGRES_HOST: localhost
       POSTGRES_PASSWORD: postgres
       POSTGRES_USER: postgres
+    parallelism: 4
     steps:
       - checkout
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "Test/compile"
+      - split_tests_for_parallel_run
       - execute_sbt_command:
           # run all tests except the live cluster ones
           pre_sbt_cmd: ./start-canton.sh external && ./start-frontends.sh -d
-          cmd: "\"testOnly * -- -l LiveDevNetTest\""
+          cmd: "\"$RUN_SPLITTED_TESTS_CMD -- -l LiveDevNetTest\""
           post_sbt_cmd: ./stop-canton.sh external && ./stop-frontends.sh
-          # TODO(#1318) Reduce this once our tests are faster again.
-          timeout: "15m"
-      - execute_sbt_command:
-          cmd: "damlTest"
           timeout: "10m"
       - cleanup_sbt_test_job
 
@@ -871,8 +922,11 @@ workflows:
     # Linting and formatting
     - static_tests:
         <<: *notify-fail
+    # Daml
+    - daml_test:
+        <<: *notify-fail
     # Scala
-    - test:
+    - scala_test:
         <<: *notify-fail
     - bundle:
         <<: *notify-fail
