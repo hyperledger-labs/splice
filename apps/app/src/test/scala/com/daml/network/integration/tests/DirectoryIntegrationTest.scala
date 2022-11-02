@@ -43,6 +43,8 @@ class DirectoryIntegrationTest
         bobValidator.remoteParticipant.dars.upload(directoryDarPath)
       })
 
+  println(">>> ENVIRONMENT: " + environmentDefinition)
+
   "Directory service" should {
 
     "restart cleanly" in { implicit env =>

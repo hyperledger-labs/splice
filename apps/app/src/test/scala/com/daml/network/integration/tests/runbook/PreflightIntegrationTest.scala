@@ -36,13 +36,14 @@ class PreflightIntegrationTest
         validatorPath / "validator-participant.conf",
       )
       .clearConfigTransforms()
-      .addConfigTransforms((_, conf) => CoinConfigTransforms.ensureUniqueNames("preflight")(conf))
+      .addConfigTransforms((_, conf) => CoinConfigTransforms.addDamlNameSuffix("preflight")(conf))
+      // .addConfigTransforms((_, conf) => CoinConfigTransforms.ensureNovelDamlNames()(conf))
       .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy1000(conf))
       // Disable autostart, because our apps require the participant to be connected to a domain
       // when the app starts. The apps are started manually in `validator-participant.canton` below.
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
 
-  // when running locally, these tesst may fail if the CC DAR deployed to DevNet
+  // when running locally, these tests may fail if the CC DAR deployed to DevNet
   // differs from the latest one on your branch
 
   "run through runbook against cluster SVC" taggedAs LiveDevNetTest in { implicit env =>

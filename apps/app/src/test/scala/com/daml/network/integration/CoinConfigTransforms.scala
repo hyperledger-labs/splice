@@ -35,21 +35,21 @@ object CoinConfigTransforms {
       .replace(NonNegativeDuration.tryFromDuration(10.seconds))
   }
 
-  /* Ensure that all usernames in a configuration have a common and unique
-   * suffix. Note that this only adds the suffix to names in a '.conf' file.
-   * Any '.canton' file built against a given configuration must inspect
-   * the configured objects at runtime to determine what the names are.
-   *
-   * An example of this is as follows:
-   *
-   * val validatorUserName = validatorApp.config.damlUser
-   *
-   * println(s"Creating validator user: " + validatorUserName)
-   * val validatorParty = validatorParticipant.parties.enable(validatorUserName)
-   */
-  def ensureUniqueNames(context: String): CoinConfigTransform = { config =>
+  /** Ensure that the set of Daml user names used in a given instance of a configuration
+    * have a common, context-specific suffix.
+    *
+    * Note that this creates usernames that are textually different from what appears
+    * in the source text of a '.conf' file. To reference these names in a '.canton' file,
+    * you must read them from the objects themselves:
+    *
+    * val validatorUserName = validatorApp.config.damlUser
+    * // validatorUserName will have the name with the suffix applied
+    * val validatorParty = validatorParticipant.parties.enable(validatorUserName)
+    */
+  def addDamlNameSuffix(context: String): CoinConfigTransform = { config =>
     {
-      val suffix = s"${context.toLowerCase}-${UUID.randomUUID()}"
+      val suffix = s"${context}-${UUID.randomUUID().toString()}".toLowerCase
+
       val config1 = updateSvcConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config)
       val config2 = updateCcScanConfig(c => c.copy(svcUser = s"${c.svcUser}-$suffix"))(config1)
       val config3 =
@@ -71,7 +71,9 @@ object CoinConfigTransforms {
           config4
         )
       val config6 =
-        updateAllDirectoryAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config5)
+        updateAllDirectoryAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
+          config5
+        )
       val config7 =
         updateAllSplitwiseAppConfigs_(c => c.copy(providerUser = s"${c.providerUser}-$suffix"))(
           config6
@@ -87,13 +89,32 @@ object CoinConfigTransforms {
     }
   }
 
-  /** Default transforms to apply to tests using a [[CoinEnvironmentDefinition]].
-    * Covers the primary ways that distinct concurrent environments may unintentionally collide.
+  /** Ensure that the set of Daml user names used in a given instance of a configuration
+    * are novel and unshared with any previous instance of that configuration. This is used
+    * To isolate one set of tests from another. (Leveraging Daml's party visiblity model.)
+    *
+    * Note that this creates usernames that are textually different from what appears
+    * in the source text of a '.conf' file. To reference these names in a '.canton' file,
+    * you must read them from the objects themselves:
+    *
+    * val validatorUserName = validatorApp.config.damlUser
+    * // validatorUserName will have the name with the suffix applied
+    * val validatorParty = validatorParticipant.parties.enable(validatorUserName)
     */
-  def defaults(context: String): Seq[CoinConfigTransform] = {
+  def ensureNovelDamlNames(): CoinConfigTransform = {
+    addDamlNameSuffix(UUID.randomUUID().toString())
+  }
+
+  /** Default transforms to apply to tests using a [[CoinEnvironmentDefinition]].
+    * Covers the primary ways that distinct concurrent environments may unintentionally
+    * collide, and adds a suffix to Daml user names that is specific to a given test
+    * context.
+    */
+  def defaults(testContextNameSuffix: String): Seq[CoinConfigTransform] = {
     Seq(
       makeAllTimeoutsBounded,
-      ensureUniqueNames(context),
+      addDamlNameSuffix(testContextNameSuffix),
+      // ,ensureNovelDamlNames(),
     )
   }
 
