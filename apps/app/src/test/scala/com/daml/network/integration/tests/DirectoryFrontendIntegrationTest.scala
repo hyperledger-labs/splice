@@ -36,10 +36,10 @@ class DirectoryFrontendIntegrationTest extends FrontendIntegrationTest("alice") 
         textField("entry-name-field").value = entryName
         click on "request-entry-button"
         eventually(scaled(5 seconds)) {
-          aliceRemoteWallet.listAppMultiPaymentRequests() should have size 1
+          aliceRemoteWallet.listAppPaymentRequests() should have size 1
         }
-        inside(aliceRemoteWallet.listAppMultiPaymentRequests()) { case Seq(paymentRequest) =>
-          aliceRemoteWallet.acceptAppMultiPaymentRequest(paymentRequest.contractId)
+        inside(aliceRemoteWallet.listAppPaymentRequests()) { case Seq(paymentRequest) =>
+          aliceRemoteWallet.acceptAppPaymentRequest(paymentRequest.contractId)
         }
         eventually(scaled(10 seconds)) {
           findAll(className("entries-table-row")) should have size 1

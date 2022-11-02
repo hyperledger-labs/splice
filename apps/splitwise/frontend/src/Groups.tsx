@@ -97,16 +97,11 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider }) => {
       .map(([k, v]) => {
         return { receiver: k, quantity: v.substring(1, v.length - 1) };
       });
-    const cid = await ledgerApiClient.initiateMultiTransfer(
-      party,
-      provider,
-      key(group),
-      quantities
-    );
+    const cid = await ledgerApiClient.initiateTransfer(party, provider, key(group), quantities);
     const here = window.location.origin.toString();
     const walletPath = config.wallet.uiUrl;
     window.location.assign(
-      `${walletPath}/app-multi-payment-requests/${cid}/?redirect=${encodeURIComponent(here)}`
+      `${walletPath}/app-payment-requests/${cid}/?redirect=${encodeURIComponent(here)}`
     );
   };
   return (
@@ -209,7 +204,7 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider 
   const [transferQuantity, setTransferQuantity] = useState<string>('');
   const [transferReceiverEntry, setTransferReceiverEntry] = useState<DirectoryEntry | null>(null);
   const onInitiateTransfer = async () => {
-    await ledgerApiClient.initiateMultiTransfer(party, provider, key(group), [
+    await ledgerApiClient.initiateTransfer(party, provider, key(group), [
       { receiver: transferReceiverEntry!.user, quantity: transferQuantity },
     ]);
   };

@@ -32,17 +32,11 @@ trait SplitwiseStore extends AutoCloseable {
   ): Future[QueryResult[Option[Contract[splitwiseCodegen.TransferInProgress]]]] =
     acsStore.lookupContractById(splitwiseCodegen.TransferInProgress)(id)
 
-  def lookupMultiTransferInProgressById(
-      id: Primitive.ContractId[splitwiseCodegen.MultiTransferInProgress]
-  ): Future[QueryResult[Option[Contract[splitwiseCodegen.MultiTransferInProgress]]]] =
-    acsStore.lookupContractById(splitwiseCodegen.MultiTransferInProgress)(id)
-
   def streamInstallRequests(): Source[Contract[splitwiseCodegen.SplitwiseInstallRequest], NotUsed] =
     acsStore.streamContracts(splitwiseCodegen.SplitwiseInstallRequest)
 
-  def streamAcceptedAppMultiPayments()
-      : Source[Contract[walletCodegen.AcceptedAppMultiPayment], NotUsed] =
-    acsStore.streamContracts(walletCodegen.AcceptedAppMultiPayment)
+  def streamAcceptedAppPayments(): Source[Contract[walletCodegen.AcceptedAppPayment], NotUsed] =
+    acsStore.streamContracts(walletCodegen.AcceptedAppPayment)
 }
 
 object SplitwiseStore {
@@ -64,10 +58,8 @@ object SplitwiseStore {
         mkFilter(splitwiseCodegen.SplitwiseInstallRequest)(co => co.payload.provider == provider),
         mkFilter(splitwiseCodegen.SplitwiseInstall)(co => co.payload.provider == provider),
         mkFilter(splitwiseCodegen.TransferInProgress)(co => co.payload.group.provider == provider),
-        mkFilter(splitwiseCodegen.MultiTransferInProgress)(co =>
-          co.payload.group.provider == provider
-        ),
-        mkFilter(walletCodegen.AcceptedAppMultiPayment)(co => co.payload.provider == provider),
+        mkFilter(splitwiseCodegen.TransferInProgress)(co => co.payload.group.provider == provider),
+        mkFilter(walletCodegen.AcceptedAppPayment)(co => co.payload.provider == provider),
       ),
     )
   }

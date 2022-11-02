@@ -56,52 +56,52 @@ abstract class WalletAppReference(
     }
   }
 
-  @Help.Summary("List all multi-payment requests of the configured user")
+  @Help.Summary("List all payment requests of the configured user")
   @Help.Description(
-    "Queries the configured remote participant for the MultiPaymentRequests of the configured user. " +
-      "Returns all found multi-payment requests."
+    "Queries the configured remote participant for the PaymentRequests of the configured user. " +
+      "Returns all found payment requests."
   )
-  def listAppMultiPaymentRequests(): Seq[Contract[walletCodegen.AppMultiPaymentRequest]] = {
+  def listAppPaymentRequests(): Seq[Contract[walletCodegen.AppPaymentRequest]] = {
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.ListAppMultiPaymentRequests(), callCredentials)
+      adminCommand(GrpcWalletAppClient.ListAppPaymentRequests(), callCredentials)
     }
   }
 
-  @Help.Summary("Accept a multi-payment request")
+  @Help.Summary("Accept a payment request")
   @Help.Description(
-    "Accept a multi-payment request and deliver the coin to be locked into the accepted multi-payment." +
-      " Returns the contract ID of the accepted multi-payment."
+    "Accept a payment request and deliver the coin to be locked into the accepted payment." +
+      " Returns the contract ID of the accepted payment."
   )
-  def acceptAppMultiPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.AppMultiPaymentRequest]
-  ): Primitive.ContractId[walletCodegen.AcceptedAppMultiPayment] = {
+  def acceptAppPaymentRequest(
+      requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest]
+  ): Primitive.ContractId[walletCodegen.AcceptedAppPayment] = {
     consoleEnvironment.run {
       adminCommand(
-        GrpcWalletAppClient.AcceptAppMultiPaymentRequest(requestId),
+        GrpcWalletAppClient.AcceptAppPaymentRequest(requestId),
         callCredentials,
       )
     }
   }
 
-  @Help.Summary("Reject a multi-payment request")
+  @Help.Summary("Reject a payment request")
   @Help.Description(
-    "Reject a multi-payment request."
+    "Reject a payment request."
   )
-  def rejectAppMultiPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.AppMultiPaymentRequest]
+  def rejectAppPaymentRequest(
+      requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest]
   ): Unit = {
     consoleEnvironment.run {
       adminCommand(
-        GrpcWalletAppClient.RejectAppMultiPaymentRequest(requestId),
+        GrpcWalletAppClient.RejectAppPaymentRequest(requestId),
         callCredentials,
       )
     }
   }
 
-  @Help.Summary("List all accepted app multi-payments the user is a sender on")
-  def listAcceptedAppMultiPayments(): Seq[Contract[walletCodegen.AcceptedAppMultiPayment]] =
+  @Help.Summary("List all accepted app payments the user is a sender on")
+  def listAcceptedAppPayments(): Seq[Contract[walletCodegen.AcceptedAppPayment]] =
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.ListAcceptedAppMultiPayments(), callCredentials)
+      adminCommand(GrpcWalletAppClient.ListAcceptedAppPayments(), callCredentials)
     }
 
   @Help.Summary("List all subscription requests of the configured user")

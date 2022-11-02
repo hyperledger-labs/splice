@@ -21,7 +21,7 @@ import {
 import './App.css';
 import { useUserState } from './contexts/UserContext';
 import { useWalletClient } from './contexts/WalletServiceContext';
-import AppMultiPaymentRequests from './views/AppMultiPaymentRequests';
+import AppPaymentRequests from './views/AppPaymentRequests';
 import Coins from './views/Coins';
 import Home from './views/Home';
 import Login from './views/Login';
@@ -76,8 +76,8 @@ const Content = () => {
         <Route path="coins" element={<Coins />} />
         <Route path="app-payment-channels" element={<PaymentChannels />} />
         <Route path="subscriptions" element={<Subscriptions />} />
-        <Route path="app-multi-payment-requests" element={<AppMultiPaymentRequests />}>
-          <Route path=":cid/" element={<AppMultiPaymentRequests />} />
+        <Route path="app-payment-requests" element={<AppPaymentRequests />}>
+          <Route path=":cid/" element={<AppPaymentRequests />} />
         </Route>
       </Route>
     )

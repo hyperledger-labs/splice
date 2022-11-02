@@ -153,15 +153,15 @@ class DirectoryAutomationService(
   })
 
   registerRequestHandler(
-    "handleAcceptedAppMultiPaymentRequests",
-    store.streamAcceptedAppMultiPayments(),
+    "handleAcceptedAppPaymentRequests",
+    store.streamAcceptedAppPayments(),
   )(payment => { implicit traceContext =>
     {
       val offerId = payment.payload.deliveryOffer
         .unsafeToTemplate[directoryCodegen.DirectoryEntryOffer]
       def rejectPayment(reason: String) = {
         logger.warn(s"rejecting accepted app payment: $reason")
-        val cmd = payment.contractId.exerciseAcceptedAppMultiPayment_Reject()
+        val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject()
         connection
           .submitWithResult(Seq(provider), Seq(), cmd)
           .map(_ => s"rejected accepted app payment: $reason")

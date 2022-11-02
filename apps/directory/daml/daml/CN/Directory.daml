@@ -80,7 +80,7 @@ template DirectoryEntryOffer
 
     postconsuming choice DirectoryEntryOffer_CollectPayment : (ContractId DirectoryEntry, ContractId Coin)
       with
-        acceptedAppPaymentCid : ContractId AcceptedAppMultiPayment
+        acceptedAppPaymentCid : ContractId AcceptedAppPayment
         transferContext : AppTransferContext
       controller entryRequest.provider
       do -- deliver the promised good: the entry referenced in the payment
@@ -92,7 +92,7 @@ template DirectoryEntryOffer
              expiresAt = now `addRelTime` entryLifetime
              ..
          -- collect payment
-         (_, [(_, coinCid)]) <- exercise acceptedAppPaymentCid (AcceptedAppMultiPayment_Collect transferContext)
+         (_, [(_, coinCid)]) <- exercise acceptedAppPaymentCid (AcceptedAppPayment_Collect transferContext)
          -- return the created contracts
          pure (entryCid, coinCid)
 
@@ -199,7 +199,7 @@ template DirectoryInstall with
           with
             ..
 
-    nonconsuming choice DirectoryInstall_RequestEntryPayment : (ContractId AppMultiPaymentRequest, ContractId DirectoryEntryOffer)
+    nonconsuming choice DirectoryInstall_RequestEntryPayment : (ContractId AppPaymentRequest, ContractId DirectoryEntryOffer)
       with
         requestCid : ContractId DirectoryEntryRequest
       controller provider
@@ -209,7 +209,7 @@ template DirectoryInstall with
          request.user === user
          now <- getTime
          offerCid <- create DirectoryEntryOffer with entryRequest = request; entryLifetime
-         reqCid <- create AppMultiPaymentRequest with
+         reqCid <- create AppPaymentRequest with
            receiverQuantities = [ReceiverQuantity provider request.entryFee]
            sender = user
            provider

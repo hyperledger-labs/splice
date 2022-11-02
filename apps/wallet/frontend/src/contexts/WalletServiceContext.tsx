@@ -4,7 +4,7 @@ import { WalletServicePromiseClient } from 'common-protobuf/com/daml/network/wal
 import { Metadata } from 'grpc-web';
 import React, { useContext, useState, useEffect, useMemo } from 'react';
 
-import { AppMultiPaymentRequest, PaymentChannelProposal } from '@daml.js/wallet/lib/CN/Wallet';
+import { AppPaymentRequest, PaymentChannelProposal } from '@daml.js/wallet/lib/CN/Wallet';
 import { SubscriptionRequest } from '@daml.js/wallet/lib/CN/Wallet/Subscriptions';
 
 import { useUserState } from './UserContext';
@@ -24,8 +24,8 @@ export interface ListPaymentChannelRequestsResponse {
   proposalsList: Contract<PaymentChannelProposal>[];
 }
 
-export interface ListAppMultiPaymentRequestsResponse {
-  paymentRequestsList: Contract<AppMultiPaymentRequest>[];
+export interface ListAppPaymentRequestsResponse {
+  paymentRequestsList: Contract<AppPaymentRequest>[];
 }
 
 export interface ListSubscriptionRequestsResponse {
@@ -52,8 +52,8 @@ export interface WalletClient {
   ) => Promise<void>;
   acceptPaymentChannelProposal: (proposalContractId: string) => Promise<void>;
 
-  listAppMultiPaymentRequests: () => Promise<ListAppMultiPaymentRequestsResponse>;
-  acceptAppMultiPaymentRequests: (requestContractId: string) => Promise<void>;
+  listAppPaymentRequests: () => Promise<ListAppPaymentRequestsResponse>;
+  acceptAppPaymentRequests: (requestContractId: string) => Promise<void>;
 
   listSubscriptionRequests: () => Promise<ListSubscriptionRequestsResponse>;
   acceptSubscriptionRequest: (requestContractId: string) => Promise<void>;
@@ -144,20 +144,20 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         );
       },
 
-      listAppMultiPaymentRequests: async (): Promise<ListAppMultiPaymentRequestsResponse> => {
-        const res = await walletClient.listAppMultiPaymentRequests(
-          new v0.ListAppMultiPaymentRequestsRequest().setWalletCtx(wctx),
+      listAppPaymentRequests: async (): Promise<ListAppPaymentRequestsResponse> => {
+        const res = await walletClient.listAppPaymentRequests(
+          new v0.ListAppPaymentRequestsRequest().setWalletCtx(wctx),
           creds
         );
         return {
           paymentRequestsList: res
             .getPaymentRequestsList()
-            .map(c => Contract.decode(c, AppMultiPaymentRequest)),
+            .map(c => Contract.decode(c, AppPaymentRequest)),
         };
       },
-      acceptAppMultiPaymentRequests: async requestContractId => {
-        await walletClient.acceptAppMultiPaymentRequest(
-          new v0.AcceptAppMultiPaymentRequestRequest()
+      acceptAppPaymentRequests: async requestContractId => {
+        await walletClient.acceptAppPaymentRequest(
+          new v0.AcceptAppPaymentRequestRequest()
             .setRequestContractId(requestContractId)
             .setWalletCtx(wctx),
           creds

@@ -104,22 +104,22 @@ template SplitwiseInstall
            payer = user
            ..
 
-    nonconsuming choice SplitwiseInstall_InitiateMultiTransfer : ContractId AppMultiPaymentRequest
+    nonconsuming choice SplitwiseInstall_InitiateTransfer : ContractId AppPaymentRequest
       with
         groupKey : GroupKey
         receiverQuantities : [ReceiverQuantity]
       controller user
-      do exerciseByKey @Group groupKey Group_InitiateMultiTransfer with
+      do exerciseByKey @Group groupKey Group_InitiateTransfer with
            sender = user
            ..
 
-    nonconsuming choice SplitwiseInstall_CompleteMultiTransfer : [ContractId BalanceUpdate]
+    nonconsuming choice SplitwiseInstall_CompleteTransfer : [ContractId BalanceUpdate]
       with
         groupKey : GroupKey
-        acceptedPaymentCid : ContractId AcceptedAppMultiPayment
+        acceptedPaymentCid : ContractId AcceptedAppPayment
         transferContext : AppTransferContext
       controller provider
-      do exerciseByKey @Group groupKey Group_CompleteMultiTransfer with
+      do exerciseByKey @Group groupKey Group_CompleteTransfer with
            sender = user
            ..
 
@@ -186,38 +186,38 @@ template Group
            update = ExternalPayment with
              payer, quantity, description
 
-    nonconsuming choice Group_InitiateMultiTransfer : ContractId AppMultiPaymentRequest
+    nonconsuming choice Group_InitiateTransfer : ContractId AppPaymentRequest
       with
         sender : Party
         receiverQuantities : [ReceiverQuantity]
       controller sender
       do require "sender is a member" (sender `elem` groupMembers this)
          require "receiver is a member" (fmap (\x -> x.receiver) receiverQuantities `subset` groupMembers this)
-         deliveryOffer <- create MultiTransferInProgress
+         deliveryOffer <- create TransferInProgress
            with
              group = this
              sender
              receiverQuantities
          now <- getTime
-         create AppMultiPaymentRequest with
+         create AppPaymentRequest with
            sender, provider, receiverQuantities, svc
            expiresAt = now `addRelTime` acceptDuration
            collectionDuration = collectionDuration
            deliveryOffer = toInterfaceContractId deliveryOffer
 
-    nonconsuming choice Group_CompleteMultiTransfer : [ContractId BalanceUpdate]
+    nonconsuming choice Group_CompleteTransfer : [ContractId BalanceUpdate]
       with
-        acceptedPaymentCid : ContractId AcceptedAppMultiPayment
+        acceptedPaymentCid : ContractId AcceptedAppPayment
         sender : Party
         transferContext : AppTransferContext
       controller provider
       do acceptedPayment <- fetch acceptedPaymentCid
-         Some (refCid, ref) <- fetchFromInterface @MultiTransferInProgress acceptedPayment.deliveryOffer
-         exercise acceptedPaymentCid (AcceptedAppMultiPayment_Collect transferContext)
+         Some (refCid, ref) <- fetchFromInterface @TransferInProgress acceptedPayment.deliveryOffer
+         exercise acceptedPaymentCid (AcceptedAppPayment_Collect transferContext)
          acceptedPayment.sender === sender
          archive refCid
          let  (receivers, _) = unzipReceiverQuantities ref.receiverQuantities
-              expectedAcceptedPayment = AcceptedAppMultiPayment with
+              expectedAcceptedPayment = AcceptedAppPayment with
                sender = ref.sender
                provider
                receivers
@@ -259,23 +259,11 @@ template TransferInProgress
   with
     group : Group
     sender : Party
-    receiver : Party
-    quantity : Decimal
-  where
-    signatory signatory group
-    interface instance DeliveryOffer for TransferInProgress where
-      view = DeliveryOfferView with
-        description = "Transfer from " <> show sender <> " to " <> show receiver <> " for " <> show quantity
-
-template MultiTransferInProgress
-  with
-    group : Group
-    sender : Party
     receiverQuantities : [ReceiverQuantity]
   where
     let (receivers, _) = unzipReceiverQuantities receiverQuantities
     signatory signatory group
-    interface instance DeliveryOffer for MultiTransferInProgress where
+    interface instance DeliveryOffer for TransferInProgress where
       view = DeliveryOfferView with
         description = "Transfer from " <> show sender <> " to " <> show receivers
 

@@ -100,13 +100,13 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
       val aliceParty = setupForTestWithDirectory(aliceDamlUser, aliceValidator)
       submitDirectoryEntryRequest(aliceParty, aliceDirectory, entryName)
 
-      def getPaymentRequest() = aliceRemoteWallet.listAppMultiPaymentRequests().headOption
+      def getPaymentRequest() = aliceRemoteWallet.listAppPaymentRequests().headOption
 
       aliceRemoteWallet.tap(5.0)
       val walletPaymentRequest = eventually()(
         getPaymentRequest().getOrElse(fail("Payment request is unexpectedly not defined"))
       )
-      val _ = aliceRemoteWallet.acceptAppMultiPaymentRequest(walletPaymentRequest.contractId)
+      val _ = aliceRemoteWallet.acceptAppPaymentRequest(walletPaymentRequest.contractId)
 
       def tryGetEntry() =
         Try(loggerFactory.suppressErrors(directory.lookupEntryByName(entryName)))
@@ -294,7 +294,7 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
     click on "user-id-field"
     textField("user-id-field").value = damlUser
     click on "login-button"
-    click on "app-multi-payment-requests-button"
+    click on "app-payment-requests-button"
   }
 
   private def browseToSubscriptions(damlUser: String)(implicit webDriver: WebDriver) = {

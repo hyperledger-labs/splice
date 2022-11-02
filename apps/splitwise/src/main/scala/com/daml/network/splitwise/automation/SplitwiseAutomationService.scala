@@ -92,17 +92,17 @@ class SplitwiseAutomationService(
   })
 
   registerRequestHandler(
-    "handleAcceptedAppMultiPaymentRequests",
-    store.streamAcceptedAppMultiPayments(),
+    "handleAcceptedAppPaymentRequests",
+    store.streamAcceptedAppPayments(),
   )(payment => { implicit traceContext =>
     val sender = PartyId.tryFromPrim(payment.payload.sender)
     val transferInProgressId = payment.payload.deliveryOffer
-      .unsafeToTemplate[splitwiseCodegen.MultiTransferInProgress]
+      .unsafeToTemplate[splitwiseCodegen.TransferInProgress]
     store.lookupInstall(sender).flatMap {
       case QueryResult(_, None) =>
         val msg = s"Install contract not found for sender party $sender"
         logger.warn(msg)
-        val cmd = payment.contractId.exerciseAcceptedAppMultiPayment_Reject()
+        val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject()
         connection
           .submitCommand(
             actAs = Seq(provider),
@@ -114,15 +114,15 @@ class SplitwiseAutomationService(
         for {
           transferContext <- scanConnection.getAppTransferContext()
           transferInProgress <- store
-            .lookupMultiTransferInProgressById(transferInProgressId)
+            .lookupTransferInProgressById(transferInProgressId)
             .map(
               _.value.getOrElse(
                 throw new IllegalStateException(
-                  s"Invariant violation: multi transfer in progress $transferInProgressId not known"
+                  s"Invariant violation: transfer in progress $transferInProgressId not known"
                 )
               )
             )
-          cmd = install.contractId.exerciseSplitwiseInstall_CompleteMultiTransfer(
+          cmd = install.contractId.exerciseSplitwiseInstall_CompleteTransfer(
             groupKey = splitwiseCodegen.GroupKey(
               owner = transferInProgress.payload.group.owner,
               provider = provider.toPrim,

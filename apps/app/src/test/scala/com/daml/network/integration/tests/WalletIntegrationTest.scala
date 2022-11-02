@@ -162,7 +162,7 @@ class WalletIntegrationTest
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
       // Check that no payment requests exist
-      aliceRemoteWallet.listAppMultiPaymentRequests() shouldBe empty
+      aliceRemoteWallet.listAppPaymentRequests() shouldBe empty
 
       aliceWallet.remoteParticipant.ledger_api.commands.submit(
         Seq(aliceUserParty),
@@ -183,7 +183,7 @@ class WalletIntegrationTest
           .contractId
 
       // Create a payment request to self.
-      val reqC = walletCodegen.AppMultiPaymentRequest(
+      val reqC = walletCodegen.AppPaymentRequest(
         sender = aliceUserParty.toPrim,
         provider = aliceUserParty.toPrim,
         receiverQuantities = Seq(walletCodegen.ReceiverQuantity(aliceUserParty.toPrim, 10)),
@@ -201,14 +201,14 @@ class WalletIntegrationTest
       )
 
       // Check that we can see the created payment request
-      val reqFound = aliceRemoteWallet.listAppMultiPaymentRequests().headOption.value
+      val reqFound = aliceRemoteWallet.listAppPaymentRequests().headOption.value
       reqFound.payload shouldBe reqC
 
       // Reject the payment request
-      aliceRemoteWallet.rejectAppMultiPaymentRequest(reqFound.contractId)
+      aliceRemoteWallet.rejectAppPaymentRequest(reqFound.contractId)
 
       // Check that there are no more payment requests
-      val requests2 = aliceRemoteWallet.listAppMultiPaymentRequests()
+      val requests2 = aliceRemoteWallet.listAppPaymentRequests()
       requests2 shouldBe empty
     }
 
@@ -235,7 +235,7 @@ class WalletIntegrationTest
           .contractId
 
       // Create a payment request to self.
-      val reqC = walletCodegen.AppMultiPaymentRequest(
+      val reqC = walletCodegen.AppPaymentRequest(
         sender = aliceUserParty.toPrim,
         provider = aliceUserParty.toPrim,
         receiverQuantities = Seq(walletCodegen.ReceiverQuantity(aliceUserParty.toPrim, 10)),
@@ -252,17 +252,17 @@ class WalletIntegrationTest
         commands = Seq(reqC.create.command),
       )
 
-      val cid = inside(aliceRemoteWallet.listAppMultiPaymentRequests()) { case Seq(r) =>
+      val cid = inside(aliceRemoteWallet.listAppPaymentRequests()) { case Seq(r) =>
         r.payload shouldBe reqC
         r.contractId
       }
 
       aliceRemoteWallet.tap(50)
-      val acceptedPaymentId = aliceRemoteWallet.acceptAppMultiPaymentRequest(cid)
-      aliceRemoteWallet.listAppMultiPaymentRequests() shouldBe empty
-      inside(aliceRemoteWallet.listAcceptedAppMultiPayments()) { case Seq(r) =>
+      val acceptedPaymentId = aliceRemoteWallet.acceptAppPaymentRequest(cid)
+      aliceRemoteWallet.listAppPaymentRequests() shouldBe empty
+      inside(aliceRemoteWallet.listAcceptedAppPayments()) { case Seq(r) =>
         r.contractId shouldBe acceptedPaymentId
-        r.payload shouldBe walletCodegen.AcceptedAppMultiPayment(
+        r.payload shouldBe walletCodegen.AcceptedAppPayment(
           sender = aliceUserParty.toPrim,
           receivers = Seq(aliceUserParty.toPrim),
           provider = aliceUserParty.toPrim,

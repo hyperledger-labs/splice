@@ -80,14 +80,14 @@ class SplitwiseIntegrationTest
         42.0,
         "payment",
       )
-      bobSplitwise.initiateMultiTransfer(
+      bobSplitwise.initiateTransfer(
         key,
         Seq(walletCodegen.ReceiverQuantity(aliceUserParty.toPrim, 10.0)),
       )
-      eventually()(bobRemoteWallet.listAppMultiPaymentRequests() should not be empty)
-      inside(bobRemoteWallet.listAppMultiPaymentRequests()) { case Seq(request) =>
+      eventually()(bobRemoteWallet.listAppPaymentRequests() should not be empty)
+      inside(bobRemoteWallet.listAppPaymentRequests()) { case Seq(request) =>
         bobRemoteWallet.tap(20)
-        bobRemoteWallet.acceptAppMultiPaymentRequest(request.contractId)
+        bobRemoteWallet.acceptAppPaymentRequest(request.contractId)
       }
       eventually() {
         bobSplitwise.listBalanceUpdates(key) should have size 2

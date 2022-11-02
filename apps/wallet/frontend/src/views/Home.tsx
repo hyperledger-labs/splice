@@ -32,12 +32,12 @@ const Home: React.FC = () => {
           Subscriptions
         </Button>
         <Button
-          id="app-multi-payment-requests-button"
+          id="app-payment-requests-button"
           onClick={() => {
-            navigate('/app-multi-payment-requests');
+            navigate('/app-payment-requests');
           }}
         >
-          App Multi Payment Requests
+          App Payment Requests
         </Button>
         <Outlet />
       </Box>

@@ -14,37 +14,33 @@ import {
   TableRow,
 } from '@mui/material';
 
-import { AppMultiPaymentRequest } from '@daml.js/wallet/lib/CN/Wallet';
+import { AppPaymentRequest } from '@daml.js/wallet/lib/CN/Wallet';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 
-const AppMultiPaymentRequests: React.FC = () => {
-  const { listAppMultiPaymentRequests, acceptAppMultiPaymentRequests } = useWalletClient();
+const AppPaymentRequests: React.FC = () => {
+  const { listAppPaymentRequests, acceptAppPaymentRequests } = useWalletClient();
   const { cid } = useParams();
   const [searchParams] = useSearchParams();
 
-  const [appPaymentRequests, setAppMultiPaymentRequests] = useState<
-    Contract<AppMultiPaymentRequest>[]
-  >([]);
-  const fetchAppMultiPaymentRequests = useCallback(async () => {
-    const { paymentRequestsList } = await listAppMultiPaymentRequests();
+  const [appPaymentRequests, setAppPaymentRequests] = useState<Contract<AppPaymentRequest>[]>([]);
+  const fetchAppPaymentRequests = useCallback(async () => {
+    const { paymentRequestsList } = await listAppPaymentRequests();
     const filteredReqs = () => {
       if (!cid) return paymentRequestsList;
       else return paymentRequestsList.filter(c => c.contractId === cid);
     };
-    setAppMultiPaymentRequests(prev =>
-      sameContracts(filteredReqs(), prev) ? prev : filteredReqs()
-    );
-  }, [listAppMultiPaymentRequests, setAppMultiPaymentRequests, cid]);
-  useInterval(fetchAppMultiPaymentRequests, 500);
+    setAppPaymentRequests(prev => (sameContracts(filteredReqs(), prev) ? prev : filteredReqs()));
+  }, [listAppPaymentRequests, setAppPaymentRequests, cid]);
+  useInterval(fetchAppPaymentRequests, 500);
 
-  const Request: React.FC<{ request: AppMultiPaymentRequest; provider: string; cid: string }> = ({
+  const Request: React.FC<{ request: AppPaymentRequest; provider: string; cid: string }> = ({
     request,
     provider,
     cid,
   }) => {
     const onAccept = async (cid: string) => {
-      await acceptAppMultiPaymentRequests(cid);
+      await acceptAppPaymentRequests(cid);
       const target = searchParams.get('redirect');
       if (target) {
         window.location.assign(target);
@@ -129,4 +125,4 @@ const AppMultiPaymentRequests: React.FC = () => {
   );
 };
 
-export default AppMultiPaymentRequests;
+export default AppPaymentRequests;

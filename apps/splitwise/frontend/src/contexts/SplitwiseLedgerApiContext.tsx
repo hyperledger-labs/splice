@@ -97,7 +97,7 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
     );
   }
 
-  async initiateMultiTransfer(
+  async initiateTransfer(
     sender: string,
     provider: string,
     key: GroupKey,
@@ -106,7 +106,7 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
     return await this.exerciseByKey(
       [sender],
       [],
-      SplitwiseInstall.SplitwiseInstall_InitiateMultiTransfer,
+      SplitwiseInstall.SplitwiseInstall_InitiateTransfer,
       { _1: sender, _2: provider },
       {
         groupKey: {

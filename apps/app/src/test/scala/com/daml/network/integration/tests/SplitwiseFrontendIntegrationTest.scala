@@ -38,9 +38,9 @@ class SplitwiseFrontendIntegrationTest
     directory.requestDirectoryEntry(userName)
 
     wallet.tap(5.0)
-    eventually() { wallet.listAppMultiPaymentRequests().length shouldBe 1 }
-    wallet.acceptAppMultiPaymentRequest(
-      wallet.listAppMultiPaymentRequests().head.contractId
+    eventually() { wallet.listAppPaymentRequests().length shouldBe 1 }
+    wallet.acceptAppPaymentRequest(
+      wallet.listAppPaymentRequests().head.contractId
     )
   }
 
@@ -244,11 +244,11 @@ class SplitwiseFrontendIntegrationTest
       }
 
       eventually() {
-        bobRemoteWallet.listAppMultiPaymentRequests().length shouldBe 1
+        bobRemoteWallet.listAppPaymentRequests().length shouldBe 1
       }
-      inside(bobRemoteWallet.listAppMultiPaymentRequests()) { case Seq(request) =>
+      inside(bobRemoteWallet.listAppPaymentRequests()) { case Seq(request) =>
         bobRemoteWallet.tap(510)
-        bobRemoteWallet.acceptAppMultiPaymentRequest(request.contractId)
+        bobRemoteWallet.acceptAppPaymentRequest(request.contractId)
       }
 
       withFrontEnd("bobSplitwise") { implicit webDriver =>
