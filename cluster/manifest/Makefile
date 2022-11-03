@@ -3,9 +3,12 @@
 test-vars=\
 	--tla-str gcpRegion=region \
     --tla-str gcpRepoName=project/repo \
+    --tla-str gcpDnsProject=dns-project \
+	--tla-str gcpDnsSvcAcct=dns-service-account \
     --tla-str imageTag=tag \
     --tla-str ipAddr=ipaddr \
-    --tla-str clusterName=cluster
+    --tla-str clusterName=cluster \
+	--tla-str clusterDnsName=cluster.network.global
 
 .PHONY: format
 format:

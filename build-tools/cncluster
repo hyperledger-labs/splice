@@ -47,9 +47,12 @@ function _cluster_apply() {
     # Apply base cluster config
     jsonnet --tla-str gcpRegion=${CLOUDSDK_COMPUTE_REGION} \
             --tla-str gcpRepoName=${GCP_REPO_NAME} \
+            --tla-str gcpDnsProject=${GCP_DNS_PROJECT} \
+            --tla-str gcpDnsSvcAcct=${GCP_DNS_SERVICE_ACCOUNT} \
             --tla-str imageTag=${SOURCE_IMAGE_TAG} \
             --tla-str ipAddr=$(cluster_ip) \
             --tla-str clusterName=${GCP_CLUSTER_NAME} \
+            --tla-str clusterDnsName=${CLUSTER_DNS_NAME} \
             $REPO_ROOT/cluster/manifest/canton-network-config.jsonnet \
         | kubectl apply -f -
 }
@@ -143,11 +146,11 @@ function cluster_create() {
 
     #### Store DNS service account secret for cert-manager DNS-01 authorizer to use
     #### TODO(i1447)
-    if [ -z $(kubectl get secret | grep clouddns-dns01-solver-svc-acct) ]; then
+    if [ -z $(kubectl get secret | grep ${GCP_DNS_SERVICE_ACCOUNT}) ]; then
         _log "Missing DNS Service Account secret, adding..."
         gcloud iam service-accounts keys create /tmp/key.json \
             --iam-account dns01-solver@$GCP_DNS_PROJECT.iam.gserviceaccount.com
-        kubectl create secret generic clouddns-dns01-solver-svc-acct \
+        kubectl create secret generic $GCP_DNS_SERVICE_ACCOUNT \
             --from-file=key.json=/tmp/key.json
         rm /tmp/key.json
     fi

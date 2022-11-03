@@ -1,3 +1,5 @@
+local tls = import './tls.jsonnet';
+
 local flatten(obj) =
   if std.isArray(obj)
   then std.flatMap(flatten, obj)
@@ -46,7 +48,7 @@ local toContainerPortDefn(p) = {
 local JVM_SYSTEM_MEMORY_MIB = 256;
 
 
-local deployment(config, name, ports, memoryLimitMiB=1024, ext={}, proxyToGrpcWeb=null, mountConfig=null) =
+local deployment(config, name, ports, memoryLimitMiB=1024, ext={}, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null) =
   local proxyPort =
     if proxyToGrpcWeb == null then null
     else findPort(ports, proxyToGrpcWeb);
@@ -58,7 +60,7 @@ local deployment(config, name, ports, memoryLimitMiB=1024, ext={}, proxyToGrpcWe
   );
 
   {
-    ports: std.map(function(p) (p + { service: name }) , allPorts),
+    ports: std.map(function(p) (p { service: name }), allPorts),
     deploymentObjects: [
       {
         apiVersion: 'apps/v1',
@@ -113,6 +115,11 @@ local deployment(config, name, ports, memoryLimitMiB=1024, ext={}, proxyToGrpcWe
                       mountPath: '/config',
                       name: name + '-config-vol',
                     },
+                  ] + if tlsCertSecret == null then [] else [
+                    {
+                      mountPath: '/tmp',
+                      name: name + '-tls-cert-vol',
+                    },
                   ],
                 } + ext,
               ] + (
@@ -155,6 +162,14 @@ local deployment(config, name, ports, memoryLimitMiB=1024, ext={}, proxyToGrpcWe
                     name: mountConfig,
                   },
                 },
+              ] + if tlsCertSecret == null then [] else [
+                {
+                  name: name + '-tls-cert-vol',
+                  secret: {
+                    secretName: tlsCertSecret,
+                    optional: false,
+                  },
+                },
               ],
             },
           },
@@ -188,7 +203,7 @@ local configMap(config, name, fileName, data) = {
       },
       data: {
         version: config.imageTag,
-        [ fileName ]: std.manifestJsonEx(data, '  ', '\n', ': '),
+        [fileName]: std.manifestJsonEx(data, '  ', '\n', ': '),
       },
     },
   ],
@@ -220,16 +235,29 @@ local externalService(config, ports) = {
 local cluster(config, clusterDeployments) =
   local deployments = flatten(clusterDeployments);
 
+  local tlsCertSecret = config.clusterName + '-tls';
+  local issuerName = 'letsencrypt-production';
+  local issuerServer = 'https://acme-v02.api.letsencrypt.org/directory';
+
   local allPorts =
     std.filter(function(port) !std.get(port, 'internalOnly', false),
                flatten(std.map(function(i) i.ports, deployments)));
 
   objects(deployments + [
     configMap(config, 'cluster-manifest', 'manifest.json', {
-      'ports': allPorts
+      ports: allPorts,
     }),
-    deployment(config, 'external-proxy', allPorts, memoryLimitMiB=512, mountConfig='cluster-manifest'),
+    deployment(
+      config,
+      'external-proxy',
+      allPorts,
+      memoryLimitMiB=512,
+      mountConfig='cluster-manifest',
+      tlsCertSecret=tlsCertSecret
+    ),
     externalService(config, allPorts),
+    tls.certificateIssuer(issuerName, issuerServer, config.gcpDnsProject, config.gcpDnsSvcAcct),
+    tls.certificate(issuerName, tlsCertSecret, config.clusterName, config.clusterDnsName),
   ]);
 
 {

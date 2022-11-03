@@ -163,6 +163,10 @@ local cantonNetwork(config) =
         name: 'http',
         port: 80,
       },
+      {
+        name: 'https',
+        port: 443,
+      },
     ]),
     c.deployment(config, 'gcs-proxy', [
       {
@@ -177,10 +181,22 @@ local cantonNetwork(config) =
     splitwiseDeployments(config),
   ]);
 
-function(gcpRegion, gcpRepoName, imageTag, ipAddr, clusterName) cantonNetwork(networkDefaults {
+function(
+  gcpRegion,
+  gcpRepoName,
+  gcpDnsProject,
+  gcpDnsSvcAcct,
+  imageTag,
+  ipAddr,
+  clusterName,
+  clusterDnsName
+) cantonNetwork(networkDefaults {
   gcpRegion: gcpRegion,
   gcpRepoName: gcpRepoName,
+  gcpDnsProject: gcpDnsProject,
+  gcpDnsSvcAcct: gcpDnsSvcAcct,
   imageTag: imageTag,
   ipAddr: ipAddr,
   clusterName: clusterName,
+  clusterDnsName: clusterDnsName,
 })
