@@ -32,8 +32,8 @@ class PreflightIntegrationTest
       .fromFiles(
         this.getClass.getSimpleName,
         validatorPath / "validator.conf",
-        resourcesPath / "validator1.conf",
         validatorPath / "validator-participant.conf",
+        resourcesPath / "preflight-extras.conf",
       )
       .clearConfigTransforms()
       .addConfigTransforms((_, conf) => CoinConfigTransforms.addDamlNameSuffix("preflight")(conf))
@@ -53,5 +53,10 @@ class PreflightIntegrationTest
 
   "run through runbook against cluster validator1" taggedAs LiveDevNetTest in { implicit env =>
     runScript(resourcesPath / "tap-transfer-validator1.canton")(env.environment)
+  }
+
+  "test a directory entry allocation against cluster SVC" taggedAs LiveDevNetTest in {
+    implicit env =>
+      runScript(resourcesPath / "allocate-directory-entry.canton")(env.environment)
   }
 }

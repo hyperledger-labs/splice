@@ -1,0 +1,36 @@
+// Commands needed to initialize the CN apps, tap some coins and make some transfers. Can be run as a bootstrap script.
+import com.daml.network.codegen.CC.CoinRules.CoinRules
+import com.daml.network.codegen.CN.{Directory => codegen}
+
+println("BEGIN - directory entry test")
+
+// Onboard test parties.
+val aliceUserName = aliceWallet.config.damlUser
+
+println(s"Onboarding Alice user: " + aliceUserName)
+val aliceParty = validator1App.onboardUser(aliceUserName)
+
+println("Tap CC")
+aliceValidator1Wallet.tap(100.0)
+utils.retry_until_true(aliceValidator1Wallet.list().coins.length == 1)
+
+println("Install Directory App")
+val aliceRequestCid = aliceDirectory.requestDirectoryInstall()
+
+println("Wait for Directory App installation")
+remoteParticipant.ledger_api.acs.await(aliceParty, codegen.DirectoryInstall)
+
+println("Confirm there are no payment requests")
+utils.retry_until_true {
+  aliceValidator1Wallet.listAppPaymentRequests().length == 0
+}
+
+println("Request a directory entry")
+aliceDirectory.requestDirectoryEntry("alice.cns")
+
+println("Confirm that we receive a payment request for the directory entry.")
+utils.retry_until_true {
+  aliceValidator1Wallet.listAppPaymentRequests().length == 1
+}
+
+println("END - directory entry test")
