@@ -550,12 +550,17 @@ object BuildCommon {
         //          |com\.digitalasset\.canton\.participant\.protocol\.v0\..*
         //      """
         //      ),
+        Compile / damlSourceDirectory := sourceDirectory.value / "main",
         Compile / damlCodeGeneration :=
           Seq(
             (
               (Compile / resourceDirectory).value / "dar" / "AdminWorkflows.dar",
               "com.digitalasset.canton.participant.admin.workflows",
-            )
+            ),
+            (
+              (Compile / damlDarOutput).value / "AdminWorkflowsWithVacuuming-2.5.0.dar",
+              "com.digitalasset.canton.participant.admin.workflows",
+            ),
           ),
         damlFixedDars := Seq("AdminWorkflows.dar"),
         // commented out from Canton OS repo as settings don't apply to us (yet)

@@ -1,11 +1,11 @@
 { stdenv }:
 stdenv.mkDerivation rec {
   name = "canton";
-  version = "20221025";
-  sdk_version = "2.5.0-snapshot.20221024.10827.0.c8adc54a";
+  version = "20221101";
+  sdk_version = "2.5.0-snapshot.20221028.10865.0.1b726fe8";
   src = builtins.fetchTarball {
     url = "https://github.com/digital-asset/daml/releases/download/v${sdk_version}/canton-open-source-${version}.tar.gz";
-    sha256 = "1rk57hli86r3krj0b6gb7485fqs9sjza4xlhsfd1vnwz21chq6yg";
+    sha256 = "0v4inyh3pi7286y9mpxdfa08nk2dg9nmfbjw0f9a7ys4p7kjskph";
   };
   installPhase = ''
     mkdir - p $out

@@ -16,6 +16,7 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.daml.network.util.{CommonCoinAppInstanceReferences, Proto}
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
+import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 
@@ -61,7 +62,7 @@ class DirectoryIntegrationTest
       for (_ <- 1 to 3)
         Future {
           aliceDirectory.requestDirectoryInstall()
-        }
+        }.discard
 
       // Wait for one transaction, so that automation likely kicks-off but shutdown initiates quickly
       // and thus results in 'handleDirectoryInstallRequest' handlers being aborted due to shutdown.
@@ -82,7 +83,7 @@ class DirectoryIntegrationTest
 
         // Request installs and wait for provider to auto-accept
         val n = 3
-        (1 to n).foreach(_ => Future(aliceDirectory.requestDirectoryInstall()))
+        (1 to n).foreach(_ => Future(aliceDirectory.requestDirectoryInstall()).discard)
 
         // Wait until 2*n transactions have been received (one each: create request + handle request)
         val tx = aliceValidator.remoteParticipant.ledger_api.transactions

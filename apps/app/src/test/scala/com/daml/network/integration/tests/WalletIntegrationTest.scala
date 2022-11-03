@@ -752,7 +752,7 @@ class WalletIntegrationTest
       // sending three commands in short succession to the idle wallet should lead to two transactions being executed
       // tx 1: first command that arrived is immediately executed
       // tx 2: other commands that arrived after the first command was started are executed in one batch
-      (1 to 3).foreach(i => Future(aliceRemoteWallet.executeDirectTransfer(bob, i)))
+      (1 to 3).foreach(i => Future(aliceRemoteWallet.executeDirectTransfer(bob, i)).discard)
       // Wait until 2 transactions have been received
       val txs = aliceValidator.remoteParticipant.ledger_api.transactions
         .trees(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
@@ -773,7 +773,7 @@ class WalletIntegrationTest
 
       val _ = Future(aliceRemoteWallet.executeDirectTransfer(bob, 10))
       (1 to defaultBatchSize + 1).foreach(_ =>
-        Future(aliceRemoteWallet.executeDirectTransfer(bob, 1))
+        Future(aliceRemoteWallet.executeDirectTransfer(bob, 1)).discard
       )
       // 3 txs;
       // tx 1: initial transfer

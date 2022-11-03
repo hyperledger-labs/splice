@@ -1,7 +1,7 @@
 package com.daml.network.scan.metrics
 
 import com.codahale.metrics.MetricRegistry
-import com.daml.metrics.MetricName
+import com.daml.metrics.api.MetricName
 import com.digitalasset.canton.metrics.DbStorageMetrics
 import com.digitalasset.canton.metrics.MetricHandle.NodeMetrics
 

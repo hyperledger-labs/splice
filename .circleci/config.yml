@@ -14,7 +14,7 @@ env: &env
 parameters:
   sdk-version:
     type: string
-    default: "2.5.0-snapshot.20221024.10827.0.c8adc54a" # sdk-version
+    default: "2.5.0-snapshot.20221028.10865.0.1b726fe8" # sdk-version
   # Bump this when you change the definition of what is being cached to make sure
   # old files don’t pollute your build.
   cache-version:
