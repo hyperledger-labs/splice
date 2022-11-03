@@ -1,0 +1,35 @@
+module CC.Scripts.TestFloatingOutputs where
+
+import DA.Assert
+import DA.List
+import Daml.Script
+import CC.Coin
+import CC.CoinRules
+import CC.Scripts.Util
+
+testFloatingOutputs: Script ()
+testFloatingOutputs = do
+    app <- setupApp
+    validator <- setupValidator app "validator"
+    alice <- setupUser app "alice" validator
+    bob <- setupUser app "bob" validator
+    charlie <- setupUser app "charlie" validator
+    coin <- tap app alice 100.0
+    context <- getPaymentTransferContext app alice
+    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.svc] $ exerciseCmd context.coinRules CoinRules_Transfer with
+      transfer = Transfer with
+        sender = alice.primaryParty
+        provider = alice.primaryParty
+        inputs = [InputCoin coin]
+        outputs = 
+          [ OutputReceiverCoin bob.primaryParty FloatingReceiverCoin
+          , OutputReceiverCoin charlie.primaryParty FloatingReceiverCoin
+          ]
+        payload = "test"
+      context = context.context
+
+    bobCoins <- query @Coin bob.primaryParty
+    charlieCoins <- query @Coin charlie.primaryParty
+    sort (map (\(_, c) -> c.quantity.initialQuantity) bobCoins) === [1.0, 49.4505]
+    sort (map (\(_, c) -> c.quantity.initialQuantity) charlieCoins) === [1.0, 49.4505]
+    return ()

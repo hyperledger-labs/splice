@@ -399,7 +399,7 @@ executeTransfer context config0 svc t = do
     _ <- consumeInputs context svc t.sender t.inputs
     -- distribute floating outputs
     let distributed = distributeOutputs openRound.round config svc t.sender summary0 osum.preprocessedOutputs
-    let summary1 = mergeReceiverFees distributed.receiverTransferFeess summary0
+    let summary1 = mergeReceiverFees distributed.receiverTransferFees summary0
     let summary2 = mergeDistributedOutputs distributed t.sender summary1
     -- record debugging note
     create TransferDebugNote with transfer = t; scaledConfig = config; round = openRound.round; summary = summary2; ..
@@ -713,27 +713,31 @@ data DistributedCoin = DistributedCoin with
   owner : Party
   quantity : Decimal
   lock : Optional TimeLock
+ deriving Show
 
 data OutputCreationState = OutputCreationState with
-  remainingExcessQuantity : Decimal
-  coins : [DistributedCoin]
-  receiverTransferFeess : Map Party Decimal -- ^ Receiver fees _only_ for floating sender outputs.
+    remainingExcessQuantity : Decimal
+    coins : [DistributedCoin]
+    receiverTransferFees : Map Party Decimal -- ^ Receiver fees _only_ for floating sender outputs.
+    floatingComplete : Bool -- ^ True iff all floating outputs have been processed
+  deriving Show
 
 data DistributedOutputs = DistributedOutputs with
   coins : [DistributedCoin]
-  receiverTransferFeess : Map Party Decimal  -- ^ Receiver fees _only_ for floating sender outputs.
+  receiverTransferFees : Map Party Decimal  -- ^ Receiver fees _only_ for floating sender outputs.
 
 distributeOutputs : Round -> CoinConfig CC -> Party -> Party -> TransferSummary -> [PreprocessedTransferOutput] -> DistributedOutputs
 distributeOutputs now config svc sender summary outs =
     let st = foldl createOutput initialState outs
-    in DistributedOutputs with
+    in trace (initialState.remainingExcessQuantity, perCoinExcessQuantity, outs) $ DistributedOutputs with
       coins = st.coins
-      receiverTransferFeess = st.receiverTransferFeess
+      receiverTransferFees = st.receiverTransferFees
   where
     initialState = OutputCreationState with
       remainingExcessQuantity = max 0.0 summary.quantityBalance
       coins = []
-      receiverTransferFeess = Map.empty
+      receiverTransferFees = Map.empty
+      floatingComplete = False
 
     perCoinExcessQuantity
       | summary.numFloatingCoins <= 0 = 0.0
@@ -748,13 +752,18 @@ distributeOutputs now config svc sender summary outs =
         in OutputCreationState with
              coins = coin :: st.coins
              remainingExcessQuantity = st.remainingExcessQuantity
-             receiverTransferFeess = st.receiverTransferFeess
-      PreprocessedFloatingOutput n ->
-        let quantity
-              | n < summary.numFloatingCoins = perCoinExcessQuantity
+             receiverTransferFees = st.receiverTransferFees
+             floatingComplete = st.floatingComplete
+      PreprocessedFloatingOutput n
+        | st.floatingComplete -> error $ "Internal error: Expected to be finished with floating outputs but got " <> show n
+        | otherwise ->
+        let (quantity, floatingComplete)
+              | n == 1 = 
+                  -- We iterate over the outputs in reverse order so this should be the last floating output
+                  (st.remainingExcessQuantity, True)
               -- TODO(M3-90): consider smearing this remainder excess quantity above perCoinExcessQuantity
               -- as thinly as possible over the appropriate number of floating coins.
-              | otherwise = st.remainingExcessQuantity
+              | otherwise = (perCoinExcessQuantity, False)
             receiverFee
               | sender == out.owner = 0.0
               | otherwise = chargeSteppedRate config.transferFee quantity
@@ -762,13 +771,14 @@ distributeOutputs now config svc sender summary outs =
               owner = out.owner
               quantity = quantity - receiverFee
               lock = out.lock
-        in OutputCreationState with
+        in trace (quantity, st) $ OutputCreationState with
              coins = coin :: st.coins
              remainingExcessQuantity = st.remainingExcessQuantity - quantity
-             receiverTransferFeess =
+             receiverTransferFees =
                if receiverFee == 0.0
-                 then st.receiverTransferFeess
-                 else Map.alter (\old -> Some (receiverFee + fromOptional 0.0 old)) out.owner st.receiverTransferFeess
+                 then st.receiverTransferFees
+                 else Map.alter (\old -> Some (receiverFee + fromOptional 0.0 old)) out.owner st.receiverTransferFees
+             floatingComplete = floatingComplete
 
 
 createTransferOutputs : Round -> CoinConfig CC -> Party -> [DistributedCoin] -> Update [CreatedCoin]
