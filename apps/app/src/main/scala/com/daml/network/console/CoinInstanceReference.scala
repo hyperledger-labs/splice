@@ -1,25 +1,17 @@
 package com.daml.network.console
 
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.NonNegativeDuration
 import com.digitalasset.canton.console.commands.{
   HealthAdministration,
-  LedgerApiAdministration,
-  ParticipantAdministration,
-  ParticipantPartiesAdministrationGroup,
-  ParticipantPruningAdministrationGroup,
-  ParticipantTestingGroup,
+  PartiesAdministrationGroup,
   TopologyAdministrationGroup,
 }
 import com.digitalasset.canton.console.{
-  ConsoleCommandResult,
   ConsoleEnvironment,
   ConsoleMacros,
-  FeatureFlag,
   Help,
   InstanceReference,
-  LedgerApiCommandRunner,
   LocalInstanceReference,
   RemoteParticipantReference,
 }
@@ -31,11 +23,7 @@ import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.topology.ParticipantId
 
 /** Copy of Canton ParticipantReference */
-trait CoinAppReference
-    extends InstanceReference
-    with ParticipantAdministration
-    with LedgerApiAdministration
-    with LedgerApiCommandRunner {
+trait CoinAppReference extends InstanceReference {
 
   override val name: String
 
@@ -59,7 +47,7 @@ trait CoinAppReference
     "Yields the globally unique id of this participant. " +
       "Throws an exception, if the id has not yet been allocated (e.g., the participant has not yet been started)."
   )
-  override def id: ParticipantId = topology.idHelper(name, ParticipantId(_))
+  override def id: InstanceId = topology.idHelper(name, ParticipantId(_))
 
   private lazy val topology_ =
     new TopologyAdministrationGroup(
@@ -75,23 +63,9 @@ trait CoinAppReference
   )
   def topology: TopologyAdministrationGroup = topology_
 
-  @Help.Summary(
-    "Commands used for development and testing",
-    FeatureFlag.Testing,
-  )
-  @Help.Group("Testing")
-  def testing: ParticipantTestingGroup = ???
-
-  @Help.Summary(
-    "Commands to pruning the archive of the ledger",
-    FeatureFlag.Preview,
-  )
-  @Help.Group("Ledger Pruning")
-  def pruning: ParticipantPruningAdministrationGroup = ???
-
   @Help.Summary("Inspect and manage parties")
   @Help.Group("Parties")
-  override def parties: ParticipantPartiesAdministrationGroup = partiesGroup
+  override def parties: PartiesAdministrationGroup = partiesGroup
 
   @Help.Summary("Wait until initialization has completed")
   def waitForInitialization(
@@ -104,11 +78,7 @@ trait CoinAppReference
   // TODO(i736): slightly adapted compared to Canton.
   // above command needs to be def such that `Help` works.
   lazy private val partiesGroup =
-    new ParticipantPartiesAdministrationGroup(this.id, this, consoleEnvironment)
-
-  override def ledgerApiCommand[Result](
-      command: GrpcAdminCommand[_, _, Result]
-  ): ConsoleCommandResult[Result] = ???
+    new PartiesAdministrationGroup(this, consoleEnvironment)
 
   def runningNode: Option[CantonNodeBootstrap[ParticipantNode]] =
     consoleEnvironment.environment.participants.getRunning(name)
