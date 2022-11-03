@@ -108,4 +108,3 @@ docker-check:
 
 _did_common := true
 endif
-

@@ -13,6 +13,10 @@
     1. [Checking Pod Node Assignments and Memory Usage](#checking-pod-node-assignments-and-memory-usage)
 1. [Updating the Canton Network Deployment](#updating-the-canton-network-deployment)
 1. [Fixing connection issues in kubectl](#fixing-connection-issues-in-kubectl)
+1. [TLS Certificate Provisioning](#tls-certificate-provisioning)
+   1. [First-time Infra Setup](#first-time-infra-setup)
+   1. [Cluster Configuration](#cluster-configuration)
+   1. [Adding TLS to {insert-service-here}](#adding-tls-to-insert-service-here)
 
 Note that operations in this directory require authentication to use
 Google Cloud APIs. If you have `direnv` installed (which you should),
@@ -526,3 +530,45 @@ To do so run the following commands from the cluster directory, e.g. `cluster/de
 rm .kubecfg
 direnv reload
 ```
+
+## TLS Certificate Provisioning
+
+### First-time Infra Setup
+
+Certificates are issued and renewed in the cluster automatically by `cert-manager`. There is some setup to configure specific versioned releases of `cert-manager` ready for deployment in our clusters.
+
+In particular, because we operate a private GKE cluster, we need to mirror `cert-manager`'s images to our internal image repository. We also need to rewrite the `cert-manager` manifest to point to our mirror instead of the default `quay.io` hosted images.
+
+Both of these actions can be executed automatically by the `update-cert-manager.sh` script located in the `manifest/cert-manager` directory.
+
+Currently we run `cert-manager` v1.10.0, the latest stable release at time of writing. The update script doesn't have to be re-run unless a new version of `cert-manager` is released and upgrading to it is critical, such as for addressing security vulnerabilities.
+
+### Cluster Configuration
+
+When the `cert-manager.yaml` manifest is applied to a cluster, a couple of deployments are started up in the `cert-manager` namespace. These services carry out the process of requesting and storing certificates when the appropriate custom kubernetes resources are created.
+
+Use `kubectl get pods --namespace cert-manager` to check on the status of these deployments.
+
+Of note, we create an `Issuer` resource in our `cluster.jsonnet` manifest that contains configuration for the entity that will issue us certs. We also create a `Certificate` resource to request the cert itself and declare the secret to store it in.
+
+Use `kubectl get issuers` and `kubectl get certificates` to check the status of these resources.
+
+Finally, we set up `external-proxy`, our nginx cluster ingress, to be ready to serve as a TLS termination point. This is achieved by mounting the certificate from the secret into the filesystem, and referencing the certificate from within the nginx config.
+
+### Adding TLS to {insert-service-here}
+
+Ultimately your service is likely being proxied through some `external-proxy` config file. The only thing required to enable TLS termination for a new service is to add a block like
+
+```
+server {
+   listen     443 ssl;
+   listen [::]443 ssl;
+
+   ssl_certificate     /tmp/tls.crt;
+   ssl_certificate_key /tmp/tls.key;
+
+   ...
+}
+```
+
+You can expect the certificate and certificate key to always be available at `/tmp/tls.crt` and `/tmp/tls.key` respectively, via the kubernetes secret volume mount mentioned above.
