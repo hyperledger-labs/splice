@@ -12,6 +12,7 @@ function adjust_shellscript_binary() {
   REPLACE_REVISION=$(git rev-parse HEAD)
   REPLACE_JVM_OPTS="-XX:+CrashOnOutOfMemoryError"
   REPLACE_JAR="lib\/$JAR"
+  REPLACE_MAIN_CLASS="$MAIN_CLASS"
 #  REPLACE_MAC_ICON_FILE="lib\/canton.ico"
   cp -r "$RELEASE_DIR/../../../src/pack/bin" "$RELEASE_DIR"
   for file in "bin/coin" # TODO(i161): Canton supports windows. Do we want that too? "bin/coin.bat"
@@ -20,6 +21,7 @@ function adjust_shellscript_binary() {
         sed -e "s/REPLACE_VERSION/${REPLACE_VERSION}/" |
         sed -e "s/REPLACE_REVISION/${REPLACE_REVISION}/" |
         sed -e "s/REPLACE_JVM_OPTS/${REPLACE_JVM_OPTS}/" |
+        sed -e "s/REPLACE_MAIN_CLASS/${REPLACE_MAIN_CLASS}/" |
         sed -e "s/REPLACE_JAR/${REPLACE_JAR}/" > $RELEASE_DIR/tmp.txt
         # TODO(i161): Look into this Mac Icon
 #        sed -e "s/REPLACE_MAC_ICON_FILE/${REPLACE_MAC_ICON_FILE}/"
@@ -48,6 +50,8 @@ cp -v "$JARFILE" "$RELEASE_DIR"/lib
 
 
 shift # shift JARFILE argument out-of-scope
+MAIN_CLASS=$1
+shift
 ARGS=$@ # other command line args, given in form
 
 state="scan"

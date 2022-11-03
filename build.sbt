@@ -428,7 +428,10 @@ lazy val bundleTask = {
     }) ++ dars.flatten.flatMap({ case dar =>
       Seq("-r", dar, s"dars/${dar.getName}")
     })
-    runCommand(s"bash ./create-bundle.sh $assemblyJar ${args.mkString(" ")}", log)
+    runCommand(
+      s"bash ./create-bundle.sh $assemblyJar ${(assembly / mainClass).value.get} ${args.mkString(" ")}",
+      log,
+    )
     assemblyJar
   }
 }
