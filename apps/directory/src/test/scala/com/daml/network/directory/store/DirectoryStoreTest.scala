@@ -2,12 +2,12 @@ package com.daml.network.directory.store
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.*
-import com.daml.ledger.api.v1.event.{ArchivedEvent, CreatedEvent, Event}
-import com.daml.ledger.api.v1.transaction.Transaction
 import com.daml.ledger.client.binding.Primitive
-import com.daml.network.codegen.CN.Directory as directoryCodegen
-import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.Contract
+import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.ledger.javaapi.data.{ArchivedEvent, CreatedEvent, Event, Transaction}
+import com.daml.network.codegen.java.cn.{directory => directoryCodegen}
+import com.daml.network.store.JavaAcsStore.QueryResult
+import com.daml.network.util.JavaContract
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.resource.MemoryStorage
@@ -17,12 +17,14 @@ import org.scalatest.wordspec.AsyncWordSpec
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{Future, Promise}
+import scala.jdk.CollectionConverters._
+import scala.jdk.OptionConverters._
 
 class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
 
   implicit val actorSystem: ActorSystem = ActorSystem("DirectoryAppStoreTest")
 
-  def mkPartyId(name: String) = PartyId.tryFromPrim(Primitive.Party(name + "::dummy"))
+  def mkPartyId(name: String) = PartyId.tryFromProtoPrimitive(name + "::dummy")
   val providerParty: PartyId = mkPartyId("provider")
   val svcParty: PartyId = mkPartyId("svc")
   def userParty(i: Int) = mkPartyId(s"user-$i")
@@ -32,15 +34,15 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
       provider: PartyId,
       user: PartyId,
       name: String,
-      expiresAt: Primitive.Timestamp,
-  ): Contract[directoryCodegen.DirectoryEntry] =
-    Contract[directoryCodegen.DirectoryEntry](
-      contractId = Primitive.ContractId(s"de#$number"),
-      payload = directoryCodegen.DirectoryEntry(
-        user = user.toPrim,
-        provider = provider.toPrim,
-        name = name,
-        expiresAt = expiresAt,
+      expiresAt: Instant,
+  ): JavaContract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry] =
+    JavaContract(
+      contractId = new directoryCodegen.DirectoryEntry.ContractId(s"de#$number"),
+      payload = new directoryCodegen.DirectoryEntry(
+        user.toProtoPrimitive,
+        provider.toProtoPrimitive,
+        name,
+        expiresAt,
       ),
     )
 
@@ -49,39 +51,47 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
       provider: PartyId,
       user: PartyId,
       name: String,
-  ): Contract[directoryCodegen.DirectoryEntryRequest] =
-    Contract[directoryCodegen.DirectoryEntryRequest](
-      contractId = Primitive.ContractId(s"der#$number"),
-      payload = directoryCodegen.DirectoryEntryRequest(
-        user = user.toPrim,
-        provider = provider.toPrim,
-        name = name,
-        entryFee = 1.0,
+  ): JavaContract[
+    directoryCodegen.DirectoryEntryRequest.ContractId,
+    directoryCodegen.DirectoryEntryRequest,
+  ] =
+    JavaContract(
+      contractId = new directoryCodegen.DirectoryEntryRequest.ContractId(s"der#$number"),
+      payload = new directoryCodegen.DirectoryEntryRequest(
+        provider.toProtoPrimitive,
+        user.toProtoPrimitive,
+        name,
+        BigDecimal(1.0).bigDecimal,
       ),
     )
 
-  def toCreatedEvent[T](contract: Contract[T]): CreatedEvent = {
+  def toCreatedEvent[TCid <: ContractId[T], T](
+      contract: JavaContract[TCid, T]
+  ): CreatedEvent = {
     val contractP = contract.toProtoV0
-    CreatedEvent(
+    new CreatedEvent(
       eventId = "dummyEventId",
       contractId = contractP.contractId,
-      templateId = contractP.templateId,
-      createArguments = contractP.payload,
-      witnessParties = Seq.empty,
-      signatories = Seq.empty,
-      observers = Seq.empty,
-      agreementText = None,
-      contractKey = None,
+      interfaceViews = Map.empty.asJava,
+      failedInterfaceViews = Map.empty.asJava,
+      templateId = contract.payload.getContractTypeId,
+      arguments = contract.payload.toValue,
+      witnessParties = Seq.empty.asJava,
+      signatories = Seq.empty.asJava,
+      observers = Seq.empty.asJava,
+      agreementText = None.toJava,
+      contractKey = None.toJava,
     )
   }
 
-  def toArchivedEvent[T](contract: Contract[T]): ArchivedEvent = {
-    val contractP = contract.toProtoV0
-    ArchivedEvent(
+  def toArchivedEvent[TCid <: ContractId[T], T](
+      contract: JavaContract[TCid, T]
+  ): ArchivedEvent = {
+    new ArchivedEvent(
       eventId = "dummyEventId",
-      contractId = contractP.contractId,
-      templateId = contractP.templateId,
-      witnessParties = Seq.empty,
+      contractId = contract.contractId.contractId,
+      templateId = contract.payload.getContractTypeId,
+      witnessParties = Seq.empty.asJava,
     )
   }
 
@@ -95,7 +105,7 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
     entry,
   )
 
-  val expiry: Primitive.Timestamp =
+  val expiry: Instant =
     Primitive.Timestamp.discardNanos(Instant.EPOCH).getOrElse(fail("Failed to convert timestamp"))
 
   val entries =
@@ -122,18 +132,29 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
   val tx4Offset = "014"
   val tx5Offset = "015"
 
-  val tx1: Transaction = Transaction(
+  val effectiveAt: Instant =
+    Primitive.Timestamp.discardNanos(Instant.EPOCH).getOrElse(fail("Failed to convert timestamp"))
+
+  val tx1: Transaction = new Transaction(
+    transactionId = "",
+    commandId = "",
+    workflowId = "",
+    effectiveAt = effectiveAt,
     offset = tx1Offset,
-    events = entriesToArchive.map(co => Event.of(Event.Event.Archived(toArchivedEvent(co))))
-      ++ requests.map(co => Event.of(Event.Event.Created(toCreatedEvent(co)))),
+    events = (entriesToArchive.map(toArchivedEvent)
+      ++ requests.map(toCreatedEvent)).asJava,
   )
 
-  private def createCreateTx[T](
+  private def createCreateTx[TCid <: ContractId[T], T](
       offset: String,
-      createRequests: Seq[Contract[T]],
-  ) = Transaction(
+      createRequests: Seq[JavaContract[TCid, T]],
+  ) = new Transaction(
+    transactionId = "",
+    commandId = "",
+    workflowId = "",
+    effectiveAt = effectiveAt,
     offset = offset,
-    events = createRequests.map(req => Event.of(Event.Event.Created(toCreatedEvent(req)))),
+    events = createRequests.map[Event](toCreatedEvent).asJava,
   )
 
   val tx2: Transaction = createCreateTx(tx2Offset, nonIngestedEntries)
@@ -176,7 +197,7 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
     "lookup a non-ingested entry by id" in {
       for {
         store <- mkStore()
-        result <- store.lookupEntryRequestById(Primitive.ContractId(s"non-existent#1"))
+        result <- store.lookupEntryRequestById(new ContractId(s"non-existent#1"))
       } yield result shouldBe QueryResult(tx2Offset, None)
     }
 
@@ -216,7 +237,10 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
     }
 
     "stream ingested entry requests and wait for new ones to come in" in {
-      val acc: AtomicReference[List[Contract[directoryCodegen.DirectoryEntryRequest]]] =
+      val acc: AtomicReference[List[JavaContract[
+        directoryCodegen.DirectoryEntryRequest.ContractId,
+        directoryCodegen.DirectoryEntryRequest,
+      ]]] =
         new AtomicReference(List.empty)
       for {
         store <- mkStore()

@@ -46,6 +46,8 @@ object DamlPlugin extends AutoPlugin {
     )
     val damlProjectVersionOverride =
       settingKey[Option[String]]("Allows hardcoding daml project version")
+    val damlEnableJavaCodegen =
+      settingKey[Boolean]("Enable Java codegen")
 
     val damlGenerateCode = taskKey[Seq[File]]("Generate scala code from Daml")
     val damlDependencies = taskKey[Seq[File]]("Paths to DARs that this project depends on")
@@ -80,10 +82,14 @@ object DamlPlugin extends AutoPlugin {
         val javaOutputDirectory = damlJavaCodegenOutput.value
         val cacheDirectory = streams.value.cacheDirectory
         val log = streams.value.log
+        val enableJavaCodegen = damlEnableJavaCodegen.value
 
         val cache = FileFunction.cached(cacheDirectory, FileInfo.hash) { input =>
+          val codegens =
+            Seq((Codegen.Scala, scalaOutputDirectory)) ++
+              (if (enableJavaCodegen) Seq((Codegen.Java, javaOutputDirectory)) else Seq.empty)
           settings.flatMap { case (darFile, packageName) =>
-            Seq((Codegen.Scala, scalaOutputDirectory))
+            codegens
               .flatMap { case (codegen, outputDirectory) =>
                 IO.delete(outputDirectory)
                 generateCode(
@@ -525,7 +531,7 @@ object DamlPlugin extends AutoPlugin {
         (
           s"https://repo.maven.apache.org/maven2/com/daml/codegen-java/${damlVersion}/",
           s"codegen-java-${damlVersion}.jar",
-          basePackageName + ".jva",
+          basePackageName + ".java",
           "java",
         )
       case Codegen.Scala =>

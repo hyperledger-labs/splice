@@ -1,7 +1,12 @@
 package com.daml.network.scan.admin.api.client
 
+import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.network.admin.api.client.AppConnection
 import com.daml.network.codegen.CC.{CoinRules as coinRulesCodegen}
+import com.daml.network.codegen.java.cc.{
+  coinrules => javaCoinRulesCodegen,
+  round => javaRoundCodegen,
+}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -63,6 +68,20 @@ final class ScanConnection(
         openMiningRound.contractId,
       )
     }
+
+  def getJavaAppTransferContext()(implicit
+      traceContext: TraceContext
+  ): Future[javaCoinRulesCodegen.AppTransferContext] =
+    getAppTransferContext().map(context =>
+      new javaCoinRulesCodegen.AppTransferContext(
+        new javaCoinRulesCodegen.CoinRules.ContractId(
+          ApiTypes.ContractId.unwrap(context.coinRules)
+        ),
+        new javaRoundCodegen.OpenMiningRound.ContractId(
+          ApiTypes.ContractId.unwrap(context.openMiningRound)
+        ),
+      )
+    )
 
   private def notFound(description: String) = new StatusRuntimeException(
     Status.NOT_FOUND.withDescription(description)

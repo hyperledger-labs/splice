@@ -24,4 +24,7 @@ object Dependencies {
 
   lazy val java_jwt =
     "com.auth0" % "java-jwt" % "4.1.0"
+
+  lazy val daml_bindings_java =
+    "com.daml" % "bindings-java" % CantonDependencies.daml_libraries_version
 }

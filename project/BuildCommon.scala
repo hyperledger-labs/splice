@@ -55,7 +55,10 @@ object BuildCommon {
   }
 
   lazy val sharedSettings: Seq[Def.Setting[_]] = Seq(
-    libraryDependencies += scalatest % Test
+    libraryDependencies ++= Seq(
+      scalatest % Test,
+      Dependencies.daml_bindings_java,
+    )
   )
 
   val pbTsDirectory = SettingKey[File]("output directory for ts protobuf definitions")
@@ -83,15 +86,18 @@ object BuildCommon {
       )
 
   lazy val damlCodegenSettings: Seq[Def.Setting[_]] =
-    Seq(Compile / damlCodeGeneration := {
-      val Seq(darFile) = (Compile / damlBuild).value
-      Seq(
-        (
-          darFile,
-          "com.daml.network.codegen",
+    Seq(
+      Compile / damlCodeGeneration := {
+        val Seq(darFile) = (Compile / damlBuild).value
+        Seq(
+          (
+            darFile,
+            "com.daml.network.codegen",
+          )
         )
-      )
-    })
+      },
+      Compile / damlEnableJavaCodegen := true,
+    )
 
   lazy val copyDarResources: Seq[Def.Setting[_]] = {
     Seq(
@@ -341,6 +347,7 @@ object BuildCommon {
         // "data-dependencies" daml.yaml setting relies on hardcoded "0.0.1" project version
         Compile / damlBuild := Seq(), // message-0.0.1.dar is hardcoded and contact-0.0.1.dar is built by MessagingExampleIntegrationTest
         Compile / damlProjectVersionOverride := Some("0.0.1"),
+        Compile / damlEnableJavaCodegen := false,
         // commented out from Canton OS repo as settings don't apply to us (yet)
         //      addProtobufFilesToHeaderCheck(Compile),
         //      addFilesToHeaderCheck("*.sh", "../pack", Compile),
@@ -470,6 +477,7 @@ object BuildCommon {
             )
           )
         },
+        Compile / damlEnableJavaCodegen := false,
         // commented out from Canton OS repo as settings don't apply to us (yet)
         //    addProtobufFilesToHeaderCheck(Compile),
         //    addFilesToHeaderCheck("*.daml", "daml", Compile),
@@ -562,6 +570,7 @@ object BuildCommon {
               "com.digitalasset.canton.participant.admin.workflows",
             ),
           ),
+        Compile / damlEnableJavaCodegen := false,
         damlFixedDars := Seq("AdminWorkflows.dar"),
         // commented out from Canton OS repo as settings don't apply to us (yet)
         //      addProtobufFilesToHeaderCheck(Compile),

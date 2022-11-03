@@ -2,12 +2,12 @@ package com.daml.network.directory.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.ledger.client.binding.Primitive
-import com.daml.network.codegen.CN.Wallet.Subscriptions as subsCodegen
-import com.daml.network.codegen.CN.{Directory as directoryCodegen, Wallet as walletCodegen}
+import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
+import com.daml.network.codegen.java.cn.{directory as directoryCodegen, wallet as walletCodegen}
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
-import com.daml.network.store.AcsStore
-import com.daml.network.util.Contract
+import com.daml.network.store.JavaAcsStore
+import com.daml.network.util.{JavaContract => Contract}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
@@ -22,13 +22,13 @@ import scala.concurrent.{ExecutionContext, Future}
   * custom indices to ensure the scalability of these queries.
   */
 trait DirectoryStore extends AutoCloseable {
-  import AcsStore.QueryResult
+  import JavaAcsStore.QueryResult
 
   /** The sink to use for ingesting data from the ledger into this store. */
-  val acsIngestionSink: AcsStore.IngestionSink
+  val acsIngestionSink: JavaAcsStore.IngestionSink
 
   /** The [[com.daml.network.store.AcsStore]] used to back the default implementation of the queries. */
-  protected val acsStore: AcsStore
+  protected val acsStore: JavaAcsStore
 
   /** Get the party-id of the provider.
     * All results from the store are scoped to contracts managed by this provider.
@@ -41,45 +41,65 @@ trait DirectoryStore extends AutoCloseable {
   /** Lookup the directory install for a user */
   def lookupInstall(
       user: PartyId
-  ): Future[QueryResult[Option[Contract[directoryCodegen.DirectoryInstall]]]] =
-    acsStore.findContract(directoryCodegen.DirectoryInstall)(co => co.payload.user == user.toPrim)
+  ): Future[QueryResult[Option[
+    Contract[directoryCodegen.DirectoryInstall.ContractId, directoryCodegen.DirectoryInstall]
+  ]]] =
+    acsStore.findContract(directoryCodegen.DirectoryInstall.COMPANION)(co =>
+      co.payload.user == user.toPrim
+    )
 
   /** Lookup a directory entry by name. */
   def lookupEntryByName(
       name: String
-  ): Future[QueryResult[Option[Contract[directoryCodegen.DirectoryEntry]]]] =
-    acsStore.findContract(directoryCodegen.DirectoryEntry)(co => co.payload.name == name)
+  ): Future[QueryResult[
+    Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
+  ]] =
+    acsStore.findContract(directoryCodegen.DirectoryEntry.COMPANION)(co => co.payload.name == name)
 
   /** Lookup a directory entry by party.
     * If there are multiple candidate entries, then oldest one is returned.
     */
   def lookupEntryByParty(
       partyId: PartyId
-  ): Future[QueryResult[Option[Contract[directoryCodegen.DirectoryEntry]]]] =
-    acsStore.findContract(directoryCodegen.DirectoryEntry)(co => co.payload.user == partyId.toPrim)
+  ): Future[QueryResult[
+    Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
+  ]] =
+    acsStore.findContract(directoryCodegen.DirectoryEntry.COMPANION)(co =>
+      co.payload.user == partyId.toPrim
+    )
 
   /** Lookup a directory entry offer by its id. */
   def lookupEntryOfferById(
-      id: Primitive.ContractId[directoryCodegen.DirectoryEntryOffer]
-  ): Future[QueryResult[Option[Contract[directoryCodegen.DirectoryEntryOffer]]]] =
-    acsStore.lookupContractById(directoryCodegen.DirectoryEntryOffer)(id)
+      id: ContractId[directoryCodegen.DirectoryEntryOffer]
+  ): Future[QueryResult[Option[
+    Contract[directoryCodegen.DirectoryEntryOffer.ContractId, directoryCodegen.DirectoryEntryOffer]
+  ]]] =
+    acsStore.lookupContractById(directoryCodegen.DirectoryEntryOffer.COMPANION)(id)
 
   /** Lookup a directory entry subscription context by its id. */
   def lookupEntryContextById(
-      id: Primitive.ContractId[directoryCodegen.DirectoryEntryContext]
-  ): Future[QueryResult[Option[Contract[directoryCodegen.DirectoryEntryContext]]]] =
-    acsStore.lookupContractById(directoryCodegen.DirectoryEntryContext)(id)
+      id: ContractId[directoryCodegen.DirectoryEntryContext]
+  ): Future[QueryResult[Option[Contract[
+    directoryCodegen.DirectoryEntryContext.ContractId,
+    directoryCodegen.DirectoryEntryContext,
+  ]]]] =
+    acsStore.lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(id)
 
   /** Lookup a directory entry request by its id. */
   def lookupEntryRequestById(
-      id: Primitive.ContractId[directoryCodegen.DirectoryEntryRequest]
-  ): Future[QueryResult[Option[Contract[directoryCodegen.DirectoryEntryRequest]]]] =
-    acsStore.lookupContractById(directoryCodegen.DirectoryEntryRequest)(id)
+      id: ContractId[directoryCodegen.DirectoryEntryRequest]
+  ): Future[QueryResult[Option[Contract[
+    directoryCodegen.DirectoryEntryRequest.ContractId,
+    directoryCodegen.DirectoryEntryRequest,
+  ]]]] =
+    acsStore.lookupContractById(directoryCodegen.DirectoryEntryRequest.COMPANION)(id)
 
   /** List all directory entries that are active as of a specific revision. */
-  def listEntries(): Future[QueryResult[Seq[Contract[directoryCodegen.DirectoryEntry]]]] =
+  def listEntries(): Future[QueryResult[
+    Seq[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
+  ]] =
     // TODO(#790): add limit
-    acsStore.listContracts(directoryCodegen.DirectoryEntry)
+    acsStore.listContracts(directoryCodegen.DirectoryEntry.COMPANION)
 
   /** All install requests to the provider.
     *
@@ -89,37 +109,51 @@ trait DirectoryStore extends AutoCloseable {
     *
     * '''completes''' never, as it tails newly ingested transactions
     */
-  def streamInstallRequests(): Source[Contract[directoryCodegen.DirectoryInstallRequest], NotUsed] =
-    acsStore.streamContracts(directoryCodegen.DirectoryInstallRequest)
+  def streamInstallRequests(): Source[Contract[
+    directoryCodegen.DirectoryInstallRequest.ContractId,
+    directoryCodegen.DirectoryInstallRequest,
+  ], NotUsed] =
+    acsStore.streamContracts(directoryCodegen.DirectoryInstallRequest.COMPANION)
 
   /** All directory entry requests to the provider.
     *
     * Analogous to [[streamInstallRequests]], but for `DirectoryEntryRequest`
     */
-  def streamEntryRequests(): Source[Contract[directoryCodegen.DirectoryEntryRequest], NotUsed] =
-    acsStore.streamContracts(directoryCodegen.DirectoryEntryRequest)
+  def streamEntryRequests(): Source[Contract[
+    directoryCodegen.DirectoryEntryRequest.ContractId,
+    directoryCodegen.DirectoryEntryRequest,
+  ], NotUsed] =
+    acsStore.streamContracts(directoryCodegen.DirectoryEntryRequest.COMPANION)
 
   /** All accepted app payments whose receiver is the provider.
     *
     * Analogous to [[streamInstallRequests]], but for `AcceptedAppPayment`
     */
-  def streamAcceptedAppPayments(): Source[Contract[walletCodegen.AcceptedAppPayment], NotUsed] =
-    acsStore.streamContracts(walletCodegen.AcceptedAppPayment)
+  def streamAcceptedAppPayments(): Source[
+    Contract[walletCodegen.AcceptedAppPayment.ContractId, walletCodegen.AcceptedAppPayment],
+    NotUsed,
+  ] =
+    acsStore.streamContracts(walletCodegen.AcceptedAppPayment.COMPANION)
 
   /** All accepted initial subscription payments whose receiver is the provider.
     *
     * Analogous to [[streamInstallRequests]], but for `SubscriptionInitialPayment`
     */
-  def streamSubscriptionInitialPayments()
-      : Source[Contract[subsCodegen.SubscriptionInitialPayment], NotUsed] =
-    acsStore.streamContracts(subsCodegen.SubscriptionInitialPayment)
+  def streamSubscriptionInitialPayments(): Source[Contract[
+    subsCodegen.SubscriptionInitialPayment.ContractId,
+    subsCodegen.SubscriptionInitialPayment,
+  ], NotUsed] =
+    acsStore.streamContracts(subsCodegen.SubscriptionInitialPayment.COMPANION)
 
   /** All accepted subscription payments whose receiver is the provider.
     *
     * Analogous to [[streamInstallRequests]], but for `SubscriptionPayment`
     */
-  def streamSubscriptionPayments(): Source[Contract[subsCodegen.SubscriptionPayment], NotUsed] =
-    acsStore.streamContracts(subsCodegen.SubscriptionPayment)
+  def streamSubscriptionPayments(): Source[
+    Contract[subsCodegen.SubscriptionPayment.ContractId, subsCodegen.SubscriptionPayment],
+    NotUsed,
+  ] =
+    acsStore.streamContracts(subsCodegen.SubscriptionPayment.COMPANION)
 
   // TODO(M1-92): only added for tests (in DirectoryStoreTest)
   def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
@@ -147,28 +181,34 @@ object DirectoryStore {
     }
 
   /** Contract filter of a directory app store for a specific provider. */
-  def contractFilter(providerPartyId: PartyId): AcsStore.ContractFilter = {
-    import AcsStore.mkFilter
-    val provider = providerPartyId.toPrim
+  def contractFilter(providerPartyId: PartyId): JavaAcsStore.ContractFilter = {
+    import JavaAcsStore.mkFilter
+    val provider: String = providerPartyId.toProtoPrimitive
 
-    AcsStore.SimpleContractFilter(
+    JavaAcsStore.SimpleContractFilter(
       providerPartyId,
       Map(
-        mkFilter(directoryCodegen.DirectoryEntry)(co => co.payload.provider == provider),
-        mkFilter(directoryCodegen.DirectoryEntryRequest)(co => co.payload.provider == provider),
-        mkFilter(directoryCodegen.DirectoryEntryOffer)(co =>
+        mkFilter(directoryCodegen.DirectoryEntry.COMPANION)(co => co.payload.provider == provider),
+        mkFilter(directoryCodegen.DirectoryEntryRequest.COMPANION)(co =>
+          co.payload.provider == provider
+        ),
+        mkFilter(directoryCodegen.DirectoryEntryOffer.COMPANION)(co =>
           co.payload.entryRequest.provider == provider
         ),
-        mkFilter(walletCodegen.AcceptedAppPayment)(co => co.payload.provider == provider),
-        mkFilter(directoryCodegen.DirectoryEntryContext)(co => co.payload.provider == provider),
-        mkFilter(subsCodegen.SubscriptionInitialPayment)(co =>
+        mkFilter(walletCodegen.AcceptedAppPayment.COMPANION)(co => co.payload.provider == provider),
+        mkFilter(directoryCodegen.DirectoryEntryContext.COMPANION)(co =>
+          co.payload.provider == provider
+        ),
+        mkFilter(subsCodegen.SubscriptionInitialPayment.COMPANION)(co =>
           co.payload.subscriptionData.provider == provider
         ),
-        mkFilter(subsCodegen.SubscriptionPayment)(co =>
+        mkFilter(subsCodegen.SubscriptionPayment.COMPANION)(co =>
           co.payload.subscriptionData.provider == provider
         ),
-        mkFilter(directoryCodegen.DirectoryInstallRequest)(co => co.payload.provider == provider),
-        mkFilter(directoryCodegen.DirectoryInstall)(co => co.payload.provider == provider),
+        mkFilter(directoryCodegen.DirectoryInstallRequest.COMPANION)(co =>
+          co.payload.provider == provider
+        ),
+        mkFilter(directoryCodegen.DirectoryInstall.COMPANION)(co => co.payload.provider == provider),
       ),
     )
   }

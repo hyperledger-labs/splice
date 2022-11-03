@@ -396,6 +396,9 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     case path if path.contains("module-info.class") => MergeStrategy.discard
     case PathList("org", "jline", _ @_*) => MergeStrategy.first
     case path if isScalaCodegenFile(path) => scalaCodegenStrategy
+    // Dedup between ledger-api-java-proto (pulled in via Scala bindings)
+    // and the copy of that inlined into bindings-java.
+    case PathList("com", "daml", "ledger", "api", "v1", _*) => MergeStrategy.first
     case x => oldStrategy(x)
   }
 }

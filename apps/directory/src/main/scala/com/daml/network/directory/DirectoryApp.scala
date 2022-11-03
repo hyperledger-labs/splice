@@ -10,7 +10,7 @@ import com.daml.network.directory.automation.DirectoryAutomationService
 import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.directory.v0.DirectoryServiceGrpc
-import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
+import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries, JavaCoinLedgerClient}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
@@ -58,6 +58,14 @@ class DirectoryApp(
       providerPartyId: PartyId,
   ): Future[DirectoryApp.State] =
     for {
+      javaLedgerClient <-
+        JavaCoinLedgerClient.create(
+          config.remoteParticipant.ledgerApi,
+          name.unwrap,
+          timeouts,
+          loggerFactory,
+          tracerProvider,
+        )
       scanConnection <- Future.successful(
         new ScanConnection(
           config.remoteScan.clientAdminApi,
@@ -78,7 +86,7 @@ class DirectoryApp(
       )
       automation = new DirectoryAutomationService(
         store,
-        ledgerClient,
+        javaLedgerClient,
         scanConnection,
         retryProvider,
         loggerFactory,

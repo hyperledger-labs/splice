@@ -57,7 +57,7 @@ object Contract {
           s"Actual template id $templateId does not match expected template id ${companion.id}",
         ),
       )
-      contractId = Primitive.ContractId[T](contract.contractId)
+      contractId <- Right(Primitive.ContractId[T](contract.contractId))
       payloadP <- ProtoConverter.required("payload", contract.payload)
       payload <- companion
         .fromNamedArguments(payloadP)

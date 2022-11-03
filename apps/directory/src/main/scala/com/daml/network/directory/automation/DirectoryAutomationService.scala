@@ -1,15 +1,14 @@
 package com.daml.network.directory.automation
 
 import akka.stream.Materializer
-import com.daml.ledger.client.binding.Primitive
-import com.daml.network.automation.{AcsIngestionService, AutomationService}
-import com.daml.network.codegen.CN.{Directory as directoryCodegen}
-import com.daml.network.codegen.DA.Time.Types.RelTime
+import com.daml.network.automation.{AutomationService, JavaAcsIngestionService}
+import com.daml.network.codegen.java.cn.{directory => directoryCodegen}
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.environment.{CoinRetries, JavaCoinLedgerClient}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.Contract
+import com.daml.network.store.JavaAcsStore.QueryResult
+import com.daml.network.util.{JavaContract => Contract}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
@@ -17,11 +16,12 @@ import io.opentelemetry.api.trace.Tracer
 
 import java.security.MessageDigest
 import scala.concurrent.ExecutionContextExecutor
+import scala.jdk.CollectionConverters.*
 
 /** Manages background automation that runs on an directory app. */
 class DirectoryAutomationService(
     store: DirectoryStore,
-    ledgerClient: CoinLedgerClient,
+    ledgerClient: JavaCoinLedgerClient,
     scanConnection: ScanConnection,
     retryProvider: CoinRetries,
     protected val loggerFactory: NamedLoggerFactory,
@@ -32,19 +32,19 @@ class DirectoryAutomationService(
     tracer: Tracer,
 ) extends AutomationService(retryProvider) {
 
-  private val entryFee: Primitive.Numeric = 1.0
-  private val collectionDuration = RelTime(
+  private val entryFee: BigDecimal = 1.0
+  private val collectionDuration = new RelTime(
     10_000_000
   )
-  private val acceptDuration = RelTime(
+  private val acceptDuration = new RelTime(
     60_000_000
   )
-  private val renewalDuration = RelTime(
+  private val renewalDuration = new RelTime(
     // TODO(i1395) Consider reverting this to 30 days once our tests can control time
     // 90 days
     90 * 24 * 60 * 60 * 1_000_000L
   )
-  private val entryLifetime = RelTime(
+  private val entryLifetime = new RelTime(
     // 90 days
     90 * 24 * 60 * 60 * 1_000_000L
   )
@@ -55,7 +55,7 @@ class DirectoryAutomationService(
   private val provider = store.providerParty
 
   registerService(
-    new AcsIngestionService(
+    new JavaAcsIngestionService(
       this.getClass.getSimpleName,
       store.acsIngestionSink,
       connection,
@@ -78,87 +78,90 @@ class DirectoryAutomationService(
     s"${methodName}_$hash"
   }
 
-  registerRequestHandler("handleDirectoryInstallRequest", store.streamInstallRequests())(req => {
-    implicit traceContext =>
-      {
-        val user = PartyId.tryFromPrim(req.payload.user)
-        store.lookupInstall(user).flatMap {
-          case QueryResult(_, Some(_)) =>
-            logger.info(s"Rejecting duplicate install request from user party $user")
-            val cmd = req.contractId.exerciseDirectoryInstallRequest_Reject()
-            connection
-              .submitWithResult(Seq(provider), Seq(), cmd)
-              .map(_ => "rejected request for already existing installation.")
-
-          case QueryResult(off, None) =>
-            val arg = directoryCodegen.DirectoryInstallRequest_Accept(
-              svc = store.svcParty.toPrim,
-              entryFee = entryFee,
-              collectionDuration = collectionDuration,
-              acceptDuration = acceptDuration,
-              renewalDuration = renewalDuration,
-              entryLifetime = entryLifetime,
-            )
-            val commandId =
-              mkCommandId("com.daml.network.directory.DirectoryInstall", Seq(provider, user))
-
-            val acceptCmd = req.contractId.exerciseDirectoryInstallRequest_Accept(arg).command
-            // TODO(#790): should we really discard the result here? if yes, can we avoid parsing it?
-            connection
-              .submitCommandWithDedup(
-                actAs = Seq(provider),
-                readAs = Seq(),
-                command = Seq(acceptCmd),
-                commandId = commandId,
-                deduplicationOffset = off,
-              )
-              .map(_ => "accepted install request.")
-        }
-      }
-  })
-
-  registerRequestHandler("handleDirectoryEntryRequest", store.streamEntryRequests())(req => {
-    implicit traceContext =>
-      {
-        val user = PartyId.tryFromPrim(req.payload.user)
-        val rejectRequest = (reason: String) => {
-          val arg = directoryCodegen.DirectoryEntryRequest_Reject()
-          val cmd = req.contractId.exerciseDirectoryEntryRequest_Reject(arg)
+  registerRequestHandler("handleDirectoryInstallRequest", store.streamInstallRequests())(req =>
+    implicit traceContext => {
+      val user = PartyId.tryFromProtoPrimitive(req.payload.user)
+      store.lookupInstall(user).flatMap {
+        case QueryResult(_, Some(_)) =>
+          logger.info(s"Rejecting duplicate install request from user party $user")
+          val cmd = req.contractId
+            .exerciseDirectoryInstallRequest_Reject()
           connection
-            .submitWithResult(Seq(provider), Seq(), cmd)
-            .map(_ => s"rejected request: $reason")
-        }
-        store.lookupInstall(user).flatMap {
-          case QueryResult(_, None) =>
-            logger.warn(s"Install contract not found for user party $user")
-            rejectRequest("install contract not found.")
+            .submitCommands(Seq(provider), Seq(), cmd.commands.asScala.toSeq)
+            .map(_ => "rejected request for already existing installation.")
 
-          case QueryResult(_, Some(install)) =>
-            // TODO(M3-90): validate entry name
-            store.lookupEntryByName(req.payload.name).flatMap {
-              case QueryResult(_, Some(entry)) =>
-                rejectRequest(s"already exists and owned by ${entry.payload.user}.")
+        case QueryResult(off, None) =>
+          val arg = new directoryCodegen.DirectoryInstallRequest_Accept(
+            store.svcParty.toProtoPrimitive,
+            entryFee.bigDecimal,
+            collectionDuration,
+            acceptDuration,
+            renewalDuration,
+            entryLifetime,
+          )
+          val commandId =
+            mkCommandId("com.daml.network.directory.DirectoryInstall", Seq(provider, user))
 
-              case QueryResult(_, None) =>
-                val arg = directoryCodegen.DirectoryInstall_RequestEntryPayment(
-                  requestCid = req.contractId
-                )
-                val cmd = install.contractId.exerciseDirectoryInstall_RequestEntryPayment(arg)
-                connection
-                  .submitWithResult(Seq(provider), Seq(), cmd)
-                  .map(_ => "requested payment for entry request.")
-            }
-        }
+          val acceptCmd = req.contractId
+            .exerciseDirectoryInstallRequest_Accept(arg)
+          // TODO(#790): should we really discard the result here? if yes, can we avoid parsing it?
+          connection
+            .submitCommandsWithDedup(
+              actAs = Seq(provider),
+              readAs = Seq(),
+              commands = acceptCmd.commands.asScala.toSeq,
+              commandId = commandId,
+              deduplicationOffset = off,
+            )
+            .map(_ => "accepted install request.")
       }
-  })
+    }
+  )
+
+  registerRequestHandler("handleDirectoryEntryRequest", store.streamEntryRequests())(req =>
+    implicit traceContexf => {
+      val user = PartyId.tryFromProtoPrimitive(req.payload.user)
+      val rejectRequest = (reason: String) => {
+        val arg = new directoryCodegen.DirectoryEntryRequest_Reject()
+        val cmd = req.contractId
+          .exerciseDirectoryEntryRequest_Reject(arg)
+        connection
+          .submitCommands(Seq(provider), Seq(), cmd.commands.asScala.toSeq)
+          .map(_ => s"rejected request: $reason")
+      }
+      store.lookupInstall(user).flatMap {
+        case QueryResult(_, None) =>
+          logger.warn(s"Install contract not found for user party $user")
+          rejectRequest("install contract not found.")
+
+        case QueryResult(_, Some(install)) =>
+          // TODO(M3-90): validate entry name
+          store.lookupEntryByName(req.payload.name).flatMap {
+            case QueryResult(_, Some(entry)) =>
+              rejectRequest(s"already exists and owned by ${entry.payload.user}.")
+
+            case QueryResult(_, None) =>
+              val arg = new directoryCodegen.DirectoryInstall_RequestEntryPayment(
+                req.contractId
+              )
+              val cmd = install.contractId
+                .exerciseDirectoryInstall_RequestEntryPayment(arg)
+              connection
+                .submitCommands(Seq(provider), Seq(), cmd.commands.asScala.toSeq)
+                .map(_ => "requested payment for entry request.")
+          }
+      }
+    }
+  )
 
   registerRequestHandler(
     "handleAcceptedAppPaymentRequests",
     store.streamAcceptedAppPayments(),
   )(payment => { implicit traceContext =>
     {
-      val offerId = payment.payload.deliveryOffer
-        .unsafeToTemplate[directoryCodegen.DirectoryEntryOffer]
+      val offerId = directoryCodegen.DirectoryEntryOffer.ContractId.unsafeFromInterface(
+        payment.payload.deliveryOffer
+      )
       def rejectPayment(reason: String) = {
         logger.warn(s"rejecting accepted app payment: $reason")
         val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject()
@@ -167,7 +170,10 @@ class DirectoryAutomationService(
           .map(_ => s"rejected accepted app payment: $reason")
       }
       def collectPayment(
-          offer: Contract[directoryCodegen.DirectoryEntryOffer],
+          offer: Contract[
+            directoryCodegen.DirectoryEntryOffer.ContractId,
+            directoryCodegen.DirectoryEntryOffer,
+          ],
           entryName: String,
           offset: String,
       ) = {
@@ -177,19 +183,19 @@ class DirectoryAutomationService(
           entryName,
         )
         for {
-          transferContext <- scanConnection.getAppTransferContext()
+          transferContext <- scanConnection.getJavaAppTransferContext()
           cmd =
             offer.contractId
               .exerciseDirectoryEntryOffer_CollectPayment(
                 payment.contractId,
                 transferContext,
               )
-              .command
+              .commands
           _ <- connection
-            .submitCommandWithDedup(
+            .submitCommandsWithDedup(
               actAs = Seq(provider),
               readAs = Seq.empty,
-              command = Seq(cmd),
+              commands = cmd.asScala.toSeq,
               commandId = commandId,
               deduplicationOffset = offset,
             )
@@ -224,8 +230,9 @@ class DirectoryAutomationService(
     store.streamSubscriptionInitialPayments(),
   )(payment => { implicit traceContext =>
     {
-      val contextId = payment.payload.subscriptionData.context
-        .unsafeToTemplate[directoryCodegen.DirectoryEntryContext]
+      val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
+        payment.payload.subscriptionData.context
+      )
       def rejectPayment(reason: String) = {
         logger.warn(s"rejecting initial subscription payment: $reason")
         val cmd = payment.contractId.exerciseSubscriptionInitialPayment_Reject()
@@ -234,11 +241,14 @@ class DirectoryAutomationService(
           .map(_ => s"rejected initial subscription payment: $reason")
       }
       def collectPayment(
-          context: Contract[directoryCodegen.DirectoryEntryContext],
+          context: Contract[
+            directoryCodegen.DirectoryEntryContext.ContractId,
+            directoryCodegen.DirectoryEntryContext,
+          ],
           entryName: String,
           offset: String,
       ) = {
-        val user = PartyId.tryFromPrim(context.payload.user)
+        val user = PartyId.tryFromProtoPrimitive(context.payload.user)
         store.lookupInstall(user).flatMap {
           case QueryResult(_, None) =>
             logger.warn(s"Install contract not found for user party $user")
@@ -246,24 +256,24 @@ class DirectoryAutomationService(
 
           case QueryResult(_, Some(install)) =>
             for {
-              transferContext <- scanConnection.getAppTransferContext()
+              transferContext <- scanConnection.getJavaAppTransferContext()
               cmd =
                 install.contractId
                   .exerciseDirectoryInstall_CollectInitialEntryPaymentWithSubscription(
                     payment.contractId,
                     transferContext,
                   )
-                  .command
+                  .commands
               commandId = mkCommandId(
                 "com.daml.network.directory.DirectoryEntry",
                 Seq(provider),
                 entryName,
               )
               _ <- connection
-                .submitCommandWithDedup(
+                .submitCommandsWithDedup(
                   actAs = Seq(provider),
                   readAs = Seq.empty,
-                  command = Seq(cmd),
+                  commands = cmd.asScala.toSeq,
                   commandId = commandId,
                   deduplicationOffset = offset,
                 )
@@ -299,8 +309,9 @@ class DirectoryAutomationService(
     store.streamSubscriptionPayments(),
   )(payment => { implicit traceContext =>
     {
-      val contextId = payment.payload.subscriptionData.context
-        .unsafeToTemplate[directoryCodegen.DirectoryEntryContext]
+      val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
+        payment.payload.subscriptionData.context
+      )
       def rejectPayment(reason: String) = {
         logger.warn(s"rejecting subscription payment: $reason")
         val cmd = payment.contractId.exerciseSubscriptionPayment_Reject()
@@ -309,11 +320,17 @@ class DirectoryAutomationService(
           .map(_ => s"rejected subscription payment: $reason")
       }
       def collectPayment(
-          context: Contract[directoryCodegen.DirectoryEntryContext],
-          entry: Contract[directoryCodegen.DirectoryEntry],
+          context: Contract[
+            directoryCodegen.DirectoryEntryContext.ContractId,
+            directoryCodegen.DirectoryEntryContext,
+          ],
+          entry: Contract[
+            directoryCodegen.DirectoryEntry.ContractId,
+            directoryCodegen.DirectoryEntry,
+          ],
           offset: String,
       ) = {
-        val user = PartyId.tryFromPrim(context.payload.user)
+        val user = PartyId.tryFromProtoPrimitive(context.payload.user)
         store.lookupInstall(user).flatMap {
           case QueryResult(_, None) =>
             logger.warn(s"Install contract not found for user party $user")
@@ -321,7 +338,7 @@ class DirectoryAutomationService(
 
           case QueryResult(_, Some(install)) =>
             for {
-              transferContext <- scanConnection.getAppTransferContext()
+              transferContext <- scanConnection.getJavaAppTransferContext()
               cmd =
                 install.contractId
                   .exerciseDirectoryInstall_CollectEntryRenewalPaymentWithSubscription(
@@ -329,17 +346,17 @@ class DirectoryAutomationService(
                     entry.contractId,
                     transferContext,
                   )
-                  .command
+                  .commands
               commandId = mkCommandId(
                 "com.daml.network.directory.DirectoryEntry",
                 Seq(provider),
                 entry.payload.name,
               )
               _ <- connection
-                .submitCommandWithDedup(
+                .submitCommandsWithDedup(
                   actAs = Seq(provider),
                   readAs = Seq.empty,
-                  command = Seq(cmd),
+                  commands = cmd.asScala.toSeq,
                   commandId = commandId,
                   deduplicationOffset = offset,
                 )
