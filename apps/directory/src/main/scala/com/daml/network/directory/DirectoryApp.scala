@@ -61,7 +61,8 @@ class DirectoryApp(
       javaLedgerClient <-
         JavaCoinLedgerClient.create(
           config.remoteParticipant.ledgerApi,
-          name.unwrap,
+          config.damlUser, // Application ID must be equal to user name
+          config.remoteParticipant.token,
           timeouts,
           loggerFactory,
           tracerProvider,

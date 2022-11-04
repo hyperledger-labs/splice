@@ -65,7 +65,8 @@ class WalletApp(
       javaLedgerClient <-
         JavaCoinLedgerClient.create(
           config.remoteParticipant.ledgerApi,
-          name.unwrap,
+          config.serviceUser, // Application ID must be equal to user name
+          config.remoteParticipant.token,
           timeouts,
           loggerFactory,
           tracerProvider,

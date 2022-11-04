@@ -5,6 +5,7 @@ import akka.actor.ActorSystem
 import akka.stream.scaladsl.Source
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.client.akka.ClientAdapter
+import com.daml.ledger.api.auth.client.LedgerCallCredentials
 import com.daml.ledger.api.v1.{
   ActiveContractsServiceGrpc,
   CommandServiceGrpc,
@@ -29,12 +30,12 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.TracerProvider
 import io.grpc.Channel
-import io.grpc.stub.StreamObserver
+import io.grpc.stub.{AbstractStub, StreamObserver}
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
 
 import java.io.Closeable
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, Promise}
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 
 trait JavaCoinLedgerClient extends FlagCloseableAsync {
   def applicationId: String
@@ -67,13 +68,22 @@ object JavaCoinLedgerClient {
     f(futureObserver)
     futureObserver.promise.future
   }
-  class LedgerClient(channel: Channel)(implicit esf: ExecutionSequencerFactory) extends Closeable {
+  private def withCredentials[T <: AbstractStub[T]](
+      stub: T,
+      token: Option[String],
+  ): T = {
+    token.fold(stub)(token => stub.withCallCredentials(new LedgerCallCredentials(token)))
+  }
+
+  class LedgerClient(channel: Channel, token: Option[String])(implicit
+      esf: ExecutionSequencerFactory
+  ) extends Closeable {
     val activeContractsServiceStub: ActiveContractsServiceGrpc.ActiveContractsServiceStub =
-      ActiveContractsServiceGrpc.newStub(channel)
+      withCredentials(ActiveContractsServiceGrpc.newStub(channel), token)
     val commandServiceStub: CommandServiceGrpc.CommandServiceStub =
-      CommandServiceGrpc.newStub(channel)
+      withCredentials(CommandServiceGrpc.newStub(channel), token)
     val transactionServiceStub: TransactionServiceGrpc.TransactionServiceStub =
-      TransactionServiceGrpc.newStub(channel)
+      withCredentials(TransactionServiceGrpc.newStub(channel), token)
 
     override def close(): Unit = GrpcChannel.close(channel)
 
@@ -167,6 +177,7 @@ object JavaCoinLedgerClient {
   }
   private def createLedgerClient(
       config: ClientConfig,
+      token: Option[String],
       tracerProvider: TracerProvider,
   )(implicit ec: ExecutionContextExecutor, esf: ExecutionSequencerFactory): Future[LedgerClient] = {
 
@@ -186,13 +197,14 @@ object JavaCoinLedgerClient {
       )
 
     val channel = builder.build
-    val client = new LedgerClient(channel)
+    val client = new LedgerClient(channel, token)
     Future.successful(client)
   }
 
   def create(
       clientConfig: ClientConfig,
       applicationId_ : String,
+      token: Option[String],
       processingTimeouts: ProcessingTimeout,
       loggerFactoryForCoinLedgerConnectionOverride: NamedLoggerFactory,
       tracerProvider: TracerProvider,
@@ -203,6 +215,7 @@ object JavaCoinLedgerClient {
   ): Future[JavaCoinLedgerClient with NamedLogging] =
     createLedgerClient(
       clientConfig,
+      token,
       tracerProvider,
     ).map { client_ =>
       new JavaCoinLedgerClient with NamedLogging {
