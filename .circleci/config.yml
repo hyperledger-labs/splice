@@ -51,7 +51,7 @@ commands:
         name: Install Daml SDK
         command: |
           set -eou pipefail
-          curl -sSL https://get.daml.com/ | sh -s << pipeline.parameters.sdk-version >>
+          curl -sSL --retry 8 https://get.daml.com/ | sh -s << pipeline.parameters.sdk-version >>
           printf "auto-install: false\nupdate-check: never\n" >> $HOME/.daml/daml-config.yaml
   setup_nix:
     description: Set up Nix
@@ -79,7 +79,7 @@ commands:
          # 2. We don't plan to build anything, so the risk is fairly low
          mkdir -p ~/.config/nix
          echo 'sandbox = false' >> ~/.config/nix/nix.conf
-         sh <(curl -fsSL https://nixos.org/nix/install) --no-daemon
+         sh <(curl -fsSL --retry 8 https://nixos.org/nix/install) --no-daemon
          . /home/circleci/.nix-profile/etc/profile.d/nix.sh
          nix-shell shell.nix --run 'echo "Done loading all packages."'
     - save_cache:
