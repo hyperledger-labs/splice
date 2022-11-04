@@ -26,6 +26,7 @@ import java.util.Calendar
 import scala.collection.mutable
 import scala.jdk.OptionConverters.*
 import scala.util.Try
+import scala.util.control.NonFatal
 
 trait CustomMatchers {
 
@@ -82,11 +83,20 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
         FirefoxDriver.SystemProperty.BROWSER_LOGFILE,
         Paths.get("log", s"browser.${this.getClass.getName}.${name}.log").toString,
       )
-      val webDriver = new FirefoxDriver(options)
+      val logger = loggerFactory.append("web-frontend", name).getLogger(getClass)
+      val webDriver = eventually() {
+        try {
+          new FirefoxDriver(options)
+        } catch {
+          case NonFatal(e) => {
+            logger.warn(s"FirefoxDriver failed to start; retrying. The error was: $e")
+            fail()
+          }
+        }
+      }
       webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
       webDrivers += (name -> webDriver)
       val biDi = webDriver.getBiDi();
-      val logger = loggerFactory.append("web-frontend", name).getLogger(getClass)
       biDi.addListener[LogEntry](
         Log.entryAdded(),
         logEntry => {
