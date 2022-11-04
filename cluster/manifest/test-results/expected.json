@@ -2131,7 +2131,8 @@
          "spec": {
             "dnsNames": [
                "cluster.network.global",
-               "*.cluster.network.global"
+               "*.cluster.network.global",
+               "*.validator1.cluster.network.global"
             ],
             "issuerRef": {
                "name": "letsencrypt-production"

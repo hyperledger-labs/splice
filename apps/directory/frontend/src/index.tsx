@@ -11,14 +11,9 @@ const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement)
 root.render(
   <React.StrictMode>
     {
-      // TODO(i988) Remove hack where we don't use Auth0Provider if the website doesn't run on a secure origin
-      crypto.subtle !== undefined ? (
-        <Auth0Provider {...config.auth}>
-          <App />
-        </Auth0Provider>
-      ) : (
+      <Auth0Provider {...config.auth}>
         <App />
-      )
+      </Auth0Provider>
     }
   </React.StrictMode>
 );

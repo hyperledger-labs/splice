@@ -63,13 +63,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setAuthMethod('id');
           setUserId(id);
 
-          // TODO(i988) Drop if-guard after enabling TLS in cluster
-          if (crypto.subtle === undefined) {
-            console.warn('Could not find browser crypto implementation, not generating user token');
-          } else {
-            const token = await generateToken(id);
-            setUserAccessToken(token);
-          }
+          const token = await generateToken(id);
+          setUserAccessToken(token);
         },
         loginWithAuth0: auth0.loginWithRedirect,
         logout: () => {

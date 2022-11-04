@@ -1,20 +1,20 @@
 window.canton_network_config = {
-    // Auth0 client configuration, see https://github.com/auth0/auth0-spa-js
-    auth: {
-        domain: 'canton-network-dev.us.auth0.com',
-        clientId: '5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK',
-        redirectUri: window.location.origin,
-    },
-    wallet: {
-        // URL of the gRPC-Web envoy proxy, proxying to the wallet app gRPC API
-        grpcUrl: 'http://' + window.location.hostname + ':6104',
-    },
-    validator: {
-        // URL of the gRPC-Web envoy proxy, proxying to the validator app gRPC API
-        grpcUrl: 'http://' + window.location.hostname + ':6103',
-    },
-    directory: {
-        // URL of the gRPC-Web envoy proxy, proxying to the directory app gRPC API
-        grpcUrl: 'http://' + window.location.hostname + ':6010',
-    }
-}
+  // Auth0 client configuration, see https://github.com/auth0/auth0-spa-js
+  auth: {
+    domain: "canton-network-dev.us.auth0.com",
+    clientId: "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK",
+    redirectUri: window.location.origin,
+  },
+  wallet: {
+    // URL of the gRPC-Web envoy proxy, proxying to the wallet app gRPC API
+    grpcUrl: "https://" + window.location.hostname + "/api/v0/wallet",
+  },
+  validator: {
+    // URL of the gRPC-Web envoy proxy, proxying to the validator app gRPC API
+    grpcUrl: "https://" + window.location.hostname + "/api/v0/validator",
+  },
+  directory: {
+    // URL of the gRPC-Web envoy proxy, proxying to the directory app gRPC API
+    grpcUrl: "https://" + window.location.hostname + "/api/v0/directory",
+  },
+};
