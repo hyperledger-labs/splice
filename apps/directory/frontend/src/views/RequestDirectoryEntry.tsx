@@ -14,21 +14,29 @@ const RequestDirectoryEntry: React.FC<{ primaryParty: string; provider: string }
   const ledgerApiClient = useDirectoryLedgerApiClient();
 
   const onRequestEntry = async () => {
-    await ledgerApiClient.exerciseByKey(
+    const directoryInstall = await ledgerApiClient.queryDirectoryInstall(primaryParty, provider);
+    if (!directoryInstall) {
+      throw new Error('Failed to find DirectoryInstall');
+    }
+    await ledgerApiClient.exercise(
       [primaryParty],
       [],
       DirectoryInstall.DirectoryInstall_RequestEntry,
-      { _1: provider, _2: primaryParty },
+      directoryInstall.contractId,
       { name: entryName }
     );
     console.debug('Created DirectoryEntryRequest');
   };
   const onRequestEntryWithSubscription = async () => {
-    await ledgerApiClient.exerciseByKey(
+    const directoryInstall = await ledgerApiClient.queryDirectoryInstall(primaryParty, provider);
+    if (!directoryInstall) {
+      throw new Error('Failed to find DirectoryInstall');
+    }
+    await ledgerApiClient.exercise(
       [primaryParty],
       [],
       DirectoryInstall.DirectoryInstall_RequestEntryWithSubscription,
-      { _1: provider, _2: primaryParty },
+      directoryInstall.contractId,
       { name: entryName }
     );
     console.debug('Created SubscriptionRequest');

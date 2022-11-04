@@ -4,11 +4,11 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.auth.{
-  AuthInterceptor,
   AuthConfig,
-  SignatureVerifier,
+  AuthInterceptor,
   HMACVerifier,
   RSAVerifier,
+  SignatureVerifier,
 }
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.config.SharedCoinAppParameters

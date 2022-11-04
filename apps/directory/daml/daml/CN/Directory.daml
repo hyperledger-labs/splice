@@ -109,9 +109,6 @@ template DirectoryInstall with
   where
     signatory provider, user
 
-    key (provider, user) : (Party, Party)
-    maintainer key._1, key._2
-
     choice DirectoryInstall_Cancel : ()
       with
         actor : Party

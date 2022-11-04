@@ -12,6 +12,7 @@ import {
   Commands,
   CreateCommand,
   ExerciseByKeyCommand,
+  ExerciseCommand,
 } from 'common-protobuf/com/daml/ledger/api/v1/commands_pb';
 import { CreatedEvent } from 'common-protobuf/com/daml/ledger/api/v1/event_pb';
 import {
@@ -96,6 +97,31 @@ export class LedgerApiClient {
         .setTemplateId(templateId)
         .setChoice(choice.choiceName)
         .setContractKey(encodedKey)
+        .setChoiceArgument(encodedArg)
+    );
+    const transaction = await this.submitCommand(actAs, readAs, cmd);
+    const exerciseEv = transaction
+      .getEventsByIdMap()
+      .get(transaction.getRootEventIdsList()[0])
+      ?.getExercised()!;
+    const exerciseResult = choice.resultSerializable().decodeProto(exerciseEv.getExerciseResult()!);
+    return exerciseResult;
+  }
+
+  async exercise<T extends object, C, R, K>(
+    actAs: string[],
+    readAs: string[],
+    choice: Choice<T, C, R, K>,
+    contractId: ContractId<T>,
+    argument: C
+  ): Promise<R> {
+    const encodedArg = choice.argumentSerializable().encodeProto(argument);
+    const templateId = this.templateIdToIdentifier(choice.template().templateId);
+    const cmd = new Command().setExercise(
+      new ExerciseCommand()
+        .setTemplateId(templateId)
+        .setChoice(choice.choiceName)
+        .setContractId(contractId)
         .setChoiceArgument(encodedArg)
     );
     const transaction = await this.submitCommand(actAs, readAs, cmd);
