@@ -17,6 +17,7 @@
     1. [Domain Specific Naming](#domain-specific-naming)
     1. [App Architecture - Initialization](#app-architecture---initialization)
     1. [Frontend Code](#frontend-code)
+    1. [Conversions between Java & Scala types](#java-conversions)
 1. [Testing](#testing)
     1. [Managing Canton for Tests](#managing-canton-for-tests)
     1. [Managing Frontends for Tests](#managing-frontends-for-tests)
@@ -356,6 +357,16 @@ In `apps/common/frontend` we have an NPM package containing common code. This pa
 You're also free to add more things in `common-frontend` to use across multiple frontend apps. This can really include anything: utility functions, reusable React components, shared config, etc. Just ensure whatever you add is exposed via the lib's entrypoint, `index.ts` (we use the [barreling](https://basarat.gitbook.io/typescript/main-1/barrel) technique to expose all modules from the root of the library).
 
 There is also a package available named `common-protobuf`, located in `apps/common/frontend-protobuf`. This simply contains all the web-gRPC protobuf bindings for all our services in Typescript.
+
+### Conversions between Java & Scala types
+
+Because we use the Java bindings and codegen, we need to convert
+between Java and Scala types, e.g., `Seq` and `java.util.List`.  We
+try to use Scala types whereever possible so we delay the conversion
+to Java types until the last possible point and convert from Scala to
+Java as early as possible.
+
+To convert, import `scala.jdk.CollectionConverters.*`. You can then use `toScala` and `toJava` methods.
 
 ## Testing
 

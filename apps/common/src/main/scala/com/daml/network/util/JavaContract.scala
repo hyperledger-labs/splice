@@ -10,7 +10,7 @@ import com.daml.ledger.javaapi.data.codegen.{
   ContractId,
   ValueDecoder,
 }
-import com.daml.ledger.javaapi.data.{DamlRecord, Template, Value}
+import com.daml.ledger.javaapi.data.{CreatedEvent, DamlRecord, Template, Value}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
@@ -95,4 +95,11 @@ object JavaContract {
       contractId = contract.id,
       payload = contract.data,
     )
+
+  def fromCreatedEvent[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
+      companion: ContractCompanion[TC, TCid, T]
+  )(ev: CreatedEvent): Option[JavaContract[TCid, T]] =
+    if (ev.getTemplateId == companion.TEMPLATE_ID) {
+      Some(JavaContract.fromCodegenContract(companion.fromCreatedEvent(ev)))
+    } else None
 }

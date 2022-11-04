@@ -1,16 +1,21 @@
 package com.daml.network.wallet.store
 
-import com.daml.ledger.client.binding.{Primitive, TemplateCompanion}
-import com.daml.network.codegen.CC.{
-  Coin as coinCodegen,
-  CoinRules as coinRulesCodegen,
-  Round as roundCodegen,
+import com.daml.ledger.javaapi.data.Template
+import com.daml.ledger.javaapi.data.codegen.{
+  Contract => CodegenContract,
+  ContractCompanion,
+  ContractId,
 }
-import com.daml.network.codegen.CN.Wallet.Subscriptions as subsCodegen
-import com.daml.network.codegen.CN.Wallet as walletCodegen
+import com.daml.network.codegen.java.cc.{
+  coin as coinCodegen,
+  coinrules as coinRulesCodegen,
+  round as roundCodegen,
+}
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
+import com.daml.network.codegen.java.cn.wallet as walletCodegen
 import com.daml.network.environment.CoinRetries
-import com.daml.network.store.AcsStore
-import com.daml.network.util.Contract
+import com.daml.network.store.{JavaAcsStore => AcsStore}
+import com.daml.network.util.{JavaContract => Contract}
 import com.daml.network.wallet.store.memory.InMemoryEndUserWalletStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FlagCloseableAsync
@@ -22,6 +27,7 @@ import com.digitalasset.canton.tracing.NoTracing
 import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 /** A store for serving all queries for a specific wallet end-user. */
 trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLogging {
@@ -40,44 +46,58 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
     * Returns an Option, as there can be races where this fails, and the caller has better context on
     * how to deal with this error.
     */
-  def lookupInstall(): Future[QueryResult[Option[Contract[walletCodegen.WalletAppInstall]]]] =
-    acsStore.findContract(walletCodegen.WalletAppInstall)(_ => true)
+  def lookupInstall(): Future[QueryResult[
+    Option[Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]]
+  ]] =
+    acsStore.findContract(walletCodegen.WalletAppInstall.COMPANION)(_ => true)
 
   def signalWhenIngested(offset: String): Future[Unit] =
     acsStore.signalWhenIngested(offset)
 
-  def findContract[T](
-      templateCompanion: TemplateCompanion[T],
-      filter: Contract[T] => Boolean = (_: Contract[T]) => true,
-  ): Future[QueryResult[Option[Contract[T]]]] = acsStore.findContract(templateCompanion)(filter)
+  def findContract[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
+      templateCompanion: ContractCompanion[TC, TCid, T],
+      filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
+  ): Future[QueryResult[Option[Contract[TCid, T]]]] =
+    acsStore.findContract(templateCompanion)(filter)
 
-  def listContracts[T](
-      templateCompanion: TemplateCompanion[T],
-      filter: Contract[T] => Boolean = (_: Contract[T]) => true,
-  ): Future[QueryResult[Seq[Contract[T]]]] = acsStore.listContracts(templateCompanion, filter)
+  def listContracts[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
+      templateCompanion: ContractCompanion[TC, TCid, T],
+      filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
+  ): Future[QueryResult[Seq[Contract[TCid, T]]]] = acsStore.listContracts(templateCompanion, filter)
 
   def lookupOnChannelPaymentRequestById(
-      cid: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]
-  ): Future[QueryResult[Option[Contract[walletCodegen.OnChannelPaymentRequest]]]] =
-    acsStore.lookupContractById(walletCodegen.OnChannelPaymentRequest)(cid)
+      cid: ContractId[walletCodegen.OnChannelPaymentRequest]
+  ): Future[QueryResult[Option[Contract[
+    walletCodegen.OnChannelPaymentRequest.ContractId,
+    walletCodegen.OnChannelPaymentRequest,
+  ]]]] =
+    acsStore.lookupContractById(walletCodegen.OnChannelPaymentRequest.COMPANION)(cid)
 
   def lookupAppPaymentRequestById(
-      cid: Primitive.ContractId[walletCodegen.AppPaymentRequest]
-  ): Future[QueryResult[Option[Contract[walletCodegen.AppPaymentRequest]]]] =
-    acsStore.lookupContractById(walletCodegen.AppPaymentRequest)(cid)
+      cid: ContractId[walletCodegen.AppPaymentRequest]
+  ): Future[QueryResult[
+    Option[Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]]
+  ]] =
+    acsStore.lookupContractById(walletCodegen.AppPaymentRequest.COMPANION)(cid)
 
   def lookupSubscriptionRequestById(
-      cid: Primitive.ContractId[subsCodegen.SubscriptionRequest]
-  ): Future[QueryResult[Option[Contract[subsCodegen.SubscriptionRequest]]]] =
-    acsStore.lookupContractById(subsCodegen.SubscriptionRequest)(cid)
+      cid: ContractId[subsCodegen.SubscriptionRequest]
+  ): Future[QueryResult[
+    Option[Contract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest]]
+  ]] =
+    acsStore.lookupContractById(subsCodegen.SubscriptionRequest.COMPANION)(cid)
 
   def lookupSubscriptionIdleStateById(
-      cid: Primitive.ContractId[subsCodegen.SubscriptionIdleState]
-  ): Future[QueryResult[Option[Contract[subsCodegen.SubscriptionIdleState]]]] =
-    acsStore.lookupContractById(subsCodegen.SubscriptionIdleState)(cid)
+      cid: ContractId[subsCodegen.SubscriptionIdleState]
+  ): Future[QueryResult[Option[
+    Contract[subsCodegen.SubscriptionIdleState.ContractId, subsCodegen.SubscriptionIdleState]
+  ]]] =
+    acsStore.lookupContractById(subsCodegen.SubscriptionIdleState.COMPANION)(cid)
 
   def lookupLatestOpenMiningRound(
-  ): Future[QueryResult[Option[Contract[roundCodegen.OpenMiningRound]]]]
+  ): Future[QueryResult[
+    Option[Contract[roundCodegen.OpenMiningRound.ContractId, roundCodegen.OpenMiningRound]]
+  ]]
 
   /** Wrapper around lookupLatestOpenMiningRound that retries if no open round is found,
     * which may happen if the wallet is used before its automation starts ingesting the round contracts.
@@ -86,7 +106,9 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
     */
   def getLatestOpenMiningRound(retryProvider: CoinRetries)(implicit
       ec: ExecutionContext
-  ): Future[QueryResult[Contract[roundCodegen.OpenMiningRound]]] = {
+  ): Future[
+    QueryResult[Contract[roundCodegen.OpenMiningRound.ContractId, roundCodegen.OpenMiningRound]]
+  ] = {
 
     retryProvider.retryForClientCallsWithUncleanShutdowns(
       "Waiting for open mining round to be ingested",
@@ -105,9 +127,11 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
 
   def getCoinRules()(implicit
       ec: ExecutionContext
-  ): Future[QueryResult[Contract[coinRulesCodegen.CoinRules]]] = {
+  ): Future[
+    QueryResult[Contract[coinRulesCodegen.CoinRules.ContractId, coinRulesCodegen.CoinRules]]
+  ] = {
 
-    findContract(coinRulesCodegen.CoinRules).map(
+    findContract(coinRulesCodegen.CoinRules.COMPANION).map(
       _.map(
         _.getOrElse(
           throw new StatusRuntimeException(
@@ -128,19 +152,21 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
     for {
       coinRules <- getCoinRules()
       openRound <- getLatestOpenMiningRound(retryProvider)
-      issuingMiningRounds <- listContracts(roundCodegen.IssuingMiningRound)
-      validatorRights <- listContracts(coinCodegen.ValidatorRight)
+      issuingMiningRounds <- listContracts(roundCodegen.IssuingMiningRound.COMPANION)
+      validatorRights <- listContracts(coinCodegen.ValidatorRight.COMPANION)
     } yield {
-      val transferContext = coinRulesCodegen.TransferContext(
+      val transferContext = new coinRulesCodegen.TransferContext(
         openRound.value.contractId,
-        validatorRights = validatorRights.value
-          .map(r => (r.payload.user, r.contractId))
-          .toMap[Primitive.Party, Primitive.ContractId[coinCodegen.ValidatorRight]],
-        issuingMiningRounds = issuingMiningRounds.value
+        issuingMiningRounds.value
           .map(r => (r.payload.round, r.contractId))
-          .toMap[roundCodegen.Round, Primitive.ContractId[roundCodegen.IssuingMiningRound]],
+          .toMap[roundCodegen.Round, roundCodegen.IssuingMiningRound.ContractId]
+          .asJava,
+        validatorRights.value
+          .map(r => (r.payload.user, r.contractId))
+          .toMap[String, coinCodegen.ValidatorRight.ContractId]
+          .asJava,
       )
-      coinRulesCodegen.PaymentTransferContext(
+      new coinRulesCodegen.PaymentTransferContext(
         coinRules.value.contractId,
         transferContext,
       )
@@ -180,8 +206,8 @@ object EndUserWalletStore {
   /** Contract of a wallet store for a specific wallet-service party. */
   def contractFilter(key: Key): AcsStore.ContractFilter = {
     import AcsStore.mkFilter
-    val endUser = key.endUserParty.toPrim
-    val svc = key.svcParty.toPrim
+    val endUser = key.endUserParty.toProtoPrimitive
+    val svc = key.svcParty.toProtoPrimitive
 
     def channelFilter(co: walletCodegen.PaymentChannel): Boolean =
       co.svc == svc && (co.sender == endUser || co.receiver == endUser)
@@ -190,37 +216,39 @@ object EndUserWalletStore {
       key.endUserParty,
       Map(
         // Install
-        mkFilter(walletCodegen.WalletAppInstall)(co =>
+        mkFilter(walletCodegen.WalletAppInstall.COMPANION)(co =>
           co.payload.svcParty == svc &&
             co.payload.endUserParty == endUser
         ),
         // Coins
-        mkFilter(coinCodegen.Coin)(co =>
+        mkFilter(coinCodegen.Coin.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.owner == endUser
         ),
-        mkFilter(coinCodegen.LockedCoin)(co =>
+        mkFilter(coinCodegen.LockedCoin.COMPANION)(co =>
           co.payload.coin.svc == svc &&
             co.payload.coin.owner == endUser
         ),
         // Rewards
-        mkFilter(coinCodegen.AppReward)(co =>
+        mkFilter(coinCodegen.AppReward.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.provider == endUser
         ),
-        mkFilter(coinCodegen.ValidatorReward)(co =>
+        mkFilter(coinCodegen.ValidatorReward.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.user == endUser
         ),
-        mkFilter(coinCodegen.ValidatorRight)(co =>
+        mkFilter(coinCodegen.ValidatorRight.COMPANION)(co =>
           // All validator rights that entitle the endUser to collect rewards as a validator operator
           co.payload.svc == svc &&
             co.payload.validator == endUser
         ),
         // Payment channels
-        mkFilter(walletCodegen.PaymentChannelProposal)(co => channelFilter(co.payload.channel)),
-        mkFilter(walletCodegen.PaymentChannel)(co => channelFilter(co.payload)),
-        mkFilter(walletCodegen.OnChannelPaymentRequest)(co =>
+        mkFilter(walletCodegen.PaymentChannelProposal.COMPANION)(co =>
+          channelFilter(co.payload.channel)
+        ),
+        mkFilter(walletCodegen.PaymentChannel.COMPANION)(co => channelFilter(co.payload)),
+        mkFilter(walletCodegen.OnChannelPaymentRequest.COMPANION)(co =>
           // We track requests for both sender and receiver, as both have to be displayed in the UI
           co.payload.svc == svc &&
             (co.payload.sender == endUser ||
@@ -229,38 +257,38 @@ object EndUserWalletStore {
         // We only ingest app payment contracts where the user is the sender,
         // as app payments the user is a receiver or a provider are handled by
         // the provider's app
-        mkFilter(walletCodegen.AppPaymentRequest)(co =>
+        mkFilter(walletCodegen.AppPaymentRequest.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.sender == endUser
         ),
-        mkFilter(walletCodegen.AcceptedAppPayment)(co =>
+        mkFilter(walletCodegen.AcceptedAppPayment.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.sender == endUser
         ),
         // Subscriptions
-        mkFilter(subsCodegen.Subscription)(co =>
+        mkFilter(subsCodegen.Subscription.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.sender == endUser
         ),
-        mkFilter(subsCodegen.SubscriptionRequest)(co =>
+        mkFilter(subsCodegen.SubscriptionRequest.COMPANION)(co =>
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
         ),
-        mkFilter(subsCodegen.SubscriptionIdleState)(co =>
+        mkFilter(subsCodegen.SubscriptionIdleState.COMPANION)(co =>
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
         ),
-        mkFilter(subsCodegen.SubscriptionInitialPayment)(co =>
+        mkFilter(subsCodegen.SubscriptionInitialPayment.COMPANION)(co =>
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
         ),
-        mkFilter(subsCodegen.SubscriptionPayment)(co =>
+        mkFilter(subsCodegen.SubscriptionPayment.COMPANION)(co =>
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
         ),
-        mkFilter(roundCodegen.OpenMiningRound)(co => co.payload.svc == svc),
-        mkFilter(roundCodegen.IssuingMiningRound)(co => co.payload.svc == svc),
-        mkFilter(coinRulesCodegen.CoinRules)(co => co.payload.svc == svc),
+        mkFilter(roundCodegen.OpenMiningRound.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(roundCodegen.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(coinRulesCodegen.CoinRules.COMPANION)(co => co.payload.svc == svc),
       ),
     )
   }

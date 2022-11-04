@@ -94,7 +94,12 @@ object JavaAcsStore {
   case class QueryResult[A](
       offset: String,
       value: A,
-  )
+  ) {
+    def map[B](f: A => B): QueryResult[B] =
+      copy(
+        value = f(this.value)
+      )
+  }
 
   /** A sink for ingesting an initial ACS snapshot and transactions changing it. */
   trait IngestionSink {

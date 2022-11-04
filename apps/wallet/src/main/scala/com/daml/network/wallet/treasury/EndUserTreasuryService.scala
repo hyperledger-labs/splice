@@ -4,14 +4,14 @@ import akka.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import cats.syntax.traverse.*
-import com.daml.network.codegen.CC.{
-  Coin as coinCodegen,
-  CoinRules as coinRulesCodegen,
-  Round as roundCodegen,
+import com.daml.network.codegen.java.cc.{
+  coin as coinCodegen,
+  coinrules as coinRulesCodegen,
+  round as roundCodegen,
 }
-import com.daml.network.codegen.CN.Wallet as walletCodegen
-import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
-import com.daml.network.util.Contract
+import com.daml.network.codegen.java.cn.wallet as walletCodegen
+import com.daml.network.environment.{CoinRetries, JavaCoinLedgerConnection => CoinLedgerConnection}
+import com.daml.network.util.{JavaContract as Contract}
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
 import com.daml.network.wallet.treasury.EndUserTreasuryService.*
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -22,6 +22,7 @@ import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success}
 // TODO(#1351): Add PrettyPrinting
 
@@ -57,7 +58,7 @@ case class EndUserTreasuryService(
     connection: CoinLedgerConnection,
     // TODO(#1351): don't pass WalletAppInstall contract along but look it up before each batch submission to support users updating their
     // WalletAppInstall contract
-    install: Contract[walletCodegen.WalletAppInstall],
+    install: Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall],
     walletStoreKey: WalletStore.Key,
     userStore: EndUserWalletStore,
     walletStore: WalletStore,
@@ -182,16 +183,16 @@ case class EndUserTreasuryService(
       )
       // TODO(#1351): smarter coin/input selection?
       inputs <- userStore
-        .listContracts(coinCodegen.Coin)
-        .map(cs => cs.value.map(c => coinRulesCodegen.TransferInput.InputCoin(c.contractId)))
+        .listContracts(coinCodegen.Coin.COMPANION)
+        .map(cs => cs.value.map(c => new coinRulesCodegen.transferinput.InputCoin(c.contractId)))
       transferContext <- getValidatorStore().getPaymentTransferContext(retryProvider)
-      activeIssuingRounds = transferContext.context.issuingMiningRounds.keys.toSet
+      activeIssuingRounds = transferContext.context.issuingMiningRounds.asScala.keys.toSet
       inputs <- selectTransferInputs(activeIssuingRounds)
       cmd =
         install.contractId.exerciseWalletAppInstall_ExecuteBatch(
           transferContext,
-          inputs,
-          validOperations.map(_.operation),
+          inputs.asJava,
+          validOperations.map(_.operation).asJava,
         )
       (offset, outcomes) <- connection
         .submitWithResultAndOffset(
@@ -199,8 +200,9 @@ case class EndUserTreasuryService(
           Seq(walletStoreKey.validatorParty, userStore.key.endUserParty),
           cmd,
         )
-      _ = (outcomes zip validOperations).map { case (outcome, ValidCoinOperation(operation, p)) =>
-        p.success(outcome)
+      _ = (outcomes.exerciseResult.asScala zip validOperations).map {
+        case (outcome, ValidCoinOperation(operation, p)) =>
+          p.success(outcome)
       }
     } yield offset
   }
@@ -212,19 +214,19 @@ case class EndUserTreasuryService(
       activeIssuingRounds: Set[roundCodegen.Round]
   )(implicit tc: TraceContext): Future[Seq[coinRulesCodegen.TransferInput]] = for {
     coins <- userStore
-      .listContracts(coinCodegen.Coin)
-      .map(cs => cs.value.map(c => coinRulesCodegen.TransferInput.InputCoin(c.contractId)))
+      .listContracts(coinCodegen.Coin.COMPANION)
+      .map(cs => cs.value.map(c => new coinRulesCodegen.transferinput.InputCoin(c.contractId)))
     validatorRewardsRaw <- walletStore
       .listValidatorRewardsCollectableBy(userStore)
     validatorRewards = validatorRewardsRaw
       .filter(rw => activeIssuingRounds.contains(rw.payload.round))
-      .map(rw => coinRulesCodegen.TransferInput.InputValidatorReward(rw.contractId))
+      .map(rw => new coinRulesCodegen.transferinput.InputValidatorReward(rw.contractId))
     appRewards <- userStore
-      .listContracts(coinCodegen.AppReward)
+      .listContracts(coinCodegen.AppReward.COMPANION)
       .map(rws =>
         rws.value
           .filter(rw => activeIssuingRounds.contains(rw.payload.round))
-          .map(rw => coinRulesCodegen.TransferInput.InputAppReward(rw.contractId))
+          .map(rw => new coinRulesCodegen.transferinput.InputAppReward(rw.contractId))
       )
   } yield coins ++ validatorRewards ++ appRewards
 

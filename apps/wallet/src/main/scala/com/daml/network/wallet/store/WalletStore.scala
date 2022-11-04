@@ -2,11 +2,11 @@ package com.daml.network.wallet.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.network.codegen.CC.{Coin as coinCodegen}
-import com.daml.network.codegen.CN.Wallet as walletCodegen
-import com.daml.network.store.AcsStore
-import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.Contract
+import com.daml.network.codegen.java.cc.{coin as coinCodegen}
+import com.daml.network.codegen.java.cn.wallet as walletCodegen
+import com.daml.network.store.JavaAcsStore.QueryResult
+import com.daml.network.store.{JavaAcsStore as AcsStore}
+import com.daml.network.util.{JavaContract as Contract}
 import com.daml.network.wallet.store.memory.InMemoryWalletStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.Lifecycle
@@ -34,20 +34,27 @@ trait WalletStore extends AutoCloseable with NamedLogging {
 
   def lookupInstallByParty(
       endUserParty: PartyId
-  ): Future[QueryResult[Option[Contract[walletCodegen.WalletAppInstall]]]] =
-    acsStore.findContract(walletCodegen.WalletAppInstall)(co =>
-      co.payload.endUserParty == endUserParty.toPrim
+  ): Future[QueryResult[
+    Option[Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]]
+  ]] =
+    acsStore.findContract(walletCodegen.WalletAppInstall.COMPANION)(co =>
+      co.payload.endUserParty == endUserParty.toProtoPrimitive
     )
 
   def lookupInstallByName(
       endUserName: String
-  ): Future[QueryResult[Option[Contract[walletCodegen.WalletAppInstall]]]] =
-    acsStore.findContract(walletCodegen.WalletAppInstall)(co =>
+  ): Future[QueryResult[
+    Option[Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]]
+  ]] =
+    acsStore.findContract(walletCodegen.WalletAppInstall.COMPANION)(co =>
       co.payload.endUserName == endUserName
     )
 
-  def streamInstalls: Source[Contract[walletCodegen.WalletAppInstall], NotUsed] =
-    acsStore.streamContracts(walletCodegen.WalletAppInstall)
+  def streamInstalls: Source[
+    Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall],
+    NotUsed,
+  ] =
+    acsStore.streamContracts(walletCodegen.WalletAppInstall.COMPANION)
 
   // Methods to implement per-end-user stores
   private[this] val endUserStores: TrieMap[String, EndUserWalletStore] = TrieMap.empty
@@ -90,31 +97,38 @@ trait WalletStore extends AutoCloseable with NamedLogging {
   // TODO(M1-52): this function probably needs restructuring to integrate it with automation rewards collection; e.g., make it streaming
   def listValidatorRewardsCollectableBy(
       validatorUserStore: EndUserWalletStore
-  )(implicit tc: TraceContext): Future[Seq[Contract[coinCodegen.ValidatorReward]]] = for {
-    QueryResult(_, validatorRights) <- validatorUserStore.listContracts(coinCodegen.ValidatorRight)
-    users = validatorRights.map(c => PartyId.tryFromPrim(c.payload.user)).toSet
-    validatorRewardsFs: Seq[Future[Seq[Contract[coinCodegen.ValidatorReward]]]] = users.toSeq
-      .map(u =>
-        this.lookupInstallByParty(u).flatMap {
-          case QueryResult(_, None) =>
-            logger.warn(
-              s"ValidatorRight of ${validatorUserStore.key.endUserParty} for end-user party $u has no associated WalletAppInstall contract."
-            )
-            Future.successful(Seq.empty)
-          case QueryResult(_, Some(install)) =>
-            this.lookupEndUserStore(install.payload.endUserName) match {
-              case None =>
-                logger.warn(
-                  s"Might miss validator rewards as the EndUserWalletStore for end-user name ${install.payload.endUserName} is not (yet) setup."
-                )
-                Future.successful(Seq.empty)
-              case Some(userStore) =>
-                userStore.listContracts(coinCodegen.ValidatorReward).map(_.value)
-            }
-        }
+  )(implicit
+      tc: TraceContext
+  ): Future[Seq[Contract[coinCodegen.ValidatorReward.ContractId, coinCodegen.ValidatorReward]]] =
+    for {
+      QueryResult(_, validatorRights) <- validatorUserStore.listContracts(
+        coinCodegen.ValidatorRight.COMPANION
       )
-    validatorRewards <- Future.sequence(validatorRewardsFs)
-  } yield validatorRewards.flatten
+      users = validatorRights.map(c => PartyId.tryFromProtoPrimitive(c.payload.user)).toSet
+      validatorRewardsFs: Seq[
+        Future[Seq[Contract[coinCodegen.ValidatorReward.ContractId, coinCodegen.ValidatorReward]]]
+      ] = users.toSeq
+        .map(u =>
+          this.lookupInstallByParty(u).flatMap {
+            case QueryResult(_, None) =>
+              logger.warn(
+                s"ValidatorRight of ${validatorUserStore.key.endUserParty} for end-user party $u has no associated WalletAppInstall contract."
+              )
+              Future.successful(Seq.empty)
+            case QueryResult(_, Some(install)) =>
+              this.lookupEndUserStore(install.payload.endUserName) match {
+                case None =>
+                  logger.warn(
+                    s"Might miss validator rewards as the EndUserWalletStore for end-user name ${install.payload.endUserName} is not (yet) setup."
+                  )
+                  Future.successful(Seq.empty)
+                case Some(userStore) =>
+                  userStore.listContracts(coinCodegen.ValidatorReward.COMPANION).map(_.value)
+              }
+          }
+        )
+      validatorRewards <- Future.sequence(validatorRewardsFs)
+    } yield validatorRewards.flatten
 
   override def close(): Unit =
     Lifecycle.close(endUserStores.values.toSeq: _*)(logger)
@@ -154,14 +168,14 @@ object WalletStore {
   /** Contract of a wallet store for a specific wallet-service party. */
   def contractFilter(key: Key): AcsStore.ContractFilter = {
     import AcsStore.mkFilter
-    val walletService = key.walletServiceParty.toPrim
-    val validator = key.validatorParty.toPrim
-    val svc = key.svcParty.toPrim
+    val walletService = key.walletServiceParty.toProtoPrimitive
+    val validator = key.validatorParty.toProtoPrimitive
+    val svc = key.svcParty.toProtoPrimitive
 
     AcsStore.SimpleContractFilter(
       key.walletServiceParty,
       Map(
-        mkFilter(walletCodegen.WalletAppInstall)(co =>
+        mkFilter(walletCodegen.WalletAppInstall.COMPANION)(co =>
           co.payload.walletServiceParty == walletService &&
             co.payload.validatorParty == validator &&
             co.payload.svcParty == svc

@@ -1,8 +1,11 @@
 package com.daml.network.wallet.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{AcsIngestionService, AutomationService}
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.automation.{
+  AutomationService,
+  JavaAcsIngestionService => AcsIngestionService,
+}
+import com.daml.network.environment.{CoinRetries, JavaCoinLedgerClient => CoinLedgerClient}
 import com.daml.network.wallet.store.WalletStore
 import com.daml.network.wallet.treasury.TreasuryServices
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -49,7 +52,7 @@ class WalletAutomationService(
     implicit traceContext =>
       Future {
         val endUserName = install.payload.endUserName
-        val endUserParty = PartyId.tryFromPrim(install.payload.endUserParty)
+        val endUserParty = PartyId.tryFromProtoPrimitive(install.payload.endUserParty)
         val endUserStore = walletStore.getOrCreateEndUserStore(endUserName, endUserParty, timeouts)
         val ingestionService = new AcsIngestionService(
           s"EndUserWalletStore($endUserName)",

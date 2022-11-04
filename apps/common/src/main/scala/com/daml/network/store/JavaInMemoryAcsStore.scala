@@ -19,7 +19,6 @@ import scala.collection.immutable
 import scala.collection.immutable.SortedMap
 import scala.concurrent._
 import scala.jdk.CollectionConverters.*
-import scala.util.Try
 
 /** In-memory implementation of an [[AcsStore]] intended to be embedded in the
   * in-memory implementations of application-specific stores.
@@ -132,14 +131,12 @@ class JavaInMemoryAcsStore(
   )(p: JavaContract[TCid, T] => Boolean): Future[QueryResult[Option[JavaContract[TCid, T]]]] = {
     requireInScope(templateCompanion)
     offsetAndStateAfterIngestingAcs().map({ case (off, st) =>
-      val optEntry = st.createEvents
-        .collectFirst(Function.unlift(ev => {
-          for {
-            contract <- Try(templateCompanion.fromCreatedEvent(ev._2)).toOption
-              .map(JavaContract.fromCodegenContract)
-            if p(contract)
-          } yield contract
-        }))
+      val optEntry = st.createEvents.values.collectFirst(Function.unlift(ev => {
+        for {
+          contract <- JavaContract.fromCreatedEvent(templateCompanion)(ev)
+          if p(contract)
+        } yield contract
+      }))
       QueryResult(off, optEntry)
     })
   }
@@ -150,11 +147,8 @@ class JavaInMemoryAcsStore(
   ): Future[QueryResult[Seq[JavaContract[TCid, T]]]] = {
     requireInScope(templateCompanion)
     offsetAndStateAfterIngestingAcs().map { case (off, st) =>
-      val result = st.createEvents
-        .collect(Function.unlift(ev => {
-          Try(templateCompanion.fromCreatedEvent(ev._2)).toOption
-            .map(JavaContract.fromCodegenContract)
-        }))
+      val result = st.createEvents.values
+        .collect(Function.unlift(ev => JavaContract.fromCreatedEvent(templateCompanion)(ev)))
         .toSeq
       QueryResult(off, result)
     }
@@ -173,10 +167,7 @@ class JavaInMemoryAcsStore(
             off,
             st.createEvents
               .get(evRev)
-              .flatMap(ev =>
-                Try(templateCompanion.fromCreatedEvent(ev)).toOption
-                  .map(JavaContract.fromCodegenContract)
-              ),
+              .flatMap(ev => JavaContract.fromCreatedEvent(templateCompanion)(ev)),
           )
       }
     }
@@ -198,10 +189,13 @@ class JavaInMemoryAcsStore(
     val st = stateVar
     val optEntry = st.createEvents
       .iteratorFrom(startingFromIncl)
-      .collectFirst(Function.unlift(ev => {
-        Try(templateCompanion.fromCreatedEvent(ev._2)).toOption
-          .map(co => (ev._1, JavaContract.fromCodegenContract(co)))
-      }))
+      .collectFirst(
+        Function.unlift(ev =>
+          JavaContract
+            .fromCreatedEvent(templateCompanion)(ev._2)
+            .map(co => (ev._1, co))
+        )
+      )
     optEntry match {
       case None =>
         st.offsetChanged.future.flatMap(_ =>

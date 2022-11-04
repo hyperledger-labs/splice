@@ -201,7 +201,9 @@ class WalletIntegrationTest
       )
 
       // Check that we can see the created payment request
-      val reqFound = aliceRemoteWallet.listAppPaymentRequests().headOption.value
+      val reqFound = eventually() {
+        aliceRemoteWallet.listAppPaymentRequests().headOption.value
+      }
       reqFound.payload shouldBe reqC
 
       // Reject the payment request
@@ -319,9 +321,11 @@ class WalletIntegrationTest
       val request = createSelfSubscriptionRequest(aliceUserParty);
 
       val requestId = clue("List subscription requests to find out request ID") {
-        inside(aliceRemoteWallet.listSubscriptionRequests()) { case Seq(r) =>
-          r.payload shouldBe request
-          r.contractId
+        eventually() {
+          inside(aliceRemoteWallet.listSubscriptionRequests()) { case Seq(r) =>
+            r.payload shouldBe request
+            r.contractId
+          }
         }
       }
       clue("Reject the subscription request") {

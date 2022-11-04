@@ -6,7 +6,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.auth.AuthInterceptor
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
+import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries, JavaCoinLedgerClient}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.validator.admin.api.client.ValidatorConnection
 import com.daml.network.wallet.admin.grpc.GrpcWalletService
@@ -62,6 +62,14 @@ class WalletApp(
       walletServiceParty: PartyId,
   ): Future[WalletApp.State] = {
     for {
+      javaLedgerClient <-
+        JavaCoinLedgerClient.create(
+          config.remoteParticipant.ledgerApi,
+          name.unwrap,
+          timeouts,
+          loggerFactory,
+          tracerProvider,
+        )
       scanConnection <- Future {
         new ScanConnection(
           config.remoteScan.clientAdminApi,
@@ -97,7 +105,7 @@ class WalletApp(
         WalletStore(walletStoreKey, storage, loggerFactory, coinAppParameters.processingTimeouts)
       val treasuries =
         new TreasuryServices(
-          ledgerClient.connection("TreasuryServices"),
+          javaLedgerClient.connection("TreasuryServices"),
           walletStore,
           retryProvider,
           loggerFactory,
@@ -111,7 +119,7 @@ class WalletApp(
               new GrpcWalletService(
                 walletStore,
                 treasuries,
-                ledgerClient,
+                javaLedgerClient,
                 loggerFactory,
                 retryProvider,
               ),
@@ -125,12 +133,13 @@ class WalletApp(
       val automation = new WalletAutomationService(
         walletStore,
         treasuries,
-        ledgerClient,
+        javaLedgerClient,
         retryProvider = retryProvider,
         loggerFactory,
         timeouts,
       )
       WalletApp.State(
+        javaLedgerClient,
         automation,
         storage,
         walletStore,
@@ -150,6 +159,7 @@ class WalletApp(
 
 object WalletApp {
   case class State(
+      javaLedgerClient: JavaCoinLedgerClient,
       automation: WalletAutomationService,
       storage: Storage,
       walletStore: WalletStore,
@@ -166,6 +176,7 @@ object WalletApp {
         treasuryServices,
         scanConnection,
         validatorConnection,
+        javaLedgerClient,
       )(logger)
   }
 }

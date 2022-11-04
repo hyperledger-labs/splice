@@ -1,6 +1,6 @@
 package com.daml.network.wallet.store.memory
 
-import com.daml.network.store.{AcsStore, InMemoryAcsStore}
+import com.daml.network.store.{JavaAcsStore as AcsStore, JavaInMemoryAcsStore as InMemoryAcsStore}
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory

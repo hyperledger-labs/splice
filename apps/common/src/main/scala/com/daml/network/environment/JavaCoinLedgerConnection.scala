@@ -9,9 +9,13 @@ import com.daml.ledger.javaapi.data.{
   Command,
   CreatedEvent,
   ExercisedEvent,
+  Filter,
+  FiltersByParty,
   GetActiveContractsRequest,
   GetTransactionsRequest,
   GetTransactionsResponse,
+  Identifier,
+  InclusiveFilter,
   LedgerOffset,
   Transaction,
   TransactionFilter,
@@ -57,12 +61,22 @@ trait JavaCoinLedgerSubmit extends FlagCloseableAsync {
       readAs: Seq[PartyId],
       update: Update[T],
   )(implicit traceContext: TraceContext): Future[T]
+
+  def submitWithResultAndOffset[T](
+      actAs: Seq[PartyId],
+      readAs: Seq[PartyId],
+      update: Update[T],
+  )(implicit traceContext: TraceContext): Future[(String, T)]
 }
 
 trait JavaCoinLedgerConnection extends JavaCoinLedgerSubmit {
   def activeContractsWithOffset(
       filter: TransactionFilter
   ): Future[(Seq[CreatedEvent], LedgerOffset)]
+
+  def activeContracts(
+      filter: TransactionFilter
+  ): Future[Seq[CreatedEvent]]
 
   def subscription[T](
       subscriptionName: String,
@@ -145,7 +159,14 @@ object JavaCoinLedgerConnection {
           actAs: Seq[PartyId],
           readAs: Seq[PartyId],
           update: Update[T],
-      )(implicit traceContext: TraceContext): Future[T] = {
+      )(implicit traceContext: TraceContext): Future[T] =
+        submitWithResultAndOffset(actAs, readAs, update).map(_._2)
+
+      def submitWithResultAndOffset[T](
+          actAs: Seq[PartyId],
+          readAs: Seq[PartyId],
+          update: Update[T],
+      )(implicit traceContext: TraceContext): Future[(String, T)] = {
         for {
           tree <- client.submitAndWaitForTransactionTree(
             workflowId = workflowId,
@@ -156,12 +177,13 @@ object JavaCoinLedgerConnection {
             commands = update.commands.asScala.toSeq,
             deduplicationOffset = None,
           )
-        } yield {
+        } yield (
+          tree.getOffset,
           decodeExerciseResult(
             update,
             tree,
-          )
-        }
+          ),
+        )
       }
 
       private def decodeExerciseResult[T](
@@ -219,6 +241,11 @@ object JavaCoinLedgerConnection {
           (active, new LedgerOffset.Absolute(offset))
         }
       }
+
+      override def activeContracts(
+          filter: TransactionFilter
+      ): Future[Seq[CreatedEvent]] =
+        activeContractsWithOffset(filter).map(_._1)
 
       override def subscription[T](
           subscriptionName: String,
@@ -295,6 +322,28 @@ object JavaCoinLedgerConnection {
       override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List[AsyncOrSyncCloseable](
       )
     }
+
+  def transactionFilterByParty(filter: Map[PartyId, Seq[Identifier]]): TransactionFilter =
+    new FiltersByParty(
+      filter
+        .map[String, Filter] { case (p, ts) =>
+          p.toProtoPrimitive -> InclusiveFilter.ofTemplateIds(ts.toSet.asJava)
+        }
+        .asJava
+    )
+
+  /** Same as [[transactionFilterByParty]] but for interfaces. */
+  def transactionInterfaceFilterByParty(filter: Map[PartyId, Seq[Identifier]]): TransactionFilter =
+    new FiltersByParty(
+      filter
+        .map[String, Filter] { case (p, is) =>
+          p.toProtoPrimitive -> new InclusiveFilter(
+            Set.empty.asJava,
+            is.map(i => i -> Filter.Interface.INCLUDE_VIEW).toMap.asJava,
+          )
+        }
+        .asJava
+    )
 
   def uniqueId: String = UUID.randomUUID.toString
 }

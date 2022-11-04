@@ -4,7 +4,7 @@ import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.refinements.ApiTypes.TemplateId
 import com.daml.ledger.api.v1.commands.Command
 import com.daml.ledger.client.binding
-import com.daml.network.codegen.CC.Coin.Coin
+import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.codegen.{CC, OpenBusiness}
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
@@ -128,14 +128,16 @@ object CoinUtil {
   def holdingFee(
       coin: Coin,
       currentRound: Long,
-  ): BigDecimal = {
-    (currentRound - coin.quantity.createdAt.number) * coin.quantity.ratePerRound.rate
+  ): java.math.BigDecimal = {
+    java.math.BigDecimal
+      .valueOf(currentRound - coin.quantity.createdAt.number)
+      .multiply(coin.quantity.ratePerRound.rate)
   }
 
   def currentQuantity(
       coin: Coin,
       currentRound: Long,
-  ): BigDecimal = {
-    coin.quantity.initialQuantity - holdingFee(coin, currentRound)
+  ): java.math.BigDecimal = {
+    coin.quantity.initialQuantity.subtract(holdingFee(coin, currentRound))
   }
 }

@@ -3,13 +3,12 @@
 
 package com.daml.network.util
 
-import cats.syntax.either._
 import com.daml.api.util.TimestampConversion
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.v1.value.Value
 import com.daml.ledger.client.binding.Primitive
+import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId => JavaContractId}
 import com.daml.lf.data.Numeric
-import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.topology.PartyId
 
 /** Trait for values used in our protobuf requests.
@@ -36,12 +35,19 @@ object Proto {
   // Convenience wrapper because we can’t have a generic companion.
   def decodeContractId[T](e: String): Either[String, Primitive.ContractId[T]] =
     contractIdValue[T].decode(e)
-  def decodeContractIdDeserialization[T](
-      e: String
-  ): Either[ProtoDeserializationError, Primitive.ContractId[T]] =
-    contractIdValue[T].decode(e).leftMap(ProtoDeserializationError.OtherError)
   def tryDecodeContractId[T](e: String): Primitive.ContractId[T] =
     decodeContractId[T](e).fold(err => throw new IllegalArgumentException(err), identity)
+
+  def decodeJavaContractId[TC, TCid, T](companion: ContractCompanion[TC, TCid, T])(
+      e: String
+  ): Either[String, TCid] =
+    Right(companion.toContractId(new JavaContractId(e)))
+  def tryDecodeJavaContractId[TC, TCid, T](
+      companion: ContractCompanion[TC, TCid, T]
+  )(e: String): TCid =
+    decodeJavaContractId(companion)(e)
+      .fold(err => throw new IllegalArgumentException(err), identity)
+  def encodeContractId[TCid <: JavaContractId[_]](d: TCid): String = d.contractId
 
   implicit val bigDecimalValue: Proto[BigDecimal, String] =
     new Proto[BigDecimal, String] {
@@ -52,6 +58,17 @@ object Proto {
   object BigDecimal extends ProtoCompanion[BigDecimal] {
     type Enc = String
     def instance = bigDecimalValue
+  }
+
+  implicit val javaBigDecimalValue: Proto[java.math.BigDecimal, String] =
+    new Proto[java.math.BigDecimal, String] {
+      def encode(d: java.math.BigDecimal) = Numeric.toString(d)
+      def decode(e: String) = Numeric.fromString(e)
+    }
+
+  object JavaBigDecimal extends ProtoCompanion[java.math.BigDecimal] {
+    type Enc = String
+    def instance = javaBigDecimalValue
   }
 
   implicit val partyValue: Proto[PartyId, String] = new Proto[PartyId, String] {
