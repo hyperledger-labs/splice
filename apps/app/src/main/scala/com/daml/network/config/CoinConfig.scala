@@ -2,6 +2,7 @@ package com.daml.network.config
 
 import cats.data.Validated
 import cats.syntax.functor.*
+import com.daml.network.auth.AuthConfig
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.scan.config.{LocalScanAppConfig, RemoteScanAppConfig}
 import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
@@ -40,6 +41,7 @@ import com.digitalasset.canton.version.ProtocolVersion
 import com.typesafe.config.Config
 import org.slf4j.{Logger, LoggerFactory}
 import pureconfig.ConfigReader
+import pureconfig.generic.FieldCoproductHint
 
 import java.io.File
 import scala.annotation.nowarn
@@ -356,6 +358,14 @@ object CoinConfig {
     import DeprecatedConfigUtils._
     import CantonDeprecationImplicits._
 
+    implicit val authConfigHint = new FieldCoproductHint[AuthConfig]("algorithm")
+
+    implicit val hs256UnsafeConfig: ConfigReader[AuthConfig.Hs256Unsafe] =
+      deriveReader[AuthConfig.Hs256Unsafe]
+    implicit val rs256Config: ConfigReader[AuthConfig.Rs256] =
+      deriveReader[AuthConfig.Rs256]
+    implicit val authConfig: ConfigReader[AuthConfig] =
+      deriveReader[AuthConfig]
     implicit val appInstanceReader: ConfigReader[AppInstance] =
       deriveReader[AppInstance]
     implicit val remoteScanConfigReader: ConfigReader[RemoteScanAppConfig] =

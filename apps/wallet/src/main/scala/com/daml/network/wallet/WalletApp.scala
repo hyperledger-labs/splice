@@ -3,7 +3,13 @@ package com.daml.network.wallet
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.auth.AuthInterceptor
+import com.daml.network.auth.{
+  AuthInterceptor,
+  AuthConfig,
+  SignatureVerifier,
+  HMACVerifier,
+  RSAVerifier,
+}
 import com.daml.network.codegen.CN.Wallet as walletCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries, JavaCoinLedgerClient}
@@ -113,6 +119,11 @@ class WalletApp(
           timeouts,
         )
 
+      val verifier: SignatureVerifier = config.auth match {
+        case AuthConfig.Hs256Unsafe(_, secret) => new HMACVerifier(secret)
+        case AuthConfig.Rs256(_, jwksUrl) => new RSAVerifier(jwksUrl)
+      }
+
       adminServerRegistry
         .addService(
           ServerInterceptors.intercept(
@@ -126,7 +137,11 @@ class WalletApp(
               ),
               ec,
             ),
-            new AuthInterceptor(loggerFactory),
+            new AuthInterceptor(
+              verifier,
+              config.auth.enableAuth,
+              loggerFactory,
+            ),
           )
         )
         .discard

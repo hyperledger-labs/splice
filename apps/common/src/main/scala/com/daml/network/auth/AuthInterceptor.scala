@@ -3,22 +3,23 @@
 
 package com.daml.network.auth
 
-import com.auth0.jwt.JWT
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.NoTracing
 import io.grpc.{Metadata, *}
-
-import scala.util.Try
 
 /** Inspects authorization header, and stores information from decoded access tokens
   *
   * Uses NoTracing, as its called directly by the gRPC library when handing network requests,
   * where we can't inject a tracing context.
   */
-final class AuthInterceptor(override protected val loggerFactory: NamedLoggerFactory)
-    extends ServerInterceptor
+final class AuthInterceptor(
+    verifier: SignatureVerifier,
+    enableAuth: Boolean,
+    override protected val loggerFactory: NamedLoggerFactory,
+) extends ServerInterceptor
     with NamedLogging
     with NoTracing {
+
   override def interceptCall[ReqT, RespT](
       call: ServerCall[ReqT, RespT],
       headers: Metadata,
@@ -30,8 +31,9 @@ final class AuthInterceptor(override protected val loggerFactory: NamedLoggerFac
         .toRight(s"No ${AuthInterceptor.AUTHORIZATION_KEY} header found")
       // TODO(i1012) - make "Bearer $token" format mandatory
       encodedToken = authHeaderValue.stripPrefix("Bearer ")
-      // TODO(i1011) - use JWT.require for sig verification
-      decodedToken <- Try(JWT.decode(encodedToken)).toEither.left.map(_.toString)
+      decodedToken <-
+        if (enableAuth) verifier.verify(encodedToken)
+        else verifier.decodeNoVerify(encodedToken)
     } yield decodedToken
 
     val ctx = Context.current
@@ -50,9 +52,27 @@ final class AuthInterceptor(override protected val loggerFactory: NamedLoggerFac
         )
       };
       case Left(error) => {
-        logger.debug(s"Could not decode token: $error")
-        // TODO(i1012) - strictly enforce token decoding errors
-        Contexts.interceptCall(ctx, call, headers, nextListener)
+        logger.debug(s"Could not validate token: $error")
+        // only raise errors for invalid signatures for now. This is because the error could also possibly be
+        // due to a missing "authorization" header, and we are not ready to be that strict yet until we get
+        // TODO(i1012)
+        if (
+          error.contains(
+            "The Token's Signature resulted invalid when verified using the Algorithm: HmacSHA256"
+          )
+        ) {
+          val status = com.google.rpc.Status
+            .newBuilder()
+            .setCode(com.google.rpc.Code.UNAUTHENTICATED.getNumber)
+            .build()
+
+          val err = io.grpc.protobuf.StatusProto.toStatusRuntimeException(status)
+          call.close(err.getStatus, err.getTrailers)
+          new ServerCall.Listener[ReqT]() {}
+        } else {
+          // swallow other errors, keep calm, and carry on
+          Contexts.interceptCall(ctx, call, headers, nextListener)
+        }
       }
     }
   }

@@ -1,5 +1,6 @@
 package com.daml.network.wallet.config
 
+import com.daml.network.auth.AuthConfig
 import com.daml.network.config.{LocalCoinConfig, RemoteCoinConfig}
 import com.daml.network.scan.config.RemoteScanAppConfig
 import com.digitalasset.canton.config.*
@@ -12,6 +13,7 @@ case class LocalWalletAppConfig(
     remoteParticipant: RemoteParticipantConfig,
     remoteScan: RemoteScanAppConfig,
     validator: WalletRemoteValidatorAppConfig,
+    auth: AuthConfig,
 ) extends LocalCoinConfig // TODO(i736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "wallet"

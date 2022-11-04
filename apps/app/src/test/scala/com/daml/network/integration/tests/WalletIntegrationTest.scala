@@ -880,19 +880,15 @@ class WalletIntegrationTest
     }
   }
 
-  "accepts an optional JWT token with user in subject" in { implicit env =>
-    import cats.syntax.either.*
+  "rejects HS256 JWTs with invalid signatures" in { implicit env =>
     import com.auth0.jwt.JWT
     import com.auth0.jwt.algorithms.Algorithm
-    import com.daml.network.auth.JwtCallCredential
-    import com.daml.network.util.Contract
     import com.daml.network.wallet.v0
+    import com.daml.network.auth.{JwtCallCredential}
     import io.grpc.ManagedChannelBuilder
 
     val aliceDamlUser = aliceRemoteWallet.config.damlUser
-    val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
-
-    val token = JWT.create().withSubject(aliceDamlUser).sign(Algorithm.HMAC256("secret"))
+    val token = JWT.create().withSubject(aliceDamlUser).sign(Algorithm.HMAC256("wrong-secret"))
 
     // using grpc client directly rather than console refs, as token handling isn't threaded through to console command layer (yet)
     val channel =
@@ -906,17 +902,14 @@ class WalletIntegrationTest
         .blockingStub(channel)
         .withCallCredentials(new JwtCallCredential(token))
 
-    client.tap(new v0.TapRequest("10.0"))
-    val res = client.list(new v0.ListRequest())
-
-    res.coins.head.effectiveQuantity shouldBe "10.0000000000"
-
-    for {
-      contractOpt <- res.coins.head.contract.toRight("Could not find contract payload")
-      contract <- Contract.fromProto(coinCodegen.Coin)(contractOpt).leftMap(_.toString)
-    } yield {
-      contract.payload.owner.toString shouldBe aliceUserParty.toPrim.toString
+    val error = intercept[io.grpc.StatusRuntimeException] {
+      client.tap(new v0.TapRequest("10.0"))
     }
+
+    assert(
+      error.getStatus.getCode.value == com.google.rpc.Code.UNAUTHENTICATED.getNumber
+    )
+
     channel.shutdown() // to avoid error about improperly shut down channel
   }
 
