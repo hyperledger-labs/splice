@@ -45,10 +45,10 @@ local toContainerPortDefn(p) = {
 // hosting a JVM. The JVM heap size is the container limit less this
 // amount. The number here is a best estimate and may need to be
 // adjusted.
-local JVM_SYSTEM_MEMORY_MIB = 256;
+local JVM_SYSTEM_MEMORY_MIB = 512;
 
 
-local deployment(config, name, ports, memoryLimitMiB=1024, ext={}, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null) =
+local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null) =
   local proxyPort =
     if proxyToGrpcWeb == null then null
     else findPort(ports, proxyToGrpcWeb);

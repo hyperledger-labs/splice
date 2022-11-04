@@ -42,7 +42,7 @@ local svcDeployments(config) = [
         failureThreshold: 20,
         periodSeconds: 10,
       },
-    },
+    }
   ),
 
   c.deployment(config, 'canton-participant', [

@@ -34,7 +34,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms768M -Xmx768M"
+                              "value": "-Xms1024M -Xmx1024M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/docs:tag",
@@ -52,10 +52,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            },
                            "requests": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -124,7 +124,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms256M -Xmx256M"
+                              "value": "-Xms0M -Xmx0M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/gcs-proxy:tag",
@@ -205,7 +205,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms768M -Xmx768M"
+                              "value": "-Xms1024M -Xmx1024M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-domain:tag",
@@ -235,10 +235,10 @@
                         },
                         "resources": {
                            "limits": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            },
                            "requests": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            }
                         },
                         "startupProbe": {
@@ -314,7 +314,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms2816M -Xmx2816M"
+                              "value": "-Xms2560M -Xmx2560M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -404,7 +404,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms768M -Xmx768M"
+                              "value": "-Xms1024M -Xmx1024M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/directory-app:tag",
@@ -418,10 +418,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            },
                            "requests": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -523,7 +523,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms768M -Xmx768M"
+                              "value": "-Xms1024M -Xmx1024M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/svc-app:tag",
@@ -537,10 +537,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            },
                            "requests": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -604,7 +604,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms768M -Xmx768M"
+                              "value": "-Xms1024M -Xmx1024M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/scan-app:tag",
@@ -618,10 +618,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            },
                            "requests": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -723,7 +723,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms2816M -Xmx2816M"
+                              "value": "-Xms2560M -Xmx2560M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-participant:tag",
@@ -851,7 +851,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms768M -Xmx768M"
+                              "value": "-Xms1024M -Xmx1024M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-validator-app:tag",
@@ -865,10 +865,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            },
                            "requests": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -970,7 +970,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms768M -Xmx768M"
+                              "value": "-Xms1024M -Xmx1024M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-wallet-app:tag",
@@ -984,10 +984,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            },
                            "requests": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -1089,7 +1089,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms768M -Xmx768M"
+                              "value": "-Xms1024M -Xmx1024M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-wallet-web-ui:tag",
@@ -1103,10 +1103,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            },
                            "requests": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -1170,7 +1170,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms768M -Xmx768M"
+                              "value": "-Xms1024M -Xmx1024M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-directory-web-ui:tag",
@@ -1184,10 +1184,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            },
                            "requests": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -1251,7 +1251,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms768M -Xmx768M"
+                              "value": "-Xms1024M -Xmx1024M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-splitwise-web-ui:tag",
@@ -1265,10 +1265,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            },
                            "requests": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -1332,7 +1332,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms2816M -Xmx2816M"
+                              "value": "-Xms2560M -Xmx2560M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/splitwise-participant:tag",
@@ -1460,7 +1460,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms768M -Xmx768M"
+                              "value": "-Xms1024M -Xmx1024M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/splitwise-validator-app:tag",
@@ -1474,10 +1474,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            },
                            "requests": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -1541,7 +1541,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms768M -Xmx768M"
+                              "value": "-Xms1024M -Xmx1024M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/splitwise-app:tag",
@@ -1555,10 +1555,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            },
                            "requests": {
-                              "memory": "1024Mi"
+                              "memory": "1536Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -1671,7 +1671,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms256M -Xmx256M"
+                              "value": "-Xms0M -Xmx0M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/external-proxy:tag",

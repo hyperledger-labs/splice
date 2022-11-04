@@ -123,7 +123,7 @@ function cluster_create() {
                --enable-ip-alias \
                --enable-private-nodes \
                --machine-type e2-standard-4 \
-               --num-nodes 2 \
+               --num-nodes 3 \
                --master-ipv4-cidr "${GCP_MASTER_IPV4_CIDR}" \
                --node-locations "${CLOUDSDK_COMPUTE_REGION}-a" \
                --node-labels digitalasset.com/cluster-name=${GCP_CLUSTER_NAME}
