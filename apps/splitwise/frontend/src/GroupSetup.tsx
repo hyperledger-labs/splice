@@ -23,7 +23,7 @@ const GroupSetup: React.FC<GroupSetupProps> = ({ party, provider, svc }) => {
   const ledgerApiClient = useSplitwiseLedgerApiClient();
   const [groupId, setGroupId] = useState<string>('');
   const onCreateGroup = async () => {
-    await ledgerApiClient.createGroup(party, provider, svc, groupId);
+    await ledgerApiClient.requestGroup(party, provider, svc, groupId);
   };
 
   const [groupInvites, setGroupInvites] = useState<Contract<GroupInvite>[]>([]);

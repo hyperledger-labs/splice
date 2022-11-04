@@ -1,8 +1,8 @@
 import { LedgerApiClient, buildLedgerApiClientInterface } from 'common-frontend';
-import { GroupKey } from 'common-protobuf/com/daml/network/splitwise/v0/splitwise_service_pb';
 
 import {
   AcceptedGroupInvite,
+  Group,
   GroupInvite,
   SplitwiseInstall,
 } from '@daml.js/splitwise/lib/CN/Splitwise';
@@ -13,12 +13,13 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
   collectionDuration: string = (5 * 60 * 1000000).toString();
   acceptDuration: string = (5 * 60 * 1000000).toString();
 
-  async createGroup(user: string, provider: string, svc: string, id: string) {
-    await this.exerciseByKey(
+  async requestGroup(user: string, provider: string, svc: string, id: string) {
+    const install = await this.getSplitwiseInstall(user, provider);
+    await this.exercise(
       [user],
       [],
-      SplitwiseInstall.SplitwiseInstall_CreateGroup,
-      { _1: user, _2: provider },
+      SplitwiseInstall.SplitwiseInstall_RequestGroup,
+      install.contractId,
       {
         group: {
           owner: user,
@@ -33,25 +34,32 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
     );
   }
 
-  async createGroupInvite(user: string, provider: string, id: string, observers: string[]) {
-    await this.exerciseByKey(
+  async createGroupInvite(
+    user: string,
+    provider: string,
+    group: ContractId<Group>,
+    observers: string[]
+  ) {
+    const install = await this.getSplitwiseInstall(user, provider);
+    await this.exercise(
       [user],
       [],
       SplitwiseInstall.SplitwiseInstall_CreateInvite,
-      { _1: user, _2: provider },
+      install.contractId,
       {
-        groupKey: { owner: user, provider: provider, id: { unpack: id } },
+        group: group,
         observers: observers,
       }
     );
   }
 
   async acceptInvite(user: string, provider: string, inviteContractId: ContractId<GroupInvite>) {
-    await this.exerciseByKey(
+    const install = await this.getSplitwiseInstall(user, provider);
+    await this.exercise(
       [user],
       [],
       SplitwiseInstall.SplitwiseInstall_AcceptInvite,
-      { _1: user, _2: provider },
+      install.contractId,
       {
         cid: inviteContractId,
       }
@@ -60,37 +68,31 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
   async joinGroup(
     user: string,
     provider: string,
+    group: ContractId<Group>,
     inviteContractId: ContractId<AcceptedGroupInvite>
   ) {
-    await this.exerciseByKey(
-      [user],
-      [],
-      SplitwiseInstall.SplitwiseInstall_Join,
-      { _1: user, _2: provider },
-      {
-        cid: inviteContractId,
-      }
-    );
+    const install = await this.getSplitwiseInstall(user, provider);
+    await this.exercise([user], [], SplitwiseInstall.SplitwiseInstall_Join, install.contractId, {
+      group: group,
+      cid: inviteContractId,
+    });
   }
 
   async enterPayment(
     user: string,
     provider: string,
-    key: GroupKey,
+    group: ContractId<Group>,
     quantity: string,
     description: string
   ) {
-    await this.exerciseByKey(
+    const install = await this.getSplitwiseInstall(user, provider);
+    await this.exercise(
       [user],
       [],
       SplitwiseInstall.SplitwiseInstall_EnterPayment,
-      { _1: user, _2: provider },
+      install.contractId,
       {
-        groupKey: {
-          owner: key.getOwnerPartyId(),
-          provider: key.getProviderPartyId(),
-          id: { unpack: key.getId() },
-        },
+        group: group,
         quantity: quantity,
         description: description,
       }
@@ -100,23 +102,28 @@ class SplitwiseLedgerApiClient extends LedgerApiClient {
   async initiateTransfer(
     sender: string,
     provider: string,
-    key: GroupKey,
+    group: ContractId<Group>,
     receiverQuantities: ReceiverQuantity[]
   ) {
-    return await this.exerciseByKey(
+    const install = await this.getSplitwiseInstall(sender, provider);
+    return await this.exercise(
       [sender],
       [],
       SplitwiseInstall.SplitwiseInstall_InitiateTransfer,
-      { _1: sender, _2: provider },
+      install.contractId,
       {
-        groupKey: {
-          owner: key.getOwnerPartyId(),
-          provider: key.getProviderPartyId(),
-          id: { unpack: key.getId() },
-        },
+        group: group,
         receiverQuantities: receiverQuantities,
       }
     );
+  }
+
+  async getSplitwiseInstall(user: string, provider: string) {
+    const install = await this.querySplitwiseInstall(user, provider);
+    if (!install) {
+      throw new Error('Could not find SplitwiseInstall');
+    }
+    return install;
   }
 
   async querySplitwiseInstall(user: string, provider: string) {

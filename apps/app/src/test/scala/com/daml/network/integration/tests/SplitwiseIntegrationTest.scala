@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.ledger.client.binding.{Contract => CodegenContract}
 import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen, Wallet => walletCodegen}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -11,6 +12,8 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.splitwise.admin.api.client.commands.GrpcSplitwiseAppClient
 import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+
+import scala.concurrent.Future
 
 class SplitwiseIntegrationTest
     extends CoinIntegrationTest
@@ -50,7 +53,7 @@ class SplitwiseIntegrationTest
         splitwise.ledgerApi.ledger_api.acs.await(party, splitwiseCodegen.SplitwiseInstall)
       }
 
-      aliceSplitwise.createGroup("group1")
+      aliceSplitwise.requestGroup("group1")
       eventually() {
         aliceSplitwise.listGroups() should have size 1
       }
@@ -136,6 +139,49 @@ class SplitwiseIntegrationTest
       eventually() {
         charlieSplitwise.listBalances(key) shouldBe Map(aliceUserParty -> 0, bobUserParty -> 22)
       }
+    }
+
+    "allocate unique groups per party, even when multiple requests race for them" in {
+      implicit env =>
+        import env._
+
+        val aliceUserParty = aliceValidator.onboardUser(aliceSplitwise.config.damlUser)
+
+        aliceSplitwise.createInstallRequest()
+        aliceSplitwise.ledgerApi.ledger_api.acs
+          .await(aliceUserParty, splitwiseCodegen.SplitwiseInstall)
+
+        def createGroup() = {
+          val groupRequest = aliceSplitwise.requestGroup("group1")
+
+          // Wait for request to be archived and therefore either the group to be created or
+          // the request to be rejected.
+          eventually() {
+            aliceSplitwise.ledgerApi.ledger_api.acs.filter(
+              aliceUserParty,
+              splitwiseCodegen.GroupRequest,
+              (request: CodegenContract[splitwiseCodegen.GroupRequest]) =>
+                request.contractId == groupRequest,
+            ) shouldBe empty
+          }
+        }
+
+        // Concurrently, create two groups with the same id
+        val group1 = Future {
+          createGroup()
+        }
+        val group2 = Future {
+          createGroup()
+        }
+
+        // Wait for both of them
+        group1.futureValue
+        group2.futureValue
+
+        // We read directly from the ledger API to avoid having to synchronize on the store.
+        val groups =
+          aliceSplitwise.ledgerApi.ledger_api.acs.filter(aliceUserParty, splitwiseCodegen.Group)
+        groups should have size 1
     }
 
     "return the primary party of the user" in { implicit env =>

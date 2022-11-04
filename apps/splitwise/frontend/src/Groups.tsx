@@ -97,7 +97,12 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider }) => {
       .map(([k, v]) => {
         return { receiver: k, quantity: v.substring(1, v.length - 1) };
       });
-    const cid = await ledgerApiClient.initiateTransfer(party, provider, key(group), quantities);
+    const cid = await ledgerApiClient.initiateTransfer(
+      party,
+      provider,
+      group.contractId,
+      quantities
+    );
     const here = window.location.origin.toString();
     const walletPath = config.wallet.uiUrl;
     window.location.assign(
@@ -160,7 +165,7 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({ group, party, p
   }, [group.payload.id.unpack, party, splitwiseClient]);
   useInterval(fetchAcceptedInvites, 500);
   const onAddMember = async (invite: Contract<AcceptedGroupInvite>) => {
-    await ledgerApiClient.joinGroup(party, provider, invite.contractId);
+    await ledgerApiClient.joinGroup(party, provider, group.contractId, invite.contractId);
   };
   return (
     <Box>
@@ -196,7 +201,7 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider 
     await ledgerApiClient.enterPayment(
       party,
       provider,
-      key(group),
+      group.contractId,
       paymentQuantity,
       paymentDescription
     );
@@ -204,7 +209,7 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider 
   const [transferQuantity, setTransferQuantity] = useState<string>('');
   const [transferReceiverEntry, setTransferReceiverEntry] = useState<DirectoryEntry | null>(null);
   const onInitiateTransfer = async () => {
-    await ledgerApiClient.initiateTransfer(party, provider, key(group), [
+    await ledgerApiClient.initiateTransfer(party, provider, group.contractId, [
       { receiver: transferReceiverEntry!.user, quantity: transferQuantity },
     ]);
   };
@@ -327,7 +332,7 @@ const Group: React.FC<GroupProps> = ({ directoryEntries, group, party, provider 
     await ledgerApiClient.createGroupInvite(
       party,
       provider,
-      group.payload.id.unpack,
+      group.contractId,
       directoryEntries.getAllParties()
     );
   };

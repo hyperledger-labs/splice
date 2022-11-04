@@ -1,8 +1,7 @@
 package com.daml.network.splitwise.admin.grpc
 
-import com.daml.ledger.client.binding.{Contract => CodegenContract, Primitive, Template}
+import com.daml.ledger.client.binding.{Contract => CodegenContract, Primitive}
 import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
-import com.daml.network.codegen.DA
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.v0
@@ -77,7 +76,7 @@ class GrpcSplitwiseService(
         val filtered =
           acceptedGroupInvites.filter(c =>
             c.hasStakeholder(userParty.toPrim) &&
-              c.value.groupKey == groupKey_(userParty, providerParty, request.groupId)
+              c.value.groupKey == groupKey(userParty, providerParty, request.groupId)
           )
         v0.ListAcceptedGroupInvitesResponse(
           filtered.map(c => Contract.fromCodegenContract(c).toProtoV0)
@@ -99,7 +98,7 @@ class GrpcSplitwiseService(
               c.value.group.owner,
               c.value.group.provider,
               c.value.group.id,
-            ) == groupKey_(
+            ) == groupKey(
               request.getGroupKey
             )
         )
@@ -123,7 +122,7 @@ class GrpcSplitwiseService(
                   c.value.group.owner,
                   c.value.group.provider,
                   c.value.group.id,
-                ) == groupKey_(
+                ) == groupKey(
                 request.getGroupKey
               )
           )
@@ -176,27 +175,14 @@ class GrpcSplitwiseService(
       Future.successful(v0.GetProviderPartyIdResponse(Proto.encode(providerParty)))
     }
 
-  private def installKey(
-      provider: PartyId,
-      user: PartyId,
-  ): Template.Key[splitwiseCodegen.SplitwiseInstall] =
-    splitwiseCodegen.SplitwiseInstall.key(DA.Types.Tuple2(user.toPrim, provider.toPrim))
-
-  private def groupKey(key: v0.GroupKey): Template.Key[splitwiseCodegen.Group] =
-    splitwiseCodegen.Group.key(groupKey_(key))
-  private def groupKey_(key: v0.GroupKey): splitwiseCodegen.GroupKey =
+  private def groupKey(key: v0.GroupKey): splitwiseCodegen.GroupKey =
     splitwiseCodegen.GroupKey(
       Proto.tryDecode(Proto.CodegenParty)(key.ownerPartyId),
       Proto.tryDecode(Proto.CodegenParty)(key.providerPartyId),
       splitwiseCodegen.GroupId(key.id),
     )
-  private def groupKey(
-      owner: PartyId,
-      provider: PartyId,
-      id: String,
-  ): Template.Key[splitwiseCodegen.Group] =
-    splitwiseCodegen.Group.key(groupKey_(owner, provider, id))
-  private def groupKey_(owner: PartyId, provider: PartyId, id: String): splitwiseCodegen.GroupKey =
+
+  private def groupKey(owner: PartyId, provider: PartyId, id: String): splitwiseCodegen.GroupKey =
     splitwiseCodegen.GroupKey(
       owner.toPrim,
       provider.toPrim,

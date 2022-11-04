@@ -16,6 +16,8 @@ import CN.Directory
 _unused : DirectoryEntry -> DirectoryEntry
 _unused = identity
 
+-- Stable identifier for a group. We avoid contract keys
+-- but having this as a data type is still useful.
 data GroupKey = GroupKey
   with
     owner : Party
@@ -51,9 +53,9 @@ template SplitwiseInstallRequest
 -- Assert that the given party is the owner of the group.
 -- This is used to avoid leaking authorization from the provider.
 -- A `restrictAuthority` primitive in LF would be very helpful here.
-assertOwner : GroupKey -> Party -> Update ()
-assertOwner k p = do
-  (_, Group {..}) <- fetchByKey @Group k
+assertOwner : ContractId Group -> Party -> Update ()
+assertOwner group p = do
+  Group {..} <- fetch group
   owner === p
 
 template SplitwiseInstall
@@ -62,23 +64,21 @@ template SplitwiseInstall
     user : Party
   where
     signatory user, provider
-    key (user, provider) : (Party, Party)
-    maintainer [key._1, key._2]
 
-    nonconsuming choice SplitwiseInstall_CreateGroup : ContractId Group
+    nonconsuming choice SplitwiseInstall_RequestGroup : ContractId GroupRequest
       with group : Group
       controller user
       do group.provider === provider
          group.owner === user
-         create group
+         create (GroupRequest group)
 
     nonconsuming choice SplitwiseInstall_CreateInvite : ContractId GroupInvite
       with
-        groupKey : GroupKey
+        group : ContractId Group
         observers : [Party]
       controller user
-      do assertOwner groupKey user
-         exerciseByKey @Group groupKey Group_CreateInvite with ..
+      do assertOwner group user
+         exercise group Group_CreateInvite with ..
 
     nonconsuming choice SplitwiseInstall_AcceptInvite : ContractId AcceptedGroupInvite
       with
@@ -88,53 +88,69 @@ template SplitwiseInstall
 
     nonconsuming choice SplitwiseInstall_Join : ContractId Group
       with
+        group : ContractId Group
         cid : ContractId AcceptedGroupInvite
       controller user
-      do groupInvite <- fetch cid
-         assertOwner groupInvite.groupKey user
-         exercise cid AcceptedGroupInvite_Join
+      do assertOwner group user
+         exercise cid (AcceptedGroupInvite_Join group)
 
     nonconsuming choice SplitwiseInstall_EnterPayment : ContractId BalanceUpdate
       with
-        groupKey : GroupKey
+        group : ContractId Group
         quantity : Decimal
         description : Text
       controller user
-      do exerciseByKey @Group groupKey Group_EnterPayment with
+      do exercise group Group_EnterPayment with
            payer = user
            ..
 
     nonconsuming choice SplitwiseInstall_InitiateTransfer : ContractId AppPaymentRequest
       with
-        groupKey : GroupKey
+        group : ContractId Group
         receiverQuantities : [ReceiverQuantity]
       controller user
-      do exerciseByKey @Group groupKey Group_InitiateTransfer with
+      do exercise group Group_InitiateTransfer with
            sender = user
            ..
 
     nonconsuming choice SplitwiseInstall_CompleteTransfer : [ContractId BalanceUpdate]
       with
-        groupKey : GroupKey
+        group : ContractId Group
         acceptedPaymentCid : ContractId AcceptedAppPayment
         transferContext : AppTransferContext
       controller provider
-      do exerciseByKey @Group groupKey Group_CompleteTransfer with
+      do exercise group Group_CompleteTransfer with
            sender = user
            ..
 
     nonconsuming choice SplitwiseInstall_Net : ContractId BalanceUpdate
       with
-        groupKey : GroupKey
+        group : ContractId Group
         balanceChanges : Map Party (Map Party Decimal)
       controller user
-      do assertOwner groupKey user
-         exerciseByKey @Group groupKey Group_Net with
+      do assertOwner group user
+         exercise group Group_Net with
            ..
 
 -- | Is `a` a subset of `b`?
 subset : forall a . (Ord a) => [a] -> [a] -> Bool
 subset (Set.fromList -> a) (Set.fromList -> b) = a `Set.intersection` b == a
+
+-- Request to create a group, we use a two-step workflow so the provider
+-- can enforce uniqueness of (provider, owner, groupId) via command dedup
+template GroupRequest
+  with
+    group : Group
+  where
+    signatory signatory group
+
+    choice GroupRequest_Accept : ContractId Group
+      controller group.provider
+      do create group
+
+    choice GroupRequest_Reject : ()
+      controller group.provider
+      do pure ()
 
 -- | A round identified by a a given GroupKey.
 -- The member ship can change over time by people joining the group
@@ -155,9 +171,7 @@ template Group
     acceptDuration : RelTime -- Time user has to accept a transfer request in their wallet
   where
     signatory provider, owner, members
-    key (GroupKey owner provider id) : GroupKey
-    maintainer key.owner
-
+    
     nonconsuming choice Group_CreateInvite : ContractId GroupInvite
       with
         observers : [Party]
@@ -229,7 +243,7 @@ template Group
          require "Sender is member" (ref.sender `elem` groupMembers this)
          require "Receivers are members" (receivers `subset` groupMembers this)
          -- Check that this belongs to the right group.
-         key ref.group === key this
+         getGroupKey ref.group === getGroupKey this
          forA ref.receiverQuantities \ReceiverQuantity{receiver, quantity} ->
            create BalanceUpdate with
              group = this
@@ -254,6 +268,9 @@ template Group
          create BalanceUpdate with
            group = this
            update = Netting with balanceChanges
+
+getGroupKey : Group -> GroupKey
+getGroupKey Group{..} = GroupKey{..}
 
 template TransferInProgress
   with
@@ -314,7 +331,7 @@ template GroupInvite
         invitee : Party
       controller invitee
       do create AcceptedGroupInvite with
-           groupKey = key group
+           groupKey = getGroupKey group
            invitee = invitee
 
 template AcceptedGroupInvite
@@ -324,5 +341,9 @@ template AcceptedGroupInvite
   where
     signatory groupKey.owner, groupKey.provider, invitee
     choice AcceptedGroupInvite_Join : ContractId Group
+      with
+        group : ContractId Group
       controller groupKey.owner
-      do exerciseByKey @Group groupKey (Group_Join invitee)
+      do k <- getGroupKey <$> fetch group
+         require "Group key matches" (k == groupKey)
+         exercise group (Group_Join invitee)

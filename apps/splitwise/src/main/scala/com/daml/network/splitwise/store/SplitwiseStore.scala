@@ -10,6 +10,7 @@ import com.daml.network.util.Contract
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
+import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -32,8 +33,35 @@ trait SplitwiseStore extends AutoCloseable {
   ): Future[QueryResult[Option[Contract[splitwiseCodegen.TransferInProgress]]]] =
     acsStore.lookupContractById(splitwiseCodegen.TransferInProgress)(id)
 
+  def lookupGroup(
+      owner: PartyId,
+      id: splitwiseCodegen.GroupId,
+  ): Future[QueryResult[Option[Contract[splitwiseCodegen.Group]]]] =
+    acsStore.findContract(splitwiseCodegen.Group)(co =>
+      co.payload.owner == owner.toPrim && co.payload.id == id
+    )
+
+  def getGroup(
+      owner: PartyId,
+      id: splitwiseCodegen.GroupId,
+  )(implicit ec: ExecutionContext): Future[QueryResult[Contract[splitwiseCodegen.Group]]] =
+    lookupGroup(owner, id).map(
+      _.map(
+        _.getOrElse(
+          throw new StatusRuntimeException(
+            Status.NOT_FOUND.withDescription(
+              s"No active Group contract for owner $owner and id $id"
+            )
+          )
+        )
+      )
+    )
+
   def streamInstallRequests(): Source[Contract[splitwiseCodegen.SplitwiseInstallRequest], NotUsed] =
     acsStore.streamContracts(splitwiseCodegen.SplitwiseInstallRequest)
+
+  def streamGroupRequests(): Source[Contract[splitwiseCodegen.GroupRequest], NotUsed] =
+    acsStore.streamContracts(splitwiseCodegen.GroupRequest)
 
   def streamAcceptedAppPayments(): Source[Contract[walletCodegen.AcceptedAppPayment], NotUsed] =
     acsStore.streamContracts(walletCodegen.AcceptedAppPayment)
@@ -58,7 +86,8 @@ object SplitwiseStore {
         mkFilter(splitwiseCodegen.SplitwiseInstallRequest)(co => co.payload.provider == provider),
         mkFilter(splitwiseCodegen.SplitwiseInstall)(co => co.payload.provider == provider),
         mkFilter(splitwiseCodegen.TransferInProgress)(co => co.payload.group.provider == provider),
-        mkFilter(splitwiseCodegen.TransferInProgress)(co => co.payload.group.provider == provider),
+        mkFilter(splitwiseCodegen.Group)(co => co.payload.provider == provider),
+        mkFilter(splitwiseCodegen.GroupRequest)(co => co.payload.group.provider == provider),
         mkFilter(walletCodegen.AcceptedAppPayment)(co => co.payload.provider == provider),
       ),
     )

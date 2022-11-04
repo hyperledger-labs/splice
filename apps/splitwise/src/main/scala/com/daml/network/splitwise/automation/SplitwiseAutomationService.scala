@@ -122,12 +122,12 @@ class SplitwiseAutomationService(
                 )
               )
             )
+          group <- store.getGroup(
+            PartyId.tryFromPrim(transferInProgress.payload.group.owner),
+            transferInProgress.payload.group.id,
+          )
           cmd = install.contractId.exerciseSplitwiseInstall_CompleteTransfer(
-            groupKey = splitwiseCodegen.GroupKey(
-              owner = transferInProgress.payload.group.owner,
-              provider = provider.toPrim,
-              id = transferInProgress.payload.group.id,
-            ),
+            group = group.value.contractId,
             acceptedPaymentCid = payment.contractId,
             transferContext = transferContext,
           )
@@ -137,6 +137,42 @@ class SplitwiseAutomationService(
             command = Seq(cmd.command),
           )
         } yield "Completed transfer"
+    }
+  })
+
+  registerRequestHandler("handleGroupRequest", store.streamGroupRequests())(req => { implicit tc =>
+    {
+      val user = PartyId.tryFromPrim(req.payload.group.owner)
+      val groupId = req.payload.group.id
+      store.lookupGroup(user, groupId).flatMap {
+        case QueryResult(_, Some(_)) =>
+          logger.info(
+            s"Rejecting duplicate group request from user party $user for group id ${groupId.unpack}"
+          )
+          val cmd = req.contractId.exerciseGroupRequest_Reject()
+          connection
+            .submitWithResult(Seq(provider), Seq(), cmd)
+            .map(_ => "rejected request for already existing group.")
+
+        case QueryResult(off, None) =>
+          val commandId =
+            mkCommandId(
+              "com.daml.network.splitwise.GroupRequest",
+              Seq(provider, user),
+              groupId.unpack,
+            )
+
+          val acceptCmd = req.contractId.exerciseGroupRequest_Accept().command
+          connection
+            .submitCommandWithDedup(
+              actAs = Seq(provider),
+              readAs = Seq(),
+              command = Seq(acceptCmd),
+              commandId = commandId,
+              deduplicationOffset = off,
+            )
+            .map(_ => "accepted group request.")
+      }
     }
   })
 }
