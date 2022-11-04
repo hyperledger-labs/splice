@@ -103,12 +103,14 @@ class WalletIntegrationTest
 
         nextRound(1)
 
-        checkBalance(
-          aliceRemoteWallet.balance(),
-          2,
-          (99, 100),
-          (9, 10),
-          (0.00001, 0.00002),
+        eventually()(
+          checkBalance(
+            aliceRemoteWallet.balance(),
+            2,
+            (99, 100),
+            (9, 10),
+            (0.00001, 0.00002),
+          )
         )
     }
 
@@ -145,7 +147,7 @@ class WalletIntegrationTest
 
       nextRound(0)
 
-      aliceRemoteWallet.list().coins.head.round shouldBe 1
+      eventually()(aliceRemoteWallet.list().coins.head.round shouldBe 1)
       assertInRange(aliceRemoteWallet.list().coins.head.accruedHoldingFee, (0.000004, 0.000005))
       assertInRange(aliceRemoteWallet.list().coins.head.effectiveQuantity, (24.0, 25.0))
 
@@ -915,6 +917,7 @@ class WalletIntegrationTest
     } yield {
       contract.payload.owner.toString shouldBe aliceUserParty.toPrim.toString
     }
+    channel.shutdown() // to avoid error about improperly shut down channel
   }
 
   /** @param expectedQuantityRanges: lower and upper bounds for coins sorted by their initial quantity in ascending order. */
