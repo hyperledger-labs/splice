@@ -54,7 +54,7 @@ local svcDeployments(config) = [
       name: 'cp-lg-api',
       port: 5001,
     },
-  ], memoryLimitMiB=1536),
+  ], memoryLimitMiB=3072),
 
   c.deployment(config, 'directory-app', [
     {
@@ -88,7 +88,7 @@ local validator1Deployments(config) = [
       name: 'val1-lg-api',
       port: 5101,
     },
-  ], memoryLimitMiB=1536, proxyToGrpcWeb='val1-lg-api'),
+  ], memoryLimitMiB=3072, proxyToGrpcWeb='val1-lg-api'),
 
   c.deployment(config, 'validator1-validator-app', [
     {
@@ -139,7 +139,7 @@ local splitwiseDeployments(config) = [
       name: 'sw-lg-api',
       port: 5201,
     },
-  ], memoryLimitMiB=1536, proxyToGrpcWeb='sw-lg-api'),
+  ], memoryLimitMiB=3072, proxyToGrpcWeb='sw-lg-api'),
 
   c.deployment(config, 'splitwise-validator-app', [
     {

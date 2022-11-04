@@ -307,7 +307,7 @@ function cluster_reset() {
 }
 
 function _show_ports() {
-    curl http://scratch.network.canton.global/manifest.json 2> /dev/null \
+    curl -L http://scratch.network.canton.global/manifest.json 2> /dev/null \
         | jq -r '(["SERVICE","PORT NAME","PORT","AS GRPC"],(.ports|.[]|[.service, .name, .port, .proxyToGrpc]))|@csv' \
         | column -s ',' -t
 }
