@@ -243,6 +243,12 @@ commands:
             # This will speed-up compilation, because most libraries are already in the cache.
             - sbt-canton-job={{ .Environment.CIRCLE_JOB }}-dependencies={{ checksum "project/Dependencies.scala" }}-canton-dependencies={{ checksum "project/CantonDependencies.scala" }}
 
+  download_sbt_dependencies:
+    description: Fetch SBT dependencies with retries
+    steps:
+      - execute_sbt_command:
+          cmd: "update"
+          cmd_retry_count: 5
 
   # Largely copied from Canton's CI definition
   execute_sbt_command:
@@ -253,6 +259,14 @@ commands:
         # This may contain several commands.
         # The caller needs to quote commands that contain spaces, e.g. "\"testOnly myTest\"".
         type: string
+      cmd_retry_count:
+        description: Number of times to retry the command
+        type: integer
+        default: 0
+      cmd_retry_wait:
+        description: Number of seconds to wait between retries
+        type: integer
+        default: 5
       timeout:
         type: string
         default: "25m"
@@ -260,10 +274,6 @@ commands:
         # Will cause the command to always succeed regardless of the sbt exit code.
         type: boolean
         default: false
-      retry_fetch:
-        # If true, will send a few \r\n to sbt to ensure we download dependencies
-        type: string
-        default: "50"
       extra_parameters:
         type: string
         default: ""
@@ -329,9 +339,7 @@ commands:
                # Setup heap size; corresponds to Canton large executors
                SBT_CMD+=("-J-Xmx5000M" "-J-Xms5000M")
                # Run command
-               # also send a few newline characters to sbt to ensure we keep on downloading dependencies
-               python3 -c "print ('r\n'*<< parameters.retry_fetch >>)" |
-                 timeout --kill-after=30s << parameters.timeout >> "${SBT_CMD[@]}" 2>&1 |
+               timeout --kill-after=30s << parameters.timeout >> "${SBT_CMD[@]}" 2>&1 |
                  tee sbt_output
 
                 <<# parameters.fail_on_error_in_output >>
@@ -343,6 +351,8 @@ commands:
             << parameters.pre_sbt_cmd >>
             run_sbt
             << parameters.post_sbt_cmd >>
+          cmd_retry_count: << parameters.cmd_retry_count >>
+          cmd_retry_wait: << parameters.cmd_retry_wait >>
 
   run_bash_command_in_nix:
     parameters:
@@ -351,6 +361,14 @@ commands:
       cmd_name:
         type: string
         default: "Executing bash command << parameters.cmd >> in the nix shell"
+      cmd_retry_count:
+        description: Number of times to retry the command
+        type: integer
+        default: 0
+      cmd_retry_wait:
+        description: Number of seconds to wait between retries
+        type: integer
+        default: 5
       gce_authenticate:
         type: boolean
         default: false
@@ -403,7 +421,22 @@ commands:
                 fi
               fi
 
-              << parameters.cmd >>
+              MAX_RETRY=<< parameters.cmd_retry_count >>
+              n=0
+              until [ $n -gt $MAX_RETRY ]
+              do
+                  cmd_wrapper() { 
+                    << parameters.cmd >>
+                  }
+                  cmd_wrapper && break
+                  n=$[$n+1]
+                  sleep << parameters.cmd_retry_wait >>
+              done
+
+              if [ $n -gt $MAX_RETRY ]; then
+                echo "retrying command << parameters.cmd_name >> exceeded max retries" >&2
+                exit 1
+              fi
             EOF
 
   cleanup_sbt_test_job:
@@ -451,7 +484,6 @@ commands:
     steps:
       - execute_sbt_command:
           cmd: printTests
-          retry_fetch: "50"
           fail_on_error_in_output: false
       - run:
           name: Splitting tests
@@ -670,6 +702,7 @@ jobs:
     steps:
       - checkout
       - setup_sbt_test_job
+      - download_sbt_dependencies
       # Surprisingly, running "Test/compile" before speeds up the "scalafixCheck", is a lot faster than just running "scalafixCheck"
       - execute_sbt_command:
           cmd: "Test/compile"
@@ -713,6 +746,7 @@ jobs:
     steps:
       - checkout
       - setup_sbt_test_job
+      - download_sbt_dependencies
       - execute_sbt_command:
           cmd: "Test/compile"
       - split_tests_for_parallel_run
@@ -819,6 +853,7 @@ jobs:
             cncluster wait
       - checkout_cluster_version:
           cluster: <<parameters.cluster>>
+      - download_sbt_dependencies
       - execute_sbt_command:
           cmd: "Test/compile"
       - execute_sbt_command:
