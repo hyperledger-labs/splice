@@ -40,6 +40,18 @@ function cluster_ip() {
            --format 'value(address)'
 }
 
+function nat_router() {
+    gcloud compute routers list \
+            --filter "name:${GCP_NAT_ROUTER_NAME}" \
+            --format 'value(name)'
+}
+
+function nat_config() {
+    gcloud compute routers nats list \
+            --router=${GCP_NAT_ROUTER_NAME} \
+            --format 'value(name)'
+}
+
 function _cluster_apply() {
     # Apply cert-manager deployments
     kubectl apply -f $REPO_ROOT/cluster/manifest/cert-manager/cert-manager.yaml
@@ -184,6 +196,27 @@ function cluster_create() {
            --rrdatas="${IPADDR}"
 
     echo "Cluster at IP ${IPADDR}, applying configuration."
+
+    #### Check for Cloud NAT rules
+    if [ -z $(nat_router) ]; then
+        _log "NAT router ${GCP_NAT_ROUTER_NAME} not found, creating..."
+        gcloud compute routers create "${GCP_NAT_ROUTER_NAME}" \
+            --network default \
+            --region "${CLOUDSDK_COMPUTE_REGION}"
+    else
+        _log "NAT router ${GCP_NAT_ROUTER_NAME} exists, skipping..."
+    fi
+
+    if [ -z $(nat_config) ]; then
+        _log "NAT config ${GCP_NAT_CONFIG_NAME} not found, creating..."
+        gcloud compute routers nats create "${GCP_NAT_CONFIG_NAME}" \
+                --router-region "${CLOUDSDK_COMPUTE_REGION}" \
+                --router "${GCP_NAT_ROUTER_NAME}" \
+                --nat-all-subnet-ip-ranges \
+                --auto-allocate-nat-external-ips
+    else
+        _log "NAT config ${GCP_NAT_CONFIG_NAME} exists, skipping..."
+    fi
 
     _cluster_apply
 }

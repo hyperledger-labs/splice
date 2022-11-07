@@ -1,4 +1,4 @@
-local certificateIssuer(issuerRef, issuerServer, cloudDnsProject, cloudDnsServiceAccount) = {
+local issuer(issuerRef, issuerServer, cloudDnsProject, cloudDnsServiceAccount) = {
   deploymentObjects: [
     {
       apiVersion: 'cert-manager.io/v1',
@@ -51,6 +51,6 @@ local certificate(issuerRef, tlsCertSecret, clusterName, clusterDnsName) = {
 };
 
 {
-    certificateIssuer:: certificateIssuer,
+    issuer:: issuer,
     certificate:: certificate
 }
