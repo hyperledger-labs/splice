@@ -132,18 +132,19 @@ abstract class CoinNode[State <: AutoCloseable](
     ledgerClient <- ledgerClientF
     javaLedgerClient <- javaLedgerClientF
     connection = ledgerClient.connection(name.toString)
+    javaConnection = javaLedgerClient.connection(name.toString)
     _ = logger.info(s"Acquiring primary party of service user $serviceUser")
     serviceParty <-
       if (allocateServiceUser)
         retryProvider.retryForAutomationWithUncleanShutdown(
           "Allocating user and party",
-          connection.getOrAllocateParty(serviceUser),
+          javaConnection.getOrAllocateParty(serviceUser),
           this,
         )
       else
         retryProvider.retryForAutomationWithUncleanShutdown(
           "Querying primary party of user",
-          connection.getPrimaryParty(serviceUser),
+          javaConnection.getPrimaryParty(serviceUser),
           this,
         )
     _ = logger.info(s"Acquired primary party of user $serviceUser: $serviceParty")
