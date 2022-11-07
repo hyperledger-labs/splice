@@ -2,18 +2,20 @@ package com.daml.network.util
 
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.refinements.ApiTypes.TemplateId
-import com.daml.ledger.api.v1.commands.Command
 import com.daml.ledger.client.binding
+import com.daml.ledger.javaapi.data.Command
 import com.daml.network.codegen.java.cc.coin.Coin
-import com.daml.network.codegen.{CC, OpenBusiness}
-import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
-import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.codegen.java.da.types.Tuple2
+import com.daml.network.codegen.java.{cc, openbusiness}
+import com.daml.network.environment.{CoinRetries, JavaCoinLedgerConnection => CoinLedgerConnection}
+import com.daml.network.store.JavaAcsStore.QueryResult
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.TracedLogger
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 object CoinUtil {
 
@@ -25,15 +27,12 @@ object CoinUtil {
       svc: PartyId,
       validator: PartyId,
       user: PartyId,
-  ): Command =
-    CC.Coin
-      .ValidatorRight(
-        svc = svc.toPrim,
-        validator = validator.toPrim,
-        user = user.toPrim,
-      )
-      .create
-      .command
+  ): Seq[Command] =
+    new cc.coin.ValidatorRight(
+      svc.toProtoPrimitive,
+      user.toProtoPrimitive,
+      validator.toProtoPrimitive,
+    ).create.commands.asScala.toSeq
 
   def createValidatorRight(
       svc: PartyId,
@@ -45,7 +44,9 @@ object CoinUtil {
       flagCloseable: FlagCloseable,
       lookupValidatorRightByParty: (
           PartyId
-      ) => Future[QueryResult[Option[Contract[CC.Coin.ValidatorRight]]]],
+      ) => Future[
+        QueryResult[Option[JavaContract[cc.coin.ValidatorRight.ContractId, cc.coin.ValidatorRight]]]
+      ],
   )(implicit ec: ExecutionContext, traceContext: TraceContext): Future[Unit] =
     retryProvider.retryForAutomationWithUncleanShutdown(
       "createValidatorRight",
@@ -54,12 +55,10 @@ object CoinUtil {
           // TODO(#790) Switch to the generalized version of mkCommandId once it has been added
           val commandId = s"com.daml.network.validator.ValidatorRight_$user"
           connection
-            .submitCommandWithDedup(
+            .submitCommandsWithDedup(
               actAs = Seq(validator, user),
               readAs = Seq.empty,
-              command = Seq(
-                createValidatorRightCommand(svc, validator, user)
-              ),
+              commands = createValidatorRightCommand(svc, validator, user),
               commandId = commandId,
               deduplicationOffset = off,
             )
@@ -72,57 +71,58 @@ object CoinUtil {
     )
 
   lazy val defaultHoldingFee =
-    OpenBusiness.Fees.RatePerRound(damlNumeric(1.0 / 360.0 / (24.0 * 60.0 / 2.5)))
+    new openbusiness.fees.RatePerRound(damlNumeric(1.0 / 360.0 / (24.0 * 60.0 / 2.5)))
 
   // TODO(M1-90) surely there's a better way to define Daml Numeric values in Scala
-  def damlNumeric(x: Double): BigDecimal =
-    BigDecimal(x).setScale(10, BigDecimal.RoundingMode.HALF_EVEN)
+  def damlNumeric(x: Double): java.math.BigDecimal =
+    BigDecimal(x).setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
 
-  def defaultCoinConfig: CC.CoinRules.CoinConfig[CC.CoinRules.USD] = CC.CoinRules.CoinConfig(
+  def defaultCoinConfig: cc.coinrules.CoinConfig[cc.coinrules.USD] = new cc.coinrules.CoinConfig(
     // Fee to create a new coin.
     // Set to the fixed part of the transfer fee.
-    createFee = OpenBusiness.Fees.FixedFee(0.09),
+    new openbusiness.fees.FixedFee(BigDecimal(0.09).bigDecimal),
 
     // Fee to update an existing coin.
     // Cost covering and 10x lower than creation to strongly incentivize merging coins.
-    updateFee = OpenBusiness.Fees.FixedFee(0.01),
+    new openbusiness.fees.FixedFee(BigDecimal(0.01).bigDecimal),
 
     // Fee for keeping a coin around.
     // This is roughly equivalent to 1$/360 days but expressed as rounds
     // with one day corresponding to 24*60/2.5 rounds, i.e., one round
     // every 2.5 minutes.
     // Incentivizes users to actively merge their coins.
-    holdingFee = defaultHoldingFee,
-
-    // The minimal quantity of burn for which a receipt is issued.
-    // Chosen to cover to be just above the cost of updating a single update.
-    minRewardQuantity = 0.011, // in $
+    defaultHoldingFee,
 
     // Fee for transferring some quantity of coin to a new owner.
     // TODO(M1-90) Finetuning required
-    transferFee = OpenBusiness.Fees.SteppedRate(
-      initialRate = 0.01,
-      steps = Seq(
-        com.daml.network.codegen.DA.Types.Tuple2(BigDecimal(100.0), BigDecimal(0.001)),
-        com.daml.network.codegen.DA.Types.Tuple2(BigDecimal(1000.0), BigDecimal(0.0001)),
-        com.daml.network.codegen.DA.Types.Tuple2(BigDecimal(1000000.0), BigDecimal(0.00001)),
-      ),
+    new openbusiness.fees.SteppedRate(
+      BigDecimal(0.01).bigDecimal,
+      Seq(
+        new Tuple2(BigDecimal(100.0).bigDecimal, BigDecimal(0.001).bigDecimal),
+        new Tuple2(BigDecimal(1000.0).bigDecimal, BigDecimal(0.0001).bigDecimal),
+        new Tuple2(BigDecimal(1000000.0).bigDecimal, BigDecimal(0.00001).bigDecimal),
+      ).asJava,
     ),
 
     // Coins issued per mining round.
     // Set to 60 coins, which implies a coin price of 1 $ at burn-mint-equilibrium (BME) when the network spends
     // 0.1 $/second in discounted transfer fees and a price of 100$ when the network spends 10 $ per second in discounted fees.
-    coinsIssuedPerRound = 60.0,
-    svcIssuanceRatio = 0.35,
+    BigDecimal(60.0).bigDecimal,
+
+    // The minimal quantity of burn for which a receipt is issued.
+    // Chosen to cover to be just above the cost of updating a single update.
+    BigDecimal(0.011).bigDecimal, // in $
+
+    BigDecimal(0.35).bigDecimal,
 
     // These should be large enough to ensure efficient batching, but not too large
     // to avoid creating very large transactions.
-    maxNumInputs = 100,
-    maxNumOutputs = 100,
+    100,
+    100,
 
     // Fits a hex-encoded SHA-256 or a UUID
     // TODO(M1-90): charge per character
-    maxPayloadLength = 32,
+    32,
   )
 
   def holdingFee(

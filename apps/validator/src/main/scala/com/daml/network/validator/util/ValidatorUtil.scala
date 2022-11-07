@@ -1,8 +1,8 @@
 package com.daml.network.validator.util
 
-import com.daml.network.codegen.CN.Wallet as walletCodegen
-import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
-import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.codegen.java.cn.wallet as walletCodegen
+import com.daml.network.environment.{CoinRetries, JavaCoinLedgerConnection => CoinLedgerConnection}
+import com.daml.network.store.JavaAcsStore.QueryResult
 import com.daml.network.validator.store.ValidatorStore
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.TracedLogger
@@ -10,6 +10,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 private[validator] object ValidatorUtil {
 
@@ -44,21 +45,16 @@ private[validator] object ValidatorUtil {
             // have special characters not allowed in command ids.
             val commandId = s"com.daml.network.validator.WalletAppInstall_$endUserParty"
             connection
-              .submitCommandWithDedup(
+              .submitCommandsWithDedup(
                 actAs = Seq(validatorServiceParty, walletServiceParty, endUserParty),
                 readAs = Seq.empty,
-                command = Seq(
-                  walletCodegen
-                    .WalletAppInstall(
-                      walletServiceParty = walletServiceParty.toPrim,
-                      svcParty = svcParty.toPrim,
-                      validatorParty = validatorServiceParty.toPrim,
-                      endUserParty = endUserParty.toPrim,
-                      endUserName = endUserName,
-                    )
-                    .create
-                    .command
-                ),
+                commands = new walletCodegen.WalletAppInstall(
+                  svcParty.toProtoPrimitive,
+                  validatorServiceParty.toProtoPrimitive,
+                  walletServiceParty.toProtoPrimitive,
+                  endUserName,
+                  endUserParty.toProtoPrimitive,
+                ).create.commands.asScala.toSeq,
                 commandId = commandId,
                 deduplicationOffset = off,
               )

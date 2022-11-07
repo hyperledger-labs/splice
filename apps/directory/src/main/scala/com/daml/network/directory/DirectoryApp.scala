@@ -55,18 +55,10 @@ class DirectoryApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
+      javaLedgerClient: JavaCoinLedgerClient,
       providerPartyId: PartyId,
   ): Future[DirectoryApp.State] =
     for {
-      javaLedgerClient <-
-        JavaCoinLedgerClient.create(
-          config.remoteParticipant.ledgerApi,
-          config.damlUser, // Application ID must be equal to user name
-          config.remoteParticipant.token,
-          timeouts,
-          loggerFactory,
-          tracerProvider,
-        )
       scanConnection <- Future.successful(
         new ScanConnection(
           config.remoteScan.clientAdminApi,

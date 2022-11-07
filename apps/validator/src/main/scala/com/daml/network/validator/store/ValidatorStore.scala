@@ -1,10 +1,10 @@
 package com.daml.network.validator.store
 
-import com.daml.network.codegen.CN.{Wallet => walletCodegen}
-import com.daml.network.codegen.{CC => coinCodegen}
-import com.daml.network.store.AcsStore
-import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.Contract
+import com.daml.network.codegen.java.cc.{coin => coinCodegen, coinrules => coinRulesCodegen}
+import com.daml.network.codegen.java.cn.{wallet => walletCodegen}
+import com.daml.network.store.JavaAcsStore.QueryResult
+import com.daml.network.store.{JavaAcsStore => AcsStore}
+import com.daml.network.util.{JavaContract => Contract}
 import com.daml.network.validator.store.memory.InMemoryValidatorStore
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -25,22 +25,31 @@ trait ValidatorStore extends AutoCloseable with NamedLogging {
 
   def lookupWalletInstallByName(
       endUserName: String
-  ): Future[QueryResult[Option[Contract[walletCodegen.WalletAppInstall]]]] =
-    acsStore.findContract(walletCodegen.WalletAppInstall)(co =>
+  ): Future[QueryResult[
+    Option[Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]]
+  ]] =
+    acsStore.findContract(walletCodegen.WalletAppInstall.COMPANION)(co =>
       co.payload.endUserName == endUserName
     )
 
-  def lookupCoinRules(): Future[QueryResult[Option[Contract[coinCodegen.CoinRules.CoinRules]]]] =
-    acsStore.findContract(coinCodegen.CoinRules.CoinRules)(_ => true)
+  def lookupCoinRules(): Future[
+    QueryResult[Option[Contract[coinRulesCodegen.CoinRules.ContractId, coinRulesCodegen.CoinRules]]]
+  ] =
+    acsStore.findContract(coinRulesCodegen.CoinRules.COMPANION)(_ => true)
 
-  def lookupCoinRulesRequest()
-      : Future[QueryResult[Option[Contract[coinCodegen.CoinRules.CoinRulesRequest]]]] =
-    acsStore.findContract(coinCodegen.CoinRules.CoinRulesRequest)(_ => true)
+  def lookupCoinRulesRequest(): Future[QueryResult[Option[
+    Contract[coinRulesCodegen.CoinRulesRequest.ContractId, coinRulesCodegen.CoinRulesRequest]
+  ]]] =
+    acsStore.findContract(coinRulesCodegen.CoinRulesRequest.COMPANION)(_ => true)
 
   def lookupValidatorRightByParty(
       party: PartyId
-  ): Future[QueryResult[Option[Contract[coinCodegen.Coin.ValidatorRight]]]] =
-    acsStore.findContract(coinCodegen.Coin.ValidatorRight)(co => co.payload.user == party.toPrim)
+  ): Future[
+    QueryResult[Option[Contract[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]]
+  ] =
+    acsStore.findContract(coinCodegen.ValidatorRight.COMPANION)(co =>
+      co.payload.user == party.toPrim
+    )
 }
 
 object ValidatorStore {
@@ -80,17 +89,17 @@ object ValidatorStore {
     AcsStore.SimpleContractFilter(
       key.validatorParty,
       Map(
-        mkFilter(walletCodegen.WalletAppInstall)(co =>
+        mkFilter(walletCodegen.WalletAppInstall.COMPANION)(co =>
           co.payload.walletServiceParty == walletService &&
             co.payload.validatorParty == validator &&
             co.payload.svcParty == svc
         ),
-        mkFilter(coinCodegen.CoinRules.CoinRules)(co => co.payload.svc == svc),
-        mkFilter(coinCodegen.CoinRules.CoinRulesRequest)(co =>
+        mkFilter(coinRulesCodegen.CoinRules.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(coinRulesCodegen.CoinRulesRequest.COMPANION)(co =>
           co.payload.user == validator &&
             co.payload.svc == svc
         ),
-        mkFilter(coinCodegen.Coin.ValidatorRight)(co =>
+        mkFilter(coinCodegen.ValidatorRight.COMPANION)(co =>
           co.payload.validator == validator &&
             co.payload.svc == svc
         ),

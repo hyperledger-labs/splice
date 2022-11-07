@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.codegen.CC as coinCodegen
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
+import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries, JavaCoinLedgerClient}
 import com.daml.network.scan.admin.grpc.GrpcScanService
 import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.config.LocalScanAppConfig
@@ -51,6 +51,7 @@ class ScanApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
+      javaLedgerClient: JavaCoinLedgerClient,
       svcParty: PartyId,
   ): Future[ScanApp.State] =
     for {

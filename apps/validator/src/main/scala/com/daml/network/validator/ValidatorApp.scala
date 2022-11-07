@@ -3,14 +3,19 @@ package com.daml.network.validator
 import akka.actor.ActorSystem
 import cats.implicits.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.api.domain.UserRight.CanReadAs
-import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.network.codegen.CC.CoinRules.CoinRulesRequest
-import com.daml.network.codegen.CN.Wallet as walletCodegen
+import com.daml.ledger.javaapi.data.User
+import com.daml.network.codegen.java.cc.coinrules.CoinRulesRequest
+import com.daml.network.codegen.java.cn.wallet as walletCodegen
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
+import com.daml.network.environment.{
+  CoinLedgerClient,
+  CoinNode,
+  CoinRetries,
+  JavaCoinLedgerClient,
+  JavaCoinLedgerConnection => CoinLedgerConnection,
+}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.store.JavaAcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, UploadablePackage}
 import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
 import com.daml.network.validator.automation.ValidatorAutomationService
@@ -29,6 +34,7 @@ import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.jdk.CollectionConverters.*
 
 /** Class representing a Validator app instance. */
 class ValidatorApp(
@@ -59,10 +65,8 @@ class ValidatorApp(
     logger.info(s"Attempting to setup wallet...")
     for {
       _ <- connection.uploadDarFile(new UploadablePackage {
-        lazy val walletTemplateId: com.daml.ledger.api.v1.value.Identifier =
-          ApiTypes.TemplateId.unwrap(walletCodegen.AppPaymentRequest.id)
-
-        lazy val packageId: String = walletTemplateId.packageId
+        lazy val packageId: String =
+          walletCodegen.AppPaymentRequest.COMPANION.TEMPLATE_ID.getPackageId
 
         // See `Compile / resourceGenerators` in build.sbt
         lazy val resourcePath: String = "dar/wallet-0.1.0.dar"
@@ -90,7 +94,7 @@ class ValidatorApp(
       _ <- instance.dars.traverse_(dar => connection.uploadDarFile(dar))
       party <- connection.getOrAllocateParty(
         instance.serviceUser,
-        Seq(CanReadAs(validatorParty.toLf)),
+        Seq(new User.Right.CanReadAs(validatorParty.toProtoPrimitive)),
       )
     } yield {
       logger.info(
@@ -149,7 +153,8 @@ class ValidatorApp(
       validatorParty: PartyId,
   ): Future[Unit] = {
     logger.info("Attempting to create CoinRulesRequest")
-    val coinRulesReq = CoinRulesRequest(user = validatorParty.toPrim, svc = svcParty.toPrim)
+    val coinRulesReq =
+      new CoinRulesRequest(validatorParty.toProtoPrimitive, svcParty.toProtoPrimitive)
     retryProvider
       .retryForAutomationWithUncleanShutdown(
         "Create CoinRulesRequest",
@@ -161,10 +166,10 @@ class ValidatorApp(
               // TODO(#790) Switch to the generalized version of mkCommandId once it has been added
               val commandId = s"com.daml.network.validator.CoinRulesRequest_$validatorParty"
               connection
-                .submitCommandWithDedup(
+                .submitCommandsWithDedup(
                   actAs = Seq(validatorParty),
                   readAs = Seq.empty,
-                  command = Seq(coinRulesReq.create.command),
+                  commands = coinRulesReq.create.commands.asScala.toSeq,
                   commandId = commandId,
                   deduplicationOffset = Ordering.String.min(off1, off2),
                 )
@@ -183,6 +188,7 @@ class ValidatorApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
+      javaLedgerClient: JavaCoinLedgerClient,
       validatorParty: PartyId,
   ): Future[ValidatorApp.State] =
     for {
@@ -194,7 +200,7 @@ class ValidatorApp(
             loggerFactory,
           )
         )
-      connection = ledgerClient.connection("ValidatorAppBootstrap")
+      connection = javaLedgerClient.connection("ValidatorAppBootstrap")
       svcParty <- retryProvider.retryForAutomationWithUncleanShutdown(
         "getSvcPartyId",
         scanConnection.getSvcPartyId(),
@@ -209,7 +215,7 @@ class ValidatorApp(
       store = ValidatorStore(key, storage, loggerFactory)
       automation = new ValidatorAutomationService(
         store,
-        ledgerClient,
+        javaLedgerClient,
         retryProvider,
         loggerFactory,
         timeouts,
@@ -232,7 +238,7 @@ class ValidatorApp(
         .addService(
           ValidatorAppServiceGrpc.bindService(
             new GrpcValidatorAppService(
-              ledgerClient,
+              javaLedgerClient,
               store,
               config.damlUser,
               config.walletServiceUser,

@@ -14,6 +14,7 @@ import com.daml.ledger.javaapi.data.{CreatedEvent, DamlRecord, Template, Value}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
+import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.serialization.ProtoConverter
 
 import scala.util.Try
@@ -99,7 +100,5 @@ object JavaContract {
   def fromCreatedEvent[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
       companion: ContractCompanion[TC, TCid, T]
   )(ev: CreatedEvent): Option[JavaContract[TCid, T]] =
-    if (ev.getTemplateId == companion.TEMPLATE_ID) {
-      Some(JavaContract.fromCodegenContract(companion.fromCreatedEvent(ev)))
-    } else None
+    JavaDecodeUtil.decodeCreated(companion)(ev).map(JavaContract.fromCodegenContract)
 }

@@ -1,16 +1,22 @@
 package com.daml.network.svc.admin.grpc
 
-import cats.implicits._
-import com.daml.ledger.api.v1.command_service.SubmitAndWaitForTransactionResponse
-import com.daml.ledger.client.binding.{Contract, Primitive, TemplateCompanion}
-import com.daml.network.codegen.CC
-import com.daml.network.environment.CoinLedgerClient
+import com.daml.ledger.javaapi.data.Template
+import com.daml.ledger.javaapi.data.codegen.{
+  Contract as CodegenContract,
+  ContractCompanion,
+  ContractId,
+}
+import com.daml.network.codegen.java.cc
+import com.daml.network.environment.{
+  JavaCoinLedgerClient as CoinLedgerClient,
+  JavaCoinLedgerConnection as CoinLedgerConnection,
+}
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0.SvcServiceGrpc
 import com.daml.network.svc.{SvcApp, v0}
 import com.daml.network.util.Proto
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.ledger.api.client.{DecodeUtil, LedgerConnection}
+import com.digitalasset.canton.participant.ledger.api.client.{JavaDecodeUtil as DecodeUtil}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
 import com.google.protobuf.empty.Empty
@@ -36,38 +42,28 @@ class GrpcSvcAppService(
 
   override def getDebugInfo(request: Empty): Future[v0.GetDebugInfoResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { _ => _ =>
-      connection.getOptionalPrimaryParty(svcUserName).flatMap {
-        case None =>
-          Future.successful(
-            v0.GetDebugInfoResponse(
-              svcUser = svcUserName
-            )
-          )
-        case Some(partyId) =>
-          for {
-            coinRulesCids <- connection
-              .activeContracts(partyId, CC.CoinRules.CoinRules)
-              .map(_.map(_.contractId))
-          } yield v0.GetDebugInfoResponse(
-            svcUser = svcUserName,
-            svcPartyId = Proto.encode(partyId),
-            coinPackageId = SvcApp.coinPackage.packageId,
-            coinRulesContractIds = coinRulesCids.map(Proto.encode(_)),
-          )
-      }
+      for {
+        coinRulesCids <- connection
+          .activeContracts(store.svcParty, cc.coinrules.CoinRules.COMPANION)
+          .map(_.map(_.id))
+      } yield v0.GetDebugInfoResponse(
+        svcUser = svcUserName,
+        svcPartyId = Proto.encode(store.svcParty),
+        coinPackageId = SvcApp.coinPackage.packageId,
+        coinRulesContractIds = coinRulesCids.map(Proto.encodeContractId(_)),
+      )
     }
 
   // NOTE: the commands below have not been converted to use the store, as they'll go away when we automation issuance
   override def openRound(request: v0.OpenRoundRequest): Future[v0.OpenRoundResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
+      val price = Proto.tryDecode(Proto.JavaBigDecimal)(request.coinPrice)
       for {
-        svc <- connection.getPrimaryParty(svcUserName)
-        price = Proto.tryDecode(Proto.BigDecimal)(request.coinPrice)
         coinRules <- store.getCoinRules()
         cmd = coinRules.value.contractId
-          .exerciseCoinRules_MiningRound_Open(price, CC.Round.Round(request.round))
-        cid <- connection.submitWithResult(Seq(svc), Seq.empty, cmd)
-      } yield v0.OpenRoundResponse(Proto.encode(cid))
+          .exerciseCoinRules_MiningRound_Open(price, new cc.round.Round(request.round))
+        cid <- connection.submitWithResult(Seq(store.svcParty), Seq.empty, cmd)
+      } yield v0.OpenRoundResponse(Proto.encodeContractId(cid.exerciseResult))
     }
 
   override def startClosingRound(
@@ -75,14 +71,13 @@ class GrpcSvcAppService(
   ): Future[v0.StartClosingRoundResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
-        svc <- connection.getPrimaryParty(svcUserName)
-        openRound <- getRound(CC.Round.OpenMiningRound)(_.round)(svc, request.round)
+        openRound <- getRound(cc.round.OpenMiningRound.COMPANION)(_.round)(request.round)
         coinRules <- store.getCoinRules()
         cmd = coinRules.value.contractId
           .exerciseCoinRules_MiningRound_StartClosing(openRound)
         cid <-
-          connection.submitWithResult(Seq(svc), Seq.empty, cmd)
-      } yield v0.StartClosingRoundResponse(Proto.encode(cid))
+          connection.submitWithResult(Seq(store.svcParty), Seq.empty, cmd)
+      } yield v0.StartClosingRoundResponse(Proto.encodeContractId(cid.exerciseResult))
     }
 
   override def startIssuingRound(
@@ -90,39 +85,40 @@ class GrpcSvcAppService(
   ): Future[v0.StartIssuingRoundResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
-        svc <- connection.getPrimaryParty(svcUserName)
-        closingRound <- getRound(CC.Round.ClosingMiningRound)(_.round)(svc, request.round)
-        rewards <- queryRewards(svc, request.round)
+        closingRound <- getRound(cc.round.ClosingMiningRound.COMPANION)(_.round)(request.round)
+        rewards <- queryRewards(store.svcParty, request.round)
         totalBurn = rewards.totalBurn
         coinRules <- store.getCoinRules()
         cmd = coinRules.value.contractId
-          .exerciseCoinRules_MiningRound_StartIssuing(closingRound, totalBurn)
+          .exerciseCoinRules_MiningRound_StartIssuing(closingRound, totalBurn.bigDecimal)
         cid <-
-          connection.submitWithResult(Seq(svc), Seq.empty, cmd)
-      } yield v0.StartIssuingRoundResponse(Proto.encode(totalBurn), Proto.encode(cid))
+          connection.submitWithResult(Seq(store.svcParty), Seq.empty, cmd)
+      } yield v0.StartIssuingRoundResponse(
+        Proto.encode(totalBurn),
+        Proto.encodeContractId(cid.exerciseResult),
+      )
     }
 
   override def closeRound(request: v0.CloseRoundRequest): Future[v0.CloseRoundResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
-        svc <- connection.getPrimaryParty(svcUserName)
-        issuingRound <- getRound(CC.Round.IssuingMiningRound)(_.round)(svc, request.round)
+        issuingRound <- getRound(cc.round.IssuingMiningRound.COMPANION)(_.round)(request.round)
         totals = getTotalsPerRound(request.round)
         coinRules <- store.getCoinRules()
         cmd =
           coinRules.value.contractId
             .exerciseCoinRules_MiningRound_Close(
               issuingRound,
-              totals.transferFees,
-              totals.adminFees,
-              totals.holdingFees,
-              totals.transferInputs,
-              totals.nonSelfTransferOutputs,
-              totals.selfTransferOutputs,
+              totals.transferFees.bigDecimal,
+              totals.adminFees.bigDecimal,
+              totals.holdingFees.bigDecimal,
+              totals.transferInputs.bigDecimal,
+              totals.nonSelfTransferOutputs.bigDecimal,
+              totals.selfTransferOutputs.bigDecimal,
             )
         cid <-
-          connection.submitWithResult(Seq(svc), Seq.empty, cmd)
-      } yield v0.CloseRoundResponse(Proto.encode(cid))
+          connection.submitWithResult(Seq(store.svcParty), Seq.empty, cmd)
+      } yield v0.CloseRoundResponse(Proto.encodeContractId(cid.exerciseResult))
     }
 
   private case class RoundTotals(
@@ -151,13 +147,12 @@ class GrpcSvcAppService(
   override def archiveRound(request: v0.ArchiveRoundRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
-        svc <- connection.getPrimaryParty(svcUserName)
-        closedRound <- getRound(CC.Round.ClosedMiningRound)(_.round)(svc, request.round)
+        closedRound <- getRound(cc.round.ClosedMiningRound.COMPANION)(_.round)(request.round)
         coinRules <- store.getCoinRules()
         cmd =
           coinRules.value.contractId
             .exerciseCoinRules_MiningRound_Archive(closedRound)
-        _ <- connection.submitWithResult(Seq(svc), Seq.empty, cmd)
+        _ <- connection.submitWithResult(Seq(store.svcParty), Seq.empty, cmd)
       } yield Empty()
     }
 
@@ -165,62 +160,43 @@ class GrpcSvcAppService(
     * to the corresponding contract id.
     * Fails if there is more than one round for a given validator.
     */
-  private def getRound[T](companion: TemplateCompanion[T])(
-      getRound: T => CC.Round.Round
-  )(svc: PartyId, round: Long): Future[Primitive.ContractId[T]] =
+  private def getRound[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
+      companion: ContractCompanion[TC, TCid, T]
+  )(
+      getRound: T => cc.round.Round
+  )(round: Long): Future[TCid] =
     for {
-      allRounds <- connection.activeContracts(svc, companion)
+      allRounds <- connection.activeContracts(store.svcParty, companion)
     } yield {
       val filteredRounds = allRounds.filter { case roundContract =>
-        val roundId = getRound(roundContract.value)
-        roundId.number === round
+        val roundId = getRound(roundContract.data)
+        roundId.number == round
       }
       require(
         filteredRounds.length == 1,
         s"Expected one round but got ${filteredRounds.length} rounds $filteredRounds",
       )
-      filteredRounds(0).contractId
+      filteredRounds(0).id
     }
-
-  private def roundResultsToProto[T](
-      m: Map[Primitive.Party, Primitive.ContractId[T]]
-  ): Map[String, String] =
-    m.map { case (v, cid) => Proto.encode(v) -> Proto.encode(cid) }
-
-  /** Given a set of submission results, decode them to a map of validator party to
-    * contract id of the given T.
-    * Fails if there is not exactly one create for the given template.
-    */
-  private def decodeRoundResults[T](companion: TemplateCompanion[T])(
-      getValidator: T => Primitive.Party
-  )(
-      results: Seq[SubmitAndWaitForTransactionResponse]
-  ): Map[Primitive.Party, Primitive.ContractId[T]] =
-    results.map { case r =>
-      val rounds = DecodeUtil.decodeAllCreated(companion)(r.getTransaction)
-      require(rounds.length == 1, s"Expected one round but found ${rounds.length} rounds $rounds")
-      val round = rounds(0)
-      getValidator(round.value) -> round.contractId
-    }.toMap
 
   /** Query the open reward contracts for a given round. This should only be used
     * on a ClosingMiningRound.
     */
   private def queryRewards(p: PartyId, round: Long): Future[RoundRewards] = for {
     activeContracts <- connection.activeContracts(
-      LedgerConnection.transactionFilterByParty(
-        Map(p -> Seq(CC.Coin.AppReward.id, CC.Coin.ValidatorReward.id))
+      CoinLedgerConnection.transactionFilterByParty(
+        Map(p -> Seq(cc.coin.AppReward.TEMPLATE_ID, cc.coin.ValidatorReward.TEMPLATE_ID))
       )
     )
   } yield {
     val appRewards =
-      activeContracts.flatMap(ev => DecodeUtil.decodeCreated(CC.Coin.AppReward)(ev))
+      activeContracts.flatMap(ev => DecodeUtil.decodeCreated(cc.coin.AppReward.COMPANION)(ev))
     val validatorRewards =
-      activeContracts.flatMap(ev => DecodeUtil.decodeCreated(CC.Coin.ValidatorReward)(ev))
+      activeContracts.flatMap(ev => DecodeUtil.decodeCreated(cc.coin.ValidatorReward.COMPANION)(ev))
     RoundRewards(
       round = round,
-      appRewards = appRewards.filter(c => c.value.round.number === round),
-      validatorRewards = validatorRewards.filter(c => c.value.round.number === round),
+      appRewards = appRewards.filter(c => c.data.round.number == round),
+      validatorRewards = validatorRewards.filter(c => c.data.round.number == round),
     )
   }
 }
@@ -231,13 +207,17 @@ object GrpcSvcAppService {
     */
   private case class RoundRewards(
       round: Long,
-      appRewards: Seq[Contract[CC.Coin.AppReward]],
-      validatorRewards: Seq[Contract[CC.Coin.ValidatorReward]],
+      appRewards: Seq[CodegenContract[cc.coin.AppReward.ContractId, cc.coin.AppReward]],
+      validatorRewards: Seq[
+        CodegenContract[cc.coin.ValidatorReward.ContractId, cc.coin.ValidatorReward]
+      ],
   ) {
 
     /** Calculate the total burn for the given round based on the rewards issued in that round.
       */
     def totalBurn: BigDecimal =
-      appRewards.map(_.value.quantity).sum + validatorRewards.map(_.value.quantity).sum
+      appRewards.map[BigDecimal](r => BigDecimal(r.data.quantity)).sum + validatorRewards
+        .map[BigDecimal](r => BigDecimal(r.data.quantity))
+        .sum
   }
 }

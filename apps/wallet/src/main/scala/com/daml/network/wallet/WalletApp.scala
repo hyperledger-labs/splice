@@ -65,18 +65,10 @@ class WalletApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
+      javaLedgerClient: JavaCoinLedgerClient,
       walletServiceParty: PartyId,
   ): Future[WalletApp.State] = {
     for {
-      javaLedgerClient <-
-        JavaCoinLedgerClient.create(
-          config.remoteParticipant.ledgerApi,
-          config.serviceUser, // Application ID must be equal to user name
-          config.remoteParticipant.token,
-          timeouts,
-          loggerFactory,
-          tracerProvider,
-        )
       scanConnection <- Future {
         new ScanConnection(
           config.remoteScan.clientAdminApi,
@@ -155,7 +147,6 @@ class WalletApp(
         timeouts,
       )
       WalletApp.State(
-        javaLedgerClient,
         automation,
         storage,
         walletStore,
@@ -175,7 +166,6 @@ class WalletApp(
 
 object WalletApp {
   case class State(
-      javaLedgerClient: JavaCoinLedgerClient,
       automation: WalletAutomationService,
       storage: Storage,
       walletStore: WalletStore,
@@ -192,7 +182,6 @@ object WalletApp {
         treasuryServices,
         scanConnection,
         validatorConnection,
-        javaLedgerClient,
       )(logger)
   }
 }

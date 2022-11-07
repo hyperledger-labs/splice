@@ -2,12 +2,17 @@ package com.daml.network.svc
 
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.network.codegen.CC
-import com.daml.network.codegen.CC.Coin.Coin
+import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
-import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.environment.{
+  CoinLedgerClient,
+  CoinNode,
+  CoinRetries,
+  JavaCoinLedgerClient,
+  JavaCoinLedgerConnection,
+}
+import com.daml.network.store.JavaAcsStore.QueryResult
 import com.daml.network.svc.admin.grpc.GrpcSvcAppService
 import com.daml.network.svc.automation.{SvcAutomationService, SvcLogCollectionService}
 import com.daml.network.svc.config.LocalSvcAppConfig
@@ -26,6 +31,7 @@ import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
+import scala.jdk.CollectionConverters.*
 
 /** Class representing an SVC app instance. */
 class SvcApp(
@@ -56,15 +62,16 @@ class SvcApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
+      javaLedgerClient: JavaCoinLedgerClient,
       svcPartyId: PartyId,
   ): Future[SvcApp.State] =
     for {
       store <- Future.successful(SvcStore(svcPartyId, storage, loggerFactory))
-      connection = ledgerClient.connection("SvcAppBootstrap")
+      connection = javaLedgerClient.connection("SvcAppBootstrap")
       _ <- connection.uploadDarFile(SvcApp.coinPackage)
       automation = new SvcAutomationService(
         store,
-        ledgerClient,
+        javaLedgerClient,
         retryProvider,
         loggerFactory,
         timeouts,
@@ -82,7 +89,7 @@ class SvcApp(
       adminServerRegistry
         .addService(
           SvcServiceGrpc.bindService(
-            new GrpcSvcAppService(ledgerClient, config.damlUser, store, loggerFactory),
+            new GrpcSvcAppService(javaLedgerClient, config.damlUser, store, loggerFactory),
             ec,
           )
         )
@@ -120,17 +127,14 @@ object SvcApp {
 
   }
   val coinPackage: UploadablePackage = new UploadablePackage {
-    lazy val coinTemplateId: com.daml.ledger.api.v1.value.Identifier =
-      ApiTypes.TemplateId.unwrap(Coin.id)
-
-    lazy val packageId: String = coinTemplateId.packageId
+    lazy val packageId: String = Coin.COMPANION.TEMPLATE_ID.getPackageId
 
     // See `Compile / resourceGenerators` in build.sbt
     lazy val resourcePath: String = "dar/canton-coin-0.1.0.dar"
   }
   private def setupApp(
       svc: PartyId,
-      connection: CoinLedgerConnection,
+      connection: JavaCoinLedgerConnection,
       logger: TracedLogger,
       store: SvcStore,
       retryProvider: CoinRetries,
@@ -139,15 +143,15 @@ object SvcApp {
 
     // Create CoinRules and open a first mining round
     val createCoinRulesCmd =
-      CC.CoinRules
-        .CoinRules(
-          svc = svc.toPrim,
-          observers = Seq.empty,
-          config = defaultCoinConfig,
-        )
-        .createAnd
-        .exerciseCoinRules_MiningRound_Open(coinPrice = 1.0, CC.Round.Round(0))
-        .command
+      new cc.coinrules.CoinRules(
+        svc.toProtoPrimitive,
+        defaultCoinConfig,
+        Seq.empty.asJava,
+      ).createAnd
+        .exerciseCoinRules_MiningRound_Open(BigDecimal(1.0).bigDecimal, new cc.round.Round(0))
+        .commands
+        .asScala
+        .toSeq
     for {
       _ <- createValidatorRight(
         svc = svc,
@@ -166,12 +170,10 @@ object SvcApp {
             // TODO(#790) Switch to the generalized version of mkCommandId once it has been added
             val commandId = s"com.daml.network.svc.CoinRules"
             connection
-              .submitCommandWithDedup(
+              .submitCommandsWithDedup(
                 actAs = Seq(svc),
                 readAs = Seq.empty,
-                command = Seq(
-                  createCoinRulesCmd
-                ),
+                commands = createCoinRulesCmd,
                 commandId = commandId,
                 deduplicationOffset = off,
               )

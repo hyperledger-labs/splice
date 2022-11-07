@@ -4,7 +4,14 @@ import akka.actor.ActorSystem
 import akka.stream.KillSwitches
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
-import com.daml.ledger.javaapi.data.codegen.{Created, Exercised, Update}
+import com.daml.ledger.javaapi.data.codegen.{
+  Contract,
+  ContractCompanion,
+  ContractId,
+  Created,
+  Exercised,
+  Update,
+}
 import com.daml.ledger.javaapi.data.{
   Command,
   CreatedEvent,
@@ -17,10 +24,14 @@ import com.daml.ledger.javaapi.data.{
   Identifier,
   InclusiveFilter,
   LedgerOffset,
+  Template,
   Transaction,
   TransactionFilter,
   TransactionTree,
+  User,
 }
+import com.daml.network.util.UploadablePackage
+import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
@@ -32,8 +43,10 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.AkkaUtil
+import com.google.protobuf.ByteString
 import io.grpc.StatusRuntimeException
 
+import java.nio.file.{Files, Path}
 import java.util.UUID
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters._
@@ -74,9 +87,19 @@ trait JavaCoinLedgerConnection extends JavaCoinLedgerSubmit {
       filter: TransactionFilter
   ): Future[(Seq[CreatedEvent], LedgerOffset)]
 
+  def activeContractsWithOffset[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      party: PartyId,
+      companion: ContractCompanion[TC, TCid, T],
+  ): Future[(Seq[Contract[TCid, T]], LedgerOffset)]
+
   def activeContracts(
       filter: TransactionFilter
   ): Future[Seq[CreatedEvent]]
+
+  def activeContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      party: PartyId,
+      companion: ContractCompanion[TC, TCid, T],
+  ): Future[Seq[Contract[TCid, T]]]
 
   def subscription[T](
       subscriptionName: String,
@@ -96,6 +119,26 @@ trait JavaCoinLedgerConnection extends JavaCoinLedgerSubmit {
       mapOperator: Flow[S, T, _],
       subscriptionName: String,
   ): JavaCoinLedgerSubscription
+
+  def getOptionalPrimaryParty(user: String): Future[Option[PartyId]]
+
+  def allocatePartyViaLedgerApi(hint: Option[String], displayName: Option[String]): Future[PartyId]
+
+  def createPartyAndUser(user: String, userRights: Seq[User.Right]): Future[PartyId]
+
+  def getOrAllocateParty(
+      username: String,
+      userRights: Seq[User.Right] = Seq.empty,
+  )(implicit traceContext: TraceContext): Future[PartyId]
+
+  def grantUserRights(
+      user: String,
+      actAsParties: Seq[PartyId],
+      readAsParties: Seq[PartyId],
+  ): Future[Unit]
+
+  def uploadDarFile(pkg: UploadablePackage)(implicit traceContext: TraceContext): Future[Unit]
+  def uploadDarFile(path: Path)(implicit traceContext: TraceContext): Future[Unit]
 }
 
 /** Subscription for reading the ledger */
@@ -242,10 +285,30 @@ object JavaCoinLedgerConnection {
         }
       }
 
+      override def activeContractsWithOffset[TC <: Contract[TCid, T], TCid <: ContractId[
+        T
+      ], T <: Template](
+          party: PartyId,
+          companion: ContractCompanion[TC, TCid, T],
+      ): Future[(Seq[Contract[TCid, T]], LedgerOffset)] =
+        activeContractsWithOffset(
+          JavaCoinLedgerConnection.transactionFilterByParty(
+            Map(party -> Seq(companion.TEMPLATE_ID))
+          )
+        ).map { case (events, off) =>
+          (events.map(companion.fromCreatedEvent(_)), off)
+        }
+
       override def activeContracts(
           filter: TransactionFilter
       ): Future[Seq[CreatedEvent]] =
         activeContractsWithOffset(filter).map(_._1)
+
+      override def activeContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+          party: PartyId,
+          companion: ContractCompanion[TC, TCid, T],
+      ): Future[Seq[Contract[TCid, T]]] =
+        activeContractsWithOffset(party, companion).map(_._1)
 
       override def subscription[T](
           subscriptionName: String,
@@ -319,9 +382,144 @@ object JavaCoinLedgerConnection {
           }
         }
 
+      override def getOptionalPrimaryParty(user: String): Future[Option[PartyId]] = {
+        for {
+          user <- client
+            .getUser(user)
+            .map(Some(_))
+          partyId = user.map(u =>
+            PartyId.tryFromProtoPrimitive(
+              u.getPrimaryParty.toScala
+                .getOrElse(sys.error(s"user $user was allocated without primary party"))
+            )
+          )
+        } yield partyId
+      }
+
+      override def allocatePartyViaLedgerApi(
+          hint: Option[String],
+          displayName: Option[String],
+      ): Future[PartyId] =
+        client.allocateParty(hint, displayName).map(PartyId.tryFromProtoPrimitive)
+
+      override def createPartyAndUser(
+          user: String,
+          userRights: Seq[User.Right],
+      ): Future[PartyId] = {
+        for {
+          party <- allocatePartyViaLedgerApi(Some(sanitizePartyHint(user)), Some(user))
+          userId = com.daml.lf.data.Ref.UserId.assertFromString(user)
+          userLf = new User(userId, party.toLf)
+
+          user <- client
+            .createUser(userLf, new User.Right.CanActAs(party.toLf) +: userRights)
+          partyId =
+            PartyId.tryFromProtoPrimitive(
+              user.getPrimaryParty.toScala
+                .getOrElse(sys.error(s"user $user was allocated without primary party"))
+            )
+        } yield partyId
+      }
+
+      // TODO(M1-92): Factor out user/party allocation and make it robust (current implementation is racy)
+      override def getOrAllocateParty(
+          username: String,
+          userRights: Seq[User.Right] = Seq.empty,
+      )(implicit traceContext: TraceContext): Future[PartyId] = {
+        for {
+          existingPartyId <- getOptionalPrimaryParty(username).recover {
+            case e: StatusRuntimeException
+                if e.getStatus.getCode == io.grpc.Status.Code.NOT_FOUND =>
+              None
+          }
+          partyId <- existingPartyId.fold[Future[PartyId]](
+            createPartyAndUser(username, userRights)
+          )(
+            Future.successful
+          )
+        } yield partyId
+      }
+
+      override def grantUserRights(
+          user: String,
+          actAsParties: Seq[PartyId],
+          readAsParties: Seq[PartyId],
+      ): Future[Unit] = {
+        val grants =
+          actAsParties.map(p => new User.Right.CanActAs(p.toLf)) ++ readAsParties.map(p =>
+            new User.Right.CanReadAs(p.toLf)
+          )
+        client.grantUserRights(user, grants)
+      }
+
+      private def uploadDarFileInternal(packageId: String, darFile: => ByteString)(implicit
+          traceContext: TraceContext
+      ): Future[Unit] = {
+        for {
+          known <- client.listKnownPackages()
+          _ <- {
+            if (known.map(_.getPackageId).contains(packageId)) {
+              logger.debug(s"Package of dar $packageId already exists")
+              Future.successful(())
+            } else {
+              logger.debug(s"Uploading dar file ${packageId}")
+              client.uploadDarFile(darFile)
+            }
+          }
+        } yield ()
+      }
+
+      override def uploadDarFile(
+          pkg: UploadablePackage
+      )(implicit traceContext: TraceContext): Future[Unit] = {
+        for {
+          _ <- uploadDarFileInternal(
+            pkg.packageId,
+            ByteString.readFrom(pkg.inputStream()),
+          )
+          // TODO(M1-90): The ledger API does not block until the package is vetted.
+          //  Need to wait a bit, or use the Canton admin API to upload the package (that one does block).
+          _ = Threading.sleep(500)
+          _ = logger.info(s"Package ${pkg.packageId} is uploaded")
+        } yield ()
+      }
+
+      override def uploadDarFile(
+          path: Path
+      )(implicit traceContext: TraceContext): Future[Unit] = {
+        for {
+          darFile <- Future { ByteString.readFrom(Files.newInputStream(path)) }
+          // TODO(M1-90) Consider if we want to be clever
+          // and only upload if it has not already been uploaded.
+          _ <- client.uploadDarFile(darFile)
+          // TODO(M1-90): The ledger API does not block until the package is vetted.
+          //  Need to wait a bit, or use the Canton admin API to upload the package (that one does block).
+          _ = Threading.sleep(500)
+          _ = logger.info(s"DAR $path is uploaded")
+        } yield ()
+      }
+
       override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List[AsyncOrSyncCloseable](
       )
     }
+
+  def sanitizePartyHint(hint: String): String = {
+    val (processedHint, invalidCharDetected) = hint.foldLeft(("", false))((res, currentChar) => {
+      if ("[^\\w-_:]".r matches (s"$currentChar")) {
+        (res._1 + "_", true)
+      } else {
+        (res._1 + currentChar, res._2)
+      }
+    })
+
+    if (invalidCharDetected) {
+      // append a UUID if we had to rewrite the party hint,
+      // because there's a chance it could now conflict with an existing party
+      s"${processedHint}-${UUID.randomUUID.toString}"
+    } else {
+      processedHint
+    }
+  }
 
   def transactionFilterByParty(filter: Map[PartyId, Seq[Identifier]]): TransactionFilter =
     new FiltersByParty(

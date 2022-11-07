@@ -2,12 +2,17 @@ package com.daml.network.svc.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.ledger.client.binding.TemplateCompanion
-import com.daml.network.codegen.CC
-import com.daml.network.store.AcsStore
-import com.daml.network.store.AcsStore.QueryResult
+import com.daml.ledger.javaapi.data.Template
+import com.daml.ledger.javaapi.data.codegen.{
+  Contract as CodegenContract,
+  ContractCompanion,
+  ContractId,
+}
+import com.daml.network.codegen.java.cc
+import com.daml.network.store.JavaAcsStore.QueryResult
+import com.daml.network.store.{JavaAcsStore as AcsStore}
 import com.daml.network.svc.store.memory.InMemorySvcStore
-import com.daml.network.util.Contract
+import com.daml.network.util.{JavaContract as Contract}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
@@ -32,12 +37,16 @@ trait SvcStore extends AutoCloseable {
   protected val acsStore: AcsStore
 
   def lookupCoinRules(
-  ): Future[QueryResult[Option[Contract[CC.CoinRules.CoinRules]]]] =
+  ): Future[
+    QueryResult[Option[Contract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]]]
+  ] =
     acsStore
-      .findContract(CC.CoinRules.CoinRules)(_ => true)
+      .findContract(cc.coinrules.CoinRules.COMPANION)(_ => true)
 
   def getCoinRules(
-  )(implicit ec: ExecutionContext): Future[QueryResult[Contract[CC.CoinRules.CoinRules]]] =
+  )(implicit
+      ec: ExecutionContext
+  ): Future[QueryResult[Contract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]]] =
     lookupCoinRules().map(
       _.map(
         _.getOrElse(
@@ -50,18 +59,23 @@ trait SvcStore extends AutoCloseable {
 
   def lookupValidatorRightByParty(
       party: PartyId
-  ): Future[QueryResult[Option[Contract[CC.Coin.ValidatorRight]]]] =
-    acsStore.findContract(CC.Coin.ValidatorRight)(co => co.payload.user == party.toPrim)
+  ): Future[
+    QueryResult[Option[Contract[cc.coin.ValidatorRight.ContractId, cc.coin.ValidatorRight]]]
+  ] =
+    acsStore.findContract(cc.coin.ValidatorRight.COMPANION)(co => co.payload.user == party.toPrim)
 
-  def listContracts[T](
-      templateCompanion: TemplateCompanion[T],
-      filter: Contract[T] => Boolean = (_: Contract[T]) => true,
-  ): Future[AcsStore.QueryResult[Seq[Contract[T]]]] =
+  def listContracts[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
+      templateCompanion: ContractCompanion[TC, TCid, T],
+      filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
+  ): Future[AcsStore.QueryResult[Seq[Contract[TCid, T]]]] =
     acsStore.listContracts(templateCompanion, filter)
 
   /** All requests to the SVC for creating validator-specific coin rules. */
-  def streamCoinRulesRequests(): Source[Contract[CC.CoinRules.CoinRulesRequest], NotUsed] =
-    acsStore.streamContracts(CC.CoinRules.CoinRulesRequest)
+  def streamCoinRulesRequests(): Source[
+    Contract[cc.coinrules.CoinRulesRequest.ContractId, cc.coinrules.CoinRulesRequest],
+    NotUsed,
+  ] =
+    acsStore.streamContracts(cc.coinrules.CoinRulesRequest.COMPANION)
 
 }
 
@@ -86,15 +100,15 @@ object SvcStore {
     AcsStore.SimpleContractFilter(
       svcParty,
       Map(
-        mkFilter(CC.CoinRules.CoinRules)(co => co.payload.svc == svc),
-        mkFilter(CC.CoinRules.CoinRulesRequest)(co => co.payload.svc == svc),
-        mkFilter(CC.Coin.ValidatorRight)(co =>
+        mkFilter(cc.coinrules.CoinRules.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coinrules.CoinRulesRequest.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.ValidatorRight.COMPANION)(co =>
           co.payload.svc == svc && co.payload.validator == svc && co.payload.user == svc
         ),
-        mkFilter(CC.Round.OpenMiningRound)(co => co.payload.svc == svc),
-        mkFilter(CC.Round.ClosedMiningRound)(co => co.payload.svc == svc),
-        mkFilter(CC.Round.IssuingMiningRound)(co => co.payload.svc == svc),
-        mkFilter(CC.Round.ClosingMiningRound)(co => co.payload.svc == svc),
+        mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.round.ClosingMiningRound.COMPANION)(co => co.payload.svc == svc),
       ),
     )
   }

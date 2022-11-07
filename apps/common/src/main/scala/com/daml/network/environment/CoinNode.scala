@@ -71,7 +71,11 @@ abstract class CoinNode[State <: AutoCloseable](
   // We use that in the SVC app at the moment.
   protected lazy val allocateServiceUser: Boolean = false
 
-  def initialize(ledgerClient: CoinLedgerClient, party: PartyId): Future[State]
+  def initialize(
+      ledgerClient: CoinLedgerClient,
+      javaLedgerClient: JavaCoinLedgerClient,
+      party: PartyId,
+  ): Future[State]
 
   private def waitForPackages(connection: CoinLedgerConnection): Future[Unit] = {
     val requiredPackageIds: Set[String] =
@@ -102,10 +106,25 @@ abstract class CoinNode[State <: AutoCloseable](
       this,
     )
 
+  val javaLedgerClientF: Future[JavaCoinLedgerClient] =
+    retryProvider.retryForAutomationWithUncleanShutdown(
+      "Acquiring coin ledger client",
+      JavaCoinLedgerClient.create(
+        remoteParticipant.ledgerApi,
+        name.unwrap,
+        remoteParticipant.token,
+        timeouts,
+        loggerFactory,
+        tracerProvider,
+      ),
+      this,
+    )
+
   val initializeF: Future[State] = for {
     _ <- Future.successful(logger.info(s"Starting initialization"))
     _ = logger.info(s"Acquiring ledger connection")
     ledgerClient <- ledgerClientF
+    javaLedgerClient <- javaLedgerClientF
     connection = ledgerClient.connection(name.toString)
     _ = logger.info(s"Acquiring primary party of service user $serviceUser")
     serviceParty <-
@@ -125,7 +144,7 @@ abstract class CoinNode[State <: AutoCloseable](
     _ = logger.info(s"Waiting for templates to be uploaded: ${requiredTemplates.map(_.id)}")
     _ <- waitForPackages(connection)
     _ = logger.info(s"Packages available, running app-specific init")
-    state <- initialize(ledgerClient, serviceParty)
+    state <- initialize(ledgerClient, javaLedgerClient, serviceParty)
     _ <- Future.successful(logger.info(s"Initialization complete"))
   } yield state
 
@@ -143,6 +162,11 @@ abstract class CoinNode[State <: AutoCloseable](
     logger.info(s"Stopping $name node")
     Seq(
       AsyncCloseable(s"$name App state", initializeF.map(_.close()), closingTimeout),
+      AsyncCloseable(
+        s"$name Java Ledger API connection",
+        javaLedgerClientF.map(_.close()),
+        closingTimeout,
+      ),
       AsyncCloseable(s"$name Ledger API connection", ledgerClientF.map(_.close()), closingTimeout),
     )
   }

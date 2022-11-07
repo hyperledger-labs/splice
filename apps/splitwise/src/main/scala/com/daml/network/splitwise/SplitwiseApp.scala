@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.codegen.CN.Splitwise as splitwiseCodegen
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
+import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries, JavaCoinLedgerClient}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.admin.grpc.GrpcSplitwiseService
 import com.daml.network.splitwise.automation.SplitwiseAutomationService
@@ -55,6 +55,7 @@ class SplitwiseApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
+      javaLedgerClient: JavaCoinLedgerClient,
       party: PartyId,
   ): Future[SplitwiseApp.State] = for {
     store <- Future.successful(SplitwiseStore(party, storage, loggerFactory))

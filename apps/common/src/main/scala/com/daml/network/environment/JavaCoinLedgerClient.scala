@@ -6,6 +6,13 @@ import akka.stream.scaladsl.Source
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.client.akka.ClientAdapter
 import com.daml.ledger.api.auth.client.LedgerCallCredentials
+import com.daml.ledger.api.v1.admin.{
+  PackageManagementServiceGrpc,
+  PackageManagementServiceOuterClass,
+  PartyManagementServiceGrpc,
+  PartyManagementServiceOuterClass,
+  UserManagementServiceGrpc,
+}
 import com.daml.ledger.api.v1.{
   ActiveContractsServiceGrpc,
   CommandServiceGrpc,
@@ -17,18 +24,24 @@ import com.daml.ledger.client.GrpcChannel
 import com.daml.ledger.client.configuration.LedgerClientChannelConfiguration
 import com.daml.ledger.javaapi.data.{
   Command,
+  CreateUserRequest,
+  CreateUserResponse,
   GetActiveContractsRequest,
   GetActiveContractsResponse,
   GetTransactionsRequest,
   GetTransactionsResponse,
+  GetUserRequest,
+  GrantUserRightsRequest,
   Transaction,
   TransactionTree,
+  User,
 }
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.TracerProvider
+import com.google.protobuf.ByteString
 import io.grpc.Channel
 import io.grpc.stub.{AbstractStub, StreamObserver}
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
@@ -84,6 +97,12 @@ object JavaCoinLedgerClient {
       withCredentials(CommandServiceGrpc.newStub(channel), token)
     val transactionServiceStub: TransactionServiceGrpc.TransactionServiceStub =
       withCredentials(TransactionServiceGrpc.newStub(channel), token)
+    val packageManagementServiceStub: PackageManagementServiceGrpc.PackageManagementServiceStub =
+      withCredentials(PackageManagementServiceGrpc.newStub(channel), token)
+    val partyManagementServiceStub: PartyManagementServiceGrpc.PartyManagementServiceStub =
+      withCredentials(PartyManagementServiceGrpc.newStub(channel), token)
+    val userManagementServiceStub: UserManagementServiceGrpc.UserManagementServiceStub =
+      withCredentials(UserManagementServiceGrpc.newStub(channel), token)
 
     override def close(): Unit = GrpcChannel.close(channel)
 
@@ -173,6 +192,61 @@ object JavaCoinLedgerClient {
       wrapFuture(commandServiceStub.submitAndWaitForTransactionTree(request, _)).map(response =>
         TransactionTree.fromProto(response.getTransaction)
       )
+    }
+
+    def listKnownPackages()(implicit
+        ec: ExecutionContext
+    ): Future[Seq[PackageManagementServiceOuterClass.PackageDetails]] = {
+      val request = PackageManagementServiceOuterClass.ListKnownPackagesRequest.newBuilder().build
+      wrapFuture(packageManagementServiceStub.listKnownPackages(request, _))
+        .map(_.getPackageDetailsList.asScala.toSeq)
+    }
+
+    def uploadDarFile(darFile: ByteString)(implicit ec: ExecutionContext): Future[Unit] = {
+      val request = PackageManagementServiceOuterClass.UploadDarFileRequest
+        .newBuilder()
+        .setDarFile(darFile)
+        .build
+      wrapFuture(packageManagementServiceStub.uploadDarFile(request, _)).map(_ => ())
+    }
+
+    def getUser(userId: String)(implicit ec: ExecutionContext): Future[User] = {
+      val request = new GetUserRequest(userId).toProto
+      wrapFuture(userManagementServiceStub.getUser(request, _)).map(r => User.fromProto(r.getUser))
+    }
+
+    def allocateParty(hint: Option[String], displayName: Option[String])(implicit
+        ec: ExecutionContext
+    ): Future[String] = {
+      val requestBuilder = PartyManagementServiceOuterClass.AllocatePartyRequest
+        .newBuilder()
+      hint.foreach(requestBuilder.setPartyIdHint(_))
+      hint.foreach(requestBuilder.setDisplayName(_))
+      wrapFuture(partyManagementServiceStub.allocateParty(requestBuilder.build, _))
+        .map(_.getPartyDetails.getParty)
+    }
+
+    def createUser(user: User, initialRights: Seq[User.Right])(implicit
+        ec: ExecutionContext
+    ): Future[User] = {
+
+      val request = initialRights match {
+        case hd +: tl => new CreateUserRequest(user, hd, tl: _*).toProto
+        case _ => throw new IllegalArgumentException("createUser requires at least one right")
+      }
+      wrapFuture(userManagementServiceStub.createUser(request, _)).map(r =>
+        CreateUserResponse.fromProto(r).getUser
+      )
+    }
+
+    def grantUserRights(userId: String, rights: Seq[User.Right])(implicit
+        ec: ExecutionContext
+    ): Future[Unit] = {
+      val request = rights match {
+        case hd +: tl => new GrantUserRightsRequest(userId, hd, tl: _*).toProto
+        case _ => throw new IllegalArgumentException("grantUserRights requires at least one right")
+      }
+      wrapFuture(userManagementServiceStub.grantUserRights(request, _)).map(_ => ())
     }
   }
   private def createLedgerClient(

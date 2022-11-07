@@ -1,9 +1,12 @@
 package com.daml.network.svc.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{AcsIngestionService, AutomationService}
-import com.daml.network.codegen.CC
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.automation.{
+  AutomationService,
+  JavaAcsIngestionService => AcsIngestionService,
+}
+import com.daml.network.codegen.java.cc
+import com.daml.network.environment.{CoinRetries, JavaCoinLedgerClient => CoinLedgerClient}
 import com.daml.network.svc.store.SvcStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -12,6 +15,7 @@ import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.jdk.CollectionConverters.*
 
 class SvcAutomationService(
     store: SvcStore,
@@ -24,7 +28,7 @@ class SvcAutomationService(
     mat: Materializer,
     tracer: Tracer,
 ) extends AutomationService(retryProvider) {
-  import com.daml.network.store.AcsStore.QueryResult
+  import com.daml.network.store.JavaAcsStore.QueryResult
 
   private val connection = ledgerClient.connection(this.getClass.getSimpleName)
 
@@ -55,13 +59,13 @@ class SvcAutomationService(
 
           // SCV setup is complete: check whether CoinRules already contains the requesting validator is already in the list of observers
           case Some(coinRulesContract) =>
-            val validatorParty = PartyId.tryFromPrim(req.payload.user)
+            val validatorParty = PartyId.tryFromProtoPrimitive(req.payload.user)
             if (coinRulesContract.payload.observers.contains(validatorParty.toPrim)) {
               // They are: reject
-              val cmd = req.contractId.exerciseCoinRulesRequest_Reject().command
+              val cmds = req.contractId.exerciseCoinRulesRequest_Reject().commands.asScala.toSeq
               logger.warn(s"Rejecting duplicate CoinRulesRequest from $validatorParty")
               connection
-                .submitCommand(Seq(store.svcParty), Seq(), Seq(cmd))
+                .submitCommands(Seq(store.svcParty), Seq(), cmds)
                 .map(_ => "rejected request for already existing rules")
             } else {
               // They are not: accept
@@ -69,19 +73,22 @@ class SvcAutomationService(
                 // NOTE: this is NOT SAFE under concurrent changes to the XXXMiningRounds contracts
                 // That is OK here, as we assume that on-boarding of validators happens before.
                 // TODO(M3-90): make this safe under concurrent round management and onboarding
-                QueryResult(_, openMiningRounds) <- store.listContracts(CC.Round.OpenMiningRound)
+                QueryResult(_, openMiningRounds) <- store
+                  .listContracts(cc.round.OpenMiningRound.COMPANION)
                 QueryResult(_, issuingMiningRounds) <- store
-                  .listContracts(CC.Round.IssuingMiningRound)
+                  .listContracts(cc.round.IssuingMiningRound.COMPANION)
                 QueryResult(_, coinRules) <- store.getCoinRules()
-                cmd = req.contractId
+                cmds = req.contractId
                   .exerciseCoinRulesRequest_Accept(
                     coinRules.contractId,
-                    openMiningRounds.map(_.contractId),
-                    issuingMiningRounds.map(_.contractId),
+                    openMiningRounds.map(_.contractId).asJava,
+                    issuingMiningRounds.map(_.contractId).asJava,
                   )
-                  .command
+                  .commands
+                  .asScala
+                  .toSeq
                 // No command-dedup required, as the CoinRules contract is archived and recreated
-                _ <- connection.submitCommand(Seq(store.svcParty), Seq(), Seq(cmd))
+                _ <- connection.submitCommands(Seq(store.svcParty), Seq(), cmds)
               } yield s"accepted coin rules request from $validatorParty"
             }
         }
