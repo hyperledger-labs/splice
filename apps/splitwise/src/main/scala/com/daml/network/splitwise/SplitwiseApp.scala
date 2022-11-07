@@ -69,7 +69,7 @@ class SplitwiseApp(
       )
     automation = new SplitwiseAutomationService(
       store,
-      ledgerClient,
+      javaLedgerClient,
       readAs,
       scanConnection,
       retryProvider,
@@ -81,7 +81,7 @@ class SplitwiseApp(
       .addService(
         SplitwiseServiceGrpc.bindService(
           new GrpcSplitwiseService(
-            ledgerClient,
+            javaLedgerClient,
             scanConnection,
             party,
             loggerFactory,

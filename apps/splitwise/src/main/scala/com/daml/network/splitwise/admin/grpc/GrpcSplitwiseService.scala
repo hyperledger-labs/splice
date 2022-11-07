@@ -1,12 +1,12 @@
 package com.daml.network.splitwise.admin.grpc
 
-import com.daml.ledger.client.binding.{Contract => CodegenContract, Primitive}
-import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
-import com.daml.network.environment.CoinLedgerClient
+import com.daml.ledger.javaapi.data.codegen.{Contract as CodegenContract}
+import com.daml.network.codegen.java.cn.{splitwise => splitwiseCodegen}
+import com.daml.network.environment.{JavaCoinLedgerClient as CoinLedgerClient}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.v0
 import com.daml.network.splitwise.v0.SplitwiseServiceGrpc
-import com.daml.network.util.{Contract, Proto}
+import com.daml.network.util.{JavaContract as Contract, Proto}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
@@ -15,6 +15,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 @nowarn("cat=unused")
 class GrpcSplitwiseService(
@@ -40,9 +41,9 @@ class GrpcSplitwiseService(
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
       for {
         // TODO(M1-42): check (or simulate check) of the user's cross-participant access token
-        groups <- connection.activeContracts(providerParty, splitwiseCodegen.Group)
+        groups <- connection.activeContracts(providerParty, splitwiseCodegen.Group.COMPANION)
       } yield {
-        val filtered = groups.filter(c => c.hasStakeholder(userParty.toPrim))
+        val filtered = groups.filter(c => c.hasStakeholder(userParty))
         v0.ListGroupsResponse(filtered.map(c => Contract.fromCodegenContract(c).toProtoV0))
       }
     }
@@ -53,9 +54,12 @@ class GrpcSplitwiseService(
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
       for {
-        groupInvites <- connection.activeContracts(providerParty, splitwiseCodegen.GroupInvite)
+        groupInvites <- connection.activeContracts(
+          providerParty,
+          splitwiseCodegen.GroupInvite.COMPANION,
+        )
       } yield {
-        val filtered = groupInvites.filter(c => c.hasStakeholder(userParty.toPrim))
+        val filtered = groupInvites.filter(c => c.hasStakeholder(userParty))
         v0.ListGroupInvitesResponse(
           filtered.map(c => Contract.fromCodegenContract(c).toProtoV0)
         )
@@ -70,13 +74,13 @@ class GrpcSplitwiseService(
       for {
         acceptedGroupInvites <- connection.activeContracts(
           providerParty,
-          splitwiseCodegen.AcceptedGroupInvite,
+          splitwiseCodegen.AcceptedGroupInvite.COMPANION,
         )
       } yield {
         val filtered =
           acceptedGroupInvites.filter(c =>
-            c.hasStakeholder(userParty.toPrim) &&
-              c.value.groupKey == groupKey(userParty, providerParty, request.groupId)
+            c.hasStakeholder(userParty) &&
+              c.data.groupKey == groupKey(userParty, providerParty, request.groupId)
           )
         v0.ListAcceptedGroupInvitesResponse(
           filtered.map(c => Contract.fromCodegenContract(c).toProtoV0)
@@ -90,14 +94,17 @@ class GrpcSplitwiseService(
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
       for {
-        balanceUpdates <- connection.activeContracts(providerParty, splitwiseCodegen.BalanceUpdate)
+        balanceUpdates <- connection.activeContracts(
+          providerParty,
+          splitwiseCodegen.BalanceUpdate.COMPANION,
+        )
       } yield {
         val filtered = balanceUpdates.filter(c =>
-          c.hasStakeholder(userParty.toPrim) &&
-            splitwiseCodegen.GroupKey(
-              c.value.group.owner,
-              c.value.group.provider,
-              c.value.group.id,
+          c.hasStakeholder(userParty) &&
+            new splitwiseCodegen.GroupKey(
+              c.data.group.owner,
+              c.data.group.provider,
+              c.data.group.id,
             ) == groupKey(
               request.getGroupKey
             )
@@ -111,62 +118,74 @@ class GrpcSplitwiseService(
   ): Future[v0.ListBalancesResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
+      val javaUserParty = userParty.toProtoPrimitive
       for {
-        balanceUpdates <- connection.activeContracts(providerParty, splitwiseCodegen.BalanceUpdate)
+        balanceUpdates <- connection.activeContracts(
+          providerParty,
+          splitwiseCodegen.BalanceUpdate.COMPANION,
+        )
       } yield {
         val filtered = balanceUpdates
           .filter(c =>
-            c.hasStakeholder(userParty.toPrim) &&
-              splitwiseCodegen
-                .GroupKey(
-                  c.value.group.owner,
-                  c.value.group.provider,
-                  c.value.group.id,
-                ) == groupKey(
+            c.hasStakeholder(userParty) &&
+              new splitwiseCodegen.GroupKey(
+                c.data.group.owner,
+                c.data.group.provider,
+                c.data.group.id,
+              ) == groupKey(
                 request.getGroupKey
               )
           )
-          .map(_.value)
+          .map(_.data)
         def combine(
-            acc: Map[Primitive.Party, BigDecimal],
+            acc: Map[String, BigDecimal],
             update: splitwiseCodegen.BalanceUpdate,
-        ): Map[Primitive.Party, BigDecimal] =
+        ): Map[String, BigDecimal] =
           update.update match {
-            case splitwiseCodegen.BalanceUpdateType.ExternalPayment(
-                  payer,
-                  description,
-                  quantity,
-                ) => {
-              val split: BigDecimal = quantity / (update.group.members.length + 1)
-              if (payer == userParty.toPrim) {
-                (update.group.owner +: update.group.members).foldLeft(acc) { case (acc, member) =>
-                  if (member == payer) acc
-                  else
-                    acc.updatedWith(member)(prev => Some(prev.getOrElse[BigDecimal](0.0) + split))
+            case externalPayment: splitwiseCodegen.balanceupdatetype.ExternalPayment => {
+              val split: BigDecimal =
+                BigDecimal(externalPayment.quantity) / (update.group.members.size + 1)
+              if (externalPayment.payer == javaUserParty) {
+                (update.group.owner +: update.group.members.asScala).foldLeft(acc) {
+                  case (acc, member) =>
+                    if (member == externalPayment.payer) acc
+                    else
+                      acc.updatedWith(member)(prev => Some(prev.getOrElse[BigDecimal](0.0) + split))
                 }
-              } else if ((update.group.owner +: update.group.members).contains(userParty.toPrim)) {
-                acc.updatedWith(payer)(prev => Some(prev.getOrElse[BigDecimal](0.0) - split))
+              } else if (
+                (update.group.owner +: update.group.members.asScala).contains(javaUserParty)
+              ) {
+                acc.updatedWith(externalPayment.payer)(prev =>
+                  Some(prev.getOrElse[BigDecimal](0.0) - split)
+                )
               } else {
                 acc
               }
             }
-            case splitwiseCodegen.BalanceUpdateType.Transfer(sender, receiver, quantity) =>
-              if (sender == userParty.toPrim) {
-                acc.updatedWith(receiver)(prev => Some(prev.getOrElse[BigDecimal](0.0) + quantity))
-              } else if (receiver == userParty.toPrim) {
-                acc.updatedWith(sender)(prev => Some(prev.getOrElse[BigDecimal](0.0) - quantity))
+            case transfer: splitwiseCodegen.balanceupdatetype.Transfer =>
+              if (transfer.sender == javaUserParty) {
+                acc.updatedWith(transfer.receiver)(prev =>
+                  Some(prev.getOrElse[BigDecimal](0.0) + transfer.quantity)
+                )
+              } else if (transfer.receiver == javaUserParty) {
+                acc.updatedWith(transfer.sender)(prev =>
+                  Some(prev.getOrElse[BigDecimal](0.0) - transfer.quantity)
+                )
               } else acc
-            case splitwiseCodegen.BalanceUpdateType.Netting(balanceUpdates) =>
-              balanceUpdates
-                .getOrElse(userParty.toPrim, Map.empty[Primitive.Party, BigDecimal])
+            case netting: splitwiseCodegen.balanceupdatetype.Netting =>
+              netting.balanceChanges.asScala
+                .getOrElse(javaUserParty, new java.util.HashMap[String, java.math.BigDecimal])
+                .asScala
                 .iterator
                 .foldLeft(acc) { case (acc, (k, v)) =>
                   acc.updatedWith(k)(prev => Some(prev.getOrElse[BigDecimal](0.0) + v))
                 }
+            case _ =>
+              throw new IllegalArgumentException(s"Invalid balance update type: ${update.update}")
           }
-        val balances: Map[Primitive.Party, BigDecimal] =
-          filtered.foldLeft(Map.empty[Primitive.Party, BigDecimal])(combine)
-        v0.ListBalancesResponse(balances.map { case (k, v) => Proto.encode(k) -> Proto.encode(v) })
+        val balances: Map[String, BigDecimal] =
+          filtered.foldLeft(Map.empty[String, BigDecimal])(combine)
+        v0.ListBalancesResponse(balances.map { case (k, v) => k -> Proto.encode(v) })
       }
     }
 
@@ -176,25 +195,25 @@ class GrpcSplitwiseService(
     }
 
   private def groupKey(key: v0.GroupKey): splitwiseCodegen.GroupKey =
-    splitwiseCodegen.GroupKey(
-      Proto.tryDecode(Proto.CodegenParty)(key.ownerPartyId),
-      Proto.tryDecode(Proto.CodegenParty)(key.providerPartyId),
-      splitwiseCodegen.GroupId(key.id),
+    new splitwiseCodegen.GroupKey(
+      key.ownerPartyId,
+      key.providerPartyId,
+      new splitwiseCodegen.GroupId(key.id),
     )
 
   private def groupKey(owner: PartyId, provider: PartyId, id: String): splitwiseCodegen.GroupKey =
-    splitwiseCodegen.GroupKey(
-      owner.toPrim,
-      provider.toPrim,
-      splitwiseCodegen.GroupId(id),
+    new splitwiseCodegen.GroupKey(
+      owner.toProtoPrimitive,
+      provider.toProtoPrimitive,
+      new splitwiseCodegen.GroupId(id),
     )
 }
 
 object GrpcSplitwiseService {
-  implicit class ContractSyntax[T](private val contract: CodegenContract[T]) extends AnyVal {
-    def hasStakeholder(party: Primitive.Party): Boolean =
-      contract.signatories.contains(Primitive.Party.unwrap(party)) || contract.observers.contains(
-        Primitive.Party.unwrap(party)
-      )
+  implicit class ContractSyntax(private val contract: CodegenContract[_, _]) extends AnyVal {
+    def hasStakeholder(party: PartyId): Boolean = {
+      val p = party.toProtoPrimitive
+      contract.signatories.contains(p) || contract.observers.contains(p)
+    }
   }
 }

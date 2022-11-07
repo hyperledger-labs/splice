@@ -1,12 +1,15 @@
 package com.daml.network.splitwise.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{AcsIngestionService, AutomationService}
-import com.daml.network.codegen.CN.Splitwise as splitwiseCodegen
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.automation.{
+  AutomationService,
+  JavaAcsIngestionService => AcsIngestionService,
+}
+import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
+import com.daml.network.environment.{CoinRetries, JavaCoinLedgerClient => CoinLedgerClient}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.store.SplitwiseStore
-import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.store.JavaAcsStore.QueryResult
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
@@ -14,6 +17,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import java.security.MessageDigest
 import scala.concurrent.ExecutionContextExecutor
+import scala.jdk.CollectionConverters.*
 
 /** Manages background automation that runs on an splitwise app. */
 class SplitwiseAutomationService(
@@ -62,7 +66,7 @@ class SplitwiseAutomationService(
   registerRequestHandler("handleSplitwiseInstallRequest", store.streamInstallRequests())(req => {
     implicit tc =>
       {
-        val user = PartyId.tryFromPrim(req.payload.user)
+        val user = PartyId.tryFromProtoPrimitive(req.payload.user)
         store.lookupInstall(user).flatMap {
           case QueryResult(_, Some(_)) =>
             logger.info(s"Rejecting duplicate install request from user party $user")
@@ -72,17 +76,17 @@ class SplitwiseAutomationService(
               .map(_ => "rejected request for already existing installation.")
 
           case QueryResult(off, None) =>
-            val arg = splitwiseCodegen.SplitwiseInstallRequest_Accept()
             val commandId =
               mkCommandId("com.daml.network.splitwise.SplitwiseInstall", Seq(provider, user))
 
-            val acceptCmd = req.contractId.exerciseSplitwiseInstallRequest_Accept(arg).command
+            val acceptCmd =
+              req.contractId.exerciseSplitwiseInstallRequest_Accept().commands.asScala.toSeq
             // TODO(#790): should we really discard the result here? if yes, can we avoid parsing it?
             connection
-              .submitCommandWithDedup(
+              .submitCommandsWithDedup(
                 actAs = Seq(provider),
                 readAs = Seq(),
-                command = Seq(acceptCmd),
+                commands = acceptCmd,
                 commandId = commandId,
                 deduplicationOffset = off,
               )
@@ -95,24 +99,25 @@ class SplitwiseAutomationService(
     "handleAcceptedAppPaymentRequests",
     store.streamAcceptedAppPayments(),
   )(payment => { implicit traceContext =>
-    val sender = PartyId.tryFromPrim(payment.payload.sender)
-    val transferInProgressId = payment.payload.deliveryOffer
-      .unsafeToTemplate[splitwiseCodegen.TransferInProgress]
+    val sender = PartyId.tryFromProtoPrimitive(payment.payload.sender)
+    val transferInProgressId = splitwiseCodegen.TransferInProgress.ContractId.unsafeFromInterface(
+      payment.payload.deliveryOffer
+    )
     store.lookupInstall(sender).flatMap {
       case QueryResult(_, None) =>
         val msg = s"Install contract not found for sender party $sender"
         logger.warn(msg)
         val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject()
         connection
-          .submitCommand(
+          .submitCommands(
             actAs = Seq(provider),
             readAs = Seq.empty,
-            command = Seq(cmd.command),
+            commands = cmd.commands.asScala.toSeq,
           )
           .map(_ => s"rejected accepted app payment: $msg")
       case QueryResult(_, Some(install)) =>
         for {
-          transferContext <- scanConnection.getAppTransferContext()
+          transferContext <- scanConnection.getJavaAppTransferContext()
           transferInProgress <- store
             .lookupTransferInProgressById(transferInProgressId)
             .map(
@@ -123,18 +128,18 @@ class SplitwiseAutomationService(
               )
             )
           group <- store.getGroup(
-            PartyId.tryFromPrim(transferInProgress.payload.group.owner),
+            PartyId.tryFromProtoPrimitive(transferInProgress.payload.group.owner),
             transferInProgress.payload.group.id,
           )
           cmd = install.contractId.exerciseSplitwiseInstall_CompleteTransfer(
-            group = group.value.contractId,
-            acceptedPaymentCid = payment.contractId,
-            transferContext = transferContext,
+            group.value.contractId,
+            payment.contractId,
+            transferContext,
           )
-          _ <- connection.submitCommand(
+          _ <- connection.submitCommands(
             actAs = Seq(provider),
             readAs = readAs.toSeq,
-            command = Seq(cmd.command),
+            commands = cmd.commands.asScala.toSeq,
           )
         } yield "Completed transfer"
     }
@@ -142,7 +147,7 @@ class SplitwiseAutomationService(
 
   registerRequestHandler("handleGroupRequest", store.streamGroupRequests())(req => { implicit tc =>
     {
-      val user = PartyId.tryFromPrim(req.payload.group.owner)
+      val user = PartyId.tryFromProtoPrimitive(req.payload.group.owner)
       val groupId = req.payload.group.id
       store.lookupGroup(user, groupId).flatMap {
         case QueryResult(_, Some(_)) =>
@@ -162,12 +167,12 @@ class SplitwiseAutomationService(
               groupId.unpack,
             )
 
-          val acceptCmd = req.contractId.exerciseGroupRequest_Accept().command
+          val acceptCmd = req.contractId.exerciseGroupRequest_Accept().commands.asScala.toSeq
           connection
-            .submitCommandWithDedup(
+            .submitCommandsWithDedup(
               actAs = Seq(provider),
               readAs = Seq(),
-              command = Seq(acceptCmd),
+              commands = acceptCmd,
               commandId = commandId,
               deduplicationOffset = off,
             )
