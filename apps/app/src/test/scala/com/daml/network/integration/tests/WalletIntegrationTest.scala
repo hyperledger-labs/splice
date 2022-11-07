@@ -462,7 +462,7 @@ class WalletIntegrationTest
       clue("Creating 3 subscriptions") {
         List("alice1", "alice2", "alice3").foreach(name => {
           val requestId = aliceDirectory.requestDirectoryEntryWithSubscription(name)
-          aliceRemoteWallet.acceptSubscriptionRequest(requestId)
+          aliceRemoteWallet.acceptSubscriptionRequest(Primitive.ContractId(requestId.contractId))
         })
       }
       clue("Checking that 3 idle subscriptions are listed...") {
