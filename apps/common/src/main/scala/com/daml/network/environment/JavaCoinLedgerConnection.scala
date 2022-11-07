@@ -229,41 +229,6 @@ object JavaCoinLedgerConnection {
         )
       }
 
-      private def decodeExerciseResult[T](
-          update: Update[T],
-          transaction: TransactionTree,
-      ): T = {
-        val rootEventIds = transaction.getRootEventIds.asScala.toSeq
-        if (rootEventIds.size == 1) {
-          val eventByIds = transaction.getEventsById.asScala
-          val event = eventByIds(rootEventIds(0))
-          update.foldUpdate[T](
-            new Update.FoldUpdate[T, T] {
-              override def created[CtId](create: Update.CreateUpdate[CtId, T]): T = {
-                val createdEvent = event match {
-                  case created: CreatedEvent => created
-                  case _ =>
-                    throw new IllegalArgumentException(s"Expected CreatedEvent but got $event")
-                }
-                create.k(Created.fromEvent(create.createdContractId, createdEvent))
-              }
-              override def exercised[R](exercise: Update.ExerciseUpdate[R, T]): T = {
-                val exercisedEvent = event match {
-                  case exercised: ExercisedEvent => exercised
-                  case _ =>
-                    throw new IllegalArgumentException(s"Expected ExercisedEvent but got $event")
-                }
-                exercise.k(Exercised.fromEvent(exercise.returnTypeDecoder, exercisedEvent))
-              }
-            }
-          )
-        } else {
-          throw new IllegalArgumentException(
-            s"Expected exactly one root event id but got ${rootEventIds.size}"
-          )
-        }
-      }
-
       override def activeContractsWithOffset(
           filter: TransactionFilter
       ): Future[(Seq[CreatedEvent], LedgerOffset)] = {
@@ -502,6 +467,41 @@ object JavaCoinLedgerConnection {
       override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List[AsyncOrSyncCloseable](
       )
     }
+
+  def decodeExerciseResult[T](
+      update: Update[T],
+      transaction: TransactionTree,
+  ): T = {
+    val rootEventIds = transaction.getRootEventIds.asScala.toSeq
+    if (rootEventIds.size == 1) {
+      val eventByIds = transaction.getEventsById.asScala
+      val event = eventByIds(rootEventIds(0))
+      update.foldUpdate[T](
+        new Update.FoldUpdate[T, T] {
+          override def created[CtId](create: Update.CreateUpdate[CtId, T]): T = {
+            val createdEvent = event match {
+              case created: CreatedEvent => created
+              case _ =>
+                throw new IllegalArgumentException(s"Expected CreatedEvent but got $event")
+            }
+            create.k(Created.fromEvent(create.createdContractId, createdEvent))
+          }
+          override def exercised[R](exercise: Update.ExerciseUpdate[R, T]): T = {
+            val exercisedEvent = event match {
+              case exercised: ExercisedEvent => exercised
+              case _ =>
+                throw new IllegalArgumentException(s"Expected ExercisedEvent but got $event")
+            }
+            exercise.k(Exercised.fromEvent(exercise.returnTypeDecoder, exercisedEvent))
+          }
+        }
+      )
+    } else {
+      throw new IllegalArgumentException(
+        s"Expected exactly one root event id but got ${rootEventIds.size}"
+      )
+    }
+  }
 
   def sanitizePartyHint(hint: String): String = {
     val (processedHint, invalidCharDetected) = hint.foldLeft(("", false))((res, currentChar) => {

@@ -5,6 +5,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.client.binding.TemplateCompanion
 import com.daml.ledger.client.configuration.CommandClientConfiguration
+import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.config.SharedCoinAppParameters
 import com.digitalasset.canton.config.RequireTypes.{InstanceName, Port}
 import com.digitalasset.canton.environment.CantonNode
@@ -53,7 +54,11 @@ abstract class CoinNode[State <: AutoCloseable](
     * It it save to omit a template if there is another template in the same
     * package in the set.
     */
-  protected def requiredTemplates: Set[TemplateCompanion[_]]
+  protected def requiredTemplates: Set[TemplateCompanion[_]] = Set.empty
+
+  /** Java version of requiredTemplates. We take the union of both.
+    */
+  protected def requiredJavaTemplates: Set[Identifier] = Set.empty
 
   // TODO(i736): fork or generalize status definition.
   override def status: Future[NodeStatus.Status] = {
@@ -79,7 +84,8 @@ abstract class CoinNode[State <: AutoCloseable](
 
   private def waitForPackages(connection: CoinLedgerConnection): Future[Unit] = {
     val requiredPackageIds: Set[String] =
-      requiredTemplates.map(t => ApiTypes.TemplateId.unwrap(t.id).packageId)
+      requiredTemplates.map(t => ApiTypes.TemplateId.unwrap(t.id).packageId) union
+        requiredJavaTemplates.map(t => t.getPackageId)
 
     def query(): Future[Unit] = for {
       packages <- (connection.listPackages(): Future[Set[String]])

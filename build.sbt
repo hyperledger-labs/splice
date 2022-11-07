@@ -307,6 +307,7 @@ lazy val `apps-directory` =
       Test / damlSourceDirectory := (Compile / damlSourceDirectory).value,
       Compile / damlDarOutput := file("apps/directory/daml") / ".daml" / "dist",
       BuildCommon.damlCodegenSettings,
+      Compile / damlEnableScalaCodegen := false,
       BuildCommon.copyDarResources,
     )
 

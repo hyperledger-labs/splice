@@ -97,6 +97,7 @@ object BuildCommon {
         )
       },
       Compile / damlEnableJavaCodegen := true,
+      Compile / damlEnableScalaCodegen := true,
     )
 
   lazy val copyDarResources: Seq[Def.Setting[_]] = {
@@ -347,6 +348,7 @@ object BuildCommon {
         // "data-dependencies" daml.yaml setting relies on hardcoded "0.0.1" project version
         Compile / damlBuild := Seq(), // message-0.0.1.dar is hardcoded and contact-0.0.1.dar is built by MessagingExampleIntegrationTest
         Compile / damlProjectVersionOverride := Some("0.0.1"),
+        Compile / damlEnableScalaCodegen := true,
         Compile / damlEnableJavaCodegen := false,
         // commented out from Canton OS repo as settings don't apply to us (yet)
         //      addProtobufFilesToHeaderCheck(Compile),
@@ -477,6 +479,7 @@ object BuildCommon {
             )
           )
         },
+        Compile / damlEnableScalaCodegen := true,
         Compile / damlEnableJavaCodegen := false,
         // commented out from Canton OS repo as settings don't apply to us (yet)
         //    addProtobufFilesToHeaderCheck(Compile),
@@ -570,6 +573,7 @@ object BuildCommon {
               "com.digitalasset.canton.participant.admin.workflows",
             ),
           ),
+        Compile / damlEnableScalaCodegen := true,
         Compile / damlEnableJavaCodegen := false,
         damlFixedDars := Seq("AdminWorkflows.dar"),
         // commented out from Canton OS repo as settings don't apply to us (yet)

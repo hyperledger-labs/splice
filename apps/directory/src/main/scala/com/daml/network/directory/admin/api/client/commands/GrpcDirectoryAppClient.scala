@@ -2,10 +2,10 @@ package com.daml.network.directory.admin.api.client.commands
 
 import cats.syntax.either._
 import cats.syntax.traverse._
-import com.daml.network.codegen.CN.{Directory => codegen}
+import com.daml.network.codegen.java.cn.{directory => codegen}
 import com.daml.network.directory.v0
 import com.daml.network.directory.v0.DirectoryServiceGrpc.DirectoryServiceStub
-import com.daml.network.util.{Contract, Proto}
+import com.daml.network.util.{JavaContract as Contract, Proto}
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.topology.PartyId
@@ -26,7 +26,7 @@ object GrpcDirectoryAppClient {
   ) extends BaseCommand[
         Empty,
         v0.ListEntriesResponse,
-        Seq[Contract[codegen.DirectoryEntry]],
+        Seq[Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry]],
       ] {
 
     override def createRequest(): Either[String, Empty] =
@@ -39,9 +39,9 @@ object GrpcDirectoryAppClient {
 
     override def handleResponse(
         response: v0.ListEntriesResponse
-    ): Either[String, Seq[Contract[codegen.DirectoryEntry]]] =
+    ): Either[String, Seq[Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry]]] =
       response.entries
-        .traverse(entry => Contract.fromProto(codegen.DirectoryEntry)(entry))
+        .traverse(entry => Contract.fromProto(codegen.DirectoryEntry.COMPANION)(entry))
         .leftMap(_.toString)
   }
 
@@ -50,7 +50,7 @@ object GrpcDirectoryAppClient {
   ) extends BaseCommand[
         v0.LookupEntryByPartyRequest,
         v0.LookupEntryByPartyResponse,
-        Contract[codegen.DirectoryEntry],
+        Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry],
       ] {
 
     override def createRequest(): Either[String, v0.LookupEntryByPartyRequest] =
@@ -65,10 +65,10 @@ object GrpcDirectoryAppClient {
 
     override def handleResponse(
         response: v0.LookupEntryByPartyResponse
-    ): Either[String, Contract[codegen.DirectoryEntry]] = {
+    ): Either[String, Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry]] = {
       val r = for {
         entryField <- ProtoConverter.required("entry", response.entry)
-        entry <- Contract.fromProto(codegen.DirectoryEntry)(entryField)
+        entry <- Contract.fromProto(codegen.DirectoryEntry.COMPANION)(entryField)
       } yield entry
       r.leftMap(_.toString)
 
@@ -80,7 +80,7 @@ object GrpcDirectoryAppClient {
   ) extends BaseCommand[
         v0.LookupEntryByNameRequest,
         v0.LookupEntryByNameResponse,
-        Contract[codegen.DirectoryEntry],
+        Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry],
       ] {
 
     override def createRequest(): Either[String, v0.LookupEntryByNameRequest] =
@@ -95,10 +95,10 @@ object GrpcDirectoryAppClient {
 
     override def handleResponse(
         response: v0.LookupEntryByNameResponse
-    ): Either[String, Contract[codegen.DirectoryEntry]] = {
+    ): Either[String, Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry]] = {
       val r = for {
         entryField <- ProtoConverter.required("entry", response.entry)
-        entry <- Contract.fromProto(codegen.DirectoryEntry)(entryField)
+        entry <- Contract.fromProto(codegen.DirectoryEntry.COMPANION)(entryField)
       } yield entry
       r.leftMap(_.toString)
 

@@ -1,9 +1,14 @@
 package com.daml.network.console
 
+import com.daml.ledger.api.v1.transaction.TransactionTree
 import com.daml.ledger.client.binding.{Primitive, ValueDecoder}
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.ledger.javaapi.data.codegen.{Update => JavaUpdate}
+import com.daml.ledger.javaapi.data.{TransactionTree => JavaTransactionTree}
+import com.daml.network.environment.{CoinLedgerConnection, JavaCoinLedgerConnection}
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.topology.PartyId
+
+import scala.jdk.CollectionConverters.*
 
 object LedgerApiUtils {
   def submitWithResult[T](
@@ -22,6 +27,27 @@ object LedgerApiUtils {
       optTimeout = None,
     )
     CoinLedgerConnection.decodeExerciseResult(update.toString, tree)
+  }
+
+  def submitWithResultJava[T](
+      ledgerApi: BaseLedgerApiAdministration,
+      actAs: Seq[PartyId],
+      readAs: Seq[PartyId],
+      update: JavaUpdate[T],
+      commandId: Option[String] = None,
+  ): T = {
+    val tree = ledgerApi.ledger_api.commands.submitJava(
+      actAs,
+      update.commands.asScala.toSeq,
+      workflowId = "",
+      commandId.getOrElse(""),
+      readAs = readAs,
+      optTimeout = None,
+    )
+    JavaCoinLedgerConnection.decodeExerciseResult(
+      update,
+      JavaTransactionTree.fromProto(TransactionTree.toJavaProto(tree)),
+    )
   }
 
   def getUserPrimaryParty(ledgerApi: BaseLedgerApiAdministration, userId: String) = {

@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.ledger.client.binding.Primitive
-import com.daml.network.codegen.CN.{Directory => codegen}
+import com.daml.network.codegen.java.cn.{directory => codegen}
 import com.daml.network.console.{
   LocalValidatorAppReference,
   RemoteDirectoryAppReference,
@@ -14,7 +14,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
   IsolatedCoinEnvironments,
 }
-import com.daml.network.util.{CommonCoinAppInstanceReferences, Proto}
+import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -22,6 +22,7 @@ import com.digitalasset.canton.topology.PartyId
 
 import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 class DirectoryIntegrationTest
@@ -96,30 +97,31 @@ class DirectoryIntegrationTest
 
         // check that there is only one install
         val installs = aliceValidator.remoteParticipant.ledger_api.acs
-          .of_party(aliceUserParty, filterTemplates = Seq(codegen.DirectoryInstall.id))
+          .filterJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
         installs should have size (1)
 
         val requests = aliceValidator.remoteParticipant.ledger_api.acs
-          .of_party(aliceUserParty, filterTemplates = Seq(codegen.DirectoryInstallRequest.id))
+          .filterJava(codegen.DirectoryInstallRequest.COMPANION)(aliceUserParty)
         requests shouldBe Seq.empty
 
         // Cancel install
-        val arg = codegen.DirectoryInstall_Cancel(aliceUserParty.toPrim)
-        val installCid: Primitive.ContractId[codegen.DirectoryInstall] =
-          Proto.tryDecodeContractId(installs(0).event.contractId)
-        val cmd = installCid.exerciseDirectoryInstall_Cancel(arg).command
-        aliceValidator.remoteParticipant.ledger_api.commands.submit_flat(
+        val installCid: codegen.DirectoryInstall.ContractId = installs(0).id
+        val cmds = installCid
+          .exerciseDirectoryInstall_Cancel(aliceUserParty.toProtoPrimitive)
+          .commands
+          .asScala
+          .toSeq
+        aliceValidator.remoteParticipant.ledger_api.commands.submitJava(
           actAs = Seq(aliceUserParty),
-          commands = Seq(cmd),
+          commands = cmds,
           optTimeout = None, // Setting to 'None' as otherwise the tx lookup fails
         )
 
         // Wait for install to no longer be available on alice's participant
         eventually()(
           aliceValidator.remoteParticipant.ledger_api.acs
-            .of_party(
-              aliceUserParty,
-              filterTemplates = Seq(codegen.DirectoryInstall.id),
+            .filterJava(codegen.DirectoryInstall.COMPANION)(
+              aliceUserParty
             ) shouldBe empty
         )
       }
@@ -189,14 +191,14 @@ class DirectoryIntegrationTest
           Try(loggerFactory.suppressErrors(directory.lookupEntryByName(testEntryName)))
         val entry =
           eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $testEntryName")))
-        val winnerUserParty = PartyId.tryFromPrim(entry.payload.user)
+        val winnerUserParty = PartyId.tryFromProtoPrimitive(entry.payload.user)
         logger.info(s"And the winner is ... *drumroll* ... : $winnerUserParty")
 
         // Check content of winning entry
         val entryPayload =
-          codegen.DirectoryEntry(
-            winnerUserParty.toPrim,
-            providerParty.toPrim,
+          new codegen.DirectoryEntry(
+            winnerUserParty.toProtoPrimitive,
+            providerParty.toProtoPrimitive,
             testEntryName,
             entry.payload.expiresAt,
           )
@@ -225,7 +227,7 @@ class DirectoryIntegrationTest
         }
         clue("Alice obtains some coins and accepts the subscription") {
           aliceRefs.wallet.tap(50.0)
-          aliceRefs.wallet.acceptSubscriptionRequest(subReqId)
+          aliceRefs.wallet.acceptSubscriptionRequest(Primitive.ContractId(subReqId.contractId))
         }
         val entry = clue("Getting Alice's new entry") {
           def tryGetEntry() =
@@ -233,9 +235,9 @@ class DirectoryIntegrationTest
           eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $testEntryName")))
         }
         clue("Checking payload of new entry") {
-          val expectedPayload = codegen.DirectoryEntry(
-            aliceUserParty.toPrim,
-            providerParty.toPrim,
+          val expectedPayload = new codegen.DirectoryEntry(
+            aliceUserParty.toProtoPrimitive,
+            providerParty.toProtoPrimitive,
             testEntryName,
             entry.payload.expiresAt,
           )
@@ -259,11 +261,13 @@ class DirectoryIntegrationTest
           directory.lookupEntryByName(testEntryName)
         }
         clue("Checking payload of renewed entry") {
-          renewedEntry.payload shouldBe entry.payload.copy(expiresAt =
-            Primitive.Timestamp
-              .discardNanos(entry.payload.expiresAt.plus(90, ChronoUnit.DAYS))
-              .getOrElse(sys.error("Invalid instant"))
+          val newEntry = new codegen.DirectoryEntry(
+            entry.payload.user,
+            entry.payload.provider,
+            entry.payload.name,
+            entry.payload.expiresAt.plus(90, ChronoUnit.DAYS),
           )
+          renewedEntry.payload shouldBe newEntry
         }
     }
 
@@ -272,7 +276,8 @@ class DirectoryIntegrationTest
 
       clue("Request install and wait for provider to auto-accept") {
         refs.directory.requestDirectoryInstall()
-        refs.validator.remoteParticipant.ledger_api.acs.await(userParty, codegen.DirectoryInstall)
+        refs.validator.remoteParticipant.ledger_api.acs
+          .awaitJava(codegen.DirectoryInstall.COMPANION)(userParty)
       }
 
       DynamicUserRefs(userParty, refs)

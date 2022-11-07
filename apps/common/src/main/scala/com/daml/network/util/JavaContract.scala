@@ -10,7 +10,7 @@ import com.daml.ledger.javaapi.data.codegen.{
   ContractId,
   ValueDecoder,
 }
-import com.daml.ledger.javaapi.data.{CreatedEvent, DamlRecord, Template, Value}
+import com.daml.ledger.javaapi.data.{CreatedEvent, DamlRecord, Identifier, Template, Value}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
@@ -67,7 +67,7 @@ object JavaContract {
       templateId <- ProtoConverter.required("templateId", contract.templateId)
       javaTemplateId = scalaValue.Identifier.toJavaProto(templateId)
       _ <- Either.cond(
-        javaTemplateId == companion.TEMPLATE_ID,
+        Identifier.fromProto(javaTemplateId) == companion.TEMPLATE_ID,
         (),
         ProtoDeserializationError.ValueConversionError(
           "templateId",

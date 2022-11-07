@@ -3,7 +3,7 @@ package com.daml.network.directory
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.codegen.CN.Directory as directoryCodegen
+import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.directory.admin.grpc.GrpcDirectoryService
 import com.daml.network.directory.automation.DirectoryAutomationService
@@ -104,7 +104,7 @@ class DirectoryApp(
   override lazy val ports =
     Map("admin" -> config.adminApi.port)
 
-  override lazy val requiredTemplates = Set(directoryCodegen.DirectoryInstall)
+  override lazy val requiredJavaTemplates = Set(directoryCodegen.DirectoryInstall.TEMPLATE_ID)
 }
 
 object DirectoryApp {

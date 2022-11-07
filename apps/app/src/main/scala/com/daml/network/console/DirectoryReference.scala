@@ -1,12 +1,11 @@
 package com.daml.network.console
 
-import com.daml.ledger.client.binding.{Contract => CodegenContract, Primitive}
-import com.daml.network.codegen.CN.Wallet.{Subscriptions => subsCodegen}
-import com.daml.network.codegen.CN.{Directory => codegen}
+import com.daml.network.codegen.java.cn.wallet.{subscriptions => subsCodegen}
+import com.daml.network.codegen.java.cn.{directory => codegen}
 import com.daml.network.directory.admin.api.client.commands.GrpcDirectoryAppClient
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.util.Contract
+import com.daml.network.util.{JavaContract as Contract}
 import com.digitalasset.canton.console.{
   BaseInspection,
   ExternalLedgerApiClient,
@@ -21,19 +20,23 @@ abstract class DirectoryAppReference(
     override val name: String,
 ) extends CoinAppReference {
   @Help.Summary("List all directory entries")
-  def listEntries(): Seq[Contract[codegen.DirectoryEntry]] =
+  def listEntries(): Seq[Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry]] =
     consoleEnvironment.run {
       adminCommand(GrpcDirectoryAppClient.ListEntries())
     }
 
   @Help.Summary("Lookup a directory entry by the party that registered it")
-  def lookupEntryByParty(party: PartyId): Contract[codegen.DirectoryEntry] =
+  def lookupEntryByParty(
+      party: PartyId
+  ): Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry] =
     consoleEnvironment.run {
       adminCommand(GrpcDirectoryAppClient.LookupEntryByParty(party))
     }
 
   @Help.Summary("Lookup a directory entry by its name")
-  def lookupEntryByName(name: String): Contract[codegen.DirectoryEntry] =
+  def lookupEntryByName(
+      name: String
+  ): Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry] =
     consoleEnvironment.run {
       adminCommand(GrpcDirectoryAppClient.LookupEntryByName(name))
     }
@@ -91,17 +94,18 @@ class RemoteDirectoryAppReference(
   def config: RemoteDirectoryAppConfig =
     consoleEnvironment.environment.config.remoteDirectoriesByString(name)
 
-  private def getDirectoryInstall(): Primitive.ContractId[codegen.DirectoryInstall] = {
+  private def getDirectoryInstall(): codegen.DirectoryInstall.ContractId = {
     val providerParty = getProviderPartyId()
     val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.damlUser)
-    val allInstalls = ledgerApi.ledger_api.acs.filter(
+    val allInstalls = ledgerApi.ledger_api.acs.filterJava(
+      codegen.DirectoryInstall.COMPANION
+    )(
       userParty,
-      codegen.DirectoryInstall,
-      (install: CodegenContract[codegen.DirectoryInstall]) =>
-        install.value.user == userParty.toPrim && install.value.provider == providerParty.toPrim,
+      (install: codegen.DirectoryInstall.Contract) =>
+        install.data.user == userParty.toProtoPrimitive && install.data.provider == providerParty.toProtoPrimitive,
     )
     allInstalls match {
-      case Seq(install) => install.contractId
+      case Seq(install) => install.id
       case _ =>
         throw new IllegalStateException(
           s"Expected exactly one DirectoryInstall contract for user $userParty but got $allInstalls"
@@ -110,46 +114,52 @@ class RemoteDirectoryAppReference(
   }
 
   @Help.Summary("Request DirectoryInstall contract")
-  def requestDirectoryInstall(): Primitive.ContractId[codegen.DirectoryInstallRequest] = {
+  def requestDirectoryInstall(): codegen.DirectoryInstallRequest.ContractId = {
     val providerParty = getProviderPartyId()
     val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.damlUser)
-    LedgerApiUtils.submitWithResult(
+    val created = LedgerApiUtils.submitWithResultJava(
       ledgerApi,
       actAs = Seq(userParty),
       readAs = Seq.empty,
-      update = codegen
-        .DirectoryInstallRequest(user = userParty.toPrim, provider = providerParty.toPrim)
-        .create,
+      update = new codegen.DirectoryInstallRequest(
+        providerParty.toProtoPrimitive,
+        userParty.toProtoPrimitive,
+      ).create,
     )
+    codegen.DirectoryInstallRequest.COMPANION.toContractId(created.contractId)
   }
 
   @Help.Summary("Request DirectoryEntry with the given name")
-  def requestDirectoryEntry(name: String): Primitive.ContractId[codegen.DirectoryEntryRequest] = {
+  def requestDirectoryEntry(name: String): codegen.DirectoryEntryRequest.ContractId = {
     val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.damlUser)
-    LedgerApiUtils.submitWithResult(
-      ledgerApi,
-      actAs = Seq(userParty),
-      readAs = Seq.empty,
-      update = getDirectoryInstall()
-        .exerciseDirectoryInstall_RequestEntry(
-          name = name
-        ),
-    )
+    LedgerApiUtils
+      .submitWithResultJava(
+        ledgerApi,
+        actAs = Seq(userParty),
+        readAs = Seq.empty,
+        update = getDirectoryInstall()
+          .exerciseDirectoryInstall_RequestEntry(
+            name
+          ),
+      )
+      .exerciseResult
   }
 
   @Help.Summary("Request DirectoryEntry with the given name, financed via subscription payments")
   def requestDirectoryEntryWithSubscription(
       name: String
-  ): Primitive.ContractId[subsCodegen.SubscriptionRequest] = {
+  ): subsCodegen.SubscriptionRequest.ContractId = {
     val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.damlUser)
-    LedgerApiUtils.submitWithResult(
-      ledgerApi,
-      actAs = Seq(userParty),
-      readAs = Seq.empty,
-      update = getDirectoryInstall()
-        .exerciseDirectoryInstall_RequestEntryWithSubscription(
-          name = name
-        ),
-    )
+    LedgerApiUtils
+      .submitWithResultJava(
+        ledgerApi,
+        actAs = Seq(userParty),
+        readAs = Seq.empty,
+        update = getDirectoryInstall()
+          .exerciseDirectoryInstall_RequestEntryWithSubscription(
+            name
+          ),
+      )
+      .exerciseResult
   }
 }
