@@ -5,7 +5,12 @@ import { Metadata } from 'grpc-web';
 import React, { useContext, useState, useEffect, useMemo } from 'react';
 
 import { AppPaymentRequest, PaymentChannelProposal } from '@daml.js/wallet/lib/CN/Wallet';
-import { SubscriptionRequest } from '@daml.js/wallet/lib/CN/Wallet/Subscriptions';
+import {
+  SubscriptionRequest,
+  Subscription,
+  SubscriptionIdleState,
+  SubscriptionPayment,
+} from '@daml.js/wallet/lib/CN/Wallet/Subscriptions';
 
 import { useUserState } from './UserContext';
 
@@ -30,6 +35,16 @@ export interface ListAppPaymentRequestsResponse {
 
 export interface ListSubscriptionRequestsResponse {
   subscriptionRequestsList: Contract<SubscriptionRequest>[];
+}
+
+export type SubscriptionTuple = [Contract<Subscription>, SubscriptionState];
+
+export type SubscriptionState =
+  | { type: 'idle'; value: Contract<SubscriptionIdleState> }
+  | { type: 'payment'; value: Contract<SubscriptionPayment> };
+
+export interface ListSubscriptionsResponse {
+  subscriptionsList: SubscriptionTuple[];
 }
 
 export interface UserStatusResponse {
@@ -57,6 +72,7 @@ export interface WalletClient {
 
   listSubscriptionRequests: () => Promise<ListSubscriptionRequestsResponse>;
   acceptSubscriptionRequest: (requestContractId: string) => Promise<void>;
+  listSubscriptions: () => Promise<ListSubscriptionsResponse>;
 
   userStatus: () => Promise<UserStatusResponse>;
 }
@@ -182,6 +198,27 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             .setWalletCtx(wctx),
           creds
         );
+      },
+      listSubscriptions: async (): Promise<ListSubscriptionsResponse> => {
+        const res = await walletClient.listSubscriptions(
+          new v0.ListSubscriptionsRequest().setWalletCtx(wctx),
+          creds
+        );
+        return {
+          subscriptionsList: res.getSubscriptionsList().map(sub => {
+            const main = Contract.decode(sub.getMain()!, Subscription);
+            const state = sub.hasPayment()
+              ? {
+                  type: 'payment' as 'payment',
+                  value: Contract.decode(sub.getPayment()!, SubscriptionPayment),
+                }
+              : {
+                  type: 'idle' as 'idle',
+                  value: Contract.decode(sub.getIdle()!, SubscriptionIdleState),
+                };
+            return [main, state];
+          }),
+        };
       },
 
       userStatus: async () => {

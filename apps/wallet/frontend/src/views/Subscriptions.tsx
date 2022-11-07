@@ -1,26 +1,57 @@
 import { DirectoryEntry, sameContracts, useInterval, Contract } from 'common-frontend';
 import React, { useCallback, useState } from 'react';
 
-import { Button, Stack, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/material';
+import {
+  Button,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Typography,
+} from '@mui/material';
 
-import { SubscriptionRequest } from '@daml.js/wallet/lib/CN/Wallet/Subscriptions';
+import {
+  SubscriptionRequest,
+  Subscription,
+  SubscriptionIdleState,
+  SubscriptionPayment,
+} from '@daml.js/wallet/lib/CN/Wallet/Subscriptions';
 
-import { useWalletClient } from '../contexts/WalletServiceContext';
+import {
+  useWalletClient,
+  SubscriptionTuple,
+  SubscriptionState,
+} from '../contexts/WalletServiceContext';
 
-const Subscriptions: React.FC = () => {
+const Subscriptions: React.FC = () => (
+  <Stack spacing={2}>
+    <Typography variant="h6">Active Subscription Requests</Typography>
+    <SubscriptionRequestsTable />
+    <Typography variant="h6">Active Subscriptions</Typography>
+    <SubscriptionsTable />
+  </Stack>
+);
+
+const SubscriptionRequestsTable: React.FC = () => {
   const { listSubscriptionRequests, acceptSubscriptionRequest } = useWalletClient();
-  const [SubscriptionRequests, setSubscriptions] = useState<Contract<SubscriptionRequest>[]>([]);
+  const [SubscriptionRequests, setSubscriptionRequests] = useState<Contract<SubscriptionRequest>[]>(
+    []
+  );
 
   const fetchSubscriptionRequests = useCallback(async () => {
     const { subscriptionRequestsList } = await listSubscriptionRequests();
-    setSubscriptions(prev =>
+    setSubscriptionRequests(prev =>
       sameContracts(subscriptionRequestsList, prev) ? prev : subscriptionRequestsList
     );
-  }, [listSubscriptionRequests, setSubscriptions]);
+  }, [listSubscriptionRequests, setSubscriptionRequests]);
 
   useInterval(fetchSubscriptionRequests, 500);
 
-  const Request: React.FC<{ request: Contract<SubscriptionRequest> }> = ({ request }) => (
+  const SubscriptionRequest: React.FC<{ request: Contract<SubscriptionRequest> }> = ({
+    request,
+  }) => (
     <TableRow className="sub-requests-table-row">
       <TableCell className="sub-request-receiver">
         <DirectoryEntry partyId={request.payload.subscriptionData.receiver} />
@@ -36,30 +67,111 @@ const Subscriptions: React.FC = () => {
           className="sub-request-accept-button"
           onClick={() => acceptSubscriptionRequest(request.contractId)}
         >
-          Accept
+          Accept and Pay
         </Button>
       </TableCell>
     </TableRow>
   );
 
   return (
-    <Stack spacing={2}>
-      <Table>
-        <TableHead>
-          <TableRow>
-            <TableCell>Receiver</TableCell>
-            <TableCell>Payment quantity</TableCell>
-            <TableCell>Payment interval (μs)</TableCell>
-            <TableCell>Provider</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {SubscriptionRequests.map(c => (
-            <Request request={c} key={c.contractId} />
-          ))}
-        </TableBody>
-      </Table>
-    </Stack>
+    <Table>
+      <TableHead>
+        <TableRow>
+          <TableCell>Receiver</TableCell>
+          <TableCell>Payment quantity</TableCell>
+          <TableCell>Payment interval (μs)</TableCell>
+          <TableCell>Provider</TableCell>
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {SubscriptionRequests.map(c => (
+          <SubscriptionRequest request={c} key={c.contractId} />
+        ))}
+      </TableBody>
+    </Table>
+  );
+};
+
+const SubscriptionsTable: React.FC = () => {
+  const { listSubscriptions } = useWalletClient();
+  const [SubscriptionTuples, setSubscriptionTuples] = useState<SubscriptionTuple[]>([]);
+
+  const fetchSubscriptions = useCallback(async () => {
+    const { subscriptionsList } = await listSubscriptions();
+    setSubscriptionTuples(prev =>
+      unchangedSubscriptionTuples(subscriptionsList, prev) ? prev : subscriptionsList
+    );
+  }, [listSubscriptions, setSubscriptionTuples]);
+
+  useInterval(fetchSubscriptions, 500);
+
+  const Subscription: React.FC<{
+    main: Contract<Subscription>;
+    state: SubscriptionState;
+  }> = ({ main, state }) => (
+    <TableRow className="subs-table-row">
+      <TableCell className="sub-receiver">
+        <DirectoryEntry partyId={main.payload.receiver} />
+      </TableCell>
+      <TableCell>{state.value.payload.payData.paymentQuantity}</TableCell>
+      <TableCell>{state.value.payload.payData.paymentInterval.microseconds}</TableCell>
+      <TableCell>{paymentDueAt(state)}</TableCell>
+      <TableCell className="sub-provider">
+        <DirectoryEntry partyId={main.payload.provider} />
+      </TableCell>
+      <TableCell className="sub-state">{stateDescription(state)}</TableCell>
+    </TableRow>
+  );
+
+  return (
+    <Table>
+      <TableHead>
+        <TableRow>
+          <TableCell>Receiver</TableCell>
+          <TableCell>Payment quantity</TableCell>
+          <TableCell>Payment interval (μs)</TableCell>
+          <TableCell>Next payment due at</TableCell>
+          <TableCell>Provider</TableCell>
+          <TableCell>State</TableCell>
+        </TableRow>
+      </TableHead>
+      <TableBody>
+        {SubscriptionTuples.map(t => (
+          <Subscription main={t[0]} state={t[1]} key={t[0].contractId} />
+        ))}
+      </TableBody>
+    </Table>
+  );
+};
+
+const paymentDueAt = (state: SubscriptionState): string => {
+  switch (state.type) {
+    case 'idle':
+      return (state.value.payload as SubscriptionIdleState).nextPaymentDueAt;
+    case 'payment':
+      return (state.value.payload as SubscriptionPayment).thisPaymentDueAt;
+  }
+};
+
+const stateDescription = (state: SubscriptionState): string => {
+  switch (state.type) {
+    case 'idle':
+      return 'Waiting for next payment to become due';
+    case 'payment':
+      return 'Payment in progress';
+  }
+};
+
+const unchangedSubscriptionTuples = (a: SubscriptionTuple[], b: SubscriptionTuple[]): boolean => {
+  return (
+    sameContracts(
+      a.map(x => x[0]),
+      b.map(x => x[0])
+    ) &&
+    sameContracts(
+      a.map(x => x[1].value as Contract<unknown>),
+      b.map(x => x[1].value as Contract<unknown>)
+    )
   );
 };
 

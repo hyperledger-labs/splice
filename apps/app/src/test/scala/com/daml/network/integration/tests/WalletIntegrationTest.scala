@@ -11,7 +11,7 @@ import com.daml.network.codegen.CC.{
 import com.daml.network.codegen.CN.Scripts.Wallet.TestSubscriptions as testSubsCodegen
 import com.daml.network.codegen.CN.Scripts.TestWallet as testWalletCodegen
 import com.daml.network.codegen.CN.Wallet.Subscriptions as subsCodegen
-import com.daml.network.codegen.CN.Wallet as walletCodegen
+import com.daml.network.codegen.CN.{Directory => dirCodegen, Wallet => walletCodegen}
 import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 import com.daml.network.console.{LocalWalletAppReference, WalletAppReference}
@@ -441,6 +441,71 @@ class WalletIntegrationTest
           aliceRemoteWallet.listSubscriptions() shouldBe empty
         }
       }
+
+    "allow a user to list multiple subscriptions in different states" in { implicit env =>
+      val aliceDamlUser = aliceRemoteWallet.config.damlUser
+      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+      aliceValidator.onboardUser(aliceDamlUser)
+
+      clue("Alice gets some coins") {
+        aliceRemoteWallet.tap(50)
+      }
+      clue("Setting up directory as provider for the created subscriptions") {
+        val directoryDarPath = "apps/directory/daml/.daml/dist/directory-service-0.1.0.dar"
+        aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
+        aliceDirectory.requestDirectoryInstall()
+        aliceValidator.remoteParticipant.ledger_api.acs
+          .await(aliceUserParty, dirCodegen.DirectoryInstall)
+      }
+      aliceRemoteWallet.listSubscriptions() shouldBe empty
+
+      clue("Creating 3 subscriptions") {
+        List("alice1", "alice2", "alice3").foreach(name => {
+          val requestId = aliceDirectory.requestDirectoryEntryWithSubscription(name)
+          aliceRemoteWallet.acceptSubscriptionRequest(requestId)
+        })
+      }
+      clue("Checking that 3 idle subscriptions are listed...") {
+        eventually() {
+          val subs = aliceRemoteWallet.listSubscriptions()
+          subs.length shouldBe 3
+          subs.foreach(sub => {
+            inside(sub.state) { case GrpcWalletAppClient.SubscriptionIdleState(state) => () }
+          })
+        }
+      }
+      clue("Stopping directory backend so that payments aren't collected.") {
+        directory.stop()
+      }
+      clue("Alice makes a payment on one of the subscriptions") {
+        val subscriptionStateId = inside(aliceRemoteWallet.listSubscriptions()) {
+          case Seq(sub, _, _) => {
+            inside(sub.state) {
+              case GrpcWalletAppClient.SubscriptionIdleState(state) => { state.contractId }
+            }
+          }
+        }
+        aliceRemoteWallet.makeSubscriptionPayment(subscriptionStateId)
+      }
+      clue("Checking that 2 idle subscriptions and 1 payment are listed...") {
+        eventually() {
+          val subs = aliceRemoteWallet.listSubscriptions()
+          subs.length shouldBe 3
+          subs
+            .filter(_.state match {
+              case GrpcWalletAppClient.SubscriptionIdleState(_) => true
+              case _ => false
+            })
+            .length shouldBe 2
+          subs
+            .filter(_.state match {
+              case GrpcWalletAppClient.SubscriptionPayment(_) => true
+              case _ => false
+            })
+            .length shouldBe 1
+        }
+      }
+    }
 
     "allow two users to create a payment channel and use it for a transfer" in { implicit env =>
       // Onboard alice on her self-hosted validator
@@ -1058,6 +1123,7 @@ class WalletIntegrationTest
         paymentDuration = RelTime(microseconds = 60 * 60 * 1000000L),
         collectionDuration = RelTime(microseconds = 60 * 1000000L),
       ) // paymentDuration == paymenInterval, so we can make a second payment immediately
+      // TODO(i1395) Consider changing this ^ once our tests can control time
       val request = subsCodegen.SubscriptionRequest(
         subscriptionData,
         payData,
