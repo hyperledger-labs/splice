@@ -62,7 +62,7 @@ com\.daml\.platform\.apiserver\.error\.ErrorListener
 .*eslint.*--max-warnings=0.*
 
 # npm vulnerabilities. Temporarily, we completely ignore those.
-# In i1483, we should introduce selective exclusion, and then remove the following:
+# In i1489, once we introduce blackduck, also consider replacing this with ``--no-audit` for `npm install`:
 .*\[.*info.*\].*vulnerabilities.*
 
 # Make sure to have a trailing newline
