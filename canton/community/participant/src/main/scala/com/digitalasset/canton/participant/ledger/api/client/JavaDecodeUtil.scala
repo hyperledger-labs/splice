@@ -4,13 +4,30 @@
 package com.digitalasset.canton.participant.ledger.api.client
 
 import com.daml.ledger.javaapi.data.codegen.{Contract, ContractCompanion, ContractId}
-import com.daml.ledger.javaapi.data.{CreatedEvent, Template}
+import com.daml.ledger.javaapi.data.{
+  CreatedEvent as JavaCreatedEvent,
+  Template,
+  Transaction as JavaTransaction,
+}
+
+import scala.jdk.CollectionConverters.*
 
 object JavaDecodeUtil {
   def decodeCreated[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
       companion: ContractCompanion[TC, TCid, T]
-  )(event: CreatedEvent): Option[TC] =
+  )(event: JavaCreatedEvent): Option[TC] =
     if (event.getTemplateId == companion.TEMPLATE_ID) {
       Some(companion.fromCreatedEvent(event))
     } else None
+
+  def decodeAllCreated[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      companion: ContractCompanion[TC, TCid, T]
+  )(transaction: JavaTransaction): Seq[TC] = {
+    for {
+      event <- transaction.getEvents.asScala.toList
+      eventP = event.toProtoEvent
+      created <- if (eventP.hasCreated) Seq(eventP.getCreated) else Seq()
+      a <- decodeCreated(companion)(JavaCreatedEvent.fromProto(created)).toList
+    } yield a
+  }
 }

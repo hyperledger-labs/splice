@@ -1,8 +1,8 @@
 package com.daml.network.scan.admin.grpc
 
 import com.daml.ledger.api.v1.transaction.TransactionTree
-import com.daml.network.codegen.CC.{CoinRules => coinRulesCodegen, Round => roundCodegen}
-import com.daml.network.environment.CoinLedgerClient
+import com.daml.network.codegen.java.cc.{coinrules as coinRulesCodegen, round as roundCodegen}
+import com.daml.network.environment.JavaCoinLedgerClient
 import com.daml.network.scan.store.ScanCCHistoryStore
 import com.daml.network.scan.v0
 import com.daml.network.scan.v0.{
@@ -12,7 +12,7 @@ import com.daml.network.scan.v0.{
   GetHistoryResponse,
   ScanServiceGrpc,
 }
-import com.daml.network.util.Contract
+import com.daml.network.util.JavaContract
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
 import com.google.protobuf.empty.Empty
@@ -22,7 +22,7 @@ import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcScanService(
-    ledgerClient: CoinLedgerClient,
+    ledgerClient: JavaCoinLedgerClient,
     svcUser: String,
     store: ScanCCHistoryStore,
     protected val loggerFactory: NamedLoggerFactory,
@@ -47,13 +47,27 @@ class GrpcScanService(
     withSpanFromGrpcContext("GrpcScanService") { traceContext => span =>
       for {
         svc <- connection.getPrimaryParty(svcUser)
-        coinRules <- connection.activeContracts(svc, coinRulesCodegen.CoinRules).map(_.headOption)
-        rounds <- connection.activeContracts(svc, roundCodegen.OpenMiningRound)
+        coinRules <- connection
+          .activeContracts(svc, coinRulesCodegen.CoinRules.COMPANION)
+          .map(_.headOption)
+        rounds <- connection.activeContracts(svc, roundCodegen.OpenMiningRound.COMPANION)
       } yield {
         val decodedCoinRules =
-          coinRules.map(c => Contract.fromCodegenContract[coinRulesCodegen.CoinRules](c))
-        val decodedRounds: Seq[Contract[roundCodegen.OpenMiningRound]] =
-          rounds.map(r => Contract.fromCodegenContract[roundCodegen.OpenMiningRound](r))
+          coinRules.map(c =>
+            JavaContract.fromCodegenContract[
+              coinRulesCodegen.CoinRules.ContractId,
+              coinRulesCodegen.CoinRules,
+            ](c)
+          )
+        val decodedRounds: Seq[
+          JavaContract[roundCodegen.OpenMiningRound.ContractId, roundCodegen.OpenMiningRound]
+        ] =
+          rounds.map(r =>
+            JavaContract.fromCodegenContract[
+              roundCodegen.OpenMiningRound.ContractId,
+              roundCodegen.OpenMiningRound,
+            ](r)
+          )
         v0.GetTransferContextResponse(
           coinRules = decodedCoinRules.map(_.toProtoV0),
           latestOpenMiningRound =
@@ -76,26 +90,28 @@ class GrpcScanService(
     traceContext => span =>
       for {
         svc <- connection.getPrimaryParty(svcUser)
-        treeO <- connection.transactionTreeById(Seq(svc), request.transactionId)
-        tree: TransactionTree = treeO.getOrElse(
-          sys.error(
-            s"Ledger didn't return a result when querying for the transaction tree of transaction ${request.transactionId}"
-          )
-        )
-      } yield v0.GetCoinTransactionDetailsResponse(Some(tree))
+        tree <- connection.tryGetTransactionTreeById(Seq(svc), request.transactionId)
+      } yield v0.GetCoinTransactionDetailsResponse(
+        Some(TransactionTree.fromJavaProto(tree.toProto))
+      )
   }
 
   override def getClosedRounds(request: Empty): Future[GetClosedRoundsResponse] =
     withSpanFromGrpcContext("GrpcScanService") { traceContext => span =>
       for {
         svc <- connection.getPrimaryParty(svcUser)
-        rounds <- connection.activeContracts(svc, roundCodegen.ClosedMiningRound)
+        rounds <- connection.activeContracts(svc, roundCodegen.ClosedMiningRound.COMPANION)
       } yield {
         val filteredRounds = rounds
-          .sortWith(_.value.round.number > _.value.round.number)
+          .sortWith(_.data.round.number > _.data.round.number)
         v0.GetClosedRoundsResponse(
           filteredRounds.map(r =>
-            Contract.fromCodegenContract[roundCodegen.ClosedMiningRound](r).toProtoV0
+            JavaContract
+              .fromCodegenContract[
+                roundCodegen.ClosedMiningRound.ContractId,
+                roundCodegen.ClosedMiningRound,
+              ](r)
+              .toProtoV0
           )
         )
       }

@@ -80,7 +80,7 @@ class SvcApp(
       _ = logger.info(s"SVC App is initialized")
       logCollection = new SvcLogCollectionService(
         svcPartyId,
-        ledgerClient,
+        javaLedgerClient,
         loggerFactory,
         timeouts,
         store,

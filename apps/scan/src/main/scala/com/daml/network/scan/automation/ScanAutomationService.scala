@@ -1,7 +1,7 @@
 package com.daml.network.scan.automation
 
 import com.daml.network.admin.LedgerAutomationServiceOrchestrator
-import com.daml.network.environment.CoinLedgerClient
+import com.daml.network.environment.JavaCoinLedgerClient
 import com.daml.network.scan.admin.{ReadCoinTransactionsService, ReadReferenceDataService}
 import com.daml.network.scan.store.ScanCCHistoryStore
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -16,7 +16,7 @@ import scala.concurrent.ExecutionContextExecutor
   */
 class ScanAutomationService(
     svcParty: PartyId,
-    ledgerClient: CoinLedgerClient,
+    ledgerClient: JavaCoinLedgerClient,
     loggerFactory: NamedLoggerFactory,
     processingTimeouts: ProcessingTimeout,
     store: ScanCCHistoryStore,

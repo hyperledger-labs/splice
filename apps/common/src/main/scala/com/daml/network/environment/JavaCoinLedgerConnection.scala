@@ -49,7 +49,7 @@ import io.grpc.StatusRuntimeException
 import java.nio.file.{Files, Path}
 import java.util.UUID
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.jdk.CollectionConverters._
+import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success}
 
@@ -120,7 +120,10 @@ trait JavaCoinLedgerConnection extends JavaCoinLedgerSubmit {
       subscriptionName: String,
   ): JavaCoinLedgerSubscription
 
+  def tryGetTransactionTreeById(parties: Seq[PartyId], id: String): Future[TransactionTree]
+
   def getOptionalPrimaryParty(user: String): Future[Option[PartyId]]
+  def getPrimaryParty(user: String): Future[PartyId]
 
   def allocatePartyViaLedgerApi(hint: Option[String], displayName: Option[String]): Future[PartyId]
 
@@ -347,6 +350,12 @@ object JavaCoinLedgerConnection {
           }
         }
 
+      override def tryGetTransactionTreeById(
+          parties: Seq[PartyId],
+          id: String,
+      ): Future[TransactionTree] =
+        client.tryGetTransactionTreeById(parties.map(_.toProtoPrimitive), id)
+
       override def getOptionalPrimaryParty(user: String): Future[Option[PartyId]] = {
         for {
           user <- client
@@ -357,6 +366,15 @@ object JavaCoinLedgerConnection {
               u.getPrimaryParty.toScala
                 .getOrElse(sys.error(s"user $user was allocated without primary party"))
             )
+          )
+        } yield partyId
+      }
+
+      override def getPrimaryParty(user: String): Future[PartyId] = {
+        for {
+          partyIdO <- getOptionalPrimaryParty(user)
+          partyId = partyIdO.getOrElse(
+            sys.error(s"Unable to find party for user $user")
           )
         } yield partyId
       }

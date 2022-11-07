@@ -58,7 +58,7 @@ class ScanApp(
       store <- Future.successful(ScanCCHistoryStore(storage, loggerFactory))
       automation = new ScanAutomationService(
         svcParty,
-        ledgerClient,
+        javaLedgerClient,
         loggerFactory,
         timeouts,
         store,
@@ -67,7 +67,7 @@ class ScanApp(
       adminServerRegistry
         .addService(
           ScanServiceGrpc.bindService(
-            new GrpcScanService(ledgerClient, config.svcUser, store, loggerFactory),
+            new GrpcScanService(javaLedgerClient, config.svcUser, store, loggerFactory),
             ec,
           )
         )

@@ -366,7 +366,7 @@ try to use Scala types whereever possible so we delay the conversion
 to Java types until the last possible point and convert from Scala to
 Java as early as possible.
 
-To convert, import `scala.jdk.CollectionConverters.*`. You can then use `toScala` and `toJava` methods.
+To convert, import `scala.jdk.CollectionConverters.*`. You can then use `asScala` and `asJava` methods.
 
 ## Testing
 

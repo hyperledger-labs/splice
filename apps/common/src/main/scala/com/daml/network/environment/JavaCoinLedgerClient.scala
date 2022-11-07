@@ -19,6 +19,7 @@ import com.daml.ledger.api.v1.{
   CommandServiceOuterClass,
   CommandsOuterClass,
   TransactionServiceGrpc,
+  TransactionServiceOuterClass,
 }
 import com.daml.ledger.client.GrpcChannel
 import com.daml.ledger.client.configuration.LedgerClientChannelConfiguration
@@ -76,7 +77,7 @@ object JavaCoinLedgerClient {
     }
     override def onCompleted() = {}
   }
-  private def wrapFuture[T](f: (StreamObserver[T] => Unit)): Future[T] = {
+  def wrapFuture[T](f: (StreamObserver[T] => Unit)): Future[T] = {
     val futureObserver = new FutureObserver[T]
     f(futureObserver)
     futureObserver.promise.future
@@ -89,7 +90,8 @@ object JavaCoinLedgerClient {
   }
 
   class LedgerClient(channel: Channel, token: Option[String])(implicit
-      esf: ExecutionSequencerFactory
+      esf: ExecutionSequencerFactory,
+      ec: ExecutionContext,
   ) extends Closeable {
     val activeContractsServiceStub: ActiveContractsServiceGrpc.ActiveContractsServiceStub =
       withCredentials(ActiveContractsServiceGrpc.newStub(channel), token)
@@ -112,6 +114,22 @@ object JavaCoinLedgerClient {
       ClientAdapter
         .serverStreaming(request.toProto, activeContractsServiceStub.getActiveContracts)
         .map(GetActiveContractsResponse.fromProto)
+    }
+
+    def tryGetTransactionTreeById(
+        parties: Seq[String],
+        id: String,
+    ): Future[TransactionTree] = {
+      val req = TransactionServiceOuterClass.GetTransactionByIdRequest.newBuilder
+        .setTransactionId(id)
+        .addAllRequestingParties(parties.asJava)
+        .build()
+      wrapFuture(
+        transactionServiceStub
+          .getTransactionById(req, _)
+      ).map { resp =>
+        TransactionTree.fromProto(resp.getTransaction)
+      }
     }
 
     def transactions(

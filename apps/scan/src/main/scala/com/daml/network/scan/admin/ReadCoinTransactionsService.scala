@@ -4,13 +4,14 @@ import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.v1.event.ExercisedEvent
 import com.daml.ledger.api.v1.transaction.TreeEvent.Kind.{Created, Empty, Exercised}
 import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree, TreeEvent}
-import com.daml.ledger.client.binding
 import com.daml.ledger.client.binding.Primitive
+import com.daml.ledger.javaapi.data.{Identifier, Transaction as JavaTransaction}
 import com.daml.network.admin.LedgerAutomationService
 import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
 import com.daml.network.codegen.CC.CoinRules.CoinRules
-import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.history._
+import com.daml.network.codegen.java.cc
+import com.daml.network.environment.JavaCoinLedgerConnection
+import com.daml.network.history.*
 import com.daml.network.scan.store.ScanCCHistoryStore
 import com.daml.network.util.{Contract, ExerciseNode, Trees}
 import com.digitalasset.canton.lifecycle.Lifecycle
@@ -26,14 +27,15 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class ReadCoinTransactionsService(
     svcParty: PartyId,
-    connection: CoinLedgerConnection,
+    connection: JavaCoinLedgerConnection,
     store: ScanCCHistoryStore,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, tc: TraceContext)
     extends LedgerAutomationService
     with NamedLogging {
 
-  override def templateIds: Seq[binding.Primitive.TemplateId[_]] = Seq(Coin.id, LockedCoin.id)
+  override def templateIds: Seq[Identifier] =
+    Seq(cc.coin.Coin.TEMPLATE_ID, cc.coin.LockedCoin.TEMPLATE_ID)
 
   /** This works as follows:
     * - read the flat transaction stream filtered for `Coin` creates and archives
@@ -41,19 +43,13 @@ class ReadCoinTransactionsService(
     * - traverse the corresponding TransactionTree to find the creates and archives and then add them to TxStore with the context
     * derived from the full transaction tree
     */
-  override def processTransaction(tx: Transaction)(implicit
+  override def processTransaction(tx: JavaTransaction)(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
     for {
-      treeO <- connection
-        .transactionTreeById(Seq(svcParty), tx.transactionId)
-      tree = treeO.getOrElse(
-        sys.error(
-          s"Unexpectedly, the Ledger API didn't know the transaction tree associated with transaction $tx"
-        )
-      )
-      events <- traverseForest(tree)
-      metadata = TransactionMetadata(tx)
+      tree <- connection.tryGetTransactionTreeById(Seq(svcParty), tx.getTransactionId)
+      events <- traverseForest(TransactionTree.fromJavaProto(tree.toProto))
+      metadata = TransactionMetadata(Transaction.fromJavaProto(tx.toProto))
       _ <- store.addTransaction(CoinTransaction(events, metadata))
     } yield ()
   }

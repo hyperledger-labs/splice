@@ -181,10 +181,6 @@ case class EndUserTreasuryService(
       _ = logger.debug(
         s"After lookups, the batch contains ${validOperations.size} coin operations."
       )
-      // TODO(#1351): smarter coin/input selection?
-      inputs <- userStore
-        .listContracts(coinCodegen.Coin.COMPANION)
-        .map(cs => cs.value.map(c => new coinRulesCodegen.transferinput.InputCoin(c.contractId)))
       transferContext <- getValidatorStore().getPaymentTransferContext(retryProvider)
       activeIssuingRounds = transferContext.context.issuingMiningRounds.asScala.keys.toSet
       inputs <- selectTransferInputs(activeIssuingRounds)

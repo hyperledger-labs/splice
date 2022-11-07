@@ -2,14 +2,14 @@ package com.daml.network.svc.automation
 
 import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.v1.event.ExercisedEvent
+import com.daml.ledger.api.v1.transaction.TransactionTree
 import com.daml.ledger.api.v1.transaction.TreeEvent.Kind.Exercised
-import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree}
-import com.daml.ledger.client.binding.Primitive
+import com.daml.ledger.javaapi.data.{Identifier, Transaction}
 import com.daml.network.admin.LedgerAutomationService
-import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
 import com.daml.network.codegen.CC.CoinRules.{CoinRules, TransferResult}
 import com.daml.network.codegen.DA
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.network.codegen.java.cc
+import com.daml.network.environment.JavaCoinLedgerConnection
 import com.daml.network.history.*
 import com.daml.network.svc.store.SvcEventsStore
 import com.daml.network.util.{ExerciseNode, Trees}
@@ -23,26 +23,22 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class RoundSummaryCollectionService(
     svcParty: PartyId,
-    connection: CoinLedgerConnection,
+    connection: JavaCoinLedgerConnection,
     store: SvcEventsStore,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, tc: TraceContext)
     extends LedgerAutomationService
     with NamedLogging {
 
-  override def templateIds: Seq[Primitive.TemplateId[_]] = Seq(Coin.id, LockedCoin.id)
+  override def templateIds: Seq[Identifier] =
+    Seq(cc.coin.Coin.TEMPLATE_ID, cc.coin.LockedCoin.TEMPLATE_ID)
 
   override def processTransaction(tx: Transaction)(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
     for {
-      treeO <- connection.transactionTreeById(Seq(svcParty), tx.transactionId)
-      tree = treeO.getOrElse(
-        sys.error(
-          s"Unexpectedly, the Ledger API didn't know the transaction tree associated with transaction $tx"
-        )
-      )
-      transfers <- traverseForest(tree)
+      tree <- connection.tryGetTransactionTreeById(Seq(svcParty), tx.getTransactionId)
+      transfers <- traverseForest(TransactionTree.fromJavaProto(tree.toProto))
       _ <- store.addTransfers(transfers)
     } yield ()
   }

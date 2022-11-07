@@ -1,7 +1,7 @@
 package com.daml.network.svc.automation
 
 import com.daml.network.admin.LedgerAutomationServiceOrchestrator
-import com.daml.network.environment.CoinLedgerClient
+import com.daml.network.environment.JavaCoinLedgerClient
 import com.daml.network.svc.store.SvcStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncCloseable}
@@ -17,7 +17,7 @@ import scala.concurrent.ExecutionContextExecutor
 // TODO(M1-52): integrate log collection into our store infrastructure as part of the work on automating rewards issuance
 class SvcLogCollectionService(
     svcParty: PartyId,
-    ledgerClient: CoinLedgerClient,
+    ledgerClient: JavaCoinLedgerClient,
     loggerFactory: NamedLoggerFactory,
     processingTimeouts: ProcessingTimeout,
     store: SvcStore,
