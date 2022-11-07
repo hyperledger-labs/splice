@@ -61,4 +61,8 @@ com\.daml\.platform\.apiserver\.error\.ErrorListener
 # npm linting command
 .*eslint.*--max-warnings=0.*
 
+# npm vulnerabilities. Temporarily, we completely ignore those.
+# In i1483, we should introduce selective exclusion, and then remove the following:
+.*\[.*info.*\].*vulnerabilities.*
+
 # Make sure to have a trailing newline
