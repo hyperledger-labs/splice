@@ -1,7 +1,7 @@
 package com.daml.network.directory.store.memory
 
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.store.{JavaAcsStore, JavaInMemoryAcsStore}
+import com.daml.network.store.{AcsStore, InMemoryAcsStore}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 
@@ -17,11 +17,11 @@ class InMemoryDirectoryStore(
     with NamedLogging {
 
   private val inMemoryAcsStore =
-    new JavaInMemoryAcsStore(loggerFactory, DirectoryStore.contractFilter(providerParty))
+    new InMemoryAcsStore(loggerFactory, DirectoryStore.contractFilter(providerParty))
 
-  override val acsStore: JavaAcsStore = inMemoryAcsStore
+  override val acsStore: AcsStore = inMemoryAcsStore
 
-  override val acsIngestionSink: JavaAcsStore.IngestionSink = inMemoryAcsStore.ingestionSink
+  override val acsIngestionSink: AcsStore.IngestionSink = inMemoryAcsStore.ingestionSink
 
   override def close(): Unit = ()
 

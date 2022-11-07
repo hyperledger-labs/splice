@@ -6,7 +6,7 @@ import com.daml.ledger.client.binding.Primitive
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{ArchivedEvent, CreatedEvent, Event, Transaction}
 import com.daml.network.codegen.java.cn.{directory => directoryCodegen}
-import com.daml.network.store.JavaAcsStore.QueryResult
+import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.JavaContract
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.concurrent.Threading

@@ -1,6 +1,7 @@
 package com.daml.network.automation
 
-import com.daml.network.environment.CoinLedgerConnection
+import com.daml.ledger.javaapi.data.LedgerOffset
+import com.daml.network.environment.{JavaCoinLedgerConnection as CoinLedgerConnection}
 import com.daml.network.store.AcsStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, FlagCloseableAsync}
@@ -52,7 +53,10 @@ class AcsIngestionService(
         )
         () <- ingestionSink.ingestActiveContracts(evs)
         () <- ingestionSink.switchToIngestingTransactions(
-          off.value.absolute.getOrElse(sys.error("expected absolute offset"))
+          off match {
+            case absolute: LedgerOffset.Absolute => absolute.getOffset
+            case _ => sys.error("expected absolute offset")
+          }
         )
       } yield connection.subscribeAsync("AcsIngestionService:" + name, off, txFilter)(
         ingestionSink.ingestTransaction(_)

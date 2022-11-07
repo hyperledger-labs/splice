@@ -4,7 +4,7 @@ import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.network.codegen.java.cn.{splitwise => splitwiseCodegen, wallet => walletCodegen}
 import com.daml.network.splitwise.store.memory.InMemorySplitwiseStore
-import com.daml.network.store.{JavaAcsStore => AcsStore}
+import com.daml.network.store.AcsStore
 import com.daml.network.util.{JavaContract => Contract}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}

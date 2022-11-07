@@ -1,15 +1,12 @@
 package com.daml.network.splitwise.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{
-  AutomationService,
-  JavaAcsIngestionService => AcsIngestionService,
-}
+import com.daml.network.automation.{AutomationService, AcsIngestionService}
 import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.environment.{CoinRetries, JavaCoinLedgerClient => CoinLedgerClient}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.store.SplitwiseStore
-import com.daml.network.store.JavaAcsStore.QueryResult
+import com.daml.network.store.AcsStore.QueryResult
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId

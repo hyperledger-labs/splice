@@ -12,7 +12,7 @@ import com.daml.network.environment.{
   JavaCoinLedgerClient,
   JavaCoinLedgerConnection,
 }
-import com.daml.network.store.JavaAcsStore.QueryResult
+import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.svc.admin.grpc.GrpcSvcAppService
 import com.daml.network.svc.automation.{SvcAutomationService, SvcLogCollectionService}
 import com.daml.network.svc.config.LocalSvcAppConfig

@@ -1,7 +1,7 @@
 package com.daml.network.splitwise.store.memory
 
 import com.daml.network.splitwise.store.SplitwiseStore
-import com.daml.network.store.{JavaInMemoryAcsStore => InMemoryAcsStore}
+import com.daml.network.store.InMemoryAcsStore
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 

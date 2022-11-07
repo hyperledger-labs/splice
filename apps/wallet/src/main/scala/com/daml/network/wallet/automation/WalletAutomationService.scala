@@ -1,10 +1,7 @@
 package com.daml.network.wallet.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{
-  AutomationService,
-  JavaAcsIngestionService => AcsIngestionService,
-}
+import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.environment.{CoinRetries, JavaCoinLedgerClient => CoinLedgerClient}
 import com.daml.network.wallet.store.WalletStore
 import com.daml.network.wallet.treasury.TreasuryServices

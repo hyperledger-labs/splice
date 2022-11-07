@@ -1,7 +1,7 @@
 package com.daml.network.wallet.store.memory
 
 import com.daml.network.codegen.java.cc.round as roundCodegen
-import com.daml.network.store.{JavaAcsStore as AcsStore, JavaInMemoryAcsStore as InMemoryAcsStore}
+import com.daml.network.store.{AcsStore, InMemoryAcsStore}
 import com.daml.network.util.{JavaContract as Contract}
 import com.daml.network.wallet.store.EndUserWalletStore
 import com.digitalasset.canton.config.ProcessingTimeout

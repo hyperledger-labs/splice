@@ -14,7 +14,7 @@ import com.daml.network.codegen.java.cc.{
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.wallet as walletCodegen
 import com.daml.network.environment.CoinRetries
-import com.daml.network.store.{JavaAcsStore => AcsStore}
+import com.daml.network.store.AcsStore
 import com.daml.network.util.{JavaContract => Contract}
 import com.daml.network.wallet.store.memory.InMemoryEndUserWalletStore
 import com.digitalasset.canton.config.ProcessingTimeout

@@ -1,13 +1,13 @@
 package com.daml.network.directory.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{AutomationService, JavaAcsIngestionService}
+import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.codegen.java.cn.{directory => directoryCodegen}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.{CoinRetries, JavaCoinLedgerClient}
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.store.JavaAcsStore.QueryResult
+import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{JavaContract => Contract}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -55,7 +55,7 @@ class DirectoryAutomationService(
   private val provider = store.providerParty
 
   registerService(
-    new JavaAcsIngestionService(
+    new AcsIngestionService(
       this.getClass.getSimpleName,
       store.acsIngestionSink,
       connection,

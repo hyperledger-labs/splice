@@ -24,7 +24,7 @@ import com.daml.network.environment.{
   JavaCoinLedgerClient => CoinLedgerClient,
   JavaCoinLedgerConnection => CoinLedgerConnection,
 }
-import com.daml.network.store.JavaAcsStore.QueryResult
+import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, JavaContract => Contract, JavaValue => Value, Proto}
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
 import com.daml.network.wallet.treasury.{

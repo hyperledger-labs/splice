@@ -9,8 +9,8 @@ import com.daml.ledger.javaapi.data.codegen.{
   ContractId,
 }
 import com.daml.network.codegen.java.cc
-import com.daml.network.store.JavaAcsStore.QueryResult
-import com.daml.network.store.{JavaAcsStore as AcsStore}
+import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.store.{AcsStore as AcsStore}
 import com.daml.network.svc.store.memory.InMemorySvcStore
 import com.daml.network.util.{JavaContract as Contract}
 import com.digitalasset.canton.logging.NamedLoggerFactory

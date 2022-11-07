@@ -2,8 +2,8 @@ package com.daml.network.validator.store
 
 import com.daml.network.codegen.java.cc.{coin => coinCodegen, coinrules => coinRulesCodegen}
 import com.daml.network.codegen.java.cn.{wallet => walletCodegen}
-import com.daml.network.store.JavaAcsStore.QueryResult
-import com.daml.network.store.{JavaAcsStore => AcsStore}
+import com.daml.network.store.AcsStore
+import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{JavaContract => Contract}
 import com.daml.network.validator.store.memory.InMemoryValidatorStore
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}

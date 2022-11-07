@@ -15,7 +15,7 @@ import com.daml.network.environment.{
   JavaCoinLedgerConnection => CoinLedgerConnection,
 }
 import com.daml.network.scan.admin.api.client.ScanConnection
-import com.daml.network.store.JavaAcsStore.QueryResult
+import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, UploadablePackage}
 import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
 import com.daml.network.validator.automation.ValidatorAutomationService

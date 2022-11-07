@@ -2,20 +2,23 @@ package com.daml.network.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.api.v1.event.{ArchivedEvent, CreatedEvent, Event}
-import com.daml.ledger.api.v1.transaction.Transaction
-import com.daml.ledger.api.v1.transaction_filter.TransactionFilter
-import com.daml.ledger.client.binding.{Primitive, TemplateCompanion}
-import com.daml.network.util.Contract
+import com.daml.ledger.javaapi.data.codegen.{Contract, ContractCompanion, ContractId}
+import com.daml.ledger.javaapi.data.{
+  ArchivedEvent,
+  CreatedEvent,
+  Template,
+  Transaction,
+  TransactionFilter,
+}
+import com.daml.network.util.JavaContract
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
 import monocle.macros.syntax.lens.*
 
 import scala.collection.immutable
 import scala.collection.immutable.SortedMap
-import scala.concurrent.*
+import scala.concurrent._
+import scala.jdk.CollectionConverters.*
 
 /** In-memory implementation of an [[AcsStore]] intended to be embedded in the
   * in-memory implementations of application-specific stores.
@@ -117,53 +120,46 @@ class InMemoryAcsStore(
         )
       })
 
-  private def requireInScope[T](templateCompanion: TemplateCompanion[T]): Unit =
+  private def requireInScope[TC, TCid, T](templateCompanion: ContractCompanion[TC, TCid, T]): Unit =
     require(
       contractFilter.mightContain(templateCompanion),
-      s"template ${templateCompanion.id} is part of the contract filter",
+      s"template ${templateCompanion.TEMPLATE_ID} is part of the contract filter",
     )
 
-  def findContract[T](
-      templateCompanion: TemplateCompanion[T]
-  )(p: Contract[T] => Boolean): Future[QueryResult[Option[Contract[T]]]] = {
+  def findContract[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      templateCompanion: ContractCompanion[TC, TCid, T]
+  )(p: JavaContract[TCid, T] => Boolean): Future[QueryResult[Option[JavaContract[TCid, T]]]] = {
     requireInScope(templateCompanion)
     offsetAndStateAfterIngestingAcs().map({ case (off, st) =>
-      val optEntry = st.createEvents
-        .collectFirst(Function.unlift(ev => {
-          for {
-            contract <- DecodeUtil
-              .decodeCreated(templateCompanion)(ev._2)
-              .map(Contract.fromCodegenContract)
-            if p(contract)
-          } yield contract
-        }))
+      val optEntry = st.createEvents.values.collectFirst(Function.unlift(ev => {
+        for {
+          contract <- JavaContract.fromCreatedEvent(templateCompanion)(ev)
+          if p(contract)
+        } yield contract
+      }))
       QueryResult(off, optEntry)
     })
   }
 
-  def listContracts[T](
-      templateCompanion: TemplateCompanion[T],
-      filter: Contract[T] => Boolean = (_: Contract[T]) => true,
-  ): Future[QueryResult[Seq[Contract[T]]]] = {
+  def listContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      templateCompanion: ContractCompanion[TC, TCid, T],
+      filter: JavaContract[TCid, T] => Boolean = (_: JavaContract[TCid, T]) => true,
+  ): Future[QueryResult[Seq[JavaContract[TCid, T]]]] = {
     requireInScope(templateCompanion)
     offsetAndStateAfterIngestingAcs().map { case (off, st) =>
-      val result = st.createEvents
-        .collect(Function.unlift(ev => {
-          DecodeUtil
-            .decodeCreated(templateCompanion)(ev._2)
-            .map(Contract.fromCodegenContract)
-        }))
+      val result = st.createEvents.values
+        .collect(Function.unlift(ev => JavaContract.fromCreatedEvent(templateCompanion)(ev)))
         .toSeq
       QueryResult(off, result)
     }
   }
 
-  def lookupContractById[T](
-      templateCompanion: TemplateCompanion[T]
-  )(id: Primitive.ContractId[T]): Future[QueryResult[Option[Contract[T]]]] = {
+  def lookupContractById[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      templateCompanion: ContractCompanion[TC, TCid, T]
+  )(id: ContractId[T]): Future[QueryResult[Option[JavaContract[TCid, T]]]] = {
     requireInScope(templateCompanion)
     offsetAndStateAfterIngestingAcs().map { case (off, st) =>
-      st.createEventsById.get(ApiTypes.ContractId.unwrap(id)) match {
+      st.createEventsById.get(id.contractId) match {
         case None =>
           QueryResult(off, None)
         case Some(evRev) =>
@@ -171,34 +167,35 @@ class InMemoryAcsStore(
             off,
             st.createEvents
               .get(evRev)
-              .flatMap(ev => DecodeUtil.decodeCreated(templateCompanion)(ev))
-              .map(Contract.fromCodegenContract),
+              .flatMap(ev => JavaContract.fromCreatedEvent(templateCompanion)(ev)),
           )
       }
     }
   }
 
-  def streamContracts[T](
-      templateCompanion: TemplateCompanion[T]
-  ): Source[Contract[T], NotUsed] = {
+  def streamContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      templateCompanion: ContractCompanion[TC, TCid, T]
+  ): Source[JavaContract[TCid, T], NotUsed] = {
     requireInScope(templateCompanion)
     Source.unfoldAsync(0: Long)(eventNumber =>
       nextActiveContract(templateCompanion, eventNumber).map(Some(_))
     )
   }
 
-  private def nextActiveContract[T](
-      templateCompanion: TemplateCompanion[T],
+  private def nextActiveContract[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      templateCompanion: ContractCompanion[TC, TCid, T],
       startingFromIncl: Long,
-  ): Future[(Long, Contract[T])] = {
+  ): Future[(Long, JavaContract[TCid, T])] = {
     val st = stateVar
     val optEntry = st.createEvents
       .iteratorFrom(startingFromIncl)
-      .collectFirst(Function.unlift(ev => {
-        DecodeUtil
-          .decodeCreated(templateCompanion)(ev._2)
-          .map(co => (ev._1, Contract.fromCodegenContract(co)))
-      }))
+      .collectFirst(
+        Function.unlift(ev =>
+          JavaContract
+            .fromCreatedEvent(templateCompanion)(ev._2)
+            .map(co => (ev._1, co))
+        )
+      )
     optEntry match {
       case None =>
         st.offsetChanged.future.flatMap(_ =>
@@ -213,9 +210,6 @@ class InMemoryAcsStore(
 
 object InMemoryAcsStore {
 
-  /**  Internal state of the InMemoryAcsStore
-    * @param offsetIngestionsToSignal we assume that the underlying map is sorted to efficiently remove elements from it.
-    */
   private case class State(
       offset: Option[String],
       nextEventNumber: Long,
@@ -227,7 +221,7 @@ object InMemoryAcsStore {
 
     def pretty: String = {
       def prettyEntry(entry: (Long, CreatedEvent)) = entry match {
-        case (evNum, ev) => s"    $evNum -> ${ev.templateId} -- ${ev.contractId}"
+        case (evNum, ev) => s"    $evNum -> ${ev.getTemplateId} -- ${ev.getContractId}"
       }
       val lines = Seq(
         s"  offset=$offset",
@@ -243,14 +237,14 @@ object InMemoryAcsStore {
         offset = offset,
         nextEventNumber = nextEventNumber + 1,
         createEvents = createEvents + (nextEventNumber -> ev),
-        createEventsById = createEventsById + (ev.contractId -> nextEventNumber),
+        createEventsById = createEventsById + (ev.getContractId -> nextEventNumber),
         offsetChanged = offsetChanged,
         offsetIngestionsToSignal = offsetIngestionsToSignal,
       )
     }
 
     def ingestArchivedEvent(ev: ArchivedEvent): State =
-      createEventsById.get(ev.contractId) match {
+      createEventsById.get(ev.getContractId) match {
         case None =>
           // NOTE: this will occur when ingesting an archive for a create event that was filtered on ingestion
           this
@@ -260,7 +254,7 @@ object InMemoryAcsStore {
             offset = offset,
             nextEventNumber = nextEventNumber,
             createEvents = createEvents - eventNumber,
-            createEventsById = createEventsById - ev.contractId,
+            createEventsById = createEventsById - ev.getContractId,
             offsetChanged = offsetChanged,
             offsetIngestionsToSignal = offsetIngestionsToSignal,
           )
@@ -301,18 +295,18 @@ object InMemoryAcsStore {
         tx: Transaction,
         p: CreatedEvent => Boolean,
     ): (State, (Promise[Unit], Iterable[Promise[Unit]])) = {
-      val stNew = tx.events.foldLeft(this)((st, ev) =>
-        ev.event match {
-          case Event.Event.Created(ev) => if (p(ev)) st.ingestCreatedEvent(ev) else st
-          case Event.Event.Archived(ev) => st.ingestArchivedEvent(ev)
-          case Event.Event.Empty =>
+      val stNew = tx.getEvents.asScala.foldLeft(this)((st, ev) =>
+        ev match {
+          case ev: CreatedEvent => if (p(ev)) st.ingestCreatedEvent(ev) else st
+          case ev: ArchivedEvent => st.ingestArchivedEvent(ev)
+          case _ =>
             throw new IllegalArgumentException(s"Encountered unknown event: $ev")
         }
       )
-      val offsetsToRemove = stNew.computeOffsetsToRemove(tx.offset)
+      val offsetsToRemove = stNew.computeOffsetsToRemove(tx.getOffset)
       (
         State(
-          offset = Some(tx.offset),
+          offset = Some(tx.getOffset),
           nextEventNumber = stNew.nextEventNumber,
           createEvents = stNew.createEvents,
           createEventsById = stNew.createEventsById,

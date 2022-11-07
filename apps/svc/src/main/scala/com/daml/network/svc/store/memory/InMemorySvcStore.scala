@@ -1,6 +1,6 @@
 package com.daml.network.svc.store.memory
 
-import com.daml.network.store.{JavaAcsStore as AcsStore, JavaInMemoryAcsStore as InMemoryAcsStore}
+import com.daml.network.store.{AcsStore, InMemoryAcsStore}
 import com.daml.network.svc.store.{SvcEventsStore, SvcStore}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId

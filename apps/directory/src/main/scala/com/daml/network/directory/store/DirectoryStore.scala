@@ -6,7 +6,7 @@ import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.{directory as directoryCodegen, wallet as walletCodegen}
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
-import com.daml.network.store.JavaAcsStore
+import com.daml.network.store.AcsStore
 import com.daml.network.util.{JavaContract => Contract}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
@@ -22,13 +22,13 @@ import scala.concurrent.{ExecutionContext, Future}
   * custom indices to ensure the scalability of these queries.
   */
 trait DirectoryStore extends AutoCloseable {
-  import JavaAcsStore.QueryResult
+  import AcsStore.QueryResult
 
   /** The sink to use for ingesting data from the ledger into this store. */
-  val acsIngestionSink: JavaAcsStore.IngestionSink
+  val acsIngestionSink: AcsStore.IngestionSink
 
   /** The [[com.daml.network.store.AcsStore]] used to back the default implementation of the queries. */
-  protected val acsStore: JavaAcsStore
+  protected val acsStore: AcsStore
 
   /** Get the party-id of the provider.
     * All results from the store are scoped to contracts managed by this provider.
@@ -181,11 +181,11 @@ object DirectoryStore {
     }
 
   /** Contract filter of a directory app store for a specific provider. */
-  def contractFilter(providerPartyId: PartyId): JavaAcsStore.ContractFilter = {
-    import JavaAcsStore.mkFilter
+  def contractFilter(providerPartyId: PartyId): AcsStore.ContractFilter = {
+    import AcsStore.mkFilter
     val provider: String = providerPartyId.toProtoPrimitive
 
-    JavaAcsStore.SimpleContractFilter(
+    AcsStore.SimpleContractFilter(
       providerPartyId,
       Map(
         mkFilter(directoryCodegen.DirectoryEntry.COMPANION)(co => co.payload.provider == provider),

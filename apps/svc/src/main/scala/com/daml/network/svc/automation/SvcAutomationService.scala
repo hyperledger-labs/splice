@@ -1,10 +1,7 @@
 package com.daml.network.svc.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{
-  AutomationService,
-  JavaAcsIngestionService => AcsIngestionService,
-}
+import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.{CoinRetries, JavaCoinLedgerClient => CoinLedgerClient}
 import com.daml.network.svc.store.SvcStore
@@ -28,7 +25,7 @@ class SvcAutomationService(
     mat: Materializer,
     tracer: Tracer,
 ) extends AutomationService(retryProvider) {
-  import com.daml.network.store.JavaAcsStore.QueryResult
+  import com.daml.network.store.AcsStore.QueryResult
 
   private val connection = ledgerClient.connection(this.getClass.getSimpleName)
 
