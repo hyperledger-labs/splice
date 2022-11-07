@@ -139,6 +139,15 @@ acceptPaymentRequest app sender transferRequest coin = do
     context
   return accept
 
+collectAcceptedPayment : CCApp -> CCUser -> ContractId AcceptedAppPayment -> Script ()
+collectAcceptedPayment app provider acceptedAppPayment = do
+  Some acceptedPayment <- queryContractId provider.primaryParty acceptedAppPayment
+  context <- getAppTransferContext app
+  -- multi party submit to simplify test
+  _ <- submitMulti (signatory acceptedPayment) [app.svc] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
+  pure ()
+
+
 testSingleReceiverPaymentRequest : Script ()
 testSingleReceiverPaymentRequest = script do
   app <- setupApp
@@ -162,10 +171,16 @@ testSingleReceiverPaymentRequest = script do
     svc = app.svc
     lockedCoin = lockedCoin
     deliveryOffer = toInterfaceContractId offerCid
-    receivers = [bob.primaryParty]
+    receiverQuantities = [
+      ReceiverQuantity with
+        receiver = bob.primaryParty
+        quantity = 30.0
+      ]
+
 
   pure ()
 
+testPaymentRequest : Script ()
 testPaymentRequest = script do
   app <- setupApp
   runNextIssuance app 1.0
@@ -178,18 +193,41 @@ testPaymentRequest = script do
 
   coin <- tap app alice 75.0
   t <- getTime
-  (transferRequest, deliveryOffer) <- createPaymentRequest app alice.primaryParty [(bob.primaryParty, 10.0), (charlie.primaryParty, 10.0)]
+  (transferRequest, deliveryOffer) <- createPaymentRequest app alice.primaryParty [(bob.primaryParty, 15.0), (charlie.primaryParty, 10.0)]
   acceptedPaymentCid <- acceptPaymentRequest app alice transferRequest coin
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
-  [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
+  [(lockedCoin, lockedCoinPayload)] <- query @LockedCoin alice.primaryParty
+  lockedCoinPayload.coin.quantity.initialQuantity === 25.35
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
-    receivers = [bob.primaryParty, charlie.primaryParty]
+    receiverQuantities = [
+      (ReceiverQuantity with
+        receiver = bob.primaryParty
+        quantity = 15.0),
+      (ReceiverQuantity with
+        receiver = charlie.primaryParty
+        quantity = 10.0)
+      ]
     provider = alice.primaryParty
     svc = app.svc
     lockedCoin = lockedCoin
     deliveryOffer = toInterfaceContractId deliveryOffer
 
+  aliceCoins <- query @Coin alice.primaryParty
+  map (\(_, c) -> c.quantity.initialQuantity) aliceCoins === [49.54, 1.0]
+  bobCoins <- query @Coin bob.primaryParty
+  map (\(_, c) -> c.quantity.initialQuantity) bobCoins === [1.0]
+  charlieCoins <- query @Coin charlie.primaryParty
+  map (\(_, c) -> c.quantity.initialQuantity) charlieCoins === [1.0]
+
+  collectAcceptedPayment app alice acceptedPaymentCid
+
+  aliceCoins <- query @Coin alice.primaryParty
+  map (\(_, c) -> c.quantity.initialQuantity) aliceCoins === [49.54, 1.0]
+  bobCoins <- query @Coin bob.primaryParty
+  map (\(_, c) -> c.quantity.initialQuantity) bobCoins === [1.0, 15.0]
+  charlieCoins <- query @Coin charlie.primaryParty
+  map (\(_, c) -> c.quantity.initialQuantity) charlieCoins === [1.0, 10.0]
   pure ()
 
 testBatchPaymentRequests : Script ()
@@ -234,7 +272,11 @@ testBatchPaymentRequests = script do
   -- check results
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
-    receivers = [bob.primaryParty]
+    receiverQuantities = [
+      ReceiverQuantity with
+        receiver = bob.primaryParty
+        quantity = 1.0
+      ]
     provider = alice.primaryParty
     svc = app.svc
     lockedCoin = lockedCoin
@@ -242,7 +284,14 @@ testBatchPaymentRequests = script do
 
   acceptedPayment2 === AcceptedAppPayment with
     sender = alice.primaryParty
-    receivers = [bob.primaryParty, alice.primaryParty]
+    receiverQuantities = [
+      (ReceiverQuantity with
+        receiver = bob.primaryParty
+        quantity = 2.0),
+      (ReceiverQuantity with
+        receiver = alice.primaryParty
+        quantity = 2.0)
+      ]
     provider = alice.primaryParty
     svc = app.svc
     lockedCoin = lockedCoin2
@@ -269,7 +318,14 @@ testBatchPaymentRequests = script do
 
   acceptedPayment4 === AcceptedAppPayment with
     sender = alice.primaryParty
-    receivers = [bob.primaryParty, alice.primaryParty]
+    receiverQuantities = [
+      (ReceiverQuantity with
+        receiver = bob.primaryParty
+        quantity = 3.0),
+      (ReceiverQuantity with
+        receiver = alice.primaryParty
+        quantity = 3.0)
+      ]
     provider = alice.primaryParty
     svc = app.svc
     lockedCoin = lockedCoin4

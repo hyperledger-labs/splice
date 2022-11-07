@@ -234,7 +234,7 @@ template Group
               expectedAcceptedPayment = AcceptedAppPayment with
                sender = ref.sender
                provider
-               receivers
+               receiverQuantities = ref.receiverQuantities
                svc
                lockedCoin = acceptedPayment.lockedCoin
                deliveryOffer = acceptedPayment.deliveryOffer

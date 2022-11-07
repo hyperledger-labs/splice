@@ -268,7 +268,12 @@ class WalletIntegrationTest
         r.contractId shouldBe acceptedPaymentId
         r.payload shouldBe walletCodegen.AcceptedAppPayment(
           sender = aliceUserParty.toPrim,
-          receivers = Seq(aliceUserParty.toPrim),
+          receiverQuantities = Seq(
+            walletCodegen.ReceiverQuantity(
+              receiver = aliceUserParty.toPrim,
+              quantity = 10.0,
+            )
+          ),
           provider = aliceUserParty.toPrim,
           svc = svcParty.toPrim,
           lockedCoin = r.payload.lockedCoin,

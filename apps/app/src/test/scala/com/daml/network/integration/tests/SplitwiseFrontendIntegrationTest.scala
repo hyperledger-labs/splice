@@ -1,10 +1,12 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.CN.{Directory as dirCodegen, Splitwise as splitwiseCodegen}
+import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 import com.daml.network.console.{RemoteDirectoryAppReference, RemoteWalletAppReference}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
+import com.daml.network.util.CoinUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import org.openqa.selenium.Keys
@@ -180,6 +182,41 @@ class SplitwiseFrontendIntegrationTest
           }
         }
       }
+
+      eventually() {
+        // Check final amounts in the wallets
+        val exactly = (x: BigDecimal) => (x, x)
+        checkWallet(aliceUserParty, aliceRemoteWallet, Seq((3.75, 4), exactly(400)))
+        checkWallet(bobUserParty, bobRemoteWallet, Seq((40.4, 40.5)))
+        checkWallet(charlieUserParty, charlieRemoteWallet, Seq((3.75, 4), exactly(111)))
+      }
+    }
+
+    def checkWallet(
+        walletParty: PartyId,
+        wallet: RemoteWalletAppReference,
+        expectedQuantityRanges: Seq[(BigDecimal, BigDecimal)],
+    ): Unit = clue(s"checking wallet with $expectedQuantityRanges") {
+      eventually(10.seconds, 500.millis) {
+        val coins =
+          wallet.list().coins.sortBy(coin => coin.contract.payload.quantity.initialQuantity)
+        coins should have size (expectedQuantityRanges.size.toLong)
+        coins
+          .zip(expectedQuantityRanges)
+          .foreach { case (coin, quantityBounds) =>
+            coin.contract.payload.owner shouldBe walletParty.toPrim
+            val ExpiringQuantity(initialQuantity, createdAt, ratePerRound) =
+              coin.contract.payload.quantity
+            assertInRange(initialQuantity, quantityBounds)
+            ratePerRound shouldBe RatePerRound(
+              CoinUtil.defaultHoldingFee.rate.doubleValue
+            )
+          }
+      }
+    }
+
+    def assertInRange(value: BigDecimal, range: (BigDecimal, BigDecimal)): Unit = {
+      value should (be >= range._1 and be <= range._2)
     }
 
     "settle debts with a single party" in { implicit env =>
@@ -262,6 +299,13 @@ class SplitwiseFrontendIntegrationTest
             row2.text should matchText(s"${aliceCns} paid 1000.0000000000 CC for Team lunch")
           }
         }
+      }
+
+      val exactly = (x: BigDecimal) => (x, x)
+      eventually() {
+        // Check final amounts in the wallets
+        checkWallet(aliceUserParty, aliceRemoteWallet, Seq((3.75, 4), exactly(500)))
+        checkWallet(bobUserParty, bobRemoteWallet, Seq((12.4, 12.5)))
       }
     }
 

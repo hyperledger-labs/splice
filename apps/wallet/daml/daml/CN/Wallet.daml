@@ -211,6 +211,7 @@ template AppPaymentRequest
          -- check that the reference is active and implements DeliveryOffer
          void $ fetch deliveryOffer
          require "AppPaymentRequest has not expired" (now < expiresAt)
+         fees <- exerciseComputeFees context sender quantities
          -- lock the coin and create an accepted payment
          let transfer = Transfer with
               sender
@@ -218,7 +219,7 @@ template AppPaymentRequest
               inputs
               outputs =
                 [ OutputSenderCoin with
-                    exactQuantity = Some (sum quantities)
+                    exactQuantity = Some (fees + sum quantities)
                     lock = Some TimeLock with
                       holder = provider
                       expiresAt = now `addRelTime` collectionDuration
@@ -234,7 +235,7 @@ template AppPaymentRequest
             let [TransferResultLockedCoin lockedCoin, TransferResultCoin senderChange] = result.createdCoins
             acceptedPayment <- create AcceptedAppPayment
                 with
-                  svc, provider, receivers, sender, deliveryOffer, lockedCoin
+                  svc, provider, receiverQuantities, sender, deliveryOffer, lockedCoin
             return $ Right (acceptedPayment, senderChange)
 
     choice AppPaymentRequest_Withdraw : ()
@@ -254,13 +255,13 @@ unzipReceiverCoins = foldr (\ReceiverCoin{..} (rs,cs) -> (receiver :: rs, locked
 template AcceptedAppPayment
   with
     sender : Party
-    receivers : [Party]
+    receiverQuantities : [ReceiverQuantity]
     provider : Party
     svc : Party
     lockedCoin : ContractId LockedCoin
     deliveryOffer : ContractId DeliveryOffer
   where
-    signatory sender, provider, receivers
+    signatory sender, provider, map (\r -> r.receiver) receiverQuantities
 
     choice AcceptedAppPayment_Collect : (ContractId DeliveryOffer, [(Party, ContractId Coin)])
       with
@@ -274,19 +275,22 @@ template AcceptedAppPayment
               provider
               inputs = [InputCoin coin]
               outputs = fmap
-                (\receiver -> OutputReceiverCoin with
-                  receiver
-                  coinType = FloatingReceiverCoin
-                ) receivers
+                (\receiverQuantity -> OutputReceiverCoin with
+                  receiver = receiverQuantity.receiver
+                  coinType = FixedReceiverCoin with
+                    quantity = receiverQuantity.quantity
+                    senderTransferFeeRatio = 1.0
+                ) receiverQuantities
               payload = "transfer locked payment"
         Right result <-exerciseAppTransfer context transfer
         let coins = map (\(TransferResultCoin coinCid) -> coin) result.createdCoins
         -- defensive check that the reference is still active
         void $ fetch deliveryOffer
+        let receivers = map (\r -> r.receiver) receiverQuantities
         pure (deliveryOffer, zip receivers coins)
 
     choice AcceptedAppPayment_Reject : ContractId Coin
-      controller receivers
+      controller map (\r -> r.receiver) receiverQuantities
       do exercise deliveryOffer DeliveryOffer_Archive
          exercise lockedCoin Coin_Unlock
 

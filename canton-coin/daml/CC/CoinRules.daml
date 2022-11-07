@@ -215,6 +215,33 @@ template CoinRules
          create this with
            observers = obs :: observers
 
+    -- Compute expected fees of a multi-receiver transfer. Currently limited to the very specific case that is required for
+    -- the current app payment requests implementation: Only fixed amount receiver outputs ; A single (locked) input coin ; Sender pays all fees ; No breakdown of the fees
+    nonconsuming choice CoinRules_ComputeFees : Decimal
+      with
+        context : TransferContext
+        sender: Party
+        receiverQuantities: [Decimal]
+      controller sender
+      do computeFees context config receiverQuantities
+
+computeFees : TransferContext -> CoinConfig USD -> [Decimal] -> Update Decimal
+computeFees context config0 receiverQuantities = do
+    openRound <- fetch context.openMiningRound
+    let config = scaleConfig openRound config0
+    computeFees1 config receiverQuantities
+
+computeFees1 : CoinConfig CC -> [Decimal] -> Update Decimal
+computeFees1 config receiverQuantities = do
+    transferFees <- foldlA transferFees 0.0 receiverQuantities
+    let numOutputCoins = Prelude.length receiverQuantities
+    coinUpdateFees <- computeCoinUpdateFees config 1 numOutputCoins
+    coinCreateFees <- computeCoinCreateFees config 1 numOutputCoins
+    return (coinUpdateFees + coinCreateFees + transferFees)
+  where
+    transferFees s quantity = do
+      return (s + chargeSteppedRate config.transferFee quantity)
+
 -- | Workaround for missing explicit disclosure.
 --
 -- The validator creates a request contract, the SVC archives the request and creates a CoinRules contract
@@ -305,6 +332,13 @@ exercisePaymentTransfer PaymentTransferContext{..} transfer =
   exercise coinRules CoinRules_Transfer with
     transfer
     context
+
+exerciseComputeFees : PaymentTransferContext -> Party -> [Decimal] -> Update Decimal
+exerciseComputeFees PaymentTransferContext{..} sender receiverQuantities =
+  exercise coinRules CoinRules_ComputeFees with
+    context
+    sender
+    receiverQuantities
 
 data AppTransferContext = AppTransferContext
   with
@@ -663,6 +697,9 @@ preprocessAndSummarizeOutputs config sender outs = do
 
 summarizeTransfer : CoinConfig CC -> TransferInputsSummary -> TransferOutputsSummary -> Update TransferSummary
 summarizeTransfer config inp out = do
+    coinCreateFees <- computeCoinCreateFees config inp.numCoinInputs numCoinOutputs
+    coinUpdateFees <- computeCoinUpdateFees config inp.numCoinInputs numCoinOutputs
+    let senderActionFees = coinCreateFees + coinUpdateFees + coinLockFees
     return TransferSummary with
       inQuantity = inQuantity
       nonSelfOutQuantity = out.totalNonSelfOutputs
@@ -678,14 +715,21 @@ summarizeTransfer config inp out = do
   where
     -- compute fees for the sender actions
     numCoinOutputs = out.numUnlockedSenderCoins + out.numLockedSenderCoins + out.numReceiverCoins
-    numCoinUpdates = min inp.numCoinInputs numCoinOutputs
-    numCoinCreates = max 0 (numCoinOutputs - inp.numCoinInputs)
-    coinCreateFees = config.createFee.fee * intToDecimal numCoinCreates
-    coinUpdateFees = config.updateFee.fee * intToDecimal numCoinUpdates
-    coinLockFees = config.updateFee.fee * intToDecimal out.numLockedSenderCoins
-    senderActionFees = coinCreateFees + coinUpdateFees + coinLockFees
     totalTransferFees = out.senderTransferFees + out.receiverTransferFees
     inQuantity = inp.totalQuantity
+
+    coinLockFees = config.updateFee.fee * intToDecimal out.numLockedSenderCoins
+
+computeCoinUpdateFees : CoinConfig CC -> Int -> Int -> Update (Decimal)
+computeCoinUpdateFees config numCoinInputs numCoinOutputs = do
+    let numCoinUpdates = min numCoinInputs numCoinOutputs
+    return (config.updateFee.fee * intToDecimal numCoinUpdates)
+
+computeCoinCreateFees : CoinConfig CC -> Int -> Int -> Update (Decimal)
+computeCoinCreateFees config numCoinInputs numCoinOutputs = do
+    let numCoinCreates = max 0 (numCoinOutputs - numCoinInputs)
+    return (config.createFee.fee * intToDecimal numCoinCreates)
+
 
 
 issueRewards : CoinConfig CC -> OpenMiningRound -> Party -> Party -> TransferSummary -> Update ()
