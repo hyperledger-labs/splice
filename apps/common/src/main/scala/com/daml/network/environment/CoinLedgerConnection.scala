@@ -340,7 +340,7 @@ object CoinLedgerConnection {
                 s"graph.completed $subscriptionName",
                 completed.transform {
                   case Success(v) => Success(v)
-                  case Failure(ex: StatusRuntimeException) =>
+                  case Failure(_: StatusRuntimeException) =>
                     // don't fail to close if there was a grpc status runtime exception
                     // this can happen (i.e. server not available etc.)
                     Success(Done)

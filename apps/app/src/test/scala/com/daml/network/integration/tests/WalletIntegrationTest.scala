@@ -476,7 +476,7 @@ class WalletIntegrationTest
           val subs = aliceRemoteWallet.listSubscriptions()
           subs.length shouldBe 3
           subs.foreach(sub => {
-            inside(sub.state) { case GrpcWalletAppClient.SubscriptionIdleState(state) => () }
+            sub.state should matchPattern { case GrpcWalletAppClient.SubscriptionIdleState(_) => }
           })
         }
       }
@@ -923,7 +923,7 @@ class WalletIntegrationTest
         // this leads to a retry..
         Future(aliceRemoteWallet.executeDirectTransfer(bob, 5))
           // that fails on the second execution
-          .recover { case cmdFailure: CommandFailure =>
+          .recover { case _: CommandFailure =>
             // need to recover as logs are only checked for successful futures
             ()
           },
@@ -997,7 +997,7 @@ class WalletIntegrationTest
         .zip(expectedQuantityRanges)
         .foreach { case (coin, quantityBounds) =>
           coin.contract.payload.owner shouldBe walletParty.toPrim
-          val ExpiringQuantity(initialQuantity, createdAt, ratePerRound) =
+          val ExpiringQuantity(initialQuantity, _, ratePerRound) =
             coin.contract.payload.quantity
           assertInRange(initialQuantity, quantityBounds)
           ratePerRound shouldBe RatePerRound(

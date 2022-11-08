@@ -923,7 +923,7 @@ class GrpcWalletService(
             s"the coin operation failed with a Daml exception: ${failedOperation.stringValue}."
           )
         )
-      case other =>
+      case _ =>
         ErrorUtil.internalErrorGrpc(
           s"expected to receive a coin operation outcome of type $clazz or `COO_Error` but received type ${actual.getClass} with value: $actual"
         )

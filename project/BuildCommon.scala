@@ -82,7 +82,7 @@ object BuildCommon {
           s"--js_out=import_style=commonjs:${pbTsDirectory.value}"
         ),
         Compile / PB.protoSources ++= (Test / PB.protoSources).value,
-        scalacOptions += "-Wconf:src=src_managed/.*:silent",
+        scalacOptions ++= Seq("-Wconf:src=src_managed/.*:silent", "-Wunused:patvars"),
       )
 
   lazy val damlCodegenSettings: Seq[Def.Setting[_]] =
@@ -196,7 +196,7 @@ object BuildCommon {
     // custom environment variables for the sbt-shell used by IntelliJ (https://youtrack.jetbrains.com/issue/SCL-19025)
     if (better.files.File(".disable-unused-warnings").exists)
       Seq(
-        scalacOptions += "-Wconf:cat=unused-imports:is,cat=unused-locals:is,cat=unused-params:is"
+        scalacOptions += "-Wconf:cat=unused-imports:is,cat=unused-locals:is,cat=unused-params:is,cat=unused-patvars:is"
       )
     else Seq.empty
 

@@ -197,7 +197,7 @@ case class EndUserTreasuryService(
           cmd,
         )
       _ = (outcomes.exerciseResult.asScala zip validOperations).map {
-        case (outcome, ValidCoinOperation(operation, p)) =>
+        case (outcome, ValidCoinOperation(_, p)) =>
           p.success(outcome)
       }
     } yield offset

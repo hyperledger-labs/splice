@@ -59,7 +59,7 @@ class ScanIntegrationTest
               CoinEvent(aliceNew, transferParentNode3),
             ) =>
           // all three coin-events created by the transfer should have the transfer node as parent
-          transferParentNode should matchPattern { case Some(transfer: Transfer) => }
+          transferParentNode should matchPattern { case Some(_: Transfer) => }
           transferParentNode shouldBe transferParentNode2
           transferParentNode2 shouldBe transferParentNode3
 
@@ -83,7 +83,7 @@ class ScanIntegrationTest
   }
 
   "get details of a single Coin transfer" in { implicit env =>
-    val (aliceP, bobP) = setupAliceAndBobAndChannel(env)
+    val (aliceP @ _, bobP) = setupAliceAndBobAndChannel(env)
     aliceRemoteWallet.tap(50)
     aliceRemoteWallet.executeDirectTransfer(bobP, 10)
 
@@ -127,7 +127,7 @@ class ScanIntegrationTest
   }
 
   "list closed rounds" in { implicit env =>
-    val (aliceUserParty, bobUserParty) = setupAliceAndBobAndChannel(env)
+    val (aliceUserParty @ _, bobUserParty) = setupAliceAndBobAndChannel(env)
     eventually(1.seconds) {
       scan.getTransferContext().latestOpenMiningRound.map(_.payload.round.number) shouldBe Some(0)
     }

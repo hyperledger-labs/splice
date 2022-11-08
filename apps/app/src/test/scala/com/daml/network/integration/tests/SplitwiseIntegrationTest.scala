@@ -44,10 +44,10 @@ class SplitwiseIntegrationTest
 
       // Setup install contracts
       Seq(
-        (aliceSplitwise, aliceValidator, aliceUserParty),
-        (bobSplitwise, bobValidator, bobUserParty),
-        (charlieSplitwise, aliceValidator, charlieUserParty),
-      ).foreach { case (splitwise, validator, party) =>
+        (aliceSplitwise, aliceUserParty),
+        (bobSplitwise, bobUserParty),
+        (charlieSplitwise, charlieUserParty),
+      ).foreach { case (splitwise, party) =>
         splitwise.createInstallRequest()
         splitwise.ledgerApi.ledger_api.acs
           .awaitJava(splitwiseCodegen.SplitwiseInstall.COMPANION)(party)

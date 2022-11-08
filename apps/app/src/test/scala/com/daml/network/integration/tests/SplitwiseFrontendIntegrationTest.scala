@@ -208,7 +208,7 @@ class SplitwiseFrontendIntegrationTest
           .zip(expectedQuantityRanges)
           .foreach { case (coin, quantityBounds) =>
             coin.contract.payload.owner shouldBe walletParty.toPrim
-            val ExpiringQuantity(initialQuantity, createdAt, ratePerRound) =
+            val ExpiringQuantity(initialQuantity, _, ratePerRound) =
               coin.contract.payload.quantity
             assertInRange(initialQuantity, quantityBounds)
             ratePerRound shouldBe RatePerRound(
