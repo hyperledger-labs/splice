@@ -1,5 +1,6 @@
 package com.daml.network.environment
 
+import com.digitalasset.canton.util.ErrorUtil
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.Source
@@ -43,7 +44,7 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.TracerProvider
 import com.google.protobuf.ByteString
@@ -69,19 +70,31 @@ trait CoinLedgerClient extends FlagCloseableAsync {
 }
 
 object CoinLedgerClient {
-  class FutureObserver[T] extends StreamObserver[T] {
+  @SuppressWarnings(Array("org.wartremover.warts.Var"))
+  class FutureObserver[T](implicit elc: ErrorLoggingContext) extends StreamObserver[T] {
     val promise = Promise[T]()
+    private var result: Option[T] = None
 
     override def onError(t: Throwable) = {
       promise.failure(t)
     }
 
     override def onNext(result: T) = {
-      promise.success(result)
+      this.result = Some(result)
     }
-    override def onCompleted() = {}
+    override def onCompleted() = {
+      promise.success(
+        result.getOrElse(
+          ErrorUtil.internalError(
+            new IllegalStateException("onComplete was called without prior call to onNext")
+          )
+        )
+      )
+    }
   }
-  def wrapFuture[T](f: (StreamObserver[T] => Unit)): Future[T] = {
+  def wrapFuture[T](
+      f: (StreamObserver[T] => Unit)
+  )(implicit elc: ErrorLoggingContext): Future[T] = {
     val futureObserver = new FutureObserver[T]
     f(futureObserver)
     futureObserver.promise.future
@@ -96,6 +109,7 @@ object CoinLedgerClient {
   class LedgerClient(channel: Channel, token: Option[String])(implicit
       esf: ExecutionSequencerFactory,
       ec: ExecutionContext,
+      elc: ErrorLoggingContext,
   ) extends Closeable {
     val activeContractsServiceStub: ActiveContractsServiceGrpc.ActiveContractsServiceStub =
       withCredentials(ActiveContractsServiceGrpc.newStub(channel), token)
@@ -284,7 +298,11 @@ object CoinLedgerClient {
       config: ClientConfig,
       token: Option[String],
       tracerProvider: TracerProvider,
-  )(implicit ec: ExecutionContextExecutor, esf: ExecutionSequencerFactory): Future[LedgerClient] = {
+  )(implicit
+      ec: ExecutionContextExecutor,
+      esf: ExecutionSequencerFactory,
+      elc: ErrorLoggingContext,
+  ): Future[LedgerClient] = {
 
     val clientChannelConfig = LedgerClientChannelConfiguration(
       sslContext = config.tls.map(x => ClientChannelBuilder.sslContext(x)),
@@ -317,6 +335,7 @@ object CoinLedgerClient {
       ec: ExecutionContextExecutor,
       as: ActorSystem,
       esf: ExecutionSequencerFactory,
+      elc: ErrorLoggingContext,
   ): Future[CoinLedgerClient with NamedLogging] =
     createLedgerClient(
       clientConfig,
