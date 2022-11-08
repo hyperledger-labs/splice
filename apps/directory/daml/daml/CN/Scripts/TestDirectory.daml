@@ -38,7 +38,7 @@ testWithSubscription = script do
   -- user requests entry via app install
   -- how: UI of directory service via write-delegation on app manager & call to
   -- user’s participant.
-  subscriptionRequest <- submit user.primaryParty $ exerciseCmd directoryInstall DirectoryInstall_RequestEntryWithSubscription with
+  (entryContext, subscriptionRequest) <- submit user.primaryParty $ exerciseCmd directoryInstall DirectoryInstall_RequestEntryWithSubscription with
     name = "cns.darth.vader"
 
   -- cc wallet selects a large enough coin
@@ -56,7 +56,7 @@ testWithSubscription = script do
 
   -- directory provider transactionally unlocks & transfer coins and creates directory entry and a subscription in return.
   -- how: provider on their own participant
-  (entryCid, subscriptionStateCid, _) <- submitUser provider.userId $ exerciseCmd directoryInstall DirectoryInstall_CollectInitialEntryPaymentWithSubscription with
+  (entryCid, subscriptionStateCid, _) <- submitUser provider.userId $ exerciseCmd entryContext DirectoryEntryContext_CollectInitialEntryPaymentWithSubscription with
     paymentCid = initialPaymentCid
     transferContext = appContext
 
@@ -79,7 +79,7 @@ testWithSubscription = script do
 
   -- directory provider transactionally unlocks & transfer coins and renews directory entry in return
   -- how: provider on their own participant
-  (entryCid, subscriptionStateCid, _) <- submitUser provider.userId $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryRenewalPaymentWithSubscription with
+  (entryCid, subscriptionStateCid, _) <- submitUser provider.userId $ exerciseCmd entryContext DirectoryEntryContext_CollectEntryRenewalPaymentWithSubscription with
     paymentCid
     entryCid
     transferContext = appContext
@@ -98,7 +98,7 @@ testWithSubscription = script do
   (paymentCid, _) <- submitUser user.userId $ exerciseCmd subscriptionStateCid SubscriptionIdleState_MakePayment with
     inputs = [InputCoin coin]
     context = paymentContext
-  (entryCid, subscriptionStateCid, _) <- submitUser provider.userId $ exerciseCmd directoryInstall DirectoryInstall_CollectEntryRenewalPaymentWithSubscription with
+  (entryCid, subscriptionStateCid, _) <- submitUser provider.userId $ exerciseCmd entryContext DirectoryEntryContext_CollectEntryRenewalPaymentWithSubscription with
     paymentCid
     entryCid
     transferContext = appContext

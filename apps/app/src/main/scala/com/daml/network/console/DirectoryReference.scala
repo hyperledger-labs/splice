@@ -148,9 +148,9 @@ class RemoteDirectoryAppReference(
   @Help.Summary("Request DirectoryEntry with the given name, financed via subscription payments")
   def requestDirectoryEntryWithSubscription(
       name: String
-  ): subsCodegen.SubscriptionRequest.ContractId = {
+  ): (codegen.DirectoryEntryContext.ContractId, subsCodegen.SubscriptionRequest.ContractId) = {
     val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.damlUser)
-    LedgerApiUtils
+    val damlTuple = LedgerApiUtils
       .submitWithResult(
         ledgerApi,
         actAs = Seq(userParty),
@@ -161,5 +161,6 @@ class RemoteDirectoryAppReference(
           ),
       )
       .exerciseResult
+    (damlTuple._1, damlTuple._2)
   }
 }

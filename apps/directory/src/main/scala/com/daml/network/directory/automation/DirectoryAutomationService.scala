@@ -248,37 +248,29 @@ class DirectoryAutomationService(
           entryName: String,
           offset: String,
       ) = {
-        val user = PartyId.tryFromProtoPrimitive(context.payload.user)
-        store.lookupInstall(user).flatMap {
-          case QueryResult(_, None) =>
-            logger.warn(s"Install contract not found for user party $user")
-            rejectPayment("install contract not found.")
-
-          case QueryResult(_, Some(install)) =>
-            for {
-              transferContext <- scanConnection.getJavaAppTransferContext()
-              cmd =
-                install.contractId
-                  .exerciseDirectoryInstall_CollectInitialEntryPaymentWithSubscription(
-                    payment.contractId,
-                    transferContext,
-                  )
-                  .commands
-              commandId = mkCommandId(
-                "com.daml.network.directory.DirectoryEntry",
-                Seq(provider),
-                entryName,
+        for {
+          transferContext <- scanConnection.getJavaAppTransferContext()
+          cmd =
+            contextId
+              .exerciseDirectoryEntryContext_CollectInitialEntryPaymentWithSubscription(
+                payment.contractId,
+                transferContext,
               )
-              _ <- connection
-                .submitCommandsWithDedup(
-                  actAs = Seq(provider),
-                  readAs = Seq.empty,
-                  commands = cmd.asScala.toSeq,
-                  commandId = commandId,
-                  deduplicationOffset = offset,
-                )
-            } yield "created directory entry."
-        }
+              .commands
+          commandId = mkCommandId(
+            "com.daml.network.directory.DirectoryEntry",
+            Seq(provider),
+            entryName,
+          )
+          _ <- connection
+            .submitCommandsWithDedup(
+              actAs = Seq(provider),
+              readAs = Seq.empty,
+              commands = cmd.asScala.toSeq,
+              commandId = commandId,
+              deduplicationOffset = offset,
+            )
+        } yield "created directory entry."
       }
       for {
         context <- store
@@ -330,38 +322,30 @@ class DirectoryAutomationService(
           ],
           offset: String,
       ) = {
-        val user = PartyId.tryFromProtoPrimitive(context.payload.user)
-        store.lookupInstall(user).flatMap {
-          case QueryResult(_, None) =>
-            logger.warn(s"Install contract not found for user party $user")
-            rejectPayment("install contract not found.")
-
-          case QueryResult(_, Some(install)) =>
-            for {
-              transferContext <- scanConnection.getJavaAppTransferContext()
-              cmd =
-                install.contractId
-                  .exerciseDirectoryInstall_CollectEntryRenewalPaymentWithSubscription(
-                    payment.contractId,
-                    entry.contractId,
-                    transferContext,
-                  )
-                  .commands
-              commandId = mkCommandId(
-                "com.daml.network.directory.DirectoryEntry",
-                Seq(provider),
-                entry.payload.name,
+        for {
+          transferContext <- scanConnection.getJavaAppTransferContext()
+          cmd =
+            contextId
+              .exerciseDirectoryEntryContext_CollectEntryRenewalPaymentWithSubscription(
+                payment.contractId,
+                entry.contractId,
+                transferContext,
               )
-              _ <- connection
-                .submitCommandsWithDedup(
-                  actAs = Seq(provider),
-                  readAs = Seq.empty,
-                  commands = cmd.asScala.toSeq,
-                  commandId = commandId,
-                  deduplicationOffset = offset,
-                )
-            } yield "renewed directory entry."
-        }
+              .commands
+          commandId = mkCommandId(
+            "com.daml.network.directory.DirectoryEntry",
+            Seq(provider),
+            entry.payload.name,
+          )
+          _ <- connection
+            .submitCommandsWithDedup(
+              actAs = Seq(provider),
+              readAs = Seq.empty,
+              commands = cmd.asScala.toSeq,
+              commandId = commandId,
+              deduplicationOffset = offset,
+            )
+        } yield "renewed directory entry."
       }
       for {
         context <- store

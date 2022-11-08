@@ -222,7 +222,7 @@ class DirectoryIntegrationTest
           val aliceStaticRefs = StaticUserRefs(aliceValidator, aliceDirectory, aliceRemoteWallet)
           setupUser(aliceStaticRefs)
         }
-        val subReqId = clue("Alice requests a directory entry") {
+        val (entryContextId, subReqId) = clue("Alice requests a directory entry") {
           aliceRefs.directory.requestDirectoryEntryWithSubscription(testEntryName)
         }
         clue("Alice obtains some coins and accepts the subscription") {
