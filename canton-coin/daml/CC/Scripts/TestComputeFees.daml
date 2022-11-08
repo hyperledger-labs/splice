@@ -1,0 +1,36 @@
+module CC.Scripts.TestComputeFees where
+
+import DA.Assert
+import Daml.Script
+
+import CC.Scripts.Util
+import CC.CoinRules
+
+template Test
+  with
+    sender : Party
+  where
+    signatory sender
+    choice Test_ComputeFees : Decimal
+      with
+        context : PaymentTransferContext
+        quantities : [Decimal]
+      controller sender
+      do
+        fees <- exerciseComputeFees context sender quantities
+        return fees
+
+test = script do
+    app <- setupApp
+    alice <- setupUser app "alice" app.svc
+    context <- getPaymentTransferContext app alice
+    test <- submitUser alice.userId $ createCmd Test with
+      sender = alice.primaryParty
+    let quantities = [1.0, 2.0, 101.0]
+    fees <- submitUser alice.userId $ exerciseCmd test Test_ComputeFees with ..
+    fees === (
+        0.01 * 1.0 + -- update 1 coin
+        0.09 * 2.0 + -- create 2 coins
+        0.01 * (1.0 + 2.0 + 100.0) + 0.001 * 1.0 -- stepped transfer fees
+        )
+    pure()
