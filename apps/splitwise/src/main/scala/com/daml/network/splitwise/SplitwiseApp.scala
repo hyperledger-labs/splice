@@ -2,7 +2,7 @@ package com.daml.network.splitwise
 
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.codegen.CN.Splitwise as splitwiseCodegen
+import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries, JavaCoinLedgerClient}
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -99,7 +99,7 @@ class SplitwiseApp(
     )
   }
 
-  override lazy val requiredTemplates = Set(splitwiseCodegen.SplitwiseInstall)
+  override lazy val requiredJavaTemplates = Set(splitwiseCodegen.SplitwiseInstall.TEMPLATE_ID)
 }
 
 object SplitwiseApp {

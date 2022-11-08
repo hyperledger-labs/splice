@@ -1,10 +1,10 @@
 package com.daml.network.splitwise.admin.api.client.commands
 
 import cats.implicits._
-import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
+import com.daml.network.codegen.java.cn.{splitwise => splitwiseCodegen}
 import com.daml.network.splitwise.v0
 import com.daml.network.splitwise.v0.SplitwiseServiceGrpc.SplitwiseServiceStub
-import com.daml.network.util.{Contract, Proto}
+import com.daml.network.util.{JavaContract as Contract, Proto}
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.empty.Empty
@@ -33,16 +33,16 @@ object GrpcSplitwiseAppClient {
       id: String,
   ) {
     def toProtoV0: v0.GroupKey = v0.GroupKey(Proto.encode(owner), Proto.encode(provider), id)
-    def toPrim: splitwiseCodegen.GroupKey = splitwiseCodegen.GroupKey(
-      owner.toPrim,
-      provider.toPrim,
-      splitwiseCodegen.GroupId(id),
+    def toPrim: splitwiseCodegen.GroupKey = new splitwiseCodegen.GroupKey(
+      owner.toProtoPrimitive,
+      provider.toProtoPrimitive,
+      new splitwiseCodegen.GroupId(id),
     )
   }
 
   case class ListGroups(context: SplitwiseContext)
       extends BaseCommand[v0.ListGroupsRequest, v0.ListGroupsResponse, Seq[
-        Contract[splitwiseCodegen.Group]
+        Contract[splitwiseCodegen.Group.ContractId, splitwiseCodegen.Group]
       ]] {
     override def createRequest(): Either[String, v0.ListGroupsRequest] =
       Right(v0.ListGroupsRequest(Some(context.toProtoV0)))
@@ -54,15 +54,17 @@ object GrpcSplitwiseAppClient {
 
     override def handleResponse(
         response: v0.ListGroupsResponse
-    ): Either[String, Seq[Contract[splitwiseCodegen.Group]]] =
-      response.groups.traverse(Contract.fromProto(splitwiseCodegen.Group)(_)).leftMap(_.toString)
+    ): Either[String, Seq[Contract[splitwiseCodegen.Group.ContractId, splitwiseCodegen.Group]]] =
+      response.groups
+        .traverse(Contract.fromProto(splitwiseCodegen.Group.COMPANION)(_))
+        .leftMap(_.toString)
   }
 
   case class ListGroupInvites(context: SplitwiseContext)
       extends BaseCommand[
         v0.ListGroupInvitesRequest,
         v0.ListGroupInvitesResponse,
-        Seq[Contract[splitwiseCodegen.GroupInvite]],
+        Seq[Contract[splitwiseCodegen.GroupInvite.ContractId, splitwiseCodegen.GroupInvite]],
       ] {
     override def createRequest(): Either[String, v0.ListGroupInvitesRequest] =
       Right(v0.ListGroupInvitesRequest(Some(context.toProtoV0)))
@@ -74,9 +76,11 @@ object GrpcSplitwiseAppClient {
 
     override def handleResponse(
         response: v0.ListGroupInvitesResponse
-    ): Either[String, Seq[Contract[splitwiseCodegen.GroupInvite]]] =
+    ): Either[String, Seq[
+      Contract[splitwiseCodegen.GroupInvite.ContractId, splitwiseCodegen.GroupInvite]
+    ]] =
       response.groupInvites
-        .traverse(Contract.fromProto(splitwiseCodegen.GroupInvite)(_))
+        .traverse(Contract.fromProto(splitwiseCodegen.GroupInvite.COMPANION)(_))
         .leftMap(_.toString)
   }
 
@@ -86,7 +90,10 @@ object GrpcSplitwiseAppClient {
   ) extends BaseCommand[
         v0.ListAcceptedGroupInvitesRequest,
         v0.ListAcceptedGroupInvitesResponse,
-        Seq[Contract[splitwiseCodegen.AcceptedGroupInvite]],
+        Seq[Contract[
+          splitwiseCodegen.AcceptedGroupInvite.ContractId,
+          splitwiseCodegen.AcceptedGroupInvite,
+        ]],
       ] {
     override def createRequest(): Either[String, v0.ListAcceptedGroupInvitesRequest] =
       Right(v0.ListAcceptedGroupInvitesRequest(id, Some(context.toProtoV0)))
@@ -98,9 +105,12 @@ object GrpcSplitwiseAppClient {
 
     override def handleResponse(
         response: v0.ListAcceptedGroupInvitesResponse
-    ): Either[String, Seq[Contract[splitwiseCodegen.AcceptedGroupInvite]]] =
+    ): Either[String, Seq[Contract[
+      splitwiseCodegen.AcceptedGroupInvite.ContractId,
+      splitwiseCodegen.AcceptedGroupInvite,
+    ]]] =
       response.acceptedGroupInvites
-        .traverse(Contract.fromProto(splitwiseCodegen.AcceptedGroupInvite)(_))
+        .traverse(Contract.fromProto(splitwiseCodegen.AcceptedGroupInvite.COMPANION)(_))
         .leftMap(_.toString)
   }
 
@@ -108,7 +118,7 @@ object GrpcSplitwiseAppClient {
       key: GroupKey,
       context: SplitwiseContext,
   ) extends BaseCommand[v0.ListBalanceUpdatesRequest, v0.ListBalanceUpdatesResponse, Seq[
-        Contract[splitwiseCodegen.BalanceUpdate]
+        Contract[splitwiseCodegen.BalanceUpdate.ContractId, splitwiseCodegen.BalanceUpdate]
       ]] {
     override def createRequest(): Either[String, v0.ListBalanceUpdatesRequest] =
       Right(v0.ListBalanceUpdatesRequest(Some(key.toProtoV0), Some(context.toProtoV0)))
@@ -120,9 +130,11 @@ object GrpcSplitwiseAppClient {
 
     override def handleResponse(
         response: v0.ListBalanceUpdatesResponse
-    ): Either[String, Seq[Contract[splitwiseCodegen.BalanceUpdate]]] =
+    ): Either[String, Seq[
+      Contract[splitwiseCodegen.BalanceUpdate.ContractId, splitwiseCodegen.BalanceUpdate]
+    ]] =
       response.balanceUpdates
-        .traverse(Contract.fromProto(splitwiseCodegen.BalanceUpdate)(_))
+        .traverse(Contract.fromProto(splitwiseCodegen.BalanceUpdate.COMPANION)(_))
         .leftMap(_.toString)
   }
 

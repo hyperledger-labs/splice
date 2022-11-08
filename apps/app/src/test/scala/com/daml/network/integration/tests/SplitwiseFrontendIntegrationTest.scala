@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.CN.{Directory as dirCodegen, Splitwise as splitwiseCodegen}
 import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
+import com.daml.network.codegen.java.cn.{directory as dirCodegen, splitwise as splitwiseCodegen}
 import com.daml.network.console.{RemoteDirectoryAppReference, RemoteWalletAppReference}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -16,7 +16,8 @@ import scala.concurrent.duration.DurationInt
 class SplitwiseFrontendIntegrationTest
     extends FrontendIntegrationTest("aliceSplitwise", "bobSplitwise", "charlieSplitwise") {
 
-  private val darPath = "apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar"
+  private val splitwiseDarPath = "apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar"
+  private val directoryDarPath = "apps/directory/daml/.daml/dist/directory-service-0.1.0.dar"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
@@ -24,8 +25,10 @@ class SplitwiseFrontendIntegrationTest
       .simpleTopology(this.getClass.getSimpleName)
       .withAdditionalSetup(implicit env => {
         CoinEnvironmentDefinition.simpleTopology(this.getClass.getSimpleName).setup(env)
-        aliceValidator.remoteParticipant.dars.upload(darPath)
-        bobValidator.remoteParticipant.dars.upload(darPath)
+        Seq(splitwiseDarPath, directoryDarPath).foreach { path =>
+          aliceValidator.remoteParticipant.dars.upload(path)
+          bobValidator.remoteParticipant.dars.upload(path)
+        }
       })
 
   def initialiseDirectoryApp(
@@ -35,7 +38,7 @@ class SplitwiseFrontendIntegrationTest
       wallet: RemoteWalletAppReference,
   ): Unit = {
     directory.requestDirectoryInstall()
-    directory.ledgerApi.ledger_api.acs.await(userParty, dirCodegen.DirectoryInstall)
+    directory.ledgerApi.ledger_api.acs.awaitJava(dirCodegen.DirectoryInstall.COMPANION)(userParty)
 
     directory.requestDirectoryEntry(userName)
 
@@ -90,7 +93,7 @@ class SplitwiseFrontendIntegrationTest
         textField("user-id-field").value = bobDamlUser
         click on "login-button"
         bobValidator.remoteParticipant.ledger_api.acs
-          .await(bobUserParty, splitwiseCodegen.GroupInvite)
+          .awaitJava(splitwiseCodegen.GroupInvite.COMPANION)(bobUserParty)
         click on "request-membership-link"
       }
 
@@ -104,7 +107,7 @@ class SplitwiseFrontendIntegrationTest
         textField("user-id-field").value = charlieDamlUser
         click on "login-button"
         charlieValidator.remoteParticipant.ledger_api.acs
-          .await(charlieUserParty, splitwiseCodegen.GroupInvite)
+          .awaitJava(splitwiseCodegen.GroupInvite.COMPANION)(charlieUserParty)
         click on "request-membership-link"
       }
 
@@ -248,7 +251,7 @@ class SplitwiseFrontendIntegrationTest
         textField("user-id-field").value = bobDamlUser
         click on "login-button"
         bobValidator.remoteParticipant.ledger_api.acs
-          .await(bobUserParty, splitwiseCodegen.GroupInvite)
+          .awaitJava(splitwiseCodegen.GroupInvite.COMPANION)(bobUserParty)
         click on "request-membership-link"
       }
 

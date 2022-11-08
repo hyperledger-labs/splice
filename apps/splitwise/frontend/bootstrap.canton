@@ -1,6 +1,6 @@
 import com.daml.lf.value.Value.ContractId
-import com.daml.network.codegen.CN.{Directory => codegen}
-import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen}
+import com.daml.network.codegen.java.cn.{directory => codegen}
+import com.daml.network.codegen.java.cn.{splitwise => splitwiseCodegen}
 
 println("Waiting for validator initialization...")
 aliceValidator.waitForInitialization()
@@ -8,6 +8,7 @@ bobValidator.waitForInitialization()
 
 Seq(aliceValidator.remoteParticipant, bobValidator.remoteParticipant).foreach { p =>
   p.dars.upload("apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar")
+  p.dars.upload("apps/directory/daml/.daml/dist/directory-service-0.1.0.dar")
 }
 
 val charlieValidator = aliceValidator
@@ -23,9 +24,9 @@ val aliceRequestCid = aliceDirectory.requestDirectoryInstall()
 val bobRequestCid = bobDirectory.requestDirectoryInstall()
 val charlieRequestCid = charlieDirectory.requestDirectoryInstall()
 
-aliceValidator.remoteParticipant.ledger_api.acs.await(aliceUserParty, codegen.DirectoryInstall)
-bobValidator.remoteParticipant.ledger_api.acs.await(bobUserParty, codegen.DirectoryInstall)
-charlieValidator.remoteParticipant.ledger_api.acs.await(charlieUserParty, codegen.DirectoryInstall)
+aliceValidator.remoteParticipant.ledger_api.acs.awaitJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
+bobValidator.remoteParticipant.ledger_api.acs.awaitJava(codegen.DirectoryInstall.COMPANION)(bobUserParty)
+charlieValidator.remoteParticipant.ledger_api.acs.awaitJava(codegen.DirectoryInstall.COMPANION)(charlieUserParty)
 
 aliceDirectory.requestDirectoryEntry("alice.cns")
 bobDirectory.requestDirectoryEntry("bob.cns")
@@ -47,5 +48,5 @@ Seq(aliceSplitwise -> aliceUserParty,
     bobSplitwise -> bobUserParty,
     charlieSplitwise -> charlieUserParty).foreach { case (splitwise, party) =>
   splitwise.createInstallRequest()
-  splitwise.ledgerApi.ledger_api.acs.await(party, splitwiseCodegen.SplitwiseInstall)
+  splitwise.ledgerApi.ledger_api.acs.awaitJava(splitwiseCodegen.SplitwiseInstall.COMPANION)(party)
 }

@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.ledger.client.binding.{Contract => CodegenContract}
-import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen, Wallet => walletCodegen}
+import com.daml.network.codegen.java.cn.{splitwise => splitwiseCodegen, wallet => walletCodegen}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -50,7 +49,8 @@ class SplitwiseIntegrationTest
         (charlieSplitwise, aliceValidator, charlieUserParty),
       ).foreach { case (splitwise, validator, party) =>
         splitwise.createInstallRequest()
-        splitwise.ledgerApi.ledger_api.acs.await(party, splitwiseCodegen.SplitwiseInstall)
+        splitwise.ledgerApi.ledger_api.acs
+          .awaitJava(splitwiseCodegen.SplitwiseInstall.COMPANION)(party)
       }
 
       aliceSplitwise.requestGroup("group1")
@@ -85,7 +85,12 @@ class SplitwiseIntegrationTest
       )
       bobSplitwise.initiateTransfer(
         key,
-        Seq(walletCodegen.ReceiverQuantity(aliceUserParty.toPrim, 10.0)),
+        Seq(
+          new walletCodegen.ReceiverQuantity(
+            aliceUserParty.toProtoPrimitive,
+            BigDecimal(10.0).bigDecimal,
+          )
+        ),
       )
       eventually()(bobRemoteWallet.listAppPaymentRequests() should not be empty)
       inside(bobRemoteWallet.listAppPaymentRequests()) { case Seq(request) =>
@@ -111,7 +116,7 @@ class SplitwiseIntegrationTest
       }
 
       splitwiseValidator.remoteParticipant.ledger_api.acs
-        .await(providerSplitwiseBackend.getProviderPartyId(), splitwiseCodegen.Group)
+        .awaitJava(splitwiseCodegen.Group.COMPANION)(providerSplitwiseBackend.getProviderPartyId())
 
       charlieSplitwise.listBalances(key) shouldBe Map.empty
       charlieSplitwise.enterPayment(key, 33.0, "payment")
@@ -149,7 +154,7 @@ class SplitwiseIntegrationTest
 
         aliceSplitwise.createInstallRequest()
         aliceSplitwise.ledgerApi.ledger_api.acs
-          .await(aliceUserParty, splitwiseCodegen.SplitwiseInstall)
+          .awaitJava(splitwiseCodegen.SplitwiseInstall.COMPANION)(aliceUserParty)
 
         def createGroup() = {
           val groupRequest = aliceSplitwise.requestGroup("group1")
@@ -157,12 +162,11 @@ class SplitwiseIntegrationTest
           // Wait for request to be archived and therefore either the group to be created or
           // the request to be rejected.
           eventually() {
-            aliceSplitwise.ledgerApi.ledger_api.acs.filter(
-              aliceUserParty,
-              splitwiseCodegen.GroupRequest,
-              (request: CodegenContract[splitwiseCodegen.GroupRequest]) =>
-                request.contractId == groupRequest,
-            ) shouldBe empty
+            aliceSplitwise.ledgerApi.ledger_api.acs
+              .filterJava(splitwiseCodegen.GroupRequest.COMPANION)(
+                aliceUserParty,
+                (request: splitwiseCodegen.GroupRequest.Contract) => request.id == groupRequest,
+              ) shouldBe empty
           }
         }
 
@@ -180,7 +184,8 @@ class SplitwiseIntegrationTest
 
         // We read directly from the ledger API to avoid having to synchronize on the store.
         val groups =
-          aliceSplitwise.ledgerApi.ledger_api.acs.filter(aliceUserParty, splitwiseCodegen.Group)
+          aliceSplitwise.ledgerApi.ledger_api.acs
+            .filterJava(splitwiseCodegen.Group.COMPANION)(aliceUserParty)
         groups should have size 1
     }
 

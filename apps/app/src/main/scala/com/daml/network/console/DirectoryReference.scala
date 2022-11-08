@@ -117,7 +117,7 @@ class RemoteDirectoryAppReference(
   def requestDirectoryInstall(): codegen.DirectoryInstallRequest.ContractId = {
     val providerParty = getProviderPartyId()
     val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.damlUser)
-    val created = LedgerApiUtils.submitWithResultJava(
+    val created = LedgerApiUtils.submitWithResult(
       ledgerApi,
       actAs = Seq(userParty),
       readAs = Seq.empty,
@@ -133,7 +133,7 @@ class RemoteDirectoryAppReference(
   def requestDirectoryEntry(name: String): codegen.DirectoryEntryRequest.ContractId = {
     val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.damlUser)
     LedgerApiUtils
-      .submitWithResultJava(
+      .submitWithResult(
         ledgerApi,
         actAs = Seq(userParty),
         readAs = Seq.empty,
@@ -151,7 +151,7 @@ class RemoteDirectoryAppReference(
   ): subsCodegen.SubscriptionRequest.ContractId = {
     val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.damlUser)
     LedgerApiUtils
-      .submitWithResultJava(
+      .submitWithResult(
         ledgerApi,
         actAs = Seq(userParty),
         readAs = Seq.empty,

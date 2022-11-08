@@ -1,10 +1,9 @@
 package com.daml.network.console
 
 import com.daml.ledger.api.v1.transaction.TransactionTree
-import com.daml.ledger.client.binding.{Primitive, ValueDecoder}
-import com.daml.ledger.javaapi.data.codegen.{Update => JavaUpdate}
+import com.daml.ledger.javaapi.data.codegen.Update
 import com.daml.ledger.javaapi.data.{TransactionTree => JavaTransactionTree}
-import com.daml.network.environment.{CoinLedgerConnection, JavaCoinLedgerConnection}
+import com.daml.network.environment.JavaCoinLedgerConnection
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.topology.PartyId
 
@@ -15,25 +14,7 @@ object LedgerApiUtils {
       ledgerApi: BaseLedgerApiAdministration,
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
-      update: Primitive.Update[T],
-      commandId: Option[String] = None,
-  )(implicit decoder: ValueDecoder[T]): T = {
-    val tree = ledgerApi.ledger_api.commands.submit(
-      actAs,
-      Seq(update.command),
-      workflowId = "",
-      commandId.getOrElse(""),
-      readAs = readAs,
-      optTimeout = None,
-    )
-    CoinLedgerConnection.decodeExerciseResult(update.toString, tree)
-  }
-
-  def submitWithResultJava[T](
-      ledgerApi: BaseLedgerApiAdministration,
-      actAs: Seq[PartyId],
-      readAs: Seq[PartyId],
-      update: JavaUpdate[T],
+      update: Update[T],
       commandId: Option[String] = None,
   ): T = {
     val tree = ledgerApi.ledger_api.commands.submitJava(

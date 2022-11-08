@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.ledger.client.binding.Primitive
-import com.daml.network.codegen.CN.{Directory => dirCodegen}
+import com.daml.network.codegen.java.cn.{directory => dirCodegen}
 import com.daml.network.console.{LocalValidatorAppReference, RemoteDirectoryAppReference}
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.SubscriptionIdleState
@@ -10,6 +9,7 @@ import org.openqa.selenium.WebDriver
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
 class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
@@ -291,21 +291,14 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
   ): String = {
     val dirEntryName = "directory.cns"
     val dirParty = directory.getProviderPartyId()
-    directory.remoteParticipant.ledger_api.commands.submit(
+    directory.remoteParticipant.ledger_api.commands.submitJava(
       actAs = Seq(dirParty),
-      commands = Seq(
-        dirCodegen
-          .DirectoryEntry(
-            user = dirParty.toPrim,
-            provider = dirParty.toPrim,
-            name = dirEntryName,
-            expiresAt = Primitive.Timestamp
-              .discardNanos(Instant.now().plus(90, ChronoUnit.DAYS))
-              .getOrElse(fail("Failed to convert timestamp")),
-          )
-          .create
-          .command
-      ),
+      commands = new dirCodegen.DirectoryEntry(
+        dirParty.toProtoPrimitive,
+        dirParty.toProtoPrimitive,
+        dirEntryName,
+        Instant.now().plus(90, ChronoUnit.DAYS),
+      ).create.commands.asScala.toSeq,
       optTimeout = None,
     )
     expectedCns(dirParty, dirEntryName)
@@ -319,7 +312,8 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
     // Whitelist the directory service on alice's validator
     directory.requestDirectoryInstall()
     eventually() {
-      aliceDirectory.ledgerApi.ledger_api.acs.await(userParty, dirCodegen.DirectoryInstall)
+      aliceDirectory.ledgerApi.ledger_api.acs
+        .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(userParty)
     }
     aliceDirectory.requestDirectoryEntry(dirEntry)
   }
@@ -332,7 +326,8 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
     // Whitelist the directory service on alice's validator
     directory.requestDirectoryInstall()
     eventually() {
-      aliceDirectory.ledgerApi.ledger_api.acs.await(userParty, dirCodegen.DirectoryInstall)
+      aliceDirectory.ledgerApi.ledger_api.acs
+        .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(userParty)
     }
     aliceDirectory.requestDirectoryEntryWithSubscription(dirEntry)
   }

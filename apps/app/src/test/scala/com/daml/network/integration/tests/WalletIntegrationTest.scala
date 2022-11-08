@@ -11,9 +11,10 @@ import com.daml.network.codegen.CC.{
 import com.daml.network.codegen.CN.Scripts.Wallet.TestSubscriptions as testSubsCodegen
 import com.daml.network.codegen.CN.Scripts.TestWallet as testWalletCodegen
 import com.daml.network.codegen.CN.Wallet.Subscriptions as subsCodegen
-import com.daml.network.codegen.CN.{Directory => dirCodegen, Wallet => walletCodegen}
+import com.daml.network.codegen.CN.{Wallet as walletCodegen}
 import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
+import com.daml.network.codegen.java.cn.{directory as dirCodegen}
 import com.daml.network.console.{LocalWalletAppReference, WalletAppReference}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -460,7 +461,7 @@ class WalletIntegrationTest
         aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
         aliceDirectory.requestDirectoryInstall()
         aliceValidator.remoteParticipant.ledger_api.acs
-          .await(aliceUserParty, dirCodegen.DirectoryInstall)
+          .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(aliceUserParty)
       }
       aliceRemoteWallet.listSubscriptions() shouldBe empty
 

@@ -325,12 +325,13 @@ lazy val `apps-aaa-splitwise` =
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
-      Compile / damlDependencies := (`apps-directory` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`apps-wallet-daml` / Compile / damlBuild).value,
       Compile / damlSourceDirectory := file("apps/splitwise/daml"),
       cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
       Test / damlSourceDirectory := (Compile / damlSourceDirectory).value,
       Compile / damlDarOutput := file("apps/splitwise/daml") / ".daml" / "dist",
       BuildCommon.damlCodegenSettings,
+      Compile / damlEnableScalaCodegen := false,
     )
 
 val scalaCodegenStrategy = new MergeStrategy {
@@ -355,12 +356,11 @@ val scalaCodegenStrategy = new MergeStrategy {
   val name = "scala codegen strat"
   def apply(tempDir: File, path: String, files: Seq[File]): Either[String, Seq[(File, String)]] = {
     val result = files.collectFirst {
-      // Splitwise depends on everything so we can safely
-      // chose that.
-      case f if sourceOfFileForMerge(tempDir, f)._1.getPath().contains("splitwise") => f
+      // Wallet depends on CC model.
+      case f if sourceOfFileForMerge(tempDir, f)._1.getPath().contains("wallet") => f
     }
     result match {
-      case None => Left(s"None of the codegened files originate from directory: ${files}")
+      case None => Left(s"None of the codegened files originate from wallet: ${files}")
       case Some(f) => Right(Seq((f, path)))
     }
   }
@@ -369,6 +369,13 @@ val scalaCodegenStrategy = new MergeStrategy {
 def isScalaCodegenFile(fileName: String): Boolean = {
   fileName match {
     case PathList("com", "daml", "network", "codegen", _*) => true
+    case _ => false
+  }
+}
+
+def isJavaCodegenFile(fileName: String): Boolean = {
+  fileName match {
+    case PathList("com", "daml", "network", "codegen", "java", _*) => true
     case _ => false
   }
 }
@@ -397,6 +404,7 @@ def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy
     case "META-INF/versions/9/module-info.class" => MergeStrategy.discard
     case path if path.contains("module-info.class") => MergeStrategy.discard
     case PathList("org", "jline", _ @_*) => MergeStrategy.first
+    case path if isJavaCodegenFile(path) => MergeStrategy.deduplicate
     case path if isScalaCodegenFile(path) => scalaCodegenStrategy
     // Dedup between ledger-api-java-proto (pulled in via Scala bindings)
     // and the copy of that inlined into bindings-java.
@@ -480,15 +488,15 @@ lazy val `apps-app` =
     .in(file("apps/app"))
     // make Canton code available to CC repo
     .dependsOn(
-      // Splitwise needs to come first so that the codegened files
+      // Wallet needs to come first so that the codegened files
       // come first in the classpath. Otherwise, you get NoSuchMethod errors at runtime.
+      `apps-wallet-daml`,
       `apps-aaa-splitwise`,
       `apps-directory`,
       `apps-validator`,
       `apps-svc`,
       `apps-scan`,
       `apps-wallet`,
-      `apps-wallet-daml`,
       `canton-community-app` % "compile->compile;test->test",
     )
     .settings(

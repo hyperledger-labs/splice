@@ -1,14 +1,14 @@
 package com.daml.network.console
 
-import com.daml.ledger.client.binding.{Contract => CodegenContract, Primitive, ValueDecoder}
-import com.daml.network.codegen.CN.{Splitwise => splitwiseCodegen, Wallet => walletCodegen}
-import com.daml.network.codegen.DA.Time.Types.RelTime
+import com.daml.ledger.javaapi.data.codegen.Update
+import com.daml.network.codegen.java.cn.{splitwise => splitwiseCodegen, wallet => walletCodegen}
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.LedgerApiUtils
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.scan.config.RemoteScanAppConfig
 import com.daml.network.splitwise.admin.api.client.commands.GrpcSplitwiseAppClient
 import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
-import com.daml.network.util.Contract
+import com.daml.network.util.{JavaContract as Contract}
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.console.{
   BaseInspection,
@@ -18,6 +18,8 @@ import com.digitalasset.canton.console.{
 }
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
+
+import scala.jdk.CollectionConverters.*
 
 /** Single local Splitwise app reference. Defines the console commands that can be run against a local Splitwise
   * app reference.
@@ -44,9 +46,9 @@ abstract class SplitwiseAppReference(
   def submitWithResult[T](
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
-      update: Primitive.Update[T],
+      update: Update[T],
       commandId: Option[String] = None,
-  )(implicit decoder: ValueDecoder[T]): T =
+  ): T =
     LedgerApiUtils.submitWithResult(ledgerApi, actAs, readAs, update, commandId)
 
   @Help.Summary("Get the primary party of the provider’s daml user specified in the config.")
@@ -62,10 +64,10 @@ final class RemoteSplitwiseAppReference(
 ) extends SplitwiseAppReference(coinConsoleEnvironment, name)
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
-  private val collectionDuration = RelTime(
+  private val collectionDuration = new RelTime(
     10_000_000
   )
-  private val acceptDuration = RelTime(
+  private val acceptDuration = new RelTime(
     60_000_000
   )
 
@@ -83,17 +85,16 @@ final class RemoteSplitwiseAppReference(
   lazy val context =
     GrpcSplitwiseAppClient.SplitwiseContext(getUserPrimaryParty())
 
-  private def getSplitwiseInstall(): Primitive.ContractId[splitwiseCodegen.SplitwiseInstall] = {
+  private def getSplitwiseInstall(): splitwiseCodegen.SplitwiseInstall.ContractId = {
     val providerParty = getProviderPartyId()
     val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.damlUser)
-    val installs = ledgerApi.ledger_api.acs.filter(
+    val installs = ledgerApi.ledger_api.acs.filterJava(splitwiseCodegen.SplitwiseInstall.COMPANION)(
       userParty,
-      splitwiseCodegen.SplitwiseInstall,
-      (install: CodegenContract[splitwiseCodegen.SplitwiseInstall]) =>
-        install.value.user == userParty.toPrim && install.value.provider == providerParty.toPrim,
+      (install: splitwiseCodegen.SplitwiseInstall.Contract) =>
+        install.data.user == userParty.toProtoPrimitive && install.data.provider == providerParty.toProtoPrimitive,
     )
     installs match {
-      case Seq(install) => install.contractId
+      case Seq(install) => install.id
       case _ =>
         throw new IllegalStateException(
           s"Expected exactly one DirectoryInstall contract for user $userParty but got $installs"
@@ -103,16 +104,15 @@ final class RemoteSplitwiseAppReference(
 
   private def getGroup(
       groupKey: splitwiseCodegen.GroupKey
-  ): Primitive.ContractId[splitwiseCodegen.Group] = {
+  ): splitwiseCodegen.Group.ContractId = {
     val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.damlUser)
-    val groups = ledgerApi.ledger_api.acs.filter(
+    val groups = ledgerApi.ledger_api.acs.filterJava(splitwiseCodegen.Group.COMPANION)(
       userParty,
-      splitwiseCodegen.Group,
-      (group: CodegenContract[splitwiseCodegen.Group]) =>
-        group.value.provider == groupKey.provider && group.value.owner == groupKey.owner && group.value.id == groupKey.id,
+      (group: splitwiseCodegen.Group.Contract) =>
+        group.data.provider == groupKey.provider && group.data.owner == groupKey.owner && group.data.id == groupKey.id,
     )
     groups match {
-      case Seq(group) => group.contractId
+      case Seq(group) => group.id
       case _ =>
         throw new IllegalStateException(
           s"Expected exactly one Group contract for key $groupKey but got $groups"
@@ -122,10 +122,10 @@ final class RemoteSplitwiseAppReference(
 
   private def groupKey_(owner: PartyId, id: String): splitwiseCodegen.GroupKey = {
     val provider = getProviderPartyId()
-    splitwiseCodegen.GroupKey(
-      owner.toPrim,
-      provider.toPrim,
-      splitwiseCodegen.GroupId(id),
+    new splitwiseCodegen.GroupKey(
+      owner.toProtoPrimitive,
+      provider.toProtoPrimitive,
+      new splitwiseCodegen.GroupId(id),
     )
   }
 
@@ -140,25 +140,24 @@ final class RemoteSplitwiseAppReference(
 
   @Help.Summary("Create splitwise install request for given provider party")
   def createInstallRequest(
-  ): Primitive.ContractId[splitwiseCodegen.SplitwiseInstallRequest] = {
+  ): splitwiseCodegen.SplitwiseInstallRequest.ContractId = {
     val party = getUserPrimaryParty()
     val provider = getProviderPartyId()
-    submitWithResult(
+    val created = submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
-      splitwiseCodegen
-        .SplitwiseInstallRequest(
-          user = party.toPrim,
-          provider = provider.toPrim,
-        )
-        .create,
+      new splitwiseCodegen.SplitwiseInstallRequest(
+        provider.toProtoPrimitive,
+        party.toProtoPrimitive,
+      ).create,
     )
+    splitwiseCodegen.SplitwiseInstallRequest.COMPANION.toContractId(created.contractId)
   }
 
   // Commands for the group owner
 
   @Help.Summary("Request group with the given id")
-  def requestGroup(id: String): Primitive.ContractId[splitwiseCodegen.GroupRequest] = {
+  def requestGroup(id: String): splitwiseCodegen.GroupRequest.ContractId = {
     val party = getUserPrimaryParty()
     val provider = getProviderPartyId()
     val svc = remoteScan.getSvcPartyId()
@@ -166,17 +165,17 @@ final class RemoteSplitwiseAppReference(
       actAs = Seq(party),
       readAs = Seq.empty,
       getSplitwiseInstall().exerciseSplitwiseInstall_RequestGroup(
-        splitwiseCodegen.Group(
-          owner = party.toPrim,
-          provider = provider.toPrim,
-          svc = svc.toPrim,
-          members = Seq.empty,
-          id = splitwiseCodegen.GroupId(id),
-          collectionDuration = collectionDuration,
-          acceptDuration = acceptDuration,
+        new splitwiseCodegen.Group(
+          party.toProtoPrimitive,
+          svc.toProtoPrimitive,
+          Seq.empty.asJava,
+          new splitwiseCodegen.GroupId(id),
+          provider.toProtoPrimitive,
+          collectionDuration,
+          acceptDuration,
         )
       ),
-    )
+    ).exerciseResult
   }
 
   @Help.Summary(
@@ -185,45 +184,44 @@ final class RemoteSplitwiseAppReference(
   def createGroupInvite(
       id: String,
       observers: Seq[PartyId],
-  ): Primitive.ContractId[splitwiseCodegen.GroupInvite] = {
+  ): splitwiseCodegen.GroupInvite.ContractId = {
     val party = getUserPrimaryParty()
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
       getSplitwiseInstall().exerciseSplitwiseInstall_CreateInvite(
         getGroup(groupKey_(party, id)),
-        observers.map(_.toPrim),
+        observers.map(_.toProtoPrimitive).asJava,
       ),
-    )
+    ).exerciseResult
   }
 
   @Help.Summary("Add the invitee on the accepted group invite to the group")
   def joinGroup(
-      acceptedGroupInvite: Primitive.ContractId[splitwiseCodegen.AcceptedGroupInvite]
-  ): Primitive.ContractId[splitwiseCodegen.Group] = {
+      acceptedGroupInvite: splitwiseCodegen.AcceptedGroupInvite.ContractId
+  ): splitwiseCodegen.Group.ContractId = {
     val party = getUserPrimaryParty()
-    val acceptedInvite = ledgerApi.ledger_api.acs.await(
-      party,
-      splitwiseCodegen.AcceptedGroupInvite,
-      (c: CodegenContract[splitwiseCodegen.AcceptedGroupInvite]) =>
-        c.contractId == acceptedGroupInvite,
-    )
+    val acceptedInvite =
+      ledgerApi.ledger_api.acs.awaitJava(splitwiseCodegen.AcceptedGroupInvite.COMPANION)(
+        party,
+        (c: splitwiseCodegen.AcceptedGroupInvite.Contract) => c.id == acceptedGroupInvite,
+      )
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
       getSplitwiseInstall().exerciseSplitwiseInstall_Join(
-        getGroup(acceptedInvite.value.groupKey),
+        getGroup(acceptedInvite.data.groupKey),
         acceptedGroupInvite,
       ),
-    )
+    ).exerciseResult
   }
 
   // Member invite
 
   @Help.Summary("Accept the group invite")
   def acceptInvite(
-      groupInvite: Primitive.ContractId[splitwiseCodegen.GroupInvite]
-  ): Primitive.ContractId[splitwiseCodegen.AcceptedGroupInvite] = {
+      groupInvite: splitwiseCodegen.GroupInvite.ContractId
+  ): splitwiseCodegen.AcceptedGroupInvite.ContractId = {
     val party = getUserPrimaryParty()
     submitWithResult(
       actAs = Seq(party),
@@ -231,7 +229,7 @@ final class RemoteSplitwiseAppReference(
       getSplitwiseInstall().exerciseSplitwiseInstall_AcceptInvite(
         groupInvite
       ),
-    )
+    ).exerciseResult
   }
 
   // Member operations
@@ -243,33 +241,33 @@ final class RemoteSplitwiseAppReference(
       key: GrpcSplitwiseAppClient.GroupKey,
       quantity: BigDecimal,
       description: String,
-  ): Primitive.ContractId[splitwiseCodegen.BalanceUpdate] = {
+  ): splitwiseCodegen.BalanceUpdate.ContractId = {
     val party = getUserPrimaryParty()
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
       getSplitwiseInstall().exerciseSplitwiseInstall_EnterPayment(
         getGroup(key.toPrim),
-        quantity,
+        quantity.bigDecimal,
         description,
       ),
-    )
+    ).exerciseResult
   }
 
   @Help.Summary("Initiate a transfer. Must be confirmed in the wallet.")
   def initiateTransfer(
       key: GrpcSplitwiseAppClient.GroupKey,
       receiverQuantities: Seq[walletCodegen.ReceiverQuantity],
-  ): Primitive.ContractId[walletCodegen.AppPaymentRequest] = {
+  ): walletCodegen.AppPaymentRequest.ContractId = {
     val party = getUserPrimaryParty()
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
       getSplitwiseInstall().exerciseSplitwiseInstall_InitiateTransfer(
         getGroup(key.toPrim),
-        receiverQuantities,
+        receiverQuantities.asJava,
       ),
-    )
+    ).exerciseResult
   }
 
   @Help.Summary("Net balances of the parties in the group.")
@@ -283,14 +281,16 @@ final class RemoteSplitwiseAppReference(
   def net(
       key: GrpcSplitwiseAppClient.GroupKey,
       balanceChanges: Map[PartyId, Map[PartyId, BigDecimal]],
-  ): Primitive.ContractId[splitwiseCodegen.BalanceUpdate] = {
+  ): splitwiseCodegen.BalanceUpdate.ContractId = {
     val party = getUserPrimaryParty()
-    val balanceChangesPrim
-        : Primitive.GenMap[Primitive.Party, Primitive.GenMap[Primitive.Party, BigDecimal]] =
+    val balanceChangesPrim: java.util.Map[String, java.util.Map[String, java.math.BigDecimal]] =
       balanceChanges.map { case (k, v) =>
-        k.toPrim -> (v
-          .map { case (k, v) => k.toPrim -> v }: Primitive.GenMap[Primitive.Party, BigDecimal])
-      }
+        k.toProtoPrimitive -> (v
+          .map { case (k, v) => k.toProtoPrimitive -> v.bigDecimal }: Map[
+          String,
+          java.math.BigDecimal,
+        ]).asJava
+      }.asJava
     submitWithResult(
       actAs = Seq(party),
       readAs = Seq.empty,
@@ -298,19 +298,20 @@ final class RemoteSplitwiseAppReference(
         getGroup(key.toPrim),
         balanceChangesPrim,
       ),
-    )
+    ).exerciseResult
   }
 
   // Read operations
 
   @Help.Summary("List all groups")
-  def listGroups(): Seq[Contract[splitwiseCodegen.Group]] =
+  def listGroups(): Seq[Contract[splitwiseCodegen.Group.ContractId, splitwiseCodegen.Group]] =
     consoleEnvironment.run {
       adminCommand(GrpcSplitwiseAppClient.ListGroups(context))
     }
 
   @Help.Summary("List all group invites that you have not already accepted")
-  def listGroupInvites(): Seq[Contract[splitwiseCodegen.GroupInvite]] =
+  def listGroupInvites()
+      : Seq[Contract[splitwiseCodegen.GroupInvite.ContractId, splitwiseCodegen.GroupInvite]] =
     consoleEnvironment.run {
       adminCommand(GrpcSplitwiseAppClient.ListGroupInvites(context))
     }
@@ -318,14 +319,16 @@ final class RemoteSplitwiseAppReference(
   @Help.Summary("List accepted group invites for the given group that can be used in joinGroup")
   def listAcceptedGroupInvites(
       id: String
-  ): Seq[Contract[splitwiseCodegen.AcceptedGroupInvite]] =
+  ): Seq[
+    Contract[splitwiseCodegen.AcceptedGroupInvite.ContractId, splitwiseCodegen.AcceptedGroupInvite]
+  ] =
     consoleEnvironment.run {
       adminCommand(GrpcSplitwiseAppClient.ListAcceptedGroupInvites(id, context))
     }
 
   @Help.Summary("List balance updates for the given group")
   def listBalanceUpdates(key: GrpcSplitwiseAppClient.GroupKey): Seq[
-    Contract[splitwiseCodegen.BalanceUpdate]
+    Contract[splitwiseCodegen.BalanceUpdate.ContractId, splitwiseCodegen.BalanceUpdate]
   ] =
     consoleEnvironment.run {
       adminCommand(GrpcSplitwiseAppClient.ListBalanceUpdates(key, context))

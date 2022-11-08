@@ -10,12 +10,6 @@ import CC.Assert
 import CC.CoinRules (AppTransferContext)
 import CN.Wallet
 
--- TODO(i592)
--- fake dependency
-import CN.Directory
-_unused : DirectoryEntry -> DirectoryEntry
-_unused = identity
-
 -- Stable identifier for a group. We avoid contract keys
 -- but having this as a data type is still useful.
 data GroupKey = GroupKey

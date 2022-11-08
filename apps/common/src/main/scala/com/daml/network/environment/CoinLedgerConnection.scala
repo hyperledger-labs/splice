@@ -2,9 +2,7 @@ package com.daml.network.environment
 
 import akka.actor.ActorSystem
 import com.daml.ledger.api.domain.UserRight
-import com.daml.ledger.api.refinements.ApiTypes.{ContractId, WorkflowId}
-import com.daml.ledger.api.v1.transaction.{TransactionTree, TreeEvent}
-import com.daml.ledger.client.binding.{Value => CodegenValue, ValueDecoder}
+import com.daml.ledger.api.refinements.ApiTypes.WorkflowId
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
@@ -58,42 +56,4 @@ object CoinLedgerConnection {
       override def listPackages()(implicit traceContext: TraceContext): Future[Set[String]] =
         client.packageClient.listPackages().map(_.packageIds.toSet)
     }
-
-  def toFuture[A](o: Option[A]): Future[A] =
-    o.fold(Future.failed[A](new IllegalStateException(s"Empty option: $o")))(a =>
-      Future.successful(a)
-    )
-
-  @SuppressWarnings(Array("org.wartremover.warts.AsInstanceOf"))
-  def decodeExerciseResult[T](
-      cmdDescription: String,
-      transaction: TransactionTree,
-  )(implicit decoder: ValueDecoder[T]): T = {
-    if (transaction.rootEventIds.size == 1) {
-      val event = transaction.eventsById(transaction.rootEventIds(0))
-      event.kind match {
-        case TreeEvent.Kind.Created(created) =>
-          // We don’t have enough information here to check that T is a contract id.
-          // We could try to commit some crimes using Scala reflection & TypeTag
-          // but in the end this cast seems much simpler and the Scala codegen
-          // makes Update internal so we can rely on people not making up garbage
-          // Update values.
-          ContractId(created.contractId).asInstanceOf[T]
-        case TreeEvent.Kind.Exercised(exercised) =>
-          CodegenValue
-            .decode[T](exercised.getExerciseResult)
-            .getOrElse(
-              throw new IllegalArgumentException(
-                s"Executing [$cmdDescription] produced result [$exercised] of unexpected type."
-              )
-            )
-        case TreeEvent.Kind.Empty =>
-          throw new IllegalArgumentException(s"Unknown tree event kind")
-      }
-    } else {
-      throw new IllegalArgumentException(
-        s"Expected exactly one root event id but got ${transaction.rootEventIds.size}"
-      )
-    }
-  }
 }
