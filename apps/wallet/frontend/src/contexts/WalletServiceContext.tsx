@@ -2,7 +2,7 @@ import * as v0 from 'common-protobuf/com/daml/network/wallet/v0/wallet_service_p
 import { Contract } from 'common-frontend';
 import { WalletServicePromiseClient } from 'common-protobuf/com/daml/network/wallet/v0/wallet_service_grpc_web_pb';
 import { Metadata } from 'grpc-web';
-import React, { useContext, useState, useEffect, useMemo } from 'react';
+import React, { useContext, useMemo } from 'react';
 
 import { AppPaymentRequest, PaymentChannelProposal } from '@daml.js/wallet/lib/CN/Wallet';
 import {
@@ -85,39 +85,35 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
   url,
   children,
 }) => {
-  const [creds, setCreds] = useState<Credentials>();
-  const { userId, userAccessToken } = useUserState();
-
-  useEffect(() => {
-    if (userAccessToken) {
-      setCreds({ Authorization: userAccessToken });
-    }
-  }, [userAccessToken]);
+  const { userAccessToken } = useUserState();
 
   // Collection of methods that wrap the raw grpc codegen client methods because everything in that API is constructor-chain based, requires auth headers, and just generally awkward to use
   const friendlyClient: WalletClient | undefined = useMemo(() => {
-    if (!userId) return undefined;
+    const getCreds = (): Credentials => {
+      if (!userAccessToken) {
+        throw new Error('Request issued before access token was set');
+      }
+      return {
+        Authorization: `Bearer ${userAccessToken}`,
+      };
+    };
 
     const walletClient = new WalletServicePromiseClient(url, null, null);
 
-    // TODO(i1012) -- remove wallet user context when auth is required
-    const wctx = new v0.WalletContext().setUserName(userId);
-
     return {
       list: async (): Promise<ListResponse> => {
-        const res = await walletClient.list(new v0.ListRequest().setWalletCtx(wctx), creds);
+        const res = await walletClient.list(new v0.ListRequest(), getCreds());
         return { coins: res.getCoinsList(), lockedCoins: res.getLockedCoinsList() };
       },
       tap: async quantity => {
-        await walletClient.tap(new v0.TapRequest().setQuantity(quantity).setWalletCtx(wctx), creds);
+        await walletClient.tap(new v0.TapRequest().setQuantity(quantity), getCreds());
       },
       executeDirectTransfer: async (quantity, receiverPartyId) => {
         await walletClient.executeDirectTransfer(
           new v0.ExecuteDirectTransferRequest()
             .setQuantity(quantity)
-            .setReceiverPartyId(receiverPartyId)
-            .setWalletCtx(wctx),
-          creds
+            .setReceiverPartyId(receiverPartyId),
+          getCreds()
         );
       },
 
@@ -134,15 +130,14 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             .setSenderTransferFeeRatio(senderTransferFeeRatio)
             .setAllowDirectTransfers(allowDirectTransfers)
             .setAllowOffers(allowOffers)
-            .setAllowRequests(allowRequests)
-            .setWalletCtx(wctx),
-          creds
+            .setAllowRequests(allowRequests),
+          getCreds()
         );
       },
       listPaymentChannelProposals: async (): Promise<ListPaymentChannelRequestsResponse> => {
         const res = await walletClient.listPaymentChannelProposals(
-          new v0.ListPaymentChannelProposalsRequest().setWalletCtx(wctx),
-          creds
+          new v0.ListPaymentChannelProposalsRequest(),
+          getCreds()
         );
 
         return {
@@ -153,17 +148,15 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       },
       acceptPaymentChannelProposal: async proposalContractId => {
         await walletClient.acceptPaymentChannelProposal(
-          new v0.AcceptPaymentChannelProposalRequest()
-            .setProposalContractId(proposalContractId)
-            .setWalletCtx(wctx),
-          creds
+          new v0.AcceptPaymentChannelProposalRequest().setProposalContractId(proposalContractId),
+          getCreds()
         );
       },
 
       listAppPaymentRequests: async (): Promise<ListAppPaymentRequestsResponse> => {
         const res = await walletClient.listAppPaymentRequests(
-          new v0.ListAppPaymentRequestsRequest().setWalletCtx(wctx),
-          creds
+          new v0.ListAppPaymentRequestsRequest(),
+          getCreds()
         );
         return {
           paymentRequestsList: res
@@ -173,17 +166,15 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       },
       acceptAppPaymentRequests: async requestContractId => {
         await walletClient.acceptAppPaymentRequest(
-          new v0.AcceptAppPaymentRequestRequest()
-            .setRequestContractId(requestContractId)
-            .setWalletCtx(wctx),
-          creds
+          new v0.AcceptAppPaymentRequestRequest().setRequestContractId(requestContractId),
+          getCreds()
         );
       },
 
       listSubscriptionRequests: async (): Promise<ListSubscriptionRequestsResponse> => {
         const res = await walletClient.listSubscriptionRequests(
-          new v0.ListSubscriptionRequestsRequest().setWalletCtx(wctx),
-          creds
+          new v0.ListSubscriptionRequestsRequest(),
+          getCreds()
         );
         return {
           subscriptionRequestsList: res
@@ -193,16 +184,14 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       },
       acceptSubscriptionRequest: async requestContractId => {
         await walletClient.acceptSubscriptionRequest(
-          new v0.AcceptSubscriptionRequestRequest()
-            .setRequestContractId(requestContractId)
-            .setWalletCtx(wctx),
-          creds
+          new v0.AcceptSubscriptionRequestRequest().setRequestContractId(requestContractId),
+          getCreds()
         );
       },
       listSubscriptions: async (): Promise<ListSubscriptionsResponse> => {
         const res = await walletClient.listSubscriptions(
-          new v0.ListSubscriptionsRequest().setWalletCtx(wctx),
-          creds
+          new v0.ListSubscriptionsRequest(),
+          getCreds()
         );
         return {
           subscriptionsList: res.getSubscriptionsList().map(sub => {
@@ -222,14 +211,11 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       },
 
       userStatus: async () => {
-        const res = await walletClient.userStatus(
-          new v0.UserStatusRequest().setWalletCtx(wctx),
-          creds
-        );
+        const res = await walletClient.userStatus(new v0.UserStatusRequest(), getCreds());
         return { userOnboarded: res.getUserOnboarded(), partyId: res.getPartyId() };
       },
     };
-  }, [url, creds, userId]);
+  }, [url, userAccessToken]);
 
   return <WalletContext.Provider value={friendlyClient}>{children}</WalletContext.Provider>;
 };

@@ -30,8 +30,7 @@ import PaymentChannels from './views/PaymentChannels';
 import Subscriptions from './views/Subscriptions';
 
 const App: React.FC = () => {
-  const { userId, primaryPartyId, logout } = useUserState();
-  const isAuthenticated = userId !== undefined;
+  const { isAuthenticated, primaryPartyId, logout } = useUserState();
 
   return (
     <ErrorBoundary>
@@ -47,7 +46,7 @@ const App: React.FC = () => {
                 </div>
               )}
             </Typography>
-            {userId && (
+            {isAuthenticated && (
               <Button color="inherit" onClick={logout}>
                 Log Out
               </Button>
@@ -63,7 +62,7 @@ const App: React.FC = () => {
 };
 
 const Content = () => {
-  const { updateStatus, isOnboarded, userId } = useUserState();
+  const { updateStatus, isOnboarded, isAuthenticated, userId } = useUserState();
   const walletClient = useWalletClient();
 
   // show a loading spinner until we fully determine user status
@@ -96,7 +95,7 @@ const Content = () => {
 
   // Fetch or refresh the onboarding status
   useEffect(() => {
-    if (userId) {
+    if (isAuthenticated && userId) {
       getUserStatus(userId).catch(console.error);
     }
 
@@ -107,7 +106,7 @@ const Content = () => {
       }, 5000);
       return () => clearInterval(timer);
     }
-  }, [isOnboarded, userId, getUserStatus]);
+  }, [isOnboarded, isAuthenticated, userId, getUserStatus]);
 
   if (loading) {
     return (

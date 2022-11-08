@@ -19,8 +19,7 @@ trait SignatureVerifier {
     ).toEither.left.map(_.toString)
   } yield verifiedToken
 
-  // TODO(i1012) -- make this private when we mandate auth
-  def decodeNoVerify(token: String): Either[String, DecodedJWT] =
+  private def decodeNoVerify(token: String): Either[String, DecodedJWT] =
     Try(JWT.decode(token)).toEither.left.map(_.toString);
 
   protected def getAlgorithm(token: String): Either[String, Algorithm] =

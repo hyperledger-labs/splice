@@ -111,8 +111,8 @@ class WalletApp(
         )
 
       val verifier: SignatureVerifier = config.auth match {
-        case AuthConfig.Hs256Unsafe(_, secret) => new HMACVerifier(secret)
-        case AuthConfig.Rs256(_, jwksUrl) => new RSAVerifier(jwksUrl)
+        case AuthConfig.Hs256Unsafe(secret) => new HMACVerifier(secret)
+        case AuthConfig.Rs256(jwksUrl) => new RSAVerifier(jwksUrl)
       }
 
       adminServerRegistry
@@ -130,7 +130,6 @@ class WalletApp(
             ),
             new AuthInterceptor(
               verifier,
-              config.auth.enableAuth,
               loggerFactory,
             ),
           )

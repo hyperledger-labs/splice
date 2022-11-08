@@ -424,7 +424,7 @@ class RemoteWalletAppReference(
   override protected val instanceType = "Remote wallet"
 
   override def token: String = {
-    AuthUtil.testToken(
+    AuthUtil.testTokenBearer(
       audience = AuthUtil.audience(config.adminApi.address, "wallet"),
       user = config.damlUser,
     )
@@ -461,7 +461,7 @@ class LocalWalletAppReference(
 
   @Help.Summary("Set wallet context")
   def setWalletContext(userId: String): Unit = {
-    val token = AuthUtil.testToken(
+    val token = AuthUtil.testTokenBearer(
       audience = AuthUtil.audience(config.adminApi.address, "wallet"),
       user = userId,
     )

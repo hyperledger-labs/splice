@@ -14,11 +14,12 @@ import io.grpc.{Metadata, *}
   */
 final class AuthInterceptor(
     verifier: SignatureVerifier,
-    enableAuth: Boolean,
     override protected val loggerFactory: NamedLoggerFactory,
 ) extends ServerInterceptor
     with NamedLogging
     with NoTracing {
+
+  private val bearerPrefix = "Bearer "
 
   override def interceptCall[ReqT, RespT](
       call: ServerCall[ReqT, RespT],
@@ -29,11 +30,12 @@ final class AuthInterceptor(
     val tokenPayloadE = for {
       authHeaderValue <- Option(headers.get(AuthInterceptor.AUTHORIZATION_KEY))
         .toRight(s"No ${AuthInterceptor.AUTHORIZATION_KEY} header found")
-      // TODO(i1012) - make "Bearer $token" format mandatory
-      encodedToken = authHeaderValue.stripPrefix("Bearer ")
-      decodedToken <-
-        if (enableAuth) verifier.verify(encodedToken)
-        else verifier.decodeNoVerify(encodedToken)
+      encodedToken <- Either.cond(
+        authHeaderValue.startsWith(bearerPrefix),
+        authHeaderValue.stripPrefix(bearerPrefix),
+        s"Auth header did not start with bearer  prefix '$bearerPrefix'",
+      )
+      decodedToken <- verifier.verify(encodedToken)
     } yield decodedToken
 
     val ctx = Context.current
@@ -52,27 +54,15 @@ final class AuthInterceptor(
         )
       };
       case Left(error) => {
-        logger.debug(s"Could not validate token: $error")
-        // only raise errors for invalid signatures for now. This is because the error could also possibly be
-        // due to a missing "authorization" header, and we are not ready to be that strict yet until we get
-        // TODO(i1012)
-        if (
-          error.contains(
-            "The Token's Signature resulted invalid when verified using the Algorithm: HmacSHA256"
-          )
-        ) {
-          val status = com.google.rpc.Status
-            .newBuilder()
-            .setCode(com.google.rpc.Code.UNAUTHENTICATED.getNumber)
-            .build()
+        logger.info(s"Could not validate token: $error")
+        val status = com.google.rpc.Status
+          .newBuilder()
+          .setCode(com.google.rpc.Code.UNAUTHENTICATED.getNumber)
+          .build()
 
-          val err = io.grpc.protobuf.StatusProto.toStatusRuntimeException(status)
-          call.close(err.getStatus, err.getTrailers)
-          new ServerCall.Listener[ReqT]() {}
-        } else {
-          // swallow other errors, keep calm, and carry on
-          Contexts.interceptCall(ctx, call, headers, nextListener)
-        }
+        val err = io.grpc.protobuf.StatusProto.toStatusRuntimeException(status)
+        call.close(err.getStatus, err.getTrailers)
+        new ServerCall.Listener[ReqT]() {}
       }
     }
   }

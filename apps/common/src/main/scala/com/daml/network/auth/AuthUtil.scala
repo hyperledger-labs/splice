@@ -29,6 +29,9 @@ object AuthUtil {
       .sign(testSignatureAlgorithm)
   }
 
+  def testTokenBearer(audience: String, user: String): String =
+    s"Bearer ${testToken(audience, user)}"
+
   def main(args: Array[String]): Unit = {
     println(testToken(args(0), args(1)))
   }

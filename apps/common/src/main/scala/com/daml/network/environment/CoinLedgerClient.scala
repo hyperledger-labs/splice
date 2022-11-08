@@ -1,6 +1,5 @@
 package com.daml.network.environment
 
-import com.digitalasset.canton.util.ErrorUtil
 import akka.NotUsed
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.Source
@@ -47,6 +46,7 @@ import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsy
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.TracerProvider
+import com.digitalasset.canton.util.ErrorUtil
 import com.google.protobuf.ByteString
 import io.grpc.Channel
 import io.grpc.stub.{AbstractStub, StreamObserver}

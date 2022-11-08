@@ -9,6 +9,7 @@ interface UserState {
   userId?: string;
   userAccessToken?: string;
 
+  isAuthenticated: boolean;
   isOnboarded: boolean;
   primaryPartyId?: string; // undefined when not onboarded
 
@@ -51,6 +52,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   return (
     <UserContext.Provider
       value={{
+        isAuthenticated: userId !== undefined && userAccessToken !== undefined,
         isOnboarded,
         userId,
         userAccessToken,
