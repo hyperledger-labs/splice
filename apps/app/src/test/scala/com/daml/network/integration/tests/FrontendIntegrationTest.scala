@@ -89,7 +89,7 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
           new FirefoxDriver(options)
         } catch {
           case NonFatal(e) => {
-            logger.warn(s"FirefoxDriver failed to start; retrying. The error was: $e")
+            logger.info(s"FirefoxDriver failed to start; retrying. The error was: $e")
             fail()
           }
         }
