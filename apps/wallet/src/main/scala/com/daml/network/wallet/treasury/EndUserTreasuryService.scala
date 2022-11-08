@@ -1,5 +1,6 @@
 package com.daml.network.wallet.treasury
 
+import com.digitalasset.canton.topology.PartyId
 import akka.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
@@ -183,7 +184,7 @@ case class EndUserTreasuryService(
       )
       transferContext <- getValidatorStore().getPaymentTransferContext(retryProvider)
       activeIssuingRounds = transferContext.context.issuingMiningRounds.asScala.keys.toSet
-      inputs <- selectTransferInputs(activeIssuingRounds)
+      (inputs, readAs) <- selectTransferInputs(activeIssuingRounds)
       cmd =
         install.contractId.exerciseWalletAppInstall_ExecuteBatch(
           transferContext,
@@ -193,7 +194,7 @@ case class EndUserTreasuryService(
       (offset, outcomes) <- connection
         .submitWithResultAndOffset(
           Seq(walletStoreKey.walletServiceParty),
-          Seq(walletStoreKey.validatorParty, userStore.key.endUserParty),
+          walletStoreKey.validatorParty +: userStore.key.endUserParty +: readAs.toSeq,
           cmd,
         )
       _ = (outcomes.exerciseResult.asScala zip validOperations).map {
@@ -205,26 +206,31 @@ case class EndUserTreasuryService(
 
   /** Select transfer inputs to satisfy the coin operations.
     * Currently, this function selects all unlocked coins and all currently redeemable app- and validator rewards.
+    * Also returns the set of readAs parties required for the selected inputs.
     */
   private def selectTransferInputs(
       activeIssuingRounds: Set[roundCodegen.Round]
-  )(implicit tc: TraceContext): Future[Seq[coinRulesCodegen.TransferInput]] = for {
-    coins <- userStore
+  )(implicit tc: TraceContext): Future[(Seq[coinRulesCodegen.TransferInput], Set[PartyId])] = for {
+    coinInputs <- userStore
       .listContracts(coinCodegen.Coin.COMPANION)
       .map(cs => cs.value.map(c => new coinRulesCodegen.transferinput.InputCoin(c.contractId)))
     validatorRewardsRaw <- walletStore
       .listValidatorRewardsCollectableBy(userStore)
     validatorRewards = validatorRewardsRaw
       .filter(rw => activeIssuingRounds.contains(rw.payload.round))
+    validatorRewardUsers = validatorRewards
+      .map(c => PartyId.tryFromProtoPrimitive(c.payload.user))
+      .toSet
+    validatorRewardInputs = validatorRewards
       .map(rw => new coinRulesCodegen.transferinput.InputValidatorReward(rw.contractId))
-    appRewards <- userStore
+    appRewardInputs <- userStore
       .listContracts(coinCodegen.AppReward.COMPANION)
       .map(rws =>
         rws.value
           .filter(rw => activeIssuingRounds.contains(rw.payload.round))
           .map(rw => new coinRulesCodegen.transferinput.InputAppReward(rw.contractId))
       )
-  } yield coins ++ validatorRewards ++ appRewards
+  } yield (coinInputs ++ validatorRewardInputs ++ appRewardInputs, validatorRewardUsers)
 
   // We fetch this on demand here to avoid a dependency of the validator store being
   // setup before other user’s stores.
