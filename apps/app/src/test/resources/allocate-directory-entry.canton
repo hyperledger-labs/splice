@@ -1,6 +1,6 @@
 // Commands needed to initialize the CN apps, tap some coins and make some transfers. Can be run as a bootstrap script.
 import com.daml.network.codegen.CC.CoinRules.CoinRules
-import com.daml.network.codegen.CN.{Directory => codegen}
+import com.daml.network.codegen.java.cn.{directory => codegen}
 
 println("BEGIN - directory entry test")
 
@@ -18,7 +18,7 @@ println("Install Directory App")
 val aliceRequestCid = aliceDirectory.requestDirectoryInstall()
 
 println("Wait for Directory App installation")
-remoteParticipant.ledger_api.acs.await(aliceParty, codegen.DirectoryInstall)
+remoteParticipant.ledger_api.acs.awaitJava(codegen.DirectoryInstall.COMPANION)(aliceParty)
 
 println("Confirm there are no payment requests")
 utils.retry_until_true {
