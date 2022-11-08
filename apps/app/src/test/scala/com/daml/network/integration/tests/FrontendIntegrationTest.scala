@@ -11,7 +11,7 @@ import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import org.apache.commons.io.FileUtils
-import org.openqa.selenium.bidi.log.{Log, LogEntry}
+import org.openqa.selenium.bidi.log.{BaseLogEntry, Log, LogEntry}
 import org.openqa.selenium.firefox.{FirefoxDriver, FirefoxDriverLogLevel, FirefoxOptions}
 import org.openqa.selenium.{JavascriptExecutor, OutputType, TakesScreenshot, WebDriver}
 import org.scalatest.BeforeAndAfterEach
@@ -102,15 +102,11 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
         logEntry => {
           logEntry.getConsoleLogEntry.toScala.foreach { consoleLogEntry =>
             val msg = consoleLogEntry.getText
-            // For some reason LogLevel is not exposed so casting it to Any
-            // and calling toString on that and parsing that is apparently
-            // the only option.
-            (consoleLogEntry.getLevel: Any).toString match {
-              case "debug" => logger.debug(msg)
-              case "info" => logger.info(msg)
-              case "warning" => logger.warn(msg)
-              case "error" => logger.error(msg)
-              case level => logger.error(s"Log message with unknown level `$level`: $msg")
+            consoleLogEntry.getLevel match {
+              case BaseLogEntry.LogLevel.DEBUG => logger.debug(msg)
+              case BaseLogEntry.LogLevel.INFO => logger.info(msg)
+              case BaseLogEntry.LogLevel.WARNING => logger.warn(msg)
+              case BaseLogEntry.LogLevel.ERROR => logger.error(msg)
             }
           }
         },

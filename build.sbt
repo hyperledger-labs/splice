@@ -498,7 +498,7 @@ lazy val `apps-app` =
     )
     .settings(
       libraryDependencies += "org.scalatestplus" %% "selenium-4-4" % "3.2.14.0" % "test",
-      libraryDependencies += "org.seleniumhq.selenium" % "selenium-java" % "4.5.0" % "test",
+      libraryDependencies += "org.seleniumhq.selenium" % "selenium-java" % "4.6.0" % "test",
       libraryDependencies += "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4" % "test",
       BuildCommon.sharedAppSettings,
       BuildCommon.cantonWarts,
