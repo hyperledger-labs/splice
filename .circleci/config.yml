@@ -807,7 +807,8 @@ jobs:
     steps:
       - checkout
       - setup_vpn
-      - setup_sbt_test_job
+      # Needs to occur before setup_vpn_routes
+      - setup_nix
       - setup_vpn_routes:
           cluster: << parameters.cluster >>
       - run_bash_command_in_nix:
@@ -819,6 +820,10 @@ jobs:
             cncluster wait
       - checkout_cluster_version:
           cluster: <<parameters.cluster>>
+      # Needs to occur after `checkout_cluster_version` so we hit the right cache because sbt
+      # sucks at cache invalidation
+      - restore_sbt_cache
+      - restore_precompiled_classes
       - execute_sbt_command:
           cmd: "Test/compile"
       - execute_sbt_command:
