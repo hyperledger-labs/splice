@@ -10,9 +10,9 @@ import com.daml.network.auth.{
   RSAVerifier,
   SignatureVerifier,
 }
-import com.daml.network.codegen.CN.Wallet as walletCodegen
+import com.daml.network.codegen.java.cn.wallet as walletCodegen
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries, JavaCoinLedgerClient}
+import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.validator.admin.api.client.ValidatorConnection
 import com.daml.network.wallet.admin.grpc.GrpcWalletService
@@ -65,7 +65,6 @@ class WalletApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
-      javaLedgerClient: JavaCoinLedgerClient,
       walletServiceParty: PartyId,
   ): Future[WalletApp.State] = {
     for {
@@ -104,7 +103,7 @@ class WalletApp(
         WalletStore(walletStoreKey, storage, loggerFactory, coinAppParameters.processingTimeouts)
       val treasuries =
         new TreasuryServices(
-          javaLedgerClient.connection("TreasuryServices"),
+          ledgerClient.connection("TreasuryServices"),
           walletStore,
           retryProvider,
           loggerFactory,
@@ -123,7 +122,7 @@ class WalletApp(
               new GrpcWalletService(
                 walletStore,
                 treasuries,
-                javaLedgerClient,
+                ledgerClient,
                 loggerFactory,
                 retryProvider,
               ),
@@ -141,7 +140,7 @@ class WalletApp(
       val automation = new WalletAutomationService(
         walletStore,
         treasuries,
-        javaLedgerClient,
+        ledgerClient,
         retryProvider = retryProvider,
         loggerFactory,
         timeouts,
@@ -161,7 +160,7 @@ class WalletApp(
   override lazy val ports =
     Map("admin" -> config.adminApi.port)
 
-  override lazy val requiredTemplates = Set(walletCodegen.WalletAppInstall)
+  override lazy val requiredTemplates = Set(walletCodegen.WalletAppInstall.TEMPLATE_ID)
 }
 
 object WalletApp {

@@ -5,7 +5,7 @@ import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.codegen.java.cn.{directory => directoryCodegen}
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.environment.{CoinRetries, JavaCoinLedgerClient}
+import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{JavaContract => Contract}
@@ -21,7 +21,7 @@ import scala.jdk.CollectionConverters.*
 /** Manages background automation that runs on an directory app. */
 class DirectoryAutomationService(
     store: DirectoryStore,
-    ledgerClient: JavaCoinLedgerClient,
+    ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
     retryProvider: CoinRetries,
     protected val loggerFactory: NamedLoggerFactory,

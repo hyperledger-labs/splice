@@ -10,7 +10,7 @@ import com.daml.network.admin.LedgerAutomationService
 import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
 import com.daml.network.codegen.CC.CoinRules.CoinRules
 import com.daml.network.codegen.java.cc
-import com.daml.network.environment.JavaCoinLedgerConnection
+import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history.*
 import com.daml.network.scan.store.ScanCCHistoryStore
 import com.daml.network.util.{Contract, ExerciseNode, Trees}
@@ -27,7 +27,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class ReadCoinTransactionsService(
     svcParty: PartyId,
-    connection: JavaCoinLedgerConnection,
+    connection: CoinLedgerConnection,
     store: ScanCCHistoryStore,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, tc: TraceContext)

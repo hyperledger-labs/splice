@@ -5,13 +5,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{
-  CoinLedgerClient,
-  CoinNode,
-  CoinRetries,
-  JavaCoinLedgerClient,
-  JavaCoinLedgerConnection,
-}
+import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.svc.admin.grpc.GrpcSvcAppService
 import com.daml.network.svc.automation.{SvcAutomationService, SvcLogCollectionService}
@@ -62,16 +56,15 @@ class SvcApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
-      javaLedgerClient: JavaCoinLedgerClient,
       svcPartyId: PartyId,
   ): Future[SvcApp.State] =
     for {
       store <- Future.successful(SvcStore(svcPartyId, storage, loggerFactory))
-      connection = javaLedgerClient.connection("SvcAppBootstrap")
+      connection = ledgerClient.connection("SvcAppBootstrap")
       _ <- connection.uploadDarFile(SvcApp.coinPackage)
       automation = new SvcAutomationService(
         store,
-        javaLedgerClient,
+        ledgerClient,
         retryProvider,
         loggerFactory,
         timeouts,
@@ -80,7 +73,7 @@ class SvcApp(
       _ = logger.info(s"SVC App is initialized")
       logCollection = new SvcLogCollectionService(
         svcPartyId,
-        javaLedgerClient,
+        ledgerClient,
         loggerFactory,
         timeouts,
         store,
@@ -89,7 +82,7 @@ class SvcApp(
       adminServerRegistry
         .addService(
           SvcServiceGrpc.bindService(
-            new GrpcSvcAppService(javaLedgerClient, config.damlUser, store, loggerFactory),
+            new GrpcSvcAppService(ledgerClient, config.damlUser, store, loggerFactory),
             ec,
           )
         )
@@ -134,7 +127,7 @@ object SvcApp {
   }
   private def setupApp(
       svc: PartyId,
-      connection: JavaCoinLedgerConnection,
+      connection: CoinLedgerConnection,
       logger: TracedLogger,
       store: SvcStore,
       retryProvider: CoinRetries,

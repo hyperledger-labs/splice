@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.cc.{
   round as roundCodegen,
 }
 import com.daml.network.codegen.java.cn.wallet as walletCodegen
-import com.daml.network.environment.{CoinRetries, JavaCoinLedgerConnection => CoinLedgerConnection}
+import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.util.{JavaContract as Contract}
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
 import com.daml.network.wallet.treasury.EndUserTreasuryService.*

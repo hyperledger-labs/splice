@@ -2,9 +2,6 @@ package com.daml.network.environment
 
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.client.binding.TemplateCompanion
-import com.daml.ledger.client.configuration.CommandClientConfiguration
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.config.SharedCoinAppParameters
 import com.digitalasset.canton.config.RequireTypes.{InstanceName, Port}
@@ -54,11 +51,7 @@ abstract class CoinNode[State <: AutoCloseable](
     * It it save to omit a template if there is another template in the same
     * package in the set.
     */
-  protected def requiredTemplates: Set[TemplateCompanion[_]] = Set.empty
-
-  /** Java version of requiredTemplates. We take the union of both.
-    */
-  protected def requiredJavaTemplates: Set[Identifier] = Set.empty
+  protected def requiredTemplates: Set[Identifier] = Set.empty
 
   // TODO(i736): fork or generalize status definition.
   override def status: Future[NodeStatus.Status] = {
@@ -78,14 +71,11 @@ abstract class CoinNode[State <: AutoCloseable](
 
   def initialize(
       ledgerClient: CoinLedgerClient,
-      javaLedgerClient: JavaCoinLedgerClient,
       party: PartyId,
   ): Future[State]
 
   private def waitForPackages(connection: CoinLedgerConnection): Future[Unit] = {
-    val requiredPackageIds: Set[String] =
-      requiredTemplates.map(t => ApiTypes.TemplateId.unwrap(t.id).packageId) union
-        requiredJavaTemplates.map(t => t.getPackageId)
+    val requiredPackageIds: Set[String] = requiredTemplates.map(t => t.getPackageId)
 
     def query(): Future[Unit] = for {
       packages <- (connection.listPackages(): Future[Set[String]])
@@ -108,14 +98,7 @@ abstract class CoinNode[State <: AutoCloseable](
   val ledgerClientF: Future[CoinLedgerClient] =
     retryProvider.retryForAutomationWithUncleanShutdown(
       "Acquiring coin ledger client",
-      createLedgerClient(remoteParticipant),
-      this,
-    )
-
-  val javaLedgerClientF: Future[JavaCoinLedgerClient] =
-    retryProvider.retryForAutomationWithUncleanShutdown(
-      "Acquiring coin ledger client",
-      JavaCoinLedgerClient.create(
+      CoinLedgerClient.create(
         remoteParticipant.ledgerApi,
         name.unwrap,
         remoteParticipant.token,
@@ -130,28 +113,26 @@ abstract class CoinNode[State <: AutoCloseable](
     _ <- Future.successful(logger.info(s"Starting initialization"))
     _ = logger.info(s"Acquiring ledger connection")
     ledgerClient <- ledgerClientF
-    javaLedgerClient <- javaLedgerClientF
     connection = ledgerClient.connection(name.toString)
-    javaConnection = javaLedgerClient.connection(name.toString)
     _ = logger.info(s"Acquiring primary party of service user $serviceUser")
     serviceParty <-
       if (allocateServiceUser)
         retryProvider.retryForAutomationWithUncleanShutdown(
           "Allocating user and party",
-          javaConnection.getOrAllocateParty(serviceUser),
+          connection.getOrAllocateParty(serviceUser),
           this,
         )
       else
         retryProvider.retryForAutomationWithUncleanShutdown(
           "Querying primary party of user",
-          javaConnection.getPrimaryParty(serviceUser),
+          connection.getPrimaryParty(serviceUser),
           this,
         )
     _ = logger.info(s"Acquired primary party of user $serviceUser: $serviceParty")
-    _ = logger.info(s"Waiting for templates to be uploaded: ${requiredTemplates.map(_.id)}")
+    _ = logger.info(s"Waiting for templates to be uploaded: ${requiredTemplates}")
     _ <- waitForPackages(connection)
     _ = logger.info(s"Packages available, running app-specific init")
-    state <- initialize(ledgerClient, javaLedgerClient, serviceParty)
+    state <- initialize(ledgerClient, serviceParty)
     _ <- Future.successful(logger.info(s"Initialization complete"))
   } yield state
 
@@ -170,25 +151,10 @@ abstract class CoinNode[State <: AutoCloseable](
     Seq(
       AsyncCloseable(s"$name App state", initializeF.map(_.close()), closingTimeout),
       AsyncCloseable(
-        s"$name Java Ledger API connection",
-        javaLedgerClientF.map(_.close()),
+        s"$name Ledger API connection",
+        ledgerClientF.map(_.close()),
         closingTimeout,
       ),
-      AsyncCloseable(s"$name Ledger API connection", ledgerClientF.map(_.close()), closingTimeout),
     )
   }
-
-  protected def createLedgerClient(
-      remoteParticipant: RemoteParticipantConfig
-  ): Future[CoinLedgerClient] =
-    CoinLedgerClient.create(
-      remoteParticipant.ledgerApi,
-      // Note: Ledger API auth tokens require that the application id is equal to the user id
-      ApiTypes.ApplicationId(serviceUser),
-      CommandClientConfiguration.default,
-      remoteParticipant.token,
-      parameters.processingTimeouts,
-      loggerFactory,
-      tracerProvider,
-    )
 }

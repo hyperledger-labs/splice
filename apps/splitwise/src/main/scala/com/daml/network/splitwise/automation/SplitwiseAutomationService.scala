@@ -3,7 +3,7 @@ package com.daml.network.splitwise.automation
 import akka.stream.Materializer
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
-import com.daml.network.environment.{CoinRetries, JavaCoinLedgerClient => CoinLedgerClient}
+import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.store.SplitwiseStore
 import com.daml.network.store.AcsStore.QueryResult

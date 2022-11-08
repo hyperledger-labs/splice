@@ -4,7 +4,7 @@ import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries, JavaCoinLedgerClient}
+import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.admin.grpc.GrpcSplitwiseService
 import com.daml.network.splitwise.automation.SplitwiseAutomationService
@@ -55,7 +55,6 @@ class SplitwiseApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
-      javaLedgerClient: JavaCoinLedgerClient,
       party: PartyId,
   ): Future[SplitwiseApp.State] = for {
     store <- Future.successful(SplitwiseStore(party, storage, loggerFactory))
@@ -69,7 +68,7 @@ class SplitwiseApp(
       )
     automation = new SplitwiseAutomationService(
       store,
-      javaLedgerClient,
+      ledgerClient,
       readAs,
       scanConnection,
       retryProvider,
@@ -81,7 +80,7 @@ class SplitwiseApp(
       .addService(
         SplitwiseServiceGrpc.bindService(
           new GrpcSplitwiseService(
-            javaLedgerClient,
+            ledgerClient,
             scanConnection,
             party,
             loggerFactory,
@@ -99,7 +98,7 @@ class SplitwiseApp(
     )
   }
 
-  override lazy val requiredJavaTemplates = Set(splitwiseCodegen.SplitwiseInstall.TEMPLATE_ID)
+  override lazy val requiredTemplates = Set(splitwiseCodegen.SplitwiseInstall.TEMPLATE_ID)
 }
 
 object SplitwiseApp {

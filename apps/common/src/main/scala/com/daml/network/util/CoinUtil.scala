@@ -7,7 +7,7 @@ import com.daml.ledger.javaapi.data.Command
 import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.codegen.java.{cc, openbusiness}
-import com.daml.network.environment.{CoinRetries, JavaCoinLedgerConnection => CoinLedgerConnection}
+import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.TracedLogger

@@ -39,7 +39,7 @@ lazy val root = (project in file("."))
     `apps-common`,
     `apps-validator`,
     `apps-scan`,
-    `apps-aaa-splitwise`,
+    `apps-splitwise`,
     `apps-svc`,
     `apps-app`,
     `apps-wallet`,
@@ -129,7 +129,7 @@ lazy val `apps-common-frontend` = {
       `apps-common`,
       `apps-directory`,
       `apps-wallet`,
-      `apps-aaa-splitwise`,
+      `apps-splitwise`,
     )
     .settings(
       // daml typescript code generation settings:
@@ -137,7 +137,7 @@ lazy val `apps-common-frontend` = {
         (`apps-common` / Compile / damlBuild).value ++
           (`apps-wallet-daml` / Compile / damlBuild).value ++
           (`apps-directory` / Compile / damlBuild).value ++
-          (`apps-aaa-splitwise` / Compile / damlBuild).value,
+          (`apps-splitwise` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
       damlTsCodegen := BuildCommon.damlTsCodegenTask.value,
       // npm install settings:
@@ -234,7 +234,7 @@ lazy val `apps-common-frontend-protobuf` = {
       `apps-common` % "compile->protocGenerate",
       `apps-directory` % "compile->protocGenerate",
       `apps-wallet` % "compile->protocGenerate",
-      `apps-aaa-splitwise` % "compile->protocGenerate",
+      `apps-splitwise` % "compile->protocGenerate",
       `apps-validator` % "compile->protocGenerate",
       `apps-scan` % "compile->protocGenerate",
     )
@@ -311,10 +311,7 @@ lazy val `apps-directory` =
       BuildCommon.copyDarResources,
     )
 
-// IntelliJ just sorts dependencies in alphabetical order, and splitwise needs to come first in the classpath
-// as it is the only one containing the .class files from the daml->scala codegen.
-// TODO(#592): change the splitwise module to a better name once we have improved our daml->scala codegen usage
-lazy val `apps-aaa-splitwise` =
+lazy val `apps-splitwise` =
   project
     .in(file("apps/splitwise"))
     .enablePlugins(DamlPlugin)
@@ -431,7 +428,7 @@ lazy val bundleTask = {
       Seq(
         (`apps-common` / Compile / damlBuild).value,
         (`apps-wallet-daml` / Compile / damlBuild).value,
-        (`apps-aaa-splitwise` / Compile / damlBuild).value,
+        (`apps-splitwise` / Compile / damlBuild).value,
       )
     val args = examples ++ webUis.flatMap({ case (source, name) =>
       Seq("-r", source, s"web-uis/$name")
@@ -491,7 +488,7 @@ lazy val `apps-app` =
       // Wallet needs to come first so that the codegened files
       // come first in the classpath. Otherwise, you get NoSuchMethod errors at runtime.
       `apps-wallet-daml`,
-      `apps-aaa-splitwise`,
+      `apps-splitwise`,
       `apps-directory`,
       `apps-validator`,
       `apps-svc`,

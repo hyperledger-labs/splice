@@ -9,7 +9,7 @@ import com.daml.network.admin.LedgerAutomationService
 import com.daml.network.codegen.CC.CoinRules.{CoinRules, TransferResult}
 import com.daml.network.codegen.DA
 import com.daml.network.codegen.java.cc
-import com.daml.network.environment.JavaCoinLedgerConnection
+import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history.*
 import com.daml.network.svc.store.SvcEventsStore
 import com.daml.network.util.{ExerciseNode, Trees}
@@ -23,7 +23,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class RoundSummaryCollectionService(
     svcParty: PartyId,
-    connection: JavaCoinLedgerConnection,
+    connection: CoinLedgerConnection,
     store: SvcEventsStore,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, tc: TraceContext)

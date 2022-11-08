@@ -3,7 +3,7 @@ package com.daml.network.console
 import com.daml.ledger.api.v1.transaction.TransactionTree
 import com.daml.ledger.javaapi.data.codegen.Update
 import com.daml.ledger.javaapi.data.{TransactionTree => JavaTransactionTree}
-import com.daml.network.environment.JavaCoinLedgerConnection
+import com.daml.network.environment.CoinLedgerConnection
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.topology.PartyId
 
@@ -25,7 +25,7 @@ object LedgerApiUtils {
       readAs = readAs,
       optTimeout = None,
     )
-    JavaCoinLedgerConnection.decodeExerciseResult(
+    CoinLedgerConnection.decodeExerciseResult(
       update,
       JavaTransactionTree.fromProto(TransactionTree.toJavaProto(tree)),
     )

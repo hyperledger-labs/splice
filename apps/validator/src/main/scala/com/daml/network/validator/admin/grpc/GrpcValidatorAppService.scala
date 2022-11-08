@@ -1,7 +1,7 @@
 package com.daml.network.validator.admin.grpc
 
 import com.daml.ledger.javaapi.data.User
-import com.daml.network.environment.{CoinRetries, JavaCoinLedgerClient => CoinLedgerClient}
+import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.util.{CoinUtil, Proto}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil

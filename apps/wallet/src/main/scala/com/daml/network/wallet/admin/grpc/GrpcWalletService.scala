@@ -19,11 +19,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions => subsCodegen,
 }
 import com.daml.network.codegen.java.cn.wallet as walletCodegen
-import com.daml.network.environment.{
-  CoinRetries,
-  JavaCoinLedgerClient => CoinLedgerClient,
-  JavaCoinLedgerConnection => CoinLedgerConnection,
-}
+import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, JavaContract => Contract, JavaValue => Value, Proto}
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}

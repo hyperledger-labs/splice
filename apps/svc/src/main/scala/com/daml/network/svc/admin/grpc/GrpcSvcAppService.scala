@@ -7,10 +7,7 @@ import com.daml.ledger.javaapi.data.codegen.{
   ContractId,
 }
 import com.daml.network.codegen.java.cc
-import com.daml.network.environment.{
-  JavaCoinLedgerClient as CoinLedgerClient,
-  JavaCoinLedgerConnection as CoinLedgerConnection,
-}
+import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection}
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0.SvcServiceGrpc
 import com.daml.network.svc.{SvcApp, v0}

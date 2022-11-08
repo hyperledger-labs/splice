@@ -2,7 +2,7 @@ package com.daml.network.splitwise.admin.grpc
 
 import com.daml.ledger.javaapi.data.codegen.{Contract as CodegenContract}
 import com.daml.network.codegen.java.cn.{splitwise => splitwiseCodegen}
-import com.daml.network.environment.{JavaCoinLedgerClient as CoinLedgerClient}
+import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.v0
 import com.daml.network.splitwise.v0.SplitwiseServiceGrpc

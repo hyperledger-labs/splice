@@ -3,7 +3,7 @@ package com.daml.network.svc.automation
 import akka.stream.Materializer
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.codegen.java.cc
-import com.daml.network.environment.{CoinRetries, JavaCoinLedgerClient => CoinLedgerClient}
+import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.svc.store.SvcStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory

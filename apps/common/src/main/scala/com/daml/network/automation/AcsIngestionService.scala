@@ -1,7 +1,7 @@
 package com.daml.network.automation
 
 import com.daml.ledger.javaapi.data.LedgerOffset
-import com.daml.network.environment.{JavaCoinLedgerConnection as CoinLedgerConnection}
+import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.store.AcsStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, FlagCloseableAsync}

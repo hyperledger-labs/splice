@@ -1,11 +1,7 @@
 package com.daml.network.admin
 
 import com.daml.ledger.javaapi.data.{Identifier, LedgerOffset}
-import com.daml.network.environment.{
-  JavaCoinLedgerClient,
-  JavaCoinLedgerConnection,
-  JavaCoinLedgerSubscription,
-}
+import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinLedgerSubscription}
 import com.digitalasset.canton.lifecycle.{FlagCloseableAsync, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
@@ -32,10 +28,10 @@ abstract class LedgerAutomationServiceOrchestrator(
     with Spanning {
 
   case class ServiceWithSubscriptions[S <: LedgerAutomationService](
-      subscriptions: Map[PartyId, JavaCoinLedgerSubscription],
+      subscriptions: Map[PartyId, CoinLedgerSubscription],
       service: S,
       serviceName: String,
-      connection: JavaCoinLedgerConnection,
+      connection: CoinLedgerConnection,
   ) extends AutoCloseable {
     override def close(): Unit = Lifecycle.close(
       (subscriptions.values.toSeq :+ service): _*
@@ -44,9 +40,9 @@ abstract class LedgerAutomationServiceOrchestrator(
 
   protected def createService[S <: LedgerAutomationService](
       serviceName: String,
-      ledgerClient: JavaCoinLedgerClient,
+      ledgerClient: CoinLedgerClient,
       readAs: Seq[PartyId],
-  )(createService: JavaCoinLedgerConnection => S): ServiceWithSubscriptions[S] = {
+  )(createService: CoinLedgerConnection => S): ServiceWithSubscriptions[S] = {
     logger.debug(s"Creating service $serviceName with parties $readAs")
     val connection = ledgerClient.connection(serviceName)
     val offset = LedgerOffset.LedgerBegin.getInstance()
@@ -101,18 +97,18 @@ abstract class LedgerAutomationServiceOrchestrator(
   }
 
   private def startSubscriptionForParty(
-      connection: JavaCoinLedgerConnection,
+      connection: CoinLedgerConnection,
       serviceName: String,
       offset: LedgerOffset,
       party: PartyId,
       templateIds: Seq[Identifier],
       service: LedgerAutomationService,
-  ): JavaCoinLedgerSubscription = {
+  ): CoinLedgerSubscription = {
     logger.debug(s"Starting subscription for service $serviceName and party $party")
     val subscription = connection.subscribeAsync(
       subscriptionName = serviceName,
       offset,
-      filter = JavaCoinLedgerConnection.transactionFilterByParty(Map(party -> templateIds)),
+      filter = CoinLedgerConnection.transactionFilterByParty(Map(party -> templateIds)),
     )(tx =>
       withSpan(s"$serviceName.processTransaction") { implicit traceContext => _ =>
         service.processTransaction(tx)

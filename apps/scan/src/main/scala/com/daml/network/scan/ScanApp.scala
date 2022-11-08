@@ -2,9 +2,9 @@ package com.daml.network.scan
 
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.codegen.CC as coinCodegen
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries, JavaCoinLedgerClient}
+import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
 import com.daml.network.scan.admin.grpc.GrpcScanService
 import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.config.LocalScanAppConfig
@@ -51,14 +51,13 @@ class ScanApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
-      javaLedgerClient: JavaCoinLedgerClient,
       svcParty: PartyId,
   ): Future[ScanApp.State] =
     for {
       store <- Future.successful(ScanCCHistoryStore(storage, loggerFactory))
       automation = new ScanAutomationService(
         svcParty,
-        javaLedgerClient,
+        ledgerClient,
         loggerFactory,
         timeouts,
         store,
@@ -67,7 +66,7 @@ class ScanApp(
       adminServerRegistry
         .addService(
           ScanServiceGrpc.bindService(
-            new GrpcScanService(javaLedgerClient, config.svcUser, store, loggerFactory),
+            new GrpcScanService(ledgerClient, config.svcUser, store, loggerFactory),
             ec,
           )
         )
@@ -82,7 +81,7 @@ class ScanApp(
 
   override lazy val ports = Map("admin" -> config.adminApi.port)
 
-  override lazy val requiredTemplates = Set(coinCodegen.Coin.Coin)
+  override lazy val requiredTemplates = Set(coinCodegen.Coin.TEMPLATE_ID)
 }
 
 object ScanApp {

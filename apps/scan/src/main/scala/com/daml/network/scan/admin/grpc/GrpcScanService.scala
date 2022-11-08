@@ -2,7 +2,7 @@ package com.daml.network.scan.admin.grpc
 
 import com.daml.ledger.api.v1.transaction.TransactionTree
 import com.daml.network.codegen.java.cc.{coinrules as coinRulesCodegen, round as roundCodegen}
-import com.daml.network.environment.JavaCoinLedgerClient
+import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.store.ScanCCHistoryStore
 import com.daml.network.scan.v0
 import com.daml.network.scan.v0.{
@@ -22,7 +22,7 @@ import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcScanService(
-    ledgerClient: JavaCoinLedgerClient,
+    ledgerClient: CoinLedgerClient,
     svcUser: String,
     store: ScanCCHistoryStore,
     protected val loggerFactory: NamedLoggerFactory,

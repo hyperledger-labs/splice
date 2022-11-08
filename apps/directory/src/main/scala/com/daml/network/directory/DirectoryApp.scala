@@ -10,7 +10,7 @@ import com.daml.network.directory.automation.DirectoryAutomationService
 import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.directory.v0.DirectoryServiceGrpc
-import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries, JavaCoinLedgerClient}
+import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
@@ -55,7 +55,6 @@ class DirectoryApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
-      javaLedgerClient: JavaCoinLedgerClient,
       providerPartyId: PartyId,
   ): Future[DirectoryApp.State] =
     for {
@@ -79,7 +78,7 @@ class DirectoryApp(
       )
       automation = new DirectoryAutomationService(
         store,
-        javaLedgerClient,
+        ledgerClient,
         scanConnection,
         retryProvider,
         loggerFactory,
@@ -104,7 +103,7 @@ class DirectoryApp(
   override lazy val ports =
     Map("admin" -> config.adminApi.port)
 
-  override lazy val requiredJavaTemplates = Set(directoryCodegen.DirectoryInstall.TEMPLATE_ID)
+  override lazy val requiredTemplates = Set(directoryCodegen.DirectoryInstall.TEMPLATE_ID)
 }
 
 object DirectoryApp {

@@ -7,13 +7,7 @@ import com.daml.ledger.javaapi.data.User
 import com.daml.network.codegen.java.cc.coinrules.CoinRulesRequest
 import com.daml.network.codegen.java.cn.wallet as walletCodegen
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.environment.{
-  CoinLedgerClient,
-  CoinNode,
-  CoinRetries,
-  JavaCoinLedgerClient,
-  JavaCoinLedgerConnection => CoinLedgerConnection,
-}
+import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, UploadablePackage}
@@ -188,7 +182,6 @@ class ValidatorApp(
 
   override def initialize(
       ledgerClient: CoinLedgerClient,
-      javaLedgerClient: JavaCoinLedgerClient,
       validatorParty: PartyId,
   ): Future[ValidatorApp.State] =
     for {
@@ -200,7 +193,7 @@ class ValidatorApp(
             loggerFactory,
           )
         )
-      connection = javaLedgerClient.connection("ValidatorAppBootstrap")
+      connection = ledgerClient.connection("ValidatorAppBootstrap")
       svcParty <- retryProvider.retryForAutomationWithUncleanShutdown(
         "getSvcPartyId",
         scanConnection.getSvcPartyId(),
@@ -215,7 +208,7 @@ class ValidatorApp(
       store = ValidatorStore(key, storage, loggerFactory)
       automation = new ValidatorAutomationService(
         store,
-        javaLedgerClient,
+        ledgerClient,
         retryProvider,
         loggerFactory,
         timeouts,
@@ -238,7 +231,7 @@ class ValidatorApp(
         .addService(
           ValidatorAppServiceGrpc.bindService(
             new GrpcValidatorAppService(
-              javaLedgerClient,
+              ledgerClient,
               store,
               config.damlUser,
               config.walletServiceUser,

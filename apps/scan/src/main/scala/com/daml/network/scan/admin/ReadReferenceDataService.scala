@@ -5,7 +5,7 @@ import cats.syntax.traverse.*
 import com.daml.ledger.javaapi.data.{Identifier, Transaction}
 import com.daml.network.admin.LedgerAutomationService
 import com.daml.network.codegen.java.cc.round as roundCodegen
-import com.daml.network.environment.JavaCoinLedgerConnection
+import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.scan.store.ScanCCHistoryStore
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -17,7 +17,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class ReadReferenceDataService(
     svcParty: PartyId,
-    connection: JavaCoinLedgerConnection,
+    connection: CoinLedgerConnection,
     store: ScanCCHistoryStore,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
