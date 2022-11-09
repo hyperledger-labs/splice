@@ -6,7 +6,7 @@ function(hostname="host.docker.internal") {
 
 
   "admin": {
-    "access_log_path": "/tmp/admin_access.log",
+    "access_log_path": "../log/envoy-admin.log",
     "address": {
       "socket_address": {
         "address": "0.0.0.0",

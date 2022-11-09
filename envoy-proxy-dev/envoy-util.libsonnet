@@ -8,6 +8,15 @@
            "port_value": grpc_web_port
          }
        },
+       "access_log": [
+         {
+           "name": cluster_name + "_listener_log",
+           "typed_config": {
+             "@type": "type.googleapis.com/envoy.extensions.access_loggers.file.v3.FileAccessLog",
+             "path": "../log/envoy-listener-" + cluster_name + ".log"
+           }
+         }
+       ],
        "filter_chains": [
          {
            "filters": [
