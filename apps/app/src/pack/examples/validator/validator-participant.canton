@@ -6,7 +6,7 @@ validatorParticipant.start()
 println(s"Connecting self-hosted validator to the domain $domainUrl")
 validatorParticipant.domains.connect("canton-network", domainUrl)
 
-val validatorUserName = validatorApp.config.damlUser
+val validatorUserName = "validator_user"
 
 println(s"Creating validator user: " + validatorUserName)
 val validatorParty = validatorParticipant.parties.enable(validatorUserName)

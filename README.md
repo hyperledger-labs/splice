@@ -27,6 +27,8 @@
 1. [Building and Running the Wallet and Splitwise Apps](#building-and-running-the-wallet-and-splitwise-apps)
     1. [Building the Wallet and Splitwise Frontend](#building-the-wallet-and-splitwise-frontend)
     1. [Running the Wallet and Splitwise Frontend](#running-the-wallet-and-splitwise-frontend)
+1. [Auth0 Configuration](#auth0-configuration)
+    1. [Tenant & Application Layout](#tenant-Application-layout)
 
 For information on the runtime configuration of a Canton Network
 cluster, please see the [cluster specific documentation](/cluster/README.md).
@@ -517,3 +519,21 @@ To make sure your lock files match CI, run the following steps:
 1. `find . -name '.daml' | xargs rm -r`
 2. `sbt compile`
 3. Check-in the updated lock file which should now match CI.
+
+## Auth0 Configuration
+
+We use Auth0 as our IAM integration & OAuth provider for applications we (as DA/the Canton Network team) run in our Google Cloud cluster(s). This section elucidates how this is currently set up, but keep in mind this is not necessarily how we'd advise users of self-hosted validators to set up an Auth0 integration. For that, they should look at the relevant runbook docs section. 
+
+### Tenant & Application Layout
+
+Currently we maintain two tenants with some application clients in them:
+
+1. `canton-network-test`: A tenant dedicated for test environments
+    - `Local Wallet UI`: An application to support wallet UIs running on localhost
+    - `Wallet (Test Application)`: Currently unused, but intended to experiment with API scopes
+2. `canton-network-dev`: The tenant dedicated for our cluster deployments
+    - `Validator1 Auth`: A monolith application that supports all validator1-hosted UIs (Splitwise, Directory, and Wallet) running on all cluster deployments (scratch, staging, dev, and test)
+    - `SPA Experiment`: An application for the SPA experiment located in `/experiments/auth0-spa` in this repository
+    - `API Explorer Machine`: An application that was created by default when the tenant was made. Currently unused, but we may wish to use this in the future for getting tokens for automating application client management 
+
+If you don't have access to either tenant, give a shout in the #team-canton-network-internal Slack channel. Any admin of the tenant may invite anyone else (and everyone is an admin by default). 

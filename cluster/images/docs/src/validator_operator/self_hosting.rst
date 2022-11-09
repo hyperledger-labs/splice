@@ -222,20 +222,26 @@ things simple, we use the builtin HTTP Server in Python. Start another terminal 
 
 The Wallet Web UI is now accessible on port 3000, where you can login as alice and see the coins you tapped earlier in this tutorial.
 
-Configuring a Custom IAM Provider
----------------------------------
+Configuring Authentication
+--------------------------
 
-.. warning::
+All requests to the wallet must be authenticated by attaching an ``Authorization: Bearer $JWT`` header to API requests, with a JWT-encoded authentication token. The token should use the standard ``sub`` (subject) claim to identify the Daml user name for the end-user making the request.
 
-  The following section is incomplete
+The wallet backend can be configured to run in one of two auth modes:
 
-So far we've worked with users Alice and Bob, whose wallets were statically configured in the validator configuration file used to start the node.
+1. ``hs-256-unsafe`` - this configuration will accept tokens signed with HMAC256 signature with a specified symmetric key
+2. ``rs-256`` - this configuration will accept tokens signed with RSA256, verifying against the public key exposed by a trusted JWKS URL
 
-However, as a validator operator, you will likely want to integrate an IAM provider that allows end-users from external systems to authenticate and use your node.
+By default, the validator configures the wallet backend to run in the former mode where the HMAC secret key is ``test``. In turn, the Wallet UI self-signs tokens with ``test`` for the username specified on the login page and attaches them to wallet API requests.
 
-For the purposes of this tutorial, we will be using `Auth0 <https://auth0.com>`_, but any IAM provider that is OAuth 2.0 compliant and capable of vending JWT tokens should work.
+This set-up is not secure, and should only be used when hosting a validator locally on your machine.
 
-To add custom IAM, perform the following:
+For a secure production setup, you should securely configure an external OAuth 2.0 provider to authenticate end-users and redirect them back to the wallet application with RSA256-signed JWT tokens. Any OAuth 2.0 OIDC provider should work, but the following section will walk through an example configuration using `Auth0 <https://auth0.com>`_.
+
+Auth0 Example IAM Setup
++++++++++++++++++++++++
+
+To integrate Auth0 as your validator's IAM provider, perform the following:
 
 1. Create an Auth0 tenant for your validator
 2. Create an Application in the tenant using the "Single Page Application" template
@@ -249,16 +255,34 @@ To add custom IAM, perform the following:
    - "Allowed Origins (CORS)"
 
 6. Save your application settings
-7. In the extracted release bundle on your machine, navigate to ``web-uis/wallet``
-8. Edit ``config.js`` with your custom tenant domain and client ID
-9. Refresh your browser with the wallet UI, and click the "Log in with Auth0" button
+7. Modify the ``auth`` config for ``validator.conf``
+
+  ::
+
+    auth {
+      algorithm = "rs-256"
+      jwks-url = "<AUTH0_DOMAIN_URL>"
+    }
+
+8. Kill the running CN apps process started at the beginning, and restart them
+
+  ::
+
+    bin/coin --config examples/validator/validator.conf
+
+9. In the extracted release bundle on your machine, navigate to ``web-uis/wallet``
+10. Edit ``config.js`` and replace the self-signed auth config with a suitable OAuth one
+
+  ::
+
+    auth: {
+      domain: "<AUTH0_DOMAIN_URL>",
+      clientId: "<AUTH0_CLIENT_ID>",
+      redirectUri: window.location.origin,
+    },
+
+11. Refresh your browser with the wallet UI, and click the "Log in with Auth0" button
 
 This will kick off an interactive log-in flow where the user is redirected from the locally running wallet UI to auth0's login portal, then upon a successful authentication back to the local wallet UI.
 
 If this user is logging in for the first time, a page will appear in the wallet UI prompting the user to onboard themselves. This creates the Daml user & its primary party on the ledger, associated with the external account.
-
-.. todo::
-
-  - Describe how to set `aud` claims on tokens on a per-API basis
-  - Describe how to load the IAM provider's JWKS (by url in config?) so the validator can verify JWT signatures correctly
-  - Describe how the wallet backend can get a machine-to-machine token for authenticated ledger access
