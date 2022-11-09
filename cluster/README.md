@@ -382,6 +382,16 @@ for the moment, given that we rebuild the cluster nightly anyway.
 cncluster reset
 ```
 
+### Cluster Operational Dashboards
+
+Each of our two GCE projects has a corresponding dashboard that shows
+high level stats for the clusters hosted in that project. This
+includes information on memory, network, and CPU usage trends over
+time:
+
+* [`TestNet`/`DevNet`](https://console.cloud.google.com/monitoring/dashboards/builder/f4d4f86d-7c59-4b27-9a73-fb6e0418e45b?project=da-cn-devnet&dashboardBuilderState=%257B%2522editModeEnabled%2522:false%257D&timeDomain=1m)
+* [`Staging`/`ScratchNet`](https://console.cloud.google.com/monitoring/dashboards/builder/ef100871-4e71-409e-a3c2-706b2dbd5465?project=da-cn-scratchnet&dashboardBuilderState=%257B%2522editModeEnabled%2522:false%257D&timeDomain=1m)
+
 ### Checking Pod Node Assignments and Memory Usage
 
 Kubernetes runs Docker images in `Pods` that are scheduled to run on
