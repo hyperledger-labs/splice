@@ -15,5 +15,9 @@ LogReporter - Aborted test suite
 Trying to gather entropy from the underlying operating system to initialized the contract ID seeding, but the entropy pool seems empty.
 In CI environments environment consider using the "testing-weak" mode, that may produce insecure contract IDs but does not block on startup.
 
+# Sometimes pops up in the Canton logs. This can happen
+# if the command submission tracker at some point times out but that’s perfectly fine.
+c.d.l.c.s.c.CommandTrackerFlow$ - Completion Stream failed with an error.
+
 
 # Make sure to have a trailing newline
