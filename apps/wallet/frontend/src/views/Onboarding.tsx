@@ -1,4 +1,5 @@
 import { OnboardUserRequest } from 'common-protobuf/com/daml/network/validator/v0/validator_service_pb';
+import { useState } from 'react';
 
 import { Button, Grid, Typography } from '@mui/material';
 
@@ -8,12 +9,14 @@ import { useValidatorClient } from '../contexts/ValidatorServiceContext';
 const Onboarding: React.FC<{ onOnboard: () => Promise<void> }> = ({ onOnboard }) => {
   const validatorClient = useValidatorClient();
   const { userId } = useUserState();
+  const [onboardClicked, setOnboardClicked] = useState<boolean>(false);
 
   if (!userId) {
     return <div>Loading...</div>;
   }
 
   const onOnboardUser = async () => {
+    setOnboardClicked(true);
     await validatorClient.onboardUser(new OnboardUserRequest().setName(userId), undefined);
     await onOnboard();
   };
@@ -45,6 +48,7 @@ const Onboarding: React.FC<{ onOnboard: () => Promise<void> }> = ({ onOnboard })
           e.preventDefault();
           onOnboardUser();
         }}
+        disabled={onboardClicked}
         id="onboard-button"
       >
         Onboard yourself

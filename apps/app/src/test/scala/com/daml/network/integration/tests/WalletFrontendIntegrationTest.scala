@@ -86,9 +86,11 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
         // After a short delay, the UI should realize that the user is not onboarded,
         // and switch to the onbaording page.
         click on "onboard-button"
-        // TODO(i1139): The UI should handle the user repeatedly clicking on the onboarding button,
-        // which may or may not disable/disappar after the first click.
-        // find(id("onboard-button")).foreach(_.underlying.click())
+        // The onboard button should immediately be disabled, to prevent further clicking.
+        find(id("onboard-button")) match {
+          case Some(e) => e.isEnabled shouldBe false
+          case _ => // The page went back to the default view before we could check the button
+        }
 
         // After a short delay, the UI should realize that the user is now onboarded
         // and switch to the default view.
