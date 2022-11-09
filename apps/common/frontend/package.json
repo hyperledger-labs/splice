@@ -10,6 +10,7 @@
     "@daml/ledger-api": "file:../../../nix/vendored/daml-ledger-api-0.0.0.tgz",
     "@daml/types": "file:../../../nix/vendored/daml-types-0.0.0.tgz",
     "common-protobuf": "^0.1.0",
+    "decimal.js-light": "^2.5.1",
     "grpc-web": "^1.3.1",
     "web-vitals": "^2.1.4"
   },

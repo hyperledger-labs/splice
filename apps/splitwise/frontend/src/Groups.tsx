@@ -8,6 +8,7 @@ import {
   ListGroupsRequest,
   SplitwiseContext,
 } from 'common-protobuf/com/daml/network/splitwise/v0/splitwise_service_pb';
+import { Decimal } from 'decimal.js';
 import { useCallback, useState } from 'react';
 
 import {
@@ -91,12 +92,12 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider }) => {
   }, [splitwiseClient, setBalances, group, party]);
   useInterval(fetchBalances, 500);
   const onSettleMyDebts = async () => {
-    // TODO(#1199) use numeric instead of text fields in UI
     const quantities: ReceiverQuantity[] = Array.from(balances)
-      .filter(([_, v]) => v.at(0) === '-')
+      .filter(([_, v]) => new Decimal(v).isNegative())
       .map(([k, v]) => {
-        return { receiver: k, quantity: v.substring(1, v.length - 1) };
+        return { receiver: k, quantity: Decimal.abs(new Decimal(v)).toString() };
       });
+
     const cid = await ledgerApiClient.initiateTransfer(
       party,
       provider,

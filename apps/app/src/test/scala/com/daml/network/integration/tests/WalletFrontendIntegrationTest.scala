@@ -40,6 +40,39 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
       }
     }
 
+    "correctly handle different number formats and non-numeric entries for tap" in { implicit env =>
+      val aliceDamlUser = aliceRemoteWallet.config.damlUser
+      aliceValidator.onboardUser(aliceDamlUser)
+
+      withFrontEnd("alice") { implicit webDriver =>
+        go to "http://localhost:3000"
+        click on "user-id-field"
+        textField("user-id-field").value = aliceDamlUser
+        click on "login-button"
+        click on "tap-amount-field"
+
+        textField("tap-amount-field").value = "25"
+        click on "tap-button"
+        textField("tap-amount-field").value = "35."
+        click on "tap-button"
+        textField("tap-amount-field").value = "45.0"
+        click on "tap-button"
+        eventually() {
+          val quantities = findAll(className("coins-table-row")).toList.map(row =>
+            row.childElement(className("coins-table-quantity")).text
+          )
+          quantities should contain theSameElementsAs Seq(
+            "25.0000000000",
+            "35.0000000000",
+            "45.0000000000",
+          )
+        }
+
+        textField("tap-amount-field").value = "test"
+        find(id("tap-button")).getOrElse(fail()).isEnabled shouldBe false
+      }
+    }
+
     "allow a random user to onboard themselves, then tap and list coins" in { implicit env =>
       // Note: the test generates a unique user for each test
       val newRandomUser = aliceRemoteWallet.config.damlUser
@@ -65,25 +98,6 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
         eventually() {
           findAll(className("coins-table-row")) should have size 1
         }
-      }
-    }
-
-    "report errors" in { implicit env =>
-      val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      aliceValidator.onboardUser(aliceDamlUser)
-
-      withFrontEnd("alice") { implicit webDriver =>
-        go to "http://localhost:3000"
-        click on "user-id-field"
-        textField("user-id-field").value = aliceDamlUser
-        click on "login-button"
-        click on "tap-amount-field"
-        textField("tap-amount-field").value = "non-numeric"
-        loggerFactory.suppressErrors(click on "tap-button")
-        eventually()(
-          findAll(id("error")).toList should not be empty
-        )
-        consumeError("RpcError: Could not read Numeric string \"non-numeric\"")
       }
     }
 
