@@ -123,12 +123,8 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
     webDrivers.values.flatMap { implicit webDriver =>
       findAll(id("error")).toList.map(e => fail(s"Found unexpected error: ${e.text}"))
     }
-    super.testFinished(env)
-  }
-
-  override def afterEach() = {
-    super.afterEach()
     webDrivers.values.foreach(_.quit())
+    super.testFinished(env)
   }
 
   protected def consumeError(err: String)(implicit webDriver: WebDriver): Unit = {
