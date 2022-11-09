@@ -43,11 +43,6 @@ interface SubscriptionContext
   where
     viewtype SubscriptionContextView
 
-    choice SubscriptionContext_Archive : ()
-      controller (signatory this)
-      do pure ()
-
-
 -- | Main subscription object.
 --   Usually created in `SubscriptionInitialPayment_Collect`.
 --   Immutable per subscription and passed around from state to state for convenience.
@@ -65,9 +60,8 @@ template Subscription
     signatory sender, receiver, provider
 
     choice Subscription_Archive : ()
-      controller sender, receiver
-      do
-        exercise context SubscriptionContext_Archive
+      controller signatory this
+      do archive context
 
 assertSubscriptionMatches: ContractId Subscription -> Subscription -> Update ()
 assertSubscriptionMatches subscription subscriptionData = do
@@ -123,11 +117,11 @@ template SubscriptionRequest
 
     choice SubscriptionRequest_Withdraw : ()
       controller subscriptionData.receiver
-      do exercise subscriptionData.context SubscriptionContext_Archive
+      do archive subscriptionData.context
 
     choice SubscriptionRequest_Reject : ()
       controller subscriptionData.sender
-      do exercise subscriptionData.context SubscriptionContext_Archive
+      do archive subscriptionData.context
 
 
 -- | The initial payment on a subscription.
@@ -162,7 +156,7 @@ template SubscriptionInitialPayment
     choice SubscriptionInitialPayment_Reject : ContractId Coin
       controller subscriptionData.receiver
       do
-        exercise subscriptionData.context SubscriptionContext_Archive
+        archive subscriptionData.context
         exercise lockedCoin Coin_Unlock
 
     choice SubscriptionInititalPayment_Expire : ContractId Coin
@@ -171,7 +165,7 @@ template SubscriptionInitialPayment
       controller actor
       do
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
-        exercise subscriptionData.context SubscriptionContext_Archive
+        archive subscriptionData.context
         exercise lockedCoin Coin_OwnerExpireLock -- would fail if we can't expire yet
 
 

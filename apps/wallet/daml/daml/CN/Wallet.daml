@@ -178,10 +178,6 @@ interface DeliveryOffer
   where
     viewtype DeliveryOfferView
 
-    choice DeliveryOffer_Archive : ()
-      controller (signatory this)
-      do pure ()
-
 data ReceiverQuantity = ReceiverQuantity with receiver : Party, quantity : Decimal
   deriving (Show, Eq)
 
@@ -240,11 +236,11 @@ template AppPaymentRequest
 
     choice AppPaymentRequest_Withdraw : ()
       controller receivers
-      do exercise deliveryOffer DeliveryOffer_Archive
+      do archive deliveryOffer
 
     choice AppPaymentRequest_Reject : ()
       controller sender
-      do exercise deliveryOffer DeliveryOffer_Archive
+      do archive deliveryOffer
 
 data ReceiverCoin = ReceiverCoin with receiver : Party, lockedCoin : ContractId LockedCoin
   deriving (Eq, Show)
@@ -291,12 +287,12 @@ template AcceptedAppPayment
 
     choice AcceptedAppPayment_Reject : ContractId Coin
       controller map (\r -> r.receiver) receiverQuantities
-      do exercise deliveryOffer DeliveryOffer_Archive
+      do archive deliveryOffer
          exercise lockedCoin Coin_Unlock
 
     choice AcceptedAppPayment_Expire : ContractId Coin
       controller sender
-      do exercise deliveryOffer DeliveryOffer_Archive
+      do archive deliveryOffer
          exercise lockedCoin Coin_OwnerExpireLock
 
 -- Evaluates an update, catches any exceptions it throws and converts them into an Either
