@@ -23,7 +23,7 @@ class InMemoryEndUserWalletStore(
     new InMemoryAcsStore(
       loggerFactory,
       EndUserWalletStore.contractFilter(key),
-      logAllStateUpdates = true,
+      logAllStateUpdates = false,
     )
 
   // TODO(#790): review tracing strategy for setup steps

@@ -20,7 +20,7 @@ class InMemoryWalletStore(
     new InMemoryAcsStore(
       loggerFactory,
       WalletStore.contractFilter(key),
-      logAllStateUpdates = true,
+      logAllStateUpdates = false,
     )
 
   // TODO(#790): review tracing strategy for setup steps

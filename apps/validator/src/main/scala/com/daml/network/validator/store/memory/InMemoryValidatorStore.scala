@@ -16,7 +16,7 @@ class InMemoryValidatorStore(
     new InMemoryAcsStore(
       loggerFactory,
       ValidatorStore.contractFilter(key),
-      logAllStateUpdates = true,
+      logAllStateUpdates = false,
     )
 
   // TODO(#790): review tracing strategy for setup steps
