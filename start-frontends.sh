@@ -7,6 +7,14 @@ function start_envoy() {
   cd -
 }
 
+function check_envoy_running() {
+  ENVOY_PID=`cat ${REPO_ROOT}/envoy-proxy-dev/envoy.pid`
+  if ! [[ -e /proc/$ENVOY_PID ]]; then
+    echo "envoy failed to start" >&2
+    return 1
+  fi
+}
+
 function tmux_cmd() {
   title=$1
   wd=$2
@@ -73,6 +81,8 @@ tmux_window=0
 
 LOG_DIR="${REPO_ROOT}/log"
 start_envoy
+# envoy kills itself if we spend too much time in `start-envoy.sh`, hence we check this here...
+sleep 0.5s && check_envoy_running
 
 (cd $REPO_ROOT && sbt apps-frontends/compile)
 

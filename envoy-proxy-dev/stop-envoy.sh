@@ -5,13 +5,11 @@ if [ ! -f "envoy.pid" ]; then
   echo "The file envoy.pid does not exist, not stopping envoy"
 else
   PID=$(cat envoy.pid)
-  kill "$PID"
+  echo "Stopping envoy..."
+  kill "$PID" || true
   rm envoy.pid
 fi
 
 # remove, even if the envoy process was stopped another way already
-echo "Trying to remove envoy-out.json"
-rm -f envoy-out.json
-
-
-
+echo "Removing envoy-config.json if it exists"
+rm -f envoy-config.json
