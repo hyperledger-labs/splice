@@ -28,20 +28,19 @@ export function isHs2456UnsafeAuthConfig(obj: AuthConfig): obj is HS256UnsafeAut
 const getAuthConfig = (): AuthConfig => {
   const algorithm = process.env.REACT_APP_AUTH_ALGORITHM || externalConfig.auth.algorithm;
 
-  if (algorithm !== Algorithm.RS256 && algorithm !== Algorithm.HS256UNSAFE) {
-    throw new Error('Invalid or missing algorithm type specified: ' + algorithm);
-  }
-
   if (algorithm === Algorithm.RS256) {
     const domain = process.env.REACT_APP_AUTH_DOMAIN || externalConfig.auth.domain;
     const clientId = process.env.REACT_APP_AUTH_CLIENT_ID || externalConfig.auth.clientId;
     const redirectUri = externalConfig.auth.redirectUri || window.location.origin;
 
     return { algorithm, domain, clientId, redirectUri };
-  }
+  } else if (algorithm === Algorithm.HS256UNSAFE) {
+    const secret = process.env.REACT_APP_AUTH_SECRET || externalConfig.auth.secret;
 
-  const secret = process.env.REACT_APP_AUTH_SECRET || externalConfig.auth.secret;
-  return { algorithm, secret };
+    return { algorithm, secret };
+  } else {
+    throw new Error('Invalid or missing algorithm type specified: ' + algorithm);
+  }
 };
 
 export type Config = {
