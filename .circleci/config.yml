@@ -722,6 +722,7 @@ jobs:
       # Surprisingly, running "Test/compile" before speeds up the "scalafixCheck", is a lot faster than just running "scalafixCheck"
       - execute_sbt_command:
           cmd: "Test/compile"
+          cmd_retry_count: 5
       - execute_sbt_command:
           cmd: "lint"
       - run_todo_script
@@ -786,6 +787,7 @@ jobs:
       - setup_sbt_test_job
       - execute_sbt_command:
           cmd: "bundle"
+          cmd_retry_count: 5
       - run:
           name: Copy bundle
           command: |
