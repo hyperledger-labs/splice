@@ -9,7 +9,7 @@ function start_envoy() {
 
 function check_envoy_running() {
   ENVOY_PID=`cat ${REPO_ROOT}/envoy-proxy-dev/envoy.pid`
-  if ! [[ -e /proc/$ENVOY_PID ]]; then
+  if [[ -z "$(ps -p $ENVOY_PID -o pid=)" ]]; then
     echo "envoy failed to start" >&2
     return 1
   fi

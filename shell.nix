@@ -52,6 +52,7 @@ in pkgs.mkShell {
     protobuf3_19
     protoc-gen-grpc-web
     postgresql_11
+    ps
     python3
     python3Packages.sphinx_rtd_theme
     python3Packages.datadog
