@@ -1,5 +1,6 @@
 import { Contract, sameContracts, useInterval } from 'common-frontend';
 import { DirectoryEntry as DirectoryEntryComponent } from 'common-frontend';
+import TransferButton from 'common-frontend/lib/components/TransferButton';
 import {
   GroupKey,
   ListAcceptedGroupInvitesRequest,
@@ -91,25 +92,17 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider }) => {
     setBalances(prev => (balanceEqual(prev, balances) ? prev : balances));
   }, [splitwiseClient, setBalances, group, party]);
   useInterval(fetchBalances, 500);
-  const onSettleMyDebts = async () => {
+
+  const initiateSettleDebts = async () => {
     const quantities: ReceiverQuantity[] = Array.from(balances)
       .filter(([_, v]) => new Decimal(v).isNegative())
       .map(([k, v]) => {
         return { receiver: k, quantity: Decimal.abs(new Decimal(v)).toString() };
       });
 
-    const cid = await ledgerApiClient.initiateTransfer(
-      party,
-      provider,
-      group.contractId,
-      quantities
-    );
-    const here = window.location.origin.toString();
-    const walletPath = config.wallet.uiUrl;
-    window.location.assign(
-      `${walletPath}/app-payment-requests/${cid}/?redirect=${encodeURIComponent(here)}`
-    );
+    return await ledgerApiClient.initiateTransfer(party, provider, group.contractId, quantities);
   };
+
   return (
     <Stack>
       <Stack sx={{ px: 2, py: 1 }}>
@@ -134,9 +127,12 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider }) => {
         </Table>
       </Stack>
       <Stack justifyContent="stretch">
-        <Button className="settle-my-debts-link" onClick={onSettleMyDebts}>
-          Settle My Debts
-        </Button>
+        <TransferButton
+          className="settle-my-debts-link"
+          text="Settle My Debts"
+          createPaymentRequest={initiateSettleDebts}
+          walletPath={config.wallet.uiUrl}
+        ></TransferButton>
       </Stack>
     </Stack>
   );
@@ -209,8 +205,8 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider 
   };
   const [transferQuantity, setTransferQuantity] = useState<string>('');
   const [transferReceiverEntry, setTransferReceiverEntry] = useState<DirectoryEntry | null>(null);
-  const onInitiateTransfer = async () => {
-    await ledgerApiClient.initiateTransfer(party, provider, group.contractId, [
+  const initiateTransfer = async () => {
+    return await ledgerApiClient.initiateTransfer(party, provider, group.contractId, [
       { receiver: transferReceiverEntry!.user, quantity: transferQuantity },
     ]);
   };
@@ -256,9 +252,12 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider 
           renderInput={params => <TextField {...params} label="Receiver" />}
           className="transfer-receiver-field"
         />
-        <Button className="transfer-link" onClick={onInitiateTransfer}>
-          Transfer
-        </Button>
+        <TransferButton
+          className="transfer-link"
+          text="Transfer"
+          createPaymentRequest={initiateTransfer}
+          walletPath={config.wallet.uiUrl}
+        ></TransferButton>
       </Stack>
     </Stack>
   );

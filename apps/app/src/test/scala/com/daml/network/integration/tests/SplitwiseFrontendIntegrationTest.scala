@@ -233,6 +233,7 @@ class SplitwiseFrontendIntegrationTest
       initialiseDirectoryApp("bob.cns", bobUserParty, bobDirectory, bobRemoteWallet)
       val aliceCns = expectedCns(aliceUserParty, "alice.cns")
       val bobCns = expectedCns(bobUserParty, "bob.cns")
+      bobRemoteWallet.tap(510)
 
       withFrontEnd("aliceSplitwise") { implicit webDriver =>
         go to "http://localhost:3002"
@@ -281,17 +282,19 @@ class SplitwiseFrontendIntegrationTest
           input.underlying.sendKeys(Keys.ENTER)
         }
         click on className("transfer-link")
-      }
 
-      eventually() {
-        bobRemoteWallet.listAppPaymentRequests().length shouldBe 1
-      }
-      inside(bobRemoteWallet.listAppPaymentRequests()) { case Seq(request) =>
-        bobRemoteWallet.tap(510)
-        bobRemoteWallet.acceptAppPaymentRequest(request.contractId)
-      }
+        // Bob is redirected to wallet ..
+        click on "user-id-field"
+        textField("user-id-field").value = bobDamlUser
+        click on "login-button"
 
-      withFrontEnd("bobSplitwise") { implicit webDriver =>
+        click on className("accept-button")
+
+        // And then back to splitwise
+        click on "user-id-field"
+        textField("user-id-field").value = bobDamlUser
+        click on "login-button"
+
         eventually(scaled(5 seconds)) {
           inside(findAll(className("balances-table-row")).toSeq) { case Seq(row) =>
             row.childElement(className("balances-table-receiver")).text should matchText(aliceCns)
