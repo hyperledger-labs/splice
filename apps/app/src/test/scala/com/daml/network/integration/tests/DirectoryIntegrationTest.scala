@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
 import com.daml.ledger.client.binding.Primitive
-import com.daml.network.codegen.java.cn.{directory => codegen}
+import com.daml.network.codegen.java.cn.{directory as codegen, wallet as walletCodegen}
 import com.daml.network.console.{
   LocalValidatorAppReference,
   RemoteDirectoryAppReference,
@@ -131,26 +131,25 @@ class DirectoryIntegrationTest extends CoinIntegrationTest {
 
         def requestAndPayForEntry(refs: DynamicUserRefs, entryName: String) = {
           // Grab the current offset
-          val offsetBefore = refs.validator.remoteParticipant.ledger_api.transactions.end()
 
           // Request entry and get some money to pay for it
           refs.directory.requestDirectoryEntry(entryName)
           refs.wallet.tap(5.0)
 
           // Accept first payment request that becomes visible
-          eventually()(inside(refs.wallet.listAppPaymentRequests()) { case reqId +: _ =>
-            refs.wallet.acceptAppPaymentRequest(reqId.contractId)
+          val accepted = eventually()(inside(refs.wallet.listAppPaymentRequests()) {
+            case reqId +: _ =>
+              refs.wallet.acceptAppPaymentRequest(reqId.contractId)
           })
 
-          // Wait until create entry-request, request payment, accept payment, and collect payment  have been processed
-          // NOTE: we wait for transaction to ensure the accepted payment has been processed *independent* of the outcome (accept or reject).
-          val txs = refs.validator.remoteParticipant.ledger_api.transactions
-            .flat(Set(refs.userParty), completeAfter = 4, beginOffset = offsetBefore)
-          logger.info(
-            Seq(s"Received transactions for ${refs.userParty}:")
-              .appendedAll(txs.map(_.toString))
-              .mkString(System.lineSeparator())
-          )
+          // Wait for the AcceptedAppPayment to be archived
+          eventually() {
+            refs.validator.remoteParticipant.ledger_api.acs
+              .filterJava(walletCodegen.AcceptedAppPayment.COMPANION)(
+                refs.userParty,
+                (request: walletCodegen.AcceptedAppPayment.Contract) => request.id == accepted,
+              ) shouldBe empty
+          }
         }
 
         // Setup alice
