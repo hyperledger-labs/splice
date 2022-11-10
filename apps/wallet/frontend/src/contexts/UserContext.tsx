@@ -2,7 +2,6 @@ import { RedirectLoginOptions, useAuth0 } from '@auth0/auth0-react';
 import { SignJWT } from 'jose';
 import React, { useContext, useEffect, useState } from 'react';
 
-import { config, isHs2456UnsafeAuthConfig } from '../utils';
 import { UserStatusResponse } from './WalletServiceContext';
 
 interface UserState {
@@ -99,22 +98,18 @@ export const useUserState: () => UserState = () => {
 // Generate a local token for test purposes. Only acceptable by the
 // wallet service if it is running in unsafe mode
 const generateToken = async (userId: string): Promise<string> => {
-  if (isHs2456UnsafeAuthConfig(config.auth)) {
-    const secret = new TextEncoder().encode(config.auth.secret);
-    const key = await crypto.subtle.importKey(
-      'raw',
-      secret,
-      { name: 'HMAC', hash: { name: 'SHA-256' } },
-      false,
-      ['sign']
-    );
+  const secret = new TextEncoder().encode('test');
+  const key = await crypto.subtle.importKey(
+    'raw',
+    secret,
+    { name: 'HMAC', hash: { name: 'SHA-256' } },
+    false,
+    ['sign']
+  );
 
-    return new SignJWT({})
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuedAt()
-      .setSubject(userId)
-      .sign(key);
-  } else {
-    throw new Error('Invalid auth configuration, check /config.js');
-  }
+  return new SignJWT({})
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setSubject(userId)
+    .sign(key);
 };

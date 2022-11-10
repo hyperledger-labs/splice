@@ -5,33 +5,14 @@ import { Auth0ProviderOptions } from '@auth0/auth0-react';
 // before the application code, and writes the config to the global "window" variable.
 const externalConfig = window.canton_network_config;
 
-type RS256Auth = Auth0ProviderOptions;
-type HS256UnsafeAuth = {
-  secret: string;
-};
-
-export function isHs2456UnsafeAuthConfig(obj: unknown): obj is HS256UnsafeAuth {
-  return typeof (obj as HS256UnsafeAuth).secret === 'string';
-}
-
-type AuthConfig = RS256Auth | HS256UnsafeAuth;
-
-const getAuthConfig = (): AuthConfig => {
-  if (process.env.REACT_APP_OAUTH_DOMAIN || externalConfig.auth.domain) {
-    return {
-      domain: process.env.REACT_APP_OAUTH_DOMAIN || externalConfig.auth.domain,
-      clientId: process.env.REACT_APP_OAUTH_CLIENT_ID || externalConfig.auth.clientId,
-      redirectUri: window.location.origin || externalConfig.auth.redirectUri,
-    };
-  }
-
-  return {
-    secret: process.env.REACT_APP_HMAC256_SECRET || externalConfig.auth.secret,
-  };
+const authConfig: Auth0ProviderOptions = {
+  domain: process.env.REACT_APP_OAUTH_DOMAIN || externalConfig.auth.domain,
+  clientId: process.env.REACT_APP_OAUTH_CLIENT_ID || externalConfig.auth.clientId,
+  redirectUri: window.location.origin || externalConfig.auth.redirectUri,
 };
 
 export type Config = {
-  auth: AuthConfig;
+  auth: Auth0ProviderOptions;
   wallet: {
     grpcUrl: string;
   };
@@ -44,7 +25,7 @@ export type Config = {
 };
 
 export const config: Config = {
-  auth: getAuthConfig(),
+  auth: authConfig,
   wallet: {
     grpcUrl: process.env.REACT_APP_GRPC_URL || externalConfig.wallet.grpcUrl,
   },
