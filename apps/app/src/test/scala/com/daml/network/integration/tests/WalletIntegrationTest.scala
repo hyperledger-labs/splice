@@ -243,9 +243,11 @@ class WalletIntegrationTest
         commands = Seq(reqC.create.command),
       )
 
-      val cid = inside(aliceRemoteWallet.listAppPaymentRequests()) { case Seq(r) =>
-        r.payload shouldBe reqC
-        r.contractId
+      val cid = eventually() {
+        inside(aliceRemoteWallet.listAppPaymentRequests()) { case Seq(r) =>
+          r.payload shouldBe reqC
+          r.contractId
+        }
       }
 
       aliceRemoteWallet.tap(50)
