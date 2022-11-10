@@ -354,6 +354,15 @@ commands:
           cmd_retry_count: << parameters.cmd_retry_count >>
           cmd_retry_wait: << parameters.cmd_retry_wait >>
 
+  collect_failing_test_data_and_send_to_datadog:
+    steps:
+      - run_bash_command_in_nix:
+          when: always
+          additional_nix_args: "--keep DATADOG_API_KEY --keep CIRCLE_BRANCH --keep CIRCLE_BUILD_URL --keep CIRCLE_NODE_INDEX --keep CIRCLE_JOB"
+          cmd_name: Send name of each failing test to datadog
+          cmd: |
+            python3 .circleci/canton-scripts/collect_failing_tests_and_send_to_datadog.py
+
   run_bash_command_in_nix:
     parameters:
       cmd:
@@ -764,6 +773,7 @@ jobs:
           post_sbt_cmd: ./stop-canton.sh external && ./stop-frontends.sh
           timeout: "10m"
       - cleanup_sbt_test_job
+      - collect_failing_test_data_and_send_to_datadog
 
   bundle:
     docker:
@@ -975,6 +985,9 @@ workflows:
     # Scala
     - scala_test:
         <<: *notify-fail
+        context:
+            - datadog
+            - slack-context
     - bundle:
         <<: *notify-fail
     # Ops

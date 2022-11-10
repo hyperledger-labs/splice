@@ -54,6 +54,7 @@ in pkgs.mkShell {
     postgresql_11
     python3
     python3Packages.sphinx_rtd_theme
+    python3Packages.datadog
     sbt
     scala
     selenium-server-standalone
