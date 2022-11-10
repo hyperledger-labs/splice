@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.CC
 import com.daml.network.codegen.CC.Round.*
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -67,28 +66,5 @@ class SvcConnectivityIntegrationTest
         _.contractId
       ) shouldBe Seq(issuingRoundResponse.issuingRound)
     svc.remoteParticipant.ledger_api.acs.filter(svcParty, ClosingMiningRound) shouldBe empty
-  }
-
-  "survive a network disconnect in acs ingestion" in { implicit env =>
-    svc.startSync()
-    scan.startSync()
-
-    loggerFactory.suppressWarnings {
-      toxiproxy.disable("svc-ledger-api")
-      Threading.sleep(1000)
-      // Sleeping for a bit to let the threads that complain about the connection loss do so while we're still suppressing warnings
-    }
-
-    aliceValidator.startSync()
-
-    toxiproxy.enable("svc-ledger-api")
-
-    // check that alice's validator can see the coinrules
-    val aliceValidatorParty = aliceValidator.getValidatorPartyId()
-    loggerFactory.assertThrowsAndLogs[IllegalStateException](
-      // Until we fix the issue - this await command eventually times out with an IllegalStateException
-      aliceValidator.remoteParticipant.ledger_api.acs
-        .await(aliceValidatorParty, CC.CoinRules.CoinRules)
-    )
   }
 }

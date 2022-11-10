@@ -25,6 +25,7 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -140,6 +141,31 @@ class ValidatorApp(
     }
   }
 
+  private def waitForCoinRules(
+      connection: CoinLedgerConnection,
+      store: ValidatorStore,
+      svcParty: PartyId,
+      validatorParty: PartyId,
+  ): Future[Unit] = {
+    logger.info("Waiting for CoinRules contract to be created")
+    retryProvider.retryForAutomationWithUncleanShutdown(
+      "Wait for CoinRules",
+      for {
+        coinRulesResult <- store.lookupCoinRules()
+        _ <- coinRulesResult match {
+          case QueryResult(_, Some(_)) =>
+            logger.info("CoinRules found, done waiting")
+            Future.successful(())
+          case _ =>
+            throw new StatusRuntimeException(
+              Status.NOT_FOUND.withDescription(s"CoinRules contract not found yet")
+            )
+        }
+      } yield (),
+      this,
+    )
+  }
+
   private def createCoinRulesRequest(
       connection: CoinLedgerConnection,
       store: ValidatorStore,
@@ -226,6 +252,7 @@ class ValidatorApp(
         walletServiceUser = walletServiceUser,
       )
       _ <- createCoinRulesRequest(connection, store, svcParty, validatorParty)
+      _ <- waitForCoinRules(connection, store, svcParty, validatorParty)
     } yield {
       adminServerRegistry
         .addService(
