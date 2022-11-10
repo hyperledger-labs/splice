@@ -2,7 +2,13 @@ package com.daml.network.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.ledger.javaapi.data.codegen.{Contract, ContractCompanion, ContractId}
+import com.daml.ledger.javaapi.data.codegen.{
+  Contract,
+  ContractCompanion,
+  ContractId,
+  DamlRecord,
+  InterfaceCompanion,
+}
 import com.daml.ledger.javaapi.data.{
   CreatedEvent,
   Filter,
@@ -43,6 +49,11 @@ trait AcsStore extends AutoCloseable {
       templateCompanion: ContractCompanion[TC, TCid, T]
   )(id: ContractId[T]): Future[QueryResult[Option[JavaContract[TCid, T]]]]
 
+  /** Lookup a contract by id. */
+  def lookupContractById[I, Id <: ContractId[I], View <: DamlRecord[View]](
+      interfaceCompanion: InterfaceCompanion[I, Id, View]
+  )(id: Id): Future[QueryResult[Option[JavaContract[Id, View]]]]
+
   /** Find a contract that satisfies a predicate.
     *
     * Caution: this function traverses all contracts!
@@ -52,12 +63,42 @@ trait AcsStore extends AutoCloseable {
       templateCompanion: ContractCompanion[TC, TCid, T]
   )(p: JavaContract[TCid, T] => Boolean): Future[QueryResult[Option[JavaContract[TCid, T]]]]
 
+  /** Find a contract that satisfies a predicate.
+    *
+    * Caution: this function traverses all contracts!
+    * Not intended for production use, but very useful for prototyping.
+    */
+  def findContract[I, Id <: ContractId[I], View <: DamlRecord[View]](
+      interfaceCompanion: InterfaceCompanion[I, Id, View]
+  )(p: JavaContract[Id, View] => Boolean): Future[QueryResult[Option[JavaContract[Id, View]]]]
+
   /** List all active contracts of the given template. */
   // TODO(#790): add a limit parameter
   def listContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
       templateCompanion: ContractCompanion[TC, TCid, T],
-      filter: JavaContract[TCid, T] => Boolean = (_: JavaContract[TCid, T]) => true,
+      filter: JavaContract[TCid, T] => Boolean,
   ): Future[QueryResult[Seq[JavaContract[TCid, T]]]]
+
+  /** List all active contracts of the given template. */
+  // TODO(#790): add a limit parameter
+  def listContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      templateCompanion: ContractCompanion[TC, TCid, T]
+  ): Future[QueryResult[Seq[JavaContract[TCid, T]]]] =
+    listContracts(templateCompanion, _ => true)
+
+  /** List all active contracts of the given template. */
+  // TODO(#790): add a limit parameter
+  def listContracts[I, Id <: ContractId[I], View <: DamlRecord[View]](
+      interfaceCompanion: InterfaceCompanion[I, Id, View],
+      filter: JavaContract[Id, View] => Boolean,
+  ): Future[QueryResult[Seq[JavaContract[Id, View]]]]
+
+  /** List all active contracts of the given template. */
+  // TODO(#790): add a limit parameter
+  def listContracts[I, Id <: ContractId[I], View <: DamlRecord[View]](
+      interfaceCompanion: InterfaceCompanion[I, Id, View]
+  ): Future[QueryResult[Seq[JavaContract[Id, View]]]] =
+    listContracts(interfaceCompanion, (_: JavaContract[Id, View]) => true)
 
   /** A stream of contracts of the given template.
     *
@@ -73,6 +114,21 @@ trait AcsStore extends AutoCloseable {
   def streamContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
       templateCompanion: ContractCompanion[TC, TCid, T]
   ): Source[JavaContract[TCid, T], NotUsed]
+
+  /** A stream of contracts of the given interface.
+    *
+    * The stream starts with all contracts from an ACS snapshot and then emits contracts created in transactions
+    * with the special rule that contracts whose archival is already known are not emitted.
+    *
+    * '''emits''' whenever the store knows or learns about a create event of a contract matching the interface that is
+    * (a) more recent than the previously emitted one (or it is the oldest one) and
+    * (b) whose archive event is not known to the store
+    *
+    * '''completes''' never, as it tails newly ingested transactions
+    */
+  def streamContracts[I, Id <: ContractId[I], View <: DamlRecord[View]](
+      interfaceCompanion: InterfaceCompanion[I, Id, View]
+  ): Source[JavaContract[Id, View], NotUsed]
 
   /** Signal when the store has finished ingesting ledger data from the given offset or a larger one.
     */
@@ -132,31 +188,45 @@ object AcsStore {
 
     /** Whether the scope might contain an event of the given template. */
     def mightContain[TC, TCid, T](templateCompanion: ContractCompanion[TC, TCid, T]): Boolean
+
+    /** Whether the scope might contain an event of the given interface. */
+    def mightContain[I, Id, View](interfaceCompanion: InterfaceCompanion[I, Id, View]): Boolean
   }
 
   /** A helper to easily construct a [[ContractFilter]] for a single party. */
   case class SimpleContractFilter(
       primaryParty: PartyId,
-      contractFilters: immutable.Map[Identifier, CreatedEvent => Boolean],
+      templateFilters: immutable.Map[Identifier, CreatedEvent => Boolean],
+      interfaceFilters: immutable.Map[Identifier, CreatedEvent => Boolean] = Map.empty,
   ) extends ContractFilter {
 
     override val transactionFilter: TransactionFilter = {
-      val templateIds = contractFilters.keys.toSet.asJava
+      val templateIds = templateFilters.keys.toSet.asJava
+      val interfaceIds =
+        interfaceFilters.keys.map(i => i -> Filter.Interface.INCLUDE_VIEW).toMap.asJava
       val partyString: String = primaryParty.toProtoPrimitive
       new FiltersByParty(
         Map[String, Filter](
-          partyString -> new InclusiveFilter(templateIds, Map.empty.asJava)
+          partyString -> new InclusiveFilter(templateIds, interfaceIds)
         ).asJava
       )
     }
 
     override def contains(ev: CreatedEvent): Boolean =
-      contractFilters.get(ev.getTemplateId).exists(evPredicate => evPredicate(ev))
+      templateFilters.get(ev.getTemplateId).exists(evPredicate => evPredicate(ev)) ||
+        ev.getInterfaceViews.keySet.asScala.exists { i =>
+          interfaceFilters.get(i).exists(evPredicate => evPredicate(ev))
+        }
 
     override def mightContain[TC, TCid, T](
         templateCompanion: ContractCompanion[TC, TCid, T]
     ): Boolean =
-      contractFilters.contains(templateCompanion.TEMPLATE_ID)
+      templateFilters.contains(templateCompanion.TEMPLATE_ID)
+
+    override def mightContain[I, Id, View](
+        interfaceCompanion: InterfaceCompanion[I, Id, View]
+    ): Boolean =
+      interfaceFilters.contains(interfaceCompanion.TEMPLATE_ID)
   }
 
   /** Construct a contract filter for input into a [[SimpleContractFilter]]. */
@@ -168,5 +238,16 @@ object AcsStore {
     (
       templateCompanion.TEMPLATE_ID,
       ev => p(JavaContract.fromCodegenContract[TCid, T](templateCompanion.fromCreatedEvent(ev))),
+    )
+
+  /** Construct a contract filter for input into a [[SimpleContractFilter]]. */
+  def mkFilter[I, Id <: ContractId[I], View <: DamlRecord[_]](
+      interfaceCompanion: InterfaceCompanion[I, Id, View]
+  )(
+      p: JavaContract[Id, View] => Boolean
+  ): (Identifier, CreatedEvent => Boolean) =
+    (
+      interfaceCompanion.TEMPLATE_ID, // wat
+      ev => p(JavaContract.fromCodegenContract[Id, View](interfaceCompanion.fromCreatedEvent(ev))),
     )
 }

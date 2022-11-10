@@ -9,6 +9,7 @@ import com.daml.ledger.javaapi.data.codegen.{
   ContractCompanion,
   ContractId,
   DamlRecord,
+  InterfaceCompanion,
   ValueDecoder,
 }
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template, Value}
@@ -26,7 +27,7 @@ import scala.util.Try
   * @param payload          Contract instance as defined in Daml template (without `contractId` and `agreementText`).
   * @tparam T             Contract template type parameter.
   */
-final case class JavaContract[TCid <: ContractId[T], T](
+final case class JavaContract[TCid <: ContractId[_], T](
     identifier: Identifier,
     contractId: TCid,
     payload: T with DamlRecord[_],
@@ -92,7 +93,7 @@ object JavaContract {
     )
   }
 
-  def fromCodegenContract[TCid <: ContractId[T], T <: Template](
+  def fromCodegenContract[TCid <: ContractId[_], T <: DamlRecord[_]](
       contract: CodegenContract[TCid, T]
   ): JavaContract[TCid, T] =
     JavaContract(
@@ -104,5 +105,10 @@ object JavaContract {
   def fromCreatedEvent[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
       companion: ContractCompanion[TC, TCid, T]
   )(ev: CreatedEvent): Option[JavaContract[TCid, T]] =
+    JavaDecodeUtil.decodeCreated(companion)(ev).map(JavaContract.fromCodegenContract)
+
+  def fromCreatedEvent[I, Id <: ContractId[I], View <: DamlRecord[View]](
+      companion: InterfaceCompanion[I, Id, View]
+  )(ev: CreatedEvent): Option[JavaContract[Id, View]] =
     JavaDecodeUtil.decodeCreated(companion)(ev).map(JavaContract.fromCodegenContract)
 }

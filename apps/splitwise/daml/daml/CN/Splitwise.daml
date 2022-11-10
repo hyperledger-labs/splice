@@ -276,6 +276,8 @@ template TransferInProgress
     signatory signatory group
     interface instance DeliveryOffer for TransferInProgress where
       view = DeliveryOfferView with
+        svc = group.svc
+        sender
         description = "Transfer from " <> show sender <> " to " <> show receivers
 
 template BalanceUpdate

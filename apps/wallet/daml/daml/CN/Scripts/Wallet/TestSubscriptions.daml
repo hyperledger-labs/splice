@@ -13,13 +13,14 @@ import CC.Scripts.Util
 
 template TestSubscriptionContext
   with
+    svc : Party
     user : Party
     service : Party
     description : Text
   where
     signatory user, service
     interface instance SubscriptionContext for TestSubscriptionContext where
-      view = SubscriptionContextView with description
+      view = SubscriptionContextView with description, svc, sender = user
 
 
 testSubscription : Script ()
@@ -36,7 +37,7 @@ testSubscription = script do
   coin <- tap app alice 42.0
   let payData = SubscriptionPayData 12.0 (days 28) (days 1) (minutes 5)
 
-  context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext alice.primaryParty pizzeria.primaryParty "all-you-can-eat pasta")
+  context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext app.svc alice.primaryParty pizzeria.primaryParty "all-you-can-eat pasta")
   let subscriptionData = Subscription alice.primaryParty pizzeria.primaryParty provider.primaryParty app.svc (toInterfaceContractId context)
 
   subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
@@ -45,7 +46,7 @@ testSubscription = script do
   submitMulti [alice.primaryParty] [validator] $ exerciseCmd subscriptionRequestCid SubscriptionRequest_Reject
   None <- queryContractId pizzeria.primaryParty context
   -- ...and retry
-  context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext alice.primaryParty pizzeria.primaryParty "all-you-can-eat pizza")
+  context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext app.svc alice.primaryParty pizzeria.primaryParty "all-you-can-eat pizza")
   let subscriptionData = Subscription alice.primaryParty pizzeria.primaryParty provider.primaryParty app.svc (toInterfaceContractId context)
   subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
 
@@ -56,7 +57,7 @@ testSubscription = script do
   passTime (minutes 6)
   _ <- submitUser alice.userId $ exerciseCmd initialPaymentCid SubscriptionInititalPayment_Expire with actor = alice.primaryParty
   -- ..and retry
-  context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext alice.primaryParty pizzeria.primaryParty "all-you-can-eat pizza")
+  context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext app.svc alice.primaryParty pizzeria.primaryParty "all-you-can-eat pizza")
   let subscriptionData = Subscription alice.primaryParty pizzeria.primaryParty provider.primaryParty app.svc (toInterfaceContractId context)
   subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
   (initialPaymentCid, change) <- acceptSubscriptionRequestAndMakePayment app alice subscriptionRequestCid change

@@ -104,18 +104,22 @@ test = script do
 
 template TestDeliveryOffer
   with
-    p : Party
+    svc : Party
+    sender : Party
     description : Text
   where
-    signatory p
+    signatory sender
     interface instance DeliveryOffer for TestDeliveryOffer where
-      view = DeliveryOfferView with description
+      view = DeliveryOfferView with
+        description
+        svc
+        sender
 
 createPaymentRequest : CCApp -> Party -> [(Party, Decimal)] -> Script (ContractId AppPaymentRequest, ContractId TestDeliveryOffer)
 createPaymentRequest app sender receiverQuantities = do
   t <- getTime
   let quantity = sum (map snd receiverQuantities)
-  deliveryOffer <- submit sender $ createCmd (TestDeliveryOffer sender ("multi, sender: " <> show sender <> ", quantity: " <> show quantity))
+  deliveryOffer <- submit sender $ createCmd (TestDeliveryOffer app.svc sender ("multi, sender: " <> show sender <> ", quantity: " <> show quantity))
   -- multi-party submit to simplify test
   res <- submitMulti (sender :: map fst receiverQuantities) [] $ createCmd AppPaymentRequest with
     sender = sender

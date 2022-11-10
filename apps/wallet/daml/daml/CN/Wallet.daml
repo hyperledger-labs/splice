@@ -168,6 +168,8 @@ extractSenderChange result =
 
 data DeliveryOfferView = DeliveryOfferView
   with
+    svc : Party
+    sender : Party
     description : Text
 
 -- | The description of an offer of delivery for payment.

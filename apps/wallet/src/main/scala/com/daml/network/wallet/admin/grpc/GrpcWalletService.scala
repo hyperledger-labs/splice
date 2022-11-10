@@ -19,7 +19,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions => subsCodegen,
 }
 import com.daml.network.codegen.java.cn.wallet as walletCodegen
-import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinRetries}
+import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, JavaContract => Contract, JavaValue => Value, Proto}
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
@@ -260,9 +260,8 @@ class GrpcWalletService(
                 paymentRequestO,
                 s"app payment request with cid $requestCid",
               )
-              _ <- lookupDeliveryOffer(
-                userStore.key.endUserParty,
-                paymentRequest.payload.deliveryOffer,
+              _ <- userStore.lookupDeliveryOfferById(
+                paymentRequest.payload.deliveryOffer
               )
             } yield ()
 
@@ -375,9 +374,8 @@ class GrpcWalletService(
                 subscriptionRequestO,
                 s"subscription request with cid $requestCid",
               )
-              _ <- lookupSubscriptionContext(
-                userStore.key.endUserParty,
-                subscriptionRequest.payload.subscriptionData.context,
+              _ <- userStore.lookupSubscriptionContextById(
+                subscriptionRequest.payload.subscriptionData.context
               )
             } yield ()
 
@@ -433,9 +431,8 @@ class GrpcWalletService(
                 subscriptionStateO,
                 s"subscription idle state cid $stateCid",
               )
-              _ <- lookupSubscriptionContext(
-                userStore.key.endUserParty,
-                subscriptionState.payload.subscriptionData.context,
+              _ <- userStore.lookupSubscriptionContextById(
+                subscriptionState.payload.subscriptionData.context
               )
             } yield ()
 
@@ -1000,58 +997,6 @@ class GrpcWalletService(
         candidates.maxBy(_.payload.quantity.ratePerRound.rate).contractId
       }
     }
-  }
-
-  /** Verifies that exactly one delivery offer with the given contract id is active and returns a failed future with
-    * an [[io.grpc.StatusRuntimeException]] otherwise.
-    */
-  private def lookupDeliveryOffer(
-      endUserParty: PartyId,
-      contractId: walletCodegen.DeliveryOffer.ContractId,
-  ): Future[Unit] = {
-    for {
-      // TODO(#1267): use store instead
-      activeDeliveryOffers <- connection.activeContracts(
-        CoinLedgerConnection.transactionInterfaceFilterByParty(
-          Map(endUserParty -> Seq(walletCodegen.DeliveryOffer.TEMPLATE_ID))
-        )
-      )
-      _ = if (
-        activeDeliveryOffers
-          .count(event => event.getContractId == contractId.contractId) != 1
-      )
-        throw new StatusRuntimeException(
-          Status.FAILED_PRECONDITION.withDescription(
-            s"exactly one DeliveryOffer for payment request with cid $contractId."
-          )
-        )
-    } yield ()
-  }
-
-  /** Verifies that exactly one subscription context with the given contract id is active and returns a failed future with
-    * an [[io.grpc.StatusRuntimeException]] otherwise.
-    */
-  private def lookupSubscriptionContext(
-      endUserParty: PartyId,
-      contractId: subsCodegen.SubscriptionContext.ContractId,
-  ): Future[Unit] = {
-    for {
-      // TODO(#1267): use store instead
-      activeSubscriptionContexts <- connection.activeContracts(
-        CoinLedgerConnection.transactionInterfaceFilterByParty(
-          Map(endUserParty -> Seq(subsCodegen.SubscriptionContext.TEMPLATE_ID))
-        )
-      )
-      _ = if (
-        activeSubscriptionContexts
-          .count(event => event.getContractId == contractId.contractId) != 1
-      )
-        throw new StatusRuntimeException(
-          Status.FAILED_PRECONDITION.withDescription(
-            s"exactly one SubscriptionContext with cid $contractId."
-          )
-        )
-    } yield ()
   }
 
   /** Verifies that the given payment channel is active and returns a failed future with

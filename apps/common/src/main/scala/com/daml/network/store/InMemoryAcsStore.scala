@@ -2,7 +2,13 @@ package com.daml.network.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.ledger.javaapi.data.codegen.{Contract, ContractCompanion, ContractId}
+import com.daml.ledger.javaapi.data.codegen.{
+  Contract,
+  ContractCompanion,
+  ContractId,
+  DamlRecord,
+  InterfaceCompanion,
+}
 import com.daml.ledger.javaapi.data.{
   ArchivedEvent,
   CreatedEvent,
@@ -126,14 +132,21 @@ class InMemoryAcsStore(
       s"template ${templateCompanion.TEMPLATE_ID} is part of the contract filter",
     )
 
-  def findContract[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T]
-  )(p: JavaContract[TCid, T] => Boolean): Future[QueryResult[Option[JavaContract[TCid, T]]]] = {
-    requireInScope(templateCompanion)
+  private def requireInScope[I, Id, View](
+      interfaceCompanion: InterfaceCompanion[I, Id, View]
+  ): Unit =
+    require(
+      contractFilter.mightContain(interfaceCompanion),
+      s"interface ${interfaceCompanion.TEMPLATE_ID} is part of the contract filter",
+    )
+
+  private def findContract[T](
+      fromCreatedEvent: CreatedEvent => Option[T]
+  )(p: T => Boolean): Future[QueryResult[Option[T]]] = {
     offsetAndStateAfterIngestingAcs().map({ case (off, st) =>
       val optEntry = st.createEvents.values.collectFirst(Function.unlift(ev => {
         for {
-          contract <- JavaContract.fromCreatedEvent(templateCompanion)(ev)
+          contract <- fromCreatedEvent(ev)
           if p(contract)
         } yield contract
       }))
@@ -141,23 +154,51 @@ class InMemoryAcsStore(
     })
   }
 
-  def listContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T],
-      filter: JavaContract[TCid, T] => Boolean = (_: JavaContract[TCid, T]) => true,
-  ): Future[QueryResult[Seq[JavaContract[TCid, T]]]] = {
+  def findContract[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      templateCompanion: ContractCompanion[TC, TCid, T]
+  )(p: JavaContract[TCid, T] => Boolean): Future[QueryResult[Option[JavaContract[TCid, T]]]] = {
     requireInScope(templateCompanion)
+    findContract(JavaContract.fromCreatedEvent(templateCompanion))(p)
+  }
+
+  def findContract[I, Id <: ContractId[I], View <: DamlRecord[View]](
+      interfaceCompanion: InterfaceCompanion[I, Id, View]
+  )(p: JavaContract[Id, View] => Boolean): Future[QueryResult[Option[JavaContract[Id, View]]]] = {
+    requireInScope(interfaceCompanion)
+    findContract(JavaContract.fromCreatedEvent(interfaceCompanion))(p)
+  }
+
+  private def listContracts[T](
+      fromCreatedEvent: CreatedEvent => Option[T],
+      filter: T => Boolean,
+  ): Future[QueryResult[Seq[T]]] = {
     offsetAndStateAfterIngestingAcs().map { case (off, st) =>
       val result = st.createEvents.values
-        .collect(Function.unlift(ev => JavaContract.fromCreatedEvent(templateCompanion)(ev)))
+        .collect(Function.unlift(ev => fromCreatedEvent(ev)))
         .toSeq
       QueryResult(off, result)
     }
   }
 
-  def lookupContractById[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T]
-  )(id: ContractId[T]): Future[QueryResult[Option[JavaContract[TCid, T]]]] = {
+  def listContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      templateCompanion: ContractCompanion[TC, TCid, T],
+      filter: JavaContract[TCid, T] => Boolean,
+  ): Future[QueryResult[Seq[JavaContract[TCid, T]]]] = {
     requireInScope(templateCompanion)
+    listContracts(JavaContract.fromCreatedEvent(templateCompanion), filter)
+  }
+
+  def listContracts[I, Id <: ContractId[I], View <: DamlRecord[View]](
+      interfaceCompanion: InterfaceCompanion[I, Id, View],
+      filter: JavaContract[Id, View] => Boolean,
+  ): Future[QueryResult[Seq[JavaContract[Id, View]]]] = {
+    requireInScope(interfaceCompanion)
+    listContracts(JavaContract.fromCreatedEvent(interfaceCompanion), filter)
+  }
+
+  private def lookupContractById[T](
+      fromCreatedEvent: CreatedEvent => Option[T]
+  )(id: ContractId[_]): Future[QueryResult[Option[T]]] = {
     offsetAndStateAfterIngestingAcs().map { case (off, st) =>
       st.createEventsById.get(id.contractId) match {
         case None =>
@@ -167,40 +208,64 @@ class InMemoryAcsStore(
             off,
             st.createEvents
               .get(evRev)
-              .flatMap(ev => JavaContract.fromCreatedEvent(templateCompanion)(ev)),
+              .flatMap(ev => fromCreatedEvent(ev)),
           )
       }
     }
+  }
+
+  def lookupContractById[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      templateCompanion: ContractCompanion[TC, TCid, T]
+  )(id: ContractId[T]): Future[QueryResult[Option[JavaContract[TCid, T]]]] = {
+    requireInScope(templateCompanion)
+    lookupContractById(JavaContract.fromCreatedEvent(templateCompanion))(id)
+  }
+
+  def lookupContractById[I, Id <: ContractId[I], View <: DamlRecord[View]](
+      interfaceCompanion: InterfaceCompanion[I, Id, View]
+  )(id: Id): Future[QueryResult[Option[JavaContract[Id, View]]]] = {
+    requireInScope(interfaceCompanion)
+    lookupContractById(JavaContract.fromCreatedEvent(interfaceCompanion))(id)
+  }
+
+  private def streamContracts[T](
+      fromCreatedEvent: CreatedEvent => Option[T]
+  ): Source[T, NotUsed] = {
+    Source.unfoldAsync(0: Long)(eventNumber =>
+      nextActiveContract(fromCreatedEvent, eventNumber).map(Some(_))
+    )
   }
 
   def streamContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
       templateCompanion: ContractCompanion[TC, TCid, T]
   ): Source[JavaContract[TCid, T], NotUsed] = {
     requireInScope(templateCompanion)
-    Source.unfoldAsync(0: Long)(eventNumber =>
-      nextActiveContract(templateCompanion, eventNumber).map(Some(_))
-    )
+    streamContracts(JavaContract.fromCreatedEvent(templateCompanion))
   }
 
-  private def nextActiveContract[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T],
+  def streamContracts[I, Id <: ContractId[I], View <: DamlRecord[View]](
+      interfaceCompanion: InterfaceCompanion[I, Id, View]
+  ): Source[JavaContract[Id, View], NotUsed] = {
+    requireInScope(interfaceCompanion)
+    streamContracts(JavaContract.fromCreatedEvent(interfaceCompanion))
+  }
+
+  private def nextActiveContract[T](
+      fromCreated: CreatedEvent => Option[T],
       startingFromIncl: Long,
-  ): Future[(Long, JavaContract[TCid, T])] = {
+  ): Future[(Long, T)] = {
     val st = stateVar
     val optEntry = st.createEvents
       .iteratorFrom(startingFromIncl)
       .collectFirst(
         Function.unlift(ev =>
-          JavaContract
-            .fromCreatedEvent(templateCompanion)(ev._2)
+          fromCreated(ev._2)
             .map(co => (ev._1, co))
         )
       )
     optEntry match {
       case None =>
-        st.offsetChanged.future.flatMap(_ =>
-          nextActiveContract(templateCompanion, st.nextEventNumber)
-        )
+        st.offsetChanged.future.flatMap(_ => nextActiveContract(fromCreated, st.nextEventNumber))
       case Some((eventNumber, co)) => Future((eventNumber + 1, co))
     }
   }

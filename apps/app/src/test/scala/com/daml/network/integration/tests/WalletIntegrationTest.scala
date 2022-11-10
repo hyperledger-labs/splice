@@ -157,7 +157,8 @@ class WalletIntegrationTest
         commands = Seq(
           testWalletCodegen
             .TestDeliveryOffer(
-              p = aliceUserParty.toPrim,
+              svc = scan.getSvcPartyId().toPrim,
+              sender = aliceUserParty.toPrim,
               description = "description",
             )
             .create
@@ -211,7 +212,8 @@ class WalletIntegrationTest
         commands = Seq(
           testWalletCodegen
             .TestDeliveryOffer(
-              p = aliceUserParty.toPrim,
+              sender = aliceUserParty.toPrim,
+              svc = scan.getSvcPartyId().toPrim,
               description = "description",
             )
             .create
@@ -1087,6 +1089,7 @@ class WalletIntegrationTest
         commands = Seq(
           testSubsCodegen
             .TestSubscriptionContext(
+              svc = scan.getSvcPartyId().toPrim,
               user = aliceUserParty.toPrim,
               service = aliceUserParty.toPrim,
               description = "description",

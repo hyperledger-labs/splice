@@ -3,7 +3,13 @@
 
 package com.digitalasset.canton.participant.ledger.api.client
 
-import com.daml.ledger.javaapi.data.codegen.{Contract, ContractCompanion, ContractId}
+import com.daml.ledger.javaapi.data.codegen.{
+  Contract,
+  ContractCompanion,
+  ContractId,
+  DamlRecord,
+  InterfaceCompanion,
+}
 import com.daml.ledger.javaapi.data.{
   CreatedEvent as JavaCreatedEvent,
   Template,
@@ -17,6 +23,13 @@ object JavaDecodeUtil {
       companion: ContractCompanion[TC, TCid, T]
   )(event: JavaCreatedEvent): Option[TC] =
     if (event.getTemplateId == companion.TEMPLATE_ID) {
+      Some(companion.fromCreatedEvent(event))
+    } else None
+
+  def decodeCreated[I, Id <: ContractId[I], View <: DamlRecord[View]](
+      companion: InterfaceCompanion[I, Id, View]
+  )(event: JavaCreatedEvent): Option[Contract[Id, View]] =
+    if (event.getInterfaceViews.containsKey(companion.TEMPLATE_ID)) {
       Some(companion.fromCreatedEvent(event))
     } else None
 

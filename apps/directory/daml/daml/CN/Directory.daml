@@ -15,6 +15,7 @@ import CN.Wallet.Subscriptions
 -- Can be used as a stable reference.
 template DirectoryEntryContext
   with
+    svc : Party
     provider : Party
     user : Party
     name : Text
@@ -22,7 +23,10 @@ template DirectoryEntryContext
     signatory provider, user
 
     interface instance SubscriptionContext for DirectoryEntryContext where
-      view = SubscriptionContextView with description = "Directory entry: " <> show name
+      view = SubscriptionContextView with
+        description = "Directory entry: " <> show name
+        svc
+        sender = user
 
         -- Collect a user's initial payment for a directory entry allocation.
     -- By collecting the initial payment, the directory service provider ultimately agrees to both
@@ -60,7 +64,7 @@ template DirectoryEntryContext
         entry <- fetch entryCid
         -- sanity checks
         require "Current entry matches subscription context"
-          ((DirectoryEntryContext entry.provider entry.user entry.name) == context)
+          ((DirectoryEntryContext svc entry.provider entry.user entry.name) == context)
         require "Subscription entry renewal times are in sync"
           (payment.thisPaymentDueAt == entry.expiresAt)
         -- accept payment
@@ -118,13 +122,17 @@ template DirectoryEntryRequest
 
 template DirectoryEntryOffer
   with
+    svc : Party
     entryRequest : DirectoryEntryRequest
     entryLifetime : RelTime
   where
     signatory signatory entryRequest
 
     interface instance DeliveryOffer for DirectoryEntryOffer where
-      view = DeliveryOfferView with description = "Directory entry request: " <> show entryRequest
+      view = DeliveryOfferView with
+        description = "Directory entry request: " <> show entryRequest
+        sender = entryRequest.user
+        svc
 
     postconsuming choice DirectoryEntryOffer_CollectPayment : (ContractId DirectoryEntry, ContractId Coin)
       with
@@ -206,7 +214,10 @@ template DirectoryInstall with
          request.provider === provider
          request.user === user
          now <- getTime
-         offerCid <- create DirectoryEntryOffer with entryRequest = request; entryLifetime
+         offerCid <- create DirectoryEntryOffer with
+           svc
+           entryRequest = request
+           entryLifetime
          reqCid <- create AppPaymentRequest with
            receiverQuantities = [ReceiverQuantity provider request.entryFee]
            sender = user

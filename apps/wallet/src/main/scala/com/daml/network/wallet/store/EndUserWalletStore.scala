@@ -80,6 +80,13 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
   ]] =
     acsStore.lookupContractById(walletCodegen.AppPaymentRequest.COMPANION)(cid)
 
+  def lookupDeliveryOfferById(
+      cid: walletCodegen.DeliveryOffer.ContractId
+  ): Future[QueryResult[
+    Option[Contract[walletCodegen.DeliveryOffer.ContractId, walletCodegen.DeliveryOfferView]]
+  ]] =
+    acsStore.lookupContractById(walletCodegen.DeliveryOffer.INTERFACE)(cid)
+
   def lookupSubscriptionRequestById(
       cid: ContractId[subsCodegen.SubscriptionRequest]
   ): Future[QueryResult[
@@ -93,6 +100,15 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
     Contract[subsCodegen.SubscriptionIdleState.ContractId, subsCodegen.SubscriptionIdleState]
   ]]] =
     acsStore.lookupContractById(subsCodegen.SubscriptionIdleState.COMPANION)(cid)
+
+  def lookupSubscriptionContextById(
+      cid: subsCodegen.SubscriptionContext.ContractId
+  ): Future[QueryResult[
+    Option[
+      Contract[subsCodegen.SubscriptionContext.ContractId, subsCodegen.SubscriptionContextView]
+    ]
+  ]] =
+    acsStore.lookupContractById(subsCodegen.SubscriptionContext.INTERFACE)(cid)
 
   def lookupLatestOpenMiningRound(
   ): Future[QueryResult[
@@ -286,9 +302,23 @@ object EndUserWalletStore {
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
         ),
+        mkFilter(subsCodegen.SubscriptionPayment.COMPANION)(co =>
+          co.payload.subscriptionData.svc == svc &&
+            co.payload.subscriptionData.sender == endUser
+        ),
         mkFilter(roundCodegen.OpenMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(roundCodegen.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(coinRulesCodegen.CoinRules.COMPANION)(co => co.payload.svc == svc),
+      ),
+      Map(
+        mkFilter(subsCodegen.SubscriptionContext.INTERFACE)(co =>
+          co.payload.svc == svc &&
+            co.payload.sender == endUser
+        ),
+        mkFilter(walletCodegen.DeliveryOffer.INTERFACE)(co =>
+          co.payload.svc == svc &&
+            co.payload.sender == endUser
+        ),
       ),
     )
   }
