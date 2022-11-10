@@ -128,6 +128,12 @@ Test:
 - `test`: runs all tests (with the exception of some tests running against the cluster that are excluded on purpose - see the overwrite of `test` in `BuildCommon.scala` for more details)
 - `damlTest`: run the Daml script tests included with the apps' Daml files
 
+#### `sbt` Tips&Tricks
+
+Things sometimes go wrong with `sbt` in ways that are hard to debug. This section will list common tips&tricks for getting `sbt` to do what we want it to.
+- In case you see unexpected build failures after switching branches, run `sbt reload` to have sbt update its internal state.
+- In case you continue to see unexpected build failures, despite following every other trick in this section, you probably need to delete the sbt build files. If you suspect the build failures come from CN build files, run `sbt clean-cn` to delete all CN build files. If the error might come from the build files of the OS Canton dependency, run `sbt clean` to delete all build files managed by sbt. Subsequent `sbt Test/compile`s should then succeed. 
+
 ## Contributing Changes
 
 ### Contributing as a New Joiner
