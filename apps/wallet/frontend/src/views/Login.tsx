@@ -1,25 +1,16 @@
 import { useState } from 'react';
 
-import { Button, Chip, Grid, TextField, Typography } from '@mui/material';
+import { Button, Grid, TextField, Typography } from '@mui/material';
 
 import { useUserState } from '../contexts/UserContext';
+import { config, isHs2456UnsafeAuthConfig } from '../utils';
 
 const Login: React.FC = () => {
   const [userId, setUserId] = useState<string>('');
   const { loginWithId, loginWithAuth0 } = useUserState();
 
-  return (
-    <Grid
-      height="100%"
-      container
-      spacing={0}
-      direction="column"
-      alignItems="center"
-      justifyContent="center"
-    >
-      <Typography variant="h4" sx={{ marginBottom: '15px' }}>
-        Wallet Log In
-      </Typography>
+  const loginMethod = isHs2456UnsafeAuthConfig(config.auth) ? (
+    <>
       <TextField
         label="Daml User ID"
         required
@@ -38,12 +29,27 @@ const Login: React.FC = () => {
       >
         Log In
       </Button>
+    </>
+  ) : (
+    <Button variant="outlined" onClick={loginWithAuth0}>
+      Log in with auth0
+    </Button>
+  );
 
-      <Chip label="OR" sx={{ margin: '25px 0px' }} />
+  return (
+    <Grid
+      height="100%"
+      container
+      spacing={0}
+      direction="column"
+      alignItems="center"
+      justifyContent="center"
+    >
+      <Typography variant="h4" sx={{ marginBottom: '15px' }}>
+        Wallet Log In
+      </Typography>
 
-      <Button variant="outlined" onClick={loginWithAuth0}>
-        Log in with auth0
-      </Button>
+      {loginMethod}
     </Grid>
   );
 };

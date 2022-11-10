@@ -5,14 +5,47 @@ import { Auth0ProviderOptions } from '@auth0/auth0-react';
 // before the application code, and writes the config to the global "window" variable.
 const externalConfig = window.canton_network_config;
 
-const authConfig: Auth0ProviderOptions = {
-  domain: process.env.REACT_APP_OAUTH_DOMAIN || externalConfig.auth.domain,
-  clientId: process.env.REACT_APP_OAUTH_CLIENT_ID || externalConfig.auth.clientId,
-  redirectUri: window.location.origin || externalConfig.auth.redirectUri,
+const enum Algorithm {
+  RS256 = 'rs-256',
+  HS256UNSAFE = 'hs-256-unsafe',
+}
+
+type RS256Auth = Auth0ProviderOptions & {
+  algorithm: Algorithm.RS256;
+};
+
+type HS256UnsafeAuth = {
+  algorithm: Algorithm.HS256UNSAFE;
+  secret: string;
+};
+
+type AuthConfig = RS256Auth | HS256UnsafeAuth;
+
+export function isHs2456UnsafeAuthConfig(obj: AuthConfig): obj is HS256UnsafeAuth {
+  return obj.algorithm === Algorithm.HS256UNSAFE;
+}
+
+const getAuthConfig = (): AuthConfig => {
+  const algorithm = process.env.REACT_APP_AUTH_ALGORITHM || externalConfig.auth.algorithm;
+
+  if (algorithm !== Algorithm.RS256 && algorithm !== Algorithm.HS256UNSAFE) {
+    throw new Error('Invalid or missing algorithm type specified: ' + algorithm);
+  }
+
+  if (algorithm === Algorithm.RS256) {
+    const domain = process.env.REACT_APP_AUTH_DOMAIN || externalConfig.auth.domain;
+    const clientId = process.env.REACT_APP_AUTH_CLIENT_ID || externalConfig.auth.clientId;
+    const redirectUri = externalConfig.auth.redirectUri || window.location.origin;
+
+    return { algorithm, domain, clientId, redirectUri };
+  }
+
+  const secret = process.env.REACT_APP_AUTH_SECRET || externalConfig.auth.secret;
+  return { algorithm, secret };
 };
 
 export type Config = {
-  auth: Auth0ProviderOptions;
+  auth: AuthConfig;
   wallet: {
     grpcUrl: string;
   };
@@ -25,7 +58,7 @@ export type Config = {
 };
 
 export const config: Config = {
-  auth: authConfig,
+  auth: getAuthConfig(),
   wallet: {
     grpcUrl: process.env.REACT_APP_GRPC_URL || externalConfig.wallet.grpcUrl,
   },

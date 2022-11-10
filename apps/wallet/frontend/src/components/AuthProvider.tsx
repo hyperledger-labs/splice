@@ -1,10 +1,14 @@
 import { Auth0Provider } from '@auth0/auth0-react';
 import React from 'react';
 
-import { config } from '../utils';
+import { config, isHs2456UnsafeAuthConfig } from '../utils';
 
 const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const authConfig = config.auth;
+
+  if (isHs2456UnsafeAuthConfig(authConfig)) {
+    return <>{children}</>;
+  }
 
   if (authConfig.domain === '' || authConfig.clientId === '') {
     console.warn(
@@ -14,7 +18,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     return <>{children}</>;
   }
 
-  return <Auth0Provider {...config.auth}>{children}</Auth0Provider>;
+  return <Auth0Provider {...authConfig}>{children}</Auth0Provider>;
 };
 
 export default AuthProvider;

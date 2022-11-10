@@ -1,9 +1,7 @@
 window.canton_network_config = {
-  // Auth0 client configuration, see https://github.com/auth0/auth0-spa-js
   auth: {
-    domain: "canton-network-dev.us.auth0.com",
-    clientId: "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK",
-    redirectUri: window.location.origin,
+    algorithm: "hs-256-unsafe",
+    secret: "test",
   },
   wallet: {
     // URL of the web-ui, used to forward payment workflows to wallet

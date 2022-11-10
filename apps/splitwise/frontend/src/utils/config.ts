@@ -6,8 +6,8 @@ import { Auth0ProviderOptions } from '@auth0/auth0-react';
 const externalConfig = window.canton_network_config;
 
 const authConfig: Auth0ProviderOptions = {
-  domain: process.env.REACT_APP_OAUTH_DOMAIN || externalConfig.auth.domain,
-  clientId: process.env.REACT_APP_OAUTH_CLIENT_ID || externalConfig.auth.clientId,
+  domain: process.env.REACT_APP_AUTH_DOMAIN || externalConfig.auth.domain,
+  clientId: process.env.REACT_APP_AUTH_CLIENT_ID || externalConfig.auth.clientId,
   redirectUri: window.location.origin || externalConfig.auth.redirectUri,
 };
 
