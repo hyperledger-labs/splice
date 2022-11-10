@@ -37,6 +37,7 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
       expiresAt: Instant,
   ): JavaContract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry] =
     JavaContract(
+      identifier = directoryCodegen.DirectoryEntry.TEMPLATE_ID,
       contractId = new directoryCodegen.DirectoryEntry.ContractId(s"de#$number"),
       payload = new directoryCodegen.DirectoryEntry(
         user.toProtoPrimitive,
@@ -56,6 +57,7 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
     directoryCodegen.DirectoryEntryRequest,
   ] =
     JavaContract(
+      identifier = directoryCodegen.DirectoryEntryRequest.TEMPLATE_ID,
       contractId = new directoryCodegen.DirectoryEntryRequest.ContractId(s"der#$number"),
       payload = new directoryCodegen.DirectoryEntryRequest(
         provider.toProtoPrimitive,
@@ -74,7 +76,7 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
       contractId = contractP.contractId,
       interfaceViews = Map.empty.asJava,
       failedInterfaceViews = Map.empty.asJava,
-      templateId = contract.payload.getContractTypeId,
+      templateId = contract.identifier,
       arguments = contract.payload.toValue,
       witnessParties = Seq.empty.asJava,
       signatories = Seq.empty.asJava,
@@ -90,7 +92,7 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
     new ArchivedEvent(
       eventId = "dummyEventId",
       contractId = contract.contractId.contractId,
-      templateId = contract.payload.getContractTypeId,
+      templateId = contract.identifier,
       witnessParties = Seq.empty.asJava,
     )
   }

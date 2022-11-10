@@ -8,9 +8,10 @@ import com.daml.ledger.javaapi.data.codegen.{
   Contract => CodegenContract,
   ContractCompanion,
   ContractId,
+  DamlRecord,
   ValueDecoder,
 }
-import com.daml.ledger.javaapi.data.{CreatedEvent, DamlRecord, Identifier, Template, Value}
+import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template, Value}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
@@ -26,11 +27,12 @@ import scala.util.Try
   * @tparam T             Contract template type parameter.
   */
 final case class JavaContract[TCid <: ContractId[T], T](
+    identifier: Identifier,
     contractId: TCid,
-    payload: T with Template,
+    payload: T with DamlRecord[_],
 ) extends PrettyPrinting {
   def toProtoV0: v0.Contract = v0.Contract(
-    templateId = Some(scalaValue.Identifier.fromJavaProto(payload.getContractTypeId.toProto)),
+    templateId = Some(scalaValue.Identifier.fromJavaProto(identifier.toProto)),
     contractId = contractId.contractId,
     payload = Some(scalaValue.Record.fromJavaProto(payload.toValue.toProtoRecord)),
   )
@@ -48,12 +50,12 @@ final case class JavaContract[TCid <: ContractId[T], T](
       }
     }
 
-    implicit def prettyRecord: Pretty[DamlRecord] =
-      PrettyUtil.prettyOfString(_.toString)
+    implicit def prettyRecord: Pretty[DamlRecord[_]] =
+      PrettyUtil.prettyOfString(_.toValue.toString)
 
     prettyOfClass[JavaContract[TCid, T]](
       param("contractId", _.contractId),
-      param("payload", _.payload.toValue),
+      param("payload", _.payload),
     )
   }
 }
@@ -65,9 +67,9 @@ object JavaContract {
     val decoder: ValueDecoder[T] = ContractCompanion.valueDecoder[T](companion)
     for {
       templateId <- ProtoConverter.required("templateId", contract.templateId)
-      javaTemplateId = scalaValue.Identifier.toJavaProto(templateId)
+      javaTemplateId = Identifier.fromProto(scalaValue.Identifier.toJavaProto(templateId))
       _ <- Either.cond(
-        Identifier.fromProto(javaTemplateId) == companion.TEMPLATE_ID,
+        javaTemplateId == companion.TEMPLATE_ID,
         (),
         ProtoDeserializationError.ValueConversionError(
           "templateId",
@@ -83,7 +85,8 @@ object JavaContract {
       ).toEither.left.map(ex =>
         ProtoDeserializationError.ValueConversionError("payload", s"Failed to decode payload: $ex")
       )
-    } yield JavaContract(
+    } yield JavaContract[TCid, T](
+      identifier = javaTemplateId,
       contractId = contractId,
       payload = payload,
     )
@@ -93,6 +96,7 @@ object JavaContract {
       contract: CodegenContract[TCid, T]
   ): JavaContract[TCid, T] =
     JavaContract(
+      identifier = contract.getContractTypeId,
       contractId = contract.id,
       payload = contract.data,
     )
