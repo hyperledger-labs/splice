@@ -926,7 +926,7 @@ class WalletIntegrationTest
       )
 
       // eventually, the cancel goes through
-      eventually()((cancelF.isCompleted && !transferF.isCompleted) shouldBe true)
+      eventually()((cancelF.isCompleted) shouldBe true)
       eventually()(aliceRemoteWallet.listPaymentChannels() should have size 1)
       eventually()(bobRemoteWallet.listPaymentChannels() should have size 1)
 
