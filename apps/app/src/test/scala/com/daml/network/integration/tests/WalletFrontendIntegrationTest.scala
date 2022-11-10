@@ -70,6 +70,10 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
 
         textField("tap-amount-field").value = "test"
         find(id("tap-button")).getOrElse(fail()).isEnabled shouldBe false
+        find(id("tap-amount-field-label"))
+          .getOrElse(fail())
+          .underlying
+          .getAttribute("class") should include("Mui-error")
       }
     }
 
