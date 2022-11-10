@@ -58,7 +58,9 @@ object BuildCommon {
     libraryDependencies ++= Seq(
       scalatest % Test,
       Dependencies.daml_bindings_java,
-    )
+    ),
+    // Enable logging of begin and end of test cases, test suites, and test runs.
+    Test / testOptions += Tests.Argument("-C", "com.digitalasset.canton.LogReporter"),
   )
 
   val pbTsDirectory = SettingKey[File]("output directory for ts protobuf definitions")
