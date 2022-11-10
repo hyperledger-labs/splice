@@ -2,30 +2,14 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.CC.Round.{ClosedMiningRound, Round}
 import com.daml.network.codegen.DA
-import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.history._
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
-  CoinTestConsoleEnvironment,
-  IsolatedCoinEnvironments,
-}
-import com.daml.network.util.{CommonCoinAppInstanceReferences, ExerciseNode, PaymentChannelTestUtil}
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
+import com.daml.network.util.{ExerciseNode, PaymentChannelTestUtil}
 
 import scala.concurrent.duration._
 
 // TODO(M1-92): Add tests that cover all possible CoinEvents
-class ScanIntegrationTest
-    extends CoinIntegrationTest
-    with IsolatedCoinEnvironments
-    with CommonCoinAppInstanceReferences
-    with PaymentChannelTestUtil {
-
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+class ScanIntegrationTest extends CoinIntegrationTest with PaymentChannelTestUtil {
 
   "restart cleanly" in { implicit env =>
     scan.stop()

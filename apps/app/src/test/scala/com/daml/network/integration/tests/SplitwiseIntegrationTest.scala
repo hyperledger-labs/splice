@@ -6,18 +6,13 @@ import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
-  IsolatedCoinEnvironments,
 }
 import com.daml.network.splitwise.admin.api.client.commands.GrpcSplitwiseAppClient
-import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.concurrent.Future
 
-class SplitwiseIntegrationTest
-    extends CoinIntegrationTest
-    with IsolatedCoinEnvironments
-    with CommonCoinAppInstanceReferences {
+class SplitwiseIntegrationTest extends CoinIntegrationTest {
 
   private val darPath = "apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar"
 

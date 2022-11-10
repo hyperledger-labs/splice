@@ -119,6 +119,10 @@ object CoinEnvironmentDefinition {
       .withAllocatedValidatorUsers()
       .withInitializedNodes()
 
+  def simpleTopologyWithSimTime(testName: String): CoinEnvironmentDefinition =
+    simpleTopology(testName)
+      .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy(10_000)(conf))
+
   def fromResource(path: String, testName: String): CoinEnvironmentDefinition =
     CoinEnvironmentDefinition(
       baseConfig = loadConfigFromResource(path),

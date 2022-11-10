@@ -40,8 +40,7 @@ class DirectoryAutomationService(
     60_000_000
   )
   private val renewalDuration = new RelTime(
-    // TODO(i1395) Consider reverting this to 30 days once our tests can control time
-    // 90 days
+    // 90 days; keeping this generous makes testing easier
     90 * 24 * 60 * 60 * 1_000_000L
   )
   private val entryLifetime = new RelTime(

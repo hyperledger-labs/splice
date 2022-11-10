@@ -6,7 +6,6 @@ import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
-  IsolatedCoinEnvironments,
 }
 import com.daml.network.integration.{CoinConfigTransforms, CoinEnvironmentDefinition}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -16,10 +15,7 @@ import monocle.macros.syntax.lens._
 /** Integration test for the runbook. Uses the exact same configuration files and bootstrap scripts as the runbook.
   * This test also doubles as the pre-flight validator test.
   */
-class PreflightIntegrationTest
-    extends CoinIntegrationTest
-    with IsolatedCoinEnvironments
-    with HasConsoleScriptRunner {
+class PreflightIntegrationTest extends CoinIntegrationTest with HasConsoleScriptRunner {
 
   val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
   val validatorPath: File = examplesPath / "validator"
@@ -38,7 +34,7 @@ class PreflightIntegrationTest
       .clearConfigTransforms()
       .addConfigTransforms((_, conf) => CoinConfigTransforms.addDamlNameSuffix("preflight")(conf))
       .addConfigTransforms((_, conf) => CoinConfigTransforms.ensureNovelDamlNames()(conf))
-      .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy1000(conf))
+      .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy(1000)(conf))
       // Disable autostart, because our apps require the participant to be connected to a domain
       // when the app starts. The apps are started manually in `validator-participant.canton` below.
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))

@@ -2,24 +2,9 @@ package com.daml.network.integration.tests
 
 import com.daml.network.codegen.CC.Coin._
 import com.daml.network.codegen.CC.Round._
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
-  CoinTestConsoleEnvironment,
-  IsolatedCoinEnvironments,
-}
-import com.daml.network.util.CommonCoinAppInstanceReferences
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
 
-class SvcIntegrationTest
-    extends CoinIntegrationTest
-    with IsolatedCoinEnvironments
-    with CommonCoinAppInstanceReferences {
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
+class SvcIntegrationTest extends CoinIntegrationTest {
 
   "restart cleanly" in { implicit env =>
     // TODO(M1-92): share tests for common properties of CoinApps, like restartabilty

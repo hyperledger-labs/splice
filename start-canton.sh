@@ -21,6 +21,14 @@ POSTGRES_MODE=${1:-docker}
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwise"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_da"
 
+# Create new databases (one for each node used in `simple-topology-canton-simtime.conf`)
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_alice_simtime"
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_svc_simtime"
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_bob_simtime"
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_directory_simtime"
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwise_simtime"
+./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_da_simtime"
+
 # Start Canton
 canton \
     daemon --auto-connect-local --log-level-canton=DEBUG \
@@ -29,12 +37,21 @@ canton \
 PID=$!
 echo "$PID" > canton.pid
 
-# Wait for Canton
-while [ ! -f canton.ports ]; do
-    echo "Waiting for Canton to start"
+# Start second Canton with simulated time, for time-based tests
+canton \
+    daemon --auto-connect-local --log-level-canton=DEBUG \
+    --no-tty -c ./apps/app/src/test/resources/simple-topology-canton-simtime.conf -C canton.parameters.ports-file=canton-simtime.ports \
+    --log-file-name log/canton-simtime.log \
+    --bootstrap bootstrap-canton.canton &
+PID=$!
+echo "$PID" > canton-simtime.pid
+
+# Wait for both Cantons to start
+while [ ! -f canton.ports ] && [ ! -f canton-simtime.ports ]; do
+    echo "Waiting for Canton instances to start"
     sleep 1;
 done
-echo "Canton started"
+echo "Canton instances started"
 
 # Start toxiproxy server
 toxiproxy-server > log/toxi.log 2>&1 &

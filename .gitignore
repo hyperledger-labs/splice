@@ -21,6 +21,7 @@ target
 *#
 *.pid
 canton.ports
+canton-simtime.ports
 canton-release
 .disable-unused-warnings
 todo-out

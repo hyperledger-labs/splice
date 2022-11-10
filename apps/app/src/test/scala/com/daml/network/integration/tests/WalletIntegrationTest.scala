@@ -16,23 +16,14 @@ import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 import com.daml.network.codegen.java.cn.{directory as dirCodegen}
 import com.daml.network.console.{LocalWalletAppReference, WalletAppReference}
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
-  IsolatedCoinEnvironments,
 }
-import com.daml.network.util.{
-  CoinUtil,
-  CommonCoinAppInstanceReferences,
-  PaymentChannelTestUtil,
-  Proto,
-}
+import com.daml.network.util.{CoinUtil, PaymentChannelTestUtil, Proto}
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.Balance
 import com.digitalasset.canton.console.CommandFailure
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
 import com.digitalasset.canton.topology.PartyId
@@ -46,15 +37,8 @@ import scala.util.{Success, Try}
 
 class WalletIntegrationTest
     extends CoinIntegrationTest
-    with IsolatedCoinEnvironments
     with HasExecutionContext
-    with CommonCoinAppInstanceReferences
     with PaymentChannelTestUtil {
-
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
 
   "A wallet" should {
 
@@ -1128,8 +1112,8 @@ class WalletIntegrationTest
         paymentInterval = RelTime(microseconds = 60 * 60 * 1000000L),
         paymentDuration = RelTime(microseconds = 60 * 60 * 1000000L),
         collectionDuration = RelTime(microseconds = 60 * 1000000L),
-      ) // paymentDuration == paymenInterval, so we can make a second payment immediately
-      // TODO(i1395) Consider changing this ^ once our tests can control time
+      ) // paymentDuration == paymenInterval, so we can make a second payment immediately,
+      // without having to mess with time
       val request = subsCodegen.SubscriptionRequest(
         subscriptionData,
         payData,

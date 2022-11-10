@@ -1,14 +1,9 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.environment.CoinEnvironmentImpl
-import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
-  IsolatedCoinEnvironments,
 }
-import com.daml.network.util.CommonCoinAppInstanceReferences
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import org.apache.commons.io.FileUtils
 import org.openqa.selenium.bidi.log.{BaseLogEntry, Log, LogEntry}
@@ -48,17 +43,10 @@ trait CustomMatchers {
 abstract class FrontendIntegrationTest(frontendNames: String*)
     extends CoinIntegrationTest
     with BeforeAndAfterEach
-    with IsolatedCoinEnvironments
-    with CommonCoinAppInstanceReferences
     with WebBrowser
     with CustomMatchers {
 
   type WebDriverType = WebDriver with TakesScreenshot with JavascriptExecutor
-
-  override def environmentDefinition
-      : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
-    CoinEnvironmentDefinition
-      .simpleTopology(this.getClass.getSimpleName)
 
   val options: FirefoxOptions =
     new FirefoxOptions().setHeadless(true).setLogLevel(FirefoxDriverLogLevel.DEBUG)

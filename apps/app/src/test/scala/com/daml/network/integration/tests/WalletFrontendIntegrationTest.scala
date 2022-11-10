@@ -268,7 +268,6 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
           directory.stop()
         }
         clue("Make a subscription payment") {
-          // TODO(i1426) Replace this with a wait + automatic payment
           val stateId = inside(aliceRemoteWallet.listSubscriptions().head.state) {
             case SubscriptionIdleState(state) => state.contractId
           }

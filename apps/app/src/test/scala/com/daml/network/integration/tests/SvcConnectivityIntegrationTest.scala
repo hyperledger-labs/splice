@@ -7,18 +7,14 @@ import com.daml.network.integration.plugins.toxiproxy.UseToxiproxy
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
-  IsolatedCoinEnvironments,
 }
-import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import monocle.macros.syntax.lens._
 
-class SvcConnectivityIntegrationTest
-    extends CoinIntegrationTest
-    with IsolatedCoinEnvironments
-    with CommonCoinAppInstanceReferences {
+class SvcConnectivityIntegrationTest extends CoinIntegrationTest {
+
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition

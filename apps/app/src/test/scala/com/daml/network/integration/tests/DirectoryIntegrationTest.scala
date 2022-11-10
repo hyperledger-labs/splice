@@ -12,9 +12,7 @@ import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
-  IsolatedCoinEnvironments,
 }
-import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
@@ -25,10 +23,7 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
-class DirectoryIntegrationTest
-    extends CoinIntegrationTest
-    with IsolatedCoinEnvironments
-    with CommonCoinAppInstanceReferences {
+class DirectoryIntegrationTest extends CoinIntegrationTest {
 
   import DirectoryIntegrationTest._
 

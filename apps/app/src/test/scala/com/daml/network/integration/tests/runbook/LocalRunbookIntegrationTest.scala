@@ -5,7 +5,6 @@ import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
-  IsolatedCoinEnvironments,
 }
 import com.daml.network.integration.{
   CoinConfigTransform,
@@ -19,10 +18,7 @@ import monocle.macros.syntax.lens._
 import scala.util.Try
 
 /** Runs through runbook but does so while spinning up a local SVC. */
-class LocalRunbookIntegrationTest
-    extends CoinIntegrationTest
-    with IsolatedCoinEnvironments
-    with HasConsoleScriptRunner {
+class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScriptRunner {
   val examplesPath: File = "apps" / "app" / "src" / "pack" / "examples"
   val clusterImagesPath: File = "cluster" / "images"
   val validatorPath: File = examplesPath / "validator"
@@ -44,8 +40,12 @@ class LocalRunbookIntegrationTest
         scanAppPath / "coin.conf",
       )
       .clearConfigTransforms()
-      .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy1000(conf))
-      .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpSvcParticipantPortsBy1000(conf))
+      // Bump ports by 1000 to avoid collisions with the Canton instance started outside of our tests.
+      .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy(1000)(conf))
+      // Our SVC participant is instance 0 usually. However in our runbook
+      // our users are not exposed to that so we also use 0 for their participant. This
+      // rewrites the SVC ports by an extra 1000 to avoid collisions.
+      .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpSvcParticipantPortsBy(1000)(conf))
       .addConfigTransform((_, conf) => remoteScanAddressToLocalhost(conf))
       .addConfigTransform((_, conf) => remoteParticipantAddressToLocalhost(conf))
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
@@ -72,12 +72,12 @@ class LocalRunbookIntegrationTest
   }
 
   private def remoteParticipantAddressToLocalhost: CoinConfigTransform = {
-    CoinConfigTransforms.updateSvcConfig(
+    CoinConfigTransforms.updateSvcAppConfig(
       _.focus(_.remoteParticipant.adminApi.address)
         .replace("localhost")
         .focus(_.remoteParticipant.ledgerApi.address)
         .replace("localhost")
-    ) compose CoinConfigTransforms.updateCcScanConfig(
+    ) compose CoinConfigTransforms.updateScanAppConfig(
       _.focus(_.remoteParticipant.adminApi.address)
         .replace("localhost")
         .focus(_.remoteParticipant.ledgerApi.address)

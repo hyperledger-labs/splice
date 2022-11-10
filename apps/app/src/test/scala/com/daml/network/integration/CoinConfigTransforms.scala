@@ -50,8 +50,8 @@ object CoinConfigTransforms {
     {
       val suffix = s"${context}".toLowerCase
 
-      val config1 = updateSvcConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config)
-      val config2 = updateCcScanConfig(c => c.copy(svcUser = s"${c.svcUser}-$suffix"))(config1)
+      val config1 = updateSvcAppConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config)
+      val config2 = updateScanAppConfig(c => c.copy(svcUser = s"${c.svcUser}-$suffix"))(config1)
       val config3 =
         updateAllValidatorConfigs_(c =>
           c.copy(
@@ -71,7 +71,7 @@ object CoinConfigTransforms {
           config4
         )
       val config6 =
-        updateAllDirectoryAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
+        updateDirectoryAppConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
           config5
         )
       val config7 =
@@ -129,9 +129,7 @@ object CoinConfigTransforms {
   type SplitwiseAppTransform = CnAppConfigTransform[LocalSplitwiseAppConfig]
   type RemoteSplitwiseAppTransform = CnAppConfigTransform[RemoteSplitwiseAppConfig]
 
-  def updateAllDirectoryAppConfigs_(
-      update: DirectoryAppTransform
-  ): CoinConfigTransform =
+  def updateDirectoryAppConfig(update: DirectoryAppTransform): CoinConfigTransform =
     cantonConfig =>
       cantonConfig
         .focus(_.directoryApp)
@@ -168,7 +166,7 @@ object CoinConfigTransforms {
       (name, update(config))
     })
 
-  def updateCcScanConfig(update: ScanAppTransform): CoinConfigTransform =
+  def updateScanAppConfig(update: ScanAppTransform): CoinConfigTransform =
     cantonConfig =>
       cantonConfig
         .focus(_.scanApp)
@@ -177,7 +175,7 @@ object CoinConfigTransforms {
           case Some(scan) => Some(update(scan))
         })
 
-  def updateSvcConfig(update: SvcAppTransform): CoinConfigTransform =
+  def updateSvcAppConfig(update: SvcAppTransform): CoinConfigTransform =
     cantonConfig =>
       cantonConfig
         .focus(_.svcApp)
@@ -239,46 +237,67 @@ object CoinConfigTransforms {
   ): CoinConfigTransform =
     updateAllParticipantConfigs((_, config) => update(config))
 
-  // Bump ports by 1000 to avoid collisions with the Canton instance started
-  // outside of our tests.
-  def bumpCantonPortsBy1000: CoinConfigTransform = {
+  def bumpCantonPortsBy(bump: Int): CoinConfigTransform = {
     val domain = updateAllDomainConfigs_(
-      _.focus(_.adminApi).modify(portTransform).focus(_.publicApi).modify(portTransform)
+      _.focus(_.adminApi)
+        .modify(portTransform(bump, _))
+        .focus(_.publicApi)
+        .modify(portTransform(bump, _))
     )
     val participant = updateAllParticipantConfigs_(
-      _.focus(_.adminApi).modify(portTransform).focus(_.ledgerApi).modify(portTransform)
+      _.focus(_.adminApi)
+        .modify(portTransform(bump, _))
+        .focus(_.ledgerApi)
+        .modify(portTransform(bump, _))
     )
-    val validator = updateAllValidatorConfigs_(_.focus(_.remoteParticipant).modify(portTransform))
-    val wallet = updateAllWalletAppConfigs_(_.focus(_.remoteParticipant).modify(portTransform))
-    val svc = updateSvcConfig(_.focus(_.remoteParticipant).modify(portTransform))
-    val scan = updateCcScanConfig(_.focus(_.remoteParticipant).modify(portTransform))
+    val svc = updateSvcAppConfig(_.focus(_.remoteParticipant).modify(portTransform(bump, _)))
+    val scan = updateScanAppConfig(_.focus(_.remoteParticipant).modify(portTransform(bump, _)))
+    val validator = updateAllValidatorConfigs_(
+      _.focus(_.remoteParticipant).modify(portTransform(bump, _))
+    )
+    val wallet = updateAllWalletAppConfigs_(
+      _.focus(_.remoteParticipant).modify(portTransform(bump, _))
+    )
+    val directory = updateDirectoryAppConfig(
+      _.focus(_.remoteParticipant).modify(portTransform(bump, _))
+    )
+    val splitwise = updateAllSplitwiseAppConfigs_(
+      _.focus(_.remoteParticipant).modify(portTransform(bump, _))
+    )
 
-    domain compose participant compose validator compose wallet compose svc compose scan
+    domain compose participant compose svc compose scan compose validator compose wallet compose directory compose splitwise
   }
 
-  // Our SVC participant is instance 0 usually. However in our runbook
-  // our users are not exposed to that so we also use 0 for their participant. This
-  // rewrites the SVC ports by an extra 1000 to avoid collisions.
-  def bumpSvcParticipantPortsBy1000: CoinConfigTransform = {
+  def bumpSvcParticipantPortsBy(bump: Int): CoinConfigTransform = {
     val participant = updateAllParticipantConfigs { case (name, conf) =>
       if (name == "svc_participant") {
-        conf.focus(_.adminApi).modify(portTransform).focus(_.ledgerApi).modify(portTransform)
+        conf
+          .focus(_.adminApi)
+          .modify(portTransform(bump, _))
+          .focus(_.ledgerApi)
+          .modify(portTransform(bump, _))
       } else conf
     }
-    val svc = updateSvcConfig(_.focus(_.remoteParticipant).modify(portTransform))
-    val scan = updateCcScanConfig(_.focus(_.remoteParticipant).modify(portTransform))
+    val svc = updateSvcAppConfig(_.focus(_.remoteParticipant).modify(portTransform(bump, _)))
+    val scan = updateScanAppConfig(_.focus(_.remoteParticipant).modify(portTransform(bump, _)))
     participant compose svc compose scan
   }
 
-  private def portTransform(c: CommunityAdminServerConfig): CommunityAdminServerConfig =
-    c.copy(internalPort = c.internalPort.map(p => p + 1000))
-  private def portTransform(c: CommunityPublicServerConfig): CommunityPublicServerConfig =
-    c.copy(internalPort = c.internalPort.map(p => p + 1000))
-  private def portTransform(c: ClientConfig): ClientConfig =
-    c.copy(port = c.port + 1000)
-  private def portTransform(c: LedgerApiServerConfig): LedgerApiServerConfig =
-    c.copy(internalPort = c.internalPort.map(p => p + 1000))
-  private def portTransform(c: RemoteParticipantConfig): RemoteParticipantConfig =
-    c.focus(_.adminApi).modify(portTransform).focus(_.ledgerApi).modify(portTransform)
+  private def portTransform(bump: Int, c: CommunityAdminServerConfig): CommunityAdminServerConfig =
+    c.copy(internalPort = c.internalPort.map(p => p + bump))
+  private def portTransform(
+      bump: Int,
+      c: CommunityPublicServerConfig,
+  ): CommunityPublicServerConfig =
+    c.copy(internalPort = c.internalPort.map(p => p + bump))
+  private def portTransform(bump: Int, c: ClientConfig): ClientConfig =
+    c.copy(port = c.port + bump)
+  private def portTransform(bump: Int, c: LedgerApiServerConfig): LedgerApiServerConfig =
+    c.copy(internalPort = c.internalPort.map(p => p + bump))
+  private def portTransform(bump: Int, c: RemoteParticipantConfig): RemoteParticipantConfig =
+    c.focus(_.adminApi)
+      .modify(portTransform(bump, _))
+      .focus(_.ledgerApi)
+      .modify(portTransform(bump, _))
 
 }
