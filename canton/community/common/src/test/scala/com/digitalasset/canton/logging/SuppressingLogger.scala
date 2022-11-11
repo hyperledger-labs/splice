@@ -264,6 +264,32 @@ class SuppressingLogger private[logging] (
       )
     }
 
+  /** Variant of assertLogsSeq where assertions can depend on the result of the
+    * computation.
+    */
+  def assertLogsSeqWithResult[A](
+      rule: SuppressionRule
+  )(within: => A, assertion: (A, Seq[LogEntry]) => Assertion): A =
+    suppress(rule) {
+      runWithCleanup(
+        {
+          within
+        },
+        { (result: A) =>
+          // check the log
+
+          val logEntries = recordedLogEntries.asScala.toSeq
+
+          assertion(result, logEntries)
+
+          // Remove checked log entries only if check succeeds.
+          // This is to allow for retries, if the check fails.
+          logEntries.foreach(_ => recordedLogEntries.remove())
+        },
+        () => (),
+      )
+    }
+
   /** Asserts that the sequence of logged warnings/errors meets a set of expected log messages. */
   def assertLogsSeqString[A](rule: SuppressionRule, expectedLogs: Seq[String])(within: => A): A =
     assertLogsSeq(rule)(
@@ -417,7 +443,7 @@ class SuppressingLogger private[logging] (
     * @throws java.lang.IllegalArgumentException if `T` is `EitherT` or `OptionT`
     */
   @SuppressWarnings(Array("org.wartremover.warts.Var", "org.wartremover.warts.AsInstanceOf"))
-  private def runWithCleanup[T](body: => T, onSuccess: () => Unit, doFinally: () => Unit): T = {
+  private def runWithCleanup[T](body: => T, onSuccess: (T) => Unit, doFinally: () => Unit): T = {
     var isAsync = false
     try {
       // Run the computation in body
@@ -429,7 +455,7 @@ class SuppressingLogger private[logging] (
           // Cleanup after completion of the future.
           val asyncResultWithCleanup = asyncResult
             .map(r => {
-              onSuccess()
+              onSuccess(result)
               r
             })
             .thereafter(_ => doFinally())
@@ -449,7 +475,7 @@ class SuppressingLogger private[logging] (
         // Therefore, we don't know whether the suppression needs to be asynchronous.
 
         case syncResult =>
-          onSuccess()
+          onSuccess(syncResult)
           syncResult
       }
     } finally {
@@ -460,6 +486,9 @@ class SuppressingLogger private[logging] (
         doFinally()
     }
   }
+
+  private def runWithCleanup[T](body: => T, onSuccess: () => Unit, doFinally: () => Unit): T =
+    runWithCleanup(body, (_: T) => onSuccess(), doFinally)
 
   private def beginSuppress(rule: SuppressionRule): () => Unit = {
     withClue("Trying to suppress warnings/errors several times") {

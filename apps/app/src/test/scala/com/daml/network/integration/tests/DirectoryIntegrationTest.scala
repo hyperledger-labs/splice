@@ -15,7 +15,9 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
+import org.slf4j.event.Level.WARN
 
 import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
@@ -128,26 +130,48 @@ class DirectoryIntegrationTest extends CoinIntegrationTest {
         // The provider of the directory service
         val providerParty = directory.getProviderPartyId()
 
-        def requestAndPayForEntry(refs: DynamicUserRefs, entryName: String) = {
-          // Grab the current offset
-
-          // Request entry and get some money to pay for it
-          refs.directory.requestDirectoryEntry(entryName)
+        def requestAndPayForEntry(refs: DynamicUserRefs, entryName: String): String = {
           refs.wallet.tap(5.0)
 
-          // Accept first payment request that becomes visible
-          val accepted = eventually()(inside(refs.wallet.listAppPaymentRequests()) {
-            case reqId +: _ =>
-              refs.wallet.acceptAppPaymentRequest(reqId.contractId)
-          })
+          // Request entry and get some money to pay for it
+          val entryRequest = refs.directory.requestDirectoryEntry(entryName)
 
-          // Wait for the AcceptedAppPayment to be archived
+          // Wait for DirectoryEntryRequest to be archived
           eventually() {
             refs.validator.remoteParticipant.ledger_api.acs
-              .filterJava(walletCodegen.AcceptedAppPayment.COMPANION)(
+              .filterJava(codegen.DirectoryEntryRequest.COMPANION)(
                 refs.userParty,
-                (request: walletCodegen.AcceptedAppPayment.Contract) => request.id == accepted,
+                (request: codegen.DirectoryEntryRequest.Contract) => request.id == entryRequest,
               ) shouldBe empty
+          }
+
+          // Check if a payment request got created
+          val paymentRequests = refs.validator.remoteParticipant.ledger_api.acs
+            .filterJava(walletCodegen.AppPaymentRequest.COMPANION)(
+              refs.userParty
+            )
+
+          paymentRequests match {
+            case Seq(req) =>
+              // Accept payment request, we need another eventually here to wait for store ingestion.
+              val accepted = eventually()(inside(refs.wallet.listAppPaymentRequests()) {
+                case Seq(storeRequest) =>
+                  storeRequest.contractId shouldBe req.id
+                  refs.wallet.acceptAppPaymentRequest(storeRequest.contractId)
+              })
+              // Wait for the AcceptedAppPayment to be archived
+              eventually() {
+                refs.validator.remoteParticipant.ledger_api.acs
+                  .filterJava(walletCodegen.AcceptedAppPayment.COMPANION)(
+                    refs.userParty,
+                    (request: walletCodegen.AcceptedAppPayment.Contract) => request.id == accepted,
+                  ) shouldBe empty
+              }
+              "AcceptedRequest"
+            case Seq() =>
+              // No payment request, other entry already got created
+              "RejectedRequest"
+            case _ => fail(s"More than one payment request created: $paymentRequests")
           }
         }
 
@@ -160,7 +184,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest {
         val bobRefs = setupUser(bobStaticRefs)
 
         // Concurrently, request an entry as alice and bob
-        loggerFactory.assertLogs(
+        loggerFactory.assertLogsSeqWithResult[Seq[String]](SuppressionRule.LevelAndAbove(WARN))(
           {
             val aliceF = Future {
               requestAndPayForEntry(aliceRefs, testEntryName)
@@ -171,12 +195,21 @@ class DirectoryIntegrationTest extends CoinIntegrationTest {
 
             // Wait for both of them
             // TODO(#790): check how one could write an assertion that command dedup is triggered
-            aliceF.futureValue
-            bobF.futureValue
+            Seq(aliceF.futureValue, bobF.futureValue)
           },
-          _.warningMessage should include(
-            "rejecting accepted app payment: entry already exists and owned by"
-          ),
+          {
+            case (results, logs) if results.contains("RejectedRequest") =>
+              // We don’t log on requested requests since that’s a user error.
+              logs shouldBe empty
+            case (results, logs) =>
+              results should contain("AcceptedRequest")
+              inside(logs) { case Seq(msg) =>
+                msg.warningMessage should include(
+                  "rejecting accepted app payment: entry already exists and owned by"
+                )
+              }
+
+          },
         )
 
         // Check who won
