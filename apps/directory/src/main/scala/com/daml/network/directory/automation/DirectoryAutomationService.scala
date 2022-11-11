@@ -63,8 +63,6 @@ class DirectoryAutomationService(
     )
   )
 
-  private val hashFun = MessageDigest.getInstance("SHA-256")
-
   // TODO(#790): generalize this so that it can be shared with other command dedup calls
   private def mkCommandId(
       methodName: String,
@@ -73,6 +71,8 @@ class DirectoryAutomationService(
   ): String = {
     require(!methodName.contains('/'))
     val str = parties.map(_.toProtoPrimitive).appended(suffix).mkString("/")
+    // Digest is not thread safe, create a new one each time.
+    val hashFun = MessageDigest.getInstance("SHA-256")
     val hash = hashFun.digest(str.getBytes("UTF-8")).map("%02x".format(_)).mkString
     s"${methodName}_$hash"
   }
