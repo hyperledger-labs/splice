@@ -1,12 +1,7 @@
 package com.daml.network.scan.admin.api.client
 
-import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.network.admin.api.client.AppConnection
-import com.daml.network.codegen.CC.{CoinRules as coinRulesCodegen}
-import com.daml.network.codegen.java.cc.{
-  coinrules => javaCoinRulesCodegen,
-  round => javaRoundCodegen,
-}
+import com.daml.network.codegen.java.cc.{coinrules as coinRulesCodegen}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -63,7 +58,7 @@ final class ScanConnection(
       val openMiningRound = context.latestOpenMiningRound.getOrElse(
         throw notFound("No active OpenMiningRound contract")
       )
-      coinRulesCodegen.AppTransferContext(
+      new coinRulesCodegen.AppTransferContext(
         coinRules.contractId,
         openMiningRound.contractId,
       )
@@ -71,15 +66,11 @@ final class ScanConnection(
 
   def getJavaAppTransferContext()(implicit
       traceContext: TraceContext
-  ): Future[javaCoinRulesCodegen.AppTransferContext] =
+  ): Future[coinRulesCodegen.AppTransferContext] =
     getAppTransferContext().map(context =>
-      new javaCoinRulesCodegen.AppTransferContext(
-        new javaCoinRulesCodegen.CoinRules.ContractId(
-          ApiTypes.ContractId.unwrap(context.coinRules)
-        ),
-        new javaRoundCodegen.OpenMiningRound.ContractId(
-          ApiTypes.ContractId.unwrap(context.openMiningRound)
-        ),
+      new coinRulesCodegen.AppTransferContext(
+        context.coinRules,
+        context.openMiningRound,
       )
     )
 

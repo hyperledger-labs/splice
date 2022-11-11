@@ -14,6 +14,7 @@ import com.daml.network.codegen.CN.Wallet.Subscriptions as subsCodegen
 import com.daml.network.codegen.CN.{Wallet as walletCodegen}
 import com.daml.network.codegen.DA.Time.Types.RelTime
 import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
+import com.daml.network.codegen.java.cc.{coinrules as javaCoinRulesCodegen}
 import com.daml.network.codegen.java.cn.{directory as dirCodegen}
 import com.daml.network.console.{LocalWalletAppReference, WalletAppReference}
 import com.daml.network.integration.tests.CoinTests.{
@@ -39,6 +40,8 @@ class WalletIntegrationTest
     extends CoinIntegrationTest
     with HasExecutionContext
     with PaymentChannelTestUtil {
+
+  import WalletIntegrationTest.*
 
   "A wallet" should {
 
@@ -368,7 +371,7 @@ class WalletIntegrationTest
         }
         clue("Collect the initial payment (as the receiver), which creates the subscription") {
           val collectCommand = initialPaymentId
-            .exerciseSubscriptionInitialPayment_Collect(transferContext)
+            .exerciseSubscriptionInitialPayment_Collect(transferContext.toScala)
             .command
           aliceWallet.remoteParticipant.ledger_api.commands.submit(
             actAs = Seq(aliceUserParty),
@@ -409,7 +412,7 @@ class WalletIntegrationTest
           "Collect the second payment (as the receiver), which sets the subscription back to idle"
         ) {
           val collectCommand2 = paymentId
-            .exerciseSubscriptionPayment_Collect(transferContext)
+            .exerciseSubscriptionPayment_Collect(transferContext.toScala)
             .command
           aliceWallet.remoteParticipant.ledger_api.commands.submit(
             actAs = Seq(aliceUserParty),
@@ -1018,7 +1021,7 @@ class WalletIntegrationTest
       validatorParty: PartyId,
       coins: Seq[GrpcWalletAppClient.CoinPosition],
       quantity: Int,
-      transferContext: coinRulesCodegen.AppTransferContext,
+      transferContext: javaCoinRulesCodegen.AppTransferContext,
   ): Unit = {
     val coinOpt = coins.find(_.effectiveQuantity >= quantity)
     val expirationOpt = Proto.decode(Proto.Timestamp)(20000000000000000L) // Wed May 18 2033
@@ -1029,7 +1032,8 @@ class WalletIntegrationTest
           Seq(userParty, validatorParty),
           optTimeout = None,
           commands = Seq(
-            transferContext.coinRules
+            Primitive
+              .ContractId[coinRulesCodegen.CoinRules](transferContext.coinRules.contractId)
               .exerciseCoinRules_Transfer(
                 coinRulesCodegen.Transfer(
                   sender = userParty.toPrim,
@@ -1055,7 +1059,8 @@ class WalletIntegrationTest
                   payload = "lock coins",
                 ),
                 coinRulesCodegen.TransferContext(
-                  openMiningRound = transferContext.openMiningRound,
+                  openMiningRound =
+                    Primitive.ContractId(transferContext.openMiningRound.contractId),
                   issuingMiningRounds = Map.empty[roundCodegen.Round, Primitive.ContractId[
                     roundCodegen.IssuingMiningRound
                   ]],
@@ -1130,5 +1135,15 @@ class WalletIntegrationTest
       )
       request
     }
+  }
+}
+
+object WalletIntegrationTest {
+  implicit class AppTranferContextUtils(val context: javaCoinRulesCodegen.AppTransferContext)
+      extends AnyVal {
+    def toScala: coinRulesCodegen.AppTransferContext = new coinRulesCodegen.AppTransferContext(
+      Primitive.ContractId(context.coinRules.contractId),
+      Primitive.ContractId(context.openMiningRound.contractId),
+    )
   }
 }

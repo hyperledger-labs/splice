@@ -16,19 +16,31 @@ import scala.util.Try
   * See https://docs.daml.com/app-dev/daml-lf-translation.html#data-types for the translation
   * from Daml to Daml-LF.
   * @param value The underlying value.
+  * @param toValue Conversion to protobuf value. Java codegen does not provide a generic
+  *   mechanism for that so we explicitly carry the function around.
   */
-final case class JavaValue[T <: CodegenValue](
-    value: T
+final class JavaValue[T](
+    val value: T,
+    toValue: T => CodegenValue,
 ) {
   def toProtoV0: v0.Value = v0.Value(
-    value = Some(scalaValue.Value.fromJavaProto(value.toProto))
+    value = Some(scalaValue.Value.fromJavaProto(toValue(value).toProto))
   )
+
+  // Overridden to avoid equality on toValue. toValue is uniquely defined
+  // for codegen values so this is safe.
+  override def equals(obj: Any) = obj match {
+    case that: JavaValue[_] => this.value == that.value
+    case _ => false
+  }
+
+  override def hashCode(): Int = this.value.hashCode()
 }
 
 object JavaValue {
-  def fromProto[T](decoder: ValueDecoder[T])(
+  def fromProto[T](decoder: ValueDecoder[T], toValue: T => CodegenValue)(
       value: v0.Value
-  ): Either[ProtoDeserializationError, Value[T]] = {
+  ): Either[ProtoDeserializationError, JavaValue[T]] = {
     for {
       valueP <- ProtoConverter.required("Value.value", value.value)
       value <- Try(
@@ -38,8 +50,9 @@ object JavaValue {
           ProtoDeserializationError
             .ValueConversionError("value", s"Failed to decode $valueP")
         )
-    } yield Value(
-      value = value
+    } yield new JavaValue(
+      value = value,
+      toValue = toValue,
     )
   }
 }

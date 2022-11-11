@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.CC.Round.{ClosedMiningRound, Round}
-import com.daml.network.codegen.DA
+import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, Round}
+import com.daml.network.codegen.java.da
 import com.daml.network.history._
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
 import com.daml.network.util.{ExerciseNode, PaymentChannelTestUtil}
@@ -26,8 +26,8 @@ class ScanIntegrationTest extends CoinIntegrationTest with PaymentChannelTestUti
       val tapCreateTx = history(0)
       val tapEvent = tapCreateTx.events(0)
       inside(tapEvent.parentO) { case Some(tap: Tap) =>
-        tap.node.argument.quantity shouldBe 50
-        tap.node.argument.receiver shouldBe aliceP.toPrim
+        BigDecimal(tap.node.argument.value.quantity) shouldBe 50
+        tap.node.argument.value.receiver shouldBe aliceP.toPrim
       }
 
       val transferTx = history(1)
@@ -48,10 +48,10 @@ class ScanIntegrationTest extends CoinIntegrationTest with PaymentChannelTestUti
           transferParentNode2 shouldBe transferParentNode3
 
           inside(transferParentNode) { case Some(Transfer(ExerciseNode(argument, result))) =>
-            argument.transfer.sender shouldBe aliceP.toPrim
+            argument.value.transfer.sender shouldBe aliceP.toPrim
             // one transfer result for alice, one for bob
-            inside(result) { case DA.Types.Either.Right(result) =>
-              result.createdCoins should have length 2
+            inside(result.value) { case result: da.types.either.Right[_, _] =>
+              result.bValue.createdCoins should have length 2
             }
           }
 
@@ -60,7 +60,7 @@ class ScanIntegrationTest extends CoinIntegrationTest with PaymentChannelTestUti
 
           inside(bob) { case CoinCreate(coin: CoinContract) =>
             // -0.05 as sender needs to pay half of the transfer fee (0.1)
-            coin.contract.payload.quantity.initialQuantity shouldBe BigDecimal(9.95)
+            BigDecimal(coin.contract.payload.quantity.initialQuantity) shouldBe 9.95
           }
       }
     }
@@ -138,29 +138,29 @@ class ScanIntegrationTest extends CoinIntegrationTest with PaymentChannelTestUti
     inside(closed) { case Seq(round1, round0) =>
       // TODO(M1-92): make this more robust or don't care about exact values at all
       round0.payload should be(
-        ClosedMiningRound(
-          svc = svcParty.toPrim,
-          round = Round(number = 0),
-          totalTransferFees = BigDecimal(0.58),
-          totalAdminFees = BigDecimal(0.2),
-          totalHoldingFees = BigDecimal(0.0),
-          totalTransferInputs = BigDecimal(360.705),
-          totalNonSelfTransferOutputs = BigDecimal(57.71),
-          totalSelfTransferOutputs = BigDecimal(302.215),
-          observers = round0.payload.observers,
+        new ClosedMiningRound(
+          svcParty.toProtoPrimitive,
+          new Round(0),
+          BigDecimal(0.58).bigDecimal.setScale(10),
+          BigDecimal(0.2).bigDecimal.setScale(10),
+          BigDecimal(0.0).bigDecimal.setScale(10),
+          BigDecimal(360.705).bigDecimal.setScale(10),
+          BigDecimal(57.71).bigDecimal.setScale(10),
+          BigDecimal(302.215).bigDecimal.setScale(10),
+          round0.payload.observers,
         )
       )
       round1.payload should be(
-        ClosedMiningRound(
-          svc = svcParty.toPrim,
-          round = Round(number = 1),
-          totalTransferFees = BigDecimal(0.39),
-          totalAdminFees = BigDecimal(0.3),
-          totalHoldingFees = BigDecimal(0.0000048225),
-          totalTransferInputs = BigDecimal(356.8949855325),
-          totalNonSelfTransferOutputs = BigDecimal(29 + 9 + 1 - 0.195),
-          totalSelfTransferOutputs = BigDecimal(317.3999855325),
-          observers = round1.payload.observers,
+        new ClosedMiningRound(
+          svcParty.toProtoPrimitive,
+          new Round(1),
+          BigDecimal(0.39).bigDecimal.setScale(10),
+          BigDecimal(0.3).bigDecimal.setScale(10),
+          BigDecimal(0.0000048225).bigDecimal.setScale(10),
+          BigDecimal(356.8949855325).bigDecimal.setScale(10),
+          BigDecimal(29 + 9 + 1 - 0.195).bigDecimal.setScale(10),
+          BigDecimal(317.3999855325).bigDecimal.setScale(10),
+          round1.payload.observers,
         )
       )
 

@@ -1,12 +1,12 @@
 package com.daml.network.console
 
-import com.daml.ledger.api.v1.transaction.TransactionTree
-import com.daml.network.codegen.CC.{CoinRules => coinRulesCodegen, Round => roundCodegen}
+import com.daml.ledger.javaapi.data.TransactionTree
+import com.daml.network.codegen.java.cc.{coinrules => coinRulesCodegen, round => roundCodegen}
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.history.{CoinTransaction, CoinTransactionTreeView}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
 import com.daml.network.scan.config.{LocalScanAppConfig, RemoteScanAppConfig}
-import com.daml.network.util.Contract
+import com.daml.network.util.{JavaContract as Contract}
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
@@ -51,7 +51,7 @@ abstract class ScanAppReference(
     )
     val coinRules =
       getTransferContext().coinRules.getOrElse(throw notFound("No active CoinRules contract"))
-    coinRulesCodegen.AppTransferContext(
+    new coinRulesCodegen.AppTransferContext(
       coinRules.contractId,
       openMiningRound.contractId,
     )
@@ -77,7 +77,8 @@ abstract class ScanAppReference(
   @Help.Summary(
     "Lists all closed rounds with their collected statistics"
   )
-  def getClosedRounds(): Seq[Contract[roundCodegen.ClosedMiningRound]] =
+  def getClosedRounds()
+      : Seq[Contract[roundCodegen.ClosedMiningRound.ContractId, roundCodegen.ClosedMiningRound]] =
     consoleEnvironment.run {
       adminCommand(GrpcScanAppClient.GetClosedRounds())
     }

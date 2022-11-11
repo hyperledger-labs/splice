@@ -1,22 +1,24 @@
 package com.daml.network.scan.admin
 
-import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.api.v1.event.ExercisedEvent
-import com.daml.ledger.api.v1.transaction.TreeEvent.Kind.{Created, Empty, Exercised}
-import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree, TreeEvent}
-import com.daml.ledger.client.binding.Primitive
-import com.daml.ledger.javaapi.data.{Identifier, Transaction as JavaTransaction}
+import com.daml.ledger.javaapi.data.{
+  CreatedEvent,
+  ExercisedEvent,
+  Identifier,
+  Transaction,
+  TransactionTree,
+  TreeEvent,
+}
 import com.daml.network.admin.LedgerAutomationService
-import com.daml.network.codegen.CC.Coin.{Coin, LockedCoin}
-import com.daml.network.codegen.CC.CoinRules.CoinRules
 import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
+import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history.*
 import com.daml.network.scan.store.ScanCCHistoryStore
-import com.daml.network.util.{Contract, ExerciseNode, Trees}
+import com.daml.network.util.{ExerciseNode, JavaContract => Contract, Trees}
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
+import com.digitalasset.canton.participant.ledger.api.client.{JavaDecodeUtil as DecodeUtil}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
@@ -43,23 +45,23 @@ class ReadCoinTransactionsService(
     * - traverse the corresponding TransactionTree to find the creates and archives and then add them to TxStore with the context
     * derived from the full transaction tree
     */
-  override def processTransaction(tx: JavaTransaction)(implicit
+  override def processTransaction(tx: Transaction)(implicit
       traceContext: TraceContext
   ): Future[Unit] = {
     for {
       tree <- connection.tryGetTransactionTreeById(Seq(svcParty), tx.getTransactionId)
-      events <- traverseForest(TransactionTree.fromJavaProto(tree.toProto))
-      metadata = TransactionMetadata(Transaction.fromJavaProto(tx.toProto))
+      events <- traverseForest(tree)
+      metadata = TransactionMetadata(tx)
       _ <- store.addTransaction(CoinTransaction(events, metadata))
     } yield ()
   }
 
-  private val activeCoins: concurrent.Map[Primitive.ContractId[Coin], Contract[Coin]] =
-    TrieMap[Primitive.ContractId[Coin], Contract[Coin]]()
+  private val activeCoins: concurrent.Map[Coin.ContractId, Contract[Coin.ContractId, Coin]] =
+    TrieMap[Coin.ContractId, Contract[Coin.ContractId, Coin]]()
 
   private val activeLockedCoins
-      : concurrent.Map[Primitive.ContractId[LockedCoin], Contract[LockedCoin]] =
-    TrieMap[Primitive.ContractId[LockedCoin], Contract[LockedCoin]]()
+      : concurrent.Map[LockedCoin.ContractId, Contract[LockedCoin.ContractId, LockedCoin]] =
+    TrieMap[LockedCoin.ContractId, Contract[LockedCoin.ContractId, LockedCoin]]()
 
   /** Traverse a Ledger API TransactionTree via a pre-order DFS and extract the CoinEvents */
   @SuppressWarnings(Array("org.wartremover.warts.While"))
@@ -68,7 +70,7 @@ class ReadCoinTransactionsService(
 
       val coinEvents: mutable.Buffer[CoinEvent] = mutable.ListBuffer()
 
-      def addToEvents(event: EventTypeAndCoin, parentO: Option[TreeEvent.Kind]) = {
+      def addToEvents(event: EventTypeAndCoin, parentO: Option[TreeEvent]) = {
         parentO match {
           case None =>
             event match {
@@ -90,24 +92,24 @@ class ReadCoinTransactionsService(
 
       Trees.traverseTree(
         tree,
-        onCreate = (created: Created, pathToNode: Seq[TreeEvent.Kind]) => {
+        onCreate = (created: CreatedEvent, pathToNode: Seq[TreeEvent]) => {
           DecodeUtil
-            .decodeCreated(Coin)(created.value)
+            .decodeCreated(Coin.COMPANION)(created)
             .foreach(c => {
               val coinContract = Contract.fromCodegenContract(c)
               activeCoins.addOne((coinContract.contractId, coinContract))
               addToEvents(CoinCreate(CoinContract(coinContract)), pathToNode.lastOption)
             })
           DecodeUtil
-            .decodeCreated(LockedCoin)(created.value)
+            .decodeCreated(LockedCoin.COMPANION)(created)
             .foreach(c => {
               val coinContract = Contract.fromCodegenContract(c)
               activeLockedCoins.addOne((coinContract.contractId, coinContract))
               addToEvents(CoinCreate(LockedCoinContract(coinContract)), pathToNode.lastOption)
             })
         },
-        onExercise = (exercised: Exercised, pathToNode: Seq[TreeEvent.Kind]) => {
-          val coinContractOpt = DecodeUtil.decodeArchivedExercise(Coin)(exercised)
+        onExercise = (exercised: ExercisedEvent, pathToNode: Seq[TreeEvent]) => {
+          val coinContractOpt = DecodeUtil.decodeArchivedExercise(Coin.COMPANION)(exercised)
           coinContractOpt.foreach(cid => {
             val coinContract = activeCoins
               .remove(cid)
@@ -118,7 +120,8 @@ class ReadCoinTransactionsService(
               )
             addToEvents(CoinArchive(CoinContract(coinContract)), pathToNode.lastOption)
           })
-          val lockedCoinContractOpt = DecodeUtil.decodeArchivedExercise(LockedCoin)(exercised)
+          val lockedCoinContractOpt =
+            DecodeUtil.decodeArchivedExercise(LockedCoin.COMPANION)(exercised)
           lockedCoinContractOpt.foreach(cid => {
             val coinContract = activeLockedCoins
               .remove(cid)
@@ -136,60 +139,63 @@ class ReadCoinTransactionsService(
     }
 
   // Some helper methods
-  private val rulesTemplate = ApiTypes.TemplateId.unwrap(CoinRules.id)
-  private val lockedCoinTemplate = ApiTypes.TemplateId.unwrap(LockedCoin.id)
-  private def isCoinRules(event: ExercisedEvent) = event.templateId.contains(rulesTemplate)
-  private def isLockedCoin(event: ExercisedEvent) = event.templateId.contains(lockedCoinTemplate)
+  private val rulesTemplate = CoinRules.TEMPLATE_ID
+  private val lockedCoinTemplate = LockedCoin.TEMPLATE_ID
+  private def isCoinRules(event: ExercisedEvent) = event.getTemplateId == rulesTemplate
+  private def isLockedCoin(event: ExercisedEvent) = event.getTemplateId == lockedCoinTemplate
 
-  private def isTap(event: ExercisedEvent) = event.choice == "CoinRules_Tap" && isCoinRules(event)
+  private def isTap(event: ExercisedEvent) =
+    event.getChoice == "CoinRules_Tap" && isCoinRules(event)
   private def isCoinUnlock(event: ExercisedEvent) =
-    event.choice == "Coin_Unlock" && isLockedCoin(event)
+    event.getChoice == "Coin_Unlock" && isLockedCoin(event)
   private def isTransfer(event: ExercisedEvent) =
-    event.choice == "CoinRules_Transfer" && isCoinRules(event)
+    event.getChoice == "CoinRules_Transfer" && isCoinRules(event)
   private def isSvcExpireLock(event: ExercisedEvent) =
-    event.choice == "Coin_SvcExpireLock" && isLockedCoin(event)
+    event.getChoice == "Coin_SvcExpireLock" && isLockedCoin(event)
   private def isOwnerExpireLock(event: ExercisedEvent) =
-    event.choice == "Coin_OwnerExpireLock" && isLockedCoin(event)
+    event.getChoice == "Coin_OwnerExpireLock" && isLockedCoin(event)
   private def isStartIssuing(event: ExercisedEvent) =
-    event.choice == "CoinRules_MiningRound_StartIssuing" && isCoinRules(event)
+    event.getChoice == "CoinRules_MiningRound_StartIssuing" && isCoinRules(event)
 
   import cats.syntax.option._
 
-  private def parseEvent(event: TreeEvent.Kind): Option[ParentNode] = {
+  private def parseEvent(event: TreeEvent): Option[ParentNode] = {
     event match {
-      case exercised: Exercised if isTransfer(exercised.value) =>
+      case exercised: ExercisedEvent if isTransfer(exercised) =>
         Transfer(ExerciseNode.tryFromProtoEvent(Transfer)(exercised)).some
-      case exercised: Exercised if isTap(exercised.value) =>
+      case exercised: ExercisedEvent if isTap(exercised) =>
         Tap(ExerciseNode.tryFromProtoEvent(Tap)(exercised)).some
-      case exercised: Exercised if isStartIssuing(exercised.value) =>
+      case exercised: ExercisedEvent if isStartIssuing(exercised) =>
         StartIssuing(ExerciseNode.tryFromProtoEvent(StartIssuing)(exercised)).some
-      case exercised: Exercised if isCoinUnlock(exercised.value) =>
+      case exercised: ExercisedEvent if isCoinUnlock(exercised) =>
         CoinUnlock(ExerciseNode.tryFromProtoEvent(CoinUnlock)(exercised)).some
-      case exercised: Exercised if isSvcExpireLock(exercised.value) =>
+      case exercised: ExercisedEvent if isSvcExpireLock(exercised) =>
         SvcExpireLock(ExerciseNode.tryFromProtoEvent(SvcExpireLock)(exercised)).some
-      case exercised: Exercised if isOwnerExpireLock(exercised.value) =>
+      case exercised: ExercisedEvent if isOwnerExpireLock(exercised) =>
         OwnerExpireLock(ExerciseNode.tryFromProtoEvent(OwnerExpireLock)(exercised)).some
       case _ => None
     }
   }
 
-  private def parseParentEvent(parent: TreeEvent.Kind): Option[ParentNode] = {
+  private def parseParentEvent(parent: TreeEvent): Option[ParentNode] = {
     val ev = parseEvent(parent)
     ev match {
       case None =>
         parent match {
-          case other: Exercised =>
+          case other: ExercisedEvent =>
             logger.warn(
               s"Parent of coin create or archival was not a tap, transfer or start issuing but ${other.getClass} ($other)"
             )
             None
-          case created: Created =>
+          case created: CreatedEvent =>
             ErrorUtil.invalidState(
               "Observed that the parent of a Coin create or archival is a `Created` node" +
                 s"$created. However, a `Created` node should never have any children. "
             )
-          case Empty =>
-            logger.warn("Ancestor of Coin event in the transaction tree was an empty node")
+          case _ =>
+            logger.warn(
+              s"Ancestor of Coin event in the transaction tree was an unknown node $parent"
+            )
             None
         }
       case _ => ev

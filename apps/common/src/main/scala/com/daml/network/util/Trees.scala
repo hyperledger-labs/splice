@@ -3,33 +3,33 @@
 
 package com.daml.network.util
 
-import com.daml.ledger.api.v1.transaction.TreeEvent.Kind.{Created, Empty, Exercised}
-import com.daml.ledger.api.v1.transaction.{TransactionTree, TreeEvent}
+import com.daml.ledger.javaapi.data.{CreatedEvent, ExercisedEvent, TransactionTree, TreeEvent}
 
 import scala.collection.mutable
+import scala.jdk.CollectionConverters.*
 
 object Trees {
 
-  type StackElement = (TreeEvent.Kind, Seq[TreeEvent.Kind])
+  type StackElement = (TreeEvent, Seq[TreeEvent])
 
   @SuppressWarnings(Array("org.wartremover.warts.While"))
   def traverseTree(
       tree: TransactionTree,
-      onCreate: (Created, Seq[TreeEvent.Kind]) => Unit,
-      onExercise: (Exercised, Seq[TreeEvent.Kind]) => Unit,
+      onCreate: (CreatedEvent, Seq[TreeEvent]) => Unit,
+      onExercise: (ExercisedEvent, Seq[TreeEvent]) => Unit,
   ): Unit = {
     val stack: mutable.Stack[StackElement] = mutable.Stack()
-    val roots = tree.rootEventIds.map(id => tree.eventsById(id).kind)
+    val roots = tree.getRootEventIds.asScala.map(id => tree.getEventsById.get(id))
     stack.pushAll(roots.map((_, Seq())).reverse)
     while (stack.nonEmpty) {
       val (node, pathToNode) = stack.pop()
       node match {
-        case Empty =>
-        case created: Created => onCreate(created, pathToNode)
-        case exercised: Exercised =>
+        case created: CreatedEvent => onCreate(created, pathToNode)
+        case exercised: ExercisedEvent =>
           onExercise(exercised, pathToNode)
-          val children = exercised.value.childEventIds.map(tree.eventsById(_).kind)
+          val children = exercised.getChildEventIds.asScala.map(tree.getEventsById.get(_))
           stack.pushAll(children.map((_, pathToNode :+ node)).reverse)
+        case _ =>
       }
     }
   }

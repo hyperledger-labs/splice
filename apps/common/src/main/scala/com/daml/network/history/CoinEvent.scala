@@ -1,23 +1,24 @@
 package com.daml.network.history
 
 import cats.syntax.traverse._
-import com.daml.ledger.client.binding.{Primitive => P}
-import com.daml.network.codegen.CC.Coin.{
+import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
+import com.daml.ledger.javaapi.data.{Text, Value}
+import com.daml.network.codegen.java.cc.coin.{
   Coin,
   Coin_OwnerExpireLock,
   Coin_SvcExpireLock,
   Coin_Unlock,
   LockedCoin,
 }
-import com.daml.network.codegen.CC.CoinRules.{
+import com.daml.network.codegen.java.cc.coinrules.{
   CoinRules_MiningRound_StartIssuing,
   CoinRules_Tap,
   CoinRules_Transfer,
   TransferResult,
 }
-import com.daml.network.codegen.CC.Round.IssuingMiningRound
-import com.daml.network.codegen.DA
-import com.daml.network.util.{Contract, ExerciseNode, ExerciseNodeCompanion}
+import com.daml.network.codegen.java.cc.round.IssuingMiningRound
+import com.daml.network.codegen.java.da
+import com.daml.network.util.{ExerciseNode, ExerciseNodeCompanion, JavaContract => Contract}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 
@@ -25,7 +26,7 @@ import com.digitalasset.canton.ProtoDeserializationError
 sealed trait ParentNode {
   def toProtoV0: v0.ParentNode
 }
-case class Transfer(node: ExerciseNode[CoinRules_Transfer, DA.Types.Either[P.Text, TransferResult]])
+case class Transfer(node: ExerciseNode[CoinRules_Transfer, da.types.Either[String, TransferResult]])
     extends ParentNode {
   def toProtoV0: v0.ParentNode =
     v0.ParentNode().withTransfer(node.toProtoV0)
@@ -33,7 +34,16 @@ case class Transfer(node: ExerciseNode[CoinRules_Transfer, DA.Types.Either[P.Tex
 
 object Transfer extends ExerciseNodeCompanion {
   override type Arg = CoinRules_Transfer
-  override type Res = DA.Types.Either[P.Text, TransferResult]
+  override val argDecoder = CoinRules_Transfer.valueDecoder()
+  override def argToValue(arg: CoinRules_Transfer) = arg.toValue
+
+  override type Res = da.types.Either[String, TransferResult]
+  override val resDecoder = da.types.Either.valueDecoder[String, TransferResult](
+    PrimitiveValueDecoders.fromText,
+    TransferResult.valueDecoder,
+  )
+  override def resToValue(res: da.types.Either[String, TransferResult]) =
+    res.toValue(t => new Text(t), _.toValue)
 
   def fromProtoV0(
       transferP: v0.ParentNode.Type.Transfer
@@ -44,14 +54,22 @@ object Transfer extends ExerciseNodeCompanion {
   }
 }
 
-case class Tap(node: ExerciseNode[CoinRules_Tap, P.ContractId[Coin]]) extends ParentNode {
+case class Tap(node: ExerciseNode[CoinRules_Tap, Coin.ContractId]) extends ParentNode {
   def toProtoV0: v0.ParentNode =
     v0.ParentNode().withTap(node.toProtoV0)
 }
 
 object Tap extends ExerciseNodeCompanion {
   override type Arg = CoinRules_Tap
-  override type Res = P.ContractId[Coin]
+  override val argDecoder = CoinRules_Tap.valueDecoder()
+  override def argToValue(arg: CoinRules_Tap) = arg.toValue
+
+  override type Res = Coin.ContractId
+  override val resDecoder = (cid: Value) =>
+    Coin.ContractId.fromContractId(
+      PrimitiveValueDecoders.fromContractId(Coin.valueDecoder).decode(cid)
+    )
+  override def resToValue(res: Coin.ContractId) = res.toValue
 
   def fromProtoV0(tapP: v0.ParentNode.Type.Tap): Either[ProtoDeserializationError, Tap] = for {
     node <- ExerciseNode.fromProto(Tap)(tapP.value)
@@ -59,7 +77,7 @@ object Tap extends ExerciseNodeCompanion {
 }
 
 case class StartIssuing(
-    node: ExerciseNode[CoinRules_MiningRound_StartIssuing, P.ContractId[IssuingMiningRound]]
+    node: ExerciseNode[CoinRules_MiningRound_StartIssuing, IssuingMiningRound.ContractId]
 ) extends ParentNode {
   def toProtoV0: v0.ParentNode =
     v0.ParentNode()
@@ -68,7 +86,15 @@ case class StartIssuing(
 
 object StartIssuing extends ExerciseNodeCompanion {
   override type Arg = CoinRules_MiningRound_StartIssuing
-  override type Res = P.ContractId[IssuingMiningRound]
+  override val argDecoder = CoinRules_MiningRound_StartIssuing.valueDecoder()
+  override def argToValue(arg: CoinRules_MiningRound_StartIssuing) = arg.toValue
+
+  override type Res = IssuingMiningRound.ContractId
+  override val resDecoder = (cid: Value) =>
+    IssuingMiningRound.ContractId.fromContractId(
+      PrimitiveValueDecoders.fromContractId(IssuingMiningRound.valueDecoder).decode(cid)
+    )
+  override def resToValue(res: IssuingMiningRound.ContractId) = res.toValue
 
   def fromProtoV0(
       issuingP: v0.ParentNode.Type.StartIssuing
@@ -77,7 +103,7 @@ object StartIssuing extends ExerciseNodeCompanion {
   } yield StartIssuing(node)
 }
 
-case class OwnerExpireLock(node: ExerciseNode[Coin_OwnerExpireLock, P.ContractId[Coin]])
+case class OwnerExpireLock(node: ExerciseNode[Coin_OwnerExpireLock, Coin.ContractId])
     extends ParentNode {
   def toProtoV0: v0.ParentNode =
     v0.ParentNode().withOwnerExpireLock(node.toProtoV0)
@@ -85,7 +111,15 @@ case class OwnerExpireLock(node: ExerciseNode[Coin_OwnerExpireLock, P.ContractId
 
 object OwnerExpireLock extends ExerciseNodeCompanion {
   override type Arg = Coin_OwnerExpireLock
-  override type Res = P.ContractId[Coin]
+  override val argDecoder = Coin_OwnerExpireLock.valueDecoder()
+  override def argToValue(arg: Coin_OwnerExpireLock) = arg.toValue
+
+  override type Res = Coin.ContractId
+  override val resDecoder = (cid: Value) =>
+    Coin.ContractId.fromContractId(
+      PrimitiveValueDecoders.fromContractId(Coin.valueDecoder).decode(cid)
+    )
+  override def resToValue(res: Coin.ContractId) = res.toValue
 
   def fromProtoV0(
       expireP: v0.ParentNode.Type.OwnerExpireLock
@@ -94,7 +128,7 @@ object OwnerExpireLock extends ExerciseNodeCompanion {
   } yield OwnerExpireLock(node)
 }
 
-case class SvcExpireLock(node: ExerciseNode[Coin_SvcExpireLock, P.ContractId[Coin]])
+case class SvcExpireLock(node: ExerciseNode[Coin_SvcExpireLock, Coin.ContractId])
     extends ParentNode {
   def toProtoV0: v0.ParentNode =
     v0.ParentNode().withSvcExpireLock(node.toProtoV0)
@@ -102,7 +136,15 @@ case class SvcExpireLock(node: ExerciseNode[Coin_SvcExpireLock, P.ContractId[Coi
 
 object SvcExpireLock extends ExerciseNodeCompanion {
   override type Arg = Coin_SvcExpireLock
-  override type Res = P.ContractId[Coin]
+  override val argDecoder = Coin_SvcExpireLock.valueDecoder()
+  override def argToValue(arg: Coin_SvcExpireLock) = arg.toValue
+
+  override type Res = Coin.ContractId
+  override val resDecoder = (cid: Value) =>
+    Coin.ContractId.fromContractId(
+      PrimitiveValueDecoders.fromContractId(Coin.valueDecoder).decode(cid)
+    )
+  override def resToValue(res: Coin.ContractId) = res.toValue
 
   def fromProtoV0(
       expireP: v0.ParentNode.Type.SvcExpireLock
@@ -112,7 +154,7 @@ object SvcExpireLock extends ExerciseNodeCompanion {
 }
 
 case class CoinUnlock(
-    node: ExerciseNode[Coin_Unlock, P.ContractId[Coin]]
+    node: ExerciseNode[Coin_Unlock, Coin.ContractId]
 ) extends ParentNode {
   def toProtoV0: v0.ParentNode =
     v0.ParentNode().withCoinUnlock(node.toProtoV0)
@@ -120,7 +162,15 @@ case class CoinUnlock(
 
 object CoinUnlock extends ExerciseNodeCompanion {
   override type Arg = Coin_Unlock
-  override type Res = P.ContractId[Coin]
+  override val argDecoder = Coin_Unlock.valueDecoder()
+  override def argToValue(arg: Coin_Unlock) = arg.toValue
+
+  override type Res = Coin.ContractId
+  override val resDecoder = (cid: Value) =>
+    Coin.ContractId.fromContractId(
+      PrimitiveValueDecoders.fromContractId(Coin.valueDecoder).decode(cid)
+    )
+  override def resToValue(res: Coin.ContractId) = res.toValue
 
   def fromProtoV0(
       unlockP: v0.ParentNode.Type.CoinUnlock
@@ -152,11 +202,13 @@ sealed trait CoinOrLockedCoinContract {
   def toProtoV0: v0.Contract
 }
 
-case class CoinContract(contract: Contract[Coin]) extends CoinOrLockedCoinContract {
+case class CoinContract(contract: Contract[Coin.ContractId, Coin])
+    extends CoinOrLockedCoinContract {
   override def toProtoV0: v0.Contract = contract.toProtoV0
 }
 
-case class LockedCoinContract(contract: Contract[LockedCoin]) extends CoinOrLockedCoinContract {
+case class LockedCoinContract(contract: Contract[LockedCoin.ContractId, LockedCoin])
+    extends CoinOrLockedCoinContract {
   override def toProtoV0: v0.Contract = contract.toProtoV0
 }
 
@@ -174,13 +226,15 @@ object EventTypeAndCoin {
     proto match {
       case v0.CCEvent.Coin.Empty => Left(ProtoDeserializationError.FieldNotSet("CCEvent.coin"))
       case v0.CCEvent.Coin.Create(create) =>
-        Contract.fromProto(Coin)(create).map(c => CoinCreate(CoinContract(c)))
+        Contract.fromProto(Coin.COMPANION)(create).map(c => CoinCreate(CoinContract(c)))
       case v0.CCEvent.Coin.Archive(archive) =>
-        Contract.fromProto(Coin)(archive).map(c => CoinArchive(CoinContract(c)))
+        Contract.fromProto(Coin.COMPANION)(archive).map(c => CoinArchive(CoinContract(c)))
       case v0.CCEvent.Coin.LockedCreate(create) =>
-        Contract.fromProto(LockedCoin)(create).map(c => CoinCreate(LockedCoinContract(c)))
+        Contract.fromProto(LockedCoin.COMPANION)(create).map(c => CoinCreate(LockedCoinContract(c)))
       case v0.CCEvent.Coin.LockedArchive(archive) =>
-        Contract.fromProto(LockedCoin)(archive).map(c => CoinArchive(LockedCoinContract(c)))
+        Contract
+          .fromProto(LockedCoin.COMPANION)(archive)
+          .map(c => CoinArchive(LockedCoinContract(c)))
     }
   }
 }

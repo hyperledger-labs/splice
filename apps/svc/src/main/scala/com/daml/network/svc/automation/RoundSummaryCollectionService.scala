@@ -1,14 +1,9 @@
 package com.daml.network.svc.automation
 
-import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.api.v1.event.ExercisedEvent
-import com.daml.ledger.api.v1.transaction.TransactionTree
-import com.daml.ledger.api.v1.transaction.TreeEvent.Kind.Exercised
-import com.daml.ledger.javaapi.data.{Identifier, Transaction}
+import com.daml.ledger.javaapi.data.{ExercisedEvent, Identifier, Transaction, TransactionTree}
 import com.daml.network.admin.LedgerAutomationService
-import com.daml.network.codegen.CC.CoinRules.{CoinRules, TransferResult}
-import com.daml.network.codegen.DA
-import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.coinrules.{CoinRules, TransferResult}
+import com.daml.network.codegen.java.{cc, da}
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history.*
 import com.daml.network.svc.store.SvcEventsStore
@@ -38,7 +33,7 @@ class RoundSummaryCollectionService(
   ): Future[Unit] = {
     for {
       tree <- connection.tryGetTransactionTreeById(Seq(svcParty), tx.getTransactionId)
-      transfers <- traverseForest(TransactionTree.fromJavaProto(tree.toProto))
+      transfers <- traverseForest(tree)
       _ <- store.addTransfers(transfers)
     } yield ()
   }
@@ -48,15 +43,16 @@ class RoundSummaryCollectionService(
       Trees.traverseTree(
         tree,
         onCreate = (_, _) => {},
-        onExercise = (exercised: Exercised, _) => {
-          if (isTransfer(exercised.value)) {
+        onExercise = (exercised: ExercisedEvent, _) => {
+          if (isTransfer(exercised)) {
             val tf = ExerciseNode.tryFromProtoEvent(Transfer)(exercised)
-            tf.result match {
-              case DA.Types.Either.Left(errorMsg) =>
+            tf.result.value match {
+              case left: da.types.either.Left[_, _] =>
                 logger.debug(
-                  s"Dropping transfer with input ${tf.argument} as it completed with an error: $errorMsg"
+                  s"Dropping transfer with input ${tf.argument} as it completed with an error: $left.aValue"
                 )
-              case DA.Types.Either.Right(result) => transferResults.append(result)
+              case right: da.types.either.Right[_, _] => transferResults.append(right.bValue)
+              case v => sys.error(s"Unexpected value for Either type: $v")
             }
 
           }
@@ -68,9 +64,8 @@ class RoundSummaryCollectionService(
 
   override def close(): Unit = Lifecycle.close(connection)(logger)
 
-  private val rulesTemplate = ApiTypes.TemplateId.unwrap(CoinRules.id)
   private def isTransfer(event: ExercisedEvent) =
-    event.choice == "CoinRules_Transfer" && isCoinRules(event)
-  private def isCoinRules(event: ExercisedEvent) = event.templateId.contains(rulesTemplate)
+    event.getChoice == "CoinRules_Transfer" && isCoinRules(event)
+  private def isCoinRules(event: ExercisedEvent) = event.getTemplateId == CoinRules.TEMPLATE_ID
 
 }

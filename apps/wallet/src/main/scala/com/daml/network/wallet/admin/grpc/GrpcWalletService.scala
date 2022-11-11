@@ -832,7 +832,12 @@ class GrpcWalletService(
           validatorStore <- getUserStore(store.key.validatorUserName)
           inputs = request.inputs
             .traverse(
-              Value.fromProto(coinRulesCodegen.TransferInput.valueDecoder())(_).map(_.value)
+              Value
+                .fromProto(
+                  coinRulesCodegen.TransferInput.valueDecoder(),
+                  (x: coinRulesCodegen.TransferInput) => x.toValue,
+                )(_)
+                .map(_.value)
             )
             .valueOr(err => throw err.toAdminError.asGrpcError)
           outputs = request.outputs.map(toOutput)

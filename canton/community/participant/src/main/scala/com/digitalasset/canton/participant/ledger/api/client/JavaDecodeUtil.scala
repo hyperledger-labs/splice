@@ -11,9 +11,10 @@ import com.daml.ledger.javaapi.data.codegen.{
   InterfaceCompanion,
 }
 import com.daml.ledger.javaapi.data.{
-  CreatedEvent as JavaCreatedEvent,
+  CreatedEvent => JavaCreatedEvent,
+  ExercisedEvent,
   Template,
-  Transaction as JavaTransaction,
+  Transaction => JavaTransaction,
 }
 
 import scala.jdk.CollectionConverters.*
@@ -43,4 +44,11 @@ object JavaDecodeUtil {
       a <- decodeCreated(companion)(JavaCreatedEvent.fromProto(created)).toList
     } yield a
   }
+
+  def decodeArchivedExercise[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      companion: ContractCompanion[TC, TCid, T]
+  )(event: ExercisedEvent): Option[TCid] =
+    Option.when(event.getTemplateId == companion.TEMPLATE_ID && event.isConsuming)(
+      companion.toContractId(new ContractId[T]((event.getContractId)))
+    )
 }

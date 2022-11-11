@@ -1,6 +1,6 @@
 package com.daml.network.svc.store.memory
 
-import com.daml.network.codegen.CC.CoinRules.{TransferResult, TransferSummary}
+import com.daml.network.codegen.java.cc.coinrules.{TransferResult, TransferSummary}
 import com.daml.network.svc.store.SvcEventsStore
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 
@@ -22,7 +22,7 @@ class InMemorySvcEventsStore(override protected val loggerFactory: NamedLoggerFa
     blocking {
       synchronized {
         transfers.foreach(tr => {
-          val round = tr.round.number
+          val round: Long = tr.round.number
           val summary = tr.summary
           transfersPerRound += (round -> (transfersPerRound.get(round).getOrElse(Seq()) :+ summary))
         })

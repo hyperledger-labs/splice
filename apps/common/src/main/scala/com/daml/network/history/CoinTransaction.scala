@@ -1,13 +1,19 @@
 package com.daml.network.history
 
 import cats.syntax.traverse._
-import com.daml.ledger.api.v1.event.{CreatedEvent, ExercisedEvent}
-import com.daml.ledger.api.v1.transaction.TreeEvent.Kind.{Created, Exercised}
-import com.daml.ledger.api.v1.transaction.{Transaction, TransactionTree, TreeEvent}
+import com.daml.ledger.javaapi.data.{
+  CreatedEvent,
+  ExercisedEvent,
+  Transaction,
+  TransactionTree,
+  TreeEvent,
+}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.google.protobuf.timestamp.Timestamp
+
+import scala.jdk.CollectionConverters.*
 
 /** Representation of a Coin transaction. A Coin transaction consists of at least one CoinEvent and meta-data
   * about the corresponding Daml transaction.
@@ -37,35 +43,34 @@ case class CoinTransactionTreeView(
 
 object CoinTransactionTreeView {
   def fromTree(tree: TransactionTree): CoinTransactionTreeView =
-    CoinTransactionTreeView(tree.transactionId, tree.offset, makeASCIITree(tree))
+    CoinTransactionTreeView(tree.getTransactionId, tree.getOffset, makeASCIITree(tree))
 
   def makeASCIITree(tree: TransactionTree): String = {
-    def traverseTree(curr: TreeEvent.Kind, depth: Int): String = {
+    def traverseTree(curr: TreeEvent, depth: Int): String = {
       lazy val indent = "\t" * depth
       curr match {
-        case TreeEvent.Kind.Empty => ""
-        case Created(created: CreatedEvent) =>
-          s"""$indent create ${created.templateId}
+        case created: CreatedEvent =>
+          s"""$indent create ${created.getTemplateId}
              |$indent with
-             |$indent  ${created.createArguments}
+             |$indent  ${created.getArguments}
              |""".stripMargin
-        case Exercised(exercised: ExercisedEvent) =>
+        case exercised: ExercisedEvent =>
           val children = {
-            exercised.childEventIds
-              .map(child => traverseTree(tree.eventsById(child).kind, depth + 1))
+            exercised.getChildEventIds.asScala
+              .map(child => traverseTree(tree.getEventsById.get(child), depth + 1))
               .mkString(System.lineSeparator())
           }
-          s"""$indent '${exercised.actingParties}' exercises ${exercised.choice}
+          s"""$indent '${exercised.getActingParties}' exercises ${exercised.getChoice}
              |$indent with
-             |$indent ${exercised.choiceArgument}
+             |$indent ${exercised.getChoiceArgument}
              |$indent children:
              |$indent  $children
              |""".stripMargin
-
+        case _ => sys.error(s"Unknown tree event type: $curr")
       }
     }
 
-    val roots = tree.rootEventIds.map(rootId => tree.eventsById(rootId).kind)
+    val roots = tree.getRootEventIds.asScala.map(rootId => tree.getEventsById.get(rootId))
     roots.map(r => traverseTree(r, 0)).mkString(System.lineSeparator())
   }
 }
@@ -74,25 +79,39 @@ case class TransactionMetadata(
     transactionId: String,
     commandId: String,
     workflowId: String,
-    effectiveAt: Option[Timestamp],
+    effectiveAt: Timestamp,
     offset: String,
 ) {
   def toProtoV0: v0.TransactionMetadata = {
-    v0.TransactionMetadata(transactionId, commandId, workflowId, effectiveAt, offset)
+    v0.TransactionMetadata(transactionId, commandId, workflowId, Some(effectiveAt), offset)
   }
 }
 
 object TransactionMetadata {
   def apply(tx: Transaction): TransactionMetadata = {
-    TransactionMetadata(tx.transactionId, tx.commandId, tx.workflowId, tx.effectiveAt, tx.offset)
+    val effectiveAt = Timestamp.of(tx.getEffectiveAt.getEpochSecond, tx.getEffectiveAt.getNano)
+    TransactionMetadata(
+      tx.getTransactionId,
+      tx.getCommandId,
+      tx.getWorkflowId,
+      effectiveAt,
+      tx.getOffset,
+    )
   }
 
   def fromProtoV0(
       metadataP: v0.TransactionMetadata
   ): Either[ProtoDeserializationError, TransactionMetadata] = {
-    val v0.TransactionMetadata(transactionId, commandId, workflowId, effectiveAt, offset, _) =
-      metadataP
-    // TODO(M1-92): add validation for all of these and switch to types from com.daml.ledger.api.domain.
-    Right(TransactionMetadata(transactionId, commandId, workflowId, effectiveAt, offset))
+    val effectiveAtJava =
+      Timestamp.of(metadataP.getEffectiveAt.seconds, metadataP.getEffectiveAt.nanos)
+    Right(
+      TransactionMetadata(
+        metadataP.transactionId,
+        metadataP.commandId,
+        metadataP.workflowId,
+        effectiveAtJava,
+        metadataP.offset,
+      )
+    )
   }
 }
