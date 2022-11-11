@@ -18,6 +18,7 @@ import com.daml.network.wallet.config.{
   WalletRemoteValidatorAppConfig,
 }
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.config.CantonCommunityConfig.CantonDeprecationImplicits
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.config.RequireTypes.InstanceName
@@ -38,12 +39,14 @@ import com.digitalasset.canton.participant.config.{
 }
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigRenderOptions}
 import org.slf4j.{Logger, LoggerFactory}
-import pureconfig.ConfigReader
 import pureconfig.generic.FieldCoproductHint
+import pureconfig.{ConfigReader, ConfigWriter}
 
 import java.io.File
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Path}
 import scala.annotation.nowarn
 
 case class CoinConfig(
@@ -405,6 +408,60 @@ object CoinConfig {
     deriveReader[CoinConfig]
   }
 
+  @nowarn("cat=unused")
+  private implicit def coinConfigWriter: ConfigWriter[CoinConfig] = {
+    val writers = new CantonConfig.ConfigWriters(confidential = false)
+    import writers._
+    import DeprecatedConfigUtils._
+    import CantonDeprecationImplicits._
+
+    implicit val authConfigHint = new FieldCoproductHint[AuthConfig]("algorithm")
+
+    implicit val hs256UnsafeConfig: ConfigWriter[AuthConfig.Hs256Unsafe] =
+      deriveWriter[AuthConfig.Hs256Unsafe]
+    implicit val rs256Config: ConfigWriter[AuthConfig.Rs256] =
+      deriveWriter[AuthConfig.Rs256]
+    implicit val authConfig: ConfigWriter[AuthConfig] =
+      deriveWriter[AuthConfig]
+    implicit val appInstanceWriter: ConfigWriter[AppInstance] =
+      deriveWriter[AppInstance]
+    implicit val remoteScanConfigWriter: ConfigWriter[RemoteScanAppConfig] =
+      deriveWriter[RemoteScanAppConfig]
+    implicit val validatorConfigWriter: ConfigWriter[LocalValidatorAppConfig] =
+      deriveWriter[LocalValidatorAppConfig]
+    implicit val remoteValidatorConfigWriter: ConfigWriter[RemoteValidatorAppConfig] =
+      deriveWriter[RemoteValidatorAppConfig]
+    implicit val scanConfigWriter: ConfigWriter[LocalScanAppConfig] =
+      deriveWriter[LocalScanAppConfig]
+    implicit val svcConfigWriter: ConfigWriter[LocalSvcAppConfig] =
+      deriveWriter[LocalSvcAppConfig]
+    implicit val remoteSvcConfigWriter: ConfigWriter[RemoteSvcAppConfig] =
+      deriveWriter[RemoteSvcAppConfig]
+    implicit val coinAppParametersWriter: ConfigWriter[SharedCoinAppParameters] =
+      deriveWriter[SharedCoinAppParameters]
+    implicit val walletRemoteValidatorConfigWriter: ConfigWriter[WalletRemoteValidatorAppConfig] =
+      deriveWriter[WalletRemoteValidatorAppConfig]
+    implicit val walletConfigWriter: ConfigWriter[LocalWalletAppConfig] =
+      deriveWriter[LocalWalletAppConfig]
+    implicit val remoteWalletConfigWriter: ConfigWriter[RemoteWalletAppConfig] =
+      deriveWriter[RemoteWalletAppConfig]
+    implicit val directoryConfigWriter: ConfigWriter[LocalDirectoryAppConfig] =
+      deriveWriter[LocalDirectoryAppConfig]
+    implicit val remoteDirectoryConfigWriter: ConfigWriter[RemoteDirectoryAppConfig] =
+      deriveWriter[RemoteDirectoryAppConfig]
+    implicit val splitwiseConfigWriter: ConfigWriter[LocalSplitwiseAppConfig] =
+      deriveWriter[LocalSplitwiseAppConfig]
+    implicit val remoteSplitwiseConfigWriter: ConfigWriter[RemoteSplitwiseAppConfig] =
+      deriveWriter[RemoteSplitwiseAppConfig]
+
+    implicit val communityDomainConfigWriter: ConfigWriter[CommunityDomainConfig] =
+      deriveWriter[CommunityDomainConfig]
+    implicit val communityParticipantConfigWriter: ConfigWriter[CommunityParticipantConfig] =
+      deriveWriter[CommunityParticipantConfig]
+
+    deriveWriter[CoinConfig]
+  }
+
   def load(config: Config)(implicit
       elc: ErrorLoggingContext = elc
   ): Either[CantonConfigError, CoinConfig] =
@@ -417,4 +474,16 @@ object CoinConfig {
 
   def loadOrExit(config: Config)(implicit elc: ErrorLoggingContext = elc): CoinConfig =
     CantonConfig.loadOrExit[CoinConfig](config)
+
+  def writeToFile(config: CoinConfig, path: Path): Unit = {
+    val renderer = ConfigRenderOptions
+      .defaults()
+      .setOriginComments(false)
+      .setComments(false)
+      .setJson(false)
+    val content = "canton { " + ConfigWriter[CoinConfig]
+      .to(config)
+      .render(renderer) + "}"
+    Files.write(path, content.getBytes(StandardCharsets.UTF_8)).discard
+  }
 }

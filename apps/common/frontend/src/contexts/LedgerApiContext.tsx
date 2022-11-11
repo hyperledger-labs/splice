@@ -21,6 +21,8 @@ import {
 } from 'common-protobuf/com/daml/ledger/api/v1/transaction_filter_pb';
 import { TransactionTree } from 'common-protobuf/com/daml/ledger/api/v1/transaction_pb';
 import { Identifier, Value } from 'common-protobuf/com/daml/ledger/api/v1/value_pb';
+import grpcWeb from 'grpc-web';
+import { SignJWT } from 'jose';
 import React, { useContext } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -34,17 +36,20 @@ export class LedgerApiClient {
   commandServiceClient: CommandServicePromiseClient;
   userManagementServiceClient: UserManagementServicePromiseClient;
   userId: string;
+  metaData: grpcWeb.Metadata;
 
   constructor(
     activeContractsServiceClient: ActiveContractsServicePromiseClient,
     commandServiceClient: CommandServicePromiseClient,
     userManagementServiceClient: UserManagementServicePromiseClient,
-    userId: string
+    userId: string,
+    token: string | undefined
   ) {
     this.activeContractsServiceClient = activeContractsServiceClient;
     this.commandServiceClient = commandServiceClient;
     this.userManagementServiceClient = userManagementServiceClient;
     this.userId = userId;
+    this.metaData = token !== undefined ? { Authorization: 'Bearer ' + token } : {};
   }
 
   templateIdToIdentifier(templateId: string): Identifier {
@@ -120,7 +125,7 @@ export class LedgerApiClient {
     const request = new SubmitAndWaitRequest().setCommands(cmds);
     const response = await this.commandServiceClient.submitAndWaitForTransactionTree(
       request,
-      undefined
+      this.metaData
     );
     return response.getTransaction()!;
   }
@@ -140,7 +145,7 @@ export class LedgerApiClient {
       .set(p, new Filters().setInclusive(new InclusiveFilters().setTemplateIdsList([templateId])));
     // TODO(M1-92) Avoid relying on verbose mode. This needs changes in decoding of the protobuf values.
     const request = new GetActiveContractsRequest().setFilter(filter).setVerbose(true);
-    const response = this.activeContractsServiceClient.getActiveContracts(request);
+    const response = this.activeContractsServiceClient.getActiveContracts(request, this.metaData);
     const contracts = await new Promise<Contract<T>[]>(resolve => {
       let acc: Contract<T>[] = [];
       response.on('data', el => {
@@ -162,7 +167,7 @@ export class LedgerApiClient {
   async getUserReadAs(userId: string): Promise<string[]> {
     const userRightsResponse = await this.userManagementServiceClient.listUserRights(
       new ListUserRightsRequest().setUserId(this.userId),
-      undefined
+      this.metaData
     );
     return userRightsResponse.getRightsList().flatMap(right => {
       const readAs = right.getCanReadAs();
@@ -173,15 +178,35 @@ export class LedgerApiClient {
   async getPrimaryParty(): Promise<string> {
     const user = await this.userManagementServiceClient.getUser(
       new GetUserRequest().setUserId(this.userId),
-      undefined
+      this.metaData
     );
     return user.getUser()!.getPrimaryParty();
   }
 }
 
+// Generate a local token for test purposes.
+// See the Scala equivalent com.daml.network.auth.AuthUtil.LedgerApi.testToken
+export async function generateLedgerApiToken(userId: string): Promise<string> {
+  const secret = new TextEncoder().encode('test');
+  const key = await crypto.subtle.importKey(
+    'raw',
+    secret,
+    { name: 'HMAC', hash: { name: 'SHA-256' } },
+    false,
+    ['sign']
+  );
+
+  return new SignJWT({ scope: 'daml_ledger_api' })
+    .setProtectedHeader({ alg: 'HS256' })
+    .setIssuedAt()
+    .setSubject(userId)
+    .sign(key);
+}
+
 export interface LedgerApiClientProps {
   url: string;
   userId: string;
+  token: string;
 }
 
 // use this to create a Provider component and a use function in case you extended LedgerApiClient
@@ -190,7 +215,8 @@ export const buildLedgerApiClientInterface = <T extends LedgerApiClient>(c: {
     activeContractsServiceClient: ActiveContractsServicePromiseClient,
     commandServiceClient: CommandServicePromiseClient,
     userManagementServiceClient: UserManagementServicePromiseClient,
-    userId: string
+    userId: string,
+    token: string
   ): T;
 }): [React.FC<React.PropsWithChildren<LedgerApiClientProps>>, () => T] => {
   const context = React.createContext<T | undefined>(undefined);
@@ -199,6 +225,7 @@ export const buildLedgerApiClientInterface = <T extends LedgerApiClient>(c: {
     children,
     url,
     userId,
+    token,
   }) => {
     const activeContractsClient = new ActiveContractsServicePromiseClient(url);
     const commandServiceClient = new CommandServicePromiseClient(url);
@@ -207,7 +234,8 @@ export const buildLedgerApiClientInterface = <T extends LedgerApiClient>(c: {
       activeContractsClient,
       commandServiceClient,
       userManagementClient,
-      userId
+      userId,
+      token
     );
     return <context.Provider value={apiClient}>{children}</context.Provider>;
   };

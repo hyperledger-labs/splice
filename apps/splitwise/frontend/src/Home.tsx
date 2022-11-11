@@ -99,14 +99,23 @@ const HomeWithContext: React.FC<{
   }
 };
 
-const Home: React.FC<{ userId: string; svc: string | undefined; dirEntries: DirectoryEntries }> = ({
-  userId,
-  svc,
-  dirEntries,
-}) => (
-  <SplitwiseLedgerApiClientProvider url={config.ledgerApi.grpcUrl} userId={userId}>
-    <HomeWithContext userId={userId} svc={svc} dirEntries={dirEntries} />
-  </SplitwiseLedgerApiClientProvider>
-);
+interface HomeProps {
+  userId: string;
+  svc: string | undefined;
+  dirEntries: DirectoryEntries;
+  ledgerApiToken: string;
+}
+
+const Home: React.FC<HomeProps> = ({ userId, svc, dirEntries, ledgerApiToken }) => {
+  return (
+    <SplitwiseLedgerApiClientProvider
+      url={config.ledgerApi.grpcUrl}
+      userId={userId}
+      token={ledgerApiToken}
+    >
+      <HomeWithContext userId={userId} svc={svc} dirEntries={dirEntries} />
+    </SplitwiseLedgerApiClientProvider>
+  );
+};
 
 export default Home;

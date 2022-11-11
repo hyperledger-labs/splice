@@ -32,6 +32,27 @@ object AuthUtil {
   def testTokenBearer(audience: String, user: String): String =
     s"Bearer ${testToken(audience, user)}"
 
+  object LedgerApi {
+
+    /** Uses scope-based tokens for the ledger API, see https://docs.daml.com/app-dev/authorization.html#scope-based-tokens.
+      *
+      * Notes:
+      *  - We don't use audience-based tokens because they require you to include the participant id,
+      *    which is randomly assigned at runtime
+      *  - We don't use custom claims based tokens, because they require you to use party names instead of user names
+      */
+    def testToken(
+        user: String,
+        secret: String,
+    ): String = {
+      JWT
+        .create()
+        .withSubject(user)
+        .withClaim("scope", "daml_ledger_api")
+        .sign(Algorithm.HMAC256(secret))
+    }
+  }
+
   def main(args: Array[String]): Unit = {
     println(testToken(args(0), args(1)))
   }

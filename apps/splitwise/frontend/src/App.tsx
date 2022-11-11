@@ -1,5 +1,6 @@
 import { Contract, sameContracts, useDirectoryClient, useInterval } from 'common-frontend';
 import { ErrorBoundary } from 'common-frontend';
+import { generateLedgerApiToken } from 'common-frontend/lib/contexts/LedgerApiContext';
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -37,6 +38,16 @@ const App: React.FC = () => {
   }, [scanClient]);
 
   const [userId, setUserId] = useState<string | undefined>();
+  const [ledgerApiToken, setLedgerApiToken] = useState<string | undefined>();
+  useEffect(() => {
+    const generateToken = async (userId: string | undefined) => {
+      if (userId !== undefined) {
+        const token = await generateLedgerApiToken(userId);
+        setLedgerApiToken(token);
+      }
+    };
+    generateToken(userId);
+  }, [userId]);
 
   return (
     <ErrorBoundary>
@@ -47,8 +58,8 @@ const App: React.FC = () => {
             <Typography variant="h6">CN Splitwise</Typography>
           </Toolbar>
         </AppBar>
-        {userId ? (
-          <Home userId={userId} svc={svc} dirEntries={dirEntries} />
+        {userId && ledgerApiToken ? (
+          <Home userId={userId} svc={svc} dirEntries={dirEntries} ledgerApiToken={ledgerApiToken} />
         ) : (
           <Login onLogin={setUserId} />
         )}

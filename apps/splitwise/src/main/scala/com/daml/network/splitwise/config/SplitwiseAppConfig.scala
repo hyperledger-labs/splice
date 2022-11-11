@@ -24,6 +24,7 @@ case class RemoteSplitwiseAppConfig(
     adminApi: ClientConfig,
     // Ledger API for writes.
     ledgerApi: ClientConfig,
+    ledgerApiToken: Option[String],
     remoteScan: RemoteScanAppConfig,
     damlUser: String,
 ) extends RemoteCoinConfig {

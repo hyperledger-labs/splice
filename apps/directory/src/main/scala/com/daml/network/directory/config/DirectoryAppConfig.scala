@@ -22,6 +22,7 @@ case class RemoteDirectoryAppConfig(
     damlUser: String,
     adminApi: ClientConfig,
     ledgerApi: ClientConfig,
+    ledgerApiToken: Option[String],
 ) extends RemoteCoinConfig {
   override def clientAdminApi: ClientConfig = adminApi
 }

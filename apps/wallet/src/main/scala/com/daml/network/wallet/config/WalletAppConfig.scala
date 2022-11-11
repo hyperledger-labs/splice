@@ -11,6 +11,7 @@ case class LocalWalletAppConfig(
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     serviceUser: String,
     remoteParticipant: RemoteParticipantConfig,
+    remoteParticipantToken: Option[String] = None,
     remoteScan: RemoteScanAppConfig,
     validator: WalletRemoteValidatorAppConfig,
     auth: AuthConfig,

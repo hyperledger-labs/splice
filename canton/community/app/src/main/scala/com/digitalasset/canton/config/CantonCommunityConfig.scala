@@ -6,6 +6,7 @@ package com.digitalasset.canton.config
 import cats.data.Validated
 import cats.syntax.functor.*
 import com.daml.nonempty.NonEmpty
+import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.domain.config.{
@@ -20,12 +21,14 @@ import com.digitalasset.canton.participant.config.{
   RemoteParticipantConfig,
 }
 import com.digitalasset.canton.tracing.TraceContext
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigRenderOptions}
 import monocle.macros.syntax.lens.*
 import org.slf4j.{Logger, LoggerFactory}
 import pureconfig.{ConfigReader, ConfigWriter}
 
 import java.io.File
+import java.nio.charset.StandardCharsets
+import java.nio.file.{Files, Path}
 import scala.annotation.nowarn
 
 case class CantonCommunityConfig(
@@ -132,4 +135,15 @@ object CantonCommunityConfig {
       .to(config)
       .render(CantonConfig.defaultConfigRenderer)
 
+  def writeToFile(config: CantonCommunityConfig, path: Path): Unit = {
+    val renderer = ConfigRenderOptions
+      .defaults()
+      .setOriginComments(false)
+      .setComments(false)
+      .setJson(false)
+    val content = "canton { " + ConfigWriter[CantonCommunityConfig]
+      .to(config)
+      .render(renderer) + "}"
+    Files.write(path, content.getBytes(StandardCharsets.UTF_8)).discard
+  }
 }

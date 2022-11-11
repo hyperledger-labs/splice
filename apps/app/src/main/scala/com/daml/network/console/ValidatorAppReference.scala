@@ -60,7 +60,7 @@ final class LocalValidatorAppReference(
   val remoteParticipant =
     new CoinRemoteParticipantReference(
       consoleEnvironment,
-      s"remote participant for `$name``",
+      s"remote participant for `$name`",
       name,
       config.remoteParticipant,
     )

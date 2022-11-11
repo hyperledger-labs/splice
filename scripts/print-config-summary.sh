@@ -7,4 +7,4 @@ echo "If you wish to skip this step, comment out the corresponding line"
 sbt bundle
 
 echo "Printing port usage summary for simple-topology"
-scala -classpath /Users/robert/the-real-canton-coin/apps/app/target/release/coin/lib/coin-0.1.0-SNAPSHOT.jar ./scripts/print-config-summary.sc apps/app/src/test/resources/simple-topology.conf apps/app/src/test/resources/simple-topology-canton.conf
+scala -classpath $BUNDLE/lib/coin-0.1.0-SNAPSHOT.jar ./scripts/print-config-summary.sc apps/app/src/test/resources/simple-topology.conf apps/app/src/test/resources/simple-topology-canton.conf

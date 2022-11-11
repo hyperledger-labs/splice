@@ -1,27 +1,38 @@
-package com.daml.network.integration
+package com.daml.network.config
 
+import com.daml.network.auth.AuthUtil
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.scan.config.LocalScanAppConfig
 import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
+import com.digitalasset.canton.config.RequireTypes.NonEmptyString
 import com.digitalasset.canton.config.{
+  CantonCommunityConfig,
   ClientConfig,
   CommunityAdminServerConfig,
   NodeConfig,
   NonNegativeDuration,
+  SequencerConnectionConfig,
 }
-import com.digitalasset.canton.domain.config.{CommunityDomainConfig, CommunityPublicServerConfig}
+import com.digitalasset.canton.domain.config.{
+  CommunityDomainConfig,
+  CommunityPublicServerConfig,
+  RemoteDomainConfig,
+}
 import com.digitalasset.canton.participant.config.{
+  AuthServiceConfig,
   CommunityParticipantConfig,
   LedgerApiServerConfig,
   RemoteParticipantConfig,
 }
-import monocle.macros.syntax.lens._
+import monocle.macros.syntax.lens.*
 
 import java.util.UUID
-import scala.concurrent.duration._
+import scala.collection.mutable
+import scala.concurrent.duration.*
+import scala.io.Source
 
 object CoinConfigTransforms {
 
@@ -115,6 +126,9 @@ object CoinConfigTransforms {
       makeAllTimeoutsBounded,
       addDamlNameSuffix(testContextNameSuffix),
       ensureNovelDamlNames(),
+      useAdminAuthTokensForRemoteParticipants(),
+      enableLedgerApiAuthForLocalParticipants("test"),
+      useLedgerApiAuthTokens("test"),
     )
   }
 
@@ -232,6 +246,19 @@ object CoinConfigTransforms {
         .focus(_.participants)
         .modify(_.map { case (pName, pConfig) => (pName, update(pName.unwrap, pConfig)) })
 
+  def updateRemoteParticipantConfigs_(
+      update: RemoteParticipantConfig => RemoteParticipantConfig
+  ): CoinConfigTransform =
+    updateRemoteParticipantConfigs((_, config) => update(config))
+
+  def updateRemoteParticipantConfigs(
+      update: (String, RemoteParticipantConfig) => RemoteParticipantConfig
+  ): CoinConfigTransform =
+    cantonConfig =>
+      cantonConfig
+        .focus(_.remoteParticipants)
+        .modify(_.map { case (pName, pConfig) => (pName, update(pName.unwrap, pConfig)) })
+
   def updateAllParticipantConfigs_(
       update: CommunityParticipantConfig => CommunityParticipantConfig
   ): CoinConfigTransform =
@@ -300,4 +327,148 @@ object CoinConfigTransforms {
       .focus(_.ledgerApi)
       .modify(portTransform(bump, _))
 
+  /** All local participants require auth tokens for their ledger API.
+    * The tokens are expected to by signed by hmac256 with the given secret.
+    */
+  def enableLedgerApiAuthForLocalParticipants(secret: String): CoinConfigTransform =
+    updateAllParticipantConfigs { case (_, c) =>
+      c.focus(_.ledgerApi.authServices)
+        .replace(Seq(AuthServiceConfig.UnsafeJwtHmac256(NonEmptyString.tryCreate(secret))))
+    }
+
+  /** All remote participants use admin tokens for the ledger API.
+    * I.e., all console commands (used by tests) bypass auth.
+    */
+  def useAdminAuthTokensForRemoteParticipants(): CoinConfigTransform = { config =>
+    {
+      val transforms: Seq[CoinConfigTransform] = Seq(
+        updateSvcAppConfig(c => {
+          val adminToken = getAdminToken(c.remoteParticipant)
+          c.focus(_.remoteParticipant).modify(_.copy(token = adminToken))
+        }),
+        updateScanAppConfig(c => {
+          val adminToken = getAdminToken(c.remoteParticipant)
+          c.focus(_.remoteParticipant).modify(_.copy(token = adminToken))
+        }),
+        updateAllValidatorConfigs_(c => {
+          val adminToken = getAdminToken(c.remoteParticipant)
+          c.focus(_.remoteParticipant).modify(_.copy(token = adminToken))
+        }),
+        updateAllWalletAppConfigs_(c => {
+          val adminToken = getAdminToken(c.remoteParticipant)
+          c.focus(_.remoteParticipant).modify(_.copy(token = adminToken))
+        }),
+        updateDirectoryAppConfig(c => {
+          val adminToken = getAdminToken(c.remoteParticipant)
+          c.focus(_.remoteParticipant).modify(_.copy(token = adminToken))
+        }),
+        updateAllRemoteDirectoryAppConfigs_(c => {
+          val adminToken = getAdminToken(c.ledgerApi)
+          c.copy(ledgerApiToken = adminToken)
+        }),
+        updateAllSplitwiseAppConfigs_(c => {
+          val adminToken = getAdminToken(c.remoteParticipant)
+          c.focus(_.remoteParticipant).modify(_.copy(token = adminToken))
+        }),
+        updateAllRemoteSplitwiseAppConfigs_(c => {
+          val adminToken = getAdminToken(c.ledgerApi)
+          c.copy(ledgerApiToken = adminToken)
+        }),
+      )
+      transforms.foldLeft(config)((c, tf) => tf(c))
+    }
+  }
+
+  /** All auth-enabled apps use static tokens for the ledger API, authorizing the app service user.
+    * The tokens are signed by hmac256 with the given secret.
+    */
+  def useLedgerApiAuthTokens(secret: String): CoinConfigTransform = { config =>
+    {
+      val transforms: Seq[CoinConfigTransform] = Seq(
+        updateAllValidatorConfigs_(c => {
+          val userToken = ledgerApiTestToken(c.damlUser, secret)
+          c.copy(remoteParticipantToken = userToken)
+        }),
+        updateAllWalletAppConfigs_(c => {
+          val userToken = ledgerApiTestToken(c.serviceUser, secret)
+          c.copy(remoteParticipantToken = userToken)
+        }),
+      )
+      transforms.foldLeft(config)((c, tf) => tf(c))
+    }
+  }
+
+  /** Canton has a built in authorizer that accepts "canton admin tokens",
+    * see [[com.digitalasset.canton.participant.ledger.api.CantonAdminTokenAuthService]]
+    * These are 128 character random strings (not JWTs), generated independently for each local participant node at canton startup.
+    * Attaching an admin token to a ledger API request allows you to bypass auth, i.e., to act as any party and perform all admin operations.
+    * There is (intentionally) no way of getting the admin tokens from an external canton process,
+    * so we export them to a file in our canton bootstrap script (see `bootstrap-canton.canton`).
+    */
+  private def readTokenDataFile(): Map[Int, String] = {
+    val tokens: mutable.Map[Int, String] = mutable.Map.empty
+
+    val tokenDataSource = Source.fromFile("canton.tokens")
+    for (line <- tokenDataSource.getLines()) {
+      val parts = line.split(" ")
+      tokens.put(parts(0).toInt, parts(1))
+    }
+    tokenDataSource.close
+
+    tokens.toMap
+  }
+  private lazy val adminTokenData = readTokenDataFile()
+
+  def getAdminToken(config: RemoteParticipantConfig): Option[String] = {
+    getAdminToken(config.ledgerApi)
+  }
+  def getAdminToken(ledgerApi: ClientConfig): Option[String] = {
+    val port = ledgerApi.port.unwrap
+    val token = {
+      adminTokenData.getOrElse(
+        port,
+        sys.error(s"No admin token found for ledger API at port $port"),
+      )
+    }
+    Some(token)
+  }
+
+  private def ledgerApiTestToken(user: String, secret: String): Option[String] = {
+    val token = AuthUtil.LedgerApi.testToken(user = user, secret = secret)
+    Some(token)
+  }
+
+  /** This transforms canton configs, not coin configs, but we need it for the Canton coin project:
+    * We use a long running canton process that is running in the background.
+    * Sometimes you want to attach a Canton console to that process for debugging.
+    * Since the canton process uses an authenticated ledger API, we need a way of automatically
+    * generating a config that contains the right access tokens.
+    */
+  def remoteCantonConfigWithAdminTokens: CantonCommunityConfig => CantonCommunityConfig = {
+    config: CantonCommunityConfig =>
+      {
+        config.copy(
+          domains = Map.empty,
+          participants = Map.empty,
+          remoteDomains = config.domains.view
+            .mapValues(d =>
+              RemoteDomainConfig(
+                adminApi = d.adminApi.clientConfig,
+                publicApi = SequencerConnectionConfig.Grpc(d.publicApi.address, d.publicApi.port),
+              )
+            )
+            .toMap,
+          remoteParticipants = config.participants.view
+            .mapValues(p =>
+              RemoteParticipantConfig(
+                adminApi = p.adminApi.clientConfig,
+                ledgerApi = p.ledgerApi.clientConfig,
+                token = getAdminToken(p.ledgerApi.clientConfig),
+              )
+            )
+            .toMap,
+          features = config.features.copy(enableTestingCommands = true),
+        )
+      }
+  }
 }

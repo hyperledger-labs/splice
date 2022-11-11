@@ -40,21 +40,30 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
       operationName: String,
       task: => Future[T],
       flagCloseable: FlagCloseable,
+      additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ): Future[T] = retry(operationName, task, flagCloseable, retryForAutomationConfig)
+  ): Future[T] =
+    retry(operationName, task, flagCloseable, retryForAutomationConfig, additionalCodes)
 
   /** A retry intended for automation calls, may retry for relatively long. */
   def retryForAutomation[T](
       operationName: String,
       task: => FutureUnlessShutdown[T],
       flagCloseable: FlagCloseable,
+      additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): FutureUnlessShutdown[T] =
-    retryUnlessShutdown(operationName, task, flagCloseable, retryForAutomationConfig)
+    retryUnlessShutdown(
+      operationName,
+      task,
+      flagCloseable,
+      retryForAutomationConfig,
+      additionalCodes,
+    )
 
   /** A retry intended for client calls, thus timing out relatively quickly.
     * This implementation does not guarantee clean shutdown, and should be avoided if possible in favor of [[retryForClientCalls()]]
@@ -64,27 +73,37 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
       operationName: String,
       task: => Future[T],
       flagCloseable: FlagCloseable,
+      additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ): Future[T] = retry(operationName, task, flagCloseable, retryForClientCallsConfig)
+  ): Future[T] =
+    retry(operationName, task, flagCloseable, retryForClientCallsConfig, additionalCodes)
 
   /** A retry intended for client calls, thus timing out relatively quickly. */
   def retryForClientCalls[T](
       operationName: String,
       task: => FutureUnlessShutdown[T],
       flagCloseable: FlagCloseable,
+      additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): FutureUnlessShutdown[T] =
-    retryUnlessShutdown(operationName, task, flagCloseable, retryForClientCallsConfig)
+    retryUnlessShutdown(
+      operationName,
+      task,
+      flagCloseable,
+      retryForClientCallsConfig,
+      additionalCodes,
+    )
 
   private def retry[T](
       operationName: String,
       task: => Future[T],
       flagCloseable: FlagCloseable,
       retryConfig: RetryConfig,
+      additionalCodes: Seq[Status.Code],
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -98,7 +117,7 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
       retryConfig.initialDelay,
       retryConfig.maxDelay,
       operationName,
-    ).apply(task, CoinRetries.RetryableError(operationName))
+    ).apply(task, CoinRetries.RetryableError(operationName, additionalCodes))
   }
 
   private def retryUnlessShutdown[T](
@@ -106,6 +125,7 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
       task: => FutureUnlessShutdown[T],
       flagCloseable: FlagCloseable,
       retryConfig: RetryConfig,
+      additionalCodes: Seq[Status.Code],
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
@@ -119,7 +139,7 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
       retryConfig.initialDelay,
       retryConfig.maxDelay,
       operationName,
-    ).unlessShutdown(task, CoinRetries.RetryableError(operationName))
+    ).unlessShutdown(task, CoinRetries.RetryableError(operationName, additionalCodes))
   }
 }
 
@@ -129,7 +149,13 @@ object CoinRetries {
     new CoinRetries(loggerFactory)
   }
 
-  case class RetryableError(operationName: String) extends ExceptionRetryable {
+  /** @param additionalCodes Additional gRPC status codes on which we can retry the given call,
+    *                        since we know that an external process is changing the system state.
+    */
+  case class RetryableError(
+      operationName: String,
+      additionalCodes: Seq[Status.Code],
+  ) extends ExceptionRetryable {
     // Additional categories that are not marked as retryable but we
     // can safely retry since we know there are other apps or
     // processes that change the system state.
@@ -140,6 +166,14 @@ object CoinRetries {
         ErrorCategory.InvalidGivenCurrentSystemStateResourceMissing,
         ErrorCategory.InvalidGivenCurrentSystemStateSeekAfterEnd,
       )
+
+    // TODO (#1066) Remove the need to retry on UNIMPLEMENTED.
+    private val retryableStatusCodes = Seq(
+      Status.Code.UNIMPLEMENTED,
+      Status.Code.UNAVAILABLE,
+      Status.Code.NOT_FOUND,
+      Status.Code.FAILED_PRECONDITION,
+    ) ++ additionalCodes
 
     override def retryOK(outcome: Try[_], logger: TracedLogger)(implicit
         tc: TraceContext
@@ -161,15 +195,7 @@ object CoinRetries {
                 .appendedAll(errorDetails.map(_.toString))
             logger.info(msg.mkString(System.lineSeparator()))
             TransientErrorKind
-          // TODO (#1066) Remove the need to retry on UNIMPLEMENTED.
-          case None
-              if Seq(
-                Status.Code.UNIMPLEMENTED,
-                Status.Code.UNAVAILABLE,
-                Status.Code.NOT_FOUND,
-                Status.Code.FAILED_PRECONDITION,
-              )
-                .contains(statusCode) =>
+          case None if retryableStatusCodes.contains(statusCode) =>
             val msg =
               s"The operation ${operationName.singleQuoted} failed with a retryable error (full stack trace omitted): "
             logger.info(msg + ex.getMessage)

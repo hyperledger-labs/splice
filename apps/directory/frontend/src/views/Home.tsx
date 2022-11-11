@@ -85,9 +85,16 @@ const Home: React.FC<{ userId: string }> = ({ userId }) => {
   }
 };
 
-const HomeWithContexts: React.FC<{ userId: string }> = ({ userId }) => {
+const HomeWithContexts: React.FC<{ userId: string; ledgerApiToken: string }> = ({
+  userId,
+  ledgerApiToken,
+}) => {
   return (
-    <DirectoryLedgerApiClientProvider url={config.ledgerApi.grpcUrl} userId={userId}>
+    <DirectoryLedgerApiClientProvider
+      url={config.ledgerApi.grpcUrl}
+      userId={userId}
+      token={ledgerApiToken}
+    >
       <DirectoryClientProvider url={config.directory.grpcUrl}>
         <Home userId={userId} />
       </DirectoryClientProvider>

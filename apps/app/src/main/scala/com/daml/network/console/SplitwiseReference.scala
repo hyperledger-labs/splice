@@ -78,6 +78,7 @@ final class RemoteSplitwiseAppReference(
       config.ledgerApi.address,
       config.ledgerApi.port,
       config.ledgerApi.tls,
+      config.ledgerApiToken,
     )(consoleEnvironment)
 
   val userId: String = config.damlUser

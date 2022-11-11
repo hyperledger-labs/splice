@@ -1,5 +1,6 @@
 import { useAuth0 } from '@auth0/auth0-react';
 import { ErrorBoundary } from 'common-frontend';
+import { generateLedgerApiToken } from 'common-frontend/lib/contexts/LedgerApiContext';
 import { useEffect, useState } from 'react';
 
 import { AppBar, Box, Button, Container, CssBaseline, Toolbar, Typography } from '@mui/material';
@@ -11,12 +12,23 @@ import Login from './views/Login';
 const App: React.FC = () => {
   const [damlUserId, setDamlUserId] = useState<string>();
   const { user, logout } = useAuth0();
+  const [ledgerApiToken, setLedgerApiToken] = useState<string | undefined>();
 
   useEffect(() => {
     if (user) {
       setDamlUserId(user.sub);
     }
   }, [user]);
+
+  useEffect(() => {
+    const generateToken = async (userId: string | undefined) => {
+      if (userId !== undefined) {
+        const token = await generateLedgerApiToken(userId);
+        setLedgerApiToken(token);
+      }
+    };
+    generateToken(damlUserId);
+  }, [damlUserId]);
 
   return (
     <ErrorBoundary>
@@ -41,7 +53,11 @@ const App: React.FC = () => {
           </Toolbar>
         </AppBar>
         <Container style={{ height: '100%', flex: '1' }}>
-          {damlUserId ? <Home userId={damlUserId} /> : <Login onLogin={setDamlUserId} />}
+          {damlUserId && ledgerApiToken ? (
+            <Home userId={damlUserId} ledgerApiToken={ledgerApiToken} />
+          ) : (
+            <Login onLogin={setDamlUserId} />
+          )}
         </Container>
       </Box>
     </ErrorBoundary>

@@ -1,16 +1,17 @@
 package com.daml.network.integration.tests.runbook
 
-import better.files._
+import better.files.*
 import com.daml.network.LiveDevNetTest
+import com.daml.network.config.CoinConfigTransforms
 import com.daml.network.environment.CoinEnvironmentImpl
+import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import com.daml.network.integration.{CoinConfigTransforms, CoinEnvironmentDefinition}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
-import monocle.macros.syntax.lens._
+import monocle.macros.syntax.lens.*
 
 /** Integration test for the runbook. Uses the exact same configuration files and bootstrap scripts as the runbook.
   * This test also doubles as the pre-flight validator test.

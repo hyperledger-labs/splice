@@ -19,6 +19,7 @@ case class LocalValidatorAppConfig(
     walletServiceUser: String,
     appInstances: Map[String, AppInstance],
     remoteParticipant: RemoteParticipantConfig,
+    remoteParticipantToken: Option[String] = None,
     remoteScan: RemoteScanAppConfig,
 ) extends LocalCoinConfig // TODO(i736): fork or generalize this trait.
     {

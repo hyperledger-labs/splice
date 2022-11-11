@@ -7,6 +7,7 @@ if [ -z "$(which envoy)" ]; then
   exit 1
 fi
 echo "Starting envoy..."
+mkdir -p ../log
 envoy --log-level debug --log-path ../log/envoy-system.log -c envoy-config.json > ../log/envoy-out.log 2>&1 &
 PID=$!
 echo "$PID" > envoy.pid

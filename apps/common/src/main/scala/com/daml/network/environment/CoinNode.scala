@@ -107,6 +107,12 @@ abstract class CoinNode[State <: AutoCloseable](
         tracerProvider,
       ),
       this,
+      // Note: In general, app service users are allocated by the validator app.
+      // While the app has a valid access token for its service user but that user has not yet been allocated by the validator app,
+      // all ledger API calls with fail with PERMISSION_DENIED.
+      // Since initializing the ledger client makes the very first ledger API call in the app,
+      // we additionally retry on auth errors here.
+      additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
     )
 
   val initializeF: Future[State] = for {

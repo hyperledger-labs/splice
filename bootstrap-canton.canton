@@ -1,3 +1,11 @@
+import scala.collection.mutable.ListBuffer
+
+import java.nio.file.{Paths, Files}
+import java.nio.charset.StandardCharsets
+
+println("Running canton bootstrap script...")
+
+println(s"Allocating validator service users...")
 Seq(
   (aliceParticipant, "alice_validator_user"),
   (bobParticipant, "bob_validator_user"),
@@ -13,3 +21,17 @@ Seq(
     participantAdmin = true,
   )
 }
+
+println(s"Collecting admin tokens...")
+val adminTokensData = ListBuffer[(String, String)]()
+participants.local.foreach(participant => {
+  val adminToken = participant.underlying.map(_.adminToken.secret).getOrElse("")
+  val port = participant.config.ledgerApi.internalPort.get.unwrap
+  adminTokensData.append(s"$port" -> adminToken)
+})
+
+println(s"Writing admin tokens file...")
+val adminTokensContent = adminTokensData.map(x => s"${x._1} ${x._2}").mkString(System.lineSeparator())
+Files.write(Paths.get("canton.tokens"), adminTokensContent.getBytes(StandardCharsets.UTF_8))
+
+println("Canton bootstrap script done.")

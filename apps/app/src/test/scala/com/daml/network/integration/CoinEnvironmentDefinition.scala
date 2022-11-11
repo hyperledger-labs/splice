@@ -1,7 +1,7 @@
 package com.daml.network.integration
 
 import better.files.{File, Resource}
-import com.daml.network.config.CoinConfig
+import com.daml.network.config.{CoinConfig, CoinConfigTransforms}
 import com.daml.network.environment.{
   CoinConsoleEnvironment,
   CoinEnvironmentFactory,
@@ -18,7 +18,7 @@ import com.digitalasset.canton.integration.{
 }
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.typesafe.config.ConfigFactory
-import monocle.macros.syntax.lens._
+import monocle.macros.syntax.lens.*
 
 /** Analogue to Canton's CommunityEnvironmentDefinition. */
 case class CoinEnvironmentDefinition(
@@ -45,8 +45,9 @@ case class CoinEnvironmentDefinition(
     copy(preSetup = env => {
       import env._
       this.preSetup(env)
-      participants.all.foreach(_.domains.connect_local(da))
+      participants.local.foreach(_.domains.connect_local(da))
     })
+
   def withAllocatedValidatorUsers(): CoinEnvironmentDefinition =
     copy(preSetup = env => {
       import env._

@@ -25,4 +25,8 @@ else
     echo "The file canton-simtime.pid does not exist, not stopping simtime Canton"
 fi
 
+if [ -f "canton.tokens" ]; then
+    rm canton.tokens
+fi
+
 ./scripts/postgres.sh "$POSTGRES_MODE" stop

@@ -496,9 +496,9 @@ our own apps. Here we use the topology from our tests:
 
 2. Start the Coin apps and run the bootstrap script to initialize.
 
-We use a single bootstrap script to initialize both the wallets and the splitwise apps.
+We use a single script to initialize both the wallets and the splitwise apps.
 ```
-sbt "apps-app/runMain com.daml.network.CoinApp --config apps/app/src/test/resources/simple-topology.conf --bootstrap apps/splitwise/frontend/bootstrap.canton"
+./scripts/start-backends-for-local-frontend-testing.sh
 ```
 
 3. To build and start the frontends, type:

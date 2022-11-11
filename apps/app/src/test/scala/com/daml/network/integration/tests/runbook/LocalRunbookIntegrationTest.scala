@@ -1,19 +1,16 @@
 package com.daml.network.integration.tests.runbook
 
-import better.files.{File, _}
+import better.files.{File, *}
+import com.daml.network.config.{CoinConfigTransform, CoinConfigTransforms}
 import com.daml.network.environment.CoinEnvironmentImpl
+import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import com.daml.network.integration.{
-  CoinConfigTransform,
-  CoinConfigTransforms,
-  CoinEnvironmentDefinition,
-}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
-import monocle.macros.syntax.lens._
+import monocle.macros.syntax.lens.*
 
 import scala.util.Try
 
