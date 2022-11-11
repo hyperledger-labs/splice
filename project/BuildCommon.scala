@@ -99,7 +99,7 @@ object BuildCommon {
         )
       },
       Compile / damlEnableJavaCodegen := true,
-      Compile / damlEnableScalaCodegen := true,
+      Compile / damlEnableScalaCodegen := false,
     )
 
   lazy val copyDarResources: Seq[Def.Setting[_]] = {

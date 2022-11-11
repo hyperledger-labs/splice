@@ -273,7 +273,6 @@ lazy val `apps-wallet-daml` =
       Test / damlSourceDirectory := file("apps/wallet/daml"),
       Compile / damlDarOutput := file("apps/wallet/daml") / ".daml" / "dist",
       BuildCommon.damlCodegenSettings,
-      Compile / damlEnableScalaCodegen := false,
       BuildCommon.copyDarResources,
     )
 
@@ -308,7 +307,6 @@ lazy val `apps-directory` =
       Test / damlSourceDirectory := (Compile / damlSourceDirectory).value,
       Compile / damlDarOutput := file("apps/directory/daml") / ".daml" / "dist",
       BuildCommon.damlCodegenSettings,
-      Compile / damlEnableScalaCodegen := false,
       BuildCommon.copyDarResources,
     )
 
@@ -329,7 +327,6 @@ lazy val `apps-splitwise` =
       Test / damlSourceDirectory := (Compile / damlSourceDirectory).value,
       Compile / damlDarOutput := file("apps/splitwise/daml") / ".daml" / "dist",
       BuildCommon.damlCodegenSettings,
-      Compile / damlEnableScalaCodegen := false,
     )
 
 // Copied from Canton. Can probably be removed once we use Canton as a library.

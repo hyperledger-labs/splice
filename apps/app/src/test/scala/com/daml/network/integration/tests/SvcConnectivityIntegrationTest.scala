@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.CC.Round.*
+import com.daml.network.codegen.java.cc.round.*
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.plugins.toxiproxy.UseToxiproxy
@@ -33,9 +33,10 @@ class SvcConnectivityIntegrationTest extends CoinIntegrationTest {
 
     val closingRound = svc.startClosingRound(0)
     svc.remoteParticipant.ledger_api.acs
-      .filter(svcParty, ClosingMiningRound)
-      .map(_.contractId) shouldBe Seq(closingRound)
-    svc.remoteParticipant.ledger_api.acs.filter(svcParty, OpenMiningRound) shouldBe empty
+      .filterJava(ClosingMiningRound.COMPANION)(svcParty)
+      .map(_.id) shouldBe Seq(closingRound)
+    svc.remoteParticipant.ledger_api.acs
+      .filterJava(OpenMiningRound.COMPANION)(svcParty) shouldBe empty
 
     loggerFactory.suppressWarnings {
       toxiproxy.disable("svc-ledger-api")
@@ -57,10 +58,11 @@ class SvcConnectivityIntegrationTest extends CoinIntegrationTest {
       }
     }
     svc.remoteParticipant.ledger_api.acs
-      .filter(svcParty, IssuingMiningRound)
+      .filterJava(IssuingMiningRound.COMPANION)(svcParty)
       .map(
-        _.contractId
+        _.id
       ) shouldBe Seq(issuingRoundResponse.issuingRound)
-    svc.remoteParticipant.ledger_api.acs.filter(svcParty, ClosingMiningRound) shouldBe empty
+    svc.remoteParticipant.ledger_api.acs
+      .filterJava(ClosingMiningRound.COMPANION)(svcParty) shouldBe empty
   }
 }

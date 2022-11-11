@@ -1,6 +1,4 @@
 // Commands needed to initialize the CN apps, tap some coins and make some transfers. Can be run as a bootstrap script.
-import com.daml.network.codegen.CC.CoinRules.CoinRules
-
 
 // Onboard Test Parties
 val aliceUserName = aliceWallet.config.damlUser

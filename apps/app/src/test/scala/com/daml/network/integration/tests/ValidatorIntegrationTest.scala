@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.CC
+import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -34,11 +34,11 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     scan.startSync()
     // Check that there is exactly one CoinRule and OpenMiningRound
     val coinRules = svc.remoteParticipant.ledger_api.acs
-      .of_party(svcParty, filterTemplates = Seq(CC.CoinRules.CoinRules.id))
+      .filterJava(cc.coinrules.CoinRules.COMPANION)(svcParty)
     coinRules should have length 1
 
     val openRounds = svc.remoteParticipant.ledger_api.acs
-      .of_party(svcParty, filterTemplates = Seq(CC.Round.OpenMiningRound.id))
+      .filterJava(cc.round.OpenMiningRound.COMPANION)(svcParty)
     openRounds should have length 1
 
     // Start Alice’s validator
@@ -47,14 +47,14 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     // Check that no coin rules request is outstanding
     eventually()(
       svc.remoteParticipant.ledger_api.acs
-        .filter(svcParty, CC.CoinRules.CoinRulesRequest)
+        .filterJava(cc.coinrules.CoinRulesRequest.COMPANION)(svcParty)
         shouldBe empty
     )
 
     // check that alice's validator can see the coinrules
     val aliceValidatorParty = aliceValidator.getValidatorPartyId()
     aliceValidator.remoteParticipant.ledger_api.acs
-      .await(aliceValidatorParty, CC.CoinRules.CoinRules)
+      .awaitJava(cc.coinrules.CoinRules.COMPANION)(aliceValidatorParty)
 
     // onboard end user
     aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)

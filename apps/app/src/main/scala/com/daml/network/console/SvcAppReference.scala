@@ -1,7 +1,6 @@
 package com.daml.network.console
 
-import com.daml.ledger.client.binding.Primitive.ContractId
-import com.daml.network.codegen.CC.{Round => roundCodegen}
+import com.daml.network.codegen.java.cc.{round => roundCodegen}
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.svc.admin.api.client.commands.GrpcSvcAppClient
 import com.daml.network.svc.config.{LocalSvcAppConfig, RemoteSvcAppConfig}
@@ -23,7 +22,7 @@ abstract class SvcAppReference(
   def openRound(
       round: Long,
       coinPrice: BigDecimal,
-  ): ContractId[roundCodegen.OpenMiningRound] =
+  ): roundCodegen.OpenMiningRound.ContractId =
     consoleEnvironment.run {
       adminCommand(GrpcSvcAppClient.OpenRound(round, coinPrice))
     }
@@ -31,7 +30,7 @@ abstract class SvcAppReference(
   @Help.Summary("Start closing the mining round for all validators")
   def startClosingRound(
       round: Long
-  ): ContractId[roundCodegen.ClosingMiningRound] =
+  ): roundCodegen.ClosingMiningRound.ContractId =
     consoleEnvironment.run {
       adminCommand(GrpcSvcAppClient.StartClosingRound(round))
     }
@@ -47,7 +46,7 @@ abstract class SvcAppReference(
   @Help.Summary("Close the given mining round for all validators")
   def closeRound(
       round: Long
-  ): ContractId[roundCodegen.ClosedMiningRound] =
+  ): roundCodegen.ClosedMiningRound.ContractId =
     consoleEnvironment.run {
       adminCommand(GrpcSvcAppClient.CloseRound(round))
     }
