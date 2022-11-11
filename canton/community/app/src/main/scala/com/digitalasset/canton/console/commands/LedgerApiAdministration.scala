@@ -132,6 +132,28 @@ trait BaseLedgerApiAdministration extends NoTracing {
         )
       })
 
+      @Help.Summary("Get transaction trees", FeatureFlag.Testing)
+      @Help.Description(
+        """This function connects to the transaction tree stream for the given parties and collects transaction trees
+          |until either `completeAfter` transaction trees have been received or `timeout` has elapsed.
+          |The returned transaction trees can be filtered to be between the given offsets (default: no filtering).
+          |If the participant has been pruned via `pruning.prune` and if `beginOffset` is lower than the pruning offset,
+          |this command fails with a `NOT_FOUND` error."""
+      )
+      def treesJava(
+          partyIds: Set[PartyId],
+          completeAfter: Int,
+          beginOffset: LedgerOffset =
+            new LedgerOffset().withBoundary(LedgerOffset.LedgerBoundary.LEDGER_BEGIN),
+          endOffset: Option[LedgerOffset] = None,
+          verbose: Boolean = true,
+          timeout: NonNegativeDuration = timeouts.ledgerCommand,
+      ): Seq[javaapi.data.TransactionTree] = check(FeatureFlag.Testing)({
+        trees(partyIds, completeAfter, beginOffset, endOffset, verbose, timeout).map(t =>
+          javaapi.data.TransactionTree.fromProto(TransactionTree.toJavaProto(t))
+        )
+      })
+
       private def mkResult[Res](
           call: => AutoCloseable,
           requestDescription: String,

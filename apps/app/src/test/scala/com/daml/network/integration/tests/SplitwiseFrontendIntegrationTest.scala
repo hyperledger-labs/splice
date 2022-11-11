@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
 import com.daml.network.codegen.java.cn.{directory as dirCodegen, splitwise as splitwiseCodegen}
 import com.daml.network.console.{RemoteDirectoryAppReference, RemoteWalletAppReference}
 import com.daml.network.environment.CoinEnvironmentImpl
@@ -208,12 +207,10 @@ class SplitwiseFrontendIntegrationTest
           .zip(expectedQuantityRanges)
           .foreach { case (coin, quantityBounds) =>
             coin.contract.payload.owner shouldBe walletParty.toPrim
-            val ExpiringQuantity(initialQuantity, _, ratePerRound) =
+            val coinQuantity =
               coin.contract.payload.quantity
-            assertInRange(initialQuantity, quantityBounds)
-            ratePerRound shouldBe RatePerRound(
-              CoinUtil.defaultHoldingFee.rate.doubleValue
-            )
+            assertInRange(coinQuantity.initialQuantity, quantityBounds)
+            coinQuantity.ratePerRound shouldBe CoinUtil.defaultHoldingFee
           }
       }
     }

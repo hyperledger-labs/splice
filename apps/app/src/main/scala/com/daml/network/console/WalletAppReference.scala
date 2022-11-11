@@ -1,12 +1,11 @@
 package com.daml.network.console
 
-import com.daml.ledger.client.binding.Primitive
 import com.daml.network.auth.{AuthUtil, JwtCallCredential}
-import com.daml.network.codegen.CC.{Coin as coinCodegen, CoinRules as coinRulesCodegen}
-import com.daml.network.codegen.CN.Wallet.{PaymentChannel, Subscriptions => subsCodegen}
-import com.daml.network.codegen.CN.Wallet as walletCodegen
+import com.daml.network.codegen.java.cc.{coin as coinCodegen, coinrules as coinRulesCodegen}
+import com.daml.network.codegen.java.cn.wallet.{PaymentChannel, subscriptions => subsCodegen}
+import com.daml.network.codegen.java.cn.wallet as walletCodegen
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.util.{Contract, Value}
+import com.daml.network.util.{JavaContract as Contract, JavaValue as Value}
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.ListResponse
 import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
@@ -40,7 +39,7 @@ abstract class WalletAppReference(
     "This function will only be available in the testnet. It allows creating coins for testing purposes." +
       "Returns the contract ID of the created contract. "
   )
-  def tap(quantity: BigDecimal): Primitive.ContractId[coinCodegen.Coin] = {
+  def tap(quantity: BigDecimal): coinCodegen.Coin.ContractId = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.Tap(quantity), callCredentials)
     }
@@ -61,7 +60,9 @@ abstract class WalletAppReference(
     "Queries the configured remote participant for the PaymentRequests of the configured user. " +
       "Returns all found payment requests."
   )
-  def listAppPaymentRequests(): Seq[Contract[walletCodegen.AppPaymentRequest]] = {
+  def listAppPaymentRequests(): Seq[
+    Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]
+  ] = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.ListAppPaymentRequests(), callCredentials)
     }
@@ -73,8 +74,8 @@ abstract class WalletAppReference(
       " Returns the contract ID of the accepted payment."
   )
   def acceptAppPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest]
-  ): Primitive.ContractId[walletCodegen.AcceptedAppPayment] = {
+      requestId: walletCodegen.AppPaymentRequest.ContractId
+  ): walletCodegen.AcceptedAppPayment.ContractId = {
     consoleEnvironment.run {
       adminCommand(
         GrpcWalletAppClient.AcceptAppPaymentRequest(requestId),
@@ -88,7 +89,7 @@ abstract class WalletAppReference(
     "Reject a payment request."
   )
   def rejectAppPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.AppPaymentRequest]
+      requestId: walletCodegen.AppPaymentRequest.ContractId
   ): Unit = {
     consoleEnvironment.run {
       adminCommand(
@@ -99,7 +100,9 @@ abstract class WalletAppReference(
   }
 
   @Help.Summary("List all accepted app payments the user is a sender on")
-  def listAcceptedAppPayments(): Seq[Contract[walletCodegen.AcceptedAppPayment]] =
+  def listAcceptedAppPayments(): Seq[
+    Contract[walletCodegen.AcceptedAppPayment.ContractId, walletCodegen.AcceptedAppPayment]
+  ] =
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.ListAcceptedAppPayments(), callCredentials)
     }
@@ -109,7 +112,9 @@ abstract class WalletAppReference(
     "Queries the configured remote participant for the SubscriptionRequests of the configured user. " +
       "Returns all found subscription requests."
   )
-  def listSubscriptionRequests(): Seq[Contract[subsCodegen.SubscriptionRequest]] = {
+  def listSubscriptionRequests(): Seq[
+    Contract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest]
+  ] = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.ListSubscriptionRequests(), callCredentials)
     }
@@ -120,7 +125,10 @@ abstract class WalletAppReference(
     "Queries the configured remote participant for the SubscriptionInitialPayments of the configured user. " +
       "Returns all found payments."
   )
-  def listSubscriptionInitialPayments(): Seq[Contract[subsCodegen.SubscriptionInitialPayment]] = {
+  def listSubscriptionInitialPayments(): Seq[Contract[
+    subsCodegen.SubscriptionInitialPayment.ContractId,
+    subsCodegen.SubscriptionInitialPayment,
+  ]] = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.ListSubscriptionInitialPayments(), callCredentials)
     }
@@ -143,8 +151,8 @@ abstract class WalletAppReference(
       " Returns the contract ID of the initial subscription payment."
   )
   def acceptSubscriptionRequest(
-      requestId: Primitive.ContractId[subsCodegen.SubscriptionRequest]
-  ): Primitive.ContractId[subsCodegen.SubscriptionInitialPayment] = {
+      requestId: subsCodegen.SubscriptionRequest.ContractId
+  ): subsCodegen.SubscriptionInitialPayment.ContractId = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.AcceptSubscriptionRequest(requestId), callCredentials)
     }
@@ -155,7 +163,7 @@ abstract class WalletAppReference(
     "Reject a subscription request."
   )
   def rejectSubscriptionRequest(
-      requestId: Primitive.ContractId[subsCodegen.SubscriptionRequest]
+      requestId: subsCodegen.SubscriptionRequest.ContractId
   ): Unit = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.RejectSubscriptionRequest(requestId), callCredentials)
@@ -168,8 +176,8 @@ abstract class WalletAppReference(
       " Returns the contract ID of the subscription payment."
   )
   def makeSubscriptionPayment(
-      stateId: Primitive.ContractId[subsCodegen.SubscriptionIdleState]
-  ): Primitive.ContractId[subsCodegen.SubscriptionPayment] = {
+      stateId: subsCodegen.SubscriptionIdleState.ContractId
+  ): subsCodegen.SubscriptionPayment.ContractId = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.MakeSubscriptionPayment(stateId), callCredentials)
     }
@@ -180,7 +188,7 @@ abstract class WalletAppReference(
     "Cancels a subscription that is in idle state."
   )
   def cancelSubscription(
-      stateId: Primitive.ContractId[subsCodegen.SubscriptionIdleState]
+      stateId: subsCodegen.SubscriptionIdleState.ContractId
   ): Unit = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.CancelSubscription(stateId), callCredentials)
@@ -194,12 +202,12 @@ abstract class WalletAppReference(
   )
   def proposePaymentChannel(
       receiver: PartyId,
-      replacesChannelId: Option[Primitive.ContractId[PaymentChannel]] = None,
+      replacesChannelId: Option[PaymentChannel.ContractId] = None,
       allowRequests: Boolean = true,
       allowOffers: Boolean = true,
       allowDirectTransfers: Boolean = true,
       senderTransferFeeRatio: Double = 1.0,
-  ): Primitive.ContractId[walletCodegen.PaymentChannelProposal] = {
+  ): walletCodegen.PaymentChannelProposal.ContractId = {
     consoleEnvironment.run {
       adminCommand(
         GrpcWalletAppClient.ProposePaymentChannel(
@@ -219,7 +227,9 @@ abstract class WalletAppReference(
   @Help.Description(
     "Shows both incoming and outgoing payment channel proposals."
   )
-  def listPaymentChannelProposals(): Seq[Contract[walletCodegen.PaymentChannelProposal]] = {
+  def listPaymentChannelProposals(): Seq[
+    Contract[walletCodegen.PaymentChannelProposal.ContractId, walletCodegen.PaymentChannelProposal]
+  ] = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.ListPaymentChannelProposals(), callCredentials)
     }
@@ -229,7 +239,8 @@ abstract class WalletAppReference(
   @Help.Description(
     "Shows payment channels where the user is either the sender or the receiver"
   )
-  def listPaymentChannels(): Seq[Contract[walletCodegen.PaymentChannel]] = {
+  def listPaymentChannels()
+      : Seq[Contract[walletCodegen.PaymentChannel.ContractId, walletCodegen.PaymentChannel]] = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.ListPaymentChannels(), callCredentials)
     }
@@ -240,8 +251,8 @@ abstract class WalletAppReference(
     "Accept a specific payment channel proposal."
   )
   def acceptPaymentChannelProposal(
-      proposalId: Primitive.ContractId[walletCodegen.PaymentChannelProposal]
-  ): Primitive.ContractId[walletCodegen.PaymentChannel] = {
+      proposalId: walletCodegen.PaymentChannelProposal.ContractId
+  ): walletCodegen.PaymentChannel.ContractId = {
     consoleEnvironment.run {
       adminCommand(
         GrpcWalletAppClient.AcceptPaymentChannelProposal(proposalId),
@@ -300,7 +311,7 @@ abstract class WalletAppReference(
       sender: PartyId,
       quantity: BigDecimal,
       description: String,
-  ): Primitive.ContractId[walletCodegen.OnChannelPaymentRequest] = {
+  ): walletCodegen.OnChannelPaymentRequest.ContractId = {
     consoleEnvironment.run {
       adminCommand(
         GrpcWalletAppClient.CreateOnChannelPaymentRequest(
@@ -317,7 +328,10 @@ abstract class WalletAppReference(
   @Help.Description(
     "Shows all incoming and outgoing payment requests over payment channels."
   )
-  def listOnChannelPaymentRequests(): Seq[Contract[walletCodegen.OnChannelPaymentRequest]] = {
+  def listOnChannelPaymentRequests(): Seq[Contract[
+    walletCodegen.OnChannelPaymentRequest.ContractId,
+    walletCodegen.OnChannelPaymentRequest,
+  ]] = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.ListOnChannelPaymentRequests(), callCredentials)
     }
@@ -328,7 +342,7 @@ abstract class WalletAppReference(
     "Accepts the request using the given coin."
   )
   def acceptOnChannelPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]
+      requestId: walletCodegen.OnChannelPaymentRequest.ContractId
   ): Unit = {
     consoleEnvironment.run {
       adminCommand(
@@ -343,7 +357,7 @@ abstract class WalletAppReference(
     "Rejects the request."
   )
   def rejectOnChannelPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]
+      requestId: walletCodegen.OnChannelPaymentRequest.ContractId
   ): Unit = {
     consoleEnvironment.run {
       adminCommand(
@@ -358,7 +372,7 @@ abstract class WalletAppReference(
     "Withdraws the request."
   )
   def withdrawOnChannelPaymentRequest(
-      requestId: Primitive.ContractId[walletCodegen.OnChannelPaymentRequest]
+      requestId: walletCodegen.OnChannelPaymentRequest.ContractId
   ): Unit = {
     consoleEnvironment.run {
       adminCommand(
@@ -370,7 +384,7 @@ abstract class WalletAppReference(
 
   @Help.Summary("List app rewards")
   @Help.Description("List all open app rewards for the configured user")
-  def listAppRewards(): Seq[Contract[coinCodegen.AppReward]] =
+  def listAppRewards(): Seq[Contract[coinCodegen.AppReward.ContractId, coinCodegen.AppReward]] =
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.ListAppRewards(), callCredentials)
     }
@@ -379,7 +393,8 @@ abstract class WalletAppReference(
   @Help.Description(
     "List all open validator rewards for the configured user based on the active ValidatorRights"
   )
-  def listValidatorRewards(): Seq[Contract[coinCodegen.ValidatorReward]] =
+  def listValidatorRewards()
+      : Seq[Contract[coinCodegen.ValidatorReward.ContractId, coinCodegen.ValidatorReward]] =
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.ListValidatorRewards(), callCredentials)
     }
@@ -401,12 +416,12 @@ abstract class WalletAppReference(
   )
   // TODO(#1351) - Make this a `CoinOperation` too or remove
   def redistribute(
-      inputCoins: Seq[Primitive.ContractId[coinCodegen.Coin]],
+      inputCoins: Seq[coinCodegen.Coin.ContractId],
       outputQuantities: Seq[Option[BigDecimal]],
-  ): Seq[Primitive.ContractId[coinCodegen.Coin]] =
+  ): Seq[coinCodegen.Coin.ContractId] =
     consoleEnvironment.run {
       val inputs: Seq[Value[coinRulesCodegen.TransferInput]] =
-        inputCoins.map(c => Value(coinRulesCodegen.TransferInput.InputCoin(c)))
+        inputCoins.map(c => new Value(new coinRulesCodegen.transferinput.InputCoin(c), _.toValue))
       val outputs = outputQuantities.map(q => GrpcWalletAppClient.RedistributeOutput(q))
       adminCommand(GrpcWalletAppClient.Redistribute(inputs, outputs), callCredentials)
     }

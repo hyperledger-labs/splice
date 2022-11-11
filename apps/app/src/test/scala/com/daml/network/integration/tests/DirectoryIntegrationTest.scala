@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.ledger.client.binding.Primitive
-import com.daml.network.codegen.java.cn.{directory as codegen, wallet as walletCodegen}
+import com.daml.network.codegen.java.cn.{directory => codegen, wallet => walletCodegen}
 import com.daml.network.console.{
   LocalValidatorAppReference,
   RemoteDirectoryAppReference,
@@ -221,7 +220,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest {
         }
         clue("Alice obtains some coins and accepts the subscription") {
           aliceRefs.wallet.tap(50.0)
-          aliceRefs.wallet.acceptSubscriptionRequest(Primitive.ContractId(subReqId.contractId))
+          aliceRefs.wallet.acceptSubscriptionRequest(subReqId)
         }
         val entry = clue("Getting Alice's new entry") {
           def tryGetEntry() =

@@ -317,7 +317,10 @@ unlockAndTransfer transferContext subscriptionData lockedCoin = do
               coinType = FloatingReceiverCoin
           ]
         payload = "transfer locked payment"
-  Right result <- exerciseAppTransfer transferContext transfer
+  result <- exerciseAppTransfer transferContext transfer
+  result <- case result of
+    Right r -> pure r
+    Left e -> abort e
   let [TransferResultCoin coinCid] = result.createdCoins
 
   pure coinCid

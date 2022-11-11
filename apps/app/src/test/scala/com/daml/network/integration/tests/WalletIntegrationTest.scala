@@ -1,21 +1,15 @@
 package com.daml.network.integration.tests
 
-import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.client.binding
-import com.daml.ledger.client.binding.Primitive
-import com.daml.network.codegen.CC.{
-  Coin as coinCodegen,
-  CoinRules as coinRulesCodegen,
-  Round as roundCodegen,
+import com.daml.network.codegen.java.cc.{
+  coin as coinCodegen,
+  coinrules as coinRulesCodegen,
+  round as roundCodegen,
 }
-import com.daml.network.codegen.CN.Scripts.Wallet.TestSubscriptions as testSubsCodegen
-import com.daml.network.codegen.CN.Scripts.TestWallet as testWalletCodegen
-import com.daml.network.codegen.CN.Wallet.Subscriptions as subsCodegen
-import com.daml.network.codegen.CN.{Wallet as walletCodegen}
-import com.daml.network.codegen.DA.Time.Types.RelTime
-import com.daml.network.codegen.OpenBusiness.Fees.{ExpiringQuantity, RatePerRound}
-import com.daml.network.codegen.java.cc.{coinrules as javaCoinRulesCodegen}
-import com.daml.network.codegen.java.cn.{directory as dirCodegen}
+import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
+import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
+import com.daml.network.codegen.java.cn.{directory => dirCodegen, wallet => walletCodegen}
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{LocalWalletAppReference, WalletAppReference}
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
@@ -26,7 +20,7 @@ import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.Balance
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.participant.ledger.api.client.DecodeUtil
+import com.digitalasset.canton.participant.ledger.api.client.{JavaDecodeUtil as DecodeUtil}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.{DiscardOps, HasExecutionContext}
 import org.slf4j.event.Level
@@ -34,14 +28,14 @@ import org.slf4j.event.Level
 import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
 import scala.concurrent.duration.*
+import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 import scala.util.{Success, Try}
 
 class WalletIntegrationTest
     extends CoinIntegrationTest
     with HasExecutionContext
     with PaymentChannelTestUtil {
-
-  import WalletIntegrationTest.*
 
   "A wallet" should {
 
@@ -154,41 +148,39 @@ class WalletIntegrationTest
       // Check that no payment requests exist
       aliceRemoteWallet.listAppPaymentRequests() shouldBe empty
 
-      aliceWallet.remoteParticipant.ledger_api.commands.submit(
+      aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
         Seq(aliceUserParty),
         optTimeout = None,
-        commands = Seq(
-          testWalletCodegen
-            .TestDeliveryOffer(
-              svc = scan.getSvcPartyId().toPrim,
-              sender = aliceUserParty.toPrim,
-              description = "description",
-            )
-            .create
-            .command
-        ),
+        commands = new testWalletCodegen.TestDeliveryOffer(
+          scan.getSvcPartyId().toProtoPrimitive,
+          aliceUserParty.toProtoPrimitive,
+          "description",
+        ).create.commands.asScala.toSeq,
       )
       val referenceId =
         aliceWallet.remoteParticipant.ledger_api.acs
-          .await(aliceUserParty, testWalletCodegen.TestDeliveryOffer)
-          .contractId
+          .awaitJava(testWalletCodegen.TestDeliveryOffer.COMPANION)(aliceUserParty)
+          .id
 
       // Create a payment request to self.
-      val reqC = walletCodegen.AppPaymentRequest(
-        sender = aliceUserParty.toPrim,
-        provider = aliceUserParty.toPrim,
-        receiverQuantities = Seq(walletCodegen.ReceiverQuantity(aliceUserParty.toPrim, 10)),
-        svc = svcParty.toPrim,
-        expiresAt = binding.Primitive.Timestamp
-          .discardNanos(java.time.Instant.now().plus(1, ChronoUnit.MINUTES))
-          .getOrElse(sys.error("Invalid instant")),
-        collectionDuration = RelTime(microseconds = 60 * 1000000),
-        deliveryOffer = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
+      val reqC = new walletCodegen.AppPaymentRequest(
+        aliceUserParty.toProtoPrimitive,
+        Seq(
+          new walletCodegen.ReceiverQuantity(
+            aliceUserParty.toProtoPrimitive,
+            BigDecimal(10).bigDecimal.setScale(10),
+          )
+        ).asJava,
+        aliceUserParty.toProtoPrimitive,
+        svcParty.toProtoPrimitive,
+        java.time.Instant.now().plus(1, ChronoUnit.MINUTES),
+        new RelTime(60 * 1000000),
+        referenceId.toInterface(walletCodegen.DeliveryOffer.INTERFACE),
       )
-      aliceWallet.remoteParticipant.ledger_api.commands.submit(
+      aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
         actAs = Seq(aliceUserParty),
         optTimeout = None,
-        commands = Seq(reqC.create.command),
+        commands = reqC.create.commands.asScala.toSeq,
       )
 
       // Check that we can see the created payment request
@@ -209,41 +201,39 @@ class WalletIntegrationTest
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
       val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
 
-      aliceWallet.remoteParticipant.ledger_api.commands.submit(
+      aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
         Seq(aliceUserParty),
         optTimeout = None,
-        commands = Seq(
-          testWalletCodegen
-            .TestDeliveryOffer(
-              sender = aliceUserParty.toPrim,
-              svc = scan.getSvcPartyId().toPrim,
-              description = "description",
-            )
-            .create
-            .command
-        ),
+        commands = new testWalletCodegen.TestDeliveryOffer(
+          scan.getSvcPartyId().toProtoPrimitive,
+          aliceUserParty.toProtoPrimitive,
+          "description",
+        ).create.commands.asScala.toSeq,
       )
       val referenceId =
         aliceWallet.remoteParticipant.ledger_api.acs
-          .await(aliceUserParty, testWalletCodegen.TestDeliveryOffer)
-          .contractId
+          .awaitJava(testWalletCodegen.TestDeliveryOffer.COMPANION)(aliceUserParty)
+          .id
 
       // Create a payment request to self.
-      val reqC = walletCodegen.AppPaymentRequest(
-        sender = aliceUserParty.toPrim,
-        provider = aliceUserParty.toPrim,
-        receiverQuantities = Seq(walletCodegen.ReceiverQuantity(aliceUserParty.toPrim, 10)),
-        svc = svcParty.toPrim,
-        expiresAt = binding.Primitive.Timestamp
-          .discardNanos(java.time.Instant.now().plus(1, ChronoUnit.MINUTES))
-          .getOrElse(sys.error("Invalid instant")),
-        collectionDuration = RelTime(microseconds = 60 * 1000000),
-        deliveryOffer = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
+      val reqC = new walletCodegen.AppPaymentRequest(
+        aliceUserParty.toProtoPrimitive,
+        Seq(
+          new walletCodegen.ReceiverQuantity(
+            aliceUserParty.toProtoPrimitive,
+            BigDecimal(10).bigDecimal.setScale(10),
+          )
+        ).asJava,
+        aliceUserParty.toProtoPrimitive,
+        svcParty.toProtoPrimitive,
+        java.time.Instant.now().plus(1, ChronoUnit.MINUTES),
+        new RelTime(60 * 1000000),
+        referenceId.toInterface(walletCodegen.DeliveryOffer.INTERFACE),
       )
-      aliceWallet.remoteParticipant.ledger_api.commands.submit(
+      aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
         actAs = Seq(aliceUserParty),
         optTimeout = None,
-        commands = Seq(reqC.create.command),
+        commands = reqC.create.commands.asScala.toSeq,
       )
 
       val cid = eventually() {
@@ -258,18 +248,18 @@ class WalletIntegrationTest
       aliceRemoteWallet.listAppPaymentRequests() shouldBe empty
       inside(aliceRemoteWallet.listAcceptedAppPayments()) { case Seq(r) =>
         r.contractId shouldBe acceptedPaymentId
-        r.payload shouldBe walletCodegen.AcceptedAppPayment(
-          sender = aliceUserParty.toPrim,
-          receiverQuantities = Seq(
-            walletCodegen.ReceiverQuantity(
-              receiver = aliceUserParty.toPrim,
-              quantity = 10.0,
+        r.payload shouldBe new walletCodegen.AcceptedAppPayment(
+          aliceUserParty.toProtoPrimitive,
+          Seq(
+            new walletCodegen.ReceiverQuantity(
+              aliceUserParty.toProtoPrimitive,
+              BigDecimal(10).bigDecimal.setScale(10),
             )
-          ),
-          provider = aliceUserParty.toPrim,
-          svc = svcParty.toPrim,
-          lockedCoin = r.payload.lockedCoin,
-          deliveryOffer = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(referenceId)),
+          ).asJava,
+          aliceUserParty.toProtoPrimitive,
+          svcParty.toProtoPrimitive,
+          r.payload.lockedCoin,
+          referenceId.toInterface(walletCodegen.DeliveryOffer.INTERFACE),
         )
       }
     }
@@ -371,13 +361,15 @@ class WalletIntegrationTest
         }
         clue("Collect the initial payment (as the receiver), which creates the subscription") {
           val collectCommand = initialPaymentId
-            .exerciseSubscriptionInitialPayment_Collect(transferContext.toScala)
-            .command
-          aliceWallet.remoteParticipant.ledger_api.commands.submit(
+            .exerciseSubscriptionInitialPayment_Collect(transferContext)
+            .commands
+            .asScala
+            .toSeq
+          aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
             actAs = Seq(aliceUserParty),
             readAs = Seq(aliceValidatorParty),
             optTimeout = None,
-            commands = Seq(collectCommand),
+            commands = collectCommand,
           )
         }
         val subscriptionStateId = clue("List subscriptions to find out state ID") {
@@ -412,13 +404,15 @@ class WalletIntegrationTest
           "Collect the second payment (as the receiver), which sets the subscription back to idle"
         ) {
           val collectCommand2 = paymentId
-            .exerciseSubscriptionPayment_Collect(transferContext.toScala)
-            .command
-          aliceWallet.remoteParticipant.ledger_api.commands.submit(
+            .exerciseSubscriptionPayment_Collect(transferContext)
+            .commands
+            .asScala
+            .toSeq
+          aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
             actAs = Seq(aliceUserParty),
             readAs = Seq(aliceValidatorParty),
             optTimeout = None,
-            commands = Seq(collectCommand2),
+            commands = collectCommand2,
           )
         }
         val subscriptionStateId2 = clue("List subscriptions to find out the new state ID") {
@@ -459,7 +453,7 @@ class WalletIntegrationTest
       clue("Creating 3 subscriptions") {
         List("alice1", "alice2", "alice3").foreach(name => {
           val (_, requestId) = aliceDirectory.requestDirectoryEntryWithSubscription(name)
-          aliceRemoteWallet.acceptSubscriptionRequest(Primitive.ContractId(requestId.contractId))
+          aliceRemoteWallet.acceptSubscriptionRequest(requestId)
         })
       }
       clue("Checking that 3 idle subscriptions are listed...") {
@@ -560,7 +554,7 @@ class WalletIntegrationTest
       aliceRemoteWallet.tap(50)
       checkWallet(aliceUserParty, aliceRemoteWallet, Seq((50, 50)))
       aliceRemoteWallet.executeDirectTransfer(bobUserParty, 10)
-      bobWallet.remoteParticipant.ledger_api.acs.await(bobUserParty, coinCodegen.Coin)
+      bobWallet.remoteParticipant.ledger_api.acs.awaitJava(coinCodegen.Coin.COMPANION)(bobUserParty)
       checkWallet(aliceUserParty, aliceRemoteWallet, Seq((39, 40)))
       checkWallet(bobUserParty, bobRemoteWallet, Seq((9, 10)))
 
@@ -574,7 +568,7 @@ class WalletIntegrationTest
       aliceRemoteWallet.acceptOnChannelPaymentRequest(request)
       eventually()(
         bobWallet.remoteParticipant.ledger_api.acs
-          .of_party(bobUserParty, filterTemplates = Seq(coinCodegen.Coin.id))
+          .filterJava(coinCodegen.Coin.COMPANION)(bobUserParty)
           should have size 2
       )
       checkWallet(aliceUserParty, aliceRemoteWallet, Seq((29, 30)))
@@ -718,7 +712,7 @@ class WalletIntegrationTest
       svc.startClosingRound(0)
       svc.startIssuingRound(0)
       aliceWallet.remoteParticipant.ledger_api.acs
-        .await(aliceValidator.getValidatorPartyId(), roundCodegen.IssuingMiningRound)
+        .awaitJava(roundCodegen.IssuingMiningRound.COMPANION)(aliceValidator.getValidatorPartyId())
 
       // alice uses her reward
       aliceRemoteWallet.executeDirectTransfer(bobUserParty, 1)
@@ -749,8 +743,8 @@ class WalletIntegrationTest
 
       // Wait for app rewards to become visible in bob's wallet, and check structure
       bobWallet.remoteParticipant.ledger_api.acs
-        .await(bobUserParty, coinCodegen.AppReward)
-        .contractId
+        .awaitJava(coinCodegen.AppReward.COMPANION)(bobUserParty)
+        .id
       val appRewards = bobRemoteWallet.listAppRewards()
       appRewards should have size 1
       bobRemoteWallet.listValidatorRewards() shouldBe empty
@@ -782,8 +776,8 @@ class WalletIntegrationTest
         prevCoins
           .map(c =>
             (
-              c.contract.payload.quantity.initialQuantity,
-              c.contract.payload.quantity.initialQuantity + 2,
+              BigDecimal(c.contract.payload.quantity.initialQuantity),
+              BigDecimal(c.contract.payload.quantity.initialQuantity) + 2,
             )
           )
           .sortBy(_._1),
@@ -815,7 +809,7 @@ class WalletIntegrationTest
     "be batched" in { implicit env =>
       val (alice, bob) = setupAliceAndBobAndChannel
       aliceRemoteWallet.tap(50)
-      aliceValidator.remoteParticipant.ledger_api.acs.await(alice, coinCodegen.Coin)
+      aliceValidator.remoteParticipant.ledger_api.acs.awaitJava(coinCodegen.Coin.COMPANION)(alice)
       val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
       // sending three commands in short succession to the idle wallet should lead to two transactions being executed
       // tx 1: first command that arrived is immediately executed
@@ -823,8 +817,8 @@ class WalletIntegrationTest
       (1 to 3).foreach(i => Future(aliceRemoteWallet.executeDirectTransfer(bob, i)).discard)
       // Wait until 2 transactions have been received
       val txs = aliceValidator.remoteParticipant.ledger_api.transactions
-        .trees(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
-      val createdCoinsInTx = txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin)(_))
+        .treesJava(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
+      val createdCoinsInTx = txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_))
 
       // create change + transferred coin
       createdCoinsInTx(0) should have size 2
@@ -836,7 +830,7 @@ class WalletIntegrationTest
       val defaultBatchSize = 10
       val (alice, bob) = setupAliceAndBobAndChannel
       aliceRemoteWallet.tap(50)
-      aliceValidator.remoteParticipant.ledger_api.acs.await(alice, coinCodegen.Coin)
+      aliceValidator.remoteParticipant.ledger_api.acs.awaitJava(coinCodegen.Coin.COMPANION)(alice)
       val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
 
       val _ = Future(aliceRemoteWallet.executeDirectTransfer(bob, 10))
@@ -848,8 +842,8 @@ class WalletIntegrationTest
       // tx 2: 10 subsequent batched transfers
       // tx 3: single transfer that was not picked due to the batch size limit
       val txs = aliceValidator.remoteParticipant.ledger_api.transactions
-        .trees(Set(alice), completeAfter = 3, beginOffset = offsetBefore)
-      val createdCoinsInTx = txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin)(_))
+        .treesJava(Set(alice), completeAfter = 3, beginOffset = offsetBefore)
+      val createdCoinsInTx = txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_))
 
       // create change + transferred coin
       createdCoinsInTx(0) should have size 2
@@ -866,7 +860,7 @@ class WalletIntegrationTest
 
         // tapping some coin & waiting for it to appear as a way to synchronize on the initialization of the apps.
         aliceRemoteWallet.tap(10)
-        aliceValidator.remoteParticipant.ledger_api.acs.await(alice, coinCodegen.Coin)
+        aliceValidator.remoteParticipant.ledger_api.acs.awaitJava(coinCodegen.Coin.COMPANION)(alice)
         // ... such that we don't grab the ledger offset when some init txs are still occurring
         val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
 
@@ -894,8 +888,9 @@ class WalletIntegrationTest
         }
 
         val txs = aliceValidator.remoteParticipant.ledger_api.transactions
-          .trees(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
-        val createdCoinsInTx = txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin)(_))
+          .treesJava(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
+        val createdCoinsInTx =
+          txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_))
         createdCoinsInTx(0) should have size 1
         // two taps went through, even though transfer in same batch failed.
         createdCoinsInTx(1) should have size 2
@@ -904,7 +899,7 @@ class WalletIntegrationTest
     "retry a batch if it fails due to contention" in { implicit env =>
       val (alice, bob) = setupAliceAndBobAndChannel
       aliceRemoteWallet.tap(10)
-      aliceValidator.remoteParticipant.ledger_api.acs.await(alice, coinCodegen.Coin)
+      aliceValidator.remoteParticipant.ledger_api.acs.awaitJava(coinCodegen.Coin.COMPANION)(alice)
 
       val cancelF = Future(bobRemoteWallet.cancelPaymentChannelBySender(alice))
 
@@ -988,12 +983,11 @@ class WalletIntegrationTest
         .zip(expectedQuantityRanges)
         .foreach { case (coin, quantityBounds) =>
           coin.contract.payload.owner shouldBe walletParty.toPrim
-          val ExpiringQuantity(initialQuantity, _, ratePerRound) =
+          val coinQuantity =
             coin.contract.payload.quantity
-          assertInRange(initialQuantity, quantityBounds)
-          ratePerRound shouldBe RatePerRound(
-            CoinUtil.defaultHoldingFee.rate.doubleValue
-          )
+          assertInRange(coinQuantity.initialQuantity, quantityBounds)
+          coinQuantity.ratePerRound shouldBe
+            CoinUtil.defaultHoldingFee
         }
     }
   }
@@ -1021,55 +1015,50 @@ class WalletIntegrationTest
       validatorParty: PartyId,
       coins: Seq[GrpcWalletAppClient.CoinPosition],
       quantity: Int,
-      transferContext: javaCoinRulesCodegen.AppTransferContext,
+      transferContext: coinRulesCodegen.AppTransferContext,
   ): Unit = {
     val coinOpt = coins.find(_.effectiveQuantity >= quantity)
     val expirationOpt = Proto.decode(Proto.Timestamp)(20000000000000000L) // Wed May 18 2033
 
     (coinOpt, expirationOpt) match {
       case (Some(coin), Right(expiration)) => {
-        userWallet.remoteParticipant.ledger_api.commands.submit(
+        userWallet.remoteParticipant.ledger_api.commands.submitJava(
           Seq(userParty, validatorParty),
           optTimeout = None,
-          commands = Seq(
-            Primitive
-              .ContractId[coinRulesCodegen.CoinRules](transferContext.coinRules.contractId)
-              .exerciseCoinRules_Transfer(
-                coinRulesCodegen.Transfer(
-                  sender = userParty.toPrim,
-                  provider = userParty.toPrim,
-                  inputs = Primitive.List(
-                    coinRulesCodegen.TransferInput.InputCoin(coin.contract.contractId)
+          commands = transferContext.coinRules
+            .exerciseCoinRules_Transfer(
+              new coinRulesCodegen.Transfer(
+                userParty.toProtoPrimitive,
+                userParty.toProtoPrimitive,
+                Seq[coinRulesCodegen.TransferInput](
+                  new coinRulesCodegen.transferinput.InputCoin(coin.contract.contractId)
+                ).asJava,
+                Seq[coinRulesCodegen.TransferOutput](
+                  new coinRulesCodegen.transferoutput.OutputSenderCoin(
+                    Some(BigDecimal(quantity).bigDecimal).toJava,
+                    Some(
+                      new coinCodegen.TimeLock(
+                        userParty.toProtoPrimitive,
+                        expiration,
+                      )
+                    ).toJava,
                   ),
-                  outputs = Primitive.List(
-                    coinRulesCodegen.TransferOutput.OutputSenderCoin(
-                      exactQuantity = Some(quantity),
-                      lock = Primitive.Optional[coinCodegen.TimeLock](
-                        coinCodegen.TimeLock(
-                          userParty.toPrim,
-                          expiresAt = expiration,
-                        )
-                      ),
-                    ),
-                    coinRulesCodegen.TransferOutput.OutputSenderCoin(
-                      exactQuantity = None,
-                      lock = None,
-                    ),
+                  new coinRulesCodegen.transferoutput.OutputSenderCoin(
+                    None.toJava,
+                    None.toJava,
                   ),
-                  payload = "lock coins",
-                ),
-                coinRulesCodegen.TransferContext(
-                  openMiningRound =
-                    Primitive.ContractId(transferContext.openMiningRound.contractId),
-                  issuingMiningRounds = Map.empty[roundCodegen.Round, Primitive.ContractId[
-                    roundCodegen.IssuingMiningRound
-                  ]],
-                  validatorRights =
-                    Map.empty[Primitive.Party, Primitive.ContractId[coinCodegen.ValidatorRight]],
-                ),
-              )
-              .command
-          ),
+                ).asJava,
+                "lock coins",
+              ),
+              new coinRulesCodegen.TransferContext(
+                transferContext.openMiningRound,
+                Map.empty[roundCodegen.Round, roundCodegen.IssuingMiningRound.ContractId].asJava,
+                Map.empty[String, coinCodegen.ValidatorRight.ContractId].asJava,
+              ),
+            )
+            .commands
+            .asScala
+            .toSeq,
         )
       }
       case _ => {
@@ -1090,60 +1079,45 @@ class WalletIntegrationTest
       env: CoinTestConsoleEnvironment
   ): subsCodegen.SubscriptionRequest = {
     val contextId = clue("Create a subscription context") {
-      aliceWallet.remoteParticipant.ledger_api.commands.submit(
+      aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
         Seq(aliceUserParty),
         optTimeout = None,
-        commands = Seq(
-          testSubsCodegen
-            .TestSubscriptionContext(
-              svc = scan.getSvcPartyId().toPrim,
-              user = aliceUserParty.toPrim,
-              service = aliceUserParty.toPrim,
-              description = "description",
-            )
-            .create
-            .command
-        ),
+        commands = new testSubsCodegen.TestSubscriptionContext(
+          scan.getSvcPartyId().toProtoPrimitive,
+          aliceUserParty.toProtoPrimitive,
+          aliceUserParty.toProtoPrimitive,
+          "description",
+        ).create.commands.asScala.toSeq,
       )
       aliceWallet.remoteParticipant.ledger_api.acs
-        .await(aliceUserParty, testSubsCodegen.TestSubscriptionContext)
-        .contractId
+        .awaitJava(testSubsCodegen.TestSubscriptionContext.COMPANION)(aliceUserParty)
+        .id
     }
     clue("Create a subscription request to self") {
-      val subscriptionData = subsCodegen.Subscription(
-        sender = aliceUserParty.toPrim,
-        receiver = aliceUserParty.toPrim,
-        provider = aliceUserParty.toPrim,
-        svc = svcParty.toPrim,
-        context = binding.Primitive.ContractId(ApiTypes.ContractId.unwrap(contextId)),
+      val subscriptionData = new subsCodegen.Subscription(
+        aliceUserParty.toProtoPrimitive,
+        aliceUserParty.toProtoPrimitive,
+        aliceUserParty.toProtoPrimitive,
+        svcParty.toProtoPrimitive,
+        contextId.toInterface(subsCodegen.SubscriptionContext.INTERFACE),
       )
-      val payData = subsCodegen.SubscriptionPayData(
-        paymentQuantity = BigDecimal(10: Int),
-        paymentInterval = RelTime(microseconds = 60 * 60 * 1000000L),
-        paymentDuration = RelTime(microseconds = 60 * 60 * 1000000L),
-        collectionDuration = RelTime(microseconds = 60 * 1000000L),
+      val payData = new subsCodegen.SubscriptionPayData(
+        BigDecimal(10).bigDecimal.setScale(10),
+        new RelTime(60 * 60 * 1000000L),
+        new RelTime(60 * 60 * 1000000L),
+        new RelTime(60 * 1000000L),
       ) // paymentDuration == paymenInterval, so we can make a second payment immediately,
       // without having to mess with time
-      val request = subsCodegen.SubscriptionRequest(
+      val request = new subsCodegen.SubscriptionRequest(
         subscriptionData,
         payData,
       )
-      aliceWallet.remoteParticipant.ledger_api.commands.submit(
+      aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
         actAs = Seq(aliceUserParty),
         optTimeout = None,
-        commands = Seq(request.create.command),
+        commands = request.create.commands.asScala.toSeq,
       )
       request
     }
-  }
-}
-
-object WalletIntegrationTest {
-  implicit class AppTranferContextUtils(val context: javaCoinRulesCodegen.AppTransferContext)
-      extends AnyVal {
-    def toScala: coinRulesCodegen.AppTransferContext = new coinRulesCodegen.AppTransferContext(
-      Primitive.ContractId(context.coinRules.contractId),
-      Primitive.ContractId(context.openMiningRound.contractId),
-    )
   }
 }
