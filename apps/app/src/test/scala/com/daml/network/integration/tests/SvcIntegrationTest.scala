@@ -1,9 +1,10 @@
 package com.daml.network.integration.tests
 
-import scala.jdk.CollectionConverters.*
 import com.daml.network.codegen.java.cc.coin._
 import com.daml.network.codegen.java.cc.round._
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
+
+import scala.jdk.CollectionConverters.*
 
 class SvcIntegrationTest extends CoinIntegrationTest {
 

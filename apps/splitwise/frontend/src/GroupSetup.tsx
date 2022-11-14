@@ -69,7 +69,12 @@ const GroupSetup: React.FC<GroupSetupProps> = ({ party, provider, svc }) => {
                 is inviting you to join{' '}
                 <Typography variant="button">{invite.payload.group.id.unpack}</Typography>
               </div>
-              <Button id="request-membership-link" onClick={() => onAcceptInvite(invite)}>
+              <Button
+                data-owner={invite.payload.group.owner}
+                data-group={invite.payload.group.id.unpack}
+                className="request-membership-link"
+                onClick={() => onAcceptInvite(invite)}
+              >
                 Request membership
               </Button>
             </Stack>

@@ -8,7 +8,7 @@ import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.daml.network.util.CoinUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
-import org.openqa.selenium.Keys
+import org.openqa.selenium.{Keys, StaleElementReferenceException}
 
 import scala.concurrent.duration.DurationInt
 
@@ -83,7 +83,7 @@ class SplitwiseFrontendIntegrationTest
         click on "group-id-field"
         textField("group-id-field").value = groupName
         click on "create-group-button"
-        click on "create-invite-link"
+        click on className("create-invite-link")
       }
 
       withFrontEnd("bobSplitwise") { implicit webDriver =>
@@ -93,7 +93,7 @@ class SplitwiseFrontendIntegrationTest
         click on "login-button"
         bobValidator.remoteParticipant.ledger_api.acs
           .awaitJava(splitwiseCodegen.GroupInvite.COMPANION)(bobUserParty)
-        click on "request-membership-link"
+        click on className("request-membership-link")
       }
 
       withFrontEnd("aliceSplitwise") { implicit webDriver =>
@@ -107,7 +107,7 @@ class SplitwiseFrontendIntegrationTest
         click on "login-button"
         charlieValidator.remoteParticipant.ledger_api.acs
           .awaitJava(splitwiseCodegen.GroupInvite.COMPANION)(charlieUserParty)
-        click on "request-membership-link"
+        click on className("request-membership-link")
       }
 
       withFrontEnd("aliceSplitwise") { implicit webDriver =>
@@ -240,7 +240,7 @@ class SplitwiseFrontendIntegrationTest
         click on "group-id-field"
         textField("group-id-field").value = groupName
         click on "create-group-button"
-        click on "create-invite-link"
+        click on className("create-invite-link")
       }
 
       withFrontEnd("bobSplitwise") { implicit webDriver =>
@@ -250,7 +250,7 @@ class SplitwiseFrontendIntegrationTest
         click on "login-button"
         bobValidator.remoteParticipant.ledger_api.acs
           .awaitJava(splitwiseCodegen.GroupInvite.COMPANION)(bobUserParty)
-        click on "request-membership-link"
+        click on className("request-membership-link")
       }
 
       withFrontEnd("aliceSplitwise") { implicit webDriver =>
@@ -309,6 +309,153 @@ class SplitwiseFrontendIntegrationTest
         // Check final amounts in the wallets
         checkWallet(aliceUserParty, aliceRemoteWallet, Seq((3.75, 4), exactly(500)))
         checkWallet(bobUserParty, bobRemoteWallet, Seq((12.4, 12.5)))
+      }
+    }
+
+    "handle multiple groups correctly" in { implicit env =>
+      val aliceDamlUser = aliceSplitwise.config.damlUser
+      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+      val bobDamlUser = bobSplitwise.config.damlUser
+      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
+      val charlieDamlUser = charlieSplitwise.config.damlUser
+      // we re-use alice's validator here to save some resources
+      val charlieValidator = aliceValidator
+      val charlieUserParty = charlieValidator.onboardUser(charlieDamlUser)
+
+      initialiseDirectoryApp("alice.cns", aliceUserParty, aliceDirectory, aliceRemoteWallet)
+      initialiseDirectoryApp("bob.cns", bobUserParty, bobDirectory, bobRemoteWallet)
+      initialiseDirectoryApp("charlie.cns", charlieUserParty, charlieDirectory, charlieRemoteWallet)
+
+      // Alice creates three groups - abc, ab, ac
+      withFrontEnd("aliceSplitwise") { implicit webDriver =>
+        go to "http://localhost:3002"
+        click on "user-id-field"
+        textField("user-id-field").value = aliceDamlUser
+        click on "login-button"
+
+        click on "group-id-field"
+        textField("group-id-field").value = "group-abc"
+        click on "create-group-button"
+
+        click on "group-id-field"
+        textField("group-id-field").value = "group-ab"
+        click on "create-group-button"
+
+        click on "group-id-field"
+        textField("group-id-field").value = "group-ac"
+        click on "create-group-button"
+
+        eventually() {
+          findAll(className("create-invite-link")).toSeq should have length 3
+        }
+        findAll(className("create-invite-link")).toSeq.map(click on _)
+      }
+
+      // Bob requests to join groups abc and ab
+      withFrontEnd("bobSplitwise") { implicit webDriver =>
+        go to "http://localhost:3003"
+        click on "user-id-field"
+        textField("user-id-field").value = bobDamlUser
+        click on "login-button"
+        bobValidator.remoteParticipant.ledger_api.acs
+          .awaitJava(splitwiseCodegen.GroupInvite.COMPANION)(bobUserParty)
+        eventually() {
+          findAll(className("request-membership-link")).toSeq should have length 3
+        }
+        click on findAll(className("request-membership-link")).toSeq
+          .filter(_.attribute("data-owner") == Some(aliceUserParty.toProtoPrimitive))
+          .filter(_.attribute("data-group") == Some("group-abc"))
+          .head
+        click on findAll(className("request-membership-link")).toSeq
+          .filter(_.attribute("data-owner") == Some(aliceUserParty.toProtoPrimitive))
+          .filter(_.attribute("data-group") == Some("group-ab"))
+          .head
+      }
+
+      // Charlie requests to join groups abc and ac
+      withFrontEnd("charlieSplitwise") { implicit webDriver =>
+        go to "http://localhost:3005"
+        click on "user-id-field"
+        textField("user-id-field").value = charlieDamlUser
+        click on "login-button"
+        bobValidator.remoteParticipant.ledger_api.acs
+          .awaitJava(splitwiseCodegen.GroupInvite.COMPANION)(bobUserParty)
+        eventually() {
+          findAll(className("request-membership-link")).toSeq should have length 3
+        }
+        click on findAll(className("request-membership-link")).toSeq
+          .filter(_.attribute("data-owner") == Some(aliceUserParty.toProtoPrimitive))
+          .filter(_.attribute("data-group") == Some("group-abc"))
+          .head
+        click on findAll(className("request-membership-link")).toSeq
+          .filter(_.attribute("data-owner") == Some(aliceUserParty.toProtoPrimitive))
+          .filter(_.attribute("data-group") == Some("group-ac"))
+          .head
+      }
+
+      def accept_request(group: String, invitee: String)(implicit
+          webDriver: WebDriverType
+      ): Unit = {
+        // The element can become stale while we are finding&clicking them (due to the previously clicked ones) - hence the eventually() wrapper
+        eventually() {
+          try {
+            findAll(className("add-user-link"))
+              .filter(elem =>
+                elem.attribute("data-group") == Some(group) &&
+                  elem.attribute("data-invitee") == Some(invitee)
+              )
+              .toSeq
+              .map(click on _)
+            ()
+          } catch {
+            case _: StaleElementReferenceException => fail()
+          }
+        }
+      }
+
+      // Alice accepts all requests
+      withFrontEnd("aliceSplitwise") { implicit webDriver =>
+        eventually(timeUntilSuccess = 20.minute) {
+          findAll(className("add-user-link")) should have length 4
+        }
+        // The add-user elements change under our feet as we are clicking them, so we need to first extract the information from all, then find&click them one-by-one
+        findAll(className("add-user-link")).toSeq
+          .map(elem =>
+            (
+              elem.attribute("data-group").getOrElse(fail()),
+              elem.attribute("data-invitee").getOrElse(fail()),
+            )
+          )
+          .map(a => accept_request(a._1, a._2))
+      }
+
+      withFrontEnd("bobSplitwise") { implicit webDriver =>
+        eventually() {
+          findAll(className("group-entry")) should have length 2
+          val groups = findAll(className("group-entry")).toSeq
+            .map(elem => (elem.attribute("data-group-owner"), elem.attribute("data-group-id")))
+            .sorted
+          groups should be(
+            Seq(
+              (Some(aliceUserParty.toProtoPrimitive), Some("group-ab")),
+              (Some(aliceUserParty.toProtoPrimitive), Some("group-abc")),
+            )
+          )
+        }
+      }
+      withFrontEnd("charlieSplitwise") { implicit webDriver =>
+        eventually() {
+          findAll(className("group-entry")) should have length 2
+          val groups = findAll(className("group-entry")).toSeq
+            .map(elem => (elem.attribute("data-group-owner"), elem.attribute("data-group-id")))
+            .sorted
+          groups should be(
+            Seq(
+              (Some(aliceUserParty.toProtoPrimitive), Some("group-abc")),
+              (Some(aliceUserParty.toProtoPrimitive), Some("group-ac")),
+            )
+          )
+        }
       }
     }
 

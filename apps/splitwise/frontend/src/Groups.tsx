@@ -161,6 +161,7 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({ group, party, p
     setAcceptedInvites(prev => (sameContracts(decoded, prev) ? prev : decoded));
   }, [group.payload.id.unpack, party, splitwiseClient]);
   useInterval(fetchAcceptedInvites, 500);
+
   const onAddMember = async (invite: Contract<AcceptedGroupInvite>) => {
     await ledgerApiClient.joinGroup(party, provider, group.contractId, invite.contractId);
   };
@@ -171,7 +172,12 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({ group, party, p
         <List>
           {acceptedInvites.map(invite => (
             <ListItem key={invite.contractId}>
-              <Button className="add-user-link" onClick={() => onAddMember(invite)}>
+              <Button
+                data-group={group.payload.id.unpack}
+                data-invitee={invite.payload.invitee}
+                className="add-user-link"
+                onClick={() => onAddMember(invite)}
+              >
                 Add <DirectoryEntryComponent partyId={invite.payload.invitee} />
               </Button>
             </ListItem>
@@ -211,55 +217,61 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider 
     ]);
   };
   return (
-    <Stack>
-      <Stack direction="row">
-        <TextField
-          label="Quantity"
-          className="enter-payment-quantity-field"
-          value={paymentQuantity}
-          onChange={event => setPaymentQuantity(event.target.value)}
-        ></TextField>
-        <TextField
-          label="Description"
-          className="enter-payment-description-field"
-          value={paymentDescription}
-          onChange={event => setPaymentDescription(event.target.value)}
-        ></TextField>
-        <Button className="enter-payment-link" onClick={onEnterPayment}>
-          Enter payment
-        </Button>
+    <div
+      className="group-entry"
+      data-group-owner={group.payload.owner}
+      data-group-id={group.payload.id.unpack}
+    >
+      <Stack>
+        <Stack direction="row">
+          <TextField
+            label="Quantity"
+            className="enter-payment-quantity-field"
+            value={paymentQuantity}
+            onChange={event => setPaymentQuantity(event.target.value)}
+          ></TextField>
+          <TextField
+            label="Description"
+            className="enter-payment-description-field"
+            value={paymentDescription}
+            onChange={event => setPaymentDescription(event.target.value)}
+          ></TextField>
+          <Button className="enter-payment-link" onClick={onEnterPayment}>
+            Enter payment
+          </Button>
+        </Stack>
+        <Stack direction="row" justifyContent="stretch">
+          <TextField
+            label="Quantity"
+            className="transfer-quantity-field"
+            value={transferQuantity}
+            onChange={event => setTransferQuantity(event.target.value)}
+          ></TextField>
+          <Autocomplete<DirectoryEntry, false, false, true>
+            sx={{ width: '38%' }}
+            freeSolo
+            options={directoryEntries.getAllEntries()}
+            getOptionLabel={option => (typeof option === 'string' ? option : option.name)}
+            value={transferReceiverEntry}
+            onChange={(_, newValue) => {
+              if (typeof newValue === 'string') {
+                setTransferReceiverEntry({ user: newValue, name: newValue });
+              } else {
+                setTransferReceiverEntry(newValue);
+              }
+            }}
+            renderInput={params => <TextField {...params} label="Receiver" />}
+            className="transfer-receiver-field"
+          />
+          <TransferButton
+            className="transfer-link"
+            text="Transfer"
+            createPaymentRequest={initiateTransfer}
+            walletPath={config.wallet.uiUrl}
+          ></TransferButton>
+        </Stack>
       </Stack>
-      <Stack direction="row" justifyContent="stretch">
-        <TextField
-          label="Quantity"
-          className="transfer-quantity-field"
-          value={transferQuantity}
-          onChange={event => setTransferQuantity(event.target.value)}
-        ></TextField>
-        <Autocomplete<DirectoryEntry, false, false, true>
-          sx={{ width: '38%' }}
-          freeSolo
-          options={directoryEntries.getAllEntries()}
-          getOptionLabel={option => (typeof option === 'string' ? option : option.name)}
-          value={transferReceiverEntry}
-          onChange={(_, newValue) => {
-            if (typeof newValue === 'string') {
-              setTransferReceiverEntry({ user: newValue, name: newValue });
-            } else {
-              setTransferReceiverEntry(newValue);
-            }
-          }}
-          renderInput={params => <TextField {...params} label="Receiver" />}
-          className="transfer-receiver-field"
-        />
-        <TransferButton
-          className="transfer-link"
-          text="Transfer"
-          createPaymentRequest={initiateTransfer}
-          walletPath={config.wallet.uiUrl}
-        ></TransferButton>
-      </Stack>
-    </Stack>
+    </div>
   );
 };
 
@@ -345,9 +357,15 @@ const Group: React.FC<GroupProps> = ({ directoryEntries, group, party, provider 
         justifyContent="space-between"
         alignItems="center"
       >
-        <Typography variant="button">{group.payload.id.unpack}</Typography>
+        <Typography variant="button" className="group-name">
+          {group.payload.id.unpack}
+        </Typography>
         {isOwner && (
-          <Button id="create-invite-link" onClick={onCreateInvite}>
+          <Button
+            data-group={group.payload.id.unpack}
+            className="create-invite-link"
+            onClick={onCreateInvite}
+          >
             Create Invite
           </Button>
         )}
@@ -395,7 +413,7 @@ const Groups: React.FC<GroupsProps> = ({ directoryEntries, party, provider }) =>
     <Stack spacing={2}>
       {groups.map(group => (
         <Group
-          key={`${group.payload.owner}:${group.payload.id}`}
+          key={`${group.payload.owner}:${group.payload.id.unpack}`}
           directoryEntries={directoryEntries}
           group={group}
           party={party}
