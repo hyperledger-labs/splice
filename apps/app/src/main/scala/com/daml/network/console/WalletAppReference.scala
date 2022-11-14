@@ -2,8 +2,11 @@ package com.daml.network.console
 
 import com.daml.network.auth.{AuthUtil, JwtCallCredential}
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, coinrules as coinRulesCodegen}
-import com.daml.network.codegen.java.cn.wallet.{PaymentChannel, subscriptions => subsCodegen}
-import com.daml.network.codegen.java.cn.wallet as walletCodegen
+import com.daml.network.codegen.java.cn.wallet.{
+  payment => walletCodegen,
+  paymentchannel => channelCodegen,
+  subscriptions => subsCodegen,
+}
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.util.{JavaContract as Contract, JavaValue as Value}
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
@@ -202,12 +205,12 @@ abstract class WalletAppReference(
   )
   def proposePaymentChannel(
       receiver: PartyId,
-      replacesChannelId: Option[PaymentChannel.ContractId] = None,
+      replacesChannelId: Option[channelCodegen.PaymentChannel.ContractId] = None,
       allowRequests: Boolean = true,
       allowOffers: Boolean = true,
       allowDirectTransfers: Boolean = true,
       senderTransferFeeRatio: Double = 1.0,
-  ): walletCodegen.PaymentChannelProposal.ContractId = {
+  ): channelCodegen.PaymentChannelProposal.ContractId = {
     consoleEnvironment.run {
       adminCommand(
         GrpcWalletAppClient.ProposePaymentChannel(
@@ -228,7 +231,10 @@ abstract class WalletAppReference(
     "Shows both incoming and outgoing payment channel proposals."
   )
   def listPaymentChannelProposals(): Seq[
-    Contract[walletCodegen.PaymentChannelProposal.ContractId, walletCodegen.PaymentChannelProposal]
+    Contract[
+      channelCodegen.PaymentChannelProposal.ContractId,
+      channelCodegen.PaymentChannelProposal,
+    ]
   ] = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.ListPaymentChannelProposals(), callCredentials)
@@ -240,7 +246,7 @@ abstract class WalletAppReference(
     "Shows payment channels where the user is either the sender or the receiver"
   )
   def listPaymentChannels()
-      : Seq[Contract[walletCodegen.PaymentChannel.ContractId, walletCodegen.PaymentChannel]] = {
+      : Seq[Contract[channelCodegen.PaymentChannel.ContractId, channelCodegen.PaymentChannel]] = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.ListPaymentChannels(), callCredentials)
     }
@@ -251,8 +257,8 @@ abstract class WalletAppReference(
     "Accept a specific payment channel proposal."
   )
   def acceptPaymentChannelProposal(
-      proposalId: walletCodegen.PaymentChannelProposal.ContractId
-  ): walletCodegen.PaymentChannel.ContractId = {
+      proposalId: channelCodegen.PaymentChannelProposal.ContractId
+  ): channelCodegen.PaymentChannel.ContractId = {
     consoleEnvironment.run {
       adminCommand(
         GrpcWalletAppClient.AcceptPaymentChannelProposal(proposalId),
@@ -311,7 +317,7 @@ abstract class WalletAppReference(
       sender: PartyId,
       quantity: BigDecimal,
       description: String,
-  ): walletCodegen.OnChannelPaymentRequest.ContractId = {
+  ): channelCodegen.OnChannelPaymentRequest.ContractId = {
     consoleEnvironment.run {
       adminCommand(
         GrpcWalletAppClient.CreateOnChannelPaymentRequest(
@@ -329,8 +335,8 @@ abstract class WalletAppReference(
     "Shows all incoming and outgoing payment requests over payment channels."
   )
   def listOnChannelPaymentRequests(): Seq[Contract[
-    walletCodegen.OnChannelPaymentRequest.ContractId,
-    walletCodegen.OnChannelPaymentRequest,
+    channelCodegen.OnChannelPaymentRequest.ContractId,
+    channelCodegen.OnChannelPaymentRequest,
   ]] = {
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.ListOnChannelPaymentRequests(), callCredentials)
@@ -342,7 +348,7 @@ abstract class WalletAppReference(
     "Accepts the request using the given coin."
   )
   def acceptOnChannelPaymentRequest(
-      requestId: walletCodegen.OnChannelPaymentRequest.ContractId
+      requestId: channelCodegen.OnChannelPaymentRequest.ContractId
   ): Unit = {
     consoleEnvironment.run {
       adminCommand(
@@ -357,7 +363,7 @@ abstract class WalletAppReference(
     "Rejects the request."
   )
   def rejectOnChannelPaymentRequest(
-      requestId: walletCodegen.OnChannelPaymentRequest.ContractId
+      requestId: channelCodegen.OnChannelPaymentRequest.ContractId
   ): Unit = {
     consoleEnvironment.run {
       adminCommand(
@@ -372,7 +378,7 @@ abstract class WalletAppReference(
     "Withdraws the request."
   )
   def withdrawOnChannelPaymentRequest(
-      requestId: walletCodegen.OnChannelPaymentRequest.ContractId
+      requestId: channelCodegen.OnChannelPaymentRequest.ContractId
   ): Unit = {
     consoleEnvironment.run {
       adminCommand(

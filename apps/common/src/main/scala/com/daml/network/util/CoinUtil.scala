@@ -4,9 +4,9 @@ import com.daml.ledger.api.refinements.ApiTypes
 import com.daml.ledger.api.refinements.ApiTypes.TemplateId
 import com.daml.ledger.client.binding
 import com.daml.ledger.javaapi.data.Command
+import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.codegen.java.da.types.Tuple2
-import com.daml.network.codegen.java.cc
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.digitalasset.canton.lifecycle.FlagCloseable

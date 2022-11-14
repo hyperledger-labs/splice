@@ -1,0 +1,139 @@
+module CN.Wallet.Payment where
+
+import DA.Action
+import DA.Time
+
+import CC.Assert
+import CC.Coin
+import CC.CoinRules
+
+data DeliveryOfferView = DeliveryOfferView
+  with
+    svc : Party
+    sender : Party
+    description : Text
+
+-- | The description of an offer of delivery for payment.
+--
+-- Contracts implementing this interface are used to carry extra data along the payment request and approval flow.
+-- Their lifetime is bound 1-1 with the lifetime of the 'AppPaymentRequest' and 'AcceptedAppPayment' referencing them.
+interface DeliveryOffer
+  where
+    viewtype DeliveryOfferView
+
+data ReceiverQuantity = ReceiverQuantity with receiver : Party, quantity : Decimal
+  deriving (Show, Eq)
+
+unzipReceiverQuantities : [ReceiverQuantity] -> ([Party], [Decimal])
+unzipReceiverQuantities = foldr (\ReceiverQuantity{..} (rs,cs) -> (receiver :: rs, quantity :: cs)) ([], [])
+
+template AppPaymentRequest
+  with
+    sender : Party -- ^ The party that should pay.
+    receiverQuantities : [ReceiverQuantity] -- ^ Pairs of (party, quantity) requesting to be paid.
+    provider : Party -- ^ The app provider; receives usage rewards.
+    svc : Party -- ^ The issuer of CC that should be used to make the payment.
+    expiresAt : Time -- ^ When the payment request expires.
+    collectionDuration : RelTime -- ^ The time available to the provider to collect a payment.
+    deliveryOffer : ContractId DeliveryOffer -- ^ The reference to the reason / good for which the payment is requested.
+  where
+    let (receivers, quantities) = unzipReceiverQuantities receiverQuantities
+    signatory sender, receivers, provider
+    ensure (collectionDuration > aunit && all (> 0.0) quantities)
+
+    choice AppPaymentRequest_Accept : Either Text (ContractId AcceptedAppPayment, ContractId Coin)
+      with
+        inputs : [TransferInput]
+        context : PaymentTransferContext
+      controller sender
+      do now <- getTime
+         -- check that the reference is active and implements DeliveryOffer
+         void $ fetch deliveryOffer
+         require "AppPaymentRequest has not expired" (now < expiresAt)
+         fees <- exerciseComputeFees context sender quantities
+         -- lock the coin and create an accepted payment
+         let transfer = Transfer with
+              sender
+              provider
+              inputs
+              outputs =
+                [ OutputSenderCoin with
+                    exactQuantity = Some (fees + sum quantities)
+                    lock = Some TimeLock with
+                      holder = provider
+                      expiresAt = now `addRelTime` collectionDuration
+                , OutputSenderCoin with
+                    exactQuantity = None
+                    lock = None
+                ]
+              payload = "lock payment"
+         result <- exercisePaymentTransfer context transfer
+         case result of
+          Left errorMsg -> return $ Left errorMsg
+          Right result -> do
+            let [TransferResultLockedCoin lockedCoin, TransferResultCoin senderChange] = result.createdCoins
+            acceptedPayment <- create AcceptedAppPayment
+                with
+                  svc, provider, receiverQuantities, sender, deliveryOffer, lockedCoin
+            return $ Right (acceptedPayment, senderChange)
+
+    choice AppPaymentRequest_Withdraw : ()
+      controller receivers
+      do archive deliveryOffer
+
+    choice AppPaymentRequest_Reject : ()
+      controller sender
+      do archive deliveryOffer
+
+data ReceiverCoin = ReceiverCoin with receiver : Party, lockedCoin : ContractId LockedCoin
+  deriving (Eq, Show)
+
+unzipReceiverCoins : [ReceiverCoin] -> ([Party], [ContractId LockedCoin])
+unzipReceiverCoins = foldr (\ReceiverCoin{..} (rs,cs) -> (receiver :: rs, lockedCoin :: cs)) ([], [])
+
+template AcceptedAppPayment
+  with
+    sender : Party
+    receiverQuantities : [ReceiverQuantity]
+    provider : Party
+    svc : Party
+    lockedCoin : ContractId LockedCoin
+    deliveryOffer : ContractId DeliveryOffer
+  where
+    signatory sender, provider, map (\r -> r.receiver) receiverQuantities
+
+    choice AcceptedAppPayment_Collect : (ContractId DeliveryOffer, [(Party, ContractId Coin)])
+      with
+        context : AppTransferContext
+      controller signatory this
+      do
+        -- unlock coin and transfer the remainder to the receiver
+        coin <- exercise lockedCoin LockedCoin_Unlock
+        let transfer = Transfer with
+              sender
+              provider
+              inputs = [InputCoin coin]
+              outputs = fmap
+                (\receiverQuantity -> OutputReceiverCoin with
+                  receiver = receiverQuantity.receiver
+                  coinType = FixedReceiverCoin with
+                    quantity = receiverQuantity.quantity
+                    senderTransferFeeRatio = 1.0
+                ) receiverQuantities
+              payload = "transfer locked payment"
+        Right result <-exerciseAppTransfer context transfer
+        let coins = map (\(TransferResultCoin coinCid) -> coin) result.createdCoins
+        -- defensive check that the reference is still active
+        void $ fetch deliveryOffer
+        let receivers = map (\r -> r.receiver) receiverQuantities
+        pure (deliveryOffer, zip receivers coins)
+
+    choice AcceptedAppPayment_Reject : ContractId Coin
+      controller map (\r -> r.receiver) receiverQuantities
+      do archive deliveryOffer
+         exercise lockedCoin LockedCoin_Unlock
+
+    choice AcceptedAppPayment_Expire : ContractId Coin
+      controller sender
+      do archive deliveryOffer
+         exercise lockedCoin LockedCoin_OwnerExpireLock

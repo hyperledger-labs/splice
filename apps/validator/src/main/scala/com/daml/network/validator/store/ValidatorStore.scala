@@ -1,7 +1,7 @@
 package com.daml.network.validator.store
 
 import com.daml.network.codegen.java.cc.{coin => coinCodegen, coinrules => coinRulesCodegen}
-import com.daml.network.codegen.java.cn.{wallet => walletCodegen}
+import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.store.AcsStore
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{JavaContract => Contract}

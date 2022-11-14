@@ -13,5 +13,5 @@ gen_project_docs () {
 (cd ../../..; sbt apps-common/damlBuild apps-wallet-daml/damlBuild apps-directory/damlBuild)
 
 gen_project_docs canton-coin cc
-gen_project_docs apps/wallet/daml wallet
+gen_project_docs apps/wallet/daml-payments wallet
 gen_project_docs apps/directory/daml directory-service

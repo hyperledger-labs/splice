@@ -1,0 +1,195 @@
+module CN.Wallet.Install where
+
+import DA.Exception
+
+import CC.Coin
+import CC.CoinRules
+
+import CN.Wallet.Payment
+import CN.Wallet.PaymentChannel
+import CN.Wallet.Subscriptions
+
+-- Evaluates an update, catches any exceptions it throws and converts them into an Either
+catchAll: Update a -> Update (Either Text a)
+catchAll operation =
+  try do
+    fmap (\res -> Right res) operation
+  catch (ex : AnyException) -> return $ Left $ message ex
+
+-- Same as `catchAll` except the update already returns an Either
+catchAllE: (Update (Either Text a)) -> Update (Either Text a)
+catchAllE operation =
+  try do
+    operation
+  catch (ex : AnyException) -> return $ Left $ message ex
+
+-- Main function for batched execution of multiple coin operations.
+-- Given multiple coin operations and transfer inputs, it executes the operations sequentially while
+-- stringing along the remaining inputs. Returns all outcomes.
+executeCoinOperationRec : PaymentTransferContext -> [TransferInput] -> [CoinOperationOutcome] -> [CoinOperation] -> Update ([CoinOperationOutcome])
+executeCoinOperationRec context inputs prevResults (operation::remainingOperations) = do
+  case operation of
+    CO_AppPayment cid -> handleE AppPaymentRequest_Accept COO_AcceptedAppPayment cid
+    CO_ChannelPayment cid -> handleE OnChannelPaymentRequest_Accept COO_AcceptedChannelPayment cid
+    CO_ChannelTransfer channel quantity payload -> do
+      resultE <- catchAllE $ exercise channel (PaymentChannel_ExecuteDirectTransfer inputs quantity payload context)
+      handleResult COO_AcceptedChannelTransfer resultE
+    CO_SubscriptionAcceptAndMakeInitialPayment cid -> handle SubscriptionRequest_AcceptAndMakePayment COO_SubscriptionInitialPayment cid
+    CO_SubscriptionMakePayment cid -> handle SubscriptionIdleState_MakePayment COO_SubscriptionPayment cid
+    CO_Tap svc validator endUser quantity -> do
+      coin <- catchAll (exercise context.coinRules (CoinRules_Tap endUser quantity context.context.openMiningRound))
+      handleResultTap coin
+  where
+    handle : Choice t c (r, ContractId Coin) => ([TransferInput] -> PaymentTransferContext -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
+    handle choiceConstructor resultConstructor cid = do
+      resultE <- catchAll $ exercise cid (choiceConstructor inputs context)
+      handleResult resultConstructor resultE
+
+    handleE : Choice t c (Either Text (r, ContractId Coin)) => ([TransferInput] -> PaymentTransferContext -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
+    handleE choiceConstructor resultConstructor cid = do
+      resultE <- catchAllE $ exercise cid (choiceConstructor inputs context)
+      handleResult resultConstructor resultE
+
+    handleResult : (r -> CoinOperationOutcome) -> Either Text (r, ContractId Coin) -> Update [CoinOperationOutcome]
+    handleResult resultConstructor = \case
+      Left errorMsg -> handleLeft errorMsg
+      Right (result, change) -> executeCoinOperationRec context [InputCoin change] (resultConstructor result :: prevResults) remainingOperations
+
+    handleResultTap : Either Text (ContractId Coin) -> Update [CoinOperationOutcome]
+    handleResultTap = \case
+      Left errorMsg -> handleLeft errorMsg
+      Right tappedCoin -> executeCoinOperationRec context (InputCoin tappedCoin :: inputs) (COO_Tap tappedCoin :: prevResults) remainingOperations
+
+    handleLeft : Text -> Update [CoinOperationOutcome]
+    handleLeft errorMsg = executeCoinOperationRec context inputs (COO_Error errorMsg :: prevResults) remainingOperations
+
+executeCoinOperationRec _context _inputs prevResults [] = do
+  return prevResults
+
+
+-- Enum of the possible ways coins can be manipulated through the wallet.
+data CoinOperation
+  = CO_AppPayment (ContractId AppPaymentRequest)
+  | CO_ChannelPayment (ContractId OnChannelPaymentRequest)
+  | CO_ChannelTransfer with
+    channel : ContractId PaymentChannel
+    quantity: Decimal
+    payload: Text
+  | CO_SubscriptionAcceptAndMakeInitialPayment (ContractId SubscriptionRequest)
+  | CO_SubscriptionMakePayment (ContractId SubscriptionIdleState)
+  | CO_Tap with
+    svc: Party
+    validator: Party
+    endUser: Party
+    quantity: Decimal
+
+
+  deriving (Eq, Show)
+
+-- Enum of the possible outcomes of operating on a Canton coin through the wallet.
+data CoinOperationOutcome
+  = COO_AcceptedAppPayment (ContractId AcceptedAppPayment)
+  | COO_AcceptedChannelPayment TransferResult
+  | COO_AcceptedChannelTransfer TransferResult
+  | COO_SubscriptionInitialPayment (ContractId SubscriptionInitialPayment)
+  | COO_SubscriptionPayment (ContractId SubscriptionPayment)
+  | COO_Tap (ContractId Coin)
+  | COO_Error Text
+  deriving (Eq, Show)
+
+
+-- Note: includes the svc party and the validator app service party, so that choices can look up CoinRules (where the validator is observer)
+-- This should be replaced by explicit disclosure
+template WalletAppInstall
+  with
+    svcParty : Party -- TODO(M1-51): remove workaround for explicit disclosure
+    validatorParty : Party -- TODO(M1-51): remove workaround for explicit disclosure
+    walletServiceParty : Party
+    endUserName : Text -- The participant user name of the end-user
+    endUserParty : Party -- The primary party of the end-user
+  where
+    signatory walletServiceParty, endUserParty, validatorParty
+
+    -- Takes a batch of commands manipulating coins, and tries to execute them sequentially in one large Daml transaction.
+    nonconsuming choice WalletAppInstall_ExecuteBatch: [CoinOperationOutcome]
+      with
+        context : PaymentTransferContext
+        inputs : [TransferInput]
+        operations : [CoinOperation]
+      controller walletServiceParty
+      do
+        accepted <- executeCoinOperationRec context inputs [] operations
+        return $ reverse accepted
+
+    nonconsuming choice WalletAppInstall_AppPaymentRequest_Reject : ()
+      with
+        cid : ContractId AppPaymentRequest
+      controller walletServiceParty
+      do exercise cid AppPaymentRequest_Reject
+
+    nonconsuming choice WalletAppInstall_SubscriptionRequest_Reject : ()
+      with
+        cid : ContractId SubscriptionRequest
+      controller walletServiceParty
+      do exercise cid SubscriptionRequest_Reject
+
+    nonconsuming choice WalletAppInstall_SubscriptionIdleState_CancelSubscription : ()
+      with
+        cid : ContractId SubscriptionIdleState
+      controller walletServiceParty
+      do exercise cid SubscriptionIdleState_CancelSubscription
+
+    nonconsuming choice WalletAppInstall_CreatePaymentChannelProposal : ContractId PaymentChannelProposal
+      with
+        proposer : Party
+        channel : PaymentChannel
+        replacesChannel : Optional (ContractId PaymentChannel)
+      controller walletServiceParty
+      do create PaymentChannelProposal with ..
+
+    nonconsuming choice WalletAppInstall_PaymentChannelProposal_Accept : ContractId PaymentChannel
+      with
+        cid : ContractId PaymentChannelProposal
+      controller walletServiceParty
+      do exercise cid PaymentChannelProposal_Accept
+
+    nonconsuming choice WalletAppInstall_PaymentChannel_Cancel_By_Sender : ()
+      with
+        cid : ContractId PaymentChannel
+      controller walletServiceParty
+      do exercise cid PaymentChannel_Cancel_By_Sender
+
+    nonconsuming choice WalletAppInstall_PaymentChannel_Cancel_By_Receiver : ()
+      with
+        cid : ContractId PaymentChannel
+      controller walletServiceParty
+      do exercise cid PaymentChannel_Cancel_By_Receiver
+
+    nonconsuming choice WalletAppInstall_PaymentChannel_CreatePaymentRequest : ContractId OnChannelPaymentRequest
+      with
+        cid : ContractId PaymentChannel
+        quantity : Decimal
+        description : Text
+      controller walletServiceParty
+      do exercise cid (PaymentChannel_CreatePaymentRequest quantity description)
+
+    nonconsuming choice WalletAppInstall_OnChannelPaymentRequest_Withdraw : ()
+      with
+        cid : ContractId OnChannelPaymentRequest
+      controller walletServiceParty
+      do exercise cid OnChannelPaymentRequest_Withdraw
+
+    nonconsuming choice WalletAppInstall_OnChannelPaymentRequest_Reject : ()
+      with
+        cid : ContractId OnChannelPaymentRequest
+      controller walletServiceParty
+      do exercise cid OnChannelPaymentRequest_Reject
+
+    -- TODO(#1351): Remove this
+    nonconsuming choice WalletAppInstall_CoinRules_TryTransfer : TransferResult
+      with
+        cid : ContractId CoinRules
+        transfer : Transfer
+        context : TransferContext
+      controller walletServiceParty
+      do exercise cid (CoinRules_TryTransfer transfer context)

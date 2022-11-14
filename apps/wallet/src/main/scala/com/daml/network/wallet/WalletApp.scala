@@ -10,7 +10,7 @@ import com.daml.network.auth.{
   RSAVerifier,
   SignatureVerifier,
 }
-import com.daml.network.codegen.java.cn.wallet as walletCodegen
+import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -159,7 +159,7 @@ class WalletApp(
   override lazy val ports =
     Map("admin" -> config.adminApi.port)
 
-  override lazy val requiredTemplates = Set(walletCodegen.WalletAppInstall.TEMPLATE_ID)
+  override lazy val requiredTemplates = Set(installCodegen.WalletAppInstall.TEMPLATE_ID)
 }
 
 object WalletApp {

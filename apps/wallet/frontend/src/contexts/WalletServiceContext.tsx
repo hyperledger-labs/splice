@@ -4,13 +4,14 @@ import { WalletServicePromiseClient } from 'common-protobuf/com/daml/network/wal
 import { Metadata } from 'grpc-web';
 import React, { useContext, useMemo } from 'react';
 
-import { AppPaymentRequest, PaymentChannelProposal } from '@daml.js/wallet/lib/CN/Wallet';
+import { AppPaymentRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 import {
   SubscriptionRequest,
   Subscription,
   SubscriptionIdleState,
   SubscriptionPayment,
-} from '@daml.js/wallet/lib/CN/Wallet/Subscriptions';
+} from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
+import { PaymentChannelProposal } from '@daml.js/wallet/lib/CN/Wallet/PaymentChannel';
 
 import { useUserState } from './UserContext';
 

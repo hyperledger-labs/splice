@@ -1,6 +1,6 @@
 import { Button } from '@mui/material';
 
-import { AppPaymentRequest } from '@daml.js/wallet-0.1.0/lib/CN/Wallet';
+import { AppPaymentRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 import { ContractId } from '@daml/types';
 
 interface Props {

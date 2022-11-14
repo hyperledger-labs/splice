@@ -13,7 +13,7 @@ import {
   Typography,
 } from '@mui/material';
 
-import { PaymentChannelProposal } from '@daml.js/wallet/lib/CN/Wallet';
+import { PaymentChannelProposal } from '@daml.js/wallet/lib/CN/Wallet/PaymentChannel';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 

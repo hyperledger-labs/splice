@@ -1,7 +1,8 @@
 package com.daml.network.console
 
 import com.daml.ledger.javaapi.data.codegen.Update
-import com.daml.network.codegen.java.cn.{splitwise => splitwiseCodegen, wallet => walletCodegen}
+import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.LedgerApiUtils
 import com.daml.network.environment.CoinConsoleEnvironment

@@ -6,7 +6,7 @@ import DA.Time
 import CC.Assert
 import CC.Coin
 import CC.CoinRules
-import CN.Wallet
+import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 
 

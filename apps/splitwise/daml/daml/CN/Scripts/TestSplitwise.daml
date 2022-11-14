@@ -12,7 +12,7 @@ import DA.Assert
 import DA.Time
 import Daml.Script
 import CC.Scripts.Util
-import CN.Wallet
+import CN.Wallet.Payment
 
 
 createInstall : CCApp -> CCUser -> CCUser -> Script (ContractId SplitwiseInstall)

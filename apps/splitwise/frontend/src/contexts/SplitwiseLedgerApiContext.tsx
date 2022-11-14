@@ -6,7 +6,7 @@ import {
   GroupInvite,
   SplitwiseInstall,
 } from '@daml.js/splitwise/lib/CN/Splitwise';
-import { ReceiverQuantity } from '@daml.js/wallet/lib/CN/Wallet';
+import { ReceiverQuantity } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 import { ContractId } from '@daml/types';
 
 class SplitwiseLedgerApiClient extends LedgerApiClient {

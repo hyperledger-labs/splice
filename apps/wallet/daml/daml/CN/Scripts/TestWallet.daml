@@ -7,7 +7,9 @@ import DA.List
 
 import CC.Coin
 import CC.CoinRules
-import CN.Wallet
+import CN.Wallet.Install
+import CN.Wallet.Payment
+import CN.Wallet.PaymentChannel
 
 import CC.Scripts.Util
 

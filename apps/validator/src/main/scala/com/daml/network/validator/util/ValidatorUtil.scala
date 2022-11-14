@@ -1,6 +1,6 @@
 package com.daml.network.validator.util
 
-import com.daml.network.codegen.java.cn.wallet as walletCodegen
+import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.validator.store.ValidatorStore

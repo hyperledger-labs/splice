@@ -136,6 +136,7 @@ lazy val `apps-common-frontend` = {
       damlTsCodegenSources :=
         (`apps-common` / Compile / damlBuild).value ++
           (`apps-wallet-daml` / Compile / damlBuild).value ++
+          (`apps-wallet-payments-daml` / Compile / damlBuild).value ++
           (`apps-directory` / Compile / damlBuild).value ++
           (`apps-splitwise` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
@@ -258,6 +259,8 @@ lazy val `apps-frontends` = {
   )
 }
 
+// This defines the Daml model that we do not expose to app devs
+// but do use internally, e.g., for batching.
 lazy val `apps-wallet-daml` =
   project
     .in(file("apps/wallet/daml"))
@@ -267,13 +270,32 @@ lazy val `apps-wallet-daml` =
     .settings(
       BuildCommon.sharedAppSettings,
       libraryDependencies ++= Seq(daml_bindings_scala),
-      Compile / damlDependencies := (`apps-common` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`apps-common` / Compile / damlBuild).value ++ (`apps-wallet-payments-daml` / Compile / damlBuild).value,
       Compile / damlSourceDirectory := file("apps/wallet/daml"),
       cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
       Test / damlSourceDirectory := file("apps/wallet/daml"),
       Compile / damlDarOutput := file("apps/wallet/daml") / ".daml" / "dist",
       BuildCommon.damlCodegenSettings,
       BuildCommon.copyDarResources,
+    )
+
+// This defines the Daml model that we expose to app developers
+// to manage payments through the wallet.
+lazy val `apps-wallet-payments-daml` =
+  project
+    .in(file("apps/wallet/daml-payments"))
+    .dependsOn(
+    )
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.sharedAppSettings,
+      libraryDependencies ++= Seq(daml_bindings_scala),
+      Compile / damlDependencies := (`apps-common` / Compile / damlBuild).value,
+      Compile / damlSourceDirectory := file("apps/wallet/daml-payments"),
+      cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
+      Test / damlSourceDirectory := file("apps/wallet/daml-payments"),
+      Compile / damlDarOutput := file("apps/wallet/daml-payments") / ".daml" / "dist",
+      BuildCommon.damlCodegenSettings,
     )
 
 lazy val `apps-wallet` =
@@ -295,7 +317,8 @@ lazy val `apps-directory` =
     .in(file("apps/directory"))
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
-      `apps-wallet` % "compile->compile;test->test",
+      `apps-scan` % "compile->compile;test->test",
+      `apps-wallet-daml` % "compile->compile;test->test",
     )
     .enablePlugins(DamlPlugin)
     .settings(
@@ -435,10 +458,8 @@ printTests := {
 lazy val `apps-app` =
   project
     .in(file("apps/app"))
-    // make Canton code available to CC repo
     .dependsOn(
-      // Wallet needs to come first so that the codegened files
-      // come first in the classpath. Otherwise, you get NoSuchMethod errors at runtime.
+      `apps-wallet-payments-daml`,
       `apps-wallet-daml`,
       `apps-splitwise`,
       `apps-directory`,

@@ -14,7 +14,7 @@ import {
   TableRow,
 } from '@mui/material';
 
-import { AppPaymentRequest } from '@daml.js/wallet/lib/CN/Wallet';
+import { AppPaymentRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
 

@@ -17,7 +17,7 @@ import {
   Subscription,
   SubscriptionIdleState,
   SubscriptionPayment,
-} from '@daml.js/wallet/lib/CN/Wallet/Subscriptions';
+} from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 
 import {
   useWalletClient,

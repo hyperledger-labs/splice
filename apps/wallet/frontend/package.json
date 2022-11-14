@@ -6,6 +6,7 @@
     "@auth0/auth0-react": "^1.11.0",
     "@daml.js/canton-coin": "file:../../common/frontend/daml.js/canton-coin-0.1.0",
     "@daml.js/wallet": "file:../../common/frontend/daml.js/wallet-0.1.0",
+    "@daml.js/wallet-payments": "file:../../common/frontend/daml.js/wallet-payments-0.1.0",
     "@daml/ledger": "file:../../../nix/vendored/daml-ledger-0.0.0.tgz",
     "@daml/ledger-api": "file:../../../nix/vendored/daml-ledger-api-0.0.0.tgz",
     "@emotion/react": "^11.10.0",

@@ -8,7 +8,7 @@ import DA.Time
 import DA.Set qualified as Set
 import CC.Assert
 import CC.CoinRules (AppTransferContext)
-import CN.Wallet
+import CN.Wallet.Payment
 
 -- Stable identifier for a group. We avoid contract keys
 -- but having this as a data type is still useful.

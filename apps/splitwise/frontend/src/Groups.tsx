@@ -35,7 +35,7 @@ import {
   BalanceUpdate,
   Group as CodegenGroup,
 } from '@daml.js/splitwise/lib/CN/Splitwise';
-import { ReceiverQuantity } from '@daml.js/wallet/lib/CN/Wallet';
+import { ReceiverQuantity } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 
 import DirectoryEntries, { Entry as DirectoryEntry } from './DirectoryEntries';
 import { useSplitwiseLedgerApiClient } from './contexts/SplitwiseLedgerApiContext';

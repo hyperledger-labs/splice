@@ -3,8 +3,11 @@ package com.daml.network.wallet.admin.api.client.commands
 import cats.syntax.either._
 import cats.syntax.traverse._
 import com.daml.network.codegen.java.cc.{coin => coinCodegen, coinrules => coinRulesCodegen}
-import com.daml.network.codegen.java.cn.wallet.{subscriptions => subsCodegen}
-import com.daml.network.codegen.java.cn.{wallet => walletCodegen}
+import com.daml.network.codegen.java.cn.wallet.{
+  payment => walletCodegen,
+  paymentchannel => channelCodegen,
+  subscriptions => subsCodegen,
+}
 import com.daml.network.util.{JavaContract => Contract, JavaValue => Value, Proto}
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.WalletServiceGrpc.WalletServiceStub
@@ -531,7 +534,7 @@ object GrpcWalletAppClient {
 
   case class ProposePaymentChannel(
       receiver: PartyId,
-      replacesChannelId: Option[walletCodegen.PaymentChannel.ContractId],
+      replacesChannelId: Option[channelCodegen.PaymentChannel.ContractId],
       allowRequests: Boolean,
       allowOffers: Boolean,
       allowDirectTransfers: Boolean,
@@ -539,7 +542,7 @@ object GrpcWalletAppClient {
   ) extends BaseCommand[
         v0.ProposePaymentChannelRequest,
         v0.ProposePaymentChannelResponse,
-        walletCodegen.PaymentChannelProposal.ContractId,
+        channelCodegen.PaymentChannelProposal.ContractId,
       ] {
 
     override def createRequest(): Either[String, v0.ProposePaymentChannelRequest] =
@@ -562,8 +565,8 @@ object GrpcWalletAppClient {
 
     override def handleResponse(
         response: v0.ProposePaymentChannelResponse
-    ): Either[String, walletCodegen.PaymentChannelProposal.ContractId] =
-      Proto.decodeJavaContractId(walletCodegen.PaymentChannelProposal.COMPANION)(
+    ): Either[String, channelCodegen.PaymentChannelProposal.ContractId] =
+      Proto.decodeJavaContractId(channelCodegen.PaymentChannelProposal.COMPANION)(
         response.proposalContractId
       )
   }
@@ -573,8 +576,8 @@ object GrpcWalletAppClient {
         v0.ListPaymentChannelProposalsRequest,
         v0.ListPaymentChannelProposalsResponse,
         Seq[Contract[
-          walletCodegen.PaymentChannelProposal.ContractId,
-          walletCodegen.PaymentChannelProposal,
+          channelCodegen.PaymentChannelProposal.ContractId,
+          channelCodegen.PaymentChannelProposal,
         ]],
       ] {
 
@@ -591,11 +594,11 @@ object GrpcWalletAppClient {
     override def handleResponse(
         response: v0.ListPaymentChannelProposalsResponse
     ): Either[String, Seq[Contract[
-      walletCodegen.PaymentChannelProposal.ContractId,
-      walletCodegen.PaymentChannelProposal,
+      channelCodegen.PaymentChannelProposal.ContractId,
+      channelCodegen.PaymentChannelProposal,
     ]]] =
       response.proposals
-        .traverse(req => Contract.fromProto(walletCodegen.PaymentChannelProposal.COMPANION)(req))
+        .traverse(req => Contract.fromProto(channelCodegen.PaymentChannelProposal.COMPANION)(req))
         .leftMap(_.toString)
   }
 
@@ -603,7 +606,7 @@ object GrpcWalletAppClient {
       extends BaseCommand[
         v0.ListPaymentChannelsRequest,
         v0.ListPaymentChannelsResponse,
-        Seq[Contract[walletCodegen.PaymentChannel.ContractId, walletCodegen.PaymentChannel]],
+        Seq[Contract[channelCodegen.PaymentChannel.ContractId, channelCodegen.PaymentChannel]],
       ] {
 
     override def createRequest(): Either[String, v0.ListPaymentChannelsRequest] =
@@ -619,19 +622,19 @@ object GrpcWalletAppClient {
     override def handleResponse(
         response: v0.ListPaymentChannelsResponse
     ): Either[String, Seq[
-      Contract[walletCodegen.PaymentChannel.ContractId, walletCodegen.PaymentChannel]
+      Contract[channelCodegen.PaymentChannel.ContractId, channelCodegen.PaymentChannel]
     ]] =
       response.channels
-        .traverse(req => Contract.fromProto(walletCodegen.PaymentChannel.COMPANION)(req))
+        .traverse(req => Contract.fromProto(channelCodegen.PaymentChannel.COMPANION)(req))
         .leftMap(_.toString)
   }
 
   case class AcceptPaymentChannelProposal(
-      requestId: walletCodegen.PaymentChannelProposal.ContractId
+      requestId: channelCodegen.PaymentChannelProposal.ContractId
   ) extends BaseCommand[
         v0.AcceptPaymentChannelProposalRequest,
         v0.AcceptPaymentChannelProposalResponse,
-        walletCodegen.PaymentChannel.ContractId,
+        channelCodegen.PaymentChannel.ContractId,
       ] {
 
     override def createRequest(): Either[String, v0.AcceptPaymentChannelProposalRequest] =
@@ -649,8 +652,10 @@ object GrpcWalletAppClient {
 
     override def handleResponse(
         response: v0.AcceptPaymentChannelProposalResponse
-    ): Either[String, walletCodegen.PaymentChannel.ContractId] =
-      Proto.decodeJavaContractId(walletCodegen.PaymentChannel.COMPANION)(response.channelContractId)
+    ): Either[String, channelCodegen.PaymentChannel.ContractId] =
+      Proto.decodeJavaContractId(channelCodegen.PaymentChannel.COMPANION)(
+        response.channelContractId
+      )
   }
 
   case class ExecuteDirectTransfer(
@@ -690,7 +695,7 @@ object GrpcWalletAppClient {
   ) extends BaseCommand[
         v0.CreateOnChannelPaymentRequestRequest,
         v0.CreateOnChannelPaymentRequestResponse,
-        walletCodegen.OnChannelPaymentRequest.ContractId,
+        channelCodegen.OnChannelPaymentRequest.ContractId,
       ] {
     override def createRequest(): Either[String, v0.CreateOnChannelPaymentRequestRequest] =
       Right(
@@ -709,8 +714,8 @@ object GrpcWalletAppClient {
 
     override def handleResponse(
         response: v0.CreateOnChannelPaymentRequestResponse
-    ): Either[String, walletCodegen.OnChannelPaymentRequest.ContractId] =
-      Proto.decodeJavaContractId(walletCodegen.OnChannelPaymentRequest.COMPANION)(
+    ): Either[String, channelCodegen.OnChannelPaymentRequest.ContractId] =
+      Proto.decodeJavaContractId(channelCodegen.OnChannelPaymentRequest.COMPANION)(
         response.requestContractId
       )
   }
@@ -721,8 +726,8 @@ object GrpcWalletAppClient {
         v0.ListOnChannelPaymentRequestsResponse,
         Seq[
           Contract[
-            walletCodegen.OnChannelPaymentRequest.ContractId,
-            walletCodegen.OnChannelPaymentRequest,
+            channelCodegen.OnChannelPaymentRequest.ContractId,
+            channelCodegen.OnChannelPaymentRequest,
           ]
         ],
       ] {
@@ -739,16 +744,16 @@ object GrpcWalletAppClient {
     override def handleResponse(
         response: v0.ListOnChannelPaymentRequestsResponse
     ): Either[String, Seq[Contract[
-      walletCodegen.OnChannelPaymentRequest.ContractId,
-      walletCodegen.OnChannelPaymentRequest,
+      channelCodegen.OnChannelPaymentRequest.ContractId,
+      channelCodegen.OnChannelPaymentRequest,
     ]]] =
       response.paymentRequests
-        .traverse(req => Contract.fromProto(walletCodegen.OnChannelPaymentRequest.COMPANION)(req))
+        .traverse(req => Contract.fromProto(channelCodegen.OnChannelPaymentRequest.COMPANION)(req))
         .leftMap(_.toString)
   }
 
   case class AcceptOnChannelPaymentRequest(
-      requestId: walletCodegen.OnChannelPaymentRequest.ContractId
+      requestId: channelCodegen.OnChannelPaymentRequest.ContractId
   ) extends BaseCommand[
         v0.AcceptOnChannelPaymentRequestRequest,
         Empty,
@@ -774,7 +779,7 @@ object GrpcWalletAppClient {
   }
 
   case class RejectOnChannelPaymentRequest(
-      requestId: walletCodegen.OnChannelPaymentRequest.ContractId
+      requestId: channelCodegen.OnChannelPaymentRequest.ContractId
   ) extends BaseCommand[
         v0.RejectOnChannelPaymentRequestRequest,
         Empty,
@@ -800,7 +805,7 @@ object GrpcWalletAppClient {
   }
 
   case class WithdrawOnChannelPaymentRequest(
-      requestId: walletCodegen.OnChannelPaymentRequest.ContractId
+      requestId: channelCodegen.OnChannelPaymentRequest.ContractId
   ) extends BaseCommand[
         v0.WithdrawOnChannelPaymentRequestRequest,
         Empty,

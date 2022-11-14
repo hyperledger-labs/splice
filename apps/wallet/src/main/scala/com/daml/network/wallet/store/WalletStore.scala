@@ -3,7 +3,7 @@ package com.daml.network.wallet.store
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.network.codegen.java.cc.{coin as coinCodegen}
-import com.daml.network.codegen.java.cn.wallet as walletCodegen
+import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.store.AcsStore
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{JavaContract as Contract}
@@ -35,26 +35,26 @@ trait WalletStore extends AutoCloseable with NamedLogging {
   def lookupInstallByParty(
       endUserParty: PartyId
   ): Future[QueryResult[
-    Option[Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]]
+    Option[Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]]
   ]] =
-    acsStore.findContract(walletCodegen.WalletAppInstall.COMPANION)(co =>
+    acsStore.findContract(installCodegen.WalletAppInstall.COMPANION)(co =>
       co.payload.endUserParty == endUserParty.toProtoPrimitive
     )
 
   def lookupInstallByName(
       endUserName: String
   ): Future[QueryResult[
-    Option[Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]]
+    Option[Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]]
   ]] =
-    acsStore.findContract(walletCodegen.WalletAppInstall.COMPANION)(co =>
+    acsStore.findContract(installCodegen.WalletAppInstall.COMPANION)(co =>
       co.payload.endUserName == endUserName
     )
 
   def streamInstalls: Source[
-    Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall],
+    Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall],
     NotUsed,
   ] =
-    acsStore.streamContracts(walletCodegen.WalletAppInstall.COMPANION)
+    acsStore.streamContracts(installCodegen.WalletAppInstall.COMPANION)
 
   // Methods to implement per-end-user stores
   private[this] val endUserStores: TrieMap[String, EndUserWalletStore] = TrieMap.empty
@@ -175,7 +175,7 @@ object WalletStore {
     AcsStore.SimpleContractFilter(
       key.walletServiceParty,
       Map(
-        mkFilter(walletCodegen.WalletAppInstall.COMPANION)(co =>
+        mkFilter(installCodegen.WalletAppInstall.COMPANION)(co =>
           co.payload.walletServiceParty == walletService &&
             co.payload.validatorParty == validator &&
             co.payload.svcParty == svc

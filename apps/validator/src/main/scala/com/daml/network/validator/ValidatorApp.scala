@@ -5,7 +5,7 @@ import cats.implicits.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.codegen.java.cc.coinrules.CoinRulesRequest
-import com.daml.network.codegen.java.cn.wallet as walletCodegen
+import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection

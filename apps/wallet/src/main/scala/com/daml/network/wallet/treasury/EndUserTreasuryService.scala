@@ -9,7 +9,7 @@ import com.daml.network.codegen.java.cc.{
   coinrules as coinRulesCodegen,
   round as roundCodegen,
 }
-import com.daml.network.codegen.java.cn.wallet as walletCodegen
+import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.util.{JavaContract as Contract}
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
@@ -45,7 +45,7 @@ import scala.util.{Failure, Success}
   * coin operation (also for retries).
   */
 case class CoinOperationRequest[T](
-    operation: T => walletCodegen.CoinOperation,
+    operation: T => installCodegen.CoinOperation,
     tryLookups: () => Future[T],
 )
 
@@ -59,7 +59,10 @@ case class EndUserTreasuryService(
     connection: CoinLedgerConnection,
     // TODO(#1351): don't pass WalletAppInstall contract along but look it up before each batch submission to support users updating their
     // WalletAppInstall contract
-    install: Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall],
+    install: Contract[
+      installCodegen.WalletAppInstall.ContractId,
+      installCodegen.WalletAppInstall,
+    ],
     walletStoreKey: WalletStore.Key,
     userStore: EndUserWalletStore,
     walletStore: WalletStore,
@@ -100,10 +103,10 @@ case class EndUserTreasuryService(
     */
   def enqueueCoinOperation[T](
       operation: CoinOperationRequest[T]
-  )(implicit tc: TraceContext): Future[walletCodegen.CoinOperationOutcome] = {
+  )(implicit tc: TraceContext): Future[installCodegen.CoinOperationOutcome] = {
     // TODO(#1351): possibly allow callers to assign semantically meaningful ids (see the discussion
     //  at https://github.com/DACH-NY/the-real-canton-coin/pull/1145#discussion_r994508807)
-    val p = Promise[walletCodegen.CoinOperationOutcome]()
+    val p = Promise[installCodegen.CoinOperationOutcome]()
     queue.offer(EnqueuedCoinOperation(operation, p)) match {
       case Enqueued =>
         logger.trace(s"received ${operation}, queue now: ${queue.size()}")
@@ -254,7 +257,7 @@ object EndUserTreasuryService {
   /** Wrapper helper class. */
   private case class EnqueuedCoinOperation[T](
       override val operationWithLookups: CoinOperationRequest[T],
-      override val promise: Promise[walletCodegen.CoinOperationOutcome],
+      override val promise: Promise[installCodegen.CoinOperationOutcome],
   ) extends AnyEnqueuedCoinOperation {
     override type LookupResult = T
   }
@@ -265,11 +268,11 @@ object EndUserTreasuryService {
   sealed trait AnyEnqueuedCoinOperation {
     type LookupResult
     def operationWithLookups: CoinOperationRequest[LookupResult]
-    def promise: Promise[walletCodegen.CoinOperationOutcome]
+    def promise: Promise[installCodegen.CoinOperationOutcome]
   }
 
   private case class ValidCoinOperation(
-      operation: walletCodegen.CoinOperation,
-      promise: Promise[walletCodegen.CoinOperationOutcome],
+      operation: installCodegen.CoinOperation,
+      promise: Promise[installCodegen.CoinOperationOutcome],
   )
 }

@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.{directory => codegen, wallet => walletCodegen}
+import com.daml.network.codegen.java.cn.{directory => codegen}
+import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.console.{
   LocalValidatorAppReference,
   RemoteDirectoryAppReference,

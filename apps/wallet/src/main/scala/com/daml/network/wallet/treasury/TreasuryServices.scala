@@ -1,7 +1,7 @@
 package com.daml.network.wallet.treasury
 
 import akka.stream.Materializer
-import com.daml.network.codegen.java.cn.wallet.WalletAppInstall
+import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.util.{JavaContract as Contract}
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}

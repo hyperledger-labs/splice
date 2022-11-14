@@ -11,14 +11,18 @@ import com.daml.ledger.javaapi.data.codegen.{
 import com.daml.network.auth.AuthInterceptor
 import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, coinrules as coinRulesCodegen}
-import com.daml.network.codegen.java.cn.wallet.coinoperationoutcome.COO_AcceptedAppPayment
-import com.daml.network.codegen.java.cn.wallet.{
+import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_AcceptedAppPayment
+import com.daml.network.codegen.java.cn.wallet.install.{
   CoinOperationOutcome,
   coinoperation,
   coinoperationoutcome,
+}
+import com.daml.network.codegen.java.cn.wallet.{
+  install => installCodegen,
+  payment => walletCodegen,
+  paymentchannel => channelCodegen,
   subscriptions => subsCodegen,
 }
-import com.daml.network.codegen.java.cn.wallet as walletCodegen
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, JavaContract => Contract, JavaValue => Value, Proto}
@@ -475,7 +479,7 @@ class GrpcWalletService(
       request: v0.ListPaymentChannelProposalsRequest
   ): Future[v0.ListPaymentChannelProposalsResponse] =
     listContracts(
-      walletCodegen.PaymentChannelProposal.COMPANION,
+      channelCodegen.PaymentChannelProposal.COMPANION,
       v0.ListPaymentChannelProposalsResponse(_),
     )
 
@@ -483,7 +487,7 @@ class GrpcWalletService(
       request: v0.ListPaymentChannelsRequest
   ): Future[v0.ListPaymentChannelsResponse] =
     listContracts(
-      walletCodegen.PaymentChannel.COMPANION,
+      channelCodegen.PaymentChannel.COMPANION,
       v0.ListPaymentChannelsResponse(_),
     )
 
@@ -495,7 +499,7 @@ class GrpcWalletService(
         exerciseWalletAction((installCid, userStore) => {
           val receiver = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
           val proposer = userStore.key.endUserParty.toProtoPrimitive
-          val channel = new walletCodegen.PaymentChannel(
+          val channel = new channelCodegen.PaymentChannel(
             userStore.key.endUserParty.toProtoPrimitive,
             receiver.toProtoPrimitive,
             userStore.key.svcParty.toProtoPrimitive,
@@ -505,7 +509,7 @@ class GrpcWalletService(
             Proto.tryDecode(Proto.JavaBigDecimal)(request.senderTransferFeeRatio),
           )
           val replacesChannel = request.replacesChannelId.map(
-            Proto.tryDecodeJavaContractId(walletCodegen.PaymentChannel.COMPANION)
+            Proto.tryDecodeJavaContractId(channelCodegen.PaymentChannel.COMPANION)
           )
           Future.successful(
             installCid.exerciseWalletAppInstall_CreatePaymentChannelProposal(
@@ -528,7 +532,7 @@ class GrpcWalletService(
       withAuth { user =>
         exerciseWalletAction((installCid, _) => {
           val requestCid =
-            Proto.tryDecodeJavaContractId(walletCodegen.PaymentChannelProposal.COMPANION)(
+            Proto.tryDecodeJavaContractId(channelCodegen.PaymentChannelProposal.COMPANION)(
               request.proposalContractId
             )
           Future.successful(
@@ -597,7 +601,7 @@ class GrpcWalletService(
           val quantity = Proto.tryDecode(Proto.JavaBigDecimal)(request.quantity)
           val receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
           Future.successful(
-            CoinOperationRequest[walletCodegen.PaymentChannel.ContractId](
+            CoinOperationRequest[channelCodegen.PaymentChannel.ContractId](
               (channelId) =>
                 new coinoperation.CO_ChannelTransfer(
                   channelId,
@@ -705,7 +709,7 @@ class GrpcWalletService(
       request: v0.ListOnChannelPaymentRequestsRequest
   ): Future[v0.ListOnChannelPaymentRequestsResponse] =
     listContracts(
-      walletCodegen.OnChannelPaymentRequest.COMPANION,
+      channelCodegen.OnChannelPaymentRequest.COMPANION,
       v0.ListOnChannelPaymentRequestsResponse(_),
     )
 
@@ -715,7 +719,7 @@ class GrpcWalletService(
     withAuth { user =>
       exerciseWalletCoinAction((installCid, userStore) => {
         val requestCid =
-          Proto.tryDecodeJavaContractId(walletCodegen.OnChannelPaymentRequest.COMPANION)(
+          Proto.tryDecodeJavaContractId(channelCodegen.OnChannelPaymentRequest.COMPANION)(
             request.requestContractId
           )
 
@@ -751,7 +755,7 @@ class GrpcWalletService(
       withAuth { user =>
         exerciseWalletAction((installCid, _) => {
           val requestCid =
-            Proto.tryDecodeJavaContractId(walletCodegen.OnChannelPaymentRequest.COMPANION)(
+            Proto.tryDecodeJavaContractId(channelCodegen.OnChannelPaymentRequest.COMPANION)(
               request.requestContractId
             )
           Future.successful(
@@ -770,7 +774,7 @@ class GrpcWalletService(
       withAuth { user =>
         exerciseWalletAction((installCid, _) => {
           val requestCid =
-            Proto.tryDecodeJavaContractId(walletCodegen.OnChannelPaymentRequest.COMPANION)(
+            Proto.tryDecodeJavaContractId(channelCodegen.OnChannelPaymentRequest.COMPANION)(
               request.requestContractId
             )
           Future.successful(
@@ -852,7 +856,9 @@ class GrpcWalletService(
   private def getUserInstallContract(
       userWalletStore: EndUserWalletStore,
       userParty: PartyId,
-  ): Future[Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]] =
+  ): Future[
+    Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
+  ] =
     for {
       installO <- userWalletStore.lookupInstall()
       install = installO match {
@@ -881,7 +887,7 @@ class GrpcWalletService(
       ProtoResponse <: scalapb.GeneratedMessage,
   ](
       constructCoinOperation: (
-          walletCodegen.WalletAppInstall.ContractId,
+          installCodegen.WalletAppInstall.ContractId,
           EndUserWalletStore,
           // TODO(#1351): also require quantity to reject commands early?
       ) => Future[CoinOperationRequest[LookupResult]]
@@ -909,7 +915,7 @@ class GrpcWalletService(
   ](
       process: ExpectedCOO => ProtoReturnType
   )(
-      actual: walletCodegen.CoinOperationOutcome
+      actual: installCodegen.CoinOperationOutcome
   )(implicit tc: TraceContext): ProtoReturnType = {
     // I (Arne) did not find a way to avoid ClassTag usage (or passing along a partial function) here
     // For example, passing along the `ExpectedCOO` type to the treasury service doesn't work
@@ -944,7 +950,7 @@ class GrpcWalletService(
     */
   private def exerciseWalletAction[Response, ChoiceResult](
       getUpdate: (
-          walletCodegen.WalletAppInstall.ContractId,
+          installCodegen.WalletAppInstall.ContractId,
           EndUserWalletStore,
       ) => Future[Update[ChoiceResult]]
   )(
@@ -1012,12 +1018,12 @@ class GrpcWalletService(
       svcP: String,
       senderP: String,
       receiverP: String,
-  ): Future[walletCodegen.PaymentChannel.ContractId] = for {
+  ): Future[channelCodegen.PaymentChannel.ContractId] = for {
     channelO <- userStore
       .findContract(
-        walletCodegen.PaymentChannel.COMPANION,
+        channelCodegen.PaymentChannel.COMPANION,
         filter = {
-          c: Contract[walletCodegen.PaymentChannel.ContractId, walletCodegen.PaymentChannel] =>
+          c: Contract[channelCodegen.PaymentChannel.ContractId, channelCodegen.PaymentChannel] =>
             c.payload.svc == svcP && c.payload.receiver == receiverP && c.payload.sender == senderP
         },
       )

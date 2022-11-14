@@ -3,8 +3,11 @@ package com.daml.network.directory.store
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
-import com.daml.network.codegen.java.cn.{directory as directoryCodegen, wallet as walletCodegen}
+import com.daml.network.codegen.java.cn.wallet.{
+  payment => walletCodegen,
+  subscriptions => subsCodegen,
+}
+import com.daml.network.codegen.java.cn.{directory as directoryCodegen}
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.store.AcsStore
 import com.daml.network.util.{JavaContract => Contract}

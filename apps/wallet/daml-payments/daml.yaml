@@ -1,5 +1,5 @@
 sdk-version: 2.5.0-snapshot.20221028.10865.0.1b726fe8
-name: wallet
+name: wallet-payments
 source: daml
 version: 0.1.0
 dependencies:
@@ -8,6 +8,5 @@ dependencies:
   - daml-script
 data-dependencies:
 - ../../../canton-coin/.daml/dist/canton-coin-0.1.0.dar
-- ../daml-payments/.daml/dist/wallet-payments-0.1.0.dar
 build-options:
   - --target=1.dev

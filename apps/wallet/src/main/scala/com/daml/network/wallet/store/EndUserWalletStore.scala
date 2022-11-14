@@ -11,8 +11,12 @@ import com.daml.network.codegen.java.cc.{
   coinrules as coinRulesCodegen,
   round as roundCodegen,
 }
-import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
-import com.daml.network.codegen.java.cn.wallet as walletCodegen
+import com.daml.network.codegen.java.cn.wallet.{
+  install => installCodegen,
+  payment => walletCodegen,
+  paymentchannel => channelCodegen,
+  subscriptions => subsCodegen,
+}
 import com.daml.network.environment.CoinRetries
 import com.daml.network.store.AcsStore
 import com.daml.network.util.{JavaContract => Contract}
@@ -47,9 +51,9 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
     * how to deal with this error.
     */
   def lookupInstall(): Future[QueryResult[
-    Option[Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]]
+    Option[Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]]
   ]] =
-    acsStore.findContract(walletCodegen.WalletAppInstall.COMPANION)(_ => true)
+    acsStore.findContract(installCodegen.WalletAppInstall.COMPANION)(_ => true)
 
   def signalWhenIngested(offset: String): Future[Unit] =
     acsStore.signalWhenIngested(offset)
@@ -66,12 +70,12 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
   ): Future[QueryResult[Seq[Contract[TCid, T]]]] = acsStore.listContracts(templateCompanion, filter)
 
   def lookupOnChannelPaymentRequestById(
-      cid: ContractId[walletCodegen.OnChannelPaymentRequest]
+      cid: ContractId[channelCodegen.OnChannelPaymentRequest]
   ): Future[QueryResult[Option[Contract[
-    walletCodegen.OnChannelPaymentRequest.ContractId,
-    walletCodegen.OnChannelPaymentRequest,
+    channelCodegen.OnChannelPaymentRequest.ContractId,
+    channelCodegen.OnChannelPaymentRequest,
   ]]]] =
-    acsStore.lookupContractById(walletCodegen.OnChannelPaymentRequest.COMPANION)(cid)
+    acsStore.lookupContractById(channelCodegen.OnChannelPaymentRequest.COMPANION)(cid)
 
   def lookupAppPaymentRequestById(
       cid: ContractId[walletCodegen.AppPaymentRequest]
@@ -225,14 +229,14 @@ object EndUserWalletStore {
     val endUser = key.endUserParty.toProtoPrimitive
     val svc = key.svcParty.toProtoPrimitive
 
-    def channelFilter(co: walletCodegen.PaymentChannel): Boolean =
+    def channelFilter(co: channelCodegen.PaymentChannel): Boolean =
       co.svc == svc && (co.sender == endUser || co.receiver == endUser)
 
     AcsStore.SimpleContractFilter(
       key.endUserParty,
       Map(
         // Install
-        mkFilter(walletCodegen.WalletAppInstall.COMPANION)(co =>
+        mkFilter(installCodegen.WalletAppInstall.COMPANION)(co =>
           co.payload.svcParty == svc &&
             co.payload.endUserParty == endUser
         ),
@@ -260,11 +264,11 @@ object EndUserWalletStore {
             co.payload.validator == endUser
         ),
         // Payment channels
-        mkFilter(walletCodegen.PaymentChannelProposal.COMPANION)(co =>
+        mkFilter(channelCodegen.PaymentChannelProposal.COMPANION)(co =>
           channelFilter(co.payload.channel)
         ),
-        mkFilter(walletCodegen.PaymentChannel.COMPANION)(co => channelFilter(co.payload)),
-        mkFilter(walletCodegen.OnChannelPaymentRequest.COMPANION)(co =>
+        mkFilter(channelCodegen.PaymentChannel.COMPANION)(co => channelFilter(co.payload)),
+        mkFilter(channelCodegen.OnChannelPaymentRequest.COMPANION)(co =>
           // We track requests for both sender and receiver, as both have to be displayed in the UI
           co.payload.svc == svc &&
             (co.payload.sender == endUser ||
