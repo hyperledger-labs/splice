@@ -9,7 +9,7 @@ import CC.Assert
 import CC.Coin
 import CC.CoinRules
 import CC.Round
-import OpenBusiness.Fees
+import CC.Fees
 import CC.Scripts.Util
 
 template Escrow

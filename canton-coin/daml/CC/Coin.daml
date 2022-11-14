@@ -3,8 +3,7 @@ module CC.Coin where
 
 import CC.Assert
 import CC.Round
--- import OpenBusiness.Expiry
-import OpenBusiness.Fees
+import CC.Fees
 
 
 -- Lockable, expiring coins
@@ -30,11 +29,14 @@ template Coin
     signatory svc, owner
     ensure validExpiringQuantity quantity
 
-    {- TODO(M3-90) Reenable once https://github.com/digital-asset/daml/issues/13754 is fixed
-    implements ExpiringContract where
-      contractExpiresAt = quantityExpiresAt quantity
-      expiryManager = svc
-    -}
+    choice Coin_ExpireAsStakeholder : ()
+      with
+        actor : Party
+        roundCid : ContractId OpenMiningRound
+      controller actor
+      do require "Only stakeholders can expire" (actor `elem` stakeholder this)
+         round <- fetch roundCid
+         require "Contract expired" (quantityExpiresAt quantity < round.round)
 
 
 template LockedCoin
@@ -43,12 +45,6 @@ template LockedCoin
     lock : TimeLock
   where
     signatory lock.holder, signatory coin
-
-    {- TODO(M3-90) Reenable once https://github.com/digital-asset/daml/issues/13504 is fixed
-    implements ExpiringContract where
-      contractExpiresAt = quantityExpiresAt coin.quantity
-      expiryManager = coin.svc
-    -}
 
     choice Coin_Unlock : ContractId Coin
       controller lock.holder
@@ -69,6 +65,15 @@ template LockedCoin
     choice Coin_SvcExpireLock : ContractId Coin
       controller coin.svc
       do tryExpireLock
+
+    choice LockedCoin_ExpireAsStakeholder : ()
+      with
+        actor : Party
+        roundCid : ContractId OpenMiningRound
+      controller actor
+      do require "Only stakeholders can expire" (actor `elem` stakeholder this)
+         round <- fetch roundCid
+         require "Contract expired" (quantityExpiresAt coin.quantity < round.round)
 
 
 -- Contracts to implement reward issuance

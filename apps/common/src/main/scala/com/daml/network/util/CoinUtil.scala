@@ -6,7 +6,7 @@ import com.daml.ledger.client.binding
 import com.daml.ledger.javaapi.data.Command
 import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.codegen.java.da.types.Tuple2
-import com.daml.network.codegen.java.{cc, openbusiness}
+import com.daml.network.codegen.java.cc
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.digitalasset.canton.lifecycle.FlagCloseable
@@ -71,7 +71,7 @@ object CoinUtil {
     )
 
   lazy val defaultHoldingFee =
-    new openbusiness.fees.RatePerRound(damlNumeric(1.0 / 360.0 / (24.0 * 60.0 / 2.5)))
+    new cc.fees.RatePerRound(damlNumeric(1.0 / 360.0 / (24.0 * 60.0 / 2.5)))
 
   // TODO(M1-90) surely there's a better way to define Daml Numeric values in Scala
   def damlNumeric(x: Double): java.math.BigDecimal =
@@ -80,11 +80,11 @@ object CoinUtil {
   def defaultCoinConfig: cc.coinrules.CoinConfig[cc.coinrules.USD] = new cc.coinrules.CoinConfig(
     // Fee to create a new coin.
     // Set to the fixed part of the transfer fee.
-    new openbusiness.fees.FixedFee(BigDecimal(0.09).bigDecimal),
+    new cc.fees.FixedFee(BigDecimal(0.09).bigDecimal),
 
     // Fee to update an existing coin.
     // Cost covering and 10x lower than creation to strongly incentivize merging coins.
-    new openbusiness.fees.FixedFee(BigDecimal(0.01).bigDecimal),
+    new cc.fees.FixedFee(BigDecimal(0.01).bigDecimal),
 
     // Fee for keeping a coin around.
     // This is roughly equivalent to 1$/360 days but expressed as rounds
@@ -95,7 +95,7 @@ object CoinUtil {
 
     // Fee for transferring some quantity of coin to a new owner.
     // TODO(M1-90) Finetuning required
-    new openbusiness.fees.SteppedRate(
+    new cc.fees.SteppedRate(
       BigDecimal(0.01).bigDecimal,
       Seq(
         new Tuple2(BigDecimal(100.0).bigDecimal, BigDecimal(0.001).bigDecimal),

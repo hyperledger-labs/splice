@@ -1,5 +1,5 @@
 -- | Utility functions for different kinds of fees.
-module OpenBusiness.Fees where
+module CC.Fees where
 
 import CC.Round
 import DA.Time

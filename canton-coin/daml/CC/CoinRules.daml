@@ -14,7 +14,7 @@ import CC.Coin
 import CC.Round
 
 
-import OpenBusiness.Fees
+import CC.Fees
 
 -- Types
 --------
