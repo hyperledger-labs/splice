@@ -159,7 +159,7 @@ template SubscriptionInitialPayment
       controller subscriptionData.receiver
       do
         archive subscriptionData.context
-        exercise lockedCoin Coin_Unlock
+        exercise lockedCoin LockedCoin_Unlock
 
     choice SubscriptionInititalPayment_Expire : ContractId Coin
       with
@@ -168,7 +168,7 @@ template SubscriptionInitialPayment
       do
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
         archive subscriptionData.context
-        exercise lockedCoin Coin_OwnerExpireLock -- would fail if we can't expire yet
+        exercise lockedCoin LockedCoin_OwnerExpireLock -- would fail if we can't expire yet
 
 
 -- | The base state in our subscription flow.
@@ -257,7 +257,7 @@ template SubscriptionPayment
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
           ..
-        coin <- exercise lockedCoin Coin_Unlock
+        coin <- exercise lockedCoin LockedCoin_Unlock
         pure (state, coin)
 
     choice SubscriptionPayment_Expire : (ContractId SubscriptionIdleState, ContractId Coin)
@@ -270,7 +270,7 @@ template SubscriptionPayment
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
           ..
-        coin <- exercise lockedCoin Coin_OwnerExpireLock -- would fail if we can't expire yet
+        coin <- exercise lockedCoin LockedCoin_OwnerExpireLock -- would fail if we can't expire yet
         pure (state, coin)
 
 
@@ -306,7 +306,7 @@ unlockAndTransfer transferContext subscriptionData lockedCoin = do
   let Subscription { sender; receiver; provider; svc } = subscriptionData
 
   -- unlock coin and transfer the remainder to the receiver
-  coin <- exercise lockedCoin Coin_Unlock
+  coin <- exercise lockedCoin LockedCoin_Unlock
   let transfer = Transfer with
         sender
         provider

@@ -267,7 +267,7 @@ template AcceptedAppPayment
       controller signatory this
       do
         -- unlock coin and transfer the remainder to the receiver
-        coin <- exercise lockedCoin Coin_Unlock
+        coin <- exercise lockedCoin LockedCoin_Unlock
         let transfer = Transfer with
               sender
               provider
@@ -290,12 +290,12 @@ template AcceptedAppPayment
     choice AcceptedAppPayment_Reject : ContractId Coin
       controller map (\r -> r.receiver) receiverQuantities
       do archive deliveryOffer
-         exercise lockedCoin Coin_Unlock
+         exercise lockedCoin LockedCoin_Unlock
 
     choice AcceptedAppPayment_Expire : ContractId Coin
       controller sender
       do archive deliveryOffer
-         exercise lockedCoin Coin_OwnerExpireLock
+         exercise lockedCoin LockedCoin_OwnerExpireLock
 
 -- Evaluates an update, catches any exceptions it throws and converts them into an Either
 catchAll: Update a -> Update (Either Text a)

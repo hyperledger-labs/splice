@@ -147,13 +147,13 @@ class ReadCoinTransactionsService(
   private def isTap(event: ExercisedEvent) =
     event.getChoice == "CoinRules_Tap" && isCoinRules(event)
   private def isCoinUnlock(event: ExercisedEvent) =
-    event.getChoice == "Coin_Unlock" && isLockedCoin(event)
+    event.getChoice == "LockedCoin_Unlock" && isLockedCoin(event)
   private def isTransfer(event: ExercisedEvent) =
     event.getChoice == "CoinRules_Transfer" && isCoinRules(event)
   private def isSvcExpireLock(event: ExercisedEvent) =
-    event.getChoice == "Coin_SvcExpireLock" && isLockedCoin(event)
+    event.getChoice == "LockedCoin_SvcExpireLock" && isLockedCoin(event)
   private def isOwnerExpireLock(event: ExercisedEvent) =
-    event.getChoice == "Coin_OwnerExpireLock" && isLockedCoin(event)
+    event.getChoice == "LockedCoin_OwnerExpireLock" && isLockedCoin(event)
   private def isStartIssuing(event: ExercisedEvent) =
     event.getChoice == "CoinRules_MiningRound_StartIssuing" && isCoinRules(event)
 

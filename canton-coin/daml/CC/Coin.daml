@@ -46,7 +46,7 @@ template LockedCoin
   where
     signatory lock.holder, signatory coin
 
-    choice Coin_Unlock : ContractId Coin
+    choice LockedCoin_Unlock : ContractId Coin
       controller lock.holder
       do create coin
 
@@ -56,13 +56,13 @@ template LockedCoin
             require "Lock not expired" (lock.expiresAt <= t)
             create coin
 
-    choice Coin_OwnerExpireLock : ContractId Coin
+    choice LockedCoin_OwnerExpireLock : ContractId Coin
       controller coin.owner
       do tryExpireLock
 
     -- NOTE: we intentionally don't combine this choice with Coin_OwnerExpireLock to
     -- provide a more expressive transaction graph.
-    choice Coin_SvcExpireLock : ContractId Coin
+    choice LockedCoin_SvcExpireLock : ContractId Coin
       controller coin.svc
       do tryExpireLock
 

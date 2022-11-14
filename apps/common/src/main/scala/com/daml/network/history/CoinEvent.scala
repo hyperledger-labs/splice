@@ -5,10 +5,10 @@ import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
 import com.daml.ledger.javaapi.data.{Text, Value}
 import com.daml.network.codegen.java.cc.coin.{
   Coin,
-  Coin_OwnerExpireLock,
-  Coin_SvcExpireLock,
-  Coin_Unlock,
   LockedCoin,
+  LockedCoin_OwnerExpireLock,
+  LockedCoin_SvcExpireLock,
+  LockedCoin_Unlock,
 }
 import com.daml.network.codegen.java.cc.coinrules.{
   CoinRules_MiningRound_StartIssuing,
@@ -103,16 +103,16 @@ object StartIssuing extends ExerciseNodeCompanion {
   } yield StartIssuing(node)
 }
 
-case class OwnerExpireLock(node: ExerciseNode[Coin_OwnerExpireLock, Coin.ContractId])
+case class OwnerExpireLock(node: ExerciseNode[LockedCoin_OwnerExpireLock, Coin.ContractId])
     extends ParentNode {
   def toProtoV0: v0.ParentNode =
     v0.ParentNode().withOwnerExpireLock(node.toProtoV0)
 }
 
 object OwnerExpireLock extends ExerciseNodeCompanion {
-  override type Arg = Coin_OwnerExpireLock
-  override val argDecoder = Coin_OwnerExpireLock.valueDecoder()
-  override def argToValue(arg: Coin_OwnerExpireLock) = arg.toValue
+  override type Arg = LockedCoin_OwnerExpireLock
+  override val argDecoder = LockedCoin_OwnerExpireLock.valueDecoder()
+  override def argToValue(arg: LockedCoin_OwnerExpireLock) = arg.toValue
 
   override type Res = Coin.ContractId
   override val resDecoder = (cid: Value) =>
@@ -128,16 +128,16 @@ object OwnerExpireLock extends ExerciseNodeCompanion {
   } yield OwnerExpireLock(node)
 }
 
-case class SvcExpireLock(node: ExerciseNode[Coin_SvcExpireLock, Coin.ContractId])
+case class SvcExpireLock(node: ExerciseNode[LockedCoin_SvcExpireLock, Coin.ContractId])
     extends ParentNode {
   def toProtoV0: v0.ParentNode =
     v0.ParentNode().withSvcExpireLock(node.toProtoV0)
 }
 
 object SvcExpireLock extends ExerciseNodeCompanion {
-  override type Arg = Coin_SvcExpireLock
-  override val argDecoder = Coin_SvcExpireLock.valueDecoder()
-  override def argToValue(arg: Coin_SvcExpireLock) = arg.toValue
+  override type Arg = LockedCoin_SvcExpireLock
+  override val argDecoder = LockedCoin_SvcExpireLock.valueDecoder()
+  override def argToValue(arg: LockedCoin_SvcExpireLock) = arg.toValue
 
   override type Res = Coin.ContractId
   override val resDecoder = (cid: Value) =>
@@ -154,16 +154,16 @@ object SvcExpireLock extends ExerciseNodeCompanion {
 }
 
 case class CoinUnlock(
-    node: ExerciseNode[Coin_Unlock, Coin.ContractId]
+    node: ExerciseNode[LockedCoin_Unlock, Coin.ContractId]
 ) extends ParentNode {
   def toProtoV0: v0.ParentNode =
     v0.ParentNode().withCoinUnlock(node.toProtoV0)
 }
 
 object CoinUnlock extends ExerciseNodeCompanion {
-  override type Arg = Coin_Unlock
-  override val argDecoder = Coin_Unlock.valueDecoder()
-  override def argToValue(arg: Coin_Unlock) = arg.toValue
+  override type Arg = LockedCoin_Unlock
+  override val argDecoder = LockedCoin_Unlock.valueDecoder()
+  override def argToValue(arg: LockedCoin_Unlock) = arg.toValue
 
   override type Res = Coin.ContractId
   override val resDecoder = (cid: Value) =>
