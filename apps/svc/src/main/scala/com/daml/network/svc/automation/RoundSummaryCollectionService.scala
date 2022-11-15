@@ -2,7 +2,7 @@ package com.daml.network.svc.automation
 
 import com.daml.ledger.javaapi.data.{ExercisedEvent, Identifier, Transaction, TransactionTree}
 import com.daml.network.admin.LedgerAutomationService
-import com.daml.network.codegen.java.cc.coinrules.{CoinRules, TransferResult}
+import com.daml.network.codegen.java.cc.coinrules.TransferResult
 import com.daml.network.codegen.java.{cc, da}
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history.*
@@ -44,8 +44,7 @@ class RoundSummaryCollectionService(
         tree,
         onCreate = (_, _) => {},
         onExercise = (exercised: ExercisedEvent, _) => {
-          if (isTransfer(exercised)) {
-            val tf = ExerciseNode.tryFromProtoEvent(Transfer)(exercised)
+          ExerciseNode.decodeExerciseEvent(Transfer)(exercised).foreach { tf =>
             tf.result.value match {
               case left: da.types.either.Left[_, _] =>
                 logger.debug(
@@ -63,9 +62,4 @@ class RoundSummaryCollectionService(
     }
 
   override def close(): Unit = Lifecycle.close(connection)(logger)
-
-  private def isTransfer(event: ExercisedEvent) =
-    event.getChoice == "CoinRules_Transfer" && isCoinRules(event)
-  private def isCoinRules(event: ExercisedEvent) = event.getTemplateId == CoinRules.TEMPLATE_ID
-
 }

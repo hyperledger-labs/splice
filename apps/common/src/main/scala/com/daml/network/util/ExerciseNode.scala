@@ -3,7 +3,7 @@
 
 package com.daml.network.util
 
-import com.daml.ledger.javaapi.data.codegen.ValueDecoder
+import com.daml.ledger.javaapi.data.codegen.{Choice, ContractTypeCompanion, ValueDecoder}
 import com.daml.ledger.javaapi.data.{ExercisedEvent, Value}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
@@ -28,11 +28,16 @@ final case class ExerciseNode[Arg, Res](
   * The object can then be passed to ExerciseNode.fromProto.
   */
 trait ExerciseNodeCompanion {
+  type Tpl
   type Arg
+  type Res
+
+  val choice: Choice[Tpl, Arg, Res]
+  val template: ContractTypeCompanion[Tpl, _]
+
   // The Java codegen does not provide generic en/decode functionality so we need to explicitly cary it around.
   val argDecoder: ValueDecoder[Arg]
   def argToValue(a: Arg): Value
-  type Res
   val resDecoder: ValueDecoder[Res]
   def resToValue(r: Res): Value
 }
@@ -68,7 +73,7 @@ object ExerciseNode {
     )
   } yield ExerciseNode(argument, result)
 
-  def tryFromProtoEvent(
+  private def tryFromProtoEvent(
       companion: ExerciseNodeCompanion
   )(exercised: ExercisedEvent)(implicit
       lc: ErrorLoggingContext
@@ -76,6 +81,15 @@ object ExerciseNode {
     case Left(e) => ErrorUtil.invalidState(e.message)
     case Right(v) => v
   }
+
+  private def isChoice(companion: ExerciseNodeCompanion)(event: ExercisedEvent) =
+    event.getChoice == companion.choice.name &&
+      event.getTemplateId == companion.template.TEMPLATE_ID
+
+  def decodeExerciseEvent(companion: ExerciseNodeCompanion)(
+      event: ExercisedEvent
+  )(implicit lc: ErrorLoggingContext): Option[ExerciseNode[companion.Arg, companion.Res]] =
+    Option.when(isChoice(companion)(event))(ExerciseNode.tryFromProtoEvent(companion)(event))
 
   private def decodeValue[A](valueDecoder: ValueDecoder[A], toValue: A => Value)(
       field: String,

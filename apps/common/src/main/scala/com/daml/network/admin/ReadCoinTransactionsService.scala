@@ -10,7 +10,6 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
-import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history.*
 import com.daml.network.store.CCHistoryStore
@@ -138,43 +137,23 @@ class ReadCoinTransactionsService(
     }
 
   // Some helper methods
-  private val rulesTemplate = CoinRules.TEMPLATE_ID
-  private val lockedCoinTemplate = LockedCoin.TEMPLATE_ID
-  private def isCoinRules(event: ExercisedEvent) = event.getTemplateId == rulesTemplate
-  private def isLockedCoin(event: ExercisedEvent) = event.getTemplateId == lockedCoinTemplate
 
-  private def isTap(event: ExercisedEvent) =
-    event.getChoice == "CoinRules_Tap" && isCoinRules(event)
-  private def isCoinUnlock(event: ExercisedEvent) =
-    event.getChoice == "LockedCoin_Unlock" && isLockedCoin(event)
-  private def isTransfer(event: ExercisedEvent) =
-    event.getChoice == "CoinRules_Transfer" && isCoinRules(event)
-  private def isSvcExpireLock(event: ExercisedEvent) =
-    event.getChoice == "LockedCoin_SvcExpireLock" && isLockedCoin(event)
-  private def isOwnerExpireLock(event: ExercisedEvent) =
-    event.getChoice == "LockedCoin_OwnerExpireLock" && isLockedCoin(event)
-  private def isStartIssuing(event: ExercisedEvent) =
-    event.getChoice == "CoinRules_MiningRound_StartIssuing" && isCoinRules(event)
-
-  import cats.syntax.option.*
-
-  private def parseEvent(event: TreeEvent): Option[ParentNode] = {
+  private def parseEvent(event: TreeEvent): Option[ParentNode] =
     event match {
-      case exercised: ExercisedEvent if isTransfer(exercised) =>
-        Transfer(ExerciseNode.tryFromProtoEvent(Transfer)(exercised)).some
-      case exercised: ExercisedEvent if isTap(exercised) =>
-        Tap(ExerciseNode.tryFromProtoEvent(Tap)(exercised)).some
-      case exercised: ExercisedEvent if isStartIssuing(exercised) =>
-        StartIssuing(ExerciseNode.tryFromProtoEvent(StartIssuing)(exercised)).some
-      case exercised: ExercisedEvent if isCoinUnlock(exercised) =>
-        CoinUnlock(ExerciseNode.tryFromProtoEvent(CoinUnlock)(exercised)).some
-      case exercised: ExercisedEvent if isSvcExpireLock(exercised) =>
-        SvcExpireLock(ExerciseNode.tryFromProtoEvent(SvcExpireLock)(exercised)).some
-      case exercised: ExercisedEvent if isOwnerExpireLock(exercised) =>
-        OwnerExpireLock(ExerciseNode.tryFromProtoEvent(OwnerExpireLock)(exercised)).some
+      case exercised: ExercisedEvent =>
+        LazyList[ParentNodeCompanion](
+          Transfer,
+          Tap,
+          StartIssuing,
+          CoinUnlock,
+          SvcExpireLock,
+          OwnerExpireLock,
+        ).map(c => ExerciseNode.decodeExerciseEvent(c)(exercised).map(c.toParentNode(_)))
+          .collectFirst { case Some(n) =>
+            n
+          }
       case _ => None
     }
-  }
 
   private def parseParentEvent(parent: TreeEvent): Option[ParentNode] = {
     val ev = parseEvent(parent)
