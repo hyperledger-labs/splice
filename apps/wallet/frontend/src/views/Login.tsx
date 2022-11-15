@@ -7,7 +7,7 @@ import { config, isHs2456UnsafeAuthConfig } from '../utils';
 
 const Login: React.FC = () => {
   const [userId, setUserId] = useState<string>('');
-  const { loginWithId, loginWithAuth0 } = useUserState();
+  const { loginWithSst, loginWithOidc } = useUserState();
 
   const loginMethod = isHs2456UnsafeAuthConfig(config.auth) ? (
     <>
@@ -23,7 +23,7 @@ const Login: React.FC = () => {
         sx={{ marginTop: '15px' }}
         onClick={e => {
           e.preventDefault();
-          loginWithId(userId);
+          loginWithSst(userId);
         }}
         id="login-button"
       >
@@ -31,8 +31,8 @@ const Login: React.FC = () => {
       </Button>
     </>
   ) : (
-    <Button variant="outlined" onClick={loginWithAuth0}>
-      Log in with auth0
+    <Button variant="outlined" onClick={loginWithOidc}>
+      Log in with OAuth2
     </Button>
   );
 

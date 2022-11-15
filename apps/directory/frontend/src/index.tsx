@@ -1,6 +1,6 @@
-import { Auth0Provider } from '@auth0/auth0-react';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import { AuthProvider } from 'react-oidc-context';
 
 import App from './App';
 import './index.css';
@@ -11,9 +11,9 @@ const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement)
 root.render(
   <React.StrictMode>
     {
-      <Auth0Provider {...config.auth}>
+      <AuthProvider {...config.auth}>
         <App />
-      </Auth0Provider>
+      </AuthProvider>
     }
   </React.StrictMode>
 );

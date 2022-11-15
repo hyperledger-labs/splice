@@ -1,18 +1,18 @@
-import { Auth0ProviderOptions } from '@auth0/auth0-react';
+import { AuthProviderProps } from 'react-oidc-context';
 
 // Configuration specified in files that are not part of this build.
 // To use this external configuration, add a script file to the web site that is loaded
 // before the application code, and writes the config to the global "window" variable.
 const externalConfig = window.canton_network_config;
 
-const authConfig: Auth0ProviderOptions = {
-  domain: process.env.REACT_APP_AUTH_DOMAIN || externalConfig.auth.domain,
-  clientId: process.env.REACT_APP_AUTH_CLIENT_ID || externalConfig.auth.clientId,
-  redirectUri: window.location.origin || externalConfig.auth.redirectUri,
+const authConfig: AuthProviderProps = {
+  authority: process.env.REACT_APP_AUTH_AUTHORITY || externalConfig.auth.authority,
+  client_id: process.env.REACT_APP_AUTH_CLIENT_ID || externalConfig.auth.client_id,
+  redirect_uri: window.location.origin || externalConfig.auth.redirect_uri,
 };
 
 export type Config = {
-  auth: Auth0ProviderOptions;
+  auth: AuthProviderProps;
   directory: {
     grpcUrl: string;
   };

@@ -1,4 +1,4 @@
-import { Auth0ProviderOptions } from '@auth0/auth0-react';
+import { AuthProviderProps } from 'react-oidc-context';
 
 // Configuration specified in files that are not part of this build.
 // To use this external configuration, add a script file to the web site that is loaded
@@ -10,7 +10,7 @@ const enum Algorithm {
   HS256UNSAFE = 'hs-256-unsafe',
 }
 
-type RS256Auth = Auth0ProviderOptions & {
+type RS256Auth = AuthProviderProps & {
   algorithm: Algorithm.RS256;
 };
 
@@ -29,11 +29,11 @@ const getAuthConfig = (): AuthConfig => {
   const algorithm = process.env.REACT_APP_AUTH_ALGORITHM || externalConfig.auth.algorithm;
 
   if (algorithm === Algorithm.RS256) {
-    const domain = process.env.REACT_APP_AUTH_DOMAIN || externalConfig.auth.domain;
-    const clientId = process.env.REACT_APP_AUTH_CLIENT_ID || externalConfig.auth.clientId;
-    const redirectUri = externalConfig.auth.redirectUri || window.location.origin;
+    const authority = process.env.REACT_APP_AUTH_AUTHORITY || externalConfig.auth.authority;
+    const client_id = process.env.REACT_APP_AUTH_CLIENT_ID || externalConfig.auth.client_id;
+    const redirect_uri = externalConfig.auth.redirect_uri || window.location.origin;
 
-    return { algorithm, domain, clientId, redirectUri };
+    return { algorithm, authority, client_id, redirect_uri };
   } else if (algorithm === Algorithm.HS256UNSAFE) {
     const secret = process.env.REACT_APP_AUTH_SECRET || externalConfig.auth.secret;
 

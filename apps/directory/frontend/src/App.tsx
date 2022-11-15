@@ -1,7 +1,7 @@
-import { useAuth0 } from '@auth0/auth0-react';
 import { ErrorBoundary } from 'common-frontend';
 import { generateLedgerApiToken } from 'common-frontend/lib/contexts/LedgerApiContext';
 import { useEffect, useState } from 'react';
+import { useAuth } from 'react-oidc-context';
 
 import { AppBar, Box, Button, Container, CssBaseline, Toolbar, Typography } from '@mui/material';
 
@@ -9,14 +9,24 @@ import './App.css';
 import Home from './views/Home';
 import Login from './views/Login';
 
+// useAuth hook throws an error if used without a parent AuthProvider context,
+// which is actually OK & expected if the app is running with a hs-256-unsafe auth config
+const useAuthSafe = () => {
+  try {
+    return useAuth();
+  } catch {
+    return undefined;
+  }
+};
+
 const App: React.FC = () => {
   const [damlUserId, setDamlUserId] = useState<string>();
-  const { user, logout } = useAuth0();
+  const { user, removeUser } = useAuthSafe() || {};
   const [ledgerApiToken, setLedgerApiToken] = useState<string | undefined>();
 
   useEffect(() => {
     if (user) {
-      setDamlUserId(user.sub);
+      setDamlUserId(user?.profile?.sub);
     }
   }, [user]);
 
@@ -44,7 +54,7 @@ const App: React.FC = () => {
                 color="inherit"
                 onClick={() => {
                   setDamlUserId(undefined);
-                  logout();
+                  removeUser && removeUser();
                 }}
               >
                 Log Out

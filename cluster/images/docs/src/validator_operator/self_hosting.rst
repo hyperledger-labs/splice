@@ -282,7 +282,7 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
       redirectUri: window.location.origin,
     },
 
-11. Refresh your browser with the wallet UI, and click the "Log in with Auth0" button
+11. Refresh your browser with the wallet UI, and click the "Log in with OAuth2" button
 
 This will kick off an interactive log-in flow where the user is redirected from the locally running wallet UI to auth0's login portal, then upon a successful authentication back to the local wallet UI.
 

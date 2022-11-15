@@ -1,5 +1,7 @@
 package com.daml.network.auth
 
+import java.net.URL
+
 sealed trait AuthConfig {}
 
 object AuthConfig {
@@ -8,6 +10,6 @@ object AuthConfig {
   ) extends AuthConfig
 
   case class Rs256(
-      jwksUrl: String
+      jwksUrl: URL
   ) extends AuthConfig
 }

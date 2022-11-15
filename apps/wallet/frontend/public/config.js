@@ -4,12 +4,12 @@ window.canton_network_config = {
     algorithm: 'hs-256-unsafe',
     secret: 'test',
   },
-  // Auth0 client configuration, see https://github.com/auth0/auth0-spa-js
+  // OIDC client configuration, see https://authts.github.io/oidc-client-ts/interfaces/UserManagerSettings.html
   //   auth: {
   //     algorithm: 'rs-256'
-  //     domain: "",
-  //     clientId: "",
-  //     redirectUri: window.location.origin,
+  //     authority: "",
+  //     client_id: "",
+  //     redirect_uri: window.location.origin,
   //   },
   wallet: {
     // URL of the gRPC-Web envoy proxy, proxying to the wallet app gRPC API

@@ -14,4 +14,4 @@ echo "Generating config file ${OUTPUT_CONFIG} with admin tokens"
 scala -classpath $BUNDLE/lib/coin-0.1.0-SNAPSHOT.jar ./scripts/transform-config.sc "useAdminAuthTokensForRemoteParticipants" "${INPUT_CONFIG}" "${OUTPUT_CONFIG}"
 
 echo "Starting Canton Network apps for local frontend testing"
-sbt "apps-app/runMain com.daml.network.CoinApp --config ${OUTPUT_CONFIG} --bootstrap ./apps/splitwise/frontend/bootstrap.canton"
+sbt "apps-app/runMain com.daml.network.CoinApp --config ${OUTPUT_CONFIG}"

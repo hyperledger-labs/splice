@@ -5,6 +5,7 @@ import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm
 import com.auth0.jwt.interfaces.DecodedJWT
 
+import java.net.URL
 import java.util.concurrent.TimeUnit
 import scala.util.Try
 
@@ -33,7 +34,7 @@ trait SignatureVerifier {
   protected def validateAlgorithm(algorithm: String): Either[String, Algorithm]
 }
 
-class RSAVerifier(jwksUrl: String) extends SignatureVerifier {
+class RSAVerifier(jwksUrl: URL) extends SignatureVerifier {
   private val provider: JwkProvider = new JwkProviderBuilder(jwksUrl)
     .cached(10, 24, TimeUnit.HOURS)
     .rateLimited(10, 1, TimeUnit.MINUTES)

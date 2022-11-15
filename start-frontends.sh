@@ -40,6 +40,7 @@ function start_frontend() {
   user=$7
   oa_domain=$8
   oa_clientid=$9
+  algorithm="${10}"
 
   frontend_dir="${REPO_ROOT}/apps/${app}/frontend"
 
@@ -49,8 +50,9 @@ function start_frontend() {
     REACT_APP_WALLET_UI_URL=http://localhost:${wallet_port} \
     REACT_APP_VALIDATOR_API_GRPC_URL=http://localhost:${validator_grpc} \
     REACT_APP_LEDGER_API_GRPC_URL=http://localhost:${ledger_grpc} \
-    REACT_APP_AUTH_DOMAIN=${oa_domain} \
+    REACT_APP_AUTH_AUTHORITY=${oa_domain} \
     REACT_APP_AUTH_CLIENT_ID=${oa_clientid} \
+    REACT_APP_AUTH_ALGORITHM=${algorithm} \
     npm start 2>&1 | tee ${LOG_DIR}/npm-${app}-${user}.log"
 }
 
@@ -63,7 +65,8 @@ function usage() {
 }
 
 daemon=0
-oauth_domain=
+auth_algorithm=hs-256-unsafe
+oauth_authority=
 oauth_clientid=
 while getopts "hda" arg; do
   case ${arg} in
@@ -75,8 +78,9 @@ while getopts "hda" arg; do
       daemon=1
       ;;
     a)
-      oauth_domain=canton-network-test.us.auth0.com
+      oauth_authority=https://canton-network-test.us.auth0.com
       oauth_clientid=Ob8YZSBvbZR3vsM2vGKllg3KRlRgLQSw
+      auth_algorithm=rs-256
       ;;
     ?)
       usage
@@ -107,12 +111,12 @@ do
 done
 
 # start_frontend <app> <ui-http-port> <app-wallet-ui-port> <app-grpc-port> <ledgerapi-grpc-port> <validator-app-grpc-port> <user-display-name>
-start_frontend wallet    3000 6204 NA   NA   6203 alice   "$oauth_domain" "$oauth_clientid"
-start_frontend wallet    3001 6304 NA   NA   6303 bob     "$oauth_domain" "$oauth_clientid"
-start_frontend splitwise 3002 6113 3000 6201 NA   alice   "$oauth_domain" "$oauth_clientid"
-start_frontend splitwise 3003 6113 3001 6301 NA   bob     "$oauth_domain" "$oauth_clientid"
-start_frontend directory 3004 6110 NA   6201 NA   alice   "$oauth_domain" "$oauth_clientid"
-start_frontend splitwise 3005 6113 NA   6201 NA   charlie "$oauth_domain" "$oauth_clientid"
+start_frontend wallet    3000 6204 NA   NA   6203 alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
+start_frontend wallet    3001 6304 NA   NA   6303 bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
+start_frontend splitwise 3002 6113 3000 6201 NA   alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
+start_frontend splitwise 3003 6113 3001 6301 NA   bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
+start_frontend directory 3004 6110 NA   6201 NA   alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
+start_frontend splitwise 3005 6113 NA   6201 NA   charlie "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
 
 if [ $daemon -eq 0 ]; then
   tmux attach -t ${tmux_session}

@@ -3,13 +3,13 @@ window.canton_network_config = {
     algorithm: 'hs-256-unsafe',
     secret: 'test',
   },
-  // Auth0 client configuration, see https://github.com/auth0/auth0-spa-js
-  // auth: {
+  // OIDC client configuration, see https://authts.github.io/oidc-client-ts/interfaces/UserManagerSettings.html
+  //   auth: {
   //     algorithm: 'rs-256'
-  //     domain: 'canton-network-dev.us.auth0.com',
-  //     clientId: '5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK',
-  //     redirectUri: window.location.origin,
-  // },
+  //     authority: "",
+  //     client_id: "",
+  //     redirect_uri: window.location.origin,
+  //   },
   splitwise: {
     // URL of the gRPC-Web envoy proxy, proxying to the splitwise gRPC API
     grpcUrl: 'http://localhost:6113',

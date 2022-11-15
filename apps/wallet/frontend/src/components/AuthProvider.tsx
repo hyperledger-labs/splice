@@ -1,5 +1,5 @@
-import { Auth0Provider } from '@auth0/auth0-react';
 import React from 'react';
+import { AuthProvider as OidcAuthProvider } from 'react-oidc-context';
 
 import { config, isHs2456UnsafeAuthConfig } from '../utils';
 
@@ -10,15 +10,24 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
     return <>{children}</>;
   }
 
-  if (authConfig.domain === '' || authConfig.clientId === '') {
+  if (authConfig.authority === '' || authConfig.client_id === '') {
     console.warn(
-      "Required auth config fields 'domain' or 'clientId' are empty, modify '/config.js' to set them: ",
+      "Required auth config fields 'authority' or 'client_id' are empty, modify '/config.js' to set them: ",
       authConfig
     );
     return <>{children}</>;
   }
 
-  return <Auth0Provider {...authConfig}>{children}</Auth0Provider>;
+  return (
+    <OidcAuthProvider
+      {...authConfig}
+      onSigninCallback={() =>
+        window.history.replaceState({}, document.title, window.location.pathname)
+      }
+    >
+      {children}
+    </OidcAuthProvider>
+  );
 };
 
 export default AuthProvider;

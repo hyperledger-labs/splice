@@ -1,6 +1,7 @@
-import { RedirectLoginOptions, useAuth0 } from '@auth0/auth0-react';
 import { SignJWT } from 'jose';
+import { User } from 'oidc-client-ts';
 import React, { useContext, useEffect, useState } from 'react';
+import { useAuth } from 'react-oidc-context';
 
 import { config, isHs2456UnsafeAuthConfig } from '../utils';
 import { UserStatusResponse } from './WalletServiceContext';
@@ -20,40 +21,61 @@ interface UserState {
   // we expose an external callback to update the User store's internal state after login happens
   updateStatus: (status: UserStatusResponse) => void;
 
-  loginWithId: (id: string) => void;
-  loginWithAuth0: (options?: RedirectLoginOptions) => void;
+  loginWithSst: (id: string) => void;
+  loginWithOidc: () => void;
   logout: () => void;
 }
 
 const UserContext = React.createContext<UserState | undefined>(undefined);
 
+// useAuth hook throws an error if used without a parent AuthProvider context,
+// which is actually OK & expected if the app is running with a hs-256-unsafe auth config
+const useAuthSafe = () => {
+  try {
+    return useAuth();
+  } catch {
+    return undefined;
+  }
+};
+
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [authMethod, setAuthMethod] = useState<'id' | 'auth0' | undefined>(undefined);
+  // Two user authentication methods are supported:
+  //   - sst: Self-Signed Tokens based on a given user ID
+  //   - oidc: OpenID Connect logins based on OAuth2.0
+  const [authMethod, setAuthMethod] = useState<'sst' | 'oidc' | undefined>(undefined);
+
   const [isOnboarded, setIsOnboarded] = useState(false);
   const [userId, setUserId] = useState<string>();
   const [primaryPartyId, setPrimaryPartyId] = useState<string>();
   const [userAccessToken, setUserAccessToken] = useState<string>();
 
-  const auth0 = useAuth0();
+  const auth = useAuthSafe();
+
+  const isAuthenticated = auth
+    ? auth.isAuthenticated
+    : userId !== undefined && userAccessToken !== undefined;
 
   useEffect(() => {
-    async function f() {
-      setAuthMethod('auth0');
-      setUserId(auth0.user?.sub);
+    async function f(user: User) {
+      setAuthMethod('oidc');
+      setUserId(user.profile?.sub);
 
-      const { id_token } = await auth0.getAccessTokenSilently({ detailedResponse: true });
+      const { id_token } = user;
+      if (!id_token) {
+        console.warn('WARNING: Expected an ID Token, but got nothing...');
+      }
       setUserAccessToken(id_token);
     }
 
-    if (auth0.isAuthenticated) {
-      f();
+    if (auth?.isAuthenticated && auth.user) {
+      f(auth.user);
     }
-  }, [auth0]);
+  }, [auth]);
 
   return (
     <UserContext.Provider
       value={{
-        isAuthenticated: userId !== undefined && userAccessToken !== undefined,
+        isAuthenticated,
         isOnboarded,
         userId,
         userAccessToken,
@@ -62,22 +84,26 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsOnboarded(userOnboarded);
           setPrimaryPartyId(partyId);
         },
-        loginWithId: async (id: string) => {
-          setAuthMethod('id');
+        loginWithSst: async (id: string) => {
+          setAuthMethod('sst');
           setUserId(id);
 
           const token = await generateToken(id);
           setUserAccessToken(token);
         },
-        loginWithAuth0: auth0.loginWithRedirect,
+        loginWithOidc: () => {
+          if (auth) {
+            auth.signinRedirect();
+          }
+        },
         logout: () => {
           setUserId(undefined);
           setPrimaryPartyId(undefined);
           setUserAccessToken(undefined);
           setIsOnboarded(false);
 
-          if (authMethod === 'auth0') {
-            auth0.logout();
+          if (auth && authMethod === 'oidc') {
+            auth.removeUser();
           }
           setAuthMethod(undefined);
         },

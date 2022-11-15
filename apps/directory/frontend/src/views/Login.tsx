@@ -1,11 +1,21 @@
-import { useAuth0 } from '@auth0/auth0-react';
 import { useState } from 'react';
+import { useAuth } from 'react-oidc-context';
 
 import { Button, Chip, Grid, TextField, Typography } from '@mui/material';
 
+// useAuth hook throws an error if used without a parent AuthProvider context,
+// which is actually OK & expected if the app is running with a hs-256-unsafe auth config
+const useAuthSafe = () => {
+  try {
+    return useAuth();
+  } catch {
+    return undefined;
+  }
+};
+
 const Login: React.FC<{ onLogin: (userId: string) => void }> = ({ onLogin }) => {
   const [userId, setUserId] = useState<string>('');
-  const { loginWithRedirect } = useAuth0();
+  const { signinRedirect } = useAuthSafe() || {};
 
   return (
     <Grid
@@ -40,8 +50,8 @@ const Login: React.FC<{ onLogin: (userId: string) => void }> = ({ onLogin }) => 
 
       <Chip label="OR" sx={{ margin: '25px 0px' }} />
 
-      <Button variant="outlined" onClick={loginWithRedirect}>
-        Log in with auth0
+      <Button variant="outlined" onClick={() => signinRedirect && signinRedirect()}>
+        Log in with OAuth2
       </Button>
     </Grid>
   );
