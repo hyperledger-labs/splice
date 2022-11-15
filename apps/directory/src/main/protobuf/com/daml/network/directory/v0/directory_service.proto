@@ -11,30 +11,6 @@ service DirectoryService {
   rpc GetProviderPartyId (google.protobuf.Empty) returns (GetProviderPartyIdResponse);
 }
 
-message ListEntryRequestsResponse {
-  repeated com.daml.network.v0.Contract entry_requests = 1;
-}
-
-message RequestEntryPaymentRequest {
-  // Contract ID of the DirectoryEntryRequest contract
-  string contract_id = 1;
-}
-
-message RequestEntryPaymentResponse {
-  // Contract ID of the new AppPaymentRequest contract
-  string contract_id = 1;
-}
-
-message CollectEntryPaymentRequest {
-  // Contract ID of the AccepteddAppPayment contract
-  string contract_id = 1;
-}
-
-message CollectEntryPaymentResponse {
-  // Contract ID of the new DirectoryEntry contract
-  string contract_id = 1;
-}
-
 message ListEntriesResponse {
   repeated com.daml.network.v0.Contract entries = 1;
 }
