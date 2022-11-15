@@ -788,26 +788,6 @@ class WalletIntegrationTest
     }
   }
 
-  "support coin redistribution" in { implicit env =>
-    val aliceDamlUser = aliceRemoteWallet.config.damlUser
-    val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
-
-    aliceRemoteWallet.tap(50)
-    val coin2 = aliceRemoteWallet.tap(10)
-    val coin3 = aliceRemoteWallet.tap(15)
-    aliceRemoteWallet.redistribute(Seq(coin2, coin3), Seq(Some(3.0), Some(5.0), None))
-    val exactly = (x: BigDecimal) => (x, x)
-    checkWallet(
-      aliceUserParty,
-      aliceRemoteWallet,
-      Seq(exactly(3.0), exactly(5.0), (16.0, 17.0), exactly(50.0)),
-    )
-
-    val all = aliceRemoteWallet.list().coins.map(c => c.contract.contractId)
-    aliceRemoteWallet.redistribute(all, Seq(None))
-    checkWallet(aliceUserParty, aliceRemoteWallet, Seq((74.0, 75.0)))
-  }
-
   "concurrent coin-operations" should {
     "be batched" in { implicit env =>
       val (alice, bob) = setupAliceAndBobAndChannel

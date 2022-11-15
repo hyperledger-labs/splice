@@ -1,14 +1,14 @@
 package com.daml.network.console
 
 import com.daml.network.auth.{AuthUtil, JwtCallCredential}
-import com.daml.network.codegen.java.cc.{coin as coinCodegen, coinrules as coinRulesCodegen}
+import com.daml.network.codegen.java.cc.{coin as coinCodegen}
 import com.daml.network.codegen.java.cn.wallet.{
   payment => walletCodegen,
   paymentchannel => channelCodegen,
   subscriptions => subsCodegen,
 }
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.util.{JavaContract as Contract, JavaValue as Value}
+import com.daml.network.util.{JavaContract as Contract}
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.ListResponse
 import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
@@ -415,23 +415,6 @@ abstract class WalletAppReference(
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.CollectRewards(round), callCredentials)
     }
-
-  @Help.Summary("Redistribute coins")
-  @Help.Description(
-    "Redistributes value from a given set of coins. The outputs declare the number of outputs and for each output the desired quantity or None for a floating output."
-  )
-  // TODO(#1351) - Make this a `CoinOperation` too or remove
-  def redistribute(
-      inputCoins: Seq[coinCodegen.Coin.ContractId],
-      outputQuantities: Seq[Option[BigDecimal]],
-  ): Seq[coinCodegen.Coin.ContractId] =
-    consoleEnvironment.run {
-      val inputs: Seq[Value[coinRulesCodegen.TransferInput]] =
-        inputCoins.map(c => new Value(new coinRulesCodegen.transferinput.InputCoin(c), _.toValue))
-      val outputs = outputQuantities.map(q => GrpcWalletAppClient.RedistributeOutput(q))
-      adminCommand(GrpcWalletAppClient.Redistribute(inputs, outputs), callCredentials)
-    }
-
 }
 
 class RemoteWalletAppReference(

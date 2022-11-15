@@ -25,7 +25,7 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.{CoinUtil, JavaContract => Contract, JavaValue => Value, Proto}
+import com.daml.network.util.{CoinUtil, JavaContract => Contract, Proto}
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
 import com.daml.network.wallet.treasury.{
   CoinOperationRequest,
@@ -818,39 +818,6 @@ class GrpcWalletService(
         }
         .toSeq,
     )
-  }
-
-  // TODO(#1351) - Remove this
-  override def redistribute(request: v0.RedistributeRequest): Future[v0.RedistributeResponse] = {
-    def toOutput(output: v0.RedistributeOutput): coinRulesCodegen.TransferOutput =
-      new coinRulesCodegen.transferoutput.OutputSenderCoin(
-        (if (output.quantity.isEmpty) None
-         else Some(Proto.tryDecode(Proto.JavaBigDecimal)(output.quantity))).toJava,
-        None.toJava,
-      )
-
-    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
-      withAuth { user =>
-        for {
-          userStore <- getUserStore(user)
-          validatorStore <- getUserStore(store.key.validatorUserName)
-          inputs = request.inputs
-            .traverse(
-              Value
-                .fromProto(
-                  coinRulesCodegen.TransferInput.valueDecoder(),
-                  (x: coinRulesCodegen.TransferInput) => x.toValue,
-                )(_)
-                .map(_.value)
-            )
-            .valueOr(err => throw err.toAdminError.asGrpcError)
-          outputs = request.outputs.map(toOutput)
-          createdCoins <- redistribute(userStore, validatorStore, inputs, outputs)
-        } yield {
-          v0.RedistributeResponse(createdCoins.map(cid => Proto.encodeContractId(cid)))
-        }
-      }
-    }
   }
 
   private def getUserInstallContract(

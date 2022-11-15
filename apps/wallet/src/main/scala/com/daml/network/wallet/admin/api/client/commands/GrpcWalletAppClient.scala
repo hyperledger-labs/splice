@@ -2,13 +2,13 @@ package com.daml.network.wallet.admin.api.client.commands
 
 import cats.syntax.either._
 import cats.syntax.traverse._
-import com.daml.network.codegen.java.cc.{coin => coinCodegen, coinrules => coinRulesCodegen}
+import com.daml.network.codegen.java.cc.{coin => coinCodegen}
 import com.daml.network.codegen.java.cn.wallet.{
   payment => walletCodegen,
   paymentchannel => channelCodegen,
   subscriptions => subsCodegen,
 }
-import com.daml.network.util.{JavaContract => Contract, JavaValue => Value, Proto}
+import com.daml.network.util.{JavaContract => Contract, Proto}
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.WalletServiceGrpc.WalletServiceStub
 import com.daml.network.wallet.v0.{GetBalanceRequest, GetBalanceResponse}
@@ -889,42 +889,4 @@ object GrpcWalletAppClient {
         response: Empty
     ): Either[String, Unit] = Right(())
   }
-
-  case class RedistributeOutput(
-      exactQuantity: Option[BigDecimal]
-  ) {
-    def toProtoV0: v0.RedistributeOutput =
-      v0.RedistributeOutput(exactQuantity.fold("")(Proto.encode(_)))
-  }
-
-  /** Redistribute the transfer inputs via a self-transfer. The outputs
-    * declare the number of outputs and for each output the desired quantity or None
-    * if it should be a floating output.
-    */
-  case class Redistribute(
-      inputs: Seq[Value[coinRulesCodegen.TransferInput]],
-      outputs: Seq[RedistributeOutput],
-  ) extends BaseCommand[v0.RedistributeRequest, v0.RedistributeResponse, Seq[
-        coinCodegen.Coin.ContractId
-      ]] {
-
-    override def createRequest(): Either[String, v0.RedistributeRequest] =
-      Right(
-        v0.RedistributeRequest(
-          inputs = inputs.map(_.toProtoV0),
-          outputs = outputs.map(_.toProtoV0),
-        )
-      )
-
-    override def submitRequest(
-        service: WalletServiceStub,
-        request: v0.RedistributeRequest,
-    ): Future[v0.RedistributeResponse] = service.redistribute(request)
-
-    override def handleResponse(
-        response: v0.RedistributeResponse
-    ): Either[String, Seq[coinCodegen.Coin.ContractId]] =
-      response.coinContractIds.traverse(Proto.decodeJavaContractId(coinCodegen.Coin.COMPANION)(_))
-  }
-
 }

@@ -41,8 +41,6 @@ service WalletService {
   rpc ListAppRewards (ListAppRewardsRequest) returns (ListAppRewardsResponse);
   rpc ListValidatorRewards (ListValidatorRewardsRequest) returns (ListValidatorRewardsResponse);
   rpc CollectRewards (CollectRewardsRequest) returns (google.protobuf.Empty);
-
-  rpc Redistribute (RedistributeRequest) returns (RedistributeResponse);
 }
 
 message UserStatusRequest {
