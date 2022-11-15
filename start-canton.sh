@@ -6,7 +6,8 @@ if [ -f "canton.pid" ]; then
   exit 1
 fi
 
-rm -f canton.ports
+rm -f canton.tokens
+rm -f canton.ports canton-simtime.ports
 
 POSTGRES_MODE=${1:-docker}
 
@@ -47,7 +48,7 @@ PID=$!
 echo "$PID" > canton-simtime.pid
 
 # Wait for both Cantons to start
-while [ ! -f canton.ports ] && [ ! -f canton-simtime.ports ]; do
+while [ ! -f canton.ports ] || [ ! -f canton-simtime.ports ]; do
     echo "Waiting for Canton instances to start"
     sleep 1;
 done

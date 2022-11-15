@@ -25,9 +25,8 @@ else
     echo "The file canton-simtime.pid does not exist, not stopping simtime Canton"
 fi
 
-if [ -f "canton.tokens" ]; then
-    rm canton.tokens
-fi
+rm -f canton.tokens
+rm -f canton.ports canton-simtime.ports
 
 rm canton.ports canton-simtime.ports || true
 
