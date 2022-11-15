@@ -35,7 +35,7 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
   /** A retry intended for automation calls, may retry for relatively long.
     * This implementation does not guarantee clean shutdown, and should be avoided if possible in favor of [[retryForAutomation()]]
     */
-  // TODO(i1408): strive to avoid using this, or convince ourselves that this does not lead to unclean shutdowns
+  // TODO(M1-92): strive to avoid using this, or convince ourselves that this does not lead to unclean shutdowns
   def retryForAutomationWithUncleanShutdown[T](
       operationName: String,
       task: => Future[T],
@@ -68,7 +68,7 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
   /** A retry intended for client calls, thus timing out relatively quickly.
     * This implementation does not guarantee clean shutdown, and should be avoided if possible in favor of [[retryForClientCalls()]]
     */
-  // TODO(i1408): strive to avoid using this, or convince ourselves that this does not lead to unclean shutdowns
+  // TODO(M1-92): strive to avoid using this, or convince ourselves that this does not lead to unclean shutdowns
   def retryForClientCallsWithUncleanShutdowns[T](
       operationName: String,
       task: => Future[T],
