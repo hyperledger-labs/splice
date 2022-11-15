@@ -82,7 +82,7 @@ class SplitwiseIntegrationTest extends CoinIntegrationTest {
       bobSplitwise.initiateTransfer(
         key,
         Seq(
-          new walletCodegen.ReceiverQuantity(
+          new walletCodegen.ReceiverCCQuantity(
             aliceUserParty.toProtoPrimitive,
             BigDecimal(10.0).bigDecimal,
           )

@@ -109,7 +109,7 @@ enterPayment payer provider groupKey quantity description = do
   group <- getGroup payer groupKey
   void $ exerciseSplitwiseInstall payer provider SplitwiseInstall_EnterPayment with ..
 
-initiateTransfer : CCUser -> CCUser -> GroupKey -> [ReceiverQuantity] -> Script (ContractId AppPaymentRequest)
+initiateTransfer : CCUser -> CCUser -> GroupKey -> [ReceiverCCQuantity] -> Script (ContractId AppPaymentRequest)
 initiateTransfer sender provider groupKey receiverQuantities = do
   group <- getGroup sender groupKey
   exerciseSplitwiseInstall sender provider SplitwiseInstall_InitiateTransfer with ..
@@ -193,7 +193,7 @@ testCase app Parties{..} = do
   balance <- queryBalances charlie (getGroupKey group)
   balance === M.fromList [(alice.primaryParty, -21.0), (bob.primaryParty, -11.0)]
 
-  request <- initiateTransfer alice (getProvider alice) (getGroupKey group) [ReceiverQuantity bob.primaryParty 8.0]
+  request <- initiateTransfer alice (getProvider alice) (getGroupKey group) [ReceiverCCQuantity bob.primaryParty 8.0]
   coin <- tap app alice 63.0
   receipt <- acceptPaymentRequest app alice request coin
 
@@ -207,8 +207,8 @@ testCase app Parties{..} = do
   balance === M.fromList [(alice.primaryParty, -21.0), (bob.primaryParty, -11.0)]
 
   request <- initiateTransfer charlie (getProvider charlie) (getGroupKey group) [
-      ReceiverQuantity alice.primaryParty 39.0,
-      ReceiverQuantity bob.primaryParty 11.0
+      ReceiverCCQuantity alice.primaryParty 39.0,
+      ReceiverCCQuantity bob.primaryParty 11.0
     ]
   coin <- tap app charlie 55.0
   receipt <- acceptPaymentRequest app charlie request coin

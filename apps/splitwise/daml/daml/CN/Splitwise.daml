@@ -101,7 +101,7 @@ template SplitwiseInstall
     nonconsuming choice SplitwiseInstall_InitiateTransfer : ContractId AppPaymentRequest
       with
         group : ContractId Group
-        receiverQuantities : [ReceiverQuantity]
+        receiverQuantities : [ReceiverCCQuantity]
       controller user
       do exercise group Group_InitiateTransfer with
            sender = user
@@ -197,7 +197,7 @@ template Group
     nonconsuming choice Group_InitiateTransfer : ContractId AppPaymentRequest
       with
         sender : Party
-        receiverQuantities : [ReceiverQuantity]
+        receiverQuantities : [ReceiverCCQuantity]
       controller sender
       do require "sender is a member" (sender `elem` groupMembers this)
          require "receiver is a member" (fmap (\x -> x.receiver) receiverQuantities `subset` groupMembers this)
@@ -208,7 +208,8 @@ template Group
              receiverQuantities
          now <- getTime
          create AppPaymentRequest with
-           sender, provider, receiverQuantities, svc
+           sender, provider, svc
+           receiverQuantities = map (\rq -> ReceiverQuantity rq.receiver (PaymentQuantity rq.ccQuantity CC)) receiverQuantities
            expiresAt = now `addRelTime` acceptDuration
            collectionDuration = collectionDuration
            deliveryOffer = toInterfaceContractId deliveryOffer
@@ -224,11 +225,12 @@ template Group
          exercise acceptedPaymentCid (AcceptedAppPayment_Collect transferContext)
          acceptedPayment.sender === sender
          archive refCid
-         let  (receivers, _) = unzipReceiverQuantities ref.receiverQuantities
+
+         let  receivers = map (\r -> r.receiver) ref.receiverQuantities
               expectedAcceptedPayment = AcceptedAppPayment with
                sender = ref.sender
                provider
-               receiverQuantities = ref.receiverQuantities
+               ccReceiverQuantities = ref.receiverQuantities
                svc
                lockedCoin = acceptedPayment.lockedCoin
                deliveryOffer = acceptedPayment.deliveryOffer
@@ -238,13 +240,13 @@ template Group
          require "Receivers are members" (receivers `subset` groupMembers this)
          -- Check that this belongs to the right group.
          getGroupKey ref.group === getGroupKey this
-         forA ref.receiverQuantities \ReceiverQuantity{receiver, quantity} ->
+         forA ref.receiverQuantities \ReceiverCCQuantity{receiver, ccQuantity} ->
            create BalanceUpdate with
              group = this
              update = Transfer with
                sender = ref.sender
                receiver
-               quantity
+               quantity = ccQuantity
 
     nonconsuming choice Group_Net : ContractId BalanceUpdate
       with
@@ -270,9 +272,9 @@ template TransferInProgress
   with
     group : Group
     sender : Party
-    receiverQuantities : [ReceiverQuantity]
+    receiverQuantities : [ReceiverCCQuantity]
   where
-    let (receivers, _) = unzipReceiverQuantities receiverQuantities
+    let receivers = map (\rq -> rq.receiver) receiverQuantities
     signatory signatory group
     interface instance DeliveryOffer for TransferInProgress where
       view = DeliveryOfferView with

@@ -44,6 +44,14 @@ template OpenMiningRound
            observers = obs :: observers
 
 
+    -- This allows fetchByKey-style fetches if you have readAs
+    -- but not actAs claims.
+    nonconsuming choice OpenMiningRound_Fetch : (ContractId OpenMiningRound, OpenMiningRound)
+      with
+        p : Party
+      controller p
+      do pure (self, this)
+
 -- | A mining round for which the total sum of registered rewards
 -- is being computed. Rewards can no longer be registered aginst such a round.
 template ClosingMiningRound

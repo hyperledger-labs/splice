@@ -259,7 +259,7 @@ final class RemoteSplitwiseAppReference(
   @Help.Summary("Initiate a transfer. Must be confirmed in the wallet.")
   def initiateTransfer(
       key: GrpcSplitwiseAppClient.GroupKey,
-      receiverQuantities: Seq[walletCodegen.ReceiverQuantity],
+      receiverQuantities: Seq[walletCodegen.ReceiverCCQuantity],
   ): walletCodegen.AppPaymentRequest.ContractId = {
     val party = getUserPrimaryParty()
     submitWithResult(

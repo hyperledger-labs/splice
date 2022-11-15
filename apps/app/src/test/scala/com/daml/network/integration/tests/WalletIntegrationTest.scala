@@ -171,7 +171,10 @@ class WalletIntegrationTest
         Seq(
           new walletCodegen.ReceiverQuantity(
             aliceUserParty.toProtoPrimitive,
-            BigDecimal(10).bigDecimal.setScale(10),
+            new walletCodegen.PaymentQuantity(
+              BigDecimal(10).bigDecimal.setScale(10),
+              walletCodegen.Currency.CC,
+            ),
           )
         ).asJava,
         aliceUserParty.toProtoPrimitive,
@@ -224,7 +227,10 @@ class WalletIntegrationTest
         Seq(
           new walletCodegen.ReceiverQuantity(
             aliceUserParty.toProtoPrimitive,
-            BigDecimal(10).bigDecimal.setScale(10),
+            new walletCodegen.PaymentQuantity(
+              BigDecimal(10).bigDecimal.setScale(10),
+              walletCodegen.Currency.CC,
+            ),
           )
         ).asJava,
         aliceUserParty.toProtoPrimitive,
@@ -254,7 +260,7 @@ class WalletIntegrationTest
         r.payload shouldBe new walletCodegen.AcceptedAppPayment(
           aliceUserParty.toProtoPrimitive,
           Seq(
-            new walletCodegen.ReceiverQuantity(
+            new walletCodegen.ReceiverCCQuantity(
               aliceUserParty.toProtoPrimitive,
               BigDecimal(10).bigDecimal.setScale(10),
             )

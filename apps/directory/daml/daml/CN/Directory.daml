@@ -5,7 +5,7 @@ import DA.Time
 
 import CC.Assert
 import CC.Coin
-import CC.CoinRules
+import CC.CoinRules hiding (USD, CC)
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 
@@ -219,7 +219,11 @@ template DirectoryInstall with
            entryRequest = request
            entryLifetime
          reqCid <- create AppPaymentRequest with
-           receiverQuantities = [ReceiverQuantity provider request.entryFee]
+           receiverQuantities = [
+            ReceiverQuantity with
+              receiver =provider
+              quantity = (PaymentQuantity with quantity = request.entryFee, currency = CC)
+            ]
            sender = user
            provider
            svc = svc

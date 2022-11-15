@@ -17,6 +17,7 @@ import com.daml.network.codegen.java.cn.wallet.install.{
   coinoperation,
   coinoperationoutcome,
 }
+import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentQuantity}
 import com.daml.network.codegen.java.cn.wallet.{
   install => installCodegen,
   payment => walletCodegen,
@@ -605,7 +606,7 @@ class GrpcWalletService(
               (channelId) =>
                 new coinoperation.CO_ChannelTransfer(
                   channelId,
-                  quantity,
+                  new PaymentQuantity(quantity, Currency.CC),
                   "wallet: execute direct transfer",
                 ),
               () =>
@@ -692,7 +693,7 @@ class GrpcWalletService(
             )
           } yield installCid.exerciseWalletAppInstall_PaymentChannel_CreatePaymentRequest(
             channel,
-            quantity,
+            new PaymentQuantity(quantity, Currency.CC),
             description,
           )
         })(

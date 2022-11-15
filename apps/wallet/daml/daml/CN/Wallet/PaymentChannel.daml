@@ -7,6 +7,8 @@ import CC.Assert
 import CC.Coin
 import CC.CoinRules
 
+import CN.Wallet.Payment
+
 -- | A one-directional payment channel governing transfers of CC from the sender to the reciever.
 template PaymentChannel
   with
@@ -23,12 +25,13 @@ template PaymentChannel
     nonconsuming choice PaymentChannel_ExecuteDirectTransfer : Either Text (TransferResult, ContractId Coin)
       with
         inputs : [TransferInput]
-        quantity : Decimal
+        transferQuantity : PaymentQuantity
         payload : Text
         transferContext : PaymentTransferContext
       controller sender
       do
         require "Direct transfers are allowed" allowDirectTransfers
+        quantity <- paymentQuantityToCC sender transferContext.context.openMiningRound transferQuantity
         let
           transfer = Transfer with
             sender
@@ -50,7 +53,7 @@ template PaymentChannel
 
     nonconsuming choice PaymentChannel_CreatePaymentRequest : ContractId OnChannelPaymentRequest
       with
-        quantity : Decimal
+        paymentQuantity : PaymentQuantity
         description : Text
       controller receiver
       do
@@ -59,7 +62,7 @@ template PaymentChannel
           sender
           receiver
           svc
-          quantity
+          paymentQuantity
           description
           senderTransferFeeRatio
 
@@ -114,12 +117,12 @@ template OnChannelPaymentRequest
     sender : Party -- ^ The party that should pay.
     receiver : Party -- ^ The party requesting to be paid.
     svc : Party -- ^ The issuer of the CC that flows on this payment channel.
-    quantity : Decimal -- ^ The amount of CC to be paid.
+    paymentQuantity : PaymentQuantity -- ^ The amount of CC to be paid.
     description : Text -- ^ The reference to the reason / good for which the payment is requested.
     senderTransferFeeRatio : Decimal -- ^ How to split the transfer fee between the sender and the receiver.
   where
     signatory sender, receiver
-    ensure quantity > 0.0
+    ensure paymentQuantity.quantity > 0.0
 
     choice OnChannelPaymentRequest_Accept : Either Text (TransferResult, ContractId Coin)
       with
@@ -127,6 +130,7 @@ template OnChannelPaymentRequest
         transferContext : PaymentTransferContext
       controller sender
       do
+        quantity <- paymentQuantityToCC sender transferContext.context.openMiningRound paymentQuantity
         -- create the transfer
         let transfer = Transfer with
               sender
@@ -153,6 +157,7 @@ template OnChannelPaymentRequest
     choice OnChannelPaymentRequest_Reject : ()
       controller sender
       do pure ()
+
 
 -- Utility function to help get the sender change from a TransferResult
 extractSenderChange: TransferResult -> (TransferResult, ContractId Coin)

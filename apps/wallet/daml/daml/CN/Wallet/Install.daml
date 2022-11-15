@@ -23,6 +23,7 @@ catchAllE operation =
     operation
   catch (ex : AnyException) -> return $ Left $ message ex
 
+
 -- Main function for batched execution of multiple coin operations.
 -- Given multiple coin operations and transfer inputs, it executes the operations sequentially while
 -- stringing along the remaining inputs. Returns all outcomes.
@@ -36,8 +37,8 @@ executeCoinOperationRec context inputs prevResults (operation::remainingOperatio
       handleResult COO_AcceptedChannelTransfer resultE
     CO_SubscriptionAcceptAndMakeInitialPayment cid -> handle SubscriptionRequest_AcceptAndMakePayment COO_SubscriptionInitialPayment cid
     CO_SubscriptionMakePayment cid -> handle SubscriptionIdleState_MakePayment COO_SubscriptionPayment cid
-    CO_Tap svc validator endUser quantity -> do
-      coin <- catchAll (exercise context.coinRules (CoinRules_Tap endUser quantity context.context.openMiningRound))
+    CO_Tap svc validator endUser tapQuantity -> do
+      coin <- catchAll (exercise context.coinRules (CoinRules_Tap endUser tapQuantity context.context.openMiningRound))
       handleResultTap coin
   where
     handle : Choice t c (r, ContractId Coin) => ([TransferInput] -> PaymentTransferContext -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
@@ -66,14 +67,13 @@ executeCoinOperationRec context inputs prevResults (operation::remainingOperatio
 executeCoinOperationRec _context _inputs prevResults [] = do
   return prevResults
 
-
 -- Enum of the possible ways coins can be manipulated through the wallet.
 data CoinOperation
   = CO_AppPayment (ContractId AppPaymentRequest)
   | CO_ChannelPayment (ContractId OnChannelPaymentRequest)
   | CO_ChannelTransfer with
     channel : ContractId PaymentChannel
-    quantity: Decimal
+    quantity: PaymentQuantity
     payload: Text
   | CO_SubscriptionAcceptAndMakeInitialPayment (ContractId SubscriptionRequest)
   | CO_SubscriptionMakePayment (ContractId SubscriptionIdleState)
@@ -81,7 +81,7 @@ data CoinOperation
     svc: Party
     validator: Party
     endUser: Party
-    quantity: Decimal
+    tapQuantity: Decimal
 
 
   deriving (Eq, Show)
@@ -168,7 +168,7 @@ template WalletAppInstall
     nonconsuming choice WalletAppInstall_PaymentChannel_CreatePaymentRequest : ContractId OnChannelPaymentRequest
       with
         cid : ContractId PaymentChannel
-        quantity : Decimal
+        quantity : PaymentQuantity
         description : Text
       controller walletServiceParty
       do exercise cid (PaymentChannel_CreatePaymentRequest quantity description)

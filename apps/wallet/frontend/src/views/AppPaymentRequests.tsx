@@ -50,7 +50,7 @@ const AppPaymentRequests: React.FC = () => {
     const [visible, setVisible] = useState(true);
 
     const totQuantity = request.receiverQuantities.reduce(
-      (sum, { quantity }) => sum + parseFloat(quantity),
+      (sum, { quantity }) => sum + parseFloat(quantity.quantity),
       0.0
     );
 
@@ -88,7 +88,7 @@ const AppPaymentRequests: React.FC = () => {
                       <TableCell className="app-request-receiver">
                         <DirectoryEntry partyId={receiver} />
                       </TableCell>
-                      <TableCell align="right">{quantity}</TableCell>
+                      <TableCell align="right">{quantity.quantity}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>

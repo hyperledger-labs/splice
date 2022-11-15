@@ -35,7 +35,7 @@ import {
   BalanceUpdate,
   Group as CodegenGroup,
 } from '@daml.js/splitwise/lib/CN/Splitwise';
-import { ReceiverQuantity } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
+import { ReceiverCCQuantity } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
 
 import DirectoryEntries, { Entry as DirectoryEntry } from './DirectoryEntries';
 import { useSplitwiseLedgerApiClient } from './contexts/SplitwiseLedgerApiContext';
@@ -94,10 +94,10 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider }) => {
   useInterval(fetchBalances, 500);
 
   const initiateSettleDebts = async () => {
-    const quantities: ReceiverQuantity[] = Array.from(balances)
+    const quantities: ReceiverCCQuantity[] = Array.from(balances)
       .filter(([_, v]) => new Decimal(v).isNegative())
       .map(([k, v]) => {
-        return { receiver: k, quantity: Decimal.abs(new Decimal(v)).toString() };
+        return { receiver: k, ccQuantity: Decimal.abs(new Decimal(v)).toString() };
       });
 
     return await ledgerApiClient.initiateTransfer(party, provider, group.contractId, quantities);
@@ -213,7 +213,7 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider 
   const [transferReceiverEntry, setTransferReceiverEntry] = useState<DirectoryEntry | null>(null);
   const initiateTransfer = async () => {
     return await ledgerApiClient.initiateTransfer(party, provider, group.contractId, [
-      { receiver: transferReceiverEntry!.user, quantity: transferQuantity },
+      { receiver: transferReceiverEntry!.user, ccQuantity: transferQuantity },
     ]);
   };
   return (
