@@ -408,6 +408,7 @@ object CoinConfigTransforms {
   private def readTokenDataFile(): Map[Int, String] = {
     val tokens: mutable.Map[Int, String] = mutable.Map.empty
 
+    // TODO(#1606) Read from canton-simtime.tokens when running in simtime mode.
     val tokenDataSource = Source.fromFile("canton.tokens")
     for (line <- tokenDataSource.getLines()) {
       val parts = line.split(" ")

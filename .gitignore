@@ -37,3 +37,4 @@ temp/
 cluster/images/docs/src/app_dev/api
 canton.patch
 canton.tokens
+canton-simtime.tokens

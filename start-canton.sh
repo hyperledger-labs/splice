@@ -31,7 +31,7 @@ POSTGRES_MODE=${1:-docker}
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_da_simtime"
 
 # Start Canton
-canton \
+CANTON_TOKEN_FILENAME=canton.tokens canton \
     daemon --auto-connect-local --log-level-canton=DEBUG \
     --no-tty -c ./apps/app/src/test/resources/simple-topology-canton.conf -C canton.parameters.ports-file=canton.ports \
     --bootstrap bootstrap-canton.canton &
@@ -39,7 +39,7 @@ PID=$!
 echo "$PID" > canton.pid
 
 # Start second Canton with simulated time, for time-based tests
-canton \
+CANTON_TOKEN_FILENAME=canton-simtime.tokens canton \
     daemon --auto-connect-local --log-level-canton=DEBUG \
     --no-tty -c ./apps/app/src/test/resources/simple-topology-canton-simtime.conf -C canton.parameters.ports-file=canton-simtime.ports \
     --log-file-name log/canton-simtime.log \
@@ -48,7 +48,7 @@ PID=$!
 echo "$PID" > canton-simtime.pid
 
 # Wait for both Cantons to start
-while [ ! -f canton.ports ] || [ ! -f canton-simtime.ports ]; do
+while [ ! -f canton.tokens ] || [ ! -f canton-simtime.tokens ]; do
     echo "Waiting for Canton instances to start"
     sleep 1;
 done

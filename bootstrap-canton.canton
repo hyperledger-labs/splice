@@ -29,9 +29,12 @@ participants.local.foreach(participant => {
   val port = participant.config.ledgerApi.internalPort.get.unwrap
   adminTokensData.append(s"$port" -> adminToken)
 })
-
-println(s"Writing admin tokens file...")
+val tokenFile = System.getenv("CANTON_TOKEN_FILENAME")
+if (tokenFile == null) {
+  sys.error("Environment variable CANTON_TOKEN_FILENAME was not set")
+}
+println(s"Writing admin tokens file to $tokenFile...")
 val adminTokensContent = adminTokensData.map(x => s"${x._1} ${x._2}").mkString(System.lineSeparator())
-Files.write(Paths.get("canton.tokens"), adminTokensContent.getBytes(StandardCharsets.UTF_8))
+Files.write(Paths.get(tokenFile), adminTokensContent.getBytes(StandardCharsets.UTF_8))
 
 println("Canton bootstrap script done.")
