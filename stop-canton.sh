@@ -29,4 +29,6 @@ if [ -f "canton.tokens" ]; then
     rm canton.tokens
 fi
 
+rm canton.ports canton-simtime.ports || true
+
 ./scripts/postgres.sh "$POSTGRES_MODE" stop

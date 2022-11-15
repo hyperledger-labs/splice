@@ -1,8 +1,8 @@
 package com.daml.network.scan.automation
 
-import com.daml.network.admin.LedgerAutomationServiceOrchestrator
+import com.daml.network.admin.{LedgerAutomationServiceOrchestrator, ReadCoinTransactionsService}
 import com.daml.network.environment.CoinLedgerClient
-import com.daml.network.scan.admin.{ReadCoinTransactionsService, ReadReferenceDataService}
+import com.daml.network.scan.admin.ReadReferenceDataService
 import com.daml.network.scan.store.ScanCCHistoryStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncCloseable}

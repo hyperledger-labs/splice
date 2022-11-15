@@ -8,8 +8,8 @@ import com.daml.network.codegen.java.cc.{
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.wallet.{
-  subscriptions as subsCodegen,
-  payment as walletCodegen,
+  payment => walletCodegen,
+  subscriptions => subsCodegen,
 }
 import com.daml.network.codegen.java.cn.{directory => dirCodegen}
 import com.daml.network.codegen.java.da.time.types.RelTime

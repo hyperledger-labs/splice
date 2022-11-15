@@ -1,4 +1,4 @@
-package com.daml.network.scan.admin
+package com.daml.network.admin
 
 import com.daml.ledger.javaapi.data.{
   CreatedEvent,
@@ -8,17 +8,16 @@ import com.daml.ledger.javaapi.data.{
   TransactionTree,
   TreeEvent,
 }
-import com.daml.network.admin.LedgerAutomationService
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
 import com.daml.network.codegen.java.cc.coinrules.CoinRules
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history.*
-import com.daml.network.scan.store.ScanCCHistoryStore
+import com.daml.network.store.CCHistoryStore
 import com.daml.network.util.{ExerciseNode, JavaContract => Contract, Trees}
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.ledger.api.client.{JavaDecodeUtil as DecodeUtil}
+import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ErrorUtil
@@ -28,9 +27,9 @@ import scala.collection.{concurrent, mutable}
 import scala.concurrent.{ExecutionContext, Future}
 
 class ReadCoinTransactionsService(
-    svcParty: PartyId,
+    party: PartyId,
     connection: CoinLedgerConnection,
-    store: ScanCCHistoryStore,
+    store: CCHistoryStore,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext, tc: TraceContext)
     extends LedgerAutomationService
@@ -49,7 +48,7 @@ class ReadCoinTransactionsService(
       traceContext: TraceContext
   ): Future[Unit] = {
     for {
-      tree <- connection.tryGetTransactionTreeById(Seq(svcParty), tx.getTransactionId)
+      tree <- connection.tryGetTransactionTreeById(Seq(party), tx.getTransactionId)
       events <- traverseForest(tree)
       metadata = TransactionMetadata(tx)
       _ <- store.addTransaction(CoinTransaction(events, metadata))
@@ -157,7 +156,7 @@ class ReadCoinTransactionsService(
   private def isStartIssuing(event: ExercisedEvent) =
     event.getChoice == "CoinRules_MiningRound_StartIssuing" && isCoinRules(event)
 
-  import cats.syntax.option._
+  import cats.syntax.option.*
 
   private def parseEvent(event: TreeEvent): Option[ParentNode] = {
     event match {
