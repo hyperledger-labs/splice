@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.cc.api.v1.round.Round
 import com.daml.network.codegen.java.cc.coin._
 import com.daml.network.codegen.java.cc.round._
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest

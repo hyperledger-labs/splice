@@ -3,7 +3,12 @@
 
 package com.daml.network.util
 
-import com.daml.ledger.javaapi.data.codegen.{Choice, ContractTypeCompanion, ValueDecoder}
+import com.daml.ledger.javaapi.data.codegen.{
+  Choice,
+  ContractCompanion,
+  InterfaceCompanion,
+  ValueDecoder,
+}
 import com.daml.ledger.javaapi.data.{ExercisedEvent, Value}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
@@ -11,6 +16,7 @@ import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.util.ErrorUtil
 
+import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success, Try}
 
 final case class ExerciseNode[Arg, Res](
@@ -33,7 +39,7 @@ trait ExerciseNodeCompanion {
   type Res
 
   val choice: Choice[Tpl, Arg, Res]
-  val template: ContractTypeCompanion[Tpl, _]
+  val templateOrInterface: Either[ContractCompanion[_, _, Tpl], InterfaceCompanion[Tpl, _, _]]
 
   // The Java codegen does not provide generic en/decode functionality so we need to explicitly cary it around.
   val argDecoder: ValueDecoder[Arg]
@@ -82,9 +88,15 @@ object ExerciseNode {
     case Right(v) => v
   }
 
-  private def isChoice(companion: ExerciseNodeCompanion)(event: ExercisedEvent) =
-    event.getChoice == companion.choice.name &&
-      event.getTemplateId == companion.template.TEMPLATE_ID
+  private def isChoice(companion: ExerciseNodeCompanion)(event: ExercisedEvent) = {
+    val idMatches = companion.templateOrInterface match {
+      case Left(tplCompanion) =>
+        event.getTemplateId == tplCompanion.TEMPLATE_ID
+      case Right(ifaceCompanion) =>
+        event.getInterfaceId.toScala == Some(ifaceCompanion.TEMPLATE_ID)
+    }
+    idMatches && event.getChoice == companion.choice.name
+  }
 
   def decodeExerciseEvent(companion: ExerciseNodeCompanion)(
       event: ExercisedEvent

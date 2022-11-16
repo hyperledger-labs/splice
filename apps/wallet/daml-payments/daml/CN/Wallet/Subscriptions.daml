@@ -4,8 +4,8 @@ import DA.Time
 import DA.Optional
 
 import CC.Assert
-import CC.Coin
-import CC.CoinRules
+import CC.API.V1.Coin
+import CC.API.V1.CoinRules
 
 -- Subscriptions flow (happy path) for reference;
 -- solid arrows represent state transitions via exercising a choice,

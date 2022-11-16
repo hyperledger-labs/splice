@@ -1,7 +1,10 @@
 package com.daml.network.scan.admin.api.client
 
 import com.daml.network.admin.api.client.AppConnection
-import com.daml.network.codegen.java.cc.{coinrules as coinRulesCodegen}
+import com.daml.network.codegen.java.cc.api.v1.{
+  coinrules as coinRulesCodegen,
+  round as roundCodegen,
+}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -59,8 +62,8 @@ final class ScanConnection(
         throw notFound("No active OpenMiningRound contract")
       )
       new coinRulesCodegen.AppTransferContext(
-        coinRules.contractId,
-        openMiningRound.contractId,
+        coinRules.contractId.toInterface(coinRulesCodegen.CoinRules.INTERFACE),
+        openMiningRound.contractId.toInterface(roundCodegen.OpenMiningRound.INTERFACE),
       )
     }
 

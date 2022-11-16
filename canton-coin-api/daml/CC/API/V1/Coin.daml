@@ -1,0 +1,55 @@
+module CC.API.V1.Coin where
+
+data CoinView = CoinView with
+  owner : Party
+  svc : Party
+
+interface Coin where
+  viewtype CoinView
+
+data LockedCoinView = LockedCoinView with
+  lock : TimeLock
+  coin : CoinView
+
+interface LockedCoin where
+  viewtype LockedCoinView
+
+  lockedCoin_Unlock : Update (ContractId Coin)
+  lockedCoin_OwnerExpireLock : Update (ContractId Coin)
+
+  choice LockedCoin_Unlock : ContractId Coin
+    controller (view this).lock.holder
+    do lockedCoin_Unlock this
+
+  choice LockedCoin_OwnerExpireLock : ContractId Coin
+    controller (view this).coin.owner
+    do lockedCoin_OwnerExpireLock this
+
+data AppRewardView = AppRewardView with
+  svc : Party
+  provider : Party
+
+interface AppReward where
+  viewtype AppRewardView
+
+data ValidatorRewardView = ValidatorRewardView with
+  svc : Party
+  user : Party
+
+interface ValidatorReward where
+  viewtype ValidatorRewardView
+
+data ValidatorRightView = ValidatorRightView with
+  svc : Party
+  user : Party
+  validator : Party
+
+interface ValidatorRight where
+  viewtype ValidatorRightView
+
+-- | A lock held by a particular party until its expiry.
+data TimeLock = TimeLock with
+    holder: Party
+    -- TODO(#1383): add support for groups of lock holders.
+    expiresAt: Time
+  deriving (Eq, Ord, Show)

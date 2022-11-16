@@ -3,8 +3,8 @@ module CC.Scripts.TestComputeFees where
 import DA.Assert
 import Daml.Script
 
+import qualified CC.API.V1.CoinRules as API
 import CC.Scripts.Util
-import CC.CoinRules
 
 template Test
   with
@@ -13,11 +13,11 @@ template Test
     signatory sender
     choice Test_ComputeFees : Decimal
       with
-        context : PaymentTransferContext
+        context : API.PaymentTransferContext
         quantities : [Decimal]
       controller sender
       do
-        fees <- exerciseComputeFees context sender quantities
+        fees <- API.exerciseComputeFees context sender quantities
         return fees
 
 test = script do

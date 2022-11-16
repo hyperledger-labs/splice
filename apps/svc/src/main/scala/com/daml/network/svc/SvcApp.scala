@@ -3,6 +3,7 @@ package com.daml.network.svc
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.Coin
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
@@ -142,7 +143,7 @@ object SvcApp {
         defaultCoinConfig,
         Seq.empty.asJava,
       ).createAnd
-        .exerciseCoinRules_MiningRound_Open(BigDecimal(1.0).bigDecimal, new cc.round.Round(0))
+        .exerciseCoinRules_MiningRound_Open(BigDecimal(1.0).bigDecimal, new v1.round.Round(0))
         .commands
         .asScala
         .toSeq

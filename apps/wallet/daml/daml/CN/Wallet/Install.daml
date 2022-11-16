@@ -2,8 +2,10 @@ module CN.Wallet.Install where
 
 import DA.Exception
 
-import CC.Coin
-import CC.CoinRules
+import qualified CC.API.V1.Coin as API
+import qualified CC.API.V1.CoinRules as API
+import CC.Round (OpenMiningRound)
+import CC.CoinRules (CoinRules, CoinRules_Tap(..))
 
 import CN.Wallet.Payment
 import CN.Wallet.PaymentChannel
@@ -27,7 +29,7 @@ catchAllE operation =
 -- Main function for batched execution of multiple coin operations.
 -- Given multiple coin operations and transfer inputs, it executes the operations sequentially while
 -- stringing along the remaining inputs. Returns all outcomes.
-executeCoinOperationRec : PaymentTransferContext -> [TransferInput] -> [CoinOperationOutcome] -> [CoinOperation] -> Update ([CoinOperationOutcome])
+executeCoinOperationRec : API.PaymentTransferContext -> [API.TransferInput] -> [CoinOperationOutcome] -> [CoinOperation] -> Update ([CoinOperationOutcome])
 executeCoinOperationRec context inputs prevResults (operation::remainingOperations) = do
   case operation of
     CO_AppPayment cid -> handleE AppPaymentRequest_Accept COO_AcceptedAppPayment cid
@@ -38,28 +40,28 @@ executeCoinOperationRec context inputs prevResults (operation::remainingOperatio
     CO_SubscriptionAcceptAndMakeInitialPayment cid -> handle SubscriptionRequest_AcceptAndMakePayment COO_SubscriptionInitialPayment cid
     CO_SubscriptionMakePayment cid -> handle SubscriptionIdleState_MakePayment COO_SubscriptionPayment cid
     CO_Tap svc validator endUser tapQuantity -> do
-      coin <- catchAll (exercise context.coinRules (CoinRules_Tap endUser tapQuantity context.context.openMiningRound))
-      handleResultTap coin
+      coin <- catchAll (exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_Tap endUser tapQuantity (fromInterfaceContractId @OpenMiningRound context.context.openMiningRound)))
+      handleResultTap (toInterfaceContractId @API.Coin <$> coin)
   where
-    handle : Choice t c (r, ContractId Coin) => ([TransferInput] -> PaymentTransferContext -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
+    handle : Choice t c (r, ContractId API.Coin) => ([API.TransferInput] -> API.PaymentTransferContext -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
     handle choiceConstructor resultConstructor cid = do
       resultE <- catchAll $ exercise cid (choiceConstructor inputs context)
       handleResult resultConstructor resultE
 
-    handleE : Choice t c (Either Text (r, ContractId Coin)) => ([TransferInput] -> PaymentTransferContext -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
+    handleE : Choice t c (Either Text (r, ContractId API.Coin)) => ([API.TransferInput] -> API.PaymentTransferContext -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
     handleE choiceConstructor resultConstructor cid = do
       resultE <- catchAllE $ exercise cid (choiceConstructor inputs context)
       handleResult resultConstructor resultE
 
-    handleResult : (r -> CoinOperationOutcome) -> Either Text (r, ContractId Coin) -> Update [CoinOperationOutcome]
+    handleResult : (r -> CoinOperationOutcome) -> Either Text (r, ContractId API.Coin) -> Update [CoinOperationOutcome]
     handleResult resultConstructor = \case
       Left errorMsg -> handleLeft errorMsg
-      Right (result, change) -> executeCoinOperationRec context [InputCoin change] (resultConstructor result :: prevResults) remainingOperations
+      Right (result, change) -> executeCoinOperationRec context [API.InputCoin change] (resultConstructor result :: prevResults) remainingOperations
 
-    handleResultTap : Either Text (ContractId Coin) -> Update [CoinOperationOutcome]
+    handleResultTap : Either Text (ContractId API.Coin) -> Update [CoinOperationOutcome]
     handleResultTap = \case
       Left errorMsg -> handleLeft errorMsg
-      Right tappedCoin -> executeCoinOperationRec context (InputCoin tappedCoin :: inputs) (COO_Tap tappedCoin :: prevResults) remainingOperations
+      Right tappedCoin -> executeCoinOperationRec context (API.InputCoin tappedCoin :: inputs) (COO_Tap tappedCoin :: prevResults) remainingOperations
 
     handleLeft : Text -> Update [CoinOperationOutcome]
     handleLeft errorMsg = executeCoinOperationRec context inputs (COO_Error errorMsg :: prevResults) remainingOperations
@@ -89,11 +91,11 @@ data CoinOperation
 -- Enum of the possible outcomes of operating on a Canton coin through the wallet.
 data CoinOperationOutcome
   = COO_AcceptedAppPayment (ContractId AcceptedAppPayment)
-  | COO_AcceptedChannelPayment TransferResult
-  | COO_AcceptedChannelTransfer TransferResult
+  | COO_AcceptedChannelPayment API.TransferResult
+  | COO_AcceptedChannelTransfer API.TransferResult
   | COO_SubscriptionInitialPayment (ContractId SubscriptionInitialPayment)
   | COO_SubscriptionPayment (ContractId SubscriptionPayment)
-  | COO_Tap (ContractId Coin)
+  | COO_Tap (ContractId API.Coin)
   | COO_Error Text
   deriving (Eq, Show)
 
@@ -113,8 +115,8 @@ template WalletAppInstall
     -- Takes a batch of commands manipulating coins, and tries to execute them sequentially in one large Daml transaction.
     nonconsuming choice WalletAppInstall_ExecuteBatch: [CoinOperationOutcome]
       with
-        context : PaymentTransferContext
-        inputs : [TransferInput]
+        context : API.PaymentTransferContext
+        inputs : [API.TransferInput]
         operations : [CoinOperation]
       controller walletServiceParty
       do
@@ -186,10 +188,10 @@ template WalletAppInstall
       do exercise cid OnChannelPaymentRequest_Reject
 
     -- TODO(#1351): Remove this
-    nonconsuming choice WalletAppInstall_CoinRules_TryTransfer : TransferResult
+    nonconsuming choice WalletAppInstall_CoinRules_TryTransfer : API.TransferResult
       with
-        cid : ContractId CoinRules
-        transfer : Transfer
-        context : TransferContext
+        cid : ContractId API.CoinRules
+        transfer : API.Transfer
+        context : API.TransferContext
       controller walletServiceParty
-      do exercise cid (CoinRules_TryTransfer transfer context)
+      do exercise cid (API.CoinRules_TryTransfer transfer context)

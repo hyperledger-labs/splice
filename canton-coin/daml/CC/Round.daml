@@ -1,9 +1,8 @@
 module CC.Round where
 
 import CC.Assert
-
-newtype Round = Round with number : Int
-  deriving (Eq, Ord, Show)
+import qualified CC.API.V1.Round as API
+import CC.API.V1.Round (Round(..))
 
 -- | The equivalent of RelTime for rounds, i.e., a delta between
 -- two rounds
@@ -35,6 +34,9 @@ template OpenMiningRound
     observer observers
     ensure isDefinedRound round
 
+    interface instance API.OpenMiningRound for OpenMiningRound where
+      view = API.OpenMiningRoundView with ..
+
     choice OpenMiningRound_AddObserver : ContractId OpenMiningRound
       with
         obs : Party
@@ -42,15 +44,6 @@ template OpenMiningRound
       do require ("New observer " <> show obs  <> " is not a member of existing observers " <> show observers) (obs `notElem` observers)
          create this with
            observers = obs :: observers
-
-
-    -- This allows fetchByKey-style fetches if you have readAs
-    -- but not actAs claims.
-    nonconsuming choice OpenMiningRound_Fetch : (ContractId OpenMiningRound, OpenMiningRound)
-      with
-        p : Party
-      controller p
-      do pure (self, this)
 
 -- | A mining round for which the total sum of registered rewards
 -- is being computed. Rewards can no longer be registered aginst such a round.
@@ -74,6 +67,9 @@ template IssuingMiningRound
     signatory svc
     observer observers
     ensure isDefinedRound round
+
+    interface instance API.IssuingMiningRound for IssuingMiningRound where
+      view = API.IssuingMiningRoundView with ..
 
     choice IssuingMiningRound_AddObserver : ContractId IssuingMiningRound
       with

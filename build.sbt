@@ -63,6 +63,22 @@ lazy val root = (project in file("."))
     resolvers += Resolver.sonatypeRepo("snapshots"),
   )
 
+lazy val `canton-coin-api-daml` =
+  project
+    .in(file("canton-coin-api"))
+    .dependsOn(
+    )
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.sharedAppSettings,
+      libraryDependencies ++= Seq(daml_bindings_scala),
+      Compile / damlSourceDirectory := file("canton-coin-api"),
+      cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
+      Test / damlSourceDirectory := file("canton-coin-api"),
+      Compile / damlDarOutput := file("canton-coin-api") / ".daml" / "dist",
+      BuildCommon.damlCodegenSettings,
+    )
+
 lazy val `apps-common` =
   project
     .in(file("apps/common"))
@@ -84,6 +100,7 @@ lazy val `apps-common` =
        * We output the dar to the usual `.daml/dist` dir because that's where a naive user expects it.
        */
       Compile / damlSourceDirectory := file("canton-coin"),
+      Compile / damlDependencies := (`canton-coin-api-daml` / Compile / damlBuild).value,
       cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
       Test / damlSourceDirectory := file("canton-coin"),
       Compile / damlDarOutput := file("canton-coin") / ".daml" / "dist",
@@ -134,7 +151,8 @@ lazy val `apps-common-frontend` = {
     .settings(
       // daml typescript code generation settings:
       damlTsCodegenSources :=
-        (`apps-common` / Compile / damlBuild).value ++
+        (`canton-coin-api-daml` / Compile / damlBuild).value ++
+          (`apps-common` / Compile / damlBuild).value ++
           (`apps-wallet-daml` / Compile / damlBuild).value ++
           (`apps-wallet-payments-daml` / Compile / damlBuild).value ++
           (`apps-directory` / Compile / damlBuild).value ++
@@ -290,7 +308,7 @@ lazy val `apps-wallet-payments-daml` =
     .settings(
       BuildCommon.sharedAppSettings,
       libraryDependencies ++= Seq(daml_bindings_scala),
-      Compile / damlDependencies := (`apps-common` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`canton-coin-api-daml` / Compile / damlBuild).value,
       Compile / damlSourceDirectory := file("apps/wallet/daml-payments"),
       cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
       Test / damlSourceDirectory := file("apps/wallet/daml-payments"),
@@ -467,6 +485,7 @@ lazy val `apps-app` =
       `apps-svc`,
       `apps-scan`,
       `apps-wallet`,
+      `canton-coin-api-daml`,
       `canton-community-app` % "compile->compile;test->test",
     )
     .settings(

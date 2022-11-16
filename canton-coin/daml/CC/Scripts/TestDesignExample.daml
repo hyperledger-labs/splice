@@ -5,6 +5,8 @@ import DA.List.Total
 import DA.Time
 import Daml.Script
 
+import qualified CC.API.V1.Coin as API
+import qualified CC.API.V1.CoinRules as API
 import CC.Assert
 import CC.Coin
 import CC.CoinRules
@@ -24,7 +26,7 @@ template Escrow
       with
         lockedCoin : ContractId LockedCoin
         paymentCoin : ContractId Coin
-        transferContext : AppTransferContext
+        transferContext : API.AppTransferContext
       controller p
       do LockedCoin{lock,coin=locked} <- fetch lockedCoin
          require "SVC matches locked coin" (locked.svc == this.svc)
@@ -33,28 +35,28 @@ template Escrow
          payment <- fetch paymentCoin
          require "SVC matches payment coin" (payment.svc == this.svc)
          require "owner matches payment coin" (payment.owner == this.p)
-         cid <- exercise lockedCoin LockedCoin_Unlock
-         let transfer = Transfer with
+         cid <- exercise (toInterfaceContractId @API.LockedCoin lockedCoin) API.LockedCoin_Unlock
+         let transfer = API.Transfer with
                sender = p
                provider = p
                payload = "refresh"
-               inputs = [InputCoin cid, InputCoin paymentCoin]
+               inputs = [API.InputCoin cid, API.InputCoin $ toInterfaceContractId paymentCoin]
                outputs =
-                 [ OutputSenderCoin with
+                 [ API.OutputSenderCoin with
                      exactQuantity = None
                      lock = None
-                 , OutputSenderCoin with
+                 , API.OutputSenderCoin with
                      exactQuantity = Some locked.quantity.initialQuantity
-                     lock = Some TimeLock with
+                     lock = Some API.TimeLock with
                        holder = arbiter
                        expiresAt = lock.expiresAt `addRelTime` days 90
-                 , OutputReceiverCoin with
+                 , API.OutputReceiverCoin with
                      receiver = arbiter
-                     coinType = FixedReceiverCoin with
+                     coinType = API.FixedReceiverCoin with
                        quantity = 1.0
                        senderTransferFeeRatio = 0.0
                  ]
-         exerciseAppTransfer transferContext transfer
+         API.exerciseAppTransfer transferContext transfer
          pure ()
 
 -- | This matches the example in the design doc
@@ -128,7 +130,7 @@ test = do
     receiverTransferFees = 0.01
     totalSelfOutputs = 1000.25
     totalNonSelfOutputs = 1.0
-  note.summary === TransferSummary with
+  note.summary === API.TransferSummary with
     numOutputs = 3
     inQuantity = 1004.95
     nonSelfOutQuantity = 0.99
@@ -154,7 +156,7 @@ test = do
       Some change = find (\c -> c.owner == alice.primaryParty) newCoins
       Some payment = find (\c -> c.owner == arbiter.primaryParty) newCoins
   newLocked === LockedCoin with
-    lock = TimeLock with
+    lock = API.TimeLock with
       holder = arbiter.primaryParty
       expiresAt = t0 `addRelTime` days 180
     coin = Coin with

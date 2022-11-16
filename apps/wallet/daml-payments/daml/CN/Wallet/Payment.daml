@@ -4,10 +4,9 @@ import DA.Action
 import DA.Time
 
 import CC.Assert
-import CC.Coin
-import CC.CoinRules hiding (USD, CC)
-
-import CC.Round
+import CC.API.V1.Coin
+import CC.API.V1.CoinRules
+import CC.API.V1.Round
 
 data DeliveryOfferView = DeliveryOfferView
   with
@@ -43,20 +42,21 @@ data ReceiverCCQuantity = ReceiverCCQuantity
    ccQuantity : Decimal
  deriving (Show, Eq)
 
-paymentQuantityToCC : Party -> (ContractId OpenMiningRound) -> PaymentQuantity -> Update Decimal
-paymentQuantityToCC submitter openMiningRound pq =
+paymentQuantityToCC : Party -> Party -> (ContractId OpenMiningRound) -> PaymentQuantity -> Update Decimal
+paymentQuantityToCC svc submitter openMiningRound pq =
   case pq.currency of
     USD -> 
       do
-        (_, round) <- exercise @OpenMiningRound openMiningRound (OpenMiningRound_Fetch submitter)
+        round <- exercise @OpenMiningRound openMiningRound (OpenMiningRound_Fetch submitter)
+        require "SVC matches" (round.svc == svc)
         pure (pq.quantity / round.coinPrice)
     CC -> 
       pure pq.quantity
 
-receiverQuantityToCCReceiverQuantity : Party -> (ContractId OpenMiningRound) -> ReceiverQuantity -> Update ReceiverCCQuantity
-receiverQuantityToCCReceiverQuantity submitter openMiningRound rq =
+receiverQuantityToCCReceiverQuantity : Party -> Party -> (ContractId OpenMiningRound) -> ReceiverQuantity -> Update ReceiverCCQuantity
+receiverQuantityToCCReceiverQuantity svc submitter openMiningRound rq =
   do
-    cc <- paymentQuantityToCC submitter openMiningRound rq.quantity
+    cc <- paymentQuantityToCC svc submitter openMiningRound rq.quantity
     pure ReceiverCCQuantity with
       receiver = rq.receiver
       ccQuantity = cc
@@ -89,7 +89,7 @@ template AppPaymentRequest
 
          -- Convert from USD to CC quantities
 
-         ccReceiverQuantities <- forA receiverQuantities (\rq -> receiverQuantityToCCReceiverQuantity sender context.context.openMiningRound rq)
+         ccReceiverQuantities <- forA receiverQuantities (\rq -> receiverQuantityToCCReceiverQuantity svc sender context.context.openMiningRound rq)
          require "AppPaymentRequest has not expired" (now < expiresAt)
 
          ccQuantities <- forA ccReceiverQuantities (\ccq -> pure ccq.ccQuantity)

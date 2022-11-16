@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.round.{ClosedMiningRound, Round}
+import com.daml.network.codegen.java.cc.api.v1.round.Round
+import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.da
 import com.daml.network.history._
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest

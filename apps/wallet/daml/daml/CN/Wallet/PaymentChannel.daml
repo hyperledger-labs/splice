@@ -3,9 +3,9 @@ module CN.Wallet.PaymentChannel where
 import qualified DA.Foldable as F
 import DA.Assert
 
+import qualified CC.API.V1.Coin as API
+import qualified CC.API.V1.CoinRules as API
 import CC.Assert
-import CC.Coin
-import CC.CoinRules
 
 import CN.Wallet.Payment
 
@@ -22,33 +22,33 @@ template PaymentChannel
   where
     signatory sender, receiver
 
-    nonconsuming choice PaymentChannel_ExecuteDirectTransfer : Either Text (TransferResult, ContractId Coin)
+    nonconsuming choice PaymentChannel_ExecuteDirectTransfer : Either Text (API.TransferResult, ContractId API.Coin)
       with
-        inputs : [TransferInput]
+        inputs : [API.TransferInput]
         transferQuantity : PaymentQuantity
         payload : Text
-        transferContext : PaymentTransferContext
+        transferContext : API.PaymentTransferContext
       controller sender
       do
         require "Direct transfers are allowed" allowDirectTransfers
-        quantity <- paymentQuantityToCC sender transferContext.context.openMiningRound transferQuantity
+        quantity <- paymentQuantityToCC svc sender transferContext.context.openMiningRound transferQuantity
         let
-          transfer = Transfer with
+          transfer = API.Transfer with
             sender
             provider = sender
             inputs = inputs
             outputs =
-              [ OutputReceiverCoin with
+              [ API.OutputReceiverCoin with
                   receiver
-                  coinType = FixedReceiverCoin
+                  coinType = API.FixedReceiverCoin
                     quantity
                     senderTransferFeeRatio
-              , OutputSenderCoin with
+              , API.OutputSenderCoin with
                   exactQuantity = None
                   lock = None
               ]
             payload
-        result <- exercisePaymentTransfer transferContext transfer
+        result <- API.exercisePaymentTransfer transferContext transfer
         return $ fmap extractSenderChange result
 
     nonconsuming choice PaymentChannel_CreatePaymentRequest : ContractId OnChannelPaymentRequest
@@ -124,30 +124,30 @@ template OnChannelPaymentRequest
     signatory sender, receiver
     ensure paymentQuantity.quantity > 0.0
 
-    choice OnChannelPaymentRequest_Accept : Either Text (TransferResult, ContractId Coin)
+    choice OnChannelPaymentRequest_Accept : Either Text (API.TransferResult, ContractId API.Coin)
       with
-        inputs : [TransferInput]
-        transferContext : PaymentTransferContext
+        inputs : [API.TransferInput]
+        transferContext : API.PaymentTransferContext
       controller sender
       do
-        quantity <- paymentQuantityToCC sender transferContext.context.openMiningRound paymentQuantity
+        quantity <- paymentQuantityToCC svc sender transferContext.context.openMiningRound paymentQuantity
         -- create the transfer
-        let transfer = Transfer with
+        let transfer = API.Transfer with
               sender
               provider = sender
               inputs = inputs
               outputs =
-                [ OutputReceiverCoin with
+                [ API.OutputReceiverCoin with
                     receiver
-                    coinType = FixedReceiverCoin
+                    coinType = API.FixedReceiverCoin
                       quantity
                       senderTransferFeeRatio
-                , OutputSenderCoin with
+                , API.OutputSenderCoin with
                     exactQuantity = None
                     lock = None
                 ]
               payload = "Accepted payment request"
-        result <- exercisePaymentTransfer transferContext transfer
+        result <- API.exercisePaymentTransfer transferContext transfer
         return $ fmap extractSenderChange result
 
     choice OnChannelPaymentRequest_Withdraw : ()
@@ -160,7 +160,7 @@ template OnChannelPaymentRequest
 
 
 -- Utility function to help get the sender change from a TransferResult
-extractSenderChange: TransferResult -> (TransferResult, ContractId Coin)
+extractSenderChange: API.TransferResult -> (API.TransferResult, ContractId API.Coin)
 extractSenderChange result =
-  let [TransferResultCoin lockedCoin, TransferResultCoin senderChange] = result.createdCoins
+  let [API.TransferResultCoin lockedCoin, API.TransferResultCoin senderChange] = result.createdCoins
   in (result, senderChange)

@@ -6,6 +6,7 @@ import com.daml.ledger.javaapi.data.codegen.{
   ContractCompanion,
   ContractId,
 }
+import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.{
   coin as coinCodegen,
   coinrules as coinRulesCodegen,
@@ -168,26 +169,28 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
     */
   def getPaymentTransferContext(retryProvider: CoinRetries)(implicit
       ec: ExecutionContext
-  ): Future[coinRulesCodegen.PaymentTransferContext] =
+  ): Future[v1.coinrules.PaymentTransferContext] =
     for {
       coinRules <- getCoinRules()
       openRound <- getLatestOpenMiningRound(retryProvider)
       issuingMiningRounds <- listContracts(roundCodegen.IssuingMiningRound.COMPANION)
       validatorRights <- listContracts(coinCodegen.ValidatorRight.COMPANION)
     } yield {
-      val transferContext = new coinRulesCodegen.TransferContext(
-        openRound.value.contractId,
+      val transferContext = new v1.coinrules.TransferContext(
+        openRound.value.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
         issuingMiningRounds.value
-          .map(r => (r.payload.round, r.contractId))
-          .toMap[roundCodegen.Round, roundCodegen.IssuingMiningRound.ContractId]
+          .map(r =>
+            (r.payload.round, r.contractId.toInterface(v1.round.IssuingMiningRound.INTERFACE))
+          )
+          .toMap[v1.round.Round, v1.round.IssuingMiningRound.ContractId]
           .asJava,
         validatorRights.value
-          .map(r => (r.payload.user, r.contractId))
-          .toMap[String, coinCodegen.ValidatorRight.ContractId]
+          .map(r => (r.payload.user, r.contractId.toInterface(v1.coin.ValidatorRight.INTERFACE)))
+          .toMap[String, v1.coin.ValidatorRight.ContractId]
           .asJava,
       )
-      new coinRulesCodegen.PaymentTransferContext(
-        coinRules.value.contractId,
+      new v1.coinrules.PaymentTransferContext(
+        coinRules.value.contractId.toInterface(v1.coinrules.CoinRules.INTERFACE),
         transferContext,
       )
     }

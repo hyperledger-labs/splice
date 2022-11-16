@@ -7,6 +7,7 @@ import com.daml.ledger.javaapi.data.codegen.{
   ContractId,
 }
 import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection}
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0.SvcServiceGrpc
@@ -58,7 +59,7 @@ class GrpcSvcAppService(
       for {
         coinRules <- store.getCoinRules()
         cmd = coinRules.value.contractId
-          .exerciseCoinRules_MiningRound_Open(price, new cc.round.Round(request.round))
+          .exerciseCoinRules_MiningRound_Open(price, new v1.round.Round(request.round))
         cid <- connection.submitWithResult(Seq(store.svcParty), Seq.empty, cmd)
       } yield v0.OpenRoundResponse(Proto.encodeContractId(cid.exerciseResult))
     }
@@ -160,7 +161,7 @@ class GrpcSvcAppService(
   private def getRound[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
       companion: ContractCompanion[TC, TCid, T]
   )(
-      getRound: T => cc.round.Round
+      getRound: T => v1.round.Round
   )(round: Long): Future[TCid] =
     for {
       allRounds <- connection.activeContracts(store.svcParty, companion)

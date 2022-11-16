@@ -4,11 +4,8 @@ import akka.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import cats.syntax.traverse.*
-import com.daml.network.codegen.java.cc.{
-  coin as coinCodegen,
-  coinrules as coinRulesCodegen,
-  round as roundCodegen,
-}
+import com.daml.network.codegen.java.cc.api.v1
+import com.daml.network.codegen.java.cc.{coin => coinCodegen}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.util.{JavaContract as Contract}
@@ -212,11 +209,15 @@ case class EndUserTreasuryService(
     * Also returns the set of readAs parties required for the selected inputs.
     */
   private def selectTransferInputs(
-      activeIssuingRounds: Set[roundCodegen.Round]
-  )(implicit tc: TraceContext): Future[(Seq[coinRulesCodegen.TransferInput], Set[PartyId])] = for {
+      activeIssuingRounds: Set[v1.round.Round]
+  )(implicit tc: TraceContext): Future[(Seq[v1.coinrules.TransferInput], Set[PartyId])] = for {
     coinInputs <- userStore
       .listContracts(coinCodegen.Coin.COMPANION)
-      .map(cs => cs.value.map(c => new coinRulesCodegen.transferinput.InputCoin(c.contractId)))
+      .map(cs =>
+        cs.value.map(c =>
+          new v1.coinrules.transferinput.InputCoin(c.contractId.toInterface(v1.coin.Coin.INTERFACE))
+        )
+      )
     validatorRewardsRaw <- walletStore
       .listValidatorRewardsCollectableBy(userStore)
     validatorRewards = validatorRewardsRaw
@@ -225,13 +226,21 @@ case class EndUserTreasuryService(
       .map(c => PartyId.tryFromProtoPrimitive(c.payload.user))
       .toSet
     validatorRewardInputs = validatorRewards
-      .map(rw => new coinRulesCodegen.transferinput.InputValidatorReward(rw.contractId))
+      .map(rw =>
+        new v1.coinrules.transferinput.InputValidatorReward(
+          rw.contractId.toInterface(v1.coin.ValidatorReward.INTERFACE)
+        )
+      )
     appRewardInputs <- userStore
       .listContracts(coinCodegen.AppReward.COMPANION)
       .map(rws =>
         rws.value
           .filter(rw => activeIssuingRounds.contains(rw.payload.round))
-          .map(rw => new coinRulesCodegen.transferinput.InputAppReward(rw.contractId))
+          .map(rw =>
+            new v1.coinrules.transferinput.InputAppReward(
+              rw.contractId.toInterface(v1.coin.AppReward.INTERFACE)
+            )
+          )
       )
   } yield (coinInputs ++ validatorRewardInputs ++ appRewardInputs, validatorRewardUsers)
 

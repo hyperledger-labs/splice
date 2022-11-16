@@ -1,0 +1,25 @@
+module CC.API.V1.Round where
+
+newtype Round = Round with number : Int
+  deriving (Eq, Ord, Show)
+
+data OpenMiningRoundView = OpenMiningRoundView with
+  svc : Party
+  coinPrice : Decimal
+
+interface OpenMiningRound where
+  viewtype OpenMiningRoundView
+
+  -- This allows fetchByKey-style fetches if you have readAs
+  -- but not actAs claims.
+  nonconsuming choice OpenMiningRound_Fetch : OpenMiningRoundView
+    with
+      p : Party
+    controller p
+    do pure (view this)
+
+data IssuingMiningRoundView = IssuingMiningRoundView with
+  svc : Party
+
+interface IssuingMiningRound where
+  viewtype IssuingMiningRoundView

@@ -1,10 +1,7 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.{
-  coin as coinCodegen,
-  coinrules as coinRulesCodegen,
-  round as roundCodegen,
-}
+import com.daml.network.codegen.java.cc.api.v1
+import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.wallet.{
@@ -1004,7 +1001,7 @@ class WalletIntegrationTest
       validatorParty: PartyId,
       coins: Seq[GrpcWalletAppClient.CoinPosition],
       quantity: Int,
-      transferContext: coinRulesCodegen.AppTransferContext,
+      transferContext: v1.coinrules.AppTransferContext,
   ): Unit = {
     val coinOpt = coins.find(_.effectiveQuantity >= quantity)
     val expirationOpt = Proto.decode(Proto.Timestamp)(20000000000000000L) // Wed May 18 2033
@@ -1016,33 +1013,35 @@ class WalletIntegrationTest
           optTimeout = None,
           commands = transferContext.coinRules
             .exerciseCoinRules_Transfer(
-              new coinRulesCodegen.Transfer(
+              new v1.coinrules.Transfer(
                 userParty.toProtoPrimitive,
                 userParty.toProtoPrimitive,
-                Seq[coinRulesCodegen.TransferInput](
-                  new coinRulesCodegen.transferinput.InputCoin(coin.contract.contractId)
+                Seq[v1.coinrules.TransferInput](
+                  new v1.coinrules.transferinput.InputCoin(
+                    coin.contract.contractId.toInterface(v1.coin.Coin.INTERFACE)
+                  )
                 ).asJava,
-                Seq[coinRulesCodegen.TransferOutput](
-                  new coinRulesCodegen.transferoutput.OutputSenderCoin(
+                Seq[v1.coinrules.TransferOutput](
+                  new v1.coinrules.transferoutput.OutputSenderCoin(
                     Some(BigDecimal(quantity).bigDecimal).toJava,
                     Some(
-                      new coinCodegen.TimeLock(
+                      new v1.coin.TimeLock(
                         userParty.toProtoPrimitive,
                         expiration,
                       )
                     ).toJava,
                   ),
-                  new coinRulesCodegen.transferoutput.OutputSenderCoin(
+                  new v1.coinrules.transferoutput.OutputSenderCoin(
                     None.toJava,
                     None.toJava,
                   ),
                 ).asJava,
                 "lock coins",
               ),
-              new coinRulesCodegen.TransferContext(
+              new v1.coinrules.TransferContext(
                 transferContext.openMiningRound,
-                Map.empty[roundCodegen.Round, roundCodegen.IssuingMiningRound.ContractId].asJava,
-                Map.empty[String, coinCodegen.ValidatorRight.ContractId].asJava,
+                Map.empty[v1.round.Round, v1.round.IssuingMiningRound.ContractId].asJava,
+                Map.empty[String, v1.coin.ValidatorRight.ContractId].asJava,
               ),
             )
             .commands

@@ -1,7 +1,8 @@
 package com.daml.network.console
 
 import com.daml.ledger.javaapi.data.TransactionTree
-import com.daml.network.codegen.java.cc.{coinrules => coinRulesCodegen, round => roundCodegen}
+import com.daml.network.codegen.java.cc.api.v1
+import com.daml.network.codegen.java.cc.{round => roundCodegen}
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.history.{CoinTransaction, CoinTransactionTreeView}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
@@ -44,16 +45,16 @@ abstract class ScanAppReference(
   @Help.Summary(
     "Returns the transfer context required for third-party apps."
   )
-  def getAppTransferContext(): coinRulesCodegen.AppTransferContext = {
+  def getAppTransferContext(): v1.coinrules.AppTransferContext = {
     def notFound(description: String) = new IllegalStateException(description)
     val openMiningRound = getTransferContext().latestOpenMiningRound.getOrElse(
       throw notFound("No active OpenMiningRound contract")
     )
     val coinRules =
       getTransferContext().coinRules.getOrElse(throw notFound("No active CoinRules contract"))
-    new coinRulesCodegen.AppTransferContext(
-      coinRules.contractId,
-      openMiningRound.contractId,
+    new v1.coinrules.AppTransferContext(
+      coinRules.contractId.toInterface(v1.coinrules.CoinRules.INTERFACE),
+      openMiningRound.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
     )
   }
 

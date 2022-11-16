@@ -1,0 +1,9 @@
+module CC.Util where
+
+-- | Downcast interface to specific template, aborts if
+-- the contract is active but points to a different template.
+downcastInterface : forall t i. (HasFromInterface t i, HasFetch i) => Text -> ContractId i -> Update (ContractId t, t)
+downcastInterface t cid =
+  fetchFromInterface @t cid >>= \case
+    Some r -> pure r
+    None -> abort $ "Failed to downcast of " <> show cid <> " to " <> show t

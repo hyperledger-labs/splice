@@ -4,8 +4,8 @@ import DA.Assert
 import DA.List
 import Daml.Script
 import CC.Coin
-import CC.CoinRules
 import CC.Scripts.Util
+import qualified CC.API.V1.CoinRules as API
 
 testFloatingOutputs: Script ()
 testFloatingOutputs = do
@@ -16,14 +16,14 @@ testFloatingOutputs = do
     charlie <- setupUser app "charlie" validator
     coin <- tap app alice 100.0
     context <- getPaymentTransferContext app alice
-    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.svc] $ exerciseCmd context.coinRules CoinRules_Transfer with
-      transfer = Transfer with
+    submitMulti [alice.primaryParty, bob.primaryParty, charlie.primaryParty] [app.svc] $ exerciseCmd context.coinRules API.CoinRules_Transfer with
+      transfer = API.Transfer with
         sender = alice.primaryParty
         provider = alice.primaryParty
-        inputs = [InputCoin coin]
+        inputs = [API.InputCoin $ toInterfaceContractId coin]
         outputs = 
-          [ OutputReceiverCoin bob.primaryParty FloatingReceiverCoin
-          , OutputReceiverCoin charlie.primaryParty FloatingReceiverCoin
+          [ API.OutputReceiverCoin bob.primaryParty API.FloatingReceiverCoin
+          , API.OutputReceiverCoin charlie.primaryParty API.FloatingReceiverCoin
           ]
         payload = "test"
       context = context.context

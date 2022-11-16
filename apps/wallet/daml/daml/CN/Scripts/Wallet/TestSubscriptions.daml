@@ -4,8 +4,8 @@ import DA.Assert
 import DA.Time
 import Daml.Script
 
-import CC.Coin
-import CC.CoinRules
+import qualified CC.API.V1.Coin as API
+import qualified CC.API.V1.CoinRules as API
 import CN.Wallet.Subscriptions
 
 import CC.Scripts.Util
@@ -50,7 +50,7 @@ testSubscription = script do
   let subscriptionData = Subscription alice.primaryParty pizzeria.primaryParty provider.primaryParty app.svc (toInterfaceContractId context)
   subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
 
-  (initialPaymentCid, change) <- acceptSubscriptionRequestAndMakePayment app alice subscriptionRequestCid coin
+  (initialPaymentCid, change) <- acceptSubscriptionRequestAndMakePayment app alice subscriptionRequestCid (toInterfaceContractId coin)
   None <- queryContractId alice.primaryParty subscriptionRequestCid
 
   -- expire...
@@ -76,7 +76,7 @@ testSubscription = script do
     nextPaymentDueAt = t `addRelTime` (days 28)
 
   -- fails because: too soon
-  failMakeSubscriptionPayment app alice subscriptionStateCid coin
+  failMakeSubscriptionPayment app alice subscriptionStateCid (toInterfaceContractId coin)
 
   -- we can pay for the nex period starting from 1 day before the last period ends, as per the config above
   passTime (days 27)
@@ -105,33 +105,33 @@ testSubscription = script do
   pure ()
 
 
-acceptSubscriptionRequestAndMakePayment : CCApp -> CCUser -> ContractId SubscriptionRequest -> ContractId Coin -> Script (ContractId SubscriptionInitialPayment, ContractId Coin)
+acceptSubscriptionRequestAndMakePayment : CCApp -> CCUser -> ContractId SubscriptionRequest -> ContractId API.Coin -> Script (ContractId SubscriptionInitialPayment, ContractId API.Coin)
 acceptSubscriptionRequestAndMakePayment app sender request coin = do
   context <- getPaymentTransferContext app sender
   submitUser sender.userId $ exerciseCmd request SubscriptionRequest_AcceptAndMakePayment with
-    inputs = [InputCoin coin]
+    inputs = [API.InputCoin coin]
     context
 
 
-makeSubscriptionPayment : CCApp -> CCUser -> ContractId SubscriptionIdleState -> ContractId Coin -> Script (ContractId SubscriptionPayment, ContractId Coin)
+makeSubscriptionPayment : CCApp -> CCUser -> ContractId SubscriptionIdleState -> ContractId API.Coin -> Script (ContractId SubscriptionPayment, ContractId API.Coin)
 makeSubscriptionPayment app sender state coin = do
   context <- getPaymentTransferContext app sender
   (payment, change) <- submitUser sender.userId $ exerciseCmd state SubscriptionIdleState_MakePayment with
-    inputs = [InputCoin coin]
+    inputs = [API.InputCoin coin]
     context
   return (payment, change)
 
 
-failMakeSubscriptionPayment : CCApp -> CCUser -> ContractId SubscriptionIdleState -> ContractId Coin -> Script ()
+failMakeSubscriptionPayment : CCApp -> CCUser -> ContractId SubscriptionIdleState -> ContractId API.Coin -> Script ()
 failMakeSubscriptionPayment app sender state coin = do
   readAs <- getUserReadAs sender.userId
   context <- getPaymentTransferContext app sender
   submitMultiMustFail [sender.primaryParty] readAs $ exerciseCmd state SubscriptionIdleState_MakePayment with
-    inputs = [InputCoin coin]
+    inputs = [API.InputCoin coin]
     context
 
 
-collectInitialSubscriptionPayment : CCApp -> Party -> CCUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId Coin)
+collectInitialSubscriptionPayment : CCApp -> Party -> CCUser -> Party -> ContractId SubscriptionInitialPayment -> Script (ContractId Subscription, ContractId SubscriptionIdleState, ContractId API.Coin)
 collectInitialSubscriptionPayment app provider receiver sender payment = do
   readAs <- getUserReadAs receiver.userId
   transferContext <- getAppTransferContext app
@@ -140,7 +140,7 @@ collectInitialSubscriptionPayment app provider receiver sender payment = do
   return (subscription, state, coin)
 
 
-collectSubscriptionPayment : CCApp -> Party -> CCUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId Coin)
+collectSubscriptionPayment : CCApp -> Party -> CCUser -> Party -> ContractId SubscriptionPayment -> Script (ContractId SubscriptionIdleState, ContractId API.Coin)
 collectSubscriptionPayment app provider receiver sender payment = do
   readAs <- getUserReadAs receiver.userId
   transferContext <- getAppTransferContext app

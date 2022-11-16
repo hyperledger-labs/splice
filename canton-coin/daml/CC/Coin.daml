@@ -5,16 +5,8 @@ import CC.Assert
 import CC.Round
 import CC.Fees
 
-
--- Lockable, expiring coins
----------------------------
-
--- | A lock held by a particular party until its expiry.
-data TimeLock = TimeLock with
-    holder: Party
-    -- TODO(M99-90): consider adding support for groups of lock holders.
-    expiresAt: Time
-  deriving (Eq, Ord, Show)
+import qualified CC.API.V1.Coin as API
+import qualified CC.API.V1.Round as API
 
 -- | A Canton Coin, which can be locked and whose quantity expires over time.
 --
@@ -29,6 +21,9 @@ template Coin
     signatory svc, owner
     ensure validExpiringQuantity quantity
 
+    interface instance API.Coin for Coin where
+      view = API.CoinView with ..
+
     choice Coin_ExpireAsStakeholder : ()
       with
         actor : Party
@@ -42,23 +37,23 @@ template Coin
 template LockedCoin
   with
     coin : Coin
-    lock : TimeLock
+    lock : API.TimeLock
   where
     signatory lock.holder, signatory coin
 
-    choice LockedCoin_Unlock : ContractId Coin
-      controller lock.holder
-      do create coin
+    interface instance API.LockedCoin for LockedCoin where
+      view = API.LockedCoinView with
+        lock
+        -- Need to qualify view here, see https://github.com/digital-asset/daml/issues/15459
+        coin = DA.Internal.Desugar.view (toInterface @API.Coin coin)
+      lockedCoin_OwnerExpireLock = toInterfaceContractId <$> tryExpireLock
+      lockedCoin_Unlock = toInterfaceContractId <$> create coin
 
     let tryExpireLock : Update (ContractId Coin)
         tryExpireLock = do
             t <- getTime
             require "Lock not expired" (lock.expiresAt <= t)
             create coin
-
-    choice LockedCoin_OwnerExpireLock : ContractId Coin
-      controller coin.owner
-      do tryExpireLock
 
     -- NOTE: we intentionally don't combine this choice with Coin_OwnerExpireLock to
     -- provide a more expressive transaction graph.
@@ -88,6 +83,9 @@ template ValidatorRight with
   where
     signatory user, validator
 
+    interface instance API.ValidatorRight for ValidatorRight where
+      view = API.ValidatorRightView with ..
+
     choice ValidatorRight_ArchiveAsValidator : ()
       controller validator
       do pure ()
@@ -106,10 +104,13 @@ template AppReward
     svc : Party
     provider : Party -- ^ Application provider
     quantity : Decimal
-    round : Round
+    round : API.Round
   where
     signatory svc, provider
     ensure quantity > 0.0
+
+    interface instance API.AppReward for AppReward where
+      view = API.AppRewardView with ..
 
     choice AppReward_SvcExpire : ()
       with
@@ -149,10 +150,13 @@ template ValidatorReward
     svc : Party
     user : Party
     quantity : Decimal
-    round : Round
+    round : API.Round
   where
     signatory svc, user
     ensure quantity > 0.0
+
+    interface instance API.ValidatorReward for ValidatorReward where
+      view = API.ValidatorRewardView with ..
 
     choice ValidatorReward_SvcExpire : ()
       with
@@ -199,7 +203,7 @@ template ValidatorReward
 -- | The reward for the SVC members for running a mining round.
 template SvcReward with
     svc : Party
-    round : Round
+    round : API.Round
     quantity : Decimal
   where
     signatory svc

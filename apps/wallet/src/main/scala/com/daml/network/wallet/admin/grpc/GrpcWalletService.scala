@@ -9,8 +9,9 @@ import com.daml.ledger.javaapi.data.codegen.{
   Update,
 }
 import com.daml.network.auth.AuthInterceptor
+import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
-import com.daml.network.codegen.java.cc.{coin as coinCodegen, coinrules as coinRulesCodegen}
+import com.daml.network.codegen.java.cc.{coin => coinCodegen}
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_AcceptedAppPayment
 import com.daml.network.codegen.java.cn.wallet.install.{
   CoinOperationOutcome,
@@ -655,16 +656,26 @@ class GrpcWalletService(
           validatorRewards <- store.listValidatorRewardsCollectableBy(userStore)
           validatorRewardInputs = validatorRewards
             .filter(c => c.payload.round.number == request.round)
-            .map(c => new coinRulesCodegen.transferinput.InputValidatorReward(c.contractId))
+            .map(c =>
+              new v1.coinrules.transferinput.InputValidatorReward(
+                c.contractId.toInterface(v1.coin.ValidatorReward.INTERFACE)
+              )
+            )
           QueryResult(_, appRewards) <- userStore.listContracts(coinCodegen.AppReward.COMPANION)
           appRewardInputs = appRewards
             .filter(c => c.payload.round.number == request.round)
-            .map(c => new coinRulesCodegen.transferinput.InputAppReward(c.contractId))
+            .map(c =>
+              new v1.coinrules.transferinput.InputAppReward(
+                c.contractId.toInterface(v1.coin.AppReward.INTERFACE)
+              )
+            )
           coinCid <- selectCoin(userStore, 0)
-          inputCoin = new coinRulesCodegen.transferinput.InputCoin(coinCid)
+          inputCoin = new v1.coinrules.transferinput.InputCoin(
+            coinCid.toInterface(v1.coin.Coin.INTERFACE)
+          )
           inputs = (inputCoin +: validatorRewardInputs :++ appRewardInputs)
           outputs = Seq(
-            new coinRulesCodegen.transferoutput.OutputSenderCoin(None.toJava, None.toJava)
+            new v1.coinrules.transferoutput.OutputSenderCoin(None.toJava, None.toJava)
           )
           coins <- redistribute(userStore, validatorStore, inputs, outputs)
         } yield {
@@ -791,13 +802,13 @@ class GrpcWalletService(
   private def redistribute(
       userStore: EndUserWalletStore,
       validatorStore: EndUserWalletStore,
-      inputs: Seq[coinRulesCodegen.TransferInput],
-      outputs: Seq[coinRulesCodegen.TransferOutput],
-  )(implicit tc: TraceContext): Future[Seq[coinCodegen.Coin.ContractId]] = {
+      inputs: Seq[v1.coinrules.TransferInput],
+      outputs: Seq[v1.coinrules.TransferOutput],
+  )(implicit tc: TraceContext): Future[Seq[v1.coin.Coin.ContractId]] = {
     val user = userStore.key.endUserName
     val party = userStore.key.endUserParty
     exerciseWalletAction((installCid, _) => {
-      val transfer = new coinRulesCodegen.Transfer(
+      val transfer = new v1.coinrules.Transfer(
         party.toProtoPrimitive,
         party.toProtoPrimitive,
         inputs.asJava,
@@ -814,7 +825,7 @@ class GrpcWalletService(
     })(
       user,
       _.exerciseResult.createdCoins.asScala
-        .collect { case coin: coinRulesCodegen.createdcoin.TransferResultCoin =>
+        .collect { case coin: v1.coinrules.createdcoin.TransferResultCoin =>
           coin.contractIdValue
         }
         .toSeq,
