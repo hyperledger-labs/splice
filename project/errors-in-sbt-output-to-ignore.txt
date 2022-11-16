@@ -64,5 +64,7 @@ com\.daml\.platform\.apiserver\.error\.ErrorListener
 # npm vulnerabilities. Temporarily, we completely ignore those.
 # In i1489, once we introduce blackduck, also consider replacing this with ``--no-audit` for `npm install`:
 .*\[.*info.*\].*vulnerabilities.*
+# NPM deprecations in our dependencies
+.*npm WARN deprecated.*
 
 # Make sure to have a trailing newline
