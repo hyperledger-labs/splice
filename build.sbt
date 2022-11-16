@@ -36,15 +36,10 @@ inThisBuild(
  */
 lazy val root = (project in file("."))
   .aggregate(
-    `canton-coin-api-daml`,
-    `canton-coin-daml`,
-    `wallet-payments-daml`,
-    `wallet-daml`,
-    `directory-daml`,
-// Not listing splitwise-daml here. If we do list it
+// Not listing *-daml projects here. If we do list it we sometimes
+// seem to get broken dependencies, e.g.,
 // apps-common-frontend/damlTsCodegen ignores the dependency on
 // splitwise-daml and runs the codegen before the DAR has been built.
-//    `splitwise-daml`,
     `apps-common`,
     `apps-validator`,
     `apps-scan`,
