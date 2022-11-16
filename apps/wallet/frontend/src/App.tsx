@@ -74,7 +74,9 @@ const Content = () => {
         <Route index element={<Coins />} />
         <Route path="coins" element={<Coins />} />
         <Route path="app-payment-channels" element={<PaymentChannels />} />
-        <Route path="subscriptions" element={<Subscriptions />} />
+        <Route path="subscriptions" element={<Subscriptions />}>
+          <Route path=":cid/" element={<Subscriptions />} />
+        </Route>
         <Route path="app-payment-requests" element={<AppPaymentRequests />}>
           <Route path=":cid/" element={<AppPaymentRequests />} />
         </Route>

@@ -1,6 +1,6 @@
 import { Contract, sameContracts, useInterval } from 'common-frontend';
 import { DirectoryEntry as DirectoryEntryComponent } from 'common-frontend';
-import TransferButton from 'common-frontend/lib/components/TransferButton';
+import { TransferButton } from 'common-frontend/lib/components/WalletButtons';
 import {
   GroupKey,
   ListAcceptedGroupInvitesRequest,

@@ -110,12 +110,12 @@ do
     sleep 1
 done
 
-# start_frontend <app> <ui-http-port> <app-wallet-ui-port> <app-grpc-port> <ledgerapi-grpc-port> <validator-app-grpc-port> <user-display-name>
+# start_frontend <app> <ui-http-port> <app-grpc-port> <app-wallet-ui-port> <ledgerapi-grpc-port> <validator-app-grpc-port> <user-display-name>
 start_frontend wallet    3000 6204 NA   NA   6203 alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
 start_frontend wallet    3001 6304 NA   NA   6303 bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
 start_frontend splitwise 3002 6113 3000 6201 NA   alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
 start_frontend splitwise 3003 6113 3001 6301 NA   bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
-start_frontend directory 3004 6110 NA   6201 NA   alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
+start_frontend directory 3004 6110 3000 6201 NA   alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
 start_frontend splitwise 3005 6113 NA   6201 NA   charlie "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
 
 if [ $daemon -eq 0 ]; then

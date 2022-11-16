@@ -19,6 +19,9 @@ export type Config = {
   ledgerApi: {
     grpcUrl: string;
   };
+  wallet: {
+    uiUrl: string;
+  };
 };
 
 export const config: Config = {
@@ -28,5 +31,8 @@ export const config: Config = {
   },
   ledgerApi: {
     grpcUrl: process.env.REACT_APP_LEDGER_API_GRPC_URL || externalConfig.ledgerApi.grpcUrl,
+  },
+  wallet: {
+    uiUrl: process.env.REACT_APP_WALLET_UI_URL || externalConfig.wallet.uiUrl,
   },
 };

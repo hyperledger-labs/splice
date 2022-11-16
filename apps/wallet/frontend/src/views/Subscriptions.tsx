@@ -1,5 +1,6 @@
 import { DirectoryEntry, sameContracts, useInterval, Contract } from 'common-frontend';
 import React, { useCallback, useState } from 'react';
+import { useParams, useSearchParams } from 'react-router-dom';
 
 import {
   Button,
@@ -25,16 +26,24 @@ import {
   SubscriptionState,
 } from '../contexts/WalletServiceContext';
 
-const Subscriptions: React.FC = () => (
-  <Stack spacing={2}>
-    <Typography variant="h6">Active Subscription Requests</Typography>
-    <SubscriptionRequestsTable />
-    <Typography variant="h6">Active Subscriptions</Typography>
-    <SubscriptionsTable />
-  </Stack>
-);
+const Subscriptions: React.FC = () => {
+  const { cid } = useParams();
 
-const SubscriptionRequestsTable: React.FC = () => {
+  return (
+    <Stack spacing={2}>
+      <Typography variant="h6">Active Subscription Requests</Typography>
+      <SubscriptionRequestsTable cid={cid} />
+      <Typography variant="h6">Active Subscriptions</Typography>
+      <SubscriptionsTable />
+    </Stack>
+  );
+};
+
+interface SubscriptionsProps {
+  cid: string | undefined;
+}
+const SubscriptionRequestsTable: React.FC<SubscriptionsProps> = ({ cid }) => {
+  const [searchParams] = useSearchParams();
   const { listSubscriptionRequests, acceptSubscriptionRequest } = useWalletClient();
   const [SubscriptionRequests, setSubscriptionRequests] = useState<Contract<SubscriptionRequest>[]>(
     []
@@ -42,12 +51,22 @@ const SubscriptionRequestsTable: React.FC = () => {
 
   const fetchSubscriptionRequests = useCallback(async () => {
     const { subscriptionRequestsList } = await listSubscriptionRequests();
-    setSubscriptionRequests(prev =>
-      sameContracts(subscriptionRequestsList, prev) ? prev : subscriptionRequestsList
-    );
-  }, [listSubscriptionRequests, setSubscriptionRequests]);
+    const filteredReqs = () => {
+      if (!cid) return subscriptionRequestsList;
+      else return subscriptionRequestsList.filter(c => c.contractId === cid);
+    };
+    setSubscriptionRequests(prev => (sameContracts(filteredReqs(), prev) ? prev : filteredReqs()));
+  }, [listSubscriptionRequests, setSubscriptionRequests, cid]);
 
   useInterval(fetchSubscriptionRequests, 500);
+
+  const onAccept = async (cid: string) => {
+    await acceptSubscriptionRequest(cid);
+    const target = searchParams.get('redirect');
+    if (target) {
+      window.location.assign(target);
+    }
+  };
 
   const SubscriptionRequest: React.FC<{ request: Contract<SubscriptionRequest> }> = ({
     request,
@@ -65,7 +84,7 @@ const SubscriptionRequestsTable: React.FC = () => {
         <Button
           type="submit"
           className="sub-request-accept-button"
-          onClick={() => acceptSubscriptionRequest(request.contractId)}
+          onClick={() => onAccept(request.contractId)}
         >
           Accept and Pay
         </Button>

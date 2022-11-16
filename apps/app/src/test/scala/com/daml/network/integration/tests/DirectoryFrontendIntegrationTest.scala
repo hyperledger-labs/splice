@@ -35,12 +35,17 @@ class DirectoryFrontendIntegrationTest extends FrontendIntegrationTest("alice") 
         }
         textField("entry-name-field").value = entryName
         click on "request-entry-button"
-        eventually(scaled(5 seconds)) {
-          aliceRemoteWallet.listAppPaymentRequests() should have size 1
-        }
-        inside(aliceRemoteWallet.listAppPaymentRequests()) { case Seq(paymentRequest) =>
-          aliceRemoteWallet.acceptAppPaymentRequest(paymentRequest.contractId)
-        }
+
+        // Alice is redirected to wallet...
+        click on "user-id-field"
+        textField("user-id-field").value = aliceDamlUser
+        click on "login-button"
+        click on className("accept-button")
+        // And then back to directory
+        click on "user-id-field"
+        textField("user-id-field").value = aliceDamlUser
+        click on "login-button"
+
         eventually(scaled(10 seconds)) {
           findAll(className("entries-table-row")) should have size 1
         }
@@ -71,12 +76,17 @@ class DirectoryFrontendIntegrationTest extends FrontendIntegrationTest("alice") 
         }
         textField("entry-name-field").value = entryName
         click on "request-entry-with-sub-button"
-        eventually(scaled(5 seconds)) {
-          aliceRemoteWallet.listSubscriptionRequests() should have size 1
-        }
-        inside(aliceRemoteWallet.listSubscriptionRequests()) { case Seq(subscriptionRequest) =>
-          aliceRemoteWallet.acceptSubscriptionRequest(subscriptionRequest.contractId)
-        }
+
+        // Alice is redirected to wallet...
+        click on "user-id-field"
+        textField("user-id-field").value = aliceDamlUser
+        click on "login-button"
+        click on className("sub-request-accept-button")
+        // And then back to directory
+        click on "user-id-field"
+        textField("user-id-field").value = aliceDamlUser
+        click on "login-button"
+
         eventually(scaled(10 seconds)) {
           findAll(className("entries-table-row")) should have size 1
         }
