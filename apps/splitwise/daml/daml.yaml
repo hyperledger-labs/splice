@@ -9,6 +9,7 @@ dependencies:
 data-dependencies:
   - ../../../canton-coin/.daml/dist/canton-coin-0.1.0.dar
   - ../../../canton-coin-api/.daml/dist/canton-coin-api-0.1.0.dar
+  - ../../../cn-util/.daml/dist/cn-util-0.1.0.dar
   - ../../wallet/daml-payments/.daml/dist/wallet-payments-0.1.0.dar
   - ../../wallet/daml/.daml/dist/wallet-0.1.0.dar
 build-options:

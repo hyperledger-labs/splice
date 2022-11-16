@@ -1,4 +1,4 @@
-module CC.Assert where
+module CN.Util.Assert where
 
 -- TODO(#1280) Move to utility DAR
 -- | Check whether a required condition is true. If it's not, abort the

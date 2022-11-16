@@ -3,7 +3,7 @@ module CN.Wallet.Subscriptions where
 import DA.Time
 import DA.Optional
 
-import CC.Assert
+import CN.Util.Assert
 import CC.API.V1.Coin
 import CC.API.V1.CoinRules
 

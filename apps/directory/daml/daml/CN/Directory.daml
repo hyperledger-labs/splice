@@ -3,7 +3,7 @@ module CN.Directory where
 import DA.Assert
 import DA.Time
 
-import CC.Assert
+import CN.Util.Assert
 import CC.API.V1.Coin
 import CC.API.V1.CoinRules hiding (USD, CC)
 import CN.Wallet.Payment

@@ -1,7 +1,7 @@
 -- | The contracts representing the long-term state of CC.
 module CC.Coin where
 
-import CC.Assert
+import CN.Util.Assert
 import CC.Round
 import CC.Fees
 

@@ -63,6 +63,24 @@ lazy val root = (project in file("."))
     resolvers += Resolver.sonatypeRepo("snapshots"),
   )
 
+// Shared non-template/non-interface code
+// used across our DARs.
+lazy val `cn-util-daml` =
+  project
+    .in(file("cn-util"))
+    .dependsOn(
+    )
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.sharedAppSettings,
+      libraryDependencies ++= Seq(daml_bindings_scala),
+      Compile / damlSourceDirectory := file("cn-util"),
+      cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
+      Test / damlSourceDirectory := file("cn-util"),
+      Compile / damlDarOutput := file("cn-util") / ".daml" / "dist",
+      BuildCommon.damlCodegenSettings,
+    )
+
 lazy val `canton-coin-api-daml` =
   project
     .in(file("canton-coin-api"))
@@ -100,7 +118,8 @@ lazy val `apps-common` =
        * We output the dar to the usual `.daml/dist` dir because that's where a naive user expects it.
        */
       Compile / damlSourceDirectory := file("canton-coin"),
-      Compile / damlDependencies := (`canton-coin-api-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies := (`canton-coin-api-daml` / Compile / damlBuild).value ++
+        (`cn-util-daml` / Compile / damlBuild).value,
       cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
       Test / damlSourceDirectory := file("canton-coin"),
       Compile / damlDarOutput := file("canton-coin") / ".daml" / "dist",
@@ -308,7 +327,9 @@ lazy val `apps-wallet-payments-daml` =
     .settings(
       BuildCommon.sharedAppSettings,
       libraryDependencies ++= Seq(daml_bindings_scala),
-      Compile / damlDependencies := (`canton-coin-api-daml` / Compile / damlBuild).value,
+      Compile / damlDependencies :=
+        (`cn-util-daml` / Compile / damlBuild).value ++
+          (`canton-coin-api-daml` / Compile / damlBuild).value,
       Compile / damlSourceDirectory := file("apps/wallet/daml-payments"),
       cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
       Test / damlSourceDirectory := file("apps/wallet/daml-payments"),

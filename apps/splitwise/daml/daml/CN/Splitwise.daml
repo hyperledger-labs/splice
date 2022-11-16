@@ -7,7 +7,7 @@ import DA.Foldable (forA_)
 import DA.Time
 import DA.Set qualified as Set
 import CC.API.V1.CoinRules (AppTransferContext)
-import CC.Assert
+import CN.Util.Assert
 import CN.Wallet.Payment
 
 -- Stable identifier for a group. We avoid contract keys

@@ -3,7 +3,7 @@ module CN.Wallet.Payment where
 import DA.Action
 import DA.Time
 
-import CC.Assert
+import CN.Util.Assert
 import CC.API.V1.Coin
 import CC.API.V1.CoinRules
 import CC.API.V1.Round

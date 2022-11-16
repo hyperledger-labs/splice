@@ -1,6 +1,6 @@
 module CC.Round where
 
-import CC.Assert
+import CN.Util.Assert
 import qualified CC.API.V1.Round as API
 import CC.API.V1.Round (Round(..))
 
