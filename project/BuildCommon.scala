@@ -87,20 +87,20 @@ object BuildCommon {
         scalacOptions ++= Seq("-Wconf:src=src_managed/.*:silent", "-Wunused:patvars"),
       )
 
-  lazy val damlCodegenSettings: Seq[Def.Setting[_]] =
-    Seq(
-      Compile / damlCodeGeneration := {
-        val Seq(darFile) = (Compile / damlBuild).value
-        Seq(
-          (
-            darFile,
-            "com.daml.network.codegen",
+  lazy val damlSettings: Seq[Def.Setting[_]] =
+    BuildCommon.sharedAppSettings ++
+      BuildCommon.copyDarResources ++
+      Seq(
+        Compile / damlCodeGeneration := {
+          val Seq(darFile) = (Compile / damlBuild).value
+          Seq(
+            (
+              darFile,
+              "com.daml.network.codegen",
+            )
           )
-        )
-      },
-      Compile / damlEnableJavaCodegen := true,
-      Compile / damlEnableScalaCodegen := false,
-    )
+        }
+      )
 
   lazy val copyDarResources: Seq[Def.Setting[_]] = {
     Seq(
@@ -168,7 +168,7 @@ object BuildCommon {
         // so we explicitly remove all CN DARs here, just in case
         addCommandAlias(
           "clean-cn",
-          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwise/clean; apps-svc/clean; apps-wallet/clean; apps-directory/clean; apps-app/clean; apps-wallet-daml/clean; apps-wallet-payments-daml/clean; apps-frontends/clean; cleanCnDars",
+          "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwise/clean; apps-svc/clean; apps-wallet/clean; apps-directory/clean; apps-app/clean; canton-coin-daml/clean; canton-coin-api-daml/clean; wallet-daml/clean; wallet-payments-daml/clean; directory-daml/clean; splitwise-daml/clean; apps-frontends/clean; cleanCnDars",
         )
     val buildSettings = inThisBuild(
       Seq(
@@ -349,6 +349,8 @@ object BuildCommon {
         // clearing the damlBuild tasks to prevent compiling which does not work due to relative file "data-dependencies";
         // "data-dependencies" daml.yaml setting relies on hardcoded "0.0.1" project version
         Compile / damlBuild := Seq(), // message-0.0.1.dar is hardcoded and contact-0.0.1.dar is built by MessagingExampleIntegrationTest
+        Test / damlBuild := Seq(),
+        Test / damlTest := Seq(),
         Compile / damlProjectVersionOverride := Some("0.0.1"),
         Compile / damlEnableScalaCodegen := true,
         Compile / damlEnableJavaCodegen := false,
@@ -481,6 +483,7 @@ object BuildCommon {
             )
           )
         },
+        Test / damlTest := Seq(),
         Compile / damlEnableScalaCodegen := true,
         Compile / damlEnableJavaCodegen := false,
         // commented out from Canton OS repo as settings don't apply to us (yet)
@@ -564,6 +567,7 @@ object BuildCommon {
         //      """
         //      ),
         Compile / damlSourceDirectory := sourceDirectory.value / "main",
+        Test / damlTest := Seq(),
         Compile / damlCodeGeneration :=
           Seq(
             (

@@ -36,6 +36,15 @@ inThisBuild(
  */
 lazy val root = (project in file("."))
   .aggregate(
+    `canton-coin-api-daml`,
+    `canton-coin-daml`,
+    `wallet-payments-daml`,
+    `wallet-daml`,
+    `directory-daml`,
+// Not listing splitwise-daml here. If we do list it
+// apps-common-frontend/damlTsCodegen ignores the dependency on
+// splitwise-daml and runs the codegen before the DAR has been built.
+//    `splitwise-daml`,
     `apps-common`,
     `apps-validator`,
     `apps-scan`,
@@ -43,7 +52,6 @@ lazy val root = (project in file("."))
     `apps-svc`,
     `apps-app`,
     `apps-wallet`,
-    `apps-wallet-daml`,
     `apps-directory`,
     `apps-frontends`,
     `canton-community-common`,
@@ -68,41 +76,80 @@ lazy val root = (project in file("."))
 lazy val `cn-util-daml` =
   project
     .in(file("cn-util"))
-    .dependsOn(
-    )
     .enablePlugins(DamlPlugin)
     .settings(
-      BuildCommon.sharedAppSettings,
-      libraryDependencies ++= Seq(daml_bindings_scala),
-      Compile / damlSourceDirectory := file("cn-util"),
-      cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
-      Test / damlSourceDirectory := file("cn-util"),
-      Compile / damlDarOutput := file("cn-util") / ".daml" / "dist",
-      BuildCommon.damlCodegenSettings,
+      BuildCommon.damlSettings
     )
 
 lazy val `canton-coin-api-daml` =
   project
     .in(file("canton-coin-api"))
-    .dependsOn(
-    )
     .enablePlugins(DamlPlugin)
     .settings(
-      BuildCommon.sharedAppSettings,
-      libraryDependencies ++= Seq(daml_bindings_scala),
-      Compile / damlSourceDirectory := file("canton-coin-api"),
-      cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
-      Test / damlSourceDirectory := file("canton-coin-api"),
-      Compile / damlDarOutput := file("canton-coin-api") / ".daml" / "dist",
-      BuildCommon.damlCodegenSettings,
+      BuildCommon.damlSettings
+    )
+
+lazy val `canton-coin-daml` =
+  project
+    .in(file("canton-coin"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`cn-util-daml` / Compile / damlBuild).value ++
+          (`canton-coin-api-daml` / Compile / damlBuild).value,
+    )
+
+// This defines the Daml model that we expose to app developers
+// to manage payments through the wallet.
+lazy val `wallet-payments-daml` =
+  project
+    .in(file("apps/wallet/daml-payments"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`cn-util-daml` / Compile / damlBuild).value ++
+          (`canton-coin-api-daml` / Compile / damlBuild).value,
+    )
+
+// This defines the Daml model that we do not expose to app devs
+// but do use internally, e.g., for batching.
+lazy val `wallet-daml` =
+  project
+    .in(file("apps/wallet/daml"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`canton-coin-daml` / Compile / damlBuild).value ++ (`wallet-payments-daml` / Compile / damlBuild).value,
+    )
+
+lazy val `directory-daml` =
+  project
+    .in(file("apps/directory/daml"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`wallet-daml` / Compile / damlBuild).value,
+    )
+
+lazy val `splitwise-daml` =
+  project
+    .in(file("apps/splitwise/daml"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies := (`wallet-daml` / Compile / damlBuild).value,
     )
 
 lazy val `apps-common` =
   project
     .in(file("apps/common"))
-    // make Canton code available to CC repo
-    .dependsOn(`canton-community-common`, `canton-community-app` % "compile->compile;test->test")
-    .enablePlugins(DamlPlugin)
+    .dependsOn(
+      `canton-community-common`,
+      `canton-community-app` % "compile->compile;test->test",
+      `canton-coin-daml`,
+    )
     .settings(
       libraryDependencies ++= Seq(
         scalapb_runtime_grpc,
@@ -113,18 +160,6 @@ lazy val `apps-common` =
         jwks_rsa,
       ),
       BuildCommon.sharedAppSettings,
-      /* The reason we have to specify these items explicitly is that the DamlPlugin expects a gradle
-       * `src/main/daml` directory structure. Instead we have the classical SDK `./daml` structure.
-       * We output the dar to the usual `.daml/dist` dir because that's where a naive user expects it.
-       */
-      Compile / damlSourceDirectory := file("canton-coin"),
-      Compile / damlDependencies := (`canton-coin-api-daml` / Compile / damlBuild).value ++
-        (`cn-util-daml` / Compile / damlBuild).value,
-      cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
-      Test / damlSourceDirectory := file("canton-coin"),
-      Compile / damlDarOutput := file("canton-coin") / ".daml" / "dist",
-      BuildCommon.damlCodegenSettings,
-      BuildCommon.copyDarResources,
     )
 
 lazy val `apps-validator` =
@@ -133,7 +168,7 @@ lazy val `apps-validator` =
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
       `apps-scan` % "compile->compile;test->test",
-      `apps-wallet-daml` % "compile->compile;test->test",
+      `wallet-daml`,
     )
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
@@ -171,11 +206,11 @@ lazy val `apps-common-frontend` = {
       // daml typescript code generation settings:
       damlTsCodegenSources :=
         (`canton-coin-api-daml` / Compile / damlBuild).value ++
-          (`apps-common` / Compile / damlBuild).value ++
-          (`apps-wallet-daml` / Compile / damlBuild).value ++
-          (`apps-wallet-payments-daml` / Compile / damlBuild).value ++
-          (`apps-directory` / Compile / damlBuild).value ++
-          (`apps-splitwise` / Compile / damlBuild).value,
+          (`canton-coin-daml` / Compile / damlBuild).value ++
+          (`wallet-daml` / Compile / damlBuild).value ++
+          (`wallet-payments-daml` / Compile / damlBuild).value ++
+          (`directory-daml` / Compile / damlBuild).value ++
+          (`splitwise-daml` / Compile / damlBuild).value,
       damlTsCodegenDir := baseDirectory.value / "daml.js",
       damlTsCodegen := BuildCommon.damlTsCodegenTask.value,
       // npm install settings:
@@ -296,47 +331,6 @@ lazy val `apps-frontends` = {
   )
 }
 
-// This defines the Daml model that we do not expose to app devs
-// but do use internally, e.g., for batching.
-lazy val `apps-wallet-daml` =
-  project
-    .in(file("apps/wallet/daml"))
-    .dependsOn(
-    )
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.sharedAppSettings,
-      libraryDependencies ++= Seq(daml_bindings_scala),
-      Compile / damlDependencies := (`apps-common` / Compile / damlBuild).value ++ (`apps-wallet-payments-daml` / Compile / damlBuild).value,
-      Compile / damlSourceDirectory := file("apps/wallet/daml"),
-      cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
-      Test / damlSourceDirectory := file("apps/wallet/daml"),
-      Compile / damlDarOutput := file("apps/wallet/daml") / ".daml" / "dist",
-      BuildCommon.damlCodegenSettings,
-      BuildCommon.copyDarResources,
-    )
-
-// This defines the Daml model that we expose to app developers
-// to manage payments through the wallet.
-lazy val `apps-wallet-payments-daml` =
-  project
-    .in(file("apps/wallet/daml-payments"))
-    .dependsOn(
-    )
-    .enablePlugins(DamlPlugin)
-    .settings(
-      BuildCommon.sharedAppSettings,
-      libraryDependencies ++= Seq(daml_bindings_scala),
-      Compile / damlDependencies :=
-        (`cn-util-daml` / Compile / damlBuild).value ++
-          (`canton-coin-api-daml` / Compile / damlBuild).value,
-      Compile / damlSourceDirectory := file("apps/wallet/daml-payments"),
-      cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
-      Test / damlSourceDirectory := file("apps/wallet/daml-payments"),
-      Compile / damlDarOutput := file("apps/wallet/daml-payments") / ".daml" / "dist",
-      BuildCommon.damlCodegenSettings,
-    )
-
 lazy val `apps-wallet` =
   project
     .in(file("apps/wallet"))
@@ -344,7 +338,7 @@ lazy val `apps-wallet` =
       `apps-common` % "compile->compile;test->test",
       `apps-scan` % "compile->compile;test->test",
       `apps-validator` % "compile->compile;test->test",
-      `apps-wallet-daml` % "compile->compile;test->test",
+      `wallet-daml`,
     )
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
@@ -357,38 +351,25 @@ lazy val `apps-directory` =
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
       `apps-scan` % "compile->compile;test->test",
-      `apps-wallet-daml` % "compile->compile;test->test",
+      `wallet-daml`,
+      `directory-daml`,
     )
-    .enablePlugins(DamlPlugin)
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
-      Compile / damlDependencies := (`apps-wallet-daml` / Compile / damlBuild).value,
-      Compile / damlSourceDirectory := file("apps/directory/daml"),
-      cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
-      Test / damlSourceDirectory := (Compile / damlSourceDirectory).value,
-      Compile / damlDarOutput := file("apps/directory/daml") / ".daml" / "dist",
-      BuildCommon.damlCodegenSettings,
-      BuildCommon.copyDarResources,
     )
 
 lazy val `apps-splitwise` =
   project
     .in(file("apps/splitwise"))
-    .enablePlugins(DamlPlugin)
     .dependsOn(
       `apps-common` % "compile->compile;test->test",
       `apps-directory` % "compile->compile;test->test",
+      `splitwise-daml`,
     )
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
-      Compile / damlDependencies := (`apps-wallet-daml` / Compile / damlBuild).value,
-      Compile / damlSourceDirectory := file("apps/splitwise/daml"),
-      cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml",
-      Test / damlSourceDirectory := (Compile / damlSourceDirectory).value,
-      Compile / damlDarOutput := file("apps/splitwise/daml") / ".daml" / "dist",
-      BuildCommon.damlCodegenSettings,
     )
 
 // Copied from Canton. Can probably be removed once we use Canton as a library.
@@ -438,9 +419,9 @@ lazy val bundleTask = {
       )
     val dars =
       Seq(
-        (`apps-common` / Compile / damlBuild).value,
-        (`apps-wallet-daml` / Compile / damlBuild).value,
-        (`apps-splitwise` / Compile / damlBuild).value,
+        (`canton-coin-daml` / Compile / damlBuild).value,
+        (`wallet-daml` / Compile / damlBuild).value,
+        (`splitwise-daml` / Compile / damlBuild).value,
       )
     val args = examples ++ webUis.flatMap({ case (source, name) =>
       Seq("-r", source, s"web-uis/$name")
@@ -498,8 +479,8 @@ lazy val `apps-app` =
   project
     .in(file("apps/app"))
     .dependsOn(
-      `apps-wallet-payments-daml`,
-      `apps-wallet-daml`,
+      `wallet-payments-daml`,
+      `wallet-daml`,
       `apps-splitwise`,
       `apps-directory`,
       `apps-validator`,

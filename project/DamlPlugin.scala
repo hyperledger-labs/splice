@@ -68,13 +68,15 @@ object DamlPlugin extends AutoPlugin {
     lazy val baseDamlPluginSettings: Seq[Def.Setting[_]] = Seq(
       sourceGenerators += damlGenerateCode.taskValue,
       resourceGenerators += damlBuild.taskValue,
-      damlSourceDirectory := sourceDirectory.value / "daml",
-      damlDarOutput := resourceManaged.value,
+      damlSourceDirectory := baseDirectory.value,
+      damlDarOutput := damlSourceDirectory.value.getAbsoluteFile / ".daml" / "dist",
       damlDependencies := Seq(),
       damlScalaCodegenOutput := sourceManaged.value / "daml-codegen-scala",
       damlJavaCodegenOutput := sourceManaged.value / "daml-codegen-java",
       damlBuildOrder := Seq(),
       damlCodeGeneration := Seq(),
+      damlEnableScalaCodegen := false,
+      damlEnableJavaCodegen := true,
       damlGenerateCode := {
         // for the time being we assume if we're using code generation then the DARs must first be built
         damlBuild.value
@@ -259,7 +261,10 @@ object DamlPlugin extends AutoPlugin {
   )
 
   override lazy val projectSettings: Seq[Def.Setting[_]] =
-    inConfig(Compile)(baseDamlPluginSettings) ++
+    Seq(
+      cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml"
+    ) ++
+      inConfig(Compile)(baseDamlPluginSettings) ++
       inConfig(Test)(baseDamlPluginSettings :+ damlTestSetting)
 
   /** Verify that the versions in the daml.yaml file match what is being used in the sbt project.
