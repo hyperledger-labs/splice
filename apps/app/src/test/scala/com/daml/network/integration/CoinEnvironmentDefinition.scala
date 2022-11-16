@@ -8,7 +8,7 @@ import com.daml.network.environment.{
   CoinEnvironmentImpl,
 }
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
-import com.digitalasset.canton.config.TestingConfigInternal
+import com.digitalasset.canton.config.{ClockConfig, TestingConfigInternal}
 import com.digitalasset.canton.console.TestConsoleOutput
 import com.digitalasset.canton.environment.EnvironmentFactory
 import com.digitalasset.canton.integration.{
@@ -122,7 +122,12 @@ object CoinEnvironmentDefinition {
 
   def simpleTopologyWithSimTime(testName: String): CoinEnvironmentDefinition =
     simpleTopology(testName)
-      .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy(10_000)(conf))
+      .addConfigTransforms((_, conf) =>
+        CoinConfigTransforms
+          .bumpCantonPortsBy(10_000)(conf)
+          .focus(_.parameters.clock)
+          .replace(ClockConfig.SimClock)
+      )
 
   def fromResource(path: String, testName: String): CoinEnvironmentDefinition =
     CoinEnvironmentDefinition(

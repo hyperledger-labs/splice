@@ -71,6 +71,7 @@ class SplitwiseApp(
       ledgerClient,
       readAs,
       scanConnection,
+      coinAppParameters.clockConfig,
       retryProvider,
       loggerFactory,
       timeouts,

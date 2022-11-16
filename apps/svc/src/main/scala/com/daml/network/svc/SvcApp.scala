@@ -65,6 +65,7 @@ class SvcApp(
       automation = new SvcAutomationService(
         store,
         ledgerClient,
+        coinAppParameters.clockConfig,
         retryProvider,
         loggerFactory,
         timeouts,

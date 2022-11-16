@@ -140,7 +140,8 @@ class WalletApp(
         walletStore,
         treasuries,
         ledgerClient,
-        retryProvider = retryProvider,
+        coinAppParameters.clockConfig,
+        retryProvider,
         loggerFactory,
         timeouts,
       )

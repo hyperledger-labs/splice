@@ -5,7 +5,7 @@ import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.svc.store.SvcStore
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import io.grpc.{Status, StatusRuntimeException}
@@ -17,6 +17,7 @@ import scala.jdk.CollectionConverters.*
 class SvcAutomationService(
     store: SvcStore,
     ledgerClient: CoinLedgerClient,
+    clockConfig: ClockConfig,
     retryProvider: CoinRetries,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
@@ -24,7 +25,7 @@ class SvcAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends AutomationService(retryProvider) {
+) extends AutomationService(clockConfig, retryProvider) {
   import com.daml.network.store.AcsStore.QueryResult
 
   private val connection = ledgerClient.connection(this.getClass.getSimpleName)

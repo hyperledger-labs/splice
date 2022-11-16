@@ -7,7 +7,7 @@ import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.store.SplitwiseStore
 import com.daml.network.store.AcsStore.QueryResult
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
@@ -22,6 +22,7 @@ class SplitwiseAutomationService(
     ledgerClient: CoinLedgerClient,
     readAs: Set[PartyId],
     scanConnection: ScanConnection,
+    clockConfig: ClockConfig,
     retryProvider: CoinRetries,
     protected val loggerFactory: NamedLoggerFactory,
     processingTimeouts: ProcessingTimeout,
@@ -29,7 +30,7 @@ class SplitwiseAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends AutomationService(retryProvider) {
+) extends AutomationService(clockConfig, retryProvider) {
 
   override protected def timeouts: ProcessingTimeout = processingTimeouts
 

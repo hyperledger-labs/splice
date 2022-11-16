@@ -2,6 +2,7 @@ package com.daml.network.config
 
 import com.digitalasset.canton.config.{
   CachingConfigs,
+  ClockConfig,
   CommunityCryptoConfig,
   CryptoConfig,
   InitConfig,
@@ -61,4 +62,5 @@ case class SharedCoinAppParameters(
     override val devVersionSupport: Boolean,
     override val dontWarnOnDeprecatedPV: Boolean,
     override val initialProtocolVersion: ProtocolVersion,
+    val clockConfig: ClockConfig,
 ) extends LocalNodeParameters

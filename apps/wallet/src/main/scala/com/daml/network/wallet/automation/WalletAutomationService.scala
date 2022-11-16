@@ -5,7 +5,7 @@ import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.wallet.store.WalletStore
 import com.daml.network.wallet.treasury.TreasuryServices
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
@@ -21,6 +21,7 @@ class WalletAutomationService(
     walletStore: WalletStore,
     treasuryServices: TreasuryServices,
     ledgerClient: CoinLedgerClient,
+    clockConfig: ClockConfig,
     retryProvider: CoinRetries,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
@@ -28,7 +29,7 @@ class WalletAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends AutomationService(retryProvider) {
+) extends AutomationService(clockConfig, retryProvider) {
 
   private val connection = ledgerClient.connection(this.getClass.getSimpleName)
 

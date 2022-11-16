@@ -4,7 +4,7 @@ import akka.NotUsed
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{KillSwitches, Materializer}
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.pretty.PrettyPrinting
@@ -20,7 +20,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
 /** Shared base class for running ingestion and task-handler automation in applications. */
-abstract class AutomationService(retryProvider: CoinRetries)(implicit
+abstract class AutomationService(clockConfig: ClockConfig, retryProvider: CoinRetries)(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
@@ -96,33 +96,31 @@ abstract class AutomationService(retryProvider: CoinRetries)(implicit
   ): Unit = {
     withNewTrace("getTime") { implicit traceContext => _ =>
       {
-        val tryGetTime =
-          AkkaUtil.runSupervised(_ => (), connection.time().toMat(Sink.head)(Keep.right))
-        tryGetTime.onComplete(checkResult => {
-          val timeSource = checkResult match {
-            case Success(t) => {
-              logger.info(
-                "Succeeded getting time via Ledger API; will invoke handler based on ledger time."
-                  + s" The returned time was: $t"
-              )
-              connection.time()
-            }
-            case Failure(e) => {
-              logger.info(
-                "Failed getting time via Ledger API; will invoke handler based on wall clock time."
-                  + s" The returned error was: $e"
-              )
-              // The first tick is immediately, for simplicity.
-              Source
-                .tick(0.second, interval, ())
-                .map(_ => CantonTimestamp.now())
-            }
+        val timeSource = clockConfig match {
+          case ClockConfig.SimClock => {
+            logger.info(
+              "Running in SimClock mode; will invoke handler based on time service."
+            )
+            connection.time()
           }
-          registerRequestHandler(
-            name,
-            timeSource.preMaterialize()._2,
-          )(handler0)
-        })
+          case ClockConfig.WallClock(_) => {
+            logger.info(
+              "Running in WallClock mode; will invoke handler based on wall clock time."
+            )
+            // The first tick is immediately, for simplicity.
+            Source
+              .tick(0.second, interval, ())
+              .map(_ => CantonTimestamp.now())
+          }
+          case _: ClockConfig.RemoteClock =>
+            sys.error(
+              "Remote clock mode is unsupported for CN apps, use either SimClock or WallClock"
+            )
+        }
+        registerRequestHandler(
+          name,
+          timeSource.preMaterialize()._2,
+        )(handler0)
       }
     }
   }

@@ -11,6 +11,7 @@ import com.digitalasset.canton.config.RequireTypes.NonEmptyString
 import com.digitalasset.canton.config.{
   CantonCommunityConfig,
   ClientConfig,
+  ClockConfig,
   CommunityAdminServerConfig,
   NodeConfig,
   NonNegativeDuration,
@@ -341,37 +342,38 @@ object CoinConfigTransforms {
     */
   def useAdminAuthTokensForRemoteParticipants(): CoinConfigTransform = { config =>
     {
+      val clock = config.parameters.clock
       val transforms: Seq[CoinConfigTransform] = Seq(
         updateSvcAppConfig(c => {
-          val adminToken = getAdminToken(c.remoteParticipant)
+          val adminToken = getAdminToken(clock, c.remoteParticipant)
           c.focus(_.remoteParticipant).modify(_.copy(token = adminToken))
         }),
         updateScanAppConfig(c => {
-          val adminToken = getAdminToken(c.remoteParticipant)
+          val adminToken = getAdminToken(clock, c.remoteParticipant)
           c.focus(_.remoteParticipant).modify(_.copy(token = adminToken))
         }),
         updateAllValidatorConfigs_(c => {
-          val adminToken = getAdminToken(c.remoteParticipant)
+          val adminToken = getAdminToken(clock, c.remoteParticipant)
           c.focus(_.remoteParticipant).modify(_.copy(token = adminToken))
         }),
         updateAllWalletAppConfigs_(c => {
-          val adminToken = getAdminToken(c.remoteParticipant)
+          val adminToken = getAdminToken(clock, c.remoteParticipant)
           c.focus(_.remoteParticipant).modify(_.copy(token = adminToken))
         }),
         updateDirectoryAppConfig(c => {
-          val adminToken = getAdminToken(c.remoteParticipant)
+          val adminToken = getAdminToken(clock, c.remoteParticipant)
           c.focus(_.remoteParticipant).modify(_.copy(token = adminToken))
         }),
         updateAllRemoteDirectoryAppConfigs_(c => {
-          val adminToken = getAdminToken(c.ledgerApi)
+          val adminToken = getAdminToken(clock, c.ledgerApi)
           c.copy(ledgerApiToken = adminToken)
         }),
         updateAllSplitwiseAppConfigs_(c => {
-          val adminToken = getAdminToken(c.remoteParticipant)
+          val adminToken = getAdminToken(clock, c.remoteParticipant)
           c.focus(_.remoteParticipant).modify(_.copy(token = adminToken))
         }),
         updateAllRemoteSplitwiseAppConfigs_(c => {
-          val adminToken = getAdminToken(c.ledgerApi)
+          val adminToken = getAdminToken(clock, c.ledgerApi)
           c.copy(ledgerApiToken = adminToken)
         }),
       )
@@ -405,11 +407,13 @@ object CoinConfigTransforms {
     * There is (intentionally) no way of getting the admin tokens from an external canton process,
     * so we export them to a file in our canton bootstrap script (see `bootstrap-canton.canton`).
     */
-  private def readTokenDataFile(): Map[Int, String] = {
+  private def readTokenDataFile(clockConfig: ClockConfig): Map[Int, String] = {
     val tokens: mutable.Map[Int, String] = mutable.Map.empty
 
-    // TODO(#1606) Read from canton-simtime.tokens when running in simtime mode.
-    val tokenDataSource = Source.fromFile("canton.tokens")
+    val tokenDataSource = clockConfig match {
+      case ClockConfig.SimClock => Source.fromFile("canton-simtime.tokens")
+      case _ => Source.fromFile("canton.tokens")
+    }
     for (line <- tokenDataSource.getLines()) {
       val parts = line.split(" ")
       tokens.put(parts(0).toInt, parts(1))
@@ -418,15 +422,14 @@ object CoinConfigTransforms {
 
     tokens.toMap
   }
-  private lazy val adminTokenData = readTokenDataFile()
 
-  def getAdminToken(config: RemoteParticipantConfig): Option[String] = {
-    getAdminToken(config.ledgerApi)
+  def getAdminToken(clockConfig: ClockConfig, config: RemoteParticipantConfig): Option[String] = {
+    getAdminToken(clockConfig, config.ledgerApi)
   }
-  def getAdminToken(ledgerApi: ClientConfig): Option[String] = {
+  def getAdminToken(clockConfig: ClockConfig, ledgerApi: ClientConfig): Option[String] = {
     val port = ledgerApi.port.unwrap
     val token = {
-      adminTokenData.getOrElse(
+      readTokenDataFile(clockConfig).getOrElse(
         port,
         sys.error(s"No admin token found for ledger API at port $port"),
       )
@@ -464,7 +467,7 @@ object CoinConfigTransforms {
               RemoteParticipantConfig(
                 adminApi = p.adminApi.clientConfig,
                 ledgerApi = p.ledgerApi.clientConfig,
-                token = getAdminToken(p.ledgerApi.clientConfig),
+                token = getAdminToken(config.parameters.clock, p.ledgerApi.clientConfig),
               )
             )
             .toMap,

@@ -80,6 +80,7 @@ class DirectoryApp(
         store,
         ledgerClient,
         scanConnection,
+        coinAppParameters.clockConfig,
         retryProvider,
         loggerFactory,
         timeouts,
