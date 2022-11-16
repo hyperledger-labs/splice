@@ -1,6 +1,6 @@
 package com.daml.network.environment
 
-import akka.actor.ActorSystem
+import akka.actor.{ActorSystem, Cancellable}
 import akka.stream.KillSwitches
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
@@ -33,6 +33,7 @@ import com.daml.ledger.javaapi.data.{
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
@@ -44,6 +45,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.AkkaUtil
 import com.google.protobuf.ByteString
+import com.google.protobuf.timestamp.Timestamp
 import io.grpc.StatusRuntimeException
 
 import java.nio.file.{Files, Path}
@@ -144,6 +146,8 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
   def listPackages()(implicit traceContext: TraceContext): Future[Set[String]]
   def uploadDarFile(pkg: UploadablePackage)(implicit traceContext: TraceContext): Future[Unit]
   def uploadDarFile(path: Path)(implicit traceContext: TraceContext): Future[Unit]
+
+  def time()(implicit traceContext: TraceContext): Source[CantonTimestamp, Cancellable]
 }
 
 /** Subscription for reading the ledger */
@@ -498,8 +502,24 @@ object CoinLedgerConnection {
         } yield ()
       }
 
-      override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List[AsyncOrSyncCloseable](
-      )
+      override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List[AsyncOrSyncCloseable]()
+
+      override def time()(implicit
+          traceContext: TraceContext
+      ): Source[CantonTimestamp, Cancellable] = {
+        client
+          .time()
+          .map(response =>
+            CantonTimestamp
+              .fromProtoPrimitive(Timestamp.fromJavaProto(response.getCurrentTime)) match {
+              case Left(err) =>
+                throw new RuntimeException(
+                  s"Could not parse timestamp received from ledger API: $err"
+                )
+              case Right(timestamp) => timestamp
+            }
+          )
+      }
     }
 
   def decodeExerciseResult[T](

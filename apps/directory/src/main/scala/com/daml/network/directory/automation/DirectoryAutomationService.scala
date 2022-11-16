@@ -15,7 +15,8 @@ import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
 
 import java.security.MessageDigest
-import scala.concurrent.ExecutionContextExecutor
+import scala.concurrent.duration.*
+import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
 /** Manages background automation that runs on an directory app. */
@@ -47,6 +48,7 @@ class DirectoryAutomationService(
     // 90 days
     90 * 24 * 60 * 60 * 1_000_000L
   )
+  private val entryExpirationCheckInterval = 1.second
 
   override protected def timeouts: ProcessingTimeout = processingTimeouts
 
@@ -367,6 +369,43 @@ class DirectoryAutomationService(
             rejectPayment("entry doesn't exist.")
         }
       } yield result
+    }
+  })
+
+  registerTimeHandler(
+    "handleDirectoryEntryExpiration",
+    entryExpirationCheckInterval,
+    connection,
+  )(now => { implicit traceContext =>
+    {
+      store
+        .listEntries()
+        .map { case QueryResult(_, entries) =>
+          // extract due entries
+          entries.filter(e =>
+            // we grant a short additional "grace period" to account for potential clock skew
+            now.toInstant.isAfter(e.payload.expiresAt.plus(java.time.Duration.ofSeconds(1)))
+          )
+        }
+        .flatMap(due_entries => {
+          if (due_entries.isEmpty) {
+            Future("no entries due for expiry.")
+          } else {
+            // join all expire commands into one command
+            val expire_commands = due_entries.flatMap(e =>
+              e.contractId
+                .exerciseDirectoryEntry_Expire(provider.toProtoPrimitive)
+                .commands
+                .asScala
+                .toSeq
+            )
+            val due_entries_names = due_entries.map(_.payload.name).mkString(", ")
+            logger.info(s"Archiving the following expired directory entries: $due_entries_names")
+            connection
+              .submitCommands(Seq(provider), Seq(), expire_commands)
+              .map(_ => s"archived expired entries: ${due_entries_names}")
+          }
+        })
     }
   })
 }

@@ -3,8 +3,9 @@ package com.daml.network.automation
 import akka.NotUsed
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{KillSwitches, Materializer}
-import com.daml.network.environment.CoinRetries
+import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.pretty.PrettyPrinting
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -14,6 +15,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.atomic.AtomicReference
+import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
@@ -80,10 +82,55 @@ abstract class AutomationService(retryProvider: CoinRetries)(implicit
     registerService(service)
   }
 
+  /** Register a task handler invoked periodically with the current (ledger) time.
+    *  When Canton runs with wall-clock time, the handler is triggered on each `interval`.
+    *  When Canton runs with simulation time, the handler is *instead* triggered
+    *  every time the ledger time changes.
+    */
+  final protected def registerTimeHandler(
+      name: String,
+      interval: FiniteDuration,
+      connection: CoinLedgerConnection, // for querying ledger time when simtime is used
+  )(
+      handler0: CantonTimestamp => TraceContext => Future[String]
+  ): Unit = {
+    withNewTrace("getTime") { implicit traceContext => _ =>
+      {
+        val tryGetTime =
+          AkkaUtil.runSupervised(_ => (), connection.time().toMat(Sink.head)(Keep.right))
+        tryGetTime.onComplete(checkResult => {
+          val timeSource = checkResult match {
+            case Success(t) => {
+              logger.info(
+                "Succeeded getting time via Ledger API; will invoke handler based on ledger time."
+                  + s" The returned time was: $t"
+              )
+              connection.time()
+            }
+            case Failure(e) => {
+              logger.info(
+                "Failed getting time via Ledger API; will invoke handler based on wall clock time."
+                  + s" The returned error was: $e"
+              )
+              // The first tick is immediately, for simplicity.
+              Source
+                .tick(0.second, interval, ())
+                .map(_ => CantonTimestamp.now())
+            }
+          }
+          registerRequestHandler(
+            name,
+            timeSource.preMaterialize()._2,
+          )(handler0)
+        })
+      }
+    }
+  }
+
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
     Seq[AsyncOrSyncCloseable](
       SyncCloseable(
-        "Directory automation services",
+        "Automation services",
         Lifecycle.close(automationServices.get(): _*)(logger),
       )
     )

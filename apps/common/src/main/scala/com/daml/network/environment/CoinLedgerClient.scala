@@ -1,7 +1,7 @@
 package com.daml.network.environment
 
 import akka.NotUsed
-import akka.actor.ActorSystem
+import akka.actor.{ActorSystem, Cancellable}
 import akka.stream.scaladsl.Source
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.client.akka.ClientAdapter
@@ -13,6 +13,7 @@ import com.daml.ledger.api.v1.admin.{
   PartyManagementServiceOuterClass,
   UserManagementServiceGrpc,
 }
+import com.daml.ledger.api.v1.testing.{TimeServiceGrpc, TimeServiceOuterClass}
 import com.daml.ledger.api.v1.{
   ActiveContractsServiceGrpc,
   CommandServiceGrpc,
@@ -47,12 +48,13 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.TracerProvider
 import com.digitalasset.canton.util.ErrorUtil
-import com.google.protobuf.ByteString
+import com.google.protobuf.{ByteString, Timestamp}
 import io.grpc.Channel
 import io.grpc.stub.{AbstractStub, StreamObserver}
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
 
 import java.io.Closeable
+import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future, Promise}
 import scala.jdk.CollectionConverters.*
 
@@ -125,6 +127,8 @@ object CoinLedgerClient {
       withCredentials(PartyManagementServiceGrpc.newStub(channel), token)
     val userManagementServiceStub: UserManagementServiceGrpc.UserManagementServiceStub =
       withCredentials(UserManagementServiceGrpc.newStub(channel), token)
+    val timeServiceStub: TimeServiceGrpc.TimeServiceStub =
+      withCredentials(TimeServiceGrpc.newStub(channel), token)
 
     override def close(): Unit = GrpcChannel.close(channel)
 
@@ -292,6 +296,36 @@ object CoinLedgerClient {
         case _ => throw new IllegalArgumentException("grantUserRights requires at least one right")
       }
       wrapFuture(userManagementServiceStub.grantUserRights(request, _)).map(_ => ())
+    }
+
+    def time(): Source[TimeServiceOuterClass.GetTimeResponse, Cancellable] = {
+      // Based on its documentation, `GetTime` should give us updates whenever
+      // the ledger time changes. At the time of writing, this was broken
+      // however: we get no udpates if the time is set via a different
+      // participant. As a workaround, we poll ourselves.
+      Source
+        .tick(0.millis, 500.millis, ())
+        .flatMapConcat(_ => {
+          val request = TimeServiceOuterClass.GetTimeRequest.newBuilder().build()
+          ClientAdapter.serverStreaming(request, timeServiceStub.getTime).take(1)
+        })
+        // Emit only when the time changes, just as `GetTime` normally would.
+        .statefulMapConcat(() => {
+          @SuppressWarnings(Array("org.wartremover.warts.Var"))
+          var lastNow: Option[Timestamp] = None
+
+          { response =>
+            {
+              val now = response.getCurrentTime()
+              if (lastNow.map(now == _).getOrElse(false)) {
+                Nil
+              } else {
+                lastNow = Some(now)
+                response :: Nil
+              }
+            }
+          }
+        })
     }
   }
   private def createLedgerClient(

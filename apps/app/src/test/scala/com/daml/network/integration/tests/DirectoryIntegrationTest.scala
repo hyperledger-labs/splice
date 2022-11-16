@@ -20,6 +20,7 @@ import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
 import org.slf4j.event.Level.WARN
 
+import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
@@ -296,6 +297,30 @@ class DirectoryIntegrationTest extends CoinIntegrationTest {
           )
           renewedEntry.payload shouldBe newEntry
         }
+    }
+    "archive expired directory entries" in { implicit env =>
+      clue("Creating a directory entry that expires immediately") {
+        directory.listEntries() shouldBe empty
+        val dirParty = directory.getProviderPartyId()
+        directory.remoteParticipant.ledger_api.commands.submitJava(
+          actAs = Seq(dirParty),
+          commands = new codegen.DirectoryEntry(
+            dirParty.toProtoPrimitive,
+            dirParty.toProtoPrimitive,
+            testEntryName,
+            Instant.now().plus(1, ChronoUnit.SECONDS),
+          ).create.commands.asScala.toSeq,
+          optTimeout = None,
+        )
+        eventually()(
+          directory.listEntries() should not be empty
+        )
+      }
+      clue("Waiting for the backend to expire the entry...") {
+        eventually()(
+          directory.listEntries() shouldBe empty
+        )
+      }
     }
 
     def setupUser(refs: StaticUserRefs): DynamicUserRefs = {
