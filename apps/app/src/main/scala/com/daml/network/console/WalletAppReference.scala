@@ -1,16 +1,19 @@
 package com.daml.network.console
 
 import com.daml.network.auth.{AuthUtil, JwtCallCredential}
-import com.daml.network.codegen.java.cc.{coin as coinCodegen}
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.{
-  payment => walletCodegen,
-  paymentchannel => channelCodegen,
-  subscriptions => subsCodegen,
+  payment as walletCodegen,
+  paymentchannel as channelCodegen,
+  subscriptions as subsCodegen,
 }
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.util.{JavaContract as Contract}
+import com.daml.network.util.JavaContract as Contract
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
-import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.ListResponse
+import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.{
+  ListResponse,
+  UserStatusData,
+}
 import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
@@ -414,6 +417,13 @@ abstract class WalletAppReference(
   ): Unit =
     consoleEnvironment.run {
       adminCommand(GrpcWalletAppClient.CollectRewards(round), callCredentials)
+    }
+
+  @Help.Summary("User status")
+  @Help.Description("Get the user status")
+  def userStatus(): UserStatusData =
+    consoleEnvironment.run {
+      adminCommand(GrpcWalletAppClient.UserStatus(), callCredentials)
     }
 }
 

@@ -5,12 +5,17 @@ import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCode
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.wallet.{
-  payment => walletCodegen,
-  subscriptions => subsCodegen,
+  payment as walletCodegen,
+  subscriptions as subsCodegen,
 }
-import com.daml.network.codegen.java.cn.{directory => dirCodegen}
+import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.console.{LocalWalletAppReference, WalletAppReference}
+import com.daml.network.console.{
+  LocalWalletAppReference,
+  RemoteWalletAppReference,
+  ValidatorAppReference,
+  WalletAppReference,
+}
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
@@ -20,7 +25,7 @@ import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.Balance
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
-import com.digitalasset.canton.participant.ledger.api.client.{JavaDecodeUtil as DecodeUtil}
+import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.{DiscardOps, HasExecutionContext}
 import org.slf4j.event.Level
@@ -46,9 +51,10 @@ class WalletIntegrationTest
 
     "allow calling tap, list the created coins, and get the balance - locally and remotely" in {
       implicit env =>
-        val aliceDamlUser = aliceRemoteWallet.config.damlUser
+        val aliceUserParty = clue("Onboard alice on her self-hosted validator") {
+          onboardWalletUser(aliceRemoteWallet, aliceValidator)
+        }
 
-        val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
         val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
         val exactly = (x: BigDecimal) => (x, x)
@@ -97,9 +103,10 @@ class WalletIntegrationTest
     }
 
     "list all coins, including locked coins, with additional position details" in { implicit env =>
-      val aliceDamlUser = aliceRemoteWallet.config.damlUser
+      val aliceUserParty = clue("Onboard alice on her self-hosted validator") {
+        onboardWalletUser(aliceRemoteWallet, aliceValidator)
+      }
 
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
       val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
       aliceRemoteWallet.tap(50)
@@ -142,8 +149,9 @@ class WalletIntegrationTest
     }
 
     "allow a user to list, and reject app payment requests" in { implicit env =>
-      val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+      val aliceUserParty = clue("Onboard alice on her self-hosted validator") {
+        onboardWalletUser(aliceRemoteWallet, aliceValidator)
+      }
 
       // Check that no payment requests exist
       aliceRemoteWallet.listAppPaymentRequests() shouldBe empty
@@ -201,8 +209,9 @@ class WalletIntegrationTest
     }
 
     "allow a user to list and accept app payment requests" in { implicit env =>
-      val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+      val aliceUserParty = clue("Onboard alice on her self-hosted validator") {
+        onboardWalletUser(aliceRemoteWallet, aliceValidator)
+      }
 
       aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
         Seq(aliceUserParty),
@@ -272,13 +281,11 @@ class WalletIntegrationTest
 
     "correctly select coins for payments" in { implicit env =>
       val aliceUserParty = clue("Onboard alice on her self-hosted validator") {
-        val aliceDamlUser = aliceRemoteWallet.config.damlUser
-        aliceValidator.onboardUser(aliceDamlUser)
+        onboardWalletUser(aliceRemoteWallet, aliceValidator)
       }
 
       val bobUserParty = clue("Onboard bob on his self-hosted validator") {
-        val bobDamlUser = bobRemoteWallet.config.damlUser
-        bobValidator.onboardUser(bobDamlUser)
+        onboardWalletUser(bobRemoteWallet, bobValidator)
       }
 
       clue("Alice opens payment channel to Bob") {
@@ -308,8 +315,9 @@ class WalletIntegrationTest
     }
 
     "allow a user to list and reject subscription requests" in { implicit env =>
-      val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+      val aliceUserParty = clue("Onboard alice on her self-hosted validator") {
+        onboardWalletUser(aliceRemoteWallet, aliceValidator)
+      }
 
       aliceRemoteWallet.listSubscriptionRequests() shouldBe empty
 
@@ -335,8 +343,9 @@ class WalletIntegrationTest
       "to list idle subscriptions, to initiate subscription payments, " +
       "and to cancel a subscription" in { implicit env =>
         val transferContext = scan.getAppTransferContext()
-        val aliceDamlUser = aliceRemoteWallet.config.damlUser
-        val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+        val aliceUserParty = clue("Onboard alice on her self-hosted validator") {
+          onboardWalletUser(aliceRemoteWallet, aliceValidator)
+        }
         val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
         aliceRemoteWallet.listSubscriptionRequests() shouldBe empty
@@ -440,9 +449,9 @@ class WalletIntegrationTest
       }
 
     "allow a user to list multiple subscriptions in different states" in { implicit env =>
-      val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
-      aliceValidator.onboardUser(aliceDamlUser)
+      val aliceUserParty = clue("Onboard alice on her self-hosted validator") {
+        onboardWalletUser(aliceRemoteWallet, aliceValidator)
+      }
 
       clue("Alice gets some coins") {
         aliceRemoteWallet.tap(50)
@@ -505,13 +514,13 @@ class WalletIntegrationTest
     }
 
     "allow two users to create a payment channel and use it for a transfer" in { implicit env =>
-      // Onboard alice on her self-hosted validator
-      val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+      val aliceUserParty = clue("Onboard alice on her self-hosted validator") {
+        onboardWalletUser(aliceRemoteWallet, aliceValidator)
+      }
 
-      // Onboard bob on his self-hosted validator
-      val bobDamlUser = bobRemoteWallet.config.damlUser
-      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
+      val bobUserParty = clue("Onboard bob on his self-hosted validator") {
+        onboardWalletUser(bobRemoteWallet, bobValidator)
+      }
 
       // Neither Alice nor Bob see a payment channel proposal
       aliceRemoteWallet.listPaymentChannelProposals() shouldBe empty
@@ -615,16 +624,17 @@ class WalletIntegrationTest
     }
 
     "allow two remote wallets to connect to one local wallet and tap" in { implicit env =>
-      // Onboard alice on her self-hosted validator
-      val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+      val aliceUserParty = clue("Onboard alice on her self-hosted validator") {
+        onboardWalletUser(aliceRemoteWallet, aliceValidator)
+      }
 
       aliceRemoteWallet.tap(50.0)
       checkWallet(aliceUserParty, aliceRemoteWallet, Seq((50, 50)))
 
-      // Onboard charlie onto alice's validator
       val charlieDamlUser = charlieRemoteWallet.config.damlUser
-      val charlieUserParty = aliceValidator.onboardUser(charlieDamlUser)
+      val charlieUserParty = clue("Onboard charlie onto alice's validator") {
+        onboardWalletUser(charlieRemoteWallet, aliceValidator)
+      }
 
       charlieRemoteWallet.tap(50.0)
       checkWallet(charlieUserParty, charlieRemoteWallet, Seq((50, 50)))
@@ -634,13 +644,13 @@ class WalletIntegrationTest
     }
 
     "(propose, accept, and) cancel a payment channel by sender" in { implicit env =>
-      // Onboard alice on her self-hosted validator
-      val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+      val aliceUserParty = clue("Onboard alice on her self-hosted validator") {
+        onboardWalletUser(aliceRemoteWallet, aliceValidator)
+      }
 
-      // Onboard bob on his self-hosted validator
-      val bobDamlUser = bobRemoteWallet.config.damlUser
-      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
+      val bobUserParty = clue("Onboard bob on his self-hosted validator") {
+        onboardWalletUser(bobRemoteWallet, bobValidator)
+      }
 
       // Alice proposes payment channel to Bob
       aliceRemoteWallet.proposePaymentChannel(bobUserParty)
@@ -663,13 +673,13 @@ class WalletIntegrationTest
     }
 
     "(propose, accept, and) cancel a payment channel by receiver" in { implicit env =>
-      // Onboard alice on her self-hosted validator
-      val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+      val aliceUserParty = clue("Onboard alice on her self-hosted validator") {
+        onboardWalletUser(aliceRemoteWallet, aliceValidator)
+      }
 
-      // Onboard bob on his self-hosted validator
-      val bobDamlUser = bobRemoteWallet.config.damlUser
-      val bobUserParty = bobValidator.onboardUser(bobDamlUser)
+      val bobUserParty = clue("Onboard bob on his self-hosted validator") {
+        onboardWalletUser(bobRemoteWallet, bobValidator)
+      }
 
       // Alice proposes payment channel to Bob
       aliceRemoteWallet.proposePaymentChannel(bobUserParty)
@@ -841,8 +851,13 @@ class WalletIntegrationTest
 
     "fail operations early and independently that don't pass the activeness lookup checks" in {
       implicit env =>
-        val alice = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
-        val bob = bobValidator.onboardUser(bobRemoteWallet.config.damlUser)
+        val alice = clue("Onboard alice on her self-hosted validator") {
+          onboardWalletUser(aliceRemoteWallet, aliceValidator)
+        }
+
+        val bob = clue("Onboard bob on his self-hosted validator") {
+          onboardWalletUser(bobRemoteWallet, bobValidator)
+        }
 
         // tapping some coin & waiting for it to appear as a way to synchronize on the initialization of the apps.
         aliceRemoteWallet.tap(10)
@@ -1107,5 +1122,20 @@ class WalletIntegrationTest
       )
       request
     }
+  }
+
+  /** Onboards the daml user associated with the given remote wallet app reference
+    * onto the given validator, and waits until the wallet is usable for that user
+    */
+  def onboardWalletUser(
+      remoteWallet: RemoteWalletAppReference,
+      validator: ValidatorAppReference,
+  ): PartyId = {
+    val damlUser = remoteWallet.config.damlUser
+    val party = validator.onboardUser(damlUser)
+    // The wallet is not immediately usable by the onboarded user -
+    // the wallet app backend has to ingest the wallet install contract first.
+    eventually() { remoteWallet.userStatus().userOnboarded shouldBe true }
+    party
   }
 }

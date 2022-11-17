@@ -889,4 +889,27 @@ object GrpcWalletAppClient {
         response: Empty
     ): Either[String, Unit] = Right(())
   }
+
+  case class UserStatusData(
+      party: String,
+      userOnboarded: Boolean,
+  )
+
+  case class UserStatus()
+      extends BaseCommand[v0.UserStatusRequest, v0.UserStatusResponse, UserStatusData] {
+
+    override def createRequest(): Either[String, v0.UserStatusRequest] =
+      Right(v0.UserStatusRequest())
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.UserStatusRequest,
+    ): Future[v0.UserStatusResponse] = service.userStatus(request)
+
+    override def handleResponse(
+        response: v0.UserStatusResponse
+    ): Either[String, UserStatusData] = Right(
+      UserStatusData(response.partyId, response.userOnboarded)
+    )
+  }
 }
