@@ -4,7 +4,6 @@ import qualified DA.Foldable as F
 import DA.Assert
 
 import qualified CC.API.V1.Coin as API
-import qualified CC.API.V1.CoinRules as API
 import CN.Util.Assert
 
 import CN.Wallet.Payment

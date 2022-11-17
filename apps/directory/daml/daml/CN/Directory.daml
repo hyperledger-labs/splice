@@ -5,7 +5,6 @@ import DA.Time
 
 import CN.Util.Assert
 import CC.API.V1.Coin
-import CC.API.V1.CoinRules hiding (USD, CC)
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 

@@ -5,7 +5,6 @@ import DA.Time
 import Daml.Script
 
 import qualified CC.API.V1.Coin as API
-import qualified CC.API.V1.CoinRules as API
 import CN.Wallet.Subscriptions
 
 import CC.Scripts.Util

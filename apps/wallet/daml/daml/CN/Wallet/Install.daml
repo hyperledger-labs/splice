@@ -3,7 +3,6 @@ module CN.Wallet.Install where
 import DA.Exception
 
 import qualified CC.API.V1.Coin as API
-import qualified CC.API.V1.CoinRules as API
 import CC.Round (OpenMiningRound)
 import CC.CoinRules (CoinRules, CoinRules_Tap(..))
 

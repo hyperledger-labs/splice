@@ -12,7 +12,6 @@ import DA.List.Total
 import DA.Time
 
 import qualified CC.API.V1.Coin as API
-import qualified CC.API.V1.CoinRules as API
 import qualified CC.API.V1.Round as API
 import CC.Coin
 import CC.CoinRules

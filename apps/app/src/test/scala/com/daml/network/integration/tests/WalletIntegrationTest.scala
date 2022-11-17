@@ -1001,7 +1001,7 @@ class WalletIntegrationTest
       validatorParty: PartyId,
       coins: Seq[GrpcWalletAppClient.CoinPosition],
       quantity: Int,
-      transferContext: v1.coinrules.AppTransferContext,
+      transferContext: v1.coin.AppTransferContext,
   ): Unit = {
     val coinOpt = coins.find(_.effectiveQuantity >= quantity)
     val expirationOpt = Proto.decode(Proto.Timestamp)(20000000000000000L) // Wed May 18 2033
@@ -1013,16 +1013,16 @@ class WalletIntegrationTest
           optTimeout = None,
           commands = transferContext.coinRules
             .exerciseCoinRules_Transfer(
-              new v1.coinrules.Transfer(
+              new v1.coin.Transfer(
                 userParty.toProtoPrimitive,
                 userParty.toProtoPrimitive,
-                Seq[v1.coinrules.TransferInput](
-                  new v1.coinrules.transferinput.InputCoin(
+                Seq[v1.coin.TransferInput](
+                  new v1.coin.transferinput.InputCoin(
                     coin.contract.contractId.toInterface(v1.coin.Coin.INTERFACE)
                   )
                 ).asJava,
-                Seq[v1.coinrules.TransferOutput](
-                  new v1.coinrules.transferoutput.OutputSenderCoin(
+                Seq[v1.coin.TransferOutput](
+                  new v1.coin.transferoutput.OutputSenderCoin(
                     Some(BigDecimal(quantity).bigDecimal).toJava,
                     Some(
                       new v1.coin.TimeLock(
@@ -1031,14 +1031,14 @@ class WalletIntegrationTest
                       )
                     ).toJava,
                   ),
-                  new v1.coinrules.transferoutput.OutputSenderCoin(
+                  new v1.coin.transferoutput.OutputSenderCoin(
                     None.toJava,
                     None.toJava,
                   ),
                 ).asJava,
                 "lock coins",
               ),
-              new v1.coinrules.TransferContext(
+              new v1.coin.TransferContext(
                 transferContext.openMiningRound,
                 Map.empty[v1.round.Round, v1.round.IssuingMiningRound.ContractId].asJava,
                 Map.empty[String, v1.coin.ValidatorRight.ContractId].asJava,

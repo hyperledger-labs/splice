@@ -14,7 +14,6 @@ import CC.Fees
 import CC.Round
 import CC.Util
 import qualified CC.API.V1.Coin as API
-import qualified CC.API.V1.CoinRules as API
 import qualified CC.API.V1.Round as API
 import CN.Util.Assert
 

@@ -169,14 +169,14 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
     */
   def getPaymentTransferContext(retryProvider: CoinRetries)(implicit
       ec: ExecutionContext
-  ): Future[v1.coinrules.PaymentTransferContext] =
+  ): Future[v1.coin.PaymentTransferContext] =
     for {
       coinRules <- getCoinRules()
       openRound <- getLatestOpenMiningRound(retryProvider)
       issuingMiningRounds <- listContracts(roundCodegen.IssuingMiningRound.COMPANION)
       validatorRights <- listContracts(coinCodegen.ValidatorRight.COMPANION)
     } yield {
-      val transferContext = new v1.coinrules.TransferContext(
+      val transferContext = new v1.coin.TransferContext(
         openRound.value.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
         issuingMiningRounds.value
           .map(r =>
@@ -189,8 +189,8 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
           .toMap[String, v1.coin.ValidatorRight.ContractId]
           .asJava,
       )
-      new v1.coinrules.PaymentTransferContext(
-        coinRules.value.contractId.toInterface(v1.coinrules.CoinRules.INTERFACE),
+      new v1.coin.PaymentTransferContext(
+        coinRules.value.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
         transferContext,
       )
     }

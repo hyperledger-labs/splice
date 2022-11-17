@@ -4,7 +4,7 @@ import DA.Assert
 import DA.Time
 import Daml.Script
 
-import CC.API.V1.CoinRules
+import CC.API.V1.Coin
 import CN.Directory
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions

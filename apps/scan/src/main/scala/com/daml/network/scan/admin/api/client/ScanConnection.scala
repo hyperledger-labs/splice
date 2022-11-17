@@ -1,10 +1,7 @@
 package com.daml.network.scan.admin.api.client
 
 import com.daml.network.admin.api.client.AppConnection
-import com.daml.network.codegen.java.cc.api.v1.{
-  coinrules as coinRulesCodegen,
-  round as roundCodegen,
-}
+import com.daml.network.codegen.java.cc.api.v1.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -55,14 +52,14 @@ final class ScanConnection(
 
   def getAppTransferContext()(implicit
       traceContext: TraceContext
-  ): Future[coinRulesCodegen.AppTransferContext] =
+  ): Future[coinCodegen.AppTransferContext] =
     getTransferContext().map { context =>
       val coinRules = context.coinRules.getOrElse(throw notFound("No active CoinRules contract"))
       val openMiningRound = context.latestOpenMiningRound.getOrElse(
         throw notFound("No active OpenMiningRound contract")
       )
-      new coinRulesCodegen.AppTransferContext(
-        coinRules.contractId.toInterface(coinRulesCodegen.CoinRules.INTERFACE),
+      new coinCodegen.AppTransferContext(
+        coinRules.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
         openMiningRound.contractId.toInterface(roundCodegen.OpenMiningRound.INTERFACE),
       )
     }

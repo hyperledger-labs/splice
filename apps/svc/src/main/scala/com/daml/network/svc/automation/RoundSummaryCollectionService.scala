@@ -2,7 +2,7 @@ package com.daml.network.svc.automation
 
 import com.daml.ledger.javaapi.data.{ExercisedEvent, Identifier, Transaction, TransactionTree}
 import com.daml.network.admin.LedgerAutomationService
-import com.daml.network.codegen.java.cc.api.v1.coinrules.TransferResult
+import com.daml.network.codegen.java.cc.api.v1.coin.TransferResult
 import com.daml.network.codegen.java.{cc, da}
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history.*

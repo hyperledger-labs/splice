@@ -1,6 +1,6 @@
 package com.daml.network.svc.store
 
-import com.daml.network.codegen.java.cc.api.v1.coinrules.{TransferResult, TransferSummary}
+import com.daml.network.codegen.java.cc.api.v1.coin.{TransferResult, TransferSummary}
 import com.daml.network.svc.store.memory.InMemorySvcEventsStore
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}

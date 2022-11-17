@@ -5,7 +5,7 @@ import DA.List
 import Daml.Script
 import CC.Coin
 import CC.Scripts.Util
-import qualified CC.API.V1.CoinRules as API
+import qualified CC.API.V1.Coin as API
 
 testFloatingOutputs: Script ()
 testFloatingOutputs = do

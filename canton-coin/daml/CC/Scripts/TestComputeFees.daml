@@ -3,7 +3,7 @@ module CC.Scripts.TestComputeFees where
 import DA.Assert
 import Daml.Script
 
-import qualified CC.API.V1.CoinRules as API
+import qualified CC.API.V1.Coin as API
 import CC.Scripts.Util
 
 template Test

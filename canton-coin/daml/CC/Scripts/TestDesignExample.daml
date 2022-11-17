@@ -6,7 +6,6 @@ import DA.Time
 import Daml.Script
 
 import qualified CC.API.V1.Coin as API
-import qualified CC.API.V1.CoinRules as API
 import CN.Util.Assert
 import CC.Coin
 import CC.CoinRules

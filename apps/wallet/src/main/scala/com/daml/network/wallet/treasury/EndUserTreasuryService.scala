@@ -210,12 +210,12 @@ case class EndUserTreasuryService(
     */
   private def selectTransferInputs(
       activeIssuingRounds: Set[v1.round.Round]
-  )(implicit tc: TraceContext): Future[(Seq[v1.coinrules.TransferInput], Set[PartyId])] = for {
+  )(implicit tc: TraceContext): Future[(Seq[v1.coin.TransferInput], Set[PartyId])] = for {
     coinInputs <- userStore
       .listContracts(coinCodegen.Coin.COMPANION)
       .map(cs =>
         cs.value.map(c =>
-          new v1.coinrules.transferinput.InputCoin(c.contractId.toInterface(v1.coin.Coin.INTERFACE))
+          new v1.coin.transferinput.InputCoin(c.contractId.toInterface(v1.coin.Coin.INTERFACE))
         )
       )
     validatorRewardsRaw <- walletStore
@@ -227,7 +227,7 @@ case class EndUserTreasuryService(
       .toSet
     validatorRewardInputs = validatorRewards
       .map(rw =>
-        new v1.coinrules.transferinput.InputValidatorReward(
+        new v1.coin.transferinput.InputValidatorReward(
           rw.contractId.toInterface(v1.coin.ValidatorReward.INTERFACE)
         )
       )
@@ -237,7 +237,7 @@ case class EndUserTreasuryService(
         rws.value
           .filter(rw => activeIssuingRounds.contains(rw.payload.round))
           .map(rw =>
-            new v1.coinrules.transferinput.InputAppReward(
+            new v1.coin.transferinput.InputAppReward(
               rw.contractId.toInterface(v1.coin.AppReward.INTERFACE)
             )
           )

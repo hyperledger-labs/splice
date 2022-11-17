@@ -5,7 +5,6 @@ import DA.Time
 
 import CN.Util.Assert
 import CC.API.V1.Coin
-import CC.API.V1.CoinRules
 import CC.API.V1.Round
 
 data DeliveryOfferView = DeliveryOfferView

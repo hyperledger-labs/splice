@@ -23,8 +23,8 @@ sealed trait ParentNode {
 }
 case class Transfer(
     node: ExerciseNode[
-      v1.coinrules.CoinRules_Transfer,
-      da.types.Either[String, v1.coinrules.TransferResult],
+      v1.coin.CoinRules_Transfer,
+      da.types.Either[String, v1.coin.TransferResult],
     ]
 ) extends ParentNode {
   def toProtoV0: v0.ParentNode =
@@ -36,21 +36,21 @@ trait ParentNodeCompanion extends ExerciseNodeCompanion {
 }
 
 object Transfer extends ParentNodeCompanion {
-  override type Tpl = v1.coinrules.CoinRules
-  override type Arg = v1.coinrules.CoinRules_Transfer
-  override type Res = da.types.Either[String, v1.coinrules.TransferResult]
+  override type Tpl = v1.coin.CoinRules
+  override type Arg = v1.coin.CoinRules_Transfer
+  override type Res = da.types.Either[String, v1.coin.TransferResult]
 
-  override val templateOrInterface = Right(v1.coinrules.CoinRules.INTERFACE)
-  override val choice = v1.coinrules.CoinRules.CHOICE_CoinRules_Transfer
+  override val templateOrInterface = Right(v1.coin.CoinRules.INTERFACE)
+  override val choice = v1.coin.CoinRules.CHOICE_CoinRules_Transfer
 
-  override val argDecoder = v1.coinrules.CoinRules_Transfer.valueDecoder()
-  override def argToValue(arg: v1.coinrules.CoinRules_Transfer) = arg.toValue
+  override val argDecoder = v1.coin.CoinRules_Transfer.valueDecoder()
+  override def argToValue(arg: v1.coin.CoinRules_Transfer) = arg.toValue
 
-  override val resDecoder = da.types.Either.valueDecoder[String, v1.coinrules.TransferResult](
+  override val resDecoder = da.types.Either.valueDecoder[String, v1.coin.TransferResult](
     PrimitiveValueDecoders.fromText,
-    v1.coinrules.TransferResult.valueDecoder,
+    v1.coin.TransferResult.valueDecoder,
   )
-  override def resToValue(res: da.types.Either[String, v1.coinrules.TransferResult]) =
+  override def resToValue(res: da.types.Either[String, v1.coin.TransferResult]) =
     res.toValue(t => new Text(t), _.toValue)
 
   override def toParentNode(node: ExerciseNode[Arg, Res]) = Transfer(node)

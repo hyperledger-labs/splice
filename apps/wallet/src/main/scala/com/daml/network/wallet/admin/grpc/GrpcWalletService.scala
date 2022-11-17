@@ -657,7 +657,7 @@ class GrpcWalletService(
           validatorRewardInputs = validatorRewards
             .filter(c => c.payload.round.number == request.round)
             .map(c =>
-              new v1.coinrules.transferinput.InputValidatorReward(
+              new v1.coin.transferinput.InputValidatorReward(
                 c.contractId.toInterface(v1.coin.ValidatorReward.INTERFACE)
               )
             )
@@ -665,17 +665,17 @@ class GrpcWalletService(
           appRewardInputs = appRewards
             .filter(c => c.payload.round.number == request.round)
             .map(c =>
-              new v1.coinrules.transferinput.InputAppReward(
+              new v1.coin.transferinput.InputAppReward(
                 c.contractId.toInterface(v1.coin.AppReward.INTERFACE)
               )
             )
           coinCid <- selectCoin(userStore, 0)
-          inputCoin = new v1.coinrules.transferinput.InputCoin(
+          inputCoin = new v1.coin.transferinput.InputCoin(
             coinCid.toInterface(v1.coin.Coin.INTERFACE)
           )
           inputs = (inputCoin +: validatorRewardInputs :++ appRewardInputs)
           outputs = Seq(
-            new v1.coinrules.transferoutput.OutputSenderCoin(None.toJava, None.toJava)
+            new v1.coin.transferoutput.OutputSenderCoin(None.toJava, None.toJava)
           )
           coins <- redistribute(userStore, validatorStore, inputs, outputs)
         } yield {
@@ -802,13 +802,13 @@ class GrpcWalletService(
   private def redistribute(
       userStore: EndUserWalletStore,
       validatorStore: EndUserWalletStore,
-      inputs: Seq[v1.coinrules.TransferInput],
-      outputs: Seq[v1.coinrules.TransferOutput],
+      inputs: Seq[v1.coin.TransferInput],
+      outputs: Seq[v1.coin.TransferOutput],
   )(implicit tc: TraceContext): Future[Seq[v1.coin.Coin.ContractId]] = {
     val user = userStore.key.endUserName
     val party = userStore.key.endUserParty
     exerciseWalletAction((installCid, _) => {
-      val transfer = new v1.coinrules.Transfer(
+      val transfer = new v1.coin.Transfer(
         party.toProtoPrimitive,
         party.toProtoPrimitive,
         inputs.asJava,
@@ -825,7 +825,7 @@ class GrpcWalletService(
     })(
       user,
       _.exerciseResult.createdCoins.asScala
-        .collect { case coin: v1.coinrules.createdcoin.TransferResultCoin =>
+        .collect { case coin: v1.coin.createdcoin.TransferResultCoin =>
           coin.contractIdValue
         }
         .toSeq,
