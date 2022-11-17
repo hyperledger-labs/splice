@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.{directory => dirCodegen}
+import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.console.{LocalValidatorAppReference, RemoteDirectoryAppReference}
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.SubscriptionIdleState
@@ -235,7 +235,9 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
         clue("Create first subscription") {
           requestDirectoryEntryWithSubscription(aliceUserParty, aliceDirectory, "alice1.cns")
           browseToSubscriptions(aliceDamlUser)
-          eventually() { click on className("sub-request-accept-button") }
+          eventually() {
+            click on className("sub-request-accept-button")
+          }
         }
         clue("Check that the first subscription is listed") {
           eventually() {
@@ -251,7 +253,9 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
         clue("Create second subscription") {
           requestDirectoryEntryWithSubscription(aliceUserParty, aliceDirectory, "alice2.cns")
           browseToSubscriptions(aliceDamlUser)
-          eventually() { click on className("sub-request-accept-button") }
+          eventually() {
+            click on className("sub-request-accept-button")
+          }
         }
         clue("Check that the second subscription is listed") {
           eventually() {
@@ -277,7 +281,9 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
           }
           aliceRemoteWallet.makeSubscriptionPayment(stateId)
         }
-        clue("Check that the changed subscription state is visible") {
+        clue(
+          "Check that the changed subscription state is visible, and the cancellation buttons are enabled correctly"
+        ) {
           eventually() {
             noException should be thrownBy ({ // exceptions could be thrown during concurrent UI updates
               val rows = findAll(className("subs-table-row")).toList
@@ -286,7 +292,15 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
                 .filter(row => row.childElement(className("sub-state")).text == expectedIdleText)
                 .length shouldBe 1
               rows
+                .filter(row => row.childElement(className("sub-state")).text == expectedIdleText)
+                .filter(row => row.childElement(className("sub-cancel-button")).isEnabled)
+                .length shouldBe 1
+              rows
                 .filter(row => row.childElement(className("sub-state")).text == expectedPaymentText)
+                .length shouldBe 1
+              rows
+                .filter(row => row.childElement(className("sub-state")).text == expectedPaymentText)
+                .filter(row => !row.childElement(className("sub-cancel-button")).isEnabled)
                 .length shouldBe 1
             })
           }
@@ -295,6 +309,44 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
           "Navigate somewhere else to ignore the errors resulting from stopping the directory."
         ) {
           go to "http://localhost:3000"
+        }
+      }
+    }
+
+    "support canceling subscriptions" in { implicit env =>
+      val aliceDamlUser = aliceRemoteWallet.config.damlUser
+      val aliceUserParty = setupForTestWithDirectory(aliceDamlUser, aliceValidator)
+      val expectedDirName = createDirectoryEntryForDirectoryItself
+      aliceRemoteWallet.tap(50) // she'll need this for accepting and financing subscriptions
+
+      val expectedIdleText = "Waiting for next payment to become due"
+
+      withFrontEnd("alice") { implicit webDriver =>
+        clue("Create subscription") {
+          requestDirectoryEntryWithSubscription(aliceUserParty, aliceDirectory, "alice1.cns")
+          browseToSubscriptions(aliceDamlUser)
+          eventually() {
+            click on className("sub-request-accept-button")
+          }
+        }
+        clue("Check that the first subscription is listed") {
+          eventually() {
+            inside(findAll(className("subs-table-row")).toList) {
+              case Seq(row) => {
+                row.childElement(className("sub-receiver")).text should matchText(expectedDirName)
+                row.childElement(className("sub-provider")).text should matchText(expectedDirName)
+                row.childElement(className("sub-state")).text should matchText(expectedIdleText)
+              }
+            }
+          }
+        }
+        clue("Cancel subscription") {
+          click on className("sub-cancel-button")
+        }
+        clue("Check that the subscription is no longer listed") {
+          eventually() {
+            findAll(className("subs-table-row")).toSeq shouldBe empty;
+          }
         }
       }
     }

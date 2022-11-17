@@ -74,6 +74,7 @@ export interface WalletClient {
   listSubscriptionRequests: () => Promise<ListSubscriptionRequestsResponse>;
   acceptSubscriptionRequest: (requestContractId: string) => Promise<void>;
   listSubscriptions: () => Promise<ListSubscriptionsResponse>;
+  cancelSubscription: (subscriptionContractId: string) => Promise<void>;
 
   userStatus: () => Promise<UserStatusResponse>;
 }
@@ -209,6 +210,12 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             return [main, state];
           }),
         };
+      },
+      cancelSubscription: async (subscriptionContractId: string): Promise<void> => {
+        await walletClient.cancelSubscription(
+          new v0.CancelSubscriptionRequest().setIdleStateContractId(subscriptionContractId),
+          getCreds()
+        );
       },
 
       userStatus: async () => {

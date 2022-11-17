@@ -110,7 +110,7 @@ const SubscriptionRequestsTable: React.FC<SubscriptionsProps> = ({ cid }) => {
 };
 
 const SubscriptionsTable: React.FC = () => {
-  const { listSubscriptions } = useWalletClient();
+  const { listSubscriptions, cancelSubscription } = useWalletClient();
   const [SubscriptionTuples, setSubscriptionTuples] = useState<SubscriptionTuple[]>([]);
 
   const fetchSubscriptions = useCallback(async () => {
@@ -121,6 +121,13 @@ const SubscriptionsTable: React.FC = () => {
   }, [listSubscriptions, setSubscriptionTuples]);
 
   useInterval(fetchSubscriptions, 500);
+
+  const onCancel = async (state: SubscriptionState) => {
+    if (state.type !== 'idle') {
+      throw new Error('Cannot cancel a subscription which is not in idle state');
+    }
+    await cancelSubscription(state.value.contractId);
+  };
 
   const Subscription: React.FC<{
     main: Contract<Subscription>;
@@ -137,6 +144,15 @@ const SubscriptionsTable: React.FC = () => {
         <DirectoryEntry partyId={main.payload.provider} />
       </TableCell>
       <TableCell className="sub-state">{stateDescription(state)}</TableCell>
+      <TableCell>
+        <Button
+          className="sub-cancel-button"
+          onClick={() => onCancel(state)}
+          disabled={state.type !== 'idle'}
+        >
+          Cancel Subscription
+        </Button>
+      </TableCell>
     </TableRow>
   );
 
