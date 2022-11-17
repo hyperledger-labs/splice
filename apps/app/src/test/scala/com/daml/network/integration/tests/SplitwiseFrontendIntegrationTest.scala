@@ -8,7 +8,7 @@ import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.daml.network.util.CoinUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
-import org.openqa.selenium.{Keys, StaleElementReferenceException}
+import org.openqa.selenium.Keys
 
 import scala.concurrent.duration.DurationInt
 
@@ -396,20 +396,15 @@ class SplitwiseFrontendIntegrationTest
       def accept_request(group: String, invitee: String)(implicit
           webDriver: WebDriverType
       ): Unit = {
-        // The element can become stale while we are finding&clicking them (due to the previously clicked ones) - hence the eventually() wrapper
         eventually() {
-          try {
-            findAll(className("add-user-link"))
-              .filter(elem =>
-                elem.attribute("data-group") == Some(group) &&
-                  elem.attribute("data-invitee") == Some(invitee)
-              )
-              .toSeq
-              .map(click on _)
-            ()
-          } catch {
-            case _: StaleElementReferenceException => fail()
-          }
+          findAll(className("add-user-link"))
+            .filter(elem =>
+              elem.attribute("data-group") == Some(group) &&
+                elem.attribute("data-invitee") == Some(invitee)
+            )
+            .toSeq
+            .map(click on _)
+          ()
         }
       }
 

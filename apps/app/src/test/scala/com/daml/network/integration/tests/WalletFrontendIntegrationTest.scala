@@ -259,14 +259,12 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
         }
         clue("Check that the second subscription is listed") {
           eventually() {
-            noException should be thrownBy ({ // exceptions could be thrown during concurrent UI updates
-              val rows = findAll(className("subs-table-row")).toList
-              rows.length shouldBe 2
-              rows.foreach(row => {
-                row.childElement(className("sub-receiver")).text should matchText(expectedDirName)
-                row.childElement(className("sub-provider")).text should matchText(expectedDirName)
-                row.childElement(className("sub-state")).text should matchText(expectedIdleText)
-              })
+            val rows = findAll(className("subs-table-row")).toList
+            rows.length shouldBe 2
+            rows.foreach(row => {
+              row.childElement(className("sub-receiver")).text should matchText(expectedDirName)
+              row.childElement(className("sub-provider")).text should matchText(expectedDirName)
+              row.childElement(className("sub-state")).text should matchText(expectedIdleText)
             })
           }
         }
@@ -285,24 +283,22 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
           "Check that the changed subscription state is visible, and the cancellation buttons are enabled correctly"
         ) {
           eventually() {
-            noException should be thrownBy ({ // exceptions could be thrown during concurrent UI updates
-              val rows = findAll(className("subs-table-row")).toList
-              rows.length shouldBe 2
-              rows
-                .filter(row => row.childElement(className("sub-state")).text == expectedIdleText)
-                .length shouldBe 1
-              rows
-                .filter(row => row.childElement(className("sub-state")).text == expectedIdleText)
-                .filter(row => row.childElement(className("sub-cancel-button")).isEnabled)
-                .length shouldBe 1
-              rows
-                .filter(row => row.childElement(className("sub-state")).text == expectedPaymentText)
-                .length shouldBe 1
-              rows
-                .filter(row => row.childElement(className("sub-state")).text == expectedPaymentText)
-                .filter(row => !row.childElement(className("sub-cancel-button")).isEnabled)
-                .length shouldBe 1
-            })
+            val rows = findAll(className("subs-table-row")).toList
+            rows.length shouldBe 2
+            rows
+              .filter(row => row.childElement(className("sub-state")).text == expectedIdleText)
+              .length shouldBe 1
+            rows
+              .filter(row => row.childElement(className("sub-state")).text == expectedIdleText)
+              .filter(row => row.childElement(className("sub-cancel-button")).isEnabled)
+              .length shouldBe 1
+            rows
+              .filter(row => row.childElement(className("sub-state")).text == expectedPaymentText)
+              .length shouldBe 1
+            rows
+              .filter(row => row.childElement(className("sub-state")).text == expectedPaymentText)
+              .filter(row => !row.childElement(className("sub-cancel-button")).isEnabled)
+              .length shouldBe 1
           }
         }
         clue(

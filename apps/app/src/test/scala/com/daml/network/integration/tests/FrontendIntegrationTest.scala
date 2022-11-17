@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import org.openqa.selenium.StaleElementReferenceException
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
@@ -13,6 +14,7 @@ import org.scalatest.BeforeAndAfterEach
 import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatestplus.selenium.WebBrowser
 
+import scala.concurrent.duration.*
 import java.io.File
 import java.nio.file.Paths
 import java.text.SimpleDateFormat
@@ -64,6 +66,20 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
           )
         )
     )
+
+  // We override eventually to also retry on StaleElementReferenceException
+  // because that’s very common in frontend tests and having
+  // each call site try to catch that seems unlikely to be reliable.
+  override def eventually[T](
+      timeUntilSuccess: FiniteDuration = 20.seconds,
+      maxPollInterval: FiniteDuration = 5.seconds,
+  )(testCode: => T): T = super.eventually(timeUntilSuccess, maxPollInterval) {
+    try {
+      testCode
+    } catch {
+      case e: StaleElementReferenceException => fail(e)
+    }
+  }
 
   override def beforeEach() = {
     for { name <- frontendNames.toSeq } {
