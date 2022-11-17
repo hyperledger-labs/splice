@@ -6,7 +6,7 @@ if [ -f "canton.pid" ]; then
   exit 1
 fi
 
-rm -f canton.tokens
+rm -f canton.tokens canton-simtime.tokens
 rm -f canton.ports canton-simtime.ports
 
 POSTGRES_MODE=${1:-docker}
