@@ -35,7 +35,7 @@ class SplitwiseAppBootstrap(
     clock: Clock,
     metrics: SplitwiseAppMetrics,
     storageFactory: StorageFactory,
-    parentLogger: NamedLoggerFactory,
+    loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
     retryProvider: CoinRetries,
 )(implicit
@@ -55,7 +55,7 @@ class SplitwiseAppBootstrap(
       clock,
       metrics,
       storageFactory,
-      parentLogger.append(SplitwiseAppBootstrap.LoggerFactoryKeyName, name.unwrap),
+      loggerFactory,
       writeHealthDumpToFile,
     ) {
 

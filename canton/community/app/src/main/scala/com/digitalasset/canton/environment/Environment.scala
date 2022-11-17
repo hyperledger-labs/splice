@@ -188,6 +188,10 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
     val clockLoggerFactory = nodeTypeAndName.fold(loggerFactory) { case (nodeType, name) =>
       loggerFactory.append(nodeType, name)
     }
+    createClock(clockLoggerFactory)
+  }
+
+  protected def createClock(clockLoggerFactory: NamedLoggerFactory): Clock = {
     config.parameters.clock match {
       case ClockConfig.SimClock =>
         val parent = simClock.getOrElse(sys.error("This should not happen"))

@@ -40,25 +40,27 @@ trait CoinEnvironment extends Environment {
   protected def createValidator(
       name: String,
       validatorConfig: LocalValidatorAppConfig,
-  ): ValidatorAppBootstrap =
+  ): ValidatorAppBootstrap = {
+    val appLoggerFactory = loggerFactory.append(ValidatorAppBootstrap.LoggerFactoryKeyName, name)
     ValidatorAppBootstrap(
       name,
       validatorConfig,
       config.tryValidatorAppParametersByString(name),
-      createClock(Some(ValidatorAppBootstrap.LoggerFactoryKeyName -> name)),
+      createClock(appLoggerFactory),
       testingTimeService,
       coinMetrics.forValidator(name),
       testingConfig,
       futureSupervisor,
-      loggerFactory,
+      appLoggerFactory,
       writeHealthDumpToFile,
-      CoinRetries(loggerFactory),
+      CoinRetries(appLoggerFactory),
     )
       .valueOr(err =>
         throw new RuntimeException(
           s"Failed to create participant bootstrap: $err"
         )
       )
+  }
 
   lazy val validators = new ValidatorApps(
     createValidator,
@@ -72,25 +74,27 @@ trait CoinEnvironment extends Environment {
   protected def createSvc(
       name: String,
       svcConfig: LocalSvcAppConfig,
-  ): SvcAppBootstrap =
+  ): SvcAppBootstrap = {
+    val appLoggerFactory = loggerFactory.append(SvcAppBootstrap.LoggerFactoryKeyName, name)
     SvcAppBootstrap(
       name,
       svcConfig,
       config.trySvcAppParametersByString(name),
-      createClock(Some(SvcAppBootstrap.LoggerFactoryKeyName -> name)),
+      createClock(appLoggerFactory),
       testingTimeService,
       coinMetrics.forSvc(name),
       testingConfig,
       futureSupervisor,
-      loggerFactory,
+      appLoggerFactory,
       writeHealthDumpToFile,
-      CoinRetries(loggerFactory),
+      CoinRetries(appLoggerFactory),
     )
       .valueOr(err =>
         throw new RuntimeException(
           s"Failed to create participant bootstrap: $err"
         )
       )
+  }
 
   lazy val svcs = new SvcApps(
     createSvc,
@@ -104,17 +108,18 @@ trait CoinEnvironment extends Environment {
   protected def createScan(
       name: String,
       scanConfig: LocalScanAppConfig,
-  ): ScanAppBootstrap =
+  ): ScanAppBootstrap = {
+    val appLoggerFactory = loggerFactory.append(ScanAppBootstrap.LoggerFactoryKeyName, name)
     ScanAppBootstrap(
       name,
       scanConfig,
       config.tryScanAppParametersByString(name),
-      createClock(Some(ScanAppBootstrap.LoggerFactoryKeyName -> name)),
+      createClock(appLoggerFactory),
       testingTimeService,
       coinMetrics.forScan(name),
       testingConfig,
       futureSupervisor,
-      loggerFactory,
+      appLoggerFactory,
       writeHealthDumpToFile,
     )
       .valueOr(err =>
@@ -122,6 +127,7 @@ trait CoinEnvironment extends Environment {
           s"Failed to create participant bootstrap: $err"
         )
       )
+  }
 
   lazy val scans = new ScanApps(
     createScan,
@@ -135,25 +141,27 @@ trait CoinEnvironment extends Environment {
   protected def createWallet(
       name: String,
       walletConfig: LocalWalletAppConfig,
-  ): WalletAppBootstrap =
+  ): WalletAppBootstrap = {
+    val appLoggerFactory = loggerFactory.append(WalletAppBootstrap.LoggerFactoryKeyName, name)
     WalletAppBootstrap(
       name,
       walletConfig,
       config.tryWalletAppParametersByString(name),
-      createClock(Some(WalletAppBootstrap.LoggerFactoryKeyName -> name)),
+      createClock(appLoggerFactory),
       testingTimeService,
       coinMetrics.forWallet(name),
       testingConfig,
       futureSupervisor,
-      loggerFactory,
+      appLoggerFactory,
       writeHealthDumpToFile,
-      CoinRetries(loggerFactory),
+      CoinRetries(appLoggerFactory),
     )
       .valueOr(err =>
         throw new RuntimeException(
           s"Failed to create participant bootstrap: $err"
         )
       )
+  }
 
   lazy val wallets = new WalletApps(
     createWallet,
@@ -167,24 +175,26 @@ trait CoinEnvironment extends Environment {
   protected def createDirectory(
       name: String,
       directoryConfig: LocalDirectoryAppConfig,
-  ): DirectoryAppBootstrap =
+  ): DirectoryAppBootstrap = {
+    val appLoggerFactory = loggerFactory.append(DirectoryAppBootstrap.LoggerFactoryKeyName, name)
     DirectoryAppBootstrap(
       name,
       directoryConfig,
       config.tryDirectoryAppParametersByString(name),
-      createClock(Some(DirectoryAppBootstrap.LoggerFactoryKeyName -> name)),
+      createClock(appLoggerFactory),
       testingTimeService,
       coinMetrics.forDirectory(name),
       testingConfig,
       futureSupervisor,
-      loggerFactory,
+      appLoggerFactory,
       writeHealthDumpToFile,
-      CoinRetries(loggerFactory),
+      CoinRetries(appLoggerFactory),
     ).valueOr(err =>
       throw new RuntimeException(
         s"Failed to create participant bootstrap: $err"
       )
     )
+  }
 
   lazy val directories = new DirectoryApps(
     createDirectory,
@@ -198,25 +208,27 @@ trait CoinEnvironment extends Environment {
   protected def createSplitwise(
       name: String,
       splitwiseConfig: LocalSplitwiseAppConfig,
-  ): SplitwiseAppBootstrap =
+  ): SplitwiseAppBootstrap = {
+    val appLoggerFactory = loggerFactory.append(SplitwiseAppBootstrap.LoggerFactoryKeyName, name)
     SplitwiseAppBootstrap(
       name,
       splitwiseConfig,
       config.trySplitwiseAppParametersByString(name),
-      createClock(Some(SplitwiseAppBootstrap.LoggerFactoryKeyName -> name)),
+      createClock(appLoggerFactory),
       testingTimeService,
       coinMetrics.forSplitwise(name),
       testingConfig,
       futureSupervisor,
-      loggerFactory,
+      appLoggerFactory,
       writeHealthDumpToFile,
-      CoinRetries(loggerFactory),
+      CoinRetries(appLoggerFactory),
     )
       .valueOr(err =>
         throw new RuntimeException(
           s"Failed to create participant bootstrap: $err"
         )
       )
+  }
 
   lazy val splitwises = new SplitwiseApps(
     createSplitwise,
@@ -255,8 +267,10 @@ object CoinEnvironmentFactory extends EnvironmentFactory[CoinEnvironmentImpl] {
       config: CoinConfig,
       loggerFactory: NamedLoggerFactory,
       testingConfigInternal: TestingConfigInternal,
-  ): CoinEnvironmentImpl =
-    new CoinEnvironmentImpl(config, testingConfigInternal, loggerFactory)
+  ): CoinEnvironmentImpl = {
+    val envLoggerFactory = config.name.fold(loggerFactory)(loggerFactory.append("config", _))
+    new CoinEnvironmentImpl(config, testingConfigInternal, envLoggerFactory)
+  }
 }
 
 class CoinEnvironmentImpl(

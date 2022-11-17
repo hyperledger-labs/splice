@@ -35,7 +35,7 @@ class SvcAppBootstrap(
     clock: Clock,
     metrics: SvcAppMetrics,
     storageFactory: StorageFactory,
-    parentLogger: NamedLoggerFactory,
+    loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
     retryProvider: CoinRetries,
 )(implicit
@@ -55,7 +55,7 @@ class SvcAppBootstrap(
       clock,
       metrics,
       storageFactory,
-      parentLogger.append(SvcAppBootstrap.LoggerFactoryKeyName, name.unwrap),
+      loggerFactory,
       writeHealthDumpToFile,
     ) {
 

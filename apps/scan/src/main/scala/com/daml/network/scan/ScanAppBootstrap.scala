@@ -35,7 +35,7 @@ class ScanAppBootstrap(
     clock: Clock,
     metrics: ScanAppMetrics,
     storageFactory: StorageFactory,
-    parentLogger: NamedLoggerFactory,
+    loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
@@ -54,7 +54,7 @@ class ScanAppBootstrap(
       clock,
       metrics,
       storageFactory,
-      parentLogger.append(ScanAppBootstrap.LoggerFactoryKeyName, name.unwrap),
+      loggerFactory,
       writeHealthDumpToFile,
     ) {
 

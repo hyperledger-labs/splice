@@ -35,7 +35,7 @@ class WalletAppBootstrap(
     clock: Clock,
     metrics: WalletAppMetrics,
     storageFactory: StorageFactory,
-    parentLogger: NamedLoggerFactory,
+    loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
     retryProvider: CoinRetries,
 )(implicit
@@ -55,7 +55,7 @@ class WalletAppBootstrap(
       clock,
       metrics,
       storageFactory,
-      parentLogger.append(WalletAppBootstrap.LoggerFactoryKeyName, name.unwrap),
+      loggerFactory,
       writeHealthDumpToFile,
     ) {
 

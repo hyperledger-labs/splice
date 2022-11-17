@@ -36,7 +36,7 @@ class ValidatorAppBootstrap(
     clock: Clock,
     metrics: ValidatorAppMetrics,
     storageFactory: StorageFactory,
-    parentLogger: NamedLoggerFactory,
+    loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
     retryProvider: CoinRetries,
 )(implicit
@@ -56,7 +56,7 @@ class ValidatorAppBootstrap(
       clock,
       metrics,
       storageFactory,
-      parentLogger.append(ValidatorAppBootstrap.LoggerFactoryKeyName, name.unwrap),
+      loggerFactory,
       writeHealthDumpToFile,
     ) {
 

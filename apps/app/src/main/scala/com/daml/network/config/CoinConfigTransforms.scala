@@ -47,6 +47,10 @@ object CoinConfigTransforms {
       .replace(NonNegativeDuration.tryFromDuration(10.seconds))
   }
 
+  def addConfigName(context: String): CoinConfigTransform = { config =>
+    config.copy(name = Some(context))
+  }
+
   /** Ensure that the set of Daml user names used in a given instance of a configuration
     * have a common, context-specific suffix.
     *
@@ -114,7 +118,9 @@ object CoinConfigTransforms {
     * val validatorParty = validatorParticipant.parties.enable(validatorUserName)
     */
   def ensureNovelDamlNames(): CoinConfigTransform = { config =>
-    addDamlNameSuffix(UUID.randomUUID().toString())(config)
+    val id = UUID.randomUUID().toString()
+    val shortId = id.take(8)
+    addConfigName(shortId)(addDamlNameSuffix(id)(config))
   }
 
   /** Default transforms to apply to tests using a [[CoinEnvironmentDefinition]].

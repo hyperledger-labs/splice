@@ -35,7 +35,7 @@ class DirectoryAppBootstrap(
     clock: Clock,
     metrics: DirectoryAppMetrics,
     storageFactory: StorageFactory,
-    parentLogger: NamedLoggerFactory,
+    loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
     retryProvider: CoinRetries,
 )(implicit
@@ -55,7 +55,7 @@ class DirectoryAppBootstrap(
       clock,
       metrics,
       storageFactory,
-      parentLogger.append(DirectoryAppBootstrap.LoggerFactoryKeyName, name.unwrap),
+      loggerFactory,
       writeHealthDumpToFile,
     ) {
 
