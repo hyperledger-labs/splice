@@ -77,6 +77,7 @@ lazy val `daml-root` = project
     `wallet-daml`,
     `directory-daml`,
     `splitwise-daml`,
+    `svc-governance-daml`,
   )
 
 // Shared non-template/non-interface code
@@ -105,6 +106,18 @@ lazy val `canton-coin-daml` =
       BuildCommon.damlSettings,
       Compile / damlDependencies :=
         (`cn-util-daml` / Compile / damlBuild).value ++
+          (`canton-coin-api-daml` / Compile / damlBuild).value,
+    )
+
+lazy val `svc-governance-daml` =
+  project
+    .in(file("apps/sv/daml"))
+    .enablePlugins(DamlPlugin)
+    .settings(
+      BuildCommon.damlSettings,
+      Compile / damlDependencies :=
+        (`cn-util-daml` / Compile / damlBuild).value ++
+          (`canton-coin-daml` / Compile / damlBuild).value ++
           (`canton-coin-api-daml` / Compile / damlBuild).value,
     )
 

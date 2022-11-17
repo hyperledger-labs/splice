@@ -59,12 +59,14 @@ template CoinRules
       coinrules_ComputeFees context sender receiverQuantities = computeFees context config receiverQuantities
       coinrules_Transfer transfer context = executeTransfer context config svc transfer
 
-    nonconsuming choice CoinRules_Tap: ContractId Coin
+    -- A choice for the SVC to mint coin for the cases where the
+    -- consortium rules allow for that; e.g., when redeeming SVC rewards.
+    nonconsuming choice CoinRules_Mint: ContractId Coin
       with
         receiver: Party
         quantity: Decimal
         openRound: ContractId OpenMiningRound
-      controller receiver
+      controller svc, receiver
       do
         openRound <- fetch openRound
         let scaledConfig = scaleConfig openRound config
@@ -76,6 +78,15 @@ template CoinRules
                   owner = receiver
                   quantity = expiringQuantity
                   ..
+
+    -- TODO(M3-90): guard this choice by a flag in the config.
+    nonconsuming choice CoinRules_Tap: ContractId Coin
+      with
+        receiver: Party
+        quantity: Decimal
+        openRound: ContractId OpenMiningRound
+      controller receiver
+      do exercise self CoinRules_Mint with ..
 
 
     nonconsuming choice CoinRules_MiningRound_Open
@@ -237,14 +248,16 @@ template CoinRulesRequest
         openRounds : [ContractId OpenMiningRound]
         issuingRounds : [ContractId IssuingMiningRound]
       controller svc
-      do exercise coinRules (CoinRules_AddObserver user)
-         forA_ openRounds \round -> exercise round (OpenMiningRound_AddObserver user)
-         forA_ issuingRounds \round -> exercise round (IssuingMiningRound_AddObserver user)
-         pure ()
+      do
+        rules <- fetch coinRules
+        if user `elem` rules.observers
+          then pure ()  -- ignore duplicate requests
+          else do
+            exercise coinRules (CoinRules_AddObserver user)
+            forA_ openRounds \round -> exercise round (OpenMiningRound_AddObserver user)
+            forA_ issuingRounds \round -> exercise round (IssuingMiningRound_AddObserver user)
+            pure ()
 
-    choice CoinRulesRequest_Reject: ()
-      controller svc
-      do pure ()
 
 -- | A way to store some debug info on the ledger.
 --
@@ -658,7 +671,7 @@ distributeOutputs now config svc sender summary outs =
         | st.floatingComplete -> error $ "Internal error: Expected to be finished with floating outputs but got " <> show n
         | otherwise ->
         let (quantity, floatingComplete)
-              | n == 1 = 
+              | n == 1 =
                   -- We iterate over the outputs in reverse order so this should be the last floating output
                   (st.remainingExcessQuantity, True)
               -- TODO(M3-90): consider smearing this remainder excess quantity above perCoinExcessQuantity

@@ -9,6 +9,7 @@ import com.daml.network.codegen.java.cc.coinrules.{
   CoinRules,
   CoinRules_MiningRound_StartIssuing,
   CoinRules_Tap,
+  CoinRules_Mint,
 }
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.da
@@ -61,6 +62,35 @@ object Transfer extends ParentNodeCompanion {
       node <- ExerciseNode.fromProto(Transfer)(transferP.value)
     } yield Transfer(node)
   }
+}
+
+case class Mint(node: ExerciseNode[CoinRules_Mint, Coin.ContractId]) extends ParentNode {
+  def toProtoV0: v0.ParentNode =
+    v0.ParentNode().withMint(node.toProtoV0)
+}
+
+object Mint extends ParentNodeCompanion {
+  override type Tpl = CoinRules
+  override type Arg = CoinRules_Mint
+  override type Res = Coin.ContractId
+
+  override val templateOrInterface = Left(CoinRules.COMPANION)
+  override val choice = CoinRules.CHOICE_CoinRules_Mint
+
+  override val argDecoder = CoinRules_Mint.valueDecoder()
+  override def argToValue(arg: CoinRules_Mint) = arg.toValue
+
+  override val resDecoder = (cid: Value) =>
+    Coin.ContractId.fromContractId(
+      PrimitiveValueDecoders.fromContractId(Coin.valueDecoder).decode(cid)
+    )
+  override def resToValue(res: Coin.ContractId) = res.toValue
+
+  override def toParentNode(node: ExerciseNode[Arg, Res]) = Mint(node)
+
+  def fromProtoV0(mintP: v0.ParentNode.Type.Mint): Either[ProtoDeserializationError, Mint] = for {
+    node <- ExerciseNode.fromProto(Mint)(mintP.value)
+  } yield Mint(node)
 }
 
 case class Tap(node: ExerciseNode[CoinRules_Tap, Coin.ContractId]) extends ParentNode {
@@ -230,6 +260,7 @@ object ParentNode {
       case v0.ParentNode.Type.Empty =>
         Left(ProtoDeserializationError.FieldNotSet("ParentNode.type"))
       case tap: v0.ParentNode.Type.Tap => Tap.fromProtoV0(tap)
+      case mint: v0.ParentNode.Type.Mint => Mint.fromProtoV0(mint)
       case transfer: v0.ParentNode.Type.Transfer => Transfer.fromProtoV0(transfer)
       case issuing: v0.ParentNode.Type.StartIssuing => StartIssuing.fromProtoV0(issuing)
       case unlock: v0.ParentNode.Type.CoinUnlock => CoinUnlock.fromProtoV0(unlock)

@@ -118,13 +118,13 @@ template AppReward
       controller svc
       do miningRound <- fetch miningRoundCid
          require "Mining round > expiry round" (round <= miningRound.round)
-
     choice AppReward_ProviderExpire : ()
       with
         miningRoundCid : ContractId ClosedMiningRound
       controller provider
       do miningRound <- fetch miningRoundCid
          require "Mining round > expiry round" (round <= miningRound.round)
+
 
 -- | A receipt of a coin burn that can be used to claim part of a coin issuance.
 template ValidatorReward

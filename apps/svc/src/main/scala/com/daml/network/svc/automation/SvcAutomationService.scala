@@ -55,40 +55,30 @@ class SvcAutomationService(
               )
             )
 
-          // SCV setup is complete: check whether CoinRules already contains the requesting validator is already in the list of observers
-          case Some(coinRulesContract) =>
+          // SCV setup is complete: accept the CoinRules request, and rely on its idempotence wrt duplicate observers
+          case Some(_) =>
             val validatorParty = PartyId.tryFromProtoPrimitive(req.payload.user)
-            if (coinRulesContract.payload.observers.contains(validatorParty.toPrim)) {
-              // They are: reject
-              val cmds = req.contractId.exerciseCoinRulesRequest_Reject().commands.asScala.toSeq
-              logger.warn(s"Rejecting duplicate CoinRulesRequest from $validatorParty")
-              connection
-                .submitCommands(Seq(store.svcParty), Seq(), cmds)
-                .map(_ => "rejected request for already existing rules")
-            } else {
-              // They are not: accept
-              for {
-                // NOTE: this is NOT SAFE under concurrent changes to the XXXMiningRounds contracts
-                // That is OK here, as we assume that on-boarding of validators happens before.
-                // TODO(M3-90): make this safe under concurrent round management and onboarding
-                QueryResult(_, openMiningRounds) <- store
-                  .listContracts(cc.round.OpenMiningRound.COMPANION)
-                QueryResult(_, issuingMiningRounds) <- store
-                  .listContracts(cc.round.IssuingMiningRound.COMPANION)
-                QueryResult(_, coinRules) <- store.getCoinRules()
-                cmds = req.contractId
-                  .exerciseCoinRulesRequest_Accept(
-                    coinRules.contractId,
-                    openMiningRounds.map(_.contractId).asJava,
-                    issuingMiningRounds.map(_.contractId).asJava,
-                  )
-                  .commands
-                  .asScala
-                  .toSeq
-                // No command-dedup required, as the CoinRules contract is archived and recreated
-                _ <- connection.submitCommands(Seq(store.svcParty), Seq(), cmds)
-              } yield s"accepted coin rules request from $validatorParty"
-            }
+            for {
+              // NOTE: this is NOT SAFE under concurrent changes to the XXXMiningRounds contracts
+              // That is OK here, as we assume that on-boarding of validators happens before.
+              // TODO(M3-90): make this safe under concurrent round management and onboarding
+              QueryResult(_, openMiningRounds) <- store
+                .listContracts(cc.round.OpenMiningRound.COMPANION)
+              QueryResult(_, issuingMiningRounds) <- store
+                .listContracts(cc.round.IssuingMiningRound.COMPANION)
+              QueryResult(_, coinRules) <- store.getCoinRules()
+              cmds = req.contractId
+                .exerciseCoinRulesRequest_Accept(
+                  coinRules.contractId,
+                  openMiningRounds.map(_.contractId).asJava,
+                  issuingMiningRounds.map(_.contractId).asJava,
+                )
+                .commands
+                .asScala
+                .toSeq
+              // No command-dedup required, as the CoinRules contract is archived and recreated
+              _ <- connection.submitCommands(Seq(store.svcParty), Seq(), cmds)
+            } yield s"accepted coin rules request from $validatorParty"
         }
       }
   })

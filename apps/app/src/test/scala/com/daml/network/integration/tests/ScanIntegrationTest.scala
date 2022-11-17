@@ -25,10 +25,10 @@ class ScanIntegrationTest extends CoinIntegrationTest with PaymentChannelTestUti
       val history = scan.getTxHistory()
       history should have length 2
       val tapCreateTx = history(0)
-      val tapEvent = tapCreateTx.events(0)
-      inside(tapEvent.parentO) { case Some(tap: Tap) =>
-        BigDecimal(tap.node.argument.value.quantity) shouldBe 50
-        tap.node.argument.value.receiver shouldBe aliceP.toPrim
+      val mintEvent = tapCreateTx.events(0)
+      inside(mintEvent.parentO) { case Some(mint: Mint) =>
+        BigDecimal(mint.node.argument.value.quantity) shouldBe 50
+        mint.node.argument.value.receiver shouldBe aliceP.toPrim
       }
 
       val transferTx = history(1)

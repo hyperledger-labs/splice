@@ -144,6 +144,7 @@ class ReadCoinTransactionsService(
         LazyList[ParentNodeCompanion](
           Transfer,
           Tap,
+          Mint,
           StartIssuing,
           CoinUnlock,
           SvcExpireLock,
@@ -162,7 +163,7 @@ class ReadCoinTransactionsService(
         parent match {
           case other: ExercisedEvent =>
             logger.warn(
-              s"Parent of coin create or archival was not a tap, transfer or start issuing but ${other.getClass} ($other)"
+              s"Parent of coin create or archival was not a tap, mint, transfer or start issuing but ${other.getClass} ($other)"
             )
             None
           case created: CreatedEvent =>

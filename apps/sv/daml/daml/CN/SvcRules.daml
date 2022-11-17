@@ -1,0 +1,421 @@
+module CN.SvcRules where
+
+import DA.Action (void)
+import DA.Foldable (forA_)
+import DA.List as List
+import qualified DA.Map as Map
+import qualified DA.Set as Set
+
+-- TODO(M1-92) factor this one out of CC into its own library
+import CN.Util.Assert
+import CC.Coin
+import CC.CoinRules
+import CC.Round
+import CC.API.V1.Round (Round(..))
+
+
+-- Types
+---------
+
+data ActionRequiringConfirmation
+  = ARC_SvcRules with
+      svcAction : SvcRules_ActionRequiringConfirmation
+  | ARC_CoinRules with
+      coinRulesCid : ContractId CoinRules
+      coinRulesAction : CoinRules_ActionRequiringConfirmation
+  deriving (Eq, Show)
+
+data CoinRules_ActionRequiringConfirmation
+  = CRARC_MiningRound_Open CoinRules_MiningRound_Open
+  | CRARC_MiningRound_StartIssuing CoinRules_MiningRound_StartIssuing
+  | CRARC_MiningRound_Close CoinRules_MiningRound_Close
+  | CRARC_MiningRound_Archive CoinRules_MiningRound_Archive
+    -- ^ Confirmation ensures that it is only closed when there are no expired rewards left.
+  deriving (Eq, Show)
+
+data SvcRules_ActionRequiringConfirmation
+  = SRARC_AddMember SvcRules_AddMember
+  | SRARC_RemoveMember SvcRules_RemoveMember
+  deriving (Eq, Show)
+
+-- | Information about members relevant to consortium governance.
+data MemberInfo = MemberInfo with
+    joinedAsOfRound : Round
+  deriving (Eq, Show)
+
+data ConsortiumSummary = ConsortiumSummary with
+    leader : Party
+    numMembers : Int
+    requiredNumConfirmations : Int
+    -- | The number of confirmations required for an off-ledger choice. Should be
+    -- set to maxNumFaultySVs + 1.
+    requiredNumVotes : Int
+    -- | The number of votes required for electing an automation leader. Given
+    -- the assumption that any leader prioritized by an honest SV is a good leader,
+    -- this should be set to at least maxNumFaultySVs + 1. One might want to set
+    -- it to a higher number to tolerate diverging views of honest SVs wrt the
+    -- quality of a leader.
+
+    -- TODO(M2-01): review the above reasoning, and make the limits configurable so that we can trade-off performance vs. fault-tolerance
+  deriving (Eq, Show)
+
+
+-- Workflow templates
+---------------------
+
+data ElectionRequestReason
+  = ERR_LeaderUnavailable
+  -- TODO(M2-01): add case for leader asking to be relieved for a graceful shutdown
+  | ERR_OtherReason Text
+  deriving (Eq, Ord, Show)
+
+-- | A request to elect a new leader for the SVC.
+template ElectionRequest with
+    svc : Party
+    requester : Party
+    epoch : Int  -- current epoch whose leader should be replaced
+    reason : ElectionRequestReason -- reason for electing a new leader
+    ranking : [Party] -- preference ranking for new leaders
+  where
+    -- NOTE: we expect the requester to observe this contract through being
+    -- a backing member of the 'svc' consortium party. The requester can in
+    -- particular not be a signatory, as otherwise fetching and archiving of
+    -- the request would require the requesters confirmation instead of only
+    -- the confirmation of the 'svc'.
+    signatory svc
+
+-- | A confirmation for the leader to take an action in the name of the SVC.
+template Confirmation with
+    svc : Party
+    confirmer : Party
+    action : ActionRequiringConfirmation
+    -- TODO(M2-01): add expiry
+  where
+    -- As for 'ElectionRequest' we only make the 'svc' a signatory.
+    signatory svc
+
+-- | A note that an SV was issued part of the SvcReward in a specific round.
+template SvReward with
+    svc : Party
+    sv : Party
+    round : Round
+    quantity : Decimal
+  where
+    signatory svc
+
+
+-- SV Consortium rules
+----------------------
+
+-- | Rules governing the consortium.
+template SvcRules with
+    svc : Party        -- ^ The consortium party representing this consortium
+    epoch : Int        -- ^ The number of leaders that have already been elected.
+    nextMiningRound : Round
+    members : Map.Map Party MemberInfo
+    leader : Party
+    -- TODO(M2-01): manage config explicitly, and support changing the config
+  where
+    ensure leader `Map.member` members
+
+    -- NOTE: the members are not direct signatories as that would not give us the right fault-tolerance wrt
+    -- validating choices on this contract. Instead, the members are indirect signatories by being backing
+    -- members of the 'svc' consortium party.
+    signatory svc
+
+
+    -- Membership management
+    ------------------------
+
+    choice SvcRules_AddMember : ContractId SvcRules
+      with
+        newMember : Party
+        reason : Text
+      controller svc
+      do
+        require "Member is new" (not $ newMember `Map.member` members)
+        let info = MemberInfo with joinedAsOfRound = nextMiningRound
+        create SvcRules with
+          svc
+          epoch
+          nextMiningRound
+          leader
+          members = Map.insert newMember info members
+
+    choice SvcRules_RemoveMember : ContractId SvcRules
+      with
+        member : Party
+        reason : Text
+      controller svc
+      do
+        require "Member exists" (member `Map.member` members)
+        create SvcRules with
+          svc
+          epoch
+          nextMiningRound
+          leader
+          -- NOTE: this immediate deletion also slashes that members share of the current round's issuance
+          members = Map.delete member members
+
+    -- Leader election
+    ------------------
+
+    nonconsuming choice SvcRules_RequestElection : ContractId ElectionRequest
+      with
+        requester : Party
+        reason: ElectionRequestReason
+        ranking : [Party]
+      controller requester
+      do
+        -- TODO(M2-01): consider interaction with concurrent membership changes
+        require "Requester is a consortium member" (requester `Map.member` members)
+        require "All members are ranked exactly once" (sort ranking == sort (Map.keys members))
+        create ElectionRequest with
+          ..
+
+    choice SvcRules_ElectLeader : ContractId SvcRules
+      with
+        actor : Party
+        requestCids : [ContractId ElectionRequest]
+      controller actor
+      do
+        let summary = summarizeConsortium this
+        -- fetch, check, and archive all requests
+        reqs <- forA requestCids $ \requestCid -> do
+          req <- fetch requestCid
+          archive requestCid
+          require "Request is for this epoch" (req.epoch == epoch)
+          require "Requestor is a consortium member" (req.requester `Map.member` members)
+          pure req
+        let numVotes = length reqs
+            numVoters = numVotes
+            -- TODO(M2-01): consider whether that is the right number of votes to require
+            -- as there might be more votes being taken into consideration
+            numVotesForMajority = (summary.requiredNumVotes + 1) / 2
+        require "Requests are from different members" (unique $ map (.requester) reqs)
+        require "There are enough requests" (numVotes >= summary.requiredNumVotes)
+        let rankings = [ (req.requester, req.ranking) | req <- reqs ]
+            newLeader = instantRunOffVoting numVotesForMajority (numVoters - 1) rankings
+        create SvcRules with
+          svc
+          epoch = epoch + 1
+          nextMiningRound
+          members
+          leader = newLeader
+        pure self
+
+    nonconsuming choice SvcRules_ArchiveOutdatedElectionRequest : ()
+      with
+        requestCid : ContractId ElectionRequest
+      controller leader
+      do
+        request <- fetch requestCid
+        archive requestCid
+        require "Election request is outdated" (request.epoch < epoch)
+
+
+    -- Executing actions with confirmation
+    --------------------------------------
+
+    nonconsuming choice SvcRules_ConfirmAction : ContractId Confirmation
+      with
+        confirmer : Party
+        action : ActionRequiringConfirmation
+      controller confirmer
+      do
+        require "Confirmer is a consortium member" (confirmer `Map.member` members)
+        create Confirmation with
+          svc
+          confirmer
+          action
+
+    nonconsuming choice SvcRules_ExecuteConfirmedAction : ()
+      with
+        action : ActionRequiringConfirmation
+        confirmationCids : [ContractId Confirmation]
+      controller leader
+      do
+        let s = summarizeConsortium this
+        require "Enough confirmations" (length confirmationCids >= s.requiredNumConfirmations)
+        confirmers <- forA confirmationCids $ \confirmationCid -> do
+          confirmation <- fetch confirmationCid
+          archive confirmationCid
+          require "SVC matches" (confirmation.svc == svc)
+          require "Confirmer is a consortium member" (confirmation.confirmer `Map.member` members)
+          require "Confirmed action matches" (confirmation.action == action)
+          pure confirmation.confirmer
+        require "No duplicate confirmers" (unique confirmers)
+        executeActionRequiringConfirmation self action
+
+    -- TODO(M2-01): remove expired confirmations
+
+
+    -- Validator onboarding
+    -----------------------
+
+    nonconsuming choice SvcRules_CoinRulesRequest_Accept : ()
+      with
+        cid : ContractId CoinRulesRequest
+        choiceArg : CoinRulesRequest_Accept
+      controller leader
+      do
+        -- NOTE: we do not use voting as missing the addition of a mining round obserer
+        -- to an already existing round only impacts that ability of the validator to
+        -- use that round, but will not impact any future rounds.
+        --
+        -- Moreover, this problem will be gone once we use explicit disclosure.
+        exercise cid choiceArg
+
+
+
+    -- Reward management driven directly by the leader
+    --------------------------------------------------
+
+    nonconsuming choice SvcRules_CollectSvcReward : ()
+      with
+        rewardCid : ContractId SvcReward
+      controller leader
+      do
+        reward <- fetch rewardCid
+        archive rewardCid
+        require "SVC matches" (reward.svc == svc)
+        let eligibleSVs =
+              [ member | (member, info) <- Map.toList members, info.joinedAsOfRound <= reward.round]
+            -- TODO(M3-90): review rounding of SV issuance
+            issuancePerSV = reward.quantity / intToDecimal (length eligibleSVs)
+        -- NOTE: we are not directly creating coin's for the SV's here, as otherwise
+        -- we'd require their participants to confirm this tx, which is not fault-tolerant
+        -- against some SVs being offline. Instead, we create separate reward contracts
+        -- signed by the SVC only, which can then be collected by the individual SVs.
+        forA_ eligibleSVs $ \sv ->
+          create SvReward with
+            svc
+            sv
+            round = reward.round
+            quantity = issuancePerSV
+
+    nonconsuming choice SvcRules_CollectSvReward : ContractId Coin
+      with
+        sv : Party
+        rewardCid : ContractId SvReward
+        coinRulesCid : ContractId CoinRules
+        openRoundCid : ContractId OpenMiningRound
+      controller sv
+      do
+        reward <- fetch rewardCid
+        archive rewardCid
+        require "SVC matches" (reward.svc == svc)
+        require "SV matches" (reward.sv == sv)
+        openRound <- fetch openRoundCid
+        -- TODO(M2-01): make collection delay configurable
+        require "Reward is not too old" (openRound.round.number <= reward.round.number + 10)
+        exercise coinRulesCid CoinRules_Mint with
+          receiver = sv
+          quantity = reward.quantity
+          openRound = openRoundCid
+
+    -- TODO(M2-01): expire rewards that are too old
+
+    nonconsuming choice SvcRules_AppReward_SvcExpire : ()
+      with
+        cid : ContractId AppReward
+        choiceArg : AppReward_SvcExpire
+      controller leader
+      do exercise cid choiceArg
+
+    nonconsuming choice SvcRules_ValidatorReward_SvcExpire : ()
+      with
+        cid : ContractId ValidatorReward
+        choiceArg : ValidatorReward_SvcExpire
+      controller leader
+      do exercise cid choiceArg
+
+
+-- Utility functions
+--------------------
+
+summarizeConsortium : SvcRules -> ConsortiumSummary
+summarizeConsortium c = ConsortiumSummary with
+    leader = c.leader
+    numMembers
+    requiredNumConfirmations = (numMembers - 1) / 3 + 1
+    requiredNumVotes = 2 * (numMembers - 1) / 3 + 1
+  where
+    numMembers = Map.size c.members
+
+executeActionRequiringConfirmation: ContractId SvcRules -> ActionRequiringConfirmation -> Update ()
+executeActionRequiringConfirmation svcRulesCid act = case act of
+  ARC_CoinRules with .. ->
+    case coinRulesAction of
+      CRARC_MiningRound_Open choiceArg -> void $ exercise coinRulesCid choiceArg
+      CRARC_MiningRound_StartIssuing choiceArg -> void $ exercise coinRulesCid choiceArg
+      CRARC_MiningRound_Close choiceArg -> void $ exercise coinRulesCid choiceArg
+      CRARC_MiningRound_Archive choiceArg -> void $ exercise coinRulesCid choiceArg
+  ARC_SvcRules with .. ->
+    case svcAction of
+      SRARC_AddMember choiceArg -> void $ exercise svcRulesCid choiceArg
+      SRARC_RemoveMember choiceArg -> void $ exercise svcRulesCid choiceArg
+
+
+-- Functions implementing instant-runoff voting
+-----------------------------------------------
+
+data VotingState a = VotingState with
+    rankings : Map.Map a [[a]]
+    -- ^ Candidate and the remaining rankings in case that candidate is eliminated.
+    loosers : Set.Set a
+    -- ^ Loosers are tracked explicitly and removed lazily to avoid the cubic runtime
+    -- that would result from filtering the remaining rankings eagerly.
+  deriving (Eq, Show)
+
+instantRunOffVoting : Ord a => Int -> Int -> [(a, [a])] -> a
+instantRunOffVoting requiredNumVotes remainingVotingRounds rankings0 =
+    determineWinner requiredNumVotes remainingVotingRounds st
+  where
+    -- Only consider candidates that confirmed their readiness by voting themselves,
+    -- as a prudent engineering measure. These candidates have very recently shown to
+    -- be able to submit transactions.
+    voters = Set.fromList $ map fst rankings0
+    rankings = map (filter (`Set.member` voters) . snd) rankings0
+    st = tallyVotes rankings (VotingState Map.empty Set.empty)
+
+-- | Determine the winner of a preference voting election using Instant-RunOff voting
+-- https://en.wikipedia.org/wiki/Instant-runoff_voting
+determineWinner : Ord a => Int -> Int -> VotingState a -> a
+determineWinner requiredNumVotes remainingVotingRounds st
+  | remainingVotingRounds <= 0 = winner
+  | requiredNumVotes <= numWinnerVotes = winner
+  | otherwise =
+      let (looser, _) = head candidates
+          updatedVotes = distributeVotes looser st
+      in  determineWinner requiredNumVotes (remainingVotingRounds - 1) updatedVotes
+  where
+    candidates = sortOn snd
+      [ (p, length remainingRankins) | (p, remainingRankins) <- Map.toList st.rankings ]
+    (winner, numWinnerVotes) = head $ reverse candidates
+
+
+distributeVotes : forall a. Ord a => a -> VotingState a -> VotingState a
+distributeVotes looser st =
+  case Map.lookup looser st.rankings of
+    None -> error "deletion of non-existent candidate"
+    Some remainingRankings ->
+      tallyVotes remainingRankings VotingState with
+        rankings = st.rankings
+        loosers = Set.insert looser st.loosers
+
+tallyVotes : Ord a => [[a]] -> VotingState a -> VotingState a
+tallyVotes rankings votes = foldl tallyVote votes rankings
+
+tallyVote : forall a. Ord a => VotingState a -> [a] -> VotingState a
+tallyVote st [] = st
+tallyVote st (p :: ps)
+  -- loosers cannot become candidates again
+  | p `Set.member` st.loosers = tallyVote st ps
+  | otherwise = VotingState with
+      rankings = Map.alter tally p st.rankings
+      loosers = st.loosers
+  where
+    tally : Optional [[a]] -> Optional [[a]]
+    tally None = Some [ps]
+    tally (Some rankings) = Some (ps :: rankings)

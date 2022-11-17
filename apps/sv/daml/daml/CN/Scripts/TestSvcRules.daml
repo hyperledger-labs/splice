@@ -1,0 +1,282 @@
+module CN.Scripts.TestSvcRules where
+
+import DA.Action (unless)
+import DA.Foldable (forA_)
+import DA.List
+import qualified DA.Map as Map
+import qualified DA.Set as Set
+import qualified DA.Text as T
+import Daml.Script
+
+import CN.Util.Assert
+import CC.Coin
+import CC.CoinRules
+import CC.Round
+import CC.Scripts.Util
+import CN.SvcRules
+import CN.SvcBootstrap
+
+testSvcRules : Script ()
+testSvcRules = do
+
+  -- allocate users for the four founding members
+  [mallory, sv1, sv2, sv3] <- forA ["mallory", "sv1", "sv2", "sv3"] allocateParty
+
+  -- allocate consortium party
+  -- TODO(M2-02): make this a real consortium party
+  svc <- allocateParty "svc"
+
+  -- execute the propose-accept bootstrapping dance
+  submit sv1 $ createCmd SvcBootstrap with
+    svc
+    members = [sv1]
+    invitees = [mallory, sv2, sv3]
+
+  let acceptInvitation sv = do
+        [(bootstrapCid, _)] <- query @SvcBootstrap sv
+        -- TODO(M2-02): remove the actAs once consortium-party support landed in Daml
+        submitMulti [sv, svc] [] $ exerciseCmd bootstrapCid SvcBootstrap_AcceptInvitation with invitee = sv
+
+  forA_ [sv2, sv3, mallory] acceptInvitation
+
+  -- we now have a consortium with BFT for f = 1
+  svcUserId <- validateUserId "svc-user"
+  let app = CCApp with
+        svc
+        svcUser = CCUser with
+          userId = svcUserId
+          primaryParty = svc
+
+  -- run an issuance
+  runNextIssuanceD app 1.0
+
+  -- onboard a validator
+  v1 <- allocateParty "v1"
+  requestCoinRules app v1
+
+  -- mallory is not acting, which the others detect; they thus request a re-election
+  [(svcRulesCid, svcRules)] <- query @SvcRules svc
+  req1 <- submitMulti [sv1] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
+    requester = sv1
+    ranking = [sv1, sv2, sv3,  mallory]
+    reason = ERR_LeaderUnavailable
+  req2 <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
+    requester = sv2
+    ranking = [sv2, sv3, sv1, mallory]
+    reason = ERR_LeaderUnavailable
+  req3 <- submitMulti [sv3] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
+    requester = sv3
+    ranking = [sv3, sv2,  sv1, mallory]
+    reason = ERR_LeaderUnavailable
+  -- mallory tries to get himself re-elected
+  req4 <- submitMulti [mallory] [svc] $ exerciseCmd svcRulesCid SvcRules_RequestElection with
+    requester = mallory
+    ranking = [mallory, sv1, sv2, sv3]
+    reason = ERR_LeaderUnavailable
+  -- mallory does not get re-elected, as sv1 reaches a weak majority first
+  svcRulesCid <- submitMulti [sv2] [svc] $ exerciseCmd svcRulesCid SvcRules_ElectLeader with
+    actor = sv2
+    requestCids = [req1, req2, req3, req4]
+
+  [(svcRulesCid, svcRules)] <- query @SvcRules svc
+  require "SV1 got elected" (svcRules.leader == sv1)
+
+  -- coin rules get accepted now that there's a leader that acts
+  runCoinRulesAcceptBotD app
+
+  -- run a few more issuances
+  runNextIssuanceD app 1.1
+  runNextIssuanceD app 1.2
+
+  -- add a new SV member
+  sv4 <- allocateParty "sv4"
+  forA_ [sv2, sv3] $ \sv ->
+    submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_SvcRules with
+        svcAction = SRARC_AddMember $ SvcRules_AddMember with
+          newMember = sv4
+          reason = "decision:123"  -- unambiguous reference to the decision
+          -- TODO(M2-01): streamline references to off-ledger decisions
+  executeAllConfirmedActions app
+
+  -- kick out mallory, now that we have enough members to then still tolerate a failure
+  [(svcRulesCid, _)] <- query @SvcRules svc
+  forA_ [sv2, sv3] $ \sv ->
+    submitMulti [sv] [svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+      confirmer = sv
+      action = ARC_SvcRules with
+        svcAction = SRARC_RemoveMember $ SvcRules_RemoveMember with
+          member = mallory
+          reason = "decision:124"  -- unambiguous reference to the decision
+          -- TODO(M2-01): streamline references to off-ledger decisions
+  executeAllConfirmedActions app
+
+  -- check that mallory is no longer present
+  [(svcRulesCid, svcRules)] <- query @SvcRules svc
+  require "Mallory got kicked out" (Map.keys (svcRules.members) == [sv1, sv2, sv3, sv4])
+
+  -- wow! stuff works :D
+  return ()
+
+
+-- Utils
+--------
+
+leaderSubmits : CCApp -> (ContractId SvcRules -> Commands a) -> Script a
+leaderSubmits app mkCommands = do
+  [(consortiumCid, consortium)] <- query @SvcRules app.svc
+  submitMulti [consortium.leader] [app.svc] $ mkCommands consortiumCid
+
+
+-- TODO(M1-51): remove workaround for explicit disclosure
+-- Note: this must not run concurrently with commands that modify the mining rounds (e.g., runNextIssuance)
+runCoinRulesAcceptBotD : CCApp -> Script ()
+runCoinRulesAcceptBotD app = do
+  [(coinRulesCid, _)] <- query @CoinRules app.svc
+  openRounds <- query @OpenMiningRound app.svc
+  issuingRounds <- query @IssuingMiningRound app.svc
+  requests <- query @CoinRulesRequest app.svc
+  forA_ requests $ \(requestCid, request) -> do
+    leaderSubmits app $ \cid -> exerciseCmd cid $
+      SvcRules_CoinRulesRequest_Accept with
+        cid = requestCid
+        choiceArg = CoinRulesRequest_Accept coinRulesCid (fmap fst openRounds) (fmap fst issuingRounds)
+  pure ()
+
+-- | Run the next issuance.
+--
+-- TODO(M1-90): use overlapping issuances so that there are always 2 open issuances, 1 closing issuance,
+-- and 2 issuing issuances
+--
+-- TODO(M2-01): convert the whole script to use confirmations once rewards issuance has been finalized
+runNextIssuanceD : CCApp -> Decimal -> Script ()
+runNextIssuanceD app coinPrice = do
+    -- expire rewards for closed rounds
+    closedRounds <- query @ClosedMiningRound app.svc
+    forA_ closedRounds $ \(miningRoundCid, miningRound) -> do
+      -- app rewards
+      rewards <- queryFilter @AppReward app.svc (\r -> r.round == miningRound.round)
+      forA_ rewards $ \(rcid, _) ->
+        leaderSubmits app $ \cid -> exerciseCmd cid $
+          SvcRules_AppReward_SvcExpire with
+            cid = rcid
+            choiceArg = AppReward_SvcExpire with miningRoundCid
+      -- validator rewards
+      rewards <- queryFilter @ValidatorReward app.svc (\r -> r.round == miningRound.round)
+      forA_ rewards $ \(rcid, _) ->
+        leaderSubmits app $ \cid -> exerciseCmd cid $
+          SvcRules_ValidatorReward_SvcExpire with
+            cid = rcid
+            choiceArg = ValidatorReward_SvcExpire with miningRoundCid
+      -- the closed round
+      confirmAWC_MiningRound_Archive app
+      executeAllConfirmedActions app
+      -- submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_Archive with
+      --   miningRoundCid
+
+    -- TODO(M2-01): collect SvcRewards via SvRewards into per-SV coins
+
+    -- close current issuing rounds if there are any
+    imcs <- query @IssuingMiningRound app.svc
+    forA_ imcs $ \(miningRoundCid, _) ->
+      submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_Close with
+        totalTransferFees = 0.0
+        totalAdminFees = 0.0
+        totalHoldingFees = 0.0
+        totalTransferInputs = 0.0
+        totalNonSelfTransferOutputs = 0.0
+        totalSelfTransferOutputs = 0.0
+        -- Putting actual values here would require duplicating the logic from
+        -- the svc app here, and is not currently required for any of the existing
+        -- tests.
+        miningRoundCid
+
+    -- transition current OpenMiningRound into an IssuingMiningRound
+    (openRoundCid, openRound) <- getLatestOpenRound app
+    closingRoundCid <- submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_StartClosing with
+      miningRoundCid = openRoundCid
+
+    appRewards <- queryFilter @AppReward app.svc (\bc -> bc.round == openRound.round)
+    validatorRewards <- queryFilter @ValidatorReward app.svc (\bc -> bc.round == openRound.round)
+
+    submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_StartIssuing with
+      miningRoundCid = closingRoundCid
+      totalBurnQuantity =
+        sum [ r.quantity | (_, r) <- appRewards] +
+        sum [ r.quantity | (_, r) <- validatorRewards]
+
+    -- open another round
+    submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_Open with
+      coinPrice
+      round = addRelRound openRound.round (RelRound 1)
+
+    pure ()
+
+
+confirmAWC_MiningRound_Archive : CCApp -> Script ()
+confirmAWC_MiningRound_Archive app = do
+  -- get rules contracts
+  [(coinRulesCid, _)] <- query @CoinRules app.svc
+  [(svcRulesCid, rules)] <- query @SvcRules app.svc
+  -- query closed mining rounds and consortium members
+  rounds <- query @ClosedMiningRound app.svc
+  -- confirm the archival of all closed rounds
+  forA_ rounds $ \round ->
+    forA_ (Map.keys rules.members) $ \member -> do
+      -- mallory does not act
+      unless ("mallory" `T.isPrefixOf` partyToText member) $ do
+        -- TODO(M2-01): skip if there are left-over rewards for that round
+        -- TODO(M2-01): skip if there already exists a confirmation
+        submitMulti [member] [app.svc] $ exerciseCmd svcRulesCid SvcRules_ConfirmAction with
+          action = ARC_CoinRules with
+            coinRulesCid
+            coinRulesAction = CRARC_MiningRound_Archive $
+              CoinRules_MiningRound_Archive with
+                miningRoundCid = round._1
+          confirmer = member
+        pure ()
+
+executeAllConfirmedActions : CCApp -> Script ()
+executeAllConfirmedActions app = do
+  -- get rules and consortium summary
+  [(coinRulesCid, _)] <- query @CoinRules app.svc
+  [(svcRulesCid, rules)] <- query @SvcRules app.svc
+  let s = summarizeConsortium rules
+  -- query all confirmations visible to svc
+  confirmations0 <- query @Confirmation app.svc
+  -- execute the actions for which there are enough confirmations
+  let executableConfirmations =
+          filter (\cs -> s.requiredNumConfirmations <= length cs)
+        $ groupEqualOn (\c -> c._2.action) confirmations0
+  forA_ executableConfirmations $ \cs -> do
+    submitMulti [s.leader] [app.svc] $ exerciseCmd svcRulesCid SvcRules_ExecuteConfirmedAction with
+      action = (head cs)._2.action
+      confirmationCids = map fst cs
+
+-- | O(n^2): group all elements whose projection is equal.
+groupEqualOn : Eq b => (a -> b) -> [a] -> [[a]]
+groupEqualOn proj [] = []
+groupEqualOn proj (x :: xs) =
+    (x :: equal) :: groupEqualOn proj rest
+  where
+    xp = proj x
+    (equal, rest) = partition (\y -> proj y == xp) xs
+
+
+-- Instant run-off voting
+-------------------------
+
+unitTestVoting : Script ()
+unitTestVoting = do
+  let rankings =
+        [ ("A",   ["A",   "D", "B", "bad"])
+        , ("B",   ["B",   "D", "A", "bad"])
+        , ("bad", ["bad", "D", "A", "B"  ])
+        ]
+  let votes = tallyVotes (map snd rankings) (VotingState Map.empty Set.empty)
+  let candidates = sortOn snd
+        [ (p, length remainingRankins) | (p, remainingRankins) <- Map.toList votes.rankings ]
+  let winner = instantRunOffVoting 2 2 rankings
+  trace (votes, candidates, winner) $
+    assert $ (instantRunOffVoting 2 2 rankings) == "B"

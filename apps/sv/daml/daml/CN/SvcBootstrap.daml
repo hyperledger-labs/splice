@@ -1,0 +1,77 @@
+module CN.SvcBootstrap where
+
+import DA.List
+import qualified DA.Map as Map
+
+import CN.Util.Assert
+import CC.CoinRules
+import CC.API.V1.Round
+
+-- TODO(M2-01): move parameters into this file
+import CC.Scripts.Parameters
+
+import CN.SvcRules
+
+-- | A template for managing the consortium bootstrapping workflow.
+--
+-- NOTE: this bootstrapping approach can also be used to rollout an upgrade:
+-- bootstrap from the current version of the consortium rules, get confirmation from all members,
+-- and then replace the current version with the new version.
+template SvcBootstrap with
+    svc : Party
+    members : [Party] -- ^ confirmed founding members
+    invitees : [Party] -- ^ invited founding members
+  where
+    ensure unique (members ++ invitees)
+    signatory members
+    observer invitees
+
+    -- NOTE: we accept the contention on this invite flow, as we expect to have
+    -- small sets of invitees (< 10) at boostrapping time.
+    choice SvcBootstrap_AcceptInvitation : ()
+      with
+        invitee : Party
+      controller invitee, svc
+      -- TODO(M2-02): remove the 'svc' controlller, which is a workaround as we cannot
+      -- get authorization for acting as the 'svc' consortium party in the body as explained below
+      do
+        require "Invitee was invited" (invitee `elem` invitees)
+        require "Invitee is not yet a member" (not $ invitee `elem` members)
+        let newInvitees = delete invitee invitees
+            newMembers = invitee :: members
+        if null newInvitees
+          then do
+            -- all invitees accepted: finish bootstrapping
+            let mkMemberInfo sv = (sv, MemberInfo with joinedAsOfRound = Round 0)
+            -- TODO(M2-02): add call to built-in function to
+            -- use the authority of the 'svc' party for the actions below
+            svcRulesCid <- create SvcRules with
+              svc
+              epoch = 0
+              nextMiningRound = Round 1
+              members = Map.fromList $ map mkMemberInfo newMembers
+              leader = invitee
+            coinRulesCid <- create CoinRules with
+              svc
+              config = defaultCoinConfig
+              observers = newMembers
+            exercise coinRulesCid CoinRules_MiningRound_Open with
+              coinPrice = 1.0
+              round = Round 0
+            pure ()
+
+          else do
+            -- we are missing invitees: continue bootstrapping
+            create SvcBootstrap with
+              svc
+              members = invitee :: members
+              invitees = delete invitee invitees
+            pure ()
+
+    -- Any party to the bootstrapping can abort the bootstrapping,
+    -- thereby enabling recovering from spam and failed bootstrappings.
+    choice SvcBootstrap_Abort : ()
+      with
+        actor : Party
+      controller actor
+      do require "Actor is an invitee or member" (actor `elem` members || actor `elem` invitees)

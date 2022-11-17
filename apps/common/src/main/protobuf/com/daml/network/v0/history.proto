@@ -23,6 +23,7 @@ message ParentNode {
     ExerciseNode coin_unlock = 4;
     ExerciseNode owner_expire_lock = 5;
     ExerciseNode svc_expire_lock = 6;
+    ExerciseNode mint = 7;
   }
 }
 

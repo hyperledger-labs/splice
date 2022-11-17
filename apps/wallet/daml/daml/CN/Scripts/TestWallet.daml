@@ -210,7 +210,7 @@ testSingleReceiverUSDPaymentRequest = script do
       (ReceiverCCQuantity with receiver = bob.primaryParty, ccQuantity = 60.0)
       ]
 
-  pure ()  
+  pure ()
 
 testCCPaymentRequest : Script ()
 testCCPaymentRequest = script do
@@ -244,7 +244,7 @@ testCCPaymentRequest = script do
     deliveryOffer = toInterfaceContractId deliveryOffer
 
   aliceCoins <- query @Coin alice.primaryParty
-  map (\(_, c) -> c.quantity.initialQuantity) aliceCoins === [1.54, 1.0]
+  map (\(_, c) -> c.quantity.initialQuantity) aliceCoins === [1.0, 1.54]
   bobCoins <- query @Coin bob.primaryParty
   map (\(_, c) -> c.quantity.initialQuantity) bobCoins === [1.0]
   charlieCoins <- query @Coin charlie.primaryParty
@@ -290,7 +290,7 @@ testUSDPaymentRequest = script do
       (ReceiverCCQuantity with receiver = charlie.primaryParty, ccQuantity = 30.0)
       ]
 
-  pure ()  
+  pure ()
 
 testMixedPaymentRequest : Script ()
 testMixedPaymentRequest = script do
@@ -323,7 +323,7 @@ testMixedPaymentRequest = script do
       ]
 
 
-  pure ()    
+  pure ()
 
 testSuccessfulBatchCCPaymentRequests : Script ()
 testSuccessfulBatchCCPaymentRequests = script do
@@ -407,7 +407,7 @@ testInsufficientFundsBatchCCPaymentRequests = script do
 
   (transferRequest3, deliveryOffer3) <- createSingleReceiverPaymentRequest app alice.primaryParty bob.primaryParty (PaymentQuantity 10000.0 CC)
   (transferRequest4, deliveryOffer4) <- createPaymentRequest app alice.primaryParty [
-    (bob.primaryParty, PaymentQuantity 3.0 CC), 
+    (bob.primaryParty, PaymentQuantity 3.0 CC),
     (alice.primaryParty, PaymentQuantity 3.0 CC)]
   -- trying to fulfill the request for 10,000 CC will fail
   context <- getPaymentTransferContext app alice
@@ -436,4 +436,3 @@ testInsufficientFundsBatchCCPaymentRequests = script do
     deliveryOffer = toInterfaceContractId deliveryOffer4
 
   pure ()
-
