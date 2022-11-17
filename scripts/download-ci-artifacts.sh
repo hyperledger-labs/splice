@@ -18,23 +18,31 @@ CI_PROJECT="the-real-canton-coin"
 echo "Please enter the job number. This should be a ~5 digit number."
 read CI_BUILD_NUM
 
-TARGET_DIRECTORY="$(pwd)/log/ci/$CI_BUILD_NUM"
-mkdir -p $TARGET_DIRECTORY
-echo "Saving all artifacts to $TARGET_DIRECTORY"
+BASE_TARGET_DIRECTORY="$(pwd)/log/ci/$CI_BUILD_NUM"
+mkdir -p "$BASE_TARGET_DIRECTORY"
+echo "Saving all artifacts to $BASE_TARGET_DIRECTORY"
 
 ARTIFACTS_URL=https://circleci.com/api/v1.1/project/$CI_VCSTYPE/$CI_ORGNAME/$CI_PROJECT/$CI_BUILD_NUM/artifacts?circle-token=$CIRCLE_TOKEN
-curl $ARTIFACTS_URL -s | grep -o 'https://[^"]*' > "$TARGET_DIRECTORY/artifacts.txt"
+curl $ARTIFACTS_URL -s | grep -o 'https://[^"]*' > "$BASE_TARGET_DIRECTORY/artifacts.txt"
 
 while read p; do
   if [[ $p =~ ".log.gz" ]]; then
-    FILENAME="$TARGET_DIRECTORY/$(echo $p | sed -e 's?.*\/??')"
-    echo "Downloading artifact $p to $FILENAME"
-    curl -sSL -o "$FILENAME" "$p?circle-token=$CIRCLE_TOKEN"
-    gzip -f -d "$FILENAME"
+    PARALLEL_RUN="$(echo $p | sed -e 's?.*\/artifacts\/??' | sed -e 's?\/.*??')"
+    if [ -z "$PARALLEL_RUN" ]; then
+      TARGET_DIRECTORY="$BASE_TARGET_DIRECTORY/logs"
+    else
+      TARGET_DIRECTORY="$BASE_TARGET_DIRECTORY/run-$PARALLEL_RUN"
+    fi
+    mkdir -p "$TARGET_DIRECTORY"
+    FILE_NAME="$(echo $p | sed -e 's?.*\/??')"
+    TARGET_PATH="$TARGET_DIRECTORY/$FILE_NAME"
+    echo "Downloading artifact $p to $TARGET_PATH"
+    curl -sSL -o "$TARGET_PATH" "$p?circle-token=$CIRCLE_TOKEN"
+    gzip -f -d "$TARGET_PATH"
   else
     echo "Not downloading $p, as it is not a log file"
   fi
-done <"$TARGET_DIRECTORY/artifacts.txt"
+done <"$BASE_TARGET_DIRECTORY/artifacts.txt"
 
-echo "Done. Run the following command to inspect the logs:"
-echo "lnav $TARGET_DIRECTORY/*.log"
+echo "Done. Logs have been downloaded to the following directory:"
+echo "$BASE_TARGET_DIRECTORY"
