@@ -16,8 +16,6 @@ import {
 import {
   SubscriptionRequest,
   Subscription,
-  SubscriptionIdleState,
-  SubscriptionPayment,
 } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 
 import {
@@ -166,9 +164,9 @@ const SubscriptionsTable: React.FC = () => {
 const paymentDueAt = (state: SubscriptionState): string => {
   switch (state.type) {
     case 'idle':
-      return (state.value.payload as SubscriptionIdleState).nextPaymentDueAt;
+      return state.value.payload.nextPaymentDueAt;
     case 'payment':
-      return (state.value.payload as SubscriptionPayment).thisPaymentDueAt;
+      return state.value.payload.thisPaymentDueAt;
   }
 };
 
