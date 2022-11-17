@@ -67,16 +67,6 @@ final class ScanConnection(
       )
     }
 
-  def getJavaAppTransferContext()(implicit
-      traceContext: TraceContext
-  ): Future[coinRulesCodegen.AppTransferContext] =
-    getAppTransferContext().map(context =>
-      new coinRulesCodegen.AppTransferContext(
-        context.coinRules,
-        context.openMiningRound,
-      )
-    )
-
   private def notFound(description: String) = new StatusRuntimeException(
     Status.NOT_FOUND.withDescription(description)
   )

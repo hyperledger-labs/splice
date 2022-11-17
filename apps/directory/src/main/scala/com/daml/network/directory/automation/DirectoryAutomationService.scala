@@ -185,7 +185,7 @@ class DirectoryAutomationService(
           entryName,
         )
         for {
-          transferContext <- scanConnection.getJavaAppTransferContext()
+          transferContext <- scanConnection.getAppTransferContext()
           cmd =
             offer.contractId
               .exerciseDirectoryEntryOffer_CollectPayment(
@@ -251,7 +251,7 @@ class DirectoryAutomationService(
           offset: String,
       ) = {
         for {
-          transferContext <- scanConnection.getJavaAppTransferContext()
+          transferContext <- scanConnection.getAppTransferContext()
           cmd =
             contextId
               .exerciseDirectoryEntryContext_CollectInitialEntryPaymentWithSubscription(
@@ -325,7 +325,7 @@ class DirectoryAutomationService(
           offset: String,
       ) = {
         for {
-          transferContext <- scanConnection.getJavaAppTransferContext()
+          transferContext <- scanConnection.getAppTransferContext()
           cmd =
             contextId
               .exerciseDirectoryEntryContext_CollectEntryRenewalPaymentWithSubscription(

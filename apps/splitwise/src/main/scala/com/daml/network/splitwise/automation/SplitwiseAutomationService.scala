@@ -115,7 +115,7 @@ class SplitwiseAutomationService(
           .map(_ => s"rejected accepted app payment: $msg")
       case QueryResult(_, Some(install)) =>
         for {
-          transferContext <- scanConnection.getJavaAppTransferContext()
+          transferContext <- scanConnection.getAppTransferContext()
           transferInProgress <- store
             .lookupTransferInProgressById(transferInProgressId)
             .map(
