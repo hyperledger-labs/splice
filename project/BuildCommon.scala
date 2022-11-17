@@ -169,7 +169,8 @@ object BuildCommon {
         addCommandAlias(
           "clean-cn",
           "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwise/clean; apps-svc/clean; apps-wallet/clean; apps-directory/clean; apps-app/clean; canton-coin-daml/clean; canton-coin-api-daml/clean; wallet-daml/clean; wallet-payments-daml/clean; directory-daml/clean; splitwise-daml/clean; apps-frontends/clean; cleanCnDars",
-        )
+        ) ++
+        addCommandAlias("cn-clean", "; clean-cn")
     val buildSettings = inThisBuild(
       Seq(
         organization := "com.daml.network",

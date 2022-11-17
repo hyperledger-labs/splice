@@ -66,6 +66,19 @@ lazy val root = (project in file("."))
     resolvers += Resolver.sonatypeRepo("snapshots"),
   )
 
+// Defined so we can call damlBuild and damlTest on just our daml files
+// (due to sbt being sbt, there is no better workaround).
+lazy val `daml-root` = project
+  .aggregate(
+    `cn-util-daml`,
+    `canton-coin-api-daml`,
+    `canton-coin-daml`,
+    `wallet-payments-daml`,
+    `wallet-daml`,
+    `directory-daml`,
+    `splitwise-daml`,
+  )
+
 // Shared non-template/non-interface code
 // used across our DARs.
 lazy val `cn-util-daml` =
