@@ -126,24 +126,6 @@ template AppReward
       do miningRound <- fetch miningRoundCid
          require "Mining round > expiry round" (round <= miningRound.round)
 
-    choice AppReward_Merge : ContractId AppReward
-      -- ^ This choice is used by the SVC to merge all burned coins per validator.
-      -- The expectation is that there is at most one burned coin per validator before
-      -- the issuance event is triggered.
-      with
-        cids : [ContractId AppReward]
-      controller svc
-      do
-        require "Merge with at least one burned coin" (not (null cids))
-        quantities <- forA cids $ \cid -> do
-          burnedCoin <- fetch cid
-          archive cid
-          require ("Burned coins must match") (this == burnedCoin with quantity)
-          return burnedCoin.quantity
-        create this with quantity = this.quantity + sum quantities
-
-
-
 -- | A receipt of a coin burn that can be used to claim part of a coin issuance.
 template ValidatorReward
   with
@@ -172,23 +154,6 @@ template ValidatorReward
       -- TODO(M3-90): consider whether we should use time-based expiry so that the user can expire it unilaterally after let's say 24h
       do miningRound <- fetch miningRoundCid
          require "Mining round > expiry round" (round <= miningRound.round)
-
-
-    choice ValidatorReward_Merge : ContractId ValidatorReward
-      -- ^ This choice is used by the SVC to merge all burned coins per validator.
-      -- The expectation is that there is at most one burned coin per validator before
-      -- the issuance event is triggered.
-      with
-        cids : [ContractId ValidatorReward]
-      controller svc
-      do
-        require "Merge with at least one burned coin" (not (null cids))
-        quantities <- forA cids $ \cid -> do
-          burnedCoin <- fetch cid
-          archive cid
-          require ("Burned coins must match") (this == burnedCoin with quantity)
-          return burnedCoin.quantity
-        create this with quantity = this.quantity + sum quantities
 
     choice ValidatorReward_ArchiveAsValidator : ()
       -- ^ This choice is used by validators to archive the burn receipt upon claiming its corresponding issuance.
