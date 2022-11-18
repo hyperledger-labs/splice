@@ -1,7 +1,16 @@
 import { DirectoryEntry, sameContracts, useInterval, Contract } from 'common-frontend';
 import React, { useCallback, useState } from 'react';
 
-import { Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
+import {
+  Button,
+  Stack,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
+  Typography,
+} from '@mui/material';
 
 import {
   SubscriptionRequest as damlSubscriptionRequest,
