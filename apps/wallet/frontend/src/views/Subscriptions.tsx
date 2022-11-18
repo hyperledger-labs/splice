@@ -1,23 +1,14 @@
 import { DirectoryEntry, sameContracts, useInterval, Contract } from 'common-frontend';
 import React, { useCallback, useState } from 'react';
-import { useParams, useSearchParams } from 'react-router-dom';
+
+import { Stack, Table, TableBody, TableCell, TableHead, TableRow, Typography } from '@mui/material';
 
 import {
-  Button,
-  Stack,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
-  Typography,
-} from '@mui/material';
-
-import {
-  SubscriptionRequest,
+  SubscriptionRequest as damlSubscriptionRequest,
   Subscription,
 } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 
+import SubscriptionRequestsTable from '../components/SubscriptionRequestsTable';
 import {
   useWalletClient,
   SubscriptionTuple,
@@ -25,87 +16,28 @@ import {
 } from '../contexts/WalletServiceContext';
 
 const Subscriptions: React.FC = () => {
-  const { cid } = useParams();
-
-  return (
-    <Stack spacing={2}>
-      <Typography variant="h6">Active Subscription Requests</Typography>
-      <SubscriptionRequestsTable cid={cid} />
-      <Typography variant="h6">Active Subscriptions</Typography>
-      <SubscriptionsTable />
-    </Stack>
-  );
-};
-
-interface SubscriptionsProps {
-  cid: string | undefined;
-}
-const SubscriptionRequestsTable: React.FC<SubscriptionsProps> = ({ cid }) => {
-  const [searchParams] = useSearchParams();
-  const { listSubscriptionRequests, acceptSubscriptionRequest } = useWalletClient();
-  const [SubscriptionRequests, setSubscriptionRequests] = useState<Contract<SubscriptionRequest>[]>(
-    []
-  );
+  const { listSubscriptionRequests } = useWalletClient();
+  const [SubscriptionRequests, setSubscriptionRequests] = useState<
+    Contract<damlSubscriptionRequest>[]
+  >([]);
 
   const fetchSubscriptionRequests = useCallback(async () => {
     const { subscriptionRequestsList } = await listSubscriptionRequests();
     const filteredReqs = () => {
-      if (!cid) return subscriptionRequestsList;
-      else return subscriptionRequestsList.filter(c => c.contractId === cid);
+      return subscriptionRequestsList;
     };
     setSubscriptionRequests(prev => (sameContracts(filteredReqs(), prev) ? prev : filteredReqs()));
-  }, [listSubscriptionRequests, setSubscriptionRequests, cid]);
+  }, [listSubscriptionRequests, setSubscriptionRequests]);
 
   useInterval(fetchSubscriptionRequests, 500);
 
-  const onAccept = async (cid: string) => {
-    await acceptSubscriptionRequest(cid);
-    const target = searchParams.get('redirect');
-    if (target) {
-      window.location.assign(target);
-    }
-  };
-
-  const SubscriptionRequest: React.FC<{ request: Contract<SubscriptionRequest> }> = ({
-    request,
-  }) => (
-    <TableRow className="sub-requests-table-row">
-      <TableCell className="sub-request-receiver">
-        <DirectoryEntry partyId={request.payload.subscriptionData.receiver} />
-      </TableCell>
-      <TableCell>{request.payload.payData.paymentQuantity}</TableCell>
-      <TableCell>{request.payload.payData.paymentInterval.microseconds}</TableCell>
-      <TableCell className="sub-request-provider">
-        <DirectoryEntry partyId={request.payload.subscriptionData.provider} />
-      </TableCell>
-      <TableCell>
-        <Button
-          type="submit"
-          className="sub-request-accept-button"
-          onClick={() => onAccept(request.contractId)}
-        >
-          Accept and Pay
-        </Button>
-      </TableCell>
-    </TableRow>
-  );
-
   return (
-    <Table>
-      <TableHead>
-        <TableRow>
-          <TableCell>Receiver</TableCell>
-          <TableCell>Payment quantity</TableCell>
-          <TableCell>Payment interval (μs)</TableCell>
-          <TableCell>Provider</TableCell>
-        </TableRow>
-      </TableHead>
-      <TableBody>
-        {SubscriptionRequests.map(c => (
-          <SubscriptionRequest request={c} key={c.contractId} />
-        ))}
-      </TableBody>
-    </Table>
+    <Stack spacing={2}>
+      <Typography variant="h6">Active Subscription Requests</Typography>
+      <SubscriptionRequestsTable requests={SubscriptionRequests} />
+      <Typography variant="h6">Active Subscriptions</Typography>
+      <SubscriptionsTable />
+    </Stack>
   );
 };
 
