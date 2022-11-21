@@ -45,6 +45,7 @@ lazy val root = (project in file("."))
     `apps-scan`,
     `apps-splitwise`,
     `apps-svc`,
+    `apps-sv`,
     `apps-app`,
     `apps-wallet`,
     `apps-directory`,
@@ -200,6 +201,15 @@ lazy val `apps-svc` =
   project
     .in(file("apps/svc"))
     .dependsOn(`apps-common` % "compile->compile;test->test")
+    .settings(
+      libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
+      BuildCommon.sharedAppSettings,
+    )
+
+lazy val `apps-sv` =
+  project
+    .in(file("apps/sv"))
+    .dependsOn(`apps-common` % "compile->compile;test->test", `svc-governance-daml`)
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
