@@ -5,7 +5,7 @@ import cats.implicits.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
 import com.daml.network.codegen.java.cc.coinrules.CoinRulesRequest
-import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -60,8 +60,9 @@ class ValidatorApp(
     logger.info(s"Attempting to setup wallet...")
     for {
       _ <- connection.uploadDarFile(new UploadablePackage {
+        // should be the same as package dependency in wallet app
         lazy val packageId: String =
-          walletCodegen.AppPaymentRequest.COMPANION.TEMPLATE_ID.getPackageId
+          installCodegen.WalletAppInstall.TEMPLATE_ID.getPackageId
 
         // See `Compile / resourceGenerators` in build.sbt
         lazy val resourcePath: String = "dar/wallet-0.1.0.dar"

@@ -160,6 +160,7 @@ class WalletApp(
   override lazy val ports =
     Map("admin" -> config.adminApi.port)
 
+  // should be the same as uploaded package in validator app
   override lazy val requiredTemplates = Set(installCodegen.WalletAppInstall.TEMPLATE_ID)
 }
 
