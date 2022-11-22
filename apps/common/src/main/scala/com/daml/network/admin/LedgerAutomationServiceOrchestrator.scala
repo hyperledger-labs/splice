@@ -11,12 +11,18 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.ExecutionContextExecutor
 import scala.util.{Failure, Success}
 
-/** Orchestrates the background (Ledger API) automations that run on a given CN node.
+/** DEPRECATED: use AcsStores and AutomationService directly.
+  *
+  * Orchestrates the background (Ledger API) automations that run on a given CN node.
   *
   * Each automation workflow is an independent application with their own ledger connection.
   *
   * Modelled after Canton's [[com.digitalasset.canton.participant.admin.AdminWorkflowServices]].
   */
+@deprecated(
+  "We plan to remove this class. Use `AcsStore` and `AutomationService` instead.",
+  since = "dummyVersion",
+)
 abstract class LedgerAutomationServiceOrchestrator(
     protected val loggerFactory: NamedLoggerFactory
 )(implicit
@@ -63,37 +69,6 @@ abstract class LedgerAutomationServiceOrchestrator(
       .toMap
 
     ServiceWithSubscriptions(subscriptions, service, serviceName, connection)
-  }
-
-  protected def updateReadAs[S <: LedgerAutomationService](
-      service: ServiceWithSubscriptions[S],
-      readAs: Seq[PartyId],
-  ): ServiceWithSubscriptions[S] = {
-    logger.debug(s"Updating service ${service.serviceName} with parties $readAs")
-    (service.subscriptions.keySet -- readAs).foreach(p => service.subscriptions(p).close())
-    val offset = LedgerOffset.LedgerBegin.getInstance()
-    val subscriptions = readAs
-      .map(party =>
-        party -> service.subscriptions.getOrElse(
-          party,
-          startSubscriptionForParty(
-            service.connection,
-            service.serviceName,
-            offset,
-            party,
-            service.service.templateIds,
-            service.service,
-          ),
-        )
-      )
-      .toMap
-
-    ServiceWithSubscriptions(
-      subscriptions,
-      service.service,
-      service.serviceName,
-      service.connection,
-    )
   }
 
   private def startSubscriptionForParty(

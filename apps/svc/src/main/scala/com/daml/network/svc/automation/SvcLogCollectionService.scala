@@ -9,12 +9,14 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
 
+import scala.annotation.nowarn
 import scala.concurrent.ExecutionContextExecutor
 
 /** Background automation to collect audit log entries, which currently consists of only
   * the collection of all transfers results, for summary when closing the round.
   */
 // TODO(M1-52): integrate log collection into our store infrastructure as part of the work on automating rewards issuance
+@nowarn("msg=class LedgerAutomationServiceOrchestrator")
 class SvcLogCollectionService(
     svcParty: PartyId,
     ledgerClient: CoinLedgerClient,

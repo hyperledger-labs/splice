@@ -103,24 +103,11 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
       companion: ContractCompanion[TC, TCid, T],
   ): Future[Seq[Contract[TCid, T]]]
 
-  def subscription[T](
-      subscriptionName: String,
-      offset: LedgerOffset,
-      filter: TransactionFilter,
-  )(mapOperator: Flow[Transaction, Any, _]): CoinLedgerSubscription
-
   def subscribeAsync(
       subscriptionName: String,
       offset: LedgerOffset,
       filter: TransactionFilter,
   )(f: Transaction => Future[Unit]): CoinLedgerSubscription
-
-  // TODO(#790): this function should probably better live in a common.automation package
-  def makeSubscription[S, T](
-      source: Source[S, NotUsed],
-      mapOperator: Flow[S, T, _],
-      subscriptionName: String,
-  ): CoinLedgerSubscription
 
   def tryGetTransactionTreeById(parties: Seq[PartyId], id: String): Future[TransactionTree]
 
@@ -284,7 +271,7 @@ object CoinLedgerConnection {
       ): Future[Seq[Contract[TCid, T]]] =
         activeContractsWithOffset(party, companion).map(_._1)
 
-      override def subscription[T](
+      private def subscription[T](
           subscriptionName: String,
           offset: LedgerOffset,
           filter: TransactionFilter,
@@ -308,7 +295,7 @@ object CoinLedgerConnection {
           Flow[Transaction].mapAsync(1)(f)
         })
 
-      override def makeSubscription[S, T](
+      private def makeSubscription[S, T](
           source: Source[S, NotUsed],
           mapOperator: Flow[S, T, _],
           subscriptionName: String,

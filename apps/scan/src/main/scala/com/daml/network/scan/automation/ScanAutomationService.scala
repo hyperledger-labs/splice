@@ -10,10 +10,12 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
 
+import scala.annotation.nowarn
 import scala.concurrent.ExecutionContextExecutor
 
 /** Manages background automation that runs on a CC Scan app.
   */
+@nowarn("msg=class LedgerAutomationServiceOrchestrator")
 class ScanAutomationService(
     svcParty: PartyId,
     ledgerClient: CoinLedgerClient,
