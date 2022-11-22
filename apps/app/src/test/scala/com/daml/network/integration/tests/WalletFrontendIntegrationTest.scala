@@ -1,9 +1,11 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
+import com.daml.network.codegen.java.cn.wallet.{subscriptions => subsCodegen}
 import com.daml.network.codegen.java.cn.directory as dirCodegen
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{LocalValidatorAppReference, RemoteDirectoryAppReference}
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
-import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.SubscriptionIdleState
 import com.digitalasset.canton.topology.PartyId
 import org.openqa.selenium.WebDriver
 
@@ -222,6 +224,7 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
         }
       }
     }
+
     "show subscriptions in different states" in { implicit env =>
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
       val aliceUserParty = setupForTestWithDirectory(aliceDamlUser, aliceValidator)
@@ -232,14 +235,14 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
       val expectedPaymentText = "Payment in progress"
 
       withFrontEnd("alice") { implicit webDriver =>
-        clue("Create first subscription") {
-          requestDirectoryEntryWithSubscription(aliceUserParty, aliceDirectory, "alice1.cns")
+        clue("Create a subscription for registering alice.cns") {
+          requestDirectoryEntryWithSubscription(aliceUserParty, aliceDirectory, "alice.cns")
           browseToSubscriptions(aliceDamlUser)
           eventually() {
             click on className("sub-request-accept-button")
           }
         }
-        clue("Check that the first subscription is listed") {
+        clue("Check that the subscription is listed as idle") {
           eventually() {
             inside(findAll(className("subs-table-row")).toList) {
               case Seq(row) => {
@@ -250,61 +253,25 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
             }
           }
         }
-        clue("Create second subscription") {
-          requestDirectoryEntryWithSubscription(aliceUserParty, aliceDirectory, "alice2.cns")
-          browseToSubscriptions(aliceDamlUser)
-          eventually() {
-            click on className("sub-request-accept-button")
-          }
-        }
-        clue("Check that the second subscription is listed") {
-          eventually() {
-            val rows = findAll(className("subs-table-row")).toList
-            rows.length shouldBe 2
-            rows.foreach(row => {
-              row.childElement(className("sub-receiver")).text should matchText(expectedDirName)
-              row.childElement(className("sub-provider")).text should matchText(expectedDirName)
-              row.childElement(className("sub-state")).text should matchText(expectedIdleText)
-            })
-          }
+        clue("Create second subscription, the payment on which won't be collected") {
+          createSelfSubscription(aliceUserParty, nextPaymentDueAt = Instant.now())
         }
         clue(
-          "Stopping directory backend so that payments aren't collected (so that we can see them)."
-        ) {
-          directory.stop()
-        }
-        clue("Make a subscription payment") {
-          val stateId = inside(aliceRemoteWallet.listSubscriptions().head.state) {
-            case SubscriptionIdleState(state) => state.contractId
-          }
-          aliceRemoteWallet.makeSubscriptionPayment(stateId)
-        }
-        clue(
-          "Check that the changed subscription state is visible, and the cancellation buttons are enabled correctly"
+          "Wait until the wallet backend triggers the next subscription payment, then " +
+            "check that the changed subscription state is visible and the cancellation buttons are enabled correctly"
         ) {
           eventually() {
             val rows = findAll(className("subs-table-row")).toList
             rows.length shouldBe 2
-            rows
-              .filter(row => row.childElement(className("sub-state")).text == expectedIdleText)
-              .length shouldBe 1
             rows
               .filter(row => row.childElement(className("sub-state")).text == expectedIdleText)
               .filter(row => row.childElement(className("sub-cancel-button")).isEnabled)
               .length shouldBe 1
             rows
               .filter(row => row.childElement(className("sub-state")).text == expectedPaymentText)
-              .length shouldBe 1
-            rows
-              .filter(row => row.childElement(className("sub-state")).text == expectedPaymentText)
               .filter(row => !row.childElement(className("sub-cancel-button")).isEnabled)
               .length shouldBe 1
           }
-        }
-        clue(
-          "Navigate somewhere else to ignore the errors resulting from stopping the directory."
-        ) {
-          go to "http://localhost:3000"
         }
       }
     }
@@ -397,6 +364,67 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
         .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(userParty)
     }
     aliceDirectory.requestDirectoryEntryWithSubscription(dirEntry)
+  }
+
+  private def createSelfSubscription(aliceUserParty: PartyId, nextPaymentDueAt: Instant)(implicit
+      env: CoinTestConsoleEnvironment
+  ) = {
+    val context = new testSubsCodegen.TestSubscriptionContext(
+      scan.getSvcPartyId().toProtoPrimitive,
+      aliceUserParty.toProtoPrimitive,
+      aliceUserParty.toProtoPrimitive,
+      "description",
+    )
+    val contextId = clue("Create a subscription context") {
+      aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
+        Seq(aliceUserParty),
+        optTimeout = None,
+        commands = context.create.commands.asScala.toSeq,
+      )
+      aliceWallet.remoteParticipant.ledger_api.acs
+        .awaitJava(testSubsCodegen.TestSubscriptionContext.COMPANION)(
+          aliceUserParty,
+          _.data == context,
+        )
+        .id
+    }
+    val (subscriptionId, subscriptionData) = clue("Create a subscription") {
+      val subscription = new subsCodegen.Subscription(
+        aliceUserParty.toProtoPrimitive,
+        aliceUserParty.toProtoPrimitive,
+        aliceUserParty.toProtoPrimitive,
+        svcParty.toProtoPrimitive,
+        contextId.toInterface(subsCodegen.SubscriptionContext.INTERFACE),
+      )
+      aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
+        Seq(aliceUserParty),
+        optTimeout = None,
+        commands = subscription.create.commands.asScala.toSeq,
+      )
+      val subscriptionId = aliceWallet.remoteParticipant.ledger_api.acs
+        .awaitJava(subsCodegen.Subscription.COMPANION)(aliceUserParty, _.data == subscription)
+        .id
+      (subscriptionId, subscription)
+    }
+    clue("Create a subscription idle state") {
+      val payData = new subsCodegen.SubscriptionPayData(
+        BigDecimal(10).bigDecimal.setScale(10),
+        new RelTime(60 * 60 * 1000000L),
+        new RelTime(10 * 60 * 1000000L),
+        new RelTime(60 * 1000000L),
+      )
+      val state = new subsCodegen.SubscriptionIdleState(
+        subscriptionId,
+        subscriptionData,
+        payData,
+        nextPaymentDueAt,
+      )
+      aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
+        actAs = Seq(aliceUserParty),
+        optTimeout = None,
+        commands = state.create.commands.asScala.toSeq,
+      )
+    }
   }
 
   private def browseToPaymentRequests(damlUser: String)(implicit webDriver: WebDriver) = {

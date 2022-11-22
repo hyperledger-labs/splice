@@ -8,7 +8,6 @@ import com.daml.network.codegen.java.cn.wallet.{
   payment as walletCodegen,
   subscriptions as subsCodegen,
 }
-import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{
   LocalWalletAppReference,
@@ -387,34 +386,23 @@ class WalletIntegrationTest
             commands = collectCommand,
           )
         }
-        val subscriptionStateId = clue("List subscriptions to find out state ID") {
-          inside(aliceRemoteWallet.listSubscriptions()) { case Seq(sub) =>
-            sub.main.payload should equal(request.subscriptionData)
-            inside(sub.state) {
-              case GrpcWalletAppClient.SubscriptionIdleState(state) => {
-                state.payload.subscription should equal(sub.main.contractId)
-                state.payload.payData should equal(request.payData)
-                state.contractId
+        // note that because the directory sets paymentDuration = paymentInterval,
+        // the wallet backend can make the second payment immediately
+        val paymentId =
+          clue("Wait for an automated subscription payment to be initiated by the backend") {
+            eventually() {
+              inside(aliceRemoteWallet.listSubscriptions()) { case Seq(sub) =>
+                sub.main.payload should equal(request.subscriptionData)
+                inside(sub.state) {
+                  case GrpcWalletAppClient.SubscriptionPayment(state) => {
+                    state.payload.subscription shouldBe sub.main.contractId
+                    state.payload.payData should equal(request.payData)
+                    state.contractId
+                  }
+                }
               }
             }
           }
-        }
-        val paymentId = clue("Initiate a subscription payment") {
-          aliceRemoteWallet.makeSubscriptionPayment(subscriptionStateId)
-        }
-        clue("Check that payment contract was created successfully") {
-          inside(aliceRemoteWallet.listSubscriptions()) { case Seq(sub) =>
-            sub.main.payload should equal(request.subscriptionData)
-            inside(sub.state) {
-              case GrpcWalletAppClient.SubscriptionPayment(state) => {
-                state.contractId shouldBe paymentId
-                state.payload.subscription shouldBe sub.main.contractId
-                state.payload.payData should equal(request.payData)
-              }
-            }
-          }
-          paymentId
-        }
         clue(
           "Collect the second payment (as the receiver), which sets the subscription back to idle"
         ) {
@@ -447,71 +435,6 @@ class WalletIntegrationTest
           aliceRemoteWallet.listSubscriptions() shouldBe empty
         }
       }
-
-    "allow a user to list multiple subscriptions in different states" in { implicit env =>
-      val aliceUserParty = clue("Onboard alice on her self-hosted validator") {
-        onboardWalletUser(aliceRemoteWallet, aliceValidator)
-      }
-
-      clue("Alice gets some coins") {
-        aliceRemoteWallet.tap(50)
-      }
-      clue("Setting up directory as provider for the created subscriptions") {
-        val directoryDarPath = "apps/directory/daml/.daml/dist/directory-service-0.1.0.dar"
-        aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
-        aliceDirectory.requestDirectoryInstall()
-        aliceValidator.remoteParticipant.ledger_api.acs
-          .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(aliceUserParty)
-      }
-      aliceRemoteWallet.listSubscriptions() shouldBe empty
-
-      clue("Creating 3 subscriptions") {
-        List("alice1", "alice2", "alice3").foreach(name => {
-          val (_, requestId) = aliceDirectory.requestDirectoryEntryWithSubscription(name)
-          aliceRemoteWallet.acceptSubscriptionRequest(requestId)
-        })
-      }
-      clue("Checking that 3 idle subscriptions are listed...") {
-        eventually() {
-          val subs = aliceRemoteWallet.listSubscriptions()
-          subs.length shouldBe 3
-          subs.foreach(sub => {
-            sub.state should matchPattern { case GrpcWalletAppClient.SubscriptionIdleState(_) => }
-          })
-        }
-      }
-      clue("Stopping directory backend so that payments aren't collected.") {
-        directory.stop()
-      }
-      clue("Alice makes a payment on one of the subscriptions") {
-        val subscriptionStateId = inside(aliceRemoteWallet.listSubscriptions()) {
-          case Seq(sub, _, _) => {
-            inside(sub.state) {
-              case GrpcWalletAppClient.SubscriptionIdleState(state) => { state.contractId }
-            }
-          }
-        }
-        aliceRemoteWallet.makeSubscriptionPayment(subscriptionStateId)
-      }
-      clue("Checking that 2 idle subscriptions and 1 payment are listed...") {
-        eventually() {
-          val subs = aliceRemoteWallet.listSubscriptions()
-          subs.length shouldBe 3
-          subs
-            .filter(_.state match {
-              case GrpcWalletAppClient.SubscriptionIdleState(_) => true
-              case _ => false
-            })
-            .length shouldBe 2
-          subs
-            .filter(_.state match {
-              case GrpcWalletAppClient.SubscriptionPayment(_) => true
-              case _ => false
-            })
-            .length shouldBe 1
-        }
-      }
-    }
 
     "allow two users to create a payment channel and use it for a transfer" in { implicit env =>
       val aliceUserParty = clue("Onboard alice on her self-hosted validator") {

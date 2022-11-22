@@ -419,45 +419,6 @@ class GrpcWalletService(
       }
     }
 
-  override def makeSubscriptionPayment(
-      request: v0.MakeSubscriptionPaymentRequest
-  ): Future[v0.MakeSubscriptionPaymentResponse] =
-    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
-      withAuth { user =>
-        exerciseWalletCoinAction((installCid, userStore) => {
-          val stateCid =
-            Proto.tryDecodeJavaContractId(subsCodegen.SubscriptionIdleState.COMPANION)(
-              request.idleStateContractId
-            )
-
-          def lookups = () =>
-            for {
-              subscriptionStateO <- userStore.lookupSubscriptionIdleStateById(stateCid)
-              subscriptionState = getQueryResult(
-                subscriptionStateO,
-                s"subscription idle state cid $stateCid",
-              )
-              _ <- userStore.lookupSubscriptionContextById(
-                subscriptionState.payload.subscriptionData.context
-              )
-            } yield ()
-
-          Future.successful(
-            CoinOperationRequest(
-              (_: Unit) => new coinoperation.CO_SubscriptionMakePayment(stateCid),
-              lookups,
-            )
-          )
-        })(
-          user,
-          (outcome: coinoperationoutcome.COO_SubscriptionPayment) =>
-            v0.MakeSubscriptionPaymentResponse(
-              Proto.encodeContractId(outcome.contractIdValue)
-            ),
-        )
-      }
-    }
-
   override def cancelSubscription(
       request: v0.CancelSubscriptionRequest
   ): Future[Empty] =

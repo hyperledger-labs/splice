@@ -22,7 +22,6 @@ service WalletService {
   rpc ListSubscriptions (ListSubscriptionsRequest) returns (ListSubscriptionsResponse);
   rpc AcceptSubscriptionRequest (AcceptSubscriptionRequestRequest) returns (AcceptSubscriptionRequestResponse);
   rpc RejectSubscriptionRequest (RejectSubscriptionRequestRequest) returns (google.protobuf.Empty);
-  rpc MakeSubscriptionPayment (MakeSubscriptionPaymentRequest) returns (MakeSubscriptionPaymentResponse);
   rpc CancelSubscription (CancelSubscriptionRequest) returns (google.protobuf.Empty);
 
   rpc ProposePaymentChannel (ProposePaymentChannelRequest) returns (ProposePaymentChannelResponse);
@@ -154,14 +153,6 @@ message AcceptSubscriptionRequestResponse {
 
 message RejectSubscriptionRequestRequest {
   string request_contract_id = 1;
-}
-
-message MakeSubscriptionPaymentRequest {
-  string idle_state_contract_id = 1;
-}
-
-message MakeSubscriptionPaymentResponse {
-  string payment_contract_id = 1;
 }
 
 message CancelSubscriptionRequest {

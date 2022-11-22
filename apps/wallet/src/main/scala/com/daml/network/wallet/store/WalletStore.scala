@@ -3,7 +3,7 @@ package com.daml.network.wallet.store
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.network.codegen.java.cc.{coin as coinCodegen}
-import com.daml.network.codegen.java.cn.wallet.install as installCodegen
+import com.daml.network.codegen.java.cn.wallet.{install => installCodegen}
 import com.daml.network.store.AcsStore
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{JavaContract as Contract}
@@ -57,13 +57,18 @@ trait WalletStore extends AutoCloseable with NamedLogging {
     acsStore.streamContracts(installCodegen.WalletAppInstall.COMPANION)
 
   // Methods to implement per-end-user stores
-  private[this] val endUserStores: TrieMap[String, EndUserWalletStore] = TrieMap.empty
+  private[this] val endUserStoresMap: TrieMap[String, EndUserWalletStore] = TrieMap.empty
 
   /** Lookup an end-user's store.
     * Succeeds if the user has been onboarded and its store has been initialized.
     */
   final def lookupEndUserStore(endUserName: String): Option[EndUserWalletStore] =
-    endUserStores.get(endUserName)
+    endUserStoresMap.get(endUserName)
+
+  /** List all existing end-user stores.
+    */
+  final def endUserStores: Iterable[EndUserWalletStore] =
+    endUserStoresMap.values
 
   /** Get or create the store for an end-user. Intended to be called when a user is onboarded.
     *
@@ -75,7 +80,7 @@ trait WalletStore extends AutoCloseable with NamedLogging {
       timeouts: ProcessingTimeout,
   ): EndUserWalletStore = {
     val store = createEndUserStore(endUserName, endUserParty: PartyId, timeouts)
-    endUserStores
+    endUserStoresMap
       .putIfAbsent(endUserName, store)
       .fold(store)(existingStore => {
         store.close()
@@ -85,7 +90,7 @@ trait WalletStore extends AutoCloseable with NamedLogging {
 
   /** Remove an end-user store. Intended to be called when a user is off-boarded. */
   final def removeEndUserStore(endUserName: String): Unit =
-    endUserStores.remove(endUserName).fold(())(store => store.close())
+    endUserStoresMap.remove(endUserName).fold(())(store => store.close())
 
   /** Abstract method to create an end-users store. */
   protected def createEndUserStore(
@@ -131,7 +136,7 @@ trait WalletStore extends AutoCloseable with NamedLogging {
     } yield validatorRewards.flatten
 
   override def close(): Unit =
-    Lifecycle.close(endUserStores.values.toSeq: _*)(logger)
+    Lifecycle.close(endUserStoresMap.values.toSeq: _*)(logger)
 }
 
 object WalletStore {

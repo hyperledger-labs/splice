@@ -13,7 +13,6 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
@@ -271,16 +270,9 @@ class DirectoryIntegrationTest extends CoinIntegrationTest {
           )
           entry.payload shouldBe expectedPayload
         }
-        clue("Alice makes a follow-up subscription payment") {
-          val subscriptionStateId =
-            eventually()(inside(aliceRefs.wallet.listSubscriptions()) { case Seq(sub) =>
-              inside(sub.state) { case GrpcWalletAppClient.SubscriptionIdleState(state) =>
-                state.contractId
-              }
-            })
-          aliceRefs.wallet.makeSubscriptionPayment(subscriptionStateId)
-        }
-        val renewedEntry = clue("Getting Alice's renewed entry") {
+        val renewedEntry = clue(
+          "Eventually, Alice makes a follup-up subscription payment, which the directory collects, renewing her entry."
+        ) {
           eventually()(
             directory
               .lookupEntryByName(testEntryName)

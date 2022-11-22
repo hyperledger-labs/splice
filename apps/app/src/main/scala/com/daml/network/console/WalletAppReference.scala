@@ -176,19 +176,6 @@ abstract class WalletAppReference(
     }
   }
 
-  @Help.Summary("Make a subscription payment")
-  @Help.Description(
-    "Initiate a subscription payment and deliver the coin to be locked into that payment." +
-      " Returns the contract ID of the subscription payment."
-  )
-  def makeSubscriptionPayment(
-      stateId: subsCodegen.SubscriptionIdleState.ContractId
-  ): subsCodegen.SubscriptionPayment.ContractId = {
-    consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.MakeSubscriptionPayment(stateId), callCredentials)
-    }
-  }
-
   @Help.Summary("Cancel a subscription")
   @Help.Description(
     "Cancels a subscription that is in idle state."

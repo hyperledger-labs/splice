@@ -486,30 +486,6 @@ object GrpcWalletAppClient {
       Right(())
   }
 
-  case class MakeSubscriptionPayment(
-      stateId: subsCodegen.SubscriptionIdleState.ContractId
-  ) extends BaseCommand[
-        v0.MakeSubscriptionPaymentRequest,
-        v0.MakeSubscriptionPaymentResponse,
-        subsCodegen.SubscriptionPayment.ContractId,
-      ] {
-
-    override def createRequest(): Either[String, v0.MakeSubscriptionPaymentRequest] =
-      Right(v0.MakeSubscriptionPaymentRequest(Proto.encodeContractId(stateId)))
-
-    override def submitRequest(
-        service: WalletServiceStub,
-        request: v0.MakeSubscriptionPaymentRequest,
-    ): Future[v0.MakeSubscriptionPaymentResponse] = service.makeSubscriptionPayment(request)
-
-    override def handleResponse(
-        response: v0.MakeSubscriptionPaymentResponse
-    ): Either[String, subsCodegen.SubscriptionPayment.ContractId] =
-      Proto.decodeJavaContractId(subsCodegen.SubscriptionPayment.COMPANION)(
-        response.paymentContractId
-      )
-  }
-
   case class CancelSubscription(
       stateId: subsCodegen.SubscriptionIdleState.ContractId
   ) extends BaseCommand[
