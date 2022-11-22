@@ -73,6 +73,7 @@ object DamlPlugin extends AutoPlugin {
       damlDependencies := Seq(),
       damlScalaCodegenOutput := sourceManaged.value / "daml-codegen-scala",
       damlJavaCodegenOutput := sourceManaged.value / "daml-codegen-java",
+      managedSourceDirectories ++= Seq(damlScalaCodegenOutput.value, damlJavaCodegenOutput.value),
       damlBuildOrder := Seq(),
       damlCodeGeneration := Seq(),
       damlEnableScalaCodegen := false,
