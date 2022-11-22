@@ -15,7 +15,7 @@ import com.daml.ledger.javaapi.data.codegen.{
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template, Value}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
-import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting, PrettyUtil}
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.serialization.ProtoConverter
 
@@ -40,22 +40,11 @@ final case class JavaContract[TCid <: ContractId[_], T](
 
   override def pretty: Pretty[JavaContract[TCid, T]] = {
 
-    implicit def prettyPrimitiveContractId: Pretty[ContractId[_]] = prettyOfString { coid =>
-      val coidStr = coid.contractId
-      val tokens = coidStr.split(':')
-      if (tokens.lengthCompare(2) == 0) {
-        tokens(0).readableHash.toString + ":" + tokens(1).readableHash.toString
-      } else {
-        // Don't abbreviate anything for unusual contract ids
-        coidStr
-      }
-    }
-
-    implicit def prettyRecord: Pretty[DamlRecord[_]] =
-      PrettyUtil.prettyOfString(_.toValue.toString)
+    import com.daml.network.util.PrettyInstances.*
 
     prettyOfClass[JavaContract[TCid, T]](
       param("contractId", _.contractId),
+      param("templateId", _.identifier),
       param("payload", _.payload),
     )
   }

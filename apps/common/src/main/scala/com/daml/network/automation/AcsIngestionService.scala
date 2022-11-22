@@ -6,12 +6,13 @@ import com.daml.network.store.AcsStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, FlagCloseableAsync}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.NoTracing
+import com.digitalasset.canton.tracing.{NoTracing, Spanning}
 import com.digitalasset.canton.util.retry.RetryUtil.AllExnRetryable
 import com.digitalasset.canton.util.{FutureUtil, retry}
+import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContext
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 class AcsIngestionService(
     name: String,
@@ -20,10 +21,15 @@ class AcsIngestionService(
     override protected val loggerFactory: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
 )(implicit
-    ec: ExecutionContext
+    ec: ExecutionContext,
+    tracer: Tracer,
 ) extends FlagCloseableAsync
-    with NoTracing
-    with NamedLogging {
+    with NamedLogging
+    with Spanning
+    with NoTracing {
+
+  private val txFilter = ingestionSink.transactionFilter
+  private val serviceDescriptor = s"AcsIngestionService($name, ${txFilter.getParties.toString})"
 
   // TODO(#790): double-check and cleanup the usage of retry here
   implicit val success: retry.Success[Any] = retry.Success.always
@@ -38,30 +44,30 @@ class AcsIngestionService(
     )
 
   // TODO(#790): stream contracts instead of ingesting them as a single Seq
-  logger.debug("Attempting to ingest the ACS and initialize the transaction subscription.")
-
-  private val txFilter = ingestionSink.transactionFilter
-
-  // TODO(#790): review logs produced and ensure they are specific to the streams being ingested
   private val subscriptionF = {
-    FutureUtil.logOnFailure(
-      for {
-        // TODO(#790): stop retrying if we're already closing
-        (evs, off) <- policy(s"Get active contracts for $txFilter")(
-          connection.activeContractsWithOffset(txFilter),
-          AllExnRetryable,
+    withNewTrace(serviceDescriptor)(implicit traceContext =>
+      _ => {
+        logger.debug(s"Starting $serviceDescriptor")
+        FutureUtil.logOnFailure(
+          for {
+            // TODO(#790): stop retrying if we're already closing
+            (evs, off) <- policy(s"Get active contracts for $txFilter")(
+              connection.activeContractsWithOffset(txFilter),
+              AllExnRetryable,
+            )
+            () <- ingestionSink.ingestActiveContracts(evs)
+            () <- ingestionSink.switchToIngestingTransactions(
+              off match {
+                case absolute: LedgerOffset.Absolute => absolute.getOffset
+                case _ => sys.error("expected absolute offset")
+              }
+            )
+          } yield connection.subscribeAsync("AcsIngestionService:" + name, off, txFilter)(
+            ingestionSink.ingestTransaction(_)
+          ),
+          "Failed to ingest the ACS and initialize transaction subscription.",
         )
-        () <- ingestionSink.ingestActiveContracts(evs)
-        () <- ingestionSink.switchToIngestingTransactions(
-          off match {
-            case absolute: LedgerOffset.Absolute => absolute.getOffset
-            case _ => sys.error("expected absolute offset")
-          }
-        )
-      } yield connection.subscribeAsync("AcsIngestionService:" + name, off, txFilter)(
-        ingestionSink.ingestTransaction(_)
-      ),
-      "Failed to ingest the ACS and initialize transaction subscription.",
+      }
     )
     // TODO(#790): handle this case seen in the CoinLedgerConnection code
     // case Failure(ex: StatusRuntimeException) =>
@@ -69,11 +75,9 @@ class AcsIngestionService(
     // this can happen (i.e. server not available etc.)
   }
 
-  subscriptionF.foreach(_ => logger.debug("Ingested ACS and initialized transaction subscription."))
-
   override def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
     AsyncCloseable(
-      "DirectoryStoreIngestionSubscription",
+      serviceDescriptor,
       subscriptionF,
       timeouts.shutdownNetwork.duration,
     )

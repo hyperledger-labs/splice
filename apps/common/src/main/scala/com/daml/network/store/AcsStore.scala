@@ -166,15 +166,15 @@ object AcsStore {
     /** Ingest create events that are part of the initial active contract snapshot ingestion */
     def ingestActiveContracts(
         events: Seq[CreatedEvent]
-    ): Future[Unit]
+    )(implicit traceContext: TraceContext): Future[Unit]
 
     /** Signal the end of ingesting the active contract snapshot. */
     def switchToIngestingTransactions(
         acsOffset: String
-    ): Future[Unit]
+    )(implicit traceContext: TraceContext): Future[Unit]
 
     /** Ingest a transaction served by the transaction stream. */
-    def ingestTransaction(tx: Transaction): Future[Unit]
+    def ingestTransaction(tx: Transaction)(implicit traceContext: TraceContext): Future[Unit]
   }
 
   /** Static specification of a set of create events in scope for ingestion into an AcsStore. */

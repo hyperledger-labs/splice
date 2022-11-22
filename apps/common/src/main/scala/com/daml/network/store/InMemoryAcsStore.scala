@@ -1,5 +1,6 @@
 package com.daml.network.store
 
+import com.digitalasset.canton.util.ShowUtil.*
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.codegen.{
@@ -17,13 +18,14 @@ import com.daml.ledger.javaapi.data.{
   TransactionFilter,
 }
 import com.daml.network.util.JavaContract
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.{NoTracing, TraceContext}
+import com.digitalasset.canton.tracing.TraceContext
 import monocle.macros.syntax.lens.*
 
-import scala.collection.immutable
+import scala.collection.{immutable, mutable}
 import scala.collection.immutable.SortedMap
-import scala.concurrent._
+import scala.concurrent.*
 import scala.jdk.CollectionConverters.*
 
 /** In-memory implementation of an [[AcsStore]] intended to be embedded in the
@@ -73,33 +75,39 @@ class InMemoryAcsStore(
     }
   }
 
-  val ingestionSink: AcsStore.IngestionSink = new AcsStore.IngestionSink with NoTracing {
+  val ingestionSink: AcsStore.IngestionSink = new AcsStore.IngestionSink {
 
     override def transactionFilter: TransactionFilter = contractFilter.transactionFilter
 
     override def ingestActiveContracts(
         evs: Seq[CreatedEvent]
-    ): Future[Unit] =
-      updateState(st => (st.ingestCreatedEvents(evs.filter(contractFilter.contains)), ()))
+    )(implicit traceContext: TraceContext): Future[Unit] =
+      updateState(_.ingestCreatedEvents(evs, contractFilter.contains)).map(summary =>
+        logger.debug(show"Ingested ACS update $summary")
+      )
 
     override def switchToIngestingTransactions(
         acsOffset: String
-    ): Future[Unit] =
+    )(implicit traceContext: TraceContext): Future[Unit] =
       updateState(
         _.switchToIngestingTransactions(acsOffset)
       ).map {
         case (offsetChanged, offsetIngestionsToSignal) => {
+          logger.debug(show"Ingested complete ACS at offset ${acsOffset.singleQuoted}")
           offsetIngestionsToSignal.foreach(_.success(()))
           offsetChanged.success(())
           finishedAcsIngestion.success(())
         }
       }
 
-    override def ingestTransaction(tx: Transaction): Future[Unit] =
+    override def ingestTransaction(
+        tx: Transaction
+    )(implicit traceContext: TraceContext): Future[Unit] =
       updateState(
         _.ingestTransaction(tx, contractFilter.contains)
       ).map {
-        case (offsetChanged, offsetIngestionsToSignal) => {
+        case (summary, offsetChanged, offsetIngestionsToSignal) => {
+          logger.debug(show"Ingested transaction $summary")
           offsetIngestionsToSignal.foreach(_.success(()))
           offsetChanged.success(())
         }
@@ -308,27 +316,57 @@ object InMemoryAcsStore {
       )
     }
 
-    def ingestArchivedEvent(ev: ArchivedEvent): State =
+    def ingestArchivedEvent(ev: ArchivedEvent): (State, Boolean) =
       createEventsById.get(ev.getContractId) match {
         case None =>
           // NOTE: this will occur when ingesting an archive for a create event that was filtered on ingestion
-          this
+          (this, false)
         case Some(eventNumber) => {
           assert(createEvents.contains(eventNumber), s"event number $eventNumber defined")
-          State(
-            offset = offset,
-            nextEventNumber = nextEventNumber,
-            createEvents = createEvents - eventNumber,
-            createEventsById = createEventsById - ev.getContractId,
-            offsetChanged = offsetChanged,
-            offsetIngestionsToSignal = offsetIngestionsToSignal,
+          (
+            State(
+              offset = offset,
+              nextEventNumber = nextEventNumber,
+              createEvents = createEvents - eventNumber,
+              createEventsById = createEventsById - ev.getContractId,
+              offsetChanged = offsetChanged,
+              offsetIngestionsToSignal = offsetIngestionsToSignal,
+            ),
+            true,
           )
         }
       }
 
-    def ingestCreatedEvents(evs: Seq[CreatedEvent]): State = {
+    def ingestCreatedEvents(
+        evs: Seq[CreatedEvent],
+        p: CreatedEvent => Boolean,
+    ): (State, IngestionSummary) = {
       assert(offset.isEmpty, "state was not switched to tx ingestion yet")
-      evs.foldLeft(this)((st, ev) => st.ingestCreatedEvent(ev))
+      @SuppressWarnings(Array("org.wartremover.warts.Var"))
+      var numFilteredCreatedEvents = 0
+      val ingestedCreatedEvents = mutable.ListBuffer[CreatedEvent]()
+
+      val stNew = evs.foldLeft(this)((st, ev) =>
+        if (p(ev)) {
+          ingestedCreatedEvents.append(ev)
+          st.ingestCreatedEvent(ev)
+        } else {
+          numFilteredCreatedEvents += 1
+          st
+        }
+      )
+      (
+        stNew,
+        IngestionSummary(
+          None,
+          ingestedCreatedEvents,
+          numFilteredCreatedEvents,
+          mutable.ListBuffer.empty,
+          0,
+          None,
+          stNew.createEvents.size,
+        ),
+      )
     }
 
     def switchToIngestingTransactions(
@@ -359,26 +397,57 @@ object InMemoryAcsStore {
     def ingestTransaction(
         tx: Transaction,
         p: CreatedEvent => Boolean,
-    ): (State, (Promise[Unit], Iterable[Promise[Unit]])) = {
+    ): (State, (IngestionSummary, Promise[Unit], Iterable[Promise[Unit]])) = {
+      @SuppressWarnings(Array("org.wartremover.warts.Var"))
+      var numFilteredCreatedEvents = 0
+      @SuppressWarnings(Array("org.wartremover.warts.Var"))
+      var numFilteredArchivedEvents = 0
+      val ingestedCreatedEvents = mutable.ListBuffer[CreatedEvent]()
+      val ingestedArchivedEvents = mutable.ListBuffer[ArchivedEvent]()
+
       val stNew = tx.getEvents.asScala.foldLeft(this)((st, ev) =>
         ev match {
-          case ev: CreatedEvent => if (p(ev)) st.ingestCreatedEvent(ev) else st
-          case ev: ArchivedEvent => st.ingestArchivedEvent(ev)
+          case ev: CreatedEvent if p(ev) =>
+            ingestedCreatedEvents.append(ev)
+            st.ingestCreatedEvent(ev)
+          case _: CreatedEvent =>
+            numFilteredCreatedEvents += 1
+            st
+          case ev: ArchivedEvent =>
+            val (newSt, ingested) = st.ingestArchivedEvent(ev)
+            if (ingested)
+              ingestedArchivedEvents.append(ev)
+            else
+              numFilteredArchivedEvents += 1
+            newSt
           case _ =>
             throw new IllegalArgumentException(s"Encountered unknown event: $ev")
         }
       )
       val offsetsToRemove = stNew.computeOffsetsToRemove(tx.getOffset)
+      val newOffset = Some(tx.getOffset)
       (
         State(
-          offset = Some(tx.getOffset),
+          offset = newOffset,
           nextEventNumber = stNew.nextEventNumber,
           createEvents = stNew.createEvents,
           createEventsById = stNew.createEventsById,
           offsetChanged = Promise(),
           offsetIngestionsToSignal = stNew.offsetIngestionsToSignal.removedAll(offsetsToRemove.keys),
         ),
-        (offsetChanged, offsetsToRemove.values),
+        (
+          IngestionSummary(
+            Some(tx.getTransactionId),
+            ingestedCreatedEvents,
+            numFilteredCreatedEvents,
+            ingestedArchivedEvents,
+            numFilteredArchivedEvents,
+            newOffset,
+            stNew.createEvents.size,
+          ),
+          offsetChanged,
+          offsetsToRemove.values,
+        ),
       )
     }
 
@@ -392,6 +461,44 @@ object InMemoryAcsStore {
           (this.focus(_.offsetIngestionsToSignal).modify(_ + (offset -> p)), p)
         case Some(existingP) => (this, existingP)
       }
+    }
+  }
+
+  private case class IngestionSummary(
+      txId: Option[String],
+      ingestedCreatedEvents: mutable.ListBuffer[CreatedEvent],
+      numFilteredCreatedEvents: Int,
+      ingestedArchivedEvents: mutable.ListBuffer[ArchivedEvent],
+      numFilteredArchivedEvents: Int,
+      offset: Option[String],
+      newAcsSize: Int,
+  ) extends PrettyPrinting {
+
+    override def pretty: Pretty[this.type] = {
+      import com.daml.network.util.PrettyInstances.*
+
+      prettyNode(
+        "", // intentionally left empty, as that worked better in the log messages above
+        paramIfDefined("offset", _.offset.map(_.unquoted)),
+        paramIfDefined("txId", _.txId.map(_.readableHash)),
+        param("ingestedCreates", _.ingestedCreatedEvents.toSeq),
+        param(
+          "numFilteredCreates",
+          _.numFilteredCreatedEvents,
+          _.numFilteredCreatedEvents != 0,
+        ),
+        param(
+          "ingestedArchivals",
+          _.ingestedArchivedEvents.toSeq,
+          _.ingestedArchivedEvents.nonEmpty,
+        ),
+        param(
+          "numFilteredArchivals",
+          _.numFilteredArchivedEvents,
+          _.numFilteredArchivedEvents != 0,
+        ),
+        param("newAcsSize", _.newAcsSize),
+      )
     }
   }
 }
