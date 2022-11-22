@@ -18,6 +18,7 @@ class ErrorBoundary extends React.Component<IProps, IState> {
     this.state = { hasError: false };
   }
   private promiseRejectionHandler = (event: PromiseRejectionEvent) => {
+    console.error('ErrorBoundary caught an unhandled promise rejection', event.reason.toString());
     this.setState({
       hasError: true,
       error: event.reason.toString(),
@@ -29,6 +30,13 @@ class ErrorBoundary extends React.Component<IProps, IState> {
   }
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     // Placeholder for potentially logging the error further
+    console.error(
+      'ErrorBoundary caught an error',
+      error.name,
+      error.message,
+      error.stack,
+      errorInfo.componentStack
+    );
   }
   componentDidMount(): void {
     // Add an event listener to the window to catch unhandled promise rejections & stash the error in the state
