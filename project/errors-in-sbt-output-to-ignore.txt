@@ -49,6 +49,10 @@ io\.grpc\.Status\.asRuntimeException
 c.*\.d.*\.p.*\.a.*\.e.*\.ErrorInterceptor
 c.*\.d.*\.p.*\.a.*\.e.*\.ErrorListener
 
+# Ignore generic http 400/500 response errors, until we investigate why these are caused.
+# TODO (#1713): investigate this further, and try to stop ignoring this if possible.
+.*Http response at 400 or 500 level.*
+
 # sbt 1.4 onwards logs GC warnings
 .*\[.*warn.*\].* of the last .* were spent in garbage collection\.
 

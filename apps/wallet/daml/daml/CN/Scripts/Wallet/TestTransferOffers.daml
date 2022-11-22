@@ -14,7 +14,7 @@ import CC.Scripts.Util
 testTransferOffers = script do
   
   app <- setupApp
-  runNextIssuance app 1.0
+  runNextIssuance app
   runCoinDepositBots app
 
   validator <- setupValidator app "validator1"
@@ -38,7 +38,6 @@ testTransferOffers = script do
           quantity = PaymentQuantity quantity CC
           description = description
           expiresAt = curTime `addRelTime` minutes 5
-          senderTransferFeeRatio = 0.5
 
   let completeTransfer accepted coin transferContext = submitMulti [walletServiceParty] [validator, alice.primaryParty] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
         inputs = [API.InputCoin $ toInterfaceContractId coin]

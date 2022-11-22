@@ -196,7 +196,6 @@ template WalletAppInstall
       with
         receiver : Party
         quantity : PaymentQuantity
-        senderTransferFeeRatio : Decimal
         description : Text
         expiresAt: Time
       controller walletServiceParty
