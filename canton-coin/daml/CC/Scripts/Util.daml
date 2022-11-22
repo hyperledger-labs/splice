@@ -188,7 +188,7 @@ runNextIssuanceInternal app coinPrice = do
         -- tests.
         miningRoundCid
 
-    -- transition the oldest OpenMiningRound into a ClosingMiningRound and
+    -- transition the oldest OpenMiningRound into a SummarizingMiningRound and
     -- create a new OpenMiningRound
     [(roundToArchiveCid, roundToArchive), (r2Cid, _), (r3Cid, _)] <- getOpenRoundsSorted app
     (closingRoundCid, openRoundCid) <- submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_AdvanceOpenMiningRounds with

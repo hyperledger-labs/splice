@@ -50,7 +50,7 @@ template OpenMiningRound
 
 -- | A mining round for which the total sum of registered rewards
 -- is being computed. Rewards can no longer be registered aginst such a round.
-template ClosingMiningRound
+template SummarizingMiningRound
   with
     svc : Party
     round : Round

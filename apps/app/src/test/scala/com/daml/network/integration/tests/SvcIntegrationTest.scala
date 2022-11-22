@@ -27,10 +27,10 @@ class SvcIntegrationTest extends CoinIntegrationTest {
       }
     })
 
-    val closingRound = svc.startClosingRound(0)
+    val summarizingRound = svc.startSummarizingRound(0)
     svc.remoteParticipant.ledger_api.acs
-      .filterJava(ClosingMiningRound.COMPANION)(svcParty)
-      .map(_.id) shouldBe Seq(closingRound)
+      .filterJava(SummarizingMiningRound.COMPANION)(svcParty)
+      .map(_.id) shouldBe Seq(summarizingRound)
     svc.remoteParticipant.ledger_api.acs
       .filterJava(OpenMiningRound.COMPANION)(svcParty) shouldBe empty
 
@@ -41,7 +41,7 @@ class SvcIntegrationTest extends CoinIntegrationTest {
         _.id
       ) shouldBe Seq(issuingRoundResponse.issuingRound)
     svc.remoteParticipant.ledger_api.acs
-      .filterJava(ClosingMiningRound.COMPANION)(svcParty) shouldBe empty
+      .filterJava(SummarizingMiningRound.COMPANION)(svcParty) shouldBe empty
 
     val closedRound = svc.closeRound(0)
     svc.remoteParticipant.ledger_api.acs
@@ -107,7 +107,7 @@ class SvcIntegrationTest extends CoinIntegrationTest {
       optTimeout = None,
       commands = rewards.flatMap(_.create.commands.asScala.toSeq),
     )
-    svc.startClosingRound(0)
+    svc.startSummarizingRound(0)
     val result = svc.startIssuingRound(0)
     result.totalBurnQuantity shouldBe BigDecimal(1 + 2 + 3 + 4)
   }

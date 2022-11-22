@@ -129,7 +129,7 @@ template CoinRules
         create OpenMiningRound with svc; observers; round; coinPrice; opensAt; targetClosesAt
 
     nonconsuming choice CoinRules_AdvanceOpenMiningRounds
-      : (ContractId ClosingMiningRound, ContractId OpenMiningRound)
+      : (ContractId SummarizingMiningRound, ContractId OpenMiningRound)
       with
         coinPrice : Decimal
         roundToArchiveCid : ContractId OpenMiningRound
@@ -158,16 +158,16 @@ template CoinRules
 
         -- archive and create the rounds
         archive roundToArchiveCid
-        newClosingRound <- create ClosingMiningRound with
+        newSummarizingRound <- create SummarizingMiningRound with
           svc
           observers
           round = roundToArchive.round
         newOpenRound <- create OpenMiningRound with svc; observers; round; coinPrice; opensAt; targetClosesAt
-        return (newClosingRound, newOpenRound)
+        return (newSummarizingRound, newOpenRound)
 
     -- TODO(#1680) - remove. 
-    nonconsuming choice CoinRules_MiningRound_StartClosing
-      : ContractId ClosingMiningRound
+    nonconsuming choice CoinRules_MiningRound_StartSummarizing
+      : ContractId SummarizingMiningRound
       with
         miningRoundCid : ContractId OpenMiningRound
       controller svc
@@ -176,20 +176,20 @@ template CoinRules
         miningRound <- fetch miningRoundCid
         archive miningRoundCid
         require "SVC matches" (miningRound.svc == svc)
-        -- create closing round
-        create ClosingMiningRound with
+        -- create summarizing round
+        create SummarizingMiningRound with
           svc
           observers
           round = miningRound.round
     nonconsuming choice CoinRules_MiningRound_StartIssuing
       : ContractId IssuingMiningRound
       with
-        miningRoundCid : ContractId ClosingMiningRound
+        miningRoundCid : ContractId SummarizingMiningRound
         -- The amount of coin burned in this round.
         totalBurnQuantity : Decimal
       controller svc
       do
-        -- archive closing mining round
+        -- archive summarizing mining round
         miningRound <- fetch miningRoundCid
         archive miningRoundCid
         require "SVC matches" (miningRound.svc == svc)
@@ -238,7 +238,7 @@ template CoinRules
         require "transfer outputs cannot exceed transfer inputs" (totalSelfTransferOutputs + totalNonSelfTransferOutputs <= totalTransferInputs)
         require "transfer inputs - fees must match outputs" ((totalTransferInputs - totalTransferFees - totalAdminFees) == (totalSelfTransferOutputs + totalNonSelfTransferOutputs))
 
-        -- create closing round
+        -- create closed round
         create ClosedMiningRound with
           svc
           observers

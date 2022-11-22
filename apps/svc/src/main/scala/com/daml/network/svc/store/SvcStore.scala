@@ -108,7 +108,7 @@ object SvcStore {
         mkFilter(cc.round.OpenMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.round.ClosingMiningRound.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.round.SummarizingMiningRound.COMPANION)(co => co.payload.svc == svc),
       ),
     )
   }

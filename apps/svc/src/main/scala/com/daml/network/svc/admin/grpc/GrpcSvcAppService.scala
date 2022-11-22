@@ -67,18 +67,18 @@ class GrpcSvcAppService(
       } yield v0.OpenRoundResponse(Proto.encodeContractId(cid.exerciseResult))
     }
 
-  override def startClosingRound(
-      request: v0.StartClosingRoundRequest
-  ): Future[v0.StartClosingRoundResponse] =
+  override def startSummarizingRound(
+      request: v0.StartSummarizingRoundRequest
+  ): Future[v0.StartSummarizingRoundResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
         openRound <- getRound(cc.round.OpenMiningRound.COMPANION)(_.round)(request.round)
         coinRules <- store.getCoinRules()
         cmd = coinRules.value.contractId
-          .exerciseCoinRules_MiningRound_StartClosing(openRound)
+          .exerciseCoinRules_MiningRound_StartSummarizing(openRound)
         cid <-
           connection.submitWithResult(Seq(store.svcParty), Seq.empty, cmd)
-      } yield v0.StartClosingRoundResponse(Proto.encodeContractId(cid.exerciseResult))
+      } yield v0.StartSummarizingRoundResponse(Proto.encodeContractId(cid.exerciseResult))
     }
 
   override def startIssuingRound(
@@ -86,12 +86,14 @@ class GrpcSvcAppService(
   ): Future[v0.StartIssuingRoundResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
-        closingRound <- getRound(cc.round.ClosingMiningRound.COMPANION)(_.round)(request.round)
+        summarizingRound <- getRound(cc.round.SummarizingMiningRound.COMPANION)(_.round)(
+          request.round
+        )
         rewards <- queryRewards(store.svcParty, request.round)
         totalBurn = rewards.totalBurn
         coinRules <- store.getCoinRules()
         cmd = coinRules.value.contractId
-          .exerciseCoinRules_MiningRound_StartIssuing(closingRound, totalBurn.bigDecimal)
+          .exerciseCoinRules_MiningRound_StartIssuing(summarizingRound, totalBurn.bigDecimal)
         cid <-
           connection.submitWithResult(Seq(store.svcParty), Seq.empty, cmd)
       } yield v0.StartIssuingRoundResponse(
@@ -181,7 +183,7 @@ class GrpcSvcAppService(
     }
 
   /** Query the open reward contracts for a given round. This should only be used
-    * on a ClosingMiningRound.
+    * on a SummarizingMiningRound.
     */
   private def queryRewards(p: PartyId, round: Long): Future[RoundRewards] = for {
     activeContracts <- connection.activeContracts(

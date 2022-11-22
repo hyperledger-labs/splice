@@ -648,7 +648,7 @@ class WalletIntegrationTest
 
       // next round.
       svc.openRound(1, 1)
-      svc.startClosingRound(0)
+      svc.startSummarizingRound(0)
       svc.startIssuingRound(0)
       aliceWallet.remoteParticipant.ledger_api.acs
         .awaitJava(roundCodegen.IssuingMiningRound.COMPANION)(aliceValidator.getValidatorPartyId())
@@ -697,7 +697,7 @@ class WalletIntegrationTest
       // Bob collects/realizes rewards
       val prevCoins = bobRemoteWallet.list().coins
       svc.openRound(1, 1)
-      svc.startClosingRound(0)
+      svc.startSummarizingRound(0)
       svc.startIssuingRound(0)
       eventually() {
         val r = loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
@@ -995,7 +995,7 @@ class WalletIntegrationTest
   }
 
   def nextRound(i: Long)(implicit env: CoinTestConsoleEnvironment): Unit = {
-    svc.startClosingRound(i)
+    svc.startSummarizingRound(i)
     svc.startIssuingRound(i)
     svc.closeRound(i)
     svc.openRound(i + 1, 1)

@@ -31,10 +31,10 @@ class SvcConnectivityIntegrationTest extends CoinIntegrationTest {
     svc.startSync()
     scan.startSync()
 
-    val closingRound = svc.startClosingRound(0)
+    val summarizingRound = svc.startSummarizingRound(0)
     svc.remoteParticipant.ledger_api.acs
-      .filterJava(ClosingMiningRound.COMPANION)(svcParty)
-      .map(_.id) shouldBe Seq(closingRound)
+      .filterJava(SummarizingMiningRound.COMPANION)(svcParty)
+      .map(_.id) shouldBe Seq(summarizingRound)
     svc.remoteParticipant.ledger_api.acs
       .filterJava(OpenMiningRound.COMPANION)(svcParty) shouldBe empty
 
@@ -63,6 +63,6 @@ class SvcConnectivityIntegrationTest extends CoinIntegrationTest {
         _.id
       ) shouldBe Seq(issuingRoundResponse.issuingRound)
     svc.remoteParticipant.ledger_api.acs
-      .filterJava(ClosingMiningRound.COMPANION)(svcParty) shouldBe empty
+      .filterJava(SummarizingMiningRound.COMPANION)(svcParty) shouldBe empty
   }
 }

@@ -13,8 +13,8 @@ service SvcService {
   // Open a new mining round for all currently registered validators.
   rpc OpenRound (OpenRoundRequest) returns (OpenRoundResponse);
 
-  // Mark the given mining round as closing for all validators.
-  rpc StartClosingRound (StartClosingRoundRequest) returns (StartClosingRoundResponse);
+  // Mark the given mining round as summarizing for all validators.
+  rpc StartSummarizingRound (StartSummarizingRoundRequest) returns (StartSummarizingRoundResponse);
 
   // Start issuing for the given mining round for all validators.
   rpc StartIssuingRound (StartIssuingRoundRequest) returns (StartIssuingRoundResponse);
@@ -62,12 +62,12 @@ message OpenRoundResponse {
 }
 
 
-message StartClosingRoundRequest {
+message StartSummarizingRoundRequest {
   int64 round = 1;
 }
 
-message StartClosingRoundResponse {
-  string closing_mining_round_contract_id = 1;
+message StartSummarizingRoundResponse {
+  string summarizing_mining_round_contract_id = 1;
 }
 
 message StartIssuingRoundRequest {

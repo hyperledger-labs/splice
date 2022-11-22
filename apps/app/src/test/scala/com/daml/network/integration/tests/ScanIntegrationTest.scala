@@ -101,7 +101,7 @@ class ScanIntegrationTest extends CoinIntegrationTest with PaymentChannelTestUti
       scan.getTransferContext().latestOpenMiningRound.map(_.payload.round.number) shouldBe Some(0)
     }
 
-    svc.startClosingRound(0)
+    svc.startSummarizingRound(0)
     svc.startIssuingRound(0)
     svc.closeRound(0)
     svc.openRound(1, 1.0)
@@ -123,7 +123,7 @@ class ScanIntegrationTest extends CoinIntegrationTest with PaymentChannelTestUti
 
     svc.openRound(1, 1)
 
-    svc.startClosingRound(0)
+    svc.startSummarizingRound(0)
     svc.startIssuingRound(0)
     svc.closeRound(0)
 
@@ -131,7 +131,7 @@ class ScanIntegrationTest extends CoinIntegrationTest with PaymentChannelTestUti
     aliceRemoteWallet.executeDirectTransfer(bobUserParty, 9)
     aliceRemoteWallet.executeDirectTransfer(bobUserParty, 1)
 
-    svc.startClosingRound(1)
+    svc.startSummarizingRound(1)
     svc.startIssuingRound(1)
     svc.closeRound(1)
 

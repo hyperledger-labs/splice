@@ -82,25 +82,25 @@ object GrpcSvcAppClient {
       )
   }
 
-  case class StartClosingRound(round: Long)
+  case class StartSummarizingRound(round: Long)
       extends BaseCommand[
-        v0.StartClosingRoundRequest,
-        v0.StartClosingRoundResponse,
-        roundCodegen.ClosingMiningRound.ContractId,
+        v0.StartSummarizingRoundRequest,
+        v0.StartSummarizingRoundResponse,
+        roundCodegen.SummarizingMiningRound.ContractId,
       ] {
-    override def createRequest(): Either[String, v0.StartClosingRoundRequest] = Right(
-      v0.StartClosingRoundRequest(round)
+    override def createRequest(): Either[String, v0.StartSummarizingRoundRequest] = Right(
+      v0.StartSummarizingRoundRequest(round)
     )
     override def submitRequest(
         service: SvcServiceStub,
-        request: v0.StartClosingRoundRequest,
-    ): Future[v0.StartClosingRoundResponse] =
-      service.startClosingRound(request)
+        request: v0.StartSummarizingRoundRequest,
+    ): Future[v0.StartSummarizingRoundResponse] =
+      service.startSummarizingRound(request)
     override def handleResponse(
-        response: v0.StartClosingRoundResponse
-    ): Either[String, roundCodegen.ClosingMiningRound.ContractId] =
-      Proto.decodeJavaContractId(roundCodegen.ClosingMiningRound.COMPANION)(
-        response.closingMiningRoundContractId
+        response: v0.StartSummarizingRoundResponse
+    ): Either[String, roundCodegen.SummarizingMiningRound.ContractId] =
+      Proto.decodeJavaContractId(roundCodegen.SummarizingMiningRound.COMPANION)(
+        response.summarizingMiningRoundContractId
       )
   }
 
