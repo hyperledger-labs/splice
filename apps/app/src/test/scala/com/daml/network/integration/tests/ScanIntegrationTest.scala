@@ -5,12 +5,12 @@ import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.da
 import com.daml.network.history._
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
-import com.daml.network.util.{ExerciseNode, PaymentChannelTestUtil}
+import com.daml.network.util.{ExerciseNode, CoinTestUtil}
 
 import scala.concurrent.duration._
 
 // TODO(M1-92): Add tests that cover all possible CoinEvents
-class ScanIntegrationTest extends CoinIntegrationTest with PaymentChannelTestUtil {
+class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
 
   "restart cleanly" in { implicit env =>
     scan.stop()
@@ -18,7 +18,7 @@ class ScanIntegrationTest extends CoinIntegrationTest with PaymentChannelTestUti
   }
 
   "see Coin transfers" in { implicit env =>
-    val (aliceP, bobP) = setupAliceAndBobAndChannel(env)
+    val (aliceP, bobP) = setupAliceAndBobAndChannel(this)
     aliceRemoteWallet.tap(50)
     aliceRemoteWallet.executeDirectTransfer(bobP, 10)
     eventually(5.seconds) {
@@ -68,7 +68,7 @@ class ScanIntegrationTest extends CoinIntegrationTest with PaymentChannelTestUti
   }
 
   "get details of a single Coin transfer" in { implicit env =>
-    val (aliceP @ _, bobP) = setupAliceAndBobAndChannel(env)
+    val (aliceP @ _, bobP) = setupAliceAndBobAndChannel(this)
     aliceRemoteWallet.tap(50)
     aliceRemoteWallet.executeDirectTransfer(bobP, 10)
 
@@ -96,7 +96,7 @@ class ScanIntegrationTest extends CoinIntegrationTest with PaymentChannelTestUti
   }
 
   "report correct reference data" in { implicit env =>
-    setupAliceAndBobAndChannel(env)
+    setupAliceAndBobAndChannel(this)
     eventually(1.seconds) {
       scan.getTransferContext().latestOpenMiningRound.map(_.payload.round.number) shouldBe Some(0)
     }
@@ -112,7 +112,7 @@ class ScanIntegrationTest extends CoinIntegrationTest with PaymentChannelTestUti
   }
 
   "list closed rounds" in { implicit env =>
-    val (aliceUserParty @ _, bobUserParty) = setupAliceAndBobAndChannel(env)
+    val (aliceUserParty @ _, bobUserParty) = setupAliceAndBobAndChannel(this)
     eventually(1.seconds) {
       scan.getTransferContext().latestOpenMiningRound.map(_.payload.round.number) shouldBe Some(0)
     }

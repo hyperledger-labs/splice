@@ -8,7 +8,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import com.daml.network.util.PaymentChannelTestUtil
+import com.daml.network.util.CoinTestUtil
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
@@ -17,7 +17,7 @@ import org.slf4j.event.Level
 import java.time.Duration
 import scala.util.{Success, Try}
 
-class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with PaymentChannelTestUtil {
+class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
@@ -89,7 +89,7 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with PaymentCha
   }
 
   "automatically collect app & validator rewards on coin operations" in { implicit env =>
-    val (aliceUserParty, bobUserParty) = setupAliceAndBobAndChannel
+    val (aliceUserParty, bobUserParty) = setupAliceAndBobAndChannel(this)
     // Set-up payment channel between alice and her validator
     val proposalId =
       aliceValidatorRemoteWallet.proposePaymentChannel(
@@ -134,7 +134,7 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with PaymentCha
   }
 
   "list and manually collect app & validator rewards" in { implicit env =>
-    val (aliceUserParty, bobUserParty) = setupAliceAndBobAndChannel
+    val (aliceUserParty, bobUserParty) = setupAliceAndBobAndChannel(this)
 
     // Tap coin and do a transfer from alice to bob
     aliceRemoteWallet.tap(50)
