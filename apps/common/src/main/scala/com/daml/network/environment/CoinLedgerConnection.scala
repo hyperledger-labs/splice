@@ -49,6 +49,7 @@ import com.google.protobuf.timestamp.Timestamp
 import io.grpc.StatusRuntimeException
 
 import java.nio.file.{Files, Path}
+import java.security.MessageDigest
 import java.util.UUID
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -67,7 +68,7 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
       commands: Seq[Command],
-      commandId: String,
+      commandId: CoinLedgerConnection.CommandId,
       deduplicationOffset: String,
   )(implicit traceContext: TraceContext): Future[Transaction]
 
@@ -144,6 +145,35 @@ trait CoinLedgerSubscription extends FlagCloseableAsync with NamedLogging {
 
 object CoinLedgerConnection {
 
+  /** Abstract representation of a command-id for deduplication.
+    * @param methodName: fully-classified name of the method whose calls should be deduplicated,
+    *   e.g., "com.daml.network.directory.createDirectoryEntry".
+    * @param parties: list of parties whose method calls should be considered distinct,
+    *   e.g., "Seq(directoryProvider)"
+    * @param discriminator: additional discriminator for method calls,
+    *   e.g., "digitalasset.cn" in case of deduplicating directory entry requests relating to directory name "digitalasset.cn". Beware of naive concatenation
+    *   strings for discriminators. Always ensure that the encoding is injective.
+    */
+  case class CommandId(methodName: String, parties: Seq[PartyId], discriminator: String = "") {
+    require(!methodName.contains('_'))
+
+    // NOTE: avoid changing this computation, as otherwise some commands might not get properly deduplicated
+    // on an app upgrade.
+    def commandIdForSubmission: String = {
+      val str = parties
+        .map(_.toProtoPrimitive)
+        .prepended(
+          parties.length.toString
+        ) // prepend length to avoid suffixes interfering with party mapping
+        .appended(discriminator)
+        .mkString("/")
+      // Digest is not thread safe, create a new one each time.
+      val hashFun = MessageDigest.getInstance("SHA-256")
+      val hash = hashFun.digest(str.getBytes("UTF-8")).map("%02x".format(_)).mkString
+      s"${methodName}_$hash"
+    }
+  }
+
   def apply(
       coinLedgerClient: CoinLedgerClient,
       maxRetries: Int,
@@ -180,13 +210,13 @@ object CoinLedgerConnection {
           actAs: Seq[PartyId],
           readAs: Seq[PartyId],
           commands: Seq[Command],
-          commandId: String,
+          commandId: CommandId,
           deduplicationOffset: String,
       )(implicit traceContext: TraceContext): Future[Transaction] = {
         client.submitAndWaitForTransaction(
           workflowId = workflowId,
           applicationId = coinLedgerClient.applicationId,
-          commandId = commandId,
+          commandId = commandId.commandIdForSubmission,
           actAs = actAs.map(_.toProtoPrimitive),
           readAs = readAs.map(_.toProtoPrimitive),
           commands = commands,

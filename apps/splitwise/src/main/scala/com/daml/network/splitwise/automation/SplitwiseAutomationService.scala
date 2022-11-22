@@ -3,7 +3,7 @@ package com.daml.network.splitwise.automation
 import akka.stream.Materializer
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.store.SplitwiseStore
 import com.daml.network.store.AcsStore.QueryResult
@@ -12,7 +12,6 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
 
-import java.security.MessageDigest
 import scala.concurrent.ExecutionContextExecutor
 import scala.jdk.CollectionConverters.*
 
@@ -48,20 +47,6 @@ class SplitwiseAutomationService(
     )
   )
 
-  // TODO(#790): generalize this so that it can be shared with other command dedup calls
-  private def mkCommandId(
-      methodName: String,
-      parties: Seq[PartyId],
-      suffix: String = "",
-  ): String = {
-    require(!methodName.contains('/'))
-    val str = parties.map(_.toProtoPrimitive).appended(suffix).mkString("/")
-    // Digest is not thread safe, create a new one each time.
-    val hashFun = MessageDigest.getInstance("SHA-256")
-    val hash = hashFun.digest(str.getBytes("UTF-8")).map("%02x".format(_)).mkString
-    s"${methodName}_$hash"
-  }
-
   registerRequestHandler("handleSplitwiseInstallRequest", store.streamInstallRequests())(req => {
     implicit tc =>
       {
@@ -75,9 +60,6 @@ class SplitwiseAutomationService(
               .map(_ => "rejected request for already existing installation.")
 
           case QueryResult(off, None) =>
-            val commandId =
-              mkCommandId("com.daml.network.splitwise.SplitwiseInstall", Seq(provider, user))
-
             val acceptCmd =
               req.contractId.exerciseSplitwiseInstallRequest_Accept().commands.asScala.toSeq
             // TODO(#790): should we really discard the result here? if yes, can we avoid parsing it?
@@ -86,7 +68,10 @@ class SplitwiseAutomationService(
                 actAs = Seq(provider),
                 readAs = Seq(),
                 commands = acceptCmd,
-                commandId = commandId,
+                commandId = CoinLedgerConnection.CommandId(
+                  "com.daml.network.splitwise.createSplitwiseInstall",
+                  Seq(provider, user),
+                ),
                 deduplicationOffset = off,
               )
               .map(_ => "accepted install request.")
@@ -159,20 +144,17 @@ class SplitwiseAutomationService(
             .map(_ => "rejected request for already existing group.")
 
         case QueryResult(off, None) =>
-          val commandId =
-            mkCommandId(
-              "com.daml.network.splitwise.GroupRequest",
-              Seq(provider, user),
-              groupId.unpack,
-            )
-
           val acceptCmd = req.contractId.exerciseGroupRequest_Accept().commands.asScala.toSeq
           connection
             .submitCommandsWithDedup(
               actAs = Seq(provider),
               readAs = Seq(),
               commands = acceptCmd,
-              commandId = commandId,
+              commandId = CoinLedgerConnection.CommandId(
+                "com.daml.network.splitwise.createGroupRequest",
+                Seq(provider, user),
+                groupId.unpack,
+              ),
               deduplicationOffset = off,
             )
             .map(_ => "accepted group request.")

@@ -53,14 +53,13 @@ object CoinUtil {
       "createValidatorRight",
       lookupValidatorRightByParty(user).flatMap {
         case QueryResult(off, None) =>
-          // TODO(#790) Switch to the generalized version of mkCommandId once it has been added
-          val commandId = s"com.daml.network.validator.ValidatorRight_$user"
           connection
             .submitCommandsWithDedup(
               actAs = Seq(validator, user),
               readAs = Seq.empty,
               commands = createValidatorRightCommand(svc, validator, user),
-              commandId = commandId,
+              commandId = CoinLedgerConnection
+                .CommandId("com.daml.network.validator.createValidatorRight", Seq(user)),
               deduplicationOffset = off,
             )
             .map(_ => ())

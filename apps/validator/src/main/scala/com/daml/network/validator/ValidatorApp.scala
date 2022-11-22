@@ -178,20 +178,22 @@ class ValidatorApp(
       new CoinRulesRequest(validatorParty.toProtoPrimitive, svcParty.toProtoPrimitive)
     retryProvider
       .retryForAutomationWithUncleanShutdown(
-        "Create CoinRulesRequest",
+        "createCoinRulesRequest",
         for {
           coinRulesResult <- store.lookupCoinRules()
           coinRulesRequestResult <- store.lookupCoinRulesRequest()
           _ <- (coinRulesResult, coinRulesRequestResult) match {
             case (QueryResult(off1, None), QueryResult(off2, None)) =>
-              // TODO(#790) Switch to the generalized version of mkCommandId once it has been added
-              val commandId = s"com.daml.network.validator.CoinRulesRequest_$validatorParty"
               connection
                 .submitCommandsWithDedup(
                   actAs = Seq(validatorParty),
                   readAs = Seq.empty,
                   commands = coinRulesReq.create.commands.asScala.toSeq,
-                  commandId = commandId,
+                  commandId = CoinLedgerConnection
+                    .CommandId(
+                      "com.daml.network.validator.createCoinRulesRequest",
+                      Seq(validatorParty),
+                    ),
                   deduplicationOffset = Ordering.String.min(off1, off2),
                 )
             case (QueryResult(_, Some(_)), _) =>

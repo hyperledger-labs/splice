@@ -165,14 +165,13 @@ object SvcApp {
         "create coinrules and issuance state",
         store.lookupCoinRules().flatMap {
           case QueryResult(off, None) =>
-            // TODO(#790) Switch to the generalized version of mkCommandId once it has been added
-            val commandId = s"com.daml.network.svc.CoinRules"
             connection
               .submitCommandsWithDedup(
                 actAs = Seq(svc),
                 readAs = Seq.empty,
                 commands = createCoinRulesCmd,
-                commandId = commandId,
+                commandId =
+                  CoinLedgerConnection.CommandId("com.daml.network.svc.createCoinRules", Seq()),
                 deduplicationOffset = off,
               )
           case QueryResult(_, Some(_)) =>

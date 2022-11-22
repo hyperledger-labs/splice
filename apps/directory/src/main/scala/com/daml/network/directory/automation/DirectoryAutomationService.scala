@@ -2,19 +2,18 @@ package com.daml.network.directory.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
-import com.daml.network.codegen.java.cn.{directory => directoryCodegen}
+import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.{JavaContract => Contract}
+import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
 
-import java.security.MessageDigest
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
@@ -67,19 +66,15 @@ class DirectoryAutomationService(
     )
   )
 
-  // TODO(#790): generalize this so that it can be shared with other command dedup calls
-  private def mkCommandId(
-      methodName: String,
-      parties: Seq[PartyId],
-      suffix: String = "",
-  ): String = {
-    require(!methodName.contains('/'))
-    val str = parties.map(_.toProtoPrimitive).appended(suffix).mkString("/")
-    // Digest is not thread safe, create a new one each time.
-    val hashFun = MessageDigest.getInstance("SHA-256")
-    val hash = hashFun.digest(str.getBytes("UTF-8")).map("%02x".format(_)).mkString
-    s"${methodName}_$hash"
-  }
+  private def createDirectoryEntryCommandId(
+      provider: PartyId,
+      entryName: String,
+  ): CoinLedgerConnection.CommandId =
+    CoinLedgerConnection.CommandId(
+      "com.daml.network.directory.createDirectoryEntry",
+      Seq(provider),
+      entryName,
+    )
 
   registerRequestHandler("handleDirectoryInstallRequest", store.streamInstallRequests())(req =>
     implicit traceContext => {
@@ -102,9 +97,6 @@ class DirectoryAutomationService(
             renewalDuration,
             entryLifetime,
           )
-          val commandId =
-            mkCommandId("com.daml.network.directory.DirectoryInstall", Seq(provider, user))
-
           val acceptCmd = req.contractId
             .exerciseDirectoryInstallRequest_Accept(arg)
           // TODO(#790): should we really discard the result here? if yes, can we avoid parsing it?
@@ -113,7 +105,10 @@ class DirectoryAutomationService(
               actAs = Seq(provider),
               readAs = Seq(),
               commands = acceptCmd.commands.asScala.toSeq,
-              commandId = commandId,
+              commandId = CoinLedgerConnection.CommandId(
+                "com.daml.network.directory.createDirectoryInstall",
+                Seq(provider, user),
+              ),
               deduplicationOffset = off,
             )
             .map(_ => "accepted install request.")
@@ -180,11 +175,6 @@ class DirectoryAutomationService(
           entryName: String,
           offset: String,
       ) = {
-        val commandId = mkCommandId(
-          "com.daml.network.directory.DirectoryEntry",
-          Seq(provider),
-          entryName,
-        )
         for {
           transferContext <- scanConnection.getAppTransferContext()
           cmd =
@@ -199,7 +189,7 @@ class DirectoryAutomationService(
               actAs = Seq(provider),
               readAs = Seq.empty,
               commands = cmd.asScala.toSeq,
-              commandId = commandId,
+              commandId = createDirectoryEntryCommandId(provider, entryName),
               deduplicationOffset = offset,
             )
         } yield "created directory entry."
@@ -260,17 +250,12 @@ class DirectoryAutomationService(
                 transferContext,
               )
               .commands
-          commandId = mkCommandId(
-            "com.daml.network.directory.DirectoryEntry",
-            Seq(provider),
-            entryName,
-          )
           _ <- connection
             .submitCommandsWithDedup(
               actAs = Seq(provider),
               readAs = Seq.empty,
               commands = cmd.asScala.toSeq,
-              commandId = commandId,
+              commandId = createDirectoryEntryCommandId(provider, entryName),
               deduplicationOffset = offset,
             )
         } yield "created directory entry."
@@ -335,17 +320,12 @@ class DirectoryAutomationService(
                 transferContext,
               )
               .commands
-          commandId = mkCommandId(
-            "com.daml.network.directory.DirectoryEntry",
-            Seq(provider),
-            entry.payload.name,
-          )
           _ <- connection
             .submitCommandsWithDedup(
               actAs = Seq(provider),
               readAs = Seq.empty,
               commands = cmd.asScala.toSeq,
-              commandId = commandId,
+              commandId = createDirectoryEntryCommandId(provider, entry.payload.name),
               deduplicationOffset = offset,
             )
         } yield "renewed directory entry."

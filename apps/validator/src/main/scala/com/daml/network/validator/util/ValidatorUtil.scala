@@ -40,10 +40,6 @@ private[validator] object ValidatorUtil {
         "installWalletForUser",
         store.lookupWalletInstallByName(endUserName).flatMap {
           case QueryResult(off, None) =>
-            // TODO(#790) Switch to the generalized version of mkCommandId once it has been added
-            // We dedup on the party rather than the username because the username can
-            // have special characters not allowed in command ids.
-            val commandId = s"com.daml.network.validator.WalletAppInstall_$endUserParty"
             connection
               .submitCommandsWithDedup(
                 actAs = Seq(validatorServiceParty, walletServiceParty, endUserParty),
@@ -55,7 +51,10 @@ private[validator] object ValidatorUtil {
                   endUserName,
                   endUserParty.toProtoPrimitive,
                 ).create.commands.asScala.toSeq,
-                commandId = commandId,
+                // We dedup on the party rather than the username because the username can
+                // have special characters not allowed in command ids.
+                commandId = CoinLedgerConnection
+                  .CommandId("com.daml.network.validator.installWalletForUser", Seq(endUserParty)),
                 deduplicationOffset = off,
               )
           case QueryResult(_, Some(_)) =>
