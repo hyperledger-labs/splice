@@ -16,6 +16,7 @@ import {
 
 import { Coin } from '@daml.js/canton-coin/lib/CC/Coin';
 
+import { QuantityDisplay } from '../components/QuantityDisplay';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 
 const Coins: React.FC = () => {
@@ -77,8 +78,8 @@ const Coins: React.FC = () => {
         <TableHead>
           <TableRow>
             <TableCell>Contract ID</TableCell>
-            <TableCell>Initial quantity</TableCell>
-            <TableCell>Created at</TableCell>
+            <TableCell>Initial Quantity</TableCell>
+            <TableCell>Created At</TableCell>
           </TableRow>
         </TableHead>
         <TableBody>
@@ -94,7 +95,7 @@ const Coins: React.FC = () => {
                 </Button>
               </TableCell>
               <TableCell className="coins-table-quantity">
-                {c.payload.quantity.initialQuantity}
+                <QuantityDisplay quantity={c.payload.quantity.initialQuantity} />
               </TableCell>
               <TableCell>{c.payload.quantity.createdAt.number}</TableCell>
             </TableRow>

@@ -38,7 +38,7 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
         }
         val row = inside(findAll(className("coins-table-row")).toList) { case Seq(row) => row }
         val quantity = row.childElement(className("coins-table-quantity"))
-        quantity.text should be("15.0000000000")
+        quantity.text should be("15.0000000000CC")
       }
     }
 
@@ -64,9 +64,9 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
             row.childElement(className("coins-table-quantity")).text
           )
           quantities should contain theSameElementsAs Seq(
-            "25.0000000000",
-            "35.0000000000",
-            "45.0000000000",
+            "25.0000000000CC",
+            "35.0000000000CC",
+            "45.0000000000CC",
           )
         }
 
@@ -192,6 +192,31 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
               expectedDirName
             )
             row
+          }
+        }
+      }
+    }
+
+    "show app payment requests, including quantity and currency code" in { implicit env =>
+      val expectedDirName = createDirectoryEntryForDirectoryItself
+
+      // Alice submits a directory entry request, which will create an app payment request in her wallet
+      val aliceDamlUser = aliceRemoteWallet.config.damlUser
+      val aliceUserParty = setupForTestWithDirectory(aliceDamlUser, aliceValidator)
+      submitDirectoryEntryRequest(aliceUserParty, aliceDirectory, "alice.cns")
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToPaymentRequests(aliceDamlUser)
+        // Check that the directory party ID has been resolved to its directory entry correctly.
+        // We do this in another eventually() as a "..." text might appear momentarily, until the directory service responds.
+        eventually() {
+          inside(findAll(className("app-request-breakdown-table-row")).toList) { case Seq(row) =>
+            row.childElement(className("app-request-receiver")).text should matchText(
+              expectedDirName
+            )
+            row.childElement(className("app-request-payment-quantity")).text should matchText(
+              "1.0000000000CC"
+            )
           }
         }
       }

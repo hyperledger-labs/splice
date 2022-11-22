@@ -13,12 +13,13 @@ import {
   TableRow,
 } from '@mui/material';
 
-import { AppPaymentRequest as DamlPaymentRequest } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
+import { AppPaymentRequest } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
+import { PaymentQuantityDisplay } from './QuantityDisplay';
 
 interface AppPaymentRequestsProps {
-  requests: Contract<DamlPaymentRequest>[];
+  requests: Contract<AppPaymentRequest>[];
 }
 
 const AppPaymentRequestsTable: React.FC<AppPaymentRequestsProps> = ({ requests }) => {
@@ -33,7 +34,7 @@ const AppPaymentRequestsTable: React.FC<AppPaymentRequestsProps> = ({ requests }
       </TableHead>
       <TableBody>
         {requests.map(c => (
-          <AppPaymentRequest
+          <AppPaymentRequestRows
             request={c.payload}
             provider={c.payload.provider}
             cid={c.contractId}
@@ -45,8 +46,8 @@ const AppPaymentRequestsTable: React.FC<AppPaymentRequestsProps> = ({ requests }
   );
 };
 
-const AppPaymentRequest: React.FC<{
-  request: DamlPaymentRequest;
+const AppPaymentRequestRows: React.FC<{
+  request: AppPaymentRequest;
   provider: string;
   cid: string;
 }> = ({ request, provider, cid }) => {
@@ -96,9 +97,8 @@ const AppPaymentRequest: React.FC<{
                     <TableCell className="app-request-receiver">
                       <DirectoryEntry partyId={receiver} />
                     </TableCell>
-                    <TableCell align="right">
-                      {quantity.quantity}
-                      {quantity.currency}
+                    <TableCell className="app-request-payment-quantity" align="right">
+                      <PaymentQuantityDisplay quantity={quantity} />
                     </TableCell>
                   </TableRow>
                 ))}
