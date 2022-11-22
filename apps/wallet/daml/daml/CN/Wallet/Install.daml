@@ -9,6 +9,7 @@ import CC.CoinRules (CoinRules, CoinRules_Tap(..))
 import CN.Wallet.Payment
 import CN.Wallet.PaymentChannel
 import CN.Wallet.Subscriptions
+import CN.Wallet.TransferOffer
 
 -- Evaluates an update, catches any exceptions it throws and converts them into an Either
 catchAll: Update a -> Update (Either Text a)
@@ -36,6 +37,9 @@ executeCoinOperationRec context inputs prevResults (operation::remainingOperatio
     CO_ChannelTransfer channel quantity payload -> do
       resultE <- catchAllE $ exercise channel (PaymentChannel_ExecuteDirectTransfer inputs quantity payload context)
       handleResult COO_AcceptedChannelTransfer resultE
+    CO_CompleteAcceptedTransfer acceptedOffer -> do
+      resultE <- catchAllE $ exercise acceptedOffer (AcceptedTransferOffer_Complete inputs context)
+      handleResult COO_CompleteAcceptedTransfer resultE
     CO_SubscriptionAcceptAndMakeInitialPayment cid -> handle SubscriptionRequest_AcceptAndMakePayment COO_SubscriptionInitialPayment cid
     CO_SubscriptionMakePayment cid -> handle SubscriptionIdleState_MakePayment COO_SubscriptionPayment cid
     CO_Tap svc validator endUser tapQuantity -> do
@@ -76,6 +80,7 @@ data CoinOperation
     channel : ContractId PaymentChannel
     quantity: PaymentQuantity
     payload: Text
+  | CO_CompleteAcceptedTransfer (ContractId AcceptedTransferOffer)
   | CO_SubscriptionAcceptAndMakeInitialPayment (ContractId SubscriptionRequest)
   | CO_SubscriptionMakePayment (ContractId SubscriptionIdleState)
   | CO_Tap with
@@ -92,6 +97,7 @@ data CoinOperationOutcome
   = COO_AcceptedAppPayment (ContractId AcceptedAppPayment)
   | COO_AcceptedChannelPayment API.TransferResult
   | COO_AcceptedChannelTransfer API.TransferResult
+  | COO_CompleteAcceptedTransfer API.TransferResult
   | COO_SubscriptionInitialPayment (ContractId SubscriptionInitialPayment)
   | COO_SubscriptionPayment (ContractId SubscriptionPayment)
   | COO_Tap (ContractId API.Coin)
@@ -185,6 +191,20 @@ template WalletAppInstall
         cid : ContractId OnChannelPaymentRequest
       controller walletServiceParty
       do exercise cid OnChannelPaymentRequest_Reject
+
+    nonconsuming choice WalletAppInstall_CreateTransferOffer : ContractId TransferOffer
+      with
+        receiver : Party
+        quantity : PaymentQuantity
+        senderTransferFeeRatio : Decimal
+        description : Text
+        expiresAt: Time
+      controller walletServiceParty
+      do
+        create TransferOffer with
+          sender = endUserParty
+          svc = svcParty
+          ..
 
     -- TODO(#1351): Remove this
     nonconsuming choice WalletAppInstall_CoinRules_TryTransfer : API.TransferResult
