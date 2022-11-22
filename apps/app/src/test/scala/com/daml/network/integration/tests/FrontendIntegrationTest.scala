@@ -132,7 +132,14 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
     webDrivers.values.flatMap { implicit webDriver =>
       findAll(id("error")).toList.map(e => fail(s"Found unexpected error: ${e.text}"))
     }
-    webDrivers.values.foreach(_.quit())
+    webDrivers.values.foreach(webDriver => {
+      // The browser might not quit immediately after we tell it to, so we
+      // navigate it to an empty page at the end of each test; this helps avoid
+      // sending gRPC requests to services that are being shut down.
+      webDriver.navigate.to("about:blank")
+      eventually()(webDriver.getTitle() shouldBe "")
+      webDriver.quit()
+    })
     super.testFinished(env)
   }
 
