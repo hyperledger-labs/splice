@@ -205,6 +205,10 @@ template CoinRules
           round = miningRound.round
           quantity = svcCoinsPerIssuance
 
+        now <- getTime
+        let opensAt = addRelTime now config.tickDuration
+        let targetClosesAt = addRelTime opensAt (config.tickDuration + config.tickDuration)
+
         -- create issuing round
         create IssuingMiningRound with
           svc
@@ -214,6 +218,8 @@ template CoinRules
             if totalBurnQuantity <= 0.0
               then 0.0
               else userIssuanceRatio * min 1.0 (userCoinsPerIssuance / totalBurnQuantity)
+          opensAt = opensAt
+          targetClosesAt = targetClosesAt
 
     nonconsuming choice CoinRules_MiningRound_Close
       : ContractId ClosedMiningRound
@@ -373,6 +379,7 @@ miningRoundIsOpen round = do
   require ("mining round " <> show round <> " is open") (round.opensAt <= now)
   return ()
 
+
 -- | Execute a transfer.
 --
 executeTransfer : API.TransferContext -> CoinConfig USD -> Party -> API.Transfer -> Update (Either Text API.TransferResult)
@@ -381,7 +388,6 @@ executeTransfer context config0 svc t = do
   (_, openRound) <- downcastInterface @OpenMiningRound "OpenMiningRound" context.openMiningRound
   let config = scaleConfig openRound config0
 
-  -- TODO(#1680): analogue for issuing mining rounds.
   _ <- miningRoundIsOpen openRound
   isum <- summarizeAndValidateInputs context openRound.round config svc t.sender t.inputs
 
@@ -471,7 +477,8 @@ mergeDistributedOutputs distributed sender summary =
 
 summarizeAndValidateInputs : API.TransferContext -> API.Round -> CoinConfig CC -> Party -> Party -> [API.TransferInput] -> Update TransferInputsSummary
 summarizeAndValidateInputs context round config svc sender inps = do
-    foldlA (summarizeInput round) initialSummary inps
+    now <- getTime
+    foldlA (summarizeInput now round) initialSummary inps
   where
     initialSummary = TransferInputsSummary with
       numBurnInputs = 0
@@ -479,7 +486,7 @@ summarizeAndValidateInputs context round config svc sender inps = do
       totalQuantity = 0.0
       totalHoldingFees = 0.0
 
-    summarizeInput round s (API.InputCoin coinCid) = do
+    summarizeInput now round s (API.InputCoin coinCid) = do
       (_, coin) <- downcastInterface @Coin "Coin" coinCid
       require "SVC matches" (svc == coin.svc)
       require "Sender matches owner" (sender == coin.owner)
@@ -493,10 +500,11 @@ summarizeAndValidateInputs context round config svc sender inps = do
         totalHoldingFees =
           s.totalHoldingFees + holdingFee
 
-    summarizeInput round s (API.InputAppReward rewardCid) = do
+    summarizeInput now round s (API.InputAppReward rewardCid) = do
       (_, reward) <- downcastInterface @AppReward "AppReward" rewardCid
       require "SVC matches" (svc == reward.svc)
       (_, miningRound) <- fetchIssuingMiningRound context svc reward.round
+      require "issuing round is open" (now >= miningRound.opensAt)
       require "Sender matches app provider" (sender == reward.provider)
       return TransferInputsSummary with
         numBurnInputs = s.numBurnInputs + 1
@@ -504,7 +512,7 @@ summarizeAndValidateInputs context round config svc sender inps = do
         totalQuantity = s.totalQuantity + reward.quantity * miningRound.issuancePerCoin
         totalHoldingFees = s.totalHoldingFees
 
-    summarizeInput round s (API.InputValidatorReward rewardCid) = do
+    summarizeInput now round s (API.InputValidatorReward rewardCid) = do
       (_, reward) <- downcastInterface @ValidatorReward "ValidatorReward" rewardCid
       require "SVC matches" (svc == reward.svc)
       (_, miningRound) <- fetchIssuingMiningRound context svc reward.round

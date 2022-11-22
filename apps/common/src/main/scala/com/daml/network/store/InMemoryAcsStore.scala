@@ -1,6 +1,5 @@
 package com.daml.network.store
 
-import com.digitalasset.canton.util.ShowUtil.*
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.codegen.{
@@ -21,10 +20,11 @@ import com.daml.network.util.JavaContract
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.ShowUtil.*
 import monocle.macros.syntax.lens.*
 
-import scala.collection.{immutable, mutable}
 import scala.collection.immutable.SortedMap
+import scala.collection.{immutable, mutable}
 import scala.concurrent.*
 import scala.jdk.CollectionConverters.*
 

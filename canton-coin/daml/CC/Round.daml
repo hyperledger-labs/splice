@@ -30,7 +30,7 @@ template OpenMiningRound
     coinPrice : Decimal
     observers : [Party] -- TODO(M1-51): remove workaround for explicit disclosure
     opensAt : Time -- ^ Time after which transfers can use this mining round
-    targetClosesAt: Time -- ^ Time when the SVC expects to close this round. The round MUST NOT be archived before this time.
+    targetClosesAt: Time -- ^ Time when the SVC expects to close this round. The round SHOULD NOT be archived before this time.
   where
     signatory svc
     observer observers
@@ -66,6 +66,8 @@ template IssuingMiningRound
     round : Round
     issuancePerCoin : Decimal
     observers : [Party] -- TODO(M1-51): remove workaround for explicit disclosure
+    opensAt : Time-- ^ Time after which rewards from this mining round can be collected
+    targetClosesAt : Time -- ^ Time when the SVC expects to close this round. The round SHOULD NOT be archived before this time.
   where
     signatory svc
     observer observers

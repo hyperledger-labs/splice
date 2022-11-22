@@ -1,8 +1,9 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.console.WalletAppReference
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.util.CommonCoinAppInstanceReferences
+import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences}
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.{
   BaseEnvironmentDefinition,
@@ -11,8 +12,10 @@ import com.digitalasset.canton.integration.{
   SharedEnvironment,
   TestConsoleEnvironment,
 }
+import com.digitalasset.canton.topology.PartyId
 
 import java.time.Duration
+import scala.concurrent.duration.*
 
 /** Analogue to Canton's CommunityTests */
 object CoinTests {
@@ -60,5 +63,33 @@ object CoinTests {
         }
       }
     }
+
+    /** @param expectedQuantityRanges : lower and upper bounds for coins sorted by their initial quantity in ascending order. */
+    def checkWallet(
+        walletParty: PartyId,
+        wallet: WalletAppReference,
+        expectedQuantityRanges: Seq[(BigDecimal, BigDecimal)],
+    ): Unit = clue(s"checking wallet with $expectedQuantityRanges") {
+      eventually(10.seconds, 500.millis) {
+        val coins =
+          wallet.list().coins.sortBy(coin => coin.contract.payload.quantity.initialQuantity)
+        coins should have size (expectedQuantityRanges.size.toLong)
+        coins
+          .zip(expectedQuantityRanges)
+          .foreach { case (coin, quantityBounds) =>
+            coin.contract.payload.owner shouldBe walletParty.toPrim
+            val coinQuantity =
+              coin.contract.payload.quantity
+            assertInRange(coinQuantity.initialQuantity, quantityBounds)
+            coinQuantity.ratePerRound shouldBe
+              CoinUtil.defaultHoldingFee
+          }
+      }
+    }
+
+    def assertInRange(value: BigDecimal, range: (BigDecimal, BigDecimal)): Unit = {
+      value should (be >= range._1 and be <= range._2)
+    }
+
   }
 }
