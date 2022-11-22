@@ -491,12 +491,12 @@ our own apps. Here we use the topology from our tests:
 1. Start Canton
 ```
 ./start-canton.sh
-
 ```
 
-2. Start the Coin apps and run the bootstrap script to initialize.
+2. Start the Coin apps and run the bootstrap script to
+   initialize. This starts the necessary Canton Coin apps (in a single
+   process) to run the front ends.
 
-We use a single script to initialize both the wallets and the splitwise apps.
 ```
 ./scripts/start-backends-for-local-frontend-testing.sh
 ```
@@ -505,9 +505,19 @@ We use a single script to initialize both the wallets and the splitwise apps.
 ```
 ./start-frontends.sh
 ```
-You can then browse to http://localhost:3000 and http://localhost:3001 for the two wallet UIs, and login as `alice_wallet_user` and `bob_wallet_user` respectively.
 
-Note that start-frontents.sh serves the different frontends from separate tmux screens,
+Once this is complete, the front ends will be running on the following URL's:
+
+| App       | Alice                     | Bob                      | Charlie                 |
+|:----------|:-------------------------:|:------------------------:|:-----------------------:|
+| Wallet    | <http://localhost:3000>   | <http://localhost:3001>  |                         |
+| Splitwise | <http://localhost:3002>   | <http://localhost:3003>  | <http://localhost:3005> |
+| Directory | <http://localhost:3004>   |                          |                         |
+
+For the UI's running as Alice and Bob, you can login as the
+`alice_wallet_user` and `bob_wallet_user` users respectively.
+
+Note that `start-frontents.sh` serves the different frontends from separate tmux screens,
 and then attaches the terminal to that tmux session. To detach from tmux, type `Ctrl+B D`.
 To switch between screens, type `Ctrl+B <screen>`.
 
