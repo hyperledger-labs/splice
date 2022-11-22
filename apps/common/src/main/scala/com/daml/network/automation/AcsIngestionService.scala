@@ -6,7 +6,7 @@ import com.daml.network.store.AcsStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, FlagCloseableAsync}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.tracing.{NoTracing, Spanning}
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.FutureUtil
 import io.opentelemetry.api.trace.Tracer
 
@@ -24,8 +24,7 @@ class AcsIngestionService(
     tracer: Tracer,
 ) extends FlagCloseableAsync
     with NamedLogging
-    with Spanning
-    with NoTracing {
+    with Spanning {
 
   private val txFilter = ingestionSink.transactionFilter
   private val serviceDescriptor = s"AcsIngestionService($name, ${txFilter.getParties.toString})"
@@ -58,11 +57,14 @@ class AcsIngestionService(
     )
   }
 
-  override def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
-    AsyncCloseable(
-      serviceDescriptor,
-      subscriptionF,
-      timeouts.shutdownNetwork.duration,
+  override def closeAsync(): Seq[AsyncOrSyncCloseable] = {
+    implicit def traceContext: TraceContext = TraceContext.empty
+    Seq(
+      AsyncCloseable(
+        serviceDescriptor,
+        subscriptionF,
+        timeouts.shutdownNetwork.duration,
+      )
     )
-  )
+  }
 }
