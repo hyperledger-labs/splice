@@ -55,9 +55,9 @@ template SvcBootstrap with
               svc
               config = defaultCoinConfig
               observers = newMembers
-            exercise coinRulesCid CoinRules_MiningRound_Open with
+            
+            exercise coinRulesCid CoinRules_Bootstrap_Rounds with
               coinPrice = 1.0
-              round = Round 0
             pure ()
 
           else do

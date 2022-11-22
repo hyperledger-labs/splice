@@ -7,6 +7,7 @@ import qualified DA.Map as Map
 import qualified DA.Set as Set
 import qualified DA.Text as T
 import Daml.Script
+import DA.Time
 
 import CN.Util.Assert
 import CC.Coin
@@ -15,6 +16,8 @@ import CC.Round
 import CC.Scripts.Util
 import CN.SvcRules
 import CN.SvcBootstrap
+
+import CC.Scripts.Parameters
 
 testSvcRules : Script ()
 testSvcRules = do
@@ -145,13 +148,11 @@ runCoinRulesAcceptBotD app = do
   pure ()
 
 -- | Run the next issuance.
---
--- TODO(M1-90): use overlapping issuances so that there are always 2 open issuances, 1 closing issuance,
--- and 2 issuing issuances
---
 -- TODO(M2-01): convert the whole script to use confirmations once rewards issuance has been finalized
 runNextIssuanceD : CCApp -> Decimal -> Script ()
 runNextIssuanceD app coinPrice = do
+    now <- getTime
+    setTime (addRelTime now defaultCoinConfig.tickDuration)
     -- expire rewards for closed rounds
     closedRounds <- query @ClosedMiningRound app.svc
     forA_ closedRounds $ \(miningRoundCid, miningRound) -> do
@@ -192,24 +193,25 @@ runNextIssuanceD app coinPrice = do
         -- tests.
         miningRoundCid
 
-    -- transition current OpenMiningRound into an IssuingMiningRound
-    (openRoundCid, openRound) <- getLatestOpenRound app
-    closingRoundCid <- submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_StartClosing with
-      miningRoundCid = openRoundCid
+    -- transition the oldest OpenMiningRound into a ClosingMiningRound and
+    -- create a new OpenMiningRound
+    [(roundToArchiveCid, roundToArchive), (r2Cid, _), (r3Cid, _)] <- getOpenRoundsSorted app
+    (closingRoundCid, openRoundCid) <- submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_AdvanceOpenMiningRounds with
+      coinPrice
+      roundToArchiveCid
+      middleRoundCid = r2Cid
+      latestRoundCid = r3Cid
 
-    appRewards <- queryFilter @AppReward app.svc (\bc -> bc.round == openRound.round)
-    validatorRewards <- queryFilter @ValidatorReward app.svc (\bc -> bc.round == openRound.round)
+    -- compute total burn
+    appRewards <- queryFilter @AppReward app.svc (\bc -> bc.round == roundToArchive.round)
+    validatorRewards <- queryFilter @ValidatorReward app.svc (\bc -> bc.round == roundToArchive.round)
+    let totalBurn = sum [ r.quantity | (_, r) <- appRewards] + sum [ r.quantity | (_, r) <- validatorRewards]
 
+    -- create issuing mining round
     submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_StartIssuing with
       miningRoundCid = closingRoundCid
-      totalBurnQuantity =
-        sum [ r.quantity | (_, r) <- appRewards] +
-        sum [ r.quantity | (_, r) <- validatorRewards]
+      totalBurnQuantity = totalBurn
 
-    -- open another round
-    submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_Open with
-      coinPrice
-      round = addRelRound openRound.round (RelRound 1)
 
     pure ()
 

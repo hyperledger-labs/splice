@@ -14,10 +14,11 @@ import CN.Wallet.PaymentChannel
 
 import CC.Scripts.Util
 
+test : Script ()
 test = script do
   app <- setupApp
 
-  runNextIssuance app 1.0
+  runNextIssuance app
   runCoinDepositBots app
 
   sender <- setupUser app "sender" app.svc
@@ -156,7 +157,7 @@ collectAcceptedPayment app provider acceptedAppPayment = do
 testSingleReceiverCCPaymentRequest : Script ()
 testSingleReceiverCCPaymentRequest = script do
   app <- setupApp
-  runNextIssuance app 1.0
+  runNextIssuance app
   runCoinDepositBots app
 
   validator <- setupValidator app "validator1"
@@ -186,7 +187,7 @@ testSingleReceiverCCPaymentRequest = script do
 testSingleReceiverUSDPaymentRequest : Script ()
 testSingleReceiverUSDPaymentRequest = script do
   app <- setupApp
-  runNextIssuance app 0.5
+  advanceToIssuanceWithPrice app 0.5
   runCoinDepositBots app
 
   validator <- setupValidator app "validator1"
@@ -215,7 +216,7 @@ testSingleReceiverUSDPaymentRequest = script do
 testCCPaymentRequest : Script ()
 testCCPaymentRequest = script do
   app <- setupApp
-  runNextIssuance app 1.0
+  advanceToIssuanceWithPrice app 1.0
   runCoinDepositBots app
 
   validator <- setupValidator app "validator1"
@@ -244,6 +245,7 @@ testCCPaymentRequest = script do
     deliveryOffer = toInterfaceContractId deliveryOffer
 
   aliceCoins <- query @Coin alice.primaryParty
+
   map (\(_, c) -> c.quantity.initialQuantity) aliceCoins === [1.0, 1.54]
   bobCoins <- query @Coin bob.primaryParty
   map (\(_, c) -> c.quantity.initialQuantity) bobCoins === [1.0]
@@ -253,9 +255,9 @@ testCCPaymentRequest = script do
   collectAcceptedPayment app alice acceptedPaymentCid
 
   aliceCoins <- query @Coin alice.primaryParty
-  map (\(_, c) -> c.quantity.initialQuantity) aliceCoins === [1.54, 1.0]
+  map (\(_, c) -> c.quantity.initialQuantity) aliceCoins === [1.0, 1.54]
   bobCoins <- query @Coin bob.primaryParty
-  map (\(_, c) -> c.quantity.initialQuantity) bobCoins === [1.0, 15.0]
+  map (\(_, c) -> c.quantity.initialQuantity) bobCoins === [15.0, 1.0]
   charlieCoins <- query @Coin charlie.primaryParty
   map (\(_, c) -> c.quantity.initialQuantity) charlieCoins === [1.0, 10.0]
   pure ()
@@ -263,7 +265,7 @@ testCCPaymentRequest = script do
 testUSDPaymentRequest : Script ()
 testUSDPaymentRequest = script do
   app <- setupApp
-  runNextIssuance app 0.5
+  advanceToIssuanceWithPrice app 0.5
   runCoinDepositBots app
 
   validator <- setupValidator app "validator1"
@@ -295,7 +297,7 @@ testUSDPaymentRequest = script do
 testMixedPaymentRequest : Script ()
 testMixedPaymentRequest = script do
   app <- setupApp
-  runNextIssuance app 0.5
+  advanceToIssuanceWithPrice app 0.5
   runCoinDepositBots app
 
   validator <- setupValidator app "validator1"
@@ -328,7 +330,7 @@ testMixedPaymentRequest = script do
 testSuccessfulBatchCCPaymentRequests : Script ()
 testSuccessfulBatchCCPaymentRequests = script do
   app <- setupApp
-  runNextIssuance app 1.0
+  runNextIssuance app
   runCoinDepositBots app
 
   validator <- setupValidator app "validator1"
@@ -389,7 +391,7 @@ testSuccessfulBatchCCPaymentRequests = script do
 testInsufficientFundsBatchCCPaymentRequests : Script ()
 testInsufficientFundsBatchCCPaymentRequests = script do
   app <- setupApp
-  runNextIssuance app 1.0
+  runNextIssuance app
   runCoinDepositBots app
 
   validator <- setupValidator app "validator1"

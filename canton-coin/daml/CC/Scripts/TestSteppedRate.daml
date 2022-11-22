@@ -6,6 +6,7 @@ import Daml.Script
 
 import CC.Fees
 
+test : Script ()
 test = script do
   let example = SteppedRate 0.01 [(100.0, 0.001), (1000.0, 0.0001), (1000000.0, 0.00001)]
   -- Negative values & zero are handled gracefully

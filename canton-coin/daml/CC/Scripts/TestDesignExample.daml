@@ -73,7 +73,7 @@ test = do
     createCmd rules with
       config.coinsIssuedPerRound = 5000.0
 
-  runNextIssuance app 1.0
+  runNextIssuance app
   runCoinDepositBots app
 
   alice <- setupUser app "alice" app.svc
@@ -90,7 +90,7 @@ test = do
 
   [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
   -- advance 40k rounds
-  runNextIssuance app 1.0
+  runNextIssuance app
   skipNRounds app 39_999
   (_, c1) <- getLatestOpenRound app
 
@@ -101,7 +101,7 @@ test = do
 
 
   -- advance 10k rounds
-  runNextIssuance app 1.0
+  runNextIssuance app
   skipNRounds app 9_999
 
   (_, c2) <- getLatestOpenRound app
@@ -113,6 +113,7 @@ test = do
   submitUser alice.userId $ exerciseCmd escrow Refresh with ..
 
   [(_, note)] <- query @TransferDebugNote app.svc
+
   note.isum === TransferInputsSummary with
     numBurnInputs  = 0
     numCoinInputs = 2
@@ -129,17 +130,18 @@ test = do
     receiverTransferFees = 0.01
     totalSelfOutputs = 1000.25
     totalNonSelfOutputs = 1.0
+
   note.summary === API.TransferSummary with
-    numOutputs = 3
     inQuantity = 1004.95
-    nonSelfOutQuantity = 0.99
     selfOutQuantity = 1003.83
+    nonSelfOutQuantity = 0.99
+    numInputs = 2
+    numOutputs = 3
     quantityBalance = 3.58
     numFloatingCoins = 1
     totalTransferFees = 0.01
     senderAdminFees = 0.12
     senderHoldingFees = 0.3
-    numInputs = 2
     receiverTransferFees = 0.01
 
   allCoins <- query @Coin app.svc

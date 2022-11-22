@@ -143,7 +143,10 @@ object SvcApp {
         defaultCoinConfig,
         Seq.empty.asJava,
       ).createAnd
-        .exerciseCoinRules_MiningRound_Open(BigDecimal(1.0).bigDecimal, new v1.round.Round(0))
+        .exerciseCoinRules_MiningRound_Open(
+          BigDecimal(1.0).bigDecimal,
+          new v1.round.Round(0),
+        )
         .commands
         .asScala
         .toSeq

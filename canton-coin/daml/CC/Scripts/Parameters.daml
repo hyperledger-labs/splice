@@ -1,5 +1,6 @@
 module CC.Scripts.Parameters where
 
+import DA.Time
 import CC.CoinRules
 
 import CC.Fees
@@ -55,3 +56,6 @@ defaultCoinConfig = CoinConfig with
     --
     -- TODO(M3-90): charge per character
     maxPayloadLength = 32
+
+    -- Default duration of 2.5 minutes
+    tickDuration = seconds 150

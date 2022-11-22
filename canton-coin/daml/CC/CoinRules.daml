@@ -38,6 +38,7 @@ data CoinConfig currency = CoinConfig with
     maxNumInputs : Int -- ^ Maximum number of batch inputs for a transfer.
     maxNumOutputs : Int -- ^ Maximum number of batch outputs for a transfer.
     maxPayloadLength : Int -- ^ Maximum length of the payload message on a transfer.
+    tickDuration: RelTime -- ^ Length of a tick
   deriving (Eq, Ord, Show)
 
 -- | The rules governing how CC users can modify the CC state
@@ -78,6 +79,7 @@ template CoinRules
                   quantity = expiringQuantity
                   ..
 
+
     -- TODO(M3-90): guard this choice by a flag in the config.
     nonconsuming choice CoinRules_Tap: ContractId Coin
       with
@@ -87,7 +89,31 @@ template CoinRules
       controller receiver
       do exercise self CoinRules_Mint with ..
 
+    -- Bootstrap the open mining rounds by creating
+    -- - one immediately open-mining-round with 1 tick left
+    -- - one immediately open-mining-round with 2 ticks left
+    -- - one open-mining round that opens in 1 tick
+    -- Should only be called ONCE at network genesis.
+    nonconsuming choice CoinRules_Bootstrap_Rounds
+      : ContractId OpenMiningRound
+      with
+        coinPrice : Decimal
+      controller svc
+      do
+        now <- getTime
+        let opensAt0 = now
+        let opensAt1 = now
+        let opensAt2 = addRelTime now config.tickDuration
 
+        let targetClosesAt0 = addRelTime now config.tickDuration
+        let targetClosesAt1 = addRelTime targetClosesAt0 config.tickDuration
+        let targetClosesAt2 = addRelTime targetClosesAt1 config.tickDuration
+
+        create OpenMiningRound with svc; round = API.Round 0; observers;  coinPrice; opensAt = opensAt0; targetClosesAt = targetClosesAt0
+        create OpenMiningRound with svc; round = API.Round 1; observers; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1
+        create OpenMiningRound with svc; round = API.Round 2; observers;  coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2
+
+    -- TODO(#1680): remove
     nonconsuming choice CoinRules_MiningRound_Open
       : ContractId OpenMiningRound
       with
@@ -95,8 +121,51 @@ template CoinRules
         round: API.Round
       controller svc
       do
-        create OpenMiningRound with svc; observers; round; coinPrice
+        now <- getTime
+        -- TODO(#1680): placeholder value such that existing tests pass.
+        let opensAt = now
+        -- round is open for two ticks.
+        let targetClosesAt = addRelTime opensAt (config.tickDuration + config.tickDuration)
+        create OpenMiningRound with svc; observers; round; coinPrice; opensAt; targetClosesAt
 
+    nonconsuming choice CoinRules_AdvanceOpenMiningRounds
+      : (ContractId ClosingMiningRound, ContractId OpenMiningRound)
+      with
+        coinPrice : Decimal
+        roundToArchiveCid : ContractId OpenMiningRound
+        middleRoundCid : ContractId OpenMiningRound
+        latestRoundCid : ContractId OpenMiningRound
+      controller svc
+      do
+        roundToArchive <- fetch roundToArchiveCid
+        middleRound <- fetch middleRoundCid
+        latestRound <- fetch latestRoundCid
+
+        now <- getTime
+
+        require "middleRound is one after roundToArchive" (middleRound.round.number == roundToArchive.round.number + 1)
+        require "latestRound is one after middleRound" (latestRound.round.number == middleRound.round.number + 1)
+        require "roundToArchive is past targetCloseAt" (roundToArchive.targetClosesAt <= now)
+        require "latestRound is open" (latestRound.opensAt <= now)
+        require "middle round has been open for >= 1 tick" (addRelTime middleRound.opensAt config.tickDuration <= now)
+
+
+        -- round is in pre-fetchable state for at least 1 tick and can only open with 1-tick difference between latestRound's opensAt
+        let opensAt = addRelTime (max now latestRound.opensAt) config.tickDuration
+        -- round is open for two ticks.
+        let targetClosesAt = addRelTime opensAt (config.tickDuration + config.tickDuration)
+        let round = API.Round (latestRound.round.number + 1)
+
+        -- archive and create the rounds
+        archive roundToArchiveCid
+        newClosingRound <- create ClosingMiningRound with
+          svc
+          observers
+          round = roundToArchive.round
+        newOpenRound <- create OpenMiningRound with svc; observers; round; coinPrice; opensAt; targetClosesAt
+        return (newClosingRound, newOpenRound)
+
+    -- TODO(#1680) - remove. 
     nonconsuming choice CoinRules_MiningRound_StartClosing
       : ContractId ClosingMiningRound
       with
@@ -273,6 +342,7 @@ template TransferDebugNote with
     signatory svc
 
 
+
 -- Transfer logic
 -- ==============
 
@@ -297,6 +367,11 @@ checkTransferConstraints transfer summary config
     | summary.quantityBalance /= 0.0 && summary.numFloatingCoins == 0 = Left $ "There needs to be at least one floating output coin to receive excess input quantity" <> show summary.quantityBalance
     | otherwise = Right ()
 
+miningRoundIsOpen: OpenMiningRound -> Update ()
+miningRoundIsOpen round = do
+  now <- getTime
+  require ("mining round " <> show round <> " is open") (round.opensAt <= now)
+  return ()
 
 -- | Execute a transfer.
 --
@@ -305,8 +380,12 @@ executeTransfer context config0 svc t = do
   -- check that the current mining round is open
   (_, openRound) <- downcastInterface @OpenMiningRound "OpenMiningRound" context.openMiningRound
   let config = scaleConfig openRound config0
-  -- compute summaries
+
+  -- TODO(#1680): analogue for issuing mining rounds.
+  _ <- miningRoundIsOpen openRound
   isum <- summarizeAndValidateInputs context openRound.round config svc t.sender t.inputs
+
+  -- compute summaries
   osum <- preprocessAndSummarizeOutputs config t.sender t.outputs
   summary0 <- summarizeTransfer config isum osum
   -- check that overall transfer constraints are satisfied
@@ -391,8 +470,8 @@ mergeDistributedOutputs distributed sender summary =
         else st + distCoin.quantity
 
 summarizeAndValidateInputs : API.TransferContext -> API.Round -> CoinConfig CC -> Party -> Party -> [API.TransferInput] -> Update TransferInputsSummary
-summarizeAndValidateInputs context now config svc sender inps = do
-    foldlA (summarizeInput now) initialSummary inps
+summarizeAndValidateInputs context round config svc sender inps = do
+    foldlA (summarizeInput round) initialSummary inps
   where
     initialSummary = TransferInputsSummary with
       numBurnInputs = 0
@@ -400,11 +479,11 @@ summarizeAndValidateInputs context now config svc sender inps = do
       totalQuantity = 0.0
       totalHoldingFees = 0.0
 
-    summarizeInput now s (API.InputCoin coinCid) = do
+    summarizeInput round s (API.InputCoin coinCid) = do
       (_, coin) <- downcastInterface @Coin "Coin" coinCid
       require "SVC matches" (svc == coin.svc)
       require "Sender matches owner" (sender == coin.owner)
-      let quantity = actualQuantity now coin.quantity
+      let quantity = actualQuantity round coin.quantity
           holdingFee = coin.quantity.initialQuantity - quantity
       return TransferInputsSummary with
         numBurnInputs = s.numBurnInputs
@@ -414,7 +493,7 @@ summarizeAndValidateInputs context now config svc sender inps = do
         totalHoldingFees =
           s.totalHoldingFees + holdingFee
 
-    summarizeInput now s (API.InputAppReward rewardCid) = do
+    summarizeInput round s (API.InputAppReward rewardCid) = do
       (_, reward) <- downcastInterface @AppReward "AppReward" rewardCid
       require "SVC matches" (svc == reward.svc)
       (_, miningRound) <- fetchIssuingMiningRound context svc reward.round
@@ -425,7 +504,7 @@ summarizeAndValidateInputs context now config svc sender inps = do
         totalQuantity = s.totalQuantity + reward.quantity * miningRound.issuancePerCoin
         totalHoldingFees = s.totalHoldingFees
 
-    summarizeInput now s (API.InputValidatorReward rewardCid) = do
+    summarizeInput round s (API.InputValidatorReward rewardCid) = do
       (_, reward) <- downcastInterface @ValidatorReward "ValidatorReward" rewardCid
       require "SVC matches" (svc == reward.svc)
       (_, miningRound) <- fetchIssuingMiningRound context svc reward.round
@@ -720,3 +799,4 @@ scaleFees s c = CoinConfig with
     maxNumInputs = c.maxNumInputs
     maxNumOutputs = c.maxNumOutputs
     maxPayloadLength = c.maxPayloadLength
+    tickDuration = c.tickDuration

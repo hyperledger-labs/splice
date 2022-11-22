@@ -15,7 +15,7 @@ testCoinBurn = do
   app <- setupApp
 
   -- -- start issuing so the SVC has some coins to invite users
-  runNextIssuance app 1.0
+  runNextIssuance app
   runCoinDepositBots app
 
   -- -- -- -- bootstrap user and service provider party
@@ -24,7 +24,7 @@ testCoinBurn = do
   provider2 <- setupUser app "provider2" validator1
   user <- setupUser app "user" validator1
 
-  runNextIssuance app 1.1
+  advanceToIssuanceWithPrice app 1.1
   runCoinDepositBots app
 
   -- svc transfers 20 coin to user
@@ -36,7 +36,7 @@ testCoinBurn = do
   pay app user provider1.primaryParty 5.0 "otc"
   runCoinDepositBots app
 
-  runNextIssuance app 1.2
+  advanceToIssuanceWithPrice app 1.2
   runCoinDepositBots app
 
   -- -- test declaration of validator rights after the fact
@@ -52,21 +52,21 @@ testCoinBurn = do
   -- after having being declared as validator
   runCoinDepositBots app
   -- run some more issuances and transfer
-  runNextIssuance app 1.3
+  advanceToIssuanceWithPrice app 1.3
   runCoinDepositBots app
 
   -- crash the coin price to burn more coin than is issued
-  runNextIssuance app 0.002
+  advanceToIssuanceWithPrice app 0.002
   runCoinDepositBots app
 
   -- -- the next issuances run with normal prices again
-  runNextIssuance app 1.5
+  advanceToIssuanceWithPrice app 1.5
   runCoinDepositBots app
 
   tap app provider2 75.0
   runCoinDepositBots app
 
-  runNextIssuance app 1.6
+  advanceToIssuanceWithPrice app 1.6
   runCoinDepositBots app
 
   -- cleanup transfer notes

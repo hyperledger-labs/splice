@@ -12,7 +12,7 @@ test = do
   app <- setupApp
 
   -- -- start issuing so the SVC has some coins to invite users
-  runNextIssuance app 1.0
+  runNextIssuance app
   runCoinDepositBots app
 
   -- -- -- -- bootstrap validators
@@ -28,7 +28,7 @@ test = do
 
   -- user1 transfers 0.01 coins to user2
   mapA_ (\i -> do
-    runNextIssuance app 1.0
+    runNextIssuance app
     runCoinDepositBots app
     pay app user1 user2.primaryParty 0.01 ("pay in round " <> show i)
     ) [1,2,3,4,5]

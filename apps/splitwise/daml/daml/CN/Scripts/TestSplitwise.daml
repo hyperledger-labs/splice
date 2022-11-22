@@ -125,7 +125,7 @@ completeTransfer app sender provider groupKey acceptedPaymentCid = do
 
 testProviderHosted = script do
   app <- setupApp
-  runNextIssuance app 1.0
+  runNextIssuance app
   runCoinDepositBots app
 
   validator <- setupValidator app "validator1"

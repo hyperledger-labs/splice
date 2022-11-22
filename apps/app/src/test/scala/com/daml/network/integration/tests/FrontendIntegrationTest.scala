@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import org.openqa.selenium.StaleElementReferenceException
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
@@ -9,18 +8,24 @@ import com.digitalasset.canton.topology.PartyId
 import org.apache.commons.io.FileUtils
 import org.openqa.selenium.bidi.log.{BaseLogEntry, Log, LogEntry}
 import org.openqa.selenium.firefox.{FirefoxDriver, FirefoxDriverLogLevel, FirefoxOptions}
-import org.openqa.selenium.{JavascriptExecutor, OutputType, TakesScreenshot, WebDriver}
+import org.openqa.selenium.{
+  JavascriptExecutor,
+  OutputType,
+  StaleElementReferenceException,
+  TakesScreenshot,
+  WebDriver,
+}
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.matchers.{MatchResult, Matcher}
 import org.scalatestplus.selenium.WebBrowser
 
-import scala.concurrent.duration.*
 import java.io.File
 import java.nio.file.Paths
 import java.text.SimpleDateFormat
 import java.time.Duration
 import java.util.Calendar
 import scala.collection.mutable
+import scala.concurrent.duration.*
 import scala.jdk.OptionConverters.*
 import scala.util.Try
 import scala.util.control.NonFatal

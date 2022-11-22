@@ -15,7 +15,7 @@ testWithSubscription : Script ()
 testWithSubscription = script do
   app <- setupApp
 
-  runNextIssuance app 1.0
+  runNextIssuance app
   runCoinDepositBots app
 
   provider <- setupUser app "provider" app.svc
@@ -119,7 +119,7 @@ testWithRegularPayment : Script ()
 testWithRegularPayment = script do
   app <- setupApp
 
-  runNextIssuance app 1.0
+  runNextIssuance app
   runCoinDepositBots app
 
   provider <- setupUser app "provider" app.svc

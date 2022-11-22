@@ -2,7 +2,7 @@ package com.daml.network.svc.admin.grpc
 
 import com.daml.ledger.javaapi.data.Template
 import com.daml.ledger.javaapi.data.codegen.{
-  Contract as CodegenContract,
+  Contract => CodegenContract,
   ContractCompanion,
   ContractId,
 }
@@ -14,7 +14,7 @@ import com.daml.network.svc.v0.SvcServiceGrpc
 import com.daml.network.svc.{SvcApp, v0}
 import com.daml.network.util.Proto
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.ledger.api.client.{JavaDecodeUtil as DecodeUtil}
+import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
 import com.google.protobuf.empty.Empty
@@ -59,7 +59,10 @@ class GrpcSvcAppService(
       for {
         coinRules <- store.getCoinRules()
         cmd = coinRules.value.contractId
-          .exerciseCoinRules_MiningRound_Open(price, new v1.round.Round(request.round))
+          .exerciseCoinRules_MiningRound_Open(
+            price,
+            new v1.round.Round(request.round),
+          )
         cid <- connection.submitWithResult(Seq(store.svcParty), Seq.empty, cmd)
       } yield v0.OpenRoundResponse(Proto.encodeContractId(cid.exerciseResult))
     }

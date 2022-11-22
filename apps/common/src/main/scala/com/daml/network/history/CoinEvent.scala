@@ -8,8 +8,8 @@ import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin, LockedCoin_SvcEx
 import com.daml.network.codegen.java.cc.coinrules.{
   CoinRules,
   CoinRules_MiningRound_StartIssuing,
-  CoinRules_Tap,
   CoinRules_Mint,
+  CoinRules_Tap,
 }
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.da

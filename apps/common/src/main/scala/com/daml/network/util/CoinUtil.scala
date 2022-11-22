@@ -6,6 +6,7 @@ import com.daml.ledger.client.binding
 import com.daml.ledger.javaapi.data.Command
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.Coin
+import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.codegen.java.da.types.Tuple2
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
@@ -123,6 +124,8 @@ object CoinUtil {
     // Fits a hex-encoded SHA-256 or a UUID
     // TODO(M1-90): charge per character
     32,
+    // 2.5 min default duration
+    new RelTime(150 * 1000000),
   )
 
   def holdingFee(
