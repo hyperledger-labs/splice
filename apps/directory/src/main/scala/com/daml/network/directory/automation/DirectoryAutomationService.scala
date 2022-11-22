@@ -61,6 +61,7 @@ class DirectoryAutomationService(
       this.getClass.getSimpleName,
       store.acsIngestionSink,
       connection,
+      retryProvider,
       loggerFactory,
       timeouts,
     )

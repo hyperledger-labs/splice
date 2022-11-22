@@ -30,6 +30,7 @@ class ValidatorAutomationService(
       store.getClass.getSimpleName,
       store.acsIngestionSink,
       connection,
+      retryProvider,
       loggerFactory,
       timeouts,
     )

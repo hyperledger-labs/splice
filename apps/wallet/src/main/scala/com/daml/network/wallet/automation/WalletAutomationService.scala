@@ -38,6 +38,7 @@ class WalletAutomationService(
       "WalletStore",
       walletStore.acsIngestionSink,
       connection,
+      retryProvider,
       loggerFactory,
       timeouts,
     )
@@ -56,6 +57,7 @@ class WalletAutomationService(
           s"EndUserWalletStore($endUserName)",
           endUserStore.acsIngestionSink,
           connection,
+          retryProvider,
           loggerFactory,
           timeouts,
         )
