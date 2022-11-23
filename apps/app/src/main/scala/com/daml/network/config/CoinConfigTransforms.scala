@@ -295,15 +295,18 @@ object CoinConfigTransforms {
     val directory = updateDirectoryAppConfig(
       _.focus(_.remoteParticipant).modify(portTransform(bump, _))
     )
-    val remoteDirectory = updateAllRemoteDirectoryAppConfigs_(
-      _.focus(_.ledgerApi).modify(portTransform(bump, _))
-    )
     val splitwise = updateAllSplitwiseAppConfigs_(
       _.focus(_.remoteParticipant).modify(portTransform(bump, _))
     )
 
     domain compose participant compose svc compose scan compose validator compose
-      wallet compose directory compose remoteDirectory compose splitwise
+      wallet compose directory compose splitwise
+  }
+
+  def bumpRemoteDirectoryPortsBy(bump: Int): CoinConfigTransform = {
+    updateAllRemoteDirectoryAppConfigs_(
+      _.focus(_.ledgerApi).modify(portTransform(bump, _))
+    )
   }
 
   def bumpSvcParticipantPortsBy(bump: Int): CoinConfigTransform = {

@@ -122,11 +122,14 @@ object CoinEnvironmentDefinition {
 
   def simpleTopologyWithSimTime(testName: String): CoinEnvironmentDefinition =
     simpleTopology(testName)
+      .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy(10_000)(conf))
+      // we bump the remote directory ports separately in order to not confuse
+      // the PreflightIntegrationTest which also uses bumpCantonPortsBy
       .addConfigTransforms((_, conf) =>
-        CoinConfigTransforms
-          .bumpCantonPortsBy(10_000)(conf)
-          .focus(_.parameters.clock)
-          .replace(ClockConfig.SimClock)
+        CoinConfigTransforms.bumpRemoteDirectoryPortsBy(10_000)(conf)
+      )
+      .addConfigTransforms((_, conf) =>
+        conf.focus(_.parameters.clock).replace(ClockConfig.SimClock)
       )
 
   def fromResource(path: String, testName: String): CoinEnvironmentDefinition =
