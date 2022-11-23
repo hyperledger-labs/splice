@@ -23,7 +23,7 @@ interface LockedCoin where
   lockedCoin_OwnerExpireLock : Update (ContractId Coin)
 
   choice LockedCoin_Unlock : ContractId Coin
-    controller (view this).lock.holder
+    controller let v = view this in v.coin.owner :: v.lock.holders
     do lockedCoin_Unlock this
 
   choice LockedCoin_OwnerExpireLock : ContractId Coin
@@ -52,10 +52,9 @@ data ValidatorRightView = ValidatorRightView with
 interface ValidatorRight where
   viewtype ValidatorRightView
 
--- | A lock held by a particular party until its expiry.
+-- | A lock held by multiple parties until its expiry.
 data TimeLock = TimeLock with
-    holder: Party
-    -- TODO(#1383): add support for groups of lock holders.
+    holders: [Party]
     expiresAt: Time
   deriving (Eq, Ord, Show)
 

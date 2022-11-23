@@ -745,7 +745,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
                       Some(BigDecimal(quantity).bigDecimal).toJava,
                       Some(
                         new v1.coin.TimeLock(
-                          userParty.toProtoPrimitive,
+                          Seq(userParty.toProtoPrimitive).asJava,
                           expiration,
                         )
                       ).toJava,

@@ -2,10 +2,12 @@ module CC.CoinRules where
 
 import DA.Action (void, when, foldlA)
 import DA.Foldable (forA_, mapA_)
-import DA.Map as Map
+import DA.Map (Map)
+import qualified DA.Map as Map
 import DA.Optional
-import DA.Set as Set
-import DA.Text
+import DA.Set (Set)
+import qualified DA.Set as Set
+import qualified DA.Text
 import DA.Time
 import DA.Traversable qualified as F
 
@@ -32,11 +34,13 @@ data CoinConfig currency = CoinConfig with
     updateFee : FixedFee -- ^ Fee to update an existing coin.
     holdingFee : RatePerRound -- ^ Fee for keeping a coin around
     transferFee : SteppedRate -- ^ Fee for transferring some quantity of coin to a new owner.
+    lockHolderFee : FixedFee -- ^ Fee per lock holder of a locked coin.
     coinsIssuedPerRound : Decimal
     minRewardQuantity : Decimal -- ^ The minimal quantity of burn for which a receipt is issued.
     svcIssuanceRatio : Decimal
     maxNumInputs : Int -- ^ Maximum number of batch inputs for a transfer.
     maxNumOutputs : Int -- ^ Maximum number of batch outputs for a transfer.
+    maxNumLockHolders : Int -- ^ Maximum number of lock holders allowed for a locked coin.
     maxPayloadLength : Int -- ^ Maximum length of the payload message on a transfer.
     tickDuration: RelTime -- ^ Length of a tick
   deriving (Eq, Ord, Show)
@@ -165,7 +169,7 @@ template CoinRules
         newOpenRound <- create OpenMiningRound with svc; observers; round; coinPrice; opensAt; targetClosesAt
         return (newSummarizingRound, newOpenRound)
 
-    -- TODO(#1680) - remove. 
+    -- TODO(#1680) - remove.
     nonconsuming choice CoinRules_MiningRound_StartSummarizing
       : ContractId SummarizingMiningRound
       with
@@ -357,7 +361,7 @@ transferControllers : API.Transfer -> Set Party
 transferControllers t =
     foldl addOutputController (Set.fromList [t.sender, t.provider]) t.outputs
   where
-    addOutputController s (API.OutputSenderCoin with lock; ..) = optional s (`Set.insert` s) (API.holder <$> lock)
+    addOutputController s (API.OutputSenderCoin with lock; ..) = optional s (foldl (flip Set.insert) s) (API.holders <$> lock)
     addOutputController s (API.OutputReceiverCoin with receiver; ..) = Set.insert receiver s
 
 scaleConfig : OpenMiningRound -> CoinConfig USD -> CoinConfig CC
@@ -422,8 +426,8 @@ data TransferInputsSummary = TransferInputsSummary with
   deriving (Eq, Show)
 
 data TransferOutputsSummary = TransferOutputsSummary with
-    numUnlockedSenderCoins : Int
-    numLockedSenderCoins : Int
+    numSenderCoins : Int
+    numlockHolders : Int
     numReceiverCoins : Int
     numFloatingCoins : Int -- ^ Coins that do not have a desired exact quantity specified.
     requiredQuantity : Decimal
@@ -573,8 +577,8 @@ preprocessAndSummarizeOutputs config sender outs = do
     foldlA summarizeOutput initialSummary outs
   where
     initialSummary = TransferOutputsSummary with
-      numUnlockedSenderCoins = 0
-      numLockedSenderCoins = 0
+      numSenderCoins = 0
+      numlockHolders = 0
       numReceiverCoins = 0
       requiredQuantity = 0.0
       senderTransferFees = 0.0
@@ -586,9 +590,14 @@ preprocessAndSummarizeOutputs config sender outs = do
 
     summarizeOutput s (API.OutputSenderCoin with exactQuantity; lock) = do
       -- check validity of locking request
-      now <- getTime
-      let lockDuration = optional (days 0) (\l -> subTime l.expiresAt now) lock
-      require "Positive lock duration" (days 0 <= lockDuration)
+      forA_ lock $ \l -> do
+        now <- getTime
+        let lockDuration = subTime l.expiresAt now
+        require "Positive lock duration" (days 0 <= lockDuration)
+        let numlockHolders = length l.holders
+        require "At least one lock holder" (not $ null l.holders)
+        require "Fewer than the allowed number of lock holders"
+          (length l.holders <= config.maxNumLockHolders)
       -- compute output
       let output = PreprocessedTransferOutput with
             owner = sender
@@ -599,8 +608,8 @@ preprocessAndSummarizeOutputs config sender outs = do
                 quantity = quantity
             lock
       return TransferOutputsSummary with
-        numUnlockedSenderCoins = s.numUnlockedSenderCoins + (if isSome lock then 0 else 1)
-        numLockedSenderCoins = s.numLockedSenderCoins + (if isSome lock then 1 else 0)
+        numSenderCoins = s.numSenderCoins + 1
+        numlockHolders = s.numlockHolders + optional 0 (\l -> length l.holders) lock
         numReceiverCoins = s.numReceiverCoins
         requiredQuantity = s.requiredQuantity + fromOptional 0.0 exactQuantity
         senderTransferFees = s.senderTransferFees
@@ -632,8 +641,8 @@ preprocessAndSummarizeOutputs config sender outs = do
               -- a receivers coin
               None
       return TransferOutputsSummary with
-        numUnlockedSenderCoins = s.numUnlockedSenderCoins
-        numLockedSenderCoins = s.numLockedSenderCoins
+        numSenderCoins = s.numSenderCoins
+        numlockHolders = s.numlockHolders
         numReceiverCoins = s.numReceiverCoins + 1
         requiredQuantity = s.requiredQuantity + case coinType of
           API.FixedReceiverCoin{quantity} -> quantity
@@ -652,8 +661,8 @@ preprocessAndSummarizeOutputs config sender outs = do
 
 summarizeTransfer : CoinConfig CC -> TransferInputsSummary -> TransferOutputsSummary -> Update API.TransferSummary
 summarizeTransfer config inp out = do
-    coinCreateFees <- computeCoinCreateFees config inp.numCoinInputs numCoinOutputs
-    coinUpdateFees <- computeCoinUpdateFees config inp.numCoinInputs numCoinOutputs
+    coinCreateFees <- computeCoinCreateFees config inp.numCoinInputs numOutputs
+    coinUpdateFees <- computeCoinUpdateFees config inp.numCoinInputs numOutputs
     let senderActionFees = coinCreateFees + coinUpdateFees + coinLockFees
     return API.TransferSummary with
       inQuantity = inQuantity
@@ -663,17 +672,17 @@ summarizeTransfer config inp out = do
       numFloatingCoins = out.numFloatingCoins
       receiverTransferFees = out.receiverTransferFees
       numInputs = inp.numCoinInputs + inp.numBurnInputs
-      numOutputs = out.numUnlockedSenderCoins + out.numLockedSenderCoins + out.numReceiverCoins
+      numOutputs
       senderHoldingFees = inp.totalHoldingFees
       senderAdminFees = senderActionFees
       totalTransferFees = totalTransferFees
   where
     -- compute fees for the sender actions
-    numCoinOutputs = out.numUnlockedSenderCoins + out.numLockedSenderCoins + out.numReceiverCoins
+    numOutputs = out.numSenderCoins + out.numReceiverCoins
     totalTransferFees = out.senderTransferFees + out.receiverTransferFees
     inQuantity = inp.totalQuantity
 
-    coinLockFees = config.updateFee.fee * intToDecimal out.numLockedSenderCoins
+    coinLockFees = config.lockHolderFee.fee * intToDecimal out.numlockHolders
 
 computeCoinUpdateFees : CoinConfig CC -> Int -> Int -> Update (Decimal)
 computeCoinUpdateFees config numCoinInputs numCoinOutputs = do
@@ -800,11 +809,13 @@ scaleFees s c = CoinConfig with
     createFee = scaleFixedFee s c.createFee
     updateFee = scaleFixedFee s c.updateFee
     holdingFee = scaleRatePerRound s c.holdingFee
+    lockHolderFee = scaleFixedFee s c.lockHolderFee
     minRewardQuantity = s * c.minRewardQuantity
     transferFee = scaleSteppedRate s c.transferFee
     coinsIssuedPerRound = c.coinsIssuedPerRound
     svcIssuanceRatio = c.svcIssuanceRatio
     maxNumInputs = c.maxNumInputs
     maxNumOutputs = c.maxNumOutputs
+    maxNumLockHolders = c.maxNumLockHolders
     maxPayloadLength = c.maxPayloadLength
     tickDuration = c.tickDuration

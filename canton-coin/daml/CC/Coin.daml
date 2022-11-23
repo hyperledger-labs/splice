@@ -39,7 +39,7 @@ template LockedCoin
     coin : Coin
     lock : API.TimeLock
   where
-    signatory lock.holder, signatory coin
+    signatory lock.holders, signatory coin
 
     interface instance API.LockedCoin for LockedCoin where
       view = API.LockedCoinView with
@@ -49,6 +49,7 @@ template LockedCoin
       lockedCoin_OwnerExpireLock = toInterfaceContractId <$> tryExpireLock
       lockedCoin_Unlock = toInterfaceContractId <$> create coin
 
+    -- TODO(M1-60): review how lock-expiry is structured, and its relation to coin expiry
     let tryExpireLock : Update (ContractId Coin)
         tryExpireLock = do
             t <- getTime

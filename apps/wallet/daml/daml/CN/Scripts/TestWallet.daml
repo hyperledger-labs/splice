@@ -119,14 +119,14 @@ template TestDeliveryOffer
         svc
         sender
 
-createPaymentRequest : CCApp -> Party -> [(Party, PaymentQuantity)] -> Script (ContractId AppPaymentRequest, ContractId TestDeliveryOffer)
-createPaymentRequest app sender receiverQuantities = do
+createPaymentRequest : CCApp -> Party -> Party -> [(Party, PaymentQuantity)] -> Script (ContractId AppPaymentRequest, ContractId TestDeliveryOffer)
+createPaymentRequest app provider sender receiverQuantities = do
   t <- getTime
   deliveryOffer <- submit sender $ createCmd (TestDeliveryOffer app.svc sender ("multi, sender: " <> show sender <> ", quantity: " <> show receiverQuantities))
   -- multi-party submit to simplify test
-  res <- submitMulti (sender :: map fst receiverQuantities) [] $ createCmd AppPaymentRequest with
-    sender = sender
-    provider = sender
+  res <- submitMulti (sender :: provider :: map fst receiverQuantities) [] $ createCmd AppPaymentRequest with
+    sender
+    provider
     svc = app.svc
     receiverQuantities = map (uncurry ReceiverQuantity) receiverQuantities
     deliveryOffer = toInterfaceContractId deliveryOffer
@@ -134,9 +134,9 @@ createPaymentRequest app sender receiverQuantities = do
     collectionDuration = minutes 5
   return (res, deliveryOffer)
 
-createSingleReceiverPaymentRequest : CCApp -> Party -> Party -> PaymentQuantity -> Script (ContractId AppPaymentRequest, ContractId TestDeliveryOffer)
-createSingleReceiverPaymentRequest app sender receiver quantity = do
-  createPaymentRequest app sender [(receiver, quantity)]
+createSingleReceiverPaymentRequest : CCApp -> Party -> Party -> Party -> PaymentQuantity -> Script (ContractId AppPaymentRequest, ContractId TestDeliveryOffer)
+createSingleReceiverPaymentRequest app provider sender receiver quantity = do
+  createPaymentRequest app provider sender [(receiver, quantity)]
 
 acceptPaymentRequest : CCApp -> CCUser -> ContractId AppPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppPayment)
 acceptPaymentRequest app sender transferRequest coin = do
@@ -161,11 +161,14 @@ testSingleReceiverCCPaymentRequest = script do
   runCoinDepositBots app
 
   validator <- setupValidator app "validator1"
+  provider <- setupUser app "provider" validator
   alice <- setupUser app "alice" validator
   bob <- setupUser app "bob" validator
 
   coin <- tap app alice 42.0
-  (transferRequest, offerCid) <- createSingleReceiverPaymentRequest app alice.primaryParty bob.primaryParty (PaymentQuantity 30.0 CC)
+  (transferRequest, offerCid) <- createSingleReceiverPaymentRequest app
+    provider.primaryParty alice.primaryParty bob.primaryParty
+    (PaymentQuantity 30.0 CC)
 
   acceptedPaymentCid <- acceptPaymentRequest app alice transferRequest coin
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
@@ -173,7 +176,7 @@ testSingleReceiverCCPaymentRequest = script do
   [(aliceChange, _), _] <- query @Coin alice.primaryParty
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
-    provider = alice.primaryParty
+    provider = provider.primaryParty
     svc = app.svc
     lockedCoin = toInterfaceContractId lockedCoin
     deliveryOffer = toInterfaceContractId offerCid
@@ -191,11 +194,14 @@ testSingleReceiverUSDPaymentRequest = script do
   runCoinDepositBots app
 
   validator <- setupValidator app "validator1"
+  provider <- setupUser app "provider" validator
   alice <- setupUser app "alice" validator
   bob <- setupUser app "bob" validator
 
   coin <- tap app alice 62.0 -- Need to cover a 30USD payment with 1USD=2CC
-  (transferRequest, offerCid) <- createSingleReceiverPaymentRequest app alice.primaryParty bob.primaryParty (PaymentQuantity 30.0 USD)
+  (transferRequest, offerCid) <- createSingleReceiverPaymentRequest app
+    provider.primaryParty alice.primaryParty bob.primaryParty
+    (PaymentQuantity 30.0 USD)
 
   acceptedPaymentCid <- acceptPaymentRequest app alice transferRequest coin
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
@@ -203,7 +209,7 @@ testSingleReceiverUSDPaymentRequest = script do
   [(aliceChange, _), _] <- query @Coin alice.primaryParty
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
-    provider = alice.primaryParty
+    provider = provider.primaryParty
     svc = app.svc
     lockedCoin = toInterfaceContractId lockedCoin
     deliveryOffer = toInterfaceContractId offerCid
@@ -220,46 +226,54 @@ testCCPaymentRequest = script do
   runCoinDepositBots app
 
   validator <- setupValidator app "validator1"
+  provider <- setupUser app "provider" validator
   alice <- setupUser app "alice" validator
   bob <- setupUser app "bob" validator
   charlie <- setupUser app "charlie" validator
 
   coin <- tap app alice 27.0
   t <- getTime
-  (transferRequest, deliveryOffer) <- createPaymentRequest app alice.primaryParty [
-    (bob.primaryParty, PaymentQuantity 15.0 CC),
-    (charlie.primaryParty, PaymentQuantity 10.0 CC)]
+  (transferRequest, deliveryOffer) <-
+    createPaymentRequest app provider.primaryParty alice.primaryParty [
+      (bob.primaryParty, PaymentQuantity 15.0 CC),
+      (charlie.primaryParty, PaymentQuantity 10.0 CC)]
   acceptedPaymentCid <- acceptPaymentRequest app alice transferRequest coin
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
   [(lockedCoin, lockedCoinPayload)] <- query @LockedCoin alice.primaryParty
   lockedCoinPayload.coin.quantity.initialQuantity === 25.35
+  lockedCoinPayload.lock.holders === map (.primaryParty) [bob, charlie, provider]
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
     ccReceiverQuantities = [
       (ReceiverCCQuantity with receiver = bob.primaryParty, ccQuantity = 15.0),
       (ReceiverCCQuantity with receiver = charlie.primaryParty, ccQuantity = 10.0)
       ]
-    provider = alice.primaryParty
+    provider = provider.primaryParty
     svc = app.svc
     lockedCoin = toInterfaceContractId lockedCoin
     deliveryOffer = toInterfaceContractId deliveryOffer
 
   aliceCoins <- query @Coin alice.primaryParty
 
-  map (\(_, c) -> c.quantity.initialQuantity) aliceCoins === [1.0, 1.54]
+  map (\(_, c) -> c.quantity.initialQuantity) aliceCoins === [1.0, 1.52]
   bobCoins <- query @Coin bob.primaryParty
   map (\(_, c) -> c.quantity.initialQuantity) bobCoins === [1.0]
   charlieCoins <- query @Coin charlie.primaryParty
   map (\(_, c) -> c.quantity.initialQuantity) charlieCoins === [1.0]
 
+  -- Check that the locked-coin is visible to charlie
+  [(charlieLockedCoinCid, _)] <- query @LockedCoin charlie.primaryParty
+  charlieLockedCoinCid === lockedCoin
+
+
   collectAcceptedPayment app alice acceptedPaymentCid
 
   aliceCoins <- query @Coin alice.primaryParty
-  map (\(_, c) -> c.quantity.initialQuantity) aliceCoins === [1.0, 1.54]
+  map (\(_, c) -> c.quantity.initialQuantity) aliceCoins === [1.0, 1.52]
   bobCoins <- query @Coin bob.primaryParty
-  map (\(_, c) -> c.quantity.initialQuantity) bobCoins === [15.0, 1.0]
+  sort (map (\(_, c) -> c.quantity.initialQuantity) bobCoins) === [1.0, 15.0]
   charlieCoins <- query @Coin charlie.primaryParty
-  map (\(_, c) -> c.quantity.initialQuantity) charlieCoins === [1.0, 10.0]
+  sort (map (\(_, c) -> c.quantity.initialQuantity) charlieCoins) === [1.0, 10.0]
   pure ()
 
 testUSDPaymentRequest : Script ()
@@ -269,21 +283,23 @@ testUSDPaymentRequest = script do
   runCoinDepositBots app
 
   validator <- setupValidator app "validator1"
+  provider <- setupUser app "provider" validator
   alice <- setupUser app "alice" validator
   bob <- setupUser app "bob" validator
   charlie <- setupUser app "charlie" validator
 
   coin <- tap app alice 52.0
   t <- getTime
-  (transferRequest, deliveryOffer) <- createPaymentRequest app alice.primaryParty [
-    (bob.primaryParty, PaymentQuantity 10.0 USD),
-    (charlie.primaryParty, PaymentQuantity 15.0 USD)]
+  (transferRequest, deliveryOffer) <-
+    createPaymentRequest app provider.primaryParty alice.primaryParty [
+      (bob.primaryParty, PaymentQuantity 10.0 USD),
+      (charlie.primaryParty, PaymentQuantity 15.0 USD)]
   acceptedPaymentCid <- acceptPaymentRequest app alice transferRequest coin
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
   [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
-    provider = alice.primaryParty
+    provider = provider.primaryParty
     svc = app.svc
     lockedCoin = toInterfaceContractId lockedCoin
     deliveryOffer = toInterfaceContractId deliveryOffer
@@ -301,21 +317,23 @@ testMixedPaymentRequest = script do
   runCoinDepositBots app
 
   validator <- setupValidator app "validator1"
+  provider <- setupUser app "provider" validator
   alice <- setupUser app "alice" validator
   bob <- setupUser app "bob" validator
   charlie <- setupUser app "charlie" validator
 
   coin <- tap app alice 32.0
   t <- getTime
-  (transferRequest, deliveryOffer) <- createPaymentRequest app alice.primaryParty [
-    (bob.primaryParty, PaymentQuantity 10.0 CC),
-    (charlie.primaryParty, PaymentQuantity 10.0 USD)]
+  (transferRequest, deliveryOffer) <-
+    createPaymentRequest app provider.primaryParty alice.primaryParty [
+      (bob.primaryParty, PaymentQuantity 10.0 CC),
+      (charlie.primaryParty, PaymentQuantity 10.0 USD)]
   acceptedPaymentCid <- acceptPaymentRequest app alice transferRequest coin
   Some acceptedPayment <- queryContractId alice.primaryParty acceptedPaymentCid
   [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
-    provider = alice.primaryParty
+    provider = provider.primaryParty
     svc = app.svc
     lockedCoin = toInterfaceContractId lockedCoin
     deliveryOffer = toInterfaceContractId deliveryOffer
@@ -334,14 +352,18 @@ testSuccessfulBatchCCPaymentRequests = script do
   runCoinDepositBots app
 
   validator <- setupValidator app "validator1"
+  provider <- setupUser app "provider" validator
   alice <- setupUser app "alice" validator
   bob <- setupUser app "bob" validator
 
   coin <- tap app alice 42.0
-  (transferRequest, deliveryOffer) <- createSingleReceiverPaymentRequest app alice.primaryParty bob.primaryParty (PaymentQuantity 1.0 CC)
-  (transferRequest2, deliveryOffer2) <- createPaymentRequest app alice.primaryParty [
-    (bob.primaryParty, PaymentQuantity 2.0 CC),
-    (alice.primaryParty, PaymentQuantity 2.0 CC)]
+  (transferRequest, deliveryOffer) <- createSingleReceiverPaymentRequest app
+    provider.primaryParty alice.primaryParty bob.primaryParty
+    (PaymentQuantity 1.0 CC)
+  (transferRequest2, deliveryOffer2) <-
+    createPaymentRequest app provider.primaryParty alice.primaryParty [
+      (bob.primaryParty, PaymentQuantity 2.0 CC),
+      (alice.primaryParty, PaymentQuantity 2.0 CC)]
 
   install <- submitMulti [alice.primaryParty, validator] [] $ createCmd $ WalletAppInstall with
     -- for simplicity, alice is service and end-user
@@ -367,7 +389,7 @@ testSuccessfulBatchCCPaymentRequests = script do
   -- check results
   acceptedPayment === AcceptedAppPayment with
     sender = alice.primaryParty
-    provider = alice.primaryParty
+    provider = provider.primaryParty
     svc = app.svc
     lockedCoin = toInterfaceContractId lockedCoin
     deliveryOffer = toInterfaceContractId deliveryOffer
@@ -380,7 +402,7 @@ testSuccessfulBatchCCPaymentRequests = script do
       (ReceiverCCQuantity with receiver = bob.primaryParty, ccQuantity = 2.0),
       (ReceiverCCQuantity with receiver = alice.primaryParty, ccQuantity = 2.0)
       ]
-    provider = alice.primaryParty
+    provider = provider.primaryParty
     svc = app.svc
     lockedCoin = toInterfaceContractId lockedCoin2
     deliveryOffer = toInterfaceContractId deliveryOffer2
@@ -395,6 +417,7 @@ testInsufficientFundsBatchCCPaymentRequests = script do
   runCoinDepositBots app
 
   validator <- setupValidator app "validator1"
+  provider <- setupUser app "provider" validator
   alice <- setupUser app "alice" validator
   bob <- setupUser app "bob" validator
   coin <- tap app alice 42.0
@@ -407,10 +430,13 @@ testInsufficientFundsBatchCCPaymentRequests = script do
     svcParty = app.svc
     validatorParty = validator
 
-  (transferRequest3, deliveryOffer3) <- createSingleReceiverPaymentRequest app alice.primaryParty bob.primaryParty (PaymentQuantity 10000.0 CC)
-  (transferRequest4, deliveryOffer4) <- createPaymentRequest app alice.primaryParty [
-    (bob.primaryParty, PaymentQuantity 3.0 CC),
-    (alice.primaryParty, PaymentQuantity 3.0 CC)]
+  (transferRequest3, deliveryOffer3) <- createSingleReceiverPaymentRequest app
+    provider.primaryParty alice.primaryParty bob.primaryParty
+    (PaymentQuantity 10000.0 CC)
+  (transferRequest4, deliveryOffer4) <-
+    createPaymentRequest app provider.primaryParty alice.primaryParty [
+      (bob.primaryParty, PaymentQuantity 3.0 CC),
+      (alice.primaryParty, PaymentQuantity 3.0 CC)]
   -- trying to fulfill the request for 10,000 CC will fail
   context <- getPaymentTransferContext app alice
   outcomes <- submitUser alice.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
@@ -432,7 +458,7 @@ testInsufficientFundsBatchCCPaymentRequests = script do
       (ReceiverCCQuantity with receiver = bob.primaryParty, ccQuantity = 3.0),
       (ReceiverCCQuantity with receiver = alice.primaryParty, ccQuantity = 3.0)
       ]
-    provider = alice.primaryParty
+    provider = provider.primaryParty
     svc = app.svc
     lockedCoin = toInterfaceContractId lockedCoin4
     deliveryOffer = toInterfaceContractId deliveryOffer4

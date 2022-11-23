@@ -104,6 +104,11 @@ object CoinUtil {
       ).asJava,
     ),
 
+    // Fee per lock holder.
+    // Chosen to match the update fee to cover the cost of informing lock-holders about
+    // actions on the locked coin.
+    new cc.fees.FixedFee(BigDecimal(0.01).bigDecimal),
+
     // Coins issued per mining round.
     // Set to 60 coins, which implies a coin price of 1 $ at burn-mint-equilibrium (BME) when the network spends
     // 0.1 $/second in discounted transfer fees and a price of 100$ when the network spends 10 $ per second in discounted fees.
@@ -119,6 +124,10 @@ object CoinUtil {
     // to avoid creating very large transactions.
     100,
     100,
+
+    // Maximum number of lock holders.
+    // Chosen conservatively, but high enough to invite thinking about what's possible.
+    50,
 
     // Fits a hex-encoded SHA-256 or a UUID
     // TODO(M1-90): charge per character

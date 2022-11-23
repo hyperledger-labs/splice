@@ -1,6 +1,7 @@
 module CN.Wallet.Payment where
 
 import DA.Action
+import DA.List (dedupSort)
 import DA.Time
 
 import CN.Util.Assert
@@ -44,12 +45,12 @@ data ReceiverCCQuantity = ReceiverCCQuantity
 paymentQuantityToCC : Party -> Party -> (ContractId OpenMiningRound) -> PaymentQuantity -> Update Decimal
 paymentQuantityToCC svc submitter openMiningRound pq =
   case pq.currency of
-    USD -> 
+    USD ->
       do
         round <- exercise @OpenMiningRound openMiningRound (OpenMiningRound_Fetch submitter)
         require "SVC matches" (round.svc == svc)
         pure (pq.quantity / round.coinPrice)
-    CC -> 
+    CC ->
       pure pq.quantity
 
 receiverQuantityToCCReceiverQuantity : Party -> Party -> (ContractId OpenMiningRound) -> ReceiverQuantity -> Update ReceiverCCQuantity
@@ -103,7 +104,7 @@ template AppPaymentRequest
                 [ OutputSenderCoin with
                     exactQuantity = Some (fees + sum ccQuantities)
                     lock = Some TimeLock with
-                      holder = provider
+                      holders = dedupSort $ provider :: map (.receiver) receiverQuantities
                       expiresAt = now `addRelTime` collectionDuration
                 , OutputSenderCoin with
                     exactQuantity = None
@@ -180,4 +181,3 @@ template AcceptedAppPayment
       controller sender
       do archive deliveryOffer
          exercise lockedCoin LockedCoin_OwnerExpireLock
-

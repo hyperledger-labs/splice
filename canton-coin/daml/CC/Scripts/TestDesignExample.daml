@@ -30,7 +30,7 @@ template Escrow
       do LockedCoin{lock,coin=locked} <- fetch lockedCoin
          require "SVC matches locked coin" (locked.svc == this.svc)
          require "owner matches locked coin" (locked.owner == this.p)
-         require "lock holder matches locked coin " (arbiter == lock.holder)
+         require "lock holder matches locked coin " ([arbiter] == lock.holders)
          payment <- fetch paymentCoin
          require "SVC matches payment coin" (payment.svc == this.svc)
          require "owner matches payment coin" (payment.owner == this.p)
@@ -47,7 +47,7 @@ template Escrow
                  , API.OutputSenderCoin with
                      exactQuantity = Some locked.quantity.initialQuantity
                      lock = Some API.TimeLock with
-                       holder = arbiter
+                       holders = [arbiter]
                        expiresAt = lock.expiresAt `addRelTime` days 90
                  , API.OutputReceiverCoin with
                      receiver = arbiter
@@ -86,7 +86,7 @@ test = do
   t0 <- getTime
   (_, c0) <- getLatestOpenRound app
 
-  lockTo app alice arbiter.primaryParty 1000.25 (days 90) "lock"
+  lockTo1 app alice arbiter.primaryParty 1000.25 (days 90) "lock"
 
   [(lockedCoin, _)] <- query @LockedCoin alice.primaryParty
   -- advance 40k rounds
@@ -120,13 +120,13 @@ test = do
     totalQuantity = 1004.95
     totalHoldingFees = 0.3
   note.osum { preprocessedOutputs = [] } === TransferOutputsSummary with
-    numLockedSenderCoins = 1
+    numSenderCoins = 2
     numReceiverCoins = 1
     numFloatingCoins = 1
     requiredQuantity = 1001.25
     senderTransferFees = 0.0
     preprocessedOutputs = []
-    numUnlockedSenderCoins = 1
+    numlockHolders = 1
     receiverTransferFees = 0.01
     totalSelfOutputs = 1000.25
     totalNonSelfOutputs = 1.0
@@ -158,7 +158,7 @@ test = do
       Some payment = find (\c -> c.owner == arbiter.primaryParty) newCoins
   newLocked === LockedCoin with
     lock = API.TimeLock with
-      holder = arbiter.primaryParty
+      holders = [arbiter.primaryParty]
       expiresAt = t0 `addRelTime` days 180
     coin = Coin with
       svc = app.svc

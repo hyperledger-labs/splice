@@ -296,8 +296,8 @@ pay app sender recipient coinQuantity msg = do
 -- | Locks a coin of the given quantity to the given lock holder
 -- for the given time starting at the current time
 -- It gathers all coints of the sender as input coins.
-lockTo : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Text -> Script ()
-lockTo app sender lockHolder coinQuantity lockDuration msg = do
+lockTo1 : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Text -> Script ()
+lockTo1 app sender lockHolder coinQuantity lockDuration msg = do
   now <- getTime
   readAs <- getUserReadAs sender.userId
   -- TODO(M1-92): create payment pre-approval flow and use that here instead of submitMulti
@@ -314,7 +314,7 @@ lockTo app sender lockHolder coinQuantity lockDuration msg = do
           , API.OutputSenderCoin with
               exactQuantity = Some coinQuantity
               lock = Some API.TimeLock with
-                holder = lockHolder
+                holders = [lockHolder]
                 expiresAt = now `addRelTime` lockDuration
           ]
   (openRound, _) <- getLatestOpenRound app
