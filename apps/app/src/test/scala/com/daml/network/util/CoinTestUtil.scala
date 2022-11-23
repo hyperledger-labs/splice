@@ -1,11 +1,21 @@
 package com.daml.network.util
 
-import com.daml.network.console.{RemoteWalletAppReference, ValidatorAppReference}
+import com.daml.network.codegen.java.da.time.types.RelTime
+import com.daml.network.console.{
+  CoinRemoteParticipantReference,
+  RemoteWalletAppReference,
+  ValidatorAppReference,
+}
+import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
+import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.sequencing.SequencerTestUtils.eventually
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.matchers.should.Matchers.*
+
+import java.time.temporal.ChronoUnit
+import scala.jdk.CollectionConverters.*
 
 // TODO(M1-92 - Tech Debt): This could be reused in more places and extended
 trait CoinTestUtil { this: CommonCoinAppInstanceReferences =>
@@ -56,5 +66,56 @@ trait CoinTestUtil { this: CommonCoinAppInstanceReferences =>
     }
 
     (aliceUserParty, bobUserParty)
+  }
+
+  def createSelfPaymentRequest(
+      test: BaseTest,
+      remoteParticipant: CoinRemoteParticipantReference,
+      userParty: PartyId,
+  )(implicit
+      env: CoinTestConsoleEnvironment
+  ): (testWalletCodegen.TestDeliveryOffer.ContractId, walletCodegen.AppPaymentRequest) = {
+    val referenceId = test.clue(s"Create test delivery offer for $userParty") {
+      remoteParticipant.ledger_api.commands.submitJava(
+        Seq(userParty),
+        optTimeout = None,
+        commands = new testWalletCodegen.TestDeliveryOffer(
+          scan.getSvcPartyId().toProtoPrimitive,
+          userParty.toProtoPrimitive,
+          "description",
+        ).create.commands.asScala.toSeq,
+      )
+      remoteParticipant.ledger_api.acs
+        .awaitJava(testWalletCodegen.TestDeliveryOffer.COMPANION)(userParty)
+        .id
+    }
+
+    val reqC = test.clue(s"Create payment request for $userParty to self") {
+      val reqC = new walletCodegen.AppPaymentRequest(
+        userParty.toProtoPrimitive,
+        Seq(
+          new walletCodegen.ReceiverQuantity(
+            userParty.toProtoPrimitive,
+            new walletCodegen.PaymentQuantity(
+              BigDecimal(10).bigDecimal.setScale(10),
+              walletCodegen.Currency.CC,
+            ),
+          )
+        ).asJava,
+        userParty.toProtoPrimitive,
+        svcParty.toProtoPrimitive,
+        java.time.Instant.now().plus(1, ChronoUnit.MINUTES),
+        new RelTime(60 * 1000000),
+        referenceId.toInterface(walletCodegen.DeliveryOffer.INTERFACE),
+      )
+      remoteParticipant.ledger_api.commands.submitJava(
+        actAs = Seq(userParty),
+        optTimeout = None,
+        commands = reqC.create.commands.asScala.toSeq,
+      )
+      reqC
+    }
+
+    (referenceId, reqC)
   }
 }
