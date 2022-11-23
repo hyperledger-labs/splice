@@ -1,4 +1,4 @@
-package com.daml.network.admin
+package com.daml.network.scan.store
 
 import com.daml.ledger.javaapi.data.{
   CreatedEvent,
@@ -12,9 +12,8 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history.*
-import com.daml.network.store.CCHistoryStore
-import com.daml.network.util.{ExerciseNode, JavaContract => Contract, Trees}
-import com.digitalasset.canton.lifecycle.Lifecycle
+import com.daml.network.store.{CCHistoryStore, AuditLogIngestionSink}
+import com.daml.network.util.{ExerciseNode, Trees, JavaContract as Contract}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
 import com.digitalasset.canton.topology.PartyId
@@ -25,14 +24,16 @@ import scala.collection.concurrent.TrieMap
 import scala.collection.{concurrent, mutable}
 import scala.concurrent.{ExecutionContext, Future}
 
-class ReadCoinTransactionsService(
+class CoinTransactionsIngestionSink(
     party: PartyId,
     connection: CoinLedgerConnection,
     store: CCHistoryStore,
     protected val loggerFactory: NamedLoggerFactory,
-)(implicit ec: ExecutionContext, tc: TraceContext)
-    extends LedgerAutomationService
+)(implicit ec: ExecutionContext)
+    extends AuditLogIngestionSink
     with NamedLogging {
+
+  override def filterParty: PartyId = party
 
   override def templateIds: Seq[Identifier] =
     Seq(cc.coin.Coin.TEMPLATE_ID, cc.coin.LockedCoin.TEMPLATE_ID)
@@ -63,7 +64,9 @@ class ReadCoinTransactionsService(
 
   /** Traverse a Ledger API TransactionTree via a pre-order DFS and extract the CoinEvents */
   @SuppressWarnings(Array("org.wartremover.warts.While"))
-  private def traverseForest(tree: TransactionTree): Future[Seq[CoinEvent]] =
+  private def traverseForest(tree: TransactionTree)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[CoinEvent]] =
     Future {
 
       val coinEvents: mutable.Buffer[CoinEvent] = mutable.ListBuffer()
@@ -138,7 +141,9 @@ class ReadCoinTransactionsService(
 
   // Some helper methods
 
-  private def parseEvent(event: TreeEvent): Option[ParentNode] =
+  private def parseEvent(event: TreeEvent)(implicit
+      traceContext: TraceContext
+  ): Option[ParentNode] =
     event match {
       case exercised: ExercisedEvent =>
         LazyList[ParentNodeCompanion](
@@ -156,7 +161,9 @@ class ReadCoinTransactionsService(
       case _ => None
     }
 
-  private def parseParentEvent(parent: TreeEvent): Option[ParentNode] = {
+  private def parseParentEvent(parent: TreeEvent)(implicit
+      traceContext: TraceContext
+  ): Option[ParentNode] = {
     val ev = parseEvent(parent)
     ev match {
       case None =>
@@ -180,7 +187,4 @@ class ReadCoinTransactionsService(
       case _ => ev
     }
   }
-
-  override def close(): Unit = Lifecycle.close(connection)(logger)
-
 }

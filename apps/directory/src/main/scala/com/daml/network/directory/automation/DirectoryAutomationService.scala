@@ -52,7 +52,7 @@ class DirectoryAutomationService(
 
   override protected def timeouts: ProcessingTimeout = processingTimeouts
 
-  private val connection = ledgerClient.connection("DirectoryAutomationService")
+  private val connection = registerResource(ledgerClient.connection("DirectoryAutomationService"))
   private val provider = store.providerParty
 
   registerService(

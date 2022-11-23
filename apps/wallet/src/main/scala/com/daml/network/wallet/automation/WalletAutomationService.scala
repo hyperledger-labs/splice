@@ -49,7 +49,7 @@ class WalletAutomationService(
   // keeping this above 15s helps avoid payment failures due to clock skew
   private val subscriptionPaymentMinDelay = 1.second
 
-  private val connection = ledgerClient.connection(this.getClass.getSimpleName)
+  private val connection = registerResource(ledgerClient.connection(this.getClass.getSimpleName))
 
   registerService(
     new AcsIngestionService(

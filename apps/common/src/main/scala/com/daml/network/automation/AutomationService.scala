@@ -32,9 +32,20 @@ abstract class AutomationService(clockConfig: ClockConfig, retryProvider: CoinRe
     Seq.empty
   )
 
-  /** Register a service to orchestrate, which currently means ensuring its prompt closure. */
+  /** Register a resource that should be promptly closed when closing the automation service. */
+  final protected def registerResource[T <: AutoCloseable](resource: T): T = {
+    val _ = automationServices.getAndUpdate(_.prepended(resource))
+    resource
+  }
+
+  /** Special case of 'registerResource' for registering a service that
+    * runs in the background and should be promptly closed when closing the automation service.
+    *
+    * Kept separate from 'registerResource' to simplify calling it, and to prepare for future
+    * extensions where extra information about a registered service is tracked by the automation service.
+    */
   final protected def registerService(service: AutoCloseable): Unit = {
-    val _ = automationServices.getAndUpdate(_.prepended(service))
+    val _ = registerResource(service)
     ()
   }
 

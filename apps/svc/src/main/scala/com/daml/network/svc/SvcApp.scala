@@ -9,7 +9,7 @@ import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.svc.admin.grpc.GrpcSvcAppService
-import com.daml.network.svc.automation.{SvcAutomationService, SvcLogCollectionService}
+import com.daml.network.svc.automation.SvcAutomationService
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0.SvcServiceGrpc
@@ -73,13 +73,6 @@ class SvcApp(
       )
       _ <- SvcApp.setupApp(svcPartyId, connection, logger, store, retryProvider, this)
       _ = logger.info(s"SVC App is initialized")
-      logCollection = new SvcLogCollectionService(
-        svcPartyId,
-        ledgerClient,
-        loggerFactory,
-        timeouts,
-        store,
-      )
     } yield {
       adminServerRegistry
         .addService(
@@ -92,7 +85,6 @@ class SvcApp(
       SvcApp.State(
         storage,
         store,
-        logCollection,
         automation,
         logger,
       )
@@ -108,7 +100,6 @@ object SvcApp {
   case class State(
       storage: Storage,
       store: SvcStore,
-      logCollection: SvcLogCollectionService,
       automation: SvcAutomationService,
       logger: TracedLogger,
   ) extends AutoCloseable {
@@ -116,7 +107,6 @@ object SvcApp {
       Lifecycle.close(
         storage,
         store,
-        logCollection,
         automation,
       )(logger)
 

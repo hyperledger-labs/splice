@@ -35,6 +35,7 @@ class ScanApp(
     val loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
     adminServerRegistry: CantonMutableHandlerRegistry,
+    retryProvider: CoinRetries,
 )(implicit
     ac: ActorSystem,
     ec: ExecutionContextExecutor,
@@ -58,6 +59,8 @@ class ScanApp(
       automation = new ScanAutomationService(
         svcParty,
         ledgerClient,
+        coinAppParameters.clockConfig,
+        retryProvider,
         loggerFactory,
         timeouts,
         store,

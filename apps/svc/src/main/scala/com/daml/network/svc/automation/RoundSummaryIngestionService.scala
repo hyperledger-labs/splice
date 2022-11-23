@@ -1,14 +1,13 @@
 package com.daml.network.svc.automation
 
 import com.daml.ledger.javaapi.data.{ExercisedEvent, Identifier, Transaction, TransactionTree}
-import com.daml.network.admin.LedgerAutomationService
 import com.daml.network.codegen.java.cc.api.v1.coin.TransferResult
 import com.daml.network.codegen.java.{cc, da}
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history.*
+import com.daml.network.store.AuditLogIngestionSink
 import com.daml.network.svc.store.SvcEventsStore
 import com.daml.network.util.{ExerciseNode, Trees}
-import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -16,14 +15,16 @@ import com.digitalasset.canton.tracing.TraceContext
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 
-class RoundSummaryCollectionService(
+class RoundSummaryIngestionService(
     svcParty: PartyId,
     connection: CoinLedgerConnection,
     store: SvcEventsStore,
     protected val loggerFactory: NamedLoggerFactory,
-)(implicit ec: ExecutionContext, tc: TraceContext)
-    extends LedgerAutomationService
+)(implicit ec: ExecutionContext)
+    extends AuditLogIngestionSink
     with NamedLogging {
+
+  override def filterParty: PartyId = svcParty
 
   override def templateIds: Seq[Identifier] =
     Seq(cc.coin.Coin.TEMPLATE_ID, cc.coin.LockedCoin.TEMPLATE_ID)
@@ -37,7 +38,9 @@ class RoundSummaryCollectionService(
       _ <- store.addTransfers(transfers)
     } yield ()
   }
-  def traverseForest(tree: TransactionTree): Future[Seq[TransferResult]] =
+  def traverseForest(tree: TransactionTree)(implicit
+      traceContext: TraceContext
+  ): Future[Seq[TransferResult]] =
     Future {
       val transferResults: mutable.Buffer[TransferResult] = mutable.ListBuffer()
       Trees.traverseTree(
@@ -60,6 +63,4 @@ class RoundSummaryCollectionService(
 
       transferResults.toSeq
     }
-
-  override def close(): Unit = Lifecycle.close(connection)(logger)
 }

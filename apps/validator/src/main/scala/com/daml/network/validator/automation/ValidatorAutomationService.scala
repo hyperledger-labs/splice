@@ -23,7 +23,7 @@ class ValidatorAutomationService(
     tracer: Tracer,
 ) extends AutomationService(clockConfig, retryProvider) {
 
-  private val connection = ledgerClient.connection(this.getClass.getSimpleName)
+  private val connection = registerResource(ledgerClient.connection(this.getClass.getSimpleName))
 
   registerService(
     new AcsIngestionService(

@@ -1,7 +1,11 @@
 package com.daml.network.svc.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{AcsIngestionService, AutomationService}
+import com.daml.network.automation.{
+  AcsIngestionService,
+  AutomationService,
+  AuditLogIngestionService,
+}
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.svc.store.SvcStore
@@ -28,7 +32,7 @@ class SvcAutomationService(
 ) extends AutomationService(clockConfig, retryProvider) {
   import com.daml.network.store.AcsStore.QueryResult
 
-  private val connection = ledgerClient.connection(this.getClass.getSimpleName)
+  private val connection = registerResource(ledgerClient.connection(this.getClass.getSimpleName))
 
   registerService(
     new AcsIngestionService(
@@ -36,6 +40,21 @@ class SvcAutomationService(
       store.acsIngestionSink,
       connection,
       retryProvider,
+      loggerFactory,
+      timeouts,
+    )
+  )
+
+  registerService(
+    new AuditLogIngestionService(
+      "svcRoundSummaryCollectionService",
+      new RoundSummaryIngestionService(
+        store.svcParty,
+        connection,
+        store.events,
+        loggerFactory,
+      ),
+      connection,
       loggerFactory,
       timeouts,
     )

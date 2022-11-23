@@ -33,7 +33,7 @@ class SplitwiseAutomationService(
 
   override protected def timeouts: ProcessingTimeout = processingTimeouts
 
-  private val connection = ledgerClient.connection("SplitwiseAutomationService")
+  private val connection = registerResource(ledgerClient.connection("SplitwiseAutomationService"))
   private val provider = store.providerParty
 
   registerService(

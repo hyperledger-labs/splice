@@ -121,6 +121,7 @@ trait CoinEnvironment extends Environment {
       futureSupervisor,
       appLoggerFactory,
       writeHealthDumpToFile,
+      CoinRetries(appLoggerFactory),
     )
       .valueOr(err =>
         throw new RuntimeException(
