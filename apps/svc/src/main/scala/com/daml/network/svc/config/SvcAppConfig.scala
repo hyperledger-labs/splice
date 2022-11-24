@@ -1,7 +1,7 @@
 package com.daml.network.svc.config
 
-import com.daml.network.config.{LocalCoinConfig, RemoteCoinConfig}
-import com.digitalasset.canton.config._
+import com.daml.network.config.{AutomationConfig, LocalCoinConfig, RemoteCoinConfig}
+import com.digitalasset.canton.config.*
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 
 case class LocalSvcAppConfig(
@@ -9,6 +9,7 @@ case class LocalSvcAppConfig(
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     damlUser: String,
     remoteParticipant: RemoteParticipantConfig,
+    automation: AutomationConfig = AutomationConfig(),
 ) extends LocalCoinConfig {
   override val nodeTypeName: String = "SVC"
 

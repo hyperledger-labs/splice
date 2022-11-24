@@ -1,7 +1,8 @@
 package com.daml.network.scan.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{AutomationService, AuditLogIngestionService}
+import com.daml.network.automation.{AuditLogIngestionService, AutomationService}
+import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.scan.admin.ReferenceDataIngestionSink
 import com.daml.network.scan.store.{CoinTransactionsIngestionSink, ScanCCHistoryStore}
@@ -14,9 +15,10 @@ import scala.concurrent.ExecutionContextExecutor
 
 /** Manages background automation that runs on a CC Scan app. */
 class ScanAutomationService(
+    automationConfig: AutomationConfig,
+    clockConfig: ClockConfig,
     svcParty: PartyId,
     ledgerClient: CoinLedgerClient,
-    clockConfig: ClockConfig,
     retryProvider: CoinRetries,
     protected val loggerFactory: NamedLoggerFactory,
     protected val timeouts: ProcessingTimeout,
@@ -25,7 +27,7 @@ class ScanAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends AutomationService(clockConfig, retryProvider) {
+) extends AutomationService(automationConfig, clockConfig, retryProvider) {
 
   private val connection = registerResource(ledgerClient.connection("ScanAutomationService"))
 

@@ -3,10 +3,11 @@ package com.daml.network.svc.automation
 import akka.stream.Materializer
 import com.daml.network.automation.{
   AcsIngestionService,
-  AutomationService,
   AuditLogIngestionService,
+  AutomationService,
 }
 import com.daml.network.codegen.java.cc
+import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.svc.store.SvcStore
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
@@ -19,9 +20,10 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
 class SvcAutomationService(
+    automationConfig: AutomationConfig,
+    clockConfig: ClockConfig,
     store: SvcStore,
     ledgerClient: CoinLedgerClient,
-    clockConfig: ClockConfig,
     retryProvider: CoinRetries,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
@@ -29,7 +31,7 @@ class SvcAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends AutomationService(clockConfig, retryProvider) {
+) extends AutomationService(automationConfig, clockConfig, retryProvider) {
   import com.daml.network.store.AcsStore.QueryResult
 
   private val connection = registerResource(ledgerClient.connection(this.getClass.getSimpleName))

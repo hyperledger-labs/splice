@@ -4,6 +4,7 @@ import akka.stream.Materializer
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
+import com.daml.network.config.AutomationConfig
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -20,10 +21,11 @@ import scala.jdk.CollectionConverters.*
 
 /** Manages background automation that runs on an directory app. */
 class DirectoryAutomationService(
+    automationConfig: AutomationConfig,
+    clockConfig: ClockConfig,
     store: DirectoryStore,
     ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
-    clockConfig: ClockConfig,
     retryProvider: CoinRetries,
     protected val loggerFactory: NamedLoggerFactory,
     processingTimeouts: ProcessingTimeout,
@@ -31,7 +33,7 @@ class DirectoryAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends AutomationService(clockConfig, retryProvider) {
+) extends AutomationService(automationConfig, clockConfig, retryProvider) {
 
   private val entryFee: BigDecimal = 1.0
   private val collectionDuration = new RelTime(

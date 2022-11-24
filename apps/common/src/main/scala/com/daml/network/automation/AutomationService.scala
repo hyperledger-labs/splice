@@ -3,6 +3,7 @@ package com.daml.network.automation
 import akka.NotUsed
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{KillSwitches, Materializer}
+import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -20,7 +21,11 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.util.{Failure, Success}
 
 /** Shared base class for running ingestion and task-handler automation in applications. */
-abstract class AutomationService(clockConfig: ClockConfig, retryProvider: CoinRetries)(implicit
+abstract class AutomationService(
+    automationConfig: AutomationConfig,
+    clockConfig: ClockConfig,
+    retryProvider: CoinRetries,
+)(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
@@ -84,6 +89,7 @@ abstract class AutomationService(clockConfig: ClockConfig, retryProvider: CoinRe
       }
     }
     val service = new AutomationService.TaskHandlerService[T](
+      automationConfig,
       name,
       source,
       handler,
@@ -146,7 +152,9 @@ abstract class AutomationService(clockConfig: ClockConfig, retryProvider: CoinRe
 }
 
 object AutomationService {
+
   private class TaskHandlerService[T](
+      config: AutomationConfig,
       name: String,
       source: Source[T, NotUsed],
       processTask: T => Future[Unit],
@@ -165,8 +173,7 @@ object AutomationService {
         // we place the kill switch before the map operator, such that
         // we can shut down the operator quickly and signal upstream to cancel further sending
         .viaMat(KillSwitches.single)(Keep.right)
-        // TODO(#790): make this configurable
-        .mapAsync(4)(processTask)
+        .mapAsync(parallelism = config.parallelism)(processTask)
         // and we get the Future[Done] as completed from the sink so we know when the last message
         // was processed
         .toMat(Sink.ignore)(Keep.both),

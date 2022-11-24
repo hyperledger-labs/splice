@@ -67,11 +67,12 @@ class SplitwiseApp(
         loggerFactory,
       )
     automation = new SplitwiseAutomationService(
+      config.automation,
+      coinAppParameters.clockConfig,
       store,
       ledgerClient,
       readAs,
       scanConnection,
-      coinAppParameters.clockConfig,
       retryProvider,
       loggerFactory,
       timeouts,

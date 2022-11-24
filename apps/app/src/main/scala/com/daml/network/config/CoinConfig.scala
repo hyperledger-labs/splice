@@ -370,6 +370,8 @@ object CoinConfig {
 
     implicit val authConfigHint = new FieldCoproductHint[AuthConfig]("algorithm")
 
+    implicit val automationConfig: ConfigReader[AutomationConfig] =
+      deriveReader[AutomationConfig]
     implicit val hs256UnsafeConfig: ConfigReader[AuthConfig.Hs256Unsafe] =
       deriveReader[AuthConfig.Hs256Unsafe]
     implicit val rs256Config: ConfigReader[AuthConfig.Rs256] =
@@ -424,6 +426,8 @@ object CoinConfig {
 
     implicit val authConfigHint = new FieldCoproductHint[AuthConfig]("algorithm")
 
+    implicit val automationConfig: ConfigWriter[AutomationConfig] =
+      deriveWriter[AutomationConfig]
     implicit val hs256UnsafeConfig: ConfigWriter[AuthConfig.Hs256Unsafe] =
       deriveWriter[AuthConfig.Hs256Unsafe]
     implicit val rs256Config: ConfigWriter[AuthConfig.Rs256] =

@@ -1,7 +1,7 @@
 package com.daml.network.scan.config
 
-import com.daml.network.config.{LocalCoinConfig, RemoteCoinConfig}
-import com.digitalasset.canton.config._
+import com.daml.network.config.{AutomationConfig, LocalCoinConfig, RemoteCoinConfig}
+import com.digitalasset.canton.config.*
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 
 trait BaseScanAppConfig {}
@@ -11,6 +11,7 @@ case class LocalScanAppConfig(
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     svcUser: String,
     override val remoteParticipant: RemoteParticipantConfig,
+    automation: AutomationConfig = AutomationConfig(),
 ) extends LocalCoinConfig
     with BaseScanAppConfig // TODO(i736): fork or generalize this trait.
     {

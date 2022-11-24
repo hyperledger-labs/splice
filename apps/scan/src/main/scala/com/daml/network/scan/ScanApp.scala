@@ -57,9 +57,10 @@ class ScanApp(
     for {
       store <- Future.successful(ScanCCHistoryStore(storage, loggerFactory))
       automation = new ScanAutomationService(
+        config.automation,
+        coinAppParameters.clockConfig,
         svcParty,
         ledgerClient,
-        coinAppParameters.clockConfig,
         retryProvider,
         loggerFactory,
         timeouts,

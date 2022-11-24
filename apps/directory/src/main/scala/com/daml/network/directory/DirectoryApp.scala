@@ -77,10 +77,11 @@ class DirectoryApp(
         loggerFactory,
       )
       automation = new DirectoryAutomationService(
+        config.automation,
+        coinAppParameters.clockConfig,
         store,
         ledgerClient,
         scanConnection,
-        coinAppParameters.clockConfig,
         retryProvider,
         loggerFactory,
         timeouts,

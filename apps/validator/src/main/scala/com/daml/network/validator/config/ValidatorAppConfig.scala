@@ -1,8 +1,8 @@
 package com.daml.network.validator.config
 
-import com.daml.network.config.{LocalCoinConfig, RemoteCoinConfig}
+import com.daml.network.config.{AutomationConfig, LocalCoinConfig, RemoteCoinConfig}
 import com.daml.network.scan.config.RemoteScanAppConfig
-import com.digitalasset.canton.config._
+import com.digitalasset.canton.config.*
 import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 
 import java.nio.file.Path
@@ -21,6 +21,7 @@ case class LocalValidatorAppConfig(
     remoteParticipant: RemoteParticipantConfig,
     remoteParticipantToken: Option[String] = None,
     remoteScan: RemoteScanAppConfig,
+    automation: AutomationConfig = AutomationConfig(),
 ) extends LocalCoinConfig // TODO(i736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "validator"

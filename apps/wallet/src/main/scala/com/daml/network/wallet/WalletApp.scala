@@ -137,10 +137,11 @@ class WalletApp(
         .discard
 
       val automation = new WalletAutomationService(
+        config.automation,
+        coinAppParameters.clockConfig,
         walletStore,
         treasuries,
         ledgerClient,
-        coinAppParameters.clockConfig,
         retryProvider,
         loggerFactory,
         timeouts,

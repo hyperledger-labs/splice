@@ -64,9 +64,10 @@ class SvcApp(
       connection = ledgerClient.connection("SvcAppBootstrap")
       _ <- connection.uploadDarFile(SvcApp.coinPackage)
       automation = new SvcAutomationService(
+        config.automation,
+        coinAppParameters.clockConfig,
         store,
         ledgerClient,
-        coinAppParameters.clockConfig,
         retryProvider,
         loggerFactory,
         timeouts,

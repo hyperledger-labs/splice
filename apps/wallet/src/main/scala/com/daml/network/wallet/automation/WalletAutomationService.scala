@@ -5,9 +5,10 @@ import cats.syntax.either.*
 import cats.syntax.traverse.*
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.codegen.java.cn.wallet.{
-  install => installCodegen,
-  subscriptions => subsCodegen,
+  install as installCodegen,
+  subscriptions as subsCodegen,
 }
+import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
@@ -30,10 +31,11 @@ import scala.jdk.DurationConverters.*
 /** Manages background automation that runs on an Wallet app.
   */
 class WalletAutomationService(
+    automationConfig: AutomationConfig,
+    clockConfig: ClockConfig,
     walletStore: WalletStore,
     treasuryServices: TreasuryServices,
     ledgerClient: CoinLedgerClient,
-    clockConfig: ClockConfig,
     retryProvider: CoinRetries,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
@@ -41,7 +43,7 @@ class WalletAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends AutomationService(clockConfig, retryProvider) {
+) extends AutomationService(automationConfig, clockConfig, retryProvider) {
 
   // TODO(i1692) both of these should be configuration options that get overridden in tests
   private val canMakeSubscriptionPaymentCheckInterval = 1.second

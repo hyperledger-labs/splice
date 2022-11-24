@@ -3,6 +3,7 @@ package com.daml.network.splitwise.automation
 import akka.stream.Materializer
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
+import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.store.SplitwiseStore
@@ -17,11 +18,12 @@ import scala.jdk.CollectionConverters.*
 
 /** Manages background automation that runs on an splitwise app. */
 class SplitwiseAutomationService(
+    automationConfig: AutomationConfig,
+    clockConfig: ClockConfig,
     store: SplitwiseStore,
     ledgerClient: CoinLedgerClient,
     readAs: Set[PartyId],
     scanConnection: ScanConnection,
-    clockConfig: ClockConfig,
     retryProvider: CoinRetries,
     protected val loggerFactory: NamedLoggerFactory,
     processingTimeouts: ProcessingTimeout,
@@ -29,7 +31,7 @@ class SplitwiseAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends AutomationService(clockConfig, retryProvider) {
+) extends AutomationService(automationConfig, clockConfig, retryProvider) {
 
   override protected def timeouts: ProcessingTimeout = processingTimeouts
 
