@@ -172,17 +172,17 @@ class GrpcSvcAppService(
       getRound: T => v1.round.Round
   )(round: Long): Future[TCid] =
     for {
-      allRounds <- connection.activeContracts(store.svcParty, companion)
+      allRounds <- store.listContracts(companion)
     } yield {
-      val filteredRounds = allRounds.filter { case roundContract =>
-        val roundId = getRound(roundContract.data)
+      val filteredRounds = allRounds.value.filter { roundContract =>
+        val roundId = getRound(roundContract.payload)
         roundId.number == round
       }
       require(
         filteredRounds.length == 1,
         s"Expected one round but got ${filteredRounds.length} rounds $filteredRounds",
       )
-      filteredRounds(0).id
+      filteredRounds(0).contractId
     }
 
   /** Query the open reward contracts for a given round. This should only be used

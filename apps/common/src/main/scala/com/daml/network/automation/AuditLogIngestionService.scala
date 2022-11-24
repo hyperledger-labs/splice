@@ -31,6 +31,7 @@ class AuditLogIngestionService(
 
   private val serviceDescriptor = s"AuditLogIngestionService($name, ${ingestionSink.filterParty})"
 
+  // TODO(M3-83): this ingestion is not protected from disconnects; we don't want to invest in fixing this until we have merged AuditLog and AcsStore, which we plan to do as part of the persistent stores work.
   private val subscription = {
     val offset = LedgerOffset.LedgerBegin.getInstance()
     withNewTrace(serviceDescriptor)(implicit traceContext =>

@@ -79,6 +79,8 @@ class InMemoryAcsStore(
 
     override def transactionFilter: TransactionFilter = contractFilter.transactionFilter
 
+    override def getLastIngestedOffset: Future[Option[String]] = Future.successful(stateVar.offset)
+
     override def ingestActiveContracts(
         evs: Seq[CreatedEvent]
     )(implicit traceContext: TraceContext): Future[Unit] =

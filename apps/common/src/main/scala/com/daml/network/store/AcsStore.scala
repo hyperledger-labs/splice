@@ -173,6 +173,12 @@ object AcsStore {
         acsOffset: String
     )(implicit traceContext: TraceContext): Future[Unit]
 
+    /** The last offset that was ingested by this sink.
+      *
+      * Expected to be used by ingestion services to determine from where they should continue ingesting.
+      */
+    def getLastIngestedOffset: Future[Option[String]]
+
     /** Ingest a transaction served by the transaction stream. */
     def ingestTransaction(tx: Transaction)(implicit traceContext: TraceContext): Future[Unit]
   }
