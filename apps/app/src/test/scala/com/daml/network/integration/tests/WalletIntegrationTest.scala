@@ -271,90 +271,96 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
         aliceRemoteWallet.listSubscriptionRequests() shouldBe empty
         aliceRemoteWallet.listSubscriptions() shouldBe empty
 
-        val request = createSelfSubscriptionRequest(aliceUserParty);
-
-        val requestId = clue("List subscription requests to find out request ID") {
-          inside(aliceRemoteWallet.listSubscriptionRequests()) { case Seq(r) =>
-            r.payload shouldBe request
-            r.contractId
-          }
-        }
+        val (request, requestId) = actAndCheck(
+          "Create self-subscription request",
+          createSelfSubscriptionRequest(aliceUserParty),
+        )(
+          "the created subscription request is listed correctly",
+          request =>
+            inside(aliceRemoteWallet.listSubscriptionRequests()) { case Seq(r) =>
+              r.payload shouldBe request
+              r.contractId
+            },
+        )
         clue("Alice gets some coins") {
           aliceRemoteWallet.tap(50)
         }
-        val initialPaymentId =
-          clue("Accept the subscription request, initiating the first subscription payment") {
-            aliceRemoteWallet.acceptSubscriptionRequest(requestId)
-          }
-        clue("Check that initial payment contract was created successfully") {
-          aliceRemoteWallet.listSubscriptionRequests() shouldBe empty
-          inside(aliceRemoteWallet.listSubscriptionInitialPayments()) { case Seq(r) =>
-            r.contractId shouldBe initialPaymentId
-            r.payload.subscriptionData should equal(request.subscriptionData)
-            r.payload.payData should equal(request.payData)
-          }
-        }
-        clue("Collect the initial payment (as the receiver), which creates the subscription") {
-          val collectCommand = initialPaymentId
-            .exerciseSubscriptionInitialPayment_Collect(transferContext)
-            .commands
-            .asScala
-            .toSeq
-          aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
-            actAs = Seq(aliceUserParty),
-            readAs = Seq(aliceValidatorParty),
-            optTimeout = None,
-            commands = collectCommand,
-          )
-        }
-        // note that because the directory sets paymentDuration = paymentInterval,
-        // the wallet backend can make the second payment immediately
-        val paymentId =
-          clue("Wait for an automated subscription payment to be initiated by the backend") {
-            eventually() {
-              inside(aliceRemoteWallet.listSubscriptions()) { case Seq(sub) =>
-                sub.main.payload should equal(request.subscriptionData)
-                inside(sub.state) {
-                  case GrpcWalletAppClient.SubscriptionPayment(state) => {
-                    state.payload.subscription shouldBe sub.main.contractId
-                    state.payload.payData should equal(request.payData)
-                    state.contractId
-                  }
-                }
-              }
+
+        val (initialPaymentId, _) = actAndCheck(
+          "Accept the subscription request, which initiates the first subscription payment",
+          aliceRemoteWallet.acceptSubscriptionRequest(requestId),
+        )(
+          "initial subscription payment is listed correctly",
+          initialPaymentId => {
+            aliceRemoteWallet.listSubscriptionRequests() shouldBe empty
+            inside(aliceRemoteWallet.listSubscriptionInitialPayments()) { case Seq(r) =>
+              r.contractId shouldBe initialPaymentId
+              r.payload.subscriptionData should equal(request.subscriptionData)
+              r.payload.payData should equal(request.payData)
             }
-          }
-        clue(
-          "Collect the second payment (as the receiver), which sets the subscription back to idle"
-        ) {
-          val collectCommand2 = paymentId
-            .exerciseSubscriptionPayment_Collect(transferContext)
-            .commands
-            .asScala
-            .toSeq
-          aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
-            actAs = Seq(aliceUserParty),
-            readAs = Seq(aliceValidatorParty),
-            optTimeout = None,
-            commands = collectCommand2,
-          )
-        }
-        val subscriptionStateId2 = clue("List subscriptions to find out the new state ID") {
-          inside(aliceRemoteWallet.listSubscriptions()) { case Seq(sub) =>
-            sub.main.payload should equal(request.subscriptionData)
-            inside(sub.state) {
-              case GrpcWalletAppClient.SubscriptionIdleState(state) => {
+          },
+        )
+
+        val (_, paymentId) = actAndCheck(
+          "Collect the initial payment (as the receiver), which creates the subscription", {
+            val collectCommand = initialPaymentId
+              .exerciseSubscriptionInitialPayment_Collect(transferContext)
+              .commands
+              .asScala
+              .toSeq
+            aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
+              actAs = Seq(aliceUserParty),
+              readAs = Seq(aliceValidatorParty),
+              optTimeout = None,
+              commands = collectCommand,
+            )
+          },
+        )(
+          // note that because the directory sets paymentDuration = paymentInterval,
+          // the wallet backend can make the second payment immediately
+          "an automated subscription payment is eventually initiated by the wallet",
+          _ =>
+            inside(aliceRemoteWallet.listSubscriptions()) { case Seq(sub) =>
+              sub.main.payload should equal(request.subscriptionData)
+              inside(sub.state) { case GrpcWalletAppClient.SubscriptionPayment(state) =>
+                state.payload.subscription shouldBe sub.main.contractId
+                state.payload.payData should equal(request.payData)
+                state.contractId
+              }
+            },
+        )
+
+        val (_, subscriptionStateId2) = actAndCheck(
+          "Collect the second payment (as the receiver), which sets the subscription back to idle", {
+            val collectCommand2 = paymentId
+              .exerciseSubscriptionPayment_Collect(transferContext)
+              .commands
+              .asScala
+              .toSeq
+            aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
+              actAs = Seq(aliceUserParty),
+              readAs = Seq(aliceValidatorParty),
+              optTimeout = None,
+              commands = collectCommand2,
+            )
+          },
+        )(
+          "the subscription is back in idle state",
+          _ =>
+            inside(aliceRemoteWallet.listSubscriptions()) { case Seq(sub) =>
+              sub.main.payload should equal(request.subscriptionData)
+              inside(sub.state) { case GrpcWalletAppClient.SubscriptionIdleState(state) =>
                 state.payload.subscription should equal(sub.main.contractId)
                 state.payload.payData should equal(request.payData)
                 state.contractId
               }
-            }
-          }
-        }
-        clue("Cancel the subscription") {
-          aliceRemoteWallet.cancelSubscription(subscriptionStateId2);
-          aliceRemoteWallet.listSubscriptions() shouldBe empty
-        }
+            },
+        )
+
+        actAndCheck(
+          "Cancel the subscription",
+          aliceRemoteWallet.cancelSubscription(subscriptionStateId2),
+        )("no more subscriptions exist", _ => aliceRemoteWallet.listSubscriptions() shouldBe empty)
       }
 
     "allow two users to create a payment channel and use it for a transfer" in { implicit env =>
@@ -483,24 +489,38 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
       val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
       val bobUserParty = onboardWalletUser(this, bobRemoteWallet, bobValidator)
 
-      // Alice proposes payment channel to Bob
-      aliceRemoteWallet.proposePaymentChannel(bobUserParty)
-      val aliceProposals = aliceRemoteWallet.listPaymentChannelProposals()
-      val aliceProposal = aliceProposals(0)
-
-      // Bob monitors proposals and accepts the one
-      eventually()(bobRemoteWallet.listPaymentChannelProposals() should have size 1)
-      bobRemoteWallet.acceptPaymentChannelProposal(aliceProposal.contractId)
-
-      // Bob requests a payment, and then immediately cancels the channel
-      bobRemoteWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please pay")
-      bobRemoteWallet.cancelPaymentChannelBySender(aliceUserParty)
-
-      // Neither sees the payment channel nor the payment request anymore
-      bobRemoteWallet.listPaymentChannels() shouldBe empty
-      bobRemoteWallet.listOnChannelPaymentRequests() should not be empty
-      eventually()(aliceRemoteWallet.listOnChannelPaymentRequests() should not be empty)
-      eventually()(aliceRemoteWallet.listPaymentChannels() shouldBe empty)
+      val (_, aliceProposal) = actAndCheck(
+        "Alice proposes payment channel to Bob",
+        aliceRemoteWallet.proposePaymentChannel(bobUserParty),
+      )(
+        "payment channel proposal is listed for both Alice and Bob",
+        _ => {
+          val aliceProposal = inside(aliceRemoteWallet.listPaymentChannelProposals()) {
+            case Seq(p) => p
+          }
+          inside(bobRemoteWallet.listPaymentChannelProposals()) { case Seq(p) =>
+            p shouldBe aliceProposal
+          }
+          aliceProposal
+        },
+      )
+      clue("Bob accepts the proposal") {
+        bobRemoteWallet.acceptPaymentChannelProposal(aliceProposal.contractId)
+      }
+      actAndCheck(
+        "Bob requests a payment, and then immediately cancels the channel", {
+          bobRemoteWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please pay")
+          bobRemoteWallet.cancelPaymentChannelBySender(aliceUserParty)
+        },
+      )(
+        "neither Alice nor Bob see neither the payment channel nor the payment request anymore",
+        _ => {
+          bobRemoteWallet.listPaymentChannels() shouldBe empty
+          bobRemoteWallet.listOnChannelPaymentRequests() should not be empty
+          eventually()(aliceRemoteWallet.listOnChannelPaymentRequests() should not be empty)
+          eventually()(aliceRemoteWallet.listPaymentChannels() shouldBe empty)
+        },
+      )
     }
 
     "(propose, accept, and) cancel a payment channel by receiver" in { implicit env =>
@@ -612,14 +632,15 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
             // but no money was deducted due to the transfer
             checkWallet(alice, aliceRemoteWallet, Seq((9, 10), (9, 10), (9, 10), (9, 10)))
           }
-
-          val txs = aliceValidator.remoteParticipant.ledger_api.transactions
-            .treesJava(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
-          val createdCoinsInTx =
-            txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_))
-          createdCoinsInTx(0) should have size 1
-          // two taps went through, even though transfer in same batch failed.
-          createdCoinsInTx(1) should have size 2
+          eventually() {
+            val txs = aliceValidator.remoteParticipant.ledger_api.transactions
+              .treesJava(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
+            val createdCoinsInTx =
+              txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_))
+            createdCoinsInTx(0) should have size 1
+            // two taps went through, even though transfer in same batch failed.
+            createdCoinsInTx(1) should have size 2
+          }
       }
 
       "retry a batch if it fails due to contention" in { implicit env =>

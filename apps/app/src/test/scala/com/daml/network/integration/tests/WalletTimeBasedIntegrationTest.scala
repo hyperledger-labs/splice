@@ -44,48 +44,66 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
 
       clue("Creating 3 subscriptions, 10 days apart") {
         for ((name, i) <- List("alice1", "alice2", "alice3").zipWithIndex) {
-          val (_, requestId) = aliceDirectory.requestDirectoryEntryWithSubscription(name)
-          aliceRemoteWallet.acceptSubscriptionRequest(requestId)
-          eventually() {
-            val subs = aliceRemoteWallet.listSubscriptions()
-            val now = svc.remoteParticipant.ledger_api.time.get()
-            subs.length shouldBe i + 1
-            // TODO(i1217) we can remove this check once `renewalDuration == entryLifetime` is no longer hard-coded in the directory backend
-            subs.foreach(sub => {
-              sub.state match {
-                case GrpcWalletAppClient.SubscriptionIdleState(state) =>
-                  assert(state.payload.nextPaymentDueAt.isAfter(now.toInstant))
-                case _ => fail()
-              }
-            })
-          }
+
+          val (_, requestId) = actAndCheck(
+            "Request directory entry", {
+              aliceDirectory.requestDirectoryEntryWithSubscription(name)._1
+            },
+          )(
+            "the corresponding subscription request is created",
+            { _ =>
+              inside(aliceRemoteWallet.listSubscriptionRequests()) { case Seq(r) => r.contractId }
+            },
+          )
+          actAndCheck(
+            "Accept subscription request", {
+              aliceRemoteWallet.acceptSubscriptionRequest(requestId)
+            },
+          )(
+            "subscription is created and no subscription is ready for payment",
+            _ => {
+              val subs = aliceRemoteWallet.listSubscriptions()
+              val now = svc.remoteParticipant.ledger_api.time.get()
+              subs.length shouldBe i + 1
+              // TODO(i1217) we can remove this check once `renewalDuration == entryLifetime` is no longer hard-coded in the directory backend
+              subs.foreach(sub => {
+                sub.state match {
+                  case GrpcWalletAppClient.SubscriptionIdleState(state) =>
+                    assert(state.payload.nextPaymentDueAt.isAfter(now.toInstant))
+                  case _ => fail()
+                }
+              })
+            },
+          )
           advanceTime(Duration.ofDays(10))
         }
       }
       clue("Stopping directory backend so that payments aren't collected.") {
         directory.stop()
       }
-      clue("Waiting for the time for a payment on the first subscription to arrive...") {
-        advanceTime(Duration.ofDays(60))
-      }
-      clue("Checking that 2 idle subscriptions and 1 payment are listed.") {
-        eventually() {
-          val subs = aliceRemoteWallet.listSubscriptions()
-          subs.length shouldBe 3
-          subs
-            .count(_.state match {
-              case GrpcWalletAppClient.SubscriptionIdleState(_) => true
-              case _ => false
-            }) shouldBe 2
-          subs
-            .count(_.state match {
-              case GrpcWalletAppClient.SubscriptionPayment(_) => true
-              case _ => false
-            }) shouldBe 1
-        }
-      }
+      actAndCheck(
+        "Wait for the time for a payment on the first subscription to arrive",
+        advanceTime(Duration.ofDays(60)),
+      )(
+        "2 idle subscriptions and 1 payment are listed",
+        _ => {
+          eventually() {
+            val subs = aliceRemoteWallet.listSubscriptions()
+            subs.length shouldBe 3
+            subs
+              .count(_.state match {
+                case GrpcWalletAppClient.SubscriptionIdleState(_) => true
+                case _ => false
+              }) shouldBe 2
+            subs
+              .count(_.state match {
+                case GrpcWalletAppClient.SubscriptionPayment(_) => true
+                case _ => false
+              }) shouldBe 1
+          }
+        },
+      )
     }
-
   }
 
   "automatically collect app & validator rewards on coin operations" in { implicit env =>
