@@ -162,7 +162,7 @@ case class EndUserTreasuryService(
       batch: Seq[AnyEnqueuedCoinOperation]
   ): Future[String] =
     TraceContext.withNewTraceContext { implicit tc =>
-      retryProvider.retryForAutomationWithUncleanShutdown(
+      retryProvider.retryForAutomation(
         "execute coin operation batch",
         executeBatch(batch),
         this,

@@ -95,12 +95,12 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
       }
     }
 
-    retryProvider.retryForAutomationWithUncleanShutdown("Wait for packages", query(), this)
+    retryProvider.retryForAutomation("Wait for packages", query(), this)
 
   }
 
   val ledgerClientF: Future[CoinLedgerClient] =
-    retryProvider.retryForAutomationWithUncleanShutdown(
+    retryProvider.retryForAutomation(
       "Acquiring coin ledger client",
       CoinLedgerClient.create(
         remoteParticipant.ledgerApi,
@@ -127,13 +127,13 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
     _ = logger.info(s"Acquiring primary party of service user $serviceUser")
     serviceParty <-
       if (allocateServiceUser)
-        retryProvider.retryForAutomationWithUncleanShutdown(
+        retryProvider.retryForAutomation(
           "Allocating user and party",
           connection.getOrAllocateParty(serviceUser),
           this,
         )
       else
-        retryProvider.retryForAutomationWithUncleanShutdown(
+        retryProvider.retryForAutomation(
           "Querying primary party of user",
           connection.getPrimaryParty(serviceUser),
           this,

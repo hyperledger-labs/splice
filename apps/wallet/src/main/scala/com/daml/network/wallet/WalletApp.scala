@@ -83,12 +83,12 @@ class WalletApp(
           loggerFactory,
         )
       }
-      validatorUserInfo <- retryProvider.retryForAutomationWithUncleanShutdown(
+      validatorUserInfo <- retryProvider.retryForAutomation(
         "getValidatorPartyId",
         validatorConnection.getValidatorUserInfo(),
         this,
       )
-      svcParty <- retryProvider.retryForAutomationWithUncleanShutdown(
+      svcParty <- retryProvider.retryForAutomation(
         "getSvcPartyId",
         scanConnection.getSvcPartyId(),
         this,

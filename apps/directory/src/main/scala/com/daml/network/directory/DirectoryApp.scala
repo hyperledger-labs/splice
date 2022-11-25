@@ -66,7 +66,7 @@ class DirectoryApp(
           loggerFactory,
         )
       )
-      svcParty <- retryProvider.retryForAutomationWithUncleanShutdown(
+      svcParty <- retryProvider.retryForAutomation(
         "getSvcPartyId",
         scanConnection.getSvcPartyId(),
         this,

@@ -75,19 +75,25 @@ abstract class AutomationService(
         retryProvider
           .retryForAutomation(
             name,
-            performUnlessClosingF(name)(handler0(req)(traceContext)),
+            handler0(req)(traceContext),
             flagCloseable = this,
           )
-          .onShutdown("aborted due to shutdown")
           .transform {
             case Success(outcome) =>
               logger.info(s"Completed operation ${name.singleQuoted} with outcome: $outcome")
               Success(())
             case Failure(ex) =>
-              logger.error(
-                s"Operation ${name.singleQuoted} failed fatally and is skipped due to",
-                ex,
-              )
+              if (this.isClosing)
+                logger.info(
+                  s"Ignoring failure of operation ${name.singleQuoted}, as we are shutting down",
+                  ex,
+                )
+              else
+                logger.error(
+                  s"Operation ${name.singleQuoted} failed fatally and is skipped due to",
+                  ex,
+                )
+
               // Here we recover from the failure so that processing can continue for other tasks.
               Success(())
           }

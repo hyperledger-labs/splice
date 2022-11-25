@@ -149,7 +149,7 @@ class ValidatorApp(
       validatorParty: PartyId,
   ): Future[Unit] = {
     logger.info("Waiting for CoinRules contract to be created")
-    retryProvider.retryForAutomationWithUncleanShutdown(
+    retryProvider.retryForAutomation(
       "Wait for CoinRules",
       for {
         coinRulesResult <- store.lookupCoinRules()
@@ -177,7 +177,7 @@ class ValidatorApp(
     val coinRulesReq =
       new CoinRulesRequest(validatorParty.toProtoPrimitive, svcParty.toProtoPrimitive)
     retryProvider
-      .retryForAutomationWithUncleanShutdown(
+      .retryForAutomation(
         "createCoinRulesRequest",
         for {
           coinRulesResult <- store.lookupCoinRules()
@@ -223,7 +223,7 @@ class ValidatorApp(
           )
         )
       connection = ledgerClient.connection("ValidatorAppBootstrap")
-      svcParty <- retryProvider.retryForAutomationWithUncleanShutdown(
+      svcParty <- retryProvider.retryForAutomation(
         "getSvcPartyId",
         scanConnection.getSvcPartyId(),
         this,

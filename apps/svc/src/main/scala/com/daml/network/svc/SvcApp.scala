@@ -155,7 +155,7 @@ object SvcApp {
         flagCloseable = flagCloseable,
         lookupValidatorRightByParty = store.lookupValidatorRightByParty,
       )
-      _ <- retryProvider.retryForAutomationWithUncleanShutdown(
+      _ <- retryProvider.retryForAutomation(
         "create coinrules and issuance state",
         store.lookupCoinRules().flatMap {
           case QueryResult(off, None) =>

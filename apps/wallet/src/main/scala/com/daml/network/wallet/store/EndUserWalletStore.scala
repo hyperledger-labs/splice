@@ -131,7 +131,7 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
     QueryResult[Contract[roundCodegen.OpenMiningRound.ContractId, roundCodegen.OpenMiningRound]]
   ] = {
 
-    retryProvider.retryForClientCallsWithUncleanShutdowns(
+    retryProvider.retryForClientCalls(
       "Waiting for open mining round to be ingested",
       lookupLatestOpenMiningRound().map { result =>
         result.map(
