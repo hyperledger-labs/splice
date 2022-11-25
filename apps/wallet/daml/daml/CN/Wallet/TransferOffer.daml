@@ -59,7 +59,7 @@ template AcceptedTransferOffer
   where
     signatory sender, receiver
 
-    choice AcceptedTransferOffer_Complete : Either Text (API.TransferResult, ContractId API.Coin)
+    nonconsuming choice AcceptedTransferOffer_Complete : Either Text (API.TransferResult, ContractId API.Coin)
       with
         inputs : [API.TransferInput]
         transferContext : API.PaymentTransferContext
@@ -85,7 +85,12 @@ template AcceptedTransferOffer
               ]
             payload = description
         result <- API.exercisePaymentTransfer transferContext transfer
-        return $ fmap extractSenderChange result
+        case result of
+          Left i -> return $ Left i
+          Right result -> do
+            archive self
+            let [_, API.TransferResultCoin senderChange] = result.createdCoins
+            return $ Right (result, senderChange)
 
     choice AcceptedTransferOffer_Expire : ()
       with
@@ -96,9 +101,3 @@ template AcceptedTransferOffer
         now <- getTime
         require "Offer has expired" (now >= expiresAt)
         pure()
-
--- Utility function to help get the sender change from a TransferResult
-extractSenderChange: API.TransferResult -> (API.TransferResult, ContractId API.Coin)
-extractSenderChange result =
-  let [API.TransferResultCoin lockedCoin, API.TransferResultCoin senderChange] = result.createdCoins
-  in (result, senderChange)
