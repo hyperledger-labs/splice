@@ -14,7 +14,7 @@ import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0.SvcServiceGrpc
 import com.daml.network.util.CoinUtil.{createValidatorRight, defaultCoinConfig}
-import com.daml.network.util.UploadablePackage
+import com.daml.network.util.{HasHealth, UploadablePackage}
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
@@ -103,7 +103,10 @@ object SvcApp {
       store: SvcStore,
       automation: SvcAutomationService,
       logger: TracedLogger,
-  ) extends AutoCloseable {
+  ) extends AutoCloseable
+      with HasHealth {
+    override def isHealthy: Boolean = storage.isActive && automation.isHealthy
+
     override def close(): Unit =
       Lifecycle.close(
         storage,

@@ -57,6 +57,7 @@ class SvcAutomationService(
         loggerFactory,
       ),
       connection,
+      retryProvider,
       loggerFactory,
       timeouts,
     )

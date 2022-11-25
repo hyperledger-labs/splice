@@ -38,29 +38,30 @@ class SvcConnectivityIntegrationTest extends CoinIntegrationTest {
     svc.remoteParticipant.ledger_api.acs
       .filterJava(OpenMiningRound.COMPANION)(svcParty) shouldBe empty
 
+    clue("svc app should report as active")(svc.health.active shouldBe true)
+
     clue("disable connection from SVC app to the ledger API server for 5 seconds") {
-      loggerFactory.suppressWarnings {
-        toxiproxy.disable("svc-ledger-api")
-        Threading.sleep(5000)
-      }
+      toxiproxy.disable("svc-ledger-api")
+      Threading.sleep(5000)
+
       loggerFactory.assertThrowsAndLogs[CommandFailure](
         svc.startIssuingRound(0),
         a => a.errorMessage should startWith("Request failed for svc-app. Is the server running?"),
       )
+
+      clue("svc app should report as inactive")(svc.health.active shouldBe false)
+
       toxiproxy.enable("svc-ledger-api")
     }
 
-    clue("progress round 0 to issuing and check ACS matches expectations") {
-      // TODO(#1093): wait for the SVC app health check to succeed and only then issue the command
-      val issuingRoundResponse = loggerFactory.suppressWarningsAndErrors {
-        eventually() {
-          try {
-            svc.startIssuingRound(0)
-          } catch {
-            case _: CommandFailure => fail()
-          }
-        }
+    clue("waiting for svc app to report healthy again") {
+      eventually() {
+        svc.health.active shouldBe true
       }
+    }
+
+    clue("progress round 0 to issuing and check ACS matches expectations") {
+      val issuingRoundResponse = svc.startIssuingRound(0)
 
       svc.remoteParticipant.ledger_api.acs
         .filterJava(IssuingMiningRound.COMPANION)(svcParty)
@@ -72,17 +73,7 @@ class SvcConnectivityIntegrationTest extends CoinIntegrationTest {
     clue(
       "attempt to close the issuing round, which requires the store to recover from the disconnect"
     ) {
-      // We need to suppress the intermittent errors raised by the server due to its view being out of
-      // date while the store ingestion has not yet recovered.
-      loggerFactory.suppressWarningsAndErrors {
-        eventually() {
-          try {
-            svc.closeRound(0)
-          } catch {
-            case _: CommandFailure => fail()
-          }
-        }
-      }
+      svc.closeRound(0)
 
       svc.remoteParticipant.ledger_api.acs
         .filterJava(IssuingMiningRound.COMPANION)(svcParty)

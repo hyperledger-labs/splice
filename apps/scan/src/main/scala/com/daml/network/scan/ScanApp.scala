@@ -10,6 +10,7 @@ import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.config.LocalScanAppConfig
 import com.daml.network.scan.store.ScanCCHistoryStore
 import com.daml.network.scan.v0.ScanServiceGrpc
+import com.daml.network.util.HasHealth
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
@@ -95,8 +96,11 @@ object ScanApp {
       store: ScanCCHistoryStore,
       automation: ScanAutomationService,
       logger: TracedLogger,
-  ) extends AutoCloseable {
-    override def close() =
+  ) extends AutoCloseable
+      with HasHealth {
+    override def isHealthy: Boolean = storage.isActive && automation.isHealthy
+
+    override def close(): Unit =
       Lifecycle.close(
         storage,
         store,

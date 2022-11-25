@@ -36,6 +36,7 @@ class ScanAutomationService(
       "Scan:ReadCoinTransactionsService",
       new CoinTransactionsIngestionSink(svcParty, connection, store, loggerFactory),
       connection,
+      retryProvider,
       loggerFactory,
       timeouts,
     )
@@ -46,6 +47,7 @@ class ScanAutomationService(
       "Scan:ReadReferenceData",
       new ReferenceDataIngestionSink(svcParty, store, loggerFactory),
       connection,
+      retryProvider,
       loggerFactory,
       timeouts,
     )

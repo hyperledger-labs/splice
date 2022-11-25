@@ -12,6 +12,7 @@ import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.directory.v0.DirectoryServiceGrpc
 import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.util.HasHealth
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
@@ -115,8 +116,11 @@ object DirectoryApp {
       store: DirectoryStore,
       scanConnection: ScanConnection,
       logger: TracedLogger,
-  ) extends AutoCloseable {
-    override def close() =
+  ) extends AutoCloseable
+      with HasHealth {
+    override def isHealthy: Boolean = storage.isActive && automation.isHealthy
+
+    override def close(): Unit =
       Lifecycle.close(
         automation,
         storage,

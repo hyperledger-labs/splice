@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.Identifier
 import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.util.HasHealth
 import com.digitalasset.canton.config.RequireTypes.{InstanceName, Port}
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
@@ -19,7 +20,7 @@ import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
 /** A running instance of a canton node */
-abstract class CoinNode[State <: AutoCloseable](
+abstract class CoinNode[State <: AutoCloseable & HasHealth](
     serviceUser: String,
     remoteParticipant: RemoteParticipantConfig,
     parameters: SharedCoinAppParameters,
@@ -43,7 +44,10 @@ abstract class CoinNode[State <: AutoCloseable](
 
   protected def isInitialized = isInitializedVar.get()
 
-  protected def isActive: Boolean = isInitialized
+  protected def isActive: Boolean = {
+    // initialized and the state reports itself as healthy
+    isInitialized && initializeF.value.exists(_.toOption.exists(_.isHealthy))
+  }
 
   protected def ports: Map[String, Port]
 

@@ -14,6 +14,7 @@ import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.util.HasHealth
 import com.daml.network.validator.admin.api.client.ValidatorConnection
 import com.daml.network.wallet.admin.grpc.GrpcWalletService
 import com.daml.network.wallet.automation.WalletAutomationService
@@ -174,7 +175,10 @@ object WalletApp {
       scanConnection: ScanConnection,
       validatorConnection: ValidatorConnection,
       logger: TracedLogger,
-  ) extends AutoCloseable {
+  ) extends AutoCloseable
+      with HasHealth {
+    override def isHealthy: Boolean = storage.isActive && automation.isHealthy
+
     override def close(): Unit =
       Lifecycle.close(
         automation,

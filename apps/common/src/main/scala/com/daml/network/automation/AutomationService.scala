@@ -5,6 +5,7 @@ import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{KillSwitches, Materializer}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
+import com.daml.network.util.HasHealth
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
@@ -29,29 +30,33 @@ abstract class AutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends FlagCloseableAsync
+) extends HasHealth
+    with FlagCloseableAsync
     with NamedLogging
     with Spanning {
 
-  private[this] val automationServices: AtomicReference[Seq[AutoCloseable]] = new AtomicReference(
-    Seq.empty
-  )
+  private[this] val backgroundServices: AtomicReference[Seq[HasHealth & AutoCloseable]] =
+    new AtomicReference(
+      Seq.empty
+    )
+
+  override def isHealthy: Boolean = backgroundServices.get().forall(_.isHealthy)
+
+  /** Register a background service orchestrated by and required for this automation service.
+    *
+    * The background service is promptly closed when the automation service is closed.
+    */
+  final protected def registerService(service: HasHealth & AutoCloseable): Unit = {
+    val _ = backgroundServices.getAndUpdate(_.prepended(service))
+    ()
+  }
+
+  private[this] val resources: AtomicReference[Seq[AutoCloseable]] = new AtomicReference(Seq.empty)
 
   /** Register a resource that should be promptly closed when closing the automation service. */
   final protected def registerResource[T <: AutoCloseable](resource: T): T = {
-    val _ = automationServices.getAndUpdate(_.prepended(resource))
+    val _ = resources.getAndUpdate(_.prepended(resource))
     resource
-  }
-
-  /** Special case of 'registerResource' for registering a service that
-    * runs in the background and should be promptly closed when closing the automation service.
-    *
-    * Kept separate from 'registerResource' to simplify calling it, and to prepare for future
-    * extensions where extra information about a registered service is tracked by the automation service.
-    */
-  final protected def registerService(service: AutoCloseable): Unit = {
-    val _ = registerResource(service)
-    ()
   }
 
   /** Register a task handler driven from a source of tasks. */
@@ -145,9 +150,13 @@ abstract class AutomationService(
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
     Seq[AsyncOrSyncCloseable](
       SyncCloseable(
-        "Automation services",
-        Lifecycle.close(automationServices.get(): _*)(logger),
-      )
+        "Background services",
+        Lifecycle.close(backgroundServices.get(): _*)(logger),
+      ),
+      SyncCloseable(
+        "Resources",
+        Lifecycle.close(resources.get(): _*)(logger),
+      ),
     )
 }
 
@@ -162,7 +171,8 @@ object AutomationService {
       override val timeouts: ProcessingTimeout,
   )(implicit
       mat: Materializer
-  ) extends FlagCloseableAsync
+  ) extends HasHealth
+      with FlagCloseableAsync
       // TODO(#790): review logging
       with NamedLogging
       with NoTracing {
@@ -178,6 +188,8 @@ object AutomationService {
         // was processed
         .toMat(Sink.ignore)(Keep.both),
     )
+
+    override def isHealthy: Boolean = !completed.isCompleted
 
     override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
       Seq[AsyncOrSyncCloseable](

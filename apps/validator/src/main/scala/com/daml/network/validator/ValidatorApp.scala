@@ -10,7 +10,7 @@ import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinNode, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.{CoinUtil, UploadablePackage}
+import com.daml.network.util.{CoinUtil, HasHealth, UploadablePackage}
 import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
 import com.daml.network.validator.automation.ValidatorAutomationService
 import com.daml.network.validator.config.{AppInstance, LocalValidatorAppConfig}
@@ -297,8 +297,11 @@ object ValidatorApp {
       automation: ValidatorAutomationService,
       scanConnection: ScanConnection,
       logger: TracedLogger,
-  ) extends AutoCloseable {
-    override def close() =
+  ) extends AutoCloseable
+      with HasHealth {
+    override def isHealthy: Boolean = storage.isActive && automation.isHealthy
+
+    override def close(): Unit =
       Lifecycle.close(
         automation,
         store,

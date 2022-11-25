@@ -11,6 +11,7 @@ import com.daml.network.splitwise.automation.SplitwiseAutomationService
 import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
 import com.daml.network.splitwise.store.SplitwiseStore
 import com.daml.network.splitwise.v0.SplitwiseServiceGrpc
+import com.daml.network.util.HasHealth
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
@@ -110,8 +111,11 @@ object SplitwiseApp {
       store: SplitwiseStore,
       scanConnection: ScanConnection,
       logger: TracedLogger,
-  ) extends AutoCloseable {
-    override def close() =
+  ) extends AutoCloseable
+      with HasHealth {
+    override def isHealthy: Boolean = storage.isActive && automation.isHealthy
+
+    override def close(): Unit =
       Lifecycle.close(
         automation,
         storage,
