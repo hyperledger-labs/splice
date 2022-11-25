@@ -230,18 +230,6 @@ template WalletAppInstall
       controller walletServiceParty
       do exercise cid $ TransferOffer_Expire actor
 
-    nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Cancel : ()
-      with
-        cid : ContractId AcceptedTransferOffer
-      controller walletServiceParty
-      do exercise cid $ AcceptedTransferOffer_Cancel
-
-    nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Withdraw : ()
-      with
-        cid : ContractId AcceptedTransferOffer
-      controller walletServiceParty
-      do exercise cid $ AcceptedTransferOffer_Withdraw
-
     nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Expire : ()
       with
         cid : ContractId AcceptedTransferOffer

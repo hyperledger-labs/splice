@@ -63,16 +63,6 @@ testTransferOffers = script do
   offer <- createOffer 4.0 "to be withdrawn" t
   submitMulti [walletServiceParty] [alice.primaryParty] $ exerciseCmd aliceInstall WalletAppInstall_TransferOffer_Withdraw with cid = offer
 
-  offer <- createOffer 5.0 "To be cancelled post-acceptance" t
-  accepted <- submitMulti [walletServiceParty] [bob.primaryParty] $ exerciseCmd bobInstall
-        WalletAppInstall_TransferOffer_Accept with cid = offer
-  submitMulti [walletServiceParty] [alice.primaryParty] $ exerciseCmd aliceInstall WalletAppInstall_AcceptedTransferOffer_Cancel with cid = accepted
-
-  offer <- createOffer 6.0 "To be withdrawn post-acceptance" t
-  accepted <- submitMulti [walletServiceParty] [bob.primaryParty] $ exerciseCmd bobInstall
-        WalletAppInstall_TransferOffer_Accept with cid = offer
-  submitMulti [walletServiceParty] [bob.primaryParty] $ exerciseCmd bobInstall WalletAppInstall_AcceptedTransferOffer_Withdraw with cid = accepted
-
   offer <- createOffer 7.0 "To expire, and archived by bob" t
   passTime (minutes 6)
   t <- getTime

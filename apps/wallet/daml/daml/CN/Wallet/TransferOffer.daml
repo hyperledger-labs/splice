@@ -87,16 +87,6 @@ template AcceptedTransferOffer
         result <- API.exercisePaymentTransfer transferContext transfer
         return $ fmap extractSenderChange result
 
-    choice AcceptedTransferOffer_Cancel : ()
-      controller sender
-      do
-        pure ()
-      
-    choice AcceptedTransferOffer_Withdraw : ()
-      controller receiver
-      do
-        pure ()
-
     choice AcceptedTransferOffer_Expire : ()
       with
         actor : Party
