@@ -36,30 +36,30 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
   def retryForAutomation[T](
       operationName: String,
       task: => Future[T],
-      flagCloseable: FlagCloseable,
+      callingService: FlagCloseable,
       additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): Future[T] =
-    retry(operationName, task, flagCloseable, retryForAutomationConfig, additionalCodes)
+    retry(operationName, task, callingService, retryForAutomationConfig, additionalCodes)
 
   /** A retry intended for client calls, thus timing out relatively quickly. */
   def retryForClientCalls[T](
       operationName: String,
       task: => Future[T],
-      flagCloseable: FlagCloseable,
+      callingService: FlagCloseable,
       additionalCodes: Seq[Status.Code] = Seq.empty,
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): Future[T] =
-    retry(operationName, task, flagCloseable, retryForClientCallsConfig, additionalCodes)
+    retry(operationName, task, callingService, retryForClientCallsConfig, additionalCodes)
 
   private def retry[T](
       operationName: String,
       task: => Future[T],
-      flagCloseable: FlagCloseable,
+      callingService: FlagCloseable,
       retryConfig: RetryConfig,
       additionalCodes: Seq[Status.Code],
   )(implicit
@@ -69,8 +69,8 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
     implicit val success: Success[T] = Success.always
 
     Backoff(
-      logger,
-      flagCloseable,
+      loggerFactory.getTracedLogger(callingService.getClass),
+      callingService,
       retryConfig.maxRetries,
       retryConfig.initialDelay,
       retryConfig.maxDelay,

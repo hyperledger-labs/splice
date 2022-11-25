@@ -71,12 +71,11 @@ abstract class AutomationService(
       withNewTrace(name) { implicit traceContext => _ =>
         // TODO(#790): try out switching to show"my $prettyReq" interpolator
         logger.info(s"Running operation ${name.singleQuoted} for\n$prettiedReq")
-        // TODO(#790): retryProvider should take an explicit logger as the argument to provide better precision as to who initiated the logging
         retryProvider
           .retryForAutomation(
             name,
             handler0(req)(traceContext),
-            flagCloseable = this,
+            callingService = this,
           )
           .transform {
             case Success(outcome) =>
