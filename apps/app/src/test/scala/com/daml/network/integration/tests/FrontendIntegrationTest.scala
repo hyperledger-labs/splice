@@ -24,6 +24,7 @@ import java.nio.file.Paths
 import java.text.SimpleDateFormat
 import java.time.Duration
 import java.util.Calendar
+import java.util.concurrent.atomic.AtomicLong
 import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.jdk.OptionConverters.*
@@ -90,7 +91,12 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
     for { name <- frontendNames.toSeq } {
       System.setProperty(
         FirefoxDriver.SystemProperty.BROWSER_LOGFILE,
-        Paths.get("log", s"browser.${this.getClass.getName}.${name}.log").toString,
+        Paths
+          .get(
+            "log",
+            s"browser.${this.getClass.getName}.${name}.${FrontendIntegrationTest.counter.getAndIncrement()}.log",
+          )
+          .toString,
       )
       val logger = loggerFactory.append("web-frontend", name).getLogger(getClass)
       val webDriver = eventually() {
@@ -173,4 +179,9 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
     s"${entry} (${full.substring(0, 4)}...${full.substring(full.length - 4)})"
   }
 
+}
+
+object FrontendIntegrationTest {
+  // counter to generate unique log-file names as otherwise each new test overwrites the previous one's log
+  val counter = new AtomicLong(0)
 }
