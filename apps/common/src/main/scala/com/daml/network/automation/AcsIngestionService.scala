@@ -47,7 +47,7 @@ class AcsIngestionService(
   /** Ingests the ACS and returns the offset of the ACS, as of which the transaction stream should be read. */
   private def ingestAcs()(implicit traceContext: TraceContext): Future[String] = {
     for {
-      // TODO(#790): stream contracts instead of ingesting them as a single Seq
+      // TODO(M3-83): stream contracts instead of ingesting them as a single Seq
       (evs, off) <- connection.activeContractsWithOffset(txFilter)
       _ <- ingestionSink.ingestActiveContracts(evs)
       offsetAsString = off match {

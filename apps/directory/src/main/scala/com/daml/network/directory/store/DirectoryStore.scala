@@ -101,7 +101,6 @@ trait DirectoryStore extends AutoCloseable {
   def listEntries(): Future[QueryResult[
     Seq[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
   ]] =
-    // TODO(#790): add limit
     acsStore.listContracts(directoryCodegen.DirectoryEntry.COMPANION)
 
   /** All install requests to the provider.

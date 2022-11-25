@@ -67,10 +67,8 @@ abstract class AutomationService(
       handler0: T => TraceContext => Future[String]
   ): Unit = {
     def handler(req: T): Future[Unit] = {
-      lazy val prettiedReq = (req: PrettyPrinting).toString
       withNewTrace(name) { implicit traceContext => _ =>
-        // TODO(#790): try out switching to show"my $prettyReq" interpolator
-        logger.info(s"Running operation ${name.singleQuoted} for\n$prettiedReq")
+        logger.info(show"Running operation ${name.singleQuoted} for\n$req")
         retryProvider
           .retryForAutomation(
             name,
@@ -79,17 +77,19 @@ abstract class AutomationService(
           )
           .transform {
             case Success(outcome) =>
-              logger.info(s"Completed operation ${name.singleQuoted} with outcome: $outcome")
+              logger.info(
+                show"Completed operation ${name.singleQuoted} with outcome: ${outcome.unquoted}"
+              )
               Success(())
             case Failure(ex) =>
               if (this.isClosing)
                 logger.info(
-                  s"Ignoring failure of operation ${name.singleQuoted}, as we are shutting down",
+                  show"Ignoring failure of operation ${name.singleQuoted}, as we are shutting down",
                   ex,
                 )
               else
                 logger.error(
-                  s"Operation ${name.singleQuoted} failed fatally and is skipped due to",
+                  show"Operation ${name.singleQuoted} failed fatally and is skipped due to",
                   ex,
                 )
 
@@ -178,20 +178,15 @@ object AutomationService {
       mat: Materializer
   ) extends HasHealth
       with FlagCloseableAsync
-      // TODO(#790): review logging
+      // TODO(#1747): review logging
       with NamedLogging
       with NoTracing {
 
     val (killSwitch, completed) = AkkaUtil.runSupervised(
       logger.error("Fatally failed to handle task", _),
       source
-        // we place the kill switch before the map operator, such that
-        // we can shut down the operator quickly and signal upstream to cancel further sending
         .viaMat(KillSwitches.single)(Keep.right)
-        .mapAsync(parallelism = config.parallelism)(processTask)
-        // and we get the Future[Done] as completed from the sink so we know when the last message
-        // was processed
-        .toMat(Sink.ignore)(Keep.both),
+        .toMat(Sink.foreachAsync(parallelism = config.parallelism)(processTask))(Keep.both),
     )
 
     override def isHealthy: Boolean = !completed.isCompleted

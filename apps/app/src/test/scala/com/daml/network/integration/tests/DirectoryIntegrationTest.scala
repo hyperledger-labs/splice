@@ -66,7 +66,6 @@ class DirectoryIntegrationTest extends CoinIntegrationTest {
       // and thus results in 'handleDirectoryInstallRequest' handlers being aborted due to shutdown.
       directoryValidator.remoteParticipant.ledger_api.transactions
         .flat(Set(aliceUserParty), completeAfter = 1, beginOffset = offsetBefore)
-    // TODO(#790): figure out how to assert on at least one of the handleDirectoryInstallRequest automation services getting aborted
     }
 
     "accept unique install requests" in { implicit env =>
@@ -195,7 +194,6 @@ class DirectoryIntegrationTest extends CoinIntegrationTest {
             }
 
             // Wait for both of them
-            // TODO(#790): check how one could write an assertion that command dedup is triggered
             Seq(aliceF.futureValue, bobF.futureValue)
           },
           {

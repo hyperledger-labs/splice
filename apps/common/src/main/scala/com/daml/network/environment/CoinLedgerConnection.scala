@@ -63,7 +63,7 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       commands: Seq[Command],
   )(implicit traceContext: TraceContext): Future[Transaction]
 
-  // TODO(#790): make this the default, and name 'submitCommand' -> 'submitCommandNoDedup'; and introduce the submitResult variant
+  // TODO(#1750): make this the default, and name 'submitCommand' -> 'submitCommandNoDedup'; and introduce the submitResult variant
   def submitCommandsWithDedup(
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
@@ -205,7 +205,6 @@ object CoinLedgerConnection {
         )
       }
 
-      // TODO(#790): make this the default, and name 'submitCommand' -> 'submitCommandNoDedup'; and introduce the submitResult variant
       def submitCommandsWithDedup(
           actAs: Seq[PartyId],
           readAs: Seq[PartyId],

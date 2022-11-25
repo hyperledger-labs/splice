@@ -101,7 +101,6 @@ class DirectoryAutomationService(
           )
           val acceptCmd = req.contractId
             .exerciseDirectoryInstallRequest_Accept(arg)
-          // TODO(#790): should we really discard the result here? if yes, can we avoid parsing it?
           connection
             .submitCommandsWithDedup(
               actAs = Seq(provider),

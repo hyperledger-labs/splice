@@ -26,7 +26,7 @@ class InMemoryEndUserWalletStore(
       logAllStateUpdates = false,
     )
 
-  // TODO(#790): review tracing strategy for setup steps
+  // TODO(#1747): review tracing strategy for setup steps
   noTracingLogger.debug(s"Created InMemoryEndUserWalletStore for $key")
 
   val acsStore: AcsStore = inMemoryAcsStore

@@ -181,9 +181,9 @@ class DirectoryStoreTest extends AsyncWordSpec with BaseTest {
     } yield store
   }
 
-  // TODO(#790): test queries running concurrently with ingestion
-  // TODO(#790): test queries before and after ingesting a transaction
-  // TODO(#790): review test coverage in general
+  // TODO(#1748): test queries running concurrently with ingestion
+  // TODO(#1748): test queries before and after ingesting a transaction
+  // TODO(#1748): review test coverage in general
 
   "Directory app store" should {
 

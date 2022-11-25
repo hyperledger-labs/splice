@@ -64,7 +64,6 @@ class SplitwiseAutomationService(
           case QueryResult(off, None) =>
             val acceptCmd =
               req.contractId.exerciseSplitwiseInstallRequest_Accept().commands.asScala.toSeq
-            // TODO(#790): should we really discard the result here? if yes, can we avoid parsing it?
             connection
               .submitCommandsWithDedup(
                 actAs = Seq(provider),
