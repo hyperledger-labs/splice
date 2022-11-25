@@ -11,7 +11,7 @@ import com.daml.ledger.javaapi.data.codegen.{
 import com.daml.network.auth.AuthInterceptor
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
-import com.daml.network.codegen.java.cc.{coin => coinCodegen}
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_AcceptedAppPayment
 import com.daml.network.codegen.java.cn.wallet.install.{
   CoinOperationOutcome,
@@ -20,10 +20,11 @@ import com.daml.network.codegen.java.cn.wallet.install.{
 }
 import com.daml.network.codegen.java.cn.wallet.payment.{Currency, PaymentQuantity}
 import com.daml.network.codegen.java.cn.wallet.{
-  install => installCodegen,
-  payment => walletCodegen,
-  paymentchannel => channelCodegen,
-  subscriptions => subsCodegen,
+  install as installCodegen,
+  payment as walletCodegen,
+  paymentchannel as channelCodegen,
+  subscriptions as subsCodegen,
+  transferoffer as transferOffersCodegen,
 }
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
@@ -35,7 +36,16 @@ import com.daml.network.wallet.treasury.{
   TreasuryServices,
 }
 import com.daml.network.wallet.v0
-import com.daml.network.wallet.v0.{CollectRewardsRequest, WalletServiceGrpc}
+import com.daml.network.wallet.v0.{
+  AcceptTransferOfferRequest,
+  AcceptTransferOfferResponse,
+  CollectRewardsRequest,
+  CreateTransferOfferRequest,
+  CreateTransferOfferResponse,
+  ListAcceptedTransferOffersResponse,
+  ListTransferOffersResponse,
+  WalletServiceGrpc,
+}
 import com.daml.network.v0 as networkV0
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
@@ -756,6 +766,112 @@ class GrpcWalletService(
             )
           )
         })(user, _ => Empty())
+      }
+    }
+
+  override def createTransferOffer(
+      request: CreateTransferOfferRequest
+  ): Future[CreateTransferOfferResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      withAuth { user =>
+        exerciseWalletAction((installCid, _) => {
+          val receiver = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
+          val quantity = Proto.tryDecode(Proto.JavaBigDecimal)(request.quantity)
+          val expiresAt = Proto.tryDecode(Proto.Timestamp)(request.expiresAt)
+          Future.successful(
+            installCid.exerciseWalletAppInstall_CreateTransferOffer(
+              receiver.toProtoPrimitive,
+              new PaymentQuantity(quantity, Currency.CC),
+              request.description,
+              expiresAt,
+            )
+          )
+        })(
+          user,
+          cid => v0.CreateTransferOfferResponse(Proto.encodeContractId(cid.exerciseResult)),
+        )
+      }
+    }
+
+  override def listTransferOffers(
+      request: Empty
+  ): Future[ListTransferOffersResponse] =
+    listContracts(
+      transferOffersCodegen.TransferOffer.COMPANION,
+      v0.ListTransferOffersResponse(_),
+    )
+
+  override def acceptTransferOffer(
+      request: AcceptTransferOfferRequest
+  ): Future[AcceptTransferOfferResponse] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      withAuth { user =>
+        exerciseWalletAction((installCid, _) => {
+          val requestCid =
+            Proto.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
+              request.offerContractId
+            )
+          Future.successful(
+            installCid.exerciseWalletAppInstall_TransferOffer_Accept(
+              requestCid
+            )
+          )
+        })(
+          user,
+          cid => v0.AcceptTransferOfferResponse(Proto.encodeContractId(cid.exerciseResult)),
+        )
+      }
+    }
+
+  override def listAcceptedTransferOffers(
+      request: Empty
+  ): Future[ListAcceptedTransferOffersResponse] =
+    listContracts(
+      transferOffersCodegen.AcceptedTransferOffer.COMPANION,
+      v0.ListAcceptedTransferOffersResponse(_),
+    )
+
+  override def rejectTransferOffer(
+      request: v0.RejectTransferOfferRequest
+  ): Future[Empty] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      withAuth { user =>
+        exerciseWalletAction((installCid, _) => {
+          val requestCid =
+            Proto.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
+              request.offerContractId
+            )
+          Future.successful(
+            installCid.exerciseWalletAppInstall_TransferOffer_Reject(
+              requestCid
+            )
+          )
+        })(
+          user,
+          _ => Empty(),
+        )
+      }
+    }
+
+  override def withdrawTransferOffer(
+      request: v0.WithdrawTransferOfferRequest
+  ): Future[Empty] =
+    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
+      withAuth { user =>
+        exerciseWalletAction((installCid, _) => {
+          val requestCid =
+            Proto.tryDecodeJavaContractId(transferOffersCodegen.TransferOffer.COMPANION)(
+              request.offerContractId
+            )
+          Future.successful(
+            installCid.exerciseWalletAppInstall_TransferOffer_Withdraw(
+              requestCid
+            )
+          )
+        })(
+          user,
+          _ => Empty(),
+        )
       }
     }
 

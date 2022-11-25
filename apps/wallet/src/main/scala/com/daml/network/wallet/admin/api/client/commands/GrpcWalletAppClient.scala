@@ -1,17 +1,25 @@
 package com.daml.network.wallet.admin.api.client.commands
 
-import cats.syntax.either._
-import cats.syntax.traverse._
-import com.daml.network.codegen.java.cc.{coin => coinCodegen}
+import cats.syntax.either.*
+import cats.syntax.traverse.*
+import com.daml.ledger.client.binding.Primitive
+import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cn.wallet.transferoffer.TransferOffer
 import com.daml.network.codegen.java.cn.wallet.{
-  payment => walletCodegen,
-  paymentchannel => channelCodegen,
-  subscriptions => subsCodegen,
+  payment as walletCodegen,
+  paymentchannel as channelCodegen,
+  subscriptions as subsCodegen,
+  transferoffer as transferOfferCodegen,
 }
 import com.daml.network.util.{JavaContract => Contract, Proto}
 import com.daml.network.wallet.v0
 import com.daml.network.wallet.v0.WalletServiceGrpc.WalletServiceStub
-import com.daml.network.wallet.v0.{GetBalanceRequest, GetBalanceResponse}
+import com.daml.network.wallet.v0.{
+  CreateTransferOfferRequest,
+  CreateTransferOfferResponse,
+  GetBalanceRequest,
+  GetBalanceResponse,
+}
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
@@ -804,6 +812,180 @@ object GrpcWalletAppClient {
         response: Empty
     ): Either[String, Unit] =
       Right(())
+  }
+
+  case class CreateTransferOffer(
+      receiver: PartyId,
+      quantity: BigDecimal,
+      description: String,
+      expiresAt: Primitive.Timestamp,
+  ) extends BaseCommand[
+        v0.CreateTransferOfferRequest,
+        v0.CreateTransferOfferResponse,
+        transferOfferCodegen.TransferOffer.ContractId,
+      ] {
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: CreateTransferOfferRequest,
+    ): Future[CreateTransferOfferResponse] = service.createTransferOffer(request)
+
+    override def createRequest(): Either[String, CreateTransferOfferRequest] =
+      Right(
+        v0.CreateTransferOfferRequest(
+          Proto.encode(receiver),
+          Proto.encode(quantity),
+          description,
+          Proto.encode(expiresAt),
+        )
+      )
+
+    override def handleResponse(
+        response: CreateTransferOfferResponse
+    ): Either[String, TransferOffer.ContractId] =
+      Proto.decodeJavaContractId(transferOfferCodegen.TransferOffer.COMPANION)(
+        response.offerContractId
+      )
+  }
+
+  case class ListTransferOffers()
+      extends BaseCommand[
+        Empty,
+        v0.ListTransferOffersResponse,
+        Seq[Contract[
+          transferOfferCodegen.TransferOffer.ContractId,
+          transferOfferCodegen.TransferOffer,
+        ]],
+      ] {
+
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: Empty,
+    ): Future[v0.ListTransferOffersResponse] = service.listTransferOffers(request)
+
+    override def handleResponse(
+        response: v0.ListTransferOffersResponse
+    ): Either[String, Seq[Contract[
+      transferOfferCodegen.TransferOffer.ContractId,
+      transferOfferCodegen.TransferOffer,
+    ]]] =
+      response.offers
+        .traverse(req => Contract.fromProto(transferOfferCodegen.TransferOffer.COMPANION)(req))
+        .leftMap(_.toString)
+  }
+
+  case class AcceptTransferOffer(
+      requestId: transferOfferCodegen.TransferOffer.ContractId
+  ) extends BaseCommand[
+        v0.AcceptTransferOfferRequest,
+        v0.AcceptTransferOfferResponse,
+        transferOfferCodegen.AcceptedTransferOffer.ContractId,
+      ] {
+
+    override def createRequest(): Either[String, v0.AcceptTransferOfferRequest] =
+      Right(
+        v0.AcceptTransferOfferRequest(
+          offerContractId = Proto.encodeContractId(requestId)
+        )
+      )
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.AcceptTransferOfferRequest,
+    ): Future[v0.AcceptTransferOfferResponse] =
+      service.acceptTransferOffer(request)
+
+    override def handleResponse(
+        response: v0.AcceptTransferOfferResponse
+    ): Either[String, transferOfferCodegen.AcceptedTransferOffer.ContractId] =
+      Proto.decodeJavaContractId(transferOfferCodegen.AcceptedTransferOffer.COMPANION)(
+        response.acceptedOfferContractId
+      )
+  }
+
+  case class ListAcceptedTransferOffers()
+      extends BaseCommand[
+        Empty,
+        v0.ListAcceptedTransferOffersResponse,
+        Seq[Contract[
+          transferOfferCodegen.AcceptedTransferOffer.ContractId,
+          transferOfferCodegen.AcceptedTransferOffer,
+        ]],
+      ] {
+
+    override def createRequest(): Either[String, Empty] =
+      Right(Empty())
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: Empty,
+    ): Future[v0.ListAcceptedTransferOffersResponse] = service.listAcceptedTransferOffers(request)
+
+    override def handleResponse(
+        response: v0.ListAcceptedTransferOffersResponse
+    ): Either[String, Seq[Contract[
+      transferOfferCodegen.AcceptedTransferOffer.ContractId,
+      transferOfferCodegen.AcceptedTransferOffer,
+    ]]] =
+      response.acceptedOffers
+        .traverse(req =>
+          Contract.fromProto(transferOfferCodegen.AcceptedTransferOffer.COMPANION)(req)
+        )
+        .leftMap(_.toString)
+  }
+
+  case class RejectTransferOffer(
+      requestId: transferOfferCodegen.TransferOffer.ContractId
+  ) extends BaseCommand[
+        v0.RejectTransferOfferRequest,
+        Empty,
+        Unit,
+      ] {
+
+    override def createRequest(): Either[String, v0.RejectTransferOfferRequest] =
+      Right(
+        v0.RejectTransferOfferRequest(
+          offerContractId = Proto.encodeContractId(requestId)
+        )
+      )
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.RejectTransferOfferRequest,
+    ): Future[Empty] =
+      service.rejectTransferOffer(request)
+
+    override def handleResponse(
+        response: Empty
+    ): Either[String, Unit] = Right(())
+  }
+
+  case class WithdrawTransferOffer(
+      requestId: transferOfferCodegen.TransferOffer.ContractId
+  ) extends BaseCommand[
+        v0.WithdrawTransferOfferRequest,
+        Empty,
+        Unit,
+      ] {
+
+    override def createRequest(): Either[String, v0.WithdrawTransferOfferRequest] =
+      Right(
+        v0.WithdrawTransferOfferRequest(
+          offerContractId = Proto.encodeContractId(requestId)
+        )
+      )
+
+    override def submitRequest(
+        service: WalletServiceStub,
+        request: v0.WithdrawTransferOfferRequest,
+    ): Future[Empty] =
+      service.withdrawTransferOffer(request)
+
+    override def handleResponse(
+        response: Empty
+    ): Either[String, Unit] = Right(())
   }
 
   case class ListAppRewards()

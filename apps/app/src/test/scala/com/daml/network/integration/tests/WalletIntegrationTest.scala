@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
@@ -15,6 +16,7 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.daml.network.util.{CoinTestUtil, Proto}
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
+import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
@@ -22,6 +24,8 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.{DiscardOps, HasExecutionContext}
 import org.slf4j.event.Level
 
+import java.time.Instant
+import java.time.temporal.ChronoUnit
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -362,6 +366,65 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
           aliceRemoteWallet.cancelSubscription(subscriptionStateId2),
         )("no more subscriptions exist", _ => aliceRemoteWallet.listSubscriptions() shouldBe empty)
       }
+
+    "allow two users to make direct transfers between them" in { implicit env =>
+      // val aliceUserParty =
+      onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
+      val bobUserParty = onboardWalletUser(this, bobRemoteWallet, bobValidator)
+
+      val expiration = Primitive.Timestamp
+        .discardNanos(Instant.now().plus(1, ChronoUnit.MINUTES))
+        .getOrElse(fail("Failed to convert timestamp"))
+
+      val shortExpiration = Primitive.Timestamp
+        .discardNanos(Instant.now().plus(5, ChronoUnit.SECONDS))
+        .getOrElse(fail("Failed to convert timestamp"))
+
+      val offer =
+        aliceRemoteWallet.createTransferOffer(bobUserParty, 1.0, "direct transfer test", expiration)
+      val offer2 =
+        aliceRemoteWallet.createTransferOffer(bobUserParty, 2.0, "to be rejected", expiration)
+      val offer3 =
+        aliceRemoteWallet.createTransferOffer(bobUserParty, 3.0, "to be withdrawn", expiration)
+
+      eventually() {
+        aliceRemoteWallet.listTransferOffers().length shouldBe 3
+        bobRemoteWallet.listTransferOffers().length shouldBe 3
+      }
+
+      bobRemoteWallet.acceptTransferOffer(offer)
+
+      eventually() {
+        // TODO(#1730): for now, we just check that an accepted offer has been created. Once accepted offers are automatically completed, replace this with waiting for the transfer to actually go through
+        aliceRemoteWallet.listTransferOffers().length shouldBe 2
+        aliceRemoteWallet.listAcceptedTransferOffers().length shouldBe 1
+        bobRemoteWallet.listTransferOffers().length shouldBe 2
+        bobRemoteWallet.listAcceptedTransferOffers().length shouldBe 1
+      }
+
+      bobRemoteWallet.rejectTransferOffer(offer2)
+      aliceRemoteWallet.withdrawTransferOffer(offer3)
+
+      eventually() {
+        aliceRemoteWallet.listTransferOffers().length shouldBe 0
+        aliceRemoteWallet.listAcceptedTransferOffers().length shouldBe 1
+        bobRemoteWallet.listTransferOffers().length shouldBe 0
+        bobRemoteWallet.listAcceptedTransferOffers().length shouldBe 1
+      }
+
+      val offer4 =
+        aliceRemoteWallet.createTransferOffer(bobUserParty, 4.0, "to expire", shortExpiration)
+      eventually() {
+        aliceRemoteWallet.listTransferOffers().length shouldBe 1
+      }
+      Threading.sleep(10000)
+      // TODO(#1731): Once expiration is automation, replace this with waiting for the offer to disappear
+      loggerFactory.assertThrowsAndLogs[CommandFailure](
+        bobRemoteWallet.acceptTransferOffer(offer4),
+        a => a.errorMessage should include("The requirement 'Offer has not expired' was not met."),
+      )
+
+    }
 
     "allow two users to create a payment channel and use it for a transfer" in { implicit env =>
       val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)

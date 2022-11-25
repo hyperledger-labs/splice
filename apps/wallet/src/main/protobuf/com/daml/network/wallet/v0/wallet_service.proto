@@ -37,6 +37,13 @@ service WalletService {
   rpc RejectOnChannelPaymentRequest (RejectOnChannelPaymentRequestRequest) returns (google.protobuf.Empty);
   rpc WithdrawOnChannelPaymentRequest (WithdrawOnChannelPaymentRequestRequest) returns (google.protobuf.Empty);
 
+  rpc CreateTransferOffer (CreateTransferOfferRequest) returns (CreateTransferOfferResponse);
+  rpc ListTransferOffers (google.protobuf.Empty) returns (ListTransferOffersResponse);
+  rpc AcceptTransferOffer (AcceptTransferOfferRequest) returns (AcceptTransferOfferResponse);
+  rpc ListAcceptedTransferOffers (google.protobuf.Empty) returns (ListAcceptedTransferOffersResponse);
+  rpc RejectTransferOffer (RejectTransferOfferRequest) returns (google.protobuf.Empty);
+  rpc WithdrawTransferOffer (WithdrawTransferOfferRequest) returns (google.protobuf.Empty);
+
   rpc ListAppRewards (ListAppRewardsRequest) returns (ListAppRewardsResponse);
   rpc ListValidatorRewards (ListValidatorRewardsRequest) returns (ListValidatorRewardsResponse);
   rpc CollectRewards (CollectRewardsRequest) returns (google.protobuf.Empty);
@@ -215,6 +222,54 @@ message ExecuteDirectTransferRequest {
 
   // Quantity of CC to transfer.
   string quantity = 2;
+}
+
+message CreateTransferOfferRequest {
+  // Receiver to whom to offer a transfer
+  string receiver_party_id = 1;
+
+  // Quantity of CC to transfer.
+  string quantity = 2;
+
+  // A textual description of the transfer
+  string description = 3;
+
+  // Expiration time for the offer (in epoch microseconds)
+  uint64 expires_at = 4;
+}
+
+message CreateTransferOfferResponse {
+  string offer_contract_id = 1;
+}
+
+message ListTransferOffersRequest {
+}
+
+message ListTransferOffersResponse {
+  repeated com.daml.network.v0.Contract offers = 1;
+}
+
+message AcceptTransferOfferRequest {
+  string offer_contract_id = 1;
+}
+
+message AcceptTransferOfferResponse {
+  string accepted_offer_contract_id = 1;
+}
+
+message ListAcceptedTransferOffersRequest {
+}
+
+message ListAcceptedTransferOffersResponse {
+  repeated com.daml.network.v0.Contract accepted_offers = 1;
+}
+
+message RejectTransferOfferRequest {
+  string offer_contract_id = 1;
+}
+
+message WithdrawTransferOfferRequest {
+  string offer_contract_id = 1;
 }
 
 message ListAppRewardsRequest {

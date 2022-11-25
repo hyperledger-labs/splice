@@ -1,11 +1,13 @@
 package com.daml.network.console
 
+import com.daml.ledger.client.binding.Primitive
 import com.daml.network.auth.{AuthUtil, JwtCallCredential}
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   payment as walletCodegen,
   paymentchannel as channelCodegen,
   subscriptions as subsCodegen,
+  transferoffer as transferOfferCodegen,
 }
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.util.JavaContract as Contract
@@ -373,6 +375,96 @@ abstract class WalletAppReference(
     consoleEnvironment.run {
       adminCommand(
         GrpcWalletAppClient.WithdrawOnChannelPaymentRequest(requestId),
+        callCredentials,
+      )
+    }
+  }
+
+  @Help.Summary("Offer a transfer to another party")
+  @Help.Description("Creates a transfer offer, to be accepted by the receiver")
+  def createTransferOffer(
+      receiver: PartyId,
+      quantity: BigDecimal,
+      description: String,
+      expiresAt: Primitive.Timestamp,
+  ): transferOfferCodegen.TransferOffer.ContractId =
+    consoleEnvironment.run {
+      adminCommand(
+        GrpcWalletAppClient.CreateTransferOffer(receiver, quantity, description, expiresAt),
+        callCredentials,
+      )
+    }
+
+  @Help.Summary("List active transfer offers")
+  @Help.Description(
+    "Shows both incoming and outgoing transfer offers."
+  )
+  def listTransferOffers(): Seq[
+    Contract[
+      transferOfferCodegen.TransferOffer.ContractId,
+      transferOfferCodegen.TransferOffer,
+    ]
+  ] = {
+    consoleEnvironment.run {
+      adminCommand(GrpcWalletAppClient.ListTransferOffers(), callCredentials)
+    }
+  }
+
+  @Help.Summary("Accept a transfer offer.")
+  @Help.Description(
+    "Accept a specific offer for a direct transfer."
+  )
+  def acceptTransferOffer(
+      offerId: transferOfferCodegen.TransferOffer.ContractId
+  ): transferOfferCodegen.AcceptedTransferOffer.ContractId = {
+    consoleEnvironment.run {
+      adminCommand(
+        GrpcWalletAppClient.AcceptTransferOffer(offerId),
+        callCredentials,
+      )
+    }
+  }
+
+  @Help.Summary("List accepted transfer offers")
+  @Help.Description(
+    "Shows accepted transfer offers where the user is either a receiver or a sender."
+  )
+  def listAcceptedTransferOffers(): Seq[
+    Contract[
+      transferOfferCodegen.AcceptedTransferOffer.ContractId,
+      transferOfferCodegen.AcceptedTransferOffer,
+    ]
+  ] = {
+    consoleEnvironment.run {
+      adminCommand(GrpcWalletAppClient.ListAcceptedTransferOffers(), callCredentials)
+    }
+  }
+
+  @Help.Summary("Reject a transfer offer.")
+  @Help.Description(
+    "Reject a specific offer for a direct transfer (as the receiver)."
+  )
+  def rejectTransferOffer(
+      offerId: transferOfferCodegen.TransferOffer.ContractId
+  ): Unit = {
+    consoleEnvironment.run {
+      adminCommand(
+        GrpcWalletAppClient.RejectTransferOffer(offerId),
+        callCredentials,
+      )
+    }
+  }
+
+  @Help.Summary("Withdraw a transfer offer.")
+  @Help.Description(
+    "Withdraw a specific offer for a direct transfer (as the sender)."
+  )
+  def withdrawTransferOffer(
+      offerId: transferOfferCodegen.TransferOffer.ContractId
+  ): Unit = {
+    consoleEnvironment.run {
+      adminCommand(
+        GrpcWalletAppClient.WithdrawTransferOffer(offerId),
         callCredentials,
       )
     }

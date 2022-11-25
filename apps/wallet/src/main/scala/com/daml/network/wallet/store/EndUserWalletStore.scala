@@ -17,6 +17,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   payment => walletCodegen,
   paymentchannel => channelCodegen,
   subscriptions => subsCodegen,
+  transferoffer => transferOffersCodegen,
 }
 import com.daml.network.environment.CoinRetries
 import com.daml.network.store.AcsStore
@@ -273,6 +274,17 @@ object EndUserWalletStore {
         mkFilter(channelCodegen.PaymentChannel.COMPANION)(co => channelFilter(co.payload)),
         mkFilter(channelCodegen.OnChannelPaymentRequest.COMPANION)(co =>
           // We track requests for both sender and receiver, as both have to be displayed in the UI
+          co.payload.svc == svc &&
+            (co.payload.sender == endUser ||
+              co.payload.receiver == endUser)
+        ),
+        // Transfer offers
+        mkFilter(transferOffersCodegen.TransferOffer.COMPANION)(co =>
+          co.payload.svc == svc &&
+            (co.payload.sender == endUser ||
+              co.payload.receiver == endUser)
+        ),
+        mkFilter(transferOffersCodegen.AcceptedTransferOffer.COMPANION)(co =>
           co.payload.svc == svc &&
             (co.payload.sender == endUser ||
               co.payload.receiver == endUser)
