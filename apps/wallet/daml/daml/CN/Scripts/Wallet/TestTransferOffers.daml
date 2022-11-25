@@ -7,7 +7,6 @@ import qualified CC.API.V1.Coin as API
 import CC.Coin
 import CN.Wallet.Install
 import CN.Wallet.Payment
-import CN.Wallet.TransferOffer
 
 import CC.Scripts.Util
 
@@ -25,67 +24,86 @@ testTransferOffers = script do
   tap app alice 15.0
 
   t <- getTime
-  install <- submitMulti [walletServiceParty, alice.primaryParty, validator] [] $ createCmd $ WalletAppInstall with
+  aliceInstall <- submitMulti [walletServiceParty, alice.primaryParty, validator] [] $ createCmd $ WalletAppInstall with
     walletServiceParty = walletServiceParty
     endUserParty = alice.primaryParty
-    endUserName = "wallet_service_participant_user"
+    endUserName = "alice"
     svcParty = app.svc
     validatorParty = validator
 
-  let createOffer quantity description curTime = submitMulti [walletServiceParty, alice.primaryParty] [] $ exerciseCmd install 
+  bobInstall <- submitMulti [walletServiceParty, bob.primaryParty, validator] [] $ createCmd $ WalletAppInstall with
+    walletServiceParty = walletServiceParty
+    endUserParty = bob.primaryParty
+    endUserName = "bob"
+    svcParty = app.svc
+    validatorParty = validator
+
+  let createOffer quantity description curTime = submitMulti [walletServiceParty] [alice.primaryParty] $ exerciseCmd aliceInstall 
         WalletAppInstall_CreateTransferOffer with
           receiver = bob.primaryParty
           quantity = PaymentQuantity quantity CC
           description = description
           expiresAt = curTime `addRelTime` minutes 5
 
-  let completeTransfer accepted coin transferContext = submitMulti [walletServiceParty] [validator, alice.primaryParty] $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+  let completeTransfer accepted coin transferContext = submitMulti [walletServiceParty] [alice.primaryParty, validator] $ exerciseCmd aliceInstall WalletAppInstall_ExecuteBatch with
         inputs = [API.InputCoin $ toInterfaceContractId coin]
         operations = [CO_CompleteAcceptedTransfer accepted]
         context = transferContext
 
-  [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.quantity.initialQuantity > 2.5)
-  transferContext <- getPaymentTransferContext app alice
-
   offer <- createOffer 2.0 " transfer test" t
-  accepted <- submit bob.primaryParty $ exerciseCmd offer TransferOffer_Accept
+  accepted <- submitMulti [walletServiceParty] [bob.primaryParty] $ exerciseCmd bobInstall
+        WalletAppInstall_TransferOffer_Accept with cid = offer
   [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.quantity.initialQuantity > 2.5)
   transferContext <- getPaymentTransferContext app alice
   outcomes <- completeTransfer accepted coin transferContext
 
   offer <- createOffer 3.0 "to be rejected" t
-  submit bob.primaryParty $ exerciseCmd offer TransferOffer_Reject
+  submitMulti [walletServiceParty] [bob.primaryParty] $ exerciseCmd bobInstall WalletAppInstall_TransferOffer_Reject with cid = offer
 
   offer <- createOffer 4.0 "to be withdrawn" t
-  submit alice.primaryParty $ exerciseCmd offer TransferOffer_Withdraw
+  submitMulti [walletServiceParty] [alice.primaryParty] $ exerciseCmd aliceInstall WalletAppInstall_TransferOffer_Withdraw with cid = offer
 
   offer <- createOffer 5.0 "To be cancelled post-acceptance" t
-  accepted <- submit bob.primaryParty $ exerciseCmd offer TransferOffer_Accept
-  submit alice.primaryParty $ exerciseCmd accepted AcceptedTransferOffer_Cancel
+  accepted <- submitMulti [walletServiceParty] [bob.primaryParty] $ exerciseCmd bobInstall
+        WalletAppInstall_TransferOffer_Accept with cid = offer
+  submitMulti [walletServiceParty] [alice.primaryParty] $ exerciseCmd aliceInstall WalletAppInstall_AcceptedTransferOffer_Cancel with cid = accepted
 
   offer <- createOffer 6.0 "To be withdrawn post-acceptance" t
-  accepted <- submit bob.primaryParty $ exerciseCmd offer TransferOffer_Accept
-  submit bob.primaryParty $ exerciseCmd accepted AcceptedTransferOffer_Withdraw
+  accepted <- submitMulti [walletServiceParty] [bob.primaryParty] $ exerciseCmd bobInstall
+        WalletAppInstall_TransferOffer_Accept with cid = offer
+  submitMulti [walletServiceParty] [bob.primaryParty] $ exerciseCmd bobInstall WalletAppInstall_AcceptedTransferOffer_Withdraw with cid = accepted
 
   offer <- createOffer 7.0 "To expire, and archived by bob" t
   passTime (minutes 6)
   t <- getTime
-  submitMustFail bob.primaryParty $ exerciseCmd offer TransferOffer_Accept
-  submit bob.primaryParty $ exerciseCmd offer TransferOffer_Expire with actor=bob.primaryParty
+  submitMultiMustFail [walletServiceParty] [bob.primaryParty] $ exerciseCmd bobInstall
+        WalletAppInstall_TransferOffer_Accept with cid = offer
+  submitMulti [walletServiceParty] [bob.primaryParty] $ exerciseCmd bobInstall
+        WalletAppInstall_TransferOffer_Expire with
+          cid = offer
+          actor = bob.primaryParty
 
   offer <- createOffer 7.5 "To expire, and archived by alice" t
   passTime (minutes 6)
   t <- getTime
-  submitMustFail bob.primaryParty $ exerciseCmd offer TransferOffer_Accept
-  submit alice.primaryParty $ exerciseCmd offer TransferOffer_Expire with actor=alice.primaryParty
+  submitMultiMustFail [walletServiceParty] [bob.primaryParty] $ exerciseCmd bobInstall
+        WalletAppInstall_TransferOffer_Accept with cid = offer
+  submitMulti [walletServiceParty] [alice.primaryParty] $ exerciseCmd aliceInstall
+        WalletAppInstall_TransferOffer_Expire with
+          cid = offer
+          actor = alice.primaryParty
 
   offer <- createOffer 8.0 "To expire post-acceptance" t
-  accepted <- submit bob.primaryParty $ exerciseCmd offer TransferOffer_Accept
+  accepted <- submitMulti [walletServiceParty] [bob.primaryParty] $ exerciseCmd bobInstall
+        WalletAppInstall_TransferOffer_Accept with cid = offer
   passTime (minutes 6)
   [(coin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.quantity.initialQuantity > 2.5)
   transferContext <- getPaymentTransferContext app alice
   outcomes <- completeTransfer accepted coin transferContext
   let [COO_Error errorMsg] = outcomes
-  submit alice.primaryParty $ exerciseCmd accepted AcceptedTransferOffer_Expire with actor=alice.primaryParty
+  submitMulti [walletServiceParty] [alice.primaryParty] $ exerciseCmd aliceInstall
+        WalletAppInstall_AcceptedTransferOffer_Expire with
+          cid = accepted
+          actor = alice.primaryParty
 
   pure ()

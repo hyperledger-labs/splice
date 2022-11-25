@@ -205,6 +205,50 @@ template WalletAppInstall
           svc = svcParty
           ..
 
+    nonconsuming choice WalletAppInstall_TransferOffer_Accept : ContractId AcceptedTransferOffer
+      with
+        cid : ContractId TransferOffer
+      controller walletServiceParty
+      do exercise cid TransferOffer_Accept
+
+    nonconsuming choice WalletAppInstall_TransferOffer_Reject : ()
+      with
+        cid : ContractId TransferOffer
+      controller walletServiceParty
+      do exercise cid TransferOffer_Reject
+
+    nonconsuming choice WalletAppInstall_TransferOffer_Withdraw : ()
+      with
+        cid : ContractId TransferOffer
+      controller walletServiceParty
+      do exercise cid TransferOffer_Withdraw
+
+    nonconsuming choice WalletAppInstall_TransferOffer_Expire : ()
+      with
+        cid : ContractId TransferOffer
+        actor : Party
+      controller walletServiceParty
+      do exercise cid $ TransferOffer_Expire actor
+
+    nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Cancel : ()
+      with
+        cid : ContractId AcceptedTransferOffer
+      controller walletServiceParty
+      do exercise cid $ AcceptedTransferOffer_Cancel
+
+    nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Withdraw : ()
+      with
+        cid : ContractId AcceptedTransferOffer
+      controller walletServiceParty
+      do exercise cid $ AcceptedTransferOffer_Withdraw
+
+    nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Expire : ()
+      with
+        cid : ContractId AcceptedTransferOffer
+        actor : Party
+      controller walletServiceParty
+      do exercise cid $ AcceptedTransferOffer_Expire actor
+
     -- TODO(#1351): Remove this
     nonconsuming choice WalletAppInstall_CoinRules_TryTransfer : API.TransferResult
       with
