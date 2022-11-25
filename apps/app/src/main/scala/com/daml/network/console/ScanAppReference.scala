@@ -99,6 +99,15 @@ final class LocalScanAppReference(
   @Help.Summary("Return local scan app config")
   override def config: LocalScanAppConfig =
     coinConsoleEnvironment.environment.config.scansByString(name)
+
+  /** Remote participant this scan app is configured to interact with. */
+  val remoteParticipant =
+    new CoinRemoteParticipantReference(
+      coinConsoleEnvironment,
+      s"remote participant for `$name``",
+      name,
+      config.remoteParticipant,
+    )
 }
 
 /** Remote reference to a scan app in the style of CoinRemoteParticipantReference, i.e.,
