@@ -8,15 +8,7 @@ import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
 import com.digitalasset.canton.config.RequireTypes.NonEmptyString
-import com.digitalasset.canton.config.{
-  CantonCommunityConfig,
-  ClientConfig,
-  ClockConfig,
-  CommunityAdminServerConfig,
-  NodeConfig,
-  NonNegativeDuration,
-  SequencerConnectionConfig,
-}
+import com.digitalasset.canton.config.*
 import com.digitalasset.canton.domain.config.{
   CommunityDomainConfig,
   CommunityPublicServerConfig,
@@ -30,7 +22,6 @@ import com.digitalasset.canton.participant.config.{
 }
 import monocle.macros.syntax.lens.*
 
-import java.util.UUID
 import scala.collection.mutable
 import scala.concurrent.duration.*
 import scala.io.Source
@@ -64,7 +55,7 @@ object CoinConfigTransforms {
     */
   def addDamlNameSuffix(context: String): CoinConfigTransform = { config =>
     {
-      val suffix = s"${context}".toLowerCase
+      val suffix = context.toLowerCase
 
       val config1 = updateSvcAppConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config)
       val config2 = updateScanAppConfig(c => c.copy(svcUser = s"${c.svcUser}-$suffix"))(config1)
@@ -118,9 +109,8 @@ object CoinConfigTransforms {
     * val validatorParty = validatorParticipant.parties.enable(validatorUserName)
     */
   def ensureNovelDamlNames(): CoinConfigTransform = { config =>
-    val id = UUID.randomUUID().toString()
-    val shortId = id.take(8)
-    addConfigName(shortId)(addDamlNameSuffix(id)(config))
+    val id = (new scala.util.Random).nextInt().toHexString
+    addConfigName(id)(addDamlNameSuffix(id)(config))
   }
 
   /** Default transforms to apply to tests using a [[CoinEnvironmentDefinition]].
@@ -131,7 +121,6 @@ object CoinConfigTransforms {
   def defaults(testContextNameSuffix: String): Seq[CoinConfigTransform] = {
     Seq(
       makeAllTimeoutsBounded,
-      addDamlNameSuffix(testContextNameSuffix),
       ensureNovelDamlNames(),
       useAdminAuthTokensForRemoteParticipants(),
       enableLedgerApiAuthForLocalParticipants("test"),
