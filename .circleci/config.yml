@@ -805,7 +805,9 @@ jobs:
            export GOOGLE_CLOUD_PROJECT=da-cn-images
            VERSION=$(version-gen)
            (cd /tmp/artifacts ; for filename in *.tar.gz; do mv "$filename" "${VERSION}_${filename}"; done)
-           gsutil cp /tmp/artifacts/*.tar.gz gs://release-bundles
+           # we cp with -n so that it doesn't try to overwrite an already uploaded bundle with this version,
+           # which would lead to an error due to a misisng `delete` permission
+           gsutil cp -n /tmp/artifacts/*.tar.gz gs://release-bundles
 
       - cleanup_sbt_test_job
 
