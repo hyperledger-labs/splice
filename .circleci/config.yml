@@ -362,6 +362,7 @@ commands:
           cmd_name: Send name of each failing test to datadog
           cmd: |
             python3 .circleci/canton-scripts/collect_failing_tests_and_send_to_datadog.py
+          cmd_retry_count: 5
 
   run_bash_command_in_nix:
     parameters:
@@ -604,6 +605,7 @@ commands:
             set -eou pipefail
             export KUBECONFIG=$PWD/.kubecfg
             cncluster activate
+          cmd_retry_count: 5
       - run:
           # Separate command since running this outside of nix is easier.
           name: Setup VPN Routes - Adding new routes
@@ -808,7 +810,7 @@ jobs:
            # we cp with -n so that it doesn't try to overwrite an already uploaded bundle with this version,
            # which would lead to an error due to a misisng `delete` permission
            gsutil cp -n /tmp/artifacts/*.tar.gz gs://release-bundles
-
+         # we're not adding a cmd_retry_count here because of the `mv` above and because gsutil cp has a retry mechanism of its own
       - cleanup_sbt_test_job
 
   deployment_test:
@@ -845,6 +847,7 @@ jobs:
             set -eou pipefail
             cncluster activate
             cncluster ciapply
+          cmd_retry_count: 5
       - notify-cluster-fail:
           cluster: << parameters.cluster >>
 
@@ -873,6 +876,7 @@ jobs:
           cmd: |
             cncluster activate
             cncluster wait
+          cmd_retry_count: 5
       - checkout_cluster_version:
           cluster: <<parameters.cluster>>
       # Needs to occur after `checkout_cluster_version` so we hit the right cache because sbt
@@ -952,6 +956,7 @@ jobs:
            (yes || true) | gcloud auth configure-docker us-central1-docker.pkg.dev
            export PATH=$HOME/.daml/bin:$PATH
            make -C cluster docker-push
+         cmd_retry_count: 5
       - cleanup_sbt_test_job
 
   docker_images_build:
