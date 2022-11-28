@@ -41,7 +41,7 @@ private[validator] object ValidatorUtil {
         store.lookupWalletInstallByName(endUserName).flatMap {
           case QueryResult(off, None) =>
             connection
-              .submitCommandsWithDedup(
+              .submitCommands(
                 actAs = Seq(validatorServiceParty, walletServiceParty, endUserParty),
                 readAs = Seq.empty,
                 commands = new walletCodegen.WalletAppInstall(

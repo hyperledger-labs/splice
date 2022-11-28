@@ -57,14 +57,8 @@ import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success}
 
 trait CoinLedgerSubmit extends FlagCloseableAsync {
-  def submitCommands(
-      actAs: Seq[PartyId],
-      readAs: Seq[PartyId],
-      commands: Seq[Command],
-  )(implicit traceContext: TraceContext): Future[Transaction]
 
-  // TODO(#1750): make this the default, and name 'submitCommand' -> 'submitCommandNoDedup'; and introduce the submitResult variant
-  def submitCommandsWithDedup(
+  def submitCommands(
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
       commands: Seq[Command],
@@ -72,13 +66,20 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
       deduplicationOffset: String,
   )(implicit traceContext: TraceContext): Future[Transaction]
 
-  def submitWithResult[T](
+  // TODO(M3-60): review all uses of command submission w/o deduplication
+  def submitCommandsNoDedup(
+      actAs: Seq[PartyId],
+      readAs: Seq[PartyId],
+      commands: Seq[Command],
+  )(implicit traceContext: TraceContext): Future[Transaction]
+
+  def submitWithResultNoDedup[T](
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
       update: Update[T],
   )(implicit traceContext: TraceContext): Future[T]
 
-  def submitWithResultAndOffset[T](
+  def submitWithResultAndOffsetNoDedup[T](
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
       update: Update[T],
@@ -189,7 +190,7 @@ object CoinLedgerConnection {
       implicit private def as: ActorSystem = coinLedgerClient.actorSystem
       implicit private def ec: ExecutionContextExecutor = coinLedgerClient.executionContextExecutor
 
-      def submitCommands(
+      def submitCommandsNoDedup(
           actAs: Seq[PartyId],
           readAs: Seq[PartyId],
           commands: Seq[Command],
@@ -205,7 +206,7 @@ object CoinLedgerConnection {
         )
       }
 
-      def submitCommandsWithDedup(
+      def submitCommands(
           actAs: Seq[PartyId],
           readAs: Seq[PartyId],
           commands: Seq[Command],
@@ -223,14 +224,14 @@ object CoinLedgerConnection {
         )
       }
 
-      def submitWithResult[T](
+      def submitWithResultNoDedup[T](
           actAs: Seq[PartyId],
           readAs: Seq[PartyId],
           update: Update[T],
       )(implicit traceContext: TraceContext): Future[T] =
-        submitWithResultAndOffset(actAs, readAs, update).map(_._2)
+        submitWithResultAndOffsetNoDedup(actAs, readAs, update).map(_._2)
 
-      def submitWithResultAndOffset[T](
+      def submitWithResultAndOffsetNoDedup[T](
           actAs: Seq[PartyId],
           readAs: Seq[PartyId],
           update: Update[T],

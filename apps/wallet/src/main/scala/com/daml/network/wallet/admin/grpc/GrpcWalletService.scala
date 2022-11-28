@@ -469,6 +469,7 @@ class GrpcWalletService(
   ): Future[v0.ProposePaymentChannelResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth { user =>
+        // TODO(M3-02): this command should use command dedup, and the same will hold for proposing a transfer offer.
         exerciseWalletAction((installCid, userStore) => {
           val receiver = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
           val proposer = userStore.key.endUserParty.toProtoPrimitive
@@ -661,6 +662,7 @@ class GrpcWalletService(
   ): Future[v0.CreateOnChannelPaymentRequestResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth { user =>
+        // TODO(M3-02): the command below should use command dedup. However, we'll remove payment requests, which will resolve that problem.
         exerciseWalletAction((installCid, userStore) => {
           val senderParty = Proto.tryDecode(Proto.Party)(request.senderPartyId)
           val svcParty = userStore.key.svcParty
@@ -1021,7 +1023,7 @@ class GrpcWalletService(
       install <- getUserInstallContract(userStore, userParty)
       update <- getUpdate(install.contractId, userStore)
       result <- connection
-        .submitWithResult(
+        .submitWithResultNoDedup(
           Seq(walletServiceParty),
           Seq(validatorParty, userParty),
           update,

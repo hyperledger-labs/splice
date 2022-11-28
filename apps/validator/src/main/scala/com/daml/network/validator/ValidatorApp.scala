@@ -185,7 +185,7 @@ class ValidatorApp(
           _ <- (coinRulesResult, coinRulesRequestResult) match {
             case (QueryResult(off1, None), QueryResult(off2, None)) =>
               connection
-                .submitCommandsWithDedup(
+                .submitCommands(
                   actAs = Seq(validatorParty),
                   readAs = Seq.empty,
                   commands = coinRulesReq.create.commands.asScala.toSeq,

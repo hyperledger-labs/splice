@@ -54,7 +54,7 @@ object CoinUtil {
       lookupValidatorRightByParty(user).flatMap {
         case QueryResult(off, None) =>
           connection
-            .submitCommandsWithDedup(
+            .submitCommands(
               actAs = Seq(validator, user),
               readAs = Seq.empty,
               commands = createValidatorRightCommand(svc, validator, user),

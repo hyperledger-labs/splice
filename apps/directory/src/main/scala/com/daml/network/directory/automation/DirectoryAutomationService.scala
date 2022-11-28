@@ -87,7 +87,7 @@ class DirectoryAutomationService(
           val cmd = req.contractId
             .exerciseDirectoryInstallRequest_Reject()
           connection
-            .submitCommands(Seq(provider), Seq(), cmd.commands.asScala.toSeq)
+            .submitCommandsNoDedup(Seq(provider), Seq(), cmd.commands.asScala.toSeq)
             .map(_ => "rejected request for already existing installation.")
 
         case QueryResult(off, None) =>
@@ -102,7 +102,7 @@ class DirectoryAutomationService(
           val acceptCmd = req.contractId
             .exerciseDirectoryInstallRequest_Accept(arg)
           connection
-            .submitCommandsWithDedup(
+            .submitCommands(
               actAs = Seq(provider),
               readAs = Seq(),
               commands = acceptCmd.commands.asScala.toSeq,
@@ -125,7 +125,7 @@ class DirectoryAutomationService(
         val cmd = req.contractId
           .exerciseDirectoryEntryRequest_Reject(arg)
         connection
-          .submitCommands(Seq(provider), Seq(), cmd.commands.asScala.toSeq)
+          .submitCommandsNoDedup(Seq(provider), Seq(), cmd.commands.asScala.toSeq)
           .map(_ => s"rejected request: $reason")
       }
       store.lookupInstall(user).flatMap {
@@ -146,7 +146,7 @@ class DirectoryAutomationService(
               val cmd = install.contractId
                 .exerciseDirectoryInstall_RequestEntryPayment(arg)
               connection
-                .submitCommands(Seq(provider), Seq(), cmd.commands.asScala.toSeq)
+                .submitCommandsNoDedup(Seq(provider), Seq(), cmd.commands.asScala.toSeq)
                 .map(_ => "requested payment for entry request.")
           }
       }
@@ -163,9 +163,9 @@ class DirectoryAutomationService(
       )
       def rejectPayment(reason: String) = {
         logger.warn(s"rejecting accepted app payment: $reason")
-        val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject()
+        val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject().commands.asScala.toSeq
         connection
-          .submitWithResult(Seq(provider), Seq(), cmd)
+          .submitCommandsNoDedup(Seq(provider), Seq(), cmd)
           .map(_ => s"rejected accepted app payment: $reason")
       }
       def collectPayment(
@@ -186,7 +186,7 @@ class DirectoryAutomationService(
               )
               .commands
           _ <- connection
-            .submitCommandsWithDedup(
+            .submitCommands(
               actAs = Seq(provider),
               readAs = Seq.empty,
               commands = cmd.asScala.toSeq,
@@ -231,7 +231,7 @@ class DirectoryAutomationService(
         logger.warn(s"rejecting initial subscription payment: $reason")
         val cmd = payment.contractId.exerciseSubscriptionInitialPayment_Reject()
         connection
-          .submitWithResult(Seq(provider), Seq(), cmd)
+          .submitWithResultNoDedup(Seq(provider), Seq(), cmd)
           .map(_ => s"rejected initial subscription payment: $reason")
       }
       def collectPayment(
@@ -252,7 +252,7 @@ class DirectoryAutomationService(
               )
               .commands
           _ <- connection
-            .submitCommandsWithDedup(
+            .submitCommands(
               actAs = Seq(provider),
               readAs = Seq.empty,
               commands = cmd.asScala.toSeq,
@@ -295,9 +295,9 @@ class DirectoryAutomationService(
       )
       def rejectPayment(reason: String) = {
         logger.warn(s"rejecting subscription payment: $reason")
-        val cmd = payment.contractId.exerciseSubscriptionPayment_Reject()
+        val cmd = payment.contractId.exerciseSubscriptionPayment_Reject().commands
         connection
-          .submitWithResult(Seq(provider), Seq(), cmd)
+          .submitCommandsNoDedup(Seq(provider), Seq(), cmd.asScala.toSeq)
           .map(_ => s"rejected subscription payment: $reason")
       }
       def collectPayment(
@@ -322,7 +322,7 @@ class DirectoryAutomationService(
               )
               .commands
           _ <- connection
-            .submitCommandsWithDedup(
+            .submitCommands(
               actAs = Seq(provider),
               readAs = Seq.empty,
               commands = cmd.asScala.toSeq,
@@ -385,7 +385,7 @@ class DirectoryAutomationService(
             val due_entries_names = due_entries.map(_.payload.name).mkString(", ")
             logger.info(s"Archiving the following expired directory entries: $due_entries_names")
             connection
-              .submitCommands(Seq(provider), Seq(), expire_commands)
+              .submitCommandsNoDedup(Seq(provider), Seq(), expire_commands)
               .map(_ => s"archived expired entries: ${due_entries_names}")
           }
         })

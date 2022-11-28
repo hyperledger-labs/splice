@@ -63,7 +63,8 @@ class GrpcSvcAppService(
             price,
             new v1.round.Round(request.round),
           )
-        cid <- connection.submitWithResult(Seq(store.svcParty), Seq.empty, cmd)
+        // TODO(M1-52): the command below is not safe w/o command dedup. This will though become safe once we change to the joint-open-round-advancement in M1-52.
+        cid <- connection.submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
       } yield v0.OpenRoundResponse(Proto.encodeContractId(cid.exerciseResult))
     }
 
@@ -77,7 +78,7 @@ class GrpcSvcAppService(
         cmd = coinRules.value.contractId
           .exerciseCoinRules_MiningRound_StartSummarizing(openRound)
         cid <-
-          connection.submitWithResult(Seq(store.svcParty), Seq.empty, cmd)
+          connection.submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
       } yield v0.StartSummarizingRoundResponse(Proto.encodeContractId(cid.exerciseResult))
     }
 
@@ -98,7 +99,7 @@ class GrpcSvcAppService(
         cmd = coinRules.value.contractId
           .exerciseCoinRules_MiningRound_StartIssuing(summarizingRound, totalBurn.bigDecimal)
         cid <-
-          connection.submitWithResult(Seq(store.svcParty), Seq.empty, cmd)
+          connection.submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
       } yield v0.StartIssuingRoundResponse(
         Proto.encode(totalBurn),
         Proto.encodeContractId(cid.exerciseResult),
@@ -123,7 +124,7 @@ class GrpcSvcAppService(
               totals.selfTransferOutputs.bigDecimal,
             )
         cid <-
-          connection.submitWithResult(Seq(store.svcParty), Seq.empty, cmd)
+          connection.submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
       } yield v0.CloseRoundResponse(Proto.encodeContractId(cid.exerciseResult))
     }
 
@@ -158,7 +159,7 @@ class GrpcSvcAppService(
         cmd =
           coinRules.value.contractId
             .exerciseCoinRules_MiningRound_Archive(closedRound)
-        _ <- connection.submitWithResult(Seq(store.svcParty), Seq.empty, cmd)
+        _ <- connection.submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
       } yield Empty()
     }
 

@@ -100,7 +100,7 @@ class SvcAutomationService(
                 .asScala
                 .toSeq
               // No command-dedup required, as the CoinRules contract is archived and recreated
-              _ <- connection.submitCommands(Seq(store.svcParty), Seq(), cmds)
+              _ <- connection.submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds)
             } yield s"accepted coin rules request from $validatorParty"
         }
       }

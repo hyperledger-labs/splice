@@ -58,14 +58,14 @@ class SplitwiseAutomationService(
             logger.info(s"Rejecting duplicate install request from user party $user")
             val cmd = req.contractId.exerciseSplitwiseInstallRequest_Reject()
             connection
-              .submitWithResult(Seq(provider), Seq(), cmd)
+              .submitWithResultNoDedup(Seq(provider), Seq(), cmd)
               .map(_ => "rejected request for already existing installation.")
 
           case QueryResult(off, None) =>
             val acceptCmd =
               req.contractId.exerciseSplitwiseInstallRequest_Accept().commands.asScala.toSeq
             connection
-              .submitCommandsWithDedup(
+              .submitCommands(
                 actAs = Seq(provider),
                 readAs = Seq(),
                 commands = acceptCmd,
@@ -94,7 +94,7 @@ class SplitwiseAutomationService(
         logger.warn(msg)
         val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject()
         connection
-          .submitCommands(
+          .submitCommandsNoDedup(
             actAs = Seq(provider),
             readAs = Seq.empty,
             commands = cmd.commands.asScala.toSeq,
@@ -121,7 +121,7 @@ class SplitwiseAutomationService(
             payment.contractId,
             transferContext,
           )
-          _ <- connection.submitCommands(
+          _ <- connection.submitCommandsNoDedup(
             actAs = Seq(provider),
             readAs = readAs.toSeq,
             commands = cmd.commands.asScala.toSeq,
@@ -141,13 +141,13 @@ class SplitwiseAutomationService(
           )
           val cmd = req.contractId.exerciseGroupRequest_Reject()
           connection
-            .submitWithResult(Seq(provider), Seq(), cmd)
+            .submitWithResultNoDedup(Seq(provider), Seq(), cmd)
             .map(_ => "rejected request for already existing group.")
 
         case QueryResult(off, None) =>
           val acceptCmd = req.contractId.exerciseGroupRequest_Accept().commands.asScala.toSeq
           connection
-            .submitCommandsWithDedup(
+            .submitCommands(
               actAs = Seq(provider),
               readAs = Seq(),
               commands = acceptCmd,

@@ -192,7 +192,10 @@ case class EndUserTreasuryService(
           validOperations.map(_.operation).asJava,
         )
       (offset, outcomes) <- connection
-        .submitWithResultAndOffset(
+        // TODO(M3-02): as of 2022-11-25 there are two operations that are not self-conflicting: Tap and DirectTransfer,
+        // which implies that network problems might lead to duplicate 'DirectTransfer' calls. They will be replaced by
+        // TransferOffers as part of M3-02, which will consume the TransferOffer, and thus make the batch-execution w/o command dedup safe.
+        .submitWithResultAndOffsetNoDedup(
           Seq(walletStoreKey.walletServiceParty),
           walletStoreKey.validatorParty +: userStore.key.endUserParty +: readAs.toSeq,
           cmd,

@@ -160,7 +160,7 @@ object SvcApp {
         store.lookupCoinRules().flatMap {
           case QueryResult(off, None) =>
             connection
-              .submitCommandsWithDedup(
+              .submitCommands(
                 actAs = Seq(svc),
                 readAs = Seq.empty,
                 commands = createCoinRulesCmd,
