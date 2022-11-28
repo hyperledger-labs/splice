@@ -16,14 +16,8 @@ service SvcService {
   // Mark the given mining round as summarizing for all validators.
   rpc StartSummarizingRound (StartSummarizingRoundRequest) returns (StartSummarizingRoundResponse);
 
-  // Start issuing for the given mining round for all validators.
-  rpc StartIssuingRound (StartIssuingRoundRequest) returns (StartIssuingRoundResponse);
-
   // Close the given mining round for all validators.
   rpc CloseRound (CloseRoundRequest) returns (CloseRoundResponse);
-
-  // Archive the given mining round for all validators.
-  rpc ArchiveRound (ArchiveRoundRequest) returns (google.protobuf.Empty);
 }
 
 // Contains information useful for debugging a running SVC app.
@@ -70,14 +64,6 @@ message StartSummarizingRoundResponse {
   string summarizing_mining_round_contract_id = 1;
 }
 
-message StartIssuingRoundRequest {
-  int64 round = 1;
-}
-
-message StartIssuingRoundResponse {
-  string total_burn_quantity = 1; // Total burn quantity used to start issuing.
-  string issuing_mining_round_contract_id = 2;
-}
 
 message CloseRoundRequest {
   int64 round = 1;
@@ -87,6 +73,3 @@ message CloseRoundResponse {
   string closed_mining_round_contract_id = 1;
 }
 
-message ArchiveRoundRequest {
-  int64 round = 1;
-}

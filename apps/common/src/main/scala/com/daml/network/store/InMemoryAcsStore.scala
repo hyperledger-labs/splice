@@ -185,6 +185,7 @@ class InMemoryAcsStore(
     offsetAndStateAfterIngestingAcs().map { case (off, st) =>
       val result = st.createEvents.values
         .collect(Function.unlift(ev => fromCreatedEvent(ev)))
+        .filter(filter)
         .toSeq
       QueryResult(off, result)
     }

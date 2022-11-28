@@ -34,7 +34,7 @@ trait SvcStore extends AutoCloseable {
   val acsIngestionSink: AcsStore.IngestionSink
 
   /** The [[com.daml.network.store.AcsStore]] used to back the default implementation of the queries. */
-  protected val acsStore: AcsStore
+  val acsStore: AcsStore
 
   def lookupCoinRules(
   ): Future[
@@ -109,6 +109,8 @@ object SvcStore {
         mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.SummarizingMiningRound.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.AppReward.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.ValidatorReward.COMPANION)(co => co.payload.svc == svc),
       ),
     )
   }

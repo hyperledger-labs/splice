@@ -1,6 +1,7 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.{coin => coinCodegen, round => roundCodegen}
+import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
+import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -130,7 +131,11 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
     // next round.
     svc.openRound(1, 1)
     svc.startSummarizingRound(0)
-    svc.startIssuingRound(0)
+    eventually() {
+      // automation archives the summarizing round and creates the issuing round
+      svc.remoteParticipant.ledger_api.acs
+        .filterJava(SummarizingMiningRound.COMPANION)(svcParty) shouldBe empty
+    }
     // ensure issuing round is open
     advanceTime(Duration.ofMinutes(3))
     aliceWallet.remoteParticipant.ledger_api.acs
@@ -181,7 +186,11 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
     val prevCoins = bobRemoteWallet.list().coins
     svc.openRound(1, 1)
     svc.startSummarizingRound(0)
-    svc.startIssuingRound(0)
+    eventually() {
+      // automation archives the summarizing round and creates the issuing round
+      svc.remoteParticipant.ledger_api.acs
+        .filterJava(SummarizingMiningRound.COMPANION)(svcParty) shouldBe empty
+    }
     // ensure issuing round is open
     advanceTime(Duration.ofMinutes(3))
     eventually() {

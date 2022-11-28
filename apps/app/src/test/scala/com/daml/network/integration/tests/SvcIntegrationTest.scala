@@ -1,9 +1,11 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cc.api.v1.round.Round
-import com.daml.network.codegen.java.cc.coin._
-import com.daml.network.codegen.java.cc.round._
+import com.daml.network.codegen.java.cc.coin.*
+import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
+import com.digitalasset.canton.logging.SuppressionRule
+import org.slf4j.event.Level
 
 import scala.jdk.CollectionConverters.*
 
@@ -13,51 +15,6 @@ class SvcIntegrationTest extends CoinIntegrationTest {
     // TODO(M1-92): share tests for common properties of CoinApps, like restartabilty
     svc.stop()
     svc.startSync()
-  }
-
-  "round management" in { implicit env =>
-    val coinPrice: BigDecimal = 23.0
-
-    // Sync with background automation that onboards validator.
-    eventually()({
-      val requests = svc.remoteParticipant.ledger_api.acs
-        .filterJava(OpenMiningRound.COMPANION)(svcParty)
-      inside(requests) { case Seq(request) =>
-        request.data.observers should have length 4
-      }
-    })
-
-    val summarizingRound = svc.startSummarizingRound(0)
-    svc.remoteParticipant.ledger_api.acs
-      .filterJava(SummarizingMiningRound.COMPANION)(svcParty)
-      .map(_.id) shouldBe Seq(summarizingRound)
-    svc.remoteParticipant.ledger_api.acs
-      .filterJava(OpenMiningRound.COMPANION)(svcParty) shouldBe empty
-
-    val issuingRoundResponse = svc.startIssuingRound(0)
-    svc.remoteParticipant.ledger_api.acs
-      .filterJava(IssuingMiningRound.COMPANION)(svcParty)
-      .map(
-        _.id
-      ) shouldBe Seq(issuingRoundResponse.issuingRound)
-    svc.remoteParticipant.ledger_api.acs
-      .filterJava(SummarizingMiningRound.COMPANION)(svcParty) shouldBe empty
-
-    val closedRound = svc.closeRound(0)
-    svc.remoteParticipant.ledger_api.acs
-      .filterJava(ClosedMiningRound.COMPANION)(svcParty)
-      .map(_.id) shouldBe Seq(closedRound)
-    svc.remoteParticipant.ledger_api.acs
-      .filterJava(IssuingMiningRound.COMPANION)(svcParty) shouldBe empty
-
-    svc.archiveRound(0)
-    svc.remoteParticipant.ledger_api.acs
-      .filterJava(ClosedMiningRound.COMPANION)(svcParty) shouldBe empty
-
-    remoteSvc.openRound(1, coinPrice)
-    inside(svc.remoteParticipant.ledger_api.acs.filterJava(OpenMiningRound.COMPANION)(svcParty)) {
-      case Seq(round) => round.data.round == new Round(1)
-    }
   }
 
   "total burn calculation" in { implicit env =>
@@ -97,7 +54,7 @@ class SvcIntegrationTest extends CoinIntegrationTest {
       new ValidatorReward(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
-        BigDecimal(5.0).bigDecimal,
+        BigDecimal(15.0).bigDecimal,
         new Round(1),
       ),
     )
@@ -107,8 +64,21 @@ class SvcIntegrationTest extends CoinIntegrationTest {
       optTimeout = None,
       commands = rewards.flatMap(_.create.commands.asScala.toSeq),
     )
-    svc.startSummarizingRound(0)
-    val result = svc.startIssuingRound(0)
-    result.totalBurnQuantity shouldBe BigDecimal(1 + 2 + 3 + 4)
+
+    loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+      {
+        svc.startSummarizingRound(0)
+        eventually() {
+          svc.remoteParticipant.ledger_api.acs
+            .filterJava(SummarizingMiningRound.COMPANION)(svcParty) shouldBe empty
+        }
+      },
+      entries =>
+        forAtLeast(1, entries)(
+          _.message should include(
+            s"successfully archived summarizing mining round with burn ${1 + 2 + 3 + 4}"
+          )
+        ),
+    )
   }
 }

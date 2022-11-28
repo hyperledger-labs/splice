@@ -35,28 +35,12 @@ abstract class SvcAppReference(
       adminCommand(GrpcSvcAppClient.StartSummarizingRound(round))
     }
 
-  @Help.Summary("Open the given mining round for issuance for all validators")
-  def startIssuingRound(
-      round: Long
-  ): GrpcSvcAppClient.StartIssuingRoundResponse =
-    consoleEnvironment.run {
-      adminCommand(GrpcSvcAppClient.StartIssuingRound(round))
-    }
-
   @Help.Summary("Close the given mining round for all validators")
   def closeRound(
       round: Long
   ): roundCodegen.ClosedMiningRound.ContractId =
     consoleEnvironment.run {
       adminCommand(GrpcSvcAppClient.CloseRound(round))
-    }
-
-  @Help.Summary("Archive the given mining round for all validators")
-  def archiveRound(
-      round: Long
-  ): Unit =
-    consoleEnvironment.run {
-      adminCommand(GrpcSvcAppClient.ArchiveRound(round))
     }
 
 }

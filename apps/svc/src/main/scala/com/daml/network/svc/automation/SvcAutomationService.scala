@@ -22,9 +22,10 @@ import io.opentelemetry.api.trace.Tracer
 import java.time.temporal.ChronoUnit
 import scala.annotation.nowarn
 import scala.concurrent.duration.*
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
+// TODO(#1430): remove all manual round management commands
 @nowarn("msg=match may not be exhaustive")
 class SvcAutomationService(
     automationConfig: AutomationConfig,
@@ -207,6 +208,47 @@ class SvcAutomationService(
       }
   }
 
+  registerRequestHandler(
+    "archive summarizing rounds and create issuing rounds",
+    store.acsStore.streamContracts(cc.round.SummarizingMiningRound.COMPANION),
+  ) { summarizingRound => implicit tc =>
+    for {
+      rewards <- queryRewards(summarizingRound.payload.round.number)
+      totalBurn = rewards.totalBurn
+      coinRules <- store.getCoinRules()
+      // TODO(tech-debt): consider querying the round audit store (once we have it) and
+      // passing along the opensAt time of the previous IssuingMiningRound
+      // see discussion: https://docs.google.com/document/d/1RAcc4uJKjRtPKDmVglVhqg-y58fCJ7xyljPbwimE-IA/edit?disco=AAAAjyuFFEw
+      cmd = coinRules.value.contractId
+        .exerciseCoinRules_MiningRound_StartIssuing(
+          summarizingRound.contractId,
+          totalBurn.bigDecimal,
+        )
+      cid <-
+        connection.submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
+    } yield Some(
+      s"successfully archived summarizing mining round with burn ${totalBurn} created issuing mining round with cid $cid"
+    )
+  }
+
+  registerRequestHandler(
+    "archive closed rounds and unclaimed rewards",
+    store.acsStore.streamContracts(cc.round.ClosedMiningRound.COMPANION),
+  ) { closedRound => implicit tc =>
+    for {
+      coinRules <- store.getCoinRules()
+      cmd = coinRules.value.contractId
+        .exerciseCoinRules_MiningRound_Archive(
+          closedRound.contractId
+        )
+        .commands
+        .asScala
+        .toSeq
+      _ <-
+        connection.submitCommandsNoDedup(Seq(store.svcParty), Seq.empty, cmd)
+    } yield Some(s"successfully archived closed mining round $closedRound")
+  }
+
   private def getCoinRules()
       : Future[JavaContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]] = {
     store.lookupCoinRules().map(_.value).flatMap {
@@ -222,4 +264,45 @@ class SvcAutomationService(
       case Some(rules) => Future.successful(rules)
     }
   }
+
+  /** The rewards issued for a given round.
+    */
+  private case class RoundRewards(
+      round: Long,
+      appRewards: Seq[JavaContract[cc.coin.AppReward.ContractId, cc.coin.AppReward]],
+      validatorRewards: Seq[
+        JavaContract[cc.coin.ValidatorReward.ContractId, cc.coin.ValidatorReward]
+      ],
+  ) {
+
+    /** Calculate the total burn for the given round based on the rewards issued in that round.
+      */
+    def totalBurn: BigDecimal =
+      appRewards.map[BigDecimal](r => BigDecimal(r.payload.quantity)).sum + validatorRewards
+        .map[BigDecimal](r => BigDecimal(r.payload.quantity))
+        .sum
+  }
+
+  /** Query the open reward contracts for a given round. This should only be used
+    * for a SummarizingMiningRound.
+    */
+  private def queryRewards(round: Long)(implicit ec: ExecutionContext): Future[RoundRewards] =
+    for {
+      appRewards <- store.acsStore.listContracts(
+        cc.coin.AppReward.COMPANION,
+        (c: JavaContract[cc.coin.AppReward.ContractId, cc.coin.AppReward]) =>
+          c.payload.round.number == round,
+      )
+      validatorRewards <- store.acsStore.listContracts(
+        cc.coin.ValidatorReward.COMPANION,
+        (c: JavaContract[cc.coin.ValidatorReward.ContractId, cc.coin.ValidatorReward]) =>
+          c.payload.round.number == round,
+      )
+    } yield {
+      RoundRewards(
+        round = round,
+        appRewards = appRewards.value,
+        validatorRewards = validatorRewards.value,
+      )
+    }
 }

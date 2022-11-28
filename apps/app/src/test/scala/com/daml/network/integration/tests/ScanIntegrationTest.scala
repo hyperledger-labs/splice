@@ -1,13 +1,12 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.api.v1.round.Round
-import com.daml.network.codegen.java.cc.round.ClosedMiningRound
+import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
 import com.daml.network.codegen.java.da
-import com.daml.network.history._
+import com.daml.network.history.*
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
 import com.daml.network.util.{CoinTestUtil, ExerciseNode}
 
-import scala.concurrent.duration._
+import scala.concurrent.duration.*
 
 // TODO(M1-92): Add tests that cover all possible CoinEvents
 class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
@@ -102,7 +101,11 @@ class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
     }
 
     svc.startSummarizingRound(0)
-    svc.startIssuingRound(0)
+    eventually() {
+      // automation archives the summarizing round and creates the issuing round
+      svc.remoteParticipant.ledger_api.acs
+        .filterJava(SummarizingMiningRound.COMPANION)(svcParty) shouldBe empty
+    }
     svc.closeRound(0)
     svc.openRound(1, 1.0)
 
@@ -124,7 +127,11 @@ class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
     svc.openRound(1, 1)
 
     svc.startSummarizingRound(0)
-    svc.startIssuingRound(0)
+    eventually() {
+      // automation archives the summarizing round and creates the issuing round
+      svc.remoteParticipant.ledger_api.acs
+        .filterJava(SummarizingMiningRound.COMPANION)(svcParty) shouldBe empty
+    }
     svc.closeRound(0)
 
     aliceRemoteWallet.executeDirectTransfer(bobUserParty, 29)
@@ -132,41 +139,49 @@ class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
     aliceRemoteWallet.executeDirectTransfer(bobUserParty, 1)
 
     svc.startSummarizingRound(1)
-    svc.startIssuingRound(1)
+    eventually() {
+      // automation archives the summarizing round and creates the issuing round
+      svc.remoteParticipant.ledger_api.acs
+        .filterJava(SummarizingMiningRound.COMPANION)(svcParty) shouldBe empty
+    }
     svc.closeRound(1)
 
-    val closed = scan.getClosedRounds()
-    inside(closed) { case Seq(round1, round0) =>
-      // TODO(M1-92): make this more robust or don't care about exact values at all
-      round0.payload should be(
-        new ClosedMiningRound(
-          svcParty.toProtoPrimitive,
-          new Round(0),
-          BigDecimal(0.58).bigDecimal.setScale(10),
-          BigDecimal(0.2).bigDecimal.setScale(10),
-          BigDecimal(0.0).bigDecimal.setScale(10),
-          BigDecimal(360.705).bigDecimal.setScale(10),
-          BigDecimal(57.71).bigDecimal.setScale(10),
-          BigDecimal(302.215).bigDecimal.setScale(10),
-          round0.payload.observers,
-        )
-      )
-      round1.payload should be(
-        new ClosedMiningRound(
-          svcParty.toProtoPrimitive,
-          new Round(1),
-          BigDecimal(0.39).bigDecimal.setScale(10),
-          BigDecimal(0.3).bigDecimal.setScale(10),
-          BigDecimal(0.0000048225).bigDecimal.setScale(10),
-          BigDecimal(356.8949855325).bigDecimal.setScale(10),
-          BigDecimal(29 + 9 + 1 - 0.195).bigDecimal.setScale(10),
-          BigDecimal(317.3999855325).bigDecimal.setScale(10),
-          round1.payload.observers,
-        )
-      )
-
-    // TODO(#832): do the math and verify that the values above are correct
+    eventually() {
+      scan.getClosedRounds() shouldBe empty
     }
+  // TODO(#1705): Re-enable ~equivalent to the below once we add an audit log store for closed rounds.
+//    val closed = scan.getClosedRounds()
+//    inside(closed) { case Seq(round1, round0) =>
+//      // TODO(M1-92): make this more robust or don't care about exact values at all
+//      round0.payload should be(
+//        new ClosedMiningRound(
+//          svcParty.toProtoPrimitive,
+//          new Round(0),
+//          BigDecimal(0.58).bigDecimal.setScale(10),
+//          BigDecimal(0.2).bigDecimal.setScale(10),
+//          BigDecimal(0.0).bigDecimal.setScale(10),
+//          BigDecimal(360.705).bigDecimal.setScale(10),
+//          BigDecimal(57.71).bigDecimal.setScale(10),
+//          BigDecimal(302.215).bigDecimal.setScale(10),
+//          round0.payload.observers,
+//        )
+//      )
+//      round1.payload should be(
+//        new ClosedMiningRound(
+//          svcParty.toProtoPrimitive,
+//          new Round(1),
+//          BigDecimal(0.39).bigDecimal.setScale(10),
+//          BigDecimal(0.3).bigDecimal.setScale(10),
+//          BigDecimal(0.0000048225).bigDecimal.setScale(10),
+//          BigDecimal(356.8949855325).bigDecimal.setScale(10),
+//          BigDecimal(29 + 9 + 1 - 0.195).bigDecimal.setScale(10),
+//          BigDecimal(317.3999855325).bigDecimal.setScale(10),
+//          round1.payload.observers,
+//        )
+//      )
+
+  // TODO(#832): do the math and verify that the values above are correct
+//    }
   }
 
 }
