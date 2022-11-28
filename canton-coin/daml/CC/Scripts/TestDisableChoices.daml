@@ -1,0 +1,40 @@
+module CC.Scripts.TestDisableChoices where
+
+import DA.Time
+import Daml.Script
+
+import qualified CC.API.V1.Coin as API
+import CC.Coin
+import CC.Scripts.Util
+
+cycleCoinConfig : CCApp -> (CoinConfig USD -> CoinConfig USD) -> Script ()
+cycleCoinConfig app transform = do
+  Some (rulesCid, rules) <- queryCoinRulesByKey app.svc
+  submit app.svc $
+    archiveCmd rulesCid *>
+    createCmd rules with
+      config = transform rules.config
+  pure ()
+
+test : Script ()
+test = do
+  app <- setupApp
+
+  alice <- setupUser app "alice" app.svc
+  bob <- setupUser app "bob" app.svc
+
+  _ <- tap app alice 50.0
+  lockTo1 app alice bob.primaryParty 20.0 (minutes 5) "locktest"
+
+  [(cid, _)] <- query @LockedCoin bob.primaryParty
+
+
+  cycleCoinConfig app (\c -> c { enabledChoices.enable_LockedCoin_Unlock = False })
+  Some (coinRules, _) <- queryCoinRulesByKey app.svc
+  submitMultiMustFail [bob.primaryParty, alice.primaryParty] [app.svc] $ exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_Unlock $ toInterfaceContractId @API.CoinRules coinRules)
+
+  cycleCoinConfig app (\c -> c { enabledChoices.enable_LockedCoin_Unlock = True })
+  Some (coinRules, _) <- queryCoinRulesByKey app.svc
+  submitMulti [bob.primaryParty, alice.primaryParty] [app.svc] $ exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_Unlock $ toInterfaceContractId @API.CoinRules coinRules)
+
+  pure ()

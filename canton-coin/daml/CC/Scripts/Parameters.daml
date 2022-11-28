@@ -3,6 +3,7 @@ module CC.Scripts.Parameters where
 import DA.Time
 
 import CC.Coin
+import qualified CC.API.V1.Coin as API
 import CC.Fees
 
 -- | Default proposal for cost-competitive fees.
@@ -68,3 +69,5 @@ defaultCoinConfig = CoinConfig with
 
     -- Default duration of 2.5 minutes
     tickDuration = seconds 150
+
+    enabledChoices = API.enableAllChoices

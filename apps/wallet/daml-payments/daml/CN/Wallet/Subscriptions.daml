@@ -156,10 +156,12 @@ template SubscriptionInitialPayment
         pure (subscription, state, coin)
 
     choice SubscriptionInitialPayment_Reject : ContractId Coin
+      with
+        transferContext : AppTransferContext
       controller subscriptionData.receiver
       do
         archive subscriptionData.context
-        exercise lockedCoin LockedCoin_Unlock
+        exercise lockedCoin (LockedCoin_Unlock transferContext.coinRules)
 
     choice SubscriptionInititalPayment_Expire : ContractId Coin
       with
@@ -251,13 +253,15 @@ template SubscriptionPayment
         pure (state, coin)
 
     choice SubscriptionPayment_Reject : (ContractId SubscriptionIdleState, ContractId Coin)
+      with
+        transferContext : AppTransferContext
       controller subscriptionData.receiver
       do
         assertSubscriptionMatches subscription subscriptionData
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
           ..
-        coin <- exercise lockedCoin LockedCoin_Unlock
+        coin <- exercise lockedCoin (LockedCoin_Unlock transferContext.coinRules)
         pure (state, coin)
 
     choice SubscriptionPayment_Expire : (ContractId SubscriptionIdleState, ContractId Coin)
@@ -306,7 +310,7 @@ unlockAndTransfer transferContext subscriptionData lockedCoin = do
   let Subscription { sender; receiver; provider; svc } = subscriptionData
 
   -- unlock coin and transfer the remainder to the receiver
-  coin <- exercise lockedCoin LockedCoin_Unlock
+  coin <- exercise lockedCoin (LockedCoin_Unlock transferContext.coinRules)
   let transfer = Transfer with
         sender
         provider

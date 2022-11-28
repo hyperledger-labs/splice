@@ -92,14 +92,15 @@ class SplitwiseAutomationService(
       case QueryResult(_, None) =>
         val msg = s"Install contract not found for sender party $sender"
         logger.warn(msg)
-        val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject()
-        connection
-          .submitCommandsNoDedup(
+        for {
+          transferContext <- scanConnection.getAppTransferContext()
+          cmd = payment.contractId.exerciseAcceptedAppPayment_Reject(transferContext)
+          _ <- connection.submitCommandsNoDedup(
             actAs = Seq(provider),
             readAs = Seq.empty,
             commands = cmd.commands.asScala.toSeq,
           )
-          .map(_ => s"rejected accepted app payment: $msg")
+        } yield s"rejected accepted app payment: $msg"
       case QueryResult(_, Some(install)) =>
         for {
           transferContext <- scanConnection.getAppTransferContext()

@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 module CC.API.V1.Coin where
 
 import DA.Map (Map)
@@ -19,12 +20,14 @@ data LockedCoinView = LockedCoinView with
 interface LockedCoin where
   viewtype LockedCoinView
 
-  lockedCoin_Unlock : Update (ContractId Coin)
+  lockedCoin_Unlock : ContractId CoinRules -> Update (ContractId Coin)
   lockedCoin_OwnerExpireLock : Update (ContractId Coin)
 
   choice LockedCoin_Unlock : ContractId Coin
+    with
+      coinRulesCid : ContractId CoinRules
     controller let v = view this in v.coin.owner :: v.lock.holders
-    do lockedCoin_Unlock this
+    do lockedCoin_Unlock this coinRulesCid
 
   choice LockedCoin_OwnerExpireLock : ContractId Coin
     controller (view this).coin.owner
@@ -60,6 +63,20 @@ data TimeLock = TimeLock with
 
 data CoinRulesView = CoinRulesView with
   svc : Party
+  config : CoinRulesConfigView
+
+data CoinRulesConfigView = CoinRulesConfigView with
+  enabledChoices : EnabledChoices
+
+-- | Configuration that allows us to disable certain choices if we encounter a bug.
+data EnabledChoices = EnabledChoices
+  with
+    enable_LockedCoin_Unlock : Bool
+  deriving (Eq, Ord, Show)
+
+enableAllChoices : EnabledChoices
+enableAllChoices = EnabledChoices with
+  enable_LockedCoin_Unlock = True
 
 interface CoinRules where
   viewtype CoinRulesView

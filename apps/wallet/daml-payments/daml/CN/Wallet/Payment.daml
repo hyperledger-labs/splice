@@ -152,7 +152,7 @@ template AcceptedAppPayment
       controller signatory this
       do
         -- unlock coin and transfer the remainder to the receiver
-        coin <- exercise lockedCoin LockedCoin_Unlock
+        coin <- exercise lockedCoin (LockedCoin_Unlock context.coinRules)
         let transfer = Transfer with
               sender
               provider
@@ -173,9 +173,11 @@ template AcceptedAppPayment
         pure (deliveryOffer, zip receivers coins)
 
     choice AcceptedAppPayment_Reject : ContractId Coin
+      with
+        context : AppTransferContext
       controller map (\r -> r.receiver) ccReceiverQuantities
       do archive deliveryOffer
-         exercise lockedCoin LockedCoin_Unlock
+         exercise lockedCoin (LockedCoin_Unlock context.coinRules)
 
     choice AcceptedAppPayment_Expire : ContractId Coin
       controller sender

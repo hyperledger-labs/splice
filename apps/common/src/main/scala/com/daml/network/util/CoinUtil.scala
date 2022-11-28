@@ -134,6 +134,9 @@ object CoinUtil {
     32,
     // 2.5 min default duration
     new RelTime(150 * 1000000),
+    new cc.api.v1.coin.EnabledChoices(
+      true
+    ),
   )
 
   def holdingFee(

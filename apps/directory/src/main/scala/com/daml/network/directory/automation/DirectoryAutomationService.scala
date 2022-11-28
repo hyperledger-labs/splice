@@ -2,6 +2,7 @@ package com.daml.network.directory.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
+import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.AutomationConfig
@@ -161,9 +162,13 @@ class DirectoryAutomationService(
       val offerId = directoryCodegen.DirectoryEntryOffer.ContractId.unsafeFromInterface(
         payment.payload.deliveryOffer
       )
-      def rejectPayment(reason: String) = {
+      def rejectPayment(reason: String, transferContext: v1.coin.AppTransferContext) = {
         logger.warn(s"rejecting accepted app payment: $reason")
-        val cmd = payment.contractId.exerciseAcceptedAppPayment_Reject().commands.asScala.toSeq
+        val cmd = payment.contractId
+          .exerciseAcceptedAppPayment_Reject(transferContext)
+          .commands
+          .asScala
+          .toSeq
         connection
           .submitCommandsNoDedup(Seq(provider), Seq(), cmd)
           .map(_ => s"rejected accepted app payment: $reason")
@@ -175,16 +180,16 @@ class DirectoryAutomationService(
           ],
           entryName: String,
           offset: String,
+          transferContext: v1.coin.AppTransferContext,
       ) = {
+        val cmd =
+          offer.contractId
+            .exerciseDirectoryEntryOffer_CollectPayment(
+              payment.contractId,
+              transferContext,
+            )
+            .commands
         for {
-          transferContext <- scanConnection.getAppTransferContext()
-          cmd =
-            offer.contractId
-              .exerciseDirectoryEntryOffer_CollectPayment(
-                payment.contractId,
-                transferContext,
-              )
-              .commands
           _ <- connection
             .submitCommands(
               actAs = Seq(provider),
@@ -207,13 +212,17 @@ class DirectoryAutomationService(
           )
         // TODO(M3-90): understand what kind of assertions are worth checking here for defensive programming
         entryName = offer.payload.entryRequest.name
+        transferContext <- scanConnection.getAppTransferContext()
         // check whether the entry already exists
         result <- store.lookupEntryByName(entryName).flatMap {
           case QueryResult(_, Some(entry)) =>
-            rejectPayment(s"entry already exists and owned by ${entry.payload.user}.")
+            rejectPayment(
+              s"entry already exists and owned by ${entry.payload.user}.",
+              transferContext,
+            )
           case QueryResult(off, None) =>
             // collect the payment and create the entry
-            collectPayment(offer, entryName, off)
+            collectPayment(offer, entryName, off, transferContext)
         }
       } yield result
     }
@@ -227,9 +236,9 @@ class DirectoryAutomationService(
       val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
         payment.payload.subscriptionData.context
       )
-      def rejectPayment(reason: String) = {
+      def rejectPayment(reason: String, transferContext: v1.coin.AppTransferContext) = {
         logger.warn(s"rejecting initial subscription payment: $reason")
-        val cmd = payment.contractId.exerciseSubscriptionInitialPayment_Reject()
+        val cmd = payment.contractId.exerciseSubscriptionInitialPayment_Reject(transferContext)
         connection
           .submitWithResultNoDedup(Seq(provider), Seq(), cmd)
           .map(_ => s"rejected initial subscription payment: $reason")
@@ -241,16 +250,16 @@ class DirectoryAutomationService(
           ],
           entryName: String,
           offset: String,
+          transferContext: v1.coin.AppTransferContext,
       ) = {
+        val cmd =
+          contextId
+            .exerciseDirectoryEntryContext_CollectInitialEntryPaymentWithSubscription(
+              payment.contractId,
+              transferContext,
+            )
+            .commands
         for {
-          transferContext <- scanConnection.getAppTransferContext()
-          cmd =
-            contextId
-              .exerciseDirectoryEntryContext_CollectInitialEntryPaymentWithSubscription(
-                payment.contractId,
-                transferContext,
-              )
-              .commands
           _ <- connection
             .submitCommands(
               actAs = Seq(provider),
@@ -271,15 +280,19 @@ class DirectoryAutomationService(
               )
             )
           )
+        transferContext <- scanConnection.getAppTransferContext()
         // TODO(M3-90): understand what kind of assertions are worth checking here for defensive programming
         entryName = context.payload.name
         // check whether the entry already exists
         result <- store.lookupEntryByName(entryName).flatMap {
           case QueryResult(_, Some(entry)) =>
-            rejectPayment(s"entry already exists and owned by ${entry.payload.user}.")
+            rejectPayment(
+              s"entry already exists and owned by ${entry.payload.user}.",
+              transferContext,
+            )
           case QueryResult(off, None) =>
             // collect the payment and create the entry
-            collectPayment(context, entryName, off)
+            collectPayment(context, entryName, off, transferContext)
         }
       } yield result
     }
@@ -293,9 +306,9 @@ class DirectoryAutomationService(
       val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
         payment.payload.subscriptionData.context
       )
-      def rejectPayment(reason: String) = {
+      def rejectPayment(reason: String, transferContext: v1.coin.AppTransferContext) = {
         logger.warn(s"rejecting subscription payment: $reason")
-        val cmd = payment.contractId.exerciseSubscriptionPayment_Reject().commands
+        val cmd = payment.contractId.exerciseSubscriptionPayment_Reject(transferContext).commands
         connection
           .submitCommandsNoDedup(Seq(provider), Seq(), cmd.asScala.toSeq)
           .map(_ => s"rejected subscription payment: $reason")
@@ -310,17 +323,17 @@ class DirectoryAutomationService(
             directoryCodegen.DirectoryEntry,
           ],
           offset: String,
+          transferContext: v1.coin.AppTransferContext,
       ) = {
+        val cmd =
+          contextId
+            .exerciseDirectoryEntryContext_CollectEntryRenewalPaymentWithSubscription(
+              payment.contractId,
+              entry.contractId,
+              transferContext,
+            )
+            .commands
         for {
-          transferContext <- scanConnection.getAppTransferContext()
-          cmd =
-            contextId
-              .exerciseDirectoryEntryContext_CollectEntryRenewalPaymentWithSubscription(
-                payment.contractId,
-                entry.contractId,
-                transferContext,
-              )
-              .commands
           _ <- connection
             .submitCommands(
               actAs = Seq(provider),
@@ -341,15 +354,16 @@ class DirectoryAutomationService(
               )
             )
           )
+        transferContext <- scanConnection.getAppTransferContext()
         // TODO(M3-90): understand what kind of assertions are worth checking here for defensive programming
         entryName = context.payload.name
         // check whether the entry exists
         result <- store.lookupEntryByName(entryName).flatMap {
           case QueryResult(off, Some(entry)) =>
             // collect the payment and renew the entry
-            collectPayment(context, entry, off)
+            collectPayment(context, entry, off, transferContext)
           case QueryResult(_, None) =>
-            rejectPayment("entry doesn't exist.")
+            rejectPayment("entry doesn't exist.", transferContext)
         }
       } yield result
     }

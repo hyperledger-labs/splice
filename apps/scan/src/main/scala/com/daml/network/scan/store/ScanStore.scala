@@ -2,9 +2,9 @@ package com.daml.network.scan.store
 
 import com.daml.ledger.javaapi.data.Template
 import com.daml.ledger.javaapi.data.codegen.{
+  Contract => CodegenContract,
   ContractCompanion,
   ContractId,
-  Contract as CodegenContract,
 }
 import com.daml.network.codegen.java.cc
 import com.daml.network.scan.store.memory.InMemoryScanStore
