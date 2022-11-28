@@ -55,7 +55,7 @@ if (sys.env.getOrElse("GITHUB_TOKEN", "").isEmpty){
   Console.err.println(
     """Error: GITHUB_TOKEN not set
       |
-      |The TODO checker uses the Github cli to fetch the PR description and the list of open Github issues.
+      |The TODO checker uses the Github cli to fetch the PR description, the commits in the PR, and the list of open Github issues.
       |You'll need to create a personal access token and export it from GITHUB_TOKEN for this to work.
       |
       |Please follow
@@ -76,11 +76,13 @@ Console.out.println(
 val fixedIssuesCurrentPR: Set[Int] = {
   prNumO.fold(Set.empty[Int])({ prNum =>
     val prInfo = Seq("hub", "pr", "show", "-f", "%b", prNum).!!
+    val branch = Seq("hub", "pr", "show", "-f", "%H", prNum).!!.trim
+    val commits = Seq("git", "log", s"main..$branch").!!
     val issueCloseKeywords = "((fixes)|(closes))"
     val fixedIssueRegexStr = "(?i)" + issueCloseKeywords + "(\\s+)(#)([0-9]+)"
     val fixedIssueRegex = fixedIssueRegexStr.r
     fixedIssueRegex
-      .findAllMatchIn(prInfo)
+      .findAllMatchIn(prInfo + commits)
       .map(m => "([0-9]+)".r.findFirstMatchIn(m.matched).get.matched.toInt)
       .toSet
   })
