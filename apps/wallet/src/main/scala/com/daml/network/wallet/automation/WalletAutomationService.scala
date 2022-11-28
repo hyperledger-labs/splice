@@ -82,7 +82,7 @@ class WalletAutomationService(
           timeouts,
         )
         treasuryServices.addOrCreateTreasuryService(install, walletStore.key, endUserStore): Unit
-        registerService(ingestionServices, endUserName, ingestionService)
+        Some(registerService(ingestionServices, endUserName, ingestionService))
       }
   })
 
@@ -100,7 +100,7 @@ class WalletAutomationService(
         // join results
         .map(_.flatten.partitionMap(r => r) match {
           case (lefts, rights) => {
-            s"created ${rights.size} subscription payments (${lefts.size} failures)."
+            Some(s"created ${rights.size} subscription payments (${lefts.size} failures).")
           }
         })
     }

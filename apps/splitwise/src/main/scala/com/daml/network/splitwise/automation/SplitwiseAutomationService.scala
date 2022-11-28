@@ -59,7 +59,7 @@ class SplitwiseAutomationService(
             val cmd = req.contractId.exerciseSplitwiseInstallRequest_Reject()
             connection
               .submitWithResultNoDedup(Seq(provider), Seq(), cmd)
-              .map(_ => "rejected request for already existing installation.")
+              .map(_ => Some("rejected request for already existing installation."))
 
           case QueryResult(off, None) =>
             val acceptCmd =
@@ -75,7 +75,7 @@ class SplitwiseAutomationService(
                 ),
                 deduplicationOffset = off,
               )
-              .map(_ => "accepted install request.")
+              .map(_ => Some("accepted install request."))
         }
       }
   })
@@ -95,12 +95,14 @@ class SplitwiseAutomationService(
         for {
           transferContext <- scanConnection.getAppTransferContext()
           cmd = payment.contractId.exerciseAcceptedAppPayment_Reject(transferContext)
-          _ <- connection.submitCommandsNoDedup(
-            actAs = Seq(provider),
-            readAs = Seq.empty,
-            commands = cmd.commands.asScala.toSeq,
-          )
-        } yield s"rejected accepted app payment: $msg"
+          res <- connection
+            .submitCommandsNoDedup(
+              actAs = Seq(provider),
+              readAs = Seq.empty,
+              commands = cmd.commands.asScala.toSeq,
+            )
+            .map(_ => Some(s"rejected accepted app payment: $msg"))
+        } yield res
       case QueryResult(_, Some(install)) =>
         for {
           transferContext <- scanConnection.getAppTransferContext()
@@ -127,7 +129,7 @@ class SplitwiseAutomationService(
             readAs = readAs.toSeq,
             commands = cmd.commands.asScala.toSeq,
           )
-        } yield "Completed transfer"
+        } yield Some("Completed transfer")
     }
   })
 
@@ -143,7 +145,7 @@ class SplitwiseAutomationService(
           val cmd = req.contractId.exerciseGroupRequest_Reject()
           connection
             .submitWithResultNoDedup(Seq(provider), Seq(), cmd)
-            .map(_ => "rejected request for already existing group.")
+            .map(_ => Some("rejected request for already existing group."))
 
         case QueryResult(off, None) =>
           val acceptCmd = req.contractId.exerciseGroupRequest_Accept().commands.asScala.toSeq
@@ -159,7 +161,7 @@ class SplitwiseAutomationService(
               ),
               deduplicationOffset = off,
             )
-            .map(_ => "accepted group request.")
+            .map(_ => Some("accepted group request."))
       }
     }
   })

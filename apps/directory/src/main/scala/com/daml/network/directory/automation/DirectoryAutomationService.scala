@@ -89,7 +89,7 @@ class DirectoryAutomationService(
             .exerciseDirectoryInstallRequest_Reject()
           connection
             .submitCommandsNoDedup(Seq(provider), Seq(), cmd.commands.asScala.toSeq)
-            .map(_ => "rejected request for already existing installation.")
+            .map(_ => Some("rejected request for already existing installation."))
 
         case QueryResult(off, None) =>
           val arg = new directoryCodegen.DirectoryInstallRequest_Accept(
@@ -113,7 +113,7 @@ class DirectoryAutomationService(
               ),
               deduplicationOffset = off,
             )
-            .map(_ => "accepted install request.")
+            .map(_ => Some("accepted install request."))
       }
     }
   )
@@ -127,7 +127,7 @@ class DirectoryAutomationService(
           .exerciseDirectoryEntryRequest_Reject(arg)
         connection
           .submitCommandsNoDedup(Seq(provider), Seq(), cmd.commands.asScala.toSeq)
-          .map(_ => s"rejected request: $reason")
+          .map(_ => Some(s"rejected request: $reason"))
       }
       store.lookupInstall(user).flatMap {
         case QueryResult(_, None) =>
@@ -148,7 +148,7 @@ class DirectoryAutomationService(
                 .exerciseDirectoryInstall_RequestEntryPayment(arg)
               connection
                 .submitCommandsNoDedup(Seq(provider), Seq(), cmd.commands.asScala.toSeq)
-                .map(_ => "requested payment for entry request.")
+                .map(_ => Some("requested payment for entry request."))
           }
       }
     }
@@ -171,7 +171,7 @@ class DirectoryAutomationService(
           .toSeq
         connection
           .submitCommandsNoDedup(Seq(provider), Seq(), cmd)
-          .map(_ => s"rejected accepted app payment: $reason")
+          .map(_ => Some(s"rejected accepted app payment: $reason"))
       }
       def collectPayment(
           offer: Contract[
@@ -181,7 +181,7 @@ class DirectoryAutomationService(
           entryName: String,
           offset: String,
           transferContext: v1.coin.AppTransferContext,
-      ) = {
+      ): Future[Option[String]] = {
         val cmd =
           offer.contractId
             .exerciseDirectoryEntryOffer_CollectPayment(
@@ -198,7 +198,7 @@ class DirectoryAutomationService(
               commandId = createDirectoryEntryCommandId(provider, entryName),
               deduplicationOffset = offset,
             )
-        } yield "created directory entry."
+        } yield Some("created directory entry.")
       }
       for {
         offer <- store
@@ -241,7 +241,7 @@ class DirectoryAutomationService(
         val cmd = payment.contractId.exerciseSubscriptionInitialPayment_Reject(transferContext)
         connection
           .submitWithResultNoDedup(Seq(provider), Seq(), cmd)
-          .map(_ => s"rejected initial subscription payment: $reason")
+          .map(_ => Some(s"rejected initial subscription payment: $reason"))
       }
       def collectPayment(
           context: Contract[
@@ -268,7 +268,7 @@ class DirectoryAutomationService(
               commandId = createDirectoryEntryCommandId(provider, entryName),
               deduplicationOffset = offset,
             )
-        } yield "created directory entry."
+        } yield Some("created directory entry.")
       }
       for {
         context <- store
@@ -311,7 +311,7 @@ class DirectoryAutomationService(
         val cmd = payment.contractId.exerciseSubscriptionPayment_Reject(transferContext).commands
         connection
           .submitCommandsNoDedup(Seq(provider), Seq(), cmd.asScala.toSeq)
-          .map(_ => s"rejected subscription payment: $reason")
+          .map(_ => Some(s"rejected subscription payment: $reason"))
       }
       def collectPayment(
           context: Contract[
@@ -342,7 +342,7 @@ class DirectoryAutomationService(
               commandId = createDirectoryEntryCommandId(provider, entry.payload.name),
               deduplicationOffset = offset,
             )
-        } yield "renewed directory entry."
+        } yield Some("renewed directory entry.")
       }
       for {
         context <- store
@@ -381,12 +381,13 @@ class DirectoryAutomationService(
           // extract due entries
           entries.filter(e =>
             // we grant a short additional "grace period" to account for potential clock skew
-            now.toInstant.isAfter(e.payload.expiresAt.plus(java.time.Duration.ofSeconds(1)))
+            now.toInstant
+              .isAfter(e.payload.expiresAt.plus(automationConfig.clockSkewAutomationDelay.duration))
           )
         }
         .flatMap(due_entries => {
           if (due_entries.isEmpty) {
-            Future("no entries due for expiry.")
+            Future(Some("no entries due for expiry."))
           } else {
             // join all expire commands into one command
             val expire_commands = due_entries.flatMap(e =>
@@ -400,7 +401,7 @@ class DirectoryAutomationService(
             logger.info(s"Archiving the following expired directory entries: $due_entries_names")
             connection
               .submitCommandsNoDedup(Seq(provider), Seq(), expire_commands)
-              .map(_ => s"archived expired entries: ${due_entries_names}")
+              .map(_ => Some(s"archived expired entries: ${due_entries_names}"))
           }
         })
     }

@@ -9,16 +9,23 @@ import com.daml.network.automation.{
 import com.daml.network.codegen.java.cc
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.svc.admin.grpc.GrpcSvcAppService.getTotalsPerRound
 import com.daml.network.svc.store.SvcStore
+import com.daml.network.util.CoinUtil.defaultTickDurationInMicroseconds
+import com.daml.network.util.JavaContract
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
+import java.time.temporal.ChronoUnit
+import scala.annotation.nowarn
+import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
+@nowarn("msg=match may not be exhaustive")
 class SvcAutomationService(
     automationConfig: AutomationConfig,
     clockConfig: ClockConfig,
@@ -66,43 +73,153 @@ class SvcAutomationService(
   registerRequestHandler("handleCoinRulesRequest", store.streamCoinRulesRequests())(req => {
     implicit traceContext =>
       {
-        // Guard the action by a lookup for the SVC's own CoinRules to ensure that all of the dependent state
-        // has already been created.
-        store.lookupCoinRules().map(_.value).flatMap {
-          case None =>
-            // SCV setup is not yet complete: throw a StatusRuntimeException as that properly triggers the retry loop
-            Future.failed(
-              new StatusRuntimeException(
-                Status.NOT_FOUND
-                  .withDescription(s"Could not find CoinRules for SVC party ${store.svcParty}")
-              )
+        for {
+          // Guard the action by a lookup for the SVC's own CoinRules to ensure that all of the dependent state
+          // has already been created.
+          _ <- getCoinRules()
+          validatorParty = PartyId.tryFromProtoPrimitive(req.payload.user)
+          // NOTE: this is NOT SAFE under concurrent changes to the XXXMiningRounds contracts
+          // That is OK here, as we assume that on-boarding of validators happens before.
+          // TODO(M3-90): make this safe under concurrent round management and onboarding
+          QueryResult(_, openMiningRounds) <- store
+            .listContracts(cc.round.OpenMiningRound.COMPANION)
+          QueryResult(_, issuingMiningRounds) <- store
+            .listContracts(cc.round.IssuingMiningRound.COMPANION)
+          QueryResult(_, coinRules) <- store.getCoinRules()
+          cmds = req.contractId
+            .exerciseCoinRulesRequest_Accept(
+              coinRules.contractId,
+              openMiningRounds.map(_.contractId).asJava,
+              issuingMiningRounds.map(_.contractId).asJava,
             )
-
-          // SCV setup is complete: accept the CoinRules request, and rely on its idempotence wrt duplicate observers
-          case Some(_) =>
-            val validatorParty = PartyId.tryFromProtoPrimitive(req.payload.user)
-            for {
-              // NOTE: this is NOT SAFE under concurrent changes to the XXXMiningRounds contracts
-              // That is OK here, as we assume that on-boarding of validators happens before.
-              // TODO(M3-90): make this safe under concurrent round management and onboarding
-              QueryResult(_, openMiningRounds) <- store
-                .listContracts(cc.round.OpenMiningRound.COMPANION)
-              QueryResult(_, issuingMiningRounds) <- store
-                .listContracts(cc.round.IssuingMiningRound.COMPANION)
-              QueryResult(_, coinRules) <- store.getCoinRules()
-              cmds = req.contractId
-                .exerciseCoinRulesRequest_Accept(
-                  coinRules.contractId,
-                  openMiningRounds.map(_.contractId).asJava,
-                  issuingMiningRounds.map(_.contractId).asJava,
-                )
-                .commands
-                .asScala
-                .toSeq
-              // No command-dedup required, as the CoinRules contract is archived and recreated
-              _ <- connection.submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds)
-            } yield s"accepted coin rules request from $validatorParty"
-        }
+            .commands
+            .asScala
+            .toSeq
+          // No command-dedup required, as the CoinRules contract is archived and recreated
+          _ <- connection.submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds)
+        } yield Some(s"accepted coin rules request from $validatorParty")
       }
   })
+
+  private val roundAutomationInterval = 10.seconds
+
+  registerTimeHandler("cycle OpenMiningRounds", roundAutomationInterval, connection) {
+    now =>
+      { implicit tc =>
+        for {
+          rules <- getCoinRules()
+          QueryResult(_, openMiningRounds) <- store
+            .listContracts(cc.round.OpenMiningRound.COMPANION)
+          res <-
+            // TODO(#1680): remove once we removed the calls to mining rounds being manipulated through
+            //  CoinRules_MiningRound_Open / CoinRules_MiningRound_StartSummarizing.
+            if (openMiningRounds.size != 3) {
+              Future.successful(
+                Some(
+                  "exiting early because we didn't see 3 rounds and thus no proper bootstrap was run"
+                )
+              )
+            } else {
+              val Seq(toArchive, middle, latest) = openMiningRounds
+                .sortBy(contract => contract.payload.round.number)
+
+              // checking some of the same conditions that are also checked on the ledger because ledger operations are expensive
+              // so we check the conditions that are most likely to fail.
+              val isPastTargetClosesAt = now.toInstant
+                .isAfter(
+                  toArchive.payload.targetClosesAt.plus(
+                    automationConfig.clockSkewAutomationDelay.duration
+                  )
+                )
+              val midPointForMiddleRound = middle.payload.opensAt
+                .plus(defaultTickDurationInMicroseconds, ChronoUnit.MICROS)
+                .plus(automationConfig.clockSkewAutomationDelay.duration)
+              val isPastLatestOpensAt = now.toInstant
+                .isAfter(
+                  latest.payload.opensAt.plus(automationConfig.clockSkewAutomationDelay.duration)
+                )
+              val middleRoundOpenLongEnough = now.toInstant.isAfter(midPointForMiddleRound)
+              if (isPastTargetClosesAt && middleRoundOpenLongEnough && isPastLatestOpensAt) {
+                val cmds = rules.contractId
+                  .exerciseCoinRules_AdvanceOpenMiningRounds(
+                    // TODO(#1705): use price from SvcRules
+                    java.math.BigDecimal.valueOf(1.0),
+                    toArchive.contractId,
+                    middle.contractId,
+                    latest.contractId,
+                  )
+                  .commands
+                  .asScala
+                  .toSeq
+                connection
+                  .submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds)
+                  .map(_ =>
+                    Some(
+                      s"successfully advanced the rounds and archived round ${toArchive.payload.round.number}"
+                    )
+                  )
+              } else Future.successful(None)
+            }
+
+        } yield res
+      }
+  }
+
+  registerTimeHandler(
+    "archive IssuingMiningRounds past their targetClosesAt",
+    roundAutomationInterval,
+    connection,
+  ) {
+    now =>
+      { implicit tc =>
+        for {
+          coinRules <- store.getCoinRules()
+          QueryResult(_, issuingMiningRounds) <- store
+            .listContracts(cc.round.IssuingMiningRound.COMPANION)
+          roundsSorted = issuingMiningRounds
+            .sortBy(contract => contract.payload.round.number)
+            .lastOption
+          res <- roundsSorted match {
+            case None => Future.successful(None)
+            case Some(oldestIssuingRound) =>
+              val totals = getTotalsPerRound(store)(oldestIssuingRound.payload.round.number)
+              val oldestRoundCanBeClosed =
+                now.toInstant.isAfter(oldestIssuingRound.payload.targetClosesAt)
+              if (oldestRoundCanBeClosed) {
+                val cmd = coinRules.value.contractId
+                  .exerciseCoinRules_MiningRound_Close(
+                    oldestIssuingRound.contractId,
+                    totals.transferFees.bigDecimal,
+                    totals.adminFees.bigDecimal,
+                    totals.holdingFees.bigDecimal,
+                    totals.transferInputs.bigDecimal,
+                    totals.nonSelfTransferOutputs.bigDecimal,
+                    totals.selfTransferOutputs.bigDecimal,
+                  )
+                connection
+                  .submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
+                  .map(cid => Some(s"successfully created the closed mining round with cid $cid"))
+              } else
+                Future.successful(None)
+
+          }
+        } yield res
+      }
+  }
+
+  private def getCoinRules()
+      : Future[JavaContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]] = {
+    store.lookupCoinRules().map(_.value).flatMap {
+      case None =>
+        // SCV setup is not yet complete: throw a StatusRuntimeException as that properly triggers the retry loop
+        Future.failed(
+          new StatusRuntimeException(
+            Status.NOT_FOUND
+              .withDescription(s"Could not find CoinRules for SVC party ${store.svcParty}")
+          )
+        )
+
+      case Some(rules) => Future.successful(rules)
+    }
+  }
 }

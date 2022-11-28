@@ -64,7 +64,7 @@ abstract class AutomationService(
       name: String,
       source: Source[T, NotUsed],
   )(
-      handler0: T => TraceContext => Future[String]
+      handler0: T => TraceContext => Future[Option[String]]
   ): Unit = {
     def handler(req: T): Future[Unit] = {
       withNewTrace(name) { implicit traceContext => _ =>
@@ -76,11 +76,15 @@ abstract class AutomationService(
             callingService = this,
           )
           .transform {
-            case Success(outcome) =>
-              logger.info(
-                show"Completed operation ${name.singleQuoted} with outcome: ${outcome.unquoted}"
-              )
-              Success(())
+            case Success(outcomeO) =>
+              outcomeO match {
+                case None => Success(())
+                case Some(outcome) =>
+                  logger.info(
+                    show"Completed operation ${name.singleQuoted} with outcome: ${outcome.unquoted}"
+                  )
+                  Success(())
+              }
             case Failure(ex) =>
               if (this.isClosing)
                 logger.info(
@@ -119,7 +123,7 @@ abstract class AutomationService(
       interval: FiniteDuration,
       connection: CoinLedgerConnection, // for querying ledger time when simtime is used
   )(
-      handler0: CantonTimestamp => TraceContext => Future[String]
+      handler0: CantonTimestamp => TraceContext => Future[Option[String]]
   ): Unit = {
     withNewTrace("getTime") { implicit traceContext => _ =>
       {

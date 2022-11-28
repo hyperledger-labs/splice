@@ -72,8 +72,12 @@ trait AcsStore extends AutoCloseable {
       interfaceCompanion: InterfaceCompanion[I, Id, View]
   )(p: JavaContract[Id, View] => Boolean): Future[QueryResult[Option[JavaContract[Id, View]]]]
 
-  /** List all active contracts of the given template. */
-  // TODO(M3-83): add a limit parameter here, and in other cases where it is necessary
+  /** List all active contracts of the given template.
+    *
+    * Beware that for the in-memory implementation, this method iterates through all the created events in the store.
+    * TODO(M3-83): add indexes for ^.
+    */
+  // TODO(M3-83): add a limit parameter
   def listContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
       templateCompanion: ContractCompanion[TC, TCid, T],
       filter: JavaContract[TCid, T] => Boolean,

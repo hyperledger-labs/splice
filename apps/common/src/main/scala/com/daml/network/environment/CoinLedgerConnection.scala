@@ -148,7 +148,8 @@ object CoinLedgerConnection {
 
   /** Abstract representation of a command-id for deduplication.
     * @param methodName: fully-classified name of the method whose calls should be deduplicated,
-    *   e.g., "com.daml.network.directory.createDirectoryEntry".
+    *   e.g., "com.daml.network.directory.createDirectoryEntry". DON'T USE [[io.functionmeta.functionFullName]] here,
+    *   as it is not consistent across updates and restarts.
     * @param parties: list of parties whose method calls should be considered distinct,
     *   e.g., "Seq(directoryProvider)"
     * @param discriminator: additional discriminator for method calls,
@@ -165,7 +166,8 @@ object CoinLedgerConnection {
         .map(_.toProtoPrimitive)
         .prepended(
           parties.length.toString
-        ) // prepend length to avoid suffixes interfering with party mapping
+        ) // prepend length to avoid suffixes interfering with party mapping, e.g., otherwise we have
+        // CommandId("myMethod", Seq(alice), "bob").commandIdForSubmission == CommandId("myMethod", Seq(alice,bob), "").commandIdForSubmission
         .appended(discriminator)
         .mkString("/")
       // Digest is not thread safe, create a new one each time.

@@ -77,6 +77,8 @@ object CoinUtil {
   def damlNumeric(x: Double): java.math.BigDecimal =
     BigDecimal(x).setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
 
+  lazy val defaultTickDurationInMicroseconds: Long = 150 * 1000000L
+
   def defaultCoinConfig: cc.coin.CoinConfig[cc.coin.USD] = new cc.coin.CoinConfig(
     // Fee to create a new coin.
     // Set to the fixed part of the transfer fee.
@@ -133,7 +135,7 @@ object CoinUtil {
     // TODO(M1-90): charge per character
     32,
     // 2.5 min default duration
-    new RelTime(150 * 1000000),
+    new RelTime(defaultTickDurationInMicroseconds),
     new cc.api.v1.coin.EnabledChoices(
       true
     ),

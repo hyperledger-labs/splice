@@ -110,7 +110,7 @@ class GrpcSvcAppService(
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
       for {
         issuingRound <- getRound(cc.round.IssuingMiningRound.COMPANION)(_.round)(request.round)
-        totals = getTotalsPerRound(request.round)
+        totals = getTotalsPerRound(store)(request.round)
         coinRules <- store.getCoinRules()
         cmd =
           coinRules.value.contractId
@@ -127,29 +127,6 @@ class GrpcSvcAppService(
           connection.submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
       } yield v0.CloseRoundResponse(Proto.encodeContractId(cid.exerciseResult))
     }
-
-  private case class RoundTotals(
-      transferFees: BigDecimal = 0.0,
-      adminFees: BigDecimal = 0.0,
-      holdingFees: BigDecimal = 0.0,
-      transferInputs: BigDecimal = 0.0,
-      nonSelfTransferOutputs: BigDecimal = 0.0,
-      selfTransferOutputs: BigDecimal = 0.0,
-  )
-
-  private def getTotalsPerRound(round: Long): RoundTotals = {
-    val transfers = store.events.getTransferSummariesPerRound(round)
-    transfers.foldLeft(RoundTotals())((t, transfer) => {
-      RoundTotals(
-        t.transferFees + transfer.totalTransferFees,
-        t.adminFees + transfer.senderAdminFees,
-        t.holdingFees + transfer.senderHoldingFees,
-        t.transferInputs + transfer.inQuantity,
-        t.nonSelfTransferOutputs + transfer.nonSelfOutQuantity,
-        t.selfTransferOutputs + transfer.selfOutQuantity,
-      )
-    })
-  }
 
   override def archiveRound(request: v0.ArchiveRoundRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
@@ -209,6 +186,29 @@ class GrpcSvcAppService(
 }
 
 object GrpcSvcAppService {
+
+  case class RoundTotals(
+      transferFees: BigDecimal = 0.0,
+      adminFees: BigDecimal = 0.0,
+      holdingFees: BigDecimal = 0.0,
+      transferInputs: BigDecimal = 0.0,
+      nonSelfTransferOutputs: BigDecimal = 0.0,
+      selfTransferOutputs: BigDecimal = 0.0,
+  )
+
+  def getTotalsPerRound(store: SvcStore)(round: Long): RoundTotals = {
+    val transfers = store.events.getTransferSummariesPerRound(round)
+    transfers.foldLeft(RoundTotals())((t, transfer) => {
+      RoundTotals(
+        t.transferFees + transfer.totalTransferFees,
+        t.adminFees + transfer.senderAdminFees,
+        t.holdingFees + transfer.senderHoldingFees,
+        t.transferInputs + transfer.inQuantity,
+        t.nonSelfTransferOutputs + transfer.nonSelfOutQuantity,
+        t.selfTransferOutputs + transfer.selfOutQuantity,
+      )
+    })
+  }
 
   /** The rewards issued for a given round.
     */
