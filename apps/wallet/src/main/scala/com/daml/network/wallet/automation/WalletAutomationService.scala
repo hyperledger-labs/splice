@@ -81,7 +81,7 @@ class WalletAutomationService(
           loggerFactory,
           timeouts,
         )
-        treasuryServices.addOrCreateTreasuryService(install, walletStore.key, endUserStore): Unit
+        treasuryServices.addOrCreateTreasuryService(install, endUserStore): Unit
         Some(registerService(ingestionServices, endUserName, ingestionService))
       }
   })

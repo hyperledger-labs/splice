@@ -18,7 +18,6 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 
-import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success}
@@ -52,7 +51,7 @@ case class CoinOperationRequest[T](
   * For the design, please see https://github.com/DACH-NY/the-real-canton-coin/issues/913 and the documentation on
   * [[CoinOperationRequest]].
   */
-case class EndUserTreasuryService(
+class EndUserTreasuryService(
     connection: CoinLedgerConnection,
     // TODO(#1351): don't pass WalletAppInstall contract along but look it up before each batch submission to support users updating their
     // WalletAppInstall contract
@@ -60,7 +59,6 @@ case class EndUserTreasuryService(
       installCodegen.WalletAppInstall.ContractId,
       installCodegen.WalletAppInstall,
     ],
-    walletStoreKey: WalletStore.Key,
     userStore: EndUserWalletStore,
     walletStore: WalletStore,
     retryProvider: CoinRetries,
@@ -73,7 +71,6 @@ case class EndUserTreasuryService(
   // Magic numbers
   private val batchSize = 10L
   private val bufferSize = 1000
-  private val waitTimeForStore = 300.millis
 
   private val queue: BoundedSourceQueue[AnyEnqueuedCoinOperation] = Source
     .queue[AnyEnqueuedCoinOperation](bufferSize)
@@ -81,11 +78,12 @@ case class EndUserTreasuryService(
     .batch(batchSize, operation => Seq(operation))((operations, operation) =>
       operations :+ operation
     )
+    // TODO(#1351): this is likely leaking resources ==> use construction from AcsIngestion for managing lifetime, and allocate a new traceContext to improve logs
     .toMat(
       Sink.foreachAsync(1)(batch =>
         executeBatchWithRetry(batch).flatMap(offset => {
           userStore
-            .signalWhenIngested(offset)
+            .signalWhenIngested(offset)(TraceContext.empty)
             .map(_ =>
               logger
                 .debug(s"Finished waiting for store to ingest offset $offset")(TraceContext.empty)
@@ -94,6 +92,10 @@ case class EndUserTreasuryService(
       )
     )(Keep.left)
     .run()
+
+  // Overriding, as this method is used in "FlagCloseable" to pretty-print the object being closed.
+  override def toString: String =
+    s"EndUserTreasureService(endUserParty=${userStore.key.endUserParty})"
 
   /** Enqueues a coin operation into an internal task queue.
     * The [[EndUserTreasuryService]] will schedule the operation and then complete the returned with its result.
@@ -196,8 +198,8 @@ case class EndUserTreasuryService(
         // which implies that network problems might lead to duplicate 'DirectTransfer' calls. They will be replaced by
         // TransferOffers as part of M3-02, which will consume the TransferOffer, and thus make the batch-execution w/o command dedup safe.
         .submitWithResultAndOffsetNoDedup(
-          Seq(walletStoreKey.walletServiceParty),
-          walletStoreKey.validatorParty +: userStore.key.endUserParty +: readAs.toSeq,
+          Seq(walletStore.key.walletServiceParty),
+          walletStore.key.validatorParty +: userStore.key.endUserParty +: readAs.toSeq,
           cmd,
         )
       _ = (outcomes.exerciseResult.asScala zip validOperations).map {

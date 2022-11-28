@@ -2,11 +2,11 @@ package com.daml.network.wallet.store.memory
 
 import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.store.{AcsStore, InMemoryAcsStore}
-import com.daml.network.util.{JavaContract as Contract}
+import com.daml.network.util.JavaContract as Contract
 import com.daml.network.wallet.store.EndUserWalletStore
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.lifecycle.AsyncOrSyncCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.util.ShowUtil.*
 
 import scala.concurrent.*
 
@@ -18,6 +18,8 @@ class InMemoryEndUserWalletStore(
     ec: ExecutionContext
 ) extends EndUserWalletStore
     with NamedLogging {
+
+  override def toString: String = show"InMemoryEndUserWalletStore(endUserParty=${key.endUserParty})"
 
   private val inMemoryAcsStore =
     new InMemoryAcsStore(
@@ -40,6 +42,4 @@ class InMemoryEndUserWalletStore(
     acsStore
       .listContracts(roundCodegen.OpenMiningRound.COMPANION)
       .map(_.map(contracts => contracts.sortBy(r => r.payload.round.number).lastOption))
-
-  override def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq()
 }

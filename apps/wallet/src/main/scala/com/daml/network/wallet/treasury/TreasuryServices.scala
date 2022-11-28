@@ -29,14 +29,12 @@ class TreasuryServices(
 
   def addOrCreateTreasuryService(
       install: Contract[WalletAppInstall.ContractId, WalletAppInstall],
-      walletStoreKey: WalletStore.Key,
       userStore: EndUserWalletStore,
   ): EndUserTreasuryService = treasuries.getOrElseUpdate(
     userStore.key.endUserName,
-    EndUserTreasuryService(
+    new EndUserTreasuryService(
       connection,
       install,
-      walletStoreKey,
       userStore,
       walletStore,
       retryProvider,

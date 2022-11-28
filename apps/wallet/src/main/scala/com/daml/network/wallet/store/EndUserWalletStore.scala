@@ -9,30 +9,30 @@ import com.daml.ledger.javaapi.data.codegen.{
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.wallet.{
-  install => installCodegen,
-  payment => walletCodegen,
-  paymentchannel => channelCodegen,
-  subscriptions => subsCodegen,
-  transferoffer => transferOffersCodegen,
+  install as installCodegen,
+  payment as walletCodegen,
+  paymentchannel as channelCodegen,
+  subscriptions as subsCodegen,
+  transferoffer as transferOffersCodegen,
 }
 import com.daml.network.environment.CoinRetries
 import com.daml.network.store.AcsStore
-import com.daml.network.util.{JavaContract => Contract}
+import com.daml.network.util.JavaContract as Contract
 import com.daml.network.wallet.store.memory.InMemoryEndUserWalletStore
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.lifecycle.FlagCloseableAsync
+import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.NoTracing
+import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 /** A store for serving all queries for a specific wallet end-user. */
-trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLogging {
+trait EndUserWalletStore extends FlagCloseable with NamedLogging {
   import AcsStore.QueryResult
 
   /** The sink to use for ingesting data from the ledger into this store. */
@@ -53,7 +53,7 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
   ]] =
     acsStore.findContract(installCodegen.WalletAppInstall.COMPANION)(_ => true)
 
-  def signalWhenIngested(offset: String): Future[Unit] =
+  def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
     acsStore.signalWhenIngested(offset)
 
   def findContract[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
@@ -123,11 +123,11 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
     *              the wallet initialization synchronizing on the first round being ingested instead.
     */
   def getLatestOpenMiningRound(retryProvider: CoinRetries)(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      tc: TraceContext,
   ): Future[
     QueryResult[Contract[roundCodegen.OpenMiningRound.ContractId, roundCodegen.OpenMiningRound]]
-  ] = {
-
+  ] =
     retryProvider.retryForClientCalls(
       "Waiting for open mining round to be ingested",
       lookupLatestOpenMiningRound().map { result =>
@@ -141,14 +141,10 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
       },
       this,
     )
-  }
 
-  def getCoinRules()(implicit
-      ec: ExecutionContext
-  ): Future[
+  def getCoinRules()(implicit ec: ExecutionContext): Future[
     QueryResult[Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]]
-  ] = {
-
+  ] =
     findContract(coinCodegen.CoinRules.COMPANION).map(
       _.map(
         _.getOrElse(
@@ -158,14 +154,14 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
         )
       )
     )
-  }
 
   /** Get the context required for executing a transfer. This must be run
     * on the store of the validator user since the primary party of end users
     * is not a stakeholder on the contracts used here.
     */
   def getPaymentTransferContext(retryProvider: CoinRetries)(implicit
-      ec: ExecutionContext
+      ec: ExecutionContext,
+      tc: TraceContext,
   ): Future[v1.coin.PaymentTransferContext] =
     for {
       coinRules <- getCoinRules()
@@ -337,5 +333,4 @@ object EndUserWalletStore {
       ),
     )
   }
-
 }

@@ -159,11 +159,11 @@ abstract class AutomationService(
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =
     Seq[AsyncOrSyncCloseable](
       SyncCloseable(
-        "Background services",
+        "Orchestrated services",
         Lifecycle.close(backgroundServices.get(): _*)(logger),
       ),
       SyncCloseable(
-        "Resources",
+        "Managed resources",
         Lifecycle.close(resources.get(): _*)(logger),
       ),
     )
