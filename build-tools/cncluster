@@ -129,13 +129,15 @@ function cluster_create() {
         echo "Cluster already exists."
         exit 1
     else
+        #### Cluster can be resized from deployment directories with the following command:
+        ####   gcloud container clusters resize "cn-${GCP_CLUSTER_BASENAME}net" --num-nodes 4
         gcloud container clusters create ${GCP_CLUSTER_NAME} \
                --create-subnetwork name=${GCP_CLUSTER_NAME}-subnet \
                --enable-master-authorized-networks \
                --enable-ip-alias \
                --enable-private-nodes \
                --machine-type e2-standard-4 \
-               --num-nodes 3 \
+               --num-nodes 4 \
                --master-ipv4-cidr "${GCP_MASTER_IPV4_CIDR}" \
                --node-locations "${CLOUDSDK_COMPUTE_REGION}-a" \
                --node-labels digitalasset.com/cluster-name=${GCP_CLUSTER_NAME}

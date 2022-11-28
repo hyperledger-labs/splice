@@ -314,7 +314,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms2560M -Xmx2560M"
+                              "value": "-Xms5632M -Xmx5632M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -332,10 +332,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "3072Mi"
+                              "memory": "6144Mi"
                            },
                            "requests": {
-                              "memory": "3072Mi"
+                              "memory": "6144Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -723,7 +723,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms2560M -Xmx2560M"
+                              "value": "-Xms5632M -Xmx5632M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-participant:tag",
@@ -741,10 +741,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "3072Mi"
+                              "memory": "6144Mi"
                            },
                            "requests": {
-                              "memory": "3072Mi"
+                              "memory": "6144Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -1332,7 +1332,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms2560M -Xmx2560M"
+                              "value": "-Xms5632M -Xmx5632M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/splitwise-participant:tag",
@@ -1350,10 +1350,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "3072Mi"
+                              "memory": "6144Mi"
                            },
                            "requests": {
-                              "memory": "3072Mi"
+                              "memory": "6144Mi"
                            }
                         },
                         "volumeMounts": [ ]
