@@ -16,7 +16,7 @@ case class CoinStatus() extends CantonStatus {
     Pretty.prettyOfString(_ => "Not implemented")
 }
 
-// TODO(i1159): Properly implement or remove health dumping
+// TODO(#1159): Properly implement or remove health dumping
 @nowarn("cat=lint-byname-implicit") // https://github.com/scala/bug/issues/12072
 class CoinHealthDumpGenerator(
     override val environment: CoinEnvironment,

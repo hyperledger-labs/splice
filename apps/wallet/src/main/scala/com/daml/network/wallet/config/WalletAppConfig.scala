@@ -16,7 +16,7 @@ case class LocalWalletAppConfig(
     validator: WalletRemoteValidatorAppConfig,
     auth: AuthConfig,
     automation: AutomationConfig = AutomationConfig(),
-) extends LocalCoinConfig // TODO(i736): fork or generalize this trait.
+) extends LocalCoinConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "wallet"
 

@@ -12,7 +12,7 @@ case class LocalSplitwiseAppConfig(
     remoteParticipant: RemoteParticipantConfig,
     remoteScan: RemoteScanAppConfig,
     automation: AutomationConfig = AutomationConfig(),
-) extends LocalCoinConfig // TODO(i736): fork or generalize this trait.
+) extends LocalCoinConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "splitwise"
 

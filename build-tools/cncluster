@@ -157,7 +157,7 @@ function cluster_create() {
     fi
 
     #### Store DNS service account secret for cert-manager DNS-01 authorizer to use
-    #### TODO(i1447)
+    #### TODO(#1447)
     if [ -z $(kubectl get secret | grep ${GCP_DNS_SERVICE_ACCOUNT}) ]; then
         _log "Missing DNS Service Account secret, adding..."
         gcloud iam service-accounts keys create /tmp/key.json \

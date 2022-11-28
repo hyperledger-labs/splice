@@ -165,7 +165,7 @@ class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
         )
       )
 
-    // TODO(i832): do the math and verify that the values above are correct
+    // TODO(#832): do the math and verify that the values above are correct
     }
   }
 

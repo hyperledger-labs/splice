@@ -15,7 +15,7 @@ import com.daml.network.console.{
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.topology.PartyId
 
-// TODO(i736): these should eventually be defined analogue to Canton's `participant1` references etc
+// TODO(#736): these should eventually be defined analogue to Canton's `participant1` references etc
 // however, this is likely only possible once we depend on Canton as a library
 trait CommonCoinAppInstanceReferences {
 

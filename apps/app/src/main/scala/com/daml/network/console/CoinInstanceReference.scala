@@ -37,7 +37,7 @@ trait CoinAppReference extends InstanceReference {
 
   override type Status = SimpleStatus
 
-  // TODO(i736): remove/cleanup all the uninteresting console commands copied from Canton.
+  // TODO(#736): remove/cleanup all the uninteresting console commands copied from Canton.
   @Help.Summary("Health and diagnostic related commands")
   @Help.Group("Health")
   override def health =
@@ -75,7 +75,7 @@ trait CoinAppReference extends InstanceReference {
       health.status.successOption.map(_.active).getOrElse(false)
     )
 
-  // TODO(i736): slightly adapted compared to Canton.
+  // TODO(#736): slightly adapted compared to Canton.
   // above command needs to be def such that `Help` works.
   lazy private val partiesGroup =
     new PartiesAdministrationGroup(this, consoleEnvironment)

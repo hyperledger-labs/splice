@@ -53,7 +53,7 @@ case class SharedCoinAppParameters(
     override val loggingConfig: LoggingConfig,
     override val logQueryCost: Option[QueryCostMonitoringConfig],
     override val processingTimeouts: ProcessingTimeout,
-    // TODO(i736): likely remove all of the following:
+    // TODO(#736): likely remove all of the following:
     override val cachingConfigs: CachingConfigs,
     override val enableAdditionalConsistencyChecks: Boolean,
     override val enablePreviewFeatures: Boolean,

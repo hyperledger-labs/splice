@@ -34,7 +34,7 @@ object CoinNodeBootstrap {
 /** Modelled after CantonNodeBootstrap
   */
 trait CoinNodeBootstrap[+Node <: CantonNode]
-    extends CantonNodeBootstrap[Node] // TODO(i736): remove the dependency on this trait.
+    extends CantonNodeBootstrap[Node] // TODO(#736): remove the dependency on this trait.
     {
 
   def name: InstanceName
@@ -50,7 +50,7 @@ trait CoinNodeBootstrap[+Node <: CantonNode]
 
   def getNode: Option[Node]
 
-  // TODO(i736): following methods are only here because of the CantonNodeBootstrap trait
+  // TODO(#736): following methods are only here because of the CantonNodeBootstrap trait
   def initializeWithProvidedId(id: NodeId): EitherT[Future, String, Unit] = initialize
   def getId: Option[NodeId] = None
   def crypto: Crypto = ???
@@ -141,7 +141,7 @@ abstract class CoinNodeBootstrapBase[
   def getNode: Option[T] = ref.get()
   def isInitialized: Boolean = ref.get().isDefined
 
-  // TODO(i736): obviously we don't need this. however, removing this likely requires a Canton upstream change.
+  // TODO(#736): obviously we don't need this. however, removing this likely requires a Canton upstream change.
   // This absolutely must be a "def", because it is used during class initialization.
   protected def connectionPoolForParticipant: Boolean = false
 

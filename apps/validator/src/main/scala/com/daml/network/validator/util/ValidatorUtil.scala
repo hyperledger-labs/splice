@@ -34,7 +34,7 @@ private[validator] object ValidatorUtil {
       s"Installing wallet for endUserParty=$endUserParty, walletServiceParty=$walletServiceParty, validatorServiceParty=$validatorServiceParty, svcParty=$svcParty"
     )
     for {
-      // TODO (i713): remove this workaround for missing `read-as-any-party` rights
+      // TODO(#713): remove this workaround for missing `read-as-any-party` rights
       _ <- connection.grantUserRights(walletServiceUser, Seq.empty, Seq(endUserParty))
       _ <- retryProvider.retryForAutomation(
         "installWalletForUser",

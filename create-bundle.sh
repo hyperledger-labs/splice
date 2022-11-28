@@ -15,7 +15,7 @@ function adjust_shellscript_binary() {
   REPLACE_MAIN_CLASS="$MAIN_CLASS"
 #  REPLACE_MAC_ICON_FILE="lib\/canton.ico"
   cp -r "$RELEASE_DIR/../../../src/pack/bin" "$RELEASE_DIR"
-  for file in "bin/coin" # TODO(i161): Canton supports windows. Do we want that too? "bin/coin.bat"
+  for file in "bin/coin" # TODO(#161): Canton supports windows. Do we want that too? "bin/coin.bat"
   do
       cat "$RELEASE_DIR"/$file |
         sed -e "s/REPLACE_VERSION/${REPLACE_VERSION}/" |
@@ -23,7 +23,7 @@ function adjust_shellscript_binary() {
         sed -e "s/REPLACE_JVM_OPTS/${REPLACE_JVM_OPTS}/" |
         sed -e "s/REPLACE_MAIN_CLASS/${REPLACE_MAIN_CLASS}/" |
         sed -e "s/REPLACE_JAR/${REPLACE_JAR}/" > $RELEASE_DIR/tmp.txt
-        # TODO(i161): Look into this Mac Icon
+        # TODO(#161): Look into this Mac Icon
 #        sed -e "s/REPLACE_MAC_ICON_FILE/${REPLACE_MAC_ICON_FILE}/"
       mv "$RELEASE_DIR"/tmp.txt "$RELEASE_DIR"/$file
       chmod 755 $RELEASE_DIR/$file

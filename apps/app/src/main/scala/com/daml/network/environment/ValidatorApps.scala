@@ -19,7 +19,7 @@ class ValidatorApps(
     _loggerFactory: NamedLoggerFactory,
 )(implicit
     protected val executionContext: ExecutionContextIdlenessExecutorService
-) extends ManagedNodes[ // TODO(i736): We should remove the CantonNode/CantonNodeBootstrap type requirements from
+) extends ManagedNodes[ // TODO(#736): We should remove the CantonNode/CantonNodeBootstrap type requirements from
       // this trait.
       ValidatorApp,
       LocalValidatorAppConfig,

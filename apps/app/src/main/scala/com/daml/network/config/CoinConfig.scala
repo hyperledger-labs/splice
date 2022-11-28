@@ -63,7 +63,7 @@ case class CoinConfig(
     remoteDirectoryApps: Map[InstanceName, RemoteDirectoryAppConfig] = Map.empty,
     splitwiseApps: Map[InstanceName, LocalSplitwiseAppConfig] = Map.empty,
     remoteSplitwiseApps: Map[InstanceName, RemoteSplitwiseAppConfig] = Map.empty,
-    // TODO(i736): we want to remove all of the configurations options below:
+    // TODO(#736): we want to remove all of the configurations options below:
     domains: Map[InstanceName, CommunityDomainConfig] = Map.empty,
     participants: Map[InstanceName, CommunityParticipantConfig] = Map.empty,
     remoteDomains: Map[InstanceName, RemoteDomainConfig] = Map.empty,
@@ -71,7 +71,7 @@ case class CoinConfig(
     monitoring: MonitoringConfig = MonitoringConfig(),
     parameters: CantonParameters = CantonParameters(),
     features: CantonFeatures = CantonFeatures(),
-) extends CantonConfig // TODO(i736): generalize or fork this trait.
+) extends CantonConfig // TODO(#736): generalize or fork this trait.
     with ConfigDefaults[DefaultPorts, CoinConfig] {
 
   override type DomainConfigType = CommunityDomainConfig
@@ -338,10 +338,10 @@ case class CoinConfig(
       n.unwrap -> c
     }
 
-  override def dumpString: String = "TODO(i736): remove or implement."
+  override def dumpString: String = "TODO(#736): remove or implement."
 
   override def withDefaults(ports: DefaultPorts): CoinConfig =
-    this // TODO(i736): CantonCommunityConfig does more here. Do we want to copy that?
+    this // TODO(#736): CantonCommunityConfig does more here. Do we want to copy that?
   // NOTE(Simon): in particular it handles default ports derived from the ports object introduced in https://github.com/DACH-NY/canton/commit/ccff59fccf349893cc68413a7859e8ef748a94fa
 }
 

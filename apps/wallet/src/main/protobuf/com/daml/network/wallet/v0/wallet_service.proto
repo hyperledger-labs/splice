@@ -94,7 +94,7 @@ message ListAppPaymentRequestsRequest {
 }
 
 message ListAppPaymentRequestsResponse {
-  // TODO(i300): add pagination for payment requests
+  // TODO(#300): add pagination for payment requests
   repeated com.daml.network.v0.Contract payment_requests = 1;
 }
 
@@ -309,7 +309,7 @@ message ListOnChannelPaymentRequestsRequest {
 }
 
 message ListOnChannelPaymentRequestsResponse {
-  // TODO(i300): add pagination for payment requests
+  // TODO(#300): add pagination for payment requests
   repeated com.daml.network.v0.Contract payment_requests = 1;
 }
 

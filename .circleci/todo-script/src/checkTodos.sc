@@ -183,7 +183,7 @@ case class Tag(tags: List[String]) extends RegexCategory {
 }
 
 object Issue extends RegexCategory {
-  override val regex = "[i#][0-9]+".r
+  override val regex = "[#][0-9]+".r
 
   override def getBucket(str: String) = numsToIssue(str)
 }

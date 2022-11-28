@@ -57,7 +57,7 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
     */
   protected def requiredTemplates: Set[Identifier] = Set.empty
 
-  // TODO(i736): fork or generalize status definition.
+  // TODO(#736): fork or generalize status definition.
   override def status: Future[NodeStatus.Status] = {
     val status = SimpleStatus(
       uid = UniqueIdentifier.tryFromProtoPrimitive(s"coin::$name"),

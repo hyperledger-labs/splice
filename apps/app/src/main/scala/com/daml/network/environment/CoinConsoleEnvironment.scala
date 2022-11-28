@@ -50,7 +50,7 @@ class CoinConsoleEnvironment(
     val consoleOutput: ConsoleOutput = StandardConsoleOutput,
     protected val createAdminCommandRunner: ConsoleEnvironment => ConsoleGrpcAdminCommandRunner =
       new ConsoleGrpcAdminCommandRunner(_),
-) extends ConsoleEnvironment // TODO(i736): Generalize this.
+) extends ConsoleEnvironment // TODO(#736): Generalize this.
     {
 
   override type Env = CoinEnvironmentImpl

@@ -45,7 +45,7 @@ class WalletAutomationService(
     tracer: Tracer,
 ) extends AutomationService(automationConfig, clockConfig, retryProvider) {
 
-  // TODO(i1692) both of these should be configuration options that get overridden in tests
+  // TODO(#1692) both of these should be configuration options that get overridden in tests
   private val canMakeSubscriptionPaymentCheckInterval = 1.second
   // How long to delay a subscription payment after it has become payable;
   // keeping this above 15s helps avoid payment failures due to clock skew
@@ -147,7 +147,7 @@ class WalletAutomationService(
       }
   }
 
-  // TODO(i1247) consider reducing duplication with exerciseWalletCoinAction from GrpcWalletService
+  // TODO(#1247) consider reducing duplication with exerciseWalletCoinAction from GrpcWalletService
   private def makeSubscriptionPayment(
       stateCid: subsCodegen.SubscriptionIdleState.ContractId,
       userStore: EndUserWalletStore,
@@ -193,7 +193,7 @@ class WalletAutomationService(
     }))
   }
 
-  // TODO(i1247) consider reducing duplication with GrpcWallet service
+  // TODO(#1247) consider reducing duplication with GrpcWallet service
   private def getUserInstallContract(
       userWalletStore: EndUserWalletStore,
       userParty: PartyId,
@@ -207,7 +207,7 @@ class WalletAutomationService(
       .lookupInstall()
       .map(getQueryResult(_, s"WalletAppInstall contract of user $userParty"))
 
-  // TODO(i1247) consider reducing duplication with GrpcWallet service / moving into the `QueryResult` class itself
+  // TODO(#1247) consider reducing duplication with GrpcWallet service / moving into the `QueryResult` class itself
   private def getQueryResult[T](
       result: QueryResult[Option[T]],
       errorMsg: String,

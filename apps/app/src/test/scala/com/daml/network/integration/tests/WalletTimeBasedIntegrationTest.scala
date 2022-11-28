@@ -65,7 +65,7 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
               val subs = aliceRemoteWallet.listSubscriptions()
               val now = svc.remoteParticipant.ledger_api.time.get()
               subs.length shouldBe i + 1
-              // TODO(i1217) we can remove this check once `renewalDuration == entryLifetime` is no longer hard-coded in the directory backend
+              // TODO(#1217) we can remove this check once `renewalDuration == entryLifetime` is no longer hard-coded in the directory backend
               subs.foreach(sub => {
                 sub.state match {
                   case GrpcWalletAppClient.SubscriptionIdleState(state) =>

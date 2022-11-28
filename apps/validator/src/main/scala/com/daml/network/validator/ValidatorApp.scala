@@ -69,7 +69,7 @@ class ValidatorApp(
       })
       party <- connection.getOrAllocateParty(config.walletServiceUser)
       // Note: need to immediately grant right to act as wallet service user in order to install wallet install contract
-      // TODO(i713): remove this workaround for missing act-as-any-party rights
+      // TODO(#713): remove this workaround for missing act-as-any-party rights
       _ <- connection.grantUserRights(config.damlUser, Seq(party), Seq.empty)
     } yield {
       logger.info(

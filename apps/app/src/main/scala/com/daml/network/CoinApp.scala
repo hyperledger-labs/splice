@@ -7,7 +7,7 @@ import com.digitalasset.canton.config.ConfigErrors.CantonConfigError
 import com.digitalasset.canton.environment.EnvironmentFactory
 import com.typesafe.config.Config
 
-// TODO(i736): generalize. e.g. custom Cli class for Canton Coin and a Canton Coin banner (ASCII art) for the console
+// TODO(#736): generalize. e.g. custom Cli class for Canton Coin and a Canton Coin banner (ASCII art) for the console
 object CoinApp extends CantonAppDriver[CoinEnvironmentImpl] {
 
   override def loadConfig(config: Config): Either[CantonConfigError, CoinConfig] =

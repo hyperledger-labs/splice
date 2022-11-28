@@ -206,7 +206,7 @@ object CantonDependencies {
 
   // demo dependencies (you also need to update demo.sc)
   lazy val scalafx = "org.scalafx" %% "scalafx" % "17.0.1-R26"
-  // TODO(i8460) Don't upgrade until https://github.com/sbt/sbt/issues/6564 is fixed
+  // TODO(#8460) Don't upgrade until https://github.com/sbt/sbt/issues/6564 is fixed
   lazy val javafx_all =
     Seq("controls", "base", "fxml", "media", "web", "graphics").map { x =>
       "org.openjfx" % s"javafx-$x" % "17-ea+8"
