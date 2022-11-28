@@ -1,6 +1,6 @@
 package com.daml.network.validator.store
 
-import com.daml.network.codegen.java.cc.{coin => coinCodegen, coinrules => coinRulesCodegen}
+import com.daml.network.codegen.java.cc.{coin => coinCodegen}
 import com.daml.network.codegen.java.cn.wallet.install as walletCodegen
 import com.daml.network.store.AcsStore
 import com.daml.network.store.AcsStore.QueryResult
@@ -33,14 +33,14 @@ trait ValidatorStore extends AutoCloseable with NamedLogging {
     )
 
   def lookupCoinRules(): Future[
-    QueryResult[Option[Contract[coinRulesCodegen.CoinRules.ContractId, coinRulesCodegen.CoinRules]]]
+    QueryResult[Option[Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]]]
   ] =
-    acsStore.findContract(coinRulesCodegen.CoinRules.COMPANION)(_ => true)
+    acsStore.findContract(coinCodegen.CoinRules.COMPANION)(_ => true)
 
   def lookupCoinRulesRequest(): Future[QueryResult[Option[
-    Contract[coinRulesCodegen.CoinRulesRequest.ContractId, coinRulesCodegen.CoinRulesRequest]
+    Contract[coinCodegen.CoinRulesRequest.ContractId, coinCodegen.CoinRulesRequest]
   ]]] =
-    acsStore.findContract(coinRulesCodegen.CoinRulesRequest.COMPANION)(_ => true)
+    acsStore.findContract(coinCodegen.CoinRulesRequest.COMPANION)(_ => true)
 
   def lookupValidatorRightByParty(
       party: PartyId
@@ -94,8 +94,8 @@ object ValidatorStore {
             co.payload.validatorParty == validator &&
             co.payload.svcParty == svc
         ),
-        mkFilter(coinRulesCodegen.CoinRules.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(coinRulesCodegen.CoinRulesRequest.COMPANION)(co =>
+        mkFilter(coinCodegen.CoinRules.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(coinCodegen.CoinRulesRequest.COMPANION)(co =>
           co.payload.user == validator &&
             co.payload.svc == svc
         ),

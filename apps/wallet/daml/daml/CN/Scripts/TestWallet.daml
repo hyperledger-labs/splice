@@ -6,7 +6,7 @@ import Daml.Script
 import DA.List
 
 import qualified CC.API.V1.Coin as API
-import CC.Coin
+import CC.Coin hiding (CC, USD)
 import CN.Wallet.Install
 import CN.Wallet.Payment
 import CN.Wallet.PaymentChannel

@@ -38,15 +38,15 @@ trait SvcStore extends AutoCloseable {
 
   def lookupCoinRules(
   ): Future[
-    QueryResult[Option[Contract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]]]
+    QueryResult[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]
   ] =
     acsStore
-      .findContract(cc.coinrules.CoinRules.COMPANION)(_ => true)
+      .findContract(cc.coin.CoinRules.COMPANION)(_ => true)
 
   def getCoinRules(
   )(implicit
       ec: ExecutionContext
-  ): Future[QueryResult[Contract[cc.coinrules.CoinRules.ContractId, cc.coinrules.CoinRules]]] =
+  ): Future[QueryResult[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
     lookupCoinRules().map(
       _.map(
         _.getOrElse(
@@ -72,10 +72,10 @@ trait SvcStore extends AutoCloseable {
 
   /** All requests to the SVC for creating validator-specific coin rules. */
   def streamCoinRulesRequests(): Source[
-    Contract[cc.coinrules.CoinRulesRequest.ContractId, cc.coinrules.CoinRulesRequest],
+    Contract[cc.coin.CoinRulesRequest.ContractId, cc.coin.CoinRulesRequest],
     NotUsed,
   ] =
-    acsStore.streamContracts(cc.coinrules.CoinRulesRequest.COMPANION)
+    acsStore.streamContracts(cc.coin.CoinRulesRequest.COMPANION)
 
 }
 
@@ -100,8 +100,8 @@ object SvcStore {
     AcsStore.SimpleContractFilter(
       svcParty,
       Map(
-        mkFilter(cc.coinrules.CoinRules.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.coinrules.CoinRulesRequest.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.CoinRules.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.CoinRulesRequest.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.ValidatorRight.COMPANION)(co =>
           co.payload.svc == svc && co.payload.validator == svc && co.payload.user == svc
         ),

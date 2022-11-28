@@ -1,7 +1,7 @@
 package com.daml.network.scan.admin.grpc
 
 import com.daml.ledger.api.v1.transaction.TransactionTree
-import com.daml.network.codegen.java.cc.{coinrules as coinRulesCodegen, round as roundCodegen}
+import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.store.ScanCCHistoryStore
 import com.daml.network.scan.v0
@@ -48,15 +48,15 @@ class GrpcScanService(
       for {
         svc <- connection.getPrimaryParty(svcUser)
         coinRules <- connection
-          .activeContracts(svc, coinRulesCodegen.CoinRules.COMPANION)
+          .activeContracts(svc, coinCodegen.CoinRules.COMPANION)
           .map(_.headOption)
         rounds <- connection.activeContracts(svc, roundCodegen.OpenMiningRound.COMPANION)
       } yield {
         val decodedCoinRules =
           coinRules.map(c =>
             JavaContract.fromCodegenContract[
-              coinRulesCodegen.CoinRules.ContractId,
-              coinRulesCodegen.CoinRules,
+              coinCodegen.CoinRules.ContractId,
+              coinCodegen.CoinRules,
             ](c)
           )
         val decodedRounds: Seq[

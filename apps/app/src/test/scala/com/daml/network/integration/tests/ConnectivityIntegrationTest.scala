@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.coinrules.CoinRulesRequest
+import com.daml.network.codegen.java.cc.coin.CoinRulesRequest
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.plugins.toxiproxy.UseToxiproxy

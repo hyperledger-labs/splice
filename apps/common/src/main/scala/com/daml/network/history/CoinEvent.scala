@@ -4,12 +4,14 @@ import cats.syntax.traverse._
 import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
 import com.daml.ledger.javaapi.data.{Text, Value}
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin, LockedCoin_SvcExpireLock}
-import com.daml.network.codegen.java.cc.coinrules.{
+import com.daml.network.codegen.java.cc.coin.{
+  Coin,
   CoinRules,
   CoinRules_MiningRound_StartIssuing,
   CoinRules_Mint,
   CoinRules_Tap,
+  LockedCoin,
+  LockedCoin_SvcExpireLock,
 }
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.codegen.java.da

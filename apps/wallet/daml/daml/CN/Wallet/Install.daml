@@ -4,7 +4,7 @@ import DA.Exception
 
 import qualified CC.API.V1.Coin as API
 import CC.Round (OpenMiningRound)
-import CC.CoinRules (CoinRules, CoinRules_Tap(..))
+import CC.Coin (CoinRules, CoinRules_Tap(..))
 
 import CN.Wallet.Payment
 import CN.Wallet.PaymentChannel

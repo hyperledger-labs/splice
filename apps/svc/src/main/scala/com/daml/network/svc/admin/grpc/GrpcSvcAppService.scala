@@ -42,7 +42,7 @@ class GrpcSvcAppService(
     withSpanFromGrpcContext("GrpcSvcAppService") { _ => _ =>
       for {
         coinRulesCids <- connection
-          .activeContracts(store.svcParty, cc.coinrules.CoinRules.COMPANION)
+          .activeContracts(store.svcParty, cc.coin.CoinRules.COMPANION)
           .map(_.map(_.id))
       } yield v0.GetDebugInfoResponse(
         svcUser = svcUserName,

@@ -132,7 +132,7 @@ object SvcApp {
 
     // Create CoinRules and open a first mining round
     val createCoinRulesCmd =
-      new cc.coinrules.CoinRules(
+      new cc.coin.CoinRules(
         svc.toProtoPrimitive,
         defaultCoinConfig,
         Seq.empty.asJava,

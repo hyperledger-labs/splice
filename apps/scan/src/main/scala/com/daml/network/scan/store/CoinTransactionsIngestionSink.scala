@@ -12,8 +12,8 @@ import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history.*
-import com.daml.network.store.{CCHistoryStore, AuditLogIngestionSink}
-import com.daml.network.util.{ExerciseNode, Trees, JavaContract as Contract}
+import com.daml.network.store.{AuditLogIngestionSink, CCHistoryStore}
+import com.daml.network.util.{ExerciseNode, JavaContract => Contract, Trees}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
 import com.digitalasset.canton.topology.PartyId

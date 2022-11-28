@@ -1,13 +1,13 @@
 package com.daml.network.util
 
+import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
+import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{
   CoinRemoteParticipantReference,
   RemoteWalletAppReference,
   ValidatorAppReference,
 }
-import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
-import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.sequencing.SequencerTestUtils.eventually

@@ -77,7 +77,7 @@ object CoinUtil {
   def damlNumeric(x: Double): java.math.BigDecimal =
     BigDecimal(x).setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
 
-  def defaultCoinConfig: cc.coinrules.CoinConfig[cc.coinrules.USD] = new cc.coinrules.CoinConfig(
+  def defaultCoinConfig: cc.coin.CoinConfig[cc.coin.USD] = new cc.coin.CoinConfig(
     // Fee to create a new coin.
     // Set to the fixed part of the transfer fee.
     new cc.fees.FixedFee(BigDecimal(0.09).bigDecimal),

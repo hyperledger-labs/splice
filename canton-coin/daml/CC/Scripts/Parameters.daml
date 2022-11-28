@@ -1,8 +1,8 @@
 module CC.Scripts.Parameters where
 
 import DA.Time
-import CC.CoinRules
 
+import CC.Coin
 import CC.Fees
 
 -- | Default proposal for cost-competitive fees.

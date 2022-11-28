@@ -8,7 +8,6 @@ import Daml.Script
 import qualified CC.API.V1.Coin as API
 import CN.Util.Assert
 import CC.Coin
-import CC.CoinRules
 import CC.Round
 import CC.Fees
 import CC.Scripts.Util

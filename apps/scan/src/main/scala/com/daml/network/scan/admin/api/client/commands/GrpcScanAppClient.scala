@@ -4,7 +4,7 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import com.daml.ledger.api.v1.transaction.{TransactionTree => ScalaTransactionTree}
 import com.daml.ledger.javaapi.data.TransactionTree
-import com.daml.network.codegen.java.cc.{coinrules => coinRulesCodegen, round => roundCodegen}
+import com.daml.network.codegen.java.cc.{coin => coinCodegen, round => roundCodegen}
 import com.daml.network.history.CoinTransaction
 import com.daml.network.scan.v0
 import com.daml.network.scan.v0.GetClosedRoundsResponse
@@ -55,7 +55,7 @@ object GrpcScanAppClient {
 
   case class TransferContext(
       coinRules: Option[
-        Contract[coinRulesCodegen.CoinRules.ContractId, coinRulesCodegen.CoinRules]
+        Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]
       ],
       latestOpenMiningRound: Option[
         Contract[roundCodegen.OpenMiningRound.ContractId, roundCodegen.OpenMiningRound]
@@ -79,9 +79,7 @@ object GrpcScanAppClient {
     ): Either[String, TransferContext] =
       for {
         coinRules <- response.coinRules
-          .traverse(coinRules =>
-            Contract.fromProto(coinRulesCodegen.CoinRules.COMPANION)(coinRules)
-          )
+          .traverse(coinRules => Contract.fromProto(coinCodegen.CoinRules.COMPANION)(coinRules))
           .leftMap(_.toString)
         openMiningRounds <- response.openMiningRounds
           .traverse(round => Contract.fromProto(roundCodegen.OpenMiningRound.COMPANION)(round))

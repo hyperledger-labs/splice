@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.cc.round.ClosedMiningRound
 import com.daml.network.codegen.java.da
 import com.daml.network.history._
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
-import com.daml.network.util.{ExerciseNode, CoinTestUtil}
+import com.daml.network.util.{CoinTestUtil, ExerciseNode}
 
 import scala.concurrent.duration._
 

@@ -7,11 +7,7 @@ import com.daml.ledger.javaapi.data.codegen.{
   ContractId,
 }
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.{
-  coin as coinCodegen,
-  coinrules as coinRulesCodegen,
-  round as roundCodegen,
-}
+import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.wallet.{
   install => installCodegen,
   payment => walletCodegen,
@@ -150,10 +146,10 @@ trait EndUserWalletStore extends FlagCloseableAsync with NoTracing with NamedLog
   def getCoinRules()(implicit
       ec: ExecutionContext
   ): Future[
-    QueryResult[Contract[coinRulesCodegen.CoinRules.ContractId, coinRulesCodegen.CoinRules]]
+    QueryResult[Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]]
   ] = {
 
-    findContract(coinRulesCodegen.CoinRules.COMPANION).map(
+    findContract(coinCodegen.CoinRules.COMPANION).map(
       _.map(
         _.getOrElse(
           throw new StatusRuntimeException(
@@ -327,7 +323,7 @@ object EndUserWalletStore {
         ),
         mkFilter(roundCodegen.OpenMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(roundCodegen.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(coinRulesCodegen.CoinRules.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(coinCodegen.CoinRules.COMPANION)(co => co.payload.svc == svc),
       ),
       Map(
         mkFilter(subsCodegen.SubscriptionContext.INTERFACE)(co =>

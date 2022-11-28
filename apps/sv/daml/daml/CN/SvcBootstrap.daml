@@ -4,7 +4,7 @@ import DA.List
 import qualified DA.Map as Map
 
 import CN.Util.Assert
-import CC.CoinRules
+import CC.Coin
 import CC.API.V1.Round
 
 -- TODO(M2-01): move parameters into this file
