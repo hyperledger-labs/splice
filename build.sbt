@@ -40,6 +40,7 @@ lazy val root = (project in file("."))
 // seem to get broken dependencies, e.g.,
 // apps-common-frontend/damlTsCodegen ignores the dependency on
 // splitwise-daml and runs the codegen before the DAR has been built.
+// Be sure to also update the `clean-cn` alias when changing this list!
     `apps-common`,
     `apps-validator`,
     `apps-scan`,
@@ -69,6 +70,7 @@ lazy val root = (project in file("."))
 
 // Defined so we can call damlBuild and damlTest on just our daml files
 // (due to sbt being sbt, there is no better workaround).
+// Be sure to also update the `clean-cn` and `damlTestSingle` aliases when changing this list!
 lazy val `daml-root` = project
   .aggregate(
     `cn-util-daml`,

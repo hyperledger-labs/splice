@@ -738,7 +738,7 @@ jobs:
       - checkout
       - setup_sbt_test_job
       - execute_sbt_command:
-          cmd: "daml-root/damlTest"
+          cmd: "damlTestSingle"
           timeout: "10m"
       - cleanup_sbt_test_job
 
