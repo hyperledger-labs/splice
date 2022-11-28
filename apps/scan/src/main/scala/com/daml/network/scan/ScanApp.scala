@@ -8,7 +8,7 @@ import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
 import com.daml.network.scan.admin.grpc.GrpcScanService
 import com.daml.network.scan.automation.ScanAutomationService
 import com.daml.network.scan.config.LocalScanAppConfig
-import com.daml.network.scan.store.ScanCCHistoryStore
+import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.v0.ScanServiceGrpc
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.config.RequireTypes.InstanceName
@@ -56,7 +56,7 @@ class ScanApp(
       svcParty: PartyId,
   ): Future[ScanApp.State] =
     for {
-      store <- Future.successful(ScanCCHistoryStore(storage, loggerFactory))
+      store <- Future.successful(ScanStore(svcParty, storage, loggerFactory))
       automation = new ScanAutomationService(
         config.automation,
         coinAppParameters.clockConfig,
@@ -71,7 +71,7 @@ class ScanApp(
       adminServerRegistry
         .addService(
           ScanServiceGrpc.bindService(
-            new GrpcScanService(ledgerClient, config.svcUser, store, loggerFactory),
+            new GrpcScanService(ledgerClient, store, loggerFactory),
             ec,
           )
         )
@@ -93,7 +93,7 @@ object ScanApp {
 
   case class State(
       storage: Storage,
-      store: ScanCCHistoryStore,
+      store: ScanStore,
       automation: ScanAutomationService,
       logger: TracedLogger,
   ) extends AutoCloseable

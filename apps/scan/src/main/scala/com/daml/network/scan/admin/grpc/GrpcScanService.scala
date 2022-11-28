@@ -1,18 +1,12 @@
 package com.daml.network.scan.admin.grpc
 
 import com.daml.ledger.api.v1.transaction.TransactionTree
-import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
+import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.environment.CoinLedgerClient
-import com.daml.network.scan.store.ScanCCHistoryStore
+import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.v0
-import com.daml.network.scan.v0.{
-  GetClosedRoundsResponse,
-  GetCoinTransactionDetailsRequest,
-  GetCoinTransactionDetailsResponse,
-  GetHistoryResponse,
-  ScanServiceGrpc,
-}
-import com.daml.network.util.JavaContract
+import com.daml.network.scan.v0.*
+import com.daml.network.store.AcsStore.QueryResult
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
 import com.google.protobuf.empty.Empty
@@ -23,8 +17,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class GrpcScanService(
     ledgerClient: CoinLedgerClient,
-    svcUser: String,
-    store: ScanCCHistoryStore,
+    store: ScanStore,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -38,41 +31,19 @@ class GrpcScanService(
   @nowarn("cat=unused")
   override def getSvcPartyId(request: Empty): Future[v0.GetSvcPartyIdResponse] =
     withSpanFromGrpcContext("GrpcScanService") { implicit traceContext => span =>
-      for {
-        party <- connection.getPrimaryParty(svcUser)
-      } yield v0.GetSvcPartyIdResponse(party.toProtoPrimitive)
+      Future.successful(v0.GetSvcPartyIdResponse(store.svcParty.toProtoPrimitive))
     }
 
   override def getTransferContext(request: Empty): Future[v0.GetTransferContextResponse] =
     withSpanFromGrpcContext("GrpcScanService") { traceContext => span =>
       for {
-        svc <- connection.getPrimaryParty(svcUser)
-        coinRules <- connection
-          .activeContracts(svc, coinCodegen.CoinRules.COMPANION)
-          .map(_.headOption)
-        rounds <- connection.activeContracts(svc, roundCodegen.OpenMiningRound.COMPANION)
+        QueryResult(_, coinRules) <- store.lookupCoinRules()
+        QueryResult(_, rounds) <- store.listContracts(roundCodegen.OpenMiningRound.COMPANION)
       } yield {
-        val decodedCoinRules =
-          coinRules.map(c =>
-            JavaContract.fromCodegenContract[
-              coinCodegen.CoinRules.ContractId,
-              coinCodegen.CoinRules,
-            ](c)
-          )
-        val decodedRounds: Seq[
-          JavaContract[roundCodegen.OpenMiningRound.ContractId, roundCodegen.OpenMiningRound]
-        ] =
-          rounds.map(r =>
-            JavaContract.fromCodegenContract[
-              roundCodegen.OpenMiningRound.ContractId,
-              roundCodegen.OpenMiningRound,
-            ](r)
-          )
         v0.GetTransferContextResponse(
-          coinRules = decodedCoinRules.map(_.toProtoV0),
-          latestOpenMiningRound =
-            decodedRounds.maxByOption(_.payload.round.number).map(_.toProtoV0),
-          openMiningRounds = decodedRounds.map(_.toProtoV0),
+          coinRules = coinRules.map(_.toProtoV0),
+          latestOpenMiningRound = rounds.maxByOption(_.payload.round.number).map(_.toProtoV0),
+          openMiningRounds = rounds.map(_.toProtoV0),
         )
       }
     }
@@ -80,7 +51,7 @@ class GrpcScanService(
   override def getHistory(request: Empty): Future[GetHistoryResponse] =
     withSpanFromGrpcContext("GrpcScanService") { traceContext => span =>
       for {
-        result <- store.getCCHistory
+        result <- store.history.getCCHistory
       } yield v0.GetHistoryResponse(result.map(_.toProtoV0))
     }
 
@@ -89,8 +60,7 @@ class GrpcScanService(
   ): Future[GetCoinTransactionDetailsResponse] = withSpanFromGrpcContext("GrpcScanService") {
     traceContext => span =>
       for {
-        svc <- connection.getPrimaryParty(svcUser)
-        tree <- connection.tryGetTransactionTreeById(Seq(svc), request.transactionId)
+        tree <- connection.tryGetTransactionTreeById(Seq(store.svcParty), request.transactionId)
       } yield v0.GetCoinTransactionDetailsResponse(
         Some(TransactionTree.fromJavaProto(tree.toProto))
       )
@@ -99,22 +69,10 @@ class GrpcScanService(
   override def getClosedRounds(request: Empty): Future[GetClosedRoundsResponse] =
     withSpanFromGrpcContext("GrpcScanService") { traceContext => span =>
       for {
-        svc <- connection.getPrimaryParty(svcUser)
-        rounds <- connection.activeContracts(svc, roundCodegen.ClosedMiningRound.COMPANION)
+        QueryResult(_, rounds) <- store.listContracts(roundCodegen.ClosedMiningRound.COMPANION)
       } yield {
-        val filteredRounds = rounds
-          .sortWith(_.data.round.number > _.data.round.number)
-        v0.GetClosedRoundsResponse(
-          filteredRounds.map(r =>
-            JavaContract
-              .fromCodegenContract[
-                roundCodegen.ClosedMiningRound.ContractId,
-                roundCodegen.ClosedMiningRound,
-              ](r)
-              .toProtoV0
-          )
-        )
+        val filteredRounds = rounds.sortWith(_.payload.round.number > _.payload.round.number)
+        v0.GetClosedRoundsResponse(filteredRounds.map(r => r.toProtoV0))
       }
     }
-
 }

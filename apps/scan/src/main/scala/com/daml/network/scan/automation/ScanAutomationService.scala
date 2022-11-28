@@ -1,11 +1,14 @@
 package com.daml.network.scan.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{AuditLogIngestionService, AutomationService}
+import com.daml.network.automation.{
+  AcsIngestionService,
+  AuditLogIngestionService,
+  AutomationService,
+}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
-import com.daml.network.scan.admin.ReferenceDataIngestionSink
-import com.daml.network.scan.store.{CoinTransactionsIngestionSink, ScanCCHistoryStore}
+import com.daml.network.scan.store.{CoinTransactionsIngestionSink, ScanStore}
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
@@ -22,7 +25,7 @@ class ScanAutomationService(
     retryProvider: CoinRetries,
     protected val loggerFactory: NamedLoggerFactory,
     protected val timeouts: ProcessingTimeout,
-    store: ScanCCHistoryStore,
+    store: ScanStore,
 )(implicit
     ec: ExecutionContextExecutor,
     mat: Materializer,
@@ -34,7 +37,7 @@ class ScanAutomationService(
   registerService(
     new AuditLogIngestionService(
       "Scan:ReadCoinTransactionsService",
-      new CoinTransactionsIngestionSink(svcParty, connection, store, loggerFactory),
+      new CoinTransactionsIngestionSink(svcParty, connection, store.history, loggerFactory),
       connection,
       retryProvider,
       loggerFactory,
@@ -43,9 +46,9 @@ class ScanAutomationService(
   )
 
   registerService(
-    new AuditLogIngestionService(
-      "Scan:ReadReferenceData",
-      new ReferenceDataIngestionSink(svcParty, store, loggerFactory),
+    new AcsIngestionService(
+      store.getClass.getSimpleName,
+      store.acsIngestionSink,
       connection,
       retryProvider,
       loggerFactory,
