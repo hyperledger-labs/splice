@@ -7,3 +7,5 @@ dependencies:
 - daml-stdlib
 - daml-script
 data-dependencies: []
+build-options:
+  - --ghc-option=-Wno-controller-can

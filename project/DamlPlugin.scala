@@ -217,9 +217,9 @@ object DamlPlugin extends AutoPlugin {
           sourceDirectory ** "daml.yaml"
         val log = streams.value.log
         val damlVersion = damlCompilerVersion.value
-        val damlc = ensureDamlc(damlVersion)
+        val damlc = ensureDamlc(damlVersion, log)
         // so far canton system dars depend on daml-script, but maybe daml-triggers or others some day?
-        val damlLibsEnv = ensureDamlLibsEnv(damlVersion, damlLanguageVersions.value)
+        val damlLibsEnv = ensureDamlLibsEnv(damlVersion, damlLanguageVersions.value, log)
         damlProjectFiles.get.toList.foreach { projectFile =>
           val projectDirectory = projectFile.toPath.toAbsolutePath.getParent
           val result = Process(
@@ -239,19 +239,6 @@ object DamlPlugin extends AutoPlugin {
   }
 
   import autoImport._
-
-  class BufferedLogger extends ProcessLogger {
-    private val buffer = mutable.Buffer[String]()
-
-    override def out(s: => String): Unit = buffer.append(s)
-    override def err(s: => String): Unit = buffer.append(s)
-    override def buffer[T](f: => T): T = f
-
-    /** Output the buffered content to a String applying an optional line prefix.
-      */
-    def output(linePrefix: String = ""): String =
-      buffer.map(l => s"$linePrefix$l").mkString(System.lineSeparator)
-  }
 
   override lazy val globalSettings: Seq[Def.Setting[_]] = Seq(
     damlCompilerVersion := CantonDependencies.daml_compiler_version,
@@ -343,17 +330,26 @@ object DamlPlugin extends AutoPlugin {
   private def artifactoryUrl(damlVersion: String) =
     s"https://storage.googleapis.com/daml-binaries/split-releases/${damlVersion}/"
 
-  private def ensureDamlc(damlVersion: String) =
+  private def ensureDamlc(damlVersion: String, log: Logger) = {
+    val os =
+      if (System.getProperty("os.name").toLowerCase.startsWith("mac os x"))
+        "macos"
+      else
+        "linux"
     ensureArtifactAvailable(
       url = artifactoryUrl(damlVersion),
-      artifactFilename =
-        s"damlc-${damlVersion}-${if (System.getProperty("os.name").toLowerCase.startsWith("mac os x")) "macos"
-          else "linux"}.tar.gz",
+      artifactFilename = s"damlc-${damlVersion}-$os.tar.gz",
       damlVersion = damlVersion,
       tarballPath = Seq("damlc", "damlc"),
+      log = log,
     )
+  }
 
-  private def ensureDamlLibsEnv(damlVersion: String, damlLanguageVersions: Seq[String]) = {
+  private def ensureDamlLibsEnv(
+      damlVersion: String,
+      damlLanguageVersions: Seq[String],
+      log: Logger,
+  ) = {
     // so far canton system dars depend on daml-script, but maybe daml-triggers or others some day?
     val damlLibsDependencyTypes = Seq("daml-script")
     val damlLibsDependencyVersions = damlLanguageVersions.foldLeft(Seq(""))(_ :+ "-" + _)
@@ -366,6 +362,7 @@ object DamlPlugin extends AutoPlugin {
         artifactFilename = s"${depType}${depVersion}.dar",
         damlVersion = damlVersion,
         localSubdir = Some("daml-libs"),
+        log = log,
       )
     }).headOption.map("DAML_SDK" -> _.getParentFile.getParentFile.getAbsolutePath).toSeq
   }
@@ -387,9 +384,9 @@ object DamlPlugin extends AutoPlugin {
     )
     val projectDirectory = originalDamlProjectFile.getAbsoluteFile.getParentFile
     val url = artifactoryUrl(damlVersion)
-    val damlc = ensureDamlc(damlVersion)
+    val damlc = ensureDamlc(damlVersion, log)
 
-    val damlLibsEnv = ensureDamlLibsEnv(damlVersion, damlLanguageVersions)
+    val damlLibsEnv = ensureDamlLibsEnv(damlVersion, damlLanguageVersions, log)
 
     log.debug(
       s"building ${projectDirectory}"
@@ -399,22 +396,15 @@ object DamlPlugin extends AutoPlugin {
     val damlProjectVersion = readDamlYaml(originalDamlProjectFile).get("version").toString
     val outputDar =
       outputDirectory / s"$damlProjectName-$damlProjectVersion.dar"
-    val processLogger = new BufferedLogger
 
-    val result = Process(
-      command = damlc.getAbsolutePath :: "build" ::
+    val result = BuildUtil.runCommand(
+      damlc.getAbsolutePath :: "build" ::
         "--project-root" :: projectDirectory.toString ::
         "--output" :: outputDar.getAbsolutePath :: Nil,
-      cwd = projectDirectory,
-      extraEnv = damlLibsEnv: _*, // env variable set so that damlc finds daml-script dar
-    ) ! processLogger
-
-    if (result != 0) {
-      throw new MessageOnlyException(s"""
-                                        |damlc build failed [$originalDamlProjectFile]:
-                                        |${processLogger.output("  ")}
-        """.stripMargin.trim)
-    }
+      log,
+      optCwd = Some(projectDirectory),
+      extraEnv = damlLibsEnv, // env variable set so that damlc finds daml-script dar
+    )
 
     Seq(outputDar)
   }
@@ -426,39 +416,11 @@ object DamlPlugin extends AutoPlugin {
     } finally reader.close()
   }
 
-  private def retryProcess(
-      args: Seq[String],
-      logger: BufferedLogger,
-      errorMessage: Throwable => String,
-  ) = {
-    @tailrec
-    def go(n: Int): Unit = {
-      Try {
-        Process(args) !! logger
-      } match {
-        case Success(str) =>
-          if (str.nonEmpty)
-            logger.output("OUTPUT: ")
-        case Failure(t) =>
-          logger.output()
-          val msg = errorMessage(t)
-          if (n <= 0) {
-            throw new MessageOnlyException(
-              msg
-            )
-          } else {
-            Thread.sleep(1000)
-            go(n - 1)
-          }
-      }
-    }
-    go(5)
-  }
-
   private def ensureArtifactAvailable(
       url: String,
       artifactFilename: String,
       damlVersion: String,
+      log: Logger,
       tarballPath: Seq[String] = Seq.empty,
       localSubdir: Option[String] = None,
   ): File = {
@@ -474,8 +436,7 @@ object DamlPlugin extends AutoPlugin {
 
     this.synchronized {
       if (!artifact.exists) {
-        val logger = new BufferedLogger()
-        logger.out(s"Downloading missing ${artifactFilename} to ${root.path}")
+        log.info(s"Downloading missing ${artifactFilename} to ${root.path}")
         root.createDirectoryIfNotExists(createParents = true)
         val curlWithBasicOptions = "curl" :: "-sSL" :: "--fail" :: Nil
         val credentials = url match {
@@ -491,28 +452,23 @@ object DamlPlugin extends AutoPlugin {
         }
         val fileAndUrl =
           "-o" :: (root / artifactFilename).toJava.getPath :: (url + artifactFilename) :: Nil
-        retryProcess(
+        BuildUtil.runCommandWithRetries(
           curlWithBasicOptions ++ credentials ++ fileAndUrl,
-          logger,
-          t => s"Failed to download from ${url + artifactFilename}. Exception ${t.getMessage}",
+          log,
+          optError = Some(s"Failed to download from ${url + artifactFilename}"),
         )
 
         if (tarballPath.nonEmpty) {
           val tarball = root / artifactFilename
-          logger.out(s"Downloaded damlc tarball to ${root.path}. Untarring ${tarball.pathAsString}")
-          val result = Process(
-            command = "tar" :: "xzf" :: tarball.pathAsString :: Nil,
-            cwd = root.toJava,
-          ) ! logger
+          log.info(s"Downloaded damlc tarball to ${root.path}. Untarring ${tarball.pathAsString}")
+          BuildUtil.runCommand(
+            "tar" :: "xzf" :: tarball.pathAsString :: Nil,
+            log,
+            optCwd = Some(root.toJava),
+          )
 
-          if (result == 0) {
-            // best effort removal of tarball no longer needed to save space
-            tarball.delete(swallowIOExceptions = true)
-          } else {
-            throw new MessageOnlyException(s"""
-                                              |tar xzf ${tarball.pathAsString} has failed with exit code ${result}:
-                                              |${logger.output("  ")}""".stripMargin.trim)
-          }
+          // best effort removal of tarball no longer needed to save space
+          tarball.delete(swallowIOExceptions = true)
         }
       }
 
@@ -556,24 +512,16 @@ object DamlPlugin extends AutoPlugin {
       url = url,
       artifactFilename = artifact,
       damlVersion = damlVersion,
+      log = log,
     ).getAbsolutePath
 
     log.debug(s"Running $language-codegen for ${darFile} into ${managedSourceDir}")
 
-    val processLogger = new BufferedLogger
-
-    // run the daml process using the working directory of the daml.yaml project file
-    val result = Process(
+    BuildUtil.runCommand(
       "java" :: "-jar" :: codegenJarPath :: s"${darFile.getAbsolutePath}=$packageName" ::
-        s"--output-directory=${managedSourceDir.getAbsolutePath}" :: Nil
-    ) ! processLogger
-
-    if (result != 0) {
-      throw new MessageOnlyException(s"""
-                                        |java -jar ${codegenJarPath} failed [${darFile.getName}]:
-                                        |${processLogger.output("  ")}
-      """.stripMargin.trim)
-    }
+        s"--output-directory=${managedSourceDir.getAbsolutePath}" :: Nil,
+      log,
+    )
 
     // return all generated scala files
     (managedSourceDir ** s"*.${suffix}").get

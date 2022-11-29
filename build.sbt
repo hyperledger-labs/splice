@@ -1,4 +1,5 @@
-import BuildCommon.{runCommand, sharedCantonSettings}
+import BuildUtil.runCommand
+import BuildCommon.sharedCantonSettings
 import Dependencies._
 import DamlPlugin.autoImport._
 import BuildCommon.defs._
@@ -260,7 +261,7 @@ lazy val `apps-common-frontend` = {
         (`apps-common-frontend-protobuf` / Compile / compile).value
         val log = streams.value.log
         runCommand(
-          s"npm run build --workspace common-frontend",
+          Seq("npm", "run", "build", "--workspace", "common-frontend"),
           log,
           None,
           Some(npmRootDir.value),
@@ -272,7 +273,7 @@ lazy val `apps-common-frontend` = {
       npmLint := {
         val log = streams.value.log
         runCommand(
-          s"npm run check --workspaces",
+          Seq("npm", "run", "check", "--workspaces"),
           log,
           None,
           Some(npmRootDir.value),
@@ -281,7 +282,7 @@ lazy val `apps-common-frontend` = {
       npmFix := {
         val log = streams.value.log
         runCommand(
-          s"npm run fix --workspaces",
+          Seq("npm", "run", "fix", "--workspaces"),
           log,
           None,
           Some(npmRootDir.value),
@@ -347,7 +348,7 @@ lazy val `apps-common-frontend-protobuf` = {
     .settings(
       Compile / sourceGenerators += Def.task {
         val log = streams.value.log
-        runCommand(s"bash ${baseDirectory.value}/gen-ledger-api-proto.sh", log)
+        runCommand(Seq(s"${baseDirectory.value}/gen-ledger-api-proto.sh"), log)
         Seq()
       }.taskValue,
       cleanFiles += baseDirectory.value / "com",
@@ -456,13 +457,17 @@ lazy val bundleTask = {
         (`wallet-daml` / Compile / damlBuild).value,
         (`splitwise-daml` / Compile / damlBuild).value,
       )
-    val args = examples ++ webUis.flatMap({ case (source, name) =>
-      Seq("-r", source, s"web-uis/$name")
+    val args: Seq[String] = examples ++ webUis.flatMap({ case (source, name) =>
+      Seq[String]("-r", source.toString, s"web-uis/$name")
     }) ++ dars.flatten.flatMap({ case dar =>
-      Seq("-r", dar, s"dars/${dar.getName}")
+      Seq[String]("-r", dar.toString, s"dars/${dar.getName}")
     })
     runCommand(
-      s"bash ./create-bundle.sh $assemblyJar ${(assembly / mainClass).value.get} ${args.mkString(" ")}",
+      Seq[String](
+        "./create-bundle.sh",
+        assemblyJar.toString,
+        (assembly / mainClass).value.get,
+      ) ++ args,
       log,
     )
     assemblyJar
@@ -472,8 +477,8 @@ lazy val bundleTask = {
 lazy val cleanCnDars = taskKey[Unit]("Remove all `.dar` files in `apps` and `canton-coin`")
 cleanCnDars := {
   val log = streams.value.log
-  runCommand(s"find apps -name *.dar -delete", log)
-  runCommand(s"find canton-coin -name *.dar -delete", log)
+  runCommand(Seq("find", "apps", "-name", "*.dar", "-delete"), log)
+  runCommand(Seq("find", "canton-coin", "-name", "*.dar", "-delete"), log)
 }
 
 lazy val checkErrors = taskKey[Unit]("Check test log for errors and fail if there is one")

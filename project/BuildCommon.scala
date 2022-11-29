@@ -36,7 +36,7 @@ object BuildCommon {
     // While the error claims that being in PATH is sufficient, the error is lying. It really
     // needs to be an absolute path. Since some people also like starting
     // SBT outside of the nix-shell we query nix directly for the PATH.
-    val processLogger = new DamlPlugin.BufferedLogger
+    val processLogger = new BuildUtil.BufferedLogger
     val exitCode = scala.sys.process
       .Process(
         Seq("nix-build", "-E", "(import nix/default.nix {}).protoc-gen-grpc-web", "--no-out-link"),
@@ -271,7 +271,7 @@ object BuildCommon {
           |""".stripMargin,
       )
       // call buf tool
-      runCommand(s"buf lint", streams.value.log, optCwd = Some(targetSourceDir))
+      BuildUtil.runCommand(Seq("buf", "lint"), streams.value.log, optCwd = Some(targetSourceDir))
       ()
     },
   )
@@ -292,29 +292,6 @@ object BuildCommon {
 //    ),
     scalacOptions += "-Wconf:src=src_managed/.*:silent",
   )
-
-  /** Utility function to run a (shell) command. */
-  def runCommand(
-      command: String,
-      log: ManagedLogger,
-      optError: Option[String] = None,
-      optCwd: Option[File] = None,
-  ): String = {
-    import scala.sys.process.Process
-    val processLogger = new DamlPlugin.BufferedLogger
-    val cwdInfo = optCwd.map(cwd => s" in `$cwd`").getOrElse("")
-    log.debug(s"Running $command$cwdInfo")
-    val exitCode = Process(command, optCwd) ! processLogger
-    val output = processLogger.output()
-    if (exitCode != 0) {
-      val errorMsg =
-        s"Running command `$command`$cwdInfo returned non-zero exit code: $exitCode}"
-      log.error(output)
-      if (optError.isDefined) log.error(optError.getOrElse(""))
-      throw new IllegalStateException(errorMsg)
-    } else if (output != "") log.info(processLogger.output())
-    output
-  }
 
   lazy val `canton-community-app` = {
     import CantonDependencies._
@@ -703,12 +680,13 @@ object BuildCommon {
   lazy val damlTsCodegenTask: Def.Initialize[Task[Seq[File]]] = Def.task {
     val log = streams.value.log
     val dars = damlTsCodegenSources.value
-    val args = dars ++ Seq("-o", damlTsCodegenDir.value)
+    val args: Seq[String] =
+      dars.map(_.toString) ++ Seq[String]("-o", damlTsCodegenDir.value.toString)
     val cacheDir = streams.value.cacheDirectory
     val cache =
       FileFunction.cached(cacheDir) { _ =>
         damlTsCodegenDir.value.delete()
-        runCommand(s"daml2ts ${args.mkString(" ")}", log)
+        BuildUtil.runCommand("daml2ts" +: args, log)
         Set(damlTsCodegenDir.value)
       }
     cache(dars.toSet).toSeq
@@ -725,7 +703,12 @@ object BuildCommon {
     val cacheDir = streams.value.cacheDirectory
     val cache =
       FileFunction.cached(cacheDir) { _ =>
-        runCommand(npmInstallScript.getAbsolutePath, log, None, Some(npmRootDir.value))
+        BuildUtil.runCommandWithRetries(
+          Seq(npmInstallScript.getAbsolutePath),
+          log,
+          None,
+          Some(npmRootDir.value),
+        )
         Set(npmRootDir.value / "node_modules")
       }
     cache(pkgs.toSet).toSeq
@@ -738,8 +721,8 @@ object BuildCommon {
   lazy val bundleFrontend: Def.Initialize[Task[File]] = Def.task {
     commonFrontendBundle.value
     val log = streams.value.log
-    runCommand(
-      s"npm run build -w ${frontendWorkspace.value}",
+    BuildUtil.runCommand(
+      Seq("npm", "run", "build", "-w", frontendWorkspace.value),
       log,
       None,
       Some(baseDirectory.value / "../../"),

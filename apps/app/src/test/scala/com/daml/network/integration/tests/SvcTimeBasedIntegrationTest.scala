@@ -1,13 +1,13 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.round.*
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.round.*
 import com.daml.network.util.CoinTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 

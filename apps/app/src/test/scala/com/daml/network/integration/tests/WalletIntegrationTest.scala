@@ -2,8 +2,8 @@ package com.daml.network.integration.tests
 
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   payment as walletCodegen,
