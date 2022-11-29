@@ -144,14 +144,10 @@ object BuildCommon {
     )
 
     val commandAliases =
-      // cheekily overwriting test task here because we don't want the tests of the copied Canton files to run
-      // additionally, we don't want LiveDevNetTest tests to run by default either
-      addCommandAlias("test", "; apps-app/testOnly * -- -l LiveDevNetTest") ++
-        addCommandAlias("testOnly", "; apps-app/testOnly") ++
-        addCommandAlias(
-          "scalafixCheck",
-          s"${alsoTest("scalafix --check")}",
-        ) ++
+      addCommandAlias(
+        "scalafixCheck",
+        s"${alsoTest("scalafix --check")}",
+      ) ++
         addCommandAlias(
           "format",
           s"; scalafmt ; Test / scalafmt ; scalafmtSbt",
@@ -260,6 +256,17 @@ object BuildCommon {
     },
   )
 
+  // Settings to disable tests for canton projects, so we don't run them when running our tests.
+  lazy val disableTests = Seq(
+    Compile / testOnly := {},
+    Test / testOnly := {},
+    testOnly := {},
+    Compile / test := {},
+    Test / test := {},
+    testOnly := {},
+    Test / definedTests := Seq.empty,
+  )
+
   // applies to all Canton-based sub-projects (descendants of community-common)
   lazy val sharedCantonSettings = Seq(
     // Enable logging of begin and end of test cases, test suites, and test runs.
@@ -290,6 +297,7 @@ object BuildCommon {
       .settings(
         // commented out from Canton OS repo as settings don't apply to us
         //      sharedAppSettings,
+        disableTests,
         libraryDependencies ++= Seq(
           scala_logging,
           jul_to_slf4j,
@@ -351,6 +359,7 @@ object BuildCommon {
         `canton-wartremover-extension` % "compile->compile;test->test",
       )
       .settings(
+        disableTests,
         sharedCantonSettings,
         libraryDependencies ++= Seq(
           akka_slf4j, // not used at compile time, but required by com.digitalasset.canton.util.AkkaUtil.createActorSystem
@@ -477,6 +486,7 @@ object BuildCommon {
       .apply("canton-community-domain", file("canton/community/domain"))
       .dependsOn(`canton-community-common` % "compile->compile;test->test")
       .settings(
+        disableTests,
         sharedCantonSettings,
         libraryDependencies ++= Seq(
           scala_logging,
@@ -514,6 +524,7 @@ object BuildCommon {
       .dependsOn(`canton-community-common` % "compile->compile;test->test", `canton-daml-fork`)
       .enablePlugins(DamlPlugin)
       .settings(
+        disableTests,
         sharedCantonSettings,
         libraryDependencies ++= Seq(
           scala_logging,
@@ -573,6 +584,7 @@ object BuildCommon {
       .apply("canton-blake2b", file("canton/community/lib/Blake2b"))
       .disablePlugins(ScalafmtPlugin, WartRemover)
       .settings(
+        disableTests,
         sharedSettings,
         libraryDependencies ++= Seq(
           bouncycastle_bcprov_jdk15on,
@@ -587,6 +599,7 @@ object BuildCommon {
       .apply("canton-functionmeta", file("canton/community/lib/functionmeta"))
       .disablePlugins(ScalafmtPlugin, WartRemover)
       .settings(
+        disableTests,
         sharedSettings,
         libraryDependencies ++= Seq(
           scala_reflect,
@@ -606,6 +619,7 @@ object BuildCommon {
       .apply("canton-slick-fork", file("canton/community/lib/slick"))
       .disablePlugins(ScalafmtPlugin, WartRemover)
       .settings(
+        disableTests,
         sharedSettings,
         libraryDependencies ++= Seq(
           scala_reflect,
@@ -620,6 +634,7 @@ object BuildCommon {
       .apply("canton-wartremover-extension", file("canton/community/lib/wartremover"))
       .dependsOn(`canton-slick-fork`)
       .settings(
+        disableTests,
         sharedSettings,
         libraryDependencies ++= Seq(
           cats,
@@ -642,6 +657,7 @@ object BuildCommon {
       .apply("canton-daml-fork", file("canton/community/lib/daml"))
       .disablePlugins(WartRemover) // to accommodate different daml repo coding style
       .settings(
+        disableTests,
         sharedSettings,
         libraryDependencies ++= Seq(),
         dependencyOverrides ++= Seq(log4j_core, log4j_api),
