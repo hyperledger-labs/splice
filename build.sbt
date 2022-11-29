@@ -37,11 +37,6 @@ inThisBuild(
  */
 lazy val root = (project in file("."))
   .aggregate(
-// Not listing *-daml projects here. If we do list it we sometimes
-// seem to get broken dependencies, e.g.,
-// apps-common-frontend/damlTsCodegen ignores the dependency on
-// splitwise-daml and runs the codegen before the DAR has been built.
-// Be sure to also update the `clean-cn` alias when changing this list!
     `apps-common`,
     `apps-validator`,
     `apps-scan`,
@@ -52,6 +47,14 @@ lazy val root = (project in file("."))
     `apps-wallet`,
     `apps-directory`,
     `apps-frontends`,
+    `cn-util-daml`,
+    `canton-coin-api-daml`,
+    `canton-coin-daml`,
+    `wallet-payments-daml`,
+    `wallet-daml`,
+    `directory-daml`,
+    `splitwise-daml`,
+    `svc-governance-daml`,
     `canton-community-common`,
     `canton-blake2b`,
     `canton-slick-fork`,
@@ -67,21 +70,6 @@ lazy val root = (project in file("."))
     scalacOptions += "-Wconf:src=src_managed/.*:silent",
     // Needed to be able to resolve scalafmt snapshot versions
     resolvers += Resolver.sonatypeRepo("snapshots"),
-  )
-
-// Defined so we can call damlBuild and damlTest on just our daml files
-// (due to sbt being sbt, there is no better workaround).
-// Be sure to also update the `clean-cn` and `damlTestSingle` aliases when changing this list!
-lazy val `daml-root` = project
-  .aggregate(
-    `cn-util-daml`,
-    `canton-coin-api-daml`,
-    `canton-coin-daml`,
-    `wallet-payments-daml`,
-    `wallet-daml`,
-    `directory-daml`,
-    `splitwise-daml`,
-    `svc-governance-daml`,
   )
 
 // Shared non-template/non-interface code

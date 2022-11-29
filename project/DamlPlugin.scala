@@ -253,7 +253,7 @@ object DamlPlugin extends AutoPlugin {
       cleanFiles += (Compile / damlSourceDirectory).value.getAbsoluteFile / ".daml"
     ) ++
       inConfig(Compile)(baseDamlPluginSettings) ++
-      inConfig(Test)(baseDamlPluginSettings :+ damlTestSetting)
+      inConfig(Test)(damlTestSetting)
 
   /** Verify that the versions in the daml.yaml file match what is being used in the sbt project.
     * If a mismatch is found a [[sbt.internal.MessageOnlyException]] will be thrown.

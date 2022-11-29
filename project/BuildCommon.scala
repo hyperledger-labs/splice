@@ -170,23 +170,7 @@ object BuildCommon {
           "clean-cn",
           "; apps-common/clean; apps-validator/clean; apps-scan/clean; apps-splitwise/clean; apps-svc/clean; apps-sv/clean; apps-wallet/clean; apps-directory/clean; apps-app/clean; cn-util-daml/clean; canton-coin-daml/clean; canton-coin-api-daml/clean; svc-governance-daml/clean; wallet-daml/clean; wallet-payments-daml/clean; directory-daml/clean; splitwise-daml/clean; apps-frontends/clean; cleanCnDars",
         ) ++
-        addCommandAlias("cn-clean", "; clean-cn") ++
-        addCommandAlias(
-          "damlTest",
-          "; daml-root/damlTest; ",
-        ) ++
-        addCommandAlias(
-          "damlTestSingle",
-          // like damlTest, but forces sbt to run the individual tests one by
-          // one. We use this on CI to avoid a daml_test flake which is most likely
-          // due to sbt failing to maintain correct daml build order or sbt causing
-          // some weird damlc race.
-          "; cn-util-daml/damlTest; canton-coin-daml/damlTest; canton-coin-api-daml/damlTest; wallet-daml/damlTest; wallet-payments-daml/damlTest; directory-daml/damlTest; splitwise-daml/damlTest; svc-governance-daml/damlTest",
-        ) ++
-        addCommandAlias(
-          "damlBuild",
-          "; daml-root/damlBuild; ",
-        )
+        addCommandAlias("cn-clean", "; clean-cn")
     val buildSettings = inThisBuild(
       Seq(
         organization := "com.daml.network",

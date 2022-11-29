@@ -116,7 +116,7 @@ More commands can be found in build.sbt and BuildCommon.scala.
 - `format`: apply `scalafmt` to format source files
 - `formatFix`: apply `scalafmt`, `sbt scalafixAll` and `sbt apps-frontends/npmFix` to format source files
 - `lint`: lint-check. Does not apply any fixes. Checks enforcement of `scalafmt`, `buf`, `scalafix` and `apps-frontends/npmLint` rules
-- `damlRoot/damlBuild`: create `.dar` files for all Daml projects
+- `damlBuild`: create `.dar` files for all Daml projects
 - `protobufLint`: to lint our protobuf files using `buf`
 - `bundle`: create a release bundle in `apps/app/target/release/<version>`. The release binary is loaded into your PATH automatically via `direnv`. Simply run `coin` to call it.
 - `checkErrors`: check test log for errors and fail if there is one. Note that if you haven't deleted your local log file in a long time, this may find very old errors.
@@ -126,7 +126,7 @@ Test:
   `testOnly com.digitalasset.myPackage.*` runs all tests in package `com.digitalasset.myPackage`.
   `testOnly *Wallet* -- -z "allow calling tap"` runs all tests with classname matching `*Wallet*` and test description matching `allow calling tap`.
 - `test`: runs all tests (with the exception of some tests running against the cluster that are excluded on purpose - see the overwrite of `test` in `BuildCommon.scala` for more details)
-- `daml-root/damlTest`: run the Daml script tests included with the apps' Daml files
+- `damlTest`: run the Daml script tests included with the apps' Daml files
 
 #### `sbt` Tips&Tricks
 
