@@ -90,17 +90,15 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
         _ => {
           eventually() {
             val subs = aliceRemoteWallet.listSubscriptions()
-            subs.length shouldBe 3
+            subs should have length 3
             subs
-              .count(_.state match {
-                case GrpcWalletAppClient.SubscriptionIdleState(_) => true
-                case _ => false
-              }) shouldBe 2
+              .collect(_.state match {
+                case s: GrpcWalletAppClient.SubscriptionIdleState => s
+              }) should have length 2
             subs
-              .count(_.state match {
-                case GrpcWalletAppClient.SubscriptionPayment(_) => true
-                case _ => false
-              }) shouldBe 1
+              .collect(_.state match {
+                case s: GrpcWalletAppClient.SubscriptionPayment => s
+              }) should have length 1
           }
         },
       )
