@@ -113,7 +113,7 @@ class EndUserTreasuryService(
     val p = Promise[installCodegen.CoinOperationOutcome]()
     queue.offer(EnqueuedCoinOperation(operation, p)) match {
       case Enqueued =>
-        logger.trace(s"received ${operation}, queue now: ${queue.size()}")
+        logger.debug(s"received ${operation}, queue now: ${queue.size()}")
         p.future
       // TODO(M3-90): add tests for the failure cases.
       case Dropped =>

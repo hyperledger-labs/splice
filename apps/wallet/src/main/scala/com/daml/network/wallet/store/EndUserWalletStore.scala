@@ -1,5 +1,7 @@
 package com.daml.network.wallet.store
 
+import akka.NotUsed
+import akka.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.Template
 import com.daml.ledger.javaapi.data.codegen.{
   Contract => CodegenContract,
@@ -74,6 +76,23 @@ trait EndUserWalletStore extends FlagCloseable with NamedLogging {
     channelCodegen.OnChannelPaymentRequest,
   ]]]] =
     acsStore.lookupContractById(channelCodegen.OnChannelPaymentRequest.COMPANION)(cid)
+
+  def lookupAcceptedTransferOfferById(
+      cid: ContractId[transferOffersCodegen.AcceptedTransferOffer]
+  ): Future[QueryResult[Option[Contract[
+    transferOffersCodegen.AcceptedTransferOffer.ContractId,
+    transferOffersCodegen.AcceptedTransferOffer,
+  ]]]] =
+    acsStore.lookupContractById(transferOffersCodegen.AcceptedTransferOffer.COMPANION)(cid)
+
+  def streamAcceptedTransferOffers: Source[
+    Contract[
+      transferOffersCodegen.AcceptedTransferOffer.ContractId,
+      transferOffersCodegen.AcceptedTransferOffer,
+    ],
+    NotUsed,
+  ] =
+    acsStore.streamContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION)
 
   def lookupAppPaymentRequestById(
       cid: ContractId[walletCodegen.AppPaymentRequest]

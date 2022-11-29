@@ -64,7 +64,7 @@ class WalletAutomationService(
     )
   )
 
-  private val ingestionServices: TrieMap[String, AutoCloseable] = TrieMap.empty
+  private val endUserAutomations: TrieMap[String, AutoCloseable] = TrieMap.empty
 
   // TODO(#763): not handling archive events, uninstalling wallets without a restart is not supported yet
   registerRequestHandler("WalletAppInstall", walletStore.streamInstalls)(install => {
@@ -73,16 +73,21 @@ class WalletAutomationService(
         val endUserName = install.payload.endUserName
         val endUserParty = PartyId.tryFromProtoPrimitive(install.payload.endUserParty)
         val endUserStore = walletStore.getOrCreateEndUserStore(endUserName, endUserParty, timeouts)
-        val ingestionService = new AcsIngestionService(
-          s"EndUserWalletStore($endUserName)",
-          endUserStore.acsIngestionSink,
-          connection,
+        val endUserTreasuryService =
+          treasuryServices.addOrCreateTreasuryService(install, endUserStore)
+        val endUserAutomation = new EndUserWalletAutomationService(
+          endUserName,
+          endUserParty,
+          endUserStore,
+          endUserTreasuryService,
+          ledgerClient,
+          automationConfig,
+          clockConfig,
           retryProvider,
           loggerFactory,
           timeouts,
         )
-        treasuryServices.addOrCreateTreasuryService(install, endUserStore): Unit
-        Some(registerService(ingestionServices, endUserName, ingestionService))
+        Some(registerService(endUserAutomations, endUserName, endUserAutomation))
       }
   })
 
@@ -221,7 +226,7 @@ class WalletAutomationService(
     Seq(
       SyncCloseable(
         "EndUserIngestionServices",
-        Lifecycle.close(ingestionServices.values.toSeq: _*)(logger),
+        Lifecycle.close(endUserAutomations.values.toSeq: _*)(logger),
       )
     ) ++ super.closeAsync()
 }

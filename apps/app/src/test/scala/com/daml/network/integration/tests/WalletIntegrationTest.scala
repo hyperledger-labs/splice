@@ -370,8 +370,9 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
 
     "allow two users to make direct transfers between them" in { implicit env =>
       // val aliceUserParty =
-      onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
       val bobUserParty = onboardWalletUser(this, bobRemoteWallet, bobValidator)
+      aliceRemoteWallet.tap(100.0)
 
       val expiration = Primitive.Timestamp
         .discardNanos(Instant.now().plus(1, ChronoUnit.MINUTES))
@@ -393,38 +394,68 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
         bobRemoteWallet.listTransferOffers().length shouldBe 3
       }
 
-      bobRemoteWallet.acceptTransferOffer(offer)
+      actAndCheck("Bob accepts one offer", bobRemoteWallet.acceptTransferOffer(offer))(
+        "Accepted offer gets paid",
+        _ => {
+          aliceRemoteWallet.listTransferOffers().length shouldBe 2
+          aliceRemoteWallet.listAcceptedTransferOffers().length shouldBe 0
+          bobRemoteWallet.listTransferOffers().length shouldBe 2
+          bobRemoteWallet.listAcceptedTransferOffers().length shouldBe 0
+          checkWallet(aliceUserParty, aliceRemoteWallet, Seq((98.8, 99.0)))
+          checkWallet(bobUserParty, bobRemoteWallet, Seq((1.0, 1.0)))
+        },
+      )
 
-      eventually() {
-        // TODO(#1730): for now, we just check that an accepted offer has been created. Once accepted offers are automatically completed, replace this with waiting for the transfer to actually go through
-        aliceRemoteWallet.listTransferOffers().length shouldBe 2
-        aliceRemoteWallet.listAcceptedTransferOffers().length shouldBe 1
-        bobRemoteWallet.listTransferOffers().length shouldBe 2
-        bobRemoteWallet.listAcceptedTransferOffers().length shouldBe 1
-      }
+      actAndCheck(
+        "Bob rejects one offer, alice withdraws the other", {
+          bobRemoteWallet.rejectTransferOffer(offer2)
+          aliceRemoteWallet.withdrawTransferOffer(offer3)
+        },
+      )(
+        "No more offers listed",
+        _ => {
+          aliceRemoteWallet.listTransferOffers().length shouldBe 0
+          aliceRemoteWallet.listAcceptedTransferOffers().length shouldBe 0
+          bobRemoteWallet.listTransferOffers().length shouldBe 0
+          bobRemoteWallet.listAcceptedTransferOffers().length shouldBe 0
+        },
+      )
 
-      bobRemoteWallet.rejectTransferOffer(offer2)
-      aliceRemoteWallet.withdrawTransferOffer(offer3)
+      val (offer4, _) = actAndCheck(
+        "Alice offers another payment",
+        aliceRemoteWallet.createTransferOffer(bobUserParty, 4.0, "to expire", shortExpiration),
+      )("New offer is listed", _ => { aliceRemoteWallet.listTransferOffers().length shouldBe 1 })
 
-      eventually() {
-        aliceRemoteWallet.listTransferOffers().length shouldBe 0
-        aliceRemoteWallet.listAcceptedTransferOffers().length shouldBe 1
-        bobRemoteWallet.listTransferOffers().length shouldBe 0
-        bobRemoteWallet.listAcceptedTransferOffers().length shouldBe 1
-      }
-
-      val offer4 =
-        aliceRemoteWallet.createTransferOffer(bobUserParty, 4.0, "to expire", shortExpiration)
-      eventually() {
-        aliceRemoteWallet.listTransferOffers().length shouldBe 1
-      }
       Threading.sleep(10000)
-      // TODO(#1731): Once expiration is automation, replace this with waiting for the offer to disappear
+      // TODO(#1731): Once expiration is automated, replace this with waiting for the offer to disappear
       loggerFactory.assertThrowsAndLogs[CommandFailure](
         bobRemoteWallet.acceptTransferOffer(offer4),
         a => a.errorMessage should include("The requirement 'Offer has not expired' was not met."),
       )
 
+      val offer5 =
+        aliceRemoteWallet.createTransferOffer(
+          bobUserParty,
+          quantity = 150.0,
+          description = "not rich enough yet",
+          expiration,
+        )
+      eventually() {
+        bobRemoteWallet.acceptTransferOffer(offer5)
+      }
+      clue("Sleeping for a while, to make sure a few retries fail first")(
+        // TODO(M3-02): consider making this a time-based test, and advancing time gradually to trigger the failing automation instead
+        Threading.sleep(4000)
+      )
+      clue("Tapping more coin, to afford the accepted transfer offer")(
+        aliceRemoteWallet.tap(200.0)
+      )
+      clue("Checking final balances")(
+        eventually() {
+          checkWallet(aliceUserParty, aliceRemoteWallet, Seq((147.5, 148.0)))
+          checkWallet(bobUserParty, bobRemoteWallet, Seq((1.0, 1.0), (150.0, 150.0)))
+        }
+      )
     }
 
     "allow two users to create a payment channel and use it for a transfer" in { implicit env =>
