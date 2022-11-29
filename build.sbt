@@ -183,6 +183,8 @@ lazy val `apps-common` =
         daml_ledger_api_proto % "protobuf",
         java_jwt,
         jwks_rsa,
+        spray_json,
+        akka_spray_json,
       ),
       BuildCommon.sharedAppSettings,
     )

@@ -30,4 +30,10 @@ object Dependencies {
 
   lazy val daml_bindings_java =
     "com.daml" % "bindings-java" % CantonDependencies.daml_libraries_version
+
+  lazy val spray_json =
+    "io.spray" %% "spray-json" % "1.3.6"
+
+  lazy val akka_spray_json =
+    "com.typesafe.akka" %% "akka-http-spray-json" % "10.2.8"
 }

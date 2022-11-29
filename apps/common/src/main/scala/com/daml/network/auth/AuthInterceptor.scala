@@ -36,15 +36,15 @@ final class AuthInterceptor(
         s"Auth header did not start with bearer  prefix '$bearerPrefix'",
       )
       decodedToken <- verifier.verify(encodedToken)
-    } yield decodedToken
+      damlUser <- JwtClaims.getDamlUser(decodedToken).toRight("No daml user found in token")
+    } yield damlUser
 
     val ctx = Context.current
 
     tokenPayloadE match {
-      case Right(jwt) => {
-        val subject = Option(jwt.getSubject)
-        logger.debug(s"Decoded token with subject = $subject")
-        val newCtx = ctx.withValue(AuthInterceptor.SUBJECT_KEY, subject)
+      case Right(damlUser) => {
+        logger.debug(s"Decoded token with subject = $damlUser")
+        val newCtx = ctx.withValue(AuthInterceptor.SUBJECT_KEY, damlUser)
 
         Contexts.interceptCall(
           newCtx,
@@ -69,16 +69,12 @@ final class AuthInterceptor(
 }
 
 object AuthInterceptor {
-  val SUBJECT_KEY = Context.key[Option[String]]("AuthServiceDecodedClaim")
+  val SUBJECT_KEY = Context.key[String]("AuthServiceDecodedClaim")
   val AUTHORIZATION_KEY = Metadata.Key.of("Authorization", Metadata.ASCII_STRING_MARSHALLER)
 
-  def extractSubjectFromContext(): Option[String] = {
-    val claimSet = SUBJECT_KEY.get()
-    if (claimSet == null)
-      None
-    else
-      claimSet
-  }
+  def extractSubjectFromContext(): Option[String] = Option(
+    SUBJECT_KEY.get()
+  ) // wrapped in Option because getter could return null
 }
 
 import io.grpc.CallCredentials
