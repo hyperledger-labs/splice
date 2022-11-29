@@ -10,62 +10,75 @@ We use the following prefixes for their names:
 - alice: for servers operated by alice acting as a self-hosted validator operator
 - bob: for servers operated by bob acting as a self-hosted validator operator
 
+Test Setup
+==========
+
+Most of our tests share the same long-running Canton instance,
+see `./start-canton.sh` and `simple-topology-canton.conf`.
+Test isolation is implemented by each test using unique Daml party names and leveraging Daml privacy features.
+
+Most of our tests use the same definition of the Canton Network setup,
+see `simple-topology.conf`.
+To avoid port collisions, tests run sequentially, see `ConcurrentEnvironmentLimiter`.
+
 Port Allocation
 ===============
 
-As different tests run in parallel, every test suite needs unique ports.
-
-The chosen ports should be between 4001 and 32767, 
+Chosen ports should be between 4001 and 32767, 
 as the other ports tend to be either reserved or will be randomly chosen for client connections: 
 https://en.wikipedia.org/wiki/Ephemeral_port
 
 ## Manually allocated ports
 
 Consequently, we use the following port allocation scheme when manually allocating static ports:
-A port number has five digits and is of the form `<Test Index><Node Index><Kind>`, where:
+A port number has five digits and is of the form `<Network Index><Node Index><API Index>`, where:
 
-- `<Test Index>` is between 5 and 31 and uniquely identifies the test suite.
-- `<Node Index>` is between 0 and 9 and uniquely identifies the node within the test suite.
-- `<Kind>` is one of the following:
-  - `01`: Participant, Ledger API
-  - `02`: Participant, Admin API
-  - `03`: Validator, Admin API
-  - `04`: Wallet, Admin API
-  - `05`: SVC, Admin API
-  - `06`: Domain manager, Admin API
-  - `07`: Mediator, Admin API
-  - `08`: Domain, Public API
-  - `09`: Domain, Admin API
-  - `10`: Directory provider, Admin API
-  - `11`: Directory user, Admin API
-  - `12`: Scan, Admin API
-  - `13`: Splitwise, Admin API
+- `<Network Index>` is between 5 and 31 and uniquely identifies a canton network instance.
+- `<Node Index>` is between 0 and 9 and uniquely identifies the node within the network.
+- `<API Index>` is between 0 and 99 and uniquely identifies an API exposed by the node.
 
-Example:
-- `5301` is the Ledger API of Participant 3 in Test Suite 5.
-- `17309` is the Admin API of Domain 3 in Test Suite 17.
+### Allocated Networks
 
-At time of writing, the following test indices have been used by integration tests running on CI:
-- 4: -
-- 5: `simple-topology.conf` (not yet run on CI, but likely will soon)
-- 6: -
-- 7: -
-- 8: -
-- 9: -
-- 10: -
-- 11: -
-- 12: -
-- 13: -
-- 14: -
-- 15+: dynamically allocated ports (typically from integration tests deriving from BaseIntegrationTest)
+To avoid collisions with our grpc-web proxy (which proxies ports `N` to `N+1000`, see below),
+all network indices must be odd numbers.
 
+- `5`: Default for integration tests
+  - See `simple-topology.conf`, `simple-topology-canton.conf`.
+- `5`: Self-hosted validator for preflight check
+  - See `validator.conf`, `validator-participant.conf`
+- `7`: Local runbook integration test, self-hosted validator
+  - See `LocalRunbookIntegrationTest.scala`
+- `9`: Local runbook integration test, SVC node
+  - See `LocalRunbookIntegrationTest.scala`
+- `15`: Simulated time
+  - See `simple-topology.conf` with ports bumped by 10k, `simple-topology-canton-simtime.conf`
 
-## Dynamically allocated ports
+### Allocated APIs
 
-For tests that do not need a known static port, the `CoinConfigTransforms.globallyUniquePorts` configuration transform
-can be used to allocate a unique port within a test run (this is done by default).
+- `01`: Participant, Ledger API
+- `02`: Participant, Admin API
+- `03`: Validator, Admin API
+- `04`: Wallet, Admin API
+- `05`: SVC, Admin API
+- `06`: Domain manager, Admin API
+- `07`: Mediator, Admin API
+- `08`: Domain, Public API
+- `09`: Domain, Admin API
+- `10`: Directory provider, Admin API
+- `11`: Directory user, Admin API
+- `12`: Scan, Admin API
+- `13`: Splitwise, Admin API
+
+### Examples
+
+- `5301` is the Ledger API of Participant 3 in Canton Network 5.
+- `17309` is the Admin API of Domain 3 in Canton Network 17.
 
 ## Envoy grpc-web proxy
 
 We use an envoy proxy to allow web applications to communicate with gRPC services using gRPC-web.
 A gRPC service running on port `N` is proxied to a gRPC-web server running on port `N + 1000`.
+
+## Verifying port allocation
+
+Run `./scripts/print-config-summary.sh` to print the actual ports used by our main configuration files.

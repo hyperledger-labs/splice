@@ -38,11 +38,11 @@ class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScr
       )
       .clearConfigTransforms()
       // Bump ports by 1000 to avoid collisions with the Canton instance started outside of our tests.
-      .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy(1000)(conf))
+      .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy(2000)(conf))
       // Our SVC participant is instance 0 usually. However in our runbook
       // our users are not exposed to that so we also use 0 for their participant. This
       // rewrites the SVC ports by an extra 1000 to avoid collisions.
-      .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpSvcParticipantPortsBy(1000)(conf))
+      .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpSvcParticipantPortsBy(2000)(conf))
       .addConfigTransform((_, conf) => remoteScanAddressToLocalhost(conf))
       .addConfigTransform((_, conf) => remoteParticipantAddressToLocalhost(conf))
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
@@ -86,7 +86,7 @@ class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScr
     val propName = "DOMAIN_URL"
     val prevProperty = System.getProperty(propName)
     val result = Try {
-      System.setProperty(propName, "http://localhost:6008")
+      System.setProperty(propName, "http://localhost:7008")
 
       runScript(validatorPath / "validator-participant.canton")(env.environment)
       runScript(validatorPath / "tap-transfer-demo.canton")(env.environment)
