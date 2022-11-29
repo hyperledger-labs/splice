@@ -21,7 +21,7 @@ interface LockedCoin where
   viewtype LockedCoinView
 
   lockedCoin_Unlock : ContractId CoinRules -> Update (ContractId Coin)
-  lockedCoin_OwnerExpireLock : Update (ContractId Coin)
+  lockedCoin_OwnerExpireLock : ContractId CoinRules -> Update (ContractId Coin)
 
   choice LockedCoin_Unlock : ContractId Coin
     with
@@ -30,8 +30,10 @@ interface LockedCoin where
     do lockedCoin_Unlock this coinRulesCid
 
   choice LockedCoin_OwnerExpireLock : ContractId Coin
+    with
+      coinRulesCid : ContractId CoinRules
     controller (view this).coin.owner
-    do lockedCoin_OwnerExpireLock this
+    do lockedCoin_OwnerExpireLock this coinRulesCid
 
 data AppRewardView = AppRewardView with
   svc : Party
@@ -72,17 +74,43 @@ data CoinRulesConfigView = CoinRulesConfigView with
 data EnabledChoices = EnabledChoices
   with
     enable_LockedCoin_Unlock : Bool
+    enable_LockedCoin_OwnerExpireLock : Bool
+    enable_LockedCoin_ExpireAsStakeholder : Bool
+
+    enable_Coin_ExpireAsStakeholder : Bool
+
+    enable_AppReward_ProviderExpire : Bool
+
+    enable_ValidatorReward_UserExpire : Bool
+    enable_ValidatorReward_ArchiveAsValidator : Bool
+
+    enable_CoinRules_Tap : Bool
+    enable_CoinRules_Transfer : Bool
+    enable_CoinRules_ComputeFees : Bool
   deriving (Eq, Ord, Show)
 
 enableAllChoices : EnabledChoices
 enableAllChoices = EnabledChoices with
   enable_LockedCoin_Unlock = True
+  enable_LockedCoin_OwnerExpireLock = True
+  enable_LockedCoin_ExpireAsStakeholder = True
+
+  enable_Coin_ExpireAsStakeholder = True
+
+  enable_AppReward_ProviderExpire = True
+
+  enable_ValidatorReward_UserExpire = True
+  enable_ValidatorReward_ArchiveAsValidator = True
+
+  enable_CoinRules_Tap = True
+  enable_CoinRules_Transfer = True
+  enable_CoinRules_ComputeFees = True
 
 interface CoinRules where
   viewtype CoinRulesView
 
   coinrules_Transfer_Controllers : Transfer -> [Party]
-  coinrules_Transfer : Transfer -> TransferContext -> Update (Either Text TransferResult)
+  coinrules_Transfer : ContractId CoinRules -> Transfer -> TransferContext -> Update (Either Text TransferResult)
   coinrules_ComputeFees : TransferContext -> Party -> [Decimal] -> Update Decimal
 
   nonconsuming choice CoinRules_Transfer : Either Text TransferResult
@@ -90,7 +118,7 @@ interface CoinRules where
       transfer : Transfer
       context : TransferContext
     controller coinrules_Transfer_Controllers this transfer
-    do coinrules_Transfer this transfer context
+    do coinrules_Transfer this self transfer context
 
   nonconsuming choice CoinRules_TryTransfer : TransferResult
     with

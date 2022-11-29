@@ -180,6 +180,8 @@ template AcceptedAppPayment
          exercise lockedCoin (LockedCoin_Unlock context.coinRules)
 
     choice AcceptedAppPayment_Expire : ContractId Coin
+      with
+        context : AppTransferContext
       controller sender
       do archive deliveryOffer
-         exercise lockedCoin LockedCoin_OwnerExpireLock
+         exercise lockedCoin (LockedCoin_OwnerExpireLock context.coinRules)

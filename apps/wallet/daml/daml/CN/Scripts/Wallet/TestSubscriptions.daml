@@ -54,7 +54,8 @@ testSubscription = script do
 
   -- expire...
   passTime (minutes 6)
-  _ <- submitUser alice.userId $ exerciseCmd initialPaymentCid SubscriptionInititalPayment_Expire with actor = alice.primaryParty
+  transferContext <- getAppTransferContext app
+  _ <- submitUser alice.userId $ exerciseCmd initialPaymentCid SubscriptionInititalPayment_Expire with actor = alice.primaryParty, transferContext
   -- ..and retry
   context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext app.svc alice.primaryParty pizzeria.primaryParty "all-you-can-eat pizza")
   let subscriptionData = Subscription alice.primaryParty pizzeria.primaryParty provider.primaryParty app.svc (toInterfaceContractId context)

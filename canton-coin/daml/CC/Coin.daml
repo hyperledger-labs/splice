@@ -44,8 +44,11 @@ template Coin
       with
         actor : Party
         roundCid : ContractId OpenMiningRound
+        coinRulesCid : ContractId API.CoinRules
       controller actor
-      do require "Only stakeholders can expire" (actor `elem` stakeholder this)
+      do coinRules <- view <$> fetch coinRulesCid
+         requireChoiceIsEnabled "Coin_ExpireAsStakeholder" (\c -> c.enable_Coin_ExpireAsStakeholder) coinRules
+         require "Only stakeholders can expire" (actor `elem` stakeholder this)
          round <- fetch roundCid
          require "Contract expired" (quantityExpiresAt quantity < round.round)
 
@@ -62,10 +65,14 @@ template LockedCoin
         lock
         -- Need to qualify view here, see https://github.com/digital-asset/daml/issues/15459
         coin = DA.Internal.Desugar.view (toInterface @API.Coin coin)
-      lockedCoin_OwnerExpireLock = toInterfaceContractId <$> tryExpireLock
+      lockedCoin_OwnerExpireLock coinRulesCid = do
+        coinRules <- view <$> fetch coinRulesCid
+        requireChoiceIsEnabled "LockedCoin_OwnerExpireLock" (\c -> c.enable_LockedCoin_OwnerExpireLock) coinRules
+        toInterfaceContractId <$> tryExpireLock
+
       lockedCoin_Unlock coinRulesCid = do
         coinRules <- view <$> fetch coinRulesCid
-        requireChoiceIsEnabled @"enable_LockedCoin_Unlock" "LockedCoin_Unlock" coinRules
+        requireChoiceIsEnabled "LockedCoin_Unlock" (\c -> c.enable_LockedCoin_Unlock) coinRules
         toInterfaceContractId <$> create coin
 
     -- TODO(M1-60): review how lock-expiry is structured, and its relation to coin expiry
@@ -85,8 +92,11 @@ template LockedCoin
       with
         actor : Party
         roundCid : ContractId OpenMiningRound
+        coinRulesCid : ContractId API.CoinRules
       controller actor
-      do require "Only stakeholders can expire" (actor `elem` stakeholder this)
+      do coinRules <- view <$> fetch coinRulesCid
+         requireChoiceIsEnabled "LockedCoin_Unlock" (\c -> c.enable_LockedCoin_ExpireAsStakeholder) coinRules
+         require "Only stakeholders can expire" (actor `elem` stakeholder this)
          round <- fetch roundCid
          require "Contract expired" (quantityExpiresAt coin.quantity < round.round)
 
@@ -141,8 +151,11 @@ template AppReward
     choice AppReward_ProviderExpire : ()
       with
         miningRoundCid : ContractId ClosedMiningRound
+        coinRulesCid : ContractId API.CoinRules
       controller provider
-      do miningRound <- fetch miningRoundCid
+      do coinRules <- view <$> fetch coinRulesCid
+         requireChoiceIsEnabled "AppReward_ProviderExpire" (\c -> c.enable_AppReward_ProviderExpire) coinRules
+         miningRound <- fetch miningRoundCid
          require "Mining round > expiry round" (round <= miningRound.round)
 
 
@@ -170,9 +183,12 @@ template ValidatorReward
     choice ValidatorReward_UserExpire : ()
       with
         miningRoundCid : ContractId ClosedMiningRound
+        coinRulesCid : ContractId API.CoinRules
       controller user
       -- TODO(M3-90): consider whether we should use time-based expiry so that the user can expire it unilaterally after let's say 24h
-      do miningRound <- fetch miningRoundCid
+      do coinRules <- view <$> fetch coinRulesCid
+         requireChoiceIsEnabled "ValidatorReward_UserExpire" (\c -> c.enable_ValidatorReward_UserExpire) coinRules
+         miningRound <- fetch miningRoundCid
          require "Mining round > expiry round" (round <= miningRound.round)
 
     choice ValidatorReward_ArchiveAsValidator : ()
@@ -180,8 +196,11 @@ template ValidatorReward
       with
         validator : Party
         rightCid : ContractId ValidatorRight
+        coinRulesCid : ContractId API.CoinRules
       controller svc, validator
       do
+        coinRules <- view <$> fetch coinRulesCid
+        requireChoiceIsEnabled "ValidatorReward_ArchiveAsValidator" (\c -> c.enable_ValidatorReward_ArchiveAsValidator) coinRules
         right <- fetch rightCid
         require "Right must match" (right == ValidatorRight with svc; validator, user)
 
@@ -218,9 +237,9 @@ data CoinConfig currency = CoinConfig with
   deriving (Eq, Ord, Show)
 
 
-requireChoiceIsEnabled : forall c m. (CanAssert m, HasField c API.EnabledChoices Bool) => Text -> API.CoinRulesView -> m ()
-requireChoiceIsEnabled desc rules = 
-  require ("Choice " <> desc <> " is enabled") (getField @c rules.config.enabledChoices)
+requireChoiceIsEnabled : CanAssert m => Text -> (API.EnabledChoices -> Bool) -> API.CoinRulesView -> m ()
+requireChoiceIsEnabled desc getField rules =
+  require ("Choice " <> desc <> " is enabled") (getField rules.config.enabledChoices)
 
 -- | The rules governing how CC users can modify the CC state
 -- managed by the SVC.
@@ -240,8 +259,12 @@ template CoinRules
           enabledChoices = config.enabledChoices
         ..
       coinrules_Transfer_Controllers = Set.toList . transferControllers
-      coinrules_ComputeFees context sender receiverQuantities = computeFees context config receiverQuantities
-      coinrules_Transfer transfer context = executeTransfer context config svc transfer
+      coinrules_ComputeFees context sender receiverQuantities = do
+        requireChoiceIsEnabled "CoinRules_ComputeFees" (\c -> c.enable_CoinRules_ComputeFees) (view $ toInterface @API.CoinRules this)
+        computeFees context config receiverQuantities
+      coinrules_Transfer coinRulesCid transfer context = do
+        requireChoiceIsEnabled "CoinRules_Transfer" (\c -> c.enable_CoinRules_Transfer) (view $ toInterface @API.CoinRules this)
+        executeTransfer coinRulesCid context config svc transfer
 
     -- A choice for the SVC to mint coin for the cases where the
     -- consortium rules allow for that; e.g., when redeeming SVC rewards.
@@ -271,7 +294,8 @@ template CoinRules
         quantity: Decimal
         openRound: ContractId OpenMiningRound
       controller receiver
-      do exercise self CoinRules_Mint with ..
+      do requireChoiceIsEnabled "CoinRules_Tap" (\c -> c.enable_CoinRules_Tap) (view $ toInterface @API.CoinRules this)
+         exercise self CoinRules_Mint with ..
 
     -- Bootstrap the open mining rounds by creating
     -- - one immediately open-mining-round with 1 tick left
@@ -566,8 +590,8 @@ miningRoundIsOpen round = do
 
 -- | Execute a transfer.
 --
-executeTransfer : API.TransferContext -> CoinConfig USD -> Party -> API.Transfer -> Update (Either Text API.TransferResult)
-executeTransfer context config0 svc t = do
+executeTransfer : ContractId API.CoinRules -> API.TransferContext -> CoinConfig USD -> Party -> API.Transfer -> Update (Either Text API.TransferResult)
+executeTransfer coinRulesCid context config0 svc t = do
   -- check that the current mining round is open
   (_, openRound) <- downcastInterface @OpenMiningRound "OpenMiningRound" context.openMiningRound
   let config = scaleConfig openRound config0
@@ -581,7 +605,7 @@ executeTransfer context config0 svc t = do
   -- check that overall transfer constraints are satisfied
   forA (checkTransferConstraints t summary0 config) $ \_ -> do
     -- consume inputs only after all assertions have been checked
-    _ <- consumeInputs context svc t.sender t.inputs
+    _ <- consumeInputs coinRulesCid context svc t.sender t.inputs
     -- distribute floating outputs
     let distributed = distributeOutputs openRound.round config svc t.sender summary0 osum.preprocessedOutputs
     let summary1 = mergeReceiverFees distributed.receiverTransferFees summary0
@@ -726,8 +750,8 @@ fetchIssuingMiningRound API.TransferContext{issuingMiningRounds} svc round = do
       require "Round matches" (miningRound.round == round)
       pure (miningRoundCid, miningRound)
 
-consumeInputs : API.TransferContext -> Party -> Party -> [API.TransferInput] -> Update ()
-consumeInputs context svc sender inps = do
+consumeInputs : ContractId API.CoinRules -> API.TransferContext -> Party -> Party -> [API.TransferInput] -> Update ()
+consumeInputs coinRulesCid context svc sender inps = do
     mapA_ consumeInput inps
   where
     initialSummary = TransferInputsSummary with
@@ -747,7 +771,7 @@ consumeInputs context svc sender inps = do
       (_, miningRound) <- fetchIssuingMiningRound context svc reward.round
       (rightCid, validatorRight) <- fetchValidatorRight context reward
       require "Validator matches" (validatorRight.validator == sender)
-      exercise rewardCid ValidatorReward_ArchiveAsValidator with validator = sender; rightCid
+      exercise rewardCid ValidatorReward_ArchiveAsValidator with validator = sender; rightCid, coinRulesCid
 
 preprocessAndSummarizeOutputs : CoinConfig CC -> Party -> [API.TransferOutput] -> Update TransferOutputsSummary
 preprocessAndSummarizeOutputs config sender outs = do

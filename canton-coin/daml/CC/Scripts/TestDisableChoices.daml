@@ -1,11 +1,146 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 module CC.Scripts.TestDisableChoices where
 
+import DA.List (sortOn)
+import DA.Action
+import qualified DA.Map as Map
 import DA.Time
 import Daml.Script
 
+import CC.Scripts.Parameters
 import qualified CC.API.V1.Coin as API
+import qualified CC.API.V1.Round as API
 import CC.Coin
+import CC.Round
 import CC.Scripts.Util
+
+testLockedCoin : Script ()
+testLockedCoin = do
+  app <- setupApp
+
+  alice <- setupUser app "alice" app.svc
+  bob <- setupUser app "bob" app.svc
+
+  cid <- getLockedCoin app alice bob.primaryParty 20.0
+  testChoice @"enable_LockedCoin_Unlock" app [bob.primaryParty, alice.primaryParty] [app.svc] $ \coinRules ->
+    exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_Unlock coinRules)
+
+  cid <- getLockedCoin app alice bob.primaryParty 20.0
+  passTime (minutes 6)
+  testChoice @"enable_LockedCoin_OwnerExpireLock" app [alice.primaryParty] [app.svc] $ \coinRules ->
+    exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_OwnerExpireLock coinRules)
+
+  cid <- getLockedCoin app alice bob.primaryParty defaultCoinConfig.holdingFee.rate
+  replicateA_  3 $ runNextIssuance app
+  (round, _) <- getLatestOpenRound app
+  testChoice @"enable_LockedCoin_ExpireAsStakeholder" app [alice.primaryParty] [app.svc] $ \coinRules ->
+    exerciseCmd cid (LockedCoin_ExpireAsStakeholder alice.primaryParty round coinRules)
+  pure ()
+
+testCoin : Script ()
+testCoin = do
+  app <- setupApp
+  alice <- setupUser app "alice" app.svc
+
+  cid <- tap app alice defaultCoinConfig.holdingFee.rate
+  replicateA_ 3 $ runNextIssuance app
+  (round, _) <- getLatestOpenRound app
+  testChoice @"enable_Coin_ExpireAsStakeholder" app [alice.primaryParty] [app.svc] $ \coinRules ->
+    exerciseCmd cid (Coin_ExpireAsStakeholder alice.primaryParty round coinRules)
+  pure ()
+
+testAppReward : Script ()
+testAppReward = do
+  app <- setupApp
+  alice <- setupUser app "alice" app.svc
+  bob <- setupUser app "bob" app.svc
+
+  cid <- tap app alice 10.0
+  payWithTransferFeeRatio app alice bob.primaryParty 5.0 0.0 ""
+  [(cid, _)] <- query @AppReward bob.primaryParty
+
+  replicateA_ 3 $ runNextIssuance app
+  (round, _) :: _ <- sortOn (\(_, r) -> r.round) <$> query @ClosedMiningRound app.svc
+
+  testChoice @"enable_AppReward_ProviderExpire" app [bob.primaryParty] [app.svc] $ \coinRules ->
+    exerciseCmd cid (AppReward_ProviderExpire round coinRules)
+  pure ()
+
+testValidatorReward : Script ()
+testValidatorReward = do
+  app <- setupApp
+  validator <- setupValidator app "validator"
+  alice <- setupUser app "alice" validator
+  recordValidatorOf app alice.primaryParty validator
+  
+  _ <- tap app alice 10.0
+  pay app alice alice.primaryParty 5.0 ""
+  [(cid, _)] <- query @ValidatorReward alice.primaryParty
+
+  replicateA_ 3 $ runNextIssuance app
+  (round, _) :: _ <- sortOn (\(_, r) -> r.round) <$> query @ClosedMiningRound app.svc
+
+  testChoice @"enable_ValidatorReward_UserExpire" app [alice.primaryParty] [app.svc] $ \coinRules ->
+    exerciseCmd cid (ValidatorReward_UserExpire round coinRules)
+
+  [(right, _)] <- query @ValidatorRight alice.primaryParty
+
+  _ <- tap app alice 10.0
+  pay app alice alice.primaryParty 5.0 ""
+  [(cid, _)] <- query @ValidatorReward alice.primaryParty
+
+  testChoice @"enable_ValidatorReward_ArchiveAsValidator" app [validator, app.svc] [alice.primaryParty] $ \coinRules ->
+    exerciseCmd cid (ValidatorReward_ArchiveAsValidator validator right coinRules)
+
+  pure ()
+
+testCoinRules : Script ()
+testCoinRules = do
+  app <- setupApp
+  
+  alice <- setupUser app "alice" app.svc
+
+  (round, _) <- getLatestOpenRound app
+  testChoice @"enable_CoinRules_Tap" app [alice.primaryParty] [app.svc] $ \coinRules ->
+    exerciseCmd (fromInterfaceContractId @CoinRules coinRules) (CoinRules_Tap alice.primaryParty 5.0 round)
+
+  (round, _) <- getLatestOpenRound app
+  coin <- tap app alice 5.0
+  testChoice @"enable_CoinRules_Transfer" app [alice.primaryParty] [app.svc] $ \coinRules ->
+    exerciseCmd coinRules
+      API.CoinRules_Transfer with
+        transfer = API.Transfer with
+          sender = alice.primaryParty
+          provider = alice.primaryParty
+          inputs = [API.InputCoin $ toInterfaceContractId @API.Coin coin]
+          outputs = [API.OutputSenderCoin None None]
+          payload = "test"
+        context = API.TransferContext with
+          openMiningRound = toInterfaceContractId @API.OpenMiningRound round
+          issuingMiningRounds = Map.empty
+          validatorRights = Map.empty
+
+  context <- getTransferContext app alice
+  testChoice @"enable_CoinRules_ComputeFees" app [alice.primaryParty] [app.svc] $ \coinRules ->
+    exerciseCmd coinRules
+      API.CoinRules_ComputeFees with
+        context = context
+        sender = alice.primaryParty
+        receiverQuantities = []
+
+
+  pure ()
+
+testChoice : forall (c : GHC.Types.Symbol) a. HasField c API.EnabledChoices Bool => CCApp -> [Party] -> [Party] -> (ContractId API.CoinRules -> Commands a) -> Script ()
+testChoice app actAs readAs buildCommand = do
+  cycleCoinConfig app (\c -> c { enabledChoices = setField @c False c.enabledChoices })
+  Some (coinRules, _) <- queryCoinRulesByKey app.svc
+  submitMultiMustFail actAs readAs (buildCommand $ toInterfaceContractId @API.CoinRules coinRules)
+
+  cycleCoinConfig app (\c -> c { enabledChoices = setField @c True c.enabledChoices })
+  Some (coinRules, _) <- queryCoinRulesByKey app.svc
+  submitMulti actAs readAs (buildCommand $ toInterfaceContractId @API.CoinRules coinRules)
+  pure ()
 
 cycleCoinConfig : CCApp -> (CoinConfig USD -> CoinConfig USD) -> Script ()
 cycleCoinConfig app transform = do
@@ -16,25 +151,10 @@ cycleCoinConfig app transform = do
       config = transform rules.config
   pure ()
 
-test : Script ()
-test = do
-  app <- setupApp
-
-  alice <- setupUser app "alice" app.svc
-  bob <- setupUser app "bob" app.svc
-
-  _ <- tap app alice 50.0
-  lockTo1 app alice bob.primaryParty 20.0 (minutes 5) "locktest"
-
-  [(cid, _)] <- query @LockedCoin bob.primaryParty
-
-
-  cycleCoinConfig app (\c -> c { enabledChoices.enable_LockedCoin_Unlock = False })
-  Some (coinRules, _) <- queryCoinRulesByKey app.svc
-  submitMultiMustFail [bob.primaryParty, alice.primaryParty] [app.svc] $ exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_Unlock $ toInterfaceContractId @API.CoinRules coinRules)
-
-  cycleCoinConfig app (\c -> c { enabledChoices.enable_LockedCoin_Unlock = True })
-  Some (coinRules, _) <- queryCoinRulesByKey app.svc
-  submitMulti [bob.primaryParty, alice.primaryParty] [app.svc] $ exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_Unlock $ toInterfaceContractId @API.CoinRules coinRules)
-
-  pure ()
+getLockedCoin : CCApp -> CCUser -> Party -> Decimal -> Script (ContractId LockedCoin)
+getLockedCoin app owner lockHolder amount =  do
+-- tap amount + 1 to account for fees
+  _ <- tap app owner (amount + 1.0)
+  lockTo1 app owner lockHolder amount (minutes 5) "locktest"
+  [(cid, _)] <- query @LockedCoin lockHolder
+  pure cid

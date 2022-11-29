@@ -166,11 +166,12 @@ template SubscriptionInitialPayment
     choice SubscriptionInititalPayment_Expire : ContractId Coin
       with
         actor : Party
+        transferContext : AppTransferContext
       controller actor
       do
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
         archive subscriptionData.context
-        exercise lockedCoin LockedCoin_OwnerExpireLock -- would fail if we can't expire yet
+        exercise lockedCoin (LockedCoin_OwnerExpireLock transferContext.coinRules) -- would fail if we can't expire yet
 
 
 -- | The base state in our subscription flow.
@@ -267,6 +268,7 @@ template SubscriptionPayment
     choice SubscriptionPayment_Expire : (ContractId SubscriptionIdleState, ContractId Coin)
       with
         actor : Party
+        transferContext : AppTransferContext
       controller actor
       do
         require ("Actor " <> show actor <> " is a signatory") (actor `elem` signatory this)
@@ -274,7 +276,7 @@ template SubscriptionPayment
         state <- create SubscriptionIdleState with
           nextPaymentDueAt = thisPaymentDueAt
           ..
-        coin <- exercise lockedCoin LockedCoin_OwnerExpireLock -- would fail if we can't expire yet
+        coin <- exercise lockedCoin (LockedCoin_OwnerExpireLock transferContext.coinRules) -- would fail if we can't expire yet
         pure (state, coin)
 
 

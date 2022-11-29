@@ -137,7 +137,7 @@ object CoinUtil {
     // 2.5 min default duration
     new RelTime(defaultTickDurationInMicroseconds),
     new cc.api.v1.coin.EnabledChoices(
-      true
+      true, true, true, true, true, true, true, true, true, true,
     ),
   )
 

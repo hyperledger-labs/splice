@@ -153,7 +153,6 @@ runNextIssuance app = do
 -- Due to effective-dating, the price you give here is not the coin price that can be used immediately
 runNextIssuanceInternal : CCApp -> Decimal -> Script ()
 runNextIssuanceInternal app coinPrice = do
-
     now <- getTime
     setTime (addRelTime now defaultCoinConfig.tickDuration)
     -- expire rewards for closed rounds
@@ -271,6 +270,13 @@ queryCoinRulesByKey svc = do
 -- The left-over quantity is kept.
 pay : CCApp -> CCUser -> Party -> Decimal -> Text -> Script ()
 pay app sender recipient coinQuantity msg = do
+  payWithTransferFeeRatio app sender recipient coinQuantity 1.0 msg
+  
+-- | A simple and slightly hacky-way to test payment: it just gathers all coins from
+-- the sender and transfer's the desired quantity off of them to the receiver.
+-- The left-over quantity is kept.
+payWithTransferFeeRatio : CCApp -> CCUser -> Party -> Decimal -> Decimal -> Text -> Script ()
+payWithTransferFeeRatio app sender recipient coinQuantity transferFeeRatio msg = do
   -- TODO(M1-92): create payment pre-approval flow and use that here instead of submitMulti
   readAs <- getUserReadAs sender.userId
   coins <- unlockedCoins sender.primaryParty
@@ -287,7 +293,7 @@ pay app sender recipient coinQuantity msg = do
               receiver = recipient
               coinType = API.FixedReceiverCoin with
                 quantity = coinQuantity
-                senderTransferFeeRatio = 1.0
+                senderTransferFeeRatio = transferFeeRatio
           ]
   (openRound, _) <- getLatestOpenRound app
   void $ submitExerciseCoinRulesAPIByKey app [sender.primaryParty, recipient] readAs (API.CoinRules_TryTransfer with transfer, context = API.coinTransferContext $ toInterfaceContractId openRound)
