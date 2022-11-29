@@ -706,6 +706,8 @@ commands:
                               --keep DOCKER_MACHINE_NAME \
                               --keep DOCKER_TLS_VERIFY \
                               --keep NO_PROXY"
+         # Retrying as sometimes the download from docker.io fails
+         cmd_retry_count: 5
          cmd: |
            export PATH=$HOME/.daml/bin:$PATH
            (cd $REPO_ROOT/cluster && make docker-build)
