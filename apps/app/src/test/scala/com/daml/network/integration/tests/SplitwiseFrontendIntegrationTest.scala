@@ -8,6 +8,7 @@ import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.daml.network.util.CoinUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.util.ShowUtil.*
 import org.openqa.selenium.Keys
 
 import scala.concurrent.duration.DurationInt
@@ -36,15 +37,33 @@ class SplitwiseFrontendIntegrationTest
       directory: RemoteDirectoryAppReference,
       wallet: RemoteWalletAppReference,
   ): Unit = {
-    directory.requestDirectoryInstall()
-    directory.ledgerApi.ledger_api.acs.awaitJava(dirCodegen.DirectoryInstall.COMPANION)(userParty)
+    actAndCheck("Request directory install", directory.requestDirectoryInstall())(
+      "Install created",
+      _ =>
+        directory.ledgerApi.ledger_api.acs
+          .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(userParty),
+    )
 
-    directory.requestDirectoryEntry(userName)
+    val (_, reqId) = actAndCheck(
+      show"Request directory entry ${userName.singleQuoted} for $userParty",
+      directory.requestDirectoryEntry(userName),
+    )(
+      "There is exactly one app payment request",
+      _ => {
+        val reqs = wallet.listAppPaymentRequests()
+        reqs should have length 1
+        reqs.head.contractId
+      },
+    )
 
-    wallet.tap(5.0)
-    eventually() { wallet.listAppPaymentRequests().length shouldBe 1 }
-    wallet.acceptAppPaymentRequest(
-      wallet.listAppPaymentRequests().head.contractId
+    actAndCheck(
+      "Tap and accept app payment request", {
+        wallet.tap(5.0)
+        wallet.acceptAppPaymentRequest(reqId)
+      },
+    )(
+      "There are no app payment request left",
+      _ => wallet.listAppPaymentRequests() should have length 0,
     )
   }
 
