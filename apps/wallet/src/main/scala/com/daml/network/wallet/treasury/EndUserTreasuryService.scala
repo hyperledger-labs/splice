@@ -5,10 +5,11 @@ import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.{coin => coinCodegen}
+import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_Error
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
-import com.daml.network.util.{JavaContract as Contract}
+import com.daml.network.util.JavaContract as Contract
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
 import com.daml.network.wallet.treasury.EndUserTreasuryService.*
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -81,13 +82,17 @@ class EndUserTreasuryService(
     // TODO(#1351): this is likely leaking resources ==> use construction from AcsIngestion for managing lifetime, and allocate a new traceContext to improve logs
     .toMat(
       Sink.foreachAsync(1)(batch =>
-        executeBatchWithRetry(batch).flatMap(offset => {
-          userStore
-            .signalWhenIngested(offset)(TraceContext.empty)
-            .map(_ =>
-              logger
-                .debug(s"Finished waiting for store to ingest offset $offset")(TraceContext.empty)
-            )
+        executeBatchWithRetry(batch).flatMap(_ match {
+          case None =>
+            // No offset returned (probably because all operations failed), not waiting for ingestion
+            Future(())
+          case Some(offset) =>
+            userStore
+              .signalWhenIngested(offset)(TraceContext.empty)
+              .map(_ =>
+                logger
+                  .debug(s"Finished waiting for store to ingest offset $offset")(TraceContext.empty)
+              )
         })
       )
     )(Keep.left)
@@ -162,7 +167,7 @@ class EndUserTreasuryService(
     */
   private def executeBatchWithRetry(
       batch: Seq[AnyEnqueuedCoinOperation]
-  ): Future[String] =
+  ): Future[Option[String]] =
     TraceContext.withNewTraceContext { implicit tc =>
       retryProvider.retryForAutomation(
         "execute coin operation batch",
@@ -173,7 +178,7 @@ class EndUserTreasuryService(
 
   private def executeBatch(
       batch: Seq[AnyEnqueuedCoinOperation]
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[Option[String]] = {
 
     logger.debug(
       s"Running batch of coin operations for user ${userStore.key.endUserParty} with length ${batch.size}: $batch"
@@ -206,7 +211,11 @@ class EndUserTreasuryService(
         case (outcome, ValidCoinOperation(_, p)) =>
           p.success(outcome)
       }
-    } yield offset
+      onlyErrors = outcomes.exerciseResult.asScala.forall(_ match {
+        case _: COO_Error => true
+        case _ => false
+      })
+    } yield if (onlyErrors) None else Some(offset)
   }
 
   /** Select transfer inputs to satisfy the coin operations.

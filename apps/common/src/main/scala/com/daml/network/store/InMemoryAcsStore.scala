@@ -117,7 +117,9 @@ class InMemoryAcsStore(
   }
 
   /** The implementation is idempotent. */
-  override def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] = {
+  override def signalWhenIngested(
+      offset: String
+  )(implicit tc: TraceContext): Future[Unit] = {
     val alreadyIngested = stateVar.offset.exists(_ >= offset)
     if (alreadyIngested) {
       Future.successful(())
