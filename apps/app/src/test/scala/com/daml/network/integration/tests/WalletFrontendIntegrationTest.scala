@@ -392,7 +392,9 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice", "bo
           "Bob sees the accepted offer",
           _ => {
             findAll(className("transfer-offers-row")) should have size 0
-            findAll(className("accepted-transfer-offers-row")) should have size 1
+            // TODO(#1730) Consider how we want to test this without racing with the automation
+            // that tries to archive this concurrently.
+            // findAll(className("accepted-transfer-offers-row")) should have size 1
           },
         )
       }
@@ -401,10 +403,11 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice", "bo
         clue("Alice also sees the accepted offer")(
           {
             findAll(className("transfer-offers-row")) should have size 0
-            findAll(className("accepted-transfer-offers-row")) should have size 1
+            // TODO(#1730) Consider how we want to test this without racing with the automation
+            // that tries to archive this concurrently.
+            // findAll(className("accepted-transfer-offers-row")) should have size 1
           }
         )
-        // TODO(#1730) once automation is implemented - extend this test
 
         createOffer("to be withdrawn")
         actAndCheck(
