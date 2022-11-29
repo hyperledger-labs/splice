@@ -30,6 +30,7 @@ import Login from './views/Login';
 import Onboarding from './views/Onboarding';
 import PaymentChannels from './views/PaymentChannels';
 import Subscriptions from './views/Subscriptions';
+import TransferOffers from './views/TransferOffers';
 
 const App: React.FC = () => {
   const { isAuthenticated, primaryPartyId, logout } = useUserState();
@@ -76,6 +77,7 @@ const Content = () => {
         <Route index element={<Coins />} />
         <Route path="coins" element={<Coins />} />
         <Route path="app-payment-channels" element={<PaymentChannels />} />
+        <Route path="transfer-offers" element={<TransferOffers />} />
         <Route path="subscriptions" element={<Subscriptions />}></Route>
         <Route path="app-payment-requests" element={<AppPaymentRequests />}></Route>
         <Route path="confirm-payment/:cid/" element={<ConfirmPayment />} />

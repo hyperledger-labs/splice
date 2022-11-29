@@ -1,6 +1,7 @@
 import * as v0 from 'common-protobuf/com/daml/network/wallet/v0/wallet_service_pb';
 import { Contract } from 'common-frontend';
 import { WalletServicePromiseClient } from 'common-protobuf/com/daml/network/wallet/v0/wallet_service_grpc_web_pb';
+import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { Metadata } from 'grpc-web';
 import React, { useContext, useMemo } from 'react';
 
@@ -12,6 +13,7 @@ import {
   SubscriptionPayment,
 } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 import { PaymentChannelProposal } from '@daml.js/wallet/lib/CN/Wallet/PaymentChannel';
+import { AcceptedTransferOffer, TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer';
 
 import { useUserState } from './UserContext';
 
@@ -24,6 +26,14 @@ export interface WalletProps {
 export interface ListResponse {
   lockedCoins: v0.CoinPosition[];
   coins: v0.CoinPosition[];
+}
+
+export interface ListTransferOffersResponse {
+  offersList: Contract<TransferOffer>[];
+}
+
+export interface ListAcceptedTransferOffersResponse {
+  acceptedOffersList: Contract<AcceptedTransferOffer>[];
 }
 
 export interface ListPaymentChannelRequestsResponse {
@@ -57,6 +67,18 @@ export interface WalletClient {
   tap: (quantity: string) => Promise<void>;
   list: () => Promise<ListResponse>;
   executeDirectTransfer: (quantity: string, receiverPartyId: string) => Promise<void>;
+
+  listTransferOffers: () => Promise<ListTransferOffersResponse>;
+  createTransferOffer: (
+    receiverPartyId: string,
+    quantity: string,
+    description: string,
+    expiresAt: Date
+  ) => Promise<void>;
+  acceptTransferOffer: (offerContractId: string) => Promise<void>;
+  withdrawTransferOffer: (offerContractId: string) => Promise<void>;
+  rejectTransferOffer: (offerContractId: string) => Promise<void>;
+  listAcceptedTransferOffers: () => Promise<ListAcceptedTransferOffersResponse>;
 
   listPaymentChannelProposals: () => Promise<ListPaymentChannelRequestsResponse>;
   proposePaymentChannel: (
@@ -118,7 +140,48 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
           getCreds()
         );
       },
-
+      createTransferOffer: async (receiverPartyId, quantity, description, expiresAt) => {
+        await walletClient.createTransferOffer(
+          new v0.CreateTransferOfferRequest()
+            .setReceiverPartyId(receiverPartyId)
+            .setQuantity(quantity)
+            .setDescription(description)
+            .setExpiresAt(expiresAt.getTime() * 1000),
+          getCreds()
+        );
+      },
+      listTransferOffers: async (): Promise<ListTransferOffersResponse> => {
+        const res = await walletClient.listTransferOffers(new Empty(), getCreds());
+        return {
+          offersList: res.getOffersList().map(c => Contract.decode(c, TransferOffer)),
+        };
+      },
+      acceptTransferOffer: async offerContractId => {
+        await walletClient.acceptTransferOffer(
+          new v0.AcceptTransferOfferRequest().setOfferContractId(offerContractId),
+          getCreds()
+        );
+      },
+      rejectTransferOffer: async offerContractId => {
+        await walletClient.rejectTransferOffer(
+          new v0.RejectTransferOfferRequest().setOfferContractId(offerContractId),
+          getCreds()
+        );
+      },
+      withdrawTransferOffer: async offerContractId => {
+        await walletClient.withdrawTransferOffer(
+          new v0.WithdrawTransferOfferRequest().setOfferContractId(offerContractId),
+          getCreds()
+        );
+      },
+      listAcceptedTransferOffers: async (): Promise<ListAcceptedTransferOffersResponse> => {
+        const res = await walletClient.listAcceptedTransferOffers(new Empty(), getCreds());
+        return {
+          acceptedOffersList: res
+            .getAcceptedOffersList()
+            .map(c => Contract.decode(c, AcceptedTransferOffer)),
+        };
+      },
       proposePaymentChannel: async (
         receiverPartyId,
         senderTransferFeeRatio,

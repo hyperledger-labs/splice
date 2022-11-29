@@ -1,10 +1,14 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
-import com.daml.network.codegen.java.cn.wallet.{subscriptions => subsCodegen}
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.console.{LocalValidatorAppReference, RemoteDirectoryAppReference}
+import com.daml.network.console.{
+  LocalValidatorAppReference,
+  RemoteDirectoryAppReference,
+  RemoteWalletAppReference,
+}
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.topology.PartyId
 import org.openqa.selenium.WebDriver
@@ -14,7 +18,7 @@ import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
-class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
+class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice", "bob") {
 
   private val directoryDarPath =
     "apps/directory/daml/.daml/dist/directory-service-0.1.0.dar"
@@ -26,10 +30,7 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
       aliceValidator.onboardUser(aliceDamlUser)
 
       withFrontEnd("alice") { implicit webDriver =>
-        go to "http://localhost:3000"
-        click on "user-id-field"
-        textField("user-id-field").value = aliceDamlUser
-        click on "login-button"
+        browseToAliceWallet(aliceDamlUser)
         click on "tap-amount-field"
         textField("tap-amount-field").value = "15.0"
         click on "tap-button"
@@ -47,10 +48,7 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
       aliceValidator.onboardUser(aliceDamlUser)
 
       withFrontEnd("alice") { implicit webDriver =>
-        go to "http://localhost:3000"
-        click on "user-id-field"
-        textField("user-id-field").value = aliceDamlUser
-        click on "login-button"
+        browseToAliceWallet(aliceDamlUser)
         click on "tap-amount-field"
 
         textField("tap-amount-field").value = "25"
@@ -84,7 +82,8 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
       val newRandomUser = aliceRemoteWallet.config.damlUser
 
       withFrontEnd("alice") { implicit webDriver =>
-        go to "http://localhost:3000"
+        // Do not use browseToWallet below, because that waits for the user to be logged in, which is not the case here
+        go to s"http://localhost:3000"
         click on "user-id-field"
         textField("user-id-field").value = newRandomUser
         click on "login-button"
@@ -130,14 +129,7 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
       eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $entryName")))
 
       withFrontEnd("alice") { implicit webDriver =>
-        // Browse to alice's wallet
-        go to "http://localhost:3000"
-        click on "user-id-field"
-        textField("user-id-field").value = aliceDamlUser
-        click on "login-button"
-        eventually() {
-          find(id("logged-in-user")).getOrElse(fail("Logged-in user information never showed up"))
-        }
+        browseToAliceWallet(aliceDamlUser)
 
         // Check that alice is shown as the user, and her party ID has been resolved to its directory entry correctly.
         // We do this in another eventually() as a "..." text might appear momentarily, until the directory service responds.
@@ -338,6 +330,100 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
         }
       }
     }
+
+    "support transfer offers" in { implicit env =>
+      val aliceDamlUser = aliceRemoteWallet.config.damlUser
+      val aliceParty = setupForTestWithDirectory(aliceDamlUser, aliceValidator)
+      val aliceEntryName = "alice.cns"
+      actAndCheck("Tap coin for alice", aliceRemoteWallet.tap(50))(
+        "Alice has coin",
+        _ => (aliceRemoteWallet.list().coins.length shouldBe 1),
+      )
+      createDirectoryEntry(aliceParty, aliceDirectory, aliceEntryName, aliceRemoteWallet)
+      val bobDamlUser = bobRemoteWallet.config.damlUser
+      val bobParty = setupForTestWithDirectory(bobDamlUser, bobValidator)
+      val bobEntryName = "bob.cns"
+      actAndCheck("Tap coin for bob", bobRemoteWallet.tap(50))(
+        "Bob has coin",
+        _ => (bobRemoteWallet.list().coins.length shouldBe 1),
+      )
+      createDirectoryEntry(bobParty, bobDirectory, bobEntryName, bobRemoteWallet)
+
+      def createOffer(description: String)(implicit webDriver: WebDriver) = {
+        actAndCheck(
+          s"Alice creates offer \"${description}\"", {
+            click on "create-offer-receiver"
+            textField("create-offer-receiver").value = bobParty.toProtoPrimitive
+            click on "create-offer-quantity"
+            textField("create-offer-quantity").value = "10.0"
+            click on "create-offer-description"
+            textField("create-offer-description").value = description
+            click on "create-offer-button"
+          },
+        )(
+          "Alice sees the transfer offer",
+          _ => {
+            findAll(className("transfer-offers-row")) should have size 1
+          },
+        )
+
+      }
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToAliceWallet(aliceDamlUser)
+        click on "transfer-offers-button"
+
+        createOffer("Testing transfer offers")
+        val row = inside(findAll(className("transfer-offers-row")).toList) { case Seq(row) => row }
+        row.childElement(className("transfer-offers-table-quantity")).text should be(
+          "10.0000000000CC"
+        )
+      }
+
+      withFrontEnd("bob") { implicit webDriver =>
+        browseToBobWallet(bobDamlUser)
+        actAndCheck("Bob browses to transfer offers", click on "transfer-offers-button")(
+          "Bob also sees the transfer offer",
+          _ => {
+            findAll(className("transfer-offers-row")) should have size 1
+          },
+        )
+        actAndCheck("Bob accepts the offer", click on className("transfer-offers-table-accept"))(
+          "Bob sees the accepted offer",
+          _ => {
+            findAll(className("transfer-offers-row")) should have size 0
+            findAll(className("accepted-transfer-offers-row")) should have size 1
+          },
+        )
+      }
+
+      withFrontEnd("alice") { implicit webDriver =>
+        clue("Alice also sees the accepted offer")(
+          {
+            findAll(className("transfer-offers-row")) should have size 0
+            findAll(className("accepted-transfer-offers-row")) should have size 1
+          }
+        )
+        // TODO(#1730) once automation is implemented - extend this test
+
+        createOffer("to be withdrawn")
+        actAndCheck(
+          "Alice withdraws her offer",
+          click on className("transfer-offers-table-withdraw"),
+        )("The offer is deleted", _ => findAll(className("transfer-offers-row")) should have size 0)
+
+        createOffer("to be rejected")
+      }
+
+      withFrontEnd("bob") { implicit webDrivers =>
+        eventually()(findAll(className("transfer-offers-row")) should have size 1)
+        actAndCheck("Bob rejects the offer", click on className("transfer-offers-table-reject"))(
+          "The offer is deleted",
+          _ => findAll(className("transfer-offers-row")) should have size 0,
+        )
+      }
+
+    }
   }
 
   private def setupForTestWithDirectory(damlUser: String, validator: LocalValidatorAppReference) = {
@@ -367,14 +453,30 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
       userParty: PartyId,
       directory: RemoteDirectoryAppReference,
       dirEntry: String,
-  )(implicit env: CoinTestConsoleEnvironment) = {
+  ) = {
     // Whitelist the directory service on alice's validator
     directory.requestDirectoryInstall()
     eventually() {
-      aliceDirectory.ledgerApi.ledger_api.acs
+      directory.ledgerApi.ledger_api.acs
         .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(userParty)
     }
-    aliceDirectory.requestDirectoryEntry(dirEntry)
+    directory.requestDirectoryEntry(dirEntry)
+  }
+
+  private def createDirectoryEntry(
+      userParty: PartyId,
+      directory: RemoteDirectoryAppReference,
+      dirEntry: String,
+      wallet: RemoteWalletAppReference,
+  ) = {
+    submitDirectoryEntryRequest(userParty, directory, dirEntry)
+    wallet.tap(5.0)
+    eventually() {
+      wallet.listAppPaymentRequests().length shouldBe 1
+    }
+    wallet.acceptAppPaymentRequest(
+      wallet.listAppPaymentRequests().head.contractId
+    )
   }
 
   private def requestDirectoryEntryWithSubscription(
@@ -452,21 +554,37 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
     }
   }
 
+  private def browseToWallet(port: Int, damlUser: String)(implicit webDriver: WebDriver) = {
+    actAndCheck(
+      s"Browse to wallet UI at port ${port}", {
+        go to s"http://localhost:${port}"
+        click on "user-id-field"
+        textField("user-id-field").value = damlUser
+        click on "login-button"
+      },
+    )(
+      "Logged in user shows up",
+      _ => find(id("logged-in-user")).getOrElse(fail("Logged-in user information never showed up")),
+    )
+  }
+
+  private def browseToAliceWallet(damlUser: String)(implicit webDriver: WebDriver) = {
+    browseToWallet(3000, damlUser)
+  }
+
+  private def browseToBobWallet(damlUser: String)(implicit webDriver: WebDriver) = {
+    browseToWallet(3001, damlUser)
+  }
+
   private def browseToPaymentRequests(damlUser: String)(implicit webDriver: WebDriver) = {
     // Go to app payment requests tab in alice's wallet
-    go to "http://localhost:3000"
-    click on "user-id-field"
-    textField("user-id-field").value = damlUser
-    click on "login-button"
+    browseToAliceWallet(damlUser)
     click on "app-payment-requests-button"
   }
 
   private def browseToSubscriptions(damlUser: String)(implicit webDriver: WebDriver) = {
     // Go to subscriptions tab in alice's wallet
-    go to "http://localhost:3000"
-    click on "user-id-field"
-    textField("user-id-field").value = damlUser
-    click on "login-button"
+    browseToAliceWallet(damlUser)
     click on "subscriptions-button"
   }
 }

@@ -24,6 +24,14 @@ const Home: React.FC = () => {
           Payment Channels
         </Button>
         <Button
+          id="transfer-offers-button"
+          onClick={() => {
+            navigate('/transfer-offers');
+          }}
+        >
+          Transfer Offers
+        </Button>
+        <Button
           id="subscriptions-button"
           onClick={() => {
             navigate('/subscriptions');
