@@ -415,7 +415,7 @@ object CoinLedgerConnection {
           userRights: Seq[User.Right],
       ): Future[PartyId] = {
         for {
-          party <- allocatePartyViaLedgerApi(Some(sanitizePartyHint(user)), Some(user))
+          party <- allocatePartyViaLedgerApi(Some(sanitizeUserIdToLedgerString(user)), Some(user))
           userId = com.daml.lf.data.Ref.UserId.assertFromString(user)
           userLf = new User(userId, party.toLf)
 
@@ -576,8 +576,12 @@ object CoinLedgerConnection {
     }
   }
 
-  def sanitizePartyHint(hint: String): String = {
-    val (processedHint, invalidCharDetected) = hint.foldLeft(("", false))((res, currentChar) => {
+  /** In a number of places we want to use a user id in a place where a `LedgerString` is expected, e.g.,
+    * in party id hints and in workflow ids. However, the allowed set of characters is slightly different so
+    * this function can be used to perform the necessary escaping.g
+    */
+  def sanitizeUserIdToLedgerString(userId: String): String = {
+    val (processed, invalidCharDetected) = userId.foldLeft(("", false))((res, currentChar) => {
       if ("[^\\w-_:]".r matches (s"$currentChar")) {
         (res._1 + "_", true)
       } else {
@@ -586,11 +590,11 @@ object CoinLedgerConnection {
     })
 
     if (invalidCharDetected) {
-      // append a UUID if we had to rewrite the party hint,
+      // append a UUID if we had to rewrite the user id
       // because there's a chance it could now conflict with an existing party
-      s"${processedHint}-${UUID.randomUUID.toString}"
+      s"${processed}-${UUID.randomUUID.toString}"
     } else {
-      processedHint
+      processed
     }
   }
 

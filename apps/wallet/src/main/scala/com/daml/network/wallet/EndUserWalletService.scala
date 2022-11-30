@@ -3,7 +3,7 @@ package com.daml.network.wallet
 import akka.stream.Materializer
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
+import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinRetries}
 import com.daml.network.util.JavaContract
 import com.daml.network.wallet.automation.EndUserWalletAutomationService
 import com.daml.network.wallet.store.EndUserWalletStore
@@ -43,7 +43,9 @@ class EndUserWalletService(
   val store: EndUserWalletStore = EndUserWalletStore(key, storage, loggerFactory, timeouts)
 
   // TODO(#1351): remove the need for this by having the automation service handle treasury requests
-  private val connection = ledgerClient.connection(s"EndUserTreasuryService_${key.endUserName}")
+  private val connection = ledgerClient.connection(
+    s"EndUserTreasuryService_${CoinLedgerConnection.sanitizeUserIdToLedgerString(key.endUserName)}"
+  )
 
   val treasury: EndUserTreasuryService = new EndUserTreasuryService(
     connection,
