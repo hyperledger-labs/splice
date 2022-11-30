@@ -100,7 +100,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
         loginWithSst: loginWithSst,
         loginWithOidc: () => {
           if (auth) {
-            auth.signinRedirect();
+            // We store the user id in localStorage. If it really was cleared
+            // users should get a chance to login as a different user.
+            auth.signinRedirect({ prompt: 'login' });
           }
         },
         logout: () => {

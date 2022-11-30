@@ -1,3 +1,4 @@
+import { WebStorageStateStore } from 'oidc-client-ts';
 import React from 'react';
 import { AuthProvider as OidcAuthProvider } from 'react-oidc-context';
 
@@ -24,6 +25,7 @@ const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => 
       onSigninCallback={() =>
         window.history.replaceState({}, document.title, window.location.pathname)
       }
+      userStore={new WebStorageStateStore({ store: window.localStorage })}
     >
       {children}
     </OidcAuthProvider>
