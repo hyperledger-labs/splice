@@ -8,7 +8,6 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import monocle.macros.syntax.lens.*
 
@@ -26,7 +25,7 @@ class ConnectivityIntegrationTest extends CoinIntegrationTest {
   private val toxiproxy = new UseToxiproxy()
   registerPlugin(toxiproxy)
 
-  "survive a 2 second disconnect" in { implicit env =>
+  "survive a disconnect" in { implicit env =>
     svc.startSync()
     scan.startSync()
 
@@ -36,10 +35,13 @@ class ConnectivityIntegrationTest extends CoinIntegrationTest {
 
     clue("disable connection from SVC app to the ledger API server for 2 seconds") {
       toxiproxy.disable("svc-ledger-api")
-      Threading.sleep(2)
     }
 
-    clue("svc app should report as inactive")(svc.health.active shouldBe false)
+    clue("svc app should report as inactive") {
+      eventually() {
+        svc.health.active shouldBe false
+      }
+    }
 
     clue("start bob's validator and wait for its 'CoinRulesRequest' appearing on the SVC") {
       bobValidator.start()
