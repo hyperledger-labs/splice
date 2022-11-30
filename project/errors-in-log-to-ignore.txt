@@ -31,4 +31,8 @@ INTERNAL: Half-closed without a request
 # We use self-signed ledger API tokens for tests
 HMAC256 JWT Validator is NOT recommended for production environments
 
+# Using an access token for a user that has not yet been allocated produces the following warning.
+# Users are allocated by the validator app, and all apps are starting concurrently.
+AuthorizationInterceptor.*Could not resolve is_deactivated status for user
+
 # Make sure to have a trailing newline

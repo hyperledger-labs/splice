@@ -80,7 +80,7 @@ class LocalSvcAppReference(
       consoleEnvironment,
       s"remote participant for `$name``",
       name,
-      config.remoteParticipant,
+      config.remoteParticipant.remoteParticipantConfigWithAdminToken,
     )
 
   /** secret, not publicly documented way to get the admin token */

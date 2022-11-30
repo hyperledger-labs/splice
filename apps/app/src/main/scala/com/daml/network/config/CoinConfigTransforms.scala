@@ -122,9 +122,8 @@ object CoinConfigTransforms {
     Seq(
       makeAllTimeoutsBounded,
       ensureNovelDamlNames(),
-      useAdminAuthTokensForRemoteParticipants(),
       enableLedgerApiAuthForLocalParticipants("test"),
-      useLedgerApiAuthTokens("test"),
+      useSelfSignedTokensForLedgerApiAuth("test"),
     )
   }
 
@@ -322,9 +321,14 @@ object CoinConfigTransforms {
     c.copy(internalPort = c.internalPort.map(p => p + bump))
   private def portTransform(bump: Int, c: ClientConfig): ClientConfig =
     c.copy(port = c.port + bump)
+  private def portTransform(bump: Int, c: CoinLedgerApiClientConfig): CoinLedgerApiClientConfig =
+    c.focus(_.clientConfig).modify(portTransform(bump, _))
   private def portTransform(bump: Int, c: LedgerApiServerConfig): LedgerApiServerConfig =
     c.copy(internalPort = c.internalPort.map(p => p + bump))
-  private def portTransform(bump: Int, c: RemoteParticipantConfig): RemoteParticipantConfig =
+  private def portTransform(
+      bump: Int,
+      c: CoinRemoteParticipantConfig,
+  ): CoinRemoteParticipantConfig =
     c.focus(_.adminApi)
       .modify(portTransform(bump, _))
       .focus(_.ledgerApi)
@@ -339,67 +343,74 @@ object CoinConfigTransforms {
         .replace(Seq(AuthServiceConfig.UnsafeJwtHmac256(NonEmptyString.tryCreate(secret))))
     }
 
-  /** All remote participants use admin tokens for the ledger API.
-    * I.e., all console commands (used by tests) bypass auth.
+  /** Auth-enabled CN apps use self-signed tokens with the given secret for their ledger API connections.
+    * Other CN apps use canton admin tokens for their ledger API connections.
     */
-  def useAdminAuthTokensForRemoteParticipants(): CoinConfigTransform = { config =>
-    {
-      val clock = config.parameters.clock
-      val transforms: Seq[CoinConfigTransform] = Seq(
-        updateSvcAppConfig(c => {
-          val adminToken = getAdminToken(clock, c.remoteParticipant)
-          c.focus(_.remoteParticipant).modify(_.copy(token = adminToken))
-        }),
-        updateScanAppConfig(c => {
-          val adminToken = getAdminToken(clock, c.remoteParticipant)
-          c.focus(_.remoteParticipant).modify(_.copy(token = adminToken))
-        }),
-        updateAllValidatorConfigs_(c => {
-          val adminToken = getAdminToken(clock, c.remoteParticipant)
-          c.focus(_.remoteParticipant).modify(_.copy(token = adminToken))
-        }),
-        updateAllWalletAppConfigs_(c => {
-          val adminToken = getAdminToken(clock, c.remoteParticipant)
-          c.focus(_.remoteParticipant).modify(_.copy(token = adminToken))
-        }),
-        updateDirectoryAppConfig(c => {
-          val adminToken = getAdminToken(clock, c.remoteParticipant)
-          c.focus(_.remoteParticipant).modify(_.copy(token = adminToken))
-        }),
-        updateAllRemoteDirectoryAppConfigs_(c => {
-          val adminToken = getAdminToken(clock, c.ledgerApi)
-          c.copy(ledgerApiToken = adminToken)
-        }),
-        updateAllSplitwiseAppConfigs_(c => {
-          val adminToken = getAdminToken(clock, c.remoteParticipant)
-          c.focus(_.remoteParticipant).modify(_.copy(token = adminToken))
-        }),
-        updateAllRemoteSplitwiseAppConfigs_(c => {
-          val adminToken = getAdminToken(clock, c.ledgerApi)
-          c.copy(ledgerApiToken = adminToken)
-        }),
-      )
-      transforms.foldLeft(config)((c, tf) => tf(c))
-    }
+  def useSelfSignedTokensForLedgerApiAuth(secret: String): CoinConfigTransform = { config =>
+    updateAllLedgerApiClientConfigs(
+      readyForAuth = selfSignedTokenAuthSourceTransform(config.parameters.clock, secret),
+      notReadyForAuth = adminTokenAuthSourceTransform(config.parameters.clock),
+    )(config)
   }
 
-  /** All auth-enabled apps use static tokens for the ledger API, authorizing the app service user.
-    * The tokens are signed by hmac256 with the given secret.
-    */
-  def useLedgerApiAuthTokens(secret: String): CoinConfigTransform = { config =>
-    {
-      val transforms: Seq[CoinConfigTransform] = Seq(
-        updateAllValidatorConfigs_(c => {
-          val userToken = ledgerApiTestToken(c.damlUser, secret)
-          c.copy(remoteParticipantToken = userToken)
-        }),
-        updateAllWalletAppConfigs_(c => {
-          val userToken = ledgerApiTestToken(c.serviceUser, secret)
-          c.copy(remoteParticipantToken = userToken)
-        }),
-      )
-      transforms.foldLeft(config)((c, tf) => tf(c))
-    }
+  // TODO(#1627): Remove notReadyForAuth once all apps are auth-ready
+  private def updateAllLedgerApiClientConfigs(
+      readyForAuth: (String, CoinLedgerApiClientConfig) => CoinLedgerApiClientConfig,
+      notReadyForAuth: (String, CoinLedgerApiClientConfig) => CoinLedgerApiClientConfig,
+  ): CoinConfigTransform = { config =>
+    val transforms: Seq[CoinConfigTransform] = Seq(
+      // Validator and wallet apps are ready for auth:
+      // - all of their ledger API commands are submitted by the party associated with the app service user
+      // - they only read data for parties for which their service user has readAd rights
+      // - they don't use admin endpoints unless their service user has admin rights (validator app only)
+      updateAllValidatorConfigs_(c => {
+        c.focus(_.remoteParticipant.ledgerApi).modify(readyForAuth(c.damlUser, _))
+      }),
+      updateAllWalletAppConfigs_(c => {
+        c.focus(_.remoteParticipant.ledgerApi).modify(readyForAuth(c.serviceUser, _))
+      }),
+      // Other apps may not be ready for auth
+      updateSvcAppConfig(c => {
+        c.focus(_.remoteParticipant.ledgerApi).modify(notReadyForAuth(c.damlUser, _))
+      }),
+      updateScanAppConfig(c => {
+        c.focus(_.remoteParticipant.ledgerApi).modify(notReadyForAuth(c.svcUser, _))
+      }),
+      updateDirectoryAppConfig(c => {
+        c.focus(_.remoteParticipant.ledgerApi).modify(notReadyForAuth(c.damlUser, _))
+      }),
+      updateAllRemoteDirectoryAppConfigs_(c => {
+        c.focus(_.ledgerApi).modify(notReadyForAuth(c.damlUser, _))
+      }),
+      updateAllSplitwiseAppConfigs_(c => {
+        c.focus(_.remoteParticipant.ledgerApi).modify(notReadyForAuth(c.providerUser, _))
+      }),
+      updateAllRemoteSplitwiseAppConfigs_(c => {
+        c.focus(_.ledgerApi).modify(notReadyForAuth(c.damlUser, _))
+      }),
+    )
+    transforms.foldLeft(config)((c, tf) => tf(c))
+  }
+
+  private def adminTokenAuthSourceTransform(clockConfig: ClockConfig)(
+      _user: String,
+      c: CoinLedgerApiClientConfig,
+  ): CoinLedgerApiClientConfig = {
+    val adminToken = getAdminToken(clockConfig, c.clientConfig)
+    c.copy(
+      authConfig = AuthTokenSourceConfig.Static(adminToken, Some(adminToken))
+    )
+  }
+
+  private def selfSignedTokenAuthSourceTransform(clockConfig: ClockConfig, secret: String)(
+      user: String,
+      c: CoinLedgerApiClientConfig,
+  ): CoinLedgerApiClientConfig = {
+    val userToken = AuthUtil.LedgerApi.testToken(user = user, secret = secret)
+    val adminToken = getAdminToken(clockConfig, c.clientConfig)
+    c.copy(
+      authConfig = AuthTokenSourceConfig.Static(userToken, Some(adminToken))
+    )
   }
 
   /** Canton has a built in authorizer that accepts "canton admin tokens",
@@ -425,10 +436,10 @@ object CoinConfigTransforms {
     tokens.toMap
   }
 
-  def getAdminToken(clockConfig: ClockConfig, config: RemoteParticipantConfig): Option[String] = {
-    getAdminToken(clockConfig, config.ledgerApi)
+  def getAdminToken(clockConfig: ClockConfig, config: CoinRemoteParticipantConfig): String = {
+    getAdminToken(clockConfig, config.ledgerApi.clientConfig)
   }
-  def getAdminToken(clockConfig: ClockConfig, ledgerApi: ClientConfig): Option[String] = {
+  def getAdminToken(clockConfig: ClockConfig, ledgerApi: ClientConfig): String = {
     val port = ledgerApi.port.unwrap
     val token = {
       readTokenDataFile(clockConfig).getOrElse(
@@ -436,12 +447,7 @@ object CoinConfigTransforms {
         sys.error(s"No admin token found for ledger API at port $port"),
       )
     }
-    Some(token)
-  }
-
-  private def ledgerApiTestToken(user: String, secret: String): Option[String] = {
-    val token = AuthUtil.LedgerApi.testToken(user = user, secret = secret)
-    Some(token)
+    token
   }
 
   /** This transforms canton configs, not coin configs, but we need it for the Canton coin project:
@@ -469,7 +475,7 @@ object CoinConfigTransforms {
               RemoteParticipantConfig(
                 adminApi = p.adminApi.clientConfig,
                 ledgerApi = p.ledgerApi.clientConfig,
-                token = getAdminToken(config.parameters.clock, p.ledgerApi.clientConfig),
+                token = Some(getAdminToken(config.parameters.clock, p.ledgerApi.clientConfig)),
               )
             )
             .toMap,

@@ -1,9 +1,13 @@
 package com.daml.network.validator.config
 
-import com.daml.network.config.{AutomationConfig, LocalCoinConfig, RemoteCoinConfig}
+import com.daml.network.config.{
+  AutomationConfig,
+  CoinRemoteParticipantConfig,
+  LocalCoinConfig,
+  RemoteCoinConfig,
+}
 import com.daml.network.scan.config.RemoteScanAppConfig
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 
 import java.nio.file.Path
 
@@ -18,8 +22,7 @@ case class LocalValidatorAppConfig(
     damlUser: String,
     walletServiceUser: String,
     appInstances: Map[String, AppInstance],
-    remoteParticipant: RemoteParticipantConfig,
-    remoteParticipantToken: Option[String] = None,
+    remoteParticipant: CoinRemoteParticipantConfig,
     remoteScan: RemoteScanAppConfig,
     automation: AutomationConfig = AutomationConfig(),
 ) extends LocalCoinConfig // TODO(#736): fork or generalize this trait.

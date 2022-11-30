@@ -13,9 +13,9 @@ object TransformConfig extends App {
       val inputConfig = CantonCommunityConfig.parseAndLoadOrExit(Seq(inputFileName.toFile))
       val outputConfig = CoinConfigTransforms.remoteCantonConfigWithAdminTokens(inputConfig)
       CantonCommunityConfig.writeToFile(outputConfig, outputFileName)
-    case "useAdminAuthTokensForRemoteParticipants" =>
+    case "useSelfSignedTokensForLedgerApiAuth" =>
       val inputConfig = CoinConfig.parseAndLoadOrExit(Seq(inputFileName.toFile))
-      val outputConfig = CoinConfigTransforms.useAdminAuthTokensForRemoteParticipants()(inputConfig)
+      val outputConfig = CoinConfigTransforms.useSelfSignedTokensForLedgerApiAuth("test")(inputConfig)
       CoinConfig.writeToFile(outputConfig, outputFileName)
     case _ =>
       println(s"Unknown mode '$mode'")

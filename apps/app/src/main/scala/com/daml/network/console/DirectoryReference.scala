@@ -72,7 +72,7 @@ class LocalDirectoryAppReference(
       consoleEnvironment,
       s"remote participant for `$name``",
       name,
-      config.remoteParticipant,
+      config.remoteParticipant.remoteParticipantConfigWithAdminToken,
     )
 }
 
@@ -83,10 +83,11 @@ class RemoteDirectoryAppReference(
     with GrpcRemoteInstanceReference {
 
   val ledgerApi = new ExternalLedgerApiClient(
-    config.ledgerApi.address,
-    config.ledgerApi.port,
-    config.ledgerApi.tls,
-    config.ledgerApiToken,
+    config.ledgerApi.clientConfig.address,
+    config.ledgerApi.clientConfig.port,
+    config.ledgerApi.clientConfig.tls,
+    // TODO(#1627): Use actual ledger API auth
+    config.ledgerApi.authConfig.adminToken,
   )(consoleEnvironment)
 
   override protected val instanceType = "Remote directory"

@@ -3,14 +3,19 @@ package com.daml.network.environment
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.Identifier
-import com.daml.network.config.SharedCoinAppParameters
+import com.daml.network.auth.AuthTokenSource
+import com.daml.network.config.{CoinRemoteParticipantConfig, SharedCoinAppParameters}
 import com.daml.network.util.HasHealth
 import com.digitalasset.canton.config.RequireTypes.{InstanceName, Port}
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
-import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, FlagCloseableAsync}
+import com.digitalasset.canton.lifecycle.{
+  AsyncCloseable,
+  AsyncOrSyncCloseable,
+  FlagCloseableAsync,
+  SyncCloseable,
+}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 import com.digitalasset.canton.time.HasUptime
 import com.digitalasset.canton.topology.{PartyId, UniqueIdentifier}
 import com.digitalasset.canton.tracing.{NoTracing, TracerProvider}
@@ -22,7 +27,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 /** A running instance of a canton node */
 abstract class CoinNode[State <: AutoCloseable & HasHealth](
     serviceUser: String,
-    remoteParticipant: RemoteParticipantConfig,
+    remoteParticipant: CoinRemoteParticipantConfig,
     parameters: SharedCoinAppParameters,
     loggerFactory: NamedLoggerFactory,
     tracerProvider: TracerProvider,
@@ -99,30 +104,40 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
 
   }
 
-  val ledgerClientF: Future[CoinLedgerClient] =
-    retryProvider.retryForAutomation(
+  private def createAuthTokenSource(): AuthTokenSource = {
+    logger.info(s"Creating ledger API auth token source")
+    AuthTokenSource.fromConfig(remoteParticipant.ledgerApi.authConfig, loggerFactory, timeouts)
+  }
+
+  private def createLedgerClient(authTokenSource: AuthTokenSource): Future[CoinLedgerClient] = for {
+    token <- retryProvider.retryForAutomation(
+      "Acquiring initial auth token",
+      authTokenSource.getToken,
+      this,
+    )
+    _ = logger.debug(s"Using token $token for this ledger client")
+    client <- retryProvider.retryForAutomation(
       "Acquiring coin ledger client",
       CoinLedgerClient.create(
-        remoteParticipant.ledgerApi,
-        name.unwrap,
-        remoteParticipant.token,
+        remoteParticipant.ledgerApi.clientConfig,
+        // Note: When ledger API auth is enabled, application ID must be equal to user ID
+        serviceUser,
+        // TODO(#1596): Make sure the client correctly refreshes tokens.
+        //  E.g., by adding something like [[com.digitalasset.canton.sequencing.authentication.grpc.AuthenticationTokenManager]] to
+        //  automatically re-fetch tokens shortly before they expire and then a [[io.grpc.ClientInterceptor]] to add the current token
+        //  to all requests.
+        token,
         timeouts,
         loggerFactory,
         tracerProvider,
       ),
       this,
-      // Note: In general, app service users are allocated by the validator app.
-      // While the app has a valid access token for its service user but that user has not yet been allocated by the validator app,
-      // all ledger API calls with fail with PERMISSION_DENIED.
-      // Since initializing the ledger client makes the very first ledger API call in the app,
-      // we additionally retry on auth errors here.
-      additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
     )
+  } yield client
 
-  val initializeF: Future[State] = for {
-    _ <- Future.successful(logger.info(s"Starting initialization"))
+  private def initializeNode(ledgerClient: CoinLedgerClient) = for {
+    _ <- Future.successful(())
     _ = logger.info(s"Acquiring ledger connection")
-    ledgerClient <- ledgerClientF
     connection = ledgerClient.connection(name.toString)
     _ = logger.info(s"Acquiring primary party of service user $serviceUser")
     serviceParty <-
@@ -131,22 +146,37 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
           "Allocating user and party",
           connection.getOrAllocateParty(serviceUser),
           this,
+          // Note: In general, app service users are allocated by the validator app.
+          // While the app has a valid access token for its service user but that user has not yet been allocated by the validator app,
+          // all ledger API calls with fail with PERMISSION_DENIED.
+          // Since this is the first ledger API call in the app, we additionally retry on auth errors here.
+          additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
         )
       else
         retryProvider.retryForAutomation(
           "Querying primary party of user",
           connection.getPrimaryParty(serviceUser),
           this,
+          // Note: In general, app service users are allocated by the validator app.
+          // While the app has a valid access token for its service user but that user has not yet been allocated by the validator app,
+          // all ledger API calls with fail with PERMISSION_DENIED.
+          // Since this is the first ledger API call in the app, we additionally retry on auth errors here.
+          additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
         )
     _ = logger.info(s"Acquired primary party of user $serviceUser: $serviceParty")
     _ = logger.info(s"Waiting for templates to be uploaded: ${requiredTemplates}")
     _ <- waitForPackages(connection)
     _ = logger.info(s"Packages available, running app-specific init")
     state <- initialize(ledgerClient, serviceParty)
-    _ <- Future.successful(logger.info(s"Initialization complete"))
   } yield state
 
+  logger.info(s"Starting initialization")
+  private val authTokenSource = createAuthTokenSource()
+  private val ledgerClientF = createLedgerClient(authTokenSource)
+  private val initializeF = ledgerClientF.flatMap(initializeNode)
+
   initializeF.onComplete { _ =>
+    logger.info(s"Initialization complete")
     isInitializedVar.set(true)
   }
 
@@ -165,6 +195,7 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
         ledgerClientF.map(_.close()),
         closingTimeout,
       ),
+      SyncCloseable(s"$name auth token source", authTokenSource.close()),
     )
   }
 }

@@ -106,7 +106,7 @@ final class LocalScanAppReference(
       coinConsoleEnvironment,
       s"remote participant for `$name``",
       name,
-      config.remoteParticipant,
+      config.remoteParticipant.remoteParticipantConfigWithAdminToken,
     )
 }
 

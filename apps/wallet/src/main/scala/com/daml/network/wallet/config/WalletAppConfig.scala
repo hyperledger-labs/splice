@@ -1,17 +1,20 @@
 package com.daml.network.wallet.config
 
 import com.daml.network.auth.AuthConfig
-import com.daml.network.config.{AutomationConfig, LocalCoinConfig, RemoteCoinConfig}
+import com.daml.network.config.{
+  AutomationConfig,
+  CoinRemoteParticipantConfig,
+  LocalCoinConfig,
+  RemoteCoinConfig,
+}
 import com.daml.network.scan.config.RemoteScanAppConfig
 import com.digitalasset.canton.config.*
-import com.digitalasset.canton.participant.config.RemoteParticipantConfig
 
 case class LocalWalletAppConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     serviceUser: String,
-    remoteParticipant: RemoteParticipantConfig,
-    remoteParticipantToken: Option[String] = None,
+    remoteParticipant: CoinRemoteParticipantConfig,
     remoteScan: RemoteScanAppConfig,
     validator: WalletRemoteValidatorAppConfig,
     auth: AuthConfig,

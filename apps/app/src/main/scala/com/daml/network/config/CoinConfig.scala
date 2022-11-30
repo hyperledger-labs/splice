@@ -370,14 +370,30 @@ object CoinConfig {
 
     implicit val authConfigHint = new FieldCoproductHint[AuthConfig]("algorithm")
 
-    implicit val automationConfig: ConfigReader[AutomationConfig] =
-      deriveReader[AutomationConfig]
     implicit val hs256UnsafeConfig: ConfigReader[AuthConfig.Hs256Unsafe] =
       deriveReader[AuthConfig.Hs256Unsafe]
     implicit val rs256Config: ConfigReader[AuthConfig.Rs256] =
       deriveReader[AuthConfig.Rs256]
     implicit val authConfig: ConfigReader[AuthConfig] =
       deriveReader[AuthConfig]
+
+    implicit val authTokenSourceConfigHint: FieldCoproductHint[AuthTokenSourceConfig] =
+      new FieldCoproductHint[AuthTokenSourceConfig]("type")
+    implicit val authTokenSourceNoneReader: ConfigReader[AuthTokenSourceConfig.None] =
+      deriveReader[AuthTokenSourceConfig.None]
+    implicit val authTokenSourceStaticReader: ConfigReader[AuthTokenSourceConfig.Static] =
+      deriveReader[AuthTokenSourceConfig.Static]
+    implicit val authTokenSourceCCReader: ConfigReader[AuthTokenSourceConfig.ClientCredentials] =
+      deriveReader[AuthTokenSourceConfig.ClientCredentials]
+    implicit val authTokenSourceConfigReader: ConfigReader[AuthTokenSourceConfig] =
+      deriveReader[AuthTokenSourceConfig]
+
+    implicit val automationConfig: ConfigReader[AutomationConfig] =
+      deriveReader[AutomationConfig]
+    implicit val coinLedgerApiClientConfigReader: ConfigReader[CoinLedgerApiClientConfig] =
+      deriveReader[CoinLedgerApiClientConfig]
+    implicit val coinRemoteParticipantConfigReader: ConfigReader[CoinRemoteParticipantConfig] =
+      deriveReader[CoinRemoteParticipantConfig]
     implicit val appInstanceReader: ConfigReader[AppInstance] =
       deriveReader[AppInstance]
     implicit val remoteScanConfigReader: ConfigReader[RemoteScanAppConfig] =
@@ -426,14 +442,30 @@ object CoinConfig {
 
     implicit val authConfigHint = new FieldCoproductHint[AuthConfig]("algorithm")
 
-    implicit val automationConfig: ConfigWriter[AutomationConfig] =
-      deriveWriter[AutomationConfig]
     implicit val hs256UnsafeConfig: ConfigWriter[AuthConfig.Hs256Unsafe] =
       deriveWriter[AuthConfig.Hs256Unsafe]
     implicit val rs256Config: ConfigWriter[AuthConfig.Rs256] =
       deriveWriter[AuthConfig.Rs256]
     implicit val authConfig: ConfigWriter[AuthConfig] =
       deriveWriter[AuthConfig]
+
+    implicit val authTokenSourceConfigHint: FieldCoproductHint[AuthTokenSourceConfig] =
+      new FieldCoproductHint[AuthTokenSourceConfig]("type")
+    implicit val authTokenSourceNoneWriter: ConfigWriter[AuthTokenSourceConfig.None] =
+      deriveWriter[AuthTokenSourceConfig.None]
+    implicit val authTokenSourceStaticWriter: ConfigWriter[AuthTokenSourceConfig.Static] =
+      deriveWriter[AuthTokenSourceConfig.Static]
+    implicit val authTokenSourceCCWriter: ConfigWriter[AuthTokenSourceConfig.ClientCredentials] =
+      deriveWriter[AuthTokenSourceConfig.ClientCredentials]
+    implicit val authTokenSourceConfigWriter: ConfigWriter[AuthTokenSourceConfig] =
+      deriveWriter[AuthTokenSourceConfig]
+
+    implicit val automationConfig: ConfigWriter[AutomationConfig] =
+      deriveWriter[AutomationConfig]
+    implicit val coinLedgerApiClientConfigWriter: ConfigWriter[CoinLedgerApiClientConfig] =
+      deriveWriter[CoinLedgerApiClientConfig]
+    implicit val coinRemoteParticipantConfigWriter: ConfigWriter[CoinRemoteParticipantConfig] =
+      deriveWriter[CoinRemoteParticipantConfig]
     implicit val appInstanceWriter: ConfigWriter[AppInstance] =
       deriveWriter[AppInstance]
     implicit val remoteScanConfigWriter: ConfigWriter[RemoteScanAppConfig] =

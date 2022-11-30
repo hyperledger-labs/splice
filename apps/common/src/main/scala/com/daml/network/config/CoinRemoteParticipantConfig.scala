@@ -1,0 +1,20 @@
+package com.daml.network.config
+
+import com.digitalasset.canton.config.ClientConfig
+import com.digitalasset.canton.participant.config.{BaseParticipantConfig, RemoteParticipantConfig}
+
+/** Configuration to connect the console to a participant running remotely.
+  *
+  * @param adminApi the configuration to connect the console to the remote admin api
+  * @param ledgerApi the configuration to connect the console to the remote ledger api
+  */
+case class CoinRemoteParticipantConfig(
+    adminApi: ClientConfig,
+    ledgerApi: CoinLedgerApiClientConfig,
+) extends BaseParticipantConfig {
+  override def clientAdminApi: ClientConfig = adminApi
+  override def clientLedgerApi: ClientConfig = ledgerApi.clientConfig
+
+  def remoteParticipantConfigWithAdminToken: RemoteParticipantConfig =
+    RemoteParticipantConfig(adminApi, ledgerApi.clientConfig, ledgerApi.authConfig.adminToken)
+}

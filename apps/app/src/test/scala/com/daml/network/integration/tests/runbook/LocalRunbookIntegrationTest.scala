@@ -72,12 +72,12 @@ class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScr
     CoinConfigTransforms.updateSvcAppConfig(
       _.focus(_.remoteParticipant.adminApi.address)
         .replace("localhost")
-        .focus(_.remoteParticipant.ledgerApi.address)
+        .focus(_.remoteParticipant.ledgerApi.clientConfig.address)
         .replace("localhost")
     ) compose CoinConfigTransforms.updateScanAppConfig(
       _.focus(_.remoteParticipant.adminApi.address)
         .replace("localhost")
-        .focus(_.remoteParticipant.ledgerApi.address)
+        .focus(_.remoteParticipant.ledgerApi.clientConfig.address)
         .replace("localhost")
     )
   }
