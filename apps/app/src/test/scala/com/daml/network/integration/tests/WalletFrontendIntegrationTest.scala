@@ -433,6 +433,27 @@ class WalletFrontendIntegrationTest
       }
 
     }
+
+    "user name is persisted" in { implicit env =>
+      val aliceParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      withFrontEnd("alice") { implicit webDrivers =>
+        browseToAliceWallet(aliceWallet.config.damlUser)
+        find(id("logged-in-user")).value.text should matchText(aliceParty.toProtoPrimitive)
+        actAndCheck(
+          "Alice reloads the page", {
+            go to s"http://localhost:3000"
+          },
+        )(
+          "Alice is automatically logged in",
+          _ => find(id("logged-in-user")).value.text should matchText(aliceParty.toProtoPrimitive),
+        )
+        actAndCheck(
+          "Alice logs out", {
+            click on "logout-button"
+          },
+        )("Alice sees the login screen again", _ => find(id("login-button")) should not be empty)
+      }
+    }
   }
 
   private def setupForTestWithDirectory(

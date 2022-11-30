@@ -1,6 +1,6 @@
 import { SignJWT } from 'jose';
 import { User } from 'oidc-client-ts';
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { useAuth } from 'react-oidc-context';
 
 import { config, isHs2456UnsafeAuthConfig } from '../utils';
@@ -38,11 +38,13 @@ const useAuthSafe = () => {
   }
 };
 
+const SESSION_STORAGE_KEY = 'canton.network.wallet.userid';
+
 export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   // Two user authentication methods are supported:
   //   - sst: Self-Signed Tokens based on a given user ID
   //   - oidc: OpenID Connect logins based on OAuth2.0
-  const [authMethod, setAuthMethod] = useState<'sst' | 'oidc' | undefined>(undefined);
+  const authMethod: 'sst' | 'oidc' = isHs2456UnsafeAuthConfig(config.auth) ? 'sst' : 'oidc';
 
   const [isOnboarded, setIsOnboarded] = useState(false);
   const [userId, setUserId] = useState<string>();
@@ -55,9 +57,15 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
     ? auth.isAuthenticated
     : userId !== undefined && userAccessToken !== undefined;
 
+  const loginWithSst = useCallback(async (userId: string) => {
+    setUserId(userId);
+    const token = await generateToken(userId);
+    setUserAccessToken(token);
+    window.sessionStorage.setItem(SESSION_STORAGE_KEY, userId);
+  }, []);
+
   useEffect(() => {
     async function f(user: User) {
-      setAuthMethod('oidc');
       setUserId(user.profile?.sub);
 
       const { id_token } = user;
@@ -69,8 +77,13 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (auth?.isAuthenticated && auth.user) {
       f(auth.user);
+    } else if (authMethod === 'sst') {
+      const storedUserId = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+      if (storedUserId) {
+        loginWithSst(storedUserId);
+      }
     }
-  }, [auth]);
+  }, [auth, authMethod, loginWithSst]);
 
   return (
     <UserContext.Provider
@@ -84,13 +97,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsOnboarded(userOnboarded);
           setPrimaryPartyId(partyId);
         },
-        loginWithSst: async (id: string) => {
-          setAuthMethod('sst');
-          setUserId(id);
-
-          const token = await generateToken(id);
-          setUserAccessToken(token);
-        },
+        loginWithSst: loginWithSst,
         loginWithOidc: () => {
           if (auth) {
             auth.signinRedirect();
@@ -104,8 +111,9 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           if (auth && authMethod === 'oidc') {
             auth.removeUser();
+          } else if (authMethod === 'sst') {
+            window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
           }
-          setAuthMethod(undefined);
         },
       }}
     >

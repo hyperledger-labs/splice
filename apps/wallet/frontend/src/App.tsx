@@ -50,7 +50,7 @@ const App: React.FC = () => {
               )}
             </Typography>
             {isAuthenticated && (
-              <Button color="inherit" onClick={logout}>
+              <Button color="inherit" onClick={logout} id="logout-button">
                 Log Out
               </Button>
             )}
