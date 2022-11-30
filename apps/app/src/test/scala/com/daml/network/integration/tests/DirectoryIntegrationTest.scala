@@ -13,6 +13,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
+import com.daml.network.util.CoinTestUtil
 import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
@@ -25,7 +26,7 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
-class DirectoryIntegrationTest extends CoinIntegrationTest {
+class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
 
   import DirectoryIntegrationTest._
 
@@ -53,7 +54,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest {
       import env._
 
       // The user of the directory service.
-      val aliceUserParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
+      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
       val offsetBefore = directoryValidator.remoteParticipant.ledger_api.transactions.end()
 
       // Trigger three concurrent install requests
@@ -71,7 +72,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest {
     "accept unique install requests" in { implicit env =>
       import env._
       // The user of the directory service.
-      val aliceUserParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
+      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
 
       // Test that we can do a racy allocation and cancellation of a directory install request multiple times
       for (_ <- 1 to 3) {
@@ -240,7 +241,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest {
     }
     "allocate directory entries following an initial subscription payment and renew entries on follow-up payments" in {
       implicit env =>
-        val aliceUserParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
+        val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
         val providerParty = directory.getProviderPartyId()
 
         val aliceRefs = clue("Setup Alice") {
@@ -314,7 +315,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest {
     }
 
     def setupUser(refs: StaticUserRefs): DynamicUserRefs = {
-      val userParty = refs.validator.onboardUser(refs.wallet.config.damlUser)
+      val userParty = onboardWalletUser(this, refs.wallet, refs.validator)
 
       clue("Request install and wait for provider to auto-accept") {
         refs.directory.requestDirectoryInstall()

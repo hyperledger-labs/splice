@@ -1,10 +1,11 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.integration.CoinEnvironmentDefinition
+import com.daml.network.util.CoinTestUtil
 
 import scala.concurrent.duration.DurationInt
 
-class DirectoryFrontendIntegrationTest extends FrontendIntegrationTest("alice") {
+class DirectoryFrontendIntegrationTest extends FrontendIntegrationTest("alice") with CoinTestUtil {
 
   private val directoryDarPath =
     "apps/directory/daml/.daml/dist/directory-service-0.1.0.dar"
@@ -20,7 +21,7 @@ class DirectoryFrontendIntegrationTest extends FrontendIntegrationTest("alice") 
 
     "allow requesting an entry and then list it" in { implicit env =>
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      aliceValidator.onboardUser(aliceDamlUser)
+      onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
       aliceRemoteWallet.tap(100.0)
 
       val entryName = "mycoolentry"
@@ -59,7 +60,7 @@ class DirectoryFrontendIntegrationTest extends FrontendIntegrationTest("alice") 
 
     "allow requesting an entry with subscription payments and then list it" in { implicit env =>
       val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      aliceValidator.onboardUser(aliceDamlUser)
+      onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
       aliceRemoteWallet.tap(100.0)
 
       val entryName = "mycoolentry"

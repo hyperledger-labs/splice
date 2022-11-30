@@ -9,11 +9,12 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinTestConsoleEnvironment,
 }
 import com.daml.network.splitwise.admin.api.client.commands.GrpcSplitwiseAppClient
+import com.daml.network.util.CoinTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.concurrent.Future
 
-class SplitwiseIntegrationTest extends CoinIntegrationTest {
+class SplitwiseIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
 
   private val darPath = "apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar"
 
@@ -34,9 +35,9 @@ class SplitwiseIntegrationTest extends CoinIntegrationTest {
 
     "support provider-hosted mode" in { implicit env =>
       // Onboard users
-      val aliceUserParty = aliceValidator.onboardUser(aliceSplitwise.config.damlUser)
-      val charlieUserParty = aliceValidator.onboardUser(charlieSplitwise.config.damlUser)
-      val bobUserParty = bobValidator.onboardUser(bobSplitwise.config.damlUser)
+      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
+      val charlieUserParty = onboardWalletUser(this, charlieRemoteWallet, aliceValidator)
+      val bobUserParty = onboardWalletUser(this, bobRemoteWallet, bobValidator)
 
       // Setup install contracts
       Seq(
@@ -146,7 +147,7 @@ class SplitwiseIntegrationTest extends CoinIntegrationTest {
       implicit env =>
         import env._
 
-        val aliceUserParty = aliceValidator.onboardUser(aliceSplitwise.config.damlUser)
+        val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
 
         aliceSplitwise.createInstallRequest()
         aliceSplitwise.ledgerApi.ledger_api.acs

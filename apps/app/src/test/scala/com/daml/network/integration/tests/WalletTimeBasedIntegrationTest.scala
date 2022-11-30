@@ -28,8 +28,7 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
   "A wallet" should {
 
     "allow a user to list multiple subscriptions in different states" in { implicit env =>
-      val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      val aliceUserParty = aliceValidator.onboardUser(aliceDamlUser)
+      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
 
       clue("Alice gets some coins") {
         aliceRemoteWallet.tap(50)
