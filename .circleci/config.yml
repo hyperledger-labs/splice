@@ -996,7 +996,7 @@ jobs:
             }
             fetch_previous_pipeline() {
                 fetch "https://circleci.com/api/v2/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pipeline?branch=main" "/tmp/pipelines.json"
-                OUT=$(jq < /tmp/pipelines.json ".items | map(select(.trigger.type == "webhook" and .number < << pipeline.number >>)) | first")
+                OUT=$(jq < /tmp/pipelines.json ".items | map(select(.trigger.type == \"webhook\" and .number < << pipeline.number >>)) | first")
                 >&2 echo "Waiting for build $(echo $OUT | jq '.number')"
                 echo $OUT | jq -r '.id'
             }
