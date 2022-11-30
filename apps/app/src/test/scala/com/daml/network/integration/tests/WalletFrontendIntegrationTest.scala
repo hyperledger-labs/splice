@@ -359,7 +359,7 @@ class WalletFrontendIntegrationTest
             click on "create-offer-receiver"
             textField("create-offer-receiver").value = bobParty.toProtoPrimitive
             click on "create-offer-quantity"
-            textField("create-offer-quantity").value = "10.0"
+            textField("create-offer-quantity").value = "100.0"
             click on "create-offer-description"
             textField("create-offer-description").value = description
             click on "create-offer-button"
@@ -380,7 +380,7 @@ class WalletFrontendIntegrationTest
         createOffer("Testing transfer offers")
         val row = inside(findAll(className("transfer-offers-row")).toList) { case Seq(row) => row }
         row.childElement(className("transfer-offers-table-quantity")).text should be(
-          "10.0000000000CC"
+          "100.0000000000CC"
         )
       }
 
@@ -393,24 +393,26 @@ class WalletFrontendIntegrationTest
           },
         )
         actAndCheck("Bob accepts the offer", click on className("transfer-offers-table-accept"))(
-          "Bob sees the accepted offer",
+          "Bob sees the accepted offer (not enough funds for it to complete)",
           _ => {
             findAll(className("transfer-offers-row")) should have size 0
-            // TODO(#1730) Consider how we want to test this without racing with the automation
-            // that tries to archive this concurrently.
-            // findAll(className("accepted-transfer-offers-row")) should have size 1
+            findAll(className("accepted-transfer-offers-row")) should have size 1
           },
         )
       }
 
       withFrontEnd("alice") { implicit webDriver =>
-        clue("Alice also sees the accepted offer")(
-          {
-            findAll(className("transfer-offers-row")) should have size 0
-            // TODO(#1730) Consider how we want to test this without racing with the automation
-            // that tries to archive this concurrently.
-            // findAll(className("accepted-transfer-offers-row")) should have size 1
+        clue("Alice also sees the accepted offer") {
+          eventually() {
+            findAll(className("accepted-transfer-offers-row")) should have size 1
           }
+        }
+
+        actAndCheck("Tap more coin for alice", aliceRemoteWallet.tap(100))(
+          "Accepted offer is completed",
+          _ => {
+            findAll(className("accepted-transfer-offers-row")) should have size 0
+          },
         )
 
         createOffer("to be withdrawn")
