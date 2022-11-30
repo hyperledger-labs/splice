@@ -176,7 +176,7 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
   private val initializeF = ledgerClientF.flatMap(initializeNode)
 
   initializeF.onComplete { _ =>
-    logger.info(s"Initialization complete")
+    logger.info(s"Initialization complete, running on version ${BuildInfo.compiledVersion}")
     isInitializedVar.set(true)
   }
 

@@ -1,5 +1,7 @@
 package com.daml.network.admin.api.client
 
+import com.daml.network.admin.api.client.version.GrpcVersionClient
+import com.daml.network.environment.BuildInfo
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.Lifecycle.CloseableChannel
@@ -26,6 +28,28 @@ abstract class AppConnection(
     s"$serviceName connection",
   )
 
+  checkVersionCompatibility()
+
+  private def checkVersionCompatibility() = {
+    val _ = for {
+      version <- getAppVersion()(TraceContext.empty)
+    } yield {
+      logger.debug(s"Found app version: ${version}")(TraceContext.empty)
+      val myVersion = BuildInfo.compiledVersion
+      if (version != myVersion) {
+        logger.error(
+          s"Versions do not match for $serviceName: server is on $version, but mine is: $myVersion"
+        )(TraceContext.empty)
+      } else {
+        logger.debug(
+          s"Version verification passed for $serviceName, server is on the same version as mine: ${version}"
+        )(
+          TraceContext.empty
+        )
+      }
+    }
+  }
+
   def serviceName: String
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = Seq(
@@ -51,4 +75,7 @@ abstract class AppConnection(
       result <- toFuture(cmd.handleResponse(response))
     } yield result
   }
+
+  protected def getAppVersion()(implicit traceContext: TraceContext): Future[String] =
+    runCmd(GrpcVersionClient.GetVersion())
 }

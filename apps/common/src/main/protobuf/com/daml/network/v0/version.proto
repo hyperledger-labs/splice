@@ -1,0 +1,12 @@
+syntax = "proto3";
+package com.daml.network.v0;
+
+import "google/protobuf/empty.proto";
+
+service VersionService {
+  rpc GetVersion(google.protobuf.Empty) returns (GetVersionResponse);
+}
+
+message GetVersionResponse {
+  string version = 1;
+}

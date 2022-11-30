@@ -3,7 +3,9 @@ package com.daml.network.environment
 import akka.actor.ActorSystem
 import better.files.File
 import cats.data.EitherT
+import com.daml.network.admin.grpc.GrpcVersionService
 import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
+import com.daml.network.v0.VersionServiceGrpc
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.config.{LocalNodeConfig, LocalNodeParameters, ProcessingTimeout}
@@ -187,6 +189,12 @@ abstract class CoinNodeBootstrapBase[
               writeHealthDumpToFile,
               parameterConfig.processingTimeouts,
             ),
+            executionContext,
+          )
+        )
+        .addService(
+          VersionServiceGrpc.bindService(
+            new GrpcVersionService(loggerFactory),
             executionContext,
           )
         )

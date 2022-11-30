@@ -10,7 +10,9 @@ object BuildUtil {
     private val buffer = mutable.Buffer[String]()
 
     override def out(s: => String): Unit = buffer.append(s)
+
     override def err(s: => String): Unit = buffer.append(s)
+
     override def buffer[T](f: => T): T = f
 
     /** Output the buffered content to a String applying an optional line prefix.
@@ -27,20 +29,32 @@ object BuildUtil {
       optCwd: Option[File] = None,
       extraEnv: Seq[(String, String)] = Seq.empty,
   ): String = {
+    runCommandOptionalLog(args, Some(log), optError, optCwd, extraEnv)
+  }
+
+  def runCommandOptionalLog(
+      args: Seq[String],
+      optLog: Option[Logger] = None,
+      optError: Option[String] = None,
+      optCwd: Option[File] = None,
+      extraEnv: Seq[(String, String)] = Seq.empty,
+  ): String = {
     import scala.sys.process.Process
     val command = args.mkString(" ")
     val processLogger = new BuildUtil.BufferedLogger
     val cwdInfo = optCwd.map(cwd => s" in `$cwd`").getOrElse("")
-    log.debug(s"Running $command$cwdInfo")
+    if (optLog.isDefined) optLog.map(_.debug(s"Running $command$cwdInfo"))
     val exitCode = Process(args, optCwd, extraEnv = extraEnv: _*) ! processLogger
     val output = processLogger.output()
     if (exitCode != 0) {
       val errorMsg =
         s"Running command `$command`$cwdInfo returned non-zero exit code: $exitCode}"
-      log.error(output)
-      if (optError.isDefined) log.error(optError.getOrElse(""))
+      if (optLog.isDefined) optLog.map(_.error(output))
+      if (optError.isDefined && optLog.isDefined)
+        if (optLog.isDefined) optLog.map(_.error(optError.getOrElse("")))
       throw new IllegalStateException(errorMsg)
-    } else if (output != "") log.info(processLogger.output())
+    } else if (output != "" && optLog.isDefined)
+      if (optLog.isDefined) optLog.map(_.info(processLogger.output()))
     output
   }
 
@@ -68,6 +82,7 @@ object BuildUtil {
           }
       }
     }
+
     go(5)
   }
 }

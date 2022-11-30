@@ -163,6 +163,7 @@ lazy val `apps-common` =
       `canton-community-app` % "compile->compile;test->test",
       `canton-coin-daml`,
     )
+    .enablePlugins(BuildInfoPlugin)
     .settings(
       libraryDependencies ++= Seq(
         scalapb_runtime_grpc,
@@ -175,6 +176,14 @@ lazy val `apps-common` =
         akka_spray_json,
       ),
       BuildCommon.sharedAppSettings,
+      buildInfoKeys := Seq[BuildInfoKey](
+        BuildInfoKey(
+          "compiledVersion",
+          BuildUtil.runCommandOptionalLog(Seq("./build-tools/version-gen")),
+        )
+      ),
+      buildInfoPackage := "com.daml.network.environment",
+      buildInfoObject := "BuildInfo",
     )
 
 lazy val `apps-validator` =
