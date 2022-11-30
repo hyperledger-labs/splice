@@ -15,3 +15,7 @@ $(docker-build): $(html)
 $(html): $(src)
 	./gen-daml-docs.sh
 	VERSION=$(shell version-gen) sphinx-build -M html src target -D version=$(shell version-gen) -W
+
+.PHONY: clean
+clean:
+	rm -vfr src/app_dev/api
