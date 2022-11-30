@@ -11,19 +11,17 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
-import com.daml.network.wallet.treasury.{CoinOperationRequest, TreasuryServices}
+import com.daml.network.wallet.EndUserWalletManager
+import com.daml.network.wallet.store.EndUserWalletStore
+import com.daml.network.wallet.treasury.CoinOperationRequest
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
-import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncCloseable}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import java.time.temporal.ChronoUnit
-import scala.collection.concurrent.TrieMap
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.DurationConverters.*
@@ -33,8 +31,7 @@ import scala.jdk.DurationConverters.*
 class WalletAutomationService(
     automationConfig: AutomationConfig,
     clockConfig: ClockConfig,
-    walletStore: WalletStore,
-    treasuryServices: TreasuryServices,
+    walletManager: EndUserWalletManager,
     ledgerClient: CoinLedgerClient,
     retryProvider: CoinRetries,
     override protected val loggerFactory: NamedLoggerFactory,
@@ -56,7 +53,7 @@ class WalletAutomationService(
   registerService(
     new AcsIngestionService(
       "WalletStore",
-      walletStore.acsIngestionSink,
+      walletManager.store.acsIngestionSink,
       connection,
       retryProvider,
       loggerFactory,
@@ -64,33 +61,21 @@ class WalletAutomationService(
     )
   )
 
-  private val endUserAutomations: TrieMap[String, AutoCloseable] = TrieMap.empty
-
   // TODO(#763): not handling archive events, uninstalling wallets without a restart is not supported yet
-  registerRequestHandler("WalletAppInstall", walletStore.streamInstalls)(install => {
+  registerRequestHandler("WalletAppInstall", walletManager.store.streamInstalls)(install => {
     implicit traceContext =>
       Future {
         val endUserName = install.payload.endUserName
-        val endUserParty = PartyId.tryFromProtoPrimitive(install.payload.endUserParty)
-        val endUserStore = walletStore.getOrCreateEndUserStore(endUserName, endUserParty, timeouts)
-        val endUserTreasuryService =
-          treasuryServices.addOrCreateTreasuryService(install, endUserStore)
-        val endUserAutomation = new EndUserWalletAutomationService(
-          endUserName,
-          endUserParty,
-          endUserStore,
-          endUserTreasuryService,
-          ledgerClient,
-          automationConfig,
-          clockConfig,
-          retryProvider,
-          loggerFactory,
-          timeouts,
-        )
-        Some(registerService(endUserAutomations, endUserName, endUserAutomation))
+        if (walletManager.getOrCreateEndUserWallet(install))
+          Some(s"onboarded wallet end-user '$endUserName'")
+        else {
+          logger.warn(s"Unexpected duplicate on-boarding of wallet user '$endUserName'")
+          Some(s"skipped duplicate on-boarding wallet end-user '$endUserName'")
+        }
       }
   })
 
+  // TODO(#1808): move to EndUserWalletAutomationService
   registerTimeHandler(
     "handleCanMakeSubscriptionPayment",
     canMakeSubscriptionPaymentCheckInterval,
@@ -98,33 +83,17 @@ class WalletAutomationService(
   )(now => { implicit traceContext =>
     {
       // process each store separately
-      walletStore.endUserStores
-        .map(makeDueSubscriptionPaymentsForStore(_, now))
+      walletManager.endUserWallets
+        .map(wallet => makeDueSubscriptionPaymentsForStore(wallet.store, now))
         .toList
         .sequence
         // join results
         .map(_.flatten.partitionMap(r => r) match {
-          case (lefts, rights) => {
+          case (lefts, rights) =>
             Some(s"created ${rights.size} subscription payments (${lefts.size} failures).")
-          }
         })
     }
   })
-
-  private def registerService(
-      services: TrieMap[String, AutoCloseable],
-      endUserName: String,
-      service: AutoCloseable,
-  )(implicit tc: TraceContext): String = {
-    services.putIfAbsent(endUserName, service) match {
-      case None =>
-        s"onboarded wallet end-user '$endUserName'"
-      case Some(_) =>
-        logger.warn(s"Unexpected duplicate on-boarding of wallet user '$endUserName'")
-        service.close()
-        s"skipped duplicate on-boarding wallet end-user '$endUserName'"
-    }
-  }
 
   private def makeDueSubscriptionPaymentsForStore(
       userStore: EndUserWalletStore,
@@ -173,44 +142,25 @@ class WalletAutomationService(
       (_: Unit) => new installCodegen.coinoperation.CO_SubscriptionMakePayment(stateCid),
       lookups,
     )
-    (treasuryServices
-      .lookupEndUserTreasury(userStore.key.endUserName) match {
-      case None => {
-        Future(Left(s"missing end-user treasury"))
-      }
-      case Some(userTreasury) =>
-        userTreasury
+    (walletManager.lookupEndUserWallet(userStore.key.endUserName) match {
+      case None => Future(Left(s"missing end-user treasury"))
+      case Some(userWallet) =>
+        userWallet.treasury
           .enqueueCoinOperation(operation)
-          .map(_ match {
-            case failedOperation: installCodegen.coinoperationoutcome.COO_Error => {
+          .map {
+            case failedOperation: installCodegen.coinoperationoutcome.COO_Error =>
               Left(
                 s"the coin operation failed with a Daml exception: ${failedOperation.stringValue}."
               )
-            }
-            case _ => {
+            case _ =>
               logger.info(s"Made a subscription payment on state $stateCid")
               Right(())
-            }
-          })
+          }
     }).map(_.leftMap(error => {
       logger.warn(s"Failed making a subscription payment on state $stateCid: $error")
       s"state $stateCid: $error"
     }))
   }
-
-  // TODO(#1247) consider reducing duplication with GrpcWallet service
-  private def getUserInstallContract(
-      userWalletStore: EndUserWalletStore,
-      userParty: PartyId,
-  ): Future[
-    com.daml.network.util.JavaContract[
-      installCodegen.WalletAppInstall.ContractId,
-      installCodegen.WalletAppInstall,
-    ]
-  ] =
-    userWalletStore
-      .lookupInstall()
-      .map(getQueryResult(_, s"WalletAppInstall contract of user $userParty"))
 
   // TODO(#1247) consider reducing duplication with GrpcWallet service / moving into the `QueryResult` class itself
   private def getQueryResult[T](
@@ -221,12 +171,4 @@ class WalletAutomationService(
       throw new StatusRuntimeException(Status.NOT_FOUND.withDescription(errorMsg))
     case QueryResult(_, Some(x)) => x
   }
-
-  override def closeAsync(): Seq[AsyncOrSyncCloseable] =
-    Seq(
-      SyncCloseable(
-        "EndUserIngestionServices",
-        Lifecycle.close(endUserAutomations.values.toSeq: _*)(logger),
-      )
-    ) ++ super.closeAsync()
 }

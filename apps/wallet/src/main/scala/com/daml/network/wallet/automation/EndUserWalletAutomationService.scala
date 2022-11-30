@@ -17,19 +17,16 @@ import com.daml.network.wallet.store.EndUserWalletStore
 import com.daml.network.wallet.treasury.{CoinOperationRequest, EndUserTreasuryService}
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.duration.*
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, Future}
 
 class EndUserWalletAutomationService(
-    endUserName: String,
-    endUserPartyId: PartyId,
-    endUserStore: EndUserWalletStore,
-    endUserTreasuryService: EndUserTreasuryService,
+    store: EndUserWalletStore,
+    treasury: EndUserTreasuryService,
     ledgerClient: CoinLedgerClient,
     automationConfig: AutomationConfig,
     clockConfig: ClockConfig,
@@ -37,7 +34,7 @@ class EndUserWalletAutomationService(
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
 )(implicit
-    ec: ExecutionContextExecutor,
+    ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
 ) extends AutomationService(automationConfig, clockConfig, retryProvider) {
@@ -48,8 +45,8 @@ class EndUserWalletAutomationService(
   private val connection = registerResource(ledgerClient.connection(this.getClass.getSimpleName))
   registerService(
     new AcsIngestionService(
-      s"EndUserWalletStore($endUserName)",
-      endUserStore.acsIngestionSink,
+      s"EndUserWalletStore(${store.key.endUserName})",
+      store.acsIngestionSink,
       connection,
       retryProvider,
       loggerFactory,
@@ -62,14 +59,14 @@ class EndUserWalletAutomationService(
   )(implicit tc: TraceContext): Future[Either[String, String]] = {
     def lookups = () => {
       for {
-        _ <- endUserStore.lookupAcceptedTransferOfferById(acceptedOffer.contractId)
+        _ <- store.lookupAcceptedTransferOfferById(acceptedOffer.contractId)
       } yield ()
     }
     val operation = CoinOperationRequest(
       (_: Unit) => new CO_CompleteAcceptedTransfer(acceptedOffer.contractId),
       lookups,
     )
-    endUserTreasuryService
+    treasury
       .enqueueCoinOperation(operation)
       .map(a => {
         a match {
@@ -91,7 +88,7 @@ class EndUserWalletAutomationService(
   def completeAcceptedTransferOfferIfSender(
       acceptedOffer: JavaContract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer]
   )(implicit tc: TraceContext): Future[Either[String, String]] = {
-    endUserPartyId.toProtoPrimitive match {
+    store.key.endUserParty.toProtoPrimitive match {
       case acceptedOffer.payload.sender =>
         logger.info("Transfer offer accepted, trying to complete the transfer...")
         completeAcceptedTransferOffer(acceptedOffer)
@@ -101,7 +98,7 @@ class EndUserWalletAutomationService(
         Future(Right(msg))
       case _ =>
         val msg =
-          s"end user party (${endUserPartyId}) is unexpectedly neither the sender (${acceptedOffer.payload.sender}) nor the receiver (${acceptedOffer.payload.receiver})"
+          s"end user party (${store.key.endUserParty}) is unexpectedly neither the sender (${acceptedOffer.payload.sender}) nor the receiver (${acceptedOffer.payload.receiver})"
         logger.error(
           msg
         )
@@ -120,7 +117,7 @@ class EndUserWalletAutomationService(
   )(_ => { implicit traceContext =>
     {
       logger.info("Looking for accepted transfer offers to complete...")
-      endUserStore.listContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION).flatMap {
+      store.listContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION).flatMap {
         case QueryResult(_, acceptedOffers) =>
           logger.info(s"Attempting to complete ${acceptedOffers.length} accepted transfer offers")
           acceptedOffers

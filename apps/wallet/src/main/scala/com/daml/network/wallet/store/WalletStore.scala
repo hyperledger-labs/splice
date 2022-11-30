@@ -2,21 +2,17 @@ package com.daml.network.wallet.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.network.codegen.java.cc.{coin as coinCodegen}
-import com.daml.network.codegen.java.cn.wallet.{install => installCodegen}
+import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.store.AcsStore
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.{JavaContract as Contract}
+import com.daml.network.util.JavaContract as Contract
 import com.daml.network.wallet.store.memory.InMemoryWalletStore
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
 
-import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
 
 /** A store for serving all queries used by the wallet backend's gRPC request handlers and automation. */
@@ -55,88 +51,6 @@ trait WalletStore extends AutoCloseable with NamedLogging {
     NotUsed,
   ] =
     acsStore.streamContracts(installCodegen.WalletAppInstall.COMPANION)
-
-  // Methods to implement per-end-user stores
-  private[this] val endUserStoresMap: TrieMap[String, EndUserWalletStore] = TrieMap.empty
-
-  /** Lookup an end-user's store.
-    * Succeeds if the user has been onboarded and its store has been initialized.
-    */
-  final def lookupEndUserStore(endUserName: String): Option[EndUserWalletStore] =
-    endUserStoresMap.get(endUserName)
-
-  /** List all existing end-user stores.
-    */
-  final def endUserStores: Iterable[EndUserWalletStore] =
-    endUserStoresMap.values
-
-  /** Get or create the store for an end-user. Intended to be called when a user is onboarded.
-    *
-    * Do not use this in request handlers to avoid leaking resources.
-    */
-  final def getOrCreateEndUserStore(
-      endUserName: String,
-      endUserParty: PartyId,
-      timeouts: ProcessingTimeout,
-  ): EndUserWalletStore = {
-    val store = createEndUserStore(endUserName, endUserParty: PartyId, timeouts)
-    endUserStoresMap
-      .putIfAbsent(endUserName, store)
-      .fold(store)(existingStore => {
-        store.close()
-        existingStore
-      })
-  }
-
-  /** Remove an end-user store. Intended to be called when a user is off-boarded. */
-  final def removeEndUserStore(endUserName: String): Unit =
-    endUserStoresMap.remove(endUserName).fold(())(store => store.close())
-
-  /** Abstract method to create an end-users store. */
-  protected def createEndUserStore(
-      endUserName: String,
-      endUserParty: PartyId,
-      timeouts: ProcessingTimeout,
-  ): EndUserWalletStore
-
-  // TODO(M1-52): this function probably needs restructuring to integrate it with automation rewards collection; e.g., make it streaming
-  def listValidatorRewardsCollectableBy(
-      validatorUserStore: EndUserWalletStore
-  )(implicit
-      tc: TraceContext
-  ): Future[Seq[Contract[coinCodegen.ValidatorReward.ContractId, coinCodegen.ValidatorReward]]] =
-    for {
-      QueryResult(_, validatorRights) <- validatorUserStore.listContracts(
-        coinCodegen.ValidatorRight.COMPANION
-      )
-      users = validatorRights.map(c => PartyId.tryFromProtoPrimitive(c.payload.user)).toSet
-      validatorRewardsFs: Seq[
-        Future[Seq[Contract[coinCodegen.ValidatorReward.ContractId, coinCodegen.ValidatorReward]]]
-      ] = users.toSeq
-        .map(u =>
-          this.lookupInstallByParty(u).flatMap {
-            case QueryResult(_, None) =>
-              logger.warn(
-                s"ValidatorRight of ${validatorUserStore.key.endUserParty} for end-user party $u has no associated WalletAppInstall contract."
-              )
-              Future.successful(Seq.empty)
-            case QueryResult(_, Some(install)) =>
-              this.lookupEndUserStore(install.payload.endUserName) match {
-                case None =>
-                  logger.warn(
-                    s"Might miss validator rewards as the EndUserWalletStore for end-user name ${install.payload.endUserName} is not (yet) setup."
-                  )
-                  Future.successful(Seq.empty)
-                case Some(userStore) =>
-                  userStore.listContracts(coinCodegen.ValidatorReward.COMPANION).map(_.value)
-              }
-          }
-        )
-      validatorRewards <- Future.sequence(validatorRewardsFs)
-    } yield validatorRewards.flatten
-
-  override def close(): Unit =
-    Lifecycle.close(endUserStoresMap.values.toSeq: _*)(logger)
 }
 
 object WalletStore {

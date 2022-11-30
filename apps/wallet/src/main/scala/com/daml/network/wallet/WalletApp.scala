@@ -3,13 +3,7 @@ package com.daml.network.wallet
 import akka.actor.ActorSystem
 import akka.stream.Materializer
 import com.daml.grpc.adapter.ExecutionSequencerFactory
-import com.daml.network.auth.{
-  AuthConfig,
-  AuthInterceptor,
-  HMACVerifier,
-  RSAVerifier,
-  SignatureVerifier,
-}
+import com.daml.network.auth.*
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
@@ -20,7 +14,6 @@ import com.daml.network.wallet.admin.grpc.GrpcWalletService
 import com.daml.network.wallet.automation.WalletAutomationService
 import com.daml.network.wallet.config.LocalWalletAppConfig
 import com.daml.network.wallet.store.WalletStore
-import com.daml.network.wallet.treasury.TreasuryServices
 import com.daml.network.wallet.v0.WalletServiceGrpc
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.lifecycle.Lifecycle
@@ -102,10 +95,13 @@ class WalletApp(
       )
       val walletStore =
         WalletStore(walletStoreKey, storage, loggerFactory, coinAppParameters.processingTimeouts)
-      val treasuries =
-        new TreasuryServices(
-          ledgerClient.connection("TreasuryServices"),
+      val walletManager =
+        new EndUserWalletManager(
+          ledgerClient,
           walletStore,
+          config.automation,
+          coinAppParameters.clockConfig,
+          storage: Storage,
           retryProvider,
           loggerFactory,
           timeouts,
@@ -121,8 +117,7 @@ class WalletApp(
           ServerInterceptors.intercept(
             WalletServiceGrpc.bindService(
               new GrpcWalletService(
-                walletStore,
-                treasuries,
+                walletManager,
                 ledgerClient,
                 loggerFactory,
                 retryProvider,
@@ -140,8 +135,7 @@ class WalletApp(
       val automation = new WalletAutomationService(
         config.automation,
         coinAppParameters.clockConfig,
-        walletStore,
-        treasuries,
+        walletManager,
         ledgerClient,
         retryProvider,
         loggerFactory,
@@ -151,7 +145,7 @@ class WalletApp(
         automation,
         storage,
         walletStore,
-        treasuries,
+        walletManager,
         scanConnection,
         validatorConnection,
         loggerFactory.getTracedLogger(WalletApp.State.getClass),
@@ -171,7 +165,7 @@ object WalletApp {
       automation: WalletAutomationService,
       storage: Storage,
       walletStore: WalletStore,
-      treasuryServices: TreasuryServices,
+      walletManager: EndUserWalletManager,
       scanConnection: ScanConnection,
       validatorConnection: ValidatorConnection,
       logger: TracedLogger,
@@ -184,7 +178,7 @@ object WalletApp {
         automation,
         storage,
         walletStore,
-        treasuryServices,
+        walletManager,
         scanConnection,
         validatorConnection,
       )(logger)

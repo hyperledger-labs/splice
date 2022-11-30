@@ -1,17 +1,16 @@
 package com.daml.network.wallet.admin.grpc
 
-import cats.implicits.*
 import com.daml.ledger.javaapi.data.Template
 import com.daml.ledger.javaapi.data.codegen.{
-  Contract => CodegenContract,
   ContractCompanion,
   ContractId,
   Update,
+  Contract as CodegenContract,
 }
 import com.daml.network.auth.AuthInterceptor
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_AcceptedAppPayment
 import com.daml.network.codegen.java.cn.wallet.install.{
   CoinOperationOutcome,
@@ -28,25 +27,12 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.{CoinUtil, JavaContract => Contract, Proto}
-import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
-import com.daml.network.wallet.treasury.{
-  CoinOperationRequest,
-  EndUserTreasuryService,
-  TreasuryServices,
-}
-import com.daml.network.wallet.v0
-import com.daml.network.wallet.v0.{
-  AcceptTransferOfferRequest,
-  AcceptTransferOfferResponse,
-  CollectRewardsRequest,
-  CreateTransferOfferRequest,
-  CreateTransferOfferResponse,
-  ListAcceptedTransferOffersResponse,
-  ListTransferOffersResponse,
-  WalletServiceGrpc,
-}
+import com.daml.network.util.{CoinUtil, Proto, JavaContract as Contract}
 import com.daml.network.v0 as networkV0
+import com.daml.network.wallet.store.EndUserWalletStore
+import com.daml.network.wallet.treasury.{CoinOperationRequest, EndUserTreasuryService}
+import com.daml.network.wallet.v0.*
+import com.daml.network.wallet.{EndUserWalletManager, EndUserWalletService, v0}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -62,8 +48,7 @@ import scala.jdk.OptionConverters.*
 import scala.reflect.ClassTag
 
 class GrpcWalletService(
-    store: WalletStore,
-    treasuries: TreasuryServices,
+    walletManager: EndUserWalletManager,
     ledgerClient: CoinLedgerClient,
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: CoinRetries,
@@ -74,6 +59,7 @@ class GrpcWalletService(
     with Spanning
     with NamedLogging {
 
+  private val store = walletManager.store
   private val walletServiceParty: PartyId = store.key.walletServiceParty
   private val validatorParty: PartyId = store.key.validatorParty
 
@@ -127,24 +113,21 @@ class GrpcWalletService(
     }
   }
 
-  private[this] def getUserStore(user: String): Future[EndUserWalletStore] = Future {
-    store
-      .lookupEndUserStore(user)
+  private[this] def getUserWallet(user: String): EndUserWalletService =
+    walletManager
+      .lookupEndUserWallet(user)
       .getOrElse(
         throw new StatusRuntimeException(
-          Status.NOT_FOUND.withDescription(s"User ${user.singleQuoted}")
+          Status.NOT_FOUND.withDescription(show"User ${user.singleQuoted}")
         )
       )
+
+  private[this] def getUserStore(user: String): Future[EndUserWalletStore] = Future {
+    getUserWallet(user).store
   }
 
   private[this] def getUserTreasury(user: String): Future[EndUserTreasuryService] = Future {
-    treasuries
-      .lookupEndUserTreasury(user)
-      .getOrElse(
-        throw new StatusRuntimeException(
-          Status.NOT_FOUND.withDescription(s"User ${user.singleQuoted}")
-        )
-      )
+    getUserWallet(user).treasury
   }
 
   private def listContracts[TC <: CodegenContract[TCid, T], TCid <: ContractId[
@@ -613,7 +596,7 @@ class GrpcWalletService(
       withAuth { user =>
         for {
           userStore <- getUserStore(user)
-          validatorRewards <- store.listValidatorRewardsCollectableBy(userStore)
+          validatorRewards <- walletManager.listValidatorRewardsCollectableBy(userStore)
         } yield v0.ListValidatorRewardsResponse(validatorRewards.map(_.toProtoV0))
       }
     }
@@ -625,7 +608,7 @@ class GrpcWalletService(
         for {
           userStore <- getUserStore(user)
           validatorStore <- getUserStore(store.key.validatorUserName)
-          validatorRewards <- store.listValidatorRewardsCollectableBy(userStore)
+          validatorRewards <- walletManager.listValidatorRewardsCollectableBy(userStore)
           validatorRewardInputs = validatorRewards
             .filter(c => c.payload.round.number == request.round)
             .map(c =>

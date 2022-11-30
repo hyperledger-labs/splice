@@ -18,7 +18,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.duration.*
-import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 /** Shared base class for running ingestion and task-handler automation in applications. */
@@ -27,7 +27,7 @@ abstract class AutomationService(
     clockConfig: ClockConfig,
     retryProvider: CoinRetries,
 )(implicit
-    ec: ExecutionContextExecutor,
+    ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
 ) extends HasHealth

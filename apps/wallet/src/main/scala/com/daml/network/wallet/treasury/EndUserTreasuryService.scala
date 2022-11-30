@@ -6,11 +6,12 @@ import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_Error
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
+import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_Error
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.util.JavaContract as Contract
-import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
+import com.daml.network.wallet.EndUserWalletManager
+import com.daml.network.wallet.store.EndUserWalletStore
 import com.daml.network.wallet.treasury.EndUserTreasuryService.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FlagCloseable
@@ -61,7 +62,7 @@ class EndUserTreasuryService(
       installCodegen.WalletAppInstall,
     ],
     userStore: EndUserWalletStore,
-    walletStore: WalletStore,
+    walletManager: EndUserWalletManager,
     retryProvider: CoinRetries,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
@@ -189,7 +190,7 @@ class EndUserTreasuryService(
       _ = logger.debug(
         s"After lookups, the batch contains ${validOperations.size} coin operations."
       )
-      transferContext <- getValidatorStore().getPaymentTransferContext(retryProvider)
+      transferContext <- getValidatorStore.getPaymentTransferContext(retryProvider)
       activeIssuingRounds = transferContext.context.issuingMiningRounds.asScala.keys.toSet
       (inputs, readAs) <- selectTransferInputs(activeIssuingRounds)
       cmd =
@@ -203,8 +204,8 @@ class EndUserTreasuryService(
         // which implies that network problems might lead to duplicate 'DirectTransfer' calls. They will be replaced by
         // TransferOffers as part of M3-02, which will consume the TransferOffer, and thus make the batch-execution w/o command dedup safe.
         .submitWithResultAndOffsetNoDedup(
-          Seq(walletStore.key.walletServiceParty),
-          walletStore.key.validatorParty +: userStore.key.endUserParty +: readAs.toSeq,
+          Seq(walletManager.store.key.walletServiceParty),
+          walletManager.store.key.validatorParty +: userStore.key.endUserParty +: readAs.toSeq,
           cmd,
         )
       _ = (outcomes.exerciseResult.asScala zip validOperations).map {
@@ -232,7 +233,7 @@ class EndUserTreasuryService(
           new v1.coin.transferinput.InputCoin(c.contractId.toInterface(v1.coin.Coin.INTERFACE))
         )
       )
-    validatorRewardsRaw <- walletStore
+    validatorRewardsRaw <- walletManager
       .listValidatorRewardsCollectableBy(userStore)
     validatorRewards = validatorRewardsRaw
       .filter(rw => activeIssuingRounds.contains(rw.payload.round))
@@ -260,14 +261,15 @@ class EndUserTreasuryService(
 
   // We fetch this on demand here to avoid a dependency of the validator store being
   // setup before other user’s stores.
-  private def getValidatorStore(): EndUserWalletStore =
-    walletStore
-      .lookupEndUserStore(walletStore.key.validatorUserName)
+  private def getValidatorStore: EndUserWalletStore =
+    walletManager
+      .lookupEndUserWallet(walletManager.store.key.validatorUserName)
       .getOrElse(
         throw new StatusRuntimeException(
           Status.FAILED_PRECONDITION.withDescription("Validator store not setup yet")
         )
       )
+      .store
 
   override def onClosed(): Unit = {
     // TODO(M1-92 - Tech Debt): add more robust shutdown, e.g., similar to shutdown for ledger subscriptions
