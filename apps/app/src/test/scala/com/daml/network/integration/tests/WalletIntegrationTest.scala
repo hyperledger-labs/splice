@@ -378,10 +378,6 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
         .discardNanos(Instant.now().plus(1, ChronoUnit.MINUTES))
         .getOrElse(fail("Failed to convert timestamp"))
 
-      val shortExpiration = Primitive.Timestamp
-        .discardNanos(Instant.now().plus(5, ChronoUnit.SECONDS))
-        .getOrElse(fail("Failed to convert timestamp"))
-
       val offer =
         aliceRemoteWallet.createTransferOffer(bobUserParty, 1.0, "direct transfer test", expiration)
       val offer2 =
@@ -421,17 +417,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
         },
       )
 
-      val (offer4, _) = actAndCheck(
-        "Alice offers another payment",
-        aliceRemoteWallet.createTransferOffer(bobUserParty, 4.0, "to expire", shortExpiration),
-      )("New offer is listed", _ => { aliceRemoteWallet.listTransferOffers().length shouldBe 1 })
-
-      Threading.sleep(10000)
-      // TODO(#1731): Once expiration is automated, replace this with waiting for the offer to disappear
-      loggerFactory.assertThrowsAndLogs[CommandFailure](
-        bobRemoteWallet.acceptTransferOffer(offer4),
-        a => a.errorMessage should include("The requirement 'Offer has not expired' was not met."),
-      )
+      // TODO(#1731): Once expiration is automated, add a test here that creates an offer with a short expiration period and waits for it to be auto-expired
 
       val offer5 =
         aliceRemoteWallet.createTransferOffer(
