@@ -12,7 +12,7 @@ import com.daml.network.util.HasHealth
 import com.daml.network.validator.admin.api.client.ValidatorConnection
 import com.daml.network.wallet.admin.grpc.GrpcWalletService
 import com.daml.network.wallet.automation.WalletAutomationService
-import com.daml.network.wallet.config.LocalWalletAppConfig
+import com.daml.network.wallet.config.WalletAppBackendConfig
 import com.daml.network.wallet.store.WalletStore
 import com.daml.network.wallet.v0.WalletServiceGrpc
 import com.digitalasset.canton.config.RequireTypes.InstanceName
@@ -34,7 +34,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
   */
 class WalletApp(
     override val name: InstanceName,
-    val config: LocalWalletAppConfig,
+    val config: WalletAppBackendConfig,
     val coinAppParameters: SharedCoinAppParameters,
     storage: Storage,
     override protected val clock: Clock,

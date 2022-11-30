@@ -6,11 +6,11 @@ import com.daml.network.console.{
   LocalSplitwiseAppReference,
   LocalSvcAppReference,
   LocalValidatorAppReference,
-  LocalWalletAppReference,
   RemoteDirectoryAppReference,
   RemoteSplitwiseAppReference,
   RemoteSvcAppReference,
-  RemoteWalletAppReference,
+  WalletAppBackendReference,
+  WalletAppClientReference,
 }
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.topology.PartyId
@@ -36,28 +36,28 @@ trait CommonCoinAppInstanceReferences {
         "Tried to access the Scan app but it isn't defined in the test's configuration file"
       )
     )
-  def aliceWallet(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference = w(
+  def aliceWalletBackend(implicit env: CoinTestConsoleEnvironment): WalletAppBackendReference = wb(
+    "aliceWalletBackend"
+  )
+  def aliceWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference = wc(
     "aliceWallet"
   )
-  def aliceRemoteWallet(implicit env: CoinTestConsoleEnvironment): RemoteWalletAppReference = rw(
-    "aliceRemoteWallet"
-  )
-  def aliceValidatorRemoteWallet(implicit
+  def aliceValidatorWallet(implicit
       env: CoinTestConsoleEnvironment
-  ): RemoteWalletAppReference = rw(
-    "aliceValidatorRemoteWallet"
+  ): WalletAppClientReference = wc(
+    "aliceValidatorWallet"
   )
   def aliceValidator(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
     "aliceValidator"
   )
-  def bobWallet(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference = w(
+  def bobWalletBackend(implicit env: CoinTestConsoleEnvironment): WalletAppBackendReference = wb(
+    "bobWalletBackend"
+  )
+  def bobWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference = wc(
     "bobWallet"
   )
-  def bobRemoteWallet(implicit env: CoinTestConsoleEnvironment): RemoteWalletAppReference = rw(
-    "bobRemoteWallet"
-  )
-  def charlieRemoteWallet(implicit env: CoinTestConsoleEnvironment): RemoteWalletAppReference = rw(
-    "charlieRemoteWallet"
+  def charlieWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference = wc(
+    "charlieWallet"
   )
   def bobValidator(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
     "bobValidator"
@@ -120,12 +120,12 @@ trait CommonCoinAppInstanceReferences {
     "providerSplitwiseBackend"
   )
 
-  def w(name: String)(implicit env: CoinTestConsoleEnvironment): LocalWalletAppReference =
+  def wb(name: String)(implicit env: CoinTestConsoleEnvironment): WalletAppBackendReference =
     env.wallets.local
       .find(_.name == name)
       .getOrElse(sys.error(s"wallet [$name] not configured"))
 
-  def rw(name: String)(implicit env: CoinTestConsoleEnvironment): RemoteWalletAppReference =
+  def wc(name: String)(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference =
     env.wallets.remote
       .find(_.name == name)
       .getOrElse(sys.error(s"wallet [$name] not configured"))

@@ -10,7 +10,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions as subsCodegen,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.console.{LocalWalletAppReference, RemoteWalletAppReference}
+import com.daml.network.console.{WalletAppBackendReference, WalletAppClientReference}
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
@@ -36,13 +36,13 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
   "A wallet" should {
 
     "restart cleanly" in { implicit env =>
-      aliceWallet.stop()
-      aliceWallet.startSync()
+      aliceWalletBackend.stop()
+      aliceWalletBackend.startSync()
     }
 
     "allow calling tap, list the created coins, and get the balance - locally and remotely" in {
       implicit env =>
-        val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
+        val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
 
         val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
@@ -50,33 +50,33 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
 
         clue("Alice taps 50 coins") {
           val ranges1 = Seq(exactly(50))
-          aliceRemoteWallet.tap(50)
-          checkWallet(aliceUserParty, aliceRemoteWallet, ranges1)
-          checkWallet(aliceUserParty, aliceRemoteWallet, ranges1)
+          aliceWallet.tap(50)
+          checkWallet(aliceUserParty, aliceWallet, ranges1)
+          checkWallet(aliceUserParty, aliceWallet, ranges1)
         }
 
         clue("Alice taps 60 coins") {
           val ranges2 = Seq(exactly(50), exactly(60))
-          aliceRemoteWallet.tap(60)
-          checkWallet(aliceUserParty, aliceRemoteWallet, ranges2)
-          checkWallet(aliceUserParty, aliceRemoteWallet, ranges2)
+          aliceWallet.tap(60)
+          checkWallet(aliceUserParty, aliceWallet, ranges2)
+          checkWallet(aliceUserParty, aliceWallet, ranges2)
         }
 
-        checkBalance(aliceRemoteWallet, 0, exactly(110), exactly(0), exactly(0))
+        checkBalance(aliceWallet, 0, exactly(110), exactly(0), exactly(0))
 
         nextRound(0)
 
         lockCoins(
-          aliceWallet,
+          aliceWalletBackend,
           aliceUserParty,
           aliceValidatorParty,
-          aliceRemoteWallet.list().coins,
+          aliceWallet.list().coins,
           10,
           scan.getAppTransferContext(),
         )
 
         checkBalance(
-          aliceRemoteWallet,
+          aliceWallet,
           1,
           (99, 100),
           exactly(10),
@@ -86,7 +86,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
         nextRound(1)
 
         checkBalance(
-          aliceRemoteWallet,
+          aliceWallet,
           2,
           (99, 100),
           (9, 10),
@@ -95,105 +95,106 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
     }
 
     "list all coins, including locked coins, with additional position details" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
 
       val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
       clue("Alice taps 50 coins") {
-        aliceRemoteWallet.tap(50)
+        aliceWallet.tap(50)
         eventually() {
-          aliceRemoteWallet.list().coins.length shouldBe 1
-          aliceRemoteWallet.list().lockedCoins.length shouldBe 0
+          aliceWallet.list().coins.length shouldBe 1
+          aliceWallet.list().lockedCoins.length shouldBe 0
         }
       }
 
       lockCoins(
-        aliceWallet,
+        aliceWalletBackend,
         aliceUserParty,
         aliceValidatorParty,
-        aliceRemoteWallet.list().coins,
+        aliceWallet.list().coins,
         25,
         scan.getAppTransferContext(),
       )
 
       clue("Check wallet after locking coins") {
-        aliceRemoteWallet.list().coins.length shouldBe 1
-        eventually()(aliceRemoteWallet.list().lockedCoins should have length 1)
+        aliceWallet.list().coins.length shouldBe 1
+        eventually()(aliceWallet.list().lockedCoins should have length 1)
 
-        aliceRemoteWallet.list().coins.head.round shouldBe 0
-        aliceRemoteWallet.list().coins.head.accruedHoldingFee shouldBe 0
-        assertInRange(aliceRemoteWallet.list().coins.head.effectiveQuantity, (24.0, 25.0))
+        aliceWallet.list().coins.head.round shouldBe 0
+        aliceWallet.list().coins.head.accruedHoldingFee shouldBe 0
+        assertInRange(aliceWallet.list().coins.head.effectiveQuantity, (24.0, 25.0))
 
-        aliceRemoteWallet.list().lockedCoins.head.round shouldBe 0
-        aliceRemoteWallet.list().lockedCoins.head.accruedHoldingFee shouldBe 0
-        assertInRange(aliceRemoteWallet.list().lockedCoins.head.effectiveQuantity, (24.0, 25.0))
+        aliceWallet.list().lockedCoins.head.round shouldBe 0
+        aliceWallet.list().lockedCoins.head.accruedHoldingFee shouldBe 0
+        assertInRange(aliceWallet.list().lockedCoins.head.effectiveQuantity, (24.0, 25.0))
       }
 
       nextRound(0)
 
       clue("Check wallet after advancing to next round") {
-        eventually()(aliceRemoteWallet.list().coins.head.round shouldBe 1)
-        assertInRange(aliceRemoteWallet.list().coins.head.accruedHoldingFee, (0.000004, 0.000005))
-        assertInRange(aliceRemoteWallet.list().coins.head.effectiveQuantity, (24.0, 25.0))
+        eventually()(aliceWallet.list().coins.head.round shouldBe 1)
+        assertInRange(aliceWallet.list().coins.head.accruedHoldingFee, (0.000004, 0.000005))
+        assertInRange(aliceWallet.list().coins.head.effectiveQuantity, (24.0, 25.0))
 
-        aliceRemoteWallet.list().lockedCoins.head.round shouldBe 1
+        aliceWallet.list().lockedCoins.head.round shouldBe 1
         assertInRange(
-          aliceRemoteWallet.list().lockedCoins.head.accruedHoldingFee,
+          aliceWallet.list().lockedCoins.head.accruedHoldingFee,
           (0.000004, 0.000005),
         )
-        assertInRange(aliceRemoteWallet.list().lockedCoins.head.effectiveQuantity, (24.0, 25.0))
+        assertInRange(aliceWallet.list().lockedCoins.head.effectiveQuantity, (24.0, 25.0))
       }
     }
 
     "allow a user to list, and reject app payment requests" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
 
       clue("Check that no payment requests exist") {
-        aliceRemoteWallet.listAppPaymentRequests() shouldBe empty
+        aliceWallet.listAppPaymentRequests() shouldBe empty
       }
 
-      val (_, reqC) = createSelfPaymentRequest(this, aliceWallet.remoteParticipant, aliceUserParty)
+      val (_, reqC) =
+        createSelfPaymentRequest(this, aliceWalletBackend.remoteParticipant, aliceUserParty)
 
       val reqFound = clue("Check that we can see the created payment request") {
         val reqFound = eventually() {
-          aliceRemoteWallet.listAppPaymentRequests().headOption.value
+          aliceWallet.listAppPaymentRequests().headOption.value
         }
         reqFound.payload shouldBe reqC
         reqFound
       }
 
       clue("Reject the payment request") {
-        aliceRemoteWallet.rejectAppPaymentRequest(reqFound.contractId)
+        aliceWallet.rejectAppPaymentRequest(reqFound.contractId)
       }
 
       clue("Check that there are no more payment requests") {
-        val requests2 = aliceRemoteWallet.listAppPaymentRequests()
+        val requests2 = aliceWallet.listAppPaymentRequests()
         requests2 shouldBe empty
       }
     }
 
     "allow a user to list and accept app payment requests" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
 
       val (referenceId, reqC) =
-        createSelfPaymentRequest(this, aliceWallet.remoteParticipant, aliceUserParty)
+        createSelfPaymentRequest(this, aliceWalletBackend.remoteParticipant, aliceUserParty)
 
       val cid = eventually() {
-        inside(aliceRemoteWallet.listAppPaymentRequests()) { case Seq(r) =>
+        inside(aliceWallet.listAppPaymentRequests()) { case Seq(r) =>
           r.payload shouldBe reqC
           r.contractId
         }
       }
 
       clue("Tap 50 coins") {
-        aliceRemoteWallet.tap(50)
-        eventually() { aliceRemoteWallet.list().coins should not be empty }
+        aliceWallet.tap(50)
+        eventually() { aliceWallet.list().coins should not be empty }
       }
 
       clue("Accept payment request") {
-        val acceptedPaymentId = aliceRemoteWallet.acceptAppPaymentRequest(cid)
-        aliceRemoteWallet.listAppPaymentRequests() shouldBe empty
-        inside(aliceRemoteWallet.listAcceptedAppPayments()) { case Seq(r) =>
+        val acceptedPaymentId = aliceWallet.acceptAppPaymentRequest(cid)
+        aliceWallet.listAppPaymentRequests() shouldBe empty
+        inside(aliceWallet.listAcceptedAppPayments()) { case Seq(r) =>
           r.contractId shouldBe acceptedPaymentId
           r.payload shouldBe new walletCodegen.AcceptedAppPayment(
             aliceUserParty.toProtoPrimitive,
@@ -213,54 +214,54 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
     }
 
     "correctly select coins for payments" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
 
-      val bobUserParty = onboardWalletUser(this, bobRemoteWallet, bobValidator)
+      val bobUserParty = onboardWalletUser(this, bobWallet, bobValidator)
 
       clue("Alice opens payment channel to Bob") {
-        val proposalId = aliceRemoteWallet.proposePaymentChannel(bobUserParty)
-        eventually()(bobRemoteWallet.listPaymentChannelProposals() should have size 1)
-        bobRemoteWallet.acceptPaymentChannelProposal(proposalId)
-        eventually()(bobRemoteWallet.listPaymentChannelProposals() shouldBe empty)
+        val proposalId = aliceWallet.proposePaymentChannel(bobUserParty)
+        eventually()(bobWallet.listPaymentChannelProposals() should have size 1)
+        bobWallet.acceptPaymentChannelProposal(proposalId)
+        eventually()(bobWallet.listPaymentChannelProposals() shouldBe empty)
       }
 
       clue("Alice gets some coins") {
         // Note: it would be great if we could add coins with different holding fees,
         // to test whether the wallet selects the most expensive ones for the transfer.
-        aliceRemoteWallet.tap(10)
-        aliceRemoteWallet.tap(40)
-        aliceRemoteWallet.tap(20)
-        checkWallet(aliceUserParty, aliceRemoteWallet, Seq((10, 10), (20, 20), (40, 40)))
+        aliceWallet.tap(10)
+        aliceWallet.tap(40)
+        aliceWallet.tap(20)
+        checkWallet(aliceUserParty, aliceWallet, Seq((10, 10), (20, 20), (40, 40)))
       }
 
       clue("Alice transfers 39") {
-        aliceRemoteWallet.executeDirectTransfer(bobUserParty, 39)
-        checkWallet(aliceUserParty, aliceRemoteWallet, Seq((30, 31)))
+        aliceWallet.executeDirectTransfer(bobUserParty, 39)
+        checkWallet(aliceUserParty, aliceWallet, Seq((30, 31)))
       }
       clue("Alice transfers 19") {
-        aliceRemoteWallet.executeDirectTransfer(bobUserParty, 19)
-        checkWallet(aliceUserParty, aliceRemoteWallet, Seq((11, 12)))
+        aliceWallet.executeDirectTransfer(bobUserParty, 19)
+        checkWallet(aliceUserParty, aliceWallet, Seq((11, 12)))
       }
     }
 
     "allow a user to list and reject subscription requests" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
 
-      aliceRemoteWallet.listSubscriptionRequests() shouldBe empty
+      aliceWallet.listSubscriptionRequests() shouldBe empty
 
       val request = createSelfSubscriptionRequest(aliceUserParty);
 
       val requestId = clue("List subscription requests to find out request ID") {
         eventually() {
-          inside(aliceRemoteWallet.listSubscriptionRequests()) { case Seq(r) =>
+          inside(aliceWallet.listSubscriptionRequests()) { case Seq(r) =>
             r.payload shouldBe request
             r.contractId
           }
         }
       }
       clue("Reject the subscription request") {
-        aliceRemoteWallet.rejectSubscriptionRequest(requestId)
-        aliceRemoteWallet.listSubscriptionRequests() shouldBe empty
+        aliceWallet.rejectSubscriptionRequest(requestId)
+        aliceWallet.listSubscriptionRequests() shouldBe empty
       }
     }
 
@@ -270,11 +271,11 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
       "to list idle subscriptions, to initiate subscription payments, " +
       "and to cancel a subscription" in { implicit env =>
         val transferContext = scan.getAppTransferContext()
-        val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
+        val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
         val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
-        aliceRemoteWallet.listSubscriptionRequests() shouldBe empty
-        aliceRemoteWallet.listSubscriptions() shouldBe empty
+        aliceWallet.listSubscriptionRequests() shouldBe empty
+        aliceWallet.listSubscriptions() shouldBe empty
 
         val (request, requestId) = actAndCheck(
           "Create self-subscription request",
@@ -282,23 +283,23 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
         )(
           "the created subscription request is listed correctly",
           request =>
-            inside(aliceRemoteWallet.listSubscriptionRequests()) { case Seq(r) =>
+            inside(aliceWallet.listSubscriptionRequests()) { case Seq(r) =>
               r.payload shouldBe request
               r.contractId
             },
         )
         clue("Alice gets some coins") {
-          aliceRemoteWallet.tap(50)
+          aliceWallet.tap(50)
         }
 
         val (initialPaymentId, _) = actAndCheck(
           "Accept the subscription request, which initiates the first subscription payment",
-          aliceRemoteWallet.acceptSubscriptionRequest(requestId),
+          aliceWallet.acceptSubscriptionRequest(requestId),
         )(
           "initial subscription payment is listed correctly",
           initialPaymentId => {
-            aliceRemoteWallet.listSubscriptionRequests() shouldBe empty
-            inside(aliceRemoteWallet.listSubscriptionInitialPayments()) { case Seq(r) =>
+            aliceWallet.listSubscriptionRequests() shouldBe empty
+            inside(aliceWallet.listSubscriptionInitialPayments()) { case Seq(r) =>
               r.contractId shouldBe initialPaymentId
               r.payload.subscriptionData should equal(request.subscriptionData)
               r.payload.payData should equal(request.payData)
@@ -313,7 +314,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
               .commands
               .asScala
               .toSeq
-            aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
+            aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
               actAs = Seq(aliceUserParty),
               readAs = Seq(aliceValidatorParty),
               optTimeout = None,
@@ -325,7 +326,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
           // the wallet backend can make the second payment immediately
           "an automated subscription payment is eventually initiated by the wallet",
           _ =>
-            inside(aliceRemoteWallet.listSubscriptions()) { case Seq(sub) =>
+            inside(aliceWallet.listSubscriptions()) { case Seq(sub) =>
               sub.main.payload should equal(request.subscriptionData)
               inside(sub.state) { case GrpcWalletAppClient.SubscriptionPayment(state) =>
                 state.payload.subscription shouldBe sub.main.contractId
@@ -342,7 +343,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
               .commands
               .asScala
               .toSeq
-            aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
+            aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
               actAs = Seq(aliceUserParty),
               readAs = Seq(aliceValidatorParty),
               optTimeout = None,
@@ -352,7 +353,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
         )(
           "the subscription is back in idle state",
           _ =>
-            inside(aliceRemoteWallet.listSubscriptions()) { case Seq(sub) =>
+            inside(aliceWallet.listSubscriptions()) { case Seq(sub) =>
               sub.main.payload should equal(request.subscriptionData)
               inside(sub.state) { case GrpcWalletAppClient.SubscriptionIdleState(state) =>
                 state.payload.subscription should equal(sub.main.contractId)
@@ -364,110 +365,110 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
 
         actAndCheck(
           "Cancel the subscription",
-          aliceRemoteWallet.cancelSubscription(subscriptionStateId2),
-        )("no more subscriptions exist", _ => aliceRemoteWallet.listSubscriptions() shouldBe empty)
+          aliceWallet.cancelSubscription(subscriptionStateId2),
+        )("no more subscriptions exist", _ => aliceWallet.listSubscriptions() shouldBe empty)
       }
 
     "allow two users to make direct transfers between them" in { implicit env =>
       // val aliceUserParty =
-      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
-      val bobUserParty = onboardWalletUser(this, bobRemoteWallet, bobValidator)
-      aliceRemoteWallet.tap(100.0)
+      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val bobUserParty = onboardWalletUser(this, bobWallet, bobValidator)
+      aliceWallet.tap(100.0)
 
       val expiration = Primitive.Timestamp
         .discardNanos(Instant.now().plus(1, ChronoUnit.MINUTES))
         .getOrElse(fail("Failed to convert timestamp"))
 
       val offer =
-        aliceRemoteWallet.createTransferOffer(bobUserParty, 1.0, "direct transfer test", expiration)
+        aliceWallet.createTransferOffer(bobUserParty, 1.0, "direct transfer test", expiration)
       val offer2 =
-        aliceRemoteWallet.createTransferOffer(bobUserParty, 2.0, "to be rejected", expiration)
+        aliceWallet.createTransferOffer(bobUserParty, 2.0, "to be rejected", expiration)
       val offer3 =
-        aliceRemoteWallet.createTransferOffer(bobUserParty, 3.0, "to be withdrawn", expiration)
+        aliceWallet.createTransferOffer(bobUserParty, 3.0, "to be withdrawn", expiration)
 
       eventually() {
-        aliceRemoteWallet.listTransferOffers().length shouldBe 3
-        bobRemoteWallet.listTransferOffers().length shouldBe 3
+        aliceWallet.listTransferOffers().length shouldBe 3
+        bobWallet.listTransferOffers().length shouldBe 3
       }
 
-      actAndCheck("Bob accepts one offer", bobRemoteWallet.acceptTransferOffer(offer))(
+      actAndCheck("Bob accepts one offer", bobWallet.acceptTransferOffer(offer))(
         "Accepted offer gets paid",
         _ => {
-          aliceRemoteWallet.listTransferOffers().length shouldBe 2
-          aliceRemoteWallet.listAcceptedTransferOffers().length shouldBe 0
-          bobRemoteWallet.listTransferOffers().length shouldBe 2
-          bobRemoteWallet.listAcceptedTransferOffers().length shouldBe 0
-          checkWallet(aliceUserParty, aliceRemoteWallet, Seq((98.8, 99.0)))
-          checkWallet(bobUserParty, bobRemoteWallet, Seq((1.0, 1.0)))
+          aliceWallet.listTransferOffers().length shouldBe 2
+          aliceWallet.listAcceptedTransferOffers().length shouldBe 0
+          bobWallet.listTransferOffers().length shouldBe 2
+          bobWallet.listAcceptedTransferOffers().length shouldBe 0
+          checkWallet(aliceUserParty, aliceWallet, Seq((98.8, 99.0)))
+          checkWallet(bobUserParty, bobWallet, Seq((1.0, 1.0)))
         },
       )
 
       actAndCheck(
         "Bob rejects one offer, alice withdraws the other", {
-          bobRemoteWallet.rejectTransferOffer(offer2)
-          aliceRemoteWallet.withdrawTransferOffer(offer3)
+          bobWallet.rejectTransferOffer(offer2)
+          aliceWallet.withdrawTransferOffer(offer3)
         },
       )(
         "No more offers listed",
         _ => {
-          aliceRemoteWallet.listTransferOffers().length shouldBe 0
-          aliceRemoteWallet.listAcceptedTransferOffers().length shouldBe 0
-          bobRemoteWallet.listTransferOffers().length shouldBe 0
-          bobRemoteWallet.listAcceptedTransferOffers().length shouldBe 0
+          aliceWallet.listTransferOffers().length shouldBe 0
+          aliceWallet.listAcceptedTransferOffers().length shouldBe 0
+          bobWallet.listTransferOffers().length shouldBe 0
+          bobWallet.listAcceptedTransferOffers().length shouldBe 0
         },
       )
 
       // TODO(#1731): Once expiration is automated, add a test here that creates an offer with a short expiration period and waits for it to be auto-expired
 
       val offer5 =
-        aliceRemoteWallet.createTransferOffer(
+        aliceWallet.createTransferOffer(
           bobUserParty,
           quantity = 150.0,
           description = "not rich enough yet",
           expiration,
         )
       eventually() {
-        bobRemoteWallet.acceptTransferOffer(offer5)
+        bobWallet.acceptTransferOffer(offer5)
       }
       clue("Sleeping for a while, to make sure a few retries fail first")(
         // TODO(M3-02): consider making this a time-based test, and advancing time gradually to trigger the failing automation instead
         Threading.sleep(4000)
       )
       clue("Tapping more coin, to afford the accepted transfer offer")(
-        aliceRemoteWallet.tap(200.0)
+        aliceWallet.tap(200.0)
       )
       clue("Checking final balances")(
         eventually() {
-          checkWallet(aliceUserParty, aliceRemoteWallet, Seq((147.5, 148.0)))
-          checkWallet(bobUserParty, bobRemoteWallet, Seq((1.0, 1.0), (150.0, 150.0)))
+          checkWallet(aliceUserParty, aliceWallet, Seq((147.5, 148.0)))
+          checkWallet(bobUserParty, bobWallet, Seq((1.0, 1.0), (150.0, 150.0)))
         }
       )
     }
 
     "allow two users to create a payment channel and use it for a transfer" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
 
-      val bobUserParty = onboardWalletUser(this, bobRemoteWallet, bobValidator)
+      val bobUserParty = onboardWalletUser(this, bobWallet, bobValidator)
 
       // Neither Alice nor Bob see a payment channel proposal
-      aliceRemoteWallet.listPaymentChannelProposals() shouldBe empty
-      bobRemoteWallet.listPaymentChannelProposals() shouldBe empty
+      aliceWallet.listPaymentChannelProposals() shouldBe empty
+      bobWallet.listPaymentChannelProposals() shouldBe empty
 
       // Neither Alice nor Bob see any payment channels
-      aliceRemoteWallet.listPaymentChannels() shouldBe empty
-      bobRemoteWallet.listPaymentChannels() shouldBe empty
+      aliceWallet.listPaymentChannels() shouldBe empty
+      bobWallet.listPaymentChannels() shouldBe empty
 
       // Alice proposes payment channel to Bob
-      val proposalId = aliceRemoteWallet.proposePaymentChannel(bobUserParty)
+      val proposalId = aliceWallet.proposePaymentChannel(bobUserParty)
       val aliceProposal = eventually() {
-        inside(aliceRemoteWallet.listPaymentChannelProposals()) { case Seq(proposal) =>
+        inside(aliceWallet.listPaymentChannelProposals()) { case Seq(proposal) =>
           proposal
         }
       }
 
       // Alice and Bob still don't see the payment channel yet
-      aliceRemoteWallet.listPaymentChannels() shouldBe empty
-      bobRemoteWallet.listPaymentChannels() shouldBe empty
+      aliceWallet.listPaymentChannels() shouldBe empty
+      bobWallet.listPaymentChannels() shouldBe empty
 
       val aliceChannel = aliceProposal.payload.channel
       aliceProposal.contractId shouldBe proposalId
@@ -476,169 +477,170 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
 
       // Bob monitors proposals and accepts the one
       val bobProposal = eventually() {
-        inside(bobRemoteWallet.listPaymentChannelProposals()) { case Seq(proposal) =>
+        inside(bobWallet.listPaymentChannelProposals()) { case Seq(proposal) =>
           proposal
         }
       }
       aliceProposal shouldBe bobProposal
-      bobRemoteWallet.acceptPaymentChannelProposal(aliceProposal.contractId)
-      eventually()(aliceRemoteWallet.listPaymentChannelProposals() shouldBe empty)
+      bobWallet.acceptPaymentChannelProposal(aliceProposal.contractId)
+      eventually()(aliceWallet.listPaymentChannelProposals() shouldBe empty)
 
       // Neither Alice nor Bob see a payment channel proposal
-      aliceRemoteWallet.listPaymentChannelProposals() shouldBe empty
-      bobRemoteWallet.listPaymentChannelProposals() shouldBe empty
+      aliceWallet.listPaymentChannelProposals() shouldBe empty
+      bobWallet.listPaymentChannelProposals() shouldBe empty
 
       // But both see the established channel now
-      eventually()(aliceRemoteWallet.listPaymentChannels() should have size 1)
-      aliceRemoteWallet.listPaymentChannels() shouldBe bobRemoteWallet.listPaymentChannels()
+      eventually()(aliceWallet.listPaymentChannels() should have size 1)
+      aliceWallet.listPaymentChannels() shouldBe bobWallet.listPaymentChannels()
 
       // Alice taps and does a direct transfer to Bob
-      aliceRemoteWallet.tap(50)
-      checkWallet(aliceUserParty, aliceRemoteWallet, Seq((50, 50)))
-      aliceRemoteWallet.executeDirectTransfer(bobUserParty, 10)
-      bobWallet.remoteParticipant.ledger_api.acs.awaitJava(coinCodegen.Coin.COMPANION)(bobUserParty)
-      checkWallet(aliceUserParty, aliceRemoteWallet, Seq((39, 40)))
-      checkWallet(bobUserParty, bobRemoteWallet, Seq((9, 10)))
+      aliceWallet.tap(50)
+      checkWallet(aliceUserParty, aliceWallet, Seq((50, 50)))
+      aliceWallet.executeDirectTransfer(bobUserParty, 10)
+      bobWalletBackend.remoteParticipant.ledger_api.acs
+        .awaitJava(coinCodegen.Coin.COMPANION)(bobUserParty)
+      checkWallet(aliceUserParty, aliceWallet, Seq((39, 40)))
+      checkWallet(bobUserParty, bobWallet, Seq((9, 10)))
 
       // Bob asks for more coins, alice accepts
-      aliceRemoteWallet.listOnChannelPaymentRequests().size shouldBe 0
-      val request = bobRemoteWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please pay")
-      eventually()(aliceRemoteWallet.listOnChannelPaymentRequests() should have size 1)
-      aliceRemoteWallet.listOnChannelPaymentRequests().headOption.value.contractId shouldBe request
-      bobRemoteWallet.listOnChannelPaymentRequests() shouldBe aliceRemoteWallet
+      aliceWallet.listOnChannelPaymentRequests().size shouldBe 0
+      val request = bobWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please pay")
+      eventually()(aliceWallet.listOnChannelPaymentRequests() should have size 1)
+      aliceWallet.listOnChannelPaymentRequests().headOption.value.contractId shouldBe request
+      bobWallet.listOnChannelPaymentRequests() shouldBe aliceWallet
         .listOnChannelPaymentRequests()
-      aliceRemoteWallet.acceptOnChannelPaymentRequest(request)
+      aliceWallet.acceptOnChannelPaymentRequest(request)
       eventually()(
-        bobWallet.remoteParticipant.ledger_api.acs
+        bobWalletBackend.remoteParticipant.ledger_api.acs
           .filterJava(coinCodegen.Coin.COMPANION)(bobUserParty)
           should have size 2
       )
-      checkWallet(aliceUserParty, aliceRemoteWallet, Seq((29, 30)))
-      checkWallet(bobUserParty, bobRemoteWallet, Seq((9, 10), (9, 10)))
+      checkWallet(aliceUserParty, aliceWallet, Seq((29, 30)))
+      checkWallet(bobUserParty, bobWallet, Seq((9, 10), (9, 10)))
 
       // Bob asks for more coins, alice rejects
       val request1 =
-        bobRemoteWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please reject")
-      eventually()(aliceRemoteWallet.listOnChannelPaymentRequests() should have size 1)
-      aliceRemoteWallet.rejectOnChannelPaymentRequest(request1)
-      checkWallet(aliceUserParty, aliceRemoteWallet, Seq((29, 30)))
-      checkWallet(bobUserParty, bobRemoteWallet, Seq((9, 10), (9, 10)))
+        bobWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please reject")
+      eventually()(aliceWallet.listOnChannelPaymentRequests() should have size 1)
+      aliceWallet.rejectOnChannelPaymentRequest(request1)
+      checkWallet(aliceUserParty, aliceWallet, Seq((29, 30)))
+      checkWallet(bobUserParty, bobWallet, Seq((9, 10), (9, 10)))
 
       // Bob asks for more coins, then withdraws
       val request2 =
-        bobRemoteWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "will withdraw")
-      bobRemoteWallet.withdrawOnChannelPaymentRequest(request2)
-      checkWallet(aliceUserParty, aliceRemoteWallet, Seq((29, 30)))
-      checkWallet(bobUserParty, bobRemoteWallet, Seq((9, 10), (9, 10)))
+        bobWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "will withdraw")
+      bobWallet.withdrawOnChannelPaymentRequest(request2)
+      checkWallet(aliceUserParty, aliceWallet, Seq((29, 30)))
+      checkWallet(bobUserParty, bobWallet, Seq((9, 10), (9, 10)))
 
-      aliceRemoteWallet.proposePaymentChannel(
+      aliceWallet.proposePaymentChannel(
         bobUserParty,
-        Some(aliceRemoteWallet.listPaymentChannels().head.contractId),
+        Some(aliceWallet.listPaymentChannels().head.contractId),
         allowDirectTransfers = false,
       )
-      eventually()(bobRemoteWallet.listPaymentChannelProposals() should have size 1)
-      val updatedProposal = bobRemoteWallet.acceptPaymentChannelProposal(
-        bobRemoteWallet.listPaymentChannelProposals().head.contractId
+      eventually()(bobWallet.listPaymentChannelProposals() should have size 1)
+      val updatedProposal = bobWallet.acceptPaymentChannelProposal(
+        bobWallet.listPaymentChannelProposals().head.contractId
       )
       eventually()(
-        aliceRemoteWallet.listPaymentChannels().map(_.contractId) should contain(updatedProposal)
+        aliceWallet.listPaymentChannels().map(_.contractId) should contain(updatedProposal)
       )
       loggerFactory.assertThrowsAndLogs[CommandFailure](
-        aliceRemoteWallet
+        aliceWallet
           .executeDirectTransfer(bobUserParty, 10),
         _.errorMessage should include regex ("Daml exception.*Direct transfers are allowed"),
       )
     }
 
-    "allow two remote wallets to connect to one local wallet and tap" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
+    "allow two wallet app users to connect to one wallet backend and tap" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
 
-      aliceRemoteWallet.tap(50.0)
-      checkWallet(aliceUserParty, aliceRemoteWallet, Seq((50, 50)))
+      aliceWallet.tap(50.0)
+      checkWallet(aliceUserParty, aliceWallet, Seq((50, 50)))
 
-      val charlieDamlUser = charlieRemoteWallet.config.damlUser
-      val charlieUserParty = onboardWalletUser(this, charlieRemoteWallet, aliceValidator)
+      val charlieDamlUser = charlieWallet.config.damlUser
+      val charlieUserParty = onboardWalletUser(this, charlieWallet, aliceValidator)
 
-      charlieRemoteWallet.tap(50.0)
-      checkWallet(charlieUserParty, charlieRemoteWallet, Seq((50, 50)))
+      charlieWallet.tap(50.0)
+      checkWallet(charlieUserParty, charlieWallet, Seq((50, 50)))
 
-      aliceWallet.setWalletContext(charlieDamlUser)
-      checkWallet(charlieUserParty, aliceWallet, Seq((50, 50)))
+      aliceWalletBackend.setWalletContext(charlieDamlUser)
+      checkWallet(charlieUserParty, aliceWalletBackend, Seq((50, 50)))
     }
 
     "(propose, accept, and) cancel a payment channel by sender" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
-      val bobUserParty = onboardWalletUser(this, bobRemoteWallet, bobValidator)
+      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val bobUserParty = onboardWalletUser(this, bobWallet, bobValidator)
 
       val (_, aliceProposal) = actAndCheck(
         "Alice proposes payment channel to Bob",
-        aliceRemoteWallet.proposePaymentChannel(bobUserParty),
+        aliceWallet.proposePaymentChannel(bobUserParty),
       )(
         "payment channel proposal is listed for both Alice and Bob",
         _ => {
-          val aliceProposal = inside(aliceRemoteWallet.listPaymentChannelProposals()) {
-            case Seq(p) => p
+          val aliceProposal = inside(aliceWallet.listPaymentChannelProposals()) { case Seq(p) =>
+            p
           }
-          inside(bobRemoteWallet.listPaymentChannelProposals()) { case Seq(p) =>
+          inside(bobWallet.listPaymentChannelProposals()) { case Seq(p) =>
             p shouldBe aliceProposal
           }
           aliceProposal
         },
       )
       clue("Bob accepts the proposal") {
-        bobRemoteWallet.acceptPaymentChannelProposal(aliceProposal.contractId)
+        bobWallet.acceptPaymentChannelProposal(aliceProposal.contractId)
       }
       actAndCheck(
         "Bob requests a payment, and then immediately cancels the channel", {
-          bobRemoteWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please pay")
-          bobRemoteWallet.cancelPaymentChannelBySender(aliceUserParty)
+          bobWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please pay")
+          bobWallet.cancelPaymentChannelBySender(aliceUserParty)
         },
       )(
         "neither Alice nor Bob see neither the payment channel nor the payment request anymore",
         _ => {
-          bobRemoteWallet.listPaymentChannels() shouldBe empty
-          bobRemoteWallet.listOnChannelPaymentRequests() should not be empty
-          eventually()(aliceRemoteWallet.listOnChannelPaymentRequests() should not be empty)
-          eventually()(aliceRemoteWallet.listPaymentChannels() shouldBe empty)
+          bobWallet.listPaymentChannels() shouldBe empty
+          bobWallet.listOnChannelPaymentRequests() should not be empty
+          eventually()(aliceWallet.listOnChannelPaymentRequests() should not be empty)
+          eventually()(aliceWallet.listPaymentChannels() shouldBe empty)
         },
       )
     }
 
     "(propose, accept, and) cancel a payment channel by receiver" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
-      val bobUserParty = onboardWalletUser(this, bobRemoteWallet, bobValidator)
+      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val bobUserParty = onboardWalletUser(this, bobWallet, bobValidator)
 
       // Alice proposes payment channel to Bob
-      aliceRemoteWallet.proposePaymentChannel(bobUserParty)
+      aliceWallet.proposePaymentChannel(bobUserParty)
       // wallet store sometimes takes a bit to see the proposal
-      eventually()(aliceRemoteWallet.listPaymentChannelProposals() should have size 1)
-      val aliceProposal = aliceRemoteWallet.listPaymentChannelProposals()(0)
+      eventually()(aliceWallet.listPaymentChannelProposals() should have size 1)
+      val aliceProposal = aliceWallet.listPaymentChannelProposals()(0)
 
       // Bob monitors proposals and accepts the one
-      eventually()(bobRemoteWallet.listPaymentChannelProposals() should have size 1)
-      bobRemoteWallet.acceptPaymentChannelProposal(aliceProposal.contractId)
+      eventually()(bobWallet.listPaymentChannelProposals() should have size 1)
+      bobWallet.acceptPaymentChannelProposal(aliceProposal.contractId)
 
       // Bob requests a payment, and then immediately cancels the channel
-      bobRemoteWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please pay")
-      aliceRemoteWallet.cancelPaymentChannelByReceiver(bobUserParty)
+      bobWallet.createOnChannelPaymentRequest(aliceUserParty, 10, "please pay")
+      aliceWallet.cancelPaymentChannelByReceiver(bobUserParty)
 
       // Neither sees the payment channel nor the payment request anymore
-      aliceRemoteWallet.listPaymentChannels() shouldBe empty
-      aliceRemoteWallet.listOnChannelPaymentRequests() should not be empty
-      eventually()(bobRemoteWallet.listOnChannelPaymentRequests() should not be empty)
-      eventually()(bobRemoteWallet.listPaymentChannels() shouldBe empty)
+      aliceWallet.listPaymentChannels() shouldBe empty
+      aliceWallet.listOnChannelPaymentRequests() should not be empty
+      eventually()(bobWallet.listOnChannelPaymentRequests() should not be empty)
+      eventually()(bobWallet.listPaymentChannels() shouldBe empty)
     }
 
     "concurrent coin-operations" should {
       "be batched" in { implicit env =>
         val (alice, bob) = setupAliceAndBobAndChannel(this)
-        aliceRemoteWallet.tap(50)
+        aliceWallet.tap(50)
         aliceValidator.remoteParticipant.ledger_api.acs.awaitJava(coinCodegen.Coin.COMPANION)(alice)
         val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
         // sending three commands in short succession to the idle wallet should lead to two transactions being executed
         // tx 1: first command that arrived is immediately executed
         // tx 2: other commands that arrived after the first command was started are executed in one batch
-        (1 to 3).foreach(i => Future(aliceRemoteWallet.executeDirectTransfer(bob, i)).discard)
+        (1 to 3).foreach(i => Future(aliceWallet.executeDirectTransfer(bob, i)).discard)
         // Wait until 2 transactions have been received
         val txs = aliceValidator.remoteParticipant.ledger_api.transactions
           .treesJava(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
@@ -654,13 +656,13 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
       "be batched up to `batchSize` concurrent coin-operations" in { implicit env =>
         val defaultBatchSize = 10
         val (alice, bob) = setupAliceAndBobAndChannel(this)
-        aliceRemoteWallet.tap(50)
+        aliceWallet.tap(50)
         aliceValidator.remoteParticipant.ledger_api.acs.awaitJava(coinCodegen.Coin.COMPANION)(alice)
         val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
 
-        val _ = Future(aliceRemoteWallet.executeDirectTransfer(bob, 10))
+        val _ = Future(aliceWallet.executeDirectTransfer(bob, 10))
         (1 to defaultBatchSize + 1).foreach(_ =>
-          Future(aliceRemoteWallet.executeDirectTransfer(bob, 1)).discard
+          Future(aliceWallet.executeDirectTransfer(bob, 1)).discard
         )
         // 3 txs;
         // tx 1: initial transfer
@@ -681,37 +683,37 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
 
       "fail operations early and independently that don't pass the activeness lookup checks" in {
         implicit env =>
-          val alice = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
-          val bob = onboardWalletUser(this, bobRemoteWallet, bobValidator)
+          val alice = onboardWalletUser(this, aliceWallet, aliceValidator)
+          val bob = onboardWalletUser(this, bobWallet, bobValidator)
 
           // tapping some coin & waiting for it to appear as a way to synchronize on the initialization of the apps.
-          aliceRemoteWallet.tap(10)
+          aliceWallet.tap(10)
           aliceValidator.remoteParticipant.ledger_api.acs
             .awaitJava(coinCodegen.Coin.COMPANION)(alice)
           // ... such that we don't grab the ledger offset when some init txs are still occurring
           val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
 
           // solo tap will kick off batch with only one coin operation
-          Future(aliceRemoteWallet.tap(10)).discard
+          Future(aliceWallet.tap(10)).discard
 
           // following three commands will be in one batch
-          Future(aliceRemoteWallet.tap(10)).discard
+          Future(aliceWallet.tap(10)).discard
           // fails because we don't have a channel - so removed from batch & error is reported back
           Future(
             loggerFactory.assertThrowsAndLogs[CommandFailure](
-              aliceRemoteWallet
+              aliceWallet
                 .executeDirectTransfer(bob, 10),
               _.errorMessage should include regex ("NOT_FOUND/Payment channel between"),
             )
           ).discard
-          Future(aliceRemoteWallet.tap(10)).discard
+          Future(aliceWallet.tap(10)).discard
 
           eventually() {
-            val coins = aliceRemoteWallet.list().coins
+            val coins = aliceWallet.list().coins
             // all four taps went through
             coins should have size 4
             // but no money was deducted due to the transfer
-            checkWallet(alice, aliceRemoteWallet, Seq((9, 10), (9, 10), (9, 10), (9, 10)))
+            checkWallet(alice, aliceWallet, Seq((9, 10), (9, 10), (9, 10), (9, 10)))
           }
           eventually() {
             val txs = aliceValidator.remoteParticipant.ledger_api.transactions
@@ -726,16 +728,16 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
 
       "retry a batch if it fails due to contention" in { implicit env =>
         val (alice, bob) = setupAliceAndBobAndChannel(this)
-        aliceRemoteWallet.tap(10)
+        aliceWallet.tap(10)
         aliceValidator.remoteParticipant.ledger_api.acs.awaitJava(coinCodegen.Coin.COMPANION)(alice)
 
-        val cancelF = Future(bobRemoteWallet.cancelPaymentChannelBySender(alice))
+        val cancelF = Future(bobWallet.cancelPaymentChannelBySender(alice))
 
         val transferF = loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
           // to simulate contention, submit a transfer on the channel immediately after cancelling the channel such
           // that the activeness lookup on the channel still goes through but the lookup inside the ledger fails.
           // this leads to a retry..
-          Future(aliceRemoteWallet.executeDirectTransfer(bob, 5))
+          Future(aliceWallet.executeDirectTransfer(bob, 5))
             // that fails on the second execution
             .recover { case _: CommandFailure =>
               // need to recover as logs are only checked for successful futures
@@ -757,12 +759,12 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
 
         // eventually, the cancel goes through
         eventually()((cancelF.isCompleted) shouldBe true)
-        eventually()(aliceRemoteWallet.listPaymentChannels() should have size 1)
-        eventually()(bobRemoteWallet.listPaymentChannels() should have size 1)
+        eventually()(aliceWallet.listPaymentChannels() should have size 1)
+        eventually()(bobWallet.listPaymentChannels() should have size 1)
 
         // such that on the retry, the transfer fails on the activeness check.
         eventually()(transferF.isCompleted shouldBe true)
-        checkWallet(alice, aliceRemoteWallet, Seq((10, 10)))
+        checkWallet(alice, aliceWallet, Seq((10, 10)))
 
       }
     }
@@ -774,13 +776,13 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
       import com.daml.network.auth.{JwtCallCredential}
       import io.grpc.ManagedChannelBuilder
 
-      val aliceDamlUser = aliceRemoteWallet.config.damlUser
+      val aliceDamlUser = aliceWallet.config.damlUser
       val token = JWT.create().withSubject(aliceDamlUser).sign(Algorithm.HMAC256("wrong-secret"))
 
       // using grpc client directly rather than console refs, as token handling isn't threaded through to console command layer (yet)
       val channel =
         ManagedChannelBuilder
-          .forAddress("localhost", aliceWallet.config.adminApi.port.unwrap)
+          .forAddress("localhost", aliceWalletBackend.config.adminApi.port.unwrap)
           .usePlaintext()
           .build()
 
@@ -801,7 +803,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
     }
 
     def checkBalance(
-        wallet: RemoteWalletAppReference,
+        wallet: WalletAppClientReference,
         expectedRound: Long,
         expectedUQRange: (BigDecimal, BigDecimal),
         expectedLQRange: (BigDecimal, BigDecimal),
@@ -817,7 +819,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
     }
 
     def lockCoins(
-        userWallet: LocalWalletAppReference,
+        userWallet: WalletAppBackendReference,
         userParty: PartyId,
         validatorParty: PartyId,
         coins: Seq[GrpcWalletAppClient.CoinPosition],
@@ -893,7 +895,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
         env: CoinTestConsoleEnvironment
     ): subsCodegen.SubscriptionRequest = {
       val contextId = clue("Create a subscription context") {
-        aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
+        aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
           Seq(aliceUserParty),
           optTimeout = None,
           commands = new testSubsCodegen.TestSubscriptionContext(
@@ -903,7 +905,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
             "description",
           ).create.commands.asScala.toSeq,
         )
-        aliceWallet.remoteParticipant.ledger_api.acs
+        aliceWalletBackend.remoteParticipant.ledger_api.acs
           .awaitJava(testSubsCodegen.TestSubscriptionContext.COMPANION)(aliceUserParty)
           .id
       }
@@ -926,7 +928,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
           subscriptionData,
           payData,
         )
-        aliceWallet.remoteParticipant.ledger_api.commands.submitJava(
+        aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
           actAs = Seq(aliceUserParty),
           optTimeout = None,
           commands = request.create.commands.asScala.toSeq,

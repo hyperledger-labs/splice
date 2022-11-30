@@ -57,7 +57,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
       .awaitJava(cc.coin.CoinRules.COMPANION)(aliceValidatorParty)
 
     // onboard end user
-    aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
+    aliceValidator.onboardUser(aliceWallet.config.damlUser)
   }
 
   "onboard users with party hint sanitizer" in { implicit env =>
@@ -85,8 +85,8 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
     scan.start()
     aliceValidator.startSync()
 
-    val party1 = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
-    val party2 = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
+    val party1 = aliceValidator.onboardUser(aliceWallet.config.damlUser)
+    val party2 = aliceValidator.onboardUser(aliceWallet.config.damlUser)
     party1 shouldBe party2
   }
 }

@@ -20,9 +20,9 @@ class DirectoryFrontendIntegrationTest extends FrontendIntegrationTest("alice") 
   "A directory UI" should {
 
     "allow requesting an entry and then list it" in { implicit env =>
-      val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
-      aliceRemoteWallet.tap(100.0)
+      val aliceDamlUser = aliceWallet.config.damlUser
+      onboardWalletUser(this, aliceWallet, aliceValidator)
+      aliceWallet.tap(100.0)
 
       val entryName = "mycoolentry"
 
@@ -59,13 +59,13 @@ class DirectoryFrontendIntegrationTest extends FrontendIntegrationTest("alice") 
     }
 
     "allow requesting an entry with subscription payments and then list it" in { implicit env =>
-      val aliceDamlUser = aliceRemoteWallet.config.damlUser
-      onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
-      aliceRemoteWallet.tap(100.0)
+      val aliceDamlUser = aliceWallet.config.damlUser
+      onboardWalletUser(this, aliceWallet, aliceValidator)
+      aliceWallet.tap(100.0)
 
       val entryName = "mycoolentry"
 
-      aliceRemoteWallet.listSubscriptionRequests() shouldBe empty
+      aliceWallet.listSubscriptionRequests() shouldBe empty
 
       withFrontEnd("alice") { implicit webDriver =>
         go to "http://localhost:3004"

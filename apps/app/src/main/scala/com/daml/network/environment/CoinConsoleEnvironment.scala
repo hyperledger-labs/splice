@@ -9,22 +9,22 @@ import com.daml.network.console.{
   LocalSplitwiseAppReference,
   LocalSvcAppReference,
   LocalValidatorAppReference,
-  LocalWalletAppReference,
   RemoteDirectoryAppReference,
   RemoteScanAppReference,
   RemoteSplitwiseAppReference,
   RemoteSvcAppReference,
   RemoteValidatorAppReference,
-  RemoteWalletAppReference,
   ScanAppReference,
   SplitwiseAppReference,
   ValidatorAppReference,
+  WalletAppBackendReference,
+  WalletAppClientReference,
   WalletAppReference,
 }
 import com.daml.network.scan.config.RemoteScanAppConfig
 import com.daml.network.svc.config.RemoteSvcAppConfig
 import com.daml.network.validator.config.RemoteValidatorAppConfig
-import com.daml.network.wallet.config.RemoteWalletAppConfig
+import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
 import com.digitalasset.canton.config.RequireTypes.InstanceName
 import com.digitalasset.canton.console.{
@@ -141,10 +141,10 @@ class CoinConsoleEnvironment(
       .headOption
 
   lazy val wallets
-      : NodeReferences[WalletAppReference, RemoteWalletAppReference, LocalWalletAppReference] =
+      : NodeReferences[WalletAppReference, WalletAppClientReference, WalletAppBackendReference] =
     NodeReferences(
-      environment.config.walletsByString.keys.map(createWalletReference).toSeq,
-      environment.config.remoteWalletApps.toSeq.map(createRemoteWalletReference),
+      environment.config.walletBackendsByString.keys.map(createWalletBackendReference).toSeq,
+      environment.config.walletAppClients.toSeq.map(createWalletAppClientReference),
     )
 
   lazy val directories: NodeReferences[
@@ -195,13 +195,13 @@ class CoinConsoleEnvironment(
   ): RemoteSvcAppReference =
     new RemoteSvcAppReference(this, conf._1.unwrap, conf._2)
 
-  private def createWalletReference(name: String): LocalWalletAppReference =
-    new LocalWalletAppReference(this, name)
+  private def createWalletBackendReference(name: String): WalletAppBackendReference =
+    new WalletAppBackendReference(this, name)
 
-  private def createRemoteWalletReference(
-      conf: (InstanceName, RemoteWalletAppConfig)
-  ): RemoteWalletAppReference =
-    new RemoteWalletAppReference(this, conf._1.unwrap, conf._2)
+  private def createWalletAppClientReference(
+      conf: (InstanceName, WalletAppClientConfig)
+  ): WalletAppClientReference =
+    new WalletAppClientReference(this, conf._1.unwrap, conf._2)
 
   private def createDirectoryReference(name: String): LocalDirectoryAppReference =
     new LocalDirectoryAppReference(this, name)
@@ -239,19 +239,19 @@ class CoinConsoleEnvironment(
         validators.remote,
         Seq("App References"),
       ) :++
-      wallets.local.map(w =>
-        TopLevelValue(w.name, helpText("local wallet app", w.name), w, Seq("App References"))
+      wallets.local.map(wb =>
+        TopLevelValue(wb.name, helpText("wallet app backend", wb.name), wb, Seq("App References"))
       ) :+ TopLevelValue(
         "wallets",
-        helpText("All local wallet app instances" + genericNodeReferencesDoc, "Wallets"),
+        helpText("All wallet app backend instances" + genericNodeReferencesDoc, "Wallet Backends"),
         wallets.local,
         Seq("App References"),
       ) :++
       wallets.remote.map(w =>
-        TopLevelValue(w.name, helpText("remote wallet app", w.name), w, Seq("App References"))
+        TopLevelValue(w.name, helpText("wallet app user", w.name), w, Seq("App References"))
       ) :+ TopLevelValue(
         "remoteWallets",
-        helpText("All remote wallet app instances" + genericNodeReferencesDoc, "Remote Wallets"),
+        helpText("All wallet app user instances" + genericNodeReferencesDoc, "Wallet Users"),
         wallets.remote,
         Seq("App References"),
       ) :++

@@ -28,10 +28,10 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
   "A wallet" should {
 
     "allow a user to list multiple subscriptions in different states" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
 
       clue("Alice gets some coins") {
-        aliceRemoteWallet.tap(50)
+        aliceWallet.tap(50)
       }
       clue("Setting up directory as provider for the created subscriptions") {
         val directoryDarPath = "apps/directory/daml/.daml/dist/directory-service-0.1.0.dar"
@@ -40,7 +40,7 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
         aliceValidator.remoteParticipant.ledger_api.acs
           .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(aliceUserParty)
       }
-      aliceRemoteWallet.listSubscriptions() shouldBe empty
+      aliceWallet.listSubscriptions() shouldBe empty
 
       clue("Creating 3 subscriptions, 10 days apart") {
         for ((name, i) <- List("alice1", "alice2", "alice3").zipWithIndex) {
@@ -52,17 +52,17 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
           )(
             "the corresponding subscription request is created",
             { _ =>
-              inside(aliceRemoteWallet.listSubscriptionRequests()) { case Seq(r) => r.contractId }
+              inside(aliceWallet.listSubscriptionRequests()) { case Seq(r) => r.contractId }
             },
           )
           actAndCheck(
             "Accept subscription request", {
-              aliceRemoteWallet.acceptSubscriptionRequest(requestId)
+              aliceWallet.acceptSubscriptionRequest(requestId)
             },
           )(
             "subscription is created and no subscription is ready for payment",
             _ => {
-              val subs = aliceRemoteWallet.listSubscriptions()
+              val subs = aliceWallet.listSubscriptions()
               val now = svc.remoteParticipant.ledger_api.time.get()
               subs.length shouldBe i + 1
               // TODO(#1217) we can remove this check once `renewalDuration == entryLifetime` is no longer hard-coded in the directory backend
@@ -88,7 +88,7 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
         "2 idle subscriptions and 1 payment are listed",
         _ => {
           eventually() {
-            val subs = aliceRemoteWallet.listSubscriptions()
+            val subs = aliceWallet.listSubscriptions()
             subs should have length 3
             subs
               .collect(_.state match {
@@ -108,22 +108,22 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
     val (aliceUserParty, bobUserParty) = setupAliceAndBobAndChannel(this)
     // Set-up payment channel between alice and her validator
     val proposalId =
-      aliceValidatorRemoteWallet.proposePaymentChannel(
+      aliceValidatorWallet.proposePaymentChannel(
         aliceUserParty,
         senderTransferFeeRatio = 0.5,
       )
-    eventually()(aliceRemoteWallet.listPaymentChannelProposals() should have size 1)
-    aliceRemoteWallet.acceptPaymentChannelProposal(proposalId)
-    eventually()(aliceValidatorRemoteWallet.listPaymentChannels() should have size 1)
+    eventually()(aliceWallet.listPaymentChannelProposals() should have size 1)
+    aliceWallet.acceptPaymentChannelProposal(proposalId)
+    eventually()(aliceValidatorWallet.listPaymentChannels() should have size 1)
 
-    aliceRemoteWallet.tap(50)
-    aliceValidatorRemoteWallet.tap(50)
-    eventually()(aliceRemoteWallet.list().coins should have size 1)
+    aliceWallet.tap(50)
+    aliceValidatorWallet.tap(50)
+    eventually()(aliceWallet.list().coins should have size 1)
 
     // Execute a transfer in round -> leads to rewards being generated
-    aliceRemoteWallet.executeDirectTransfer(bobUserParty, 40)
-    eventually()(aliceRemoteWallet.listAppRewards() should have size 1)
-    eventually()(aliceValidatorRemoteWallet.listValidatorRewards() should have size 1)
+    aliceWallet.executeDirectTransfer(bobUserParty, 40)
+    eventually()(aliceWallet.listAppRewards() should have size 1)
+    eventually()(aliceValidatorWallet.listValidatorRewards() should have size 1)
 
     // next round.
     svc.openRound(1, 1)
@@ -135,21 +135,21 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
     }
     // ensure issuing round is open
     advanceTime(Duration.ofMinutes(3))
-    aliceWallet.remoteParticipant.ledger_api.acs
+    aliceWalletBackend.remoteParticipant.ledger_api.acs
       .awaitJava(roundCodegen.IssuingMiningRound.COMPANION)(aliceValidator.getValidatorPartyId())
 
     // alice uses her reward
-    aliceRemoteWallet.executeDirectTransfer(bobUserParty, 1)
-    eventually()(aliceRemoteWallet.listAppRewards() should have size 0)
+    aliceWallet.executeDirectTransfer(bobUserParty, 1)
+    eventually()(aliceWallet.listAppRewards() should have size 0)
 
     // 2 validator rewards due to two transfers
-    eventually()(aliceValidatorRemoteWallet.listValidatorRewards() should have size 2)
-    aliceValidatorRemoteWallet.executeDirectTransfer(aliceUserParty, 1)
+    eventually()(aliceValidatorWallet.listValidatorRewards() should have size 2)
+    aliceValidatorWallet.executeDirectTransfer(aliceUserParty, 1)
     // +1 for the transfer, -1 due to the reward from round 0 being used
-    eventually()(aliceValidatorRemoteWallet.listValidatorRewards() should have size 2 + 1 - 1)
+    eventually()(aliceValidatorWallet.listValidatorRewards() should have size 2 + 1 - 1)
     // no rewards are used, since all other rewards are from round 1
-    aliceValidatorRemoteWallet.executeDirectTransfer(aliceUserParty, 1)
-    eventually()(aliceValidatorRemoteWallet.listValidatorRewards() should have size 3)
+    aliceValidatorWallet.executeDirectTransfer(aliceUserParty, 1)
+    eventually()(aliceValidatorWallet.listValidatorRewards() should have size 3)
 
   }
 
@@ -157,30 +157,30 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
     val (aliceUserParty, bobUserParty) = setupAliceAndBobAndChannel(this)
 
     // Tap coin and do a transfer from alice to bob
-    aliceRemoteWallet.tap(50)
-    eventually()(aliceRemoteWallet.list().coins should have size 1)
-    aliceRemoteWallet.executeDirectTransfer(bobUserParty, 40)
+    aliceWallet.tap(50)
+    eventually()(aliceWallet.list().coins should have size 1)
+    aliceWallet.executeDirectTransfer(bobUserParty, 40)
 
     // Retrieve transferred coin in bob's wallet and transfer part of it back to alice; bob will receive some app rewards
-    eventually()(bobRemoteWallet.list().coins should have size 1)
-    bobRemoteWallet.executeDirectTransfer(aliceUserParty, 30)
+    eventually()(bobWallet.list().coins should have size 1)
+    bobWallet.executeDirectTransfer(aliceUserParty, 30)
 
     // Wait for app rewards to become visible in bob's wallet, and check structure
-    bobWallet.remoteParticipant.ledger_api.acs
+    bobWalletBackend.remoteParticipant.ledger_api.acs
       .awaitJava(coinCodegen.AppReward.COMPANION)(bobUserParty)
       .id
-    val appRewards = bobRemoteWallet.listAppRewards()
+    val appRewards = bobWallet.listAppRewards()
     appRewards should have size 1
-    bobRemoteWallet.listValidatorRewards() shouldBe empty
+    bobWallet.listValidatorRewards() shouldBe empty
 
     // Wait for validator rewards to become visible in alice's wallet, check structure
-    val validatorRewards = aliceValidatorRemoteWallet.listValidatorRewards()
+    val validatorRewards = aliceValidatorWallet.listValidatorRewards()
     validatorRewards should have size 1
-    aliceRemoteWallet.tap(200)
-    eventually()(aliceRemoteWallet.list().coins should have size 3)
+    aliceWallet.tap(200)
+    eventually()(aliceWallet.list().coins should have size 3)
 
     // Bob collects/realizes rewards
-    val prevCoins = bobRemoteWallet.list().coins
+    val prevCoins = bobWallet.list().coins
     svc.openRound(1, 1)
     svc.startSummarizingRound(0)
     eventually() {
@@ -192,17 +192,17 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
     advanceTime(Duration.ofMinutes(3))
     eventually() {
       val r = loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
-        Try(bobRemoteWallet.collectRewards(0)),
+        Try(bobWallet.collectRewards(0)),
         entries => forAll(entries)(_.message should include("No issuing mining round found")),
       )
       inside(r) { case Success(_) => }
     }
-    bobRemoteWallet.listValidatorRewards() shouldBe empty
+    bobWallet.listValidatorRewards() shouldBe empty
     // We just check that we have a coin roughly in the right range, in particular higher than the input, rather than trying to repeat the calculation
     // for rewards.
     checkWallet(
       bobUserParty,
-      bobRemoteWallet,
+      bobWallet,
       prevCoins
         .map(c =>
           (

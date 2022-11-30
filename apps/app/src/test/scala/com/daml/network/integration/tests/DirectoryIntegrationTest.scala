@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.cn.{directory => codegen}
 import com.daml.network.console.{
   LocalValidatorAppReference,
   RemoteDirectoryAppReference,
-  RemoteWalletAppReference,
+  WalletAppClientReference,
 }
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -54,7 +54,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
       import env._
 
       // The user of the directory service.
-      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
       val offsetBefore = directoryValidator.remoteParticipant.ledger_api.transactions.end()
 
       // Trigger three concurrent install requests
@@ -72,7 +72,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
     "accept unique install requests" in { implicit env =>
       import env._
       // The user of the directory service.
-      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
 
       // Test that we can do a racy allocation and cancellation of a directory install request multiple times
       for (_ <- 1 to 3) {
@@ -177,11 +177,11 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
         }
 
         // Setup alice
-        val aliceStaticRefs = StaticUserRefs(aliceValidator, aliceDirectory, aliceRemoteWallet)
+        val aliceStaticRefs = StaticUserRefs(aliceValidator, aliceDirectory, aliceWallet)
         val aliceRefs = setupUser(aliceStaticRefs)
 
         // Setup bob
-        val bobStaticRefs = StaticUserRefs(bobValidator, bobDirectory, bobRemoteWallet)
+        val bobStaticRefs = StaticUserRefs(bobValidator, bobDirectory, bobWallet)
         val bobRefs = setupUser(bobStaticRefs)
 
         // Concurrently, request an entry as alice and bob
@@ -241,11 +241,11 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
     }
     "allocate directory entries following an initial subscription payment and renew entries on follow-up payments" in {
       implicit env =>
-        val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
+        val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
         val providerParty = directory.getProviderPartyId()
 
         val aliceRefs = clue("Setup Alice") {
-          val aliceStaticRefs = StaticUserRefs(aliceValidator, aliceDirectory, aliceRemoteWallet)
+          val aliceStaticRefs = StaticUserRefs(aliceValidator, aliceDirectory, aliceWallet)
           setupUser(aliceStaticRefs)
         }
         val (_, subReqId) = clue("Alice requests a directory entry") {
@@ -334,12 +334,12 @@ object DirectoryIntegrationTest {
   case class StaticUserRefs(
       validator: LocalValidatorAppReference,
       directory: RemoteDirectoryAppReference,
-      wallet: RemoteWalletAppReference,
+      wallet: WalletAppClientReference,
   )
 
   case class DynamicUserRefs(userParty: PartyId, static: StaticUserRefs) {
     def validator: LocalValidatorAppReference = static.validator
     def directory: RemoteDirectoryAppReference = static.directory
-    def wallet: RemoteWalletAppReference = static.wallet
+    def wallet: WalletAppClientReference = static.wallet
   }
 }

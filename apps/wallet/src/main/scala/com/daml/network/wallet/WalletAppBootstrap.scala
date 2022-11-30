@@ -7,7 +7,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
 import com.daml.network.environment.{CoinNodeBootstrapBase, CoinRetries}
-import com.daml.network.wallet.config.LocalWalletAppConfig
+import com.daml.network.wallet.config.WalletAppBackendConfig
 import com.daml.network.wallet.metrics.WalletAppMetrics
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
@@ -29,8 +29,8 @@ import scala.concurrent.Future
   */
 class WalletAppBootstrap(
     override val name: InstanceName,
-    val config: LocalWalletAppConfig,
-    val walletAppParameters: SharedCoinAppParameters,
+    val config: WalletAppBackendConfig,
+    val walletAppBackendParameters: SharedCoinAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
     metrics: WalletAppMetrics,
@@ -46,12 +46,12 @@ class WalletAppBootstrap(
     executionSequencerFactory: ExecutionSequencerFactory,
 ) extends CoinNodeBootstrapBase[
       WalletApp,
-      LocalWalletAppConfig,
+      WalletAppBackendConfig,
       SharedCoinAppParameters,
     ](
       name,
       config,
-      walletAppParameters,
+      walletAppBackendParameters,
       clock,
       metrics,
       storageFactory,
@@ -67,7 +67,7 @@ class WalletAppBootstrap(
         new WalletApp(
           name,
           config,
-          walletAppParameters,
+          walletAppBackendParameters,
           storage,
           clock,
           loggerFactory,
@@ -86,7 +86,7 @@ object WalletAppBootstrap {
   val LoggerFactoryKeyName: String = "wallet"
   def apply(
       name: String,
-      walletConfig: LocalWalletAppConfig,
+      walletConfig: WalletAppBackendConfig,
       coinAppParameters: SharedCoinAppParameters,
       clock: Clock,
       testingTimeService: TestingTimeService,

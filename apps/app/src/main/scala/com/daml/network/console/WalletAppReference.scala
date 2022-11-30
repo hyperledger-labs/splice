@@ -16,7 +16,7 @@ import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.{
   ListResponse,
   UserStatusData,
 }
-import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
+import com.daml.network.wallet.config.{WalletAppBackendConfig, WalletAppClientConfig}
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
@@ -506,15 +506,15 @@ abstract class WalletAppReference(
     }
 }
 
-class RemoteWalletAppReference(
+class WalletAppClientReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
-    override val config: RemoteWalletAppConfig,
+    override val config: WalletAppClientConfig,
 ) extends WalletAppReference(consoleEnvironment, name)
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
 
-  override protected val instanceType = "Remote wallet"
+  override protected val instanceType = "Wallet user"
 
   override def token: String = {
     AuthUtil.testTokenBearer(
@@ -527,7 +527,7 @@ class RemoteWalletAppReference(
 /** Single local Wallet app reference. Defines the console commands that can be run against a local Wallet
   * app reference.
   */
-class LocalWalletAppReference(
+class WalletAppBackendReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
 ) extends WalletAppReference(consoleEnvironment, name)
@@ -548,9 +548,9 @@ class LocalWalletAppReference(
 
   protected val nodes = consoleEnvironment.environment.wallets
 
-  @Help.Summary("Return wallet app config")
-  def config: LocalWalletAppConfig =
-    consoleEnvironment.environment.config.walletsByString(name)
+  @Help.Summary("Return wallet app backend config")
+  def config: WalletAppBackendConfig =
+    consoleEnvironment.environment.config.walletBackendsByString(name)
 
   @Help.Summary("Set wallet context")
   def setWalletContext(userId: String): Unit = {

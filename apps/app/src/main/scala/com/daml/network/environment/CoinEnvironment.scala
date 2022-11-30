@@ -14,7 +14,7 @@ import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.validator.ValidatorAppBootstrap
 import com.daml.network.validator.config.LocalValidatorAppConfig
 import com.daml.network.wallet.WalletAppBootstrap
-import com.daml.network.wallet.config.LocalWalletAppConfig
+import com.daml.network.wallet.config.WalletAppBackendConfig
 import com.digitalasset.canton.config.TestingConfigInternal
 import com.digitalasset.canton.console.{
   ConsoleEnvironment,
@@ -141,13 +141,13 @@ trait CoinEnvironment extends Environment {
 
   protected def createWallet(
       name: String,
-      walletConfig: LocalWalletAppConfig,
+      walletConfig: WalletAppBackendConfig,
   ): WalletAppBootstrap = {
     val appLoggerFactory = loggerFactory.append(WalletAppBootstrap.LoggerFactoryKeyName, name)
     WalletAppBootstrap(
       name,
       walletConfig,
-      config.tryWalletAppParametersByString(name),
+      config.tryWalletAppBackendParametersByString(name),
       createClock(appLoggerFactory),
       testingTimeService,
       coinMetrics.forWallet(name),
@@ -168,8 +168,8 @@ trait CoinEnvironment extends Environment {
     createWallet,
     migrationsFactory,
     timeouts,
-    config.walletsByString,
-    config.tryWalletAppParametersByString,
+    config.walletBackendsByString,
+    config.tryWalletAppBackendParametersByString,
     loggerFactory,
   )
 

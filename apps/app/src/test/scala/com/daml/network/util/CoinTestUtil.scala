@@ -5,8 +5,8 @@ import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{
   CoinRemoteParticipantReference,
-  RemoteWalletAppReference,
   ValidatorAppReference,
+  WalletAppClientReference,
 }
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.digitalasset.canton.BaseTest
@@ -20,22 +20,22 @@ import scala.jdk.CollectionConverters.*
 // TODO(M1-92 - Tech Debt): This could be reused in more places and extended
 trait CoinTestUtil { this: CommonCoinAppInstanceReferences =>
 
-  /** Onboards the daml user associated with the given remote wallet app reference
+  /** Onboards the daml user associated with the given wallet app user reference
     * onto the given validator, and waits until the wallet is usable for that user
     */
   def onboardWalletUser(
       test: BaseTest,
-      remoteWallet: RemoteWalletAppReference,
+      walletAppClient: WalletAppClientReference,
       validator: ValidatorAppReference,
   ): PartyId = {
-    val damlUser = remoteWallet.config.damlUser
+    val damlUser = walletAppClient.config.damlUser
 
     test.clue(s"Onboard $damlUser on ${validator.name}") {
       val party = validator.onboardUser(damlUser)
       // The wallet is not immediately usable by the onboarded user -
       // the wallet app backend has to ingest the wallet install contract first.
       eventually() {
-        remoteWallet.userStatus().userOnboarded shouldBe true
+        walletAppClient.userStatus().userOnboarded shouldBe true
       }
       party
     }
@@ -45,24 +45,24 @@ trait CoinTestUtil { this: CommonCoinAppInstanceReferences =>
   def setupAliceAndBobAndChannel(test: BaseTest)(implicit
       env: CoinTestConsoleEnvironment
   ): (PartyId, PartyId) = {
-    val aliceUserParty = onboardWalletUser(test, aliceRemoteWallet, aliceValidator)
-    val bobUserParty = onboardWalletUser(test, bobRemoteWallet, bobValidator)
+    val aliceUserParty = onboardWalletUser(test, aliceWallet, aliceValidator)
+    val bobUserParty = onboardWalletUser(test, bobWallet, bobValidator)
 
     test.clue("Setup payment channel between alice and bob") {
       val proposalId =
-        aliceRemoteWallet.proposePaymentChannel(bobUserParty, senderTransferFeeRatio = 0.5)
+        aliceWallet.proposePaymentChannel(bobUserParty, senderTransferFeeRatio = 0.5)
       // Bob monitors proposals and accepts the one
-      eventually()(bobRemoteWallet.listPaymentChannelProposals() should have size 1)
-      bobRemoteWallet.acceptPaymentChannelProposal(proposalId)
-      eventually()(aliceRemoteWallet.listPaymentChannels() should have size 1)
+      eventually()(bobWallet.listPaymentChannelProposals() should have size 1)
+      bobWallet.acceptPaymentChannelProposal(proposalId)
+      eventually()(aliceWallet.listPaymentChannels() should have size 1)
     }
 
     test.clue("Setup payment channel between bob and alice") {
       val bobProposalId =
-        bobRemoteWallet.proposePaymentChannel(aliceUserParty, senderTransferFeeRatio = 0.5)
-      eventually()(aliceRemoteWallet.listPaymentChannelProposals() should have size 1)
-      aliceRemoteWallet.acceptPaymentChannelProposal(bobProposalId)
-      eventually()(bobRemoteWallet.listPaymentChannels() should have size 2)
+        bobWallet.proposePaymentChannel(aliceUserParty, senderTransferFeeRatio = 0.5)
+      eventually()(aliceWallet.listPaymentChannelProposals() should have size 1)
+      aliceWallet.acceptPaymentChannelProposal(bobProposalId)
+      eventually()(bobWallet.listPaymentChannels() should have size 2)
     }
 
     (aliceUserParty, bobUserParty)

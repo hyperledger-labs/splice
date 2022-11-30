@@ -13,12 +13,12 @@ Seq(aliceValidator.remoteParticipant, bobValidator.remoteParticipant).foreach { 
 
 val charlieValidator = aliceValidator
 
-val aliceUserParty = aliceValidator.onboardUser(aliceRemoteWallet.config.damlUser)
+val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
 val auth0testUser = "auth0|632de6b067ec7e396a03262d"
 aliceValidator.remoteParticipant.ledger_api.users.lookup(auth0testUser)
     .getOrElse(aliceValidator.onboardUser(auth0testUser))
-val bobUserParty = bobValidator.onboardUser(bobRemoteWallet.config.damlUser)
-val charlieUserParty = charlieValidator.onboardUser(charlieRemoteWallet.config.damlUser)
+val bobUserParty = bobValidator.onboardUser(bobWallet.config.damlUser)
+val charlieUserParty = charlieValidator.onboardUser(charlieWallet.config.damlUser)
 
 val aliceRequestCid = aliceDirectory.requestDirectoryInstall()
 val bobRequestCid = bobDirectory.requestDirectoryInstall()
@@ -32,15 +32,15 @@ aliceDirectory.requestDirectoryEntry("alice.cns")
 bobDirectory.requestDirectoryEntry("bob.cns")
 charlieDirectory.requestDirectoryEntry("charlie.cns")
 
-val aliceCoin = aliceRemoteWallet.tap(5.0)
-utils.retry_until_true { aliceRemoteWallet.listAppPaymentRequests().length == 1 }
-val aliceAccepted = aliceRemoteWallet.acceptAppPaymentRequest(aliceRemoteWallet.listAppPaymentRequests()(0).contractId)
-val bobCoin = bobRemoteWallet.tap(5.0)
-utils.retry_until_true { bobRemoteWallet.listAppPaymentRequests().length == 1 }
-val bobAccepted = bobRemoteWallet.acceptAppPaymentRequest(bobRemoteWallet.listAppPaymentRequests()(0).contractId)
-val charlieCoin = charlieRemoteWallet.tap(5.0)
-utils.retry_until_true { charlieRemoteWallet.listAppPaymentRequests().length == 1 }
-val charlieAccepted = charlieRemoteWallet.acceptAppPaymentRequest(charlieRemoteWallet.listAppPaymentRequests()(0).contractId)
+val aliceCoin = aliceWallet.tap(5.0)
+utils.retry_until_true { aliceWallet.listAppPaymentRequests().length == 1 }
+val aliceAccepted = aliceWallet.acceptAppPaymentRequest(aliceWallet.listAppPaymentRequests()(0).contractId)
+val bobCoin = bobWallet.tap(5.0)
+utils.retry_until_true { bobWallet.listAppPaymentRequests().length == 1 }
+val bobAccepted = bobWallet.acceptAppPaymentRequest(bobWallet.listAppPaymentRequests()(0).contractId)
+val charlieCoin = charlieWallet.tap(5.0)
+utils.retry_until_true { charlieWallet.listAppPaymentRequests().length == 1 }
+val charlieAccepted = charlieWallet.acceptAppPaymentRequest(charlieWallet.listAppPaymentRequests()(0).contractId)
 
 val providerParty = providerSplitwiseBackend.getProviderPartyId()
 

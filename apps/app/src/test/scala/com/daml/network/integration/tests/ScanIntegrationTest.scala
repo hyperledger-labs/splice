@@ -18,8 +18,8 @@ class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
 
   "see Coin transfers" in { implicit env =>
     val (aliceP, bobP) = setupAliceAndBobAndChannel(this)
-    aliceRemoteWallet.tap(50)
-    aliceRemoteWallet.executeDirectTransfer(bobP, 10)
+    aliceWallet.tap(50)
+    aliceWallet.executeDirectTransfer(bobP, 10)
     eventually(5.seconds) {
       val history = scan.getTxHistory()
       history should have length 2
@@ -68,8 +68,8 @@ class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
 
   "get details of a single Coin transfer" in { implicit env =>
     val (aliceP @ _, bobP) = setupAliceAndBobAndChannel(this)
-    aliceRemoteWallet.tap(50)
-    aliceRemoteWallet.executeDirectTransfer(bobP, 10)
+    aliceWallet.tap(50)
+    aliceWallet.executeDirectTransfer(bobP, 10)
 
     eventually(5.seconds) {
       val history = scan.getTxHistory()
@@ -120,9 +120,9 @@ class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
       scan.getTransferContext().latestOpenMiningRound.map(_.payload.round.number) shouldBe Some(0)
     }
 
-    aliceRemoteWallet.tap(200)
-    aliceRemoteWallet.executeDirectTransfer(bobUserParty, 39)
-    aliceRemoteWallet.executeDirectTransfer(bobUserParty, 19)
+    aliceWallet.tap(200)
+    aliceWallet.executeDirectTransfer(bobUserParty, 39)
+    aliceWallet.executeDirectTransfer(bobUserParty, 19)
 
     svc.openRound(1, 1)
 
@@ -134,9 +134,9 @@ class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
     }
     svc.closeRound(0)
 
-    aliceRemoteWallet.executeDirectTransfer(bobUserParty, 29)
-    aliceRemoteWallet.executeDirectTransfer(bobUserParty, 9)
-    aliceRemoteWallet.executeDirectTransfer(bobUserParty, 1)
+    aliceWallet.executeDirectTransfer(bobUserParty, 29)
+    aliceWallet.executeDirectTransfer(bobUserParty, 9)
+    aliceWallet.executeDirectTransfer(bobUserParty, 1)
 
     svc.startSummarizingRound(1)
     eventually() {

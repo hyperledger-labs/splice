@@ -1,7 +1,7 @@
 package com.daml.network.environment
 
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.wallet.config.LocalWalletAppConfig
+import com.daml.network.wallet.config.WalletAppBackendConfig
 import com.daml.network.wallet.{WalletApp, WalletAppBootstrap}
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -11,10 +11,10 @@ import com.digitalasset.canton.resource.DbMigrationsFactory
 
 /** Wallet app instances. */
 class WalletApps(
-    create: (String, LocalWalletAppConfig) => WalletAppBootstrap,
+    create: (String, WalletAppBackendConfig) => WalletAppBootstrap,
     migrationsFactory: DbMigrationsFactory,
     _timeouts: ProcessingTimeout,
-    configs: Map[String, LocalWalletAppConfig],
+    configs: Map[String, WalletAppBackendConfig],
     parametersFor: String => SharedCoinAppParameters,
     _loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -22,7 +22,7 @@ class WalletApps(
 ) extends ManagedNodes[ // TODO(#736): We should remove the CantonNode/CantonNodeBootstrap type requirements from
       // this trait.
       WalletApp,
-      LocalWalletAppConfig,
+      WalletAppBackendConfig,
       SharedCoinAppParameters,
       WalletAppBootstrap,
     ](create, migrationsFactory, _timeouts, configs, parametersFor, _loggerFactory) {}

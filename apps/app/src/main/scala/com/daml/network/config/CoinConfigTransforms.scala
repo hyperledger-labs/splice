@@ -6,7 +6,7 @@ import com.daml.network.scan.config.LocalScanAppConfig
 import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.validator.config.LocalValidatorAppConfig
-import com.daml.network.wallet.config.{LocalWalletAppConfig, RemoteWalletAppConfig}
+import com.daml.network.wallet.config.{WalletAppBackendConfig, WalletAppClientConfig}
 import com.digitalasset.canton.config.RequireTypes.NonEmptyString
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.domain.config.{
@@ -70,11 +70,11 @@ object CoinConfigTransforms {
           )
         )(config2)
       val config4 =
-        updateAllWalletAppConfigs_(c => c.copy(serviceUser = s"${c.serviceUser}-$suffix"))(
+        updateAllWalletAppBackendConfigs_(c => c.copy(serviceUser = s"${c.serviceUser}-$suffix"))(
           config3
         )
       val config5 =
-        updateAllRemoteWalletAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
+        updateAllWalletAppClientConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
           config4
         )
       val config6 =
@@ -131,8 +131,8 @@ object CoinConfigTransforms {
   type DirectoryAppTransform = CnAppConfigTransform[LocalDirectoryAppConfig]
   type RemoteDirectoryAppTransform = CnAppConfigTransform[RemoteDirectoryAppConfig]
   type ValidatorAppTransform = CnAppConfigTransform[LocalValidatorAppConfig]
-  type WalletAppTransform = CnAppConfigTransform[LocalWalletAppConfig]
-  type RemoteWalletAppTransform = CnAppConfigTransform[RemoteWalletAppConfig]
+  type WalletAppBackendTransform = CnAppConfigTransform[WalletAppBackendConfig]
+  type WalletAppClientTransform = CnAppConfigTransform[WalletAppClientConfig]
   type SvcAppTransform = CnAppConfigTransform[LocalSvcAppConfig]
   type ScanAppTransform = CnAppConfigTransform[LocalScanAppConfig]
   type SplitwiseAppTransform = CnAppConfigTransform[LocalSplitwiseAppConfig]
@@ -154,24 +154,24 @@ object CoinConfigTransforms {
       (name, update(config))
     })
 
-  def updateAllWalletAppConfigs_(
-      update: WalletAppTransform
+  def updateAllWalletAppBackendConfigs_(
+      update: WalletAppBackendTransform
   ): CoinConfigTransform =
-    _.focus(_.walletApps).modify(_.map { case (name, config) =>
+    _.focus(_.walletAppBackends).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 
-  def updateAllRemoteWalletAppConfigs_(
-      update: RemoteWalletAppTransform
+  def updateAllWalletAppClientConfigs_(
+      update: WalletAppClientTransform
   ): CoinConfigTransform =
-    _.focus(_.remoteWalletApps).modify(_.map { case (name, config) =>
+    _.focus(_.walletAppClients).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 
   def updateAllAppConfigs_(
-      update: WalletAppTransform
+      update: WalletAppBackendTransform
   ): CoinConfigTransform =
-    _.focus(_.walletApps).modify(_.map { case (name, config) =>
+    _.focus(_.walletAppBackends).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 
@@ -277,7 +277,7 @@ object CoinConfigTransforms {
     val validator = updateAllValidatorConfigs_(
       _.focus(_.remoteParticipant).modify(portTransform(bump, _))
     )
-    val wallet = updateAllWalletAppConfigs_(
+    val wallet = updateAllWalletAppBackendConfigs_(
       _.focus(_.remoteParticipant).modify(portTransform(bump, _))
     )
     val directory = updateDirectoryAppConfig(
@@ -366,7 +366,7 @@ object CoinConfigTransforms {
       updateAllValidatorConfigs_(c => {
         c.focus(_.remoteParticipant.ledgerApi).modify(readyForAuth(c.damlUser, _))
       }),
-      updateAllWalletAppConfigs_(c => {
+      updateAllWalletAppBackendConfigs_(c => {
         c.focus(_.remoteParticipant.ledgerApi).modify(readyForAuth(c.serviceUser, _))
       }),
       // Other apps may not be ready for auth

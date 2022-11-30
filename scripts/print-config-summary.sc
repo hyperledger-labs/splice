@@ -51,7 +51,7 @@ object ConfigSummaryPrinter extends App {
         i.adminApi.internalPort.fold(0)(_.unwrap) -> s"Validator App '${name.unwrap}', Admin API"
       )
     }
-    config.walletApps.foreach { case (name, i) =>
+    config.walletAppBackends.foreach { case (name, i) =>
       ports.addOne(
         i.adminApi.internalPort.fold(0)(_.unwrap) -> s"Wallet App '${name.unwrap}', Admin API"
       )

@@ -63,7 +63,7 @@ class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScr
   private def remoteScanAddressToLocalhost: CoinConfigTransform = {
     CoinConfigTransforms.updateAllValidatorConfigs_(
       _.focus(_.remoteScan.adminApi.address).replace("localhost")
-    ) compose CoinConfigTransforms.updateAllWalletAppConfigs_(
+    ) compose CoinConfigTransforms.updateAllWalletAppBackendConfigs_(
       _.focus(_.remoteScan.adminApi.address).replace("localhost")
     )
   }

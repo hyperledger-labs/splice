@@ -35,9 +35,9 @@ class SplitwiseIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
 
     "support provider-hosted mode" in { implicit env =>
       // Onboard users
-      val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
-      val charlieUserParty = onboardWalletUser(this, charlieRemoteWallet, aliceValidator)
-      val bobUserParty = onboardWalletUser(this, bobRemoteWallet, bobValidator)
+      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val charlieUserParty = onboardWalletUser(this, charlieWallet, aliceValidator)
+      val bobUserParty = onboardWalletUser(this, bobWallet, bobValidator)
 
       // Setup install contracts
       Seq(
@@ -89,10 +89,10 @@ class SplitwiseIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
           )
         ),
       )
-      eventually()(bobRemoteWallet.listAppPaymentRequests() should not be empty)
-      inside(bobRemoteWallet.listAppPaymentRequests()) { case Seq(request) =>
-        bobRemoteWallet.tap(20)
-        bobRemoteWallet.acceptAppPaymentRequest(request.contractId)
+      eventually()(bobWallet.listAppPaymentRequests() should not be empty)
+      inside(bobWallet.listAppPaymentRequests()) { case Seq(request) =>
+        bobWallet.tap(20)
+        bobWallet.acceptAppPaymentRequest(request.contractId)
       }
       eventually() {
         bobSplitwise.listBalanceUpdates(key) should have size 2
@@ -147,7 +147,7 @@ class SplitwiseIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
       implicit env =>
         import env._
 
-        val aliceUserParty = onboardWalletUser(this, aliceRemoteWallet, aliceValidator)
+        val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
 
         aliceSplitwise.createInstallRequest()
         aliceSplitwise.ledgerApi.ledger_api.acs
