@@ -243,7 +243,9 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
 
       clue("Tap 50 coins") {
         aliceWallet.tap(50)
-        eventually() { aliceWallet.list().coins should not be empty }
+        eventually() {
+          aliceWallet.list().coins should not be empty
+        }
       }
 
       clue("Accept payment request") {
@@ -475,16 +477,19 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
 
       // TODO(#1731): Once expiration is automated, add a test here that creates an offer with a short expiration period and waits for it to be auto-expired
 
-      val offer5 =
+      val (offer5, _) = actAndCheck(
+        "Create a transfer offer that alice cannot yet afford",
         aliceWallet.createTransferOffer(
           bobUserParty,
           quantity = 150.0,
           description = "not rich enough yet",
           expiration,
-        )
-      eventually() {
-        bobWallet.acceptTransferOffer(offer5)
-      }
+        ),
+      )("offer is ingested", _ => aliceWallet.listTransferOffers() should have length 1)
+      actAndCheck("Bob accepts the offer", bobWallet.acceptTransferOffer(offer5))(
+        "Accepted offer is ingested",
+        _ => aliceWallet.listAcceptedTransferOffers() should have length 1,
+      )
       clue("Sleeping for a while, to make sure a few retries fail first")(
         // TODO(M3-02): consider making this a time-based test, and advancing time gradually to trigger the failing automation instead
         Threading.sleep(4000)
