@@ -61,7 +61,6 @@ class EndUserWalletManager(
       EndUserWalletStore.Key(svcParty = store.key.svcParty, endUserName, endUserParty)
     val walletService = new EndUserWalletService(
       ledgerClient,
-      install,
       key,
       this,
       automationConfig: AutomationConfig,

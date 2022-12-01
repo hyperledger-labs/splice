@@ -9,7 +9,6 @@ import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_Error
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
-import com.daml.network.util.JavaContract as Contract
 import com.daml.network.wallet.EndUserWalletManager
 import com.daml.network.wallet.store.EndUserWalletStore
 import com.daml.network.wallet.treasury.EndUserTreasuryService.*
@@ -23,7 +22,7 @@ import io.grpc.{Status, StatusRuntimeException}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success}
-// TODO(#1351): Add PrettyPrinting
+// TODO(#1818): Add PrettyPrinting
 
 /** Wrapper class for the treasury service.
   *
@@ -55,12 +54,6 @@ case class CoinOperationRequest[T](
   */
 class EndUserTreasuryService(
     connection: CoinLedgerConnection,
-    // TODO(#1351): don't pass WalletAppInstall contract along but look it up before each batch submission to support users updating their
-    // WalletAppInstall contract
-    install: Contract[
-      installCodegen.WalletAppInstall.ContractId,
-      installCodegen.WalletAppInstall,
-    ],
     userStore: EndUserWalletStore,
     walletManager: EndUserWalletManager,
     retryProvider: CoinRetries,
@@ -76,11 +69,9 @@ class EndUserTreasuryService(
 
   private val queue: BoundedSourceQueue[AnyEnqueuedCoinOperation] = Source
     .queue[AnyEnqueuedCoinOperation](bufferSize)
-    // TODO(#1351): Possible extension: re-order commands according to urgency
     .batch(batchSize, operation => Seq(operation))((operations, operation) =>
       operations :+ operation
     )
-    // TODO(#1351): this is likely leaking resources ==> use construction from AcsIngestion for managing lifetime, and allocate a new traceContext to improve logs
     .toMat(
       Sink.foreachAsync(1)(batch =>
         executeBatchWithRetry(batch).flatMap(_ match {
@@ -109,8 +100,6 @@ class EndUserTreasuryService(
   def enqueueCoinOperation[T](
       operation: CoinOperationRequest[T]
   )(implicit tc: TraceContext): Future[installCodegen.CoinOperationOutcome] = {
-    // TODO(#1351): possibly allow callers to assign semantically meaningful ids (see the discussion
-    //  at https://github.com/DACH-NY/the-real-canton-coin/pull/1145#discussion_r994508807)
     val p = Promise[installCodegen.CoinOperationOutcome]()
     queue.offer(EnqueuedCoinOperation(operation, p)) match {
       case Enqueued =>
@@ -192,6 +181,7 @@ class EndUserTreasuryService(
       )
       transferContext <- getValidatorStore.getPaymentTransferContext(retryProvider)
       activeIssuingRounds = transferContext.context.issuingMiningRounds.asScala.keys.toSet
+      install <- getInstall
       (inputs, readAs) <- selectTransferInputs(activeIssuingRounds)
       cmd =
         install.contractId.exerciseWalletAppInstall_ExecuteBatch(
@@ -270,6 +260,17 @@ class EndUserTreasuryService(
         )
       )
       .store
+
+  private def getInstall =
+    userStore
+      .lookupInstall()
+      .map(
+        _.value.getOrElse(
+          throw new StatusRuntimeException(
+            Status.NOT_FOUND.withDescription("WalletAppInstall contract")
+          )
+        )
+      )
 
   override def onClosed(): Unit = {
     // TODO(M1-92 - Tech Debt): add more robust shutdown, e.g., similar to shutdown for ledger subscriptions

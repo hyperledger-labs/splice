@@ -601,7 +601,6 @@ class GrpcWalletService(
       }
     }
 
-  // TODO(#1351) - Make this a `CoinOperation` too
   override def collectRewards(request: CollectRewardsRequest): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth { user =>
@@ -860,7 +859,7 @@ class GrpcWalletService(
       }
     }
 
-  // TODO(#1351) - Remove this
+  // TODO(#1815) - Remove this
   private def redistribute(
       userStore: EndUserWalletStore,
       validatorStore: EndUserWalletStore,
@@ -930,7 +929,6 @@ class GrpcWalletService(
       constructCoinOperation: (
           installCodegen.WalletAppInstall.ContractId,
           EndUserWalletStore,
-          // TODO(#1351): also require quantity to reject commands early?
       ) => Future[CoinOperationRequest[LookupResult]]
   )(
       user: String,
