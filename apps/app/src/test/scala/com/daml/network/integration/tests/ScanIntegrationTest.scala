@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
 import com.daml.network.codegen.java.da
 import com.daml.network.history.*
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
@@ -93,95 +92,4 @@ class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
     }
 
   }
-
-  "report correct reference data" in { implicit env =>
-    setupAliceAndBobAndChannel(this)
-    eventually(1.seconds) {
-      scan.getTransferContext().latestOpenMiningRound.map(_.payload.round.number) shouldBe Some(0)
-    }
-
-    svc.startSummarizingRound(0)
-    eventually() {
-      // automation archives the summarizing round and creates the issuing round
-      svc.remoteParticipant.ledger_api.acs
-        .filterJava(SummarizingMiningRound.COMPANION)(svcParty) shouldBe empty
-    }
-    svc.closeRound(0)
-    svc.openRound(1, 1.0)
-
-    eventually(1.seconds) {
-      scan.getTransferContext().latestOpenMiningRound.map(_.payload.round.number) shouldBe Some(1)
-    }
-  }
-
-  "list closed rounds" in { implicit env =>
-    val (aliceUserParty @ _, bobUserParty) = setupAliceAndBobAndChannel(this)
-    eventually(1.seconds) {
-      scan.getTransferContext().latestOpenMiningRound.map(_.payload.round.number) shouldBe Some(0)
-    }
-
-    aliceWallet.tap(200)
-    aliceWallet.executeDirectTransfer(bobUserParty, 39)
-    aliceWallet.executeDirectTransfer(bobUserParty, 19)
-
-    svc.openRound(1, 1)
-
-    svc.startSummarizingRound(0)
-    eventually() {
-      // automation archives the summarizing round and creates the issuing round
-      svc.remoteParticipant.ledger_api.acs
-        .filterJava(SummarizingMiningRound.COMPANION)(svcParty) shouldBe empty
-    }
-    svc.closeRound(0)
-
-    aliceWallet.executeDirectTransfer(bobUserParty, 29)
-    aliceWallet.executeDirectTransfer(bobUserParty, 9)
-    aliceWallet.executeDirectTransfer(bobUserParty, 1)
-
-    svc.startSummarizingRound(1)
-    eventually() {
-      // automation archives the summarizing round and creates the issuing round
-      svc.remoteParticipant.ledger_api.acs
-        .filterJava(SummarizingMiningRound.COMPANION)(svcParty) shouldBe empty
-    }
-    svc.closeRound(1)
-
-    eventually() {
-      scan.getClosedRounds() shouldBe empty
-    }
-  // TODO(#1705): Re-enable ~equivalent to the below once we add an audit log store for closed rounds.
-//    val closed = scan.getClosedRounds()
-//    inside(closed) { case Seq(round1, round0) =>
-//      // TODO(M1-92): make this more robust or don't care about exact values at all
-//      round0.payload should be(
-//        new ClosedMiningRound(
-//          svcParty.toProtoPrimitive,
-//          new Round(0),
-//          BigDecimal(0.58).bigDecimal.setScale(10),
-//          BigDecimal(0.2).bigDecimal.setScale(10),
-//          BigDecimal(0.0).bigDecimal.setScale(10),
-//          BigDecimal(360.705).bigDecimal.setScale(10),
-//          BigDecimal(57.71).bigDecimal.setScale(10),
-//          BigDecimal(302.215).bigDecimal.setScale(10),
-//          round0.payload.observers,
-//        )
-//      )
-//      round1.payload should be(
-//        new ClosedMiningRound(
-//          svcParty.toProtoPrimitive,
-//          new Round(1),
-//          BigDecimal(0.39).bigDecimal.setScale(10),
-//          BigDecimal(0.3).bigDecimal.setScale(10),
-//          BigDecimal(0.0000048225).bigDecimal.setScale(10),
-//          BigDecimal(356.8949855325).bigDecimal.setScale(10),
-//          BigDecimal(29 + 9 + 1 - 0.195).bigDecimal.setScale(10),
-//          BigDecimal(317.3999855325).bigDecimal.setScale(10),
-//          round1.payload.observers,
-//        )
-//      )
-
-  // TODO(#832): do the math and verify that the values above are correct
-//    }
-  }
-
 }

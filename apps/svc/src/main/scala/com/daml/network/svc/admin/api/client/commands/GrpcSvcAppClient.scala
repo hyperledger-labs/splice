@@ -1,6 +1,5 @@
 package com.daml.network.svc.admin.api.client.commands
 
-import com.daml.network.codegen.java.cc.{round => roundCodegen}
 import com.daml.network.svc.v0
 import com.daml.network.svc.v0.GetDebugInfoResponse
 import com.daml.network.svc.v0.SvcServiceGrpc.SvcServiceStub
@@ -63,77 +62,5 @@ object GrpcSvcAppClient {
           coinRulesCids = response.coinRulesContractIds,
         )
       }
-  }
-
-  case class OpenRound(round: Long, coinPrice: BigDecimal)
-      extends BaseCommand[
-        v0.OpenRoundRequest,
-        v0.OpenRoundResponse,
-        roundCodegen.OpenMiningRound.ContractId,
-      ] {
-    override def createRequest(): Either[String, v0.OpenRoundRequest] = Right(
-      v0.OpenRoundRequest(round, Proto.encode(coinPrice))
-    )
-
-    override def submitRequest(
-        service: SvcServiceStub,
-        request: v0.OpenRoundRequest,
-    ): Future[v0.OpenRoundResponse] =
-      service.openRound(request)
-
-    override def handleResponse(
-        response: v0.OpenRoundResponse
-    ): Either[String, roundCodegen.OpenMiningRound.ContractId] =
-      Proto.decodeJavaContractId(roundCodegen.OpenMiningRound.COMPANION)(
-        response.openMiningRoundContractId
-      )
-  }
-
-  case class StartSummarizingRound(round: Long)
-      extends BaseCommand[
-        v0.StartSummarizingRoundRequest,
-        v0.StartSummarizingRoundResponse,
-        roundCodegen.SummarizingMiningRound.ContractId,
-      ] {
-    override def createRequest(): Either[String, v0.StartSummarizingRoundRequest] = Right(
-      v0.StartSummarizingRoundRequest(round)
-    )
-
-    override def submitRequest(
-        service: SvcServiceStub,
-        request: v0.StartSummarizingRoundRequest,
-    ): Future[v0.StartSummarizingRoundResponse] =
-      service.startSummarizingRound(request)
-
-    override def handleResponse(
-        response: v0.StartSummarizingRoundResponse
-    ): Either[String, roundCodegen.SummarizingMiningRound.ContractId] =
-      Proto.decodeJavaContractId(roundCodegen.SummarizingMiningRound.COMPANION)(
-        response.summarizingMiningRoundContractId
-      )
-  }
-
-  case class CloseRound(round: Long)
-      extends BaseCommand[
-        v0.CloseRoundRequest,
-        v0.CloseRoundResponse,
-        roundCodegen.ClosedMiningRound.ContractId,
-      ] {
-    override def createRequest(): Either[String, v0.CloseRoundRequest] = Right(
-      v0.CloseRoundRequest(round)
-    )
-
-    override def submitRequest(
-        service: SvcServiceStub,
-        request: v0.CloseRoundRequest,
-    ): Future[v0.CloseRoundResponse] =
-      service.closeRound(request)
-
-    override def handleResponse(
-        response: v0.CloseRoundResponse
-    ): Either[String, roundCodegen.ClosedMiningRound.ContractId] =
-      Proto.decodeJavaContractId(roundCodegen.ClosedMiningRound.COMPANION)(
-        response.closedMiningRoundContractId
-      )
   }
 }

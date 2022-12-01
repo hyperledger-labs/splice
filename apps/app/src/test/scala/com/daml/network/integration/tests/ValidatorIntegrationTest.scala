@@ -39,7 +39,7 @@ class ValidatorIntegrationTest extends CoinIntegrationTest {
 
     val openRounds = svc.remoteParticipant.ledger_api.acs
       .filterJava(cc.round.OpenMiningRound.COMPANION)(svcParty)
-    openRounds should have length 1
+    openRounds should have length 3
 
     // Start Alice’s validator
     aliceValidator.startSync()

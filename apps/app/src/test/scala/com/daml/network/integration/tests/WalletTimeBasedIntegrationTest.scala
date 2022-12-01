@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
-import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -12,11 +11,8 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.util.CoinTestUtil
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.logging.SuppressionRule
-import org.slf4j.event.Level
 
 import java.time.Duration
-import scala.util.{Success, Try}
 
 class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
 
@@ -26,6 +22,114 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
 
   "A wallet" should {
+
+    "allow calling tap, list the created coins, and get the balance - locally and remotely" in {
+      implicit env =>
+        val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+
+        val aliceValidatorParty = aliceValidator.getValidatorPartyId()
+
+        val exactly = (x: BigDecimal) => (x, x)
+
+        clue("Alice taps 50 coins") {
+          val ranges1 = Seq(exactly(50))
+          aliceWallet.tap(50)
+          checkWallet(aliceUserParty, aliceWallet, ranges1)
+          checkWallet(aliceUserParty, aliceWallet, ranges1)
+        }
+
+        clue("Alice taps 60 coins") {
+          val ranges2 = Seq(exactly(50), exactly(60))
+          aliceWallet.tap(60)
+          checkWallet(aliceUserParty, aliceWallet, ranges2)
+          checkWallet(aliceUserParty, aliceWallet, ranges2)
+        }
+
+        checkBalance(aliceWallet, 1, exactly(110), exactly(0), exactly(0))
+        // leads to archival of open round 0
+        advanceRoundsByOneTick
+
+        lockCoins(
+          aliceWalletBackend,
+          aliceUserParty,
+          aliceValidatorParty,
+          aliceWallet.list().coins,
+          10,
+          scan.getAppTransferContext(),
+        )
+
+        checkBalance(
+          aliceWallet,
+          2,
+          (99, 100),
+          exactly(10),
+          (0.000004, 0.000005),
+        )
+
+        // leads to latest round being round 3
+        advanceRoundsByOneTick
+
+        checkBalance(
+          aliceWallet,
+          3,
+          (99, 100),
+          (9, 10),
+          (0.00001, 0.00002),
+        )
+    }
+
+    "list all coins, including locked coins, with additional position details" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+
+      val aliceValidatorParty = aliceValidator.getValidatorPartyId()
+
+      clue("Alice taps 50 coins") {
+        aliceWallet.tap(50)
+        eventually() {
+          aliceWallet.list().coins.length shouldBe 1
+          aliceWallet.list().lockedCoins.length shouldBe 0
+        }
+      }
+
+      lockCoins(
+        aliceWalletBackend,
+        aliceUserParty,
+        aliceValidatorParty,
+        aliceWallet.list().coins,
+        25,
+        scan.getAppTransferContext(),
+      )
+
+      clue("Check wallet after locking coins") {
+        aliceWallet.list().coins.length shouldBe 1
+        eventually()(aliceWallet.list().lockedCoins should have length 1)
+
+        aliceWallet.list().coins.head.round shouldBe 1
+        // even though we are in round 1, we have 0 holding fees because the coins were also created in round 1
+        aliceWallet.list().coins.head.accruedHoldingFee shouldBe 0
+        assertInRange(aliceWallet.list().coins.head.effectiveQuantity, (24.0, 25.0))
+
+        aliceWallet.list().lockedCoins.head.round shouldBe 1
+        aliceWallet.list().lockedCoins.head.accruedHoldingFee shouldBe 0
+        assertInRange(aliceWallet.list().lockedCoins.head.effectiveQuantity, (24.0, 25.0))
+      }
+
+      // advance to next round.
+      advanceRoundsByOneTick
+
+      clue("Check wallet after advancing to next round") {
+        eventually()(aliceWallet.list().coins.head.round shouldBe 2)
+        assertInRange(aliceWallet.list().coins.head.accruedHoldingFee, (0.000004, 0.000005))
+        assertInRange(aliceWallet.list().coins.head.effectiveQuantity, (24.0, 25.0))
+
+        aliceWallet.list().lockedCoins.head.round shouldBe 2
+        assertInRange(
+          aliceWallet.list().lockedCoins.head.accruedHoldingFee,
+          (0.000004, 0.000005),
+        )
+        assertInRange(aliceWallet.list().lockedCoins.head.effectiveQuantity, (24.0, 25.0))
+      }
+    }
 
     "allow a user to list multiple subscriptions in different states" in { implicit env =>
       val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
@@ -125,29 +229,41 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
     eventually()(aliceWallet.listAppRewards() should have size 1)
     eventually()(aliceValidatorWallet.listValidatorRewards() should have size 1)
 
-    // next round.
-    svc.openRound(1, 1)
-    svc.startSummarizingRound(0)
-    eventually() {
-      // automation archives the summarizing round and creates the issuing round
-      svc.remoteParticipant.ledger_api.acs
-        .filterJava(SummarizingMiningRound.COMPANION)(svcParty) shouldBe empty
-    }
-    // ensure issuing round is open
-    advanceTime(Duration.ofMinutes(3))
-    aliceWalletBackend.remoteParticipant.ledger_api.acs
-      .awaitJava(roundCodegen.IssuingMiningRound.COMPANION)(aliceValidator.getValidatorPartyId())
+    // advance by two ticks, so the issuing round of round 1 is created
+    advanceRoundsByOneTick
+    advanceRoundsByOneTick
+    // advance time such that issuing round 1 is open to rewards collection.
+    advanceRoundsByOneTick
 
     // alice uses her reward
     aliceWallet.executeDirectTransfer(bobUserParty, 1)
-    eventually()(aliceWallet.listAppRewards() should have size 0)
-
+    eventually()(
+      aliceWallet.listAppRewards().filter(_.payload.round.number == 1) should have size 0
+    )
+    aliceValidatorWallet
+      .listValidatorRewards()
+      .filter(_.payload.round.number == 1) should have size 1
     // 2 validator rewards due to two transfers
-    eventually()(aliceValidatorWallet.listValidatorRewards() should have size 2)
+    eventually()(
+      aliceValidatorWallet
+        .listValidatorRewards()
+        .filter(_.payload.round.number == 1) should have size 1
+    )
+
+    // validator uses reward from round 1 too.
     aliceValidatorWallet.executeDirectTransfer(aliceUserParty, 1)
-    // +1 for the transfer, -1 due to the reward from round 0 being used
-    eventually()(aliceValidatorWallet.listValidatorRewards() should have size 2 + 1 - 1)
-    // no rewards are used, since all other rewards are from round 1
+    eventually()(
+      aliceValidatorWallet
+        .listValidatorRewards()
+        .filter(_.payload.round.number == 1) should have size 0
+    )
+    // but still gains a reward for the new transfer in a different round
+    eventually()(
+      aliceValidatorWallet
+        .listValidatorRewards()
+        .filter(_.payload.round.number != 1) should have size 2
+    )
+    // doing additional transfers in this round, only leads to more rewards since only round 1 is open for rewards collections
     aliceValidatorWallet.executeDirectTransfer(aliceUserParty, 1)
     eventually()(aliceValidatorWallet.listValidatorRewards() should have size 3)
 
@@ -169,35 +285,22 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
     bobWalletBackend.remoteParticipant.ledger_api.acs
       .awaitJava(coinCodegen.AppReward.COMPANION)(bobUserParty)
       .id
-    val appRewards = bobWallet.listAppRewards()
-    appRewards should have size 1
+    bobWallet.listAppRewards() should have size 1
     bobWallet.listValidatorRewards() shouldBe empty
 
     // Wait for validator rewards to become visible in alice's wallet, check structure
-    val validatorRewards = aliceValidatorWallet.listValidatorRewards()
-    validatorRewards should have size 1
-    aliceWallet.tap(200)
-    eventually()(aliceWallet.list().coins should have size 3)
+    aliceValidatorWallet.listValidatorRewards() should have size 1
 
     // Bob collects/realizes rewards
+    // it takes 3 ticks for IR 1 to be created and open.
+    advanceRoundsByOneTick
+    advanceRoundsByOneTick
+    advanceRoundsByOneTick
+
     val prevCoins = bobWallet.list().coins
-    svc.openRound(1, 1)
-    svc.startSummarizingRound(0)
-    eventually() {
-      // automation archives the summarizing round and creates the issuing round
-      svc.remoteParticipant.ledger_api.acs
-        .filterJava(SummarizingMiningRound.COMPANION)(svcParty) shouldBe empty
-    }
-    // ensure issuing round is open
-    advanceTime(Duration.ofMinutes(3))
-    eventually() {
-      val r = loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.WARN))(
-        Try(bobWallet.collectRewards(0)),
-        entries => forAll(entries)(_.message should include("No issuing mining round found")),
-      )
-      inside(r) { case Success(_) => }
-    }
-    bobWallet.listValidatorRewards() shouldBe empty
+    bobWallet.collectRewards(1)
+    bobWallet.listAppRewards() should have size 0
+    bobWallet.listValidatorRewards() should have size 0
     // We just check that we have a coin roughly in the right range, in particular higher than the input, rather than trying to repeat the calculation
     // for rewards.
     checkWallet(

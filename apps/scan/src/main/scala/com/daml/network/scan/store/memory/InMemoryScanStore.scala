@@ -2,6 +2,7 @@ package com.daml.network.scan.store.memory
 
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.store.{AcsStore, CCHistoryStore, InMemoryAcsStore, InMemoryCCHistoryStore}
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 
@@ -10,6 +11,7 @@ import scala.concurrent.*
 class InMemoryScanStore(
     override val svcParty: PartyId,
     override protected val loggerFactory: NamedLoggerFactory,
+    override protected val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContext
 ) extends ScanStore
@@ -23,6 +25,5 @@ class InMemoryScanStore(
   override val acsStore: AcsStore = inMemoryAcsStore
 
   override val acsIngestionSink: AcsStore.IngestionSink = inMemoryAcsStore.ingestionSink
-
-  override def close(): Unit = history.close()
+  override protected def onClosed(): Unit = history.close()
 }

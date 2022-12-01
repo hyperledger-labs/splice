@@ -9,8 +9,10 @@ import com.daml.ledger.javaapi.data.codegen.{
 import com.daml.network.codegen.java.cc
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.store.{AcsStore, CCHistoryStore}
+import com.daml.network.store.{AcsStore, CCHistoryStore, StoreWithOpenMiningRounds}
 import com.daml.network.util.JavaContract as Contract
+import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
@@ -18,7 +20,7 @@ import com.digitalasset.canton.topology.PartyId
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Utility class grouping the two kinds of stores managed by the SvcApp. */
-trait ScanStore extends AutoCloseable {
+trait ScanStore extends FlagCloseable with StoreWithOpenMiningRounds {
 
   /** Get the party-id of the SVC issuing CC accepted by this provider. */
   def svcParty: PartyId
@@ -49,11 +51,12 @@ object ScanStore {
       svcParty: PartyId,
       storage: Storage,
       loggerFactory: NamedLoggerFactory,
+      timeouts: ProcessingTimeout,
   )(implicit
       ec: ExecutionContext
   ): ScanStore =
     storage match {
-      case _: MemoryStorage => new InMemoryScanStore(svcParty = svcParty, loggerFactory)
+      case _: MemoryStorage => new InMemoryScanStore(svcParty = svcParty, loggerFactory, timeouts)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

@@ -1,21 +1,18 @@
 package com.daml.network.integration.tests
 
 import com.daml.ledger.client.binding.Primitive
-import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   payment as walletCodegen,
   subscriptions as subsCodegen,
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
-import com.daml.network.console.{WalletAppBackendReference, WalletAppClientReference}
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import com.daml.network.util.{CoinTestUtil, Proto}
+import com.daml.network.util.CoinTestUtil
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.console.CommandFailure
@@ -27,10 +24,8 @@ import org.slf4j.event.Level
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
-import scala.collection.immutable.Range
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
-import scala.jdk.OptionConverters.*
 import scala.util.Try
 
 class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext with CoinTestUtil {
@@ -93,111 +88,6 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
             }
           },
       )
-    }
-
-    "allow calling tap, list the created coins, and get the balance - locally and remotely" in {
-      implicit env =>
-        val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
-
-        val aliceValidatorParty = aliceValidator.getValidatorPartyId()
-
-        val exactly = (x: BigDecimal) => (x, x)
-
-        clue("Alice taps 50 coins") {
-          val ranges1 = Seq(exactly(50))
-          aliceWallet.tap(50)
-          checkWallet(aliceUserParty, aliceWallet, ranges1)
-          checkWallet(aliceUserParty, aliceWallet, ranges1)
-        }
-
-        clue("Alice taps 60 coins") {
-          val ranges2 = Seq(exactly(50), exactly(60))
-          aliceWallet.tap(60)
-          checkWallet(aliceUserParty, aliceWallet, ranges2)
-          checkWallet(aliceUserParty, aliceWallet, ranges2)
-        }
-
-        checkBalance(aliceWallet, 0, exactly(110), exactly(0), exactly(0))
-
-        nextRound(0)
-
-        lockCoins(
-          aliceWalletBackend,
-          aliceUserParty,
-          aliceValidatorParty,
-          aliceWallet.list().coins,
-          10,
-          scan.getAppTransferContext(),
-        )
-
-        checkBalance(
-          aliceWallet,
-          1,
-          (99, 100),
-          exactly(10),
-          (0.000004, 0.000005),
-        )
-
-        nextRound(1)
-
-        checkBalance(
-          aliceWallet,
-          2,
-          (99, 100),
-          (9, 10),
-          (0.00001, 0.00002),
-        )
-    }
-
-    "list all coins, including locked coins, with additional position details" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
-
-      val aliceValidatorParty = aliceValidator.getValidatorPartyId()
-
-      clue("Alice taps 50 coins") {
-        aliceWallet.tap(50)
-        eventually() {
-          aliceWallet.list().coins.length shouldBe 1
-          aliceWallet.list().lockedCoins.length shouldBe 0
-        }
-      }
-
-      lockCoins(
-        aliceWalletBackend,
-        aliceUserParty,
-        aliceValidatorParty,
-        aliceWallet.list().coins,
-        25,
-        scan.getAppTransferContext(),
-      )
-
-      clue("Check wallet after locking coins") {
-        aliceWallet.list().coins.length shouldBe 1
-        eventually()(aliceWallet.list().lockedCoins should have length 1)
-
-        aliceWallet.list().coins.head.round shouldBe 0
-        aliceWallet.list().coins.head.accruedHoldingFee shouldBe 0
-        assertInRange(aliceWallet.list().coins.head.effectiveQuantity, (24.0, 25.0))
-
-        aliceWallet.list().lockedCoins.head.round shouldBe 0
-        aliceWallet.list().lockedCoins.head.accruedHoldingFee shouldBe 0
-        assertInRange(aliceWallet.list().lockedCoins.head.effectiveQuantity, (24.0, 25.0))
-      }
-
-      nextRound(0)
-
-      clue("Check wallet after advancing to next round") {
-        eventually()(aliceWallet.list().coins.head.round shouldBe 1)
-        assertInRange(aliceWallet.list().coins.head.accruedHoldingFee, (0.000004, 0.000005))
-        assertInRange(aliceWallet.list().coins.head.effectiveQuantity, (24.0, 25.0))
-
-        aliceWallet.list().lockedCoins.head.round shouldBe 1
-        assertInRange(
-          aliceWallet.list().lockedCoins.head.accruedHoldingFee,
-          (0.000004, 0.000005),
-        )
-        assertInRange(aliceWallet.list().lockedCoins.head.effectiveQuantity, (24.0, 25.0))
-      }
     }
 
     "allow a user to list, and reject app payment requests" in { implicit env =>
@@ -862,95 +752,6 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
       )
 
       channel.shutdown() // to avoid error about improperly shut down channel
-    }
-
-    def checkBalance(
-        wallet: WalletAppClientReference,
-        expectedRound: Long,
-        expectedUQRange: (BigDecimal, BigDecimal),
-        expectedLQRange: (BigDecimal, BigDecimal),
-        expectedHRange: (BigDecimal, BigDecimal),
-    ): Unit = clue(s"Checking balance in round $expectedRound") {
-      eventually() {
-        val balance = wallet.balance()
-        balance.round shouldBe expectedRound
-        assertInRange(balance.unlockedQty, expectedUQRange)
-        assertInRange(balance.lockedQty, expectedLQRange)
-        assertInRange(balance.holdingFees, expectedHRange)
-      }
-    }
-
-    def lockCoins(
-        userWallet: WalletAppBackendReference,
-        userParty: PartyId,
-        validatorParty: PartyId,
-        coins: Seq[GrpcWalletAppClient.CoinPosition],
-        quantity: Int,
-        transferContext: v1.coin.AppTransferContext,
-    ): Unit = clue(s"Locking $quantity coins for $userParty") {
-      val coinOpt = coins.find(_.effectiveQuantity >= quantity)
-      val expirationOpt = Proto.decode(Proto.Timestamp)(20000000000000000L) // Wed May 18 2033
-
-      (coinOpt, expirationOpt) match {
-        case (Some(coin), Right(expiration)) => {
-          userWallet.remoteParticipant.ledger_api.commands.submitJava(
-            Seq(userParty, validatorParty),
-            optTimeout = None,
-            commands = transferContext.coinRules
-              .exerciseCoinRules_Transfer(
-                new v1.coin.Transfer(
-                  userParty.toProtoPrimitive,
-                  userParty.toProtoPrimitive,
-                  Seq[v1.coin.TransferInput](
-                    new v1.coin.transferinput.InputCoin(
-                      coin.contract.contractId.toInterface(v1.coin.Coin.INTERFACE)
-                    )
-                  ).asJava,
-                  Seq[v1.coin.TransferOutput](
-                    new v1.coin.transferoutput.OutputSenderCoin(
-                      Some(BigDecimal(quantity).bigDecimal).toJava,
-                      Some(
-                        new v1.coin.TimeLock(
-                          Seq(userParty.toProtoPrimitive).asJava,
-                          expiration,
-                        )
-                      ).toJava,
-                    ),
-                    new v1.coin.transferoutput.OutputSenderCoin(
-                      None.toJava,
-                      None.toJava,
-                    ),
-                  ).asJava,
-                  "lock coins",
-                ),
-                new v1.coin.TransferContext(
-                  transferContext.openMiningRound,
-                  Map.empty[v1.round.Round, v1.round.IssuingMiningRound.ContractId].asJava,
-                  Map.empty[String, v1.coin.ValidatorRight.ContractId].asJava,
-                ),
-              )
-              .commands
-              .asScala
-              .toSeq,
-          )
-        }
-        case _ => {
-          coinOpt shouldBe a[Some[_]]
-          expirationOpt shouldBe a[Right[_, _]]
-        }
-      }
-    }
-
-    def nextRound(i: Long)(implicit env: CoinTestConsoleEnvironment): Unit = {
-      clue(s"Advancing to round ${i + 1}") {
-        svc.startSummarizingRound(i)
-        eventually() {
-          svc.remoteParticipant.ledger_api.acs
-            .filterJava(SummarizingMiningRound.COMPANION)(svcParty) shouldBe empty
-        }
-        svc.closeRound(i)
-        svc.openRound(i + 1, 1)
-      }
     }
 
     def createSelfSubscriptionRequest(aliceUserParty: PartyId)(implicit

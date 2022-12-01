@@ -34,8 +34,6 @@ class GrpcSvcAppService(
 
   private val connection = ledgerClient.connection("GrpcSvcAppService")
 
-  import GrpcSvcAppService.*
-
   override def getDebugInfo(request: Empty): Future[v0.GetDebugInfoResponse] =
     withSpanFromGrpcContext("GrpcSvcAppService") { _ => _ =>
       for {
@@ -48,58 +46,6 @@ class GrpcSvcAppService(
         coinPackageId = SvcApp.coinPackage.packageId,
         coinRulesContractIds = coinRulesCids.map(Proto.encodeContractId(_)),
       )
-    }
-
-  // NOTE: the commands below have not been converted to use the store, as they'll go away when we automation issuance
-  override def openRound(request: v0.OpenRoundRequest): Future[v0.OpenRoundResponse] =
-    withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
-      val price = Proto.tryDecode(Proto.JavaBigDecimal)(request.coinPrice)
-      for {
-        coinRules <- store.getCoinRules()
-        cmd = coinRules.value.contractId
-          .exerciseCoinRules_MiningRound_Open(
-            price,
-            new v1.round.Round(request.round),
-          )
-        // TODO(M1-52): the command below is not safe w/o command dedup. This will though become safe once we change to the joint-open-round-advancement in M1-52.
-        cid <- connection.submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
-      } yield v0.OpenRoundResponse(Proto.encodeContractId(cid.exerciseResult))
-    }
-
-  override def startSummarizingRound(
-      request: v0.StartSummarizingRoundRequest
-  ): Future[v0.StartSummarizingRoundResponse] =
-    withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
-      for {
-        openRound <- getRound(cc.round.OpenMiningRound.COMPANION)(_.round)(request.round)
-        coinRules <- store.getCoinRules()
-        cmd = coinRules.value.contractId
-          .exerciseCoinRules_MiningRound_StartSummarizing(openRound)
-        cid <-
-          connection.submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
-      } yield v0.StartSummarizingRoundResponse(Proto.encodeContractId(cid.exerciseResult))
-    }
-
-  override def closeRound(request: v0.CloseRoundRequest): Future[v0.CloseRoundResponse] =
-    withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
-      for {
-        issuingRound <- getRound(cc.round.IssuingMiningRound.COMPANION)(_.round)(request.round)
-        totals = getTotalsPerRound(store)(request.round)
-        coinRules <- store.getCoinRules()
-        cmd =
-          coinRules.value.contractId
-            .exerciseCoinRules_MiningRound_Close(
-              issuingRound,
-              totals.transferFees.bigDecimal,
-              totals.adminFees.bigDecimal,
-              totals.holdingFees.bigDecimal,
-              totals.transferInputs.bigDecimal,
-              totals.nonSelfTransferOutputs.bigDecimal,
-              totals.selfTransferOutputs.bigDecimal,
-            )
-        cid <-
-          connection.submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
-      } yield v0.CloseRoundResponse(Proto.encodeContractId(cid.exerciseResult))
     }
 
   /** Query the ACS for the given template and filter by round. Returns a map from the validator party

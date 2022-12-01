@@ -42,6 +42,7 @@ class EndUserWalletService(
 
   val treasury: EndUserTreasuryService = new EndUserTreasuryService(
     connection,
+    clockConfig,
     store,
     walletManager,
     retryProvider,

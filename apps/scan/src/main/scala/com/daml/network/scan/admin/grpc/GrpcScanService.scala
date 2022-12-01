@@ -2,11 +2,13 @@ package com.daml.network.scan.admin.grpc
 
 import com.daml.ledger.api.v1.transaction.TransactionTree
 import com.daml.network.codegen.java.cc.round as roundCodegen
-import com.daml.network.environment.CoinLedgerClient
+import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.v0
 import com.daml.network.scan.v0.*
 import com.daml.network.store.AcsStore.QueryResult
+import com.daml.network.util.TimeUtil
+import com.digitalasset.canton.config.ClockConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.Spanning
 import com.google.protobuf.empty.Empty
@@ -18,6 +20,8 @@ import scala.concurrent.{ExecutionContext, Future}
 class GrpcScanService(
     ledgerClient: CoinLedgerClient,
     store: ScanStore,
+    clockConfig: ClockConfig,
+    retryProvider: CoinRetries,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -35,14 +39,17 @@ class GrpcScanService(
     }
 
   override def getTransferContext(request: Empty): Future[v0.GetTransferContextResponse] =
-    withSpanFromGrpcContext("GrpcScanService") { traceContext => span =>
+    withSpanFromGrpcContext("GrpcScanService") { implicit traceContext => span =>
       for {
         QueryResult(_, coinRules) <- store.lookupCoinRules()
-        QueryResult(_, rounds) <- store.listContracts(roundCodegen.OpenMiningRound.COMPANION)
+        now <- TimeUtil.getTime(connection, clockConfig)
+        QueryResult(_, latestOpen) <- store.getLatestOpenMiningRound(retryProvider, now)
+        QueryResult(_, rounds) <- store.lookupSubmittableOpenMiningRounds(now)
       } yield {
         v0.GetTransferContextResponse(
           coinRules = coinRules.map(_.toProtoV0),
-          latestOpenMiningRound = rounds.maxByOption(_.payload.round.number).map(_.toProtoV0),
+          latestOpenMiningRound = Some(latestOpen.toProtoV0),
+          // TODO(tech-debt): consider just removing this attribute - not used except in tests.
           openMiningRounds = rounds.map(_.toProtoV0),
         )
       }

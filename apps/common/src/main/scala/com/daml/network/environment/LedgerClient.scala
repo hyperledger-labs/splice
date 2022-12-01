@@ -264,10 +264,10 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     wrapFuture(userManagementServiceStub.grantUserRights(request, _)).map(_ => ())
   }
 
-  def time(): Source[TimeServiceOuterClass.GetTimeResponse, Cancellable] = {
+  def getTimeSource(): Source[TimeServiceOuterClass.GetTimeResponse, Cancellable] = {
     // Based on its documentation, `GetTime` should give us updates whenever
     // the ledger time changes. At the time of writing, this was broken
-    // however: we get no udpates if the time is set via a different
+    // however: we get no updates if the time is set via a different
     // participant. As a workaround, we poll ourselves.
     Source
       .tick(0.millis, 500.millis, ())
@@ -283,7 +283,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
         { response =>
           {
             val now = response.getCurrentTime()
-            if (lastNow.map(now == _).getOrElse(false)) {
+            if (lastNow.exists(now == _)) {
               Nil
             } else {
               lastNow = Some(now)
@@ -292,6 +292,11 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
           }
         }
       })
+  }
+
+  def getTime(): Future[TimeServiceOuterClass.GetTimeResponse] = {
+    val request = TimeServiceOuterClass.GetTimeRequest.newBuilder().build()
+    wrapFuture(timeServiceStub.getTime(request, _))
   }
 }
 

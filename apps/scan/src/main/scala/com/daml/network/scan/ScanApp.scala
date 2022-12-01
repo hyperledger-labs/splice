@@ -56,7 +56,7 @@ class ScanApp(
       svcParty: PartyId,
   ): Future[ScanApp.State] =
     for {
-      store <- Future.successful(ScanStore(svcParty, storage, loggerFactory))
+      store <- Future.successful(ScanStore(svcParty, storage, loggerFactory, timeouts))
       automation = new ScanAutomationService(
         config.automation,
         coinAppParameters.clockConfig,
@@ -71,7 +71,13 @@ class ScanApp(
       adminServerRegistry
         .addService(
           ScanServiceGrpc.bindService(
-            new GrpcScanService(ledgerClient, store, loggerFactory),
+            new GrpcScanService(
+              ledgerClient,
+              store,
+              coinAppParameters.clockConfig,
+              retryProvider,
+              loggerFactory,
+            ),
             ec,
           )
         )

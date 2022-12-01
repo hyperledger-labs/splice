@@ -9,11 +9,11 @@ import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
-import com.daml.network.util.HasHealth
+import com.daml.network.util.{HasHealth, TimeUtil}
 import com.daml.network.wallet.EndUserWalletManager
 import com.daml.network.wallet.store.EndUserWalletStore
 import com.daml.network.wallet.treasury.EndUserTreasuryService.*
-import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
@@ -58,6 +58,7 @@ case class CoinOperationRequest[T](
   */
 class EndUserTreasuryService(
     connection: CoinLedgerConnection,
+    clockConfig: ClockConfig,
     userStore: EndUserWalletStore,
     walletManager: EndUserWalletManager,
     retryProvider: CoinRetries,
@@ -209,7 +210,8 @@ class EndUserTreasuryService(
       _ = logger.debug(
         s"After lookups, the batch contains ${validOperations.size} coin operations."
       )
-      transferContext <- getValidatorStore.getPaymentTransferContext(retryProvider)
+      now <- TimeUtil.getTime(connection, clockConfig)
+      transferContext <- getValidatorStore.getPaymentTransferContext(retryProvider, now)
       activeIssuingRounds = transferContext.context.issuingMiningRounds.asScala.keys.toSet
       install <- getInstall
       (inputs, readAs) <- selectTransferInputs(activeIssuingRounds)

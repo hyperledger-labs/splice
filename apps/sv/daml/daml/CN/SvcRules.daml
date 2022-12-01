@@ -25,7 +25,7 @@ data ActionRequiringConfirmation
   deriving (Eq, Show)
 
 data CoinRules_ActionRequiringConfirmation
-  = CRARC_MiningRound_Open CoinRules_MiningRound_Open
+  = CRARC_Bootstrap_Rounds CoinRules_Bootstrap_Rounds
   | CRARC_MiningRound_StartIssuing CoinRules_MiningRound_StartIssuing
   | CRARC_MiningRound_Close CoinRules_MiningRound_Close
   | CRARC_MiningRound_Archive CoinRules_MiningRound_Archive
@@ -346,7 +346,7 @@ executeActionRequiringConfirmation: ContractId SvcRules -> ActionRequiringConfir
 executeActionRequiringConfirmation svcRulesCid act = case act of
   ARC_CoinRules with .. ->
     case coinRulesAction of
-      CRARC_MiningRound_Open choiceArg -> void $ exercise coinRulesCid choiceArg
+      CRARC_Bootstrap_Rounds choiceArg -> void $ exercise coinRulesCid choiceArg
       CRARC_MiningRound_StartIssuing choiceArg -> void $ exercise coinRulesCid choiceArg
       CRARC_MiningRound_Close choiceArg -> void $ exercise coinRulesCid choiceArg
       CRARC_MiningRound_Archive choiceArg -> void $ exercise coinRulesCid choiceArg

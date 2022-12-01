@@ -18,7 +18,8 @@ import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
 
 // TODO(M1-92 - Tech Debt): This could be reused in more places and extended
-trait CoinTestUtil { this: CommonCoinAppInstanceReferences =>
+trait CoinTestUtil {
+  this: CommonCoinAppInstanceReferences =>
 
   /** Onboards the daml user associated with the given wallet app user reference
     * onto the given validator, and waits until the wallet is usable for that user
@@ -118,4 +119,5 @@ trait CoinTestUtil { this: CommonCoinAppInstanceReferences =>
 
     (referenceId, reqC)
   }
+
 }

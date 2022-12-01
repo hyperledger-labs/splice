@@ -321,21 +321,6 @@ template CoinRules
         create OpenMiningRound with svc; round = API.Round 1; observers; coinPrice; opensAt = opensAt1; targetClosesAt = targetClosesAt1
         create OpenMiningRound with svc; round = API.Round 2; observers;  coinPrice; opensAt = opensAt2; targetClosesAt = targetClosesAt2
 
-    -- TODO(#1680): remove
-    nonconsuming choice CoinRules_MiningRound_Open
-      : ContractId OpenMiningRound
-      with
-        coinPrice : Decimal
-        round: API.Round
-      controller svc
-      do
-        now <- getTime
-        -- TODO(#1680): placeholder value such that existing tests pass.
-        let opensAt = now
-        -- round is open for two ticks.
-        let targetClosesAt = addRelTime opensAt (config.tickDuration + config.tickDuration)
-        create OpenMiningRound with svc; observers; round; coinPrice; opensAt; targetClosesAt
-
     nonconsuming choice CoinRules_AdvanceOpenMiningRounds
       : (ContractId SummarizingMiningRound, ContractId OpenMiningRound)
       with
@@ -373,22 +358,6 @@ template CoinRules
         newOpenRound <- create OpenMiningRound with svc; observers; round; coinPrice; opensAt; targetClosesAt
         return (newSummarizingRound, newOpenRound)
 
-    -- TODO(#1680) - remove.
-    nonconsuming choice CoinRules_MiningRound_StartSummarizing
-      : ContractId SummarizingMiningRound
-      with
-        miningRoundCid : ContractId OpenMiningRound
-      controller svc
-      do
-        -- archive open mining round
-        miningRound <- fetch miningRoundCid
-        archive miningRoundCid
-        require "SVC matches" (miningRound.svc == svc)
-        -- create summarizing round
-        create SummarizingMiningRound with
-          svc
-          observers
-          round = miningRound.round
     nonconsuming choice CoinRules_MiningRound_StartIssuing
       : ContractId IssuingMiningRound
       with
@@ -584,7 +553,7 @@ checkTransferConstraints transfer summary config
 miningRoundIsOpen: OpenMiningRound -> Update ()
 miningRoundIsOpen round = do
   now <- getTime
-  require ("mining round " <> show round <> " is open") (round.opensAt <= now)
+  require ("mining round is open: " <> show round) (round.opensAt <= now)
   return ()
 
 

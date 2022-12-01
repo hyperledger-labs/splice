@@ -18,10 +18,11 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.environment.CoinRetries
-import com.daml.network.store.AcsStore
-import com.daml.network.util.JavaContract as Contract
+import com.daml.network.store.{AcsStore, StoreWithOpenMiningRounds}
+import com.daml.network.util.JavaContract
 import com.daml.network.wallet.store.memory.InMemoryEndUserWalletStore
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -34,7 +35,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 /** A store for serving all queries for a specific wallet end-user. */
-trait EndUserWalletStore extends FlagCloseable with NamedLogging {
+trait EndUserWalletStore extends FlagCloseable with NamedLogging with StoreWithOpenMiningRounds {
   import AcsStore.QueryResult
 
   /** The sink to use for ingesting data from the ledger into this store. */
@@ -51,7 +52,9 @@ trait EndUserWalletStore extends FlagCloseable with NamedLogging {
     * how to deal with this error.
     */
   def lookupInstall(): Future[QueryResult[
-    Option[Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]]
+    Option[
+      JavaContract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
+    ]
   ]] =
     acsStore.findContract(installCodegen.WalletAppInstall.COMPANION)(_ => true)
 
@@ -60,18 +63,19 @@ trait EndUserWalletStore extends FlagCloseable with NamedLogging {
 
   def findContract[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
       templateCompanion: ContractCompanion[TC, TCid, T],
-      filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
-  ): Future[QueryResult[Option[Contract[TCid, T]]]] =
+      filter: JavaContract[TCid, T] => Boolean = (_: JavaContract[TCid, T]) => true,
+  ): Future[QueryResult[Option[JavaContract[TCid, T]]]] =
     acsStore.findContract(templateCompanion)(filter)
 
   def listContracts[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
       templateCompanion: ContractCompanion[TC, TCid, T],
-      filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
-  ): Future[QueryResult[Seq[Contract[TCid, T]]]] = acsStore.listContracts(templateCompanion, filter)
+      filter: JavaContract[TCid, T] => Boolean = (_: JavaContract[TCid, T]) => true,
+  ): Future[QueryResult[Seq[JavaContract[TCid, T]]]] =
+    acsStore.listContracts(templateCompanion, filter)
 
   def lookupOnChannelPaymentRequestById(
       cid: ContractId[channelCodegen.OnChannelPaymentRequest]
-  ): Future[QueryResult[Option[Contract[
+  ): Future[QueryResult[Option[JavaContract[
     channelCodegen.OnChannelPaymentRequest.ContractId,
     channelCodegen.OnChannelPaymentRequest,
   ]]]] =
@@ -79,14 +83,14 @@ trait EndUserWalletStore extends FlagCloseable with NamedLogging {
 
   def lookupAcceptedTransferOfferById(
       cid: ContractId[transferOffersCodegen.AcceptedTransferOffer]
-  ): Future[QueryResult[Option[Contract[
+  ): Future[QueryResult[Option[JavaContract[
     transferOffersCodegen.AcceptedTransferOffer.ContractId,
     transferOffersCodegen.AcceptedTransferOffer,
   ]]]] =
     acsStore.lookupContractById(transferOffersCodegen.AcceptedTransferOffer.COMPANION)(cid)
 
   def streamAcceptedTransferOffers: Source[
-    Contract[
+    JavaContract[
       transferOffersCodegen.AcceptedTransferOffer.ContractId,
       transferOffersCodegen.AcceptedTransferOffer,
     ],
@@ -97,28 +101,32 @@ trait EndUserWalletStore extends FlagCloseable with NamedLogging {
   def lookupAppPaymentRequestById(
       cid: ContractId[walletCodegen.AppPaymentRequest]
   ): Future[QueryResult[
-    Option[Contract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]]
+    Option[
+      JavaContract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]
+    ]
   ]] =
     acsStore.lookupContractById(walletCodegen.AppPaymentRequest.COMPANION)(cid)
 
   def lookupDeliveryOfferById(
       cid: walletCodegen.DeliveryOffer.ContractId
   ): Future[QueryResult[
-    Option[Contract[walletCodegen.DeliveryOffer.ContractId, walletCodegen.DeliveryOfferView]]
+    Option[JavaContract[walletCodegen.DeliveryOffer.ContractId, walletCodegen.DeliveryOfferView]]
   ]] =
     acsStore.lookupContractById(walletCodegen.DeliveryOffer.INTERFACE)(cid)
 
   def lookupSubscriptionRequestById(
       cid: ContractId[subsCodegen.SubscriptionRequest]
   ): Future[QueryResult[
-    Option[Contract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest]]
+    Option[
+      JavaContract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest]
+    ]
   ]] =
     acsStore.lookupContractById(subsCodegen.SubscriptionRequest.COMPANION)(cid)
 
   def lookupSubscriptionIdleStateById(
       cid: ContractId[subsCodegen.SubscriptionIdleState]
   ): Future[QueryResult[Option[
-    Contract[subsCodegen.SubscriptionIdleState.ContractId, subsCodegen.SubscriptionIdleState]
+    JavaContract[subsCodegen.SubscriptionIdleState.ContractId, subsCodegen.SubscriptionIdleState]
   ]]] =
     acsStore.lookupContractById(subsCodegen.SubscriptionIdleState.COMPANION)(cid)
 
@@ -126,43 +134,13 @@ trait EndUserWalletStore extends FlagCloseable with NamedLogging {
       cid: subsCodegen.SubscriptionContext.ContractId
   ): Future[QueryResult[
     Option[
-      Contract[subsCodegen.SubscriptionContext.ContractId, subsCodegen.SubscriptionContextView]
+      JavaContract[subsCodegen.SubscriptionContext.ContractId, subsCodegen.SubscriptionContextView]
     ]
   ]] =
     acsStore.lookupContractById(subsCodegen.SubscriptionContext.INTERFACE)(cid)
 
-  def lookupLatestOpenMiningRound(
-  ): Future[QueryResult[
-    Option[Contract[roundCodegen.OpenMiningRound.ContractId, roundCodegen.OpenMiningRound]]
-  ]]
-
-  /** Wrapper around lookupLatestOpenMiningRound that retries if no open round is found,
-    * which may happen if the wallet is used before its automation starts ingesting the round contracts.
-    * TODO(M1-52): once round automation is implemented, we may want to consider replacing this with
-    *              the wallet initialization synchronizing on the first round being ingested instead.
-    */
-  def getLatestOpenMiningRound(retryProvider: CoinRetries)(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[
-    QueryResult[Contract[roundCodegen.OpenMiningRound.ContractId, roundCodegen.OpenMiningRound]]
-  ] =
-    retryProvider.retryForClientCalls(
-      "Waiting for open mining round to be ingested",
-      lookupLatestOpenMiningRound().map { result =>
-        result.map(
-          _.getOrElse(
-            throw new StatusRuntimeException(
-              Status.NOT_FOUND.withDescription("No active OpenMiningRound contract")
-            )
-          )
-        )
-      },
-      this,
-    )
-
   def getCoinRules()(implicit ec: ExecutionContext): Future[
-    QueryResult[Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]]
+    QueryResult[JavaContract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]]
   ] =
     findContract(coinCodegen.CoinRules.COMPANION).map(
       _.map(
@@ -178,24 +156,26 @@ trait EndUserWalletStore extends FlagCloseable with NamedLogging {
     * on the store of the validator user since the primary party of end users
     * is not a stakeholder on the contracts used here.
     */
-  def getPaymentTransferContext(retryProvider: CoinRetries)(implicit
+  def getPaymentTransferContext(retryProvider: CoinRetries, now: CantonTimestamp)(implicit
       ec: ExecutionContext,
       tc: TraceContext,
   ): Future[v1.coin.PaymentTransferContext] =
     for {
       coinRules <- getCoinRules()
-      openRound <- getLatestOpenMiningRound(retryProvider)
+      openRound <- getLatestOpenMiningRound(retryProvider, now)
       issuingMiningRounds <- listContracts(roundCodegen.IssuingMiningRound.COMPANION)
       validatorRights <- listContracts(coinCodegen.ValidatorRight.COMPANION)
     } yield {
+      val openIssuingRounds = issuingMiningRounds.value
+        .filter(c => c.payload.opensAt.isBefore(now.toInstant))
+        .map(r =>
+          (r.payload.round, r.contractId.toInterface(v1.round.IssuingMiningRound.INTERFACE))
+        )
+        .toMap[v1.round.Round, v1.round.IssuingMiningRound.ContractId]
+        .asJava
       val transferContext = new v1.coin.TransferContext(
         openRound.value.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
-        issuingMiningRounds.value
-          .map(r =>
-            (r.payload.round, r.contractId.toInterface(v1.round.IssuingMiningRound.INTERFACE))
-          )
-          .toMap[v1.round.Round, v1.round.IssuingMiningRound.ContractId]
-          .asJava,
+        openIssuingRounds,
         validatorRights.value
           .map(r => (r.payload.user, r.contractId.toInterface(v1.coin.ValidatorRight.INTERFACE)))
           .toMap[String, v1.coin.ValidatorRight.ContractId]

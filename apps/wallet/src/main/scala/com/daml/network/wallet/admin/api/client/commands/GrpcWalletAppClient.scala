@@ -1036,7 +1036,7 @@ object GrpcWalletAppClient {
       extends BaseCommand[v0.CollectRewardsRequest, Empty, Unit] {
 
     override def createRequest(): Either[String, v0.CollectRewardsRequest] =
-      Right(v0.CollectRewardsRequest())
+      Right(v0.CollectRewardsRequest(round = round))
 
     override def submitRequest(
         service: WalletServiceStub,

@@ -119,6 +119,7 @@ class WalletApp(
               new GrpcWalletService(
                 walletManager,
                 ledgerClient,
+                coinAppParameters.clockConfig,
                 loggerFactory,
                 retryProvider,
               ),

@@ -4,6 +4,7 @@ import akka.actor.{ActorSystem, Cancellable}
 import akka.stream.KillSwitches
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
+import com.daml.ledger.api.v1.testing.TimeServiceOuterClass
 import com.daml.ledger.javaapi.data.codegen.{
   Contract,
   ContractCompanion,
@@ -136,7 +137,15 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
   def uploadDarFile(pkg: UploadablePackage)(implicit traceContext: TraceContext): Future[Unit]
   def uploadDarFile(path: Path)(implicit traceContext: TraceContext): Future[Unit]
 
-  def time()(implicit traceContext: TraceContext): Source[CantonTimestamp, Cancellable]
+  /** Only call this method when using a sim-clock. It will throw an error when using wall-clock time
+    * because the Ledger API only supports time-requests when using a simulated clock.
+    */
+  def getTimeSource()(implicit traceContext: TraceContext): Source[CantonTimestamp, Cancellable]
+
+  /** Only call this method when using a sim-clock. It will throw an error when using wall-clock time
+    * because the Ledger API only supports time-requests when using a simulated clock.
+    */
+  def getTime()(implicit traceContext: TraceContext): Future[CantonTimestamp]
 }
 
 /** Subscription for reading the ledger */
@@ -523,21 +532,33 @@ object CoinLedgerConnection {
 
       override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List[AsyncOrSyncCloseable]()
 
-      override def time()(implicit
+      override def getTimeSource()(implicit
           traceContext: TraceContext
-      ): Source[CantonTimestamp, Cancellable] = {
+      ): Source[CantonTimestamp, Cancellable] =
         client
-          .time()
-          .map(response =>
-            CantonTimestamp
-              .fromProtoPrimitive(Timestamp.fromJavaProto(response.getCurrentTime)) match {
-              case Left(err) =>
-                throw new RuntimeException(
-                  s"Could not parse timestamp received from ledger API: $err"
-                )
-              case Right(timestamp) => timestamp
-            }
-          )
+          .getTimeSource()
+          .map(parseTimeResponse)
+
+      override def getTime()(implicit
+          traceContext: TraceContext
+      ): Future[CantonTimestamp] =
+        client
+          .getTimeSource()
+          .take(1)
+          .map(parseTimeResponse)
+          .runWith(Sink.head[CantonTimestamp])
+
+      private def parseTimeResponse(
+          response: TimeServiceOuterClass.GetTimeResponse
+      ): CantonTimestamp = {
+        CantonTimestamp
+          .fromProtoPrimitive(Timestamp.fromJavaProto(response.getCurrentTime)) match {
+          case Left(err) =>
+            throw new RuntimeException(
+              s"Could not parse timestamp received from ledger API: $err"
+            )
+          case Right(timestamp) => timestamp
+        }
       }
     }
 

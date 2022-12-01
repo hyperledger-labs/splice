@@ -6,18 +6,6 @@ import "google/protobuf/empty.proto";
 service SvcService {
   // Returns some debug info about the running app
   rpc GetDebugInfo (google.protobuf.Empty) returns (GetDebugInfoResponse);
-
-
-  // TODO(M1-53): Replace these manual triggers by automation as part of rewards issuance milestone
-
-  // Open a new mining round for all currently registered validators.
-  rpc OpenRound (OpenRoundRequest) returns (OpenRoundResponse);
-
-  // Mark the given mining round as summarizing for all validators.
-  rpc StartSummarizingRound (StartSummarizingRoundRequest) returns (StartSummarizingRoundResponse);
-
-  // Close the given mining round for all validators.
-  rpc CloseRound (CloseRoundRequest) returns (CloseRoundResponse);
 }
 
 // Contains information useful for debugging a running SVC app.
@@ -44,24 +32,6 @@ message GetValidatorConfigResponse {
 message InitializeResponse {
   // Identifier of the party representing the SVC.
   string svc_party_id = 1;
-}
-
-message OpenRoundRequest {
-  int64 round = 1;
-  string coin_price = 2;
-}
-
-message OpenRoundResponse {
-  string open_mining_round_contract_id = 1;
-}
-
-
-message StartSummarizingRoundRequest {
-  int64 round = 1;
-}
-
-message StartSummarizingRoundResponse {
-  string summarizing_mining_round_contract_id = 1;
 }
 
 

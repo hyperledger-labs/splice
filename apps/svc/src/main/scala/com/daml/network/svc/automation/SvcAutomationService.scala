@@ -24,7 +24,6 @@ import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
-// TODO(#1430): remove all manual round management commands
 @nowarn("msg=match may not be exhaustive")
 class SvcAutomationService(
     automationConfig: AutomationConfig,
@@ -108,56 +107,47 @@ class SvcAutomationService(
           rules <- getCoinRules()
           QueryResult(_, openMiningRounds) <- store
             .listContracts(cc.round.OpenMiningRound.COMPANION)
-          res <-
-            // TODO(#1680): remove once we removed the calls to mining rounds being manipulated through
-            //  CoinRules_MiningRound_Open / CoinRules_MiningRound_StartSummarizing.
-            if (openMiningRounds.size != 3) {
-              Future.successful(
-                Some(
-                  "exiting early because we didn't see 3 rounds and thus no proper bootstrap was run"
+          res <- {
+            val Seq(toArchive, middle, latest) = openMiningRounds
+              .sortBy(contract => contract.payload.round.number)
+
+            // checking some of the same conditions that are also checked on the ledger because ledger operations are expensive
+            // so we check the conditions that are most likely to fail.
+            val isPastTargetClosesAt = now.toInstant
+              .isAfter(
+                toArchive.payload.targetClosesAt.plus(
+                  automationConfig.clockSkewAutomationDelay.duration
                 )
               )
-            } else {
-              val Seq(toArchive, middle, latest) = openMiningRounds
-                .sortBy(contract => contract.payload.round.number)
-
-              // checking some of the same conditions that are also checked on the ledger because ledger operations are expensive
-              // so we check the conditions that are most likely to fail.
-              val isPastTargetClosesAt = now.toInstant
-                .isAfter(
-                  toArchive.payload.targetClosesAt.plus(
-                    automationConfig.clockSkewAutomationDelay.duration
+            val midPointForMiddleRound = middle.payload.opensAt
+              .plus(defaultTickDurationInMicroseconds, ChronoUnit.MICROS)
+              .plus(automationConfig.clockSkewAutomationDelay.duration)
+            val isPastLatestOpensAt = now.toInstant
+              .isAfter(
+                latest.payload.opensAt.plus(automationConfig.clockSkewAutomationDelay.duration)
+              )
+            val middleRoundOpenLongEnough = now.toInstant.isAfter(midPointForMiddleRound)
+            if (isPastTargetClosesAt && middleRoundOpenLongEnough && isPastLatestOpensAt) {
+              val cmds = rules.contractId
+                .exerciseCoinRules_AdvanceOpenMiningRounds(
+                  // TODO(#1705): use price from SvcRules
+                  java.math.BigDecimal.valueOf(1.0),
+                  toArchive.contractId,
+                  middle.contractId,
+                  latest.contractId,
+                )
+                .commands
+                .asScala
+                .toSeq
+              connection
+                .submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds)
+                .map(_ =>
+                  Some(
+                    s"successfully advanced the rounds and archived round ${toArchive.payload.round.number}"
                   )
                 )
-              val midPointForMiddleRound = middle.payload.opensAt
-                .plus(defaultTickDurationInMicroseconds, ChronoUnit.MICROS)
-                .plus(automationConfig.clockSkewAutomationDelay.duration)
-              val isPastLatestOpensAt = now.toInstant
-                .isAfter(
-                  latest.payload.opensAt.plus(automationConfig.clockSkewAutomationDelay.duration)
-                )
-              val middleRoundOpenLongEnough = now.toInstant.isAfter(midPointForMiddleRound)
-              if (isPastTargetClosesAt && middleRoundOpenLongEnough && isPastLatestOpensAt) {
-                val cmds = rules.contractId
-                  .exerciseCoinRules_AdvanceOpenMiningRounds(
-                    // TODO(#1705): use price from SvcRules
-                    java.math.BigDecimal.valueOf(1.0),
-                    toArchive.contractId,
-                    middle.contractId,
-                    latest.contractId,
-                  )
-                  .commands
-                  .asScala
-                  .toSeq
-                connection
-                  .submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds)
-                  .map(_ =>
-                    Some(
-                      s"successfully advanced the rounds and archived round ${toArchive.payload.round.number}"
-                    )
-                  )
-              } else Future.successful(None)
-            }
+            } else Future.successful(None)
+          }
 
         } yield res
       }
@@ -175,18 +165,20 @@ class SvcAutomationService(
           QueryResult(_, issuingMiningRounds) <- store
             .listContracts(cc.round.IssuingMiningRound.COMPANION)
           roundsSorted = issuingMiningRounds
-            .sortBy(contract => contract.payload.round.number)
-            .lastOption
+            .sortBy(contract => contract.payload.targetClosesAt)
+            .headOption
           res <- roundsSorted match {
-            case None => Future.successful(None)
-            case Some(oldestIssuingRound) =>
-              val totals = getTotalsPerRound(store)(oldestIssuingRound.payload.round.number)
+            case None =>
+              Future.successful(None)
+            case Some(earliestClosingIssuingRound) =>
+              val totals =
+                getTotalsPerRound(store)(earliestClosingIssuingRound.payload.round.number)
               val oldestRoundCanBeClosed =
-                now.toInstant.isAfter(oldestIssuingRound.payload.targetClosesAt)
+                now.toInstant.isAfter(earliestClosingIssuingRound.payload.targetClosesAt)
               if (oldestRoundCanBeClosed) {
                 val cmd = coinRules.value.contractId
                   .exerciseCoinRules_MiningRound_Close(
-                    oldestIssuingRound.contractId,
+                    earliestClosingIssuingRound.contractId,
                     totals.transferFees.bigDecimal,
                     totals.adminFees.bigDecimal,
                     totals.holdingFees.bigDecimal,
@@ -197,8 +189,9 @@ class SvcAutomationService(
                 connection
                   .submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
                   .map(cid => Some(s"successfully created the closed mining round with cid $cid"))
-              } else
+              } else {
                 Future.successful(None)
+              }
 
           }
         } yield res
@@ -224,7 +217,7 @@ class SvcAutomationService(
       cid <-
         connection.submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
     } yield Some(
-      s"successfully archived summarizing mining round with burn ${totalBurn} created issuing mining round with cid $cid"
+      s"successfully archived summarizing mining round with burn ${totalBurn}, and created issuing mining round with cid $cid"
     )
   }
 
@@ -234,6 +227,7 @@ class SvcAutomationService(
   ) { closedRound => implicit tc =>
     for {
       coinRules <- store.getCoinRules()
+      // TODO(#1705): claim unclaimed rewards
       cmd = coinRules.value.contractId
         .exerciseCoinRules_MiningRound_Archive(
           closedRound.contractId

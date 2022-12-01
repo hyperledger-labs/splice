@@ -27,12 +27,13 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.{CoinUtil, JavaContract => Contract, Proto}
+import com.daml.network.util.{CoinUtil, JavaContract => Contract, Proto, TimeUtil}
 import com.daml.network.wallet.store.EndUserWalletStore
 import com.daml.network.wallet.treasury.{CoinOperationRequest, EndUserTreasuryService}
 import com.daml.network.wallet.v0.*
 import com.daml.network.wallet.{EndUserWalletManager, EndUserWalletService, v0}
 import com.daml.network.v0 as networkV0
+import com.digitalasset.canton.config.ClockConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -50,6 +51,7 @@ import scala.reflect.ClassTag
 class GrpcWalletService(
     walletManager: EndUserWalletManager,
     ledgerClient: CoinLedgerClient,
+    clockConfig: ClockConfig,
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: CoinRetries,
 )(implicit
@@ -151,17 +153,16 @@ class GrpcWalletService(
         for {
           userStore <- getUserStore(user)
           validatorStore <- getUserStore(store.key.validatorUserName)
+          now <- TimeUtil.getTime(connection, clockConfig)
           currentRound <- validatorStore
-            .getLatestOpenMiningRound(retryProvider)
+            .getLatestOpenMiningRound(retryProvider, now)
             .map(_.value.payload.round.number)
           QueryResult(_, coins) <- userStore.listContracts(coinCodegen.Coin.COMPANION)
           QueryResult(_, lockedCoins) <- userStore.listContracts(coinCodegen.LockedCoin.COMPANION)
-        } yield {
-          v0.ListResponse(
-            coins.map(coinToCoinPosition(_, currentRound)),
-            lockedCoins.map(lockedCoinToCoinPosition(_, currentRound)),
-          )
-        }
+        } yield v0.ListResponse(
+          coins.map(coinToCoinPosition(_, currentRound)),
+          lockedCoins.map(lockedCoinToCoinPosition(_, currentRound)),
+        )
       }
     }
 
@@ -208,8 +209,9 @@ class GrpcWalletService(
           validatorStore <- getUserStore(store.key.validatorUserName)
           QueryResult(_, coins) <- userStore.listContracts(coinCodegen.Coin.COMPANION)
           QueryResult(_, lockedCoins) <- userStore.listContracts(coinCodegen.LockedCoin.COMPANION)
+          now <- TimeUtil.getTime(connection, clockConfig)
           currentRound <- validatorStore
-            .getLatestOpenMiningRound(retryProvider)
+            .getLatestOpenMiningRound(retryProvider, now)
             .map(_.value.payload.round.number)
         } yield {
           val unlockedHoldingFees =
@@ -877,7 +879,8 @@ class GrpcWalletService(
         "redistribute",
       )
       for {
-        transferContext <- validatorStore.getPaymentTransferContext(retryProvider)
+        now <- TimeUtil.getTime(connection, clockConfig)
+        transferContext <- validatorStore.getPaymentTransferContext(retryProvider, now)
       } yield installCid.exerciseWalletAppInstall_CoinRules_TryTransfer(
         transferContext.coinRules,
         transfer,
@@ -1019,8 +1022,9 @@ class GrpcWalletService(
     val owner = userStore.key.endUserParty
     for {
       validatorStore <- getUserStore(store.key.validatorUserName)
+      now <- TimeUtil.getTime(connection, clockConfig)
       currentRound <- validatorStore
-        .getLatestOpenMiningRound(retryProvider)
+        .getLatestOpenMiningRound(retryProvider, now)
         .map(_.value.payload.round.number)
       QueryResult(_, coins) <- userStore.listContracts(coinCodegen.Coin.COMPANION)
       candidates = coins

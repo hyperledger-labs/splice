@@ -133,7 +133,7 @@ abstract class AutomationService(
             logger.info(
               "Running in SimClock mode; will invoke handler based on time service."
             )
-            connection.time()
+            connection.getTimeSource()
           }
           case ClockConfig.WallClock(_) => {
             logger.info(

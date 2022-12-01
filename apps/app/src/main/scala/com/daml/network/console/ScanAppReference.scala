@@ -47,11 +47,12 @@ abstract class ScanAppReference(
   )
   def getAppTransferContext(): v1.coin.AppTransferContext = {
     def notFound(description: String) = new IllegalStateException(description)
-    val openMiningRound = getTransferContext().latestOpenMiningRound.getOrElse(
+    val transferContext = getTransferContext()
+    val openMiningRound = transferContext.latestOpenMiningRound.getOrElse(
       throw notFound("No active OpenMiningRound contract")
     )
     val coinRules =
-      getTransferContext().coinRules.getOrElse(throw notFound("No active CoinRules contract"))
+      transferContext.coinRules.getOrElse(throw notFound("No active CoinRules contract"))
     new v1.coin.AppTransferContext(
       coinRules.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
       openMiningRound.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
