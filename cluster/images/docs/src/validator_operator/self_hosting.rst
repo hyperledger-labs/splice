@@ -77,7 +77,8 @@ started as usual through Canton (``bin/canton``).
 
 Next, open a second terminal, navigate to the extracted bundle's root directory, and start a console with the CN apps: ::
 
-  bin/coin --config examples/validator/validator.conf
+  bin/coin --config examples/validator/validator.conf \
+      --bootstrap examples/validator/validator.canton
 
 This exposes a `CoinRules` contract to the validator party through automation running on the SVC node.
 In this feature preview, the SVC automatically accepts any validator onboard requests.

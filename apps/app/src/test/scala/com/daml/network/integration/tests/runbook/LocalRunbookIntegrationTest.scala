@@ -89,6 +89,7 @@ class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScr
       System.setProperty(propName, "http://localhost:7008")
 
       runScript(validatorPath / "validator-participant.canton")(env.environment)
+      runScript(validatorPath / "validator.canton")(env.environment)
       runScript(validatorPath / "tap-transfer-demo.canton")(env.environment)
     }
     if (prevProperty == null) {

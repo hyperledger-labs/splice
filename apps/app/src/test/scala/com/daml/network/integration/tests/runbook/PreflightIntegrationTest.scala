@@ -45,6 +45,7 @@ class PreflightIntegrationTest extends CoinIntegrationTest with HasConsoleScript
 
   "run through runbook against cluster SVC" taggedAs LiveDevNetTest in { implicit env =>
     runScript(validatorPath / "validator-participant.canton")(env.environment)
+    runScript(validatorPath / "validator.canton")(env.environment)
     runScript(validatorPath / "tap-transfer-demo.canton")(env.environment)
   }
 
