@@ -30,8 +30,11 @@ POSTGRES_MODE=${1:-docker}
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "participant_splitwise_simtime"
 ./scripts/postgres.sh "$POSTGRES_MODE" createdb "domain_da_simtime"
 
+# TODO(#1836) Switch back to the upstream Canton binary after we removed our patched auth service.
+sbt bundle
+
 # Start Canton
-CANTON_TOKEN_FILENAME=canton.tokens canton \
+CANTON_TOKEN_FILENAME=canton.tokens coin \
     daemon --auto-connect-local --log-level-canton=DEBUG \
     --no-tty -c ./apps/app/src/test/resources/simple-topology-canton.conf -C canton.parameters.ports-file=canton.ports \
     --bootstrap bootstrap-canton.canton &
@@ -39,7 +42,7 @@ PID=$!
 echo "$PID" > canton.pid
 
 # Start second Canton with simulated time, for time-based tests
-CANTON_TOKEN_FILENAME=canton-simtime.tokens canton \
+CANTON_TOKEN_FILENAME=canton-simtime.tokens coin \
     daemon --auto-connect-local --log-level-canton=DEBUG \
     --no-tty -c ./apps/app/src/test/resources/simple-topology-canton-simtime.conf -C canton.parameters.ports-file=canton-simtime.ports \
     --log-file-name log/canton-simtime.log \
