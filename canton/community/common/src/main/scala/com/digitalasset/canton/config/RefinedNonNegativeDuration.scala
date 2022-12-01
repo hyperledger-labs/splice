@@ -171,7 +171,7 @@ final case class NonNegativeFiniteDuration(underlying: FiniteDuration)
 
   def asFiniteApproximation: FiniteDuration = underlying
 
-  private[canton] def toInternal: NonNegativeFiniteDurationInternal =
+  def toInternal: NonNegativeFiniteDurationInternal =
     NonNegativeFiniteDurationInternal(
       asJava
     )

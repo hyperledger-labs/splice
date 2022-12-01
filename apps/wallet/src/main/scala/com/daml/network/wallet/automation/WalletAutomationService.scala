@@ -22,9 +22,7 @@ import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import java.time.temporal.ChronoUnit
-import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import scala.jdk.DurationConverters.*
 
 /** Manages background automation that runs on an Wallet app.
   */
@@ -41,13 +39,6 @@ class WalletAutomationService(
     mat: Materializer,
     tracer: Tracer,
 ) extends AutomationService(automationConfig, clockConfig, retryProvider) {
-
-  // TODO(#1692) both of these should be configuration options that get overridden in tests
-  private val canMakeSubscriptionPaymentCheckInterval = 1.second
-  // How long to delay a subscription payment after it has become payable;
-  // keeping this above 15s helps avoid payment failures due to clock skew
-  private val subscriptionPaymentMinDelay = 1.second
-
   private val connection = registerResource(ledgerClient.connection(this.getClass.getSimpleName))
 
   registerService(
@@ -78,7 +69,7 @@ class WalletAutomationService(
   // TODO(#1808): move to EndUserWalletAutomationService
   registerTimeHandler(
     "handleCanMakeSubscriptionPayment",
-    canMakeSubscriptionPaymentCheckInterval,
+    automationConfig.pollingInterval,
     connection,
   )(now => { implicit traceContext =>
     {
@@ -112,7 +103,7 @@ class WalletAutomationService(
                   ChronoUnit.MICROS,
                 )
                 // we don't pay immediately to account for potential clock skew
-                .plus(subscriptionPaymentMinDelay.toJava)
+                .plus(automationConfig.clockSkewAutomationDelay.duration)
             )
           )
           // initiate payment via treasury

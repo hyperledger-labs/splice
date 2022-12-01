@@ -112,7 +112,7 @@ class EndUserWalletAutomationService(
 
   registerTimeHandler(
     "RetryPendingTransferOffers",
-    pendingTransferOffersRetryInterval,
+    automationConfig.pollingInterval,
     connection,
   )(_ => { implicit traceContext =>
     {

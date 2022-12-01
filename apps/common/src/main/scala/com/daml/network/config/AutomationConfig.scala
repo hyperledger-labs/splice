@@ -9,4 +9,7 @@ case class AutomationConfig(
       *  used by the automation and the respective domain that the automation sequences ledger events across.
       */
     clockSkewAutomationDelay: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(5),
+    /** Interval at which time-based automation triggers
+      */
+    pollingInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(30),
 )

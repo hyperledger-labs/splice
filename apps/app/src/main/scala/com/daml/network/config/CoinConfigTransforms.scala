@@ -20,6 +20,7 @@ import com.digitalasset.canton.participant.config.{
   LedgerApiServerConfig,
   RemoteParticipantConfig,
 }
+import com.digitalasset.canton.time
 import monocle.macros.syntax.lens.*
 
 import scala.collection.mutable
@@ -96,6 +97,29 @@ object CoinConfigTransforms {
     }
   }
 
+  def reducePollingInterval: CoinConfigTransform = { config =>
+    {
+      val config1 =
+        updateSvcAppConfig(c => c.focus(_.automation).modify(reducePollingInterval))(config)
+      val config2 =
+        updateScanAppConfig(c => c.focus(_.automation).modify(reducePollingInterval))(config1)
+      val config3 = updateAllValidatorConfigs_(c =>
+        c.focus(_.automation).modify(reducePollingInterval)
+      )(config2)
+      val config4 =
+        updateAllWalletAppBackendConfigs_(c => c.focus(_.automation).modify(reducePollingInterval))(
+          config3
+        )
+      val config5 =
+        updateDirectoryAppConfig(c => c.focus(_.automation).modify(reducePollingInterval))(config4)
+      val config6 =
+        updateAllSplitwiseAppConfigs_(c => c.focus(_.automation).modify(reducePollingInterval))(
+          config5
+        )
+      config6
+    }
+  }
+
   /** Ensure that the set of Daml user names used in a given instance of a configuration
     * are novel and unshared with any previous instance of that configuration. This is used
     * To isolate one set of tests from another. (Leveraging Daml's party visiblity model.)
@@ -124,6 +148,7 @@ object CoinConfigTransforms {
       ensureNovelDamlNames(),
       enableLedgerApiAuthForLocalParticipants("test"),
       useSelfSignedTokensForLedgerApiAuth("test"),
+      reducePollingInterval,
     )
   }
 
@@ -137,6 +162,10 @@ object CoinConfigTransforms {
   type ScanAppTransform = CnAppConfigTransform[LocalScanAppConfig]
   type SplitwiseAppTransform = CnAppConfigTransform[LocalSplitwiseAppConfig]
   type RemoteSplitwiseAppTransform = CnAppConfigTransform[RemoteSplitwiseAppConfig]
+  type AutomationConfigTransform = AutomationConfig => AutomationConfig
+
+  def reducePollingInterval(config: AutomationConfig): AutomationConfig =
+    config.focus(_.pollingInterval).replace(time.NonNegativeFiniteDuration.ofSeconds(1))
 
   def updateDirectoryAppConfig(update: DirectoryAppTransform): CoinConfigTransform =
     cantonConfig =>

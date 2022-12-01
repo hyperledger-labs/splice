@@ -11,6 +11,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.pretty.PrettyPrinting
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.tracing.{NoTracing, Spanning, TraceContext}
 import com.digitalasset.canton.util.AkkaUtil
 import com.digitalasset.canton.util.ShowUtil.*
@@ -120,7 +121,7 @@ abstract class AutomationService(
     */
   final protected def registerTimeHandler(
       name: String,
-      interval: FiniteDuration,
+      interval: NonNegativeFiniteDuration,
       connection: CoinLedgerConnection, // for querying ledger time when simtime is used
   )(
       handler0: CantonTimestamp => TraceContext => Future[Option[String]]
@@ -140,7 +141,7 @@ abstract class AutomationService(
             )
             // The first tick is immediately, for simplicity.
             Source
-              .tick(0.second, interval, ())
+              .tick(0.second, interval.toScala, ())
               .map(_ => CantonTimestamp.now())
           }
           case _: ClockConfig.RemoteClock =>

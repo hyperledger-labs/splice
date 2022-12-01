@@ -6,8 +6,8 @@ import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_Error
+import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.util.JavaContract as Contract
 import com.daml.network.wallet.EndUserWalletManager

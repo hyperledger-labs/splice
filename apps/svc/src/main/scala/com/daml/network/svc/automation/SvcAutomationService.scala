@@ -21,7 +21,6 @@ import io.opentelemetry.api.trace.Tracer
 
 import java.time.temporal.ChronoUnit
 import scala.annotation.nowarn
-import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -102,9 +101,7 @@ class SvcAutomationService(
       }
   })
 
-  private val roundAutomationInterval = 10.seconds
-
-  registerTimeHandler("cycle OpenMiningRounds", roundAutomationInterval, connection) {
+  registerTimeHandler("cycle OpenMiningRounds", automationConfig.pollingInterval, connection) {
     now =>
       { implicit tc =>
         for {
@@ -168,7 +165,7 @@ class SvcAutomationService(
 
   registerTimeHandler(
     "archive IssuingMiningRounds past their targetClosesAt",
-    roundAutomationInterval,
+    automationConfig.pollingInterval,
     connection,
   ) {
     now =>

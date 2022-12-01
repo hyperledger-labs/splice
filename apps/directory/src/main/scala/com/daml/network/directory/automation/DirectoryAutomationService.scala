@@ -371,7 +371,7 @@ class DirectoryAutomationService(
 
   registerTimeHandler(
     "handleDirectoryEntryExpiration",
-    entryExpirationCheckInterval,
+    automationConfig.pollingInterval,
     connection,
   )(now => { implicit traceContext =>
     {
