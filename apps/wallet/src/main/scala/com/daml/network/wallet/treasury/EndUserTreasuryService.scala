@@ -10,8 +10,8 @@ import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.util.{HasHealth, TimeUtil}
-import com.daml.network.wallet.EndUserWalletManager
-import com.daml.network.wallet.store.EndUserWalletStore
+import com.daml.network.wallet.UserWalletManager
+import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.EndUserTreasuryService.*
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.FlagCloseable
@@ -59,8 +59,8 @@ case class CoinOperationRequest[T](
 class EndUserTreasuryService(
     connection: CoinLedgerConnection,
     clockConfig: ClockConfig,
-    userStore: EndUserWalletStore,
-    walletManager: EndUserWalletManager,
+    userStore: UserWalletStore,
+    walletManager: UserWalletManager,
     retryProvider: CoinRetries,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
@@ -294,7 +294,7 @@ class EndUserTreasuryService(
 
   // We fetch this on demand here to avoid a dependency of the validator store being
   // setup before other user’s stores.
-  private def getValidatorStore: EndUserWalletStore =
+  private def getValidatorStore: UserWalletStore =
     walletManager
       .lookupEndUserWallet(walletManager.store.key.validatorUserName)
       .getOrElse(

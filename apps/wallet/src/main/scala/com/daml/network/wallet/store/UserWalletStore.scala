@@ -20,7 +20,7 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.environment.CoinRetries
 import com.daml.network.store.{AcsStore, StoreWithOpenMiningRounds}
 import com.daml.network.util.JavaContract
-import com.daml.network.wallet.store.memory.InMemoryEndUserWalletStore
+import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FlagCloseable
@@ -35,7 +35,7 @@ import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
 /** A store for serving all queries for a specific wallet end-user. */
-trait EndUserWalletStore extends FlagCloseable with NamedLogging with StoreWithOpenMiningRounds {
+trait UserWalletStore extends FlagCloseable with NamedLogging with StoreWithOpenMiningRounds {
   import AcsStore.QueryResult
 
   /** The sink to use for ingesting data from the ledger into this store. */
@@ -44,7 +44,7 @@ trait EndUserWalletStore extends FlagCloseable with NamedLogging with StoreWithO
   protected def acsStore: AcsStore
 
   /** The key identifying the parties considered by this store. */
-  def key: EndUserWalletStore.Key
+  def key: UserWalletStore.Key
 
   /** Lookup the end-users install contract.
     *
@@ -189,7 +189,7 @@ trait EndUserWalletStore extends FlagCloseable with NamedLogging with StoreWithO
 
 }
 
-object EndUserWalletStore {
+object UserWalletStore {
   def apply(
       key: Key,
       storage: Storage,
@@ -197,9 +197,9 @@ object EndUserWalletStore {
       timeouts: ProcessingTimeout,
   )(implicit
       ec: ExecutionContext
-  ): EndUserWalletStore =
+  ): UserWalletStore =
     storage match {
-      case _: MemoryStorage => new InMemoryEndUserWalletStore(key, loggerFactory, timeouts)
+      case _: MemoryStorage => new InMemoryUserWalletStore(key, loggerFactory, timeouts)
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
 

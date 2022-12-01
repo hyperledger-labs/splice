@@ -11,8 +11,8 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.wallet.EndUserWalletManager
-import com.daml.network.wallet.store.EndUserWalletStore
+import com.daml.network.wallet.UserWalletManager
+import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.CoinOperationRequest
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
@@ -29,7 +29,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 class WalletAutomationService(
     automationConfig: AutomationConfig,
     clockConfig: ClockConfig,
-    walletManager: EndUserWalletManager,
+    walletManager: UserWalletManager,
     ledgerClient: CoinLedgerClient,
     retryProvider: CoinRetries,
     implicit protected val loggerFactory: NamedLoggerFactory,
@@ -87,7 +87,7 @@ class WalletAutomationService(
   })
 
   private def makeDueSubscriptionPaymentsForStore(
-      userStore: EndUserWalletStore,
+      userStore: UserWalletStore,
       now: CantonTimestamp,
   )(implicit tc: TraceContext): Future[Seq[Either[String, Unit]]] = {
     userStore
@@ -115,7 +115,7 @@ class WalletAutomationService(
   // TODO(#1247) consider reducing duplication with exerciseWalletCoinAction from GrpcWalletService
   private def makeSubscriptionPayment(
       stateCid: subsCodegen.SubscriptionIdleState.ContractId,
-      userStore: EndUserWalletStore,
+      userStore: UserWalletStore,
   )(implicit tc: TraceContext): Future[Either[String, Unit]] = {
     def lookups = () =>
       for {

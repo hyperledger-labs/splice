@@ -13,7 +13,7 @@ import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.JavaContract
-import com.daml.network.wallet.store.EndUserWalletStore
+import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.{CoinOperationRequest, EndUserTreasuryService}
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -24,8 +24,8 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 
-class EndUserWalletAutomationService(
-    store: EndUserWalletStore,
+class UserWalletAutomationService(
+    store: UserWalletStore,
     treasury: EndUserTreasuryService,
     ledgerClient: CoinLedgerClient,
     automationConfig: AutomationConfig,

@@ -4,8 +4,8 @@ import akka.stream.Materializer
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinRetries}
 import com.daml.network.util.HasHealth
-import com.daml.network.wallet.automation.EndUserWalletAutomationService
-import com.daml.network.wallet.store.EndUserWalletStore
+import com.daml.network.wallet.automation.UserWalletAutomationService
+import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.EndUserTreasuryService
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.FlagCloseable
@@ -16,10 +16,10 @@ import io.opentelemetry.api.trace.Tracer
 import scala.concurrent.ExecutionContext
 
 /** A service managing the treasury, automation, and store for an end-user's wallet. */
-class EndUserWalletService(
+class UserWalletService(
     ledgerClient: CoinLedgerClient,
-    key: EndUserWalletStore.Key,
-    walletManager: EndUserWalletManager,
+    key: UserWalletStore.Key,
+    walletManager: UserWalletManager,
     automationConfig: AutomationConfig,
     clockConfig: ClockConfig,
     storage: Storage,
@@ -34,7 +34,7 @@ class EndUserWalletService(
   override protected val loggerFactory: NamedLoggerFactory =
     loggerFactory0.append("user", key.endUserName)
 
-  val store: EndUserWalletStore = EndUserWalletStore(key, storage, loggerFactory, timeouts)
+  val store: UserWalletStore = UserWalletStore(key, storage, loggerFactory, timeouts)
 
   private val connection = ledgerClient.connection(
     s"EndUserTreasuryService_${CoinLedgerConnection.sanitizeUserIdToLedgerString(key.endUserName)}"
@@ -50,7 +50,7 @@ class EndUserWalletService(
     timeouts,
   )
 
-  private val automation = new EndUserWalletAutomationService(
+  private val automation = new UserWalletAutomationService(
     store,
     treasury,
     ledgerClient,

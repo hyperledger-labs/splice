@@ -7,7 +7,7 @@ import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{HasHealth, JavaContract as Contract}
-import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
+import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -20,7 +20,7 @@ import scala.collection.concurrent.TrieMap
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Manages all services comprising an end-user wallets. */
-class EndUserWalletManager(
+class UserWalletManager(
     ledgerClient: CoinLedgerClient,
     val store: WalletStore,
     automationConfig: AutomationConfig,
@@ -35,17 +35,17 @@ class EndUserWalletManager(
     with HasHealth {
 
   // map from end user name to end-user treasury service
-  private[this] val endUserWalletsMap
-      : scala.collection.concurrent.Map[String, EndUserWalletService] = TrieMap.empty
+  private[this] val endUserWalletsMap: scala.collection.concurrent.Map[String, UserWalletService] =
+    TrieMap.empty
 
   /** Lookup an end-user's wallet.
     *
     * Succeeds if the user has been onboarded and its wallet has been initialized.
     */
-  final def lookupEndUserWallet(endUserName: String): Option[EndUserWalletService] =
+  final def lookupEndUserWallet(endUserName: String): Option[UserWalletService] =
     endUserWalletsMap.get(endUserName)
 
-  final def endUserWallets: Iterable[EndUserWalletService] = endUserWalletsMap.values
+  final def endUserWallets: Iterable[UserWalletService] = endUserWalletsMap.values
 
   /** Get or create the store for an end-user. Intended to be called when a user is onboarded.
     *
@@ -59,8 +59,8 @@ class EndUserWalletManager(
     val endUserName = install.payload.endUserName
     val endUserParty = PartyId.tryFromProtoPrimitive(install.payload.endUserParty)
     val key =
-      EndUserWalletStore.Key(svcParty = store.key.svcParty, endUserName, endUserParty)
-    val walletService = new EndUserWalletService(
+      UserWalletStore.Key(svcParty = store.key.svcParty, endUserName, endUserParty)
+    val walletService = new UserWalletService(
       ledgerClient,
       key,
       this,
@@ -83,7 +83,7 @@ class EndUserWalletManager(
   // TODO(M1-52): this function probably needs restructuring to integrate it with automation rewards collection; e.g., make it streaming
   // NOTE: this function is exposed here in the EndUserWalletManager, as it requires joining data from all user-stores.
   def listValidatorRewardsCollectableBy(
-      validatorUserStore: EndUserWalletStore
+      validatorUserStore: UserWalletStore
   )(implicit
       tc: TraceContext
   ): Future[Seq[Contract[coinCodegen.ValidatorReward.ContractId, coinCodegen.ValidatorReward]]] =

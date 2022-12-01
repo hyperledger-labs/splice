@@ -96,7 +96,7 @@ class WalletApp(
       val walletStore =
         WalletStore(walletStoreKey, storage, loggerFactory, coinAppParameters.processingTimeouts)
       val walletManager =
-        new EndUserWalletManager(
+        new UserWalletManager(
           ledgerClient,
           walletStore,
           config.automation,
@@ -166,7 +166,7 @@ object WalletApp {
       automation: WalletAutomationService,
       storage: Storage,
       walletStore: WalletStore,
-      walletManager: EndUserWalletManager,
+      walletManager: UserWalletManager,
       scanConnection: ScanConnection,
       validatorConnection: ValidatorConnection,
       logger: TracedLogger,

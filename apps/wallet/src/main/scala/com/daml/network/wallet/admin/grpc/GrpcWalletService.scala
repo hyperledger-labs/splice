@@ -28,10 +28,10 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, JavaContract => Contract, Proto, TimeUtil}
-import com.daml.network.wallet.store.EndUserWalletStore
+import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.{CoinOperationRequest, EndUserTreasuryService}
 import com.daml.network.wallet.v0.*
-import com.daml.network.wallet.{EndUserWalletManager, EndUserWalletService, v0}
+import com.daml.network.wallet.{UserWalletManager, UserWalletService, v0}
 import com.daml.network.v0 as networkV0
 import com.digitalasset.canton.config.ClockConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -49,7 +49,7 @@ import scala.jdk.OptionConverters.*
 import scala.reflect.ClassTag
 
 class GrpcWalletService(
-    walletManager: EndUserWalletManager,
+    walletManager: UserWalletManager,
     ledgerClient: CoinLedgerClient,
     clockConfig: ClockConfig,
     protected val loggerFactory: NamedLoggerFactory,
@@ -115,7 +115,7 @@ class GrpcWalletService(
     }
   }
 
-  private[this] def getUserWallet(user: String): EndUserWalletService =
+  private[this] def getUserWallet(user: String): UserWalletService =
     walletManager
       .lookupEndUserWallet(user)
       .getOrElse(
@@ -124,7 +124,7 @@ class GrpcWalletService(
         )
       )
 
-  private[this] def getUserStore(user: String): Future[EndUserWalletStore] = Future {
+  private[this] def getUserStore(user: String): Future[UserWalletStore] = Future {
     getUserWallet(user).store
   }
 
@@ -863,8 +863,8 @@ class GrpcWalletService(
 
   // TODO(#1815) - Remove this
   private def redistribute(
-      userStore: EndUserWalletStore,
-      validatorStore: EndUserWalletStore,
+      userStore: UserWalletStore,
+      validatorStore: UserWalletStore,
       inputs: Seq[v1.coin.TransferInput],
       outputs: Seq[v1.coin.TransferOutput],
   )(implicit tc: TraceContext): Future[Seq[v1.coin.Coin.ContractId]] = {
@@ -897,7 +897,7 @@ class GrpcWalletService(
   }
 
   private def getUserInstallContract(
-      userWalletStore: EndUserWalletStore,
+      userWalletStore: UserWalletStore,
       userParty: PartyId,
   ): Future[
     Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
@@ -931,7 +931,7 @@ class GrpcWalletService(
   ](
       constructCoinOperation: (
           installCodegen.WalletAppInstall.ContractId,
-          EndUserWalletStore,
+          UserWalletStore,
       ) => Future[CoinOperationRequest[LookupResult]]
   )(
       user: String,
@@ -993,7 +993,7 @@ class GrpcWalletService(
   private def exerciseWalletAction[Response, ChoiceResult](
       getUpdate: (
           installCodegen.WalletAppInstall.ContractId,
-          EndUserWalletStore,
+          UserWalletStore,
       ) => Future[Update[ChoiceResult]]
   )(
       user: String,
@@ -1016,7 +1016,7 @@ class GrpcWalletService(
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   private def selectCoin(
-      userStore: EndUserWalletStore,
+      userStore: UserWalletStore,
       quantity: BigDecimal,
   )(implicit tc: TraceContext): Future[coinCodegen.Coin.ContractId] = {
     val owner = userStore.key.endUserParty
@@ -1057,7 +1057,7 @@ class GrpcWalletService(
     * an [[io.grpc.StatusRuntimeException]] otherwise.
     */
   private def lookupPaymentChannel(
-      userStore: EndUserWalletStore,
+      userStore: UserWalletStore,
       svcP: String,
       senderP: String,
       receiverP: String,
