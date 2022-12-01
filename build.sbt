@@ -259,13 +259,20 @@ lazy val `apps-common-frontend` = {
         (Compile / compile).value
         (`apps-common-frontend-protobuf` / Compile / compile).value
         val log = streams.value.log
-        runCommand(
-          Seq("npm", "run", "build", "--workspace", "common-frontend"),
-          log,
-          None,
-          Some(npmRootDir.value),
-        )
-        baseDirectory.value / "lib"
+        val cacheDir = streams.value.cacheDirectory
+        val sourceFiles =
+          (baseDirectory.value ** ("*.tsx" || "*.ts" || "*.js" || "*.json") --- baseDirectory.value / "lib" ** "*" --- baseDirectory.value / "node_modules" ** "*").get.toSet
+        val cache =
+          FileFunction.cached(cacheDir) { _ =>
+            runCommand(
+              Seq("npm", "run", "build", "--workspace", "common-frontend"),
+              log,
+              None,
+              Some(npmRootDir.value),
+            )
+            (baseDirectory.value / "lib" ** "*").get.toSet
+          }
+        (baseDirectory.value / "lib", cache(sourceFiles))
       },
       // We could support npmLint and npmFix at the individual project level, but right now that doesn't seem very useful
       // so we just do it once for all workspaces here.
@@ -305,7 +312,7 @@ lazy val `apps-wallet-frontend` = {
     .in(file("apps/wallet/frontend"))
     .dependsOn(`apps-common-frontend`)
     .settings(
-      commonFrontendBundle := (`apps-common-frontend` / bundle).value,
+      commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
       frontendWorkspace := "wallet-frontend",
       sharedFrontendSettings,
     )
@@ -316,7 +323,7 @@ lazy val `apps-splitwise-frontend` = {
     .in(file("apps/splitwise/frontend"))
     .dependsOn(`apps-common-frontend`)
     .settings(
-      commonFrontendBundle := (`apps-common-frontend` / bundle).value,
+      commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
       frontendWorkspace := "splitwise-frontend",
       sharedFrontendSettings,
     )
@@ -327,7 +334,7 @@ lazy val `apps-directory-frontend` = {
     .in(file("apps/directory/frontend"))
     .dependsOn(`apps-common-frontend`)
     .settings(
-      commonFrontendBundle := (`apps-common-frontend` / bundle).value,
+      commonFrontendBundle := (`apps-common-frontend` / bundle).value._2,
       frontendWorkspace := "directory-frontend",
       sharedFrontendSettings,
     )
@@ -456,20 +463,32 @@ lazy val bundleTask = {
         (`wallet-daml` / Compile / damlBuild).value,
         (`splitwise-daml` / Compile / damlBuild).value,
       )
-    val args: Seq[String] = examples ++ webUis.flatMap({ case (source, name) =>
+    val args: Seq[String] = examples ++ webUis.flatMap({ case ((source, _), name) =>
       Seq[String]("-r", source.toString, s"web-uis/$name")
     }) ++ dars.flatten.flatMap({ case dar =>
       Seq[String]("-r", dar.toString, s"dars/${dar.getName}")
     })
-    runCommand(
-      Seq[String](
-        "./create-bundle.sh",
-        assemblyJar.toString,
-        (assembly / mainClass).value.get,
-      ) ++ args,
-      log,
-    )
-    assemblyJar
+    val cacheDir = streams.value.cacheDirectory
+    val main = (assembly / mainClass).value.get
+    val cache = FileFunction.cached(cacheDir) { _ =>
+      runCommand(
+        Seq[String](
+          "./create-bundle.sh",
+          assemblyJar.toString,
+          main,
+        ) ++ args,
+        log,
+      )
+      val buildFiles = ((assemblyJar.getParentFile.getParentFile / "release") ** "*").get.toSet
+      buildFiles
+    }
+    val sourceFiles =
+      webUis.foldLeft(Set.empty[File]) { case (acc, ((_, buildFiles), _)) =>
+        acc union buildFiles
+      } ++
+        dars.foldLeft(Set.empty[File]) { case (a, b) => a ++ b } +
+        assemblyJar
+    (assemblyJar, cache(sourceFiles))
   }
 }
 

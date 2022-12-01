@@ -14,7 +14,7 @@ import sbt.internal.util.ManagedLogger
 object BuildCommon {
 
   object defs {
-    lazy val bundle = taskKey[File]("create a release bundle")
+    lazy val bundle = taskKey[(File, Set[File])]("create a release bundle")
     lazy val damlTsCodegen = taskKey[Seq[File]]("generate typescript for the daml models")
     lazy val damlTsCodegenDir =
       settingKey[File]("directory for auto-generated typescript for the daml models")
@@ -29,7 +29,7 @@ object BuildCommon {
 
     lazy val frontendWorkspace = settingKey[String]("npm workspace to bundle")
     lazy val commonFrontendBundle =
-      taskKey[File]("common frontend bundle task to run before the app frontend bundle")
+      taskKey[Set[File]]("common frontend bundle task to run before the app frontend bundle")
   }
 
   val grpcWebGen = {
@@ -718,16 +718,24 @@ object BuildCommon {
     * specified in the frontendWorkspace setting. Will also build the common frontend directory if needed,
     * by calling the task specified in setting commonFrontendBundle.
     */
-  lazy val bundleFrontend: Def.Initialize[Task[File]] = Def.task {
-    commonFrontendBundle.value
+  lazy val bundleFrontend: Def.Initialize[Task[(File, Set[File])]] = Def.task {
+    val commonFrontendFiles = commonFrontendBundle.value
     val log = streams.value.log
-    BuildUtil.runCommand(
-      Seq("npm", "run", "build", "-w", frontendWorkspace.value),
-      log,
-      None,
-      Some(baseDirectory.value / "../../"),
-    )
-    baseDirectory.value / "build"
+    val cacheDir = streams.value.cacheDirectory
+    val sourceFiles =
+      (baseDirectory.value ** ("*.tsx" || "*.ts" || "*.js" || "*.json") --- baseDirectory.value / "build" ** "*" --- baseDirectory.value / "node_modules" ** "*").get.toSet
+    val cache =
+      FileFunction.cached(cacheDir) { _ =>
+        BuildUtil.runCommand(
+          Seq("npm", "run", "build", "-w", frontendWorkspace.value),
+          log,
+          None,
+          Some(baseDirectory.value / "../../"),
+        )
+        val buildFiles = (baseDirectory.value / "build" ** "*").get.toSet
+        buildFiles
+      }
+    (baseDirectory.value / "build", cache(sourceFiles union commonFrontendFiles))
   }
 
 }
