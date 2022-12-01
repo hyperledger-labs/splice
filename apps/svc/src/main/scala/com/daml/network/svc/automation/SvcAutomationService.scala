@@ -69,7 +69,7 @@ class SvcAutomationService(
     )
   )
 
-  registerRequestHandler("handleCoinRulesRequest", store.streamCoinRulesRequests())(req => {
+  registerTrigger("handleCoinRulesRequest", store.streamCoinRulesRequests())((req, logger) => {
     implicit traceContext =>
       {
         for {
@@ -100,8 +100,8 @@ class SvcAutomationService(
       }
   })
 
-  registerTimeHandler("cycle OpenMiningRounds", automationConfig.pollingInterval, connection) {
-    now =>
+  registerPollingTrigger("cycle OpenMiningRounds", automationConfig.pollingInterval, connection) {
+    (now, logger) =>
       { implicit tc =>
         for {
           rules <- getCoinRules()
@@ -153,12 +153,12 @@ class SvcAutomationService(
       }
   }
 
-  registerTimeHandler(
+  registerPollingTrigger(
     "archive IssuingMiningRounds past their targetClosesAt",
     automationConfig.pollingInterval,
     connection,
   ) {
-    now =>
+    (now, logger) =>
       { implicit tc =>
         for {
           coinRules <- store.getCoinRules()
@@ -198,10 +198,10 @@ class SvcAutomationService(
       }
   }
 
-  registerRequestHandler(
+  registerTrigger(
     "archive summarizing rounds and create issuing rounds",
     store.acsStore.streamContracts(cc.round.SummarizingMiningRound.COMPANION),
-  ) { summarizingRound => implicit tc =>
+  ) { (summarizingRound, logger) => implicit tc =>
     for {
       rewards <- queryRewards(summarizingRound.payload.round.number)
       totalBurn = rewards.totalBurn
@@ -221,10 +221,10 @@ class SvcAutomationService(
     )
   }
 
-  registerRequestHandler(
+  registerTrigger(
     "archive closed rounds and unclaimed rewards",
     store.acsStore.streamContracts(cc.round.ClosedMiningRound.COMPANION),
-  ) { closedRound => implicit tc =>
+  ) { (closedRound, logger) => implicit tc =>
     for {
       coinRules <- store.getCoinRules()
       // TODO(#1705): claim unclaimed rewards

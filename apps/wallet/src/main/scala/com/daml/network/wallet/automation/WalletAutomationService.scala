@@ -32,7 +32,7 @@ class WalletAutomationService(
     walletManager: EndUserWalletManager,
     ledgerClient: CoinLedgerClient,
     retryProvider: CoinRetries,
-    override protected val loggerFactory: NamedLoggerFactory,
+    implicit protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContextExecutor,
@@ -53,7 +53,7 @@ class WalletAutomationService(
   )
 
   // TODO(#763): not handling archive events, uninstalling wallets without a restart is not supported yet
-  registerRequestHandler("WalletAppInstall", walletManager.store.streamInstalls)(install => {
+  registerTrigger("create user wallet", walletManager.store.streamInstalls)((install, logger) => {
     implicit traceContext =>
       Future {
         val endUserName = install.payload.endUserName
@@ -67,11 +67,11 @@ class WalletAutomationService(
   })
 
   // TODO(#1808): move to EndUserWalletAutomationService
-  registerTimeHandler(
-    "handleCanMakeSubscriptionPayment",
+  registerPollingTrigger(
+    "make due subscription payments",
     automationConfig.pollingInterval,
     connection,
-  )(now => { implicit traceContext =>
+  )((now, logger) => { implicit traceContext =>
     {
       // process each store separately
       walletManager.endUserWallets

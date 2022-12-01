@@ -49,7 +49,7 @@ class SplitwiseAutomationService(
     )
   )
 
-  registerRequestHandler("handleSplitwiseInstallRequest", store.streamInstallRequests())(req => {
+  registerTrigger("handleSplitwiseInstallRequest", store.streamInstallRequests())((req, logger) => {
     implicit tc =>
       {
         val user = PartyId.tryFromProtoPrimitive(req.payload.user)
@@ -80,10 +80,10 @@ class SplitwiseAutomationService(
       }
   })
 
-  registerRequestHandler(
+  registerTrigger(
     "handleAcceptedAppPaymentRequests",
     store.streamAcceptedAppPayments(),
-  )(payment => { implicit traceContext =>
+  )((payment, logger) => { implicit traceContext =>
     val sender = PartyId.tryFromProtoPrimitive(payment.payload.sender)
     val transferInProgressId = splitwiseCodegen.TransferInProgress.ContractId.unsafeFromInterface(
       payment.payload.deliveryOffer
@@ -133,7 +133,7 @@ class SplitwiseAutomationService(
     }
   })
 
-  registerRequestHandler("handleGroupRequest", store.streamGroupRequests())(req => { implicit tc =>
+  registerTrigger("handleGroupRequest", store.streamGroupRequests())((req, logger) => { implicit tc =>
     {
       val user = PartyId.tryFromProtoPrimitive(req.payload.group.owner)
       val groupId = req.payload.group.id

@@ -355,21 +355,18 @@ object CoinLedgerConnection {
               // was processed
               .toMat(Sink.ignore)(Keep.both),
           )
-          override val loggerFactory =
+          override val loggerFactory: NamedLoggerFactory =
             if (subscriptionName.isEmpty)
               loggerFactoryForCoinLedgerConnectionOverride
             else
-              loggerFactoryForCoinLedgerConnectionOverride.appendUnnamedKey(
-                "subscription",
-                subscriptionName,
-              )
+              loggerFactoryForCoinLedgerConnectionOverride.append("client", subscriptionName)
 
           override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
             import TraceContext.Implicits.Empty._
             List[AsyncOrSyncCloseable](
-              SyncCloseable(s"killSwitch.shutdown $subscriptionName", killSwitch.shutdown()),
+              SyncCloseable(s"terminating ledger api stream", killSwitch.shutdown()),
               AsyncCloseable(
-                s"graph.completed $subscriptionName",
+                s"ledger api stream terminated",
                 completed.transform {
                   case Success(v) => Success(v)
                   case Failure(_: StatusRuntimeException) =>

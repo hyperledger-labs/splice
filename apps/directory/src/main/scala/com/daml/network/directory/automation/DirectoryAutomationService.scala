@@ -79,7 +79,7 @@ class DirectoryAutomationService(
       entryName,
     )
 
-  registerRequestHandler("handleDirectoryInstallRequest", store.streamInstallRequests())(req =>
+  registerTrigger("handleDirectoryInstallRequest", store.streamInstallRequests())((req, logger) =>
     implicit traceContext => {
       val user = PartyId.tryFromProtoPrimitive(req.payload.user)
       store.lookupInstall(user).flatMap {
@@ -118,7 +118,7 @@ class DirectoryAutomationService(
     }
   )
 
-  registerRequestHandler("handleDirectoryEntryRequest", store.streamEntryRequests())(req =>
+  registerTrigger("handleDirectoryEntryRequest", store.streamEntryRequests())((req, logger) =>
     implicit traceContexf => {
       val user = PartyId.tryFromProtoPrimitive(req.payload.user)
       val rejectRequest = (reason: String) => {
@@ -154,10 +154,10 @@ class DirectoryAutomationService(
     }
   )
 
-  registerRequestHandler(
+  registerTrigger(
     "handleAcceptedAppPaymentRequests",
     store.streamAcceptedAppPayments(),
-  )(payment => { implicit traceContext =>
+  )((payment, logger) => { implicit traceContext =>
     {
       val offerId = directoryCodegen.DirectoryEntryOffer.ContractId.unsafeFromInterface(
         payment.payload.deliveryOffer
@@ -228,10 +228,10 @@ class DirectoryAutomationService(
     }
   })
 
-  registerRequestHandler(
+  registerTrigger(
     "handleSubscriptionInitialPayments",
     store.streamSubscriptionInitialPayments(),
-  )(payment => { implicit traceContext =>
+  )((payment, logger) => { implicit traceContext =>
     {
       val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
         payment.payload.subscriptionData.context
@@ -298,10 +298,10 @@ class DirectoryAutomationService(
     }
   })
 
-  registerRequestHandler(
+  registerTrigger(
     "handleSubscriptionPayments",
     store.streamSubscriptionPayments(),
-  )(payment => { implicit traceContext =>
+  )((payment, logger) => { implicit traceContext =>
     {
       val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
         payment.payload.subscriptionData.context
@@ -369,11 +369,11 @@ class DirectoryAutomationService(
     }
   })
 
-  registerTimeHandler(
+  registerPollingTrigger(
     "handleDirectoryEntryExpiration",
     automationConfig.pollingInterval,
     connection,
-  )(now => { implicit traceContext =>
+  )((now, logger) => { implicit traceContext =>
     {
       store
         .listEntries()

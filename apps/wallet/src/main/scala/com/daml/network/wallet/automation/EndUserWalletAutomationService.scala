@@ -109,11 +109,11 @@ class EndUserWalletAutomationService(
   //  from ingestion of a new accepted offer. On the happy path, this will complete the transfer quicker,
   //  but might be a source for contention and other races between that attempt and the periodic retry
 
-  registerTimeHandler(
+  registerPollingTrigger(
     "RetryPendingTransferOffers",
     automationConfig.pollingInterval,
     connection,
-  )(_ => { implicit traceContext =>
+  )((now, logger) => { implicit traceContext =>
     {
       logger.info("Looking for accepted transfer offers to complete...")
       store.listContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION).flatMap {

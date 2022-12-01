@@ -15,14 +15,15 @@ class AcsIngestionService(
     ingestionSink: AcsStore.IngestionSink,
     connection: CoinLedgerConnection,
     override protected val retryProvider: CoinRetries,
-    override protected val loggerFactory: NamedLoggerFactory,
+    loggerFactory0: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends LedgerIngestionService {
 
-  override protected val serviceDescriptor = s"AcsIngestionService($name)"
+  override protected val loggerFactory: NamedLoggerFactory =
+    loggerFactory0.append("ingestionLoopFor", name)
 
   private val txFilter = ingestionSink.transactionFilter
 
@@ -36,7 +37,7 @@ class AcsIngestionService(
         case Some(off) => Future.successful(off)
       }
     } yield connection.subscribeAsync(
-      serviceDescriptor,
+      s"AcsIngestion($name)",
       new LedgerOffset.Absolute(subscribeFrom),
       txFilter,
     )(

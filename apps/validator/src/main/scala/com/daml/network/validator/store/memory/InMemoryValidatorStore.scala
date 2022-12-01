@@ -19,9 +19,6 @@ class InMemoryValidatorStore(
       logAllStateUpdates = false,
     )
 
-  // TODO(#1747): review tracing strategy for setup steps
-  noTracingLogger.debug(s"Created InMemoryValidatorStore for $key")
-
   val acsStore: AcsStore = inMemoryAcsStore
 
   override val acsIngestionSink: AcsStore.IngestionSink = inMemoryAcsStore.ingestionSink

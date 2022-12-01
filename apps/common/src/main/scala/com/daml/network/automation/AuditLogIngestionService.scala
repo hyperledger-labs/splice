@@ -16,14 +16,15 @@ class AuditLogIngestionService(
     ingestionSink: AuditLogIngestionSink,
     connection: CoinLedgerConnection,
     override protected val retryProvider: CoinRetries,
-    override protected val loggerFactory: NamedLoggerFactory,
+    loggerFactory0: NamedLoggerFactory,
     override val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContext,
     tracer: Tracer,
 ) extends LedgerIngestionService {
 
-  override protected val serviceDescriptor = s"AuditLogIngestionService($name)"
+  override protected val loggerFactory: NamedLoggerFactory =
+    loggerFactory0.append("ingestLoopFor", name)
 
   private val txFilter = CoinLedgerConnection.transactionFilterByParty(
     Map(ingestionSink.filterParty -> ingestionSink.templateIds)
@@ -34,7 +35,7 @@ class AuditLogIngestionService(
   ): Future[CoinLedgerSubscription] =
     Future.successful {
       val offset = LedgerOffset.LedgerBegin.getInstance()
-      connection.subscribeAsync(serviceDescriptor, offset, txFilter)(
+      connection.subscribeAsync(s"AuditLogIngestion($name)", offset, txFilter)(
         ingestionSink.processTransaction(_)
       )
     }
