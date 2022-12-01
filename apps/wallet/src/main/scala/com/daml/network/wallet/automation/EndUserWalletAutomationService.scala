@@ -43,6 +43,7 @@ class EndUserWalletAutomationService(
   private val pendingTransferOffersRetryInterval = 1.second
 
   private val connection = registerResource(ledgerClient.connection(this.getClass.getSimpleName))
+
   registerService(
     new AcsIngestionService(
       s"EndUserWalletStore(${store.key.endUserName})",
@@ -54,7 +55,7 @@ class EndUserWalletAutomationService(
     )
   )
 
-  def completeAcceptedTransferOffer(
+  private def completeAcceptedTransferOffer(
       acceptedOffer: JavaContract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer]
   )(implicit tc: TraceContext): Future[Either[String, String]] = {
     def lookups = () => {
@@ -68,24 +69,22 @@ class EndUserWalletAutomationService(
     )
     treasury
       .enqueueCoinOperation(operation)
-      .map(a => {
-        a match {
-          case failedOperation: installCodegen.coinoperationoutcome.COO_Error =>
-            val msg =
-              show"Failed making a transfer with accepted offer ${acceptedOffer}: ${failedOperation.stringValue.singleQuoted}"
-            logger.info(
-              msg
-            ) // We report this only at an info level, because it will be retried automatically
-            Left(msg)
-          case _ =>
-            val msg = s"Completed a transfer with accepted offer ${acceptedOffer}"
-            logger.info(msg)
-            Right(msg)
-        }
-      })
+      .map {
+        case failedOperation: installCodegen.coinoperationoutcome.COO_Error =>
+          val msg =
+            show"Failed making a transfer with accepted offer ${acceptedOffer}: ${failedOperation.stringValue.singleQuoted}"
+          logger.info(
+            msg
+          ) // We report this only at an info level, because it will be retried automatically
+          Left(msg)
+        case _ =>
+          val msg = s"Completed a transfer with accepted offer ${acceptedOffer}"
+          logger.info(msg)
+          Right(msg)
+      }
   }
 
-  def completeAcceptedTransferOfferIfSender(
+  private def completeAcceptedTransferOfferIfSender(
       acceptedOffer: JavaContract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer]
   )(implicit tc: TraceContext): Future[Either[String, String]] = {
     store.key.endUserParty.toProtoPrimitive match {

@@ -1,14 +1,15 @@
 package com.daml.network.wallet.treasury
 
+import akka.Done
 import akka.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_Error
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
+import com.daml.network.util.HasHealth
 import com.daml.network.wallet.EndUserWalletManager
 import com.daml.network.wallet.store.EndUserWalletStore
 import com.daml.network.wallet.treasury.EndUserTreasuryService.*
@@ -16,9 +17,12 @@ import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{Spanning, TraceContext}
+import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
+import io.opentelemetry.api.trace.Tracer
 
+import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success}
@@ -59,36 +63,47 @@ class EndUserTreasuryService(
     retryProvider: CoinRetries,
     override protected val loggerFactory: NamedLoggerFactory,
     override protected val timeouts: ProcessingTimeout,
-)(implicit ec: ExecutionContext, mat: Materializer)
+)(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
     extends NamedLogging
-    with FlagCloseable {
+    with FlagCloseable
+    with Spanning
+    with HasHealth {
 
-  // Magic numbers
+  // Magic numbers, chosen to report overload quickly
+  // TODO(#1839): make coin operation batch size configurable
   private val batchSize = 10L
-  private val bufferSize = 1000
+  private val bufferSize: Int = 2 * batchSize.toInt
 
-  private val queue: BoundedSourceQueue[AnyEnqueuedCoinOperation] = Source
-    .queue[AnyEnqueuedCoinOperation](bufferSize)
-    .batch(batchSize, operation => Seq(operation))((operations, operation) =>
-      operations :+ operation
+  private val batchExecutorRunning = new AtomicBoolean(true)
+
+  private val queue: BoundedSourceQueue[AnyEnqueuedCoinOperation] =
+    withNewTrace(this.getClass.getSimpleName)(implicit tc =>
+      _ => {
+        val queue = Source
+          .queue[AnyEnqueuedCoinOperation](bufferSize)
+          .batch(batchSize, operation => Seq(operation))((operations, operation) =>
+            operations :+ operation
+          )
+          // Execute the batches sequentially to avoid contention
+          .mapAsync(1)(executeBatchWithRetry)
+          .toMat(
+            Sink.onComplete(result => {
+              if (isClosing)
+                logger.debug(s"Coin operation batch executor shutting down with result: $result")
+              else
+                logger.error(
+                  s"Unexpected termination of coin operation batch executor with result: $result"
+                )
+              batchExecutorRunning.set(false)
+            })
+          )(Keep.left)
+          .run()
+        logger.debug("Started coin operation operation batch executor.")
+        queue
+      }
     )
-    .toMat(
-      Sink.foreachAsync(1)(batch =>
-        executeBatchWithRetry(batch).flatMap(_ match {
-          case None =>
-            // No offset returned (probably because all operations failed), not waiting for ingestion
-            Future(())
-          case Some(offset) =>
-            userStore
-              .signalWhenIngested(offset)(TraceContext.empty)
-              .map(_ =>
-                logger
-                  .debug(s"Finished waiting for store to ingest offset $offset")(TraceContext.empty)
-              )
-        })
-      )
-    )(Keep.left)
-    .run()
+
+  override def isHealthy: Boolean = batchExecutorRunning.get()
 
   // Overriding, as this method is used in "FlagCloseable" to pretty-print the object being closed.
   override def toString: String =
@@ -110,6 +125,7 @@ class EndUserTreasuryService(
         Future.failed(
           new StatusRuntimeException(
             Status.ABORTED.withDescription(
+              // TODO(#1818): Add PrettyPrinting
               s"operation $operation was aborted, probably as there are too many (${queue.size()}) already in flight"
             )
           )
@@ -118,8 +134,8 @@ class EndUserTreasuryService(
       case QueueClosed =>
         Future.failed(
           new StatusRuntimeException(
-            Status.RESOURCE_EXHAUSTED.withDescription(
-              s"operation $operation was rejected because the queue is already closed. This indicates a shutdown."
+            Status.UNAVAILABLE.withDescription(
+              s"operation $operation was rejected because the coin operation batch executor is shutting down."
             )
           )
         )
@@ -157,23 +173,37 @@ class EndUserTreasuryService(
     */
   private def executeBatchWithRetry(
       batch: Seq[AnyEnqueuedCoinOperation]
-  ): Future[Option[String]] =
-    TraceContext.withNewTraceContext { implicit tc =>
-      retryProvider.retryForAutomation(
-        "execute coin operation batch",
-        executeBatch(batch),
-        this,
-      )
+  )(implicit tc: TraceContext): Future[Done] =
+    withSpan("executeBatchWithRetry") { implicit tc => _ =>
+      retryProvider
+        .retryForAutomation(
+          "execute coin operation batch",
+          executeBatch(batch),
+          this,
+        )
+        .recover(ex => {
+          logger.error("Skipping batch due to unexpected execution failure", ex)
+          batch.foreach(op =>
+            op.promise.failure(
+              Status.INTERNAL
+                .withDescription("Unexpected coin operation execution failure.")
+                .asRuntimeException()
+            )
+          )
+          Done
+        })
     }
 
   private def executeBatch(
       batch: Seq[AnyEnqueuedCoinOperation]
-  )(implicit tc: TraceContext): Future[Option[String]] = {
-
+  )(implicit tc: TraceContext): Future[Done] = {
     logger.debug(
       s"Running batch of coin operations for user ${userStore.key.endUserParty} with length ${batch.size}: $batch"
     )
-
+    def isErrorOutcome(outcome: installCodegen.CoinOperationOutcome): Boolean = outcome match {
+      case _: installCodegen.coinoperationoutcome.COO_Error => true
+      case _ => false
+    }
     for {
       validOperations <- runLookups(batch)
       _ = logger.debug(
@@ -198,15 +228,26 @@ class EndUserTreasuryService(
           walletManager.store.key.validatorParty +: userStore.key.endUserParty +: readAs.toSeq,
           cmd,
         )
+      // return all outcomes to the callers
       _ = (outcomes.exerciseResult.asScala zip validOperations).map {
         case (outcome, ValidCoinOperation(_, p)) =>
           p.success(outcome)
       }
-      onlyErrors = outcomes.exerciseResult.asScala.forall(_ match {
-        case _: COO_Error => true
-        case _ => false
-      })
-    } yield if (onlyErrors) None else Some(offset)
+      // wait for store to ingest the new coin holdings *provided* they were updated
+      case () <- if (outcomes.exerciseResult.asScala.forall(isErrorOutcome)) {
+        // We must not wait in this case, as the store won't see that offset until the next action comes,
+        // as the transaction filter is in the way
+        // TODO(M1-92): remove this fragility of depending on the exact daml transaction to determine whether to wait or not
+        Future.unit
+      } else {
+        logger.debug(show"Waiting for store to ingest offset ${offset.singleQuoted}")
+        userStore.signalWhenIngested(offset)
+      }
+
+    } yield {
+      logger.debug(s"Batch executed with result:\n${outcomes.exerciseResult.asScala}")
+      Done
+    }
   }
 
   /** Select transfer inputs to satisfy the coin operations.
@@ -255,9 +296,9 @@ class EndUserTreasuryService(
     walletManager
       .lookupEndUserWallet(walletManager.store.key.validatorUserName)
       .getOrElse(
-        throw new StatusRuntimeException(
-          Status.FAILED_PRECONDITION.withDescription("Validator store not setup yet")
-        )
+        throw Status.FAILED_PRECONDITION
+          .withDescription("Validator store not setup yet")
+          .asRuntimeException()
       )
       .store
 
@@ -266,14 +307,16 @@ class EndUserTreasuryService(
       .lookupInstall()
       .map(
         _.value.getOrElse(
-          throw new StatusRuntimeException(
-            Status.NOT_FOUND.withDescription("WalletAppInstall contract")
-          )
+          throw Status.NOT_FOUND.withDescription("WalletAppInstall contract").asRuntimeException()
         )
       )
 
   override def onClosed(): Unit = {
-    // TODO(M1-92 - Tech Debt): add more robust shutdown, e.g., similar to shutdown for ledger subscriptions
+    logger.debug(
+      s"Shutdown initiated, closing coin operation batch execution queue, which currently contains ${queue.size()} elements)."
+    )(
+      TraceContext.empty
+    )
     queue.complete()
   }
 }

@@ -2,8 +2,8 @@ package com.daml.network.integration.tests
 
 import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.round.SummarizingMiningRound
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   payment as walletCodegen,
@@ -27,9 +27,11 @@ import org.slf4j.event.Level
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
+import scala.collection.immutable.Range
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
+import scala.util.Try
 
 class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext with CoinTestUtil {
 
@@ -38,6 +40,59 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
     "restart cleanly" in { implicit env =>
       aliceWalletBackend.stop()
       aliceWalletBackend.startSync()
+    }
+
+    "shutdown cleanly with lots of coin operations in flight" in { implicit env =>
+      onboardWalletUser(this, aliceWallet, aliceValidator)
+
+      loggerFactory.assertLoggedWarningsAndErrorsSeq(
+        {
+          for (_ <- Range(1, 500)) {
+            val _ = Future {
+              try {
+                aliceWallet.tap(13)
+              } catch {
+                case scala.util.control.NonFatal(ex) =>
+                  logger.info("Ignoring exception when executing tap", ex)
+              }
+            }
+          }
+
+          clue(
+            "Waiting for two taps to succeed, so that the other requests have time to reach the server"
+          ) {
+            // wrapped in eventually, as it can fail due to the queue for coin operations being full
+            eventually() {
+              Try(aliceWallet.tap(20)).isSuccess shouldBe true
+            }
+            eventually() {
+              Try(aliceWallet.tap(30)).isSuccess shouldBe true
+            }
+          }
+          clue("Stopping alice's wallet") {
+            // In manual runs, we've observed that sometimes the gRPC server reports a slow shutdown.
+            // We accept that for now.
+            aliceWalletBackend.stop()
+          }
+        },
+        lines =>
+          forAll(lines) { line =>
+            val errorRegex = Seq(
+              "Request failed for aliceWallet",
+              "(ABORTED|UNAVAILABLE|CANCELLED|UNIMPLEMENTED)",
+            ).mkString("(.|\\n|\\r)*")
+            if (line.level == Level.ERROR) {
+              line.message should include regex errorRegex
+            } else if (line.level == Level.WARN) {
+              // If the coin operation buffer is large or batch execution is slow, then shutdown is not quick enough.
+              // We accept that for now, as it is non-trivial to propagate the shutdown signal from the server to the
+              // coin operation batch executor.
+              line.message should include regex ("NettyServer.*shutdown did not complete gracefully")
+            } else {
+              fail("unexpected warning or error")
+            }
+          },
+      )
     }
 
     "allow calling tap, list the created coins, and get the balance - locally and remotely" in {
@@ -654,6 +709,8 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
       }
 
       "be batched up to `batchSize` concurrent coin-operations" in { implicit env =>
+        // ATTENTION: needs to be in sync with the batchSize in [[EndUserTreasuryService]]
+        // TODO(#1839): make coin operatoin batch size configurable and read this from the config
         val defaultBatchSize = 10
         val (alice, bob) = setupAliceAndBobAndChannel(this)
         aliceWallet.tap(50)
@@ -772,8 +829,8 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
     "rejects HS256 JWTs with invalid signatures" in { implicit env =>
       import com.auth0.jwt.JWT
       import com.auth0.jwt.algorithms.Algorithm
+      import com.daml.network.auth.JwtCallCredential
       import com.daml.network.wallet.v0
-      import com.daml.network.auth.{JwtCallCredential}
       import io.grpc.ManagedChannelBuilder
 
       val aliceDamlUser = aliceWallet.config.damlUser

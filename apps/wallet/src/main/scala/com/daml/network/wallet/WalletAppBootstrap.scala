@@ -23,7 +23,7 @@ import java.util.concurrent.ScheduledExecutorService
 import scala.annotation.nowarn
 import scala.concurrent.Future
 
-/** Class used to orchester the starting/initialization of Wallet apps.
+/** Class used to orchestrate the starting/initialization of Wallet apps.
   *
   * Modelled after Canton's ParticipantNodeBootstrap class.
   */

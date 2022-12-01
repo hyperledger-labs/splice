@@ -3,6 +3,7 @@ package com.daml.network.wallet
 import akka.stream.Materializer
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinRetries}
+import com.daml.network.util.HasHealth
 import com.daml.network.wallet.automation.EndUserWalletAutomationService
 import com.daml.network.wallet.store.EndUserWalletStore
 import com.daml.network.wallet.treasury.EndUserTreasuryService
@@ -27,7 +28,8 @@ class EndUserWalletService(
     override protected val timeouts: ProcessingTimeout,
 )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
     extends FlagCloseable
-    with NamedLogging {
+    with NamedLogging
+    with HasHealth {
 
   override protected val loggerFactory: NamedLoggerFactory =
     loggerFactory0.append("user", key.endUserName)
@@ -57,6 +59,8 @@ class EndUserWalletService(
     loggerFactory,
     timeouts,
   )
+
+  override def isHealthy: Boolean = automation.isHealthy && treasury.isHealthy
 
   override def onClosed(): Unit = {
     automation.close()

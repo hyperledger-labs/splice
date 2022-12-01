@@ -171,7 +171,8 @@ object WalletApp {
       logger: TracedLogger,
   ) extends AutoCloseable
       with HasHealth {
-    override def isHealthy: Boolean = storage.isActive && automation.isHealthy
+    override def isHealthy: Boolean =
+      storage.isActive && automation.isHealthy && walletManager.isHealthy
 
     override def close(): Unit =
       Lifecycle.close(

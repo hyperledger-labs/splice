@@ -6,7 +6,7 @@ import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.JavaContract as Contract
+import com.daml.network.util.{HasHealth, JavaContract as Contract}
 import com.daml.network.wallet.store.{EndUserWalletStore, WalletStore}
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.Lifecycle
@@ -31,7 +31,8 @@ class EndUserWalletManager(
     timeouts: ProcessingTimeout,
 )(implicit ec: ExecutionContext, mat: Materializer, tracer: Tracer)
     extends AutoCloseable
-    with NamedLogging {
+    with NamedLogging
+    with HasHealth {
 
   // map from end user name to end-user treasury service
   private[this] val endUserWalletsMap
@@ -115,6 +116,8 @@ class EndUserWalletManager(
         )
       validatorRewards <- Future.sequence(validatorRewardsFs)
     } yield validatorRewards.flatten
+
+  override def isHealthy: Boolean = endUserWalletsMap.values.forall(_.isHealthy)
 
   override def close(): Unit = Lifecycle.close(endUserWalletsMap.values.toSeq *)(logger)
 }
