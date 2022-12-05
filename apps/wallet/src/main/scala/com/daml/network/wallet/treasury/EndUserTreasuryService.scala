@@ -151,6 +151,22 @@ class EndUserTreasuryService(
       .map(_.flatten)
   }
 
+  /** Background behind lookups:
+    * Inside the treasury service, we want to avoid a batch being aborted for anything other
+    * than contention errors. Some errors can be caught within Daml to avoid aborting the transaction. However, contract
+    * activeness cannot be caught in Daml. Therefore, we check that certain contracts required for the operation
+    * are active via lookups. That way, we know that if a batch failed it can only be due to contention and
+    * we can safely resubmit it.
+    *
+    * Note that we don't check that contracts managed by the SVC (CoinRules, IssuanceState, OpenMiningRound etc.) are
+    * active. These contracts should always be active (even under contention) and a non-SVC CN user isn't able
+    * to make changes to his system that would lead to these contracts being active on the next submission.
+    *
+    * Implementation:
+    * If a required contract is not found, the future should fail with an appropriate
+    * [[io.grpc.StatusRuntimeException]]. We execute `tryLookupCoinOperation` run on every submission of the corresponding
+    * coin operation (also for retries).
+    */
   private def tryLookupCoinOperation(op0: installCodegen.CoinOperation): Future[Unit] = op0 match {
     case op: coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment =>
       for {
@@ -251,7 +267,7 @@ class EndUserTreasuryService(
         s"After lookups, the batch contains ${validOperations.size} coin operations."
       )
       now <- TimeUtil.getTime(connection, clockConfig)
-      transferContext <- getValidatorStore.getPaymentTransferContext(retryProvider, now)
+      transferContext <- walletManager.store.getPaymentTransferContext(retryProvider, now)
       activeIssuingRounds = transferContext.context.issuingMiningRounds.asScala.keys.toSet
       install <- getInstall
       (inputs, readAs) <- selectTransferInputs(activeIssuingRounds)
@@ -299,7 +315,7 @@ class EndUserTreasuryService(
   private def selectTransferInputs(
       activeIssuingRounds: Set[v1.round.Round]
   )(implicit tc: TraceContext): Future[(Seq[v1.coin.TransferInput], Set[PartyId])] = for {
-    coinInputs <- userStore
+    coinInputs <- userStore.acs
       .listContracts(coinCodegen.Coin.COMPANION)
       .map(cs =>
         cs.value.map(c =>
@@ -319,7 +335,7 @@ class EndUserTreasuryService(
           rw.contractId.toInterface(v1.coin.ValidatorReward.INTERFACE)
         )
       )
-    appRewardInputs <- userStore
+    appRewardInputs <- userStore.acs
       .listContracts(coinCodegen.AppReward.COMPANION)
       .map(rws =>
         rws.value

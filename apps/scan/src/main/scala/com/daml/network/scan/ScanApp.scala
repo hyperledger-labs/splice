@@ -2,6 +2,7 @@ package com.daml.network.scan
 
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
@@ -67,6 +68,7 @@ class ScanApp(
         timeouts,
         store,
       )
+      _ <- store.acs.signalWhenIngested(OpenMiningRound.COMPANION)
     } yield {
       adminServerRegistry
         .addService(

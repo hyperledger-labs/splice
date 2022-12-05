@@ -1,9 +1,11 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
-import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
-import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
+import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
+import com.daml.network.codegen.java.cn.wallet.{
+  payment => paymentCodegen,
+  subscriptions => subsCodegen,
+}
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{

@@ -2,14 +2,8 @@ package com.daml.network.wallet.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.ledger.javaapi.data.Template
-import com.daml.ledger.javaapi.data.codegen.{
-  Contract => CodegenContract,
-  ContractCompanion,
-  ContractId,
-}
-import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
+import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as walletCodegen,
@@ -17,25 +11,21 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.environment.CoinRetries
-import com.daml.network.store.{AcsStore, StoreWithOpenMiningRounds}
+import com.daml.network.store.AcsStore
 import com.daml.network.util.JavaContract
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 /** A store for serving all queries for a specific wallet end-user. */
-trait UserWalletStore extends FlagCloseable with NamedLogging with StoreWithOpenMiningRounds {
+trait UserWalletStore extends FlagCloseable with NamedLogging {
   import AcsStore.QueryResult
 
   /** The sink to use for ingesting data from the ledger into this store. */
@@ -64,18 +54,6 @@ trait UserWalletStore extends FlagCloseable with NamedLogging with StoreWithOpen
 
   def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
     acsStore.signalWhenIngested(offset)
-
-  def findContract[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T],
-      filter: JavaContract[TCid, T] => Boolean = (_: JavaContract[TCid, T]) => true,
-  ): Future[QueryResult[Option[JavaContract[TCid, T]]]] =
-    acsStore.findContract(templateCompanion)(filter)
-
-  def listContracts[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T],
-      filter: JavaContract[TCid, T] => Boolean = (_: JavaContract[TCid, T]) => true,
-  ): Future[QueryResult[Seq[JavaContract[TCid, T]]]] =
-    acsStore.listContracts(templateCompanion, filter)
 
   def lookupOnChannelPaymentRequestById(
       cid: ContractId[channelCodegen.OnChannelPaymentRequest]
@@ -142,54 +120,6 @@ trait UserWalletStore extends FlagCloseable with NamedLogging with StoreWithOpen
     ]
   ]] =
     acsStore.lookupContractById(subsCodegen.SubscriptionContext.INTERFACE)(cid)
-
-  def getCoinRules()(implicit ec: ExecutionContext): Future[
-    QueryResult[JavaContract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]]
-  ] =
-    findContract(coinCodegen.CoinRules.COMPANION).map(
-      _.map(
-        _.getOrElse(
-          throw new StatusRuntimeException(
-            Status.NOT_FOUND.withDescription("No active CoinRules contract")
-          )
-        )
-      )
-    )
-
-  /** Get the context required for executing a transfer. This must be run
-    * on the store of the validator user since the primary party of end users
-    * is not a stakeholder on the contracts used here.
-    */
-  def getPaymentTransferContext(retryProvider: CoinRetries, now: CantonTimestamp)(implicit
-      ec: ExecutionContext,
-      tc: TraceContext,
-  ): Future[v1.coin.PaymentTransferContext] =
-    for {
-      coinRules <- getCoinRules()
-      openRound <- getLatestOpenMiningRound(retryProvider, now)
-      issuingMiningRounds <- listContracts(roundCodegen.IssuingMiningRound.COMPANION)
-      validatorRights <- listContracts(coinCodegen.ValidatorRight.COMPANION)
-    } yield {
-      val openIssuingRounds = issuingMiningRounds.value
-        .filter(c => c.payload.opensAt.isBefore(now.toInstant))
-        .map(r =>
-          (r.payload.round, r.contractId.toInterface(v1.round.IssuingMiningRound.INTERFACE))
-        )
-        .toMap[v1.round.Round, v1.round.IssuingMiningRound.ContractId]
-        .asJava
-      val transferContext = new v1.coin.TransferContext(
-        openRound.value.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
-        openIssuingRounds,
-        validatorRights.value
-          .map(r => (r.payload.user, r.contractId.toInterface(v1.coin.ValidatorRight.INTERFACE)))
-          .toMap[String, v1.coin.ValidatorRight.ContractId]
-          .asJava,
-      )
-      new v1.coin.PaymentTransferContext(
-        coinRules.value.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
-        transferContext,
-      )
-    }
 
 }
 
@@ -320,9 +250,6 @@ object UserWalletStore {
           co.payload.subscriptionData.svc == svc &&
             co.payload.subscriptionData.sender == endUser
         ),
-        mkFilter(roundCodegen.OpenMiningRound.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(roundCodegen.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(coinCodegen.CoinRules.COMPANION)(co => co.payload.svc == svc),
       ),
       Map(
         mkFilter(subsCodegen.SubscriptionContext.INTERFACE)(co =>

@@ -4,6 +4,7 @@ import akka.actor.ActorSystem
 import akka.stream.Materializer
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.auth.*
+import com.daml.network.codegen.java.cc.round.OpenMiningRound
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
@@ -86,16 +87,15 @@ class WalletApp(
         scanConnection.getSvcPartyId(),
         this,
       )
-    } yield {
-      val walletStoreKey = WalletStore.Key(
+      walletStoreKey = WalletStore.Key(
         walletServiceParty = walletServiceParty,
         validatorParty = validatorUserInfo.primaryParty,
         validatorUserName = validatorUserInfo.userName,
         svcParty = svcParty,
       )
-      val walletStore =
+      walletStore =
         WalletStore(walletStoreKey, storage, loggerFactory, coinAppParameters.processingTimeouts)
-      val walletManager =
+      walletManager =
         new UserWalletManager(
           ledgerClient,
           walletStore,
@@ -106,6 +106,17 @@ class WalletApp(
           loggerFactory,
           timeouts,
         )
+      automation = new WalletAutomationService(
+        config.automation,
+        coinAppParameters.clockConfig,
+        walletManager,
+        ledgerClient,
+        retryProvider,
+        loggerFactory,
+        timeouts,
+      )
+      _ <- walletStore.acs.signalWhenIngested(OpenMiningRound.COMPANION)
+    } yield {
 
       val verifier: SignatureVerifier = config.auth match {
         case AuthConfig.Hs256Unsafe(secret) => new HMACVerifier(secret)
@@ -133,15 +144,6 @@ class WalletApp(
         )
         .discard
 
-      val automation = new WalletAutomationService(
-        config.automation,
-        coinAppParameters.clockConfig,
-        walletManager,
-        ledgerClient,
-        retryProvider,
-        loggerFactory,
-        timeouts,
-      )
       WalletApp.State(
         automation,
         storage,

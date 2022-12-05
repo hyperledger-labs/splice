@@ -35,6 +35,8 @@ trait ScanStore extends FlagCloseable with StoreWithOpenMiningRounds {
   /** The [[com.daml.network.store.AcsStore]] used to back the default implementation of the queries. */
   protected val acsStore: AcsStore
 
+  def acs: AcsStore = acsStore
+
   def lookupCoinRules()
       : Future[QueryResult[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]] =
     acsStore.findContract(cc.coin.CoinRules.COMPANION)(_ => true)

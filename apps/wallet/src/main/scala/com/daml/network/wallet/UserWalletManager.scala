@@ -88,7 +88,7 @@ class UserWalletManager(
       tc: TraceContext
   ): Future[Seq[Contract[coinCodegen.ValidatorReward.ContractId, coinCodegen.ValidatorReward]]] =
     for {
-      QueryResult(_, validatorRights) <- validatorUserStore.listContracts(
+      QueryResult(_, validatorRights) <- validatorUserStore.acs.listContracts(
         coinCodegen.ValidatorRight.COMPANION
       )
       users = validatorRights.map(c => PartyId.tryFromProtoPrimitive(c.payload.user)).toSet
@@ -110,7 +110,9 @@ class UserWalletManager(
                   )
                   Future.successful(Seq.empty)
                 case Some(userWallet) =>
-                  userWallet.store.listContracts(coinCodegen.ValidatorReward.COMPANION).map(_.value)
+                  userWallet.store.acs
+                    .listContracts(coinCodegen.ValidatorReward.COMPANION)
+                    .map(_.value)
               }
           }
         )

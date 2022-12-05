@@ -130,7 +130,7 @@ class SvcAutomationService(
             if (isPastTargetClosesAt && middleRoundOpenLongEnough && isPastLatestOpensAt) {
               val cmds = rules.contractId
                 .exerciseCoinRules_AdvanceOpenMiningRounds(
-                  // TODO(#1705): use price from SvcRules
+                  // TODO(M3-07): use price from SvcRules
                   java.math.BigDecimal.valueOf(1.0),
                   toArchive.contractId,
                   middle.contractId,
@@ -227,7 +227,7 @@ class SvcAutomationService(
   ) { (closedRound, logger) => implicit tc =>
     for {
       coinRules <- store.getCoinRules()
-      // TODO(#1705): claim unclaimed rewards
+      // TODO(M3-06): claim unclaimed rewards
       cmd = coinRules.value.contractId
         .exerciseCoinRules_MiningRound_Archive(
           closedRound.contractId

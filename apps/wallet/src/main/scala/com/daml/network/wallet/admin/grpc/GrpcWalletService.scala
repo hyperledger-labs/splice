@@ -142,7 +142,7 @@ class GrpcWalletService(
       withAuth { user =>
         for {
           userStore <- getUserStore(user)
-          QueryResult(_, contracts) <- userStore.listContracts(templateCompanion)
+          QueryResult(_, contracts) <- userStore.acs.listContracts(templateCompanion)
         } yield mkResponse(contracts.map(_.toProtoV0))
       }
     }
@@ -154,11 +154,13 @@ class GrpcWalletService(
           userStore <- getUserStore(user)
           validatorStore <- getUserStore(store.key.validatorUserName)
           now <- TimeUtil.getTime(connection, clockConfig)
-          currentRound <- validatorStore
-            .getLatestOpenMiningRound(retryProvider, now)
+          currentRound <- store
+            .getLatestOpenMiningRound(now)
             .map(_.value.payload.round.number)
-          QueryResult(_, coins) <- userStore.listContracts(coinCodegen.Coin.COMPANION)
-          QueryResult(_, lockedCoins) <- userStore.listContracts(coinCodegen.LockedCoin.COMPANION)
+          QueryResult(_, coins) <- userStore.acs.listContracts(coinCodegen.Coin.COMPANION)
+          QueryResult(_, lockedCoins) <- userStore.acs.listContracts(
+            coinCodegen.LockedCoin.COMPANION
+          )
         } yield v0.ListResponse(
           coins.map(coinToCoinPosition(_, currentRound)),
           lockedCoins.map(lockedCoinToCoinPosition(_, currentRound)),
@@ -201,11 +203,13 @@ class GrpcWalletService(
         for {
           userStore <- getUserStore(user)
           validatorStore <- getUserStore(store.key.validatorUserName)
-          QueryResult(_, coins) <- userStore.listContracts(coinCodegen.Coin.COMPANION)
-          QueryResult(_, lockedCoins) <- userStore.listContracts(coinCodegen.LockedCoin.COMPANION)
+          QueryResult(_, coins) <- userStore.acs.listContracts(coinCodegen.Coin.COMPANION)
+          QueryResult(_, lockedCoins) <- userStore.acs.listContracts(
+            coinCodegen.LockedCoin.COMPANION
+          )
           now <- TimeUtil.getTime(connection, clockConfig)
-          currentRound <- validatorStore
-            .getLatestOpenMiningRound(retryProvider, now)
+          currentRound <- store
+            .getLatestOpenMiningRound(now)
             .map(_.value.payload.round.number)
         } yield {
           val unlockedHoldingFees =
@@ -295,13 +299,13 @@ class GrpcWalletService(
       withAuth { user =>
         for {
           userStore <- getUserStore(user)
-          QueryResult(_, subscriptions) <- userStore.listContracts(
+          QueryResult(_, subscriptions) <- userStore.acs.listContracts(
             subsCodegen.Subscription.COMPANION
           )
-          QueryResult(_, subscriptionIdleStates) <- userStore.listContracts(
+          QueryResult(_, subscriptionIdleStates) <- userStore.acs.listContracts(
             subsCodegen.SubscriptionIdleState.COMPANION
           )
-          QueryResult(_, subscriptionPayments) <- userStore.listContracts(
+          QueryResult(_, subscriptionPayments) <- userStore.acs.listContracts(
             subsCodegen.SubscriptionPayment.COMPANION
           )
         } yield {
@@ -560,7 +564,7 @@ class GrpcWalletService(
                 c.contractId.toInterface(v1.coin.ValidatorReward.INTERFACE)
               )
             )
-          QueryResult(_, appRewards) <- userStore.listContracts(coinCodegen.AppReward.COMPANION)
+          QueryResult(_, appRewards) <- userStore.acs.listContracts(coinCodegen.AppReward.COMPANION)
           appRewardInputs = appRewards
             .filter(c => c.payload.round.number == request.round)
             .map(c =>
@@ -804,7 +808,7 @@ class GrpcWalletService(
       )
       for {
         now <- TimeUtil.getTime(connection, clockConfig)
-        transferContext <- validatorStore.getPaymentTransferContext(retryProvider, now)
+        transferContext <- store.getPaymentTransferContext(retryProvider, now)
       } yield installCid.exerciseWalletAppInstall_CoinRules_TryTransfer(
         transferContext.coinRules,
         transfer,
@@ -937,10 +941,10 @@ class GrpcWalletService(
     for {
       validatorStore <- getUserStore(store.key.validatorUserName)
       now <- TimeUtil.getTime(connection, clockConfig)
-      currentRound <- validatorStore
-        .getLatestOpenMiningRound(retryProvider, now)
+      currentRound <- store
+        .getLatestOpenMiningRound(now)
         .map(_.value.payload.round.number)
-      QueryResult(_, coins) <- userStore.listContracts(coinCodegen.Coin.COMPANION)
+      QueryResult(_, coins) <- userStore.acs.listContracts(coinCodegen.Coin.COMPANION)
       candidates = coins
         .filter(c => CoinUtil.currentQuantity(c.payload, currentRound).compareTo(quantity) >= 0)
     } yield {
@@ -976,13 +980,11 @@ class GrpcWalletService(
       senderP: String,
       receiverP: String,
   ): Future[channelCodegen.PaymentChannel.ContractId] = for {
-    channelO <- userStore
-      .findContract(
-        channelCodegen.PaymentChannel.COMPANION,
-        filter = {
-          c: Contract[channelCodegen.PaymentChannel.ContractId, channelCodegen.PaymentChannel] =>
-            c.payload.svc == svcP && c.payload.receiver == receiverP && c.payload.sender == senderP
-        },
+    channelO <- userStore.acs
+      .findContract(channelCodegen.PaymentChannel.COMPANION)(
+        { c: Contract[channelCodegen.PaymentChannel.ContractId, channelCodegen.PaymentChannel] =>
+          c.payload.svc == svcP && c.payload.receiver == receiverP && c.payload.sender == senderP
+        }
       )
     channel = channelO.value.getOrElse(
       throw new StatusRuntimeException(

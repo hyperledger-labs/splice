@@ -43,7 +43,7 @@ class GrpcScanService(
       for {
         QueryResult(_, coinRules) <- store.lookupCoinRules()
         now <- TimeUtil.getTime(connection, clockConfig)
-        QueryResult(_, latestOpen) <- store.getLatestOpenMiningRound(retryProvider, now)
+        QueryResult(_, latestOpen) <- store.getLatestOpenMiningRound(now)
         QueryResult(_, rounds) <- store.lookupSubmittableOpenMiningRounds(now)
       } yield {
         v0.GetTransferContextResponse(

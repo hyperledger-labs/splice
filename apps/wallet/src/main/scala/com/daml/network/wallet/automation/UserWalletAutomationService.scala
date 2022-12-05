@@ -108,7 +108,7 @@ class UserWalletAutomationService(
   )((now, logger) => { implicit traceContext =>
     {
       logger.info("Looking for accepted transfer offers to complete...")
-      store.listContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION).flatMap {
+      store.acs.listContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION).flatMap {
         case QueryResult(_, acceptedOffers) =>
           logger.info(s"Attempting to complete ${acceptedOffers.length} accepted transfer offers")
           acceptedOffers

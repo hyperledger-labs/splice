@@ -541,7 +541,6 @@ object CoinLedgerConnection {
       ): Future[CantonTimestamp] =
         client
           .getTimeSource()
-          .take(1)
           .map(parseTimeResponse)
           .runWith(Sink.head[CantonTimestamp])
 

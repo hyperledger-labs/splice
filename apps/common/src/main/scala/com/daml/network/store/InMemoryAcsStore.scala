@@ -263,6 +263,13 @@ class InMemoryAcsStore(
     streamContracts(JavaContract.fromCreatedEvent(interfaceCompanion))
   }
 
+  def signalWhenIngested[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      templateCompanion: ContractCompanion[TC, TCid, T]
+  ): Future[Unit] = {
+    requireInScope(templateCompanion)
+    nextActiveContract(JavaContract.fromCreatedEvent(templateCompanion), 0).map(ssss => ())
+  }
+
   private def nextActiveContract[T](
       fromCreated: CreatedEvent => Option[T],
       startingFromIncl: Long,

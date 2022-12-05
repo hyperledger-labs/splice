@@ -26,5 +26,5 @@ class InMemoryWalletStore(
 
   override val acsIngestionSink: AcsStore.IngestionSink = inMemoryAcsStore.ingestionSink
 
-  override def close(): Unit = {}
+  override def onClosed(): Unit = {}
 }

@@ -101,7 +101,9 @@ trait AcsStore extends AutoCloseable {
     */
   def findContract[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
       templateCompanion: ContractCompanion[TC, TCid, T]
-  )(p: JavaContract[TCid, T] => Boolean): Future[QueryResult[Option[JavaContract[TCid, T]]]]
+  )(
+      p: JavaContract[TCid, T] => Boolean = (_: JavaContract[TCid, T]) => true
+  ): Future[QueryResult[Option[JavaContract[TCid, T]]]]
 
   /** Find a contract that satisfies a predicate.
     *
@@ -170,6 +172,11 @@ trait AcsStore extends AutoCloseable {
   def streamContracts[I, Id <: ContractId[I], View <: DamlRecord[View]](
       interfaceCompanion: InterfaceCompanion[I, Id, View]
   ): Source[JavaContract[Id, View], NotUsed]
+
+  /** Signal when the store has ingested at least one contract of the given template. */
+  def signalWhenIngested[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      templateCompanion: ContractCompanion[TC, TCid, T]
+  ): Future[Unit]
 
   /** Signal when the store has finished ingesting ledger data from the given offset or a larger one.
     */

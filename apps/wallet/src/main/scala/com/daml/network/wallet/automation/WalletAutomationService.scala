@@ -87,7 +87,7 @@ class WalletAutomationService(
       userStore: UserWalletStore,
       now: CantonTimestamp,
   )(implicit tc: TraceContext): Future[Seq[Either[String, Unit]]] = {
-    userStore
+    userStore.acs
       .listContracts(subsCodegen.SubscriptionIdleState.COMPANION)
       .flatMap { case QueryResult(_, subStates) =>
         subStates
