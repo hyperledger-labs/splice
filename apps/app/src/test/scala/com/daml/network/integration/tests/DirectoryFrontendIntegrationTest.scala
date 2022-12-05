@@ -59,5 +59,26 @@ class DirectoryFrontendIntegrationTest extends FrontendIntegrationTest("alice") 
         name.text should be(entryName)
       }
     }
+
+    "allow login via auth0" in { implicit env =>
+      // TODO(#1445) create a fresh user for each of these tests; see PR #1851
+      val auth0TestUserEmail = "test@test.com";
+      val auth0TestUserPassword = "2N8mzSTbXCCW5fP";
+      val auth0TestUserDamlUser = "auth0|6388b3b1c0f8aabff64ab105";
+
+      aliceValidator.onboardUser(auth0TestUserDamlUser)
+
+      withFrontEnd("alice") { implicit webDriver =>
+        go to "http://localhost:3004"
+        click on "oidc-login-button"
+
+        clue("auth0 login") {
+          textField(id("username")).value = auth0TestUserEmail
+          find(id("password")).foreach(_.underlying.sendKeys(auth0TestUserPassword))
+          click on name("action")
+        }
+        find(id("logged-in-user")).value.text should matchText(auth0TestUserDamlUser)
+      }
+    }
   }
 }

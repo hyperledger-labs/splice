@@ -1,44 +1,14 @@
 import { ErrorBoundary } from 'common-frontend';
-import { generateLedgerApiToken } from 'common-frontend/lib/contexts/LedgerApiContext';
-import { useEffect, useState } from 'react';
-import { useAuth } from 'react-oidc-context';
 
 import { AppBar, Box, Button, Container, CssBaseline, Toolbar, Typography } from '@mui/material';
 
 import './App.css';
+import { useUserState } from './contexts/UserContext';
 import Home from './views/Home';
 import Login from './views/Login';
 
-// useAuth hook throws an error if used without a parent AuthProvider context,
-// which is actually OK & expected if the app is running with a hs-256-unsafe auth config
-const useAuthSafe = () => {
-  try {
-    return useAuth();
-  } catch {
-    return undefined;
-  }
-};
-
 const App: React.FC = () => {
-  const [damlUserId, setDamlUserId] = useState<string>();
-  const { user, removeUser } = useAuthSafe() || {};
-  const [ledgerApiToken, setLedgerApiToken] = useState<string | undefined>();
-
-  useEffect(() => {
-    if (user) {
-      setDamlUserId(user?.profile?.sub);
-    }
-  }, [user]);
-
-  useEffect(() => {
-    const generateToken = async (userId: string | undefined) => {
-      if (userId !== undefined) {
-        const token = await generateLedgerApiToken(userId);
-        setLedgerApiToken(token);
-      }
-    };
-    generateToken(damlUserId);
-  }, [damlUserId]);
+  const { isAuthenticated, logout, userAccessToken, userId } = useUserState();
 
   return (
     <ErrorBoundary>
@@ -48,25 +18,23 @@ const App: React.FC = () => {
           <Toolbar>
             <Typography variant="h6" sx={{ flexGrow: 1 }}>
               Canton Name Service
+              {userId && (
+                // TODO(#1445) Show primaryPartyId here after dedup with wallet.
+                <div id="logged-in-user">{userId}</div>
+              )}
             </Typography>
-            {damlUserId && (
-              <Button
-                color="inherit"
-                onClick={() => {
-                  setDamlUserId(undefined);
-                  removeUser && removeUser();
-                }}
-              >
+            {isAuthenticated && (
+              <Button color="inherit" onClick={logout}>
                 Log Out
               </Button>
             )}
           </Toolbar>
         </AppBar>
         <Container style={{ height: '100%', flex: '1' }}>
-          {damlUserId && ledgerApiToken ? (
-            <Home userId={damlUserId} ledgerApiToken={ledgerApiToken} />
+          {isAuthenticated && userId && userAccessToken ? (
+            <Home userId={userId} ledgerApiToken={userAccessToken} />
           ) : (
-            <Login onLogin={setDamlUserId} />
+            <Login />
           )}
         </Container>
       </Box>

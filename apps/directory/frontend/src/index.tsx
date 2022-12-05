@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom/client';
 import { AuthProvider } from 'react-oidc-context';
 
 import App from './App';
+import { UserProvider } from './contexts/UserContext';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
 import { config } from './utils';
@@ -12,7 +13,9 @@ root.render(
   <React.StrictMode>
     {
       <AuthProvider {...config.auth}>
-        <App />
+        <UserProvider>
+          <App />
+        </UserProvider>
       </AuthProvider>
     }
   </React.StrictMode>

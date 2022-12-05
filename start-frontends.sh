@@ -41,6 +41,7 @@ function start_frontend() {
   oa_domain=$8
   oa_clientid=$9
   algorithm="${10}"
+  test_auth_secret="${11}"
 
   frontend_dir="${REPO_ROOT}/apps/${app}/frontend"
 
@@ -53,6 +54,7 @@ function start_frontend() {
     REACT_APP_AUTH_AUTHORITY=${oa_domain} \
     REACT_APP_AUTH_CLIENT_ID=${oa_clientid} \
     REACT_APP_AUTH_ALGORITHM=${algorithm} \
+    REACT_APP_TEST_AUTH_SECRET=${test_auth_secret} \
     npm start 2>&1 | tee ${LOG_DIR}/npm-${app}-${user}.log"
 }
 
@@ -61,13 +63,20 @@ function usage() {
   echo "Flags:"
   echo "  -h   display this help message"
   echo "  -d   start in detached mode"
-  echo "  -a   run configuration with canton-network-test auth0 tenant"
+  echo "  -a   run all frontends with canton-network-test auth0 tenant and no test auth"
 }
 
 daemon=0
+# default: unsafe auth
 auth_algorithm=hs-256-unsafe
 oauth_authority=
 oauth_clientid=
+# auth0 auth; might not be the default config for all frontends (yet)
+oauth_authority_auth0=https://canton-network-test.us.auth0.com
+oauth_clientid_auth0=Ob8YZSBvbZR3vsM2vGKllg3KRlRgLQSw
+auth_algorithm_auth0=rs-256
+# default: enable testing auth with secret "test"
+test_auth_secret=test
 while getopts "hda" arg; do
   case ${arg} in
     h)
@@ -78,9 +87,10 @@ while getopts "hda" arg; do
       daemon=1
       ;;
     a)
-      oauth_authority=https://canton-network-test.us.auth0.com
-      oauth_clientid=Ob8YZSBvbZR3vsM2vGKllg3KRlRgLQSw
-      auth_algorithm=rs-256
+      oauth_authority=oauth_authority_auth0
+      oauth_clientid=oauth_clientid_auth0
+      auth_algorithm=auth_algorithm_auth0
+      test_auth_secret=
       ;;
     ?)
       usage
@@ -111,12 +121,12 @@ do
 done
 
 # start_frontend <app> <ui-http-port> <app-grpc-port> <app-wallet-ui-port> <ledgerapi-grpc-port> <validator-app-grpc-port> <user-display-name>
-start_frontend wallet    3000 6204 NA   NA   6203 alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
-start_frontend wallet    3001 6304 NA   NA   6303 bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
-start_frontend splitwise 3002 6113 3000 6201 NA   alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
-start_frontend splitwise 3003 6113 3001 6301 NA   bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
-start_frontend directory 3004 6110 3000 6201 NA   alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
-start_frontend splitwise 3005 6113 NA   6201 NA   charlie "$oauth_authority" "$oauth_clientid" "$auth_algorithm"
+start_frontend wallet    3000 6204 NA   NA   6203 alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm" "$test_auth_secret"
+start_frontend wallet    3001 6304 NA   NA   6303 bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm" "$test_auth_secret"
+start_frontend splitwise 3002 6113 3000 6201 NA   alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm" "$test_auth_secret"
+start_frontend splitwise 3003 6113 3001 6301 NA   bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm" "$test_auth_secret"
+start_frontend directory 3004 6110 3000 6201 NA   alice   "$oauth_authority_auth0" "$oauth_clientid_auth0" "$auth_algorithm_auth0" "$test_auth_secret"
+start_frontend splitwise 3005 6113 NA   6201 NA   charlie "$oauth_authority" "$oauth_clientid" "$auth_algorithm" "$test_auth_secret"
 
 if [ $daemon -eq 0 ]; then
   tmux attach -t ${tmux_session}

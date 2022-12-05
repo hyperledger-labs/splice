@@ -1,4 +1,6 @@
 window.canton_network_config = {
+  // ledgerApi auth; we don't need authentication towards the directory backend
+  // note that this gets overwritten via environment variables set in `start-frontends.sh`
   auth: {
     algorithm: 'hs-256-unsafe',
     secret: 'test',
