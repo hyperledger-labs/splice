@@ -1,13 +1,14 @@
+import { isHs256UnsafeAuthConfig } from 'common-frontend';
 import { WebStorageStateStore } from 'oidc-client-ts';
 import React from 'react';
 import { AuthProvider as OidcAuthProvider } from 'react-oidc-context';
 
-import { config, isHs2456UnsafeAuthConfig } from '../utils';
+import { config } from '../utils/config';
 
 const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const authConfig = config.auth;
 
-  if (isHs2456UnsafeAuthConfig(authConfig)) {
+  if (isHs256UnsafeAuthConfig(authConfig)) {
     return <>{children}</>;
   }
 

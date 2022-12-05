@@ -1,15 +1,16 @@
+import { isHs256UnsafeAuthConfig } from 'common-frontend';
 import { useState } from 'react';
 
 import { Button, Grid, TextField, Typography } from '@mui/material';
 
 import { useUserState } from '../contexts/UserContext';
-import { config, isHs2456UnsafeAuthConfig } from '../utils';
+import { config } from '../utils/config';
 
 const Login: React.FC = () => {
   const [userId, setUserId] = useState<string>('');
   const { loginWithSst, loginWithOidc } = useUserState();
 
-  const loginMethod = isHs2456UnsafeAuthConfig(config.auth) ? (
+  const loginMethod = isHs256UnsafeAuthConfig(config.auth) ? (
     <>
       <TextField
         label="Daml User ID"

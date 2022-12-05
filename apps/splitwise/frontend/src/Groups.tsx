@@ -1,5 +1,9 @@
-import { Contract, sameContracts, useInterval } from 'common-frontend';
-import { DirectoryEntry as DirectoryEntryComponent } from 'common-frontend';
+import {
+  Contract,
+  sameContracts,
+  useInterval,
+  DirectoryEntry as DirectoryEntryComponent,
+} from 'common-frontend';
 import { TransferButton } from 'common-frontend/lib/components/WalletButtons';
 import {
   GroupKey,
@@ -40,7 +44,7 @@ import { ReceiverCCQuantity } from '@daml.js/wallet-payments/lib/CN/Wallet/Payme
 import DirectoryEntries, { Entry as DirectoryEntry } from './DirectoryEntries';
 import { useSplitwiseLedgerApiClient } from './contexts/SplitwiseLedgerApiContext';
 import { useSplitwiseClient } from './contexts/SplitwiseServiceContext';
-import { config } from './utils';
+import { config } from './utils/config';
 
 const key = (group: Contract<CodegenGroup>) =>
   new GroupKey()
@@ -131,7 +135,7 @@ const Balances: React.FC<BalancesProps> = ({ group, party, provider }) => {
           className="settle-my-debts-link"
           text="Settle My Debts"
           createPaymentRequest={initiateSettleDebts}
-          walletPath={config.wallet.uiUrl}
+          walletPath={config.services.wallet.uiUrl}
         ></TransferButton>
       </Stack>
     </Stack>
@@ -267,7 +271,7 @@ const Entry: React.FC<EntryProps> = ({ directoryEntries, group, party, provider 
             className="transfer-link"
             text="Transfer"
             createPaymentRequest={initiateTransfer}
-            walletPath={config.wallet.uiUrl}
+            walletPath={config.services.wallet.uiUrl}
           ></TransferButton>
         </Stack>
       </Stack>

@@ -1,14 +1,15 @@
+import { isHs256UnsafeAuthConfig } from 'common-frontend';
 import { useState } from 'react';
 
 import { Button, Chip, Grid, TextField, Typography } from '@mui/material';
 
 import { useUserState } from '../contexts/UserContext';
-import { config, isHs2456UnsafeAuthConfig } from '../utils';
+import { config } from '../utils/';
 
 // TODO(#1445) Reduce duplication with other frontends; move common parts to common
 
 const Login: React.FC = () => {
-  const mainLoginPrompt = isHs2456UnsafeAuthConfig(config.auth) ? (
+  const mainLoginPrompt = isHs256UnsafeAuthConfig(config.auth) ? (
     <SstLoginPrompt secret={config.auth.secret} />
   ) : (
     <OidcLoginPrompt />

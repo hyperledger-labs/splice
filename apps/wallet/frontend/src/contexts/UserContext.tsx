@@ -1,9 +1,10 @@
+import { isHs256UnsafeAuthConfig } from 'common-frontend';
 import { SignJWT } from 'jose';
 import { User } from 'oidc-client-ts';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { useAuth } from 'react-oidc-context';
 
-import { config, isHs2456UnsafeAuthConfig } from '../utils';
+import { config } from '../utils/config';
 import { UserStatusResponse } from './WalletServiceContext';
 
 interface UserState {
@@ -44,7 +45,7 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Two user authentication methods are supported:
   //   - sst: Self-Signed Tokens based on a given user ID
   //   - oidc: OpenID Connect logins based on OAuth2.0
-  const authMethod: 'sst' | 'oidc' = isHs2456UnsafeAuthConfig(config.auth) ? 'sst' : 'oidc';
+  const authMethod: 'sst' | 'oidc' = isHs256UnsafeAuthConfig(config.auth) ? 'sst' : 'oidc';
 
   const [isOnboarded, setIsOnboarded] = useState(false);
   const [userId, setUserId] = useState<string>();
@@ -135,7 +136,7 @@ export const useUserState: () => UserState = () => {
 // Generate a local token for test purposes. Only acceptable by the
 // wallet service if it is running in unsafe mode
 const generateToken = async (userId: string): Promise<string> => {
-  if (isHs2456UnsafeAuthConfig(config.auth)) {
+  if (isHs256UnsafeAuthConfig(config.auth)) {
     const secret = new TextEncoder().encode(config.auth.secret);
     const key = await crypto.subtle.importKey(
       'raw',

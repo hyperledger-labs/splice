@@ -7,14 +7,14 @@ import { ScanClientProvider } from './contexts/ScanServiceContext';
 import { SplitwiseClientProvider } from './contexts/SplitwiseServiceContext';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
-import { config } from './utils';
+import { config } from './utils/config';
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 root.render(
   <React.StrictMode>
-    <SplitwiseClientProvider url={config.splitwise.grpcUrl}>
-      <DirectoryClientProvider url={config.directory.grpcUrl}>
-        <ScanClientProvider url={config.scan.grpcUrl}>
+    <SplitwiseClientProvider url={config.services.splitwise.grpcUrl}>
+      <DirectoryClientProvider url={config.services.directory.grpcUrl}>
+        <ScanClientProvider url={config.services.scan.grpcUrl}>
           <App />
         </ScanClientProvider>
       </DirectoryClientProvider>

@@ -9,16 +9,16 @@ import { ValidatorClientProvider } from './contexts/ValidatorServiceContext';
 import { WalletClientProvider } from './contexts/WalletServiceContext';
 import './index.css';
 import reportWebVitals from './reportWebVitals';
-import { config } from './utils';
+import { config } from './utils/config';
 
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 root.render(
   <React.StrictMode>
     <AuthProvider>
       <UserProvider>
-        <WalletClientProvider url={config.wallet.grpcUrl}>
-          <ValidatorClientProvider url={config.validator.grpcUrl}>
-            <DirectoryClientProvider url={config.directory.grpcUrl}>
+        <WalletClientProvider url={config.services.wallet.grpcUrl}>
+          <ValidatorClientProvider url={config.services.validator.grpcUrl}>
+            <DirectoryClientProvider url={config.services.directory.grpcUrl}>
               <App />
             </DirectoryClientProvider>
           </ValidatorClientProvider>

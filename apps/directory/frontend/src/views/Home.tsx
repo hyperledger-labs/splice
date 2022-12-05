@@ -91,11 +91,11 @@ const HomeWithContexts: React.FC<{ userId: string; ledgerApiToken: string }> = (
 }) => {
   return (
     <DirectoryLedgerApiClientProvider
-      url={config.ledgerApi.grpcUrl}
+      url={config.services.ledgerApi.grpcUrl}
       userId={userId}
       token={ledgerApiToken}
     >
-      <DirectoryClientProvider url={config.directory.grpcUrl}>
+      <DirectoryClientProvider url={config.services.directory.grpcUrl}>
         <Home userId={userId} />
       </DirectoryClientProvider>
     </DirectoryLedgerApiClientProvider>

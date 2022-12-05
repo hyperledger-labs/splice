@@ -12,12 +12,14 @@ window.canton_network_config = {
   //     client_id: "",
   //     redirect_uri: window.location.origin,
   //   },
-  directory: {
-    // URL of the gRPC-Web envoy proxy, proxying to the directory gRPC API
-    grpcUrl: 'http://localhost:6110',
-  },
-  ledgerApi: {
-    // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
-    grpcUrl: 'http://localhost:6201',
+  services: {
+    directory: {
+      // URL of the gRPC-Web envoy proxy, proxying to the directory gRPC API
+      grpcUrl: 'http://localhost:6110',
+    },
+    ledgerApi: {
+      // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
+      grpcUrl: 'http://localhost:6201',
+    },
   },
 };

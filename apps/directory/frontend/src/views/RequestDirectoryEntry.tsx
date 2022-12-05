@@ -47,7 +47,7 @@ const RequestDirectoryEntry: React.FC<{ primaryParty: string; provider: string }
           id="request-entry-with-sub-button"
           text="Request entry"
           createPaymentRequest={requestEntry}
-          walletPath={config.wallet.uiUrl}
+          walletPath={config.services.wallet.uiUrl}
         />
       </FormGroup>
     </div>

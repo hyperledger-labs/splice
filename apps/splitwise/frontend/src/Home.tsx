@@ -14,7 +14,7 @@ import {
   SplitwiseLedgerApiClientProvider,
 } from './contexts/SplitwiseLedgerApiContext';
 import { useSplitwiseClient } from './contexts/SplitwiseServiceContext';
-import { config } from './utils';
+import { config } from './utils/config';
 
 const HomeWithContext: React.FC<{
   userId: string;
@@ -109,7 +109,7 @@ interface HomeProps {
 const Home: React.FC<HomeProps> = ({ userId, svc, dirEntries, ledgerApiToken }) => {
   return (
     <SplitwiseLedgerApiClientProvider
-      url={config.ledgerApi.grpcUrl}
+      url={config.services.ledgerApi.grpcUrl}
       userId={userId}
       token={ledgerApiToken}
     >

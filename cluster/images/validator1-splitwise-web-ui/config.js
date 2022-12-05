@@ -3,24 +3,26 @@ window.canton_network_config = {
     algorithm: "hs-256-unsafe",
     secret: "test",
   },
-  wallet: {
-    // URL of the web-ui, used to forward payment workflows to wallet
-    uiUrl: window.location.origin.replace("splitwise", "wallet"),
-  },
-  splitwise: {
-    // URL of the gRPC-Web envoy proxy, proxying the splitwise gRPC API
-    grpcUrl: "https://" + window.location.hostname + "/api/v0/splitwise",
-  },
-  ledgerApi: {
-    // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
-    grpcUrl: "https://" + window.location.hostname + "/api/v0/ledger-api",
-  },
-  directory: {
-    // URL of the gRPC-Web envoy proxy, proxying to the directory gRPC API
-    grpcUrl: "https://" + window.location.hostname + "/api/v0/directory",
-  },
-  scan: {
-    // URL of the gRPC-Web envoy proxy, proxying to the scan app gRPC API
-    grpcUrl: "https://" + window.location.hostname + "/api/v0/scan",
+  services: {
+    wallet: {
+      // URL of the web-ui, used to forward payment workflows to wallet
+      uiUrl: window.location.origin.replace("splitwise", "wallet"),
+    },
+    splitwise: {
+      // URL of the gRPC-Web envoy proxy, proxying the splitwise gRPC API
+      grpcUrl: "https://" + window.location.hostname + "/api/v0/splitwise",
+    },
+    ledgerApi: {
+      // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
+      grpcUrl: "https://" + window.location.hostname + "/api/v0/ledger-api",
+    },
+    directory: {
+      // URL of the gRPC-Web envoy proxy, proxying to the directory gRPC API
+      grpcUrl: "https://" + window.location.hostname + "/api/v0/directory",
+    },
+    scan: {
+      // URL of the gRPC-Web envoy proxy, proxying to the scan app gRPC API
+      grpcUrl: "https://" + window.location.hostname + "/api/v0/scan",
+    },
   },
 };
