@@ -134,7 +134,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
 
           // Request entry and get some money to pay for it
           val (_, subscriptionRequest) =
-            refs.directory.requestDirectoryEntryWithSubscription(entryName)
+            refs.directory.requestDirectoryEntry(entryName)
 
           // Wait for subscription request to be ingested into store
           // and accept it.
@@ -207,6 +207,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
           _.errorMessage should include("nonexistentname"),
         )
     }
+
     "archive expired directory entries" in { implicit env =>
       clue("Creating a directory entry that expires immediately") {
         directory.listEntries() shouldBe empty

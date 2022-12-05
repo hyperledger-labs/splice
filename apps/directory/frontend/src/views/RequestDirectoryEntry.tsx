@@ -15,7 +15,7 @@ const RequestDirectoryEntry: React.FC<{ primaryParty: string; provider: string }
   const [entryName, setEntryName] = useState<string>('');
   const ledgerApiClient = useDirectoryLedgerApiClient();
 
-  const requestEntryWithSubscription = async () => {
+  const requestEntry = async () => {
     const directoryInstall = await ledgerApiClient.queryDirectoryInstall(primaryParty, provider);
     if (!directoryInstall) {
       throw new Error('Failed to find DirectoryInstall');
@@ -23,7 +23,7 @@ const RequestDirectoryEntry: React.FC<{ primaryParty: string; provider: string }
     const res = await ledgerApiClient.exercise(
       [primaryParty],
       [],
-      DirectoryInstall.DirectoryInstall_RequestEntryWithSubscription,
+      DirectoryInstall.DirectoryInstall_RequestEntry,
       directoryInstall.contractId,
       { name: entryName }
     );
@@ -45,8 +45,8 @@ const RequestDirectoryEntry: React.FC<{ primaryParty: string; provider: string }
         <SubscriptionButton
           variant="contained"
           id="request-entry-with-sub-button"
-          text="Request with subscription"
-          createPaymentRequest={requestEntryWithSubscription}
+          text="Request entry"
+          createPaymentRequest={requestEntry}
           walletPath={config.wallet.uiUrl}
         />
       </FormGroup>

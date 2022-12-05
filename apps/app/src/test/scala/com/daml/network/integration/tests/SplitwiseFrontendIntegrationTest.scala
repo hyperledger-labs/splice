@@ -47,7 +47,7 @@ class SplitwiseFrontendIntegrationTest
 
     val (_, reqId) = actAndCheck(
       show"Request directory entry ${userName.singleQuoted} for $userParty",
-      directory.requestDirectoryEntryWithSubscription(userName),
+      directory.requestDirectoryEntry(userName),
     )(
       "There is exactly one subscription request",
       _ => {

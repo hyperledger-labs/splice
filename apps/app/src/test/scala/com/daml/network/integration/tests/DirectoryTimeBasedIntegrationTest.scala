@@ -69,7 +69,7 @@ class DirectoryTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTes
         }
 
         val (_, subReqId) = clue("Alice requests a directory entry") {
-          aliceDirectory.requestDirectoryEntryWithSubscription(testEntryName)
+          aliceDirectory.requestDirectoryEntry(testEntryName)
         }
         clue("Alice obtains some coins and accepts the subscription") {
           aliceWallet.tap(50.0)

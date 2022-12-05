@@ -144,7 +144,7 @@ class DirectoryAutomationService(
       ) = {
         val cmd =
           contextId
-            .exerciseDirectoryEntryContext_CollectInitialEntryPaymentWithSubscription(
+            .exerciseDirectoryEntryContext_CollectInitialEntryPayment(
               payment.contractId,
               transferContext,
             )
@@ -217,7 +217,7 @@ class DirectoryAutomationService(
       ) = {
         val cmd =
           contextId
-            .exerciseDirectoryEntryContext_CollectEntryRenewalPaymentWithSubscription(
+            .exerciseDirectoryEntryContext_CollectEntryRenewalPayment(
               payment.contractId,
               entry.contractId,
               transferContext,

@@ -29,7 +29,7 @@ template DirectoryEntryContext
         -- Collect a user's initial payment for a directory entry allocation.
     -- By collecting the initial payment, the directory service provider ultimately agrees to both
     -- the creation of the directory entry and the establishment of subscription payments for renewing it.
-    nonconsuming choice DirectoryEntryContext_CollectInitialEntryPaymentWithSubscription : (ContractId DirectoryEntry, ContractId SubscriptionIdleState, ContractId Coin)
+    nonconsuming choice DirectoryEntryContext_CollectInitialEntryPayment : (ContractId DirectoryEntry, ContractId SubscriptionIdleState, ContractId Coin)
       with
         paymentCid : ContractId SubscriptionInitialPayment
         transferContext : AppTransferContext
@@ -50,7 +50,7 @@ template DirectoryEntryContext
         pure (entryCid, subscriptionStateCid, coinCid)
 
     -- Collect a recurring entry renewal payment, renewing the entry.
-    nonconsuming choice DirectoryEntryContext_CollectEntryRenewalPaymentWithSubscription : (ContractId DirectoryEntry, ContractId SubscriptionIdleState, ContractId Coin)
+    nonconsuming choice DirectoryEntryContext_CollectEntryRenewalPayment : (ContractId DirectoryEntry, ContractId SubscriptionIdleState, ContractId Coin)
       with
         paymentCid : ContractId SubscriptionPayment
         entryCid : ContractId DirectoryEntry -- ^ The currently active entry.
@@ -172,7 +172,7 @@ template DirectoryInstall with
     -- Request a directory entry, to be paid and renewed via subscription payments.
     -- The request is answered by requesting from the user to agree on establishing subscription payments.
     -- The SubscriptionRequest is accepted (or rejected) via the user's wallet by offering the initial payment.
-    nonconsuming choice DirectoryInstall_RequestEntryWithSubscription : (ContractId DirectoryEntryContext, ContractId SubscriptionRequest)
+    nonconsuming choice DirectoryInstall_RequestEntry : (ContractId DirectoryEntryContext, ContractId SubscriptionRequest)
       with
         name : Text
       controller user

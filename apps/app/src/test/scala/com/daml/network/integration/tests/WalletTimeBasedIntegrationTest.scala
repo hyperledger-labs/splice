@@ -151,7 +151,7 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
 
           val (_, requestId) = actAndCheck(
             "Request directory entry", {
-              aliceDirectory.requestDirectoryEntryWithSubscription(name)._1
+              aliceDirectory.requestDirectoryEntry(name)._1
             },
           )(
             "the corresponding subscription request is created",

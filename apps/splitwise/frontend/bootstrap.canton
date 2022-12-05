@@ -28,9 +28,9 @@ aliceValidator.remoteParticipant.ledger_api.acs.awaitJava(codegen.DirectoryInsta
 bobValidator.remoteParticipant.ledger_api.acs.awaitJava(codegen.DirectoryInstall.COMPANION)(bobUserParty)
 charlieValidator.remoteParticipant.ledger_api.acs.awaitJava(codegen.DirectoryInstall.COMPANION)(charlieUserParty)
 
-aliceDirectory.requestDirectoryEntryWithSubscription("alice.cns")
-bobDirectory.requestDirectoryEntryWithSubscription("bob.cns")
-charlieDirectory.requestDirectoryEntryWithSubscription("charlie.cns")
+aliceDirectory.requestDirectoryEntry("alice.cns")
+bobDirectory.requestDirectoryEntry("bob.cns")
+charlieDirectory.requestDirectoryEntry("charlie.cns")
 
 val aliceCoin = aliceWallet.tap(5.0)
 utils.retry_until_true { aliceWallet.listSubscriptionRequests().length == 1 }

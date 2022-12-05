@@ -132,7 +132,7 @@ class RemoteDirectoryAppReference(
   }
 
   @Help.Summary("Request DirectoryEntry with the given name, financed via subscription payments")
-  def requestDirectoryEntryWithSubscription(
+  def requestDirectoryEntry(
       name: String
   ): (codegen.DirectoryEntryContext.ContractId, subsCodegen.SubscriptionRequest.ContractId) = {
     val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.damlUser)
@@ -142,7 +142,7 @@ class RemoteDirectoryAppReference(
         actAs = Seq(userParty),
         readAs = Seq.empty,
         update = getDirectoryInstall()
-          .exerciseDirectoryInstall_RequestEntryWithSubscription(
+          .exerciseDirectoryInstall_RequestEntry(
             name
           ),
       )

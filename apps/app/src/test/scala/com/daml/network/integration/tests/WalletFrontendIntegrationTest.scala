@@ -119,7 +119,7 @@ class WalletFrontendIntegrationTest
       val aliceDamlUser = aliceWallet.config.damlUser
       val entryName = "alice.cns"
       val aliceParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
-      requestDirectoryEntryWithSubscription(aliceParty, aliceDirectory, entryName)
+      requestDirectoryEntry(aliceParty, aliceDirectory, entryName)
 
       def getPaymentRequest() = aliceWallet.listSubscriptionRequests().headOption
 
@@ -204,7 +204,7 @@ class WalletFrontendIntegrationTest
       val aliceUserParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
       val expectedDirName = createDirectoryEntryForDirectoryItself
       aliceWallet.tap(50) // she'll need this for accepting the subscription request
-      requestDirectoryEntryWithSubscription(aliceUserParty, aliceDirectory, "alice.cns")
+      requestDirectoryEntry(aliceUserParty, aliceDirectory, "alice.cns")
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToSubscriptions(aliceDamlUser)
@@ -238,7 +238,7 @@ class WalletFrontendIntegrationTest
 
       withFrontEnd("alice") { implicit webDriver =>
         clue("Create a subscription for registering alice.cns") {
-          requestDirectoryEntryWithSubscription(aliceUserParty, aliceDirectory, "alice.cns")
+          requestDirectoryEntry(aliceUserParty, aliceDirectory, "alice.cns")
           browseToSubscriptions(aliceDamlUser)
           eventually() {
             click on className("sub-request-accept-button")
@@ -288,7 +288,7 @@ class WalletFrontendIntegrationTest
 
       withFrontEnd("alice") { implicit webDriver =>
         clue("Create subscription") {
-          requestDirectoryEntryWithSubscription(aliceUserParty, aliceDirectory, "alice1.cns")
+          requestDirectoryEntry(aliceUserParty, aliceDirectory, "alice1.cns")
           browseToSubscriptions(aliceDamlUser)
           eventually() {
             click on className("sub-request-accept-button")
@@ -470,7 +470,7 @@ class WalletFrontendIntegrationTest
       dirEntry: String,
       wallet: WalletAppClientReference,
   ) = {
-    requestDirectoryEntryWithSubscription(userParty, directory, dirEntry)
+    requestDirectoryEntry(userParty, directory, dirEntry)
     wallet.tap(5.0)
     eventually() {
       wallet.listSubscriptionRequests() should have length 1
@@ -480,7 +480,7 @@ class WalletFrontendIntegrationTest
     )
   }
 
-  private def requestDirectoryEntryWithSubscription(
+  private def requestDirectoryEntry(
       userParty: PartyId,
       directory: RemoteDirectoryAppReference,
       dirEntry: String,
@@ -491,7 +491,7 @@ class WalletFrontendIntegrationTest
       directory.ledgerApi.ledger_api.acs
         .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(userParty)
     }
-    directory.requestDirectoryEntryWithSubscription(dirEntry)
+    directory.requestDirectoryEntry(dirEntry)
   }
 
   def createSelfPaymentRequest(

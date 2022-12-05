@@ -25,7 +25,7 @@ utils.retry_until_true {
 }
 
 println("Request a directory entry")
-aliceDirectory.requestDirectoryEntryWithSubscription("alice.cns")
+aliceDirectory.requestDirectoryEntry("alice.cns")
 
 println("Confirm that we receive a payment request for the directory entry.")
 utils.retry_until_true {
