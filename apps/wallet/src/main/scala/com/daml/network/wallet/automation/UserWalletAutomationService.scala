@@ -60,7 +60,7 @@ class UserWalletAutomationService(
   )(implicit tc: TraceContext): Future[Either[String, String]] = {
     def lookups = () => {
       for {
-        _ <- store.lookupAcceptedTransferOfferById(acceptedOffer.contractId)
+        _ <- store.acs.getContractById(AcceptedTransferOffer.COMPANION)(acceptedOffer.contractId)
       } yield ()
     }
     val operation = CoinOperationRequest(

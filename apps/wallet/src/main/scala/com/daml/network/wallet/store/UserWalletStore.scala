@@ -43,6 +43,10 @@ trait UserWalletStore extends FlagCloseable with NamedLogging with StoreWithOpen
 
   protected def acsStore: AcsStore
 
+  /** A direct way to access the generic methods for querying the underlying ACS store. */
+  // TODO(#1855): change our code to use this direct acs in all stores where it makes sense
+  def acs: AcsStore = acsStore
+
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key
 

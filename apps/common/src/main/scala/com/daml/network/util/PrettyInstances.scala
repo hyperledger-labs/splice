@@ -2,8 +2,8 @@ package com.daml.network.util
 
 import com.daml.ledger.client.binding.Primitive
 import com.daml.ledger.javaapi
-import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.pretty.PrettyUtil.*
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.util.ShowUtil.*
 
 /** Extension of Canton's pretty instances with additional ones for:
@@ -48,4 +48,19 @@ trait PrettyInstances extends com.digitalasset.canton.logging.pretty.PrettyInsta
   )
 }
 
-object PrettyInstances extends PrettyInstances
+object PrettyInstances extends PrettyInstances {
+
+  /** Helper class to pretty-print contract-id references together with their template or interface identifier. */
+  case class PrettyContractId(
+      identifier: javaapi.data.Identifier,
+      contractId: javaapi.data.codegen.ContractId[_],
+  ) extends PrettyPrinting {
+
+    override def pretty: Pretty[PrettyContractId.this.type] =
+      prettyNode(
+        "ContractId",
+        param("id", typedCid => prettyContractIdString.treeOf(typedCid.contractId.contractId)),
+        param("type", typedCid => prettyIdentifier.treeOf(typedCid.identifier)),
+      )
+  }
+}

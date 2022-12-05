@@ -20,10 +20,12 @@ import com.daml.ledger.javaapi.data.{
   TransactionFilter,
 }
 import com.daml.network.util.JavaContract
+import com.daml.network.util.PrettyInstances.PrettyContractId
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 
 import scala.collection.immutable
 import scala.concurrent.{ExecutionContext, Future}
@@ -39,7 +41,7 @@ import scala.jdk.CollectionConverters.*
   * which can be used as a deduplication offset in command deduplication.
   */
 trait AcsStore extends AutoCloseable {
-  import AcsStore._
+  import AcsStore.*
 
   /** Defines which create events are to be ingested into the store. */
   def contractFilter: ContractFilter
@@ -49,10 +51,48 @@ trait AcsStore extends AutoCloseable {
       templateCompanion: ContractCompanion[TC, TCid, T]
   )(id: ContractId[T]): Future[QueryResult[Option[JavaContract[TCid, T]]]]
 
-  /** Lookup a contract by id. */
+  /** Lookup a contract's interface view by id. */
   def lookupContractById[I, Id <: ContractId[I], View <: DamlRecord[View]](
       interfaceCompanion: InterfaceCompanion[I, Id, View]
   )(id: Id): Future[QueryResult[Option[JavaContract[Id, View]]]]
+
+  /** Get a contract by id.
+    *
+    * Throws [[Status.NOT_FOUND]] if no such contract exists.
+    */
+  def getContractById[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      templateCompanion: ContractCompanion[TC, TCid, T]
+  )(id: ContractId[T])(implicit ec: ExecutionContext): Future[QueryResult[JavaContract[TCid, T]]] =
+    lookupContractById(templateCompanion)(id).map(result =>
+      result.map(
+        _.getOrElse(
+          throw Status.NOT_FOUND
+            .withDescription(
+              PrettyContractId(templateCompanion.TEMPLATE_ID, id).toString
+            )
+            .asRuntimeException
+        )
+      )
+    )
+
+  /** Get a contract's interface view by id.
+    *
+    * Throws [[Status.NOT_FOUND]] if no such contract view exists.
+    */
+  def getContractById[I, Id <: ContractId[I], View <: DamlRecord[View]](
+      interfaceCompanion: InterfaceCompanion[I, Id, View]
+  )(id: Id)(implicit ec: ExecutionContext): Future[QueryResult[JavaContract[Id, View]]] =
+    lookupContractById(interfaceCompanion)(id).map(result =>
+      result.map(
+        _.getOrElse(
+          throw Status.NOT_FOUND
+            .withDescription(
+              PrettyContractId(interfaceCompanion.TEMPLATE_ID, id).toString
+            )
+            .asRuntimeException
+        )
+      )
+    )
 
   /** Find a contract that satisfies a predicate.
     *

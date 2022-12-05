@@ -233,17 +233,6 @@ class GrpcWalletService(
       }
     }
 
-  private def getQueryResult[TCid <: ContractId[T], T](
-      result: QueryResult[Option[Contract[TCid, T]]],
-      errorMsg: String,
-  ): Contract[TCid, T] = result match {
-    case QueryResult(_, None) =>
-      throw new StatusRuntimeException(
-        Status.NOT_FOUND.withDescription(errorMsg)
-      )
-    case QueryResult(_, Some(install)) => install
-  }
-
   override def acceptAppPaymentRequest(
       request: v0.AcceptAppPaymentRequestRequest
   ): Future[v0.AcceptAppPaymentRequestResponse] =
@@ -256,13 +245,11 @@ class GrpcWalletService(
 
           def lookups = () =>
             for {
-              paymentRequestO <- userStore.lookupAppPaymentRequestById(requestCid)
-              paymentRequest = getQueryResult(
-                paymentRequestO,
-                s"app payment request with cid $requestCid",
-              )
-              _ <- userStore.lookupDeliveryOfferById(
-                paymentRequest.payload.deliveryOffer
+              paymentRequest <- userStore.acs.getContractById(
+                walletCodegen.AppPaymentRequest.COMPANION
+              )(requestCid)
+              _ <- userStore.acs.getContractById(walletCodegen.DeliveryOffer.INTERFACE)(
+                paymentRequest.value.payload.deliveryOffer
               )
             } yield ()
 
@@ -370,13 +357,11 @@ class GrpcWalletService(
 
           def lookups = () =>
             for {
-              subscriptionRequestO <- userStore.lookupSubscriptionRequestById(requestCid)
-              subscriptionRequest = getQueryResult(
-                subscriptionRequestO,
-                s"subscription request with cid $requestCid",
-              )
-              _ <- userStore.lookupSubscriptionContextById(
-                subscriptionRequest.payload.subscriptionData.context
+              subscriptionRequest <- userStore.acs.getContractById(
+                subsCodegen.SubscriptionRequest.COMPANION
+              )(requestCid)
+              _ <- userStore.acs.getContractById(subsCodegen.SubscriptionContext.INTERFACE)(
+                subscriptionRequest.value.payload.subscriptionData.context
               )
             } yield ()
 
@@ -694,15 +679,13 @@ class GrpcWalletService(
 
         def lookups = () =>
           for {
-            paymentRequestO <- userStore.lookupOnChannelPaymentRequestById(requestCid)
-            paymentRequest = getQueryResult(
-              paymentRequestO,
-              s"channel payment request with cid $requestCid",
-            )
+            paymentRequest <- userStore.acs.getContractById(
+              channelCodegen.OnChannelPaymentRequest.COMPANION
+            )(requestCid)
             _ <- lookupPaymentChannel(
               userStore,
-              paymentRequest.payload.svc,
-              receiverP = paymentRequest.payload.receiver,
+              paymentRequest.value.payload.svc,
+              receiverP = paymentRequest.value.payload.receiver,
               senderP = userStore.key.endUserParty.toProtoPrimitive,
             )
           } yield ()

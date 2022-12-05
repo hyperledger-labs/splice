@@ -18,7 +18,6 @@ import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
-import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import java.time.temporal.ChronoUnit
@@ -112,20 +111,17 @@ class WalletAutomationService(
       }
   }
 
-  // TODO(#1247) consider reducing duplication with exerciseWalletCoinAction from GrpcWalletService
   private def makeSubscriptionPayment(
       stateCid: subsCodegen.SubscriptionIdleState.ContractId,
       userStore: UserWalletStore,
   )(implicit tc: TraceContext): Future[Either[String, Unit]] = {
     def lookups = () =>
       for {
-        subscriptionStateO <- userStore.lookupSubscriptionIdleStateById(stateCid)
-        subscriptionState = getQueryResult(
-          subscriptionStateO,
-          s"subscription idle state cid $stateCid",
-        )
-        _ <- userStore.lookupSubscriptionContextById(
-          subscriptionState.payload.subscriptionData.context
+        subscriptionState <- userStore.acs.getContractById(
+          subsCodegen.SubscriptionIdleState.COMPANION
+        )(stateCid)
+        _ <- userStore.acs.getContractById(subsCodegen.SubscriptionContext.INTERFACE)(
+          subscriptionState.value.payload.subscriptionData.context
         )
       } yield ()
 
@@ -151,15 +147,5 @@ class WalletAutomationService(
       logger.warn(s"Failed making a subscription payment on state $stateCid: $error")
       s"state $stateCid: $error"
     }))
-  }
-
-  // TODO(#1247) consider reducing duplication with GrpcWallet service / moving into the `QueryResult` class itself
-  private def getQueryResult[T](
-      result: QueryResult[Option[T]],
-      errorMsg: String,
-  ): T = result match {
-    case QueryResult(_, None) =>
-      throw new StatusRuntimeException(Status.NOT_FOUND.withDescription(errorMsg))
-    case QueryResult(_, Some(x)) => x
   }
 }
