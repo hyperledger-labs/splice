@@ -534,6 +534,7 @@ lazy val `apps-app` =
       libraryDependencies += "org.scalatestplus" %% "selenium-4-4" % "3.2.14.0" % "test",
       libraryDependencies += "org.seleniumhq.selenium" % "selenium-java" % "4.6.0" % "test",
       libraryDependencies += "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4" % "test",
+      libraryDependencies += "com.auth0" % "auth0" % "1.44.1",
       BuildCommon.sharedAppSettings,
       BuildCommon.cantonWarts,
       bundleTask,

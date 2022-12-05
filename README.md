@@ -453,6 +453,10 @@ cncluster preflight
 Note that the preflight check will fail if you branch is sufficiently divergent from the main branch
 (in particular, if you made any changes to the Daml model).
 
+The preflight check also requires access to auth0's management API. To enable that, please go
+to [Auth0 API explorer](https://manage.auth0.com/dashboard/us/canton-network-dev/apis/632dbfbc50d6d58952c1b7ae/explorer),
+and copy the token to a local AUTH0_TOKEN env variable.
+
 #### Setting up `lnav` to Inspect Canton logs
 
 If you have never used `lnav` to inspect Canton logs, then we recommend:

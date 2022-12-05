@@ -9,9 +9,11 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
+import com.daml.network.util.Auth0Util
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens.*
+import scala.util.Using
 
 /** Integration test for the runbook. Uses the exact same configuration files and bootstrap scripts as the runbook.
   * This test also doubles as the pre-flight validator test.
@@ -56,5 +58,19 @@ class PreflightIntegrationTest extends CoinIntegrationTest with HasConsoleScript
   "test a directory entry allocation against cluster SVC" taggedAs LiveDevNetTest in {
     implicit env =>
       runScript(resourcesPath / "allocate-directory-entry.canton")(env.environment)
+  }
+
+  "work with auth0" taggedAs LiveDevNetTest in { _ =>
+    val token = System.getProperty("AUTH0_TOKEN")
+    if (token == null || token.isEmpty()) {
+      fail("No token given, please supply auth0 token through system property AUTH0_TOKEN")
+    }
+    val auth0 = new Auth0Util(
+      "https://canton-network-test.us.auth0.com",
+      token,
+    )
+    Using(auth0.createUser()) { user =>
+      logger.debug(s"Created user ${user.email} with password ${user.password} (id: ${user.id})")
+    }
   }
 }
