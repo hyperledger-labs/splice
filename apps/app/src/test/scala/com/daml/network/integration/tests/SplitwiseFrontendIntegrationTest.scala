@@ -47,24 +47,24 @@ class SplitwiseFrontendIntegrationTest
 
     val (_, reqId) = actAndCheck(
       show"Request directory entry ${userName.singleQuoted} for $userParty",
-      directory.requestDirectoryEntry(userName),
+      directory.requestDirectoryEntryWithSubscription(userName),
     )(
-      "There is exactly one app payment request",
+      "There is exactly one subscription request",
       _ => {
-        val reqs = wallet.listAppPaymentRequests()
+        val reqs = wallet.listSubscriptionRequests()
         reqs should have length 1
         reqs.head.contractId
       },
     )
 
     actAndCheck(
-      "Tap and accept app payment request", {
+      "Tap and accept subscription request", {
         wallet.tap(5.0)
-        wallet.acceptAppPaymentRequest(reqId)
+        wallet.acceptSubscriptionRequest(reqId)
       },
     )(
-      "There are no app payment request left",
-      _ => wallet.listAppPaymentRequests() should have length 0,
+      "There are no subscription request left",
+      _ => wallet.listSubscriptionRequests() should have length 0,
     )
   }
 

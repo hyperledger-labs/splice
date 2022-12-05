@@ -6,7 +6,6 @@ import Daml.Script
 
 import CC.API.V1.Coin
 import CN.Directory
-import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 
 import CC.Scripts.Util
@@ -111,71 +110,5 @@ testWithSubscription = script do
 
   -- directory provider can then also terminate the subscription
   submit provider.primaryParty $ exerciseCmd subscriptionStateCid (SubscriptionIdleState_ExpireSubscription provider.primaryParty)
-
-  pure ()
-
-
-testWithRegularPayment : Script ()
-testWithRegularPayment = script do
-  app <- setupApp
-
-  runNextIssuance app
-  runCoinDepositBots app
-
-  provider <- setupUser app "provider" app.svc
-  user <- setupUser app "user" app.svc
-
-  paymentContext <- getPaymentTransferContext app user
-  appContext <- getAppTransferContext app
-
-  -- provider creates directory rules
-  -- how: up to app provider
-  directoryInstallRequest <- submit user.primaryParty $ createCmd DirectoryInstallRequest with
-    provider = provider.primaryParty
-    user = user.primaryParty
-
-  directoryInstall <- submit provider.primaryParty $ exerciseCmd directoryInstallRequest DirectoryInstallRequest_Accept with
-    svc = app.svc
-    entryFee = 1.0
-    collectionDuration = minutes 5
-    acceptDuration = minutes 5
-    renewalDuration = days 30 -- not relevant to the flow we test here
-    entryLifetime = days 90
-
-  -- user requests entry via app install
-  -- how: UI of directory service via write-delegation on app manager & call to
-  -- user’s participant.
-  entryRequest <- submitUser user.userId $ exerciseCmd directoryInstall DirectoryInstall_RequestEntry with
-    name = "cns.darth.vader"
-
-  -- provider requests payment for entry via app install
-  -- how: provider on their own participant.
-  (appPaymentRequest, offerCid) <- submit provider.primaryParty $ exerciseCmd directoryInstall DirectoryInstall_RequestEntryPayment with
-    requestCid = entryRequest
-
-  -- cc wallet selects a large enough coin
-  -- how: cc wallet
-  -- note: privacy is no concern here as coin holdings are public
-  coin <- tap app user 1.5
-  -- cc wallet accepts payment and locks coin to provider
-  -- how: cc wallet
-  Right (acceptedAppPaymentCid, _) <- submitUser user.userId $ exerciseCmd appPaymentRequest AppPaymentRequest_Accept with
-    inputs = [InputCoin $ toInterfaceContractId coin]
-    context = paymentContext
-
-  -- directory providers transactionally unlocks & transfer coins
-  -- and creates directory entry in return.
-  -- how: provider on their own participant
-  (entryCid, _) <- submitUser provider.userId $ exerciseCmd offerCid DirectoryEntryOffer_CollectPayment with
-    acceptedAppPaymentCid
-    transferContext = appContext
-
-  -- we can't renew using regular payments; in the future, it won't be possible to register entries using regular payments either
-
-  submitMustFail provider.primaryParty $ exerciseCmd entryCid (DirectoryEntry_Expire provider.primaryParty)
-
-  passTime (days 91)
-
-  submit provider.primaryParty $ exerciseCmd entryCid (DirectoryEntry_Expire provider.primaryParty)
 
   pure ()

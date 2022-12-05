@@ -25,11 +25,11 @@ utils.retry_until_true {
 }
 
 println("Request a directory entry")
-aliceDirectory.requestDirectoryEntry("alice.cns")
+aliceDirectory.requestDirectoryEntryWithSubscription("alice.cns")
 
 println("Confirm that we receive a payment request for the directory entry.")
 utils.retry_until_true {
-  aliceValidator1Wallet.listAppPaymentRequests().length == 1
+  aliceValidator1Wallet.listSubscriptionRequests().length == 1
 }
 
 println("END - directory entry test")

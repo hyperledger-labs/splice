@@ -28,19 +28,19 @@ aliceValidator.remoteParticipant.ledger_api.acs.awaitJava(codegen.DirectoryInsta
 bobValidator.remoteParticipant.ledger_api.acs.awaitJava(codegen.DirectoryInstall.COMPANION)(bobUserParty)
 charlieValidator.remoteParticipant.ledger_api.acs.awaitJava(codegen.DirectoryInstall.COMPANION)(charlieUserParty)
 
-aliceDirectory.requestDirectoryEntry("alice.cns")
-bobDirectory.requestDirectoryEntry("bob.cns")
-charlieDirectory.requestDirectoryEntry("charlie.cns")
+aliceDirectory.requestDirectoryEntryWithSubscription("alice.cns")
+bobDirectory.requestDirectoryEntryWithSubscription("bob.cns")
+charlieDirectory.requestDirectoryEntryWithSubscription("charlie.cns")
 
 val aliceCoin = aliceWallet.tap(5.0)
-utils.retry_until_true { aliceWallet.listAppPaymentRequests().length == 1 }
-val aliceAccepted = aliceWallet.acceptAppPaymentRequest(aliceWallet.listAppPaymentRequests()(0).contractId)
+utils.retry_until_true { aliceWallet.listSubscriptionRequests().length == 1 }
+val aliceAccepted = aliceWallet.acceptSubscriptionRequest(aliceWallet.listSubscriptionRequests()(0).contractId)
 val bobCoin = bobWallet.tap(5.0)
-utils.retry_until_true { bobWallet.listAppPaymentRequests().length == 1 }
-val bobAccepted = bobWallet.acceptAppPaymentRequest(bobWallet.listAppPaymentRequests()(0).contractId)
+utils.retry_until_true { bobWallet.listSubscriptionRequests().length == 1 }
+val bobAccepted = bobWallet.acceptSubscriptionRequest(bobWallet.listSubscriptionRequests()(0).contractId)
 val charlieCoin = charlieWallet.tap(5.0)
-utils.retry_until_true { charlieWallet.listAppPaymentRequests().length == 1 }
-val charlieAccepted = charlieWallet.acceptAppPaymentRequest(charlieWallet.listAppPaymentRequests()(0).contractId)
+utils.retry_until_true { charlieWallet.listSubscriptionRequests().length == 1 }
+val charlieAccepted = charlieWallet.acceptSubscriptionRequest(charlieWallet.listSubscriptionRequests()(0).contractId)
 
 val providerParty = providerSplitwiseBackend.getProviderPartyId()
 

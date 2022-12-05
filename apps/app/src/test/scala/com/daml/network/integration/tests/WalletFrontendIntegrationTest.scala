@@ -1,6 +1,8 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
+import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
@@ -117,15 +119,15 @@ class WalletFrontendIntegrationTest
       val aliceDamlUser = aliceWallet.config.damlUser
       val entryName = "alice.cns"
       val aliceParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
-      submitDirectoryEntryRequest(aliceParty, aliceDirectory, entryName)
+      requestDirectoryEntryWithSubscription(aliceParty, aliceDirectory, entryName)
 
-      def getPaymentRequest() = aliceWallet.listAppPaymentRequests().headOption
+      def getPaymentRequest() = aliceWallet.listSubscriptionRequests().headOption
 
       aliceWallet.tap(5.0)
-      val walletPaymentRequest = eventually()(
+      val subscriptionRequest = eventually()(
         getPaymentRequest().getOrElse(fail("Payment request is unexpectedly not defined"))
       )
-      val _ = aliceWallet.acceptAppPaymentRequest(walletPaymentRequest.contractId)
+      val _ = aliceWallet.acceptSubscriptionRequest(subscriptionRequest.contractId)
 
       def tryGetEntry() =
         Try(loggerFactory.suppressErrors(directory.lookupEntryByName(entryName)))
@@ -149,29 +151,33 @@ class WalletFrontendIntegrationTest
       // Alice submits a directory entry request, which will create an app payment request in her wallet
       val aliceDamlUser = aliceWallet.config.damlUser
       val aliceUserParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
-      submitDirectoryEntryRequest(aliceUserParty, aliceDirectory, "alice.cns")
+      createSelfPaymentRequest(aliceUserParty)
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToPaymentRequests(aliceDamlUser)
-        val dirPartyId = directory.getProviderPartyId().toProtoPrimitive
-        // ^^ PartyId's toString might truncate the ID, so we're explicitly using toProtoPrimitive to get the full ID.
 
-        // Check that the directory party ID not been resolved has been handled properly, and the party ID is shown instead.
+        // Check that alice party ID could not be resolved against the directory service, and the party ID is shown instead.
         eventually() {
           inside(findAll(className("app-request-breakdown-table-row")).toList) { case Seq(row) =>
-            row.childElement(className("app-request-receiver")).text shouldBe dirPartyId
+            row
+              .childElement(className("app-request-receiver"))
+              .text shouldBe aliceUserParty.toProtoPrimitive
+            row.childElement(className("app-request-payment-quantity")).text should matchText(
+              "42.0000000000CC"
+            )
           }
         }
       }
     }
 
     "show app payment requests, and resolve party IDs in them" in { implicit env =>
-      val expectedDirName = createDirectoryEntryForDirectoryItself
-
       // Alice submits a directory entry request, which will create an app payment request in her wallet
       val aliceDamlUser = aliceWallet.config.damlUser
       val aliceUserParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
-      submitDirectoryEntryRequest(aliceUserParty, aliceDirectory, "alice.cns")
+      val aliceDirectoryName = "alice.cns"
+      val aliceDirectoryDisplay = expectedCns(aliceUserParty, aliceDirectoryName)
+      createDirectoryEntry(aliceUserParty, aliceDirectory, "alice.cns", aliceWallet)
+      createSelfPaymentRequest(aliceUserParty)
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToPaymentRequests(aliceDamlUser)
@@ -180,39 +186,14 @@ class WalletFrontendIntegrationTest
         eventually() {
           inside(findAll(className("app-request-breakdown-table-row")).toList) { case Seq(row) =>
             row.childElement(className("app-request-receiver")).text should matchText(
-              expectedDirName
+              aliceDirectoryDisplay
             )
           }
           inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
             row.childElement(className("app-request-provider")).text should matchText(
-              expectedDirName
+              aliceDirectoryDisplay
             )
             row
-          }
-        }
-      }
-    }
-
-    "show app payment requests, including quantity and currency code" in { implicit env =>
-      val expectedDirName = createDirectoryEntryForDirectoryItself
-
-      // Alice submits a directory entry request, which will create an app payment request in her wallet
-      val aliceDamlUser = aliceWallet.config.damlUser
-      val aliceUserParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
-      submitDirectoryEntryRequest(aliceUserParty, aliceDirectory, "alice.cns")
-
-      withFrontEnd("alice") { implicit webDriver =>
-        browseToPaymentRequests(aliceDamlUser)
-        // Check that the directory party ID has been resolved to its directory entry correctly.
-        // We do this in another eventually() as a "..." text might appear momentarily, until the directory service responds.
-        eventually() {
-          inside(findAll(className("app-request-breakdown-table-row")).toList) { case Seq(row) =>
-            row.childElement(className("app-request-receiver")).text should matchText(
-              expectedDirName
-            )
-            row.childElement(className("app-request-payment-quantity")).text should matchText(
-              "1.0000000000CC"
-            )
           }
         }
       }
@@ -483,7 +464,23 @@ class WalletFrontendIntegrationTest
     expectedCns(dirParty, dirEntryName)
   }
 
-  private def submitDirectoryEntryRequest(
+  private def createDirectoryEntry(
+      userParty: PartyId,
+      directory: RemoteDirectoryAppReference,
+      dirEntry: String,
+      wallet: WalletAppClientReference,
+  ) = {
+    requestDirectoryEntryWithSubscription(userParty, directory, dirEntry)
+    wallet.tap(5.0)
+    eventually() {
+      wallet.listSubscriptionRequests() should have length 1
+    }
+    wallet.acceptSubscriptionRequest(
+      wallet.listSubscriptionRequests().head.contractId
+    )
+  }
+
+  private def requestDirectoryEntryWithSubscription(
       userParty: PartyId,
       directory: RemoteDirectoryAppReference,
       dirEntry: String,
@@ -494,37 +491,57 @@ class WalletFrontendIntegrationTest
       directory.ledgerApi.ledger_api.acs
         .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(userParty)
     }
-    directory.requestDirectoryEntry(dirEntry)
+    directory.requestDirectoryEntryWithSubscription(dirEntry)
   }
 
-  private def createDirectoryEntry(
-      userParty: PartyId,
-      directory: RemoteDirectoryAppReference,
-      dirEntry: String,
-      wallet: WalletAppClientReference,
-  ) = {
-    submitDirectoryEntryRequest(userParty, directory, dirEntry)
-    wallet.tap(5.0)
-    eventually() {
-      wallet.listAppPaymentRequests().length shouldBe 1
-    }
-    wallet.acceptAppPaymentRequest(
-      wallet.listAppPaymentRequests().head.contractId
-    )
-  }
-
-  private def requestDirectoryEntryWithSubscription(
-      userParty: PartyId,
-      directory: RemoteDirectoryAppReference,
-      dirEntry: String,
+  def createSelfPaymentRequest(
+      aliceUserParty: PartyId
   )(implicit env: CoinTestConsoleEnvironment) = {
-    // Whitelist the directory service on alice's validator
-    directory.requestDirectoryInstall()
-    eventually() {
-      aliceDirectory.ledgerApi.ledger_api.acs
-        .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(userParty)
+    val deliveryOffer = new testWalletCodegen.TestDeliveryOffer(
+      scan.getSvcPartyId().toProtoPrimitive,
+      aliceUserParty.toProtoPrimitive,
+      "description",
+    )
+    val deliveryOfferId = clue("Create delivery offer") {
+      aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
+        Seq(aliceUserParty),
+        optTimeout = None,
+        commands = deliveryOffer.create.commands.asScala.toSeq,
+      )
+      aliceWalletBackend.remoteParticipant.ledger_api.acs
+        .awaitJava(testWalletCodegen.TestDeliveryOffer.COMPANION)(
+          aliceUserParty,
+          _.data == deliveryOffer,
+        )
+        .id
     }
-    aliceDirectory.requestDirectoryEntryWithSubscription(dirEntry)
+    clue("Create a payment request") {
+      val paymentRequest = new paymentCodegen.AppPaymentRequest(
+        aliceUserParty.toProtoPrimitive,
+        Seq(
+          new paymentCodegen.ReceiverQuantity(
+            aliceUserParty.toProtoPrimitive,
+            new paymentCodegen.PaymentQuantity(
+              BigDecimal(42.0).bigDecimal,
+              paymentCodegen.Currency.CC,
+            ),
+          )
+        ).asJava,
+        aliceUserParty.toProtoPrimitive,
+        svcParty.toProtoPrimitive,
+        Instant.now().plus(5, ChronoUnit.MINUTES), // expires in 5 min
+        new RelTime(5 * 60 * 1000000L), // 5min collection duration.
+        deliveryOfferId.toInterface(paymentCodegen.DeliveryOffer.INTERFACE),
+      )
+      aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
+        Seq(aliceUserParty),
+        optTimeout = None,
+        commands = paymentRequest.create.commands.asScala.toSeq,
+      )
+      aliceWalletBackend.remoteParticipant.ledger_api.acs
+        .awaitJava(paymentCodegen.AppPaymentRequest.COMPANION)(aliceUserParty)
+        .id
+    }
   }
 
   private def createSelfSubscription(aliceUserParty: PartyId, nextPaymentDueAt: Instant)(implicit

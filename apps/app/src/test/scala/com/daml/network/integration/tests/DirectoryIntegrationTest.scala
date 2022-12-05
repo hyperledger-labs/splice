@@ -1,6 +1,6 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.{directory => codegen}
 import com.daml.network.console.{
   LocalValidatorAppReference,
@@ -16,9 +16,7 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.util.CoinTestUtil
 import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
-import org.slf4j.event.Level.WARN
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -131,48 +129,28 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
         // The provider of the directory service
         val providerParty = directory.getProviderPartyId()
 
-        def requestAndPayForEntry(refs: DynamicUserRefs, entryName: String): String = {
+        def requestAndPayForEntry(refs: DynamicUserRefs, entryName: String) = {
           refs.wallet.tap(5.0)
 
           // Request entry and get some money to pay for it
-          val entryRequest = refs.directory.requestDirectoryEntry(entryName)
+          val (_, subscriptionRequest) =
+            refs.directory.requestDirectoryEntryWithSubscription(entryName)
 
-          // Wait for DirectoryEntryRequest to be archived
+          // Wait for subscription request to be ingested into store
+          // and accept it.
+          val initialPayment = eventually()(inside(refs.wallet.listSubscriptionRequests()) {
+            case Seq(storeRequest) =>
+              storeRequest.contractId shouldBe subscriptionRequest
+              refs.wallet.acceptSubscriptionRequest(storeRequest.contractId)
+          })
+          // Wait for the SubscriptionInitialPayment to be archived
           eventually() {
             refs.validator.remoteParticipant.ledger_api.acs
-              .filterJava(codegen.DirectoryEntryRequest.COMPANION)(
+              .filterJava(subsCodegen.SubscriptionInitialPayment.COMPANION)(
                 refs.userParty,
-                (request: codegen.DirectoryEntryRequest.Contract) => request.id == entryRequest,
+                (request: subsCodegen.SubscriptionInitialPayment.Contract) =>
+                  request.id == initialPayment,
               ) shouldBe empty
-          }
-
-          // Check if a payment request got created
-          val paymentRequests = refs.validator.remoteParticipant.ledger_api.acs
-            .filterJava(walletCodegen.AppPaymentRequest.COMPANION)(
-              refs.userParty
-            )
-
-          paymentRequests match {
-            case Seq(req) =>
-              // Accept payment request, we need another eventually here to wait for store ingestion.
-              val accepted = eventually()(inside(refs.wallet.listAppPaymentRequests()) {
-                case Seq(storeRequest) =>
-                  storeRequest.contractId shouldBe req.id
-                  refs.wallet.acceptAppPaymentRequest(storeRequest.contractId)
-              })
-              // Wait for the AcceptedAppPayment to be archived
-              eventually() {
-                refs.validator.remoteParticipant.ledger_api.acs
-                  .filterJava(walletCodegen.AcceptedAppPayment.COMPANION)(
-                    refs.userParty,
-                    (request: walletCodegen.AcceptedAppPayment.Contract) => request.id == accepted,
-                  ) shouldBe empty
-              }
-              "AcceptedRequest"
-            case Seq() =>
-              // No payment request, other entry already got created
-              "RejectedRequest"
-            case _ => fail(s"More than one payment request created: $paymentRequests")
           }
         }
 
@@ -185,7 +163,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
         val bobRefs = setupUser(bobStaticRefs)
 
         // Concurrently, request an entry as alice and bob
-        loggerFactory.assertLogsSeqWithResult[Seq[String]](SuppressionRule.LevelAndAbove(WARN))(
+        loggerFactory.assertLogs(
           {
             val aliceF = Future {
               requestAndPayForEntry(aliceRefs, testEntryName)
@@ -197,19 +175,9 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
             // Wait for both of them
             Seq(aliceF.futureValue, bobF.futureValue)
           },
-          {
-            case (results, logs) if results.contains("RejectedRequest") =>
-              // We don’t log on requested requests since that’s a user error.
-              logs shouldBe empty
-            case (results, logs) =>
-              results should contain("AcceptedRequest")
-              inside(logs) { case Seq(msg) =>
-                msg.warningMessage should include(
-                  "rejecting accepted app payment: entry already exists and owned by"
-                )
-              }
-
-          },
+          _.warningMessage should include(
+            "rejecting initial subscription payment: entry already exists and owned by"
+          ),
         )
 
         // Check who won

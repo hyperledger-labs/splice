@@ -1,6 +1,5 @@
 module CN.Directory where
 
-import DA.Assert
 import DA.Time
 
 import CN.Util.Assert
@@ -193,44 +192,6 @@ template DirectoryInstall with
           subscriptionData
           payData
         pure (context, request)
-
-    nonconsuming choice DirectoryInstall_RequestEntry
-      : ContractId DirectoryEntryRequest
-      with
-        name : Text
-      controller user
-      do
-        create DirectoryEntryRequest
-          with
-            ..
-
-    nonconsuming choice DirectoryInstall_RequestEntryPayment : (ContractId AppPaymentRequest, ContractId DirectoryEntryOffer)
-      with
-        requestCid : ContractId DirectoryEntryRequest
-      controller provider
-      do request <- fetch requestCid
-         archive requestCid
-         request.provider === provider
-         request.user === user
-         now <- getTime
-         offerCid <- create DirectoryEntryOffer with
-           svc
-           entryRequest = request
-           entryLifetime
-         reqCid <- create AppPaymentRequest with
-           receiverQuantities = [
-            ReceiverQuantity with
-              receiver =provider
-              quantity = (PaymentQuantity with quantity = request.entryFee, currency = CC)
-            ]
-           sender = user
-           provider
-           svc = svc
-           deliveryOffer = toInterfaceContractId offerCid
-           collectionDuration = collectionDuration
-           expiresAt = now `addRelTime` acceptDuration
-         pure (reqCid, offerCid)
-
 
 -- | A request from a user to a directory service provider for an installation.
 -- Used to mock the actuall installation process until we have
