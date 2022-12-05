@@ -29,7 +29,7 @@ import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, JavaContract => Contract, Proto, TimeUtil}
 import com.daml.network.wallet.store.UserWalletStore
-import com.daml.network.wallet.treasury.{CoinOperationRequest, EndUserTreasuryService}
+import com.daml.network.wallet.treasury.EndUserTreasuryService
 import com.daml.network.wallet.v0.*
 import com.daml.network.wallet.{UserWalletManager, UserWalletService, v0}
 import com.daml.network.v0 as networkV0
@@ -169,25 +169,19 @@ class GrpcWalletService(
   override def tap(request: v0.TapRequest): Future[v0.TapResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth { user =>
-        exerciseWalletCoinAction((c, endUserWalletStore) => {
-          val quantity = Proto.tryDecode(Proto.JavaBigDecimal)(request.quantity)
-          Future.successful(
-            CoinOperationRequest(
-              (_: Unit) =>
-                new coinoperation.CO_Tap(
-                  store.key.svcParty.toProtoPrimitive,
-                  validatorParty.toProtoPrimitive,
-                  endUserWalletStore.key.endUserParty.toProtoPrimitive,
-                  quantity,
-                ),
-              () => Future.successful(()),
-            )
+        val quantity = Proto.tryDecode(Proto.JavaBigDecimal)(request.quantity)
+        for {
+          userStore <- getUserStore(user)
+          result <- exerciseWalletCoinAction(
+            new coinoperation.CO_Tap(
+              userStore.key.endUserParty.toProtoPrimitive,
+              quantity,
+            ),
+            user,
+            (outcome: coinoperationoutcome.COO_Tap) =>
+              v0.TapResponse(Proto.encodeContractId(outcome.contractIdValue)),
           )
-        })(
-          user,
-          (outcome: coinoperationoutcome.COO_Tap) =>
-            v0.TapResponse(Proto.encodeContractId(outcome.contractIdValue)),
-        )
+        } yield result
       }
     }
 
@@ -238,25 +232,11 @@ class GrpcWalletService(
   ): Future[v0.AcceptAppPaymentRequestResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth { user =>
-        exerciseWalletCoinAction((installCid, userStore) => {
-          val requestCid = Proto.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(
-            request.requestContractId
-          )
-
-          def lookups = () =>
-            for {
-              paymentRequest <- userStore.acs.getContractById(
-                walletCodegen.AppPaymentRequest.COMPANION
-              )(requestCid)
-              _ <- userStore.acs.getContractById(walletCodegen.DeliveryOffer.INTERFACE)(
-                paymentRequest.value.payload.deliveryOffer
-              )
-            } yield ()
-
-          Future.successful(
-            CoinOperationRequest((_: Unit) => new coinoperation.CO_AppPayment(requestCid), lookups)
-          )
-        })(
+        val requestCid = Proto.tryDecodeJavaContractId(walletCodegen.AppPaymentRequest.COMPANION)(
+          request.requestContractId
+        )
+        exerciseWalletCoinAction(
+          new coinoperation.CO_AppPayment(requestCid),
           user,
           (outcome: COO_AcceptedAppPayment) =>
             v0.AcceptAppPaymentRequestResponse(
@@ -349,29 +329,12 @@ class GrpcWalletService(
   ): Future[v0.AcceptSubscriptionRequestResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth { user =>
-        exerciseWalletCoinAction((installCid, userStore) => {
-          val requestCid =
-            Proto.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(
-              request.requestContractId
-            )
-
-          def lookups = () =>
-            for {
-              subscriptionRequest <- userStore.acs.getContractById(
-                subsCodegen.SubscriptionRequest.COMPANION
-              )(requestCid)
-              _ <- userStore.acs.getContractById(subsCodegen.SubscriptionContext.INTERFACE)(
-                subscriptionRequest.value.payload.subscriptionData.context
-              )
-            } yield ()
-
-          Future.successful(
-            CoinOperationRequest(
-              (_: Unit) => new coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment(requestCid),
-              lookups,
-            )
+        val requestCid =
+          Proto.tryDecodeJavaContractId(subsCodegen.SubscriptionRequest.COMPANION)(
+            request.requestContractId
           )
-        })(
+        exerciseWalletCoinAction(
+          new coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment(requestCid),
           user,
           (outcome: coinoperationoutcome.COO_SubscriptionInitialPayment) =>
             v0.AcceptSubscriptionRequestResponse(
@@ -540,31 +503,26 @@ class GrpcWalletService(
   ): Future[Empty] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth { user =>
-        exerciseWalletCoinAction((c, userStore) => {
-          val endUserParty = userStore.key.endUserParty
-          val quantity = Proto.tryDecode(Proto.JavaBigDecimal)(request.quantity)
-          val receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
-          Future.successful(
-            CoinOperationRequest[channelCodegen.PaymentChannel.ContractId](
-              (channelId) =>
-                new coinoperation.CO_ChannelTransfer(
-                  channelId,
-                  new PaymentQuantity(quantity, Currency.CC),
-                  "wallet: execute direct transfer",
-                ),
-              () =>
-                lookupPaymentChannel(
-                  userStore,
-                  store.key.svcParty.toProtoPrimitive,
-                  receiverP = receiverParty.toProtoPrimitive,
-                  senderP = endUserParty.toProtoPrimitive,
-                ),
-            )
+        val quantity = Proto.tryDecode(Proto.JavaBigDecimal)(request.quantity)
+        val receiverParty = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
+        for {
+          userStore <- getUserStore(user)
+          channelId <- lookupPaymentChannel(
+            userStore,
+            store.key.svcParty.toProtoPrimitive,
+            receiverP = receiverParty.toProtoPrimitive,
+            senderP = userStore.key.endUserParty.toProtoPrimitive,
           )
-        })(
-          user,
-          (_: coinoperationoutcome.COO_AcceptedChannelTransfer) => Empty(),
-        )
+          result <- exerciseWalletCoinAction(
+            new coinoperation.CO_ChannelTransfer(
+              channelId,
+              new PaymentQuantity(quantity, Currency.CC),
+              "wallet: execute direct transfer",
+            ),
+            user,
+            (_: coinoperationoutcome.COO_AcceptedChannelTransfer) => Empty(),
+          )
+        } yield result
       }
     }
 
@@ -671,32 +629,15 @@ class GrpcWalletService(
       request: v0.AcceptOnChannelPaymentRequestRequest
   ): Future[Empty] = withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
     withAuth { user =>
-      exerciseWalletCoinAction((installCid, userStore) => {
-        val requestCid =
-          Proto.tryDecodeJavaContractId(channelCodegen.OnChannelPaymentRequest.COMPANION)(
-            request.requestContractId
-          )
-
-        def lookups = () =>
-          for {
-            paymentRequest <- userStore.acs.getContractById(
-              channelCodegen.OnChannelPaymentRequest.COMPANION
-            )(requestCid)
-            _ <- lookupPaymentChannel(
-              userStore,
-              paymentRequest.value.payload.svc,
-              receiverP = paymentRequest.value.payload.receiver,
-              senderP = userStore.key.endUserParty.toProtoPrimitive,
-            )
-          } yield ()
-
-        Future.successful(
-          CoinOperationRequest(
-            (_: Unit) => new coinoperation.CO_ChannelPayment(requestCid),
-            lookups,
-          )
+      val requestCid =
+        Proto.tryDecodeJavaContractId(channelCodegen.OnChannelPaymentRequest.COMPANION)(
+          request.requestContractId
         )
-      })(user, (_: coinoperationoutcome.COO_AcceptedChannelPayment) => Empty())
+      exerciseWalletCoinAction(
+        new coinoperation.CO_ChannelPayment(requestCid),
+        user,
+        (_: coinoperationoutcome.COO_AcceptedChannelPayment) => Empty(),
+      )
     }
   }
 
@@ -904,28 +845,18 @@ class GrpcWalletService(
     *
     * Additionally, the validator service party is also a readAs party (workaround for lack
     * of explicit disclosure for CoinRules).
-    *
-    * Note: curried syntax helps with type inference
     */
   private def exerciseWalletCoinAction[
       LookupResult,
       ExpectedCOO <: CoinOperationOutcome: ClassTag,
       ProtoResponse <: scalapb.GeneratedMessage,
   ](
-      constructCoinOperation: (
-          installCodegen.WalletAppInstall.ContractId,
-          UserWalletStore,
-      ) => Future[CoinOperationRequest[LookupResult]]
-  )(
+      operation: installCodegen.CoinOperation,
       user: String,
       processResponse: ExpectedCOO => ProtoResponse,
   )(implicit tc: TraceContext): Future[ProtoResponse] =
     for {
-      userStore <- getUserStore(user)
       userTreasury <- getUserTreasury(user)
-      userParty = userStore.key.endUserParty
-      install <- getUserInstallContract(userStore, userParty)
-      operation <- constructCoinOperation(install.contractId, userStore)
       res <- userTreasury
         .enqueueCoinOperation(operation)
         .map(processCOO[ExpectedCOO, ProtoResponse](processResponse))

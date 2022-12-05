@@ -14,7 +14,7 @@ import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.JavaContract
 import com.daml.network.wallet.store.UserWalletStore
-import com.daml.network.wallet.treasury.{CoinOperationRequest, EndUserTreasuryService}
+import com.daml.network.wallet.treasury.EndUserTreasuryService
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
@@ -58,15 +58,7 @@ class UserWalletAutomationService(
   private def completeAcceptedTransferOffer(
       acceptedOffer: JavaContract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer]
   )(implicit tc: TraceContext): Future[Either[String, String]] = {
-    def lookups = () => {
-      for {
-        _ <- store.acs.getContractById(AcceptedTransferOffer.COMPANION)(acceptedOffer.contractId)
-      } yield ()
-    }
-    val operation = CoinOperationRequest(
-      (_: Unit) => new CO_CompleteAcceptedTransfer(acceptedOffer.contractId),
-      lookups,
-    )
+    val operation = new CO_CompleteAcceptedTransfer(acceptedOffer.contractId)
     treasury
       .enqueueCoinOperation(operation)
       .map {

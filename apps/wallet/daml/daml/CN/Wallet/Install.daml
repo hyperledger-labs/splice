@@ -42,7 +42,7 @@ executeCoinOperationRec context inputs prevResults (operation::remainingOperatio
       handleResult COO_CompleteAcceptedTransfer resultE
     CO_SubscriptionAcceptAndMakeInitialPayment cid -> handle SubscriptionRequest_AcceptAndMakePayment COO_SubscriptionInitialPayment cid
     CO_SubscriptionMakePayment cid -> handle SubscriptionIdleState_MakePayment COO_SubscriptionPayment cid
-    CO_Tap svc validator endUser tapQuantity -> do
+    CO_Tap endUser tapQuantity -> do
       coin <- catchAll (exercise (fromInterfaceContractId @CoinRules context.coinRules) (CoinRules_Tap endUser tapQuantity (fromInterfaceContractId @OpenMiningRound context.context.openMiningRound)))
       handleResultTap (toInterfaceContractId @API.Coin <$> coin)
   where
@@ -84,10 +84,8 @@ data CoinOperation
   | CO_SubscriptionAcceptAndMakeInitialPayment (ContractId SubscriptionRequest)
   | CO_SubscriptionMakePayment (ContractId SubscriptionIdleState)
   | CO_Tap with
-    svc: Party
-    validator: Party
-    endUser: Party
-    tapQuantity: Decimal
+      endUser: Party
+      tapQuantity: Decimal
 
 
   deriving (Eq, Show)

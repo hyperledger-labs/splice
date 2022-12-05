@@ -7,7 +7,14 @@ import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import cats.syntax.traverse.*
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cn.wallet.install as installCodegen
+import com.daml.network.codegen.java.cn.wallet.install.coinoperation
+import com.daml.network.codegen.java.cn.wallet.{
+  install as installCodegen,
+  payment as walletCodegen,
+  paymentchannel as channelCodegen,
+  subscriptions as subsCodegen,
+  transferoffer as transferOffersCodegen,
+}
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.util.{HasHealth, TimeUtil}
 import com.daml.network.wallet.UserWalletManager
@@ -28,33 +35,10 @@ import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success}
 // TODO(#1818): Add PrettyPrinting
 
-/** Wrapper class for the treasury service.
-  *
-  * Inside the treasury service, we want to avoid a batch being aborted for anything other
-  * than contention errors. Some errors can be caught within Daml to avoid aborting the transaction. However, contract
-  * activeness cannot be caught in Daml. Therefore, we check that certain contracts required for the operation
-  * are active via lookups. That way, we know that if a batch failed it can only be due to contention and
-  * we can safely resubmit it.
-  *
-  * Note that we don't check that contracts managed by the SVC (CoinRules, IssuanceState, OpenMiningRound etc.) are
-  * active. These contracts should always be active (even under contention) and a non-SVC CN user isn't able
-  * to make changes to his system that would lead to these contracts being active on the next submission.
-  *
-  * @param tryLookups runs activeness checks on all contracts that are needed for the corresponding
-  * coin operation. If a require contract is not found, the future should fail with an appropriate
-  * [[io.grpc.StatusRuntimeException]]. We execute `tryLookups` run on every submission of the corresponding
-  * coin operation (also for retries).
-  */
-case class CoinOperationRequest[T](
-    operation: T => installCodegen.CoinOperation,
-    tryLookups: () => Future[T],
-)
-
 /** This class encapsulates the logic that sequences all operations which change the coin holdings of an user such
   * that concurrent manipulations don't conflict.
   *
-  * For the design, please see https://github.com/DACH-NY/the-real-canton-coin/issues/913 and the documentation on
-  * [[CoinOperationRequest]].
+  * For the design, please see https://github.com/DACH-NY/the-real-canton-coin/issues/913
   */
 class EndUserTreasuryService(
     connection: CoinLedgerConnection,
@@ -77,11 +61,11 @@ class EndUserTreasuryService(
 
   private val batchExecutorRunning = new AtomicBoolean(true)
 
-  private val queue: BoundedSourceQueue[AnyEnqueuedCoinOperation] =
+  private val queue: BoundedSourceQueue[EnqueuedCoinOperation] =
     withNewTrace(this.getClass.getSimpleName)(implicit tc =>
       _ => {
         val queue = Source
-          .queue[AnyEnqueuedCoinOperation](bufferSize)
+          .queue[EnqueuedCoinOperation](bufferSize)
           .batch(batchSize, operation => Seq(operation))((operations, operation) =>
             operations :+ operation
           )
@@ -114,7 +98,7 @@ class EndUserTreasuryService(
     * The [[EndUserTreasuryService]] will schedule the operation and then complete the returned with its result.
     */
   def enqueueCoinOperation[T](
-      operation: CoinOperationRequest[T]
+      operation: installCodegen.CoinOperation
   )(implicit tc: TraceContext): Future[installCodegen.CoinOperationOutcome] = {
     val p = Promise[installCodegen.CoinOperationOutcome]()
     queue.offer(EnqueuedCoinOperation(operation, p)) match {
@@ -147,12 +131,11 @@ class EndUserTreasuryService(
     * the coin operations with failed lookups.
     */
   private def runLookups(
-      batch: Seq[AnyEnqueuedCoinOperation]
-  ): Future[Seq[ValidCoinOperation]] = {
+      batch: Seq[EnqueuedCoinOperation]
+  ): Future[Seq[EnqueuedCoinOperation]] = {
     batch
-      .traverse { case EnqueuedCoinOperation(coinOperation, p) =>
-        coinOperation
-          .tryLookups()
+      .traverse { case EnqueuedCoinOperation(op, p) =>
+        tryLookupCoinOperation(op)
           .transform { lookupResult =>
             lookupResult match {
               case Failure(ex) =>
@@ -160,12 +143,69 @@ class EndUserTreasuryService(
                 p.failure(ex)
                 // but still run the rest of the operations whose lookup didn't fail
                 Success(None)
-              case Success(r) =>
-                Success(Some(ValidCoinOperation(coinOperation.operation(r), p)))
+              case Success(()) =>
+                Success(Some(EnqueuedCoinOperation(op, p)))
             }
           }
       }
       .map(_.flatten)
+  }
+
+  private def tryLookupCoinOperation(op0: installCodegen.CoinOperation): Future[Unit] = op0 match {
+    case op: coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment =>
+      for {
+        subscriptionRequest <- userStore.acs.getContractById(
+          subsCodegen.SubscriptionRequest.COMPANION
+        )(op.contractIdValue)
+        _ <- userStore.acs.getContractById(subsCodegen.SubscriptionContext.INTERFACE)(
+          subscriptionRequest.value.payload.subscriptionData.context
+        )
+      } yield ()
+
+    case op: coinoperation.CO_SubscriptionMakePayment =>
+      for {
+        subscriptionState <- userStore.acs.getContractById(
+          subsCodegen.SubscriptionIdleState.COMPANION
+        )(op.contractIdValue)
+        _ <- userStore.acs.getContractById(subsCodegen.SubscriptionContext.INTERFACE)(
+          subscriptionState.value.payload.subscriptionData.context
+        )
+      } yield ()
+
+    case op: coinoperation.CO_AppPayment =>
+      for {
+        paymentRequest <- userStore.acs.getContractById(walletCodegen.AppPaymentRequest.COMPANION)(
+          op.contractIdValue
+        )
+        _ <- userStore.acs.getContractById(walletCodegen.DeliveryOffer.INTERFACE)(
+          paymentRequest.value.payload.deliveryOffer
+        )
+      } yield ()
+
+    case op: coinoperation.CO_ChannelPayment =>
+      for {
+        _ <- userStore.acs.getContractById(channelCodegen.OnChannelPaymentRequest.COMPANION)(
+          op.contractIdValue
+        )
+      } yield ()
+
+    case op: coinoperation.CO_ChannelTransfer =>
+      for {
+        _ <- userStore.acs.getContractById(channelCodegen.PaymentChannel.COMPANION)(
+          op.channel
+        )
+      } yield ()
+
+    case op: coinoperation.CO_CompleteAcceptedTransfer =>
+      for {
+        _ <- userStore.acs.getContractById(transferOffersCodegen.AcceptedTransferOffer.COMPANION)(
+          op.contractIdValue
+        )
+      } yield ()
+
+    case _: coinoperation.CO_Tap => Future.unit
+
+    case op => throw new NotImplementedError(s"Unexpected coin operation: $op")
   }
 
   /** In case of contention, the `executeBatch` function may fail. This function adds retries so that a single coin
@@ -173,7 +213,7 @@ class EndUserTreasuryService(
     * to the wallet app.
     */
   private def executeBatchWithRetry(
-      batch: Seq[AnyEnqueuedCoinOperation]
+      batch: Seq[EnqueuedCoinOperation]
   )(implicit tc: TraceContext): Future[Done] =
     withSpan("executeBatchWithRetry") { implicit tc => _ =>
       retryProvider
@@ -185,7 +225,7 @@ class EndUserTreasuryService(
         .recover(ex => {
           logger.error("Skipping batch due to unexpected execution failure", ex)
           batch.foreach(op =>
-            op.promise.failure(
+            op.outcomePromise.failure(
               Status.INTERNAL
                 .withDescription("Unexpected coin operation execution failure.")
                 .asRuntimeException()
@@ -196,7 +236,7 @@ class EndUserTreasuryService(
     }
 
   private def executeBatch(
-      batch: Seq[AnyEnqueuedCoinOperation]
+      batch: Seq[EnqueuedCoinOperation]
   )(implicit tc: TraceContext): Future[Done] = {
     logger.debug(
       s"Running batch of coin operations for user ${userStore.key.endUserParty} with length ${batch.size}: $batch"
@@ -232,7 +272,7 @@ class EndUserTreasuryService(
         )
       // return all outcomes to the callers
       _ = (outcomes.exerciseResult.asScala zip validOperations).map {
-        case (outcome, ValidCoinOperation(_, p)) =>
+        case (outcome, EnqueuedCoinOperation(_, p)) =>
           p.success(outcome)
       }
       // wait for store to ingest the new coin holdings *provided* they were updated
@@ -325,25 +365,8 @@ class EndUserTreasuryService(
 
 object EndUserTreasuryService {
 
-  /** Wrapper helper class. */
-  private case class EnqueuedCoinOperation[T](
-      override val operationWithLookups: CoinOperationRequest[T],
-      override val promise: Promise[installCodegen.CoinOperationOutcome],
-  ) extends AnyEnqueuedCoinOperation {
-    override type LookupResult = T
-  }
-
-  // Existential trait that hides the type parameter.
-  // We cannot use EnqueuedCOinOperation[Any] since the type param
-  // is invariant.
-  sealed trait AnyEnqueuedCoinOperation {
-    type LookupResult
-    def operationWithLookups: CoinOperationRequest[LookupResult]
-    def promise: Promise[installCodegen.CoinOperationOutcome]
-  }
-
-  private case class ValidCoinOperation(
+  private case class EnqueuedCoinOperation(
       operation: installCodegen.CoinOperation,
-      promise: Promise[installCodegen.CoinOperationOutcome],
+      outcomePromise: Promise[installCodegen.CoinOperationOutcome],
   )
 }

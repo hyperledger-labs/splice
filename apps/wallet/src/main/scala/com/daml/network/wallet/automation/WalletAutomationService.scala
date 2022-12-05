@@ -13,7 +13,6 @@ import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.store.UserWalletStore
-import com.daml.network.wallet.treasury.CoinOperationRequest
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -23,8 +22,7 @@ import io.opentelemetry.api.trace.Tracer
 import java.time.temporal.ChronoUnit
 import scala.concurrent.{ExecutionContextExecutor, Future}
 
-/** Manages background automation that runs on an Wallet app.
-  */
+/** Manages background automation that runs on an Wallet app. */
 class WalletAutomationService(
     automationConfig: AutomationConfig,
     clockConfig: ClockConfig,
@@ -115,20 +113,7 @@ class WalletAutomationService(
       stateCid: subsCodegen.SubscriptionIdleState.ContractId,
       userStore: UserWalletStore,
   )(implicit tc: TraceContext): Future[Either[String, Unit]] = {
-    def lookups = () =>
-      for {
-        subscriptionState <- userStore.acs.getContractById(
-          subsCodegen.SubscriptionIdleState.COMPANION
-        )(stateCid)
-        _ <- userStore.acs.getContractById(subsCodegen.SubscriptionContext.INTERFACE)(
-          subscriptionState.value.payload.subscriptionData.context
-        )
-      } yield ()
-
-    val operation = CoinOperationRequest(
-      (_: Unit) => new installCodegen.coinoperation.CO_SubscriptionMakePayment(stateCid),
-      lookups,
-    )
+    val operation = new installCodegen.coinoperation.CO_SubscriptionMakePayment(stateCid)
     (walletManager.lookupEndUserWallet(userStore.key.endUserName) match {
       case None => Future(Left(s"missing end-user treasury"))
       case Some(userWallet) =>
