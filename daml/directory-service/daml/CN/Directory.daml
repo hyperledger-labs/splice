@@ -157,7 +157,6 @@ template DirectoryInstall with
     svc : Party
     entryFee : Decimal
     collectionDuration : RelTime -- Time provider has to collect accepted payment
-    acceptDuration : RelTime -- Time user has to accept a payment request
     renewalDuration : RelTime -- Length of interval within which user can renew. At the end the entry expires
     entryLifetime : RelTime -- Duration until an entry expires
   where
@@ -211,7 +210,6 @@ template DirectoryInstallRequest with
         svc : Party
         entryFee : Decimal
         collectionDuration : RelTime -- Time provider has to collect accepted payment
-        acceptDuration : RelTime -- Time user has to accept a payment request
         renewalDuration : RelTime -- Time user has available to make a renewal payment, before the entry expires.
         entryLifetime : RelTime -- Duration until an entry expires
       controller provider

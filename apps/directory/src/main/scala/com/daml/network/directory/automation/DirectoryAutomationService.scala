@@ -16,7 +16,6 @@ import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -40,9 +39,6 @@ class DirectoryAutomationService(
   private val collectionDuration = new RelTime(
     10_000_000
   )
-  private val acceptDuration = new RelTime(
-    60_000_000
-  )
   private val renewalDuration = new RelTime(
     // 1 day, so subscriptions can be payed between day 89 and day 90
     24 * 60 * 60 * 1_000_000L
@@ -51,7 +47,6 @@ class DirectoryAutomationService(
     // 90 days
     90 * 24 * 60 * 60 * 1_000_000L
   )
-  private val entryExpirationCheckInterval = 1.second
 
   override protected def timeouts: ProcessingTimeout = processingTimeouts
 
@@ -96,7 +91,6 @@ class DirectoryAutomationService(
             store.svcParty.toProtoPrimitive,
             entryFee.bigDecimal,
             collectionDuration,
-            acceptDuration,
             renewalDuration,
             entryLifetime,
           )

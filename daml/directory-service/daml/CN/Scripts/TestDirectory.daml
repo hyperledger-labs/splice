@@ -30,7 +30,6 @@ testWithSubscription = script do
     svc = app.svc
     entryFee = 1.0
     collectionDuration = minutes 5
-    acceptDuration = minutes 5
     renewalDuration = days 30
     entryLifetime = days 90
 
