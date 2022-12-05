@@ -46,6 +46,7 @@ in pkgs.mkShell {
     jsonnet
     kubectl
     lnav
+    nettools
     nix
     nodejs
     openjdk11
