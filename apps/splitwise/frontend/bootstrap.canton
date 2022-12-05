@@ -7,8 +7,8 @@ aliceValidator.waitForInitialization()
 bobValidator.waitForInitialization()
 
 Seq(aliceValidator.remoteParticipant, bobValidator.remoteParticipant).foreach { p =>
-  p.dars.upload("apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar")
-  p.dars.upload("apps/directory/daml/.daml/dist/directory-service-0.1.0.dar")
+  p.dars.upload("daml/splitwise/.daml/dist/splitwise-0.1.0.dar")
+  p.dars.upload("daml/directory-service/.daml/dist/directory-service-0.1.0.dar")
 }
 
 val charlieValidator = aliceValidator

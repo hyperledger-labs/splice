@@ -138,7 +138,7 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
         aliceWallet.tap(50)
       }
       clue("Setting up directory as provider for the created subscriptions") {
-        val directoryDarPath = "apps/directory/daml/.daml/dist/directory-service-0.1.0.dar"
+        val directoryDarPath = "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
         aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
         aliceDirectory.requestDirectoryInstall()
         aliceValidator.remoteParticipant.ledger_api.acs

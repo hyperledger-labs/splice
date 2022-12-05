@@ -15,7 +15,7 @@ import scala.jdk.CollectionConverters.*
 class DirectoryTimeBasedIntegrationTest extends CoinIntegrationTest {
 
   private val directoryDarPath =
-    "apps/directory/daml/.daml/dist/directory-service-0.1.0.dar"
+    "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
   private val testEntryName = "mycoolentry"
 
   override def environmentDefinition

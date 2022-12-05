@@ -16,7 +16,7 @@ import scala.concurrent.Future
 
 class SplitwiseIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
 
-  private val darPath = "apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar"
+  private val darPath = "daml/splitwise/.daml/dist/splitwise-0.1.0.dar"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =

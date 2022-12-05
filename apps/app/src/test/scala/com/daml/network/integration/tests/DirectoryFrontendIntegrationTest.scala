@@ -8,7 +8,7 @@ import scala.concurrent.duration.DurationInt
 class DirectoryFrontendIntegrationTest extends FrontendIntegrationTest("alice") with CoinTestUtil {
 
   private val directoryDarPath =
-    "apps/directory/daml/.daml/dist/directory-service-0.1.0.dar"
+    "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
 
   override def environmentDefinition =
     CoinEnvironmentDefinition

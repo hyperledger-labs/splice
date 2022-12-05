@@ -17,8 +17,8 @@ class SplitwiseFrontendIntegrationTest
     extends FrontendIntegrationTest("aliceSplitwise", "bobSplitwise", "charlieSplitwise")
     with CoinTestUtil {
 
-  private val splitwiseDarPath = "apps/splitwise/daml/.daml/dist/splitwise-0.1.0.dar"
-  private val directoryDarPath = "apps/directory/daml/.daml/dist/directory-service-0.1.0.dar"
+  private val splitwiseDarPath = "daml/splitwise/.daml/dist/splitwise-0.1.0.dar"
+  private val directoryDarPath = "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =

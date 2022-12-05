@@ -76,7 +76,7 @@ lazy val root = (project in file("."))
 // used across our DARs.
 lazy val `cn-util-daml` =
   project
-    .in(file("cn-util"))
+    .in(file("daml/cn-util"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings
@@ -84,7 +84,7 @@ lazy val `cn-util-daml` =
 
 lazy val `canton-coin-api-daml` =
   project
-    .in(file("canton-coin-api"))
+    .in(file("daml/canton-coin-api"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings
@@ -92,7 +92,7 @@ lazy val `canton-coin-api-daml` =
 
 lazy val `canton-coin-daml` =
   project
-    .in(file("canton-coin"))
+    .in(file("daml/canton-coin"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -103,7 +103,7 @@ lazy val `canton-coin-daml` =
 
 lazy val `svc-governance-daml` =
   project
-    .in(file("apps/sv/daml"))
+    .in(file("daml/svc-governance"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -117,7 +117,7 @@ lazy val `svc-governance-daml` =
 // to manage payments through the wallet.
 lazy val `wallet-payments-daml` =
   project
-    .in(file("apps/wallet/daml-payments"))
+    .in(file("daml/wallet-payments"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -130,7 +130,7 @@ lazy val `wallet-payments-daml` =
 // but do use internally, e.g., for batching.
 lazy val `wallet-daml` =
   project
-    .in(file("apps/wallet/daml"))
+    .in(file("daml/wallet"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -139,7 +139,7 @@ lazy val `wallet-daml` =
 
 lazy val `directory-daml` =
   project
-    .in(file("apps/directory/daml"))
+    .in(file("daml/directory-service"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -148,7 +148,7 @@ lazy val `directory-daml` =
 
 lazy val `splitwise-daml` =
   project
-    .in(file("apps/splitwise/daml"))
+    .in(file("daml/splitwise"))
     .enablePlugins(DamlPlugin)
     .settings(
       BuildCommon.damlSettings,
@@ -496,7 +496,7 @@ lazy val cleanCnDars = taskKey[Unit]("Remove all `.dar` files in `apps` and `can
 cleanCnDars := {
   val log = streams.value.log
   runCommand(Seq("find", "apps", "-name", "*.dar", "-delete"), log)
-  runCommand(Seq("find", "canton-coin", "-name", "*.dar", "-delete"), log)
+  runCommand(Seq("find", "daml", "-name", "*.dar", "-delete"), log)
 }
 
 lazy val checkErrors = taskKey[Unit]("Check test log for errors and fail if there is one")

@@ -6,7 +6,7 @@ build_arg := --build-arg base_version=$(shell version-gen)
 
 .PHONY: build
 build: $(docker-build)
-target/directory-service-0.1.0.dar: ../../../apps/directory/daml/.daml/dist/directory-service-0.1.0.dar
+target/directory-service-0.1.0.dar: ../../../daml/directory-service/.daml/dist/directory-service-0.1.0.dar
 	mkdir -p $(@D)
 	cp $< $@
 
