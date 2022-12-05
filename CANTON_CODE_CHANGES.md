@@ -11,6 +11,8 @@ to know which and/or what changes we'll need to upstream before the switch.
 * `idHelper`, `tryDomainNodeParametersByString`, `tryParticipantNodeParametersByString`, 
     `MetricsFactory.registerReporter`, `BaseIntegrationTest` made public
 * `testingTimeService` made protected
+* `PrettyInstances.treeOfIterable` and `PrettyInstances.prettyUidString` made public
+* pretty-printing of hex-only contract-ids shortends the contract-id using readable-hash
 ## Misc
 * Generalization of `Environment`
 * Generalization of `MetricsFactory`

@@ -102,7 +102,7 @@ trait PrettyInstances {
     elements =>
       treeOfIterable("Map", elements.map { case (k, v) => Tree.Infix(k.toTree, "->", v.toTree) })
 
-  private def treeOfIterable[T: Pretty](prefix: String, elements: Iterable[T]): Tree =
+  def treeOfIterable[T: Pretty](prefix: String, elements: Iterable[T]): Tree =
     if (elements.sizeCompare(1) == 0) {
       elements.iterator.next().toTree
     } else {
@@ -183,7 +183,7 @@ trait PrettyInstances {
   implicit def prettyPrimitiveParty: Pretty[Primitive.Party] =
     prettyOfString(partyId => prettyUidString(scalaz.Tag.unwrap(partyId)))
 
-  private def prettyUidString(partyStr: String): String =
+  def prettyUidString(partyStr: String): String =
     UniqueIdentifier.fromProtoPrimitive_(partyStr) match {
       case Right(uid) => uid.show
       case Left(_) => partyStr
@@ -232,6 +232,9 @@ trait PrettyInstances {
     val tokens = coidStr.split(':')
     if (tokens.lengthCompare(2) == 0) {
       tokens(0).readableHash.toString + ":" + tokens(1).readableHash.toString
+    } else if (coidStr.forall("1234567890abcdef".contains(_))) {
+      // abbreviate lower-case hex strings
+      coidStr.readableHash.toString
     } else {
       // Don't abbreviate anything for unusual contract ids
       coidStr
