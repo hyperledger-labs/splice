@@ -16,6 +16,7 @@ import {
 import { AcceptedTransferOffer, TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer';
 
 import { PaymentQuantityDisplay } from '../components/QuantityDisplay';
+import Timestamp from '../components/Timestamp';
 import { useUserState } from '../contexts/UserContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 
@@ -116,7 +117,7 @@ const TransferOffers: React.FC = () => {
                 {c.payload.description}
               </TableCell>
               <TableCell className="transfer-offers-table-expiration">
-                {new Date(+c.payload.expiresAt / 1000).toLocaleString()}
+                <Timestamp time={c.payload.expiresAt} />
               </TableCell>
               <TableCell>
                 {c.payload.receiver === primaryPartyId && (
@@ -172,7 +173,9 @@ const TransferOffers: React.FC = () => {
                 <PaymentQuantityDisplay quantity={c.payload.quantity} />
               </TableCell>
               <TableCell>{c.payload.description}</TableCell>
-              <TableCell>{new Date(+c.payload.expiresAt / 1000).toLocaleString()}</TableCell>
+              <TableCell>
+                <Timestamp time={c.payload.expiresAt} />
+              </TableCell>
             </TableRow>
           ))}
         </TableBody>
