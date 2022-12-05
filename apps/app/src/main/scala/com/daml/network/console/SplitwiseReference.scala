@@ -133,7 +133,6 @@ final class RemoteSplitwiseAppReference(
   }
 
   private def getUserPrimaryParty() = LedgerApiUtils.getUserPrimaryParty(ledgerApi, userId)
-  private def getUserReadAs() = LedgerApiUtils.getUserReadAs(ledgerApi, userId)
 
   @Help.Summary("Return remote splitwise app config")
   def config: RemoteSplitwiseAppConfig =

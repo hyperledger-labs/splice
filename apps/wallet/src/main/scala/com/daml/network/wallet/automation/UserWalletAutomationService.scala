@@ -21,7 +21,6 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
-import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 
 class UserWalletAutomationService(
@@ -38,9 +37,6 @@ class UserWalletAutomationService(
     mat: Materializer,
     tracer: Tracer,
 ) extends AutomationService(automationConfig, clockConfig, retryProvider) {
-
-  // TODO(M3-02) this should be a configuration option that gets overridden in tests
-  private val pendingTransferOffersRetryInterval = 1.second
 
   private val connection = registerResource(ledgerClient.connection(this.getClass.getSimpleName))
 

@@ -1,13 +1,6 @@
 package com.daml.network.svc.admin.grpc
 
-import com.daml.ledger.javaapi.data.Template
-import com.daml.ledger.javaapi.data.codegen.{
-  Contract => CodegenContract,
-  ContractCompanion,
-  ContractId,
-}
 import com.daml.network.codegen.java.cc
-import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0.SvcServiceGrpc
@@ -46,29 +39,6 @@ class GrpcSvcAppService(
         coinPackageId = SvcApp.coinPackage.packageId,
         coinRulesContractIds = coinRulesCids.map(Proto.encodeContractId(_)),
       )
-    }
-
-  /** Query the ACS for the given template and filter by round. Returns a map from the validator party
-    * to the corresponding contract id.
-    * Fails if there is more than one round for a given validator.
-    */
-  private def getRound[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      companion: ContractCompanion[TC, TCid, T]
-  )(
-      getRound: T => v1.round.Round
-  )(round: Long): Future[TCid] =
-    for {
-      allRounds <- store.listContracts(companion)
-    } yield {
-      val filteredRounds = allRounds.value.filter { roundContract =>
-        val roundId = getRound(roundContract.payload)
-        roundId.number == round
-      }
-      require(
-        filteredRounds.length == 1,
-        s"Expected one round but got ${filteredRounds.length} rounds $filteredRounds",
-      )
-      filteredRounds(0).contractId
     }
 }
 

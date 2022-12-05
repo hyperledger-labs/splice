@@ -4,7 +4,6 @@ import com.daml.network.codegen.java.cc.api.v1.coin.{TransferResult, TransferSum
 import com.daml.network.svc.store.SvcEventsStore
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 
-import java.util.concurrent.atomic.AtomicInteger
 import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future, blocking}
 
@@ -13,7 +12,6 @@ class InMemorySvcEventsStore(override protected val loggerFactory: NamedLoggerFa
 ) extends SvcEventsStore
     with NamedLogging {
 
-  private val current = new AtomicInteger(0)
   private val transfersPerRound: mutable.Map[Long, Seq[TransferSummary]] = mutable.Map()
 
   /** Expected to be called once per transaction, with all transfers found within that transaction

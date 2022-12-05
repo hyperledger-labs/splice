@@ -348,18 +348,6 @@ class EndUserTreasuryService(
       )
   } yield (coinInputs ++ validatorRewardInputs ++ appRewardInputs, validatorRewardUsers)
 
-  // We fetch this on demand here to avoid a dependency of the validator store being
-  // setup before other user’s stores.
-  private def getValidatorStore: UserWalletStore =
-    walletManager
-      .lookupEndUserWallet(walletManager.store.key.validatorUserName)
-      .getOrElse(
-        throw Status.FAILED_PRECONDITION
-          .withDescription("Validator store not setup yet")
-          .asRuntimeException()
-      )
-      .store
-
   private def getInstall =
     userStore
       .lookupInstall()
