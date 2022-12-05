@@ -239,56 +239,6 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
           _.errorMessage should include("nonexistentname"),
         )
     }
-    "allocate directory entries following an initial subscription payment and renew entries on follow-up payments" in {
-      implicit env =>
-        val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
-        val providerParty = directory.getProviderPartyId()
-
-        val aliceRefs = clue("Setup Alice") {
-          val aliceStaticRefs = StaticUserRefs(aliceValidator, aliceDirectory, aliceWallet)
-          setupUser(aliceStaticRefs)
-        }
-        val (_, subReqId) = clue("Alice requests a directory entry") {
-          aliceRefs.directory.requestDirectoryEntryWithSubscription(testEntryName)
-        }
-        clue("Alice obtains some coins and accepts the subscription") {
-          aliceRefs.wallet.tap(50.0)
-          aliceRefs.wallet.acceptSubscriptionRequest(subReqId)
-        }
-        val entry = clue("Getting Alice's new entry") {
-          def tryGetEntry() =
-            Try(loggerFactory.suppressErrors(directory.lookupEntryByName(testEntryName)))
-          eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $testEntryName")))
-        }
-        clue("Checking payload of new entry") {
-          val expectedPayload = new codegen.DirectoryEntry(
-            aliceUserParty.toProtoPrimitive,
-            providerParty.toProtoPrimitive,
-            testEntryName,
-            entry.payload.expiresAt,
-          )
-          entry.payload shouldBe expectedPayload
-        }
-        val renewedEntry = clue(
-          "Eventually, Alice makes a follup-up subscription payment, which the directory collects, renewing her entry."
-        ) {
-          eventually()(
-            directory
-              .lookupEntryByName(testEntryName)
-              .contractId should not equal entry.contractId
-          )
-          directory.lookupEntryByName(testEntryName)
-        }
-        clue("Checking payload of renewed entry") {
-          val newEntry = new codegen.DirectoryEntry(
-            entry.payload.user,
-            entry.payload.provider,
-            entry.payload.name,
-            entry.payload.expiresAt.plus(90, ChronoUnit.DAYS),
-          )
-          renewedEntry.payload shouldBe newEntry
-        }
-    }
     "archive expired directory entries" in { implicit env =>
       clue("Creating a directory entry that expires immediately") {
         directory.listEntries() shouldBe empty

@@ -269,7 +269,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
             )
           },
         )(
-          // note that because the directory sets paymentDuration = paymentInterval,
+          // note that because this test sets paymentDuration = paymentInterval,
           // the wallet backend can make the second payment immediately
           "an automated subscription payment is eventually initiated by the wallet",
           _ =>

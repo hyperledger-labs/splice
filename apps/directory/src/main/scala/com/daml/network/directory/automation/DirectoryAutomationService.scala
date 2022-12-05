@@ -44,8 +44,8 @@ class DirectoryAutomationService(
     60_000_000
   )
   private val renewalDuration = new RelTime(
-    // 90 days; keeping this generous makes testing easier
-    90 * 24 * 60 * 60 * 1_000_000L
+    // 1 day, so subscriptions can be payed between day 89 and day 90
+    24 * 60 * 60 * 1_000_000L
   )
   private val entryLifetime = new RelTime(
     // 90 days

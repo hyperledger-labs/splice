@@ -164,19 +164,10 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
               aliceWallet.acceptSubscriptionRequest(requestId)
             },
           )(
-            "subscription is created and no subscription is ready for payment",
+            "subscription is created",
             _ => {
               val subs = aliceWallet.listSubscriptions()
-              val now = svc.remoteParticipant.ledger_api.time.get()
-              subs.length shouldBe i + 1
-              // TODO(#1217) we can remove this check once `renewalDuration == entryLifetime` is no longer hard-coded in the directory backend
-              subs.foreach(sub => {
-                sub.state match {
-                  case GrpcWalletAppClient.SubscriptionIdleState(state) =>
-                    assert(state.payload.nextPaymentDueAt.isAfter(now.toInstant))
-                  case _ => fail()
-                }
-              })
+              subs should have length (i + 1L)
             },
           )
           advanceTime(Duration.ofDays(10))
