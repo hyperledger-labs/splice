@@ -2,6 +2,8 @@ import { LookupEntryByPartyRequest } from 'common-protobuf/com/daml/network/dire
 import { RpcError, StatusCode } from 'grpc-web';
 import React, { useState, useEffect } from 'react';
 
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 
 import { DirectoryEntry as damlDirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
@@ -14,7 +16,7 @@ interface Entry {
   entry: damlDirectoryEntry | undefined; // undefined if no entry exists for this user
 }
 
-const DirectoryEntry: React.FC<{ partyId: string }> = ({ partyId }) => {
+const DirectoryEntry: React.FC<{ partyId: string; noCopy?: boolean }> = ({ partyId, noCopy }) => {
   const directoryClient = useDirectoryClient();
 
   const [entry, setParty] = useState<Entry | undefined>(undefined); // undefined state represents the directory lookup still being pending
@@ -42,29 +44,54 @@ const DirectoryEntry: React.FC<{ partyId: string }> = ({ partyId }) => {
     getEntry();
   }, [directoryClient, partyId]);
 
-  const truncate = (s: string) => {
-    if (s.length > 10) {
-      return s.substring(0, 4) + '...' + s.substring(s.length - 4);
-    } else {
-      return s;
-    }
-  };
-
   if (entry === undefined) {
     return <div>...</div>;
-  } else if (entry.entry === undefined) {
-    return <span className="party-id">{entry.user}</span>;
+  }
+
+  const handleClick = () => navigator.clipboard.writeText(entry.user);
+
+  const partyIdComponent = (
+    <div style={{ display: 'flex', alignItems: 'center' }}>
+      <Tooltip title={'Party ID: ' + entry.user}>
+        <div
+          style={{
+            display: 'inline-flex',
+            maxWidth: '300px',
+          }}
+        >
+          <div
+            style={{
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
+              fontWeight: 'lighter',
+            }}
+            className="party-id"
+          >
+            {entry.user}
+          </div>
+        </div>
+      </Tooltip>
+      {!noCopy && (
+        <IconButton onClick={handleClick}>
+          <ContentCopyIcon fontSize={'small'} />
+        </IconButton>
+      )}
+    </div>
+  );
+
+  if (entry.entry === undefined) {
+    return partyIdComponent;
   } else {
     return (
-      <div>
-        <Tooltip title="Directory Entry">
-          <span className="dir-entry">{entry.entry.name}</span>
-        </Tooltip>{' '}
-        (
-        <Tooltip title={'Party ID: ' + entry.user}>
-          <span style={{ fontWeight: 'lighter' }}>{truncate(entry.user)}</span>
+      <div style={{ display: 'flex' }}>
+        <Tooltip title="Directory Entry" style={{ marginRight: '4px' }}>
+          <div className="dir-entry" style={{ display: 'flex', alignItems: 'center' }}>
+            {entry.entry.name}
+          </div>
         </Tooltip>
-        )
+        {'('}
+        {partyIdComponent}
+        {')'}
       </div>
     );
   }

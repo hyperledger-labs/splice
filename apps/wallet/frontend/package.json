@@ -12,6 +12,7 @@
     "@emotion/styled": "^11.10.0",
     "@mui/lab": "^5.0.0-alpha.93",
     "@mui/material": "^5.9.3",
+    "@mui/icons-material": "^5.10.16",
     "common-frontend": "^0.1.0",
     "common-protobuf": "^0.1.0",
     "grpc-web": "^1.4.1",

@@ -13,6 +13,7 @@ import com.daml.network.util.Auth0Util
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens.*
+
 import scala.util.Using
 
 /** Integration test for the runbook. Uses the exact same configuration files and bootstrap scripts as the runbook.

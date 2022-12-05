@@ -182,8 +182,9 @@ const MembershipRequests: React.FC<MembershipRequestsProps> = ({ group, party, p
                 className="add-user-link"
                 onClick={() => onAddMember(invite)}
               >
-                Add <DirectoryEntryComponent partyId={invite.payload.invitee} />
+                Add
               </Button>
+              <DirectoryEntryComponent partyId={invite.payload.invitee} noCopy />
             </ListItem>
           ))}
         </List>

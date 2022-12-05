@@ -11,6 +11,7 @@
     "@emotion/styled": "^11.10.0",
     "@mui/lab": "^5.0.0-alpha.93",
     "@mui/material": "^5.9.3",
+    "@mui/icons-material": "^5.10.16",
     "google-protobuf": "^3.21.0",
     "jwt-decode": "^3.1.2",
     "oidc-client-ts": "^2.1.0",

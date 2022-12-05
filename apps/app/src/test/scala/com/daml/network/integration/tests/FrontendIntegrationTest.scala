@@ -175,8 +175,7 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
   }
 
   protected def expectedCns(partyId: PartyId, entry: String) = {
-    val full = partyId.toProtoPrimitive
-    s"${entry} (${full.substring(0, 4)}...${full.substring(full.length - 4)})"
+    s"${entry}\n(\n${partyId.toProtoPrimitive}\n)"
   }
 
 }
