@@ -291,10 +291,14 @@ commands:
         type: enum
         enum: ["on_success", "always", "on_fail"]
         default: "on_success"
+      additional_nix_args:
+        type: string
+        default: ""
     steps:
       - run_bash_command_in_nix:
           cmd_name: Executing "sbt << parameters.cmd >>"
           when: << parameters.when >>
+          additional_nix_args: << parameters.additional_nix_args >>
           cmd: |
             on_exit() {
               local CODE="$?"
@@ -892,6 +896,7 @@ jobs:
           pre_sbt_cmd: |
             . cluster/deployment/<< parameters.cluster >>/.envrc.vars
           cmd: "\"testOnly *PreflightIntegrationTest\""
+          additional_nix_args: "--keep AUTH0_TOKEN"
           extra_parameters: -DDOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 -DNETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global -DAUTH0_TOKEN=${AUTH0_TOKEN}
           timeout: "10m"
       - notify-cluster-fail:
