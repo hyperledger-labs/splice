@@ -69,6 +69,7 @@ abstract class AutomationService(
   final protected def registerTrigger[T <: PrettyPrinting](
       name: String,
       source: Source[T, NotUsed],
+      sequential: Boolean = false,
   )(
       handler0: (T, TracedLogger) => TraceContext => Future[Option[String]]
   ): Unit = {
@@ -117,6 +118,7 @@ abstract class AutomationService(
       automationConfig,
       source,
       handler,
+      sequential,
       logger,
       timeouts,
     )
@@ -161,7 +163,13 @@ abstract class AutomationService(
         }
         registerTrigger(
           name,
-          timeSource.preMaterialize()._2,
+          timeSource
+            // Conflating to have slower downstream consumers only process the most recent timestamp.
+            // Using .max for prudence.
+            .conflate((oldTime, newTime) => Ordering[CantonTimestamp].max(oldTime, newTime))
+            .preMaterialize()
+            ._2,
+          sequential = true,
         )(handler0)
       }
     }
@@ -186,6 +194,7 @@ object AutomationService {
       config: AutomationConfig,
       source: Source[T, NotUsed],
       processTask: T => Future[Unit],
+      sequential: Boolean,
       override protected val logger: TracedLogger,
       override val timeouts: ProcessingTimeout,
   )(implicit
@@ -198,11 +207,13 @@ object AutomationService {
     private implicit val elc: ErrorLoggingContext =
       ErrorLoggingContext(logger, Map.empty, TraceContext.empty)
 
-    val (killSwitch, completed) = AkkaUtil.runSupervised(
+    private val parallelism = if (sequential) 1 else config.parallelism
+
+    private val (killSwitch, completed) = AkkaUtil.runSupervised(
       logger.error("Fatally failed to handle task", _),
       source
         .viaMat(KillSwitches.single)(Keep.right)
-        .toMat(Sink.foreachAsync(parallelism = config.parallelism)(processTask))(Keep.both),
+        .toMat(Sink.foreachAsync(parallelism)(processTask))(Keep.both),
     )
 
     override def isHealthy: Boolean = !completed.isCompleted
