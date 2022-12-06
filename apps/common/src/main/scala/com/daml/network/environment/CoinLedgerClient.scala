@@ -3,10 +3,10 @@ package com.daml.network.environment
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.client.configuration.LedgerClientChannelConfiguration
-import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.{ApiLoggingConfig, ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsync, SyncCloseable}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
+import com.digitalasset.canton.networking.grpc.{ApiClientRequestLogger, ClientChannelBuilder}
 import com.digitalasset.canton.tracing.TracerProvider
 import io.opentelemetry.instrumentation.grpc.v1_6.GrpcTracing
 
@@ -31,6 +31,8 @@ object CoinLedgerClient {
       config: ClientConfig,
       token: Option[String],
       tracerProvider: TracerProvider,
+      loggerFactory: NamedLoggerFactory,
+      apiLoggingConfig: ApiLoggingConfig,
   )(implicit
       ec: ExecutionContextExecutor,
       esf: ExecutionSequencerFactory,
@@ -49,7 +51,8 @@ object CoinLedgerClient {
       .builderFor(config.address, config.port.unwrap)
       .executor(ec)
       .intercept(
-        GrpcTracing.builder(tracerProvider.openTelemetry).build().newClientInterceptor()
+        GrpcTracing.builder(tracerProvider.openTelemetry).build().newClientInterceptor(),
+        new ApiClientRequestLogger(loggerFactory, apiLoggingConfig),
       )
 
     val channel = builder.build
@@ -62,6 +65,7 @@ object CoinLedgerClient {
       applicationId_ : String,
       token: Option[String],
       processingTimeouts: ProcessingTimeout,
+      apiLoggingConfig: ApiLoggingConfig,
       loggerFactoryForCoinLedgerConnectionOverride: NamedLoggerFactory,
       tracerProvider: TracerProvider,
   )(implicit
@@ -74,6 +78,8 @@ object CoinLedgerClient {
       clientConfig,
       token,
       tracerProvider,
+      loggerFactoryForCoinLedgerConnectionOverride,
+      apiLoggingConfig,
     ).map { client_ =>
       new CoinLedgerClient with NamedLogging {
 

@@ -128,6 +128,7 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
         //  to all requests.
         token,
         timeouts,
+        parameters.loggingConfig.api,
         loggerFactory,
         tracerProvider,
       ),
