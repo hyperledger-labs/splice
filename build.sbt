@@ -306,6 +306,7 @@ lazy val sharedFrontendSettings: Seq[Setting[_]] = Seq(
   (`apps-common-frontend` / npmPackageFiles) += baseDirectory.value / "package.json",
   bundle := BuildCommon.bundleFrontend.value,
   cleanFiles += baseDirectory.value / "build",
+  cleanFiles += baseDirectory.value / "node_modules",
 )
 lazy val `apps-wallet-frontend` = {
   project
