@@ -417,6 +417,42 @@ class WalletFrontendIntegrationTest
 
     }
 
+    "display currency in subscriptions and subscription requests" in { implicit env =>
+      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val usdQuantity = new paymentCodegen.PaymentQuantity(
+        BigDecimal(42.0).bigDecimal,
+        paymentCodegen.Currency.USD,
+      )
+      val dueAt = Instant.now().plus(1, ChronoUnit.DAYS)
+      createSelfSubscription(aliceUserParty, nextPaymentDueAt = dueAt, quantity = usdQuantity)
+      createSelfSubscriptionRequest(
+        aliceUserParty,
+        nextPaymentDueAt = dueAt,
+        quantity = usdQuantity,
+      )
+      createSelfPaymentRequest(aliceUserParty)
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToSubscriptions(aliceDamlUser)
+        clue("Check that the subscription request displays the currency") {
+          eventually() {
+            inside(findAll(className("sub-requests-table-row")).toList) { case Seq(row) =>
+              row.childElement(className("sub-request-quantity")).text should matchText(
+                "42.0000000000USD"
+              )
+            }
+          }
+        }
+        clue("Check that the subscription displays the currency") {
+          eventually() {
+            inside(findAll(className("subs-table-row")).toList) { case Seq(row) =>
+              row.childElement(className("sub-quantity")).text should matchText("42.0000000000USD")
+            }
+          }
+        }
+      }
+    }
+
     "user name is persisted" in { implicit env =>
       val aliceParty = onboardWalletUser(this, aliceWallet, aliceValidator)
       withFrontEnd("alice") { implicit webDrivers =>
@@ -546,16 +582,21 @@ class WalletFrontendIntegrationTest
     }
   }
 
-  private def createSelfSubscription(aliceUserParty: PartyId, nextPaymentDueAt: Instant)(implicit
+  private val defaultSubscriptionQuantity = new paymentCodegen.PaymentQuantity(
+    BigDecimal(10).bigDecimal.setScale(10),
+    paymentCodegen.Currency.CC,
+  )
+
+  private def createSelfSubscriptionContext(aliceUserParty: PartyId)(implicit
       env: CoinTestConsoleEnvironment
-  ) = {
+  ): testSubsCodegen.TestSubscriptionContext.ContractId = {
     val context = new testSubsCodegen.TestSubscriptionContext(
       scan.getSvcPartyId().toProtoPrimitive,
       aliceUserParty.toProtoPrimitive,
       aliceUserParty.toProtoPrimitive,
       "description",
     )
-    val contextId = clue("Create a subscription context") {
+    clue("Create a subscription context") {
       aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
         Seq(aliceUserParty),
         optTimeout = None,
@@ -568,7 +609,66 @@ class WalletFrontendIntegrationTest
         )
         .id
     }
-    val (subscriptionId, subscriptionData) = clue("Create a subscription") {
+  }
+
+  private def createSelfSubscriptionData(
+      contextId: testSubsCodegen.TestSubscriptionContext.ContractId,
+      aliceUserParty: PartyId,
+      nextPaymentDueAt: Instant,
+      quantity: paymentCodegen.PaymentQuantity,
+  )(implicit
+      env: CoinTestConsoleEnvironment
+  ) = {
+    val subscription = new subsCodegen.Subscription(
+      aliceUserParty.toProtoPrimitive,
+      aliceUserParty.toProtoPrimitive,
+      aliceUserParty.toProtoPrimitive,
+      svcParty.toProtoPrimitive,
+      contextId.toInterface(subsCodegen.SubscriptionContext.INTERFACE),
+    )
+    val payData = new subsCodegen.SubscriptionPayData(
+      quantity,
+      new RelTime(60 * 60 * 1000000L),
+      new RelTime(10 * 60 * 1000000L),
+      new RelTime(60 * 1000000L),
+    )
+    (subscription, payData)
+  }
+
+  private def createSelfSubscriptionRequest(
+      aliceUserParty: PartyId,
+      nextPaymentDueAt: Instant,
+      quantity: paymentCodegen.PaymentQuantity,
+  )(implicit
+      env: CoinTestConsoleEnvironment
+  ) = {
+    val contextId = createSelfSubscriptionContext(aliceUserParty)
+    val (subscription, payData) =
+      createSelfSubscriptionData(contextId, aliceUserParty, nextPaymentDueAt, quantity)
+    clue("Create subscription request") {
+      val subscriptionRequest = new subsCodegen.SubscriptionRequest(
+        subscription,
+        payData,
+      )
+      aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
+        actAs = Seq(aliceUserParty),
+        optTimeout = None,
+        commands = subscriptionRequest.create.commands.asScala.toSeq,
+      )
+    }
+  }
+
+  private def createSelfSubscription(
+      aliceUserParty: PartyId,
+      nextPaymentDueAt: Instant,
+      quantity: paymentCodegen.PaymentQuantity = defaultSubscriptionQuantity,
+  )(implicit
+      env: CoinTestConsoleEnvironment
+  ) = {
+    val contextId = createSelfSubscriptionContext(aliceUserParty)
+    val (subscriptionData, payData) =
+      createSelfSubscriptionData(contextId, aliceUserParty, nextPaymentDueAt, quantity)
+    val subscriptionId = clue("Create a subscription") {
       val subscription = new subsCodegen.Subscription(
         aliceUserParty.toProtoPrimitive,
         aliceUserParty.toProtoPrimitive,
@@ -581,21 +681,11 @@ class WalletFrontendIntegrationTest
         optTimeout = None,
         commands = subscription.create.commands.asScala.toSeq,
       )
-      val subscriptionId = aliceWalletBackend.remoteParticipant.ledger_api.acs
+      aliceWalletBackend.remoteParticipant.ledger_api.acs
         .awaitJava(subsCodegen.Subscription.COMPANION)(aliceUserParty, _.data == subscription)
         .id
-      (subscriptionId, subscription)
     }
     clue("Create a subscription idle state") {
-      val payData = new subsCodegen.SubscriptionPayData(
-        new paymentCodegen.PaymentQuantity(
-          BigDecimal(10).bigDecimal.setScale(10),
-          paymentCodegen.Currency.CC,
-        ),
-        new RelTime(60 * 60 * 1000000L),
-        new RelTime(10 * 60 * 1000000L),
-        new RelTime(60 * 1000000L),
-      )
       val state = new subsCodegen.SubscriptionIdleState(
         subscriptionId,
         subscriptionData,

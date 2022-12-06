@@ -7,6 +7,7 @@ import { Button, Table, TableBody, TableCell, TableHead, TableRow } from '@mui/m
 import { SubscriptionRequest as DamlSubscriptionRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
+import { PaymentQuantityDisplay } from './QuantityDisplay';
 
 interface SubscriptionsProps {
   requests: Contract<DamlSubscriptionRequest>[];
@@ -51,8 +52,9 @@ const SubscriptionRequest: React.FC<{ request: Contract<DamlSubscriptionRequest>
       <TableCell className="sub-request-receiver">
         <DirectoryEntry partyId={request.payload.subscriptionData.receiver} />
       </TableCell>
-      {/* TODO(#1641) Display currency */}
-      <TableCell>{request.payload.payData.paymentQuantity.quantity}</TableCell>
+      <TableCell className="sub-request-quantity">
+        <PaymentQuantityDisplay quantity={request.payload.payData.paymentQuantity} />
+      </TableCell>
       <TableCell>{request.payload.payData.paymentInterval.microseconds}</TableCell>
       <TableCell className="sub-request-provider">
         <DirectoryEntry partyId={request.payload.subscriptionData.provider} />

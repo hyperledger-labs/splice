@@ -17,6 +17,7 @@ import {
   Subscription,
 } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 
+import { PaymentQuantityDisplay } from '../components/QuantityDisplay';
 import SubscriptionRequestsTable from '../components/SubscriptionRequestsTable';
 import {
   useWalletClient,
@@ -78,8 +79,9 @@ const SubscriptionsTable: React.FC = () => {
       <TableCell className="sub-receiver">
         <DirectoryEntry partyId={main.payload.receiver} />
       </TableCell>
-      {/* TODO(#1641) Display currency */}
-      <TableCell>{state.value.payload.payData.paymentQuantity.quantity}</TableCell>
+      <TableCell className="sub-quantity">
+        <PaymentQuantityDisplay quantity={state.value.payload.payData.paymentQuantity} />
+      </TableCell>
       <TableCell>{state.value.payload.payData.paymentInterval.microseconds}</TableCell>
       <TableCell>{paymentDueAt(state)}</TableCell>
       <TableCell className="sub-provider">
