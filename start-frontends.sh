@@ -38,11 +38,12 @@ function start_frontend() {
   local wallet_port=$4
   local ledger_grpc=$5
   local validator_grpc=$6
-  local user=$7
-  local oa_domain=$8
-  local oa_clientid=$9
-  local algorithm="${10}"
-  local test_auth_secret="${11}"
+  local scan_grpc=$7
+  local user=$8
+  local oa_domain=$9
+  local oa_clientid="${10}"
+  local algorithm="${11}"
+  local test_auth_secret="${12}"
 
   local frontend_dir="${REPO_ROOT}/apps/${app}/frontend"
 
@@ -51,6 +52,7 @@ function start_frontend() {
     REACT_APP_SERVICE_WALLET_GRPC_URL=http://localhost:${app_grpc} \
     REACT_APP_SERVICE_WALLET_UI_URL=http://localhost:${wallet_port} \
     REACT_APP_SERVICE_VALIDATOR_GRPC_URL=http://localhost:${validator_grpc} \
+    REACT_APP_SERVICE_SCAN_API_GRPC_URL=http://localhost:${scan_grpc} \
     REACT_APP_SERVICE_LEDGER_API_GRPC_URL=http://localhost:${ledger_grpc} \
     REACT_APP_AUTH_AUTHORITY=${oa_domain} \
     REACT_APP_AUTH_CLIENT_ID=${oa_clientid} \
@@ -121,13 +123,13 @@ do
     sleep 1
 done
 
-# start_frontend <app> <ui-http-port> <app-grpc-port> <app-wallet-ui-port> <ledgerapi-grpc-port> <validator-app-grpc-port> <user-display-name>
-start_frontend wallet    3000 6204 0    0    6203 alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm" ""
-start_frontend wallet    3001 6304 0    0    6303 bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm" ""
-start_frontend splitwise 3002 6113 3000 6201 0    alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm" ""
-start_frontend splitwise 3003 6113 3001 6301 0    bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm" ""
-start_frontend directory 3004 6110 3000 6201 0    alice   "$oauth_authority_auth0" "$oauth_clientid_auth0" "$auth_algorithm_auth0" "$test_auth_secret"
-start_frontend splitwise 3005 6113 0    6201 0    charlie "$oauth_authority" "$oauth_clientid" "$auth_algorithm" ""
+# start_frontend <app> <ui-http-port> <app-grpc-port> <app-wallet-ui-port> <ledgerapi-grpc-port> <validator-app-grpc-port> <app-scan-grpc-port> <user-display-name>
+start_frontend wallet    3000 6204 0    0    6203 6012 alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm" ""
+start_frontend wallet    3001 6304 0    0    6303 6012 bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm" ""
+start_frontend splitwise 3002 6113 3000 6201 0    0    alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm" ""
+start_frontend splitwise 3003 6113 3001 6301 0    0    bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm" ""
+start_frontend directory 3004 6110 3000 6201 0    0    alice   "$oauth_authority_auth0" "$oauth_clientid_auth0" "$auth_algorithm_auth0" "$test_auth_secret"
+start_frontend splitwise 3005 6113 0    6201 0    0    charlie "$oauth_authority" "$oauth_clientid" "$auth_algorithm" ""
 
 if [ $daemon -eq 0 ]; then
   tmux attach -t ${tmux_session}

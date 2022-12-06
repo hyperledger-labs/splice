@@ -1,6 +1,7 @@
 import { Contract, sameContracts, useDirectoryClient, useInterval } from 'common-frontend';
 import { ErrorBoundary } from 'common-frontend';
 import { generateLedgerApiToken } from 'common-frontend/lib/contexts/LedgerApiContext';
+import { useScanClient } from 'common-frontend/lib/contexts/ScanServiceContext';
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -12,7 +13,6 @@ import './App.css';
 import DirectoryEntries from './DirectoryEntries';
 import Home from './Home';
 import Login from './Login';
-import { useScanClient } from './contexts/ScanServiceContext';
 
 const App: React.FC = () => {
   const [directoryEntries, setDirectoryEntries] = useState<Contract<DirectoryEntry>[]>([]);

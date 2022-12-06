@@ -4,6 +4,7 @@ import { Box, Button } from '@mui/material';
 
 const Home: React.FC = () => {
   const navigate = useNavigate();
+
   return (
     <>
       <Box sx={{ borderBottom: 1, borderColor: 'divider', marginBottom: 5, width: 1.0 }}>

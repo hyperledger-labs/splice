@@ -17,4 +17,8 @@ window.canton_network_config = {
       grpcUrl: "https://" + window.location.hostname + "/api/v0/directory",
     },
   },
+  directory: {
+    // URL of the gRPC-Web envoy proxy, proxying to the directory app gRPC API
+    grpcUrl: "https://" + window.location.hostname + "/api/v0/directory",
+  },
 };

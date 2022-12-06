@@ -4,7 +4,7 @@ import { useParams } from 'react-router-dom';
 
 import { Stack } from '@mui/material';
 
-import { AppPaymentRequest as damlPaymentRequest } from '@daml.js/wallet-payments/lib/CN/Wallet/Payment';
+import { AppPaymentRequest } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 
 import AppPaymentRequestsTable from '../components/AppPaymentRequestsTable';
 import { useWalletClient } from '../contexts/WalletServiceContext';
@@ -13,7 +13,7 @@ const AppPaymentRequests: React.FC = () => {
   const { listAppPaymentRequests } = useWalletClient();
   const { cid } = useParams();
 
-  const [appPaymentRequests, setAppPaymentRequests] = useState<Contract<damlPaymentRequest>[]>([]);
+  const [appPaymentRequests, setAppPaymentRequests] = useState<Contract<AppPaymentRequest>[]>([]);
   const fetchAppPaymentRequests = useCallback(async () => {
     const { paymentRequestsList } = await listAppPaymentRequests();
     const filteredReqs = () => {

@@ -10,6 +10,7 @@ const reader = new ConfigReader(
       wallet: serviceSchema,
       validator: serviceSchema,
       directory: serviceSchema,
+      scan: serviceSchema,
       ledgerApi: serviceSchema,
     }),
   })

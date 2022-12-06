@@ -1,4 +1,4 @@
-import { DirectoryClientProvider } from 'common-frontend';
+import { DirectoryClientProvider, ScanClientProvider } from 'common-frontend';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
@@ -19,7 +19,9 @@ root.render(
         <WalletClientProvider url={config.services.wallet.grpcUrl}>
           <ValidatorClientProvider url={config.services.validator.grpcUrl}>
             <DirectoryClientProvider url={config.services.directory.grpcUrl}>
-              <App />
+              <ScanClientProvider url={config.services.scan.grpcUrl}>
+                <App />
+              </ScanClientProvider>
             </DirectoryClientProvider>
           </ValidatorClientProvider>
         </WalletClientProvider>

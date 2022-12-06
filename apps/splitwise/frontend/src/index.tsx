@@ -1,9 +1,8 @@
-import { DirectoryClientProvider } from 'common-frontend';
+import { DirectoryClientProvider, ScanClientProvider } from 'common-frontend';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
 import App from './App';
-import { ScanClientProvider } from './contexts/ScanServiceContext';
 import { SplitwiseClientProvider } from './contexts/SplitwiseServiceContext';
 import './index.css';
 import reportWebVitals from './reportWebVitals';

@@ -20,6 +20,7 @@ const ENV_TESTAUTH_SECRET = process.env.REACT_APP_TESTAUTH_SECRET;
 const ENV_SERVICE_WALLET_GRPC_URL = process.env.REACT_APP_SERVICE_WALLET_GRPC_URL;
 const ENV_SERVICE_WALLET_UI_URL = process.env.REACT_APP_SERVICE_WALLET_UI_URL;
 const ENV_SERVICE_VALIDATOR_GRPC_URL = process.env.REACT_APP_SERVICE_VALIDATOR_GRPC_URL;
+const ENV_SERVICE_SCAN_GRPC_URL = process.env.REACT_APP_SERVICE_SCAN_GRPC_URL;
 const ENV_SERVICE_LEDGER_API_GRPC_URL = process.env.REACT_APP_SERVICE_LEDGER_API_GRPC_URL;
 
 const loadRs256Config = (externalConf: z.infer<typeof authSchema>, algorithm: Algorithm.RS256) => {
@@ -99,6 +100,7 @@ const loadServicesConfig = () => {
   overrideServiceKey(conf, 'wallet', 'grpcUrl', ENV_SERVICE_WALLET_GRPC_URL);
   overrideServiceKey(conf, 'wallet', 'uiUrl', ENV_SERVICE_WALLET_UI_URL);
   overrideServiceKey(conf, 'validator', 'grpcUrl', ENV_SERVICE_VALIDATOR_GRPC_URL);
+  overrideServiceKey(conf, 'scan', 'grpcUrl', ENV_SERVICE_SCAN_GRPC_URL);
   overrideServiceKey(conf, 'ledgerApi', 'grpcUrl', ENV_SERVICE_LEDGER_API_GRPC_URL);
 
   return conf.services;

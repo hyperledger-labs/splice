@@ -24,5 +24,9 @@ window.canton_network_config = {
       // URL of the gRPC-Web envoy proxy, proxying to the directory app gRPC API
       grpcUrl: 'http://localhost:6110',
     },
+    scan: {
+      // URL of the gRPC-Web envoy proxy, proxying to the scan app gRPC API
+      grpcUrl: 'http://localhost:6012',
+    },
   },
 };

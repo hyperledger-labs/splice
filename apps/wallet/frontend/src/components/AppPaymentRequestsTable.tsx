@@ -1,5 +1,7 @@
-import { Contract, DirectoryEntry } from 'common-frontend';
-import React, { useState } from 'react';
+import { useScanClient, Contract, DirectoryEntry } from 'common-frontend';
+import { Decimal } from 'decimal.js';
+import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 import {
@@ -13,16 +15,37 @@ import {
   TableRow,
 } from '@mui/material';
 
+import { OpenMiningRound } from '@daml.js/canton-coin/lib/CC/Round';
 import { AppPaymentRequest } from '@daml.js/wallet-payments-0.1.0/lib/CN/Wallet/Payment';
 
 import { useWalletClient } from '../contexts/WalletServiceContext';
-import { PaymentQuantityDisplay } from './QuantityDisplay';
+import { PaymentQuantityDisplay, PaymentQuantityTotalDisplay } from './QuantityDisplay';
 
 interface AppPaymentRequestsProps {
   requests: Contract<AppPaymentRequest>[];
 }
 
+function useCoinPrice(): Decimal | undefined {
+  const [coinPrice, setCoinPrice] = useState<Decimal | undefined>();
+  const scanClient = useScanClient();
+  useEffect(() => {
+    const fetchCoinPrice = async () => {
+      const tctx = await scanClient.getTransferContext(new Empty(), undefined);
+      const omr = tctx.getLatestOpenMiningRound();
+      if (omr) {
+        const p = Contract.decode(omr, OpenMiningRound);
+        setCoinPrice(new Decimal(p.payload.coinPrice));
+      }
+    };
+    fetchCoinPrice();
+  }, [scanClient]);
+
+  return coinPrice;
+}
+
 const AppPaymentRequestsTable: React.FC<AppPaymentRequestsProps> = ({ requests }) => {
+  const coinPrice = useCoinPrice();
+
   return (
     <Table>
       <TableHead>
@@ -39,6 +62,7 @@ const AppPaymentRequestsTable: React.FC<AppPaymentRequestsProps> = ({ requests }
             provider={c.payload.provider}
             cid={c.contractId}
             key={c.contractId}
+            coinPrice={coinPrice}
           />
         ))}
       </TableBody>
@@ -50,7 +74,8 @@ const AppPaymentRequestRows: React.FC<{
   request: AppPaymentRequest;
   provider: string;
   cid: string;
-}> = ({ request, provider, cid }) => {
+  coinPrice?: Decimal;
+}> = ({ request, provider, cid, coinPrice }) => {
   const { acceptAppPaymentRequests } = useWalletClient();
   const [searchParams] = useSearchParams();
   const onAccept = async () => {
@@ -74,7 +99,12 @@ const AppPaymentRequestRows: React.FC<{
         <TableCell className="app-request-provider">
           <DirectoryEntry partyId={provider} />
         </TableCell>
-        <TableCell />
+        <TableCell className="app-request-total-quantity">
+          <PaymentQuantityTotalDisplay
+            quantities={request.receiverQuantities.map(rq => rq.quantity)}
+            coinPrice={coinPrice}
+          />
+        </TableCell>
         <TableCell>
           <Button className="accept-button" type="submit" onClick={() => onAccept()}>
             Accept
