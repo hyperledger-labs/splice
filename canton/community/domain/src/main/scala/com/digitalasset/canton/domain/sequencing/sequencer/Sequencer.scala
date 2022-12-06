@@ -130,7 +130,7 @@ trait Sequencer extends FlagCloseable with HasCloseContext {
     */
   def acknowledgeSigned(signedAcknowledgeRequest: SignedContent[AcknowledgeRequest])(implicit
       traceContext: TraceContext
-  ): Future[Unit]
+  ): EitherT[Future, String, Unit]
 
   /** Return a structure containing the members registered with the sequencer and the latest positions of clients
     * reading events.
@@ -186,6 +186,16 @@ trait Sequencer extends FlagCloseable with HasCloseContext {
     * Effectively disables all instances of this member.
     */
   def disableMember(member: Member)(implicit traceContext: TraceContext): Future[Unit]
+
+  /** The first [[com.digitalasset.canton.SequencerCounter]] that this sequencer can serve for its sequencer client
+    * when the sequencer topology processor's [[com.digitalasset.canton.store.SequencedEventStore]] is empty.
+    * For a sequencer bootstrapped from a [[com.digitalasset.canton.domain.sequencing.sequencer.SequencerSnapshot]],
+    * this should be at least the [[com.digitalasset.canton.domain.sequencing.sequencer.SequencerSnapshot.heads]] for
+    * the [[com.digitalasset.canton.topology.SequencerId]].
+    * For a non-bootstrapped sequencer, this can be [[com.digitalasset.canton.GenesisSequencerCounter]].
+    * This is sound as pruning ensures that we never
+    */
+  private[sequencing] def firstSequencerCounterServeableForSequencer: SequencerCounter
 }
 
 object Sequencer extends HasLoggerName {

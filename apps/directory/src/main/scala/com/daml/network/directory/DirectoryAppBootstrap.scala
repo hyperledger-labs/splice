@@ -20,7 +20,6 @@ import com.digitalasset.canton.resource.*
 import com.digitalasset.canton.time.*
 
 import java.util.concurrent.ScheduledExecutorService
-import scala.annotation.nowarn
 import scala.concurrent.Future
 
 /** Class used to orchestrate the starting/initialization of Directory apps.
@@ -40,7 +39,6 @@ class DirectoryAppBootstrap(
     retryProvider: CoinRetries,
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
-    @nowarn("cat=unused")
     scheduler: ScheduledExecutorService,
     actorSystem: ActorSystem,
     executionSequencerFactory: ExecutionSequencerFactory,

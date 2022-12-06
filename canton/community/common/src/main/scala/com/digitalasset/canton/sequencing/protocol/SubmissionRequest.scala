@@ -72,22 +72,27 @@ case class SubmissionRequest private (
   def isConfirmationResponse(mediator: Member): Boolean =
     batch.envelopes.nonEmpty && batch.envelopes.forall(_.recipients.allRecipients == Set(mediator))
 
+  def isMediatorResult(mediator: Member): Boolean = batch.envelopes.nonEmpty && sender == mediator
+
   override protected[this] def toByteStringUnmemoized: ByteString =
     super[HasProtocolVersionedWrapper].toByteString
 }
-sealed trait MaxRequestSize {
+sealed trait MaxRequestSizeToDeserialize {
   val toOption: Option[NonNegativeInt] = this match {
-    case MaxRequestSize.Limit(value) => Some(value)
-    case MaxRequestSize.NoLimit => None
+    case MaxRequestSizeToDeserialize.Limit(value) => Some(value)
+    case MaxRequestSizeToDeserialize.NoLimit => None
   }
 }
-object MaxRequestSize {
-  case class Limit(value: NonNegativeInt) extends MaxRequestSize
-  case object NoLimit extends MaxRequestSize
+object MaxRequestSizeToDeserialize {
+  case class Limit(value: NonNegativeInt) extends MaxRequestSizeToDeserialize
+  case object NoLimit extends MaxRequestSizeToDeserialize
 }
 
 object SubmissionRequest
-    extends HasMemoizedProtocolVersionedWithContextCompanion[SubmissionRequest, MaxRequestSize] {
+    extends HasMemoizedProtocolVersionedWithContextCompanion[
+      SubmissionRequest,
+      MaxRequestSizeToDeserialize,
+    ] {
   val supportedProtoVersions = SupportedProtoVersions(
     ProtoVersion(0) -> VersionedProtoConverter(
       ProtocolVersion.v2,
@@ -120,11 +125,11 @@ object SubmissionRequest
 
   def fromProtoV0(
       requestP: v0.SubmissionRequest,
-      maxRequestSize: MaxRequestSize,
+      maxRequestSize: MaxRequestSizeToDeserialize,
   ): ParsingResult[SubmissionRequest] =
     fromProtoV0(maxRequestSize)(requestP, None)
 
-  private def fromProtoV0(maxRequestSize: MaxRequestSize)(
+  private def fromProtoV0(maxRequestSize: MaxRequestSizeToDeserialize)(
       requestP: v0.SubmissionRequest,
       bytes: Option[ByteString],
   ): ParsingResult[SubmissionRequest] = {
@@ -161,9 +166,6 @@ object SubmissionRequest
     )
   }
 
-  def usingSignedSubmissionRequest(protocolVersion: ProtocolVersion): Boolean = {
-    // TODO(#10047) migrate to stable
-    val sigCheckSupportSince = ProtocolVersion.dev
-    protocolVersion >= sigCheckSupportSince
-  }
+  def usingSignedSubmissionRequest(protocolVersion: ProtocolVersion): Boolean =
+    protocolVersion >= ProtocolVersion.v4
 }

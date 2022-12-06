@@ -39,6 +39,7 @@ import com.digitalasset.canton.participant.config.ParticipantInitConfig.{
   ParticipantParametersInitConfig,
 }
 import com.digitalasset.canton.participant.config.*
+import com.digitalasset.canton.protocol.DomainParameters.MaxRequestSize
 import com.digitalasset.canton.sequencing.authentication.AuthenticationTokenManagerConfig
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.time.*
@@ -103,14 +104,12 @@ final case class HealthConfig(server: HealthServerConfig, check: CheckConfig)
   *
   * @param enabled if true, we'll monitor the EC for deadlocks (or slow processings)
   * @param interval how often we check the EC
-  * @param maxReports after how many warnings are we going to shut up.
-  * @param reportAsWarnings if false, the deadlock detector will report using debug messages
+  * @param warnInterval how often we report a deadlock as still being active
   */
 final case class DeadlockDetectionConfig(
     enabled: Boolean = true,
     interval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(3),
-    maxReports: Int = 10,
-    reportAsWarnings: Boolean = true,
+    warnInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(10),
 )
 
 /** Configuration for metrics and tracing
@@ -526,6 +525,9 @@ object CantonConfig {
           .flatMap(duration => NonNegativeDuration.fromDuration(duration).leftMap(err))
       }
 
+    implicit val maxRequestSizeReader: ConfigReader[MaxRequestSize] =
+      NonNegativeNumeric.nonNegativeNumericReader[Int].map(MaxRequestSize)
+
     private def strToFiniteDuration(str: String): Either[String, FiniteDuration] =
       Either
         .catchOnly[NumberFormatException](Duration.apply(str))
@@ -714,6 +716,8 @@ object CantonConfig {
       deriveReader[RemoteDomainConfig]
     lazy implicit val remoteParticipantConfigReader: ConfigReader[RemoteParticipantConfig] =
       deriveReader[RemoteParticipantConfig]
+    lazy implicit val dbParamsReader: ConfigReader[DbParametersConfig] =
+      deriveReader[DbParametersConfig]
     lazy implicit val memoryReader: ConfigReader[CommunityStorageConfig.Memory] =
       deriveReader[CommunityStorageConfig.Memory]
     lazy implicit val h2Reader: ConfigReader[CommunityDbConfig.H2] =
@@ -950,6 +954,9 @@ object CantonConfig {
       ConfigWriter.toString(_.unwrap)
     implicit val nonNegativeIntWriter: ConfigWriter[NonNegativeInt] =
       ConfigWriter.toString(x => x.unwrap.toString)
+
+    implicit val maxRequestSizeWriter: ConfigWriter[MaxRequestSize] =
+      ConfigWriter.toString(x => x.unwrap.toString)
     implicit def positiveNumericWriter[T]: ConfigWriter[PositiveNumeric[T]] =
       ConfigWriter.toString(x => x.unwrap.toString)
     implicit val portWriter: ConfigWriter[Port] = ConfigWriter.toString(x => x.unwrap.toString)
@@ -1064,6 +1071,8 @@ object CantonConfig {
       deriveWriter[RemoteDomainConfig]
     lazy implicit val remoteParticipantConfigWriter: ConfigWriter[RemoteParticipantConfig] =
       deriveWriter[RemoteParticipantConfig]
+    lazy implicit val dbParametersWriter: ConfigWriter[DbParametersConfig] =
+      deriveWriter[DbParametersConfig]
     lazy implicit val memoryWriter: ConfigWriter[CommunityStorageConfig.Memory] =
       deriveWriter[CommunityStorageConfig.Memory]
     lazy implicit val h2Writer: ConfigWriter[CommunityDbConfig.H2] =

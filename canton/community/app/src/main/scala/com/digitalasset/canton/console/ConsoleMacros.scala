@@ -314,6 +314,7 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
               contractData.signatories,
               contractData.inheritedContractId,
               ledgerTime,
+              contractData.contractSalt,
             )
           )
         )
@@ -333,8 +334,8 @@ trait ConsoleMacros extends NamedLogging with NoTracing {
       env.run(
         ConsoleCommandResult.fromEither(
           RepairService.ContractConverter.contractInstanceToData(contract).map {
-            case (templateId, createArguments, signatories, contractId) =>
-              ContractData(templateId, createArguments, signatories, contractId)
+            case (templateId, createArguments, signatories, contractId, contractSaltO) =>
+              ContractData(templateId, createArguments, signatories, contractId, contractSaltO)
           }
         )
       )

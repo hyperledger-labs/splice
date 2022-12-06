@@ -5,14 +5,15 @@ package com.digitalasset.canton.domain.sequencing.sequencer
 
 import cats.data.EitherT
 import cats.instances.future.*
-import cats.syntax.traverse.*
+import cats.syntax.parallel.*
 import com.digitalasset.canton.SequencerCounter
-import com.digitalasset.canton.crypto.{DomainSyncCryptoClient, HashPurpose}
+import com.digitalasset.canton.crypto.HashPurpose
 import com.digitalasset.canton.domain.sequencing.sequencer.errors.*
 import com.digitalasset.canton.health.admin.data.SequencerHealthStatus
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.sequencing.protocol.{
+  AcknowledgeRequest,
   SendAsyncError,
   SignedContent,
   SubmissionRequest,
@@ -22,6 +23,7 @@ import com.digitalasset.canton.topology.{DomainTopologyManagerId, Member, Unauth
 import com.digitalasset.canton.tracing.Spanning.SpanWrapper
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.EitherTUtil.ifThenET
+import com.digitalasset.canton.util.FutureInstances.*
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.atomic.AtomicReference
@@ -36,11 +38,7 @@ abstract class BaseSequencer(
     protected val loggerFactory: NamedLoggerFactory,
     healthConfig: Option[SequencerHealthConfig],
     clock: Clock,
-    checkSignature: TraceContext => SignedContent[SubmissionRequest] => EitherT[
-      Future,
-      SendAsyncError,
-      SignedContent[SubmissionRequest],
-    ],
+    signatureVerifier: SignatureVerifier,
 )(implicit executionContext: ExecutionContext, trace: Tracer)
     extends Sequencer
     with NamedLogging
@@ -72,7 +70,7 @@ abstract class BaseSequencer(
   )(implicit traceContext: TraceContext): EitherT[Future, WriteRequestRefused, Unit] = {
     def ensureAllRecipientsRegistered: EitherT[Future, WriteRequestRefused, Unit] =
       submission.batch.allRecipients.toList
-        .traverse(ensureMemberRegistered)
+        .parTraverse(ensureMemberRegistered)
         .map(_ => ())
 
     for {
@@ -108,10 +106,34 @@ abstract class BaseSequencer(
       span.setAttribute("message_id", submission.messageId.unwrap)
       for {
         _ <- checkMemberRegistration(submission)
-        signedSubmissionWithFixedTs <- checkSignature(traceContext)(signedSubmission)
+        signedSubmissionWithFixedTs <- signatureVerifier
+          .verifySignature[SubmissionRequest](
+            signedSubmission,
+            HashPurpose.SubmissionRequestSignature,
+            _.sender,
+          )
+          .leftMap(e => SendAsyncError.RequestRefused(e))
         _ <- sendAsyncSignedInternal(signedSubmissionWithFixedTs)
       } yield ()
   }
+
+  override def acknowledgeSigned(signedAcknowledgeRequest: SignedContent[AcknowledgeRequest])(
+      implicit traceContext: TraceContext
+  ): EitherT[Future, String, Unit] = for {
+    signedAcknowledgeRequestWithFixedTs <- signatureVerifier
+      .verifySignature[AcknowledgeRequest](
+        signedAcknowledgeRequest,
+        HashPurpose.AcknowledgementSignature,
+        _.member,
+      )
+    _ <- EitherT.right(acknowledgeSignedInternal(signedAcknowledgeRequestWithFixedTs))
+  } yield ()
+
+  protected def acknowledgeSignedInternal(
+      signedAcknowledgeRequest: SignedContent[AcknowledgeRequest]
+  )(implicit
+      traceContext: TraceContext
+  ): Future[Unit]
 
   override def sendAsync(
       submission: SubmissionRequest
@@ -198,37 +220,5 @@ abstract class BaseSequencer(
 
   override def onClosed(): Unit =
     periodicHealthCheck.foreach(Lifecycle.close(_)(logger))
-
-}
-
-object BaseSequencer {
-  def checkSignature(
-      cryptoApi: DomainSyncCryptoClient
-  )(implicit
-      executionContext: ExecutionContext
-  ): TraceContext => SignedContent[SubmissionRequest] => EitherT[
-    Future,
-    SendAsyncError,
-    SignedContent[SubmissionRequest],
-  ] =
-    traceContext =>
-      signedSubmission => {
-        val snapshot = cryptoApi.headSnapshot(traceContext)
-        val timestamp = snapshot.ipsSnapshot.timestamp
-        signedSubmission
-          .verifySignature(
-            snapshot,
-            signedSubmission.content.sender,
-            HashPurpose.SubmissionRequestSignature,
-          )
-          .leftMap(error => {
-            SendAsyncError.RequestRefused(
-              s"Sequencer could not verify client's signature ${signedSubmission.timestampOfSigningKey
-                  .fold("")(ts => s"at $ts ")}on submission request with sequencer's head snapshot at $timestamp. Error: $error"
-            ): SendAsyncError
-          })
-          // set timestamp to the one used by the receiving sequencer's head snapshot timestamp
-          .map(_ => signedSubmission.copy(timestampOfSigningKey = Some(timestamp)))
-      }
 
 }

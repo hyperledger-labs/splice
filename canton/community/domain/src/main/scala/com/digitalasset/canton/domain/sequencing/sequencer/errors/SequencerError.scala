@@ -4,12 +4,12 @@
 package com.digitalasset.canton.domain.sequencing.sequencer.errors
 
 import com.daml.error.{Explanation, Resolution}
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.crypto.SignatureCheckError
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.CantonErrorGroups.SequencerErrorGroup
 import com.digitalasset.canton.error.{Alarm, AlarmErrorCode, CantonError}
 import com.digitalasset.canton.logging.ErrorLoggingContext
+import com.digitalasset.canton.protocol.DomainParameters.MaxRequestSize
 import com.digitalasset.canton.sequencing.protocol.{SignedContent, SubmissionRequest}
 import com.digitalasset.canton.topology.Member
 
@@ -57,14 +57,14 @@ object SequencerError extends SequencerErrorGroup {
   }
 
   @Explanation(
-    """This error means that the request size has exceeded the configured value maxInboundMessageSize."""
+    """This error means that the request size has exceeded the configured value maxRequestSize."""
   )
   @Resolution(
-    """Send smaller requests or increase the maxInboundMessageSize in the domain parameters"""
+    """Send smaller requests or increase the maxRequestSize in the domain parameters"""
   )
   object MaxRequestSizeExceeded extends AlarmErrorCode("MAX_REQUEST_SIZE_EXCEEDED") {
 
-    case class Error(message: String, maxRequestSize: NonNegativeInt) extends Alarm(message)
+    case class Error(message: String, maxRequestSize: MaxRequestSize) extends Alarm(message)
   }
 
   @Explanation("""
@@ -78,10 +78,11 @@ object SequencerError extends SequencerErrorGroup {
         signedSubmissionRequest: SignedContent[SubmissionRequest],
         error: SignatureCheckError,
         sequencingTimestamp: CantonTimestamp,
+        timestampOfSigningKey: CantonTimestamp,
     )(implicit override val loggingContext: ErrorLoggingContext)
         extends Alarm({
           val submissionRequest = signedSubmissionRequest.content
-          s"Sender [${submissionRequest.sender}] of send request [${submissionRequest.messageId}] provided signature that failed to be verified. " +
+          s"Sender [${submissionRequest.sender}] of send request [${submissionRequest.messageId}] provided signature from $timestampOfSigningKey that failed to be verified. " +
             s"Could not sequence at $sequencingTimestamp: $error"
         })
         with CantonError {
@@ -94,7 +95,7 @@ object SequencerError extends SequencerErrorGroup {
       |It indicates that the sequencer node that placed the request is not following the protocol as there should always be a defined timestamp.
       |This request will not get processed.
       |""")
-  object MissingSubmissionRequestTimestampSignature
+  object MissingSubmissionRequestSignatureTimestamp
       extends AlarmErrorCode("MISSING_SUBMISSION_REQUEST_SIGNATURE_TIMESTAMP") {
     case class Error(
         signedSubmissionRequest: SignedContent[SubmissionRequest],
@@ -105,26 +106,6 @@ object SequencerError extends SequencerErrorGroup {
           s"Send request [${submissionRequest.messageId}] by sender [${submissionRequest.sender}] is missing a signature timestamp. " +
             s"Could not sequence at $sequencingTimestamp"
         })
-        with CantonError {
-      override val logOnCreation: Boolean = false
-    }
-  }
-
-  @Explanation("""
-      |This error indicates that the sequencer has detected a signed submission request with a signing timestamp after the sequencing timestamp.
-      |It will not get processed.
-      |""")
-  object InvalidSubmissionRequestSignatureTimestamp
-      extends AlarmErrorCode("INVALID_SUBMISSION_REQUEST_SIGNATURE_TIMESTAMP") {
-    case class Error(
-        submissionRequest: SubmissionRequest,
-        signingTimestamp: CantonTimestamp,
-        sequencingTimestamp: CantonTimestamp,
-    )(implicit override val loggingContext: ErrorLoggingContext)
-        extends Alarm(
-          s"Send request [${submissionRequest.messageId}] by sender [${submissionRequest.sender}] has an " +
-            s"invalid signing timestamp $signingTimestamp that is after current sequencing time $sequencingTimestamp. Could not sequence."
-        )
         with CantonError {
       override val logOnCreation: Boolean = false
     }

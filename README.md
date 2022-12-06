@@ -216,7 +216,7 @@ Try forcing a clean rebuild by cleaning via SBT, e.g., `apps-common/clean` and s
 
 ### Bumping Our Canton fork
 
-Current Canton commit: `c6d8cfd13267547a23c542d2c4c45e53ec2b8459`
+Current Canton commit: `8f6af5a6cecaa8494f43b2aca28b1c624399aed3`
 
 1. Check out the [Canton Open Source repo](https://github.com/digital-asset/canton) at the current Canton commit listed above.
    NOTE: if you can't find the commit, then you are probably using the closed source https://github.com/DACH-NY/canton repo.
@@ -232,7 +232,7 @@ Current Canton commit: `c6d8cfd13267547a23c542d2c4c45e53ec2b8459`
 9. Create a commit to ease review, `git add canton/ && git commit -m"Bump Canton commit"`
 10. Reapply our changes `git apply '--exclude=canton/community/app/src/test/resources/examples/*' --directory=canton --reject canton.patch`
     and resolve conflicts (if any).
-11. Create a commit to rease review `git add canton/ && git commit -m"Reapply our changes"`
+11. Create a commit to ease review `git add canton/ && git commit -m"Reapply our changes"`
 12. Learn Canton's SDK version from `head -n15 $PATH_TO_CANTON_OSS/project/project/DamlVersions.scala`
 13. Bump the SDK/Canton versions in the following places:
     1. The current Canton commit in this `README.md`
@@ -245,9 +245,10 @@ Current Canton commit: `c6d8cfd13267547a23c542d2c4c45e53ec2b8459`
           lists `canton-open-source-20221011.tar.gz` under the
           artifacts so `20221011` is the Canton version.
        2. Bump `sdk_version` to the associated sdk snapshot version
-       3. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation (change
-             a digit of the hash to make it fail and then `cd ..` and `cd -` out of the repo).
-14. Bump the sdk version in our own daml.yaml files via `./set-sdk.sh $sdkversion` to the same version.
+       3. Change a character of the `sha256` digest (e.g. "ef..." -> "0f..."), and then `cd ..` and `cd -` out of the repo, 
+          to make the hash validation fail. Adjust the `sha256` digest by copying back the new hash when Nix throws an error during validation.
+    4. Bump the sdk version in our own daml.yaml files via `./set-sdk.sh $sdkversion` to the same version.
+    5. In `shell.nix`, manually invalidate and then update the `sha256` digest as you did for `nix/canton.nix`. 
 15. Create another commit, `git add -A && git commit -m"Bump Canton commit and Canton/SDK versions"`
 16. Make a PR with your changes, so CI starts churning.
 17. Test whether things compile using `sbt Test/compile`.

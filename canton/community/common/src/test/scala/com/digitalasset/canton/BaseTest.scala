@@ -12,6 +12,7 @@ import com.digitalasset.canton.config.{DefaultProcessingTimeouts, ProcessingTime
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCryptoProvider
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLogging, SuppressingLogger}
+import com.digitalasset.canton.protocol.DomainParameters.MaxRequestSize
 import com.digitalasset.canton.protocol.StaticDomainParameters
 import com.digitalasset.canton.time.PositiveSeconds
 import com.digitalasset.canton.topology.transaction.{SignedTopologyTransaction, TopologyChangeOp}
@@ -39,6 +40,7 @@ import org.scalatestplus.scalacheck.CheckerAsserting
 import org.slf4j.bridge.SLF4JBridgeHandler
 import org.typelevel.discipline.Laws
 
+import scala.annotation.nowarn
 import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success, Try}
@@ -334,21 +336,26 @@ object BaseTest {
 
   // Uses SymbolicCrypto for the configured crypto schemes
   lazy val defaultStaticDomainParameters: StaticDomainParameters =
-    defaultStaticDomainParametersWith(
-      protocolVersion = testedProtocolVersion
-    )
+    defaultStaticDomainParametersWith()
+
+  lazy val defaultMaxRatePerParticipant =
+    defaultStaticDomainParameters.maxRatePerParticipant: @nowarn("msg=deprecated")
+  lazy val defaultMaxRequestSize = defaultStaticDomainParameters.maxRequestSize: @nowarn(
+    "msg=deprecated"
+  )
 
   def defaultStaticDomainParametersWith(
-      maxInboundMessageSize: Int = StaticDomainParameters.defaultMaxInboundMessageSize.unwrap,
       maxRatePerParticipant: Int = StaticDomainParameters.defaultMaxRatePerParticipant.unwrap,
       reconciliationInterval: PositiveSeconds =
         StaticDomainParameters.defaultReconciliationInterval,
+      uniqueContractKeys: Boolean = false,
+      maxRequestSize: Int = StaticDomainParameters.defaultMaxRequestSize.unwrap,
       protocolVersion: ProtocolVersion = testedProtocolVersion,
-  ) = StaticDomainParameters.create(
+  ): StaticDomainParameters = StaticDomainParameters.create(
     reconciliationInterval = reconciliationInterval,
     maxRatePerParticipant = NonNegativeInt.tryCreate(maxRatePerParticipant),
-    maxInboundMessageSize = NonNegativeInt.tryCreate(maxInboundMessageSize),
-    uniqueContractKeys = false,
+    maxRequestSize = MaxRequestSize(NonNegativeInt.tryCreate(maxRequestSize)),
+    uniqueContractKeys = uniqueContractKeys,
     requiredSigningKeySchemes = SymbolicCryptoProvider.supportedSigningKeySchemes,
     requiredEncryptionKeySchemes = SymbolicCryptoProvider.supportedEncryptionKeySchemes,
     requiredSymmetricKeySchemes = SymbolicCryptoProvider.supportedSymmetricKeySchemes,

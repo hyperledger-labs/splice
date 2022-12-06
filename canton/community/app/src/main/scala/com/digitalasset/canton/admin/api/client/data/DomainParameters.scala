@@ -8,6 +8,7 @@ import com.daml.nonempty.NonEmptyUtil
 import com.digitalasset.canton.admin.api.client.data.crypto.*
 import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{NonNegativeFiniteDuration, PositiveDurationSeconds}
+import com.digitalasset.canton.protocol.DomainParameters.MaxRequestSize
 import com.digitalasset.canton.protocol.DynamicDomainParameters.InvalidDomainParameters
 import com.digitalasset.canton.protocol.{
   DynamicDomainParameters as DynamicDomainParametersInternal,
@@ -23,6 +24,7 @@ import com.digitalasset.canton.{ProtoDeserializationError, crypto as DomainCrypt
 import io.scalaland.chimney.dsl.*
 
 import scala.Ordering.Implicits.*
+import scala.annotation.nowarn
 
 /** Companion object [[com.digitalasset.canton.protocol.StaticDomainParameters]] indicates
   * when the different version were introduces.
@@ -30,7 +32,6 @@ import scala.Ordering.Implicits.*
 sealed trait StaticDomainParameters {
   def uniqueContractKeys: Boolean
   def requiredSigningKeySchemes: Set[SigningKeyScheme]
-  def maxInboundMessageSize: NonNegativeInt
   def requiredEncryptionKeySchemes: Set[EncryptionKeyScheme]
   def requiredSymmetricKeySchemes: Set[SymmetricKeyScheme]
   def requiredHashAlgorithms: Set[HashAlgorithm]
@@ -45,10 +46,11 @@ sealed trait StaticDomainParameters {
   protected def toInternal(
       maxRatePerParticipant: NonNegativeInt,
       reconciliationInterval: PositiveDurationSeconds,
+      maxRequestSize: MaxRequestSize,
   ): StaticDomainParametersInternal =
     StaticDomainParametersInternal.create(
       maxRatePerParticipant = maxRatePerParticipant,
-      maxInboundMessageSize = maxInboundMessageSize,
+      maxRequestSize = maxRequestSize,
       uniqueContractKeys = uniqueContractKeys,
       requiredSigningKeySchemes = NonEmptyUtil.fromUnsafe(
         requiredSigningKeySchemes.map(_.transformInto[DomainCrypto.SigningKeyScheme])
@@ -83,11 +85,10 @@ sealed abstract case class StaticDomainParametersV0(
     protocolVersion: ProtocolVersion,
 ) extends StaticDomainParameters {
   override private[canton] def toInternal: StaticDomainParametersInternal =
-    toInternal(maxRatePerParticipant, reconciliationInterval)
+    toInternal(maxRatePerParticipant, reconciliationInterval, MaxRequestSize(maxInboundMessageSize))
 }
 
 sealed abstract case class StaticDomainParametersV1(
-    maxInboundMessageSize: NonNegativeInt,
     uniqueContractKeys: Boolean,
     requiredSigningKeySchemes: Set[SigningKeyScheme],
     requiredEncryptionKeySchemes: Set[EncryptionKeyScheme],
@@ -99,10 +100,13 @@ sealed abstract case class StaticDomainParametersV1(
   override private[canton] def toInternal: StaticDomainParametersInternal = toInternal(
     StaticDomainParametersInternal.defaultMaxRatePerParticipant,
     StaticDomainParametersInternal.defaultReconciliationInterval.toConfig,
+    StaticDomainParametersInternal.defaultMaxRequestSize,
   )
 }
 
 object StaticDomainParameters {
+
+  @nowarn("msg=deprecated")
   def apply(
       domain: StaticDomainParametersInternal
   ): Either[ProtoDeserializationError.VersionError, StaticDomainParameters] = {
@@ -113,7 +117,7 @@ object StaticDomainParameters {
         new StaticDomainParametersV0(
           reconciliationInterval = domain.reconciliationInterval.toConfig,
           maxRatePerParticipant = domain.maxRatePerParticipant,
-          maxInboundMessageSize = domain.maxInboundMessageSize,
+          maxInboundMessageSize = domain.maxRequestSize.value,
           uniqueContractKeys = domain.uniqueContractKeys,
           requiredSigningKeySchemes =
             domain.requiredSigningKeySchemes.forgetNE.map(_.transformInto[SigningKeyScheme]),
@@ -131,7 +135,6 @@ object StaticDomainParameters {
     else if (protoVersion == 1)
       Right(
         new StaticDomainParametersV1(
-          maxInboundMessageSize = domain.maxInboundMessageSize,
           uniqueContractKeys = domain.uniqueContractKeys,
           requiredSigningKeySchemes =
             domain.requiredSigningKeySchemes.forgetNE.map(_.transformInto[SigningKeyScheme]),
@@ -256,6 +259,7 @@ final case class DynamicDomainParametersV1(
     mediatorDeduplicationTimeout: NonNegativeFiniteDuration,
     reconciliationInterval: PositiveDurationSeconds,
     maxRatePerParticipant: NonNegativeInt,
+    maxRequestSize: NonNegativeInt,
 ) extends DynamicDomainParameters {
 
   if (ledgerTimeRecordTimeTolerance * 2 > mediatorDeduplicationTimeout)
@@ -303,6 +307,7 @@ final case class DynamicDomainParametersV1(
           mediatorDeduplicationTimeout = Some(mediatorDeduplicationTimeout.toProtoPrimitive),
           reconciliationInterval = Some(reconciliationInterval.toProtoPrimitive),
           maxRatePerParticipant = maxRatePerParticipant.unwrap,
+          maxRequestSize = maxRequestSize.unwrap,
         )
       ).map(DomainParametersChangeAuthorization.Parameters.ParametersV1)
     else

@@ -415,6 +415,7 @@ lazy val `apps-splitwise` =
 // Copied from Canton. Can probably be removed once we use Canton as a library.
 def mergeStrategy(oldStrategy: String => MergeStrategy): String => MergeStrategy = {
   {
+    case PathList("buf.yaml") => MergeStrategy.discard
     case PathList("META-INF", "io.netty.versions.properties") => MergeStrategy.first
     case "reflect.properties" => MergeStrategy.first
     case PathList("org", "checkerframework", _ @_*) => MergeStrategy.first

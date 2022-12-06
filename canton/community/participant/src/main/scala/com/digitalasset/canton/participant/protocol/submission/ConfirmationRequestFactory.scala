@@ -5,7 +5,7 @@ package com.digitalasset.canton.participant.protocol.submission
 
 import cats.data.EitherT
 import cats.syntax.either.*
-import cats.syntax.traverse.*
+import cats.syntax.parallel.*
 import com.daml.ledger.participant.state.v2.SubmitterInfo
 import com.digitalasset.canton.*
 import com.digitalasset.canton.config.LoggingConfig
@@ -20,8 +20,11 @@ import com.digitalasset.canton.participant.protocol.submission.TransactionTreeFa
   SerializableContractOfId,
   TransactionTreeConversionError,
 }
-import com.digitalasset.canton.participant.protocol.validation.ContractConsistencyChecker
 import com.digitalasset.canton.participant.protocol.validation.ContractConsistencyChecker.ReferenceToFutureContractError
+import com.digitalasset.canton.participant.protocol.validation.{
+  ContractConsistencyChecker,
+  ExtractUsedContractsFromRootViews,
+}
 import com.digitalasset.canton.protocol.WellFormedTransaction.WithoutSuffixes
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
@@ -30,6 +33,7 @@ import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.transaction.ParticipantPermission.Submission
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.version.ProtocolVersion
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -38,7 +42,6 @@ import scala.concurrent.{ExecutionContext, Future}
   *
   * @param transactionTreeFactory used to create the payload
   * @param seedGenerator used to derive the transaction seed
-  * @param logEventDetails if set to true, we'll log the generated transaction view tree
   */
 class ConfirmationRequestFactory(
     submitterNode: ParticipantId,
@@ -73,9 +76,7 @@ class ConfirmationRequestFactory(
     val transactionUuid = seedGenerator.generateUuid()
     val ledgerTime = wfTransaction.metadata.ledgerTime
 
-    val randomnessLength = EncryptedViewMessage.computeRandomnessLength(cryptoSnapshot)
-    val keySeed =
-      optKeySeed.getOrElse(cryptoSnapshot.pureCrypto.generateSecureRandomness(randomnessLength))
+    val keySeed = optKeySeed.getOrElse(createDefaultSeed(cryptoSnapshot.pureCrypto))
 
     for {
       _ <- assertSubmittersNodeAuthorization(submitterInfo.actAs, cryptoSnapshot.ipsSnapshot)
@@ -100,30 +101,52 @@ class ConfirmationRequestFactory(
         .leftMap(TransactionTreeFactoryError)
 
       rootViews = transactionTree.rootViews.unblindedElements.toList
+      inputContracts = ExtractUsedContractsFromRootViews(rootViews)
       _ <- EitherT.fromEither[Future](
         ContractConsistencyChecker
-          .assertInputContractsInPast(rootViews, ledgerTime)
+          .assertInputContractsInPast(inputContracts, ledgerTime)
           .leftMap(errs => ContractConsistencyError(errs))
       )
 
-      transactionViewEnvelopes <- createTransactionViewEnvelopes(
+      confirmationRequest <- createConfirmationRequest(
         transactionTree,
         cryptoSnapshot,
         keySeed,
         protocolVersion,
       )
-    } yield {
-      if (loggingConfig.eventDetails) {
-        logger.debug(
-          s"Transaction tree is ${loggingConfig.api.printer.printAdHoc(transactionTree)}"
-        )
-      }
-      ConfirmationRequest(
-        InformeeMessage(transactionTree.tryFullInformeeTree(protocolVersion))(protocolVersion),
-        transactionViewEnvelopes,
-        protocolVersion,
+    } yield confirmationRequest
+  }
+
+  def createDefaultSeed(pureCrypto: CryptoPureApi): SecureRandomness = {
+    val randomnessLength = EncryptedViewMessage.computeRandomnessLength(pureCrypto)
+    pureCrypto.generateSecureRandomness(randomnessLength)
+  }
+
+  def createConfirmationRequest(
+      transactionTree: GenTransactionTree,
+      cryptoSnapshot: DomainSnapshotSyncCryptoApi,
+      keySeed: SecureRandomness,
+      protocolVersion: ProtocolVersion,
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, ConfirmationRequestCreationError, ConfirmationRequest] = for {
+    transactionViewEnvelopes <- createTransactionViewEnvelopes(
+      transactionTree,
+      cryptoSnapshot,
+      keySeed,
+      protocolVersion,
+    )
+  } yield {
+    if (loggingConfig.eventDetails) {
+      logger.debug(
+        s"Transaction tree is ${loggingConfig.api.printer.printAdHoc(transactionTree)}"
       )
     }
+    ConfirmationRequest(
+      InformeeMessage(transactionTree.tryFullInformeeTree(protocolVersion))(protocolVersion),
+      transactionViewEnvelopes,
+      protocolVersion,
+    )
   }
 
   private def assertSubmittersNodeAuthorization(
@@ -153,7 +176,7 @@ class ConfirmationRequestFactory(
         )
       } yield ()
     }
-    submitters.traverse(assertSubmitterNodeAuthorization).map(_ => ())
+    submitters.parTraverse(assertSubmitterNodeAuthorization).map(_ => ())
   }
 
   private def createTransactionViewEnvelopes(
@@ -172,7 +195,7 @@ class ConfirmationRequestFactory(
           .leftMap(KeySeedError)
       )
       res <- lightTreesWithMetadata.toList
-        .traverse { case (vt, witnesses, seed) =>
+        .parTraverse { case (vt, witnesses, seed) =>
           for {
             viewMessage <- EncryptedViewMessageFactory
               .create(TransactionViewType)(vt, cryptoSnapshot, protocolVersion, Some(seed))

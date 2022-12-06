@@ -115,7 +115,7 @@ class DatabaseSequencer(
       loggerFactory,
       health,
       clock,
-      BaseSequencer.checkSignature(cryptoApi),
+      SignatureVerifier(cryptoApi),
     )
     with FlagCloseable {
   private val store: SequencerStore =
@@ -226,11 +226,11 @@ class DatabaseSequencer(
   ): EitherT[Future, CreateSubscriptionError, Sequencer.EventSource] =
     reader.read(member, offset)
 
-  override def acknowledgeSigned(
+  override protected def acknowledgeSignedInternal(
       signedAcknowledgeRequest: SignedContent[AcknowledgeRequest]
   )(implicit traceContext: TraceContext): Future[Unit] = {
-    val ack = signedAcknowledgeRequest.content
-    acknowledge(ack.member, ack.timestamp)
+    val request = signedAcknowledgeRequest.content
+    acknowledge(request.member, request.timestamp)
   }
 
   override def acknowledge(member: Member, timestamp: CantonTimestamp)(implicit
@@ -294,6 +294,10 @@ class DatabaseSequencer(
       traceContext: TraceContext
   ): EitherT[Future, String, SequencerSnapshot] =
     EitherT.rightT(SequencerSnapshot.unimplemented(protocolVersion))
+
+  override private[sequencing] def firstSequencerCounterServeableForSequencer: SequencerCounter =
+    // Database sequencers are never bootstrapped
+    SequencerCounter.Genesis
 
   override def onClosed(): Unit = {
     super.onClosed()

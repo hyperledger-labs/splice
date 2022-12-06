@@ -29,6 +29,7 @@ import io.opentelemetry.api.trace.Tracer
 
 import java.io.IOException
 import java.lang.management.ManagementFactory
+import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.{Future, blocking}
 import scala.sys.process.Process
@@ -90,6 +91,7 @@ abstract class CoinNodeBootstrapBase[
     writeHealthDumpToFile: HealthDumpFunction,
 )(
     implicit val executionContext: ExecutionContextIdlenessExecutorService,
+    implicit val scheduler: ScheduledExecutorService,
     implicit val actorSystem: ActorSystem,
 ) extends CoinNodeBootstrap[T]
     with HasCloseContext
@@ -109,6 +111,7 @@ abstract class CoinNodeBootstrapBase[
         connectionPoolForParticipant,
         parameterConfig.logQueryCost,
         clock,
+        Some(scheduler),
         dbStorageMetrics,
         parameterConfig.processingTimeouts,
         loggerFactory,

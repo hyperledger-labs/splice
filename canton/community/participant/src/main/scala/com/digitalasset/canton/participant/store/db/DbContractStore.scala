@@ -4,11 +4,11 @@
 package com.digitalasset.canton.participant.store.db
 
 import cats.data.{EitherT, OptionT}
-import cats.syntax.foldable.*
-import cats.syntax.traverse.*
+import cats.syntax.parallel.*
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.config.RequireTypes.{PositiveNumeric, String2066}
 import com.digitalasset.canton.config.{BatchAggregatorConfig, CacheConfig, ProcessingTimeout}
+import com.digitalasset.canton.crypto.Salt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.pretty.Pretty
 import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
@@ -65,8 +65,10 @@ class DbContractStore(
     val ledgerCreateTime = r.<<[CantonTimestamp]
     val requestCounter = r.<<[RequestCounter]
     val creatingTransactionIdO = r.<<[Option[TransactionId]]
+    val contractSalt = r.<<[Option[Salt]]
 
-    val contract = SerializableContract(contractId, contractInstance, metadata, ledgerCreateTime)
+    val contract =
+      SerializableContract(contractId, contractInstance, metadata, ledgerCreateTime, contractSalt)
     StoredContract(contract, requestCounter, creatingTransactionIdO)
   }
 
@@ -108,7 +110,7 @@ class DbContractStore(
 
     DbStorage.toInClauses("contract_id", ids, maxContractIdSqlInListSize).map {
       case (idGroup, inClause) =>
-        (sql"""select contract_id, instance, metadata, ledger_create_time, request_counter, creating_transaction_id
+        (sql"""select contract_id, instance, metadata, ledger_create_time, request_counter, creating_transaction_id, contract_salt
           from contracts
           where domain_id = $domainId and """ ++ inClause)
           .as[StoredContract]
@@ -186,7 +188,7 @@ class DbContractStore(
           .getOrElse(sql" ")
 
       val contractsBaseQuery =
-        sql"select contract_id, instance, metadata, ledger_create_time, request_counter, creating_transaction_id from contracts"
+        sql"select contract_id, instance, metadata, ledger_create_time, request_counter, creating_transaction_id, contract_salt from contracts"
       val where = sql" where "
       val domainConstraint = sql" domain_id = $domainId "
       val pkgFilter = createConjunctiveFilter("package_id", filterPackage)
@@ -227,7 +229,6 @@ class DbContractStore(
 
   // Not to be called directly: use contractsCache
   private def contractInsert(storedContract: StoredContract): DbAction.WriteOnly[Int] = {
-    import DbStorage.Implicits.*
     val contractId = storedContract.contractId
     val contract = storedContract.contract.rawContractInstance
     val metadata = storedContract.contract.metadata
@@ -237,6 +238,7 @@ class DbContractStore(
     val template = storedContract.contract.contractInstance.unversioned.template
     val packageId = template.packageId
     val templateId = checked(String2066.tryCreate(template.qualifiedName.toString))
+    val contractSalt = storedContract.contract.contractSalt
 
     // TODO(M40): Figure out if we should check that the contract instance remains the same and whether we should update the instance if not.
     // The instance payload is not being updated as uploading this payload on a previously set field is problematic for Oracle when it exceeds 32KB
@@ -246,9 +248,9 @@ class DbContractStore(
       case _: DbStorage.Profile.Postgres =>
         sqlu"""insert into contracts as c (
                  domain_id, contract_id, instance, metadata, 
-                 ledger_create_time, request_counter, creating_transaction_id, package_id, template_id)
+                 ledger_create_time, request_counter, creating_transaction_id, package_id, template_id, contract_salt)
                values ($domainId, $contractId, $contract, $metadata, 
-                 $ledgerCreateTime, $requestCounter, $creatingTransactionId, $packageId, $templateId)
+                 $ledgerCreateTime, $requestCounter, $creatingTransactionId, $packageId, $templateId, $contractSalt)
                on conflict(domain_id, contract_id) do update 
                  set
                    metadata = $metadata,
@@ -256,7 +258,8 @@ class DbContractStore(
                    request_counter = $requestCounter,
                    creating_transaction_id = $creatingTransactionId,
                    package_id = $packageId,
-                   template_id = $templateId
+                   template_id = $templateId,
+                   contract_salt = $contractSalt
                  where (c.creating_transaction_id is null and ($creatingTransactionId is not null or c.request_counter < $requestCounter)) or 
                        (c.creating_transaction_id is not null and $creatingTransactionId is not null and c.request_counter < $requestCounter)"""
       case _: DbStorage.Profile.H2 =>
@@ -273,13 +276,14 @@ class DbContractStore(
                    request_counter = $requestCounter,
                    creating_transaction_id = $creatingTransactionId,
                    package_id = $packageId,
-                   template_id = $templateId
+                   template_id = $templateId,
+                   contract_salt = $contractSalt
                when not matched then
                 insert
                  (domain_id, contract_id, instance, metadata,
-                  ledger_create_time, request_counter, creating_transaction_id, package_id, template_id)
+                  ledger_create_time, request_counter, creating_transaction_id, package_id, template_id, contract_salt)
                  values ($domainId, $contractId, $contract, $metadata,
-                  $ledgerCreateTime, $requestCounter, $creatingTransactionId, $packageId, $templateId)"""
+                  $ledgerCreateTime, $requestCounter, $creatingTransactionId, $packageId, $templateId, $contractSalt)"""
       case _: DbStorage.Profile.Oracle =>
         sqlu"""merge into contracts 
                using dual
@@ -291,15 +295,16 @@ class DbContractStore(
                    request_counter = $requestCounter,
                    creating_transaction_id = $creatingTransactionId,
                    package_id = $packageId,
-                   template_id = $templateId
+                   template_id = $templateId,
+                   contract_salt = $contractSalt
                  where (creating_transaction_id is null and ($creatingTransactionId is not null or request_counter < $requestCounter)) or 
                        (creating_transaction_id is not null and $creatingTransactionId is not null and request_counter < $requestCounter)
                when not matched then 
                 insert
                  (domain_id, contract_id, instance, metadata, 
-                  ledger_create_time, request_counter, creating_transaction_id, package_id, template_id)
+                  ledger_create_time, request_counter, creating_transaction_id, package_id, template_id, contract_salt)
                  values ($domainId, $contractId, $contract, $metadata, 
-                  $ledgerCreateTime, $requestCounter, $creatingTransactionId, $packageId, $templateId)"""
+                  $ledgerCreateTime, $requestCounter, $creatingTransactionId, $packageId, $templateId, $contractSalt)"""
     }
   }
 
@@ -375,7 +380,7 @@ class DbContractStore(
       case Some(idsNel) =>
         EitherT(
           idsNel.forgetNE.toSeq
-            .traverse(id => lookupContract(id).toRight(id).value)
+            .parTraverse(id => lookupContract(id).toRight(id).value)
             .map(_.collectRight)
             .map { contracts =>
               Either.cond(
@@ -396,7 +401,7 @@ class DbContractStore(
       ec: ExecutionContext,
       traceContext: TraceContext,
   ): Future[Unit] = {
-    elements.traverse_ { element =>
+    elements.parTraverse_ { element =>
       val contract = fn(element)
       storage
         .queryAndUpdate(contractInsert(contract), functionFullName)

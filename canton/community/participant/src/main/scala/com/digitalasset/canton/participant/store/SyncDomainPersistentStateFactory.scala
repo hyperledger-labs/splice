@@ -4,7 +4,8 @@
 package com.digitalasset.canton.participant.store
 
 import cats.data.EitherT
-import cats.syntax.foldable.*
+import cats.syntax.bifunctor.*
+import cats.syntax.parallel.*
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.crypto.CryptoPureApi
 import com.digitalasset.canton.data.CantonTimestamp
@@ -17,6 +18,7 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.store.{IndexedDomain, IndexedStringStore, SequencedEventStore}
 import com.digitalasset.canton.topology.DomainId
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.{EitherTUtil, ErrorUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 
@@ -61,7 +63,7 @@ class SyncDomainPersistentStateFactory(
         )
         .map(_.protocolVersion)
 
-    aliasManager.aliases.toList.traverse_ { alias =>
+    aliasManager.aliases.toList.parTraverse_ { alias =>
       val resultE = for {
         domainId <- EitherT.fromEither[Future](
           aliasManager.domainIdForAlias(alias).toRight("Unknown domain-id")
@@ -190,13 +192,15 @@ class SyncDomainPersistentStateFactory(
         // make sure that we haven't been connected to a different domain before (unless we are doing a migration here)
         val allActiveDomains = syncDomainPersistentStateManager.getAll.keySet
           .filter(syncDomainPersistentStateManager.getStatusOf(_).exists(_.isActive))
-        EitherTUtil.condUnitET[Future](
-          allActiveDomains.forall(_ == domainId),
-          DomainRegistryError.ConfigurationErrors.IncompatibleUniqueContractKeysMode.Error(
-            s"Cannot connect to domain ${domainAlias.unwrap} as the participant has UCK semantics enabled and has already been connected to other domains: ${allActiveDomains
-                .mkString(", ")}"
-          ): DomainRegistryError,
-        )
+        EitherTUtil
+          .condUnitET[Future](
+            allActiveDomains.forall(_ == domainId),
+            DomainRegistryError.ConfigurationErrors.IncompatibleUniqueContractKeysMode.Error(
+              s"Cannot connect to domain ${domainAlias.unwrap} as the participant has UCK semantics enabled and has already been connected to other domains: ${allActiveDomains
+                  .mkString(", ")}"
+            ),
+          )
+          .leftWiden[DomainRegistryError]
       }
     } yield ()
   }

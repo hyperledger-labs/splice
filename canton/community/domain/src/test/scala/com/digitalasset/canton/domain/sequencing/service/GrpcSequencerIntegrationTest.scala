@@ -8,15 +8,14 @@ import cats.data.EitherT
 import com.daml.nonempty.NonEmpty
 import com.digitalasset.canton.*
 import com.digitalasset.canton.concurrent.FutureSupervisor
-import com.digitalasset.canton.config.RequireTypes.NonNegativeInt
 import com.digitalasset.canton.config.{
   DefaultProcessingTimeouts,
   LoggingConfig,
   ProcessingTimeout,
   TestingConfigInternal,
 }
-import com.digitalasset.canton.crypto.Nonce
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
+import com.digitalasset.canton.crypto.{HashPurpose, Nonce}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.api.v0
 import com.digitalasset.canton.domain.api.v0.SequencerAuthenticationServiceGrpc.SequencerAuthenticationService
@@ -28,6 +27,7 @@ import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, Lifecycle, SyncC
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.CommonMockMetrics
 import com.digitalasset.canton.networking.Endpoint
+import com.digitalasset.canton.protocol.DomainParametersLookup.SequencerDomainParameters
 import com.digitalasset.canton.protocol.messages.{
   ProtocolMessage,
   ProtocolMessageV0,
@@ -48,6 +48,7 @@ import com.digitalasset.canton.sequencing.{
   OrdinaryApplicationHandler,
   SerializedEventHandler,
 }
+import com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence
 import com.digitalasset.canton.store.memory.{InMemorySendTrackerStore, InMemorySequencedEventStore}
 import com.digitalasset.canton.time.{DomainTimeTracker, SimClock}
 import com.digitalasset.canton.topology.*
@@ -68,7 +69,7 @@ import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.FixtureAnyWordSpec
 
 import scala.concurrent.duration.*
-import scala.concurrent.{Await, ExecutionContextExecutor, Future, Promise}
+import scala.concurrent.{Await, ExecutionContext, ExecutionContextExecutor, Future, Promise}
 
 case class Env(loggerFactory: NamedLoggerFactory)(implicit
     ec: ExecutionContextExecutor,
@@ -88,8 +89,12 @@ case class Env(loggerFactory: NamedLoggerFactory)(implicit
   private val clock = new SimClock(loggerFactory = loggerFactory)
   private val sequencerSubscriptionFactory = mock[DirectSequencerSubscriptionFactory]
   def timeouts = DefaultProcessingTimeouts.testing
+  private val futureSupervisor = FutureSupervisor.Noop
   private val topologyClient = mock[DomainTopologyClient]
   private val mockTopologySnapshot = mock[TopologySnapshot]
+  private val maxRatePerParticipant = BaseTest.defaultMaxRatePerParticipant
+  private val maxRequestSize = BaseTest.defaultMaxRequestSize
+
   when(topologyClient.currentSnapshotApproximation(any[TraceContext]))
     .thenReturn(mockTopologySnapshot)
   when(
@@ -100,29 +105,44 @@ case class Env(loggerFactory: NamedLoggerFactory)(implicit
   )
     .thenReturn(
       Future.successful(
-        TestDomainParameters.defaultDynamic(maxRatePerParticipant = NonNegativeInt.tryCreate(100))
+        TestDomainParameters.defaultDynamic(
+          maxRatePerParticipant = maxRatePerParticipant,
+          maxRequestSize = maxRequestSize,
+        )
       )
     )
 
-  private val maxRatePerParticipantLookup: DomainParametersLookup[NonNegativeInt] =
-    DomainParametersLookup.forMaxRatePerParticipant(
-      BaseTest.defaultStaticDomainParametersWith(maxRatePerParticipant = 100),
+  private val domainParamsLookup: DomainParametersLookup[SequencerDomainParameters] =
+    DomainParametersLookup.forSequencerDomainParameters(
+      BaseTest.defaultStaticDomainParametersWith(maxRatePerParticipant =
+        maxRatePerParticipant.unwrap
+      ),
       topologyClient,
-      FutureSupervisor.Noop,
+      futureSupervisor,
       loggerFactory,
     )
+
+  val authenticationCheck = new AuthenticationCheck {
+
+    override def authenticate(
+        member: Member,
+        authenticatedMember: Option[Member],
+    ): Either[String, Unit] =
+      Either.cond(
+        member == participant,
+        (),
+        s"$participant attempted operation on behalf of $member",
+      )
+
+    override def lookupCurrentMember(): Option[Member] = None
+  }
   private val service =
     new GrpcSequencerService(
       sequencer,
       DomainTestMetrics.sequencer,
       loggerFactory,
       ParticipantAuditor.noop,
-      member =>
-        Either.cond(
-          member == participant,
-          (),
-          s"$participant attempted operation on behalf of $member",
-        ),
+      authenticationCheck,
       new SubscriptionPool[GrpcManagedSubscription](
         clock,
         DomainTestMetrics.sequencer,
@@ -130,8 +150,7 @@ case class Env(loggerFactory: NamedLoggerFactory)(implicit
         loggerFactory,
       ),
       sequencerSubscriptionFactory,
-      maxRatePerParticipantLookup,
-      NonNegativeInt.tryCreate(10000000),
+      domainParamsLookup,
       timeouts,
     )
   private val connectService = new GrpcSequencerConnectService(
@@ -203,6 +222,8 @@ case class Env(loggerFactory: NamedLoggerFactory)(implicit
         BaseTest.defaultStaticDomainParameters,
         DefaultProcessingTimeouts.testing,
         clock,
+        topologyClient,
+        futureSupervisor,
         _ => None,
         _ => None,
         CommonMockMetrics.sequencerClient,
@@ -216,7 +237,14 @@ case class Env(loggerFactory: NamedLoggerFactory)(implicit
         participant,
         sequencedEventStore,
         sendTrackerStore,
-        _ => request => EitherT.rightT(SignedContent(request, SymbolicCrypto.emptySignature, None)),
+        new RequestSigner {
+          override def signRequest[A <: ProtocolVersionedMemoizedEvidence](
+              request: A,
+              hashPurpose: HashPurpose,
+          )(implicit ec: ExecutionContext, traceContext: TraceContext)
+              : EitherT[Future, String, SignedContent[A]] =
+            EitherT.rightT(SignedContent(request, SymbolicCrypto.emptySignature, None))
+        },
       ).value,
       10.seconds,
     )

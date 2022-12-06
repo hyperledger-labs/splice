@@ -4,7 +4,7 @@
 package com.digitalasset.canton.participant.admin
 
 import cats.data.EitherT
-import cats.implicits.*
+import cats.syntax.parallel.*
 import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.common.domain.ServiceAgreementId
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -16,8 +16,10 @@ import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceInte
 import com.digitalasset.canton.participant.sync.SyncServiceError.SyncServiceUnknownDomain
 import com.digitalasset.canton.sequencing.{GrpcSequencerConnection, HttpSequencerConnection}
 import com.digitalasset.canton.topology.DomainId
-import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
 import com.digitalasset.canton.util.EitherTUtil
+import com.digitalasset.canton.util.FutureInstances.*
+import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.StatusRuntimeException
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -207,13 +209,13 @@ class DomainConnectivityService(
     EitherTUtil.toFuture(res)
   }
 
-  def reconnectDomains(ignoreFailures: Boolean): Future[Unit] = TraceContext.fromGrpcContext {
-    implicit traceContext =>
-      val ret = for {
-        aliases <- mapErrNew(sync.reconnectDomains(ignoreFailures = ignoreFailures))
-        _ <- aliases.traverse(waitUntilActive)
-      } yield ()
-      EitherTUtil.toFuture(ret)
+  def reconnectDomains(ignoreFailures: Boolean): Future[Unit] = {
+    implicit val traceContext: TraceContext = TraceContextGrpc.fromGrpcContext
+    val ret = for {
+      aliases <- mapErrNew(sync.reconnectDomains(ignoreFailures = ignoreFailures))
+      _ <- aliases.parTraverse(waitUntilActive)
+    } yield ()
+    EitherTUtil.toFuture(ret)
   }
 
   def getDomainId(domainAlias: String)(implicit traceContext: TraceContext): Future[DomainId] =

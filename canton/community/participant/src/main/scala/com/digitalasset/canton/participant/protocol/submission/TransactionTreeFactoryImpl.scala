@@ -7,7 +7,7 @@ import cats.data.EitherT
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.functorFilter.*
-import cats.syntax.traverse.*
+import cats.syntax.parallel.*
 import com.daml.ledger.participant.state.v2.SubmitterInfo
 import com.daml.lf.CantonOnly
 import com.daml.lf.data.Ref.PackageId
@@ -24,6 +24,7 @@ import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.{DomainId, MediatorId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.{ErrorUtil, LfTransactionUtil, MapsUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import io.scalaland.chimney.dsl.*
@@ -55,6 +56,7 @@ abstract class TransactionTreeFactoryImpl(
     with NamedLogging {
 
   private val unicumGenerator = new UnicumGenerator(cryptoOps)
+  private val cantonContractIdVersion = CantonContractIdVersion.fromProtocolVersion(protocolVersion)
 
   protected type State <: TransactionTreeFactoryImpl.State
 
@@ -155,7 +157,7 @@ abstract class TransactionTreeFactoryImpl(
 
       rootViews <- createRootViews(rootViewDecompositions, state, contractOfId)
         .map(rootViews =>
-          GenTransactionTree(cryptoOps)(
+          GenTransactionTree.tryCreate(cryptoOps)(
             submitterMetadata,
             commonMetadata,
             participantMetadata,
@@ -333,7 +335,9 @@ abstract class TransactionTreeFactoryImpl(
   )(implicit traceContext: TraceContext): LfNodeCreate = {
     val cantonContractInst = checked(
       LfTransactionUtil
-        .suffixContractInst(state.unicumOfCreatedContract)(createNode.versionedCoinst)
+        .suffixContractInst(state.unicumOfCreatedContract, cantonContractIdVersion)(
+          createNode.versionedCoinst
+        )
         .fold(
           cid =>
             throw new IllegalStateException(
@@ -352,7 +356,7 @@ abstract class TransactionTreeFactoryImpl(
           s"Invalid contract id for created contract ${createNode.coid}"
         )
     }
-    val unicum = unicumGenerator.generateUnicum(
+    val (contractSalt, unicum) = unicumGenerator.generateSaltAndUnicum(
       domainId,
       state.mediatorId,
       state.transactionUUID,
@@ -362,7 +366,8 @@ abstract class TransactionTreeFactoryImpl(
       state.ledgerTime,
       serializedCantonContractInst,
     )
-    val contractId = ContractId.fromDiscriminator(discriminator, unicum)
+
+    val contractId = cantonContractIdVersion.fromDiscriminator(discriminator, unicum)
 
     state.setUnicumFor(discriminator, unicum)
 
@@ -371,10 +376,11 @@ abstract class TransactionTreeFactoryImpl(
       .getOrElse(throw new RuntimeException("Created metadata be defined for create node"))
       .metadata
     val createdInfo = SerializableContract(
-      contractId,
-      serializedCantonContractInst,
-      createdMetadata,
-      state.ledgerTime,
+      contractId = contractId,
+      rawContractInstance = serializedCantonContractInst,
+      metadata = createdMetadata,
+      ledgerCreateTime = state.ledgerTime,
+      contractSalt = Option.when(protocolVersion >= ProtocolVersion.v4)(contractSalt.unwrap),
     )
     state.setCreatedContractInfo(contractId, createdInfo)
 
@@ -390,7 +396,7 @@ abstract class TransactionTreeFactoryImpl(
   )(idAndNode: (LfNodeId, LfActionNode)): LfActionNode = {
     val (nodeId, node) = idAndNode
     val suffixedNode = LfTransactionUtil
-      .suffixNode(state.unicumOfCreatedContract)(node)
+      .suffixNode(state.unicumOfCreatedContract, cantonContractIdVersion)(node)
       .fold(
         cid => throw new IllegalArgumentException(s"Invalid contract id $cid found"),
         Predef.identity,
@@ -479,7 +485,7 @@ abstract class TransactionTreeFactoryImpl(
 
     for {
       coreInputsWithInstances <- coreInputs.toSeq
-        .traverse(cid => withInstance(cid).map(cid -> _))
+        .parTraverse(cid => withInstance(cid).map(cid -> _))
         .leftWiden[TransactionTreeConversionError]
         .map(_.toMap)
       viewParticipantData <- EitherT

@@ -5,9 +5,11 @@ package com.digitalasset.canton.participant.admin
 
 import cats.data.{EitherT, OptionT}
 import cats.syntax.either.*
+import cats.syntax.parallel.*
 import cats.syntax.traverse.*
 import com.daml.ledger.api.v1.ledger_offset.LedgerOffset
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.participant.LedgerSyncEvent
@@ -38,13 +40,18 @@ import com.digitalasset.canton.store.{
   SequencedEventRangeOverlapsWithPruning,
   SequencedEventStore,
 }
-import com.digitalasset.canton.topology.{DomainId, ParticipantId}
+import com.digitalasset.canton.topology.{DomainId, ParticipantId, PartyId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.{DomainAlias, LedgerTransactionId, RequestCounter}
+import io.functionmeta.functionFullName
+import org.slf4j.event.Level
 
+import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStreamWriter}
 import java.time.Instant
-import java.util.NoSuchElementException
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.zip.GZIPOutputStream
 import scala.concurrent.{ExecutionContext, Future}
 
 /** Implements inspection functions for the sync state of a participant node */
@@ -53,6 +60,7 @@ class SyncStateInspection(
     participantNodePersistentState: ParticipantNodePersistentState,
     pruningProcessor: PruningProcessor,
     timeouts: ProcessingTimeout,
+    maxDbConnections: Int,
     override protected val loggerFactory: NamedLoggerFactory,
 )(implicit ec: ExecutionContext)
     extends NamedLogging {
@@ -73,7 +81,7 @@ class SyncStateInspection(
 
     syncDomainPersistentStateManager.getAll.toList
       .map { case (id, state) => lookupAlias(id) -> state }
-      .traverse { case (alias, state) =>
+      .parTraverse { case (alias, state) =>
         OptionT(state.requestJournalStore.preheadClean)
           .semiflatMap(cleanRequest =>
             state.activeContractStore
@@ -117,7 +125,7 @@ class SyncStateInspection(
   )(implicit traceContext: TraceContext): List[(Boolean, SerializableContract)] = {
     val persistentState = syncDomainPersistentStateManager.getByAlias(domain)
     val acs =
-      timeouts.inspection.await()(
+      timeouts.inspection.await("creating an ACS snapshot")(
         // not failing on unknown domain to allow inspection of unconnected domains
         persistentState
           .map(currentAcsSnapshot)
@@ -128,10 +136,118 @@ class SyncStateInspection(
         case Right(map) => map
       }
 
-    timeouts.inspection.await()(
+    timeouts.inspection.await("finding contracts in the persistent state")(
       getOrFail(persistentState, domain).contractStore
         .find(filterId, filterPackage, filterTemplate, limit)
         .map(_.map(sc => (acs.contains(sc.contractId), sc)))
+    )
+  }
+
+  def storeActiveContractsToFile(
+      parties: Set[PartyId],
+      target: File,
+      batchSize: PositiveInt,
+      filterDomain: DomainId => Boolean,
+      timestamp: Option[CantonTimestamp],
+      protocolVersion: Option[ProtocolVersion],
+  )(implicit
+      traceContext: TraceContext
+  ): Either[String, Map[DomainId, Long]] = {
+    import scala.util.Using
+    val lfParties = parties.map(_.toLf)
+    val encoder = java.util.Base64.getEncoder
+    def openStream(): OutputStreamWriter = {
+      val fileOut = new FileOutputStream(target)
+      val bufferOut = if (target.getName.endsWith(".gz")) {
+        // default gzip output buffer is 512, so setting it to the same as the
+        // buffered output stream defaults
+        new GZIPOutputStream(fileOut, 8192)
+      } else {
+        new BufferedOutputStream(fileOut)
+      }
+      new OutputStreamWriter(bufferOut)
+    }
+    logger.info(
+      s"Downloading active contract set (${timestamp.fold("head")(ts => s"at $ts")}) to ${target} for parties ${parties}"
+    )
+    val first = new AtomicBoolean(true)
+    Using(openStream()) { writer =>
+      syncDomainPersistentStateManager.getAll.toList.sortBy(_._1.uid.id.unwrap).traverse {
+        case (domainId, state) if filterDomain(domainId) =>
+          val domainIdStr = domainId.uid.toProtoPrimitive
+          // add an empty line between the contracts
+          if (!first.getAndSet(false)) {
+            writer.write("\n")
+          }
+          writer.write(SyncStateInspection.DomainIdPrefix)
+          writer.write(domainIdStr)
+          writer.write("\n")
+          val storeF = for {
+            // fetch acs
+            acs <- EitherT(
+              timestamp.fold(currentAcsSnapshot(state))(ts =>
+                state.activeContractStore.snapshot(ts)
+              )
+            )
+            useProtocolVersion <- EitherT.right(
+              protocolVersion.fold(
+                state.parameterStore.lastParameters
+                  .map(_.map(_.protocolVersion).getOrElse(ProtocolVersion.latest))
+              )(Future.successful)
+            )
+            // sort acs by coid (for easier comparison ...)
+            grouped = acs.toList.sortBy(_._1.coid).grouped(batchSize.value)
+            // fetch contracts
+            counted = grouped.foldLeft(Future.successful(0L) :: Nil) {
+              case (acc :: rest, batch) =>
+                logger.debug(
+                  s"Loading next batch of ${batch.size} contracts, looking for matching stakeholders."
+                )
+                val next = for {
+                  // we synchronise on the previous result after loading the contracts from the db.
+                  // we have to throttle here, as otherwise, we just load contracts at once
+                  // therefore, we resynchronize at the older result here before loading
+                  // this will mean that we will keep on pre-loading max-num batches
+                  _ <- rest.lastOption.map(_.map(_ => ())).getOrElse(Future.unit)
+                  contracts <- state.contractStore.lookupManyUncached(batch.map(_._1))
+                  // wait for previous write to have finished before kicking off this one
+                  counter <- acc
+                } yield {
+                  contracts.foldLeft(counter) {
+                    case (count, Some(stored))
+                        // filter for parties
+                        if lfParties.exists(stored.contract.metadata.stakeholders.contains) =>
+                      // write domain-id if this is the first entry
+                      if (count == 0) {
+                        writer.write(SyncStateInspection.DomainIdPrefix)
+                        writer.write(domainIdStr)
+                        writer.write("\n")
+                      }
+                      // write contract as base64 text to file
+                      val byteStr = stored.contract.toByteString(useProtocolVersion)
+                      writer.write(encoder.encodeToString(byteStr.toByteArray))
+                      writer.write("\n")
+                      count + 1
+                    case (count, _) => count
+                  }
+                }
+                next :: acc :: rest.take(maxDbConnections)
+              case (Nil, _) =>
+                throw new IllegalStateException(
+                  "List can not be null"
+                ) // we are always passing in something, so list can't be 0
+            }
+            loaded <- EitherT.right[AcsError](counted.sequence)
+            // the head of the list aggregates the count. all other items are there just for throtteling / synchronizing the batch reads
+          } yield (domainId, loaded.headOption.getOrElse(0L))
+
+          timeouts.unbounded
+            .await(s"Downloading ACS of ${domainId}", logFailing = Some(Level.WARN))(storeF.value)
+        case (domainId, _) => Right((domainId, 0L))
+      }
+    }.fold(
+      x => Left(x.getMessage),
+      _.map(_.filter { case (_, count) => count > 0 }.toMap).leftMap(_.toString),
     )
   }
 
@@ -157,7 +273,11 @@ class SyncStateInspection(
       end: Option[CantonTimestamp] = None,
   )(implicit traceContext: TraceContext): Option[Int] = {
     getPersistentState(domain).map { state =>
-      timeouts.inspection.await()(state.requestJournalStore.size(start, end))
+      timeouts.inspection.await(
+        s"$functionFullName from $start to $end from the journal of domain $domain"
+      )(
+        state.requestJournalStore.size(start, end)
+      )
     }
   }
 
@@ -201,7 +321,7 @@ class SyncStateInspection(
       traceContext: TraceContext
   ): Seq[(SyncStateInspection.DisplayOffset, TimestampedEvent)] =
     if (domain.unwrap == "")
-      timeouts.inspection.await()(
+      timeouts.inspection.await("finding events in the multi-domain event log")(
         participantNodePersistentState.multiDomainEventLog
           .lookupEventRange(None, limit)
           .map(_.map { case (offset, eventAndCausalChange) =>
@@ -210,7 +330,7 @@ class SyncStateInspection(
       )
     else {
       timeouts.inspection
-        .await()(
+        .await(s"$functionFullName from $from to $to in the event log")(
           getOrFail(getPersistentState(domain), domain).eventLog
             .lookupEventRange(None, None, from, to, limit)
         )
@@ -225,7 +345,7 @@ class SyncStateInspection(
       domain: DomainAlias,
   )(implicit traceContext: TraceContext): ProtocolVersion =
     timeouts.inspection
-      .await()(state.parameterStore.lastParameters)
+      .await(functionFullName)(state.parameterStore.lastParameters)
       .getOrElse(throw new IllegalStateException(s"No static domain parameters found for $domain"))
       .protocolVersion
 
@@ -251,7 +371,8 @@ class SyncStateInspection(
             foundEvents
         }
       }
-    val closed = timeouts.inspection.await()(messagesF)
+    val closed =
+      timeouts.inspection.await(s"finding messages from $from to $to on $domain")(messagesF)
     val opener =
       new EnvelopeOpener[PossiblyIgnoredSequencedEvent](
         tryGetProtocolVersion(state, domain),
@@ -267,7 +388,8 @@ class SyncStateInspection(
       throw new NoSuchElementException(s"Unknown domain $domain")
     )
     val messageF = state.sequencedEventStore.find(criterion).value
-    val closed = timeouts.inspection.await()(messageF)
+    val closed =
+      timeouts.inspection.await(s"$functionFullName on $domain matching $criterion")(messageF)
     val opener = new EnvelopeOpener[PossiblyIgnoredSequencedEvent](
       tryGetProtocolVersion(state, domain),
       state.pureCryptoApi,
@@ -283,7 +405,11 @@ class SyncStateInspection(
         .toLedgerSyncOffset(ledgerEnd)
         .flatMap(UpstreamOffsetConvert.toGlobalOffset)
       pruningOffsetO <- timeouts.inspection
-        .await()(pruningProcessor.safeToPrune(beforeOrAt, ledgerEndOffset).value)
+        .await(
+          s"checking whether timestamp $beforeOrAt with ledgerEnd $ledgerEnd is safe to prune"
+        )(
+          pruningProcessor.safeToPrune(beforeOrAt, ledgerEndOffset).value
+        )
         .leftMap(_.message)
     } yield pruningOffsetO.map(UpstreamOffsetConvert.toLedgerOffset)
   }
@@ -297,7 +423,7 @@ class SyncStateInspection(
       traceContext: TraceContext
   ): Iterable[(CommitmentPeriod, ParticipantId, AcsCommitment.CommitmentType)] = {
     val persistentState = getPersistentState(domain)
-    timeouts.inspection.await()(
+    timeouts.inspection.await(s"$functionFullName from $start to $end on $domain")(
       getOrFail(persistentState, domain).acsCommitmentStore
         .searchComputedBetween(start, end, counterParticipant)
     )
@@ -310,7 +436,7 @@ class SyncStateInspection(
       counterParticipant: Option[ParticipantId] = None,
   )(implicit traceContext: TraceContext): Iterable[SignedProtocolMessage[AcsCommitment]] = {
     val persistentState = getPersistentState(domain)
-    timeouts.inspection.await()(
+    timeouts.inspection.await(s"$functionFullName from $start to $end on $domain")(
       getOrFail(persistentState, domain).acsCommitmentStore
         .searchReceivedBetween(start, end, counterParticipant)
     )
@@ -323,7 +449,7 @@ class SyncStateInspection(
       counterParticipant: Option[ParticipantId],
   )(implicit traceContext: TraceContext): Iterable[(CommitmentPeriod, ParticipantId)] = {
     val persistentState = getPersistentState(domain)
-    timeouts.inspection.await()(
+    timeouts.inspection.await(s"$functionFullName from $start to $end on $domain")(
       getOrFail(persistentState, domain).acsCommitmentStore
         .outstanding(start, end, counterParticipant)
     )
@@ -333,7 +459,7 @@ class SyncStateInspection(
       traceContext: TraceContext
   ): Option[CantonTimestamp] = {
     val persistentState = getPersistentState(domain)
-    timeouts.inspection.await()(
+    timeouts.inspection.await(s"$functionFullName on $domain for ts $beforeOrAt")(
       getOrFail(persistentState, domain).acsCommitmentStore.noOutstandingCommitments(beforeOrAt)
     )
   }
@@ -403,5 +529,7 @@ object SyncStateInspection {
     opt.getOrElse(throw new IllegalArgumentException(s"no such domain [${domain}]"))
 
   case class NoSuchDomain(alias: DomainAlias) extends AcsError
+
+  lazy val DomainIdPrefix = "domain-id:"
 
 }

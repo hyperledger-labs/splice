@@ -7,8 +7,8 @@ import cats.data.*
 import cats.syntax.bifunctor.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
+import cats.syntax.parallel.*
 import cats.syntax.traverse.*
-import cats.syntax.traverseFilter.*
 import cats.{Applicative, MonoidK}
 import com.daml.nonempty.{NonEmpty, NonEmptyUtil}
 import com.digitalasset.canton.crypto.{DomainSnapshotSyncCryptoApi, HashOps}
@@ -23,7 +23,6 @@ import com.digitalasset.canton.logging.{
   TracedLogger,
 }
 import com.digitalasset.canton.participant.protocol.ProcessingSteps.PendingRequestData
-import com.digitalasset.canton.participant.protocol.ProtocolProcessor.PendingRequestDataOrReplayData
 import com.digitalasset.canton.participant.protocol.conflictdetection.{
   ActivenessCheck,
   ActivenessResult,
@@ -38,6 +37,7 @@ import com.digitalasset.canton.participant.protocol.transfer.TransferInProcessin
 import com.digitalasset.canton.participant.protocol.transfer.TransferOutProcessingSteps.*
 import com.digitalasset.canton.participant.protocol.transfer.TransferProcessingSteps.*
 import com.digitalasset.canton.participant.protocol.{
+  ProcessingSteps,
   ProtocolProcessor,
   SingleDomainCausalTracker,
   TransferOutUpdate,
@@ -63,13 +63,14 @@ import com.digitalasset.canton.topology.transaction.{ParticipantAttributes, Part
 import com.digitalasset.canton.tracing.{TraceContext, Traced}
 import com.digitalasset.canton.util.EitherTUtil.{condUnitET, ifThenET}
 import com.digitalasset.canton.util.EitherUtil.condUnitE
+import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.util.{EitherTUtil, MonadUtil}
 import com.digitalasset.canton.version.ProtocolVersion
 import com.digitalasset.canton.version.Transfer.{SourceProtocolVersion, TargetProtocolVersion}
 import com.digitalasset.canton.{LfPartyId, RequestCounter, SequencerCounter, checked}
 import org.slf4j.event.Level
 
-import scala.collection.{concurrent, mutable}
+import scala.collection.mutable
 import scala.concurrent.{ExecutionContext, Future}
 
 class TransferOutProcessingSteps(
@@ -91,13 +92,14 @@ class TransferOutProcessingSteps(
 
   import TransferOutProcessingSteps.stringOfNec
 
-  override type PendingRequestData = PendingTransferOut
-
   override type SubmissionResultArgs = PendingTransferSubmission
 
   override type PendingDataAndResponseArgs = TransferOutProcessingSteps.PendingDataAndResponseArgs
 
   override type RejectionArgs = Unit
+
+  override type RequestType = ProcessingSteps.RequestType.TransferOut
+  override val requestType = ProcessingSteps.RequestType.TransferOut
 
   override def pendingSubmissions(state: SyncDomainEphemeralState): PendingSubmissions = {
     state.pendingTransferOutSubmissions
@@ -289,8 +291,8 @@ class TransferOutProcessingSteps(
         UnexpectedDomain(
           TransferId(txOutRequest.sourceDomain, ts),
           domainId,
-        ): TransferProcessorError,
-      )
+        ),
+      ).leftWiden[TransferProcessorError]
       contractIdS = Set(contractId)
       contractsCheck = ActivenessCheck(
         checkFresh = Set.empty,
@@ -384,7 +386,7 @@ class TransferOutProcessingSteps(
         transferCoordination.addTransferOutRequest(transferData)
       }
       confirmingStakeholders <- EitherT.right(
-        storedContract.contract.metadata.stakeholders.toList.traverseFilter(stakeholder =>
+        storedContract.contract.metadata.stakeholders.toList.parTraverseFilter(stakeholder =>
           sourceIps.canConfirm(participantId, stakeholder).map(if (_) Some(stakeholder) else None)
         )
       )
@@ -467,12 +469,6 @@ class TransferOutProcessingSteps(
       .map(_ => isTransferringParticipant)
   }
 
-  override def pendingRequestMap
-      : SyncDomainEphemeralState => concurrent.Map[RequestId, PendingRequestDataOrReplayData[
-        PendingRequestData
-      ]] =
-    _.pendingTransferOuts
-
   override def getCommitSetAndContractsToBeStoredAndEvent(
       event: SignedContent[Deliver[DefaultOpenEnvelope]],
       result: Either[MalformedMediatorRequestResult, TransferOutResult],
@@ -552,7 +548,7 @@ class TransferOutProcessingSteps(
   }
 
   private[this] def triggerTransferInWhenExclusivityTimeoutExceeded(
-      pendingRequestData: PendingRequestData
+      pendingRequestData: RequestType#PendingRequestData
   )(implicit traceContext: TraceContext): EitherT[Future, TransferProcessorError, Unit] = {
 
     val targetDomain = pendingRequestData.targetDomain
@@ -624,7 +620,7 @@ class TransferOutProcessingSteps(
           _ <- EitherT.fromEither[Future](checkStakeholders)
           _ <- EitherT(
             adminParties.toList
-              .traverse(checkAdminParticipantCanConfirm(sourceIps, logger))
+              .parTraverse(checkAdminParticipantCanConfirm(sourceIps, logger))
               .map(
                 _.sequence.toEither.leftMap(errors =>
                   AdminPartyPermissionErrors(stringOfNec(errors)): TransferProcessorError
@@ -633,7 +629,7 @@ class TransferOutProcessingSteps(
           )
           _ <- EitherT(
             stakeholders.toList
-              .traverse(checkStakeholderHasTransferringParticipant)
+              .parTraverse(checkStakeholderHasTransferringParticipant)
               .map(
                 _.sequence.toEither
                   .leftMap(errors =>
@@ -659,16 +655,18 @@ class TransferOutProcessingSteps(
             AdminPartiesMismatch(
               expected = expectedAdminParties,
               declared = adminParties,
-            ): TransferProcessorError,
+            ),
           )
           expectedRecipientsTree = Recipients.ofSet(expectedParticipants)
-          _ <- EitherTUtil.condUnitET[Future](
-            expectedRecipientsTree.contains(recipients),
-            RecipientsMismatch(
-              expected = expectedRecipientsTree,
-              declared = recipients,
-            ): TransferProcessorError,
-          )
+          _ <- EitherTUtil
+            .condUnitET[Future](
+              expectedRecipientsTree.contains(recipients),
+              RecipientsMismatch(
+                expected = expectedRecipientsTree,
+                declared = recipients,
+              ),
+            )
+            .leftWiden[TransferProcessorError]
         } yield ()
     }
   }
@@ -832,7 +830,7 @@ object TransferOutProcessingSteps {
   ): EitherT[Future, TransferProcessorError, (Set[LfPartyId], Set[ParticipantId])] = {
 
     val stakeholdersWithParticipantPermissionsF = stakeholders.toList
-      .traverse { stakeholder =>
+      .parTraverse { stakeholder =>
         val sourceF = partyParticipants(sourceIps, stakeholder)
         val targetF = partyParticipants(targetIps, stakeholder)
         for {
@@ -856,7 +854,7 @@ object TransferOutProcessingSteps {
       )
       transferOutAdminParties <- EitherT(
         transferOutParticipants.toList
-          .traverse(adminPartyFor(sourceIps, logger))
+          .parTraverse(adminPartyFor(sourceIps, logger))
           .map(
             _.sequence.toEither
               .bimap(
@@ -1035,7 +1033,7 @@ object TransferOutProcessingSteps {
 
     def hostedStakeholders(snapshot: TopologySnapshot): Future[Set[LfPartyId]] = {
       stks.toList
-        .traverseFilter { partyId =>
+        .parTraverseFilter { partyId =>
           snapshot
             .hostedOn(partyId, participantId)
             .map(x => x.filter(_.permission == ParticipantPermission.Submission).map(_ => partyId))

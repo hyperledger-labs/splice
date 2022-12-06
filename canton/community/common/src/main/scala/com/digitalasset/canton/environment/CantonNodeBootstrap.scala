@@ -18,7 +18,7 @@ import com.digitalasset.canton.config.{
   ProcessingTimeout,
 }
 import com.digitalasset.canton.crypto.*
-import com.digitalasset.canton.crypto.admin.grpc.GrpcVaultService
+import com.digitalasset.canton.crypto.admin.grpc.GrpcVaultService.GrpcVaultServiceFactory
 import com.digitalasset.canton.crypto.admin.v0.VaultServiceGrpc
 import com.digitalasset.canton.crypto.store.CryptoPrivateStore.CryptoPrivateStoreFactory
 import com.digitalasset.canton.crypto.store.{CryptoPrivateStoreError, CryptoPublicStoreError}
@@ -59,9 +59,11 @@ import com.digitalasset.canton.util.retry
 import com.digitalasset.canton.util.retry.RetryUtil.NoExnRetryable
 import com.digitalasset.canton.version.{ProtocolVersion, ReleaseProtocolVersion}
 import io.functionmeta.functionFullName
+import io.grpc.ServerServiceDefinition
 import io.grpc.protobuf.services.ProtoReflectionService
 import io.opentelemetry.api.trace.Tracer
 
+import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.duration.*
 import scala.concurrent.{Future, blocking}
@@ -108,10 +110,12 @@ abstract class CantonNodeBootstrapBase[
     nodeMetrics: NodeMetrics,
     storageFactory: StorageFactory,
     cryptoPrivateStoreFactory: CryptoPrivateStoreFactory,
+    grpcVaultServiceFactory: GrpcVaultServiceFactory,
     val loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
 )(
     implicit val executionContext: ExecutionContextIdlenessExecutorService,
+    implicit val scheduler: ScheduledExecutorService,
     implicit val actorSystem: ActorSystem,
 ) extends CantonNodeBootstrap[T]
     with HasCloseContext
@@ -181,6 +185,7 @@ abstract class CantonNodeBootstrapBase[
         connectionPoolForParticipant,
         parameterConfig.logQueryCost,
         clock,
+        Some(scheduler),
         dbStorageMetrics,
         parameterConfig.processingTimeouts,
         loggerFactory,
@@ -247,7 +252,7 @@ abstract class CantonNodeBootstrapBase[
       )
       .addService(
         VaultServiceGrpc.bindService(
-          new GrpcVaultService(crypto, certificateGenerator, loggerFactory),
+          grpcVaultServiceFactory.create(crypto, certificateGenerator, loggerFactory),
           executionContext,
         )
       )
@@ -295,17 +300,25 @@ abstract class CantonNodeBootstrapBase[
   ): Unit = {
     adminServerRegistry
       .addServiceU(
-        TopologyManagerWriteServiceGrpc.bindService(
-          new GrpcTopologyManagerWriteService(
-            topologyManager,
-            authorizedStore,
-            crypto.cryptoPublicStore,
-            parameterConfig.initialProtocolVersion,
-            loggerFactory,
-          ),
-          executionContext,
-        )
+        topologyManagerWriteService(topologyManager, authorizedStore)
       )
+  }
+
+  protected def topologyManagerWriteService[E <: CantonError](
+      topologyManager: TopologyManager[E],
+      authorizedStore: TopologyStore[TopologyStoreId.AuthorizedStore],
+  ): ServerServiceDefinition = {
+    TopologyManagerWriteServiceGrpc.bindService(
+      new GrpcTopologyManagerWriteService(
+        topologyManager,
+        authorizedStore,
+        crypto.cryptoPublicStore,
+        parameterConfig.initialProtocolVersion,
+        loggerFactory,
+      ),
+      executionContext,
+    )
+
   }
 
   protected def startWithStoredNodeId(id: NodeId): EitherT[Future, String, Unit] = {

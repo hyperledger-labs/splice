@@ -5,7 +5,7 @@ package com.digitalasset.canton.participant.protocol.transfer
 
 import cats.data.{EitherT, OptionT}
 import cats.syntax.option.*
-import cats.syntax.traverse.*
+import cats.syntax.parallel.*
 import com.daml.lf.engine
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
@@ -39,6 +39,7 @@ import com.digitalasset.canton.topology.client.TopologySnapshot
 import com.digitalasset.canton.topology.transaction.ParticipantAttributes
 import com.digitalasset.canton.topology.{DomainId, MediatorId, ParticipantId}
 import com.digitalasset.canton.tracing.TraceContext
+import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.version.Transfer.{SourceProtocolVersion, TargetProtocolVersion}
 import com.digitalasset.canton.{LfPartyId, RequestCounter, SequencerCounter}
 
@@ -110,6 +111,15 @@ trait TransferProcessingSteps[
     pendingSubmission.transferCompletion.success(status)
   }
 
+  override def authenticateInputContracts(
+      pendingDataAndResponseArgs: PendingDataAndResponseArgs
+  )(implicit
+      traceContext: TraceContext
+  ): EitherT[Future, TransferProcessorError, Unit] = {
+    // We don't authenticate input contracts on transfers
+    EitherT.pure(())
+  }
+
   protected def performPendingSubmissionMapUpdate(
       pendingSubmissionMap: concurrent.Map[RootHash, PendingTransferSubmission],
       transferId: Option[TransferId],
@@ -138,7 +148,7 @@ trait TransferProcessingSteps[
       traceContext: TraceContext
   ): EitherT[Future, TransferProcessorError, DecryptedViews] = {
     val result = for {
-      decryptedEitherList <- batch.toNEF.traverse(decryptTree(snapshot)(_).value)
+      decryptedEitherList <- batch.toNEF.parTraverse(decryptTree(snapshot)(_).value)
     } yield DecryptedViews(decryptedEitherList)
     EitherT.right(result)
   }
@@ -158,7 +168,7 @@ trait TransferProcessingSteps[
       snapshot: TopologySnapshot,
   ): Future[List[LfPartyId]] = {
     import cats.implicits.*
-    stakeholders.traverseFilter { stk =>
+    stakeholders.parTraverseFilter { stk =>
       for {
         relationshipO <- snapshot.hostedOn(stk, participantId)
       } yield {

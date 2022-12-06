@@ -8,7 +8,7 @@ import cats.syntax.foldable.*
 import com.codahale.metrics.MetricRegistry
 import com.daml.metrics.api.MetricName
 import com.digitalasset.canton.*
-import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.concurrent.{FutureSupervisor, Threading}
 import com.digitalasset.canton.config.RequireTypes.PositiveInt
 import com.digitalasset.canton.config.{
   DefaultProcessingTimeouts,
@@ -17,12 +17,13 @@ import com.digitalasset.canton.config.{
   TestingConfigInternal,
 }
 import com.digitalasset.canton.crypto.provider.symbolic.SymbolicCrypto
-import com.digitalasset.canton.crypto.{Hash, TestHash}
+import com.digitalasset.canton.crypto.{Hash, HashPurpose, TestHash}
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{FutureUnlessShutdown, UnlessShutdown}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, NamedLoggingContext}
 import com.digitalasset.canton.metrics.{CommonMockMetrics, SequencerClientMetrics}
 import com.digitalasset.canton.protocol.messages.DefaultOpenEnvelope
+import com.digitalasset.canton.protocol.{DomainParametersLookup, TestDomainParameters}
 import com.digitalasset.canton.sequencing.*
 import com.digitalasset.canton.sequencing.client.SequencedEventValidationError.GapInSequencerCounter
 import com.digitalasset.canton.sequencing.client.SequencerClient.CloseReason.{
@@ -40,6 +41,7 @@ import com.digitalasset.canton.sequencing.client.SubscriptionCloseReason.{
 import com.digitalasset.canton.sequencing.client.transports.SequencerClientTransport
 import com.digitalasset.canton.sequencing.handshake.HandshakeRequestError
 import com.digitalasset.canton.sequencing.protocol.*
+import com.digitalasset.canton.serialization.ProtocolVersionedMemoizedEvidence
 import com.digitalasset.canton.store.CursorPrehead.SequencerCounterCursorPrehead
 import com.digitalasset.canton.store.SequencedEventStore.OrdinarySequencedEvent
 import com.digitalasset.canton.store.memory.{
@@ -60,6 +62,7 @@ import com.digitalasset.canton.time.{
 }
 import com.digitalasset.canton.topology.DefaultTestIdentities
 import com.digitalasset.canton.topology.DefaultTestIdentities.participant1
+import com.digitalasset.canton.topology.client.{DomainTopologyClient, TopologySnapshot}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.version.ProtocolVersion
 import org.scalatest.wordspec.AsyncWordSpec
@@ -740,10 +743,14 @@ class SequencerClientTest extends AsyncWordSpec with BaseTest with HasExecutorSe
     ): Future[Unit] =
       Future.unit
 
+    override def acknowledgeSigned(request: SignedContent[AcknowledgeRequest])(implicit
+        traceContext: TraceContext
+    ): EitherT[Future, String, Unit] =
+      EitherT.rightT(())
+
     override def sendAsync(
         request: SubmissionRequest,
         timeout: Duration,
-        protocolVersion: ProtocolVersion,
     )(implicit
         traceContext: TraceContext
     ): EitherT[Future, SendAsyncClientError, Unit] = {
@@ -754,14 +761,12 @@ class SequencerClientTest extends AsyncWordSpec with BaseTest with HasExecutorSe
     override def sendAsyncSigned(
         request: SignedContent[SubmissionRequest],
         timeout: Duration,
-        protocolVersion: ProtocolVersion,
     )(implicit traceContext: TraceContext): EitherT[Future, SendAsyncClientError, Unit] =
-      sendAsync(request.content, timeout, protocolVersion)
+      sendAsync(request.content, timeout)
 
     override def sendAsyncUnauthenticated(
         request: SubmissionRequest,
         timeout: Duration,
-        protocolVersion: ProtocolVersion,
     )(implicit
         traceContext: TraceContext
     ): EitherT[Future, SendAsyncClientError, Unit] = ???
@@ -841,6 +846,26 @@ class SequencerClientTest extends AsyncWordSpec with BaseTest with HasExecutorSe
         )(implicit loggingContext: NamedLoggingContext): SequencedEventValidator =
           eventValidator
       }
+      val topologyClient = mock[DomainTopologyClient]
+      val mockTopologySnapshot = mock[TopologySnapshot]
+      when(topologyClient.currentSnapshotApproximation(any[TraceContext]))
+        .thenReturn(mockTopologySnapshot)
+      when(
+        mockTopologySnapshot.findDynamicDomainParametersOrDefault(
+          any[ProtocolVersion],
+          anyBoolean,
+        )(any[TraceContext])
+      )
+        .thenReturn(
+          Future.successful(TestDomainParameters.defaultDynamic)
+        )
+      val maxRequestSizeLookup =
+        DomainParametersLookup.forSequencerDomainParameters(
+          domainParameters,
+          topologyClient,
+          FutureSupervisor.Noop,
+          loggerFactory,
+        )
 
       val client = new SequencerClient(
         DefaultTestIdentities.domainId,
@@ -848,11 +873,28 @@ class SequencerClientTest extends AsyncWordSpec with BaseTest with HasExecutorSe
         transport,
         options,
         TestingConfigInternal(),
-        domainParameters,
+        domainParameters.protocolVersion,
+        maxRequestSizeLookup,
         timeouts,
         eventValidatorFactory,
         clock,
-        _ => req => EitherT.rightT(SignedContent(req, SymbolicCrypto.emptySignature, None)),
+        new RequestSigner {
+          override def signRequest[A <: ProtocolVersionedMemoizedEvidence](
+              request: A,
+              hashPurpose: HashPurpose,
+          )(implicit
+              ec: ExecutionContext,
+              traceContext: TraceContext,
+          ): EitherT[Future, String, SignedContent[A]] =
+            EitherT(
+              Future.successful(
+                Right(SignedContent(request, SymbolicCrypto.emptySignature, None)): Either[
+                  String,
+                  SignedContent[A],
+                ]
+              )
+            )
+        },
         sequencedEventStore,
         sendTracker,
         CommonMockMetrics.sequencerClient,
