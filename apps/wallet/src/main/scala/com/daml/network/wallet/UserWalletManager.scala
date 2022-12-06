@@ -7,6 +7,7 @@ import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{HasHealth, JavaContract as Contract}
+import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.Lifecycle
@@ -25,6 +26,7 @@ class UserWalletManager(
     val store: WalletStore,
     automationConfig: AutomationConfig,
     clockConfig: ClockConfig,
+    treasuryConfig: TreasuryConfig,
     storage: Storage,
     retryProvider: CoinRetries,
     override val loggerFactory: NamedLoggerFactory,
@@ -42,7 +44,7 @@ class UserWalletManager(
     *
     * Succeeds if the user has been onboarded and its wallet has been initialized.
     */
-  final def lookupEndUserWallet(endUserName: String): Option[UserWalletService] =
+  final def lookupUserWallet(endUserName: String): Option[UserWalletService] =
     endUserWalletsMap.get(endUserName)
 
   final def endUserWallets: Iterable[UserWalletService] = endUserWalletsMap.values
@@ -53,7 +55,7 @@ class UserWalletManager(
     *
     * @return true, if a new end-user wallet was created
     */
-  final def getOrCreateEndUserWallet(
+  final def getOrCreateUserWallet(
       install: Contract[WalletAppInstall.ContractId, WalletAppInstall]
   ): Boolean = {
     val endUserName = install.payload.endUserName
@@ -64,8 +66,9 @@ class UserWalletManager(
       ledgerClient,
       key,
       this,
-      automationConfig: AutomationConfig,
-      clockConfig: ClockConfig,
+      automationConfig,
+      clockConfig,
+      treasuryConfig,
       storage,
       retryProvider,
       loggerFactory,
@@ -81,7 +84,7 @@ class UserWalletManager(
   }
 
   // TODO(M1-52): this function probably needs restructuring to integrate it with automation rewards collection; e.g., make it streaming
-  // NOTE: this function is exposed here in the EndUserWalletManager, as it requires joining data from all user-stores.
+  // NOTE: this function is exposed here in the UserWalletManager, as it requires joining data from all user-stores.
   def listValidatorRewardsCollectableBy(
       validatorUserStore: UserWalletStore
   )(implicit
@@ -103,10 +106,10 @@ class UserWalletManager(
               )
               Future.successful(Seq.empty)
             case QueryResult(_, Some(install)) =>
-              this.lookupEndUserWallet(install.payload.endUserName) match {
+              this.lookupUserWallet(install.payload.endUserName) match {
                 case None =>
                   logger.warn(
-                    s"Might miss validator rewards as the EndUserWalletStore for end-user name ${install.payload.endUserName} is not (yet) setup."
+                    s"Might miss validator rewards as the UserWalletStore for end-user name ${install.payload.endUserName} is not (yet) setup."
                   )
                   Future.successful(Seq.empty)
                 case Some(userWallet) =>

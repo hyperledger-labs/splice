@@ -101,6 +101,7 @@ class WalletApp(
           walletStore,
           config.automation,
           coinAppParameters.clockConfig,
+          config.treasury,
           storage: Storage,
           retryProvider,
           loggerFactory,

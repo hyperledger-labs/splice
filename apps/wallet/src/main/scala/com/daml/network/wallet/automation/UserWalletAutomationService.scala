@@ -14,7 +14,7 @@ import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.JavaContract
 import com.daml.network.wallet.store.UserWalletStore
-import com.daml.network.wallet.treasury.EndUserTreasuryService
+import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
@@ -25,7 +25,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 class UserWalletAutomationService(
     store: UserWalletStore,
-    treasury: EndUserTreasuryService,
+    treasury: TreasuryService,
     ledgerClient: CoinLedgerClient,
     automationConfig: AutomationConfig,
     clockConfig: ClockConfig,
@@ -42,7 +42,7 @@ class UserWalletAutomationService(
 
   registerService(
     new AcsIngestionService(
-      s"EndUserWalletStore(${store.key.endUserName})",
+      s"UserWalletStore(${store.key.endUserName})",
       store.acsIngestionSink,
       connection,
       retryProvider,

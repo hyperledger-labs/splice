@@ -13,6 +13,7 @@ import com.daml.network.validator.config.{
   RemoteValidatorAppConfig,
 }
 import com.daml.network.wallet.config.{
+  TreasuryConfig,
   WalletAppBackendConfig,
   WalletAppClientConfig,
   WalletRemoteValidatorAppConfig,
@@ -413,6 +414,8 @@ object CoinConfig {
       deriveReader[SharedCoinAppParameters]
     implicit val walletRemoteValidatorConfigReader: ConfigReader[WalletRemoteValidatorAppConfig] =
       deriveReader[WalletRemoteValidatorAppConfig]
+    implicit val treasuryConfigReader: ConfigReader[TreasuryConfig] =
+      deriveReader[TreasuryConfig]
     implicit val walletBackendConfigReader: ConfigReader[WalletAppBackendConfig] =
       deriveReader[WalletAppBackendConfig]
     implicit val WalletAppClientConfigReader: ConfigReader[WalletAppClientConfig] =
@@ -485,6 +488,8 @@ object CoinConfig {
       deriveWriter[SharedCoinAppParameters]
     implicit val walletRemoteValidatorConfigWriter: ConfigWriter[WalletRemoteValidatorAppConfig] =
       deriveWriter[WalletRemoteValidatorAppConfig]
+    implicit val treasuryConfigWriter: ConfigWriter[TreasuryConfig] =
+      deriveWriter[TreasuryConfig]
     implicit val walletBackendConfigWriter: ConfigWriter[WalletAppBackendConfig] =
       deriveWriter[WalletAppBackendConfig]
     implicit val WalletAppClientConfigWriter: ConfigWriter[WalletAppClientConfig] =

@@ -18,8 +18,9 @@ import com.daml.network.codegen.java.cn.wallet.{
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.util.{HasHealth, TimeUtil}
 import com.daml.network.wallet.UserWalletManager
+import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
-import com.daml.network.wallet.treasury.EndUserTreasuryService.*
+import com.daml.network.wallet.treasury.TreasuryService.*
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -40,8 +41,9 @@ import scala.util.{Failure, Success}
   *
   * For the design, please see https://github.com/DACH-NY/the-real-canton-coin/issues/913
   */
-class EndUserTreasuryService(
+class TreasuryService(
     connection: CoinLedgerConnection,
+    treasuryConfig: TreasuryConfig,
     clockConfig: ClockConfig,
     userStore: UserWalletStore,
     walletManager: UserWalletManager,
@@ -54,20 +56,15 @@ class EndUserTreasuryService(
     with Spanning
     with HasHealth {
 
-  // Magic numbers, chosen to report overload quickly
-  // TODO(#1839): make coin operation batch size configurable
-  private val batchSize = 10L
-  private val bufferSize: Int = 2 * batchSize.toInt
-
   private val batchExecutorRunning = new AtomicBoolean(true)
 
   private val queue: BoundedSourceQueue[EnqueuedCoinOperation] =
     withNewTrace(this.getClass.getSimpleName)(implicit tc =>
       _ => {
         val queue = Source
-          .queue[EnqueuedCoinOperation](bufferSize)
-          .batch(batchSize, operation => Seq(operation))((operations, operation) =>
-            operations :+ operation
+          .queue[EnqueuedCoinOperation](treasuryConfig.bufferSize)
+          .batch(treasuryConfig.batchSize.toLong, operation => Seq(operation))(
+            (operations, operation) => operations :+ operation
           )
           // Execute the batches sequentially to avoid contention
           .mapAsync(1)(executeBatchWithRetry)
@@ -83,7 +80,7 @@ class EndUserTreasuryService(
             })
           )(Keep.left)
           .run()
-        logger.debug("Started coin operation operation batch executor.")
+        logger.debug(s"Started coin operation operation batch executor with ${treasuryConfig}")
         queue
       }
     )
@@ -92,10 +89,10 @@ class EndUserTreasuryService(
 
   // Overriding, as this method is used in "FlagCloseable" to pretty-print the object being closed.
   override def toString: String =
-    s"EndUserTreasureService(endUserParty=${userStore.key.endUserParty})"
+    s"TreasureService(endUserParty=${userStore.key.endUserParty})"
 
   /** Enqueues a coin operation into an internal task queue.
-    * The [[EndUserTreasuryService]] will schedule the operation and then complete the returned with its result.
+    * The [[TreasuryService]] will schedule the operation and then complete the returned with its result.
     */
   def enqueueCoinOperation[T](
       operation: installCodegen.CoinOperation
@@ -367,7 +364,7 @@ class EndUserTreasuryService(
   }
 }
 
-object EndUserTreasuryService {
+object TreasuryService {
 
   private case class EnqueuedCoinOperation(
       operation: installCodegen.CoinOperation,

@@ -54,7 +54,7 @@ class WalletAutomationService(
     implicit traceContext =>
       Future {
         val endUserName = install.payload.endUserName
-        if (walletManager.getOrCreateEndUserWallet(install))
+        if (walletManager.getOrCreateUserWallet(install))
           Some(s"onboarded wallet end-user '$endUserName'")
         else {
           logger.warn(s"Unexpected duplicate on-boarding of wallet user '$endUserName'")
@@ -63,7 +63,7 @@ class WalletAutomationService(
       }
   })
 
-  // TODO(#1808): move to EndUserWalletAutomationService
+  // TODO(#1808): move to UserWalletAutomationService
   registerPollingTrigger(
     "make due subscription payments",
     automationConfig.pollingInterval,
@@ -114,7 +114,7 @@ class WalletAutomationService(
       userStore: UserWalletStore,
   )(implicit tc: TraceContext): Future[Either[String, Unit]] = {
     val operation = new installCodegen.coinoperation.CO_SubscriptionMakePayment(stateCid)
-    (walletManager.lookupEndUserWallet(userStore.key.endUserName) match {
+    (walletManager.lookupUserWallet(userStore.key.endUserName) match {
       case None => Future(Left(s"missing end-user treasury"))
       case Some(userWallet) =>
         userWallet.treasury

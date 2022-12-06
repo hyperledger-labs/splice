@@ -19,6 +19,7 @@ case class WalletAppBackendConfig(
     validator: WalletRemoteValidatorAppConfig,
     auth: AuthConfig,
     automation: AutomationConfig = AutomationConfig(),
+    treasury: TreasuryConfig = TreasuryConfig(),
 ) extends LocalCoinConfig // TODO(#736): fork or generalize this trait.
     {
   override val nodeTypeName: String = "wallet"

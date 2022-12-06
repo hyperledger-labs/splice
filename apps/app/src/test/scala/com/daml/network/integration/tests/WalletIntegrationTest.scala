@@ -604,21 +604,17 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
       }
 
       "be batched up to `batchSize` concurrent coin-operations" in { implicit env =>
-        // ATTENTION: needs to be in sync with the batchSize in [[EndUserTreasuryService]]
-        // TODO(#1839): make coin operatoin batch size configurable and read this from the config
-        val defaultBatchSize = 10
+        val batchSize = aliceWalletBackend.config.treasury.batchSize
         val (alice, bob) = setupAliceAndBobAndChannel(this)
         aliceWallet.tap(50)
         aliceValidator.remoteParticipant.ledger_api.acs.awaitJava(coinCodegen.Coin.COMPANION)(alice)
         val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
 
         val _ = Future(aliceWallet.executeDirectTransfer(bob, 10))
-        (1 to defaultBatchSize + 1).foreach(_ =>
-          Future(aliceWallet.executeDirectTransfer(bob, 1)).discard
-        )
+        (1 to batchSize + 1).foreach(_ => Future(aliceWallet.executeDirectTransfer(bob, 1)).discard)
         // 3 txs;
         // tx 1: initial transfer
-        // tx 2: 10 subsequent batched transfers
+        // tx 2: batchSize subsequent batched transfers
         // tx 3: single transfer that was not picked due to the batch size limit
         val txs = aliceValidator.remoteParticipant.ledger_api.transactions
           .treesJava(Set(alice), completeAfter = 3, beginOffset = offsetBefore)
@@ -627,8 +623,8 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
 
         // create change + transferred coin
         createdCoinsInTx(0) should have size 2
-        // (create change + transferred coin) x10
-        createdCoinsInTx(1) should have size 10 * 2
+        // (create change + transferred coin) x batchSize
+        createdCoinsInTx(1) should have size (batchSize.toLong * 2)
         // create change + transferred coin
         createdCoinsInTx(2) should have size 2
       }

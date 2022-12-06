@@ -5,8 +5,9 @@ import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinRetries}
 import com.daml.network.util.HasHealth
 import com.daml.network.wallet.automation.UserWalletAutomationService
+import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
-import com.daml.network.wallet.treasury.EndUserTreasuryService
+import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -22,6 +23,7 @@ class UserWalletService(
     walletManager: UserWalletManager,
     automationConfig: AutomationConfig,
     clockConfig: ClockConfig,
+    treasuryConfig: TreasuryConfig,
     storage: Storage,
     retryProvider: CoinRetries,
     loggerFactory0: NamedLoggerFactory,
@@ -37,11 +39,12 @@ class UserWalletService(
   val store: UserWalletStore = UserWalletStore(key, storage, loggerFactory, timeouts)
 
   private val connection = ledgerClient.connection(
-    s"EndUserTreasuryService_${CoinLedgerConnection.sanitizeUserIdToLedgerString(key.endUserName)}"
+    s"TreasuryService_${CoinLedgerConnection.sanitizeUserIdToLedgerString(key.endUserName)}"
   )
 
-  val treasury: EndUserTreasuryService = new EndUserTreasuryService(
+  val treasury: TreasuryService = new TreasuryService(
     connection,
+    treasuryConfig,
     clockConfig,
     store,
     walletManager,

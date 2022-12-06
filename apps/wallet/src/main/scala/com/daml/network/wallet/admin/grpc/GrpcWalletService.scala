@@ -29,7 +29,7 @@ import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, JavaContract => Contract, Proto, TimeUtil}
 import com.daml.network.wallet.store.UserWalletStore
-import com.daml.network.wallet.treasury.EndUserTreasuryService
+import com.daml.network.wallet.treasury.TreasuryService
 import com.daml.network.wallet.v0.*
 import com.daml.network.wallet.{UserWalletManager, UserWalletService, v0}
 import com.daml.network.v0 as networkV0
@@ -117,7 +117,7 @@ class GrpcWalletService(
 
   private[this] def getUserWallet(user: String): UserWalletService =
     walletManager
-      .lookupEndUserWallet(user)
+      .lookupUserWallet(user)
       .getOrElse(
         throw new StatusRuntimeException(
           Status.NOT_FOUND.withDescription(show"User ${user.singleQuoted}")
@@ -128,7 +128,7 @@ class GrpcWalletService(
     getUserWallet(user).store
   }
 
-  private[this] def getUserTreasury(user: String): Future[EndUserTreasuryService] = Future {
+  private[this] def getUserTreasury(user: String): Future[TreasuryService] = Future {
     getUserWallet(user).treasury
   }
 
@@ -879,7 +879,7 @@ class GrpcWalletService(
   )(implicit tc: TraceContext): ProtoReturnType = {
     // I (Arne) did not find a way to avoid ClassTag usage (or passing along a partial function) here
     // For example, passing along the `ExpectedCOO` type to the treasury service doesn't work
-    // because inside the EndUserTreasuryService we have a Queue of
+    // because inside the TreasuryService we have a Queue of
     // different coin operation outcomes and thus the type of that Queue needs to be CoinOperationOutcome
     // and it can't be the type of a particular coin operation outcome (like `ExpectedCOO`)
     val clazz = implicitly[ClassTag[ExpectedCOO]].runtimeClass
