@@ -83,6 +83,12 @@ trait DirectoryStore extends AutoCloseable {
   ]] =
     acsStore.listContracts(directoryCodegen.DirectoryEntry.COMPANION)
 
+  /** List all subscription idle states. */
+  def listSubscriptionIdleStates(): Future[QueryResult[
+    Seq[Contract[subsCodegen.SubscriptionIdleState.ContractId, subsCodegen.SubscriptionIdleState]]
+  ]] =
+    acsStore.listContracts(subsCodegen.SubscriptionIdleState.COMPANION)
+
   /** All install requests to the provider.
     *
     * '''emits''' whenever the store knows or learns about a create event of a `DirectoryInstallRequest` that is
@@ -158,6 +164,9 @@ object DirectoryStore {
           co.payload.subscriptionData.provider == provider
         ),
         mkFilter(subsCodegen.SubscriptionPayment.COMPANION)(co =>
+          co.payload.subscriptionData.provider == provider
+        ),
+        mkFilter(subsCodegen.SubscriptionIdleState.COMPANION)(co =>
           co.payload.subscriptionData.provider == provider
         ),
         mkFilter(directoryCodegen.DirectoryInstallRequest.COMPANION)(co =>

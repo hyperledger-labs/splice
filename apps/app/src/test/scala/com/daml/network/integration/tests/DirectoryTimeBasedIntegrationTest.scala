@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
@@ -110,6 +111,47 @@ class DirectoryTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTes
           )
           renewedEntry.payload shouldBe newEntry
         }
+    }
+    "expire stale subscriptions" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      clue("Request install and wait for provider to auto-accept") {
+        aliceDirectory.requestDirectoryInstall()
+        aliceValidator.remoteParticipant.ledger_api.acs
+          .awaitJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
+      }
+
+      val (_, subReqId) = clue("Alice requests a directory entry") {
+        aliceDirectory.requestDirectoryEntry(testEntryName)
+      }
+      aliceWallet.tap(50.0)
+      actAndCheck(
+        "Alice accepts subscription and waits for entry", {
+          aliceWallet.acceptSubscriptionRequest(subReqId)
+        },
+      )(
+        "Subscription and entry are created",
+        _ => {
+          aliceWallet.listSubscriptions() should have length 1
+          inside(aliceDirectory.listEntries()) { case Seq(entry) =>
+            entry.payload.name shouldBe testEntryName
+          }
+        },
+      )
+      // Stop wallet so renewal does not happen
+      aliceWalletBackend.stop()
+      advanceTime(Duration.ofDays(91))
+      eventually() {
+        aliceDirectory.listEntries() shouldBe empty
+      }
+      // Wait for subscription to be expired.
+      eventually() {
+        aliceWalletBackend.remoteParticipant.ledger_api.acs
+          .filterJava(subsCodegen.Subscription.COMPANION)(aliceUserParty) shouldBe empty
+        aliceWalletBackend.remoteParticipant.ledger_api.acs
+          .filterJava(subsCodegen.SubscriptionIdleState.COMPANION)(aliceUserParty) shouldBe empty
+        aliceWalletBackend.remoteParticipant.ledger_api.acs
+          .filterJava(codegen.DirectoryEntryContext.COMPANION)(aliceUserParty) shouldBe empty
+      }
     }
   }
 }

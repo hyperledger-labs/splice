@@ -1,6 +1,8 @@
 package com.daml.network.directory.automation
 
 import akka.stream.Materializer
+import cats.instances.list.*
+import cats.syntax.traverse.*
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
@@ -283,11 +285,63 @@ class DirectoryAutomationService(
             )
             val due_entries_names = due_entries.map(_.payload.name).mkString(", ")
             logger.info(s"Archiving the following expired directory entries: $due_entries_names")
+            // TODO(#1882) Avoid unlimited batching
             connection
               .submitCommandsNoDedup(Seq(provider), Seq(), expire_commands)
               .map(_ => Some(s"archived expired entries: ${due_entries_names}"))
           }
         })
     }
+  })
+
+  registerPollingTrigger(
+    "handleDirectorySubscriptionExpiration",
+    automationConfig.pollingInterval,
+    connection,
+  )((now, logger) => { implicit traceContext =>
+    for {
+      allSubscriptions <- store.listSubscriptionIdleStates()
+      dueSubscriptions =
+        allSubscriptions.value.filter(e =>
+          // we grant a short additional "grace period" to account for potential clock skew
+          now.toInstant
+            .isAfter(
+              e.payload.nextPaymentDueAt.plus(automationConfig.clockSkewAutomationDelay.duration)
+            )
+        )
+      // Filter to only those subscriptions that have a corresponding DirectoryEntryContext
+      directorySubscriptions <- dueSubscriptions.toList
+        .traverse { subscription =>
+          store
+            .lookupEntryContextById(
+              directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
+                subscription.payload.subscriptionData.context
+              )
+            )
+            .map(context => (subscription, context.value))
+        }
+        .map(_.collect { case (subscription, Some(context)) =>
+          context.payload.name -> subscription
+        })
+      result <-
+        if (directorySubscriptions.isEmpty) {
+          Future.successful(Some("No subscriptions due for expiry"))
+        } else {
+          val expireCommands = directorySubscriptions.flatMap { case (_, sub) =>
+            sub.contractId
+              .exerciseSubscriptionIdleState_ExpireSubscription(provider.toProtoPrimitive)
+              .commands
+              .asScala
+              .toSeq
+          }
+
+          val subscriptionEntries = directorySubscriptions.map(_._1).mkString(", ")
+          logger.info(s"Expiring subscriptions for directory entries: $subscriptionEntries")
+          // TODO(#1882) Avoid unlimited batching
+          connection
+            .submitCommandsNoDedup(Seq(provider), Seq(), expireCommands)
+            .map(_ => Some(s"Archived subscriptions for directory entries $subscriptionEntries"))
+        }
+    } yield result
   })
 }
