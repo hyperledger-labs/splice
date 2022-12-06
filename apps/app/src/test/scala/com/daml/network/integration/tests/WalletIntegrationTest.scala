@@ -317,7 +317,6 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
       }
 
     "allow two users to make direct transfers between them" in { implicit env =>
-      // val aliceUserParty =
       val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
       val bobUserParty = onboardWalletUser(this, bobWallet, bobValidator)
       aliceWallet.tap(100.0)
@@ -334,17 +333,17 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
         aliceWallet.createTransferOffer(bobUserParty, 3.0, "to be withdrawn", expiration)
 
       eventually() {
-        aliceWallet.listTransferOffers().length shouldBe 3
-        bobWallet.listTransferOffers().length shouldBe 3
+        aliceWallet.listTransferOffers() should have length 3
+        bobWallet.listTransferOffers() should have length 3
       }
 
       actAndCheck("Bob accepts one offer", bobWallet.acceptTransferOffer(offer))(
         "Accepted offer gets paid",
         _ => {
-          aliceWallet.listTransferOffers().length shouldBe 2
-          aliceWallet.listAcceptedTransferOffers().length shouldBe 0
-          bobWallet.listTransferOffers().length shouldBe 2
-          bobWallet.listAcceptedTransferOffers().length shouldBe 0
+          aliceWallet.listTransferOffers() should have length 2
+          aliceWallet.listAcceptedTransferOffers() should have length 0
+          bobWallet.listTransferOffers() should have length 2
+          bobWallet.listAcceptedTransferOffers() should have length 0
           checkWallet(aliceUserParty, aliceWallet, Seq((98.8, 99.0)))
           checkWallet(bobUserParty, bobWallet, Seq((1.0, 1.0)))
         },
@@ -358,14 +357,48 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
       )(
         "No more offers listed",
         _ => {
-          aliceWallet.listTransferOffers().length shouldBe 0
-          aliceWallet.listAcceptedTransferOffers().length shouldBe 0
-          bobWallet.listTransferOffers().length shouldBe 0
-          bobWallet.listAcceptedTransferOffers().length shouldBe 0
+          aliceWallet.listTransferOffers() should have length 0
+          aliceWallet.listAcceptedTransferOffers() should have length 0
+          bobWallet.listTransferOffers() should have length 0
+          bobWallet.listAcceptedTransferOffers() should have length 0
         },
       )
 
-      // TODO(#1731): Once expiration is automated, add a test here that creates an offer with a short expiration period and waits for it to be auto-expired
+      // TODO(#1870): consider making this a time-based test instead
+      val shortExpiration = Primitive.Timestamp
+        .discardNanos(Instant.now().plus(2, ChronoUnit.SECONDS))
+        .getOrElse(fail("Failed to convert timestamp"))
+
+      val (offer4, _) = actAndCheck(
+        "Alice creates two short-lived transfer offer", {
+          aliceWallet.createTransferOffer(
+            bobUserParty,
+            1.0,
+            "should expire before accepted",
+            shortExpiration,
+          )
+          aliceWallet
+            .createTransferOffer(
+              bobUserParty,
+              150.0,
+              "should expire after accepted",
+              shortExpiration,
+            )
+        },
+      )(
+        "Wait for new offer to be ingested",
+        _ => {
+          aliceWallet.listTransferOffers() should have length 2
+          bobWallet.listTransferOffers() should have length 2
+        },
+      )
+      clue("Bob accepts an offer that alice will not afford")(
+        bobWallet.acceptTransferOffer(offer4)
+      )
+
+      clue("Wait for both offers to expire")(eventually() {
+        aliceWallet.listTransferOffers() should have length 0
+      })
 
       val (offer5, _) = actAndCheck(
         "Create a transfer offer that alice cannot yet afford",
@@ -381,7 +414,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
         _ => aliceWallet.listAcceptedTransferOffers() should have length 1,
       )
       clue("Sleeping for a while, to make sure a few retries fail first")(
-        // TODO(M3-02): consider making this a time-based test, and advancing time gradually to trigger the failing automation instead
+        // TODO(#1870): consider making this a time-based test, and advancing time gradually to trigger the failing automation instead
         Threading.sleep(4000)
       )
       clue("Tapping more coin, to afford the accepted transfer offer")(

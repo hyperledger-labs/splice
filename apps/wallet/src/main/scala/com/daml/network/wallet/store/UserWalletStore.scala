@@ -140,6 +140,10 @@ object UserWalletStore {
   case class Key(
       /** The party-id of the SVC issuing CC managed by this end-user wallet. */
       svcParty: PartyId,
+      /** The party-id of the wallet's service party */
+      walletServiceParty: PartyId,
+      /** The party-id of the wallet's validator */
+      validatorParty: PartyId,
       /** The participant user name of the end-user */
       endUserName: String,
       /** The party-id of the end-user, which is the primary party of its participant user */

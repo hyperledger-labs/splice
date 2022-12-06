@@ -274,6 +274,7 @@ class TreasuryService(
           inputs.asJava,
           validOperations.map(_.operation).asJava,
         )
+
       (offset, outcomes) <- connection
         // TODO(M3-02): as of 2022-11-25 there are two operations that are not self-conflicting: Tap and DirectTransfer,
         // which implies that network problems might lead to duplicate 'DirectTransfer' calls. They will be replaced by

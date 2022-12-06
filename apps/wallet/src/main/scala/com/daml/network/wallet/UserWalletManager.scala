@@ -61,7 +61,13 @@ class UserWalletManager(
     val endUserName = install.payload.endUserName
     val endUserParty = PartyId.tryFromProtoPrimitive(install.payload.endUserParty)
     val key =
-      UserWalletStore.Key(svcParty = store.key.svcParty, endUserName, endUserParty)
+      UserWalletStore.Key(
+        svcParty = store.key.svcParty,
+        store.key.walletServiceParty,
+        store.key.validatorParty,
+        endUserName,
+        endUserParty,
+      )
     val walletService = new UserWalletService(
       ledgerClient,
       key,

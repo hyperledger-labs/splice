@@ -4,7 +4,7 @@ import akka.stream.Materializer
 import cats.syntax.traverse.*
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_CompleteAcceptedTransfer
-import com.daml.network.codegen.java.cn.wallet.transferoffer.AcceptedTransferOffer
+import com.daml.network.codegen.java.cn.wallet.transferoffer.{AcceptedTransferOffer, TransferOffer}
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   transferoffer as transferOffersCodegen,
@@ -19,9 +19,11 @@ import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.Success
 
 class UserWalletAutomationService(
     store: UserWalletStore,
@@ -122,4 +124,135 @@ class UserWalletAutomationService(
     }
   })
 
+  registerPollingTrigger(
+    "TryExpiringTransferOffers",
+    automationConfig.pollingInterval,
+    connection,
+  )((now, logger) => { implicit traceContext =>
+    {
+      logger.debug("Looking for transfer offers to expire...")
+      store.acs
+        .listContracts(
+          transferOffersCodegen.TransferOffer.COMPANION,
+          (c: JavaContract[
+            transferOffersCodegen.TransferOffer.ContractId,
+            transferOffersCodegen.TransferOffer,
+          ]) =>
+            now.toInstant.isAfter(
+              c.payload.expiresAt.plus(automationConfig.clockSkewAutomationDelay.duration)
+            ),
+        )
+        .flatMap({ case QueryResult(_, offers) =>
+          logger.info(s"Attempting to expire ${offers.length} expired transfer offers")
+          offers
+            .traverse { c =>
+              expireTransferOffer(c)
+                .transform(Success(_))
+            /* Note that we're disabling retries altogether here, regardless of the failure reason.
+               That's ok since this task will be periodically re-triggered anyway, and we don't care about fine-grained prompt cleanup */
+            }
+            .map(_.partitionMap(_.toEither) match {
+              case (lefts, rights) =>
+                val errs = lefts.foldLeft("")((s, l) => s"$s; $l")
+                Some(
+                  s"cleaned out ${rights.size} expired transfer offers with (${lefts.size} failures: $errs)."
+                )
+            })
+        })
+    }
+  })
+
+  registerPollingTrigger(
+    "TryExpiringAcceptedTransferOffers",
+    automationConfig.pollingInterval,
+    connection,
+  )((now, logger) => { implicit traceContext =>
+    {
+      logger.debug("Looking for accepted transfer offers to expire...")
+      store.acs
+        .listContracts(
+          transferOffersCodegen.AcceptedTransferOffer.COMPANION,
+          (c: JavaContract[
+            transferOffersCodegen.AcceptedTransferOffer.ContractId,
+            transferOffersCodegen.AcceptedTransferOffer,
+          ]) =>
+            now.toInstant.isAfter(
+              c.payload.expiresAt.plus(automationConfig.clockSkewAutomationDelay.duration)
+            ),
+        )
+        .flatMap({ case QueryResult(_, offers) =>
+          logger.info(s"Attempting to expire ${offers.length} expired accepted transfer offers")
+          offers
+            .traverse { c =>
+              expireAcceptedTransferOffer(c)
+                .transform(Success(_))
+            /* Note that we're disabling retries altogether here, regardless of the failure reason.
+               That's ok since this task will be periodically re-triggered anyway, and we don't care about fine-grained prompt cleanup */
+            }
+            .map(_.partitionMap(a => a.toEither) match {
+              case (lefts, rights) =>
+                val errs = lefts.foldLeft("")((s, l) => s"$s; $l")
+                Some(
+                  s"cleaned out ${rights.size} expired accepted transfer offers with (${lefts.size} failures: $errs)."
+                )
+            })
+        })
+    }
+  })
+
+  private def getInstall =
+    store
+      .lookupInstall()
+      .map(
+        _.value.getOrElse(
+          throw new StatusRuntimeException(
+            Status.NOT_FOUND.withDescription("WalletAppInstall contract")
+          )
+        )
+      )
+
+  private def expireTransferOffer(
+      expiredTransferOffer: JavaContract[TransferOffer.ContractId, TransferOffer]
+  )(implicit traceContext: TraceContext): Future[String] = {
+
+    for {
+      install <- getInstall
+
+      cmd = install.contractId.exerciseWalletAppInstall_TransferOffer_Expire(
+        expiredTransferOffer.contractId,
+        store.key.endUserParty.toProtoPrimitive,
+      )
+      res <- connection
+        .submitWithResultNoDedup(
+          Seq(store.key.walletServiceParty),
+          Seq(store.key.validatorParty, store.key.endUserParty),
+          cmd,
+        )
+        .map(_ => "Successfully expired transfer offer")
+    } yield res
+  }
+
+  private def expireAcceptedTransferOffer(
+      expiredAcceptedTransferOffer: JavaContract[
+        AcceptedTransferOffer.ContractId,
+        AcceptedTransferOffer,
+      ]
+  )(implicit traceContext: TraceContext): Future[String] = {
+
+    for {
+      install <- getInstall
+
+      cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Expire(
+        expiredAcceptedTransferOffer.contractId,
+        store.key.endUserParty.toProtoPrimitive,
+      )
+      res <- connection
+        .submitWithResultNoDedup(
+          Seq(store.key.walletServiceParty),
+          Seq(store.key.validatorParty, store.key.endUserParty),
+          cmd,
+        )
+        .map(_ => "Successfully expired accepted transfer offer")
+    } yield res
+  }
 }
