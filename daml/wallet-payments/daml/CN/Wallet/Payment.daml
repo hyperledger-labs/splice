@@ -94,6 +94,7 @@ template AppPaymentRequest
 
          ccQuantities <- forA ccReceiverQuantities (\ccq -> pure ccq.ccQuantity)
 
+         -- TODO(#1492) Lock to specific round to avoid fees changing
          fees <- exerciseComputeFees context sender ccQuantities
          -- lock the coin and create an accepted payment
          let transfer = Transfer with

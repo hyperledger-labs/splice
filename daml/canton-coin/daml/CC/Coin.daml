@@ -460,6 +460,7 @@ template CoinRules
          create this with
            observers = obs :: observers
 
+-- | The receiver quantities must be fixed receiver quantities with senderTransferRatio = 1.0 for this to be accurate.
 computeFees : API.TransferContext -> CoinConfig USD -> [Decimal] -> Update Decimal
 computeFees context config0 receiverQuantities = do
     (_, openRound) <- downcastInterface @OpenMiningRound "OpenMiningRound" context.openMiningRound

@@ -114,16 +114,14 @@ testUSDSubscription = script do
 
   coins1 <- query @Coin pizzeria.primaryParty
 
-  -- TODO(#1889) Switch to 0.5 once fees are no longer deducted.
-  map (\(_, c) -> c.quantity.initialQuantity) (coins1 `diffContracts` coins0) === [0.492525]
-  
+  map (\(_, c) -> c.quantity.initialQuantity) (coins1 `diffContracts` coins0) === [0.5]
+
   passTime (days 27)
   (payment2Cid, change2) <- makeSubscriptionPayment app alice subscriptionStateCid change
   (subscriptionState2Cid, pizzeriasCoin2) <- collectSubscriptionPayment app provider.primaryParty pizzeria alice.primaryParty payment2Cid
 
   coins2 <- query @Coin pizzeria.primaryParty
-  -- TODO(#1889) Switch to 0.5 once fees are no longer deducted.
-  map (\(_, c) -> c.quantity.initialQuantity) (coins2 `diffContracts` coins1) === [0.492525]
+  map (\(_, c) -> c.quantity.initialQuantity) (coins2 `diffContracts` coins1) === [0.5]
 
   advanceToIssuanceWithPrice app 0.5
 
@@ -132,8 +130,7 @@ testUSDSubscription = script do
   (subscriptionState2Cid, pizzeriasCoin2) <- collectSubscriptionPayment app provider.primaryParty pizzeria alice.primaryParty payment3Cid
 
   coins3 <- query @Coin pizzeria.primaryParty
-  -- TODO(#1889) Switch to 2 once fees are no longer deducted.
-  map (\(_, c) -> c.quantity.initialQuantity) (coins3 `diffContracts` coins2) === [1.9404]
+  map (\(_, c) -> c.quantity.initialQuantity) (coins3 `diffContracts` coins2) === [2.0]
 
   pure ()
 
