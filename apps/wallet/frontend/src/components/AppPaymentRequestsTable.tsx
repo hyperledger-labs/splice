@@ -123,7 +123,7 @@ const AppPaymentRequestRows: React.FC<{
               </TableHead>
               <TableBody>
                 {request.receiverQuantities.map(({ receiver, quantity }, index) => (
-                  <TableRow key={index}>
+                  <TableRow key={index} className="receiver-quantity-row">
                     <TableCell className="app-request-receiver">
                       <DirectoryEntry partyId={receiver} />
                     </TableCell>

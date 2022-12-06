@@ -149,27 +149,205 @@ class WalletFrontendIntegrationTest
       }
     }
 
-    "show app payment requests, and correctly handle unresolved party IDs" in { implicit env =>
+    "show app payment requests in CC, and correctly handle unresolved party IDs" in {
+      implicit env =>
+        // Alice submits a directory entry request, which will create an app payment request in her wallet
+        val aliceDamlUser = aliceWallet.config.damlUser
+        val aliceUserParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
+        createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.CC)
+
+        withFrontEnd("alice") { implicit webDriver =>
+          browseToPaymentRequests(aliceDamlUser)
+
+          // Verify that the total quantity of CC is properly displayed
+          eventually() {
+            inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
+              // Verify that the currency and quantity are properly displayed
+              row.childElement(className("app-request-total-quantity")).text should matchText(
+                "42.00000000CC"
+              )
+            }
+          }
+
+          // Verify that the receiver table row is properly displayed
+          eventually() {
+            inside(findAll(className("app-request-breakdown-table-row")).toList) { case Seq(row) =>
+              // Check that alice party ID could not be resolved against the directory
+              // service, and the party ID is shown instead.
+              row
+                .childElement(className("app-request-receiver"))
+                .text shouldBe aliceUserParty.toProtoPrimitive
+
+              // Verify that the currency and quantity are properly displayed
+              row.childElement(className("app-request-payment-quantity")).text should matchText(
+                "42.0000000000CC"
+              )
+            }
+          }
+        }
+    }
+
+    "show app payment requests in USD (with USD==CC), and correctly handle unresolved party IDs" in {
+      implicit env =>
+        // Alice submits a directory entry request, which will create an app payment request in her wallet
+        val aliceDamlUser = aliceWallet.config.damlUser
+        val aliceUserParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
+        createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.USD)
+
+        withFrontEnd("alice") { implicit webDriver =>
+          browseToPaymentRequests(aliceDamlUser)
+
+          // Verify that the total quantity of USD is properly displayed
+          eventually() {
+            inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
+              // Verify that the currency and quantity are properly displayed
+              row.childElement(className("app-request-total-quantity")).text should matchText(
+                "42.00000000CC"
+              )
+            }
+          }
+
+          // Verify that the receiver table row is properly displayed
+          eventually() {
+            inside(findAll(className("app-request-breakdown-table-row")).toList) { case Seq(row) =>
+              // Check that alice party ID could not be resolved against the directory
+              // service, and the party ID is shown instead.
+              row
+                .childElement(className("app-request-receiver"))
+                .text shouldBe aliceUserParty.toProtoPrimitive
+
+              // Verify that the currency and quantity are properly displayed
+              row.childElement(className("app-request-payment-quantity")).text should matchText(
+                "42.0000000000USD"
+              )
+            }
+          }
+        }
+    }
+
+    "show app payment requests with multiple receivers (CC only)" in { implicit env =>
       // Alice submits a directory entry request, which will create an app payment request in her wallet
       val aliceDamlUser = aliceWallet.config.damlUser
       val aliceUserParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
-      createSelfPaymentRequest(aliceUserParty)
+
+      createPaymentRequest(
+        aliceUserParty,
+        Seq(
+          receiverQuantity(aliceUserParty, 22, paymentCodegen.Currency.CC),
+          receiverQuantity(aliceUserParty, 20, paymentCodegen.Currency.CC),
+        ),
+      )
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToPaymentRequests(aliceDamlUser)
 
-        // Check that alice party ID could not be resolved against the directory service, and the party ID is shown instead.
+        // Verify that the total quantity of USD is properly displayed
         eventually() {
-          inside(findAll(className("app-request-breakdown-table-row")).toList) { case Seq(row) =>
-            row
-              .childElement(className("app-request-receiver"))
-              .text shouldBe aliceUserParty.toProtoPrimitive
-            row.childElement(className("app-request-payment-quantity")).text should matchText(
-              "42.0000000000CC"
+          inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
+            // Verify that the currency and quantity are properly displayed
+            row.childElement(className("app-request-total-quantity")).text should matchText(
+              "42.00000000CC"
             )
           }
         }
+
+        // Verify that the receiver table rows contain both receiver quantities
+        eventually() {
+          val quantities =
+            findAll(className("receiver-quantity-row")).toList.map(row =>
+              row.childElement(className("app-request-payment-quantity")).text
+            )
+
+          quantities should contain theSameElementsAs Seq(
+            "22.0000000000CC",
+            "20.0000000000CC",
+          )
+        }
       }
+    }
+
+    "show app payment requests with multiple receivers (USD only, coin price of 1.0)" in {
+      implicit env =>
+        // Alice submits a directory entry request, which will create an app payment request in her wallet
+        val aliceDamlUser = aliceWallet.config.damlUser
+        val aliceUserParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
+
+        createPaymentRequest(
+          aliceUserParty,
+          Seq(
+            receiverQuantity(aliceUserParty, 22, paymentCodegen.Currency.USD),
+            receiverQuantity(aliceUserParty, 20, paymentCodegen.Currency.USD),
+          ),
+        )
+
+        withFrontEnd("alice") { implicit webDriver =>
+          browseToPaymentRequests(aliceDamlUser)
+
+          // Verify that the total quantity of USD is properly displayed
+          eventually() {
+            inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
+              // Verify that the currency and quantity are properly displayed
+              row.childElement(className("app-request-total-quantity")).text should matchText(
+                "42.00000000CC"
+              )
+            }
+          }
+
+          // Verify that the receiver table rows contain both receiver quantities
+          eventually() {
+            val quantities =
+              findAll(className("receiver-quantity-row")).toList.map(row =>
+                row.childElement(className("app-request-payment-quantity")).text
+              )
+
+            quantities should contain theSameElementsAs Seq(
+              "22.0000000000USD",
+              "20.0000000000USD",
+            )
+          }
+        }
+    }
+
+    "show app payment requests with multiple receivers (USD and CC, coin price of 1.0)" in {
+      implicit env =>
+        // Alice submits a directory entry request, which will create an app payment request in her wallet
+        val aliceDamlUser = aliceWallet.config.damlUser
+        val aliceUserParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
+
+        createPaymentRequest(
+          aliceUserParty,
+          Seq(
+            receiverQuantity(aliceUserParty, 22, paymentCodegen.Currency.USD),
+            receiverQuantity(aliceUserParty, 20, paymentCodegen.Currency.CC),
+          ),
+        )
+
+        withFrontEnd("alice") { implicit webDriver =>
+          browseToPaymentRequests(aliceDamlUser)
+
+          // Verify that the total quantity of USD is properly displayed
+          eventually() {
+            inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
+              // Verify that the currency and quantity are properly displayed
+              row.childElement(className("app-request-total-quantity")).text should matchText(
+                "42.00000000CC"
+              )
+            }
+          }
+
+          // Verify that the receiver table rows contain both receiver quantities
+          eventually() {
+            val quantities =
+              findAll(className("receiver-quantity-row")).toList.map(row =>
+                row.childElement(className("app-request-payment-quantity")).text
+              )
+
+            quantities should contain theSameElementsAs Seq(
+              "22.0000000000USD",
+              "20.0000000000CC",
+            )
+          }
+        }
     }
 
     "show app payment requests, and resolve party IDs in them" in { implicit env =>
@@ -179,7 +357,7 @@ class WalletFrontendIntegrationTest
       val aliceDirectoryName = "alice.cns"
       val aliceDirectoryDisplay = expectedCns(aliceUserParty, aliceDirectoryName)
       createDirectoryEntry(aliceUserParty, aliceDirectory, "alice.cns", aliceWallet)
-      createSelfPaymentRequest(aliceUserParty)
+      createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.CC)
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToPaymentRequests(aliceDamlUser)
@@ -431,7 +609,7 @@ class WalletFrontendIntegrationTest
         nextPaymentDueAt = dueAt,
         quantity = usdQuantity,
       )
-      createSelfPaymentRequest(aliceUserParty)
+      createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.CC)
       withFrontEnd("alice") { implicit webDriver =>
         browseToSubscriptions(aliceDamlUser)
         clue("Check that the subscription request displays the currency") {
@@ -532,7 +710,7 @@ class WalletFrontendIntegrationTest
     directory.requestDirectoryEntry(dirEntry)
   }
 
-  def createSelfPaymentRequest(
+  def createTestDeliveryOffer(
       aliceUserParty: PartyId
   )(implicit env: CoinTestConsoleEnvironment) = {
     val deliveryOffer = new testWalletCodegen.TestDeliveryOffer(
@@ -540,7 +718,7 @@ class WalletFrontendIntegrationTest
       aliceUserParty.toProtoPrimitive,
       "description",
     )
-    val deliveryOfferId = clue("Create delivery offer") {
+    clue("Create delivery offer") {
       aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
         Seq(aliceUserParty),
         optTimeout = None,
@@ -553,18 +731,31 @@ class WalletFrontendIntegrationTest
         )
         .id
     }
+  }
+
+  def receiverQuantity(
+      receiverParty: PartyId,
+      quantity: Int,
+      currency: paymentCodegen.Currency,
+  ) =
+    new paymentCodegen.ReceiverQuantity(
+      receiverParty.toProtoPrimitive,
+      new paymentCodegen.PaymentQuantity(
+        BigDecimal(quantity).bigDecimal,
+        currency,
+      ),
+    )
+
+  def createPaymentRequest(
+      aliceUserParty: PartyId,
+      receiverQuantities: Seq[paymentCodegen.ReceiverQuantity],
+  )(implicit env: CoinTestConsoleEnvironment) = {
+    val deliveryOfferId = createTestDeliveryOffer(aliceUserParty)
+
     clue("Create a payment request") {
       val paymentRequest = new paymentCodegen.AppPaymentRequest(
         aliceUserParty.toProtoPrimitive,
-        Seq(
-          new paymentCodegen.ReceiverQuantity(
-            aliceUserParty.toProtoPrimitive,
-            new paymentCodegen.PaymentQuantity(
-              BigDecimal(42.0).bigDecimal,
-              paymentCodegen.Currency.CC,
-            ),
-          )
-        ).asJava,
+        receiverQuantities.asJava,
         aliceUserParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         Instant.now().plus(5, ChronoUnit.MINUTES), // expires in 5 min
@@ -580,6 +771,18 @@ class WalletFrontendIntegrationTest
         .awaitJava(paymentCodegen.AppPaymentRequest.COMPANION)(aliceUserParty)
         .id
     }
+  }
+
+  def createSelfPaymentRequest(
+      aliceUserParty: PartyId,
+      quantity: Int,
+      currency: paymentCodegen.Currency,
+  )(implicit env: CoinTestConsoleEnvironment) = {
+    val receiverQuantities = Seq(
+      receiverQuantity(aliceUserParty, quantity, currency)
+    )
+
+    createPaymentRequest(aliceUserParty, receiverQuantities)
   }
 
   private val defaultSubscriptionQuantity = new paymentCodegen.PaymentQuantity(

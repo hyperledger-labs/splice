@@ -8,8 +8,8 @@ import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import com.google.common.annotations.VisibleForTesting
-import io.grpc.*
 import io.grpc.ForwardingClientCallListener.SimpleForwardingClientCallListener
+import io.grpc.*
 
 import java.util.concurrent.atomic.AtomicBoolean
 
