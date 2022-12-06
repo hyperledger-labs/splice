@@ -588,7 +588,10 @@ class WalletFrontendIntegrationTest
     }
     clue("Create a subscription idle state") {
       val payData = new subsCodegen.SubscriptionPayData(
-        BigDecimal(10).bigDecimal.setScale(10),
+        new paymentCodegen.PaymentQuantity(
+          BigDecimal(10).bigDecimal.setScale(10),
+          paymentCodegen.Currency.CC,
+        ),
         new RelTime(60 * 60 * 1000000L),
         new RelTime(10 * 60 * 1000000L),
         new RelTime(60 * 1000000L),

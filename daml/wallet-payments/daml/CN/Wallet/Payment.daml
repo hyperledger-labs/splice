@@ -22,25 +22,25 @@ interface DeliveryOffer
   where
     viewtype DeliveryOfferView
 
-data Currency = USD | CC deriving (Eq, Show)
+data Currency = USD | CC deriving (Eq, Show, Ord)
 
 data PaymentQuantity = PaymentQuantity
   with
     quantity : Decimal
     currency : Currency
-  deriving (Eq, Show)
+  deriving (Eq, Show, Ord)
 
 data ReceiverQuantity = ReceiverQuantity
  with
    receiver : Party
    quantity : PaymentQuantity
- deriving (Show, Eq)
+ deriving (Show, Eq, Ord)
 
 data ReceiverCCQuantity = ReceiverCCQuantity
  with
    receiver : Party
    ccQuantity : Decimal
- deriving (Show, Eq)
+ deriving (Show, Eq, Ord)
 
 paymentQuantityToCC : Party -> Party -> (ContractId OpenMiningRound) -> PaymentQuantity -> Update Decimal
 paymentQuantityToCC svc submitter openMiningRound pq =

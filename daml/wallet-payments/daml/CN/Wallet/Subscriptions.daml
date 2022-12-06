@@ -4,6 +4,7 @@ import DA.Time
 import DA.List (dedupSort)
 import DA.Optional
 
+import CN.Wallet.Payment
 import CN.Util.Assert
 import CC.API.V1.Coin
 
@@ -81,7 +82,7 @@ assertContextValid subscriptionData = do
 -- | Payment-related properties. Expected to be mutated rarely.
 data SubscriptionPayData = SubscriptionPayData
   with
-    paymentQuantity : Decimal -- ^ What quantity of coin is due on each interval.
+    paymentQuantity : PaymentQuantity -- ^ What quantity of coin is due on each interval.
     paymentInterval : RelTime -- ^ At which intervals payments should be made.
     paymentDuration : RelTime -- ^ The time available to the sender to initiate a payment; they can initiate the payment this much before the end of the current interval.
     collectionDuration : RelTime -- ^ The time available to the receiver to collect a payment.
@@ -90,7 +91,7 @@ data SubscriptionPayData = SubscriptionPayData
 -- for ensure assertions
 payDataIsValid: SubscriptionPayData -> Bool
 payDataIsValid payData =
-  payData.paymentQuantity > 0.0 && payData.paymentInterval > aunit && payData.paymentDuration > aunit && payData.collectionDuration > aunit
+  payData.paymentQuantity.quantity > 0.0 && payData.paymentInterval > aunit && payData.paymentDuration > aunit && payData.collectionDuration > aunit
 
 
 -- | A request for establishing a subscription.
@@ -283,7 +284,10 @@ template SubscriptionPayment
 lockAndMakeChange: PaymentTransferContext -> Subscription -> SubscriptionPayData -> [TransferInput] -> Time -> Update (ContractId LockedCoin, ContractId Coin)
 lockAndMakeChange context subscriptionData payData inputs now = do
   let Subscription { sender; receiver; provider; svc } = subscriptionData
-  let SubscriptionPayData { paymentQuantity = lockQuantity; collectionDuration = lockDuration; .. } = payData
+  let SubscriptionPayData { paymentQuantity; collectionDuration = lockDuration; .. } = payData
+
+  -- TODO(#1889) Add fees to lock amount
+  lockQuantity <- paymentQuantityToCC svc subscriptionData.sender context.context.openMiningRound paymentQuantity
 
   let transfer = Transfer with
        sender

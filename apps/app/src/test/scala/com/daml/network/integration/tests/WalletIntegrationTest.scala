@@ -777,7 +777,10 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
           contextId.toInterface(subsCodegen.SubscriptionContext.INTERFACE),
         )
         val payData = new subsCodegen.SubscriptionPayData(
-          BigDecimal(10).bigDecimal.setScale(10),
+          new walletCodegen.PaymentQuantity(
+            BigDecimal(10).bigDecimal.setScale(10),
+            walletCodegen.Currency.CC,
+          ),
           new RelTime(60 * 60 * 1000000L),
           new RelTime(60 * 60 * 1000000L),
           new RelTime(60 * 1000000L),

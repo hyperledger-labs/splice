@@ -78,7 +78,8 @@ const SubscriptionsTable: React.FC = () => {
       <TableCell className="sub-receiver">
         <DirectoryEntry partyId={main.payload.receiver} />
       </TableCell>
-      <TableCell>{state.value.payload.payData.paymentQuantity}</TableCell>
+      {/* TODO(#1641) Display currency */}
+      <TableCell>{state.value.payload.payData.paymentQuantity.quantity}</TableCell>
       <TableCell>{state.value.payload.payData.paymentInterval.microseconds}</TableCell>
       <TableCell>{paymentDueAt(state)}</TableCell>
       <TableCell className="sub-provider">

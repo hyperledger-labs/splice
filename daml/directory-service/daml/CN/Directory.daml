@@ -4,6 +4,7 @@ import DA.Time
 
 import CN.Util.Assert
 import CC.API.V1.Coin
+import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 
 
@@ -134,7 +135,7 @@ template DirectoryInstall with
               context = toInterfaceContractId context
               ..
         let payData = SubscriptionPayData with
-              paymentQuantity = entryFee
+              paymentQuantity = PaymentQuantity entryFee CC
               paymentInterval = entryLifetime
               paymentDuration = renewalDuration
               collectionDuration

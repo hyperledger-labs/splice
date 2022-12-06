@@ -51,7 +51,8 @@ const SubscriptionRequest: React.FC<{ request: Contract<DamlSubscriptionRequest>
       <TableCell className="sub-request-receiver">
         <DirectoryEntry partyId={request.payload.subscriptionData.receiver} />
       </TableCell>
-      <TableCell>{request.payload.payData.paymentQuantity}</TableCell>
+      {/* TODO(#1641) Display currency */}
+      <TableCell>{request.payload.payData.paymentQuantity.quantity}</TableCell>
       <TableCell>{request.payload.payData.paymentInterval.microseconds}</TableCell>
       <TableCell className="sub-request-provider">
         <DirectoryEntry partyId={request.payload.subscriptionData.provider} />

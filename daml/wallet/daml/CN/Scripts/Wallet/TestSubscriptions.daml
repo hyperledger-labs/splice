@@ -4,7 +4,9 @@ import DA.Assert
 import DA.Time
 import Daml.Script
 
+import CC.Coin hiding (CC, USD)
 import qualified CC.API.V1.Coin as API
+import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 
 import CC.Scripts.Util
@@ -34,7 +36,7 @@ testSubscription = script do
   provider <- setupUser app "la_famiglia" validator
 
   coin <- tap app alice 42.0
-  let payData = SubscriptionPayData 12.0 (days 28) (days 1) (minutes 5)
+  let payData = SubscriptionPayData (PaymentQuantity 12.0 CC) (days 28) (days 1) (minutes 5)
 
   context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext app.svc alice.primaryParty pizzeria.primaryParty "all-you-can-eat pasta")
   let subscriptionData = Subscription alice.primaryParty pizzeria.primaryParty provider.primaryParty app.svc (toInterfaceContractId context)
@@ -75,32 +77,63 @@ testSubscription = script do
     payData
     nextPaymentDueAt = t `addRelTime` (days 28)
 
-  -- fails because: too soon
-  failMakeSubscriptionPayment app alice subscriptionStateCid (toInterfaceContractId coin)
+testUSDSubscription : Script ()
+testUSDSubscription = script do
+  app <- setupApp
+  runNextIssuance app
+  runCoinDepositBots app
 
-  -- we can pay for the nex period starting from 1 day before the last period ends, as per the config above
+  validator <- setupValidator app "validator1"
+  alice <- setupUser app "alice" validator
+  pizzeria <- setupUser app "pizzeria" validator
+  provider <- setupUser app "la_famiglia" validator
+
+  coin <- tap app alice 42.0
+  let payData = SubscriptionPayData with 
+        paymentInterval = days 28
+        paymentDuration = days 1
+        collectionDuration = minutes 5
+        paymentQuantity = PaymentQuantity 1.0 USD
+
+  context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext app.svc alice.primaryParty pizzeria.primaryParty "all-you-can-eat pasta")
+  let subscriptionData = Subscription with
+        sender = alice.primaryParty
+        receiver = pizzeria.primaryParty
+        provider = provider.primaryParty
+        svc = app.svc
+        context = toInterfaceContractId context
+
+  advanceToIssuanceWithPrice app 2.0
+
+  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
+
+  (initialPaymentCid, change) <- acceptSubscriptionRequestAndMakePayment app alice subscriptionRequestCid (toInterfaceContractId coin)
+
+  coins0 <- query @Coin pizzeria.primaryParty
+  (subscriptionCid, subscriptionStateCid, pizzeriasCoin) <- collectInitialSubscriptionPayment app provider.primaryParty pizzeria alice.primaryParty initialPaymentCid
+
+  coins1 <- query @Coin pizzeria.primaryParty
+
+  -- TODO(#1889) Switch to 0.5 once fees are no longer deducted.
+  map (\(_, c) -> c.quantity.initialQuantity) (coins1 `diffContracts` coins0) === [0.492525]
+  
   passTime (days 27)
   (payment2Cid, change2) <- makeSubscriptionPayment app alice subscriptionStateCid change
-
   (subscriptionState2Cid, pizzeriasCoin2) <- collectSubscriptionPayment app provider.primaryParty pizzeria alice.primaryParty payment2Cid
 
-  t <- getTime
-  Some subscriptionState2 <- queryContractId alice.primaryParty subscriptionState2Cid
-  subscriptionState2 === SubscriptionIdleState with
-    subscription = subscriptionCid
-    subscriptionData
-    payData
-    nextPaymentDueAt = t `addRelTime` (days 29)
+  coins2 <- query @Coin pizzeria.primaryParty
+  -- TODO(#1889) Switch to 0.5 once fees are no longer deducted.
+  map (\(_, c) -> c.quantity.initialQuantity) (coins2 `diffContracts` coins1) === [0.492525]
 
-  -- we can't expire yet
-  submitMustFail pizzeria.primaryParty $ exerciseCmd subscriptionState2Cid SubscriptionIdleState_ExpireSubscription with actor = pizzeria.primaryParty
+  advanceToIssuanceWithPrice app 0.5
 
-  -- didn't pay in time! We can expire and archive the subscription now
-  passTime (days 30)
-  submit pizzeria.primaryParty $ exerciseCmd subscriptionState2Cid SubscriptionIdleState_ExpireSubscription with actor = pizzeria.primaryParty
-  None <- queryContractId pizzeria.primaryParty subscriptionState2Cid
-  None <- queryContractId pizzeria.primaryParty subscriptionCid
-  None <- queryContractId pizzeria.primaryParty context
+  passTime (days 28)
+  (payment3Cid, change3) <- makeSubscriptionPayment app alice subscriptionState2Cid change2
+  (subscriptionState2Cid, pizzeriasCoin2) <- collectSubscriptionPayment app provider.primaryParty pizzeria alice.primaryParty payment3Cid
+
+  coins3 <- query @Coin pizzeria.primaryParty
+  -- TODO(#1889) Switch to 2 once fees are no longer deducted.
+  map (\(_, c) -> c.quantity.initialQuantity) (coins3 `diffContracts` coins2) === [1.9404]
 
   pure ()
 
@@ -147,3 +180,9 @@ collectSubscriptionPayment app provider receiver sender payment = do
   (state, coin) <- submitMulti [receiver.primaryParty, provider, sender] readAs $ exerciseCmd payment SubscriptionPayment_Collect with
     transferContext
   return (state, coin)
+
+diffContracts : [(ContractId a, a)] -> [(ContractId a, a)] -> [(ContractId a, a)]
+diffContracts as bs =
+    filter (\(cid, _) -> cid `notElem` bsCids) as
+  where
+    bsCids = map fst bs
