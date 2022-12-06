@@ -4,7 +4,6 @@ import DA.Time
 
 import CN.Util.Assert
 import CC.API.V1.Coin
-import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 
 
@@ -101,54 +100,6 @@ template DirectoryEntry
       do require "Extension positive" (extension > aunit)
          create this with
            expiresAt = this.expiresAt `addRelTime` extension
-
-
--- A request for a directory entry
-template DirectoryEntryRequest
-  with
-    provider : Party
-    user : Party
-    name : Text
-    entryFee : Decimal
-  where
-    signatory provider, user
-
-    choice DirectoryEntryRequest_Reject : ()
-      controller provider
-      do pure ()
-
-
-template DirectoryEntryOffer
-  with
-    svc : Party
-    entryRequest : DirectoryEntryRequest
-    entryLifetime : RelTime
-  where
-    signatory signatory entryRequest
-
-    interface instance DeliveryOffer for DirectoryEntryOffer where
-      view = DeliveryOfferView with
-        description = "Directory entry request: " <> show entryRequest
-        sender = entryRequest.user
-        svc
-
-    postconsuming choice DirectoryEntryOffer_CollectPayment : (ContractId DirectoryEntry, ContractId Coin)
-      with
-        acceptedAppPaymentCid : ContractId AcceptedAppPayment
-        transferContext : AppTransferContext
-      controller entryRequest.provider
-      do -- deliver the promised good: the entry referenced in the payment
-         acceptedAppPayment <- fetch acceptedAppPaymentCid
-         assertMsg "Payment is for this offer" (toInterfaceContractId self == acceptedAppPayment.deliveryOffer)
-         now <- getTime
-         entryCid <- case entryRequest of
-           DirectoryEntryRequest{..} -> create DirectoryEntry with
-             expiresAt = now `addRelTime` entryLifetime
-             ..
-         -- collect payment
-         (_, [(_, coinCid)]) <- exercise acceptedAppPaymentCid (AcceptedAppPayment_Collect transferContext)
-         -- return the created contracts
-         pure (entryCid, coinCid)
 
 
 template DirectoryInstall with

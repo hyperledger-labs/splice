@@ -3,10 +3,7 @@ package com.daml.network.directory.store
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.codegen.ContractId
-import com.daml.network.codegen.java.cn.wallet.{
-  payment => walletCodegen,
-  subscriptions => subsCodegen,
-}
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.{directory as directoryCodegen}
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.store.AcsStore
@@ -71,14 +68,6 @@ trait DirectoryStore extends AutoCloseable {
       co.payload.user == partyId.toPrim
     )
 
-  /** Lookup a directory entry offer by its id. */
-  def lookupEntryOfferById(
-      id: ContractId[directoryCodegen.DirectoryEntryOffer]
-  ): Future[QueryResult[Option[
-    Contract[directoryCodegen.DirectoryEntryOffer.ContractId, directoryCodegen.DirectoryEntryOffer]
-  ]]] =
-    acsStore.lookupContractById(directoryCodegen.DirectoryEntryOffer.COMPANION)(id)
-
   /** Lookup a directory entry subscription context by its id. */
   def lookupEntryContextById(
       id: ContractId[directoryCodegen.DirectoryEntryContext]
@@ -87,15 +76,6 @@ trait DirectoryStore extends AutoCloseable {
     directoryCodegen.DirectoryEntryContext,
   ]]]] =
     acsStore.lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(id)
-
-  /** Lookup a directory entry request by its id. */
-  def lookupEntryRequestById(
-      id: ContractId[directoryCodegen.DirectoryEntryRequest]
-  ): Future[QueryResult[Option[Contract[
-    directoryCodegen.DirectoryEntryRequest.ContractId,
-    directoryCodegen.DirectoryEntryRequest,
-  ]]]] =
-    acsStore.lookupContractById(directoryCodegen.DirectoryEntryRequest.COMPANION)(id)
 
   /** List all directory entries that are active as of a specific revision. */
   def listEntries(): Future[QueryResult[
@@ -116,26 +96,6 @@ trait DirectoryStore extends AutoCloseable {
     directoryCodegen.DirectoryInstallRequest,
   ], NotUsed] =
     acsStore.streamContracts(directoryCodegen.DirectoryInstallRequest.COMPANION)
-
-  /** All directory entry requests to the provider.
-    *
-    * Analogous to [[streamInstallRequests]], but for `DirectoryEntryRequest`
-    */
-  def streamEntryRequests(): Source[Contract[
-    directoryCodegen.DirectoryEntryRequest.ContractId,
-    directoryCodegen.DirectoryEntryRequest,
-  ], NotUsed] =
-    acsStore.streamContracts(directoryCodegen.DirectoryEntryRequest.COMPANION)
-
-  /** All accepted app payments whose receiver is the provider.
-    *
-    * Analogous to [[streamInstallRequests]], but for `AcceptedAppPayment`
-    */
-  def streamAcceptedAppPayments(): Source[
-    Contract[walletCodegen.AcceptedAppPayment.ContractId, walletCodegen.AcceptedAppPayment],
-    NotUsed,
-  ] =
-    acsStore.streamContracts(walletCodegen.AcceptedAppPayment.COMPANION)
 
   /** All accepted initial subscription payments whose receiver is the provider.
     *
@@ -191,13 +151,6 @@ object DirectoryStore {
       providerPartyId,
       Map(
         mkFilter(directoryCodegen.DirectoryEntry.COMPANION)(co => co.payload.provider == provider),
-        mkFilter(directoryCodegen.DirectoryEntryRequest.COMPANION)(co =>
-          co.payload.provider == provider
-        ),
-        mkFilter(directoryCodegen.DirectoryEntryOffer.COMPANION)(co =>
-          co.payload.entryRequest.provider == provider
-        ),
-        mkFilter(walletCodegen.AcceptedAppPayment.COMPANION)(co => co.payload.provider == provider),
         mkFilter(directoryCodegen.DirectoryEntryContext.COMPANION)(co =>
           co.payload.provider == provider
         ),
