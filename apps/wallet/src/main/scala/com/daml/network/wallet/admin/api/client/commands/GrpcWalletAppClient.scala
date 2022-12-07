@@ -819,6 +819,7 @@ object GrpcWalletAppClient {
       quantity: BigDecimal,
       description: String,
       expiresAt: Primitive.Timestamp,
+      senderFeeTransferRatio: BigDecimal,
   ) extends BaseCommand[
         v0.CreateTransferOfferRequest,
         v0.CreateTransferOfferResponse,
@@ -829,15 +830,17 @@ object GrpcWalletAppClient {
         request: CreateTransferOfferRequest,
     ): Future[CreateTransferOfferResponse] = service.createTransferOffer(request)
 
-    override def createRequest(): Either[String, CreateTransferOfferRequest] =
+    override def createRequest(): Either[String, CreateTransferOfferRequest] = {
       Right(
         v0.CreateTransferOfferRequest(
           Proto.encode(receiver),
           Proto.encode(quantity),
           description,
           Proto.encode(expiresAt),
+          Proto.encode(senderFeeTransferRatio),
         )
       )
+    }
 
     override def handleResponse(
         response: CreateTransferOfferResponse

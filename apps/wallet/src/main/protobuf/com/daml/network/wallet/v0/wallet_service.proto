@@ -236,6 +236,9 @@ message CreateTransferOfferRequest {
 
   // Expiration time for the offer (in epoch microseconds)
   uint64 expires_at = 4;
+
+  // Sender transfer fee ratio
+  string sender_transfer_fee_ratio = 5;
 }
 
 message CreateTransferOfferResponse {

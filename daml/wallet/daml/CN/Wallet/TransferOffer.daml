@@ -13,6 +13,9 @@ template TransferOffer
     quantity : PaymentQuantity
     description : Text
     expiresAt : Time
+    senderTransferFeeRatio : Decimal
+      -- ^ TODO(#875) Consider if we want to remove that configuration
+      -- once we issue app rewards even for senderTransferFeeRatio = 1.0.
   where
     signatory sender
     observer receiver
@@ -56,6 +59,9 @@ template AcceptedTransferOffer
     description : Text
     quantity : PaymentQuantity
     expiresAt : Time
+    senderTransferFeeRatio : Decimal
+      -- ^ TODO(#875) Consider if we want to remove that configuration
+      -- once we issue app rewards even for senderTransferFeeRatio = 1.0.
   where
     signatory sender, receiver
 
@@ -78,7 +84,7 @@ template AcceptedTransferOffer
                   receiver
                   coinType = API.FixedReceiverCoin
                     ccQuantity
-                    1.0 -- Sender pays all fees
+                    senderTransferFeeRatio
               , API.OutputSenderCoin with
                   exactQuantity = None
                   lock = None

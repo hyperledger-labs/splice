@@ -56,8 +56,15 @@ const TransferOffers: React.FC = () => {
     ev.preventDefault();
     const now = new Date();
     const expires = new Date(now.setMinutes(now.getMinutes() + 2));
+    const senderTransferFeeRatio = new Decimal(1.0);
     // TODO(#1776): Expiration is currently hard-coded to 2 minutes from now - add a UI for controlling that
-    await createTransferOffer(receiver, transferQuantity, description, expires);
+    await createTransferOffer(
+      receiver,
+      transferQuantity,
+      description,
+      expires,
+      senderTransferFeeRatio
+    );
     setReceiver('');
   };
 

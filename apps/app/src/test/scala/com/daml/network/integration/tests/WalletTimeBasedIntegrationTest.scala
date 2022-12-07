@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.directory as dirCodegen
+import com.daml.network.console.WalletAppClientReference
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -11,10 +11,23 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.util.CoinTestUtil
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.topology.PartyId
 
 import java.time.Duration
 
 class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
+
+  private def p2pTransferAndTriggerAutomation(
+      senderWallet: WalletAppClientReference,
+      receiverWallet: WalletAppClientReference,
+      receiver: PartyId,
+      amount: BigDecimal,
+      senderTransferFeeRatio: BigDecimal = 1.0,
+  )(implicit env: CoinTestConsoleEnvironment) = {
+    p2pTransfer(senderWallet, receiverWallet, receiver, amount, senderTransferFeeRatio)
+    // Advance time to trigger automation.
+    advanceTime(Duration.ofSeconds(1))
+  }
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
@@ -200,23 +213,14 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
   }
 
   "automatically collect app & validator rewards on coin operations" in { implicit env =>
-    val (aliceUserParty, bobUserParty) = setupAliceAndBobAndChannel(this)
-    // Set-up payment channel between alice and her validator
-    val proposalId =
-      aliceValidatorWallet.proposePaymentChannel(
-        aliceUserParty,
-        senderTransferFeeRatio = 0.5,
-      )
-    eventually()(aliceWallet.listPaymentChannelProposals() should have size 1)
-    aliceWallet.acceptPaymentChannelProposal(proposalId)
-    eventually()(aliceValidatorWallet.listPaymentChannels() should have size 1)
+    val (alice, bob) = onboardAliceAndBob(this)
 
     aliceWallet.tap(50)
     aliceValidatorWallet.tap(50)
     eventually()(aliceWallet.list().coins should have size 1)
 
     // Execute a transfer in round -> leads to rewards being generated
-    aliceWallet.executeDirectTransfer(bobUserParty, 40)
+    p2pTransferAndTriggerAutomation(aliceWallet, bobWallet, bob, 40.0, 0.0)
     eventually()(aliceWallet.listAppRewards() should have size 1)
     eventually()(aliceValidatorWallet.listValidatorRewards() should have size 1)
 
@@ -227,7 +231,7 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
     advanceRoundsByOneTick
 
     // alice uses her reward
-    aliceWallet.executeDirectTransfer(bobUserParty, 1)
+    p2pTransferAndTriggerAutomation(aliceWallet, bobWallet, bob, 1.0, 0.0)
     eventually()(
       aliceWallet.listAppRewards().filter(_.payload.round.number == 1) should have size 0
     )
@@ -242,7 +246,7 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
     )
 
     // validator uses reward from round 1 too.
-    aliceValidatorWallet.executeDirectTransfer(aliceUserParty, 1)
+    p2pTransferAndTriggerAutomation(aliceValidatorWallet, aliceWallet, alice, 1.0)
     eventually()(
       aliceValidatorWallet
         .listValidatorRewards()
@@ -255,28 +259,26 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
         .filter(_.payload.round.number != 1) should have size 2
     )
     // doing additional transfers in this round, only leads to more rewards since only round 1 is open for rewards collections
-    aliceValidatorWallet.executeDirectTransfer(aliceUserParty, 1)
+    p2pTransferAndTriggerAutomation(aliceValidatorWallet, aliceWallet, alice, 1.0)
     eventually()(aliceValidatorWallet.listValidatorRewards() should have size 3)
 
   }
 
   "list and manually collect app & validator rewards" in { implicit env =>
-    val (aliceUserParty, bobUserParty) = setupAliceAndBobAndChannel(this)
+    val (alice, bob) = onboardAliceAndBob(this)
 
     // Tap coin and do a transfer from alice to bob
     aliceWallet.tap(50)
-    eventually()(aliceWallet.list().coins should have size 1)
-    aliceWallet.executeDirectTransfer(bobUserParty, 40)
+
+    p2pTransferAndTriggerAutomation(aliceWallet, bobWallet, bob, 40.0, 0.0)
 
     // Retrieve transferred coin in bob's wallet and transfer part of it back to alice; bob will receive some app rewards
     eventually()(bobWallet.list().coins should have size 1)
-    bobWallet.executeDirectTransfer(aliceUserParty, 30)
+    p2pTransferAndTriggerAutomation(bobWallet, aliceWallet, alice, 30.0, 0.0)
 
-    // Wait for app rewards to become visible in bob's wallet, and check structure
-    bobWalletBackend.remoteParticipant.ledger_api.acs
-      .awaitJava(coinCodegen.AppReward.COMPANION)(bobUserParty)
-      .id
-    bobWallet.listAppRewards() should have size 1
+    eventually() {
+      bobWallet.listAppRewards() should have size 1
+    }
     bobWallet.listValidatorRewards() shouldBe empty
 
     // Wait for validator rewards to become visible in alice's wallet, check structure
@@ -295,7 +297,7 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
     // We just check that we have a coin roughly in the right range, in particular higher than the input, rather than trying to repeat the calculation
     // for rewards.
     checkWallet(
-      bobUserParty,
+      bob,
       bobWallet,
       prevCoins
         .map(c =>

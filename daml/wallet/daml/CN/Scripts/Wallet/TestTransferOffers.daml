@@ -44,6 +44,7 @@ testTransferOffers = script do
           quantity = PaymentQuantity quantity CC
           description = description
           expiresAt = curTime `addRelTime` minutes 5
+          senderTransferFeeRatio = 1.0
 
   let completeTransfer accepted coin transferContext = submitMulti [walletServiceParty] [alice.primaryParty, validator] $ exerciseCmd aliceInstall WalletAppInstall_ExecuteBatch with
         inputs = [API.InputCoin $ toInterfaceContractId coin]

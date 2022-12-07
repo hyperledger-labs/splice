@@ -919,7 +919,7 @@ data DistributedOutputs = DistributedOutputs with
 distributeOutputs : API.Round -> CoinConfig CC -> Party -> Party -> API.TransferSummary -> [PreprocessedTransferOutput] -> DistributedOutputs
 distributeOutputs now config svc sender summary outs =
     let st = foldl createOutput initialState outs
-    in trace (initialState.remainingExcessQuantity, perCoinExcessQuantity, outs) $ DistributedOutputs with
+    in DistributedOutputs with
       coins = st.coins
       receiverTransferFees = st.receiverTransferFees
   where

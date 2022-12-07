@@ -387,10 +387,12 @@ abstract class WalletAppReference(
       quantity: BigDecimal,
       description: String,
       expiresAt: Primitive.Timestamp,
+      senderFeeTransferRatio: BigDecimal = 1.0,
   ): transferOfferCodegen.TransferOffer.ContractId =
     consoleEnvironment.run {
       adminCommand(
-        GrpcWalletAppClient.CreateTransferOffer(receiver, quantity, description, expiresAt),
+        GrpcWalletAppClient
+          .CreateTransferOffer(receiver, quantity, description, expiresAt, senderFeeTransferRatio),
         callCredentials,
       )
     }

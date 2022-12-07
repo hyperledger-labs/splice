@@ -84,19 +84,23 @@ trait CoinTestUtil {
       receiverWallet: WalletAppClientReference,
       receiver: PartyId,
       amount: BigDecimal,
+      senderTransferFeeRatio: BigDecimal = 1.0,
   ) = {
     val expiration = Primitive.Timestamp
       .discardNanos(Instant.now().plus(1, ChronoUnit.MINUTES))
       .getOrElse(fail("Failed to convert timestamp"))
     val transferOfferId =
-      senderWallet.createTransferOffer(receiver, amount, "test transfer", expiration)
+      senderWallet.createTransferOffer(
+        receiver,
+        amount,
+        "test transfer",
+        expiration,
+        senderTransferFeeRatio,
+      )
     eventually() {
       receiverWallet.listTransferOffers() should have size 1
     }
     receiverWallet.acceptTransferOffer(transferOfferId)
-    eventually() {
-      senderWallet.listTransferOffers() shouldBe empty
-    }
   }
 
   def createSelfPaymentRequest(

@@ -68,7 +68,8 @@ export interface WalletClient {
     receiverPartyId: string,
     quantity: Decimal,
     description: string,
-    expiresAt: Date
+    expiresAt: Date,
+    senderTransferFeeRatio: Decimal
   ) => Promise<void>;
   acceptTransferOffer: (offerContractId: string) => Promise<void>;
   withdrawTransferOffer: (offerContractId: string) => Promise<void>;
@@ -135,13 +136,24 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
           getCreds()
         );
       },
-      createTransferOffer: async (receiverPartyId, quantity, description, expiresAt) => {
+      createTransferOffer: async (
+        receiverPartyId,
+        quantity,
+        description,
+        expiresAt,
+        senderTransferFeeRatio
+      ) => {
         await walletClient.createTransferOffer(
           new v0.CreateTransferOfferRequest()
             .setReceiverPartyId(receiverPartyId)
             .setQuantity(quantity.isInt() ? quantity.toFixed(1) : quantity.toString())
             .setDescription(description)
-            .setExpiresAt(expiresAt.getTime() * 1000),
+            .setExpiresAt(expiresAt.getTime() * 1000)
+            .setSenderTransferFeeRatio(
+              senderTransferFeeRatio.isInt()
+                ? senderTransferFeeRatio.toFixed(1)
+                : senderTransferFeeRatio.toString()
+            ),
           getCreds()
         );
       },
