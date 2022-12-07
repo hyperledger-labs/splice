@@ -97,7 +97,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
         aliceWallet.listAppPaymentRequests() shouldBe empty
       }
 
-      val (_, reqC) =
+      val (_, _, reqC) =
         createSelfPaymentRequest(this, aliceWalletBackend.remoteParticipant, aliceUserParty)
 
       val reqFound = clue("Check that we can see the created payment request") {
@@ -121,7 +121,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
     "allow a user to list and accept app payment requests" in { implicit env =>
       val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
 
-      val (referenceId, reqC) =
+      val (referenceId, _, reqC) =
         createSelfPaymentRequest(this, aliceWalletBackend.remoteParticipant, aliceUserParty)
 
       val cid = eventually() {
@@ -615,17 +615,17 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
     }
 
     "skip empty batches in the treasury service" in { implicit env =>
-      val (_, bob) = setupAliceAndBobAndChannel(this)
-      bobWallet.tap(49)
-      // create and withdraw request such that...
-      val request = aliceWallet.createOnChannelPaymentRequest(bob, 10, "i want money")
-      aliceWallet.withdrawOnChannelPaymentRequest(request)
+      val alice = onboardWalletUser(this, aliceWallet, aliceValidator)
+      aliceWallet.tap(49)
+      // create and reject request such that...
+      val request = createSelfPaymentRequest(this, aliceValidator.remoteParticipant, alice)._2
+      aliceWallet.rejectAppPaymentRequest(request)
 
       loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
         {
           try {
             // ... lookup on the payment request fails
-            bobWallet.acceptOnChannelPaymentRequest(request)
+            aliceWallet.acceptAppPaymentRequest(request)
           } catch {
             case _: CommandFailure =>
           }
@@ -643,35 +643,57 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
 
     "concurrent coin-operations" should {
       "be batched" in { implicit env =>
-        val (alice, bob) = setupAliceAndBobAndChannel(this)
+        val alice = onboardWalletUser(this, aliceWallet, aliceValidator)
         aliceWallet.tap(50)
-        aliceValidator.remoteParticipant.ledger_api.acs.awaitJava(coinCodegen.Coin.COMPANION)(alice)
+        val requestIds = (1 to 3).map(i =>
+          createSelfPaymentRequest(this, aliceValidator.remoteParticipant, alice)._2
+        )
         val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
         // sending three commands in short succession to the idle wallet should lead to two transactions being executed
         // tx 1: first command that arrived is immediately executed
         // tx 2: other commands that arrived after the first command was started are executed in one batch
-        (1 to 3).foreach(i => Future(aliceWallet.executeDirectTransfer(bob, i)).discard)
+        requestIds.foreach(requestId =>
+          Future(aliceWallet.acceptAppPaymentRequest(requestId)).discard
+        )
+
         // Wait until 2 transactions have been received
         val txs = aliceValidator.remoteParticipant.ledger_api.transactions
           .treesJava(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
         val createdCoinsInTx =
           txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_))
+        val createdLockedCoinsInTx =
+          txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.LockedCoin.COMPANION)(_))
 
-        // create change + transferred coin
-        createdCoinsInTx(0) should have size 2
-        // (create change + transferred coin) x2
-        createdCoinsInTx(1) should have size 2 * 2
+        // create change
+        createdCoinsInTx(0) should have size 1
+        // lock coin
+        createdLockedCoinsInTx(0) should have size 1
+        // create change x2
+        createdCoinsInTx(1) should have size 2
+        // lock coin x2
+        createdLockedCoinsInTx(1) should have size 2
       }
 
       "be batched up to `batchSize` concurrent coin-operations" in { implicit env =>
         val batchSize = aliceWalletBackend.config.treasury.batchSize
-        val (alice, bob) = setupAliceAndBobAndChannel(this)
-        aliceWallet.tap(50)
-        aliceValidator.remoteParticipant.ledger_api.acs.awaitJava(coinCodegen.Coin.COMPANION)(alice)
+        val alice = onboardWalletUser(this, aliceWallet, aliceValidator)
+        aliceWallet.tap(1000)
+
+        val requests =
+          (0 to batchSize + 1).map(_ =>
+            createSelfPaymentRequest(this, aliceValidator.remoteParticipant, alice)._2
+          )
+
+        eventually() {
+          aliceValidator.remoteParticipant.ledger_api.acs.filterJava(
+            walletCodegen.AppPaymentRequest.COMPANION
+          )(alice) should have size (batchSize.toLong + 2)
+        }
+
         val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
 
-        val _ = Future(aliceWallet.executeDirectTransfer(bob, 10))
-        (1 to batchSize + 1).foreach(_ => Future(aliceWallet.executeDirectTransfer(bob, 1)).discard)
+        requests.foreach(request => Future(aliceWallet.acceptAppPaymentRequest(request)).discard)
+
         // 3 txs;
         // tx 1: initial transfer
         // tx 2: batchSize subsequent batched transfers
@@ -680,13 +702,21 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
           .treesJava(Set(alice), completeAfter = 3, beginOffset = offsetBefore)
         val createdCoinsInTx =
           txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_))
+        val createdLockedCoinsInTx =
+          txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.LockedCoin.COMPANION)(_))
 
-        // create change + transferred coin
-        createdCoinsInTx(0) should have size 2
-        // (create change + transferred coin) x batchSize
-        createdCoinsInTx(1) should have size (batchSize.toLong * 2)
-        // create change + transferred coin
-        createdCoinsInTx(2) should have size 2
+        // create change
+        createdCoinsInTx(0) should have size 1
+        // lock coin
+        createdLockedCoinsInTx(0) should have size 1
+        // create change x batchSize
+        createdCoinsInTx(1) should have size batchSize.toLong
+        // lock coin x batchSize
+        createdLockedCoinsInTx(1) should have size batchSize.toLong
+        // create change
+        createdCoinsInTx(2) should have size 1
+        // lock coin
+        createdLockedCoinsInTx(2) should have size 1
       }
 
       "fail operations early and independently that don't pass the activeness lookup checks" in {
@@ -735,17 +765,19 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
       }
 
       "retry a batch if it fails due to contention" in { implicit env =>
-        val (alice, bob) = setupAliceAndBobAndChannel(this)
+        val alice = onboardWalletUser(this, aliceWallet, aliceValidator)
         aliceWallet.tap(10)
-        aliceValidator.remoteParticipant.ledger_api.acs.awaitJava(coinCodegen.Coin.COMPANION)(alice)
 
-        val cancelF = Future(bobWallet.cancelPaymentChannelBySender(alice))
+        val request = createSelfPaymentRequest(this, aliceValidator.remoteParticipant, alice)._2
+        eventually()(aliceWallet.listAppPaymentRequests() should have size 1)
 
-        val transferF = loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
-          // to simulate contention, submit a transfer on the channel immediately after cancelling the channel such
-          // that the activeness lookup on the channel still goes through but the lookup inside the ledger fails.
+        val cancelF = Future(aliceWallet.rejectAppPaymentRequest(request))
+
+        val acceptedF = loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+          // to simulate contention, accept the payment request immediately after rejecting it
+          // that the activeness lookup on the payment request still goes through but the lookup inside the ledger fails.
           // this leads to a retry..
-          Future(aliceWallet.executeDirectTransfer(bob, 5))
+          Future(aliceWallet.acceptAppPaymentRequest(request).discard)
             // that fails on the second execution
             .recover { case _: CommandFailure =>
               // need to recover as logs are only checked for successful futures
@@ -767,11 +799,10 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
 
         // eventually, the cancel goes through
         eventually()((cancelF.isCompleted) shouldBe true)
-        eventually()(aliceWallet.listPaymentChannels() should have size 1)
-        eventually()(bobWallet.listPaymentChannels() should have size 1)
+        eventually()(aliceWallet.listAppPaymentRequests() shouldBe empty)
 
-        // such that on the retry, the transfer fails on the activeness check.
-        eventually()(transferF.isCompleted shouldBe true)
+        // such that on the retry, the acceptance fails on the activeness check.
+        eventually()(acceptedF.isCompleted shouldBe true)
         checkWallet(alice, aliceWallet, Seq((10, 10)))
 
       }

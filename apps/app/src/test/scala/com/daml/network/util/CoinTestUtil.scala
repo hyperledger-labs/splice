@@ -6,6 +6,7 @@ import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{
   CoinRemoteParticipantReference,
+  LedgerApiUtils,
   ValidatorAppReference,
   WalletAppClientReference,
 }
@@ -42,33 +43,6 @@ trait CoinTestUtil {
       }
       party
     }
-  }
-
-  /** Setup Alice and Bob's validators, parties, and two payment channels (back-and-forth) between their parties. */
-  def setupAliceAndBobAndChannel(test: BaseTest)(implicit
-      env: CoinTestConsoleEnvironment
-  ): (PartyId, PartyId) = {
-    val aliceUserParty = onboardWalletUser(test, aliceWallet, aliceValidator)
-    val bobUserParty = onboardWalletUser(test, bobWallet, bobValidator)
-
-    test.clue("Setup payment channel between alice and bob") {
-      val proposalId =
-        aliceWallet.proposePaymentChannel(bobUserParty, senderTransferFeeRatio = 0.5)
-      // Bob monitors proposals and accepts the one
-      eventually()(bobWallet.listPaymentChannelProposals() should have size 1)
-      bobWallet.acceptPaymentChannelProposal(proposalId)
-      eventually()(aliceWallet.listPaymentChannels() should have size 1)
-    }
-
-    test.clue("Setup payment channel between bob and alice") {
-      val bobProposalId =
-        bobWallet.proposePaymentChannel(aliceUserParty, senderTransferFeeRatio = 0.5)
-      eventually()(aliceWallet.listPaymentChannelProposals() should have size 1)
-      aliceWallet.acceptPaymentChannelProposal(bobProposalId)
-      eventually()(bobWallet.listPaymentChannels() should have size 2)
-    }
-
-    (aliceUserParty, bobUserParty)
   }
 
   def onboardAliceAndBob(test: BaseTest)(implicit
@@ -109,23 +83,26 @@ trait CoinTestUtil {
       userParty: PartyId,
   )(implicit
       env: CoinTestConsoleEnvironment
-  ): (testWalletCodegen.TestDeliveryOffer.ContractId, walletCodegen.AppPaymentRequest) = {
+  ): (
+      testWalletCodegen.TestDeliveryOffer.ContractId,
+      walletCodegen.AppPaymentRequest.ContractId,
+      walletCodegen.AppPaymentRequest,
+  ) = {
     val referenceId = test.clue(s"Create test delivery offer for $userParty") {
-      remoteParticipant.ledger_api.commands.submitJava(
-        Seq(userParty),
-        optTimeout = None,
-        commands = new testWalletCodegen.TestDeliveryOffer(
+      val result = LedgerApiUtils.submitWithResult(
+        remoteParticipant,
+        actAs = Seq(userParty),
+        readAs = Seq.empty,
+        update = new testWalletCodegen.TestDeliveryOffer(
           scan.getSvcPartyId().toProtoPrimitive,
           userParty.toProtoPrimitive,
           "description",
-        ).create.commands.asScala.toSeq,
+        ).create,
       )
-      remoteParticipant.ledger_api.acs
-        .awaitJava(testWalletCodegen.TestDeliveryOffer.COMPANION)(userParty)
-        .id
+      testWalletCodegen.TestDeliveryOffer.COMPANION.toContractId(result.contractId)
     }
 
-    val reqC = test.clue(s"Create payment request for $userParty to self") {
+    val (reqCid, reqC) = test.clue(s"Create payment request for $userParty to self") {
       val reqC = new walletCodegen.AppPaymentRequest(
         userParty.toProtoPrimitive,
         Seq(
@@ -143,15 +120,17 @@ trait CoinTestUtil {
         new RelTime(60 * 1000000),
         referenceId.toInterface(walletCodegen.DeliveryOffer.INTERFACE),
       )
-      remoteParticipant.ledger_api.commands.submitJava(
+      val result = LedgerApiUtils.submitWithResult(
+        remoteParticipant,
         actAs = Seq(userParty),
-        optTimeout = None,
-        commands = reqC.create.commands.asScala.toSeq,
+        readAs = Seq.empty,
+        update = reqC.create,
       )
-      reqC
+      val cid = walletCodegen.AppPaymentRequest.COMPANION.toContractId(result.contractId)
+      (cid, reqC)
     }
 
-    (referenceId, reqC)
+    (referenceId, reqCid, reqC)
   }
 
 }
