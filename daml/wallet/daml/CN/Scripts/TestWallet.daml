@@ -10,6 +10,9 @@ import CC.Coin hiding (CC, USD)
 import CN.Wallet.Install
 import CN.Wallet.Payment
 import CN.Wallet.PaymentChannel
+import CN.Wallet.Subscriptions
+
+import CN.Scripts.Wallet.TestSubscriptions
 
 
 import CC.Scripts.Util
@@ -141,7 +144,7 @@ createSingleReceiverPaymentRequest app provider sender receiver quantity = do
 acceptPaymentRequest : CCApp -> CCUser -> ContractId AppPaymentRequest -> ContractId Coin -> Script (ContractId AcceptedAppPayment)
 acceptPaymentRequest app sender transferRequest coin = do
   context <- getPaymentTransferContext app sender
-  Right (accept, change) <- submitUser sender.userId $ exerciseCmd transferRequest AppPaymentRequest_Accept with
+  (accept, change) <- submitUser sender.userId $ exerciseCmd transferRequest AppPaymentRequest_Accept with
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     context
   return accept
@@ -464,3 +467,84 @@ testInsufficientFundsBatchCCPaymentRequests = script do
     deliveryOffer = toInterfaceContractId deliveryOffer4
 
   pure ()
+
+testInsufficientFundsBatchSubscriptions : Script ()
+testInsufficientFundsBatchSubscriptions = script do
+  app <- setupApp
+  runNextIssuance app
+  runCoinDepositBots app
+
+  validator <- setupValidator app "validator1"
+  alice <- setupUser app "alice" validator
+  pizzeria <- setupUser app "pizzeria" validator
+  provider <- setupUser app "la_famiglia" validator
+
+  install <- submitMulti [alice.primaryParty, validator] [] $ createCmd $ WalletAppInstall with
+    -- for simplicity, alice is service and end-user
+    walletServiceParty = alice.primaryParty
+    endUserParty = alice.primaryParty
+    endUserName = "wallet_service_participant_user"
+    svcParty = app.svc
+    validatorParty = validator
+
+
+
+  let payData = SubscriptionPayData with 
+        paymentInterval = days 28
+        paymentDuration = days 1
+        collectionDuration = minutes 5
+        paymentQuantity = PaymentQuantity 10.0 USD
+
+  context <- submitMulti [alice.primaryParty, pizzeria.primaryParty] [] $ createCmd (TestSubscriptionContext app.svc alice.primaryParty pizzeria.primaryParty "all-you-can-eat pasta")
+  let subscriptionData = Subscription with
+        sender = alice.primaryParty
+        receiver = pizzeria.primaryParty
+        provider = provider.primaryParty
+        svc = app.svc
+        context = toInterfaceContractId context
+
+  subscriptionRequestCid <- submitMulti [alice.primaryParty, pizzeria.primaryParty, provider.primaryParty] [] $ createCmd (SubscriptionRequest subscriptionData payData)
+
+  context <- getPaymentTransferContext app alice
+  coin <- tap  app alice 5.0
+  outcomes <- submitUser alice.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [API.InputCoin $ toInterfaceContractId coin]
+    operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
+    context
+
+  outcomes === [COO_Error "Input to output+fee quantity balance -5.23 < 0"]
+
+  coin <- tap app alice 15.0
+  outcomes <- submitUser alice.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [API.InputCoin $ toInterfaceContractId coin]
+    operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
+    context
+  initialPaymentCid <- case outcomes of
+    [COO_SubscriptionInitialPayment cid] -> pure cid
+    _ -> abort $ "Expected initial subscription payment to succeed but got " <> show outcomes
+
+  (_, subscriptionIdleStateCid, _) <- collectInitialSubscriptionPayment app provider.primaryParty pizzeria alice.primaryParty initialPaymentCid
+
+  passTime (days 27)
+
+  coin <- tap app alice 5.0
+  outcomes <- submitUser alice.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [API.InputCoin $ toInterfaceContractId coin]
+    operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
+    context
+  outcomes === [COO_Error "Input to output+fee quantity balance -5.23 < 0"]
+
+  coin <- tap app alice 15.0
+  outcomes <- submitUser alice.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [API.InputCoin $ toInterfaceContractId coin]
+    operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
+    context
+  case outcomes of
+    [COO_SubscriptionPayment _] -> pure ()
+    _ -> abort $ "Expected subscription payment to succeed but got " <> show outcomes
+  pure ()
+
+withError : CanAbort m => [CoinOperationOutcome] -> (Text -> m a) -> m a
+withError outcomes f = case outcomes of
+  [COO_Error e] -> f e
+  _ -> abort $ "Expected COO_Error but got " <> show outcomes

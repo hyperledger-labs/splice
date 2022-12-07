@@ -311,7 +311,7 @@ lockAndMakeChange context subscriptionData payData inputs now = do
          ]
        payload = "lock payment"
 
-  Right result <- exercisePaymentTransfer context transfer
+  result <- exercisePaymentTransfer context transfer
   let [TransferResultLockedCoin lockedCoin, TransferResultCoin senderChange] = result.createdCoins
 
   pure(lockedCoin, senderChange, targetQuantity)
@@ -336,9 +336,6 @@ unlockAndTransfer transferContext subscriptionData targetQuantity lockedCoin = d
           ]
         payload = "transfer locked payment"
   result <- exerciseAppTransfer transferContext transfer
-  result <- case result of
-    Right r -> pure r
-    Left e -> abort e
   let [TransferResultCoin coinCid] = result.createdCoins
 
   pure coinCid

@@ -110,25 +110,15 @@ interface CoinRules where
   viewtype CoinRulesView
 
   coinrules_Transfer_Controllers : Transfer -> [Party]
-  coinrules_Transfer : ContractId CoinRules -> Transfer -> TransferContext -> Update (Either Text TransferResult)
+  coinrules_Transfer : ContractId CoinRules -> Transfer -> TransferContext -> Update TransferResult
   coinrules_ComputeFees : TransferContext -> Party -> [Decimal] -> Update Decimal
 
-  nonconsuming choice CoinRules_Transfer : Either Text TransferResult
+  nonconsuming choice CoinRules_Transfer : TransferResult
     with
       transfer : Transfer
       context : TransferContext
     controller coinrules_Transfer_Controllers this transfer
     do coinrules_Transfer this self transfer context
-
-  nonconsuming choice CoinRules_TryTransfer : TransferResult
-    with
-      transfer : Transfer
-      context : TransferContext
-    controller coinrules_Transfer_Controllers this transfer
-    do r <- exercise self CoinRules_Transfer with ..
-       case r of
-         Left err -> abort err
-         Right r -> pure r
 
   nonconsuming choice CoinRules_ComputeFees : Decimal
     with
@@ -210,13 +200,13 @@ data AppTransferContext = AppTransferContext
     openMiningRound : ContractId OpenMiningRound
   deriving (Show, Eq)
 
-exerciseAppTransfer : AppTransferContext -> Transfer -> Update (Either Text TransferResult)
+exerciseAppTransfer : AppTransferContext -> Transfer -> Update TransferResult
 exerciseAppTransfer AppTransferContext{..} transfer =
   exercise coinRules CoinRules_Transfer with
     transfer
     context = coinTransferContext openMiningRound
 
-exercisePaymentTransfer : PaymentTransferContext -> Transfer -> Update (Either Text TransferResult)
+exercisePaymentTransfer : PaymentTransferContext -> Transfer -> Update TransferResult
 exercisePaymentTransfer PaymentTransferContext{..} transfer =
   exercise coinRules CoinRules_Transfer with
     transfer

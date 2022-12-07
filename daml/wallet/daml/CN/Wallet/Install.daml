@@ -18,27 +18,19 @@ catchAll operation =
     fmap (\res -> Right res) operation
   catch (ex : AnyException) -> return $ Left $ message ex
 
--- Same as `catchAll` except the update already returns an Either
-catchAllE: (Update (Either Text a)) -> Update (Either Text a)
-catchAllE operation =
-  try do
-    operation
-  catch (ex : AnyException) -> return $ Left $ message ex
-
-
 -- Main function for batched execution of multiple coin operations.
 -- Given multiple coin operations and transfer inputs, it executes the operations sequentially while
 -- stringing along the remaining inputs. Returns all outcomes.
 executeCoinOperationRec : API.PaymentTransferContext -> [API.TransferInput] -> [CoinOperationOutcome] -> [CoinOperation] -> Update ([CoinOperationOutcome])
 executeCoinOperationRec context inputs prevResults (operation::remainingOperations) = do
   case operation of
-    CO_AppPayment cid -> handleE AppPaymentRequest_Accept COO_AcceptedAppPayment cid
-    CO_ChannelPayment cid -> handleE OnChannelPaymentRequest_Accept COO_AcceptedChannelPayment cid
+    CO_AppPayment cid -> handle AppPaymentRequest_Accept COO_AcceptedAppPayment cid
+    CO_ChannelPayment cid -> handle OnChannelPaymentRequest_Accept COO_AcceptedChannelPayment cid
     CO_ChannelTransfer channel quantity payload -> do
-      resultE <- catchAllE $ exercise channel (PaymentChannel_ExecuteDirectTransfer inputs quantity payload context)
+      resultE <- catchAll $ exercise channel (PaymentChannel_ExecuteDirectTransfer inputs quantity payload context)
       handleResult COO_AcceptedChannelTransfer resultE
     CO_CompleteAcceptedTransfer acceptedOffer -> do
-      resultE <- catchAllE $ exercise acceptedOffer (AcceptedTransferOffer_Complete inputs context)
+      resultE <- catchAll $ exercise acceptedOffer (AcceptedTransferOffer_Complete inputs context)
       handleResult COO_CompleteAcceptedTransfer resultE
     CO_SubscriptionAcceptAndMakeInitialPayment cid -> handle SubscriptionRequest_AcceptAndMakePayment COO_SubscriptionInitialPayment cid
     CO_SubscriptionMakePayment cid -> handle SubscriptionIdleState_MakePayment COO_SubscriptionPayment cid
@@ -49,11 +41,6 @@ executeCoinOperationRec context inputs prevResults (operation::remainingOperatio
     handle : Choice t c (r, ContractId API.Coin) => ([API.TransferInput] -> API.PaymentTransferContext -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
     handle choiceConstructor resultConstructor cid = do
       resultE <- catchAll $ exercise cid (choiceConstructor inputs context)
-      handleResult resultConstructor resultE
-
-    handleE : Choice t c (Either Text (r, ContractId API.Coin)) => ([API.TransferInput] -> API.PaymentTransferContext -> c) -> (r -> CoinOperationOutcome) -> ContractId t -> Update [CoinOperationOutcome]
-    handleE choiceConstructor resultConstructor cid = do
-      resultE <- catchAllE $ exercise cid (choiceConstructor inputs context)
       handleResult resultConstructor resultE
 
     handleResult : (r -> CoinOperationOutcome) -> Either Text (r, ContractId API.Coin) -> Update [CoinOperationOutcome]
@@ -242,4 +229,4 @@ template WalletAppInstall
         transfer : API.Transfer
         context : API.TransferContext
       controller walletServiceParty
-      do exercise cid (API.CoinRules_TryTransfer transfer context)
+      do exercise cid (API.CoinRules_Transfer transfer context)

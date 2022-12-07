@@ -5,8 +5,8 @@ module CC.Coin where
 import Prelude hiding (forA)
 
 import DA.Action (void, when, foldlA)
+import DA.Exception
 import DA.Foldable (forA_, mapA_)
-import DA.Traversable (forA)
 import DA.Map (Map)
 import qualified DA.Map as Map
 import DA.Optional
@@ -541,6 +541,11 @@ transferControllers t =
 scaleConfig : OpenMiningRound -> CoinConfig USD -> CoinConfig CC
 scaleConfig openRound config = scaleFees (1.0 / openRound.coinPrice) config
 
+exception InvalidTransfer
+  with
+    description : Text
+  where
+    message description
 
 checkTransferConstraints: API.Transfer -> API.TransferSummary -> CoinConfig CC -> Either Text ()
 checkTransferConstraints transfer summary config
@@ -560,7 +565,7 @@ miningRoundIsOpen round = do
 
 -- | Execute a transfer.
 --
-executeTransfer : ContractId API.CoinRules -> API.TransferContext -> CoinConfig USD -> Party -> API.Transfer -> Update (Either Text API.TransferResult)
+executeTransfer : ContractId API.CoinRules -> API.TransferContext -> CoinConfig USD -> Party -> API.Transfer -> Update API.TransferResult
 executeTransfer coinRulesCid context config0 svc t = do
   -- check that the current mining round is open
   (_, openRound) <- downcastInterface @OpenMiningRound "OpenMiningRound" context.openMiningRound
@@ -573,24 +578,27 @@ executeTransfer coinRulesCid context config0 svc t = do
   osum <- preprocessAndSummarizeOutputs config t.sender t.outputs
   summary0 <- summarizeTransfer config isum osum
   -- check that overall transfer constraints are satisfied
-  forA (checkTransferConstraints t summary0 config) $ \_ -> do
-    -- consume inputs only after all assertions have been checked
-    _ <- consumeInputs coinRulesCid context svc t.sender t.inputs
-    -- distribute floating outputs
-    let distributed = distributeOutputs openRound.round config svc t.sender summary0 osum.preprocessedOutputs
-    let summary1 = mergeReceiverFees distributed.receiverTransferFees summary0
-    let summary2 = mergeDistributedOutputs distributed t.sender summary1
-    -- record debugging note
-    create TransferDebugNote with transfer = t; scaledConfig = config; round = openRound.round; summary = summary2; ..
-    -- issue rewards for burns
-    issueRewards config openRound t.sender t.provider summary2
-    -- record outputs
-    createdCoins <- createTransferOutputs openRound.round config svc distributed.coins
+  case checkTransferConstraints t summary0 config of
+    Left err -> throw (InvalidTransfer err)
+    Right _ -> pure ()
+  
+  -- consume inputs only after all assertions have been checked
+  _ <- consumeInputs coinRulesCid context svc t.sender t.inputs
+  -- distribute floating outputs
+  let distributed = distributeOutputs openRound.round config svc t.sender summary0 osum.preprocessedOutputs
+  let summary1 = mergeReceiverFees distributed.receiverTransferFees summary0
+  let summary2 = mergeDistributedOutputs distributed t.sender summary1
+  -- record debugging note
+  create TransferDebugNote with transfer = t; scaledConfig = config; round = openRound.round; summary = summary2; ..
+  -- issue rewards for burns
+  issueRewards config openRound t.sender t.provider summary2
+  -- record outputs
+  createdCoins <- createTransferOutputs openRound.round config svc distributed.coins
 
-    return API.TransferResult with
-      round = openRound.round
-      summary = summary2
-      ..
+  return API.TransferResult with
+    round = openRound.round
+    summary = summary2
+    ..
 
 data TransferInputsSummary = TransferInputsSummary with
     numBurnInputs : Int

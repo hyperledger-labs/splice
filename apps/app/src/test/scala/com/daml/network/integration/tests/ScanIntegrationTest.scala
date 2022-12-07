@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.da
 import com.daml.network.history.*
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
 import com.daml.network.util.{CoinTestUtil, ExerciseNode}
@@ -49,9 +48,7 @@ class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
           inside(transferParentNode) { case Some(Transfer(ExerciseNode(argument, result))) =>
             argument.value.transfer.sender shouldBe alice.toPrim
             // one transfer result for alice, one for bob
-            inside(result.value) { case result: da.types.either.Right[_, _] =>
-              result.bValue.createdCoins should have length 2
-            }
+            result.value.createdCoins should have length 2
           }
 
           aliceNew should matchPattern { case CoinCreate(_) => }

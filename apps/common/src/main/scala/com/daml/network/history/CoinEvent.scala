@@ -1,8 +1,8 @@
 package com.daml.network.history
 
 import cats.syntax.traverse._
+import com.daml.ledger.javaapi.data.Value
 import com.daml.ledger.javaapi.data.codegen.PrimitiveValueDecoders
-import com.daml.ledger.javaapi.data.{Text, Value}
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{
   Coin,
@@ -14,7 +14,6 @@ import com.daml.network.codegen.java.cc.coin.{
   LockedCoin_SvcExpireLock,
 }
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
-import com.daml.network.codegen.java.da
 import com.daml.network.util.{ExerciseNode, ExerciseNodeCompanion, JavaContract => Contract}
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
@@ -26,7 +25,7 @@ sealed trait ParentNode {
 case class Transfer(
     node: ExerciseNode[
       v1.coin.CoinRules_Transfer,
-      da.types.Either[String, v1.coin.TransferResult],
+      v1.coin.TransferResult,
     ]
 ) extends ParentNode {
   def toProtoV0: v0.ParentNode =
@@ -40,7 +39,7 @@ trait ParentNodeCompanion extends ExerciseNodeCompanion {
 object Transfer extends ParentNodeCompanion {
   override type Tpl = v1.coin.CoinRules
   override type Arg = v1.coin.CoinRules_Transfer
-  override type Res = da.types.Either[String, v1.coin.TransferResult]
+  override type Res = v1.coin.TransferResult
 
   override val templateOrInterface = Right(v1.coin.CoinRules.INTERFACE)
   override val choice = v1.coin.CoinRules.CHOICE_CoinRules_Transfer
@@ -48,12 +47,8 @@ object Transfer extends ParentNodeCompanion {
   override val argDecoder = v1.coin.CoinRules_Transfer.valueDecoder()
   override def argToValue(arg: v1.coin.CoinRules_Transfer) = arg.toValue
 
-  override val resDecoder = da.types.Either.valueDecoder[String, v1.coin.TransferResult](
-    PrimitiveValueDecoders.fromText,
-    v1.coin.TransferResult.valueDecoder,
-  )
-  override def resToValue(res: da.types.Either[String, v1.coin.TransferResult]) =
-    res.toValue(t => new Text(t), _.toValue)
+  override val resDecoder = v1.coin.TransferResult.valueDecoder
+  override def resToValue(res: v1.coin.TransferResult) = res.toValue
 
   override def toParentNode(node: ExerciseNode[Arg, Res]) = Transfer(node)
 

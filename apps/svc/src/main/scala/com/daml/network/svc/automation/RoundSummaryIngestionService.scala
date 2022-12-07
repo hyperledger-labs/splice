@@ -1,8 +1,8 @@
 package com.daml.network.svc.automation
 
 import com.daml.ledger.javaapi.data.{ExercisedEvent, Identifier, Transaction, TransactionTree}
+import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.api.v1.coin.TransferResult
-import com.daml.network.codegen.java.{cc, da}
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.history.*
 import com.daml.network.store.AuditLogIngestionSink
@@ -48,15 +48,7 @@ class RoundSummaryIngestionService(
         onCreate = (_, _) => {},
         onExercise = (exercised: ExercisedEvent, _) => {
           ExerciseNode.decodeExerciseEvent(Transfer)(exercised).foreach { tf =>
-            tf.result.value match {
-              case left: da.types.either.Left[_, _] =>
-                logger.debug(
-                  s"Dropping transfer with input ${tf.argument} as it completed with an error: $left.aValue"
-                )
-              case right: da.types.either.Right[_, _] => transferResults.append(right.bValue)
-              case v => sys.error(s"Unexpected value for Either type: $v")
-            }
-
+            transferResults.append(tf.result.value)
           }
         },
       )

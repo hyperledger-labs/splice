@@ -59,7 +59,7 @@ template AcceptedTransferOffer
   where
     signatory sender, receiver
 
-    nonconsuming choice AcceptedTransferOffer_Complete : Either Text (API.TransferResult, ContractId API.Coin)
+    nonconsuming choice AcceptedTransferOffer_Complete : (API.TransferResult, ContractId API.Coin)
       with
         inputs : [API.TransferInput]
         transferContext : API.PaymentTransferContext
@@ -85,12 +85,9 @@ template AcceptedTransferOffer
               ]
             payload = description
         result <- API.exercisePaymentTransfer transferContext transfer
-        case result of
-          Left i -> return $ Left i
-          Right result -> do
-            archive self
-            let [_, API.TransferResultCoin senderChange] = result.createdCoins
-            return $ Right (result, senderChange)
+        archive self
+        let [_, API.TransferResultCoin senderChange] = result.createdCoins
+        pure (result, senderChange)
 
     choice AcceptedTransferOffer_Expire : ()
       with

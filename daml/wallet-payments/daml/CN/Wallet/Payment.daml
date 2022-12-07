@@ -78,7 +78,7 @@ template AppPaymentRequest
     signatory sender, receivers, provider
     ensure (collectionDuration > aunit && all (\rq -> rq.quantity.quantity > 0.0) receiverQuantities)
 
-    choice AppPaymentRequest_Accept : Either Text (ContractId AcceptedAppPayment, ContractId Coin)
+    choice AppPaymentRequest_Accept : (ContractId AcceptedAppPayment, ContractId Coin)
       with
         inputs : [TransferInput]
         context : PaymentTransferContext
@@ -113,14 +113,11 @@ template AppPaymentRequest
                 ]
               payload = "lock payment"
          result <- exercisePaymentTransfer context transfer
-         case result of
-          Left errorMsg -> return $ Left errorMsg
-          Right result -> do
-            let [TransferResultLockedCoin lockedCoin, TransferResultCoin senderChange] = result.createdCoins
-            acceptedPayment <- create AcceptedAppPayment
-                with
-                  svc, provider, ccReceiverQuantities, sender, deliveryOffer, lockedCoin
-            return $ Right (acceptedPayment, senderChange)
+         let [TransferResultLockedCoin lockedCoin, TransferResultCoin senderChange] = result.createdCoins
+         acceptedPayment <- create AcceptedAppPayment
+           with
+             svc, provider, ccReceiverQuantities, sender, deliveryOffer, lockedCoin
+         return (acceptedPayment, senderChange)
 
     choice AppPaymentRequest_Withdraw : ()
       controller receivers
@@ -166,7 +163,7 @@ template AcceptedAppPayment
                     senderTransferFeeRatio = 1.0
                 ) ccReceiverQuantities
               payload = "transfer locked payment"
-        Right result <-exerciseAppTransfer context transfer
+        result <- exerciseAppTransfer context transfer
         let coins = map (\(TransferResultCoin coinCid) -> coin) result.createdCoins
         -- defensive check that the reference is still active
         void $ fetch deliveryOffer

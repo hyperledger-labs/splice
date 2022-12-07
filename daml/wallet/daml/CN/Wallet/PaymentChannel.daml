@@ -21,7 +21,7 @@ template PaymentChannel
   where
     signatory sender, receiver
 
-    nonconsuming choice PaymentChannel_ExecuteDirectTransfer : Either Text (API.TransferResult, ContractId API.Coin)
+    nonconsuming choice PaymentChannel_ExecuteDirectTransfer : (API.TransferResult, ContractId API.Coin)
       with
         inputs : [API.TransferInput]
         transferQuantity : PaymentQuantity
@@ -48,7 +48,7 @@ template PaymentChannel
               ]
             payload
         result <- API.exercisePaymentTransfer transferContext transfer
-        return $ fmap extractSenderChange result
+        return (extractSenderChange result)
 
     nonconsuming choice PaymentChannel_CreatePaymentRequest : ContractId OnChannelPaymentRequest
       with
@@ -123,7 +123,7 @@ template OnChannelPaymentRequest
     signatory sender, receiver
     ensure paymentQuantity.quantity > 0.0
 
-    choice OnChannelPaymentRequest_Accept : Either Text (API.TransferResult, ContractId API.Coin)
+    choice OnChannelPaymentRequest_Accept : (API.TransferResult, ContractId API.Coin)
       with
         inputs : [API.TransferInput]
         transferContext : API.PaymentTransferContext
@@ -147,7 +147,7 @@ template OnChannelPaymentRequest
                 ]
               payload = "Accepted payment request"
         result <- API.exercisePaymentTransfer transferContext transfer
-        return $ fmap extractSenderChange result
+        return (extractSenderChange result)
 
     choice OnChannelPaymentRequest_Withdraw : ()
       controller receiver
