@@ -186,6 +186,7 @@ export class LedgerApiClient {
 
 // Generate a local token for test purposes.
 // See the Scala equivalent com.daml.network.auth.AuthUtil.LedgerApi.testToken
+// TODO(#1445) once we update splitwise to the recent changes: remove this in favor of the same function in `directory/.../UserContext.tsx`
 export async function generateLedgerApiToken(userId: string): Promise<string> {
   const secret = new TextEncoder().encode('test');
   const key = await crypto.subtle.importKey(

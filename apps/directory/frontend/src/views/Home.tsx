@@ -1,4 +1,4 @@
-import { Contract } from 'common-frontend';
+import { Contract, useUserState } from 'common-frontend';
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useEffect, useState } from 'react';
 
@@ -13,23 +13,24 @@ import { config } from '../utils';
 import DirectoryEntries from './DirectoryEntries';
 import RequestDirectoryEntry from './RequestDirectoryEntry';
 
-const Home: React.FC<{ userId: string }> = ({ userId }) => {
-  const [primaryParty, setPrimaryParty] = useState<string | undefined>();
-  const [providerParty, setProviderParty] = useState<string | undefined>();
+const Home: React.FC = () => {
+  const { primaryPartyId, updateStatus } = useUserState();
+  const [providerPartyId, setProviderPartyId] = useState<string | undefined>();
   const [install, setInstall] = useState<Contract<DirectoryInstall> | undefined>();
   const ledgerApiClient = useDirectoryLedgerApiClient();
   const directoryClient = useDirectoryClient();
   useEffect(() => {
     const fetchPrimaryParty = async () => {
-      setPrimaryParty(await ledgerApiClient.getPrimaryParty());
+      const partyId = await ledgerApiClient.getPrimaryParty();
+      updateStatus({ userOnboarded: true, partyId });
     };
     fetchPrimaryParty();
-  }, [ledgerApiClient]);
+  }, [ledgerApiClient, updateStatus]);
 
   useEffect(() => {
     const fetchProviderParty = async () => {
       const response = await directoryClient.getProviderPartyId(new Empty(), undefined);
-      setProviderParty(response.getProviderPartyId());
+      setProviderPartyId(response.getProviderPartyId());
     };
     fetchProviderParty();
   }, [directoryClient]);
@@ -38,24 +39,27 @@ const Home: React.FC<{ userId: string }> = ({ userId }) => {
   // generate the install contract from the frontend rather than the backend.
   useEffect(() => {
     const setupInstallContract = async () => {
-      if (primaryParty && providerParty) {
+      if (primaryPartyId && providerPartyId) {
         console.debug('Searching for DirectoryInstall');
-        const install = await ledgerApiClient.queryDirectoryInstall(primaryParty, providerParty);
+        const install = await ledgerApiClient.queryDirectoryInstall(
+          primaryPartyId,
+          providerPartyId
+        );
         if (install) {
           console.debug('DirectoryInstall found');
           setInstall(install);
         } else {
           console.debug('DirectoryInstall not found, creating DirectoryInstallRequest');
-          await ledgerApiClient.create([primaryParty], DirectoryInstallRequest, {
-            user: primaryParty,
-            provider: providerParty,
+          await ledgerApiClient.create([primaryPartyId], DirectoryInstallRequest, {
+            user: primaryPartyId,
+            provider: providerPartyId,
           });
           console.debug('Created DirectoryInstallRequest, waiting for DirectoryInstall');
           setTimeout(() => {
             const queryDirectoryInstall = async () => {
               const install = await ledgerApiClient.queryDirectoryInstall(
-                primaryParty,
-                providerParty
+                primaryPartyId,
+                providerPartyId
               );
               if (install) {
                 console.debug('DirectoryInstall found');
@@ -71,13 +75,13 @@ const Home: React.FC<{ userId: string }> = ({ userId }) => {
       }
     };
     setupInstallContract();
-  }, [primaryParty, providerParty, ledgerApiClient]);
+  }, [primaryPartyId, providerPartyId, ledgerApiClient]);
 
-  if (primaryParty && providerParty && install) {
+  if (primaryPartyId && providerPartyId && install) {
     return (
       <div>
-        <RequestDirectoryEntry primaryParty={primaryParty} provider={providerParty} />
-        <DirectoryEntries primaryParty={primaryParty} provider={providerParty} />
+        <RequestDirectoryEntry primaryParty={primaryPartyId} provider={providerPartyId} />
+        <DirectoryEntries primaryParty={primaryPartyId} provider={providerPartyId} />
       </div>
     );
   } else {
@@ -85,18 +89,16 @@ const Home: React.FC<{ userId: string }> = ({ userId }) => {
   }
 };
 
-const HomeWithContexts: React.FC<{ userId: string; ledgerApiToken: string }> = ({
-  userId,
-  ledgerApiToken,
-}) => {
+const HomeWithContexts: React.FC = () => {
+  const { userAccessToken, userId } = useUserState();
   return (
     <DirectoryLedgerApiClientProvider
       url={config.services.ledgerApi.grpcUrl}
-      userId={userId}
-      token={ledgerApiToken}
+      userId={userId!}
+      token={userAccessToken!}
     >
       <DirectoryClientProvider url={config.services.directory.grpcUrl}>
-        <Home userId={userId} />
+        <Home />
       </DirectoryClientProvider>
     </DirectoryLedgerApiClientProvider>
   );

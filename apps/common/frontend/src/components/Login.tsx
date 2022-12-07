@@ -1,28 +1,27 @@
-import { isHs256UnsafeAuthConfig } from 'common-frontend';
 import { useState } from 'react';
 
 import { Button, Chip, Grid, TextField, Typography } from '@mui/material';
 
-import { useUserState } from '../contexts/UserContext';
-import { config } from '../utils/';
+import { isHs256UnsafeAuthConfig } from '../config';
+import { AuthConfig, TestAuthConfig } from '../config/schema';
+import { useUserState } from '../contexts';
 
-// TODO(#1445) Reduce duplication with other frontends; move common parts to common
-
-const Login: React.FC = () => {
-  const mainLoginPrompt = isHs256UnsafeAuthConfig(config.auth) ? (
-    <SstLoginPrompt secret={config.auth.secret} />
+const Login: React.FC<{
+  title: string;
+  authConfig: AuthConfig;
+  testAuthConfig?: TestAuthConfig;
+}> = ({ title, authConfig, testAuthConfig }) => {
+  const mainLoginPrompt = isHs256UnsafeAuthConfig(authConfig) ? (
+    <SstLoginPrompt secret={authConfig.secret} />
   ) : (
     <OidcLoginPrompt />
   );
-  const testLoginPrompt = config.testAuth ? (
+  const testLoginPrompt = testAuthConfig ? (
     <>
       <Chip label="OR" sx={{ margin: '25px 0px' }} />
-      <SstLoginPrompt title={'Use Test Auth'} secret={config.testAuth.secret} />
+      <SstLoginPrompt title={'Use Test Auth'} secret={testAuthConfig.secret} />
     </>
-  ) : (
-    ''
-  );
-
+  ) : undefined;
   return (
     <Grid
       height="100%"
@@ -33,7 +32,7 @@ const Login: React.FC = () => {
       justifyContent="center"
     >
       <Typography variant="h4" sx={{ marginBottom: '15px' }}>
-        Canton Name Service Log In
+        {title}
       </Typography>
 
       {mainLoginPrompt}

@@ -2,14 +2,13 @@ import { LookupEntryByPartyRequest } from 'common-protobuf/com/daml/network/dire
 import { RpcError, StatusCode } from 'grpc-web';
 import React, { useState, useEffect } from 'react';
 
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
-import IconButton from '@mui/material/IconButton';
 import Tooltip from '@mui/material/Tooltip';
 
 import { DirectoryEntry as damlDirectoryEntry } from '@daml.js/directory/lib/CN/Directory';
 
 import { useDirectoryClient } from '../contexts/DirectoryServiceContext';
 import { Contract } from '../utils';
+import PartyId from './PartyId';
 
 interface Entry {
   user: string;
@@ -48,39 +47,8 @@ const DirectoryEntry: React.FC<{ partyId: string; noCopy?: boolean }> = ({ party
     return <div>...</div>;
   }
 
-  const handleClick = () => navigator.clipboard.writeText(entry.user);
-
-  const partyIdComponent = (
-    <div style={{ display: 'flex', alignItems: 'center' }}>
-      <Tooltip title={'Party ID: ' + entry.user}>
-        <div
-          style={{
-            display: 'inline-flex',
-            maxWidth: '300px',
-          }}
-        >
-          <div
-            style={{
-              overflow: 'hidden',
-              textOverflow: 'ellipsis',
-              fontWeight: 'lighter',
-            }}
-            className="party-id"
-          >
-            {entry.user}
-          </div>
-        </div>
-      </Tooltip>
-      {!noCopy && (
-        <IconButton onClick={handleClick}>
-          <ContentCopyIcon fontSize={'small'} />
-        </IconButton>
-      )}
-    </div>
-  );
-
   if (entry.entry === undefined) {
-    return partyIdComponent;
+    return <PartyId partyId={partyId} noCopy={noCopy} />;
   } else {
     return (
       <div style={{ display: 'flex' }}>
@@ -90,7 +58,7 @@ const DirectoryEntry: React.FC<{ partyId: string; noCopy?: boolean }> = ({ party
           </div>
         </Tooltip>
         {'('}
-        {partyIdComponent}
+        <PartyId partyId={partyId} noCopy={noCopy} />
         {')'}
       </div>
     );

@@ -1,5 +1,6 @@
 import * as v0 from 'common-protobuf/com/daml/network/wallet/v0/wallet_service_pb';
-import { Contract } from 'common-frontend';
+import { Contract, UserStatusResponse } from 'common-frontend';
+import { useUserState } from 'common-frontend';
 import { WalletServicePromiseClient } from 'common-protobuf/com/daml/network/wallet/v0/wallet_service_grpc_web_pb';
 import { Decimal } from 'decimal.js';
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
@@ -15,8 +16,6 @@ import {
 } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
 import { PaymentChannelProposal } from '@daml.js/wallet/lib/CN/Wallet/PaymentChannel';
 import { AcceptedTransferOffer, TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer';
-
-import { useUserState } from './UserContext';
 
 const WalletContext = React.createContext<WalletClient | undefined>(undefined);
 
@@ -57,11 +56,6 @@ export type SubscriptionState =
 
 export interface ListSubscriptionsResponse {
   subscriptionsList: SubscriptionTuple[];
-}
-
-export interface UserStatusResponse {
-  userOnboarded: boolean;
-  partyId: string;
 }
 
 export interface WalletClient {

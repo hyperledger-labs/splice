@@ -7,3 +7,5 @@ export {
   LedgerApiClientProvider,
   useLedgerApiClient,
 } from './LedgerApiContext';
+
+export { useUserState, UserContext, UserProvider, type UserStatusResponse } from './UserContext';

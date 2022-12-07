@@ -1,11 +1,14 @@
-import { isHs256UnsafeAuthConfig } from 'common-frontend';
-import { SignJWT } from 'jose';
 import { User } from 'oidc-client-ts';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { useAuth } from 'react-oidc-context';
 
-import { config } from '../utils/config';
-import { UserStatusResponse } from './WalletServiceContext';
+import { AuthConfig, getHs256UnsafeSecret, isHs256UnsafeAuthConfig } from '../config/schema';
+import {
+  generateLedgerApiToken,
+  generateToken,
+  isHs256UnsafeToken,
+  tryDecodeTokenSub,
+} from '../utils/auth';
 
 interface UserState {
   // undefined when not logged in
@@ -22,15 +25,15 @@ interface UserState {
   // we expose an external callback to update the User store's internal state after login happens
   updateStatus: (status: UserStatusResponse) => void;
 
-  loginWithSst: (id: string) => void;
+  loginWithSst: (id: string, secret: string) => void;
   loginWithOidc: () => void;
   logout: () => void;
 }
 
-const UserContext = React.createContext<UserState | undefined>(undefined);
+export const UserContext = React.createContext<UserState | undefined>(undefined);
 
 // useAuth hook throws an error if used without a parent AuthProvider context,
-// which is actually OK & expected if the app is running with a hs-256-unsafe auth config
+// which is OK if the app supports only a hs-256-unsafe auth config
 const useAuthSafe = () => {
   try {
     return useAuth();
@@ -41,11 +44,15 @@ const useAuthSafe = () => {
 
 const SESSION_STORAGE_KEY = 'canton.network.wallet.userid';
 
-export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const UserProvider: React.FC<{
+  children: React.ReactNode;
+  authConf: AuthConfig;
+  useLedgerApiTokens?: boolean;
+}> = ({ children, authConf, useLedgerApiTokens }) => {
   // Two user authentication methods are supported:
   //   - sst: Self-Signed Tokens based on a given user ID
   //   - oidc: OpenID Connect logins based on OAuth2.0
-  const authMethod: 'sst' | 'oidc' = isHs256UnsafeAuthConfig(config.auth) ? 'sst' : 'oidc';
+  const authMethod: 'sst' | 'oidc' = isHs256UnsafeAuthConfig(authConf) ? 'sst' : 'oidc';
 
   const [isOnboarded, setIsOnboarded] = useState(false);
   const [userId, setUserId] = useState<string>();
@@ -54,37 +61,63 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const auth = useAuthSafe();
 
-  const isAuthenticated = auth
-    ? auth.isAuthenticated
-    : userId !== undefined && userAccessToken !== undefined;
+  const isAuthenticated =
+    userId !== undefined &&
+    userAccessToken !== undefined &&
+    (auth?.isAuthenticated || isHs256UnsafeToken(userAccessToken));
 
-  const loginWithSst = useCallback(async (userId: string) => {
-    setUserId(userId);
-    const token = await generateToken(userId);
-    setUserAccessToken(token);
-    window.sessionStorage.setItem(SESSION_STORAGE_KEY, userId);
-  }, []);
+  const loginWithSst = useCallback(
+    async (userId: string, secret: string) => {
+      setUserId(userId);
+      const token = await (useLedgerApiTokens
+        ? generateLedgerApiToken(userId, secret)
+        : generateToken(userId, secret));
+      setUserAccessToken(token);
+      window.sessionStorage.setItem(SESSION_STORAGE_KEY, userId);
+    },
+    [useLedgerApiTokens]
+  );
+
+  const loginWithOidc = () => {
+    if (auth) {
+      // We store the user id in localStorage. If it really was cleared
+      // users should get a chance to login as a different user.
+      auth.signinRedirect({ prompt: 'login' });
+    }
+  };
 
   useEffect(() => {
     async function f(user: User) {
-      setUserId(user.profile?.sub);
+      const { access_token, id_token } = user;
 
-      const { id_token } = user;
-      if (!id_token) {
-        console.warn('WARNING: Expected an ID Token, but got nothing...');
+      // If we did't request a specific audience or scope, auth0 gives us an
+      // access token that is opaque, i.e., it has an invalid jwt payload and
+      // we can't use it for auth against our backends. We must use the ID
+      // token then, which we hopefully receive and which hopefully has a valid
+      // jwt payload. Auth is great!
+      const access_token_sub = tryDecodeTokenSub(access_token);
+      const id_token_sub = tryDecodeTokenSub(id_token);
+
+      if (access_token_sub) {
+        setUserId(access_token_sub);
+        setUserAccessToken(access_token);
+      } else if (id_token_sub) {
+        setUserId(id_token_sub);
+        setUserAccessToken(id_token);
+      } else {
+        console.warn('WARNING: Got no usable token from auth provider.');
       }
-      setUserAccessToken(id_token);
     }
-
     if (auth?.isAuthenticated && auth.user) {
       f(auth.user);
     } else if (authMethod === 'sst') {
       const storedUserId = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+      const secret = getHs256UnsafeSecret(authConf);
       if (storedUserId) {
-        loginWithSst(storedUserId);
+        loginWithSst(storedUserId, secret);
       }
     }
-  }, [auth, authMethod, loginWithSst]);
+  }, [auth, authConf, authMethod, loginWithSst]);
 
   return (
     <UserContext.Provider
@@ -98,14 +131,8 @@ export const UserProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsOnboarded(userOnboarded);
           setPrimaryPartyId(partyId);
         },
-        loginWithSst: loginWithSst,
-        loginWithOidc: () => {
-          if (auth) {
-            // We store the user id in localStorage. If it really was cleared
-            // users should get a chance to login as a different user.
-            auth.signinRedirect({ prompt: 'login' });
-          }
-        },
+        loginWithSst,
+        loginWithOidc,
         logout: () => {
           setUserId(undefined);
           setPrimaryPartyId(undefined);
@@ -133,25 +160,7 @@ export const useUserState: () => UserState = () => {
   return user;
 };
 
-// Generate a local token for test purposes. Only acceptable by the
-// wallet service if it is running in unsafe mode
-const generateToken = async (userId: string): Promise<string> => {
-  if (isHs256UnsafeAuthConfig(config.auth)) {
-    const secret = new TextEncoder().encode(config.auth.secret);
-    const key = await crypto.subtle.importKey(
-      'raw',
-      secret,
-      { name: 'HMAC', hash: { name: 'SHA-256' } },
-      false,
-      ['sign']
-    );
-
-    return new SignJWT({})
-      .setProtectedHeader({ alg: 'HS256' })
-      .setIssuedAt()
-      .setSubject(userId)
-      .sign(key);
-  } else {
-    throw new Error('Invalid auth configuration, check /config.js');
-  }
-};
+export interface UserStatusResponse {
+  userOnboarded: boolean;
+  partyId: string;
+}

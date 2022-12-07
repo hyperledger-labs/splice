@@ -1,2 +1,2 @@
 export * from './reader';
-export { isHs256UnsafeAuthConfig } from './schema';
+export { isHs256UnsafeAuthConfig, getHs256UnsafeSecret } from './schema';

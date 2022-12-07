@@ -1,4 +1,4 @@
-import { ErrorBoundary, DirectoryEntry } from 'common-frontend';
+import { ErrorBoundary, DirectoryEntry, useUserState, Login } from 'common-frontend';
 import { useCallback, useEffect, useState } from 'react';
 import {
   createBrowserRouter,
@@ -19,14 +19,13 @@ import {
 } from '@mui/material';
 
 import './App.css';
-import { useUserState } from './contexts/UserContext';
 import { useWalletClient } from './contexts/WalletServiceContext';
+import { config } from './utils/config';
 import AppPaymentRequests from './views/AppPaymentRequests';
 import Coins from './views/Coins';
 import ConfirmPayment from './views/ConfirmPayment';
 import ConfirmSubscription from './views/ConfirmSubscription';
 import Home from './views/Home';
-import Login from './views/Login';
 import Onboarding from './views/Onboarding';
 import PaymentChannels from './views/PaymentChannels';
 import Subscriptions from './views/Subscriptions';
@@ -57,7 +56,15 @@ const App: React.FC = () => {
           </Toolbar>
         </AppBar>
         <Container style={{ height: '100%', flex: '1' }}>
-          {isAuthenticated ? <Content /> : <Login />}
+          {isAuthenticated ? (
+            <Content />
+          ) : (
+            <Login
+              title={'Wallet Log In'}
+              authConfig={config.auth}
+              testAuthConfig={config.testAuth}
+            />
+          )}
         </Container>
       </Box>
     </ErrorBoundary>

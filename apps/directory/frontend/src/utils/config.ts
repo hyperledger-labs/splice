@@ -5,7 +5,7 @@ import { z } from 'zod';
 const reader = new ConfigReader(
   z.object({
     auth: authSchema,
-    testAuth: testAuthSchema,
+    testAuth: testAuthSchema.optional(),
     services: z.object({
       wallet: serviceSchema.extend({
         uiUrl: z.string().url(),

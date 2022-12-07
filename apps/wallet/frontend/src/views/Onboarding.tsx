@@ -1,9 +1,9 @@
+import { useUserState } from 'common-frontend';
 import { OnboardUserRequest } from 'common-protobuf/com/daml/network/validator/v0/validator_service_pb';
 import { useState } from 'react';
 
 import { Button, Grid, Typography } from '@mui/material';
 
-import { useUserState } from '../contexts/UserContext';
 import { useValidatorClient } from '../contexts/ValidatorServiceContext';
 
 const Onboarding: React.FC<{ onOnboard: () => Promise<void> }> = ({ onOnboard }) => {

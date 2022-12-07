@@ -1,4 +1,4 @@
-import { useInterval, Contract, DirectoryEntry } from 'common-frontend';
+import { useInterval, Contract, DirectoryEntry, useUserState } from 'common-frontend';
 import { Decimal } from 'decimal.js';
 import React, { useCallback, useState } from 'react';
 
@@ -18,7 +18,6 @@ import { AcceptedTransferOffer, TransferOffer } from '@daml.js/wallet/lib/CN/Wal
 
 import { PaymentQuantityDisplay } from '../components/QuantityDisplay';
 import Timestamp from '../components/Timestamp';
-import { useUserState } from '../contexts/UserContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 
 // TODO(M3-02): directory integration for the receiver in a new offer

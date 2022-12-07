@@ -90,9 +90,9 @@ while getopts "hda" arg; do
       daemon=1
       ;;
     a)
-      oauth_authority=oauth_authority_auth0
-      oauth_clientid=oauth_clientid_auth0
-      auth_algorithm=auth_algorithm_auth0
+      oauth_authority=$oauth_authority_auth0
+      oauth_clientid=$oauth_clientid_auth0
+      auth_algorithm=$auth_algorithm_auth0
       test_auth_secret=
       ;;
     ?)

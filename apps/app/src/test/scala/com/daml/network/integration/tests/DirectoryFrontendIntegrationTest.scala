@@ -66,7 +66,7 @@ class DirectoryFrontendIntegrationTest extends FrontendIntegrationTest("alice") 
       val auth0TestUserPassword = "2N8mzSTbXCCW5fP";
       val auth0TestUserDamlUser = "auth0|6388b3b1c0f8aabff64ab105";
 
-      aliceValidator.onboardUser(auth0TestUserDamlUser)
+      val auth0TestUserPartyId = aliceValidator.onboardUser(auth0TestUserDamlUser);
 
       withFrontEnd("alice") { implicit webDriver =>
         go to "http://localhost:3004"
@@ -77,7 +77,9 @@ class DirectoryFrontendIntegrationTest extends FrontendIntegrationTest("alice") 
           find(id("password")).foreach(_.underlying.sendKeys(auth0TestUserPassword))
           click on name("action")
         }
-        find(id("logged-in-user")).value.text should matchText(auth0TestUserDamlUser)
+        find(id("logged-in-user")).value.text should matchText(
+          auth0TestUserPartyId.toProtoPrimitive
+        )
       }
     }
   }

@@ -16,7 +16,6 @@
     "common-frontend": "^0.1.0",
     "common-protobuf": "^0.1.0",
     "grpc-web": "^1.4.1",
-    "jose": "^4.10.3",
     "oidc-client-ts": "^2.1.0",
     "react": "18.2.0",
     "react-dom": "18.2.0",
