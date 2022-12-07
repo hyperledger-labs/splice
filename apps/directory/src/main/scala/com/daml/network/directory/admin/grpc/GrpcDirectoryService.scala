@@ -4,7 +4,6 @@ import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.directory.v0
 import com.daml.network.directory.v0.DirectoryServiceGrpc
 import com.daml.network.util.Proto
-import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.Spanning
@@ -26,9 +25,9 @@ class GrpcDirectoryService(
     with NamedLogging {
 
   @nowarn("cat=unused")
-  override def listEntries(request: Empty): Future[v0.ListEntriesResponse] =
+  override def listEntries(request: v0.ListEntriesRequest): Future[v0.ListEntriesResponse] =
     withSpanFromGrpcContext("GrpcDirectoryService") { implicit traceContext => span =>
-      for { entries <- store.acs.listContracts(directoryCodegen.DirectoryEntry.COMPANION) } yield v0
+      for { entries <- store.listEntries(request.namePrefix, request.pageSize) } yield v0
         .ListEntriesResponse(
           entries.value.map(_.toProtoV0)
         )

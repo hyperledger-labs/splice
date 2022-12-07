@@ -5,10 +5,21 @@ import "com/daml/network/v0/contract.proto";
 import "google/protobuf/empty.proto";
 
 service DirectoryService {
-  rpc ListEntries (google.protobuf.Empty) returns (ListEntriesResponse);
+  rpc ListEntries (ListEntriesRequest) returns (ListEntriesResponse);
   rpc LookupEntryByParty (LookupEntryByPartyRequest) returns (LookupEntryByPartyResponse);
   rpc LookupEntryByName (LookupEntryByNameRequest) returns (LookupEntryByNameResponse);
   rpc GetProviderPartyId (google.protobuf.Empty) returns (GetProviderPartyIdResponse);
+}
+
+message ListEntriesRequest {
+
+  // Only return entries matching this prefix.
+  string name_prefix = 1;
+
+  // The maximal amount of data returned per page.
+  int32 page_size = 2;
+
+  // TODO(#300): allow submitting the page token to receive the next page, as per the guidance in https://google.aip.dev/158
 }
 
 message ListEntriesResponse {

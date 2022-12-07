@@ -2,6 +2,7 @@ import { Contract, sameContracts, useDirectoryClient, useInterval } from 'common
 import { ErrorBoundary } from 'common-frontend';
 import { generateLedgerApiToken } from 'common-frontend/lib/contexts/LedgerApiContext';
 import { useScanClient } from 'common-frontend/lib/contexts/ScanServiceContext';
+import { ListEntriesRequest } from 'common-protobuf/com/daml/network/directory/v0/directory_service_pb';
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -21,11 +22,15 @@ const App: React.FC = () => {
   const scanClient = useScanClient();
 
   const fetchDirectoryEntries = useCallback(async () => {
-    const newEntries = (await directoryClient.listEntries(new Empty(), undefined)).getEntriesList();
+    const req = new ListEntriesRequest();
+    req.setNamePrefix('');
+    req.setPageSize(50);
+    const newEntries = (await directoryClient.listEntries(req, undefined)).getEntriesList();
     const decoded = newEntries.map(c => Contract.decode(c, DirectoryEntry));
     setDirectoryEntries(prev => (sameContracts(prev, decoded) ? prev : decoded));
   }, [setDirectoryEntries, directoryClient]);
 
+  // TODO(M3-08): use prefix-list for auto-completion, and per-party invites - then get rid of this polling
   useInterval(fetchDirectoryEntries, 500);
 
   const [svc, setSvc] = useState<string | undefined>();

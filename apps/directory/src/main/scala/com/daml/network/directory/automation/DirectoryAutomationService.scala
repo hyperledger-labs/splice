@@ -265,8 +265,9 @@ class DirectoryAutomationService(
     connection,
   )((now, logger) => { implicit traceContext =>
     {
-      store.acs
-        .listContracts(directoryCodegen.DirectoryEntry.COMPANION)
+      store
+        .listEntries("", 50)
+        // TODO(M3-83): At the moment, we just take the first 50 results, but if there are more active entries - those will never get expired here.
         .map { case QueryResult(_, entries) =>
           // extract due entries
           entries.filter(e =>

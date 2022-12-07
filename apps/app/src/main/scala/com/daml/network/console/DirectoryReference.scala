@@ -19,10 +19,16 @@ abstract class DirectoryAppReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
     override val name: String,
 ) extends CoinAppReference {
-  @Help.Summary("List all directory entries")
-  def listEntries(): Seq[Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry]] =
+  @Help.Summary("List directory entries")
+  @Help.Description(
+    "Lists all directory entries whose name is prefixed with the given prefix, up to a given number of entries"
+  )
+  def listEntries(
+      namePrefix: String,
+      pageSize: Int,
+  ): Seq[Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry]] =
     consoleEnvironment.run {
-      adminCommand(GrpcDirectoryAppClient.ListEntries())
+      adminCommand(GrpcDirectoryAppClient.ListEntries(namePrefix, pageSize))
     }
 
   @Help.Summary("Lookup a directory entry by the party that registered it")

@@ -34,7 +34,7 @@ class DirectoryTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTes
   "Directory service" should {
     "archive expired directory entries also when running on simtime" in { implicit env =>
       clue("Creating a directory entry that expires immediately") {
-        directory.listEntries() shouldBe empty
+        directory.listEntries("", 25) shouldBe empty
         val dirParty = directory.getProviderPartyId()
         val now = directory.remoteParticipant.ledger_api.time.get()
         directory.remoteParticipant.ledger_api.commands.submitJava(
@@ -48,13 +48,13 @@ class DirectoryTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTes
           optTimeout = None,
         )
         eventually()(
-          directory.listEntries() should not be empty
+          directory.listEntries("", 25) should not be empty
         )
       }
       clue("Waiting for the backend to expire the entry...") {
         advanceTime(Duration.ofDays(90).plus(Duration.ofSeconds(10)))
         eventually()(
-          directory.listEntries() shouldBe empty
+          directory.listEntries("", 25) shouldBe empty
         )
       }
     }
@@ -132,7 +132,7 @@ class DirectoryTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTes
         "Subscription and entry are created",
         _ => {
           aliceWallet.listSubscriptions() should have length 1
-          inside(aliceDirectory.listEntries()) { case Seq(entry) =>
+          inside(aliceDirectory.listEntries("", 25)) { case Seq(entry) =>
             entry.payload.name shouldBe testEntryName
           }
         },
@@ -141,7 +141,7 @@ class DirectoryTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTes
       aliceWalletBackend.stop()
       advanceTime(Duration.ofDays(91))
       eventually() {
-        aliceDirectory.listEntries() shouldBe empty
+        aliceDirectory.listEntries("", 25) shouldBe empty
       }
       // Wait for subscription to be expired.
       eventually() {

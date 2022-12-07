@@ -18,23 +18,26 @@ object GrpcDirectoryAppClient {
 
   abstract class BaseCommand[Req, Res, Result] extends GrpcAdminCommand[Req, Res, Result] {
     override type Svc = DirectoryServiceStub
+
     override def createService(channel: ManagedChannel): DirectoryServiceStub =
       v0.DirectoryServiceGrpc.stub(channel)
   }
 
   case class ListEntries(
+      namePrefix: String,
+      pageSize: Int,
   ) extends BaseCommand[
-        Empty,
+        v0.ListEntriesRequest,
         v0.ListEntriesResponse,
         Seq[Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry]],
       ] {
 
-    override def createRequest(): Either[String, Empty] =
-      Right(Empty())
+    override def createRequest(): Either[String, v0.ListEntriesRequest] =
+      Right(v0.ListEntriesRequest(namePrefix, pageSize))
 
     override def submitRequest(
         service: DirectoryServiceStub,
-        request: Empty,
+        request: v0.ListEntriesRequest,
     ): Future[v0.ListEntriesResponse] = service.listEntries(request)
 
     override def handleResponse(

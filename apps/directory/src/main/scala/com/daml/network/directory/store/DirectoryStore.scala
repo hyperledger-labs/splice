@@ -18,6 +18,7 @@ import scala.concurrent.{ExecutionContext, Future}
   * custom indices to ensure the scalability of these queries.
   */
 trait DirectoryStore extends AutoCloseable {
+
   import AcsStore.QueryResult
 
   /** The sink to use for ingesting data from the ledger into this store. */
@@ -63,6 +64,25 @@ trait DirectoryStore extends AutoCloseable {
     acs.findContract(directoryCodegen.DirectoryEntry.COMPANION)(co =>
       co.payload.user == partyId.toProtoPrimitive
     )
+
+  /** List all directory entries that are active as of a specific revision, up to a certain number. */
+  // TODO(#300): allow submitting the page token to receive the next page
+  // TODO(#300): at the moment, trimming the list to the right size is performed here, that should be moved to the acsStore
+  def listEntries(namePrefix: String, pageSize: Int)(implicit
+      executionContext: ExecutionContext
+  ): Future[QueryResult[
+    Seq[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
+  ]] =
+    for {
+      QueryResult(off, list) <- acs.listContracts(
+        directoryCodegen.DirectoryEntry.COMPANION,
+        (entry: Contract[
+          directoryCodegen.DirectoryEntry.ContractId,
+          directoryCodegen.DirectoryEntry,
+        ]) => entry.payload.name.startsWith(namePrefix),
+      )
+    } yield QueryResult(off, list.take(pageSize))
+
 }
 
 object DirectoryStore {

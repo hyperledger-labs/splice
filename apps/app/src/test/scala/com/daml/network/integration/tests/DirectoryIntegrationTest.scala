@@ -122,37 +122,37 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
       }
     }
 
+    def requestAndPayForEntry(refs: DynamicUserRefs, entryName: String) = {
+      refs.wallet.tap(5.0)
+
+      // Request entry and get some money to pay for it
+      val (_, subscriptionRequest) =
+        refs.directory.requestDirectoryEntry(entryName)
+
+      // Wait for subscription request to be ingested into store
+      // and accept it.
+      val initialPayment = eventually()(inside(refs.wallet.listSubscriptionRequests()) {
+        case Seq(storeRequest) =>
+          storeRequest.contractId shouldBe subscriptionRequest
+          refs.wallet.acceptSubscriptionRequest(storeRequest.contractId)
+      })
+      // Wait for the SubscriptionInitialPayment to be archived
+      eventually() {
+        refs.validator.remoteParticipant.ledger_api.acs
+          .filterJava(subsCodegen.SubscriptionInitialPayment.COMPANION)(
+            refs.userParty,
+            (request: subsCodegen.SubscriptionInitialPayment.Contract) =>
+              request.id == initialPayment,
+          ) shouldBe empty
+      }
+    }
+
     "allocate unique directory entries, even when multiple parties race for them" in {
       implicit env =>
         import env._
 
         // The provider of the directory service
         val providerParty = directory.getProviderPartyId()
-
-        def requestAndPayForEntry(refs: DynamicUserRefs, entryName: String) = {
-          refs.wallet.tap(5.0)
-
-          // Request entry and get some money to pay for it
-          val (_, subscriptionRequest) =
-            refs.directory.requestDirectoryEntry(entryName)
-
-          // Wait for subscription request to be ingested into store
-          // and accept it.
-          val initialPayment = eventually()(inside(refs.wallet.listSubscriptionRequests()) {
-            case Seq(storeRequest) =>
-              storeRequest.contractId shouldBe subscriptionRequest
-              refs.wallet.acceptSubscriptionRequest(storeRequest.contractId)
-          })
-          // Wait for the SubscriptionInitialPayment to be archived
-          eventually() {
-            refs.validator.remoteParticipant.ledger_api.acs
-              .filterJava(subsCodegen.SubscriptionInitialPayment.COMPANION)(
-                refs.userParty,
-                (request: subsCodegen.SubscriptionInitialPayment.Contract) =>
-                  request.id == initialPayment,
-              ) shouldBe empty
-          }
-        }
 
         // Setup alice
         val aliceStaticRefs = StaticUserRefs(aliceValidator, aliceDirectory, aliceWallet)
@@ -183,6 +183,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
         // Check who won
         def tryGetEntry() =
           Try(loggerFactory.suppressErrors(directory.lookupEntryByName(testEntryName)))
+
         val entry =
           eventually()(tryGetEntry().getOrElse(fail(s"Could not get entry $testEntryName")))
         val winnerUserParty = PartyId.tryFromProtoPrimitive(entry.payload.user)
@@ -199,7 +200,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
         entry.payload shouldBe entryPayload
 
         // Read entries from provider
-        directory.listEntries() shouldBe Seq(entry)
+        directory.listEntries("", 25) shouldBe Seq(entry)
         directory.lookupEntryByName(testEntryName) shouldBe entry
         directory.lookupEntryByParty(winnerUserParty) shouldBe entry
         assertThrowsAndLogsCommandFailures(
@@ -210,7 +211,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
 
     "archive expired directory entries" in { implicit env =>
       clue("Creating a directory entry that expires immediately") {
-        directory.listEntries() shouldBe empty
+        directory.listEntries("", 25) shouldBe empty
         val dirParty = directory.getProviderPartyId()
         directory.remoteParticipant.ledger_api.commands.submitJava(
           actAs = Seq(dirParty),
@@ -223,14 +224,45 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
           optTimeout = None,
         )
         eventually()(
-          directory.listEntries() should not be empty
+          directory.listEntries("", 25) should not be empty
         )
       }
       clue("Waiting for the backend to expire the entry...") {
         eventually()(
-          directory.listEntries() shouldBe empty
+          directory.listEntries("", 25) shouldBe empty
         )
       }
+    }
+
+    "support prefix lookup" in { implicit env =>
+      val aliceStaticRefs = StaticUserRefs(aliceValidator, aliceDirectory, aliceWallet)
+      val aliceRefs = setupUser(aliceStaticRefs)
+      val bobStaticRefs = StaticUserRefs(bobValidator, bobDirectory, bobWallet)
+      val bobRefs = setupUser(bobStaticRefs)
+
+      actAndCheck(
+        "Setup entries", {
+          requestAndPayForEntry(aliceRefs, "alice.cns")
+          requestAndPayForEntry(aliceRefs, "aliceAndCo.cns")
+          requestAndPayForEntry(aliceRefs, "aliceAndSons.cns")
+          requestAndPayForEntry(aliceRefs, "bobIsntHere.cns")
+          requestAndPayForEntry(bobRefs, "bob.cns")
+          requestAndPayForEntry(bobRefs, "bobIsCool.cns")
+          requestAndPayForEntry(bobRefs, "bobAndFriends.cns")
+        },
+      )(
+        "Lookup entries with prefixes",
+        _ => {
+          directory.listEntries("", 25) should have length 7
+          directory.listEntries("a", 25) should have length 3
+          directory.listEntries("a", 2) should have length 2
+          directory.listEntries("b", 25) should have length 4
+          directory.listEntries("bobIs", 25) should have length 2
+          directory.listEntries("c", 25) should have length 0
+          directory.listEntries("a", 0) should have length 0
+          directory.listEntries("a", -1) should have length 0
+        },
+      )
     }
 
     def setupUser(refs: StaticUserRefs): DynamicUserRefs = {
@@ -258,7 +290,9 @@ object DirectoryIntegrationTest {
 
   case class DynamicUserRefs(userParty: PartyId, static: StaticUserRefs) {
     def validator: LocalValidatorAppReference = static.validator
+
     def directory: RemoteDirectoryAppReference = static.directory
+
     def wallet: WalletAppClientReference = static.wallet
   }
 }
