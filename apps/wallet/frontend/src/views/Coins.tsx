@@ -21,7 +21,7 @@ import { useWalletClient } from '../contexts/WalletServiceContext';
 
 const Coins: React.FC = () => {
   const [coins, setCoins] = useState<Contract<Coin>[]>([]);
-  const [tapValue, setTapValue] = useState<Decimal | undefined>(undefined);
+  const [tapValue, setTapValue] = useState<Decimal>(new Decimal(0.0));
 
   const { tap, list } = useWalletClient();
 
@@ -42,14 +42,6 @@ const Coins: React.FC = () => {
     await navigator.clipboard.writeText(text);
   };
 
-  const parseTapValue = (value: string) => {
-    try {
-      setTapValue(new Decimal(value));
-    } catch {
-      setTapValue(undefined);
-    }
-  };
-
   const onTapClicked = () => {
     const decVal = tapValue as Decimal;
     const strVal = decVal.isInt() ? decVal.toFixed(1) : decVal.toString();
@@ -60,14 +52,15 @@ const Coins: React.FC = () => {
     <Stack spacing={2}>
       <FormGroup row>
         <TextField
-          error={tapValue === undefined}
+          error={tapValue.lessThanOrEqualTo(0.0)}
           label="Amount"
-          onChange={event => parseTapValue(event.target.value)}
+          onChange={event => setTapValue(new Decimal(event.target.value))}
+          type="number"
           id="tap-amount-field"
         ></TextField>
         <Button
           variant="contained"
-          disabled={tapValue === undefined}
+          disabled={tapValue.lessThanOrEqualTo(0.0)}
           onClick={onTapClicked}
           id="tap-button"
         >

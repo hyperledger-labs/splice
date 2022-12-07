@@ -1,6 +1,7 @@
 import * as v0 from 'common-protobuf/com/daml/network/wallet/v0/wallet_service_pb';
 import { Contract } from 'common-frontend';
 import { WalletServicePromiseClient } from 'common-protobuf/com/daml/network/wallet/v0/wallet_service_grpc_web_pb';
+import { Decimal } from 'decimal.js';
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { Metadata } from 'grpc-web';
 import React, { useContext, useMemo } from 'react';
@@ -71,7 +72,7 @@ export interface WalletClient {
   listTransferOffers: () => Promise<ListTransferOffersResponse>;
   createTransferOffer: (
     receiverPartyId: string,
-    quantity: string,
+    quantity: Decimal,
     description: string,
     expiresAt: Date
   ) => Promise<void>;
@@ -144,7 +145,7 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
         await walletClient.createTransferOffer(
           new v0.CreateTransferOfferRequest()
             .setReceiverPartyId(receiverPartyId)
-            .setQuantity(quantity)
+            .setQuantity(quantity.isInt() ? quantity.toFixed(1) : quantity.toString())
             .setDescription(description)
             .setExpiresAt(expiresAt.getTime() * 1000),
           getCreds()

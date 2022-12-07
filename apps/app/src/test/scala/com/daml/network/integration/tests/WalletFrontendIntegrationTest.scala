@@ -3,8 +3,8 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.wallet.{
-  payment => paymentCodegen,
-  subscriptions => subsCodegen,
+  payment as paymentCodegen,
+  subscriptions as subsCodegen,
 }
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
@@ -40,7 +40,7 @@ class WalletFrontendIntegrationTest
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)
         click on "tap-amount-field"
-        textField("tap-amount-field").value = "15.0"
+        numberField("tap-amount-field").underlying.sendKeys("15.0")
         click on "tap-button"
         eventually() {
           findAll(className("coins-table-row")) should have size 1
@@ -48,40 +48,6 @@ class WalletFrontendIntegrationTest
         val row = inside(findAll(className("coins-table-row")).toList) { case Seq(row) => row }
         val quantity = row.childElement(className("coins-table-quantity"))
         quantity.text should be("15.0000000000CC")
-      }
-    }
-
-    "correctly handle different number formats and non-numeric entries for tap" in { implicit env =>
-      val aliceDamlUser = aliceWallet.config.damlUser
-      onboardWalletUser(this, aliceWallet, aliceValidator)
-
-      withFrontEnd("alice") { implicit webDriver =>
-        browseToAliceWallet(aliceDamlUser)
-        click on "tap-amount-field"
-
-        textField("tap-amount-field").value = "25"
-        click on "tap-button"
-        textField("tap-amount-field").value = "35."
-        click on "tap-button"
-        textField("tap-amount-field").value = "45.0"
-        click on "tap-button"
-        eventually() {
-          val quantities = findAll(className("coins-table-row")).toList.map(row =>
-            row.childElement(className("coins-table-quantity")).text
-          )
-          quantities should contain theSameElementsAs Seq(
-            "25.0000000000CC",
-            "35.0000000000CC",
-            "45.0000000000CC",
-          )
-        }
-
-        textField("tap-amount-field").value = "test"
-        find(id("tap-button")).getOrElse(fail()).isEnabled shouldBe false
-        find(id("tap-amount-field-label"))
-          .getOrElse(fail())
-          .underlying
-          .getAttribute("class") should include("Mui-error")
       }
     }
 
@@ -108,7 +74,7 @@ class WalletFrontendIntegrationTest
         // After a short delay, the UI should realize that the user is now onboarded
         // and switch to the default view.
         click on "tap-amount-field"
-        textField("tap-amount-field").value = "15.0"
+        numberField("tap-amount-field").underlying.sendKeys("15.0")
         click on "tap-button"
         eventually() {
           findAll(className("coins-table-row")) should have size 1
@@ -520,7 +486,7 @@ class WalletFrontendIntegrationTest
             click on "create-offer-receiver"
             textField("create-offer-receiver").value = bobParty.toProtoPrimitive
             click on "create-offer-quantity"
-            textField("create-offer-quantity").value = "100.0"
+            numberField("create-offer-quantity").underlying.sendKeys("100.0")
             click on "create-offer-description"
             textField("create-offer-description").value = description
             click on "create-offer-button"

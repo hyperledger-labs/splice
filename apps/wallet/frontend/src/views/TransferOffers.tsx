@@ -1,4 +1,5 @@
 import { useInterval, Contract, DirectoryEntry } from 'common-frontend';
+import { Decimal } from 'decimal.js';
 import React, { useCallback, useState } from 'react';
 
 import {
@@ -20,7 +21,6 @@ import Timestamp from '../components/Timestamp';
 import { useUserState } from '../contexts/UserContext';
 import { useWalletClient } from '../contexts/WalletServiceContext';
 
-// TODO(#1775): factor out and reuse the numeric text field from the tap amount for input validation of the amount
 // TODO(M3-02): directory integration for the receiver in a new offer
 
 const TransferOffers: React.FC = () => {
@@ -51,7 +51,7 @@ const TransferOffers: React.FC = () => {
   useInterval(fetchAcceptedTransferOffers, 500);
 
   const [receiver, setReceiver] = useState<string>('');
-  const [transferQuantity, setTransferQuantity] = useState('');
+  const [transferQuantity, setTransferQuantity] = useState<Decimal>(new Decimal(0.0));
   const [description, setDescription] = useState('');
   const createOffer = async (ev: React.FormEvent<HTMLFormElement>) => {
     ev.preventDefault();
@@ -76,7 +76,9 @@ const TransferOffers: React.FC = () => {
             id="create-offer-quantity"
             label="Amount"
             value={transferQuantity}
-            onChange={event => setTransferQuantity(event.target.value)}
+            type="number"
+            error={transferQuantity.lessThanOrEqualTo(0.0)}
+            onChange={event => setTransferQuantity(new Decimal(event.target.value))}
           ></TextField>
           <TextField
             id={'create-offer-description'}
@@ -84,7 +86,12 @@ const TransferOffers: React.FC = () => {
             value={description}
             onChange={event => setDescription(event.target.value)}
           ></TextField>
-          <Button variant="contained" type="submit" id="create-offer-button">
+          <Button
+            variant="contained"
+            type="submit"
+            id="create-offer-button"
+            disabled={transferQuantity.lessThanOrEqualTo(0.0)}
+          >
             Create a Transfer Offer
           </Button>
         </Stack>
