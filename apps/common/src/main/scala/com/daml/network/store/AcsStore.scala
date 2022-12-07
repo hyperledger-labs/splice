@@ -178,8 +178,7 @@ trait AcsStore extends AutoCloseable {
       templateCompanion: ContractCompanion[TC, TCid, T]
   ): Future[Unit]
 
-  /** Signal when the store has finished ingesting ledger data from the given offset or a larger one.
-    */
+  /** Signal when the store has finished ingesting ledger data from the given offset or a larger one. */
   def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit]
 }
 

@@ -1,7 +1,5 @@
 package com.daml.network.wallet.store
 
-import akka.NotUsed
-import akka.stream.scaladsl.Source
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cc.coin.{CoinRules, ValidatorRight}
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
@@ -34,9 +32,8 @@ trait WalletStore extends FlagCloseable with NamedLogging with StoreWithOpenMini
   /** The sink to use for ingesting data from the ledger into this store. */
   val acsIngestionSink: AcsStore.IngestionSink
 
-  protected val acsStore: AcsStore
-
-  def acs: AcsStore = acsStore
+  /** The store to use for default queries. */
+  val acs: AcsStore
 
   /** The key identifying the parties considered by this store. */
   def key: WalletStore.Key
@@ -48,7 +45,7 @@ trait WalletStore extends FlagCloseable with NamedLogging with StoreWithOpenMini
       JavaContract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
     ]
   ]] =
-    acsStore.findContract(installCodegen.WalletAppInstall.COMPANION)(co =>
+    acs.findContract(installCodegen.WalletAppInstall.COMPANION)(co =>
       co.payload.endUserParty == endUserParty.toProtoPrimitive
     )
 
@@ -59,15 +56,9 @@ trait WalletStore extends FlagCloseable with NamedLogging with StoreWithOpenMini
       JavaContract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
     ]
   ]] =
-    acsStore.findContract(installCodegen.WalletAppInstall.COMPANION)(co =>
+    acs.findContract(installCodegen.WalletAppInstall.COMPANION)(co =>
       co.payload.endUserName == endUserName
     )
-
-  def streamInstalls: Source[
-    JavaContract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall],
-    NotUsed,
-  ] =
-    acsStore.streamContracts(installCodegen.WalletAppInstall.COMPANION)
 
   def getCoinRules()(implicit ec: ExecutionContext): Future[
     QueryResult[JavaContract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]]

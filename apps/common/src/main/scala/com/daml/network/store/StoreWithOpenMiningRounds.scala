@@ -12,7 +12,7 @@ import scala.concurrent.{ExecutionContext, Future}
 /** Mix-in for an ACS-based store that tracks the OpenMiningRound contracts. */
 trait StoreWithOpenMiningRounds { this: FlagCloseable =>
 
-  protected def acsStore: AcsStore
+  protected def acs: AcsStore
 
   /** Returns the active open mining rounds who are open according to 'opensAt'. */
   def lookupSubmittableOpenMiningRounds(
@@ -20,7 +20,7 @@ trait StoreWithOpenMiningRounds { this: FlagCloseable =>
   )(implicit ec: ExecutionContext): Future[QueryResult[
     Seq[JavaContract[OpenMiningRound.ContractId, OpenMiningRound]]
   ]] = {
-    acsStore
+    acs
       .listContracts(OpenMiningRound.COMPANION)
       .map(
         _.map(contracts =>

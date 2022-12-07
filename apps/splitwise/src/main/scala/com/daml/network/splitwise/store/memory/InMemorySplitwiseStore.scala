@@ -15,10 +15,10 @@ class InMemorySplitwiseStore(
 ) extends SplitwiseStore
     with NamedLogging {
 
-  override val acsStore: InMemoryAcsStore =
+  override val acs: InMemoryAcsStore =
     new InMemoryAcsStore(loggerFactory, SplitwiseStore.contractFilter(providerParty))
 
-  override val acsIngestionSink = acsStore.ingestionSink
+  override val acsIngestionSink = acs.ingestionSink
 
   override def close(): Unit = ()
 }

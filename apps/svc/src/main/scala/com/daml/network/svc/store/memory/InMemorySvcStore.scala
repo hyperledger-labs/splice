@@ -20,7 +20,7 @@ class InMemorySvcStore(
   private val inMemoryAcsStore =
     new InMemoryAcsStore(loggerFactory, SvcStore.contractFilter(svcParty))
 
-  override val acsStore: AcsStore = inMemoryAcsStore
+  override val acs: AcsStore = inMemoryAcsStore
 
   override val acsIngestionSink: AcsStore.IngestionSink = inMemoryAcsStore.ingestionSink
 

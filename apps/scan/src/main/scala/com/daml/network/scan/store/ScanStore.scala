@@ -1,11 +1,5 @@
 package com.daml.network.scan.store
 
-import com.daml.ledger.javaapi.data.Template
-import com.daml.ledger.javaapi.data.codegen.{
-  Contract => CodegenContract,
-  ContractCompanion,
-  ContractId,
-}
 import com.daml.network.codegen.java.cc
 import com.daml.network.scan.store.memory.InMemoryScanStore
 import com.daml.network.store.AcsStore.QueryResult
@@ -33,19 +27,11 @@ trait ScanStore extends FlagCloseable with StoreWithOpenMiningRounds {
   val acsIngestionSink: AcsStore.IngestionSink
 
   /** The [[com.daml.network.store.AcsStore]] used to back the default implementation of the queries. */
-  protected val acsStore: AcsStore
-
-  def acs: AcsStore = acsStore
+  val acs: AcsStore
 
   def lookupCoinRules()
       : Future[QueryResult[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]] =
-    acsStore.findContract(cc.coin.CoinRules.COMPANION)(_ => true)
-
-  def listContracts[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T],
-      filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
-  ): Future[AcsStore.QueryResult[Seq[Contract[TCid, T]]]] =
-    acsStore.listContracts(templateCompanion, filter)
+    acs.findContract(cc.coin.CoinRules.COMPANION)(_ => true)
 }
 
 object ScanStore {

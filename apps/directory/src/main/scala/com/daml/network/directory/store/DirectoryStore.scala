@@ -1,17 +1,13 @@
 package com.daml.network.directory.store
 
-import akka.NotUsed
-import akka.stream.scaladsl.Source
-import com.daml.ledger.javaapi.data.codegen.ContractId
+import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
-import com.daml.network.codegen.java.cn.{directory as directoryCodegen}
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.store.AcsStore
-import com.daml.network.util.{JavaContract => Contract}
+import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
-import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -27,8 +23,8 @@ trait DirectoryStore extends AutoCloseable {
   /** The sink to use for ingesting data from the ledger into this store. */
   val acsIngestionSink: AcsStore.IngestionSink
 
-  /** The [[com.daml.network.store.AcsStore]] used to back the default implementation of the queries. */
-  protected val acsStore: AcsStore
+  /** The [[com.daml.network.store.AcsStore]] to use for listing contracts and retrieving them by contract-id. */
+  val acs: AcsStore
 
   /** Get the party-id of the provider.
     * All results from the store are scoped to contracts managed by this provider.
@@ -39,13 +35,13 @@ trait DirectoryStore extends AutoCloseable {
   def svcParty: PartyId
 
   /** Lookup the directory install for a user */
-  def lookupInstall(
+  def lookupInstallByUser(
       user: PartyId
   ): Future[QueryResult[Option[
     Contract[directoryCodegen.DirectoryInstall.ContractId, directoryCodegen.DirectoryInstall]
   ]]] =
-    acsStore.findContract(directoryCodegen.DirectoryInstall.COMPANION)(co =>
-      co.payload.user == user.toPrim
+    acs.findContract(directoryCodegen.DirectoryInstall.COMPANION)(co =>
+      co.payload.user == user.toProtoPrimitive
     )
 
   /** Lookup a directory entry by name. */
@@ -54,7 +50,7 @@ trait DirectoryStore extends AutoCloseable {
   ): Future[QueryResult[
     Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
   ]] =
-    acsStore.findContract(directoryCodegen.DirectoryEntry.COMPANION)(co => co.payload.name == name)
+    acs.findContract(directoryCodegen.DirectoryEntry.COMPANION)(co => co.payload.name == name)
 
   /** Lookup a directory entry by party.
     * If there are multiple candidate entries, then oldest one is returned.
@@ -64,69 +60,9 @@ trait DirectoryStore extends AutoCloseable {
   ): Future[QueryResult[
     Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
   ]] =
-    acsStore.findContract(directoryCodegen.DirectoryEntry.COMPANION)(co =>
-      co.payload.user == partyId.toPrim
+    acs.findContract(directoryCodegen.DirectoryEntry.COMPANION)(co =>
+      co.payload.user == partyId.toProtoPrimitive
     )
-
-  /** Lookup a directory entry subscription context by its id. */
-  def lookupEntryContextById(
-      id: ContractId[directoryCodegen.DirectoryEntryContext]
-  ): Future[QueryResult[Option[Contract[
-    directoryCodegen.DirectoryEntryContext.ContractId,
-    directoryCodegen.DirectoryEntryContext,
-  ]]]] =
-    acsStore.lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(id)
-
-  /** List all directory entries that are active as of a specific revision. */
-  def listEntries(): Future[QueryResult[
-    Seq[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
-  ]] =
-    acsStore.listContracts(directoryCodegen.DirectoryEntry.COMPANION)
-
-  /** List all subscription idle states. */
-  def listSubscriptionIdleStates(): Future[QueryResult[
-    Seq[Contract[subsCodegen.SubscriptionIdleState.ContractId, subsCodegen.SubscriptionIdleState]]
-  ]] =
-    acsStore.listContracts(subsCodegen.SubscriptionIdleState.COMPANION)
-
-  /** All install requests to the provider.
-    *
-    * '''emits''' whenever the store knows or learns about a create event of a `DirectoryInstallRequest` that is
-    * (a) more recent than the previously emitted one (or it is the oldest one) and
-    * (b) whose archive event is not known to the store
-    *
-    * '''completes''' never, as it tails newly ingested transactions
-    */
-  def streamInstallRequests(): Source[Contract[
-    directoryCodegen.DirectoryInstallRequest.ContractId,
-    directoryCodegen.DirectoryInstallRequest,
-  ], NotUsed] =
-    acsStore.streamContracts(directoryCodegen.DirectoryInstallRequest.COMPANION)
-
-  /** All accepted initial subscription payments whose receiver is the provider.
-    *
-    * Analogous to [[streamInstallRequests]], but for `SubscriptionInitialPayment`
-    */
-  def streamSubscriptionInitialPayments(): Source[Contract[
-    subsCodegen.SubscriptionInitialPayment.ContractId,
-    subsCodegen.SubscriptionInitialPayment,
-  ], NotUsed] =
-    acsStore.streamContracts(subsCodegen.SubscriptionInitialPayment.COMPANION)
-
-  /** All accepted subscription payments whose receiver is the provider.
-    *
-    * Analogous to [[streamInstallRequests]], but for `SubscriptionPayment`
-    */
-  def streamSubscriptionPayments(): Source[
-    Contract[subsCodegen.SubscriptionPayment.ContractId, subsCodegen.SubscriptionPayment],
-    NotUsed,
-  ] =
-    acsStore.streamContracts(subsCodegen.SubscriptionPayment.COMPANION)
-
-  // TODO(M1-92): only added for tests (in DirectoryStoreTest)
-  def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
-    acsStore.signalWhenIngested(offset)
-
 }
 
 object DirectoryStore {

@@ -69,35 +69,39 @@ class SvcAutomationService(
     )
   )
 
-  registerTrigger("handleCoinRulesRequest", store.streamCoinRulesRequests())((req, logger) => {
-    implicit traceContext =>
-      {
-        for {
-          // Guard the action by a lookup for the SVC's own CoinRules to ensure that all of the dependent state
-          // has already been created.
-          _ <- getCoinRules()
-          validatorParty = PartyId.tryFromProtoPrimitive(req.payload.user)
-          // NOTE: this is NOT SAFE under concurrent changes to the XXXMiningRounds contracts
-          // That is OK here, as we assume that on-boarding of validators happens before.
-          // TODO(M3-90): make this safe under concurrent round management and onboarding
-          QueryResult(_, openMiningRounds) <- store
-            .listContracts(cc.round.OpenMiningRound.COMPANION)
-          QueryResult(_, issuingMiningRounds) <- store
-            .listContracts(cc.round.IssuingMiningRound.COMPANION)
-          QueryResult(_, coinRules) <- store.getCoinRules()
-          cmds = req.contractId
-            .exerciseCoinRulesRequest_Accept(
-              coinRules.contractId,
-              openMiningRounds.map(_.contractId).asJava,
-              issuingMiningRounds.map(_.contractId).asJava,
-            )
-            .commands
-            .asScala
-            .toSeq
-          // No command-dedup required, as the CoinRules contract is archived and recreated
-          _ <- connection.submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds)
-        } yield Some(s"accepted coin rules request from $validatorParty")
-      }
+  registerTrigger(
+    "handleCoinRulesRequest",
+    store.acs.streamContracts(cc.coin.CoinRulesRequest.COMPANION),
+  )((req, logger) => { implicit traceContext =>
+    {
+      for {
+        // Guard the action by a lookup for the SVC's own CoinRules to ensure that all of the dependent state
+        // has already been created.
+        _ <- getCoinRules()
+        validatorParty = PartyId.tryFromProtoPrimitive(req.payload.user)
+        // NOTE: this is NOT SAFE under concurrent changes to the XXXMiningRounds contracts
+        // That is OK here, as we assume that on-boarding of validators happens before.
+        // TODO(M3-90): make this safe under concurrent round management and onboarding
+        QueryResult(_, openMiningRounds) <- store.acs.listContracts(
+          cc.round.OpenMiningRound.COMPANION
+        )
+        QueryResult(_, issuingMiningRounds) <- store.acs.listContracts(
+          cc.round.IssuingMiningRound.COMPANION
+        )
+        QueryResult(_, coinRules) <- store.getCoinRules()
+        cmds = req.contractId
+          .exerciseCoinRulesRequest_Accept(
+            coinRules.contractId,
+            openMiningRounds.map(_.contractId).asJava,
+            issuingMiningRounds.map(_.contractId).asJava,
+          )
+          .commands
+          .asScala
+          .toSeq
+        // No command-dedup required, as the CoinRules contract is archived and recreated
+        _ <- connection.submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds)
+      } yield Some(s"accepted coin rules request from $validatorParty")
+    }
   })
 
   registerPollingTrigger("cycle OpenMiningRounds", automationConfig.pollingInterval, connection) {
@@ -105,8 +109,9 @@ class SvcAutomationService(
       { implicit tc =>
         for {
           rules <- getCoinRules()
-          QueryResult(_, openMiningRounds) <- store
-            .listContracts(cc.round.OpenMiningRound.COMPANION)
+          QueryResult(_, openMiningRounds) <- store.acs.listContracts(
+            cc.round.OpenMiningRound.COMPANION
+          )
           res <- {
             val Seq(toArchive, middle, latest) = openMiningRounds
               .sortBy(contract => contract.payload.round.number)
@@ -162,8 +167,9 @@ class SvcAutomationService(
       { implicit tc =>
         for {
           coinRules <- store.getCoinRules()
-          QueryResult(_, issuingMiningRounds) <- store
-            .listContracts(cc.round.IssuingMiningRound.COMPANION)
+          QueryResult(_, issuingMiningRounds) <- store.acs.listContracts(
+            cc.round.IssuingMiningRound.COMPANION
+          )
           roundsSorted = issuingMiningRounds
             .sortBy(contract => contract.payload.targetClosesAt)
             .headOption
@@ -200,7 +206,7 @@ class SvcAutomationService(
 
   registerTrigger(
     "archive summarizing rounds and create issuing rounds",
-    store.acsStore.streamContracts(cc.round.SummarizingMiningRound.COMPANION),
+    store.acs.streamContracts(cc.round.SummarizingMiningRound.COMPANION),
   ) { (summarizingRound, logger) => implicit tc =>
     for {
       rewards <- queryRewards(summarizingRound.payload.round.number)
@@ -223,7 +229,7 @@ class SvcAutomationService(
 
   registerTrigger(
     "archive closed rounds and unclaimed rewards",
-    store.acsStore.streamContracts(cc.round.ClosedMiningRound.COMPANION),
+    store.acs.streamContracts(cc.round.ClosedMiningRound.COMPANION),
   ) { (closedRound, logger) => implicit tc =>
     for {
       coinRules <- store.getCoinRules()
@@ -279,12 +285,12 @@ class SvcAutomationService(
     */
   private def queryRewards(round: Long)(implicit ec: ExecutionContext): Future[RoundRewards] =
     for {
-      appRewards <- store.acsStore.listContracts(
+      appRewards <- store.acs.listContracts(
         cc.coin.AppReward.COMPANION,
         (c: JavaContract[cc.coin.AppReward.ContractId, cc.coin.AppReward]) =>
           c.payload.round.number == round,
       )
-      validatorRewards <- store.acsStore.listContracts(
+      validatorRewards <- store.acs.listContracts(
         cc.coin.ValidatorReward.COMPANION,
         (c: JavaContract[cc.coin.ValidatorReward.ContractId, cc.coin.ValidatorReward]) =>
           c.payload.round.number == round,

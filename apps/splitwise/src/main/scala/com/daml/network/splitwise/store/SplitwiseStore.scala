@@ -1,12 +1,10 @@
 package com.daml.network.splitwise.store
 
-import akka.NotUsed
-import akka.stream.scaladsl.Source
-import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
+import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.splitwise.store.memory.InMemorySplitwiseStore
 import com.daml.network.store.AcsStore
-import com.daml.network.util.{JavaContract => Contract}
+import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
@@ -19,7 +17,7 @@ trait SplitwiseStore extends AutoCloseable {
 
   val acsIngestionSink: AcsStore.IngestionSink
 
-  protected val acsStore: AcsStore
+  val acs: AcsStore
 
   def providerParty: PartyId
 
@@ -28,16 +26,9 @@ trait SplitwiseStore extends AutoCloseable {
   ): Future[QueryResult[Option[
     Contract[splitwiseCodegen.SplitwiseInstall.ContractId, splitwiseCodegen.SplitwiseInstall]
   ]]] =
-    acsStore.findContract(splitwiseCodegen.SplitwiseInstall.COMPANION)(co =>
-      co.payload.user == user.toPrim
+    acs.findContract(splitwiseCodegen.SplitwiseInstall.COMPANION)(co =>
+      co.payload.user == user.toProtoPrimitive
     )
-
-  def lookupTransferInProgressById(
-      id: splitwiseCodegen.TransferInProgress.ContractId
-  ): Future[QueryResult[Option[
-    Contract[splitwiseCodegen.TransferInProgress.ContractId, splitwiseCodegen.TransferInProgress]
-  ]]] =
-    acsStore.lookupContractById(splitwiseCodegen.TransferInProgress.COMPANION)(id)
 
   def lookupGroup(
       owner: PartyId,
@@ -45,8 +36,8 @@ trait SplitwiseStore extends AutoCloseable {
   ): Future[
     QueryResult[Option[Contract[splitwiseCodegen.Group.ContractId, splitwiseCodegen.Group]]]
   ] =
-    acsStore.findContract(splitwiseCodegen.Group.COMPANION)(co =>
-      co.payload.owner == owner.toPrim && co.payload.id == id
+    acs.findContract(splitwiseCodegen.Group.COMPANION)(co =>
+      co.payload.owner == owner.toProtoPrimitive && co.payload.id == id
     )
 
   def getGroup(
@@ -66,24 +57,6 @@ trait SplitwiseStore extends AutoCloseable {
         )
       )
     )
-
-  def streamInstallRequests(): Source[Contract[
-    splitwiseCodegen.SplitwiseInstallRequest.ContractId,
-    splitwiseCodegen.SplitwiseInstallRequest,
-  ], NotUsed] =
-    acsStore.streamContracts(splitwiseCodegen.SplitwiseInstallRequest.COMPANION)
-
-  def streamGroupRequests(): Source[
-    Contract[splitwiseCodegen.GroupRequest.ContractId, splitwiseCodegen.GroupRequest],
-    NotUsed,
-  ] =
-    acsStore.streamContracts(splitwiseCodegen.GroupRequest.COMPANION)
-
-  def streamAcceptedAppPayments(): Source[
-    Contract[walletCodegen.AcceptedAppPayment.ContractId, walletCodegen.AcceptedAppPayment],
-    NotUsed,
-  ] =
-    acsStore.streamContracts(walletCodegen.AcceptedAppPayment.COMPANION)
 }
 
 object SplitwiseStore {

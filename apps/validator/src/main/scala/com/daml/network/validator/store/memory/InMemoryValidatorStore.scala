@@ -19,7 +19,7 @@ class InMemoryValidatorStore(
       logAllStateUpdates = false,
     )
 
-  val acsStore: AcsStore = inMemoryAcsStore
+  val acs: AcsStore = inMemoryAcsStore
 
   override val acsIngestionSink: AcsStore.IngestionSink = inMemoryAcsStore.ingestionSink
 

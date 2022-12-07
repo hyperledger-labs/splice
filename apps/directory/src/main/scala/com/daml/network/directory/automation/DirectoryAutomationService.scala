@@ -6,6 +6,7 @@ import cats.syntax.traverse.*
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.AutomationConfig
 import com.daml.network.directory.store.DirectoryStore
@@ -76,10 +77,13 @@ class DirectoryAutomationService(
       entryName,
     )
 
-  registerTrigger("handleDirectoryInstallRequest", store.streamInstallRequests())((req, logger) =>
+  registerTrigger(
+    "handleDirectoryInstallRequest",
+    store.acs.streamContracts(directoryCodegen.DirectoryInstallRequest.COMPANION),
+  )((req, logger) =>
     implicit traceContext => {
       val user = PartyId.tryFromProtoPrimitive(req.payload.user)
-      store.lookupInstall(user).flatMap {
+      store.lookupInstallByUser(user).flatMap {
         case QueryResult(_, Some(_)) =>
           logger.info(s"Rejecting duplicate install request from user party $user")
           val cmd = req.contractId
@@ -116,7 +120,7 @@ class DirectoryAutomationService(
 
   registerTrigger(
     "handleSubscriptionInitialPayments",
-    store.streamSubscriptionInitialPayments(),
+    store.acs.streamContracts(subsCodegen.SubscriptionInitialPayment.COMPANION),
   )((payment, logger) => { implicit traceContext =>
     {
       val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
@@ -157,8 +161,8 @@ class DirectoryAutomationService(
         } yield Some("created directory entry.")
       }
       for {
-        context <- store
-          .lookupEntryContextById(contextId)
+        context <- store.acs
+          .lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(contextId)
           .map(
             _.value.getOrElse(
               throw new IllegalStateException(
@@ -186,7 +190,7 @@ class DirectoryAutomationService(
 
   registerTrigger(
     "handleSubscriptionPayments",
-    store.streamSubscriptionPayments(),
+    store.acs.streamContracts(subsCodegen.SubscriptionPayment.COMPANION),
   )((payment, logger) => { implicit traceContext =>
     {
       val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
@@ -231,8 +235,8 @@ class DirectoryAutomationService(
         } yield Some("renewed directory entry.")
       }
       for {
-        context <- store
-          .lookupEntryContextById(contextId)
+        context <- store.acs
+          .lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(contextId)
           .map(
             _.value.getOrElse(
               throw new IllegalStateException(
@@ -261,8 +265,8 @@ class DirectoryAutomationService(
     connection,
   )((now, logger) => { implicit traceContext =>
     {
-      store
-        .listEntries()
+      store.acs
+        .listContracts(directoryCodegen.DirectoryEntry.COMPANION)
         .map { case QueryResult(_, entries) =>
           // extract due entries
           entries.filter(e =>
@@ -300,7 +304,7 @@ class DirectoryAutomationService(
     connection,
   )((now, logger) => { implicit traceContext =>
     for {
-      allSubscriptions <- store.listSubscriptionIdleStates()
+      allSubscriptions <- store.acs.listContracts(subsCodegen.SubscriptionIdleState.COMPANION)
       dueSubscriptions =
         allSubscriptions.value.filter(e =>
           // we grant a short additional "grace period" to account for potential clock skew
@@ -312,8 +316,8 @@ class DirectoryAutomationService(
       // Filter to only those subscriptions that have a corresponding DirectoryEntryContext
       directorySubscriptions <- dueSubscriptions.toList
         .traverse { subscription =>
-          store
-            .lookupEntryContextById(
+          store.acs
+            .lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(
               directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
                 subscription.payload.subscriptionData.context
               )

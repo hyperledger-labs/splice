@@ -76,7 +76,7 @@ class GrpcScanService(
   override def getClosedRounds(request: Empty): Future[GetClosedRoundsResponse] =
     withSpanFromGrpcContext("GrpcScanService") { traceContext => span =>
       for {
-        QueryResult(_, rounds) <- store.listContracts(roundCodegen.ClosedMiningRound.COMPANION)
+        QueryResult(_, rounds) <- store.acs.listContracts(roundCodegen.ClosedMiningRound.COMPANION)
       } yield {
         val filteredRounds = rounds.sortWith(_.payload.round.number > _.payload.round.number)
         v0.GetClosedRoundsResponse(filteredRounds.map(r => r.toProtoV0))

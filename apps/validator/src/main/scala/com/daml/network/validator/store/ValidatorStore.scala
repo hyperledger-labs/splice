@@ -21,34 +21,34 @@ trait ValidatorStore extends AutoCloseable with NamedLogging {
   /** The sink to use for ingesting data from the ledger into this store. */
   val acsIngestionSink: AcsStore.IngestionSink
 
-  protected val acsStore: AcsStore
+  val acs: AcsStore
 
   def lookupWalletInstallByName(
       endUserName: String
   ): Future[QueryResult[
     Option[Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]]
   ]] =
-    acsStore.findContract(walletCodegen.WalletAppInstall.COMPANION)(co =>
+    acs.findContract(walletCodegen.WalletAppInstall.COMPANION)(co =>
       co.payload.endUserName == endUserName
     )
 
   def lookupCoinRules(): Future[
     QueryResult[Option[Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]]]
   ] =
-    acsStore.findContract(coinCodegen.CoinRules.COMPANION)(_ => true)
+    acs.findContract(coinCodegen.CoinRules.COMPANION)(_ => true)
 
   def lookupCoinRulesRequest(): Future[QueryResult[Option[
     Contract[coinCodegen.CoinRulesRequest.ContractId, coinCodegen.CoinRulesRequest]
   ]]] =
-    acsStore.findContract(coinCodegen.CoinRulesRequest.COMPANION)(_ => true)
+    acs.findContract(coinCodegen.CoinRulesRequest.COMPANION)(_ => true)
 
   def lookupValidatorRightByParty(
       party: PartyId
   ): Future[
     QueryResult[Option[Contract[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]]
   ] =
-    acsStore.findContract(coinCodegen.ValidatorRight.COMPANION)(co =>
-      co.payload.user == party.toPrim
+    acs.findContract(coinCodegen.ValidatorRight.COMPANION)(co =>
+      co.payload.user == party.toProtoPrimitive
     )
 }
 
@@ -82,9 +82,9 @@ object ValidatorStore {
   /** Contract of a wallet store for a specific validator party. */
   def contractFilter(key: Key): AcsStore.ContractFilter = {
     import AcsStore.mkFilter
-    val walletService = key.walletServiceParty.toPrim
-    val validator = key.validatorParty.toPrim
-    val svc = key.svcParty.toPrim
+    val walletService = key.walletServiceParty.toProtoPrimitive
+    val validator = key.validatorParty.toProtoPrimitive
+    val svc = key.svcParty.toProtoPrimitive
 
     AcsStore.SimpleContractFilter(
       key.validatorParty,

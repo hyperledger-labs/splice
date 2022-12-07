@@ -3,6 +3,7 @@ package com.daml.network.splitwise.automation
 import akka.stream.Materializer
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
+import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -49,40 +50,42 @@ class SplitwiseAutomationService(
     )
   )
 
-  registerTrigger("handleSplitwiseInstallRequest", store.streamInstallRequests())((req, logger) => {
-    implicit tc =>
-      {
-        val user = PartyId.tryFromProtoPrimitive(req.payload.user)
-        store.lookupInstall(user).flatMap {
-          case QueryResult(_, Some(_)) =>
-            logger.info(s"Rejecting duplicate install request from user party $user")
-            val cmd = req.contractId.exerciseSplitwiseInstallRequest_Reject()
-            connection
-              .submitWithResultNoDedup(Seq(provider), Seq(), cmd)
-              .map(_ => Some("rejected request for already existing installation."))
+  registerTrigger(
+    "handleSplitwiseInstallRequest",
+    store.acs.streamContracts(splitwiseCodegen.SplitwiseInstallRequest.COMPANION),
+  )((req, logger) => { implicit tc =>
+    {
+      val user = PartyId.tryFromProtoPrimitive(req.payload.user)
+      store.lookupInstall(user).flatMap {
+        case QueryResult(_, Some(_)) =>
+          logger.info(s"Rejecting duplicate install request from user party $user")
+          val cmd = req.contractId.exerciseSplitwiseInstallRequest_Reject()
+          connection
+            .submitWithResultNoDedup(Seq(provider), Seq(), cmd)
+            .map(_ => Some("rejected request for already existing installation."))
 
-          case QueryResult(off, None) =>
-            val acceptCmd =
-              req.contractId.exerciseSplitwiseInstallRequest_Accept().commands.asScala.toSeq
-            connection
-              .submitCommands(
-                actAs = Seq(provider),
-                readAs = Seq(),
-                commands = acceptCmd,
-                commandId = CoinLedgerConnection.CommandId(
-                  "com.daml.network.splitwise.createSplitwiseInstall",
-                  Seq(provider, user),
-                ),
-                deduplicationOffset = off,
-              )
-              .map(_ => Some("accepted install request."))
-        }
+        case QueryResult(off, None) =>
+          val acceptCmd =
+            req.contractId.exerciseSplitwiseInstallRequest_Accept().commands.asScala.toSeq
+          connection
+            .submitCommands(
+              actAs = Seq(provider),
+              readAs = Seq(),
+              commands = acceptCmd,
+              commandId = CoinLedgerConnection.CommandId(
+                "com.daml.network.splitwise.createSplitwiseInstall",
+                Seq(provider, user),
+              ),
+              deduplicationOffset = off,
+            )
+            .map(_ => Some("accepted install request."))
       }
+    }
   })
 
   registerTrigger(
     "handleAcceptedAppPaymentRequests",
-    store.streamAcceptedAppPayments(),
+    store.acs.streamContracts(walletCodegen.AcceptedAppPayment.COMPANION),
   )((payment, logger) => { implicit traceContext =>
     val sender = PartyId.tryFromProtoPrimitive(payment.payload.sender)
     val transferInProgressId = splitwiseCodegen.TransferInProgress.ContractId.unsafeFromInterface(
@@ -106,8 +109,8 @@ class SplitwiseAutomationService(
       case QueryResult(_, Some(install)) =>
         for {
           transferContext <- scanConnection.getAppTransferContext()
-          transferInProgress <- store
-            .lookupTransferInProgressById(transferInProgressId)
+          transferInProgress <- store.acs
+            .lookupContractById(splitwiseCodegen.TransferInProgress.COMPANION)(transferInProgressId)
             .map(
               _.value.getOrElse(
                 throw new IllegalStateException(
@@ -133,7 +136,10 @@ class SplitwiseAutomationService(
     }
   })
 
-  registerTrigger("handleGroupRequest", store.streamGroupRequests())((req, logger) => { implicit tc =>
+  registerTrigger(
+    "handleGroupRequest",
+    store.acs.streamContracts(splitwiseCodegen.GroupRequest.COMPANION),
+  )((req, logger) => { implicit tc =>
     {
       val user = PartyId.tryFromProtoPrimitive(req.payload.group.owner)
       val groupId = req.payload.group.id

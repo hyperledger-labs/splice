@@ -1,18 +1,10 @@
 package com.daml.network.svc.store
 
-import akka.NotUsed
-import akka.stream.scaladsl.Source
-import com.daml.ledger.javaapi.data.Template
-import com.daml.ledger.javaapi.data.codegen.{
-  Contract as CodegenContract,
-  ContractCompanion,
-  ContractId,
-}
 import com.daml.network.codegen.java.cc
+import com.daml.network.store.AcsStore
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.store.{AcsStore as AcsStore}
 import com.daml.network.svc.store.memory.InMemorySvcStore
-import com.daml.network.util.{JavaContract as Contract}
+import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
@@ -34,14 +26,13 @@ trait SvcStore extends AutoCloseable {
   val acsIngestionSink: AcsStore.IngestionSink
 
   /** The [[com.daml.network.store.AcsStore]] used to back the default implementation of the queries. */
-  val acsStore: AcsStore
+  val acs: AcsStore
 
   def lookupCoinRules(
   ): Future[
     QueryResult[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]
   ] =
-    acsStore
-      .findContract(cc.coin.CoinRules.COMPANION)(_ => true)
+    acs.findContract(cc.coin.CoinRules.COMPANION)(_ => true)
 
   def getCoinRules(
   )(implicit
@@ -62,21 +53,9 @@ trait SvcStore extends AutoCloseable {
   ): Future[
     QueryResult[Option[Contract[cc.coin.ValidatorRight.ContractId, cc.coin.ValidatorRight]]]
   ] =
-    acsStore.findContract(cc.coin.ValidatorRight.COMPANION)(co => co.payload.user == party.toPrim)
-
-  def listContracts[TC <: CodegenContract[TCid, T], TCid <: ContractId[T], T <: Template](
-      templateCompanion: ContractCompanion[TC, TCid, T],
-      filter: Contract[TCid, T] => Boolean = (_: Contract[TCid, T]) => true,
-  ): Future[AcsStore.QueryResult[Seq[Contract[TCid, T]]]] =
-    acsStore.listContracts(templateCompanion, filter)
-
-  /** All requests to the SVC for creating validator-specific coin rules. */
-  def streamCoinRulesRequests(): Source[
-    Contract[cc.coin.CoinRulesRequest.ContractId, cc.coin.CoinRulesRequest],
-    NotUsed,
-  ] =
-    acsStore.streamContracts(cc.coin.CoinRulesRequest.COMPANION)
-
+    acs.findContract(cc.coin.ValidatorRight.COMPANION)(co =>
+      co.payload.user == party.toProtoPrimitive
+    )
 }
 
 object SvcStore {

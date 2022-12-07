@@ -22,7 +22,7 @@ class InMemoryScanStore(
   private val inMemoryAcsStore =
     new InMemoryAcsStore(loggerFactory, ScanStore.contractFilter(svcParty))
 
-  override val acsStore: AcsStore = inMemoryAcsStore
+  override val acs: AcsStore = inMemoryAcsStore
 
   override val acsIngestionSink: AcsStore.IngestionSink = inMemoryAcsStore.ingestionSink
   override protected def onClosed(): Unit = history.close()

@@ -50,17 +50,19 @@ class WalletAutomationService(
   )
 
   // TODO(#763): not handling archive events, uninstalling wallets without a restart is not supported yet
-  registerTrigger("create user wallet", walletManager.store.streamInstalls)((install, logger) => {
-    implicit traceContext =>
-      Future {
-        val endUserName = install.payload.endUserName
-        if (walletManager.getOrCreateUserWallet(install))
-          Some(s"onboarded wallet end-user '$endUserName'")
-        else {
-          logger.warn(s"Unexpected duplicate on-boarding of wallet user '$endUserName'")
-          Some(s"skipped duplicate on-boarding wallet end-user '$endUserName'")
-        }
+  registerTrigger(
+    "create user wallet",
+    walletManager.store.acs.streamContracts(installCodegen.WalletAppInstall.COMPANION),
+  )((install, logger) => { implicit traceContext =>
+    Future {
+      val endUserName = install.payload.endUserName
+      if (walletManager.getOrCreateUserWallet(install))
+        Some(s"onboarded wallet end-user '$endUserName'")
+      else {
+        logger.warn(s"Unexpected duplicate on-boarding of wallet user '$endUserName'")
+        Some(s"skipped duplicate on-boarding wallet end-user '$endUserName'")
       }
+    }
   })
 
   // TODO(#1808): move to UserWalletAutomationService
