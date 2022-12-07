@@ -62,14 +62,27 @@ class PreflightIntegrationTest extends CoinIntegrationTest with HasConsoleScript
   }
 
   "work with auth0" taggedAs LiveDevNetTest in { _ =>
-    val token = System.getProperty("AUTH0_TOKEN")
-    if (token == null || token.isEmpty()) {
-      fail("No token given, please supply auth0 token through system property AUTH0_TOKEN")
+    val clientId = System.getProperty("AUTH0_MANAGEMENT_API_CLIENT_ID");
+    val clientSecret = System.getProperty("AUTH0_MANAGEMENT_API_CLIENT_SECRET");
+
+    if (clientId == null || clientId.isEmpty()) {
+      fail(
+        "No clientId given, please supply auth0 clientId through system property AUTH0_MANAGEMENT_API_CLIENT_ID"
+      )
     }
+
+    if (clientSecret == null || clientSecret.isEmpty()) {
+      fail(
+        "No clientSecret given, please supply auth0 clientSecret through system property AUTH0_MANAGEMENT_API_CLIENT_SECRET"
+      )
+    }
+
     val auth0 = new Auth0Util(
-      "https://canton-network-test.us.auth0.com",
-      token,
+      "https://canton-network-dev.us.auth0.com",
+      clientId,
+      clientSecret,
     )
+
     Using(auth0.createUser()) { user =>
       logger.debug(s"Created user ${user.email} with password ${user.password} (id: ${user.id})")
     }
