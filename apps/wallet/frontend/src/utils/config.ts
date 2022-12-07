@@ -11,7 +11,6 @@ const reader = new ConfigReader(
       validator: serviceSchema,
       directory: serviceSchema,
       scan: serviceSchema,
-      ledgerApi: serviceSchema,
     }),
   })
 );

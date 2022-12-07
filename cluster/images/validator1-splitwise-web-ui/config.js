@@ -6,6 +6,7 @@ window.canton_network_config = {
   services: {
     wallet: {
       // URL of the web-ui, used to forward payment workflows to wallet
+      grpcUrl: "https://" + window.location.hostname + "/api/v0/wallet",
       uiUrl: window.location.origin.replace("splitwise", "wallet"),
     },
     splitwise: {
