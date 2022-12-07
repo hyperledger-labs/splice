@@ -16,9 +16,9 @@ class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
   }
 
   "see Coin transfers" in { implicit env =>
-    val (aliceP, bobP) = setupAliceAndBobAndChannel(this)
-    aliceWallet.tap(50)
-    aliceWallet.executeDirectTransfer(bobP, 10)
+    val (alice, bob) = onboardAliceAndBob(this)
+    aliceWallet.tap(50.0)
+    p2pTransfer(aliceWallet, bobWallet, bob, 42.0)
     eventually(5.seconds) {
       val history = scan.getTxHistory()
       history should have length 2
@@ -26,7 +26,7 @@ class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
       val mintEvent = tapCreateTx.events(0)
       inside(mintEvent.parentO) { case Some(mint: Mint) =>
         BigDecimal(mint.node.argument.value.quantity) shouldBe 50
-        mint.node.argument.value.receiver shouldBe aliceP.toPrim
+        mint.node.argument.value.receiver shouldBe alice.toPrim
       }
 
       val transferTx = history(1)
@@ -47,7 +47,7 @@ class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
           transferParentNode2 shouldBe transferParentNode3
 
           inside(transferParentNode) { case Some(Transfer(ExerciseNode(argument, result))) =>
-            argument.value.transfer.sender shouldBe aliceP.toPrim
+            argument.value.transfer.sender shouldBe alice.toPrim
             // one transfer result for alice, one for bob
             inside(result.value) { case result: da.types.either.Right[_, _] =>
               result.bValue.createdCoins should have length 2
@@ -59,16 +59,16 @@ class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
 
           inside(bob) { case CoinCreate(coin: CoinContract) =>
             // -0.05 as sender needs to pay half of the transfer fee (0.1)
-            BigDecimal(coin.contract.payload.quantity.initialQuantity) shouldBe 9.95
+            BigDecimal(coin.contract.payload.quantity.initialQuantity) shouldBe 42.0
           }
       }
     }
   }
 
   "get details of a single Coin transfer" in { implicit env =>
-    val (aliceP @ _, bobP) = setupAliceAndBobAndChannel(this)
-    aliceWallet.tap(50)
-    aliceWallet.executeDirectTransfer(bobP, 10)
+    val (_, bob) = onboardAliceAndBob(this)
+    aliceWallet.tap(50.0)
+    p2pTransfer(aliceWallet, bobWallet, bob, 42.0)
 
     eventually(5.seconds) {
       val history = scan.getTxHistory()

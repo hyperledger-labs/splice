@@ -1,5 +1,6 @@
 package com.daml.network.util
 
+import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
@@ -14,6 +15,7 @@ import com.digitalasset.canton.sequencing.SequencerTestUtils.eventually
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.matchers.should.Matchers.*
 
+import java.time.Instant
 import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
 
@@ -67,6 +69,34 @@ trait CoinTestUtil {
     }
 
     (aliceUserParty, bobUserParty)
+  }
+
+  def onboardAliceAndBob(test: BaseTest)(implicit
+      env: CoinTestConsoleEnvironment
+  ): (PartyId, PartyId) = {
+    val alice = onboardWalletUser(test, aliceWallet, aliceValidator)
+    val bob = onboardWalletUser(test, bobWallet, bobValidator)
+    (alice, bob)
+  }
+
+  def p2pTransfer(
+      senderWallet: WalletAppClientReference,
+      receiverWallet: WalletAppClientReference,
+      receiver: PartyId,
+      amount: BigDecimal,
+  ) = {
+    val expiration = Primitive.Timestamp
+      .discardNanos(Instant.now().plus(1, ChronoUnit.MINUTES))
+      .getOrElse(fail("Failed to convert timestamp"))
+    val transferOfferId =
+      senderWallet.createTransferOffer(receiver, amount, "test transfer", expiration)
+    eventually() {
+      receiverWallet.listTransferOffers() should have size 1
+    }
+    receiverWallet.acceptTransferOffer(transferOfferId)
+    eventually() {
+      senderWallet.listTransferOffers() shouldBe empty
+    }
   }
 
   def createSelfPaymentRequest(

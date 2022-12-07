@@ -17,7 +17,6 @@ class ScanTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUtil
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
 
   "report correct reference data" in { implicit env =>
-    setupAliceAndBobAndChannel(this)
     scan.getTransferContext().latestOpenMiningRound.map(_.payload.round.number) shouldBe Some(1)
     advanceRoundsByOneTick
     scan.getTransferContext().latestOpenMiningRound.map(_.payload.round.number) shouldBe Some(2)
