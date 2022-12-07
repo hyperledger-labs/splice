@@ -1,4 +1,6 @@
 {
+  domainMemoryMib: 6144,
+  participantMemoryMib: 12288,
   externalIPRanges: [
     '35.194.81.56/32',
     '35.198.147.95/32',

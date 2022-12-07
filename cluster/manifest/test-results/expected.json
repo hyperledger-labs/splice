@@ -205,7 +205,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms1024M -Xmx1024M"
+                              "value": "-Xms5632M -Xmx5632M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-domain:tag",
@@ -235,10 +235,10 @@
                         },
                         "resources": {
                            "limits": {
-                              "memory": "1536Mi"
+                              "memory": "6144Mi"
                            },
                            "requests": {
-                              "memory": "1536Mi"
+                              "memory": "6144Mi"
                            }
                         },
                         "startupProbe": {
@@ -314,7 +314,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms5632M -Xmx5632M"
+                              "value": "-Xms11776M -Xmx11776M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -332,10 +332,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "6144Mi"
+                              "memory": "12288Mi"
                            },
                            "requests": {
-                              "memory": "6144Mi"
+                              "memory": "12288Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -723,7 +723,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms5632M -Xmx5632M"
+                              "value": "-Xms11776M -Xmx11776M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-participant:tag",
@@ -741,10 +741,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "6144Mi"
+                              "memory": "12288Mi"
                            },
                            "requests": {
-                              "memory": "6144Mi"
+                              "memory": "12288Mi"
                            }
                         },
                         "volumeMounts": [ ]
@@ -1332,7 +1332,7 @@
                         "env": [
                            {
                               "name": "JAVA_TOOL_OPTIONS",
-                              "value": "-Xms5632M -Xmx5632M"
+                              "value": "-Xms11776M -Xmx11776M"
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/splitwise-participant:tag",
@@ -1350,10 +1350,10 @@
                         ],
                         "resources": {
                            "limits": {
-                              "memory": "6144Mi"
+                              "memory": "12288Mi"
                            },
                            "requests": {
-                              "memory": "6144Mi"
+                              "memory": "12288Mi"
                            }
                         },
                         "volumeMounts": [ ]

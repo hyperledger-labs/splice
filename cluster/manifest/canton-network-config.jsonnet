@@ -2,8 +2,6 @@ local networkDefaults = import './network-defaults.jsonnet';
 
 local c = import './cluster.jsonnet';
 
-local PARTICIPANT_MEMORY_MIB = 6144;
-
 // memoryLimitMiB values for deployments are taken emperically from
 // DevNet with `kubectl top pod`. Note that these were taken on a very
 // lightly loaded cluster and will very likely need to be revised for
@@ -43,8 +41,8 @@ local svcDeployments(config) = [
         failureThreshold: 20,
         periodSeconds: 10,
       },
-    }
-  ),
+    },
+  memoryLimitMiB=config.domainMemoryMib),
 
   c.deployment(config, 'canton-participant', [
     {
@@ -55,7 +53,7 @@ local svcDeployments(config) = [
       name: 'cp-lg-api',
       port: 5001,
     },
-  ], memoryLimitMiB=PARTICIPANT_MEMORY_MIB),
+  ], memoryLimitMiB=config.participantMemoryMib),
 
   c.deployment(config, 'directory-app', [
     {
@@ -89,7 +87,7 @@ local validator1Deployments(config) = [
       name: 'val1-lg-api',
       port: 5101,
     },
-  ], memoryLimitMiB=PARTICIPANT_MEMORY_MIB, proxyToGrpcWeb='val1-lg-api'),
+  ], memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb='val1-lg-api'),
 
   c.deployment(config, 'validator1-validator-app', [
     {
@@ -140,7 +138,7 @@ local splitwiseDeployments(config) = [
       name: 'sw-lg-api',
       port: 5201,
     },
-  ], memoryLimitMiB=PARTICIPANT_MEMORY_MIB, proxyToGrpcWeb='sw-lg-api'),
+  ], memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb='sw-lg-api'),
 
   c.deployment(config, 'splitwise-validator-app', [
     {
