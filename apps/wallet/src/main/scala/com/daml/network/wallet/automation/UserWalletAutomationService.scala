@@ -7,6 +7,7 @@ import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_Complete
 import com.daml.network.codegen.java.cn.wallet.transferoffer.{AcceptedTransferOffer, TransferOffer}
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
+  subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.config.AutomationConfig
@@ -16,12 +17,14 @@ import com.daml.network.util.JavaContract
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
-import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.ShowUtil.*
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
+import java.time.temporal.ChronoUnit
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Success
 
@@ -254,5 +257,65 @@ class UserWalletAutomationService(
         )
         .map(_ => "Successfully expired accepted transfer offer")
     } yield res
+  }
+
+  registerPollingTrigger(
+    "make due subscription payments",
+    automationConfig.pollingInterval,
+    connection,
+  )((now, logger) => { implicit traceContext =>
+    {
+      makeDueSubscriptionPaymentsForStore(now, logger)
+        .map(_.partitionMap(r => r) match {
+          case (lefts, rights) =>
+            Some(s"created ${rights.size} subscription payments (${lefts.size} failures).")
+        })
+    }
+  })
+
+  private def makeDueSubscriptionPaymentsForStore(
+      now: CantonTimestamp,
+      logger: TracedLogger,
+  )(implicit tc: TraceContext): Future[Seq[Either[String, Unit]]] = {
+    store.acs
+      .listContracts(subsCodegen.SubscriptionIdleState.COMPANION)
+      .flatMap { case QueryResult(_, subStates) =>
+        subStates
+          // extract subscriptions we can make payments on now
+          .filter(state =>
+            now.toInstant.isAfter(
+              state.payload.nextPaymentDueAt
+                .minus(
+                  state.payload.payData.paymentDuration.microseconds,
+                  ChronoUnit.MICROS,
+                )
+                // we don't pay immediately to account for potential clock skew
+                .plus(automationConfig.clockSkewAutomationDelay.duration)
+            )
+          )
+          // initiate payment via treasury
+          .map(readyState => makeSubscriptionPayment(readyState.contractId, logger))
+          .sequence
+      }
+  }
+
+  private def makeSubscriptionPayment(
+      stateCid: subsCodegen.SubscriptionIdleState.ContractId,
+      logger: TracedLogger,
+  )(implicit tc: TraceContext): Future[Either[String, Unit]] = {
+    val operation = new installCodegen.coinoperation.CO_SubscriptionMakePayment(stateCid)
+    treasury
+      .enqueueCoinOperation(operation)
+      .map {
+        case failedOperation: installCodegen.coinoperationoutcome.COO_Error =>
+          val error =
+            s"the coin operation failed with a Daml exception: ${failedOperation.stringValue}."
+          logger.warn(s"Failed making a subscription payment on state $stateCid: $error")
+          Left(s"state $stateCid: $error")
+
+        case _ =>
+          logger.info(s"Made a subscription payment on state $stateCid")
+          Right(())
+      }
   }
 }
