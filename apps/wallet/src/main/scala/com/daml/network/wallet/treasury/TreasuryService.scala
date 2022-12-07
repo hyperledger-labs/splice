@@ -254,55 +254,63 @@ class TreasuryService(
     logger.debug(
       s"Running batch of coin operations for user ${userStore.key.endUserParty} with length ${batch.size}: $batch"
     )
+
     def isErrorOutcome(outcome: installCodegen.CoinOperationOutcome): Boolean = outcome match {
       case _: installCodegen.coinoperationoutcome.COO_Error => true
       case _ => false
     }
-    for {
-      validOperations <- runLookups(batch)
-      _ = logger.debug(
-        s"After lookups, the batch contains ${validOperations.size} coin operations."
-      )
-      now <- TimeUtil.getTime(connection, clockConfig)
-      transferContext <- walletManager.store.getPaymentTransferContext(retryProvider, now)
-      activeIssuingRounds = transferContext.context.issuingMiningRounds.asScala.keys.toSet
-      install <- getInstall
-      (inputs, readAs) <- selectTransferInputs(activeIssuingRounds)
-      cmd =
-        install.contractId.exerciseWalletAppInstall_ExecuteBatch(
-          transferContext,
-          inputs.asJava,
-          validOperations.map(_.operation).asJava,
-        )
 
-      (offset, outcomes) <- connection
-        // TODO(M3-02): as of 2022-11-25 there are two operations that are not self-conflicting: Tap and DirectTransfer,
-        // which implies that network problems might lead to duplicate 'DirectTransfer' calls. They will be replaced by
-        // TransferOffers as part of M3-02, which will consume the TransferOffer, and thus make the batch-execution w/o command dedup safe.
-        .submitWithResultAndOffsetNoDedup(
-          Seq(walletManager.store.key.walletServiceParty),
-          walletManager.store.key.validatorParty +: userStore.key.endUserParty +: readAs.toSeq,
-          cmd,
+    runLookups(batch).flatMap {
+      // skip batches that are empty after lookups.
+      case validOperations if (validOperations.isEmpty) =>
+        logger.debug("Found no valid coin operations after running lookups.")
+        Future.successful(Done)
+      case validOperations =>
+        logger.debug(
+          s"After lookups, the batch contains ${validOperations.size} coin operations."
         )
-      // return all outcomes to the callers
-      _ = (outcomes.exerciseResult.asScala zip validOperations).map {
-        case (outcome, EnqueuedCoinOperation(_, p)) =>
-          p.success(outcome)
-      }
-      // wait for store to ingest the new coin holdings *provided* they were updated
-      case () <- if (outcomes.exerciseResult.asScala.forall(isErrorOutcome)) {
-        // We must not wait in this case, as the store won't see that offset until the next action comes,
-        // as the transaction filter is in the way
-        // TODO(M1-92): remove this fragility of depending on the exact daml transaction to determine whether to wait or not
-        Future.unit
-      } else {
-        logger.debug(show"Waiting for store to ingest offset ${offset.singleQuoted}")
-        userStore.signalWhenIngested(offset)
-      }
+        for {
+          now <- TimeUtil.getTime(connection, clockConfig)
+          transferContext <- walletManager.store.getPaymentTransferContext(retryProvider, now)
+          activeIssuingRounds = transferContext.context.issuingMiningRounds.asScala.keys.toSet
+          install <- getInstall
+          (inputs, readAs) <- selectTransferInputs(activeIssuingRounds)
+          cmd =
+            install.contractId.exerciseWalletAppInstall_ExecuteBatch(
+              transferContext,
+              inputs.asJava,
+              validOperations.map(_.operation).asJava,
+            )
 
-    } yield {
-      logger.debug(s"Batch executed with result:\n${outcomes.exerciseResult.asScala}")
-      Done
+          (offset, outcomes) <- connection
+            // TODO(M3-02): as of 2022-11-25 there are two operations that are not self-conflicting: Tap and DirectTransfer,
+            // which implies that network problems might lead to duplicate 'DirectTransfer' calls. They will be replaced by
+            // TransferOffers as part of M3-02, which will consume the TransferOffer, and thus make the batch-execution w/o command dedup safe.
+            .submitWithResultAndOffsetNoDedup(
+              Seq(walletManager.store.key.walletServiceParty),
+              walletManager.store.key.validatorParty +: userStore.key.endUserParty +: readAs.toSeq,
+              cmd,
+            )
+          // return all outcomes to the callers
+          _ = (outcomes.exerciseResult.asScala zip validOperations).map {
+            case (outcome, EnqueuedCoinOperation(_, p)) =>
+              p.success(outcome)
+          }
+          // wait for store to ingest the new coin holdings *provided* they were updated
+          case () <- if (outcomes.exerciseResult.asScala.forall(isErrorOutcome)) {
+            // We must not wait in this case, as the store won't see that offset until the next action comes,
+            // as the transaction filter is in the way
+            // TODO(M1-92): remove this fragility of depending on the exact daml transaction to determine whether to wait or not
+            Future.unit
+          } else {
+            logger.debug(show"Waiting for store to ingest offset ${offset.singleQuoted}")
+            userStore.signalWhenIngested(offset)
+          }
+
+        } yield {
+          logger.debug(s"Batch executed with result:\n${outcomes.exerciseResult.asScala}")
+          Done
+        }
     }
   }
 

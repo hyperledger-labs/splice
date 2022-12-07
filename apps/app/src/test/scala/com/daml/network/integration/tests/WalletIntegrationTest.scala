@@ -614,6 +614,33 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
       eventually()(bobWallet.listPaymentChannels() shouldBe empty)
     }
 
+    "skip empty batches in the treasury service" in { implicit env =>
+      val (_, bob) = setupAliceAndBobAndChannel(this)
+      bobWallet.tap(49)
+      // create and withdraw request such that...
+      val request = aliceWallet.createOnChannelPaymentRequest(bob, 10, "i want money")
+      aliceWallet.withdrawOnChannelPaymentRequest(request)
+
+      loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
+        {
+          try {
+            // ... lookup on the payment request fails
+            bobWallet.acceptOnChannelPaymentRequest(request)
+          } catch {
+            case _: CommandFailure =>
+          }
+        },
+        entries => {
+          forAtLeast(1, entries)(
+            // .. and we see that the empty batch is skipped.
+            _.message should include(
+              "Found no valid coin operations after running lookups"
+            )
+          )
+        },
+      )
+    }
+
     "concurrent coin-operations" should {
       "be batched" in { implicit env =>
         val (alice, bob) = setupAliceAndBobAndChannel(this)
