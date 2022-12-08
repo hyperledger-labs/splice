@@ -13,7 +13,13 @@ import org.scalatest.events.*
   */
 class LogReporter extends Reporter with NamedLogging with NoTracing {
 
-  override protected def loggerFactory: NamedLoggerFactory = NamedLoggerFactory.root
+  // Avoiding NamedLoggerFactory.root since that ends up with log messages that lnav interprets
+  // as java_log instead of canton_log.
+  // Specifically, setting name produces a log line of the form
+  // INFO  c.d.c.LogReporter:reporter=scala-test - Starting test run...
+  // and the colon after the class name does not parse in java_log.
+  override protected def loggerFactory: NamedLoggerFactory =
+    NamedLoggerFactory("reporter", "scala-test")
 
   override def apply(event: Event): Unit = event match {
     case _: RunStarting => logger.info("Starting test run...")
