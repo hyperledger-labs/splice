@@ -16,7 +16,7 @@ import com.daml.network.console.{
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.topology.PartyId
-import org.openqa.selenium.WebDriver
+import org.openqa.selenium.{Keys, WebDriver}
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -456,6 +456,74 @@ class WalletFrontendIntegrationTest
         clue("Check that the subscription is no longer listed") {
           eventually() {
             findAll(className("subs-table-row")).toSeq shouldBe empty;
+          }
+        }
+      }
+    }
+
+    "support different ways of defining the receiver in transfer offers" in { implicit env =>
+      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val aliceEntryName = "alice.cns"
+      actAndCheck("Tap coin for alice", aliceWallet.tap(50))(
+        "Alice has coin",
+        _ => (aliceWallet.list().coins.length shouldBe 1),
+      )
+      createDirectoryEntry(aliceParty, aliceDirectory, aliceEntryName, aliceWallet)
+      val bobParty = setupForTestWithDirectory(bobWallet, bobValidator)
+      val bobCns = "bob.cns"
+      val bobEntryName = bobCns
+      actAndCheck("Tap coin for bob", bobWallet.tap(50))(
+        "Bob has coin",
+        _ => (bobWallet.list().coins.length shouldBe 1),
+      )
+      createDirectoryEntry(bobParty, bobDirectory, bobEntryName, bobWallet)
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToAliceWallet(aliceDamlUser)
+        click on "transfer-offers-button"
+
+        actAndCheck(
+          s"Alice creates offer by cns name", {
+            click on "create-offer-receiver"
+            textField("create-offer-receiver").value = bobCns
+            click on "create-offer-quantity"
+            numberField("create-offer-quantity").underlying.sendKeys("100.0")
+            click on "create-offer-description"
+            textField("create-offer-description").value = "by party ID"
+            click on "create-offer-button"
+          },
+        )(
+          "Alice sees the transfer offer",
+          _ => {
+            findAll(className("transfer-offers-row")) should have size 1
+          },
+        )
+
+        actAndCheck(
+          s"Alice creates offer with auto-complete", {
+            click on "create-offer-receiver"
+            textField("create-offer-receiver").value = "b"
+            textField("create-offer-receiver").underlying.sendKeys(Keys.ARROW_DOWN)
+            textField("create-offer-receiver").underlying.sendKeys(Keys.RETURN)
+            click on "create-offer-quantity"
+            numberField("create-offer-quantity").underlying.sendKeys("100.0")
+            click on "create-offer-description"
+            textField("create-offer-description").value = "with auto-complete"
+            click on "create-offer-button"
+          },
+        )(
+          "Alice sees the transfer offer",
+          _ => {
+            findAll(className("transfer-offers-row")) should have size 2
+          },
+        )
+
+        // The case of inserting the whole party ID is tested in "support transfer offers"
+
+        clue("Bob recieved both offers") {
+          eventually() {
+            bobWallet.listTransferOffers() should have length 2
           }
         }
       }

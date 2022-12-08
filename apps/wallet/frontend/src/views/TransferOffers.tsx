@@ -1,4 +1,10 @@
-import { useInterval, Contract, DirectoryEntry, useUserState } from 'common-frontend';
+import {
+  useInterval,
+  Contract,
+  DirectoryEntry as DirectoryEntryComponent,
+  useUserState,
+  DirectoryField,
+} from 'common-frontend';
 import { Decimal } from 'decimal.js';
 import React, { useCallback, useState } from 'react';
 
@@ -15,12 +21,11 @@ import {
 } from '@mui/material';
 
 import { AcceptedTransferOffer, TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer';
+import { Party } from '@daml/types';
 
 import { PaymentQuantityDisplay } from '../components/QuantityDisplay';
 import Timestamp from '../components/Timestamp';
 import { useWalletClient } from '../contexts/WalletServiceContext';
-
-// TODO(M3-02): directory integration for the receiver in a new offer
 
 const TransferOffers: React.FC = () => {
   const {
@@ -65,19 +70,21 @@ const TransferOffers: React.FC = () => {
       expires,
       senderTransferFeeRatio
     );
-    setReceiver('');
+  };
+
+  const onReceiverChanged = async (newValue: Party) => {
+    setReceiver(newValue);
   };
 
   return (
     <Stack spacing={2}>
       <form onSubmit={createOffer}>
         <Stack direction="row">
-          <TextField
+          <DirectoryField
             id="create-offer-receiver"
             label="Receiver"
-            value={receiver}
-            onChange={event => setReceiver(event.target.value)}
-          ></TextField>
+            onPartyChanged={onReceiverChanged}
+          />
           <TextField
             id="create-offer-quantity"
             label="Amount"
@@ -118,10 +125,10 @@ const TransferOffers: React.FC = () => {
           {offers.map(c => (
             <TableRow key={c.contractId} className="transfer-offers-row">
               <TableCell className="transfer-offers-table-sender">
-                <DirectoryEntry partyId={c.payload.sender} />
+                <DirectoryEntryComponent partyId={c.payload.sender} />
               </TableCell>
               <TableCell className="transfer-offers-table-receiver">
-                <DirectoryEntry partyId={c.payload.receiver} />
+                <DirectoryEntryComponent partyId={c.payload.receiver} />
               </TableCell>
               <TableCell className="transfer-offers-table-quantity">
                 <PaymentQuantityDisplay quantity={c.payload.quantity} />
@@ -177,10 +184,10 @@ const TransferOffers: React.FC = () => {
           {acceptedOffers.map(c => (
             <TableRow key={c.contractId} className="accepted-transfer-offers-row">
               <TableCell>
-                <DirectoryEntry partyId={c.payload.sender} />
+                <DirectoryEntryComponent partyId={c.payload.sender} />
               </TableCell>
               <TableCell>
-                <DirectoryEntry partyId={c.payload.receiver} />
+                <DirectoryEntryComponent partyId={c.payload.receiver} />
               </TableCell>
               <TableCell>
                 <PaymentQuantityDisplay quantity={c.payload.quantity} />
