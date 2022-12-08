@@ -10,6 +10,7 @@ logfile
 testlog
 _build/
 .idea/*
+.envrc.private
 # We want to share run configurations
 !.idea/runConfigurations
 .vscode/*
