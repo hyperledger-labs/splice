@@ -138,7 +138,7 @@ object SvcApp {
         Seq.empty.asJava,
       ).createAnd
         .exerciseCoinRules_Bootstrap_Rounds(
-          BigDecimal(1.0).bigDecimal
+          config.coinPrice.bigDecimal
         )
         .commands
         .asScala

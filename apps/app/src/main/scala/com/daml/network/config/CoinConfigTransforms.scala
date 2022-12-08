@@ -215,6 +215,9 @@ object CoinConfigTransforms {
   def reducePollingInterval(config: AutomationConfig): AutomationConfig =
     config.focus(_.pollingInterval).replace(time.NonNegativeFiniteDuration.ofSeconds(1))
 
+  def setCoinPrice(price: BigDecimal): CoinConfigTransform =
+    updateSvcAppConfig(_.focus(_.coinPrice).replace(price))
+
   def updateDirectoryAppConfig(update: DirectoryAppTransform): CoinConfigTransform =
     cantonConfig =>
       cantonConfig

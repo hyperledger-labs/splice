@@ -7,9 +7,6 @@ import com.daml.network.config.{
   RemoteCoinConfig,
 }
 import com.digitalasset.canton.config.*
-
-// Canton currently has <..>.time.NonNegativeFiniteDuration and <..>.config.NonNegativeFiniteDuration, and
-// confusingly they only have defined a [[ConfigReader]] for time.NonNegativeFiniteDuration
 import com.digitalasset.canton.time.NonNegativeFiniteDuration as NonNegativeFiniteDurationT
 
 case class LocalSvcAppConfig(
@@ -19,6 +16,8 @@ case class LocalSvcAppConfig(
     remoteParticipant: CoinRemoteParticipantConfig,
     automation: AutomationConfig = AutomationConfig(),
     initialTickDuration: NonNegativeFiniteDurationT = NonNegativeFiniteDurationT.ofSeconds(150),
+    // TODO(M3-07): use price from SvcRules
+    coinPrice: BigDecimal = 1.0,
 ) extends LocalCoinConfig {
   override val nodeTypeName: String = "SVC"
 

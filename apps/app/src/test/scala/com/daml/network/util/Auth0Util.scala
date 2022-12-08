@@ -2,7 +2,7 @@ package com.daml.network.util
 
 import com.auth0.client.auth.AuthAPI
 import com.auth0.client.mgmt.ManagementAPI
-import com.auth0.json.mgmt.users.{User}
+import com.auth0.json.mgmt.users.User
 
 class Auth0User(val id: String, val email: String, val password: String, val auth0: Auth0Util)
     extends AutoCloseable {

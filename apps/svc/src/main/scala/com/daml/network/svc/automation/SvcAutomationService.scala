@@ -133,8 +133,7 @@ class SvcAutomationService(
             if (isPastTargetClosesAt && middleRoundOpenLongEnough && isPastLatestOpensAt) {
               val cmds = rules.contractId
                 .exerciseCoinRules_AdvanceOpenMiningRounds(
-                  // TODO(M3-07): use price from SvcRules
-                  java.math.BigDecimal.valueOf(1.0),
+                  config.coinPrice.bigDecimal,
                   toArchive.contractId,
                   middle.contractId,
                   latest.contractId,
