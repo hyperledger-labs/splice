@@ -9,7 +9,6 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import com.daml.network.util.Auth0Util
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens.*
@@ -62,28 +61,8 @@ class PreflightIntegrationTest extends CoinIntegrationTest with HasConsoleScript
   }
 
   "work with auth0" taggedAs LiveDevNetTest in { _ =>
-    val clientId = System.getProperty("AUTH0_MANAGEMENT_API_CLIENT_ID");
-    val clientSecret = System.getProperty("AUTH0_MANAGEMENT_API_CLIENT_SECRET");
-
-    if (clientId == null || clientId.isEmpty()) {
-      fail(
-        "No clientId given, please supply auth0 clientId through system property AUTH0_MANAGEMENT_API_CLIENT_ID"
-      )
-    }
-
-    if (clientSecret == null || clientSecret.isEmpty()) {
-      fail(
-        "No clientSecret given, please supply auth0 clientSecret through system property AUTH0_MANAGEMENT_API_CLIENT_SECRET"
-      )
-    }
-
-    val auth0 = new Auth0Util(
-      "https://canton-network-dev.us.auth0.com",
-      clientId,
-      clientSecret,
-    )
-
-    Using(auth0.createUser()) { user =>
+    val auth0 = auth0UtilFromSystemPoperties("https://canton-network-dev.us.auth0.com")
+    Using.resource(auth0.createUser()) { user =>
       logger.debug(s"Created user ${user.email} with password ${user.password} (id: ${user.id})")
     }
   }

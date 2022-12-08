@@ -21,6 +21,7 @@
 1. [Testing](#testing)
     1. [Managing Canton for Tests](#managing-canton-for-tests)
     1. [Managing Frontends for Tests](#managing-frontends-for-tests)
+    1. [Testing Auth0 Auth Flows Locally](#testing-auth0-auth-flows-locally)
     1. [Running and Debugging Integration Tests](#running-and-debugging-integration-tests)
     1. [Testing App Behaviour Outside of Tests Without Running Bundle ](#testing-app-behaviour-outside-of-tests-without-running-bundle)
     1. [Running The Preflight Check](#running-the-preflight-check)
@@ -439,6 +440,12 @@ All screenshots are from IntelliJ IDEA 2020.1.4 on Ubuntu.
 If you don't use IntellIJ, a workaround is running `sbt apps-app/runMain com.daml.network.CoinApp -c <conf-files>`, however,
 this doesn't give you a debugger.
 
+### Testing Auth0 Auth Flows Locally
+
+If you want to run one of the integration tests with a `LocalAuth0Test` tag, you likely need to pass Auth0 management API credentials for our `canton-network-test` tenant to `sbt`.
+We recommend using `scripts/start-sbt-for-local-auth0-tests.sh` for starting `sbt` in such a case, which guides you through the process.
+Note that [Running The Preflight Check](#running-the-preflight-check) also requires you to obtain Auth0 management API credentials, but for a different tenant.
+
 ### Running The Preflight Check
 
 The preflight check runs an integration test where a local validator
@@ -454,7 +461,7 @@ cncluster preflight
 Note that the preflight check will fail if you branch is sufficiently divergent from the main branch
 (in particular, if you made any changes to the Daml model).
 
-The preflight check also requires access to auth0's management API. To enable that, please go
+The preflight check also requires access to auth0's management API (`canton-network-dev` tenant). To enable that, please go
 to the Auth0 [API Explorer Application](https://manage.auth0.com/dashboard/us/canton-network-dev/applications/ECfosW3sLHUfHatCRLEGUQ9YG9XMs9aq/settings).
 
 Copy the Client ID and Client Secret into the following environment variables, respectively:
@@ -463,6 +470,7 @@ Copy the Client ID and Client Secret into the following environment variables, r
 - `AUTH0_MANAGEMENT_API_CLIENT_SECRET`
 
 Be aware: these tokens allow the requester to perform any administrative action against the Auth0 tenant! Use caution and keep production values secure.
+
 #### Setting up `lnav` to Inspect Canton logs
 
 If you have never used `lnav` to inspect Canton logs, then we recommend:

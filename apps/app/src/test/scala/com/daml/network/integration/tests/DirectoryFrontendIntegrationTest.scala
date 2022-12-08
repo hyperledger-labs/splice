@@ -1,9 +1,11 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.LocalAuth0Test
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.util.WalletTestUtil
 
 import scala.concurrent.duration.DurationInt
+import scala.util.Using
 
 class DirectoryFrontendIntegrationTest
     extends FrontendIntegrationTest("alice")
@@ -62,26 +64,24 @@ class DirectoryFrontendIntegrationTest
       }
     }
 
-    "allow login via auth0" in { implicit env =>
-      // TODO(#1445) create a fresh user for each of these tests; see PR #1851
-      val auth0TestUserEmail = "test@test.com";
-      val auth0TestUserPassword = "2N8mzSTbXCCW5fP";
-      val auth0TestUserDamlUser = "auth0|6388b3b1c0f8aabff64ab105";
+    "allow login via auth0" taggedAs LocalAuth0Test in { implicit env =>
+      val auth0 = auth0UtilFromSystemPoperties("https://canton-network-test.us.auth0.com")
+      Using.resource(auth0.createUser()) { user =>
+        logger.debug(s"Created user ${user.email} with password ${user.password} (id: ${user.id})")
+        val userPartyId = aliceValidator.onboardUser(user.id)
 
-      val auth0TestUserPartyId = aliceValidator.onboardUser(auth0TestUserDamlUser);
+        withFrontEnd("alice") { implicit webDriver =>
+          go to "http://localhost:3004"
+          click on "oidc-login-button"
 
-      withFrontEnd("alice") { implicit webDriver =>
-        go to "http://localhost:3004"
-        click on "oidc-login-button"
-
-        clue("auth0 login") {
-          textField(id("username")).value = auth0TestUserEmail
-          find(id("password")).foreach(_.underlying.sendKeys(auth0TestUserPassword))
-          click on name("action")
+          clue("auth0 login") {
+            textField(id("username")).value = user.email
+            find(id("password")).foreach(_.underlying.sendKeys(user.password))
+            click on name("action") // complete password prompt
+            click on xpath("//button[@value='accept']") // complete app authorization prompt
+          }
+          find(id("logged-in-user")).value.text should matchText(userPartyId.toProtoPrimitive)
         }
-        find(id("logged-in-user")).value.text should matchText(
-          auth0TestUserPartyId.toProtoPrimitive
-        )
       }
     }
   }

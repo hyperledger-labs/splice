@@ -780,6 +780,8 @@ jobs:
           pre_sbt_cmd: ./start-canton.sh external && ./start-frontends.sh -d
           cmd: "\"$RUN_SPLITTED_TESTS_CMD -- -l LiveDevNetTest\""
           post_sbt_cmd: ./stop-canton.sh external && ./stop-frontends.sh
+          additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET"
+          extra_parameters: -DAUTH0_MANAGEMENT_API_CLIENT_ID=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID} -DAUTH0_MANAGEMENT_API_CLIENT_SECRET=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET}
           timeout: "10m"
       - cleanup_sbt_test_job
       - collect_failing_test_data_and_send_to_datadog

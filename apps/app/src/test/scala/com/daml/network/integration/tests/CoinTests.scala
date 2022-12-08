@@ -2,6 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
+import com.daml.network.util.Auth0Util
 import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.integration.*
 
@@ -43,6 +44,23 @@ object CoinTests {
           }
         }
       }
+    }
+
+    def auth0UtilFromSystemPoperties(domain: String): Auth0Util = {
+      val clientId = System.getProperty("AUTH0_MANAGEMENT_API_CLIENT_ID");
+      val clientSecret = System.getProperty("AUTH0_MANAGEMENT_API_CLIENT_SECRET");
+
+      if (clientId == null || clientId.isEmpty()) {
+        fail(
+          "No clientId given, please supply auth0 clientId through system property AUTH0_MANAGEMENT_API_CLIENT_ID"
+        )
+      }
+      if (clientSecret == null || clientSecret.isEmpty()) {
+        fail(
+          "No clientSecret given, please supply auth0 clientSecret through system property AUTH0_MANAGEMENT_API_CLIENT_SECRET"
+        )
+      }
+      new Auth0Util(domain, clientId, clientSecret)
     }
   }
 }
