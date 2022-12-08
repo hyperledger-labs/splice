@@ -142,14 +142,14 @@ advanceToIssuanceWithPrice app coinPrice = do
   runNextIssuanceInternal app coinPrice
 
 
--- | Run the next issuance but don't enforce a specific coin price. 
--- 
+-- | Run the next issuance but don't enforce a specific coin price.
+--
 --
 runNextIssuance : CCApp -> Script ()
 runNextIssuance app = do
   runNextIssuanceInternal app 1.0
 
--- Only directly call this function if you know what you are doing. 
+-- Only directly call this function if you know what you are doing.
 -- Due to effective-dating, the price you give here is not the coin price that can be used immediately
 runNextIssuanceInternal : CCApp -> Decimal -> Script ()
 runNextIssuanceInternal app coinPrice = do
@@ -211,7 +211,7 @@ runNextIssuanceInternal app coinPrice = do
 skipNRounds : CCApp -> Int -> Script ()
 skipNRounds app n = do
   [(r1Cid, r1), (r2Cid, r2), (r3Cid, r3)] <- getOpenRoundsSorted app
-  
+
   let newRound1 = addRelRound r1.round (RelRound n)
   let newRound2 = addRelRound r2.round (RelRound n)
   let newRound3 = addRelRound r3.round (RelRound n)
@@ -271,7 +271,7 @@ queryCoinRulesByKey svc = do
 pay : CCApp -> CCUser -> Party -> Decimal -> Text -> Script ()
 pay app sender recipient coinQuantity msg = do
   payWithTransferFeeRatio app sender recipient coinQuantity 1.0 msg
-  
+
 -- | A simple and slightly hacky-way to test payment: it just gathers all coins from
 -- the sender and transfer's the desired quantity off of them to the receiver.
 -- The left-over quantity is kept.
@@ -379,7 +379,7 @@ getValidatorUsers validator = do
   rights <- queryFilter @ValidatorRight validator (\right -> right.validator == validator)
   return [ right.user | (_, right) <- rights ]
 
--- Primarily used by submitters to decide against which round they should try to transact. 
+-- Primarily used by submitters to decide against which round they should try to transact.
 getLatestOpenRound : CCApp -> Script (ContractId OpenMiningRound, OpenMiningRound)
 getLatestOpenRound app = do
   now <- getTime
@@ -424,13 +424,3 @@ tap app user quantity = do
     receiver = user.primaryParty
     quantity
     openRound
-
-
--- Debugging support
---------------------
-
-archiveTransferDebugNotes : CCApp -> Script ()
-archiveTransferDebugNotes app = do
-  notes <- query @TransferDebugNote app.svc
-  forA_ notes $ \(noteCid, _) ->
-    submit app.svc $ exerciseCmd noteCid Archive

@@ -29,7 +29,6 @@ testCoinBurn = do
 
   -- svc transfers 20 coin to user
   tap app user 20.0
-  archiveTransferDebugNotes app
   runCoinDepositBots app
 
   -- -- user pays provider 1
@@ -47,7 +46,6 @@ testCoinBurn = do
   requestCoinRules app provider2.primaryParty
   runCoinRulesAcceptBot app
 
-  archiveTransferDebugNotes app
   -- uncomment the following line to see how 'Validator1' can gather his rewards
   -- after having being declared as validator
   runCoinDepositBots app
@@ -69,8 +67,6 @@ testCoinBurn = do
   advanceToIssuanceWithPrice app 1.6
   runCoinDepositBots app
 
-  -- cleanup transfer notes
-  archiveTransferDebugNotes app
   -- -}
 
   return ()

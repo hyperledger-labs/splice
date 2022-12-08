@@ -511,22 +511,6 @@ template CoinRulesRequest
             pure ()
 
 
--- | A way to store some debug info on the ledger.
---
--- TODO(M1-92): replace by automated testing.
-template TransferDebugNote with
-    svc : Party
-    transfer : API.Transfer
-    isum : TransferInputsSummary
-    osum : TransferOutputsSummary
-    summary : API.TransferSummary
-    scaledConfig : CoinConfig CC
-    round : API.Round
-  where
-    signatory svc
-
-
-
 -- Transfer logic
 -- ==============
 
@@ -588,8 +572,6 @@ executeTransfer coinRulesCid context config0 svc t = do
   let distributed = distributeOutputs openRound.round config svc t.sender summary0 osum.preprocessedOutputs
   let summary1 = mergeReceiverFees distributed.receiverTransferFees summary0
   let summary2 = mergeDistributedOutputs distributed t.sender summary1
-  -- record debugging note
-  create TransferDebugNote with transfer = t; scaledConfig = config; round = openRound.round; summary = summary2; ..
   -- issue rewards for burns
   issueRewards config openRound t.sender t.provider summary2
   -- record outputs

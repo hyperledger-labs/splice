@@ -20,7 +20,7 @@ template Escrow
   where
     signatory arbiter
     observer p
-    nonconsuming choice Refresh : ()
+    nonconsuming choice Refresh : API.TransferResult
       with
         lockedCoin : ContractId LockedCoin
         paymentCoin : ContractId Coin
@@ -55,7 +55,6 @@ template Escrow
                        senderTransferFeeRatio = 0.0
                  ]
          API.exerciseAppTransfer transferContext transfer
-         pure ()
 
 -- | This matches the example in the design doc
 --  https://docs.google.com/document/d/12cagZTzODP4rgEwDQ3lqoolh5ls2chXZ3ctcgH8Hl28/edit#heading=h.hivyhhs3xqs9
@@ -94,7 +93,6 @@ test = do
   (_, c1) <- getLatestOpenRound app
 
   pay app alice alice.primaryParty 5.0 "split"
-  archiveTransferDebugNotes app
 
   [(paymentCoin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.quantity.initialQuantity == 5.0)
 
@@ -109,28 +107,9 @@ test = do
   prevLockedCoinCids <- map fst <$> query @LockedCoin app.svc
 
   transferContext <- getAppTransferContext app
-  submitUser alice.userId $ exerciseCmd escrow Refresh with ..
+  result <- submitUser alice.userId $ exerciseCmd escrow Refresh with ..
 
-  [(_, note)] <- query @TransferDebugNote app.svc
-
-  note.isum === TransferInputsSummary with
-    numBurnInputs  = 0
-    numCoinInputs = 2
-    totalQuantity = 1004.95
-    totalHoldingFees = 0.3
-  note.osum { preprocessedOutputs = [] } === TransferOutputsSummary with
-    numSenderCoins = 2
-    numReceiverCoins = 1
-    numFloatingCoins = 1
-    requiredQuantity = 1001.25
-    senderTransferFees = 0.0
-    preprocessedOutputs = []
-    numlockHolders = 1
-    receiverTransferFees = 0.01
-    totalSelfOutputs = 1000.25
-    totalNonSelfOutputs = 1.0
-
-  note.summary === API.TransferSummary with
+  result.summary === API.TransferSummary with
     inQuantity = 1004.95
     selfOutQuantity = 1003.83
     nonSelfOutQuantity = 0.99
