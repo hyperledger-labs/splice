@@ -51,9 +51,8 @@ if (disableTodoChecker) {
 }
 
 // Check `hub` prerequisites
-if (sys.env.getOrElse("GITHUB_TOKEN", "").isEmpty){
-  Console.err.println(
-    """Error: GITHUB_TOKEN not set
+if (sys.env.getOrElse("GITHUB_TOKEN", "").isEmpty) {
+  Console.err.println("""Error: GITHUB_TOKEN not set
       |
       |The TODO checker uses the Github cli to fetch the PR description, the commits in the PR, and the list of open Github issues.
       |You'll need to create a personal access token and export it from GITHUB_TOKEN for this to work.
@@ -70,7 +69,8 @@ if (sys.env.getOrElse("GITHUB_TOKEN", "").isEmpty){
 }
 
 Console.out.println(
-  s"Using Github CLI (`hub`) to fetch open issues assuming that an appropriate access token is provided in GITHUB_TOKEN. Please call `hub` manually to check your setup in case the process is stuck.")
+  s"Using Github CLI (`hub`) to fetch open issues assuming that an appropriate access token is provided in GITHUB_TOKEN. Please call `hub` manually to check your setup in case the process is stuck."
+)
 
 // Determine open issues
 val fixedIssuesCurrentPR: Set[Int] = {
@@ -78,11 +78,14 @@ val fixedIssuesCurrentPR: Set[Int] = {
     val prInfo = Seq("hub", "pr", "show", "-f", "%b", prNum).!!
     val branch = Seq("hub", "pr", "show", "-f", "%H", prNum).!!.trim
     val commits = Seq("git", "log", s"main..$branch").!!
-    val issueCloseKeywords = "((fixes)|(closes))"
-    val fixedIssueRegexStr = "(?i)" + issueCloseKeywords + "(\\s+)(#)([0-9]+)"
+    val issueCloseKeywords =
+      Seq("close", "closes", "closed", "fix", "fixes", "fixed", "resolve", "resolves", "resolved")
+        .map(w => s"($w)")
+        .mkString("|")
+    val fixedIssueRegexStr = "(?i)(" + issueCloseKeywords + ")(\\s+)(#)([0-9]+)"
     val fixedIssueRegex = fixedIssueRegexStr.r
     fixedIssueRegex
-      .findAllMatchIn(prInfo + commits)
+      .findAllMatchIn(prInfo + " " + commits)
       .map(m => "([0-9]+)".r.findFirstMatchIn(m.matched).get.matched.toInt)
       .toSet
   })
@@ -109,13 +112,14 @@ trait Bucket extends Ordered[Bucket] {
   val withinClassPosition: (Int, String)
 
   /** True whether TODOs in that bucket are OK on main.
-     */
-  val shouldNotExist : Boolean
+    */
+  val shouldNotExist: Boolean
 
   override def compare(that: Bucket): Int = {
     val compareCategories = classPosition.compareTo(that.classPosition)
     if (compareCategories == 0) {
-      val compareWithinClassPosition1 = withinClassPosition._1.compareTo(that.withinClassPosition._1)
+      val compareWithinClassPosition1 =
+        withinClassPosition._1.compareTo(that.withinClassPosition._1)
       if (compareWithinClassPosition1 == 0)
         withinClassPosition._2.compareTo(that.withinClassPosition._2)
       else
@@ -145,11 +149,29 @@ case class MilestoneBucket(major: Int, minor: String) extends Bucket {
   override val shouldNotExist = false
 }
 
-case class IssueBucket(number: Int, isOpen: Boolean) extends Bucket {
-  override val name = "Issue " + number.toString + (if (isOpen) "" else " is closed (or will be after merging this PR)")
+sealed trait IssueStatus {
+  def position: Int
+  def description: String
+}
+case class MarkedAsFixedIssue() extends IssueStatus {
+  override val position: Int = 1
+  override def description: String = "marked as fixed by this PR, but has left-over TODOs"
+}
+case class ClosedIssue() extends IssueStatus {
+  override val position: Int = 2
+  override def description: String = "closed"
+}
+case class OpenIssue() extends IssueStatus {
+  override val position: Int = 3
+  override def description: String = "open"
+}
+
+case class IssueBucket(number: Int, status: IssueStatus) extends Bucket {
+  override val name = s"Issue #$number (${status.description})"
   override val classPosition = 3
-  override val withinClassPosition = (number, "")
-  override val shouldNotExist = !isOpen
+  override val withinClassPosition = (number * 10 + status.position, "")
+  // We do not want to merge a PR or commit that claims to fix an issue, but has left-over todos for it
+  override val shouldNotExist = status == MarkedAsFixedIssue()
 }
 
 object UnknownBucket extends Bucket {
@@ -208,8 +230,11 @@ def numsToIssue(str: String): IssueBucket =
     case None => throw new RuntimeException("The given string isn't an issue")
     case Some(m) => {
       val i = m.matched.toInt
-      val isOpen = openIssues.contains(i) && !fixedIssuesCurrentPR.contains(i)
-      IssueBucket(i, isOpen)
+      val status =
+        if (fixedIssuesCurrentPR.contains(i)) MarkedAsFixedIssue()
+        else if (openIssues.contains(i)) OpenIssue()
+        else ClosedIssue()
+      IssueBucket(i, status)
     }
   }
 
@@ -224,11 +249,7 @@ val todoPatterns = Seq("TODO", "FIXME")
 val todoPatternRegexpStr = todoPatterns.map(str => s"($str)").mkString("|")
 
 val todoStyleExcludePrefixes =
-  Seq("canton/",
-    "project/CantonDependencies.scala",
-    "experiments/",
-    "README.md",
-  )
+  Seq("canton/", "project/CantonDependencies.scala", "experiments/", "README.md")
 val todoStyleExcludeSuffixes =
   Seq("/checkTodos.sc")
 
@@ -334,8 +355,8 @@ val todoCount = uniqueTodos.size
 writeToFile(todoCount.toString, "todo-out/count")
 
 // Print problems to stderr
-val problemTable = table.filter(entry => entry._1.shouldNotExist && entry._2.length > 0)
+val problemTable = table.filter(entry => entry._1.shouldNotExist && entry._2.nonEmpty)
 if (problemTable.nonEmpty) {
-  Console.err.println(tableToString(problemTable, true))
+  Console.err.println(tableToString(problemTable, color = true))
   System.exit(1)
 }
