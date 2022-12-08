@@ -14,7 +14,6 @@ import {
   SubscriptionIdleState,
   SubscriptionPayment,
 } from '@daml.js/wallet-payments/lib/CN/Wallet/Subscriptions';
-import { PaymentChannelProposal } from '@daml.js/wallet/lib/CN/Wallet/PaymentChannel';
 import { AcceptedTransferOffer, TransferOffer } from '@daml.js/wallet/lib/CN/Wallet/TransferOffer';
 
 const WalletContext = React.createContext<WalletClient | undefined>(undefined);
@@ -34,10 +33,6 @@ export interface ListTransferOffersResponse {
 
 export interface ListAcceptedTransferOffersResponse {
   acceptedOffersList: Contract<AcceptedTransferOffer>[];
-}
-
-export interface ListPaymentChannelRequestsResponse {
-  proposalsList: Contract<PaymentChannelProposal>[];
 }
 
 export interface ListAppPaymentRequestsResponse {
@@ -61,7 +56,6 @@ export interface ListSubscriptionsResponse {
 export interface WalletClient {
   tap: (quantity: string) => Promise<void>;
   list: () => Promise<ListResponse>;
-  executeDirectTransfer: (quantity: string, receiverPartyId: string) => Promise<void>;
 
   listTransferOffers: () => Promise<ListTransferOffersResponse>;
   createTransferOffer: (
@@ -75,16 +69,6 @@ export interface WalletClient {
   withdrawTransferOffer: (offerContractId: string) => Promise<void>;
   rejectTransferOffer: (offerContractId: string) => Promise<void>;
   listAcceptedTransferOffers: () => Promise<ListAcceptedTransferOffersResponse>;
-
-  listPaymentChannelProposals: () => Promise<ListPaymentChannelRequestsResponse>;
-  proposePaymentChannel: (
-    receiverPartyId: string,
-    senderTransferFeeRatio: string,
-    allowDirectTransfers: boolean,
-    allowOffers: boolean,
-    allowRequests: boolean
-  ) => Promise<void>;
-  acceptPaymentChannelProposal: (proposalContractId: string) => Promise<void>;
 
   listAppPaymentRequests: () => Promise<ListAppPaymentRequestsResponse>;
   acceptAppPaymentRequests: (requestContractId: string) => Promise<void>;
@@ -127,14 +111,6 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
       },
       tap: async quantity => {
         await walletClient.tap(new v0.TapRequest().setQuantity(quantity), getCreds());
-      },
-      executeDirectTransfer: async (quantity, receiverPartyId) => {
-        await walletClient.executeDirectTransfer(
-          new v0.ExecuteDirectTransferRequest()
-            .setQuantity(quantity)
-            .setReceiverPartyId(receiverPartyId),
-          getCreds()
-        );
       },
       createTransferOffer: async (
         receiverPartyId,
@@ -188,41 +164,6 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             .getAcceptedOffersList()
             .map(c => Contract.decode(c, AcceptedTransferOffer)),
         };
-      },
-      proposePaymentChannel: async (
-        receiverPartyId,
-        senderTransferFeeRatio,
-        allowDirectTransfers,
-        allowOffers,
-        allowRequests
-      ) => {
-        await walletClient.proposePaymentChannel(
-          new v0.ProposePaymentChannelRequest()
-            .setReceiverPartyId(receiverPartyId)
-            .setSenderTransferFeeRatio(senderTransferFeeRatio)
-            .setAllowDirectTransfers(allowDirectTransfers)
-            .setAllowOffers(allowOffers)
-            .setAllowRequests(allowRequests),
-          getCreds()
-        );
-      },
-      listPaymentChannelProposals: async (): Promise<ListPaymentChannelRequestsResponse> => {
-        const res = await walletClient.listPaymentChannelProposals(
-          new v0.ListPaymentChannelProposalsRequest(),
-          getCreds()
-        );
-
-        return {
-          proposalsList: res
-            .getProposalsList()
-            .map(c => Contract.decode(c, PaymentChannelProposal)),
-        };
-      },
-      acceptPaymentChannelProposal: async proposalContractId => {
-        await walletClient.acceptPaymentChannelProposal(
-          new v0.AcceptPaymentChannelProposalRequest().setProposalContractId(proposalContractId),
-          getCreds()
-        );
       },
 
       listAppPaymentRequests: async (): Promise<ListAppPaymentRequestsResponse> => {

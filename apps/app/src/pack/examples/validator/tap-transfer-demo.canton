@@ -1,5 +1,9 @@
 // Commands needed to initialize the CN apps, tap some coins and make some transfers. Can be run as a bootstrap script.
 
+import com.daml.ledger.client.binding.Primitive
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+
 // Onboard Test Parties
 val aliceUserName = aliceWallet.config.damlUser
 val bobUserName = bobWallet.config.damlUser
@@ -15,18 +19,13 @@ utils.retry_until_true(aliceWallet.list().coins.length == 1)
 
 require(bobWallet.list().coins.length == 0)
 
-val aliceProposal = aliceWallet.proposePaymentChannel(bobParty)
-utils.retry_until_true(bobWallet.listPaymentChannelProposals().length == 1)
-val channelId = bobWallet.acceptPaymentChannelProposal(aliceProposal)
+val expiration =
+  Primitive.Timestamp
+    .discardNanos(Instant.now().plus(1, ChronoUnit.MINUTES))
+    .getOrElse(sys.error("Failed to convert timestamp"))
+val transferOffer = aliceWallet.createTransferOffer(bobParty, 10.0, "p2ptransfer", expiration)
+utils.retry_until_true(bobWallet.listTransferOffers().length == 1)
+bobWallet.acceptTransferOffer(transferOffer)
 
-aliceWallet.executeDirectTransfer(bobParty, 10)
 utils.retry_until_true(bobWallet.list().coins.length == 1)
 bobWallet.list().coins.foreach(coin => require(BigDecimal(coin.contract.payload.quantity.initialQuantity) == 10))
-
-val paymentReq = bobWallet.createOnChannelPaymentRequest(aliceParty, 10, "Please transfer coins")
-utils.retry_until_true(aliceWallet.listOnChannelPaymentRequests().length == 1)
-aliceWallet.acceptOnChannelPaymentRequest(paymentReq)
-utils.retry_until_true(bobWallet.list().coins.length == 2)
-bobWallet.list().coins.foreach(coin => require(BigDecimal(coin.contract.payload.quantity.initialQuantity) == 10))
-utils.retry_until_true(aliceWallet.list().coins.length == 1)
-aliceWallet.list().coins.foreach(coin => require(BigDecimal(coin.contract.payload.quantity.initialQuantity) < 80 && BigDecimal(coin.contract.payload.quantity.initialQuantity) > 79.5))

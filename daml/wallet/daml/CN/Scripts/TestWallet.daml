@@ -9,105 +9,10 @@ import qualified CC.API.V1.Coin as API
 import CC.Coin hiding (CC, USD)
 import CN.Wallet.Install
 import CN.Wallet.Payment
-import CN.Wallet.PaymentChannel
 import CN.Wallet.Subscriptions
-
 import CN.Scripts.Wallet.TestSubscriptions
 
-
 import CC.Scripts.Util
-
-test : Script ()
-test = script do
-  app <- setupApp
-
-  runNextIssuance app
-  runCoinDepositBots app
-
-  sender <- setupUser app "sender" app.svc
-  receiver <- setupUser app "receiver" app.svc
-
-  tap app sender 15.0
-
-  -- setup payment channel
-  proposalId <- submit sender.primaryParty $ createCmd PaymentChannelProposal with
-    proposer = sender.primaryParty
-    replacesChannel = None
-    channel = PaymentChannel with
-      sender = sender.primaryParty
-      receiver = receiver.primaryParty
-      svc = app.svc
-      allowRequests = True
-      allowOffers = True
-      allowDirectTransfers = True
-      senderTransferFeeRatio = 0.0
-
-  channelId <- submit receiver.primaryParty $ exerciseCmd proposalId PaymentChannelProposal_Accept
-
-  -- send some CC
-  [(coin, _)] <- queryFilter @Coin sender.primaryParty (\c -> c.quantity.initialQuantity > 2.5)
-  transferContext <- getPaymentTransferContext app sender
-  let exerciseTransfer coin = exerciseCmd channelId
-            PaymentChannel_ExecuteDirectTransfer with
-              inputs = [API.InputCoin coin]
-              transferQuantity = PaymentQuantity 2.0 CC
-              payload = "direct transfer test"
-              transferContext
-  let transfer coin =
-        submitUser sender.userId $ exerciseTransfer (toInterfaceContractId coin)
-
-  transfer coin
-  [(coin, _)] <- queryFilter @Coin sender.primaryParty (\c -> c.quantity.initialQuantity > 2.5)
-  transfer coin
-
-  -- ask for some more CC
-  paymentRequest <- submit receiver.primaryParty $ exerciseCmd channelId
-    PaymentChannel_CreatePaymentRequest with
-    paymentQuantity = PaymentQuantity 1.5 CC
-    description = "A very good reason to pay me"
-
-  -- accept request
-  [(coin, _)] <- queryFilter @Coin sender.primaryParty (\c -> c.quantity.initialQuantity > 1.5)
-  transferContext <- getPaymentTransferContext app sender
-  submitUser sender.userId $ exerciseCmd paymentRequest OnChannelPaymentRequest_Accept with
-    inputs = [API.InputCoin $ toInterfaceContractId coin]
-    transferContext
-
-  -- ask for more CC, to be rejected
-  paymentRequest <- submit receiver.primaryParty $ exerciseCmd channelId
-    PaymentChannel_CreatePaymentRequest with
-      paymentQuantity = PaymentQuantity 1500.0 CC
-      description = "Not a good reason to pay"
-
-  submit sender.primaryParty $ exerciseCmd paymentRequest OnChannelPaymentRequest_Reject
-
-  -- ask for more CC, and withdraw
-  paymentRequest <- submit receiver.primaryParty $ exerciseCmd channelId
-    PaymentChannel_CreatePaymentRequest with
-      paymentQuantity = PaymentQuantity 1500.0 CC
-      description = "Going to withdraw this"
-
-  submit receiver.primaryParty $ exerciseCmd paymentRequest OnChannelPaymentRequest_Withdraw
-
-
-  -- disallow transfers
-  proposalId <- submit sender.primaryParty $ createCmd PaymentChannelProposal with
-    proposer = sender.primaryParty
-    replacesChannel = Some channelId
-    channel = PaymentChannel with
-      sender = sender.primaryParty
-      receiver = receiver.primaryParty
-      svc = app.svc
-      allowRequests = True
-      allowOffers = True
-      allowDirectTransfers = False
-      senderTransferFeeRatio = 0.0
-
-  channelId <- submit receiver.primaryParty $ exerciseCmd proposalId PaymentChannelProposal_Accept
-  submitMultiMustFail [sender.primaryParty] [app.svc] $ exerciseTransfer $ toInterfaceContractId coin
-
-  pure ()
-
 
 template TestDeliveryOffer
   with

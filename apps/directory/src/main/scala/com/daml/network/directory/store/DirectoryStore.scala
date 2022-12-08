@@ -1,7 +1,7 @@
 package com.daml.network.directory.store
 
-import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
+import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.store.AcsStore
 import com.daml.network.util.JavaContract as Contract

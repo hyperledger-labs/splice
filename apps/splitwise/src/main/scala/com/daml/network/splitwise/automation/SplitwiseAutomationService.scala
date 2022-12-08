@@ -2,8 +2,8 @@ package com.daml.network.splitwise.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
-import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection

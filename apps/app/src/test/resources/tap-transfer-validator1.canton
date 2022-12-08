@@ -1,3 +1,7 @@
+import com.daml.ledger.client.binding.Primitive
+import java.time.Instant
+import java.time.temporal.ChronoUnit
+
 // Commands needed to initialize the CN apps, tap some coins and make some transfers. Can be run as a bootstrap script.
 println("BEGIN - validator1 test")
 
@@ -20,23 +24,16 @@ utils.retry_until_true(aliceValidator1Wallet.list().coins.length == 1)
 // Bob starts out broke.
 require(bobValidator1Wallet.list().coins.length == 0)
 
-println("Set up payment channel")
-val aliceProposal = aliceValidator1Wallet.proposePaymentChannel(bobParty)
-utils.retry_until_true(bobValidator1Wallet.listPaymentChannelProposals().length == 1)
-val channelId = bobValidator1Wallet.acceptPaymentChannelProposal(aliceProposal)
+println("Execute p2p transfer")
+val expiration =
+  Primitive.Timestamp
+    .discardNanos(Instant.now().plus(1, ChronoUnit.MINUTES))
+    .getOrElse(sys.error("Failed to convert timestamp"))
+val transferOffer = aliceValidator1Wallet.createTransferOffer(bobParty, 10.0, "p2ptransfer", expiration)
+utils.retry_until_true(bobValidator1Wallet.listTransferOffers().length == 1)
+bobValidator1Wallet.acceptTransferOffer(transferOffer)
 
-println("Execute direct transfer")
-aliceValidator1Wallet.executeDirectTransfer(bobParty, 10)
 utils.retry_until_true(bobValidator1Wallet.list().coins.length == 1)
 bobValidator1Wallet.list().coins.foreach(coin => require(BigDecimal(coin.contract.payload.quantity.initialQuantity) == 10))
-
-println("Execute payment request/response     ")
-val paymentReq = bobValidator1Wallet.createOnChannelPaymentRequest(aliceParty, 10, "Please transfer coins")
-utils.retry_until_true(aliceValidator1Wallet.listOnChannelPaymentRequests().length == 1)
-aliceValidator1Wallet.acceptOnChannelPaymentRequest(paymentReq)
-utils.retry_until_true(bobValidator1Wallet.list().coins.length == 2)
-bobValidator1Wallet.list().coins.foreach(coin => require(BigDecimal(coin.contract.payload.quantity.initialQuantity) == 10))
-utils.retry_until_true(aliceValidator1Wallet.list().coins.length == 1)
-aliceValidator1Wallet.list().coins.foreach(coin => require(BigDecimal(coin.contract.payload.quantity.initialQuantity) < 80 && BigDecimal(coin.contract.payload.quantity.initialQuantity) > 79.5))
 
 println("END - validator1 test")

@@ -27,7 +27,6 @@ import ConfirmPayment from './views/ConfirmPayment';
 import ConfirmSubscription from './views/ConfirmSubscription';
 import Home from './views/Home';
 import Onboarding from './views/Onboarding';
-import PaymentChannels from './views/PaymentChannels';
 import Subscriptions from './views/Subscriptions';
 import TransferOffers from './views/TransferOffers';
 
@@ -83,7 +82,6 @@ const Content = () => {
       <Route path="/" element={<Home />}>
         <Route index element={<Coins />} />
         <Route path="coins" element={<Coins />} />
-        <Route path="app-payment-channels" element={<PaymentChannels />} />
         <Route path="transfer-offers" element={<TransferOffers />} />
         <Route path="subscriptions" element={<Subscriptions />}></Route>
         <Route path="app-payment-requests" element={<AppPaymentRequests />}></Route>

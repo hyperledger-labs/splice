@@ -5,8 +5,8 @@ import cats.instances.list.*
 import cats.syntax.traverse.*
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
+import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.config.AutomationConfig
 import com.daml.network.directory.store.DirectoryStore

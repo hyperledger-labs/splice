@@ -11,7 +11,6 @@ import com.daml.network.codegen.java.cn.wallet.install.coinoperation
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as walletCodegen,
-  paymentchannel as channelCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
@@ -197,20 +196,6 @@ class TreasuryService(
         )
         _ <- userStore.acs.getContractById(walletCodegen.DeliveryOffer.INTERFACE)(
           paymentRequest.value.payload.deliveryOffer
-        )
-      } yield ()
-
-    case op: coinoperation.CO_ChannelPayment =>
-      for {
-        _ <- userStore.acs.getContractById(channelCodegen.OnChannelPaymentRequest.COMPANION)(
-          op.contractIdValue
-        )
-      } yield ()
-
-    case op: coinoperation.CO_ChannelTransfer =>
-      for {
-        _ <- userStore.acs.getContractById(channelCodegen.PaymentChannel.COMPANION)(
-          op.channel
         )
       } yield ()
 

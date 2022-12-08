@@ -58,7 +58,7 @@ Glossary
 
       * provides payment APIs for other apps to build upon ("pay with CC") and corresponding UI, e.g., approve payment
       * used by CN users to manage their CC holdings & reward collection
-      * provides UI for managing payment channels for direct transfers/requests
+      * provides UI for managing peer-to-peer transfers
         between two users
 
     Directory Service

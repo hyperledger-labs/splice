@@ -1,7 +1,7 @@
 package com.daml.network.splitwise.store
 
-import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.splitwise.store.memory.InMemorySplitwiseStore
 import com.daml.network.store.AcsStore
 import com.daml.network.util.JavaContract as Contract

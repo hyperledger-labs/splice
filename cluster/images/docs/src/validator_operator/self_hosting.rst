@@ -122,8 +122,8 @@ You can list your balances with the following command: ::
 If you've followed the previous instructions, you should already see one coin.
 If not, try calling ``aliceWallet.tap(100.0)`` and then rerunning this command.
 
-Preparing for the first transfer
---------------------------------
+Peer-to-peer coin transfers
+---------------------------
 
 In order to have someone for Alice to transfer some coin to, please first create a second user for Bob: ::
 
@@ -133,24 +133,24 @@ You can double check that Bob has no coins yet. The following should return an e
 
   @ bobWallet.list()
 
-Before Alice can transfer coins to Bob, they first need to initiate a payment channel between them. Alice, being the sender, will initiate the request for the channel: ::
+Peer-to-peer transfers consist of three steps:
 
-  @ val aliceProposal = aliceWallet.proposePaymentChannel(bobParty)
+1. First, the sender creates a transfer offer visible to the receiver.
+2. Next, the receiver accepts (or rejects) the transfer offer.
+3. If the receiver accepts the offer, automation in the sender’s wallet will actually transfer the coin.
 
-Bob can then see the request to create the channel: ::
+In our example, Alice creates the transfer offer for bob::
 
-  @ bobWallet.listPaymentChannelProposals()
+  @ val expiration = Primitive.Timestamp.discardNanos(Instant.now().plus(5, ChronoUnit.MINUTES)).getOrElse(sys.error("Failed to convert timestamp"))
+  @ val transferOffer = aliceWallet.createTransferOffer(bobParty, 10.0, "p2ptransfer", expiration)
+
+Bob can then see the transfer offer: ::
+
+  @ bobWallet.listTransferOffers()
 
 And accept the request: ::
 
-  @ val channelId = bobWallet.acceptPaymentChannelProposal(aliceProposal)
-
-Transferring coins
-------------------
-
-Payment channels by default allow direct transfers (transfers that do not require the recipient's approval). Alice can therefore simply transfer some coins to Bob now: ::
-
-  @ aliceWallet.executeDirectTransfer(bobParty, 10, coinId)
+  @ bobWallet.acceptTransferOffer(transferOffer)
 
 Check Alice and Bob's wallets to see that Alice now has slightly less than 90 coins (due to transfer fees), and Bob has 10: ::
 
@@ -177,24 +177,6 @@ Check Alice and Bob's wallets to see that Alice now has slightly less than 90 co
       )
     )
   )
-
-Requesting a transfer
----------------------
-
-Using the same channel as before, Bob can also ask for a payment. First, initiate the request from Bob: ::
-
-  @ val paymentReq = bobWallet.createOnChannelPaymentRequest(aliceParty, 10, "Please transfer coins")
-
-Check Alice's wallet to see the request, and then accept it: ::
-
-  @ aliceWallet.listOnChannelPaymentRequests()
-  @ aliceWallet.acceptOnChannelPaymentRequest(paymentReq, aliceWallet.list().head.contractId)
-
-Note that you did not reuse the same coinCid from before for the transfer - that contract ID has been archived, and replaced with a new one containing the change from her previous transfer.
-You can now check again Bob's and Alice's wallets - Bob received 10 coins again, and Alice's holdings were reduced by slightly more than 10 coin again: ::
-
-  @ bobWallet.list()
-  @ aliceWallet.list()
 
 Hosting the Wallet Web UI
 -------------------------

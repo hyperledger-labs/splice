@@ -7,7 +7,6 @@ import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as walletCodegen,
-  paymentchannel as channelCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
@@ -53,14 +52,6 @@ trait UserWalletStore extends FlagCloseable with NamedLogging {
 
   def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
     acsStore.signalWhenIngested(offset)
-
-  def lookupOnChannelPaymentRequestById(
-      cid: ContractId[channelCodegen.OnChannelPaymentRequest]
-  ): Future[QueryResult[Option[JavaContract[
-    channelCodegen.OnChannelPaymentRequest.ContractId,
-    channelCodegen.OnChannelPaymentRequest,
-  ]]]] =
-    acsStore.lookupContractById(channelCodegen.OnChannelPaymentRequest.COMPANION)(cid)
 
   def lookupAcceptedTransferOfferById(
       cid: ContractId[transferOffersCodegen.AcceptedTransferOffer]
@@ -161,9 +152,6 @@ object UserWalletStore {
     val endUser = key.endUserParty.toProtoPrimitive
     val svc = key.svcParty.toProtoPrimitive
 
-    def channelFilter(co: channelCodegen.PaymentChannel): Boolean =
-      co.svc == svc && (co.sender == endUser || co.receiver == endUser)
-
     AcsStore.SimpleContractFilter(
       key.endUserParty,
       Map(
@@ -194,17 +182,6 @@ object UserWalletStore {
           // All validator rights that entitle the endUser to collect rewards as a validator operator
           co.payload.svc == svc &&
             co.payload.validator == endUser
-        ),
-        // Payment channels
-        mkFilter(channelCodegen.PaymentChannelProposal.COMPANION)(co =>
-          channelFilter(co.payload.channel)
-        ),
-        mkFilter(channelCodegen.PaymentChannel.COMPANION)(co => channelFilter(co.payload)),
-        mkFilter(channelCodegen.OnChannelPaymentRequest.COMPANION)(co =>
-          // We track requests for both sender and receiver, as both have to be displayed in the UI
-          co.payload.svc == svc &&
-            (co.payload.sender == endUser ||
-              co.payload.receiver == endUser)
         ),
         // Transfer offers
         mkFilter(transferOffersCodegen.TransferOffer.COMPANION)(co =>

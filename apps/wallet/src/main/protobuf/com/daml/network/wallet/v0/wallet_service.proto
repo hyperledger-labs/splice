@@ -24,19 +24,6 @@ service WalletService {
   rpc RejectSubscriptionRequest (RejectSubscriptionRequestRequest) returns (google.protobuf.Empty);
   rpc CancelSubscription (CancelSubscriptionRequest) returns (google.protobuf.Empty);
 
-  rpc ProposePaymentChannel (ProposePaymentChannelRequest) returns (ProposePaymentChannelResponse);
-  rpc ListPaymentChannelProposals (ListPaymentChannelProposalsRequest) returns (ListPaymentChannelProposalsResponse);
-  rpc ListPaymentChannels (ListPaymentChannelsRequest) returns (ListPaymentChannelsResponse);
-  rpc AcceptPaymentChannelProposal (AcceptPaymentChannelProposalRequest) returns (AcceptPaymentChannelProposalResponse);
-  rpc CancelPaymentChannelBySender(CancelPaymentChannelBySenderRequest) returns (google.protobuf.Empty);
-  rpc CancelPaymentChannelByReceiver(CancelPaymentChannelByReceiverRequest) returns (google.protobuf.Empty);
-  rpc ExecuteDirectTransfer (ExecuteDirectTransferRequest) returns (google.protobuf.Empty);
-  rpc CreateOnChannelPaymentRequest (CreateOnChannelPaymentRequestRequest) returns (CreateOnChannelPaymentRequestResponse);
-  rpc ListOnChannelPaymentRequests (ListOnChannelPaymentRequestsRequest) returns (ListOnChannelPaymentRequestsResponse);
-  rpc AcceptOnChannelPaymentRequest (AcceptOnChannelPaymentRequestRequest) returns (google.protobuf.Empty);
-  rpc RejectOnChannelPaymentRequest (RejectOnChannelPaymentRequestRequest) returns (google.protobuf.Empty);
-  rpc WithdrawOnChannelPaymentRequest (WithdrawOnChannelPaymentRequestRequest) returns (google.protobuf.Empty);
-
   rpc CreateTransferOffer (CreateTransferOfferRequest) returns (CreateTransferOfferResponse);
   rpc ListTransferOffers (google.protobuf.Empty) returns (ListTransferOffersResponse);
   rpc AcceptTransferOffer (AcceptTransferOfferRequest) returns (AcceptTransferOfferResponse);
@@ -166,64 +153,6 @@ message CancelSubscriptionRequest {
   string idle_state_contract_id = 1;
 }
 
-// NOTE: we only support sender-initiated proposals for now.
-message ProposePaymentChannelRequest {
-  // The party of the receiver.
-  string receiver_party_id = 1;
-  // For changing the configuration of the channel - provide the ID of the existing channel to be replaced
-  optional string replaces_channel_id = 2;
-  // Whether to allow payment requests
-  bool allow_requests = 3;
-  // Whether to allow payment offers
-  bool allow_offers = 4;
-  // Whether to allow direct transfers
-  bool allow_direct_transfers = 5;
-  // How to split the transfer fee between the sender and the receiver
-  string sender_transfer_fee_ratio = 6;
-}
-
-message ProposePaymentChannelResponse {
-  string proposal_contract_id = 1;
-}
-
-message ListPaymentChannelProposalsRequest {
-}
-
-message ListPaymentChannelProposalsResponse {
-  repeated com.daml.network.v0.Contract proposals = 1;
-}
-
-message ListPaymentChannelsRequest {
-}
-
-message ListPaymentChannelsResponse {
-  repeated com.daml.network.v0.Contract channels = 1;
-}
-
-message AcceptPaymentChannelProposalRequest {
-  string proposal_contract_id = 1;
-}
-
-message CancelPaymentChannelBySenderRequest {
-  string sender_party_id = 1;
-}
-
-message CancelPaymentChannelByReceiverRequest {
-  string receiver_party_id = 1;
-}
-
-message AcceptPaymentChannelProposalResponse {
-  string channel_contract_id = 1;
-}
-
-message ExecuteDirectTransferRequest {
-  // Receiver to whom to transfer CC.
-  string receiver_party_id = 1;
-
-  // Quantity of CC to transfer.
-  string quantity = 2;
-}
-
 message CreateTransferOfferRequest {
   // Receiver to whom to offer a transfer
   string receiver_party_id = 1;
@@ -291,44 +220,6 @@ message ListValidatorRewardsResponse {
 
 message CollectRewardsRequest {
   uint64 round = 2;
-}
-
-message CreateOnChannelPaymentRequestRequest {
-  // Sender who is requested to transfer CC
-  string sender_party_id = 1;
-
-  // Quantity of CC requested
-  string quantity = 2;
-
-  // Reason for the request
-  string description = 3;
-}
-
-message CreateOnChannelPaymentRequestResponse {
-  string request_contract_id = 1;
-}
-
-message ListOnChannelPaymentRequestsRequest {
-}
-
-message ListOnChannelPaymentRequestsResponse {
-  // TODO(#300): add pagination for payment requests
-  repeated com.daml.network.v0.Contract payment_requests = 1;
-}
-
-message AcceptOnChannelPaymentRequestRequest {
-  // The request to accept
-  string request_contract_id = 1;
-}
-
-message RejectOnChannelPaymentRequestRequest {
-  // The request to reject
-  string request_contract_id = 1;
-}
-
-message WithdrawOnChannelPaymentRequestRequest {
-  // The request to withdraw
-  string request_contract_id = 1;
 }
 
 message RedistributeOutput {

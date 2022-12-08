@@ -17,14 +17,6 @@ const Home: React.FC = () => {
           Coins
         </Button>
         <Button
-          id="app-payment-channels-button"
-          onClick={() => {
-            navigate('/app-payment-channels');
-          }}
-        >
-          Payment Channels
-        </Button>
-        <Button
           id="transfer-offers-button"
           onClick={() => {
             navigate('/transfer-offers');
