@@ -8,14 +8,17 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import com.daml.network.util.CoinTestUtil
+import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 
 import java.time.Duration
 
-class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
+class WalletTimeBasedIntegrationTest
+    extends CoinIntegrationTest
+    with WalletTestUtil
+    with TimeTestUtil {
 
   private def p2pTransferAndTriggerAutomation(
       senderWallet: WalletAppClientReference,
@@ -38,7 +41,7 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
 
     "allow calling tap, list the created coins, and get the balance - locally and remotely" in {
       implicit env =>
-        val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+        val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
         val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
@@ -92,7 +95,7 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
     }
 
     "list all coins, including locked coins, with additional position details" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
       val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
@@ -145,7 +148,7 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
     }
 
     "allow a user to list multiple subscriptions in different states" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
       clue("Alice gets some coins") {
         aliceWallet.tap(50)
@@ -213,7 +216,7 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
   }
 
   "automatically collect app & validator rewards on coin operations" in { implicit env =>
-    val (alice, bob) = onboardAliceAndBob(this)
+    val (alice, bob) = onboardAliceAndBob()
 
     aliceWallet.tap(50)
     aliceValidatorWallet.tap(50)
@@ -265,7 +268,7 @@ class WalletTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUt
   }
 
   "list and manually collect app & validator rewards" in { implicit env =>
-    val (alice, bob) = onboardAliceAndBob(this)
+    val (alice, bob) = onboardAliceAndBob()
 
     // Tap coin and do a transfer from alice to bob
     aliceWallet.tap(50)

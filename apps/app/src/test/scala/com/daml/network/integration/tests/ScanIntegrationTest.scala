@@ -2,12 +2,12 @@ package com.daml.network.integration.tests
 
 import com.daml.network.history.*
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
-import com.daml.network.util.{CoinTestUtil, ExerciseNode}
+import com.daml.network.util.{ExerciseNode, WalletTestUtil}
 
 import scala.concurrent.duration.*
 
 // TODO(M1-92): Add tests that cover all possible CoinEvents
-class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
+class ScanIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
   "restart cleanly" in { implicit env =>
     scan.stop()
@@ -15,7 +15,7 @@ class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
   }
 
   "see Coin transfers" in { implicit env =>
-    val (alice, bob) = onboardAliceAndBob(this)
+    val (alice, bob) = onboardAliceAndBob()
     aliceWallet.tap(50.0)
     p2pTransfer(aliceWallet, bobWallet, bob, 42.0)
     eventually(5.seconds) {
@@ -63,7 +63,7 @@ class ScanIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
   }
 
   "get details of a single Coin transfer" in { implicit env =>
-    val (_, bob) = onboardAliceAndBob(this)
+    val (_, bob) = onboardAliceAndBob()
     aliceWallet.tap(50.0)
     p2pTransfer(aliceWallet, bobWallet, bob, 42.0)
 

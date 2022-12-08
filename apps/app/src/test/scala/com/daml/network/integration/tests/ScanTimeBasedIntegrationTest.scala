@@ -6,10 +6,13 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import com.daml.network.util.CoinTestUtil
+import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-class ScanTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
+class ScanTimeBasedIntegrationTest
+    extends CoinIntegrationTest
+    with WalletTestUtil
+    with TimeTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =

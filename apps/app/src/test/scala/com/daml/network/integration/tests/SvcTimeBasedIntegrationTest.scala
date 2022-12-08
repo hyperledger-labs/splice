@@ -10,7 +10,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import com.daml.network.util.CoinTestUtil
+import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.logging.SuppressionRule
 import org.slf4j.event.Level
@@ -18,7 +18,10 @@ import org.slf4j.event.Level
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 
-class SvcTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
+class SvcTimeBasedIntegrationTest
+    extends CoinIntegrationTest
+    with WalletTestUtil
+    with TimeTestUtil {
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =

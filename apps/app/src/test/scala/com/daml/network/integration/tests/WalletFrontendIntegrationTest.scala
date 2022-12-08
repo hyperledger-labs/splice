@@ -14,8 +14,7 @@ import com.daml.network.console.{
   WalletAppClientReference,
 }
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
-import com.daml.network.util.CoinTestUtil
-import com.digitalasset.canton.BaseTest
+import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.topology.PartyId
 import org.openqa.selenium.WebDriver
 
@@ -26,7 +25,7 @@ import scala.util.Try
 
 class WalletFrontendIntegrationTest
     extends FrontendIntegrationTest("alice", "bob")
-    with CoinTestUtil {
+    with WalletTestUtil {
 
   private val directoryDarPath =
     "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
@@ -35,7 +34,7 @@ class WalletFrontendIntegrationTest
 
     "allow tapping coins and then list the created coins" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.damlUser
-      onboardWalletUser(this, aliceWallet, aliceValidator)
+      onboardWalletUser(aliceWallet, aliceValidator)
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)
@@ -86,7 +85,7 @@ class WalletFrontendIntegrationTest
       // Create directory entry for alice
       val aliceDamlUser = aliceWallet.config.damlUser
       val entryName = "alice.cns"
-      val aliceParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
+      val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       requestDirectoryEntry(aliceParty, aliceDirectory, entryName)
 
       def getPaymentRequest() = aliceWallet.listSubscriptionRequests().headOption
@@ -119,7 +118,7 @@ class WalletFrontendIntegrationTest
       implicit env =>
         // Alice submits a directory entry request, which will create an app payment request in her wallet
         val aliceDamlUser = aliceWallet.config.damlUser
-        val aliceUserParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
+        val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
         createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.CC)
 
         withFrontEnd("alice") { implicit webDriver =>
@@ -157,7 +156,7 @@ class WalletFrontendIntegrationTest
       implicit env =>
         // Alice submits a directory entry request, which will create an app payment request in her wallet
         val aliceDamlUser = aliceWallet.config.damlUser
-        val aliceUserParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
+        val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
         createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.USD)
 
         withFrontEnd("alice") { implicit webDriver =>
@@ -194,7 +193,7 @@ class WalletFrontendIntegrationTest
     "show app payment requests with multiple receivers (CC only)" in { implicit env =>
       // Alice submits a directory entry request, which will create an app payment request in her wallet
       val aliceDamlUser = aliceWallet.config.damlUser
-      val aliceUserParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
 
       createPaymentRequest(
         aliceUserParty,
@@ -236,7 +235,7 @@ class WalletFrontendIntegrationTest
       implicit env =>
         // Alice submits a directory entry request, which will create an app payment request in her wallet
         val aliceDamlUser = aliceWallet.config.damlUser
-        val aliceUserParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
+        val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
 
         createPaymentRequest(
           aliceUserParty,
@@ -278,7 +277,7 @@ class WalletFrontendIntegrationTest
       implicit env =>
         // Alice submits a directory entry request, which will create an app payment request in her wallet
         val aliceDamlUser = aliceWallet.config.damlUser
-        val aliceUserParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
+        val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
 
         createPaymentRequest(
           aliceUserParty,
@@ -319,7 +318,7 @@ class WalletFrontendIntegrationTest
     "show app payment requests, and resolve party IDs in them" in { implicit env =>
       // Alice submits a directory entry request, which will create an app payment request in her wallet
       val aliceDamlUser = aliceWallet.config.damlUser
-      val aliceUserParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val aliceDirectoryName = "alice.cns"
       val aliceDirectoryDisplay = expectedCns(aliceUserParty, aliceDirectoryName)
       createDirectoryEntry(aliceUserParty, aliceDirectory, "alice.cns", aliceWallet)
@@ -347,7 +346,7 @@ class WalletFrontendIntegrationTest
 
     "show subscription requests and allow users to accept them" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.damlUser
-      val aliceUserParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val expectedDirName = createDirectoryEntryForDirectoryItself
       aliceWallet.tap(50) // she'll need this for accepting the subscription request
       requestDirectoryEntry(aliceUserParty, aliceDirectory, "alice.cns")
@@ -375,7 +374,7 @@ class WalletFrontendIntegrationTest
 
     "show subscriptions in different states" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.damlUser
-      val aliceUserParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val expectedDirName = createDirectoryEntryForDirectoryItself
       aliceWallet.tap(50) // she'll need this for accepting and financing subscriptions
 
@@ -426,7 +425,7 @@ class WalletFrontendIntegrationTest
 
     "support canceling subscriptions" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.damlUser
-      val aliceUserParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val expectedDirName = createDirectoryEntryForDirectoryItself
       aliceWallet.tap(50) // she'll need this for accepting and financing subscriptions
 
@@ -464,7 +463,7 @@ class WalletFrontendIntegrationTest
 
     "support transfer offers" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.damlUser
-      val aliceParty = setupForTestWithDirectory(this, aliceWallet, aliceValidator)
+      val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val aliceEntryName = "alice.cns"
       actAndCheck("Tap coin for alice", aliceWallet.tap(50))(
         "Alice has coin",
@@ -472,7 +471,7 @@ class WalletFrontendIntegrationTest
       )
       createDirectoryEntry(aliceParty, aliceDirectory, aliceEntryName, aliceWallet)
       val bobDamlUser = bobWallet.config.damlUser
-      val bobParty = setupForTestWithDirectory(this, bobWallet, bobValidator)
+      val bobParty = setupForTestWithDirectory(bobWallet, bobValidator)
       val bobEntryName = "bob.cns"
       actAndCheck("Tap coin for bob", bobWallet.tap(50))(
         "Bob has coin",
@@ -563,7 +562,7 @@ class WalletFrontendIntegrationTest
 
     "display currency in subscriptions and subscription requests" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.damlUser
-      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       val usdQuantity = new paymentCodegen.PaymentQuantity(
         BigDecimal(42.0).bigDecimal,
         paymentCodegen.Currency.USD,
@@ -598,7 +597,7 @@ class WalletFrontendIntegrationTest
     }
 
     "user name is persisted" in { implicit env =>
-      val aliceParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val aliceParty = onboardWalletUser(aliceWallet, aliceValidator)
       withFrontEnd("alice") { implicit webDrivers =>
         browseToAliceWallet(aliceWallet.config.damlUser)
         find(id("logged-in-user")).value.text should matchText(aliceParty.toProtoPrimitive)
@@ -620,12 +619,11 @@ class WalletFrontendIntegrationTest
   }
 
   private def setupForTestWithDirectory(
-      test: BaseTest,
       walletClient: WalletAppClientReference,
       validator: LocalValidatorAppReference,
   ) = {
     validator.remoteParticipant.dars.upload(directoryDarPath)
-    onboardWalletUser(test, walletClient, validator)
+    onboardWalletUser(walletClient, validator)
   }
 
   private def createDirectoryEntryForDirectoryItself(implicit

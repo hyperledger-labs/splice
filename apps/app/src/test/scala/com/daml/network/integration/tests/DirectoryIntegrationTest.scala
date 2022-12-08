@@ -13,7 +13,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import com.daml.network.util.CoinTestUtil
+import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.DiscardOps
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
@@ -24,7 +24,7 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
-class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
+class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
   import DirectoryIntegrationTest._
 
@@ -52,7 +52,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
       import env._
 
       // The user of the directory service.
-      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       val offsetBefore = directoryValidator.remoteParticipant.ledger_api.transactions.end()
 
       // Trigger three concurrent install requests
@@ -70,7 +70,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
     "accept unique install requests" in { implicit env =>
       import env._
       // The user of the directory service.
-      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
       // Test that we can do a racy allocation and cancellation of a directory install request multiple times
       for (_ <- 1 to 3) {
@@ -266,7 +266,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
     }
 
     def setupUser(refs: StaticUserRefs): DynamicUserRefs = {
-      val userParty = onboardWalletUser(this, refs.wallet, refs.validator)
+      val userParty = onboardWalletUser(refs.wallet, refs.validator)
 
       clue("Request install and wait for provider to auto-accept") {
         refs.directory.requestDirectoryInstall()

@@ -8,7 +8,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import com.daml.network.util.CoinTestUtil
+import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import java.time.Duration
@@ -16,7 +16,10 @@ import java.time.temporal.ChronoUnit
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
-class DirectoryTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTestUtil {
+class DirectoryTimeBasedIntegrationTest
+    extends CoinIntegrationTest
+    with WalletTestUtil
+    with TimeTestUtil {
 
   private val directoryDarPath =
     "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
@@ -60,7 +63,7 @@ class DirectoryTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTes
     }
     "allocate directory entries following an initial subscription payment and renew entries on follow-up payments" in {
       implicit env =>
-        val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+        val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
         val providerParty = directory.getProviderPartyId()
 
         clue("Request install and wait for provider to auto-accept") {
@@ -113,7 +116,7 @@ class DirectoryTimeBasedIntegrationTest extends CoinIntegrationTest with CoinTes
         }
     }
     "expire stale subscriptions" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       clue("Request install and wait for provider to auto-accept") {
         aliceDirectory.requestDirectoryInstall()
         aliceValidator.remoteParticipant.ledger_api.acs

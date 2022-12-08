@@ -5,7 +5,7 @@ import com.daml.network.console.{RemoteDirectoryAppReference, WalletAppClientRef
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
-import com.daml.network.util.{CoinTestUtil, CoinUtil}
+import com.daml.network.util.{CoinUtil, WalletTestUtil}
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.ShowUtil.*
@@ -15,7 +15,7 @@ import scala.concurrent.duration.DurationInt
 
 class SplitwiseFrontendIntegrationTest
     extends FrontendIntegrationTest("aliceSplitwise", "bobSplitwise", "charlieSplitwise")
-    with CoinTestUtil {
+    with WalletTestUtil {
 
   private val splitwiseDarPath = "daml/splitwise/.daml/dist/splitwise-0.1.0.dar"
   private val directoryDarPath = "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
@@ -77,13 +77,13 @@ class SplitwiseFrontendIntegrationTest
 
     "settle debts with multiple parties" in { implicit env =>
       val aliceDamlUser = aliceSplitwise.config.damlUser
-      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       val bobDamlUser = bobSplitwise.config.damlUser
-      val bobUserParty = onboardWalletUser(this, bobWallet, bobValidator)
+      val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
       val charlieDamlUser = charlieSplitwise.config.damlUser
       // we re-use alice's validator here to save some resources
       val charlieValidator = aliceValidator
-      val charlieUserParty = onboardWalletUser(this, charlieWallet, charlieValidator)
+      val charlieUserParty = onboardWalletUser(charlieWallet, charlieValidator)
       val groupName = "troika"
 
       initialiseDirectoryApp("alice.cns", aliceUserParty, aliceDirectory, aliceWallet)
@@ -241,9 +241,9 @@ class SplitwiseFrontendIntegrationTest
 
     "settle debts with a single party" in { implicit env =>
       val aliceDamlUser = aliceSplitwise.config.damlUser
-      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       val bobDamlUser = bobSplitwise.config.damlUser
-      val bobUserParty = onboardWalletUser(this, bobWallet, bobValidator)
+      val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
       val groupName = "troika"
 
       initialiseDirectoryApp("alice.cns", aliceUserParty, aliceDirectory, aliceWallet)
@@ -334,13 +334,13 @@ class SplitwiseFrontendIntegrationTest
 
     "handle multiple groups correctly" in { implicit env =>
       val aliceDamlUser = aliceSplitwise.config.damlUser
-      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
       val bobDamlUser = bobSplitwise.config.damlUser
-      val bobUserParty = onboardWalletUser(this, bobWallet, bobValidator)
+      val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
       val charlieDamlUser = charlieSplitwise.config.damlUser
       // we re-use alice's validator here to save some resources
       val charlieValidator = aliceValidator
-      val charlieUserParty = onboardWalletUser(this, charlieWallet, charlieValidator)
+      val charlieUserParty = onboardWalletUser(charlieWallet, charlieValidator)
 
       initialiseDirectoryApp("alice.cns", aliceUserParty, aliceDirectory, aliceWallet)
       initialiseDirectoryApp("bob.cns", bobUserParty, bobDirectory, bobWallet)

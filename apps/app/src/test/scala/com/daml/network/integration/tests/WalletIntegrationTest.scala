@@ -12,7 +12,7 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import com.daml.network.util.CoinTestUtil
+import com.daml.network.util.WalletTestUtil
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.console.CommandFailure
@@ -28,7 +28,10 @@ import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
 
-class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext with CoinTestUtil {
+class WalletIntegrationTest
+    extends CoinIntegrationTest
+    with HasExecutionContext
+    with WalletTestUtil {
 
   "A wallet" should {
 
@@ -38,7 +41,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
     }
 
     "shutdown cleanly with lots of coin operations in flight" in { implicit env =>
-      onboardWalletUser(this, aliceWallet, aliceValidator)
+      onboardWalletUser(aliceWallet, aliceValidator)
 
       loggerFactory.assertLoggedWarningsAndErrorsSeq(
         {
@@ -91,14 +94,14 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
     }
 
     "allow a user to list, and reject app payment requests" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
       clue("Check that no payment requests exist") {
         aliceWallet.listAppPaymentRequests() shouldBe empty
       }
 
       val (_, _, reqC) =
-        createSelfPaymentRequest(this, aliceWalletBackend.remoteParticipant, aliceUserParty)
+        createSelfPaymentRequest(aliceWalletBackend.remoteParticipant, aliceUserParty)
 
       val reqFound = clue("Check that we can see the created payment request") {
         val reqFound = eventually() {
@@ -119,10 +122,10 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
     }
 
     "allow a user to list and accept app payment requests" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
       val (referenceId, _, reqC) =
-        createSelfPaymentRequest(this, aliceWalletBackend.remoteParticipant, aliceUserParty)
+        createSelfPaymentRequest(aliceWalletBackend.remoteParticipant, aliceUserParty)
 
       val cid = eventually() {
         inside(aliceWallet.listAppPaymentRequests()) { case Seq(r) =>
@@ -161,7 +164,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
     }
 
     "correctly select coins for payments" in { implicit env =>
-      val (alice, bob) = onboardAliceAndBob(this)
+      val (alice, bob) = onboardAliceAndBob()
 
       clue("Alice gets some coins") {
         // Note: it would be great if we could add coins with different holding fees,
@@ -183,7 +186,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
     }
 
     "allow a user to list and reject subscription requests" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
       aliceWallet.listSubscriptionRequests() shouldBe empty
 
@@ -209,7 +212,7 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
       "to list idle subscriptions, to initiate subscription payments, " +
       "and to cancel a subscription" in { implicit env =>
         val transferContext = scan.getAppTransferContext()
-        val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+        val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
         val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
         aliceWallet.listSubscriptionRequests() shouldBe empty
@@ -308,8 +311,8 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
       }
 
     "allow two users to make direct transfers between them" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
-      val bobUserParty = onboardWalletUser(this, bobWallet, bobValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
       aliceWallet.tap(100.0)
 
       val expiration = Primitive.Timestamp
@@ -420,13 +423,13 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
     }
 
     "allow two wallet app users to connect to one wallet backend and tap" in { implicit env =>
-      val aliceUserParty = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
       aliceWallet.tap(50.0)
       checkWallet(aliceUserParty, aliceWallet, Seq((50, 50)))
 
       val charlieDamlUser = charlieWallet.config.damlUser
-      val charlieUserParty = onboardWalletUser(this, charlieWallet, aliceValidator)
+      val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
 
       charlieWallet.tap(50.0)
       checkWallet(charlieUserParty, charlieWallet, Seq((50, 50)))
@@ -436,10 +439,10 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
     }
 
     "skip empty batches in the treasury service" in { implicit env =>
-      val alice = onboardWalletUser(this, aliceWallet, aliceValidator)
+      val alice = onboardWalletUser(aliceWallet, aliceValidator)
       aliceWallet.tap(49)
       // create and reject request such that...
-      val request = createSelfPaymentRequest(this, aliceValidator.remoteParticipant, alice)._2
+      val request = createSelfPaymentRequest(aliceValidator.remoteParticipant, alice)._2
       aliceWallet.rejectAppPaymentRequest(request)
 
       loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
@@ -464,11 +467,10 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
 
     "concurrent coin-operations" should {
       "be batched" in { implicit env =>
-        val alice = onboardWalletUser(this, aliceWallet, aliceValidator)
+        val alice = onboardWalletUser(aliceWallet, aliceValidator)
         aliceWallet.tap(50)
-        val requestIds = (1 to 3).map(i =>
-          createSelfPaymentRequest(this, aliceValidator.remoteParticipant, alice)._2
-        )
+        val requestIds =
+          (1 to 3).map(i => createSelfPaymentRequest(aliceValidator.remoteParticipant, alice)._2)
         val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
         // sending three commands in short succession to the idle wallet should lead to two transactions being executed
         // tx 1: first command that arrived is immediately executed
@@ -497,12 +499,12 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
 
       "be batched up to `batchSize` concurrent coin-operations" in { implicit env =>
         val batchSize = aliceWalletBackend.config.treasury.batchSize
-        val alice = onboardWalletUser(this, aliceWallet, aliceValidator)
+        val alice = onboardWalletUser(aliceWallet, aliceValidator)
         aliceWallet.tap(1000)
 
         val requests =
           (0 to batchSize + 1).map(_ =>
-            createSelfPaymentRequest(this, aliceValidator.remoteParticipant, alice)._2
+            createSelfPaymentRequest(aliceValidator.remoteParticipant, alice)._2
           )
 
         eventually() {
@@ -542,14 +544,14 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
 
       "fail operations early and independently that don't pass the activeness lookup checks" in {
         implicit env =>
-          val alice = onboardWalletUser(this, aliceWallet, aliceValidator)
+          val alice = onboardWalletUser(aliceWallet, aliceValidator)
 
           // tapping some coin & waiting for it to appear as a way to synchronize on the initialization of the apps.
           aliceWallet.tap(10)
           aliceValidator.remoteParticipant.ledger_api.acs
             .awaitJava(coinCodegen.Coin.COMPANION)(alice)
           // creating payment request
-          val request = createSelfPaymentRequest(this, aliceValidator.remoteParticipant, alice)._2
+          val request = createSelfPaymentRequest(aliceValidator.remoteParticipant, alice)._2
           // Reject it again
           aliceWallet.rejectAppPaymentRequest(request)
           // ... such that we don't grab the ledger offset when some init txs are still occurring
@@ -593,10 +595,10 @@ class WalletIntegrationTest extends CoinIntegrationTest with HasExecutionContext
       }
 
       "retry a batch if it fails due to contention" in { implicit env =>
-        val alice = onboardWalletUser(this, aliceWallet, aliceValidator)
+        val alice = onboardWalletUser(aliceWallet, aliceValidator)
         aliceWallet.tap(10)
 
-        val request = createSelfPaymentRequest(this, aliceValidator.remoteParticipant, alice)._2
+        val request = createSelfPaymentRequest(aliceValidator.remoteParticipant, alice)._2
         eventually()(aliceWallet.listAppPaymentRequests() should have size 1)
 
         val cancelF = Future(aliceWallet.rejectAppPaymentRequest(request))
