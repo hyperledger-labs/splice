@@ -1,6 +1,5 @@
 package com.daml.network.console
 
-import com.daml.ledger.client.binding.Primitive
 import com.daml.network.auth.{AuthUtil, JwtCallCredential}
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.{
@@ -17,6 +16,7 @@ import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient.{
 }
 import com.daml.network.wallet.config.{WalletAppBackendConfig, WalletAppClientConfig}
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
@@ -195,7 +195,7 @@ abstract class WalletAppReference(
       receiver: PartyId,
       quantity: BigDecimal,
       description: String,
-      expiresAt: Primitive.Timestamp,
+      expiresAt: CantonTimestamp,
       senderFeeTransferRatio: BigDecimal = 1.0,
   ): transferOfferCodegen.TransferOffer.ContractId =
     consoleEnvironment.run {

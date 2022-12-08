@@ -458,7 +458,7 @@ class GrpcWalletService(
               receiver.toProtoPrimitive,
               new PaymentQuantity(quantity, Currency.CC),
               request.description,
-              expiresAt,
+              expiresAt.toInstant,
               senderTransferFeeRatio,
             )
           )

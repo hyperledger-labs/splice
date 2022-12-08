@@ -1,6 +1,5 @@
 package com.daml.network.util
 
-import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
@@ -19,9 +18,10 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences, Proto}
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 
-import java.time.Instant
+import java.time.Duration
 import java.time.temporal.ChronoUnit
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
@@ -103,7 +103,7 @@ trait WalletTestUtil extends CoinIntegrationTest {
                     Some(
                       new v1.coin.TimeLock(
                         Seq(userParty.toProtoPrimitive).asJava,
-                        expiration,
+                        expiration.toInstant,
                       )
                     ).toJava,
                   ),
@@ -167,9 +167,7 @@ trait WalletTestUtil extends CoinIntegrationTest {
       amount: BigDecimal,
       senderTransferFeeRatio: BigDecimal = 1.0,
   ) = {
-    val expiration = Primitive.Timestamp
-      .discardNanos(Instant.now().plus(1, ChronoUnit.MINUTES))
-      .getOrElse(fail("Failed to convert timestamp"))
+    val expiration = CantonTimestamp.now().plus(Duration.ofMinutes(1))
     val transferOfferId =
       senderWallet.createTransferOffer(
         receiver,

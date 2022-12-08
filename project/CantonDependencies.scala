@@ -97,11 +97,6 @@ object CantonDependencies {
   lazy val daml_ledger_rxjava_client = "com.daml" % "bindings-rxjava" % daml_libraries_version
   lazy val daml_script_runner = "com.daml" %% "daml-script-runner" % daml_libraries_version
 
-  lazy val da_grpc_bindings_ledger_client = "com.daml" %% "bindings-scala" % daml_libraries_version
-
-  lazy val da_akka_bindings = "com.daml" %% "bindings-akka" % daml_libraries_version
-  lazy val rs_grpc_akka = "com.daml" %% "rs-grpc-akka" % daml_libraries_version
-
   lazy val bouncycastle_bcprov_jdk15on =
     "org.bouncycastle" % "bcprov-jdk15on" % bouncy_castle_version
   lazy val bouncycastle_bcpkix_jdk15on =

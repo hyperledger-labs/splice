@@ -2,7 +2,6 @@ package com.daml.network.store
 
 import akka.actor.ActorSystem
 import akka.stream.scaladsl.*
-import com.daml.ledger.client.binding.Primitive
 import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.ledger.javaapi.data.{ArchivedEvent, CreatedEvent, Event, Transaction}
 import com.daml.network.codegen.java.cc.{api as apiCodegen, coin as directoryCodegen}
@@ -10,6 +9,7 @@ import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.JavaContract
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 import org.scalatest.wordspec.AsyncWordSpec
 
@@ -111,8 +111,7 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
   val tx4Offset = "014"
   val tx5Offset = "015"
 
-  val effectiveAt: Instant =
-    Primitive.Timestamp.discardNanos(Instant.EPOCH).getOrElse(fail("Failed to convert timestamp"))
+  val effectiveAt: Instant = CantonTimestamp.Epoch.toInstant
 
   private def mkTx(offset: String, events: Seq[Event]): Transaction = new Transaction(
     transactionId = "",

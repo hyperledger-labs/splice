@@ -1,6 +1,5 @@
 package com.daml.network.integration.tests
 
-import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.wallet.{
@@ -16,14 +15,14 @@ import com.daml.network.util.WalletTestUtil
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.console.CommandFailure
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil as DecodeUtil
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.{DiscardOps, HasExecutionContext}
 import org.slf4j.event.Level
 
-import java.time.Instant
-import java.time.temporal.ChronoUnit
+import java.time.Duration
 import scala.concurrent.Future
 import scala.jdk.CollectionConverters.*
 import scala.util.Try
@@ -315,9 +314,7 @@ class WalletIntegrationTest
       val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
       aliceWallet.tap(100.0)
 
-      val expiration = Primitive.Timestamp
-        .discardNanos(Instant.now().plus(1, ChronoUnit.MINUTES))
-        .getOrElse(fail("Failed to convert timestamp"))
+      val expiration = CantonTimestamp.now().plus(Duration.ofMinutes(1))
 
       val offer =
         aliceWallet.createTransferOffer(bobUserParty, 1.0, "direct transfer test", expiration)
@@ -359,9 +356,7 @@ class WalletIntegrationTest
       )
 
       // TODO(#1870): consider making this a time-based test instead
-      val shortExpiration = Primitive.Timestamp
-        .discardNanos(Instant.now().plus(2, ChronoUnit.SECONDS))
-        .getOrElse(fail("Failed to convert timestamp"))
+      val shortExpiration = CantonTimestamp.now().plus(Duration.ofSeconds(2))
 
       val (offer4, _) = actAndCheck(
         "Alice creates two short-lived transfer offer", {

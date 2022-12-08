@@ -3,12 +3,12 @@
 
 package com.daml.network.util
 
-import com.daml.api.util.TimestampConversion
 import com.daml.ledger.api.refinements.ApiTypes
-import com.daml.ledger.api.v1.value.Value
 import com.daml.ledger.client.binding.Primitive
 import com.daml.ledger.javaapi.data.codegen.{ContractCompanion, ContractId => JavaContractId}
 import com.daml.lf.data.Numeric
+import com.digitalasset.canton.LfTimestamp
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 
 /** Trait for values used in our protobuf requests.
@@ -98,16 +98,15 @@ object Proto {
       def decode(e: String) = Right(Primitive.ContractId(e))
     }
 
-  implicit val timestampValue: Proto[Primitive.Timestamp, Long] =
-    new Proto[Primitive.Timestamp, Long] {
-      def encode(d: Primitive.Timestamp) = TimestampConversion.instantToMicros(d).value
+  implicit val timestampValue: Proto[CantonTimestamp, Long] =
+    new Proto[CantonTimestamp, Long] {
+      def encode(d: CantonTimestamp) = d.underlying.micros
       def decode(e: Long) = {
-        val instant = TimestampConversion.microsToInstant(Value.Sum.Timestamp(e))
-        Primitive.Timestamp.discardNanos(instant).toRight("Could not convert timestamp")
+        LfTimestamp.fromLong(e).map(CantonTimestamp(_))
       }
     }
 
-  object Timestamp extends ProtoCompanion[Primitive.Timestamp] {
+  object Timestamp extends ProtoCompanion[CantonTimestamp] {
     type Enc = Long
     def instance = timestampValue
   }

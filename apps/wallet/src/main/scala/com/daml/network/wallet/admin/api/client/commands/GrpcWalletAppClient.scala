@@ -2,7 +2,6 @@ package com.daml.network.wallet.admin.api.client.commands
 
 import cats.syntax.either.*
 import cats.syntax.traverse.*
-import com.daml.ledger.client.binding.Primitive
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.transferoffer.TransferOffer
 import com.daml.network.codegen.java.cn.wallet.{
@@ -21,6 +20,7 @@ import com.daml.network.wallet.v0.{
 }
 import com.digitalasset.canton.ProtoDeserializationError
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.empty.Empty
 import io.grpc.ManagedChannel
@@ -483,7 +483,7 @@ object GrpcWalletAppClient {
       receiver: PartyId,
       quantity: BigDecimal,
       description: String,
-      expiresAt: Primitive.Timestamp,
+      expiresAt: CantonTimestamp,
       senderFeeTransferRatio: BigDecimal,
   ) extends BaseCommand[
         v0.CreateTransferOfferRequest,
