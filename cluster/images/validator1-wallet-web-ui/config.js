@@ -1,9 +1,7 @@
 window.canton_network_config = {
   auth: {
-    algorithm: "rs-256",
-    authority: "https://canton-network-dev.us.auth0.com",
-    client_id: "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK",
-    redirect_uri: window.location.origin,
+    algorithm: "hs-256-unsafe",
+    secret: "test",
   },
   services: {
     wallet: {

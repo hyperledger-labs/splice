@@ -2,8 +2,6 @@ package com.daml.network.auth
 
 import com.auth0.jwt.interfaces.DecodedJWT
 
-import scala.jdk.CollectionConverters._
-
 case class CnClaims(
     daml_user: Option[String]
 )
@@ -11,18 +9,9 @@ case class CnClaims(
 object JwtClaims {
   val CNClaimKey = "https://canton-network"
 
-  def getCnClaims(token: DecodedJWT): Option[CnClaims] = {
-    val claim = token.getClaim(CNClaimKey)
-
-    Option(claim.asMap.asScala).flatMap {
-      _.get("daml_user").map {
-        _ match {
-          case user: String => CnClaims(Some(user))
-          case _ => CnClaims(None)
-        }
-      }
-    }
-  }
+  def getCnClaims(token: DecodedJWT): Option[CnClaims] = Option(
+    token.getClaim(CNClaimKey).as(classOf[CnClaims])
+  )
 
   /** Support two ways of specifying Daml user IDs in JWT tokens:
     *

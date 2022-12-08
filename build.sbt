@@ -537,8 +537,6 @@ lazy val `apps-app` =
       libraryDependencies += "org.seleniumhq.selenium" % "selenium-java" % "4.6.0" % "test",
       libraryDependencies += "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4" % "test",
       libraryDependencies += "com.auth0" % "auth0" % "1.44.1",
-      libraryDependencies += spray_json,
-      libraryDependencies += akka_spray_json,
       BuildCommon.sharedAppSettings,
       BuildCommon.cantonWarts,
       bundleTask,

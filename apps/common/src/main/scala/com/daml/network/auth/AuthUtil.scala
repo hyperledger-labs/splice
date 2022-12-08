@@ -10,6 +10,7 @@ import com.auth0.jwt.algorithms.Algorithm
 object AuthUtil {
 
   val testSecret: String = "test"
+  val testSignatureAlgorithm: Algorithm = Algorithm.HMAC256(testSecret)
 
   /** We expect the audience field to have format `https://<participant-id>.network.canton.global/<app-name>` */
   def audience(
@@ -20,14 +21,17 @@ object AuthUtil {
   def testToken(
       audience: String,
       user: String,
-      secret: String = testSecret,
   ): String = {
     JWT
       .create()
       .withSubject(user)
       .withAudience(audience)
-      .sign(Algorithm.HMAC256(secret))
+      .sign(testSignatureAlgorithm)
   }
+
+  def testTokenBearer(audience: String, user: String): String =
+    s"Bearer ${testToken(audience, user)}"
+
   object LedgerApi {
 
     /** Uses scope-based tokens for the ledger API, see https://docs.daml.com/app-dev/authorization.html#scope-based-tokens.
