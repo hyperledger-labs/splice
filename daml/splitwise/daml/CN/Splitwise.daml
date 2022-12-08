@@ -296,8 +296,6 @@ data BalanceUpdateType
       payer : Party
       description : Text
       quantity : Decimal -- Quantity in CC
-      -- TODO(M1-90) Support $ and translate to CC. This needs some refactoring,
-      -- we don’t want direct CoinRules access.
   -- | Transfer from sender to receiver to reduce their debt.
   -- Note that it is possible to transfer preemptively before a bill has been submitted.
   | Transfer with

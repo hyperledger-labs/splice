@@ -82,27 +82,20 @@ queryBalances p k = do
   where
     f acc BalanceUpdate{..} = case update of
       ExternalPayment {..} ->
-        let split = quantity / intToNumeric (length group.members + 1) -- TODO(M1-90) Make sure nothing gets lost here.
+        let split = quantity / intToNumeric (length group.members + 1) -- TODO(#1451) Make sure nothing gets lost here.
         in if payer == p.primaryParty
              then let g acc x
                         | x == payer = acc
-                        | otherwise = insertWith (+) x split acc
+                        | otherwise = M.insertWith (+) x split acc
                   in foldl g acc (group.owner :: group.members)
-             else insertWith (+) payer (-split) acc
+             else M.insertWith (+) payer (-split) acc
       Transfer {..}
-        | p.primaryParty == sender -> insertWith (+) receiver quantity acc
-        | p.primaryParty == receiver -> insertWith (+) sender (- quantity) acc
+        | p.primaryParty == sender -> M.insertWith (+) receiver quantity acc
+        | p.primaryParty == receiver -> M.insertWith (+) sender (- quantity) acc
         | otherwise -> acc
       Netting {..} -> case M.lookup p.primaryParty balanceChanges of
         None -> acc
-        Some changes -> foldl (\acc (p', v) -> insertWith (+) p' v acc) acc (M.toList changes)
-
--- TODO(M1-90) Remove on next SDK upgrade in favor of upstream implementation.
-insertWith : Ord k => (v -> v -> v) -> k -> v -> Map k v -> Map k v
-insertWith f k v m =
-  case M.lookup k m of
-    None -> M.insert k v m
-    Some v' -> M.insert k (f v v') m
+        Some changes -> foldl (\acc (p', v) -> M.insertWith (+) p' v acc) acc (M.toList changes)
 
 enterPayment : CCUser -> CCUser -> GroupKey -> Decimal -> Text -> Script ()
 enterPayment payer provider groupKey quantity description = do
