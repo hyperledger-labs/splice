@@ -1,6 +1,6 @@
 package com.daml.network.config
 
-import com.daml.network.auth.AuthUtil
+import com.daml.network.auth.{AuthUtil, UserCredential}
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.scan.config.LocalScanAppConfig
 import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
@@ -117,6 +117,54 @@ object CoinConfigTransforms {
           config5
         )
       config6
+    }
+  }
+
+  def addUserTokens(users: Map[String, UserCredential]): CoinConfigTransform = { config =>
+    {
+      // Traverse config structure, substitute usernames from map and inject associated token
+      def getUser(damlUser: String) =
+        users.getOrElse(damlUser, UserCredential(damlUser, None)).username
+
+      def getToken(damlUser: String) = users.get(damlUser).flatMap(_.token)
+
+      val config1 = updateSvcAppConfig(c => c.copy(damlUser = getUser(c.damlUser)))(config)
+      val config2 = updateScanAppConfig(c => c.copy(svcUser = getUser(c.svcUser)))(config1)
+      val config3 =
+        updateAllValidatorConfigs_(c =>
+          c.copy(
+            damlUser = getUser(c.damlUser),
+            walletServiceUser = getUser(c.walletServiceUser),
+            appInstances = c.appInstances.view
+              .mapValues(i => i.copy(serviceUser = getUser(i.serviceUser)))
+              .toMap,
+          )
+        )(config2)
+      val config4 =
+        updateAllWalletAppBackendConfigs_(c => c.copy(serviceUser = getUser(c.serviceUser)))(
+          config3
+        )
+      val config5 =
+        updateAllWalletAppClientConfigs_(c =>
+          c.copy(damlUser = getUser(c.damlUser), damlUserToken = getToken(c.damlUser))
+        )(
+          config4
+        )
+      val config6 =
+        updateDirectoryAppConfig(c => c.copy(damlUser = getUser(c.damlUser)))(
+          config5
+        )
+      val config7 =
+        updateAllSplitwiseAppConfigs_(c => c.copy(providerUser = getUser(c.providerUser)))(
+          config6
+        )
+      val config8 =
+        updateAllRemoteSplitwiseAppConfigs_(c => c.copy(damlUser = getUser(c.damlUser)))(
+          config7
+        )
+      val config9 =
+        updateAllRemoteDirectoryAppConfigs_(c => c.copy(damlUser = getUser(c.damlUser)))(config8)
+      config9
     }
   }
 

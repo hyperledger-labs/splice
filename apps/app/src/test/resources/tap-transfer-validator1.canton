@@ -6,13 +6,13 @@ import java.time.temporal.ChronoUnit
 println("BEGIN - validator1 test")
 
 // Onboard test parties.
-val aliceUserName = aliceWallet.config.damlUser
-val bobUserName = bobWallet.config.damlUser
+val aliceUserName = aliceValidator1Wallet.config.damlUser
+val bobUserName = bobValidator1Wallet.config.damlUser
 
 println(s"Onboarding Alice user: " + aliceUserName)
 val aliceParty = validator1App.onboardUser(aliceUserName)
 
-println(s"Onboarding Bob user: " + aliceUserName)
+println(s"Onboarding Bob user: " + bobUserName)
 val bobParty = validator1App.onboardUser(bobUserName)
 
 println("Tap CC")

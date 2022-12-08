@@ -327,11 +327,14 @@ class WalletAppClientReference(
 
   override protected val instanceType = "Wallet user"
 
-  override def token: String = {
-    AuthUtil.testTokenBearer(
-      audience = AuthUtil.audience(config.adminApi.address, "wallet"),
-      user = config.damlUser,
-    )
+  override def token: String = config.damlUserToken match {
+    case Some(token) => token
+    case None => {
+      AuthUtil.testToken(
+        audience = AuthUtil.audience(config.adminApi.address, "wallet"),
+        user = config.damlUser,
+      )
+    }
   }
 }
 
@@ -365,7 +368,7 @@ class WalletAppBackendReference(
 
   @Help.Summary("Set wallet context")
   def setWalletContext(userId: String): Unit = {
-    val token = AuthUtil.testTokenBearer(
+    val token = AuthUtil.testToken(
       audience = AuthUtil.audience(config.adminApi.address, "wallet"),
       user = userId,
     )

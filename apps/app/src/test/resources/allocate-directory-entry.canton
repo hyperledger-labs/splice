@@ -4,7 +4,7 @@ import com.daml.network.codegen.java.cn.{directory => codegen}
 println("BEGIN - directory entry test")
 
 // Onboard test parties.
-val aliceUserName = aliceWallet.config.damlUser
+val aliceUserName = aliceValidator1Wallet.config.damlUser
 
 println(s"Onboarding Alice user: " + aliceUserName)
 val aliceParty = validator1App.onboardUser(aliceUserName)

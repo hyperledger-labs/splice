@@ -72,6 +72,7 @@ class GrpcAdminCommandRunner(
       logger.debug(s"Running on ${instanceName} command ${command} against ${clientConfig}")(
         traceContext
       )
+
       val apiResult =
         awaitTimeout.await(
           s"Running on ${instanceName} command ${command} against ${clientConfig}"

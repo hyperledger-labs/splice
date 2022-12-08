@@ -19,8 +19,6 @@ final class AuthInterceptor(
     with NamedLogging
     with NoTracing {
 
-  private val bearerPrefix = "Bearer "
-
   override def interceptCall[ReqT, RespT](
       call: ServerCall[ReqT, RespT],
       headers: Metadata,
@@ -31,9 +29,9 @@ final class AuthInterceptor(
       authHeaderValue <- Option(headers.get(AuthInterceptor.AUTHORIZATION_KEY))
         .toRight(s"No ${AuthInterceptor.AUTHORIZATION_KEY} header found")
       encodedToken <- Either.cond(
-        authHeaderValue.startsWith(bearerPrefix),
-        authHeaderValue.stripPrefix(bearerPrefix),
-        s"Auth header did not start with bearer  prefix '$bearerPrefix'",
+        authHeaderValue.startsWith(AuthInterceptor.BEARER_PREFIX),
+        authHeaderValue.stripPrefix(AuthInterceptor.BEARER_PREFIX),
+        s"Auth header did not start with bearer prefix '${AuthInterceptor.BEARER_PREFIX}'",
       )
       decodedToken <- verifier.verify(encodedToken)
       damlUser <- JwtClaims.getDamlUser(decodedToken).toRight("No daml user found in token")
@@ -69,6 +67,7 @@ final class AuthInterceptor(
 }
 
 object AuthInterceptor {
+  val BEARER_PREFIX = "Bearer "
   val SUBJECT_KEY = Context.key[String]("AuthServiceDecodedClaim")
   val AUTHORIZATION_KEY = Metadata.Key.of("Authorization", Metadata.ASCII_STRING_MARSHALLER)
 
@@ -91,7 +90,7 @@ class JwtCallCredential(val jwt: String) extends CallCredentials {
       override def run() = {
         try {
           val headers = new Metadata
-          headers.put(AuthInterceptor.AUTHORIZATION_KEY, jwt)
+          headers.put(AuthInterceptor.AUTHORIZATION_KEY, s"${AuthInterceptor.BEARER_PREFIX}${jwt}")
           metadataApplier.apply(headers)
         } catch {
           case e: Throwable =>
