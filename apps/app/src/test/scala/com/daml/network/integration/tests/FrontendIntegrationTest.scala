@@ -87,7 +87,11 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
     }
   }
 
-  override def beforeEach() = {
+  override def provideEnvironment = {
+    val env = super.provideEnvironment
+    // We need to start the web frontends afterwards because selenium
+    // insists on automatically selecting free ports and those may
+    // collide with the ports used by our own services.
     for { name <- frontendNames.toSeq } {
       System.setProperty(
         FirefoxDriver.SystemProperty.BROWSER_LOGFILE,
@@ -127,7 +131,7 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
         },
       );
     }
-    super.beforeEach()
+    env
   }
 
   override def testFinished(env: CoinTestConsoleEnvironment): Unit = {
