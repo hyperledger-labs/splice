@@ -363,14 +363,14 @@ svc-app-84f954fb99-6ccw5              0/1     ImagePullBackOff   0             1
 ```
 
 The `ImagePullBackOff` status indicates that Kubernetes is waiting for
-a timeout to elapse before attemping to pull the image again. There
+a timeout to elapse before attempting to pull the image again. There
 can still be pods in `Running` status, due to the fact that we use
 Kubernetes deployment objects that wait for an updated pod to be
 running before stopping the previous pod. You can look for this
 scenario by checking the ages of the running vs. failed pods.
 
 To skip the image pull backoff timeout, you can delete the failed pod,
-which will force an immediate recreate of the pod and attempt to
+which will force an immediate recreation of the pod and attempt to
 repull the image.
 
 ```kubectl delete pod ${POD_NAME}```

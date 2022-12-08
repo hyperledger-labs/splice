@@ -248,7 +248,7 @@ object FutureUtil {
             val waitedReadable = LoggerUtil.roundDurationForHumans(waited)
             log(
               if (waited >= warnAfter) Level.INFO else Level.DEBUG,
-              s"Task $description still not completed after ${waitedReadable}. Continue waiting...",
+              show"Task ${description.singleQuoted} still not completed after ${waitedReadable}. Continue waiting...",
             )
             val leftOver = timeout.minus(waited)
             retry(
@@ -263,7 +263,7 @@ object FutureUtil {
 
       } else {
         val stackTraces = StackTraceUtil.formatStackTrace(stackTraceFilter)
-        val msg = s"Task $description did not complete within $timeout."
+        val msg = show"Task ${description.singleQuoted} did not complete within $timeout."
         log(Level.WARN, s"${msg} Stack traces:\n${stackTraces}")
         Failure(new TimeoutException(msg))
       }

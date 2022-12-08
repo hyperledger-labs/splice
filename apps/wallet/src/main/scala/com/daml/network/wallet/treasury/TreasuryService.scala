@@ -111,7 +111,8 @@ class TreasuryService(
         Future.failed(
           new StatusRuntimeException(
             Status.ABORTED.withDescription(
-              show"Aborted operation as there are too many (${queue.size()}) already in flight: $operation"
+              show"Aborted operation as there are too many (currently ${queue
+                  .size()}, max ${treasuryConfig.queueSize}) already in flight: $operation"
             )
           )
         )
