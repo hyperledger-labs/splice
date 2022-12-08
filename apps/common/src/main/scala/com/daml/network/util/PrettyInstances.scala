@@ -50,7 +50,7 @@ trait PrettyInstances extends com.digitalasset.canton.logging.pretty.PrettyInsta
   implicit def prettyDamlNumeric: Pretty[javaapi.data.Numeric] =
     prettyNode(
       "Numeric",
-      param("v", prettyOfString[javaapi.data.Numeric](_.getValue.toString).treeOf),
+      unnamedParam(prettyOfString[javaapi.data.Numeric](_.getValue.toString).treeOf),
     )
 
   implicit def prettyDamlBool: Pretty[javaapi.data.Bool] =

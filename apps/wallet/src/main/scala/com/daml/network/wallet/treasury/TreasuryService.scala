@@ -16,6 +16,7 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
+import com.daml.network.util.PrettyInstances.*
 import com.daml.network.util.{HasHealth, TimeUtil}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.config.TreasuryConfig
@@ -23,6 +24,7 @@ import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService.*
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.lifecycle.FlagCloseable
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -34,7 +36,6 @@ import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
 import scala.util.{Failure, Success}
-// TODO(#1818): Add PrettyPrinting
 
 /** This class encapsulates the logic that sequences all operations which change the coin holdings of an user such
   * that concurrent manipulations don't conflict.
@@ -62,7 +63,7 @@ class TreasuryService(
     withNewTrace(this.getClass.getSimpleName)(implicit tc =>
       _ => {
         val queue = Source
-          .queue[EnqueuedCoinOperation](treasuryConfig.bufferSize)
+          .queue[EnqueuedCoinOperation](treasuryConfig.queueSize)
           .batch(treasuryConfig.batchSize.toLong, operation => Seq(operation))(
             (operations, operation) => operations :+ operation
           )
@@ -71,16 +72,20 @@ class TreasuryService(
           .toMat(
             Sink.onComplete(result => {
               if (isClosing)
-                logger.debug(s"Coin operation batch executor shutting down with result: $result")
+                logger.debug(
+                  show"Coin operation batch executor shutting down with result: ${result.toString.unquoted}"
+                )
               else
                 logger.error(
-                  s"Unexpected termination of coin operation batch executor with result: $result"
+                  show"Unexpected termination of coin operation batch executor with result: ${result.toString.unquoted}"
                 )
               batchExecutorRunning.set(false)
             })
           )(Keep.left)
           .run()
-        logger.debug(s"Started coin operation operation batch executor with ${treasuryConfig}")
+        logger.debug(
+          show"Started coin operation operation batch executor with ${treasuryConfig.toString.unquoted}"
+        )
         queue
       }
     )
@@ -89,7 +94,7 @@ class TreasuryService(
 
   // Overriding, as this method is used in "FlagCloseable" to pretty-print the object being closed.
   override def toString: String =
-    s"TreasureService(endUserParty=${userStore.key.endUserParty})"
+    show"TreasureService(endUserParty=${userStore.key.endUserParty})"
 
   /** Enqueues a coin operation into an internal task queue.
     * The [[TreasuryService]] will schedule the operation and then complete the returned with its result.
@@ -98,17 +103,16 @@ class TreasuryService(
       operation: installCodegen.CoinOperation
   )(implicit tc: TraceContext): Future[installCodegen.CoinOperationOutcome] = {
     val p = Promise[installCodegen.CoinOperationOutcome]()
-    queue.offer(EnqueuedCoinOperation(operation, p)) match {
+    queue.offer(EnqueuedCoinOperation(operation, p, tc)) match {
       case Enqueued =>
-        logger.debug(s"received ${operation}, queue now: ${queue.size()}")
+        logger.debug(show"Received operation (queue size: ${queue.size()}): $operation")
         p.future
       // TODO(M3-90): add tests for the failure cases.
       case Dropped =>
         Future.failed(
           new StatusRuntimeException(
             Status.ABORTED.withDescription(
-              // TODO(#1818): Add PrettyPrinting
-              s"operation $operation was aborted, probably as there are too many (${queue.size()}) already in flight"
+              show"Aborted operation as there are too many (${queue.size()}) already in flight: $operation"
             )
           )
         )
@@ -117,7 +121,7 @@ class TreasuryService(
         Future.failed(
           new StatusRuntimeException(
             Status.UNAVAILABLE.withDescription(
-              s"operation $operation was rejected because the coin operation batch executor is shutting down."
+              show"Rejected operation because the coin operation batch executor is shutting down: $operation"
             )
           )
         )
@@ -129,19 +133,20 @@ class TreasuryService(
     */
   private def runLookups(
       batch: Seq[EnqueuedCoinOperation]
-  ): Future[Seq[EnqueuedCoinOperation]] = {
+  )(implicit tc: TraceContext): Future[Seq[EnqueuedCoinOperation]] = {
     batch
-      .traverse { case EnqueuedCoinOperation(op, p) =>
-        tryLookupCoinOperation(op)
+      .traverse { op =>
+        tryLookupCoinOperation(op.operation)
           .transform { lookupResult =>
             lookupResult match {
               case Failure(ex) =>
+                logger.debug(show"Failing operation due to failed lookup: $op", ex)
                 // if the lookup fails, complete the promise with the failed future
-                p.failure(ex)
+                op.outcomePromise.failure(ex)
                 // but still run the rest of the operations whose lookup didn't fail
                 Success(None)
               case Success(()) =>
-                Success(Some(EnqueuedCoinOperation(op, p)))
+                Success(Some(op))
             }
           }
       }
@@ -218,7 +223,7 @@ class TreasuryService(
 
     case _: coinoperation.CO_Tap => Future.unit
 
-    case op => throw new NotImplementedError(s"Unexpected coin operation: $op")
+    case op => throw new NotImplementedError(show"Unexpected coin operation: $op")
   }
 
   /** In case of contention, the `executeBatch` function may fail. This function adds retries so that a single coin
@@ -252,7 +257,7 @@ class TreasuryService(
       batch: Seq[EnqueuedCoinOperation]
   )(implicit tc: TraceContext): Future[Done] = {
     logger.debug(
-      s"Running batch of coin operations for user ${userStore.key.endUserParty} with length ${batch.size}: $batch"
+      show"Running batch of coin operations:${System.lineSeparator()}$batch"
     )
 
     def isErrorOutcome(outcome: installCodegen.CoinOperationOutcome): Boolean = outcome match {
@@ -266,9 +271,6 @@ class TreasuryService(
         logger.debug("Found no valid coin operations after running lookups.")
         Future.successful(Done)
       case validOperations =>
-        logger.debug(
-          s"After lookups, the batch contains ${validOperations.size} coin operations."
-        )
         for {
           now <- TimeUtil.getTime(connection, clockConfig)
           transferContext <- walletManager.store.getPaymentTransferContext(retryProvider, now)
@@ -292,9 +294,9 @@ class TreasuryService(
               cmd,
             )
           // return all outcomes to the callers
-          _ = (outcomes.exerciseResult.asScala zip validOperations).map {
-            case (outcome, EnqueuedCoinOperation(_, p)) =>
-              p.success(outcome)
+          _ = (outcomes.exerciseResult.asScala zip validOperations).map { case (outcome, op) =>
+            logger.debug(show"Completing operation $op with result ${outcome.toValue}")
+            op.outcomePromise.success(outcome)
           }
           // wait for store to ingest the new coin holdings *provided* they were updated
           case () <- if (outcomes.exerciseResult.asScala.forall(isErrorOutcome)) {
@@ -306,11 +308,7 @@ class TreasuryService(
             logger.debug(show"Waiting for store to ingest offset ${offset.singleQuoted}")
             userStore.signalWhenIngested(offset)
           }
-
-        } yield {
-          logger.debug(s"Batch executed with result:\n${outcomes.exerciseResult.asScala}")
-          Done
-        }
+        } yield Done
     }
   }
 
@@ -365,7 +363,7 @@ class TreasuryService(
 
   override def onClosed(): Unit = {
     logger.debug(
-      s"Shutdown initiated, closing coin operation batch execution queue, which currently contains ${queue.size()} elements)."
+      show"Shutdown initiated, closing coin operation batch execution queue, which currently contains ${queue.size()} elements)."
     )(
       TraceContext.empty
     )
@@ -378,5 +376,13 @@ object TreasuryService {
   private case class EnqueuedCoinOperation(
       operation: installCodegen.CoinOperation,
       outcomePromise: Promise[installCodegen.CoinOperationOutcome],
-  )
+      submittedFrom: TraceContext,
+  ) extends PrettyPrinting {
+    override def pretty: Pretty[EnqueuedCoinOperation.this.type] =
+      prettyNode(
+        "CoinOperation",
+        param("from", _.submittedFrom.showTraceId),
+        param("op", _.operation.toValue),
+      )
+  }
 }
