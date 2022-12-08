@@ -2,8 +2,7 @@ package com.daml.network.integration.tests
 
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
-import com.daml.network.util.Auth0Util
-import com.daml.network.util.CommonCoinAppInstanceReferences
+import com.daml.network.util.{Auth0Util, CommonCoinAppInstanceReferences}
 import com.digitalasset.canton.integration.*
 
 /** Analogue to Canton's CommunityTests */

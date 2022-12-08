@@ -22,7 +22,6 @@ import {
 import { TransactionTree } from 'common-protobuf/com/daml/ledger/api/v1/transaction_pb';
 import { Identifier, Value } from 'common-protobuf/com/daml/ledger/api/v1/value_pb';
 import grpcWeb from 'grpc-web';
-import { SignJWT } from 'jose';
 import React, { useContext } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -182,26 +181,6 @@ export class LedgerApiClient {
     );
     return user.getUser()!.getPrimaryParty();
   }
-}
-
-// Generate a local token for test purposes.
-// See the Scala equivalent com.daml.network.auth.AuthUtil.LedgerApi.testToken
-// TODO(#1445) once we update splitwise to the recent changes: remove this in favor of the same function in `directory/.../UserContext.tsx`
-export async function generateLedgerApiToken(userId: string): Promise<string> {
-  const secret = new TextEncoder().encode('test');
-  const key = await crypto.subtle.importKey(
-    'raw',
-    secret,
-    { name: 'HMAC', hash: { name: 'SHA-256' } },
-    false,
-    ['sign']
-  );
-
-  return new SignJWT({ scope: 'daml_ledger_api' })
-    .setProtectedHeader({ alg: 'HS256' })
-    .setIssuedAt()
-    .setSubject(userId)
-    .sign(key);
 }
 
 export interface LedgerApiClientProps {

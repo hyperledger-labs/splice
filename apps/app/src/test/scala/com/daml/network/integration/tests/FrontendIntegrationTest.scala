@@ -181,6 +181,19 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
   protected def expectedCns(partyId: PartyId, entry: String) = {
     s"${entry}\n(\n${partyId.toProtoPrimitive}\n)"
   }
+
+  protected def completeAuth0LoginWithAuthorization(username: String, password: String)(implicit
+      webDriver: WebDriver
+  ) = {
+    clue("auth0 login") {
+      textField(id("username")).value = username
+      find(id("password")).foreach(_.underlying.sendKeys(password))
+      click on name("action") // complete password prompt
+      eventually()( // the authorization prompt takes a while to appear sometimes
+        click on xpath("//button[@value='accept']") // complete app authorization prompt
+      )
+    }
+  }
 }
 
 object FrontendIntegrationTest {

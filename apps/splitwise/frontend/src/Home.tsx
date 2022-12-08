@@ -1,4 +1,4 @@
-import { Contract } from 'common-frontend';
+import { Contract, useUserState } from 'common-frontend';
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useState, useEffect } from 'react';
 
@@ -23,6 +23,7 @@ const HomeWithContext: React.FC<{
 }> = ({ userId, svc, dirEntries }) => {
   const splitwiseClient = useSplitwiseClient();
   const ledgerApiClient = useSplitwiseLedgerApiClient();
+  const { updateStatus } = useUserState();
 
   const [provider, setProvider] = useState<string | undefined>();
   const [party, setParty] = useState<string | undefined>();
@@ -38,11 +39,12 @@ const HomeWithContext: React.FC<{
 
   useEffect(() => {
     const fetchParty = async () => {
-      const party = await ledgerApiClient.getPrimaryParty();
-      setParty(party);
+      const partyId = await ledgerApiClient.getPrimaryParty();
+      setParty(partyId);
+      updateStatus({ userOnboarded: true, partyId });
     };
     fetchParty();
-  }, [userId, ledgerApiClient]);
+  }, [userId, updateStatus, ledgerApiClient]);
 
   // We don’t expect to have console-based auth in Q4 so we
   // generate the install contract from the frontend rather than the backend.

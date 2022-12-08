@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.LocalAuth0Test
 import com.daml.network.codegen.java.cn.{directory as dirCodegen, splitwise as splitwiseCodegen}
 import com.daml.network.console.{RemoteDirectoryAppReference, WalletAppClientReference}
 import com.daml.network.environment.CoinEnvironmentImpl
@@ -12,6 +13,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import org.openqa.selenium.Keys
 
 import scala.concurrent.duration.DurationInt
+import scala.util.Using
 
 class SplitwiseFrontendIntegrationTest
     extends FrontendIntegrationTest("aliceSplitwise", "bobSplitwise", "charlieSplitwise")
@@ -474,5 +476,20 @@ class SplitwiseFrontendIntegrationTest
       }
     }
 
+    "allow login via auth0" taggedAs LocalAuth0Test in { implicit env =>
+      val auth0 = auth0UtilFromSystemPoperties("https://canton-network-test.us.auth0.com")
+      Using.resource(auth0.createUser()) { user =>
+        logger.debug(s"Created user ${user.email} with password ${user.password} (id: ${user.id})")
+        val userPartyId = aliceValidator.onboardUser(user.id)
+
+        withFrontEnd("aliceSplitwise") { implicit webDriver =>
+          go to "http://localhost:3005"
+          click on "oidc-login-button"
+
+          completeAuth0LoginWithAuthorization(user.email, user.password)
+          find(id("logged-in-user")).value.text should matchText(userPartyId.toProtoPrimitive)
+        }
+      }
+    }
   }
 }

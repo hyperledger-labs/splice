@@ -126,10 +126,10 @@ done
 # start_frontend <app> <ui-http-port> <app-grpc-port> <app-wallet-ui-port> <ledgerapi-grpc-port> <validator-app-grpc-port> <app-scan-grpc-port> <user-display-name>
 start_frontend wallet    3000 6204 0    0    6203 6012 alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm" ""
 start_frontend wallet    3001 6304 0    0    6303 6012 bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm" ""
-start_frontend splitwise 3002 6113 3000 6201 0    0    alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm" ""
-start_frontend splitwise 3003 6113 3001 6301 0    0    bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm" ""
+start_frontend splitwise 3002 6113 3000 6201 0    0    alice   "$oauth_authority_auth0" "$oauth_clientid_auth0" "$auth_algorithm_auth0" "$test_auth_secret"
+start_frontend splitwise 3003 6113 3001 6301 0    0    bob     "$oauth_authority_auth0" "$oauth_clientid_auth0" "$auth_algorithm_auth0" "$test_auth_secret"
 start_frontend directory 3004 6110 3000 6201 0    0    alice   "$oauth_authority_auth0" "$oauth_clientid_auth0" "$auth_algorithm_auth0" "$test_auth_secret"
-start_frontend splitwise 3005 6113 0    6201 0    0    charlie "$oauth_authority" "$oauth_clientid" "$auth_algorithm" ""
+start_frontend splitwise 3005 6113 0    6201 0    0    charlie "$oauth_authority_auth0" "$oauth_clientid_auth0" "$auth_algorithm_auth0" "$test_auth_secret"
 
 if [ $daemon -eq 0 ]; then
   tmux attach -t ${tmux_session}

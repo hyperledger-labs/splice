@@ -74,12 +74,7 @@ class DirectoryFrontendIntegrationTest
           go to "http://localhost:3004"
           click on "oidc-login-button"
 
-          clue("auth0 login") {
-            textField(id("username")).value = user.email
-            find(id("password")).foreach(_.underlying.sendKeys(user.password))
-            click on name("action") // complete password prompt
-            click on xpath("//button[@value='accept']") // complete app authorization prompt
-          }
+          completeAuth0LoginWithAuthorization(user.email, user.password)
           find(id("logged-in-user")).value.text should matchText(userPartyId.toProtoPrimitive)
         }
       }
