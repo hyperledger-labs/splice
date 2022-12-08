@@ -7,11 +7,10 @@ import com.daml.network.automation.{
   AutomationService,
 }
 import com.daml.network.codegen.java.cc
-import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.svc.admin.grpc.GrpcSvcAppService.getTotalsPerRound
+import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.svc.store.SvcStore
-import com.daml.network.util.CoinUtil.defaultTickDurationInMicroseconds
 import com.daml.network.util.JavaContract
 import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -19,15 +18,14 @@ import com.digitalasset.canton.topology.PartyId
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
-import java.time.temporal.ChronoUnit
 import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
 @nowarn("msg=match may not be exhaustive")
 class SvcAutomationService(
-    automationConfig: AutomationConfig,
     clockConfig: ClockConfig,
+    config: LocalSvcAppConfig,
     store: SvcStore,
     ledgerClient: CoinLedgerClient,
     retryProvider: CoinRetries,
@@ -37,7 +35,7 @@ class SvcAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends AutomationService(automationConfig, clockConfig, retryProvider) {
+) extends AutomationService(config.automation, clockConfig, retryProvider) {
   import com.daml.network.store.AcsStore.QueryResult
 
   private val connection = registerResource(ledgerClient.connection(this.getClass.getSimpleName))
@@ -104,7 +102,7 @@ class SvcAutomationService(
     }
   })
 
-  registerPollingTrigger("cycle OpenMiningRounds", automationConfig.pollingInterval, connection) {
+  registerPollingTrigger("cycle OpenMiningRounds", config.automation.pollingInterval, connection) {
     (now, logger) =>
       { implicit tc =>
         for {
@@ -121,15 +119,15 @@ class SvcAutomationService(
             val isPastTargetClosesAt = now.toInstant
               .isAfter(
                 toArchive.payload.targetClosesAt.plus(
-                  automationConfig.clockSkewAutomationDelay.duration
+                  config.automation.clockSkewAutomationDelay.duration
                 )
               )
             val midPointForMiddleRound = middle.payload.opensAt
-              .plus(defaultTickDurationInMicroseconds, ChronoUnit.MICROS)
-              .plus(automationConfig.clockSkewAutomationDelay.duration)
+              .plus(config.initialTickDuration.duration)
+              .plus(config.automation.clockSkewAutomationDelay.duration)
             val isPastLatestOpensAt = now.toInstant
               .isAfter(
-                latest.payload.opensAt.plus(automationConfig.clockSkewAutomationDelay.duration)
+                latest.payload.opensAt.plus(config.automation.clockSkewAutomationDelay.duration)
               )
             val middleRoundOpenLongEnough = now.toInstant.isAfter(midPointForMiddleRound)
             if (isPastTargetClosesAt && middleRoundOpenLongEnough && isPastLatestOpensAt) {
@@ -160,7 +158,7 @@ class SvcAutomationService(
 
   registerPollingTrigger(
     "archive IssuingMiningRounds past their targetClosesAt",
-    automationConfig.pollingInterval,
+    config.automation.pollingInterval,
     connection,
   ) {
     (now, logger) =>

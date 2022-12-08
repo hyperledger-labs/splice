@@ -12,9 +12,11 @@ import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.TracedLogger
+import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
+import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
 
@@ -77,9 +79,9 @@ object CoinUtil {
   def damlNumeric(x: Double): java.math.BigDecimal =
     BigDecimal(x).setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
 
-  lazy val defaultTickDurationInMicroseconds: Long = 150 * 1000000L
-
-  def defaultCoinConfig: cc.coin.CoinConfig[cc.coin.USD] = new cc.coin.CoinConfig(
+  def defaultCoinConfig(
+      initialTickDuration: NonNegativeFiniteDuration
+  ): cc.coin.CoinConfig[cc.coin.USD] = new cc.coin.CoinConfig(
     // Fee to create a new coin.
     // Set to the fixed part of the transfer fee.
     new cc.fees.FixedFee(BigDecimal(0.09).bigDecimal),
@@ -135,7 +137,7 @@ object CoinUtil {
     // TODO(M1-90): charge per character
     32,
     // 2.5 min default duration
-    new RelTime(defaultTickDurationInMicroseconds),
+    new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),
     new cc.api.v1.coin.EnabledChoices(
       true, true, true, true, true, true, true, true, true, true,
     ),

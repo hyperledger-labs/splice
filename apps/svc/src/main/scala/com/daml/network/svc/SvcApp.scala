@@ -63,15 +63,15 @@ class SvcApp(
       connection = ledgerClient.connection("SvcAppBootstrap")
       _ <- connection.uploadDarFile(SvcApp.coinPackage)
       automation = new SvcAutomationService(
-        config.automation,
         coinAppParameters.clockConfig,
+        config,
         store,
         ledgerClient,
         retryProvider,
         loggerFactory,
         timeouts,
       )
-      _ <- SvcApp.setupApp(svcPartyId, connection, logger, store, retryProvider, this)
+      _ <- SvcApp.setupApp(svcPartyId, config, connection, logger, store, retryProvider, this)
       _ = logger.info(s"SVC App is initialized")
     } yield {
       adminServerRegistry
@@ -122,6 +122,7 @@ object SvcApp {
   }
   private def setupApp(
       svc: PartyId,
+      config: LocalSvcAppConfig,
       connection: CoinLedgerConnection,
       logger: TracedLogger,
       store: SvcStore,
@@ -133,7 +134,7 @@ object SvcApp {
     val createCoinRulesCmd =
       new cc.coin.CoinRules(
         svc.toProtoPrimitive,
-        defaultCoinConfig,
+        defaultCoinConfig(config.initialTickDuration),
         Seq.empty.asJava,
       ).createAnd
         .exerciseCoinRules_Bootstrap_Rounds(
