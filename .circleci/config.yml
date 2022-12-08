@@ -516,12 +516,9 @@ commands:
             TIMING_DATA_FILE="$CIRCLE_INTERNAL_TASK_DATA/circle-test-results/results.json"
             if [[ -e $TIMING_DATA_FILE ]]; then
               sed -ri 's/"run_time": ?\-[0-9]+\.?[0-9]+,/"run_time":0.0,/g' "$TIMING_DATA_FILE"
-              cp "$TIMING_DATA_FILE" timing-data.json
             fi
             echo "[split tests]"
-            # Set time-default to 1 minute so that tests with unknown duration get distributed evenly.
-            # (The default for tests with unknown duration would be 1s.)
-            splitted=$(cat test-full-class-names.log | circleci tests split --split-by=timings --timings-type=classname --time-default=1m)
+            splitted=$(cat test-full-class-names.log | circleci tests split --split-by=timings --timings-type=classname)
             tests=$(echo $splitted | tr '\n' ' ')
             count=$(echo $tests | wc -w)
             echo "We are running $count tests in this batch:"
@@ -767,7 +764,7 @@ jobs:
       POSTGRES_HOST: localhost
       POSTGRES_PASSWORD: postgres
       POSTGRES_USER: postgres
-    parallelism: 4
+    parallelism: 6
     steps:
       - checkout
       - setup_sbt_test_job
@@ -782,7 +779,9 @@ jobs:
           post_sbt_cmd: ./stop-canton.sh external && ./stop-frontends.sh
           additional_nix_args: "--keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID --keep AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET"
           extra_parameters: -DAUTH0_MANAGEMENT_API_CLIENT_ID=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID} -DAUTH0_MANAGEMENT_API_CLIENT_SECRET=${AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET}
-          timeout: "10m"
+          # it is in our best interest for our tests to be faster than this,
+          # but failing CI because of slow tests is also not very nice
+          timeout: "15m"
       - cleanup_sbt_test_job
       - collect_failing_test_data_and_send_to_datadog
 
