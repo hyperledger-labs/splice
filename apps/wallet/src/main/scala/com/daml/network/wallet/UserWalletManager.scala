@@ -89,7 +89,7 @@ class UserWalletManager(
       })
   }
 
-  // TODO(M1-52): this function probably needs restructuring to integrate it with automation rewards collection; e.g., make it streaming
+  // TODO(M3-06): this function probably needs restructuring to integrate it with automation rewards collection; e.g., make it streaming
   // NOTE: this function is exposed here in the UserWalletManager, as it requires joining data from all user-stores.
   def listValidatorRewardsCollectableBy(
       validatorUserStore: UserWalletStore

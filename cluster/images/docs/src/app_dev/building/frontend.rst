@@ -16,7 +16,7 @@ Use of Codegens
 * Use codegens to generate client-side types that match your Daml
   types where your backend exposes them directly
 
-.. TODO(M1-90): If we go for grpc-web, consider how we want to handle integration with our TS codegen.
+.. TODO(M3-13): If we go for grpc-web, consider how we want to handle integration with our TS codegen.
 
 Use of the HTTP JSON API
 ------------------------

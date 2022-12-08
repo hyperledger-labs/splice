@@ -131,7 +131,7 @@ leaderSubmits app mkCommands = do
   submitMulti [consortium.leader] [app.svc] $ mkCommands consortiumCid
 
 
--- TODO(M1-51): remove workaround for explicit disclosure
+-- TODO(M3-82): remove workaround for explicit disclosure
 -- Note: this must not run concurrently with commands that modify the mining rounds (e.g., runNextIssuance)
 runCoinRulesAcceptBotD : CCApp -> Script ()
 runCoinRulesAcceptBotD app = do

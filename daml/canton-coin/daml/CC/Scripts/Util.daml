@@ -112,7 +112,7 @@ getUserReadAs user = do
   rights <- listUserRights user
   pure [p | CanReadAs p <- rights]
 
--- TODO(M1-51): remove workaround for explicit disclosure
+-- TODO(M3-82): remove workaround for explicit disclosure
 requestCoinRules : CCApp -> Party -> Script ()
 requestCoinRules app user = do
   submit user $ createCmd CoinRulesRequest with
@@ -120,7 +120,7 @@ requestCoinRules app user = do
     user = user
   pure ()
 
--- TODO(M1-51): remove workaround for explicit disclosure
+-- TODO(M3-82): remove workaround for explicit disclosure
 -- Note: this must not run concurrently with commands that modify the mining rounds (e.g., runNextIssuance)
 runCoinRulesAcceptBot : CCApp -> Script ()
 runCoinRulesAcceptBot app = do

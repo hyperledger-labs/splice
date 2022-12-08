@@ -40,7 +40,7 @@ class GrpcSplitwiseService(
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       val userParty = Proto.tryDecode(Proto.Party)(request.getContext.userPartyId)
       for {
-        // TODO(M1-42): check (or simulate check) of the user's cross-participant access token
+        // TODO(M4-02): check (or simulate check) of the user's cross-participant access token
         groups <- connection.activeContracts(providerParty, splitwiseCodegen.Group.COMPANION)
       } yield {
         val filtered = groups.filter(c => c.hasStakeholder(userParty))

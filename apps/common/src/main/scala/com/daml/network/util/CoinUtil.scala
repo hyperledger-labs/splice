@@ -75,7 +75,7 @@ object CoinUtil {
   lazy val defaultHoldingFee =
     new cc.fees.RatePerRound(damlNumeric(1.0 / 360.0 / (24.0 * 60.0 / 2.5)))
 
-  // TODO(M1-90) surely there's a better way to define Daml Numeric values in Scala
+  // TODO(M1-92) surely there's a better way to define Daml Numeric values in Scala
   def damlNumeric(x: Double): java.math.BigDecimal =
     BigDecimal(x).setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
 
@@ -98,7 +98,7 @@ object CoinUtil {
     defaultHoldingFee,
 
     // Fee for transferring some quantity of coin to a new owner.
-    // TODO(M1-90) Finetuning required
+    // TODO(M3-01) Finetuning required
     new cc.fees.SteppedRate(
       BigDecimal(0.01).bigDecimal,
       Seq(
@@ -134,7 +134,7 @@ object CoinUtil {
     50,
 
     // Fits a hex-encoded SHA-256 or a UUID
-    // TODO(M1-90): charge per character
+    // TODO(M3-01): charge per character
     32,
     // 2.5 min default duration
     new RelTime(TimeUnit.NANOSECONDS.toMicros(initialTickDuration.duration.toNanos)),

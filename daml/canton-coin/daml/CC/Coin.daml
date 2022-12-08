@@ -75,7 +75,7 @@ template LockedCoin
         requireChoiceIsEnabled "LockedCoin_Unlock" (\c -> c.enable_LockedCoin_Unlock) coinRules
         toInterfaceContractId <$> create coin
 
-    -- TODO(M1-60): review how lock-expiry is structured, and its relation to coin expiry
+    -- TODO(M3-01): review how lock-expiry is structured, and its relation to coin expiry
     let tryExpireLock : Update (ContractId Coin)
         tryExpireLock = do
             t <- getTime
@@ -247,11 +247,11 @@ template CoinRules
   with
     svc : Party
     config : CoinConfig USD
-    observers: [Party] -- TODO(M1-51): remove workaround for explicit disclosure
-    -- TODO(M1-90): use a schedule with effective dating to make fees predictable to users
+    observers: [Party] -- TODO(M3-82): remove workaround for explicit disclosure
+    -- TODO(M3-07): use a schedule with effective dating to make fees predictable to users
   where
     signatory svc
-    observer observers -- TODO(M1-51): remove workaround for explicit disclosure
+    observer observers -- TODO(M3-82): remove workaround for explicit disclosure
 
     interface instance API.CoinRules for CoinRules where
       view = API.CoinRulesView with 
@@ -485,7 +485,7 @@ computeFees1 config receiverQuantities = do
 -- the new CoinRules contracts.
 -- Once explicit disclosure is available, we want to remove the request contracts and use an off-ledger flow
 -- to stream in the latest CoinRules contracts.
--- TODO(M1-51): remove workaround for explicit disclosure
+-- TODO(M3-82): remove workaround for explicit disclosure
 template CoinRulesRequest
   with
     user : Party

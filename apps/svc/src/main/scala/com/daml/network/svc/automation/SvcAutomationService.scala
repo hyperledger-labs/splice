@@ -209,7 +209,7 @@ class SvcAutomationService(
       rewards <- queryRewards(summarizingRound.payload.round.number)
       totalBurn = rewards.totalBurn
       coinRules <- store.getCoinRules()
-      // TODO(tech-debt): consider querying the round audit store (once we have it) and
+      // TODO(M3-06): consider querying the round audit store (once we have it) and
       // passing along the opensAt time of the previous IssuingMiningRound
       // see discussion: https://docs.google.com/document/d/1RAcc4uJKjRtPKDmVglVhqg-y58fCJ7xyljPbwimE-IA/edit?disco=AAAAjyuFFEw
       cmd = coinRules.value.contractId

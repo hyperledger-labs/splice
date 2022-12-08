@@ -49,7 +49,7 @@ class GrpcScanService(
         v0.GetTransferContextResponse(
           coinRules = coinRules.map(_.toProtoV0),
           latestOpenMiningRound = Some(latestOpen.toProtoV0),
-          // TODO(tech-debt): consider just removing this attribute - not used except in tests.
+          // TODO(M3-09): consider just removing this attribute - not used except in tests.
           openMiningRounds = rounds.map(_.toProtoV0),
         )
       }

@@ -36,7 +36,7 @@ Version: |version_literal|
    devnet/index.rst
 
 
-.. TODO(M1-90): add back indices and search functionality if required
+.. TODO(M3-17): add back indices and search functionality if required
 
 .. Indices and tables
 .. ==================

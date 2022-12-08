@@ -44,7 +44,7 @@ Releasing Backends and Frontends
 * Either make host/port configurable or assume they’re hosted on the
   same port behind a reverse proxy
 
-.. TODO(M1-90): think about pros/cons and changes in workflows if frontends are delivered as traditional web applications
+.. TODO(M4-90): think about pros/cons and changes in workflows if frontends are delivered as traditional web applications
 
 .. todo::
 
