@@ -180,6 +180,8 @@ trait WalletTestUtil extends CoinIntegrationTest {
       receiverWallet.listTransferOffers() should have size 1
     }
     receiverWallet.acceptTransferOffer(transferOfferId)
+    // note that something like `receiverWallet.listAcceptedTransferOffers() should have size 1`
+    // is potentially racy (possible to circumvent this by being clever, but we chose the simple solution for now)
   }
 
   def createSelfPaymentRequest(

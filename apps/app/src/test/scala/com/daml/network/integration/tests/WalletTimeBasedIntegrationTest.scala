@@ -28,7 +28,11 @@ class WalletTimeBasedIntegrationTest
       senderTransferFeeRatio: BigDecimal = 1.0,
   )(implicit env: CoinTestConsoleEnvironment) = {
     p2pTransfer(senderWallet, receiverWallet, receiver, amount, senderTransferFeeRatio)
-    // Advance time to trigger automation.
+    eventually() {
+      // wait until we observe the accepted transfer offer
+      receiverWallet.listAcceptedTransferOffers() should have size 1
+    }
+    // ... before we advance time to trigger the automation.
     advanceTime(Duration.ofSeconds(1))
   }
 
@@ -222,7 +226,7 @@ class WalletTimeBasedIntegrationTest
     aliceValidatorWallet.tap(50)
     eventually()(aliceWallet.list().coins should have size 1)
 
-    // Execute a transfer in round -> leads to rewards being generated
+    // Execute a transfer in round 1 -> leads to rewards being generated
     p2pTransferAndTriggerAutomation(aliceWallet, bobWallet, bob, 40.0, 0.0)
     eventually()(aliceWallet.listAppRewards() should have size 1)
     eventually()(aliceValidatorWallet.listValidatorRewards() should have size 1)
