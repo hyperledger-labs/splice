@@ -17,21 +17,17 @@ class Auth0Util(
   private val auth = new AuthAPI(domain, managementApiClientId, managementApiClientSecret)
   val api = new ManagementAPI(domain, requestManagementAPIToken())
 
-  class Auth0User(val id: String, val email: String, val password: String) extends AutoCloseable {
-    override def close(): Unit = deleteUser(id)
-  }
-
   def createUser(): Auth0User = {
     val user = new User()
     val rand = new scala.util.Random
     val password = s"${rand.alphanumeric.take(20).mkString}${rand.nextInt()}"
     val username = (new scala.util.Random).alphanumeric.take(20).mkString
-    val email = s"$username@test.com"
+    val email = s"$username@canton-network-test.com"
     user.setPassword(password.toCharArray)
     user.setEmail(email)
     user.setConnection("Username-Password-Authentication")
     val id = api.users().create(user).execute().getId
-    new Auth0User(id, email, password)
+    new Auth0User(id, email, password, this)
   }
 
   def deleteUser(id: String): Unit = {

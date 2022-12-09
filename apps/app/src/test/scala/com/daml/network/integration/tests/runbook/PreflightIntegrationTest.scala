@@ -7,11 +7,13 @@ import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.daml.network.integration.tests.FrontendIntegrationTest
+import com.daml.network.util.Auth0User
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.integration.tests.HasConsoleScriptRunner
 import monocle.macros.syntax.lens.*
 
-import scala.util.Using
+import scala.collection.mutable
+import scala.concurrent.duration.*
 
 /** Integration test for the runbook. Uses the exact same configuration files and bootstrap scripts as the runbook.
   * This test also doubles as the pre-flight validator test.
@@ -25,15 +27,44 @@ class PreflightIntegrationTest
 
   val resourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
 
+  val auth0Users: mutable.Map[String, Auth0User] = mutable.Map.empty[String, Auth0User]
+
+  override def beforeEach() = {
+    super.beforeEach();
+
+    val auth0 = auth0UtilFromSystemPoperties("https://canton-network-dev.us.auth0.com")
+
+    val aliceUser = auth0.createUser();
+    logger.debug(
+      s"Created user Alice ${aliceUser.email} with password ${aliceUser.password} (id: ${aliceUser.id})"
+    )
+
+    val bobUser = auth0.createUser();
+    logger.debug(
+      s"Created user Bob ${bobUser.email} with password ${bobUser.password} (id: ${bobUser.id})"
+    )
+
+    auth0Users += ("alice-v1" -> aliceUser)
+    auth0Users += ("bob-v1" -> bobUser)
+  }
+
+  override def afterEach() = {
+    super.afterEach();
+    auth0Users.values.map(_.close)
+  }
+
   private def loginAndOnboardToWalletUi(
-      damlUser: String,
+      user: Auth0User,
       walletUiUrl: String,
   )(implicit webDriver: WebDriverType): Unit = {
-    clue(s"Logging in and onboarding as user: $damlUser") {
+    clue(s"Logging in and onboarding as user: ${user.email}") {
       go to walletUiUrl
-      click on "user-id-field"
-      textField("user-id-field").value = damlUser
-      click on "login-button"
+      click on "oidc-login-button"
+
+      // TODO(#1909) - use completeAuth0LoginWithAuthorization helper method
+      textField(id("username")).value = user.email
+      find(id("password")).foreach(_.underlying.sendKeys(user.password))
+      click on name("action") // complete password prompt
 
       eventually() {
         find(id("onboard-button"))
@@ -104,22 +135,23 @@ class PreflightIntegrationTest
   // when running locally, these tests may fail if the CC DAR deployed to DevNet
   // differs from the latest one on your branch
 
-  "run through runbook against cluster SVC" taggedAs LiveDevNetTest in { implicit env =>
-    runScript(validatorPath / "validator-participant.canton")(env.environment)
-    runScript(validatorPath / "validator.canton")(env.environment)
-    runScript(validatorPath / "tap-transfer-demo.canton")(env.environment)
-  }
-
-  "run through runbook against cluster validator1" taggedAs LiveDevNetTest in { implicit env =>
+  "run through runbook against cluster validator1" taggedAs LiveDevNetTest in { _ =>
     val walletUiUrl = s"https://wallet.validator1.${System.getProperty("NETWORK_APPS_ADDRESS")}/";
 
-    val aliceDamlUser = aliceWallet.config.damlUser
-    val bobDamlUser = bobWallet.config.damlUser
+    val aliceUser = auth0Users.get("alice-v1") match {
+      case Some(user) => user
+      case None => fail("could not get alice user from auth0")
+    }
+
+    val bobUser = auth0Users.get("bob-v1") match {
+      case Some(user) => user
+      case None => fail("could not get bob user from auth0")
+    }
 
     var alicePartyId = ""
 
     withFrontEnd("alice-v1") { implicit webDriver =>
-      loginAndOnboardToWalletUi(aliceDamlUser, walletUiUrl)
+      loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
       alicePartyId = copyPartyId()
 
       findAll(className("coins-table-row")) should have size 0
@@ -128,7 +160,7 @@ class PreflightIntegrationTest
     var bobPartyId = ""
 
     withFrontEnd("bob-v1") { implicit webDriver =>
-      loginAndOnboardToWalletUi(bobDamlUser, walletUiUrl)
+      loginAndOnboardToWalletUi(bobUser, walletUiUrl)
       bobPartyId = copyPartyId()
 
       findAll(className("coins-table-row")) should have size 0
@@ -143,6 +175,11 @@ class PreflightIntegrationTest
       }
 
       createTransferOffer(bobPartyId, "10", "p2ptransfer")
+
+      click on "logout-button"
+      eventually() {
+        find(id("oidc-login-button"))
+      }
     }
 
     withFrontEnd("bob-v1") { implicit webDriver =>
@@ -160,60 +197,67 @@ class PreflightIntegrationTest
 
       click on "coins-button"
 
-      eventually() {
+      // TODO(#1985) -- cluster is slow to display updated list of Coins for Bob
+      eventually(60.seconds) {
         val coinsTableRows = findAll(className("coins-table-row"))
         coinsTableRows should have size 1
       }
 
       val coinsTableRows = findAll(className("coins-table-row"))
       coinsTableRows.toSeq.head.underlying.getText() contains ("10.0000000000CC")
-    }
-  }
 
-  "test a directory entry allocation against cluster SVC" taggedAs LiveDevNetTest in {
-    implicit env =>
-      val walletUiUrl = s"https://wallet.validator1.${System.getProperty("NETWORK_APPS_ADDRESS")}/";
-      val directoryUiUrl =
-        s"https://directory.validator1.${System.getProperty("NETWORK_APPS_ADDRESS")}/";
-
-      val aliceDamlUser = aliceWallet.config.damlUser
-
-      withFrontEnd("alice-v1") { implicit webDriver =>
-        loginAndOnboardToWalletUi(aliceDamlUser, walletUiUrl)
-
-        click on "tap-amount-field"
-        numberField("tap-amount-field").underlying.sendKeys("100")
-        click on "tap-button"
-        eventually() {
-          findAll(className("coins-table-row")) should have size 1
-        }
-
-        go to directoryUiUrl
-
-        click on "user-id-field"
-        textField("user-id-field").value = aliceDamlUser
-
-        click on "login-button"
-
-        eventually() {
-          find(id("entry-name-field"))
-        }
-
-        click on "entry-name-field"
-        textField("entry-name-field").value = "alice.cns"
-
-        click on "request-entry-with-sub-button"
-
-        eventually() {
-          findAll(className("sub-requests-table-row")) should have size 1
-        }
+      click on "logout-button"
+      eventually() {
+        find(id("oidc-login-button"))
       }
+    }
   }
 
-  "work with auth0" taggedAs LiveDevNetTest in { _ =>
-    val auth0 = auth0UtilFromSystemPoperties("https://canton-network-dev.us.auth0.com")
-    Using.resource(auth0.createUser()) { user =>
-      logger.debug(s"Created user ${user.email} with password ${user.password} (id: ${user.id})")
+  "test a directory entry allocation against cluster deployment" taggedAs LiveDevNetTest in { _ =>
+    val walletUiUrl = s"https://wallet.validator1.${System.getProperty("NETWORK_APPS_ADDRESS")}/";
+    val directoryUiUrl =
+      s"https://directory.validator1.${System.getProperty("NETWORK_APPS_ADDRESS")}/";
+
+    val aliceUser = auth0Users.get("alice-v1") match {
+      case Some(user) => user
+      case None => fail("could not get alice user from auth0")
     }
+
+    withFrontEnd("alice-v1") { implicit webDriver =>
+      loginAndOnboardToWalletUi(aliceUser, walletUiUrl)
+
+      click on "tap-amount-field"
+      numberField("tap-amount-field").underlying.sendKeys("100")
+      click on "tap-button"
+      eventually() {
+        findAll(className("coins-table-row")) should have size 1
+      }
+
+      go to directoryUiUrl
+
+      click on "user-id-field"
+      textField("user-id-field").value = aliceUser.id
+
+      click on "login-button"
+
+      eventually() {
+        find(id("entry-name-field"))
+      }
+
+      click on "entry-name-field"
+      textField("entry-name-field").value = "alice.cns"
+
+      click on "request-entry-with-sub-button"
+
+      eventually() {
+        findAll(className("sub-requests-table-row")) should have size 1
+      }
+    }
+  }
+
+  "run through runbook against cluster deployment" taggedAs LiveDevNetTest in { implicit env =>
+    runScript(validatorPath / "validator-participant.canton")(env.environment)
+    runScript(validatorPath / "validator.canton")(env.environment)
+    runScript(validatorPath / "tap-transfer-demo.canton")(env.environment)
   }
 }
