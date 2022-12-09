@@ -12,6 +12,7 @@ import scala.jdk.CollectionConverters.*
 object LedgerApiUtils {
   def submitWithResult[T](
       ledgerApi: BaseLedgerApiAdministration,
+      userId: String,
       actAs: Seq[PartyId],
       readAs: Seq[PartyId],
       update: Update[T],
@@ -23,6 +24,7 @@ object LedgerApiUtils {
       workflowId = "",
       commandId.getOrElse(""),
       readAs = readAs,
+      applicationId = userId,
       optTimeout = None,
     )
     CoinLedgerConnection.decodeExerciseResult(

@@ -46,7 +46,11 @@ class WalletIntegrationTest
       }
 
       val (_, _, reqC) =
-        createSelfPaymentRequest(aliceWalletBackend.remoteParticipantWithAdminToken, aliceUserParty)
+        createSelfPaymentRequest(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceWallet.config.damlUser,
+          aliceUserParty,
+        )
 
       val reqFound = clue("Check that we can see the created payment request") {
         val reqFound = eventually() {
@@ -70,7 +74,11 @@ class WalletIntegrationTest
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
       val (referenceId, _, reqC) =
-        createSelfPaymentRequest(aliceWalletBackend.remoteParticipantWithAdminToken, aliceUserParty)
+        createSelfPaymentRequest(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceWallet.config.damlUser,
+          aliceUserParty,
+        )
 
       val cid = eventually() {
         inside(aliceWallet.listAppPaymentRequests()) { case Seq(r) =>
@@ -384,7 +392,11 @@ class WalletIntegrationTest
       aliceWallet.tap(49)
       // create and reject request such that...
       val request =
-        createSelfPaymentRequest(aliceValidator.remoteParticipantWithAdminToken, alice)._2
+        createSelfPaymentRequest(
+          aliceValidator.remoteParticipantWithAdminToken,
+          aliceWallet.config.damlUser,
+          alice,
+        )._2
       aliceWallet.rejectAppPaymentRequest(request)
 
       loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
@@ -413,7 +425,11 @@ class WalletIntegrationTest
         aliceWallet.tap(50)
         val requestIds =
           (1 to 3).map(i =>
-            createSelfPaymentRequest(aliceValidator.remoteParticipantWithAdminToken, alice)._2
+            createSelfPaymentRequest(
+              aliceValidator.remoteParticipantWithAdminToken,
+              aliceWallet.config.damlUser,
+              alice,
+            )._2
           )
         val offsetBefore =
           aliceValidator.remoteParticipantWithAdminToken.ledger_api.transactions.end()
@@ -449,7 +465,11 @@ class WalletIntegrationTest
 
         val requests =
           (0 to batchSize + 1).map(_ =>
-            createSelfPaymentRequest(aliceValidator.remoteParticipantWithAdminToken, alice)._2
+            createSelfPaymentRequest(
+              aliceValidator.remoteParticipantWithAdminToken,
+              aliceWallet.config.damlUser,
+              alice,
+            )._2
           )
 
         eventually() {
@@ -498,7 +518,11 @@ class WalletIntegrationTest
             .awaitJava(coinCodegen.Coin.COMPANION)(alice)
           // creating payment request
           val request =
-            createSelfPaymentRequest(aliceValidator.remoteParticipantWithAdminToken, alice)._2
+            createSelfPaymentRequest(
+              aliceValidator.remoteParticipantWithAdminToken,
+              aliceWallet.config.damlUser,
+              alice,
+            )._2
           // Reject it again
           aliceWallet.rejectAppPaymentRequest(request)
           // ... such that we don't grab the ledger offset when some init txs are still occurring
@@ -547,7 +571,11 @@ class WalletIntegrationTest
         aliceWallet.tap(10)
 
         val request =
-          createSelfPaymentRequest(aliceValidator.remoteParticipantWithAdminToken, alice)._2
+          createSelfPaymentRequest(
+            aliceValidator.remoteParticipantWithAdminToken,
+            aliceWallet.config.damlUser,
+            alice,
+          )._2
         eventually()(aliceWallet.listAppPaymentRequests() should have size 1)
 
         val cancelF = Future(aliceWallet.rejectAppPaymentRequest(request))

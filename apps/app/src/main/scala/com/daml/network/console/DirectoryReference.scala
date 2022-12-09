@@ -78,7 +78,7 @@ class LocalDirectoryAppReference(
       consoleEnvironment,
       s"remote participant for `$name``",
       name,
-      config.remoteParticipant.remoteParticipantConfig,
+      config.remoteParticipant.getRemoteParticipantConfig(),
     )
 
   /** Remote participant this directory app is configured to interact with. Uses admin tokens to bypass auth. */
@@ -101,8 +101,7 @@ class RemoteDirectoryAppReference(
     config.ledgerApi.clientConfig.address,
     config.ledgerApi.clientConfig.port,
     config.ledgerApi.clientConfig.tls,
-    // TODO(#1974): Use actual ledger API auth
-    config.ledgerApi.authConfig.adminToken,
+    config.ledgerApi.getToken(),
   )(consoleEnvironment)
 
   override protected val instanceType = "Remote directory"
@@ -136,6 +135,7 @@ class RemoteDirectoryAppReference(
     val userParty = LedgerApiUtils.getUserPrimaryParty(ledgerApi, config.damlUser)
     val created = LedgerApiUtils.submitWithResult(
       ledgerApi,
+      userId = config.damlUser,
       actAs = Seq(userParty),
       readAs = Seq.empty,
       update = new codegen.DirectoryInstallRequest(
@@ -154,6 +154,7 @@ class RemoteDirectoryAppReference(
     val damlTuple = LedgerApiUtils
       .submitWithResult(
         ledgerApi,
+        userId = config.damlUser,
         actAs = Seq(userParty),
         readAs = Seq.empty,
         update = getDirectoryInstall()

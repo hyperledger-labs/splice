@@ -1,12 +1,7 @@
 package com.daml.network.config
 
-import com.daml.network.auth.AuthTokenSource
-import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
-import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.participant.config.{BaseParticipantConfig, RemoteParticipantConfig}
-
-import scala.concurrent.Await
-import scala.concurrent.duration.DurationInt
 
 /** Configuration to connect the console to a participant running remotely.
   *
@@ -20,18 +15,8 @@ case class CoinRemoteParticipantConfig(
   override def clientAdminApi: ClientConfig = adminApi
   override def clientLedgerApi: ClientConfig = ledgerApi.clientConfig
 
-  def remoteParticipantConfig: RemoteParticipantConfig = {
-    // Note: Cantons RemoteParticipantConfig expects a static token,
-    // CoinLedgerApiClientConfig contains information for how to acquire tokens.
-    // We need to perform some blocking IO to generate a RemoteParticipantConfig.
-    val loggerFactory = NamedLoggerFactory.root
-    val authTokenSource = AuthTokenSource.fromConfig(
-      ledgerApi.authConfig,
-      loggerFactory,
-      ProcessingTimeout(),
-    )
-    val token = Await.result(authTokenSource.getToken, 30.seconds)
-
+  def getRemoteParticipantConfig(): RemoteParticipantConfig = {
+    val token = ledgerApi.getToken()
     RemoteParticipantConfig(adminApi, ledgerApi.clientConfig, token)
   }
 

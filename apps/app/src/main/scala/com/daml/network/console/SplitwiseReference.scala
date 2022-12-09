@@ -44,14 +44,6 @@ abstract class SplitwiseAppReference(
       remoteScanConfig,
     )
 
-  def submitWithResult[T](
-      actAs: Seq[PartyId],
-      readAs: Seq[PartyId],
-      update: Update[T],
-      commandId: Option[String] = None,
-  ): T =
-    LedgerApiUtils.submitWithResult(ledgerApi, actAs, readAs, update, commandId)
-
   @Help.Summary("Get the primary party of the provider’s daml user specified in the config.")
   def getProviderPartyId(): PartyId =
     consoleEnvironment.run {
@@ -79,8 +71,7 @@ final class RemoteSplitwiseAppReference(
       config.ledgerApi.clientConfig.address,
       config.ledgerApi.clientConfig.port,
       config.ledgerApi.clientConfig.tls,
-      // TODO(#1974): Use actual ledger API auth
-      config.ledgerApi.authConfig.adminToken,
+      config.ledgerApi.getToken(),
     )(consoleEnvironment)
 
   val userId: String = config.damlUser
@@ -131,6 +122,14 @@ final class RemoteSplitwiseAppReference(
       new splitwiseCodegen.GroupId(id),
     )
   }
+
+  def submitWithResult[T](
+      actAs: Seq[PartyId],
+      readAs: Seq[PartyId],
+      update: Update[T],
+      commandId: Option[String] = None,
+  ): T =
+    LedgerApiUtils.submitWithResult(ledgerApi, userId, actAs, readAs, update, commandId)
 
   private def getUserPrimaryParty() = LedgerApiUtils.getUserPrimaryParty(ledgerApi, userId)
 
@@ -372,7 +371,7 @@ final class LocalSplitwiseAppReference(
       consoleEnvironment,
       s"remote participant for `$name``",
       name,
-      config.remoteParticipant.remoteParticipantConfig,
+      config.remoteParticipant.getRemoteParticipantConfig(),
     )
 
   /** Remote participant this splitwise app is configured to interact with. Uses admin tokens to bypass auth. */

@@ -54,7 +54,7 @@ class LocalSvcAppReference(
       consoleEnvironment,
       s"remote participant for `$name``",
       name,
-      config.remoteParticipant.remoteParticipantConfig,
+      config.remoteParticipant.getRemoteParticipantConfig(),
     )
 
   /** Remote participant this SVC app is configured to interact with. Uses admin tokens to bypass auth. */

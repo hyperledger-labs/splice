@@ -186,6 +186,7 @@ trait WalletTestUtil extends CoinIntegrationTest {
 
   def createSelfPaymentRequest(
       remoteParticipant: CoinRemoteParticipantReference,
+      userId: String,
       userParty: PartyId,
   )(implicit
       env: CoinTestConsoleEnvironment
@@ -197,6 +198,7 @@ trait WalletTestUtil extends CoinIntegrationTest {
     val referenceId = clue(s"Create test delivery offer for $userParty") {
       val result = LedgerApiUtils.submitWithResult(
         remoteParticipant,
+        userId = userId,
         actAs = Seq(userParty),
         readAs = Seq.empty,
         update = new testWalletCodegen.TestDeliveryOffer(
@@ -228,6 +230,7 @@ trait WalletTestUtil extends CoinIntegrationTest {
       )
       val result = LedgerApiUtils.submitWithResult(
         remoteParticipant,
+        userId = userId,
         actAs = Seq(userParty),
         readAs = Seq.empty,
         update = reqC.create,

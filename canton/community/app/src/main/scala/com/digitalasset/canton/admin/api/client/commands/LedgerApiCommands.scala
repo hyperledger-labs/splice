@@ -118,7 +118,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 object LedgerApiCommands {
 
-  final val applicationId = "CantonConsole"
+  final val defaultApplicationId = "CantonConsole"
 
   object TransactionService {
 
@@ -539,6 +539,7 @@ object LedgerApiCommands {
         observer: StreamObserver[Completion],
         parties: Seq[String],
         offset: Option[LedgerOffset],
+        applicationId: String,
     )(implicit loggingContext: ErrorLoggingContext)
         extends BaseCommand[CompletionStreamRequest, AutoCloseable, AutoCloseable] {
       // The subscription should never be cut short because of a gRPC timeout
@@ -619,6 +620,7 @@ object LedgerApiCommands {
     def actAs: Seq[LfPartyId]
     def readAs: Seq[LfPartyId]
     def commands: Seq[Command]
+    def applicationId: String
     def workflowId: String
     def commandId: String
     def deduplicationPeriod: Option[DeduplicationPeriod]
@@ -654,6 +656,7 @@ object LedgerApiCommands {
         param("actAs", _.actAs),
         param("readAs", _.readAs),
         param("commandId", _.commandId.singleQuoted),
+        param("applicationId", _.applicationId.singleQuoted),
         param("workflowId", _.workflowId.singleQuoted),
         param("submissionId", _.submissionId.singleQuoted),
         param("deduplicationPeriod", _.deduplicationPeriod),
@@ -673,6 +676,7 @@ object LedgerApiCommands {
         override val actAs: Seq[LfPartyId],
         override val readAs: Seq[LfPartyId],
         override val commands: Seq[Command],
+        override val applicationId: String,
         override val workflowId: String,
         override val commandId: String,
         override val deduplicationPeriod: Option[DeduplicationPeriod],
@@ -706,6 +710,7 @@ object LedgerApiCommands {
         override val actAs: Seq[LfPartyId],
         override val readAs: Seq[LfPartyId],
         override val commands: Seq[Command],
+        override val applicationId: String,
         override val workflowId: String,
         override val commandId: String,
         override val deduplicationPeriod: Option[DeduplicationPeriod],
@@ -740,6 +745,7 @@ object LedgerApiCommands {
         override val actAs: Seq[LfPartyId],
         override val readAs: Seq[LfPartyId],
         override val commands: Seq[Command],
+        override val applicationId: String,
         override val workflowId: String,
         override val commandId: String,
         override val deduplicationPeriod: Option[DeduplicationPeriod],

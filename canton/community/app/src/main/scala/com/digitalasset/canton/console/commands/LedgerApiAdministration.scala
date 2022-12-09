@@ -383,6 +383,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           submissionId: String = "",
           minLedgerTimeAbs: Option[Instant] = None,
           readAs: Seq[PartyId] = Seq.empty,
+          applicationId: String = LedgerApiCommands.defaultApplicationId,
       ): TransactionTree = check(FeatureFlag.Testing) {
         val tx = consoleEnvironment.run {
           ledgerApiCommand(
@@ -390,6 +391,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
               actAs.map(_.toLf),
               readAs.map(_.toLf),
               commands,
+              applicationId,
               workflowId,
               commandId,
               deduplicationPeriod,
@@ -426,6 +428,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           submissionId: String = "",
           minLedgerTimeAbs: Option[Instant] = None,
           readAs: Seq[PartyId] = Seq.empty,
+          applicationId: String = LedgerApiCommands.defaultApplicationId,
       ): TransactionTree = check(FeatureFlag.Testing) {
         val tx = consoleEnvironment.run {
           ledgerApiCommand(
@@ -433,6 +436,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
               actAs.map(_.toLf),
               readAs.map(_.toLf),
               commands.map(c => Command.fromJavaProto(c.toProtoCommand)),
+              applicationId,
               workflowId,
               commandId,
               deduplicationPeriod,
@@ -469,6 +473,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           submissionId: String = "",
           minLedgerTimeAbs: Option[Instant] = None,
           readAs: Seq[PartyId] = Seq.empty,
+          applicationId: String = LedgerApiCommands.defaultApplicationId,
       ): Transaction = check(FeatureFlag.Testing) {
         val tx = consoleEnvironment.run {
           ledgerApiCommand(
@@ -476,6 +481,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
               actAs.map(_.toLf),
               readAs.map(_.toLf),
               commands,
+              applicationId,
               workflowId,
               commandId,
               deduplicationPeriod,
@@ -501,6 +507,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           submissionId: String = "",
           minLedgerTimeAbs: Option[Instant] = None,
           readAs: Seq[PartyId] = Seq.empty,
+          applicationId: String = LedgerApiCommands.defaultApplicationId,
       ): Unit = check(FeatureFlag.Testing) {
         consoleEnvironment.run {
           ledgerApiCommand(
@@ -508,6 +515,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
               actAs.map(_.toLf),
               readAs.map(_.toLf),
               commands,
+              applicationId,
               workflowId,
               commandId,
               deduplicationPeriod,
@@ -870,7 +878,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           partyId: PartyId,
           atLeastNumCompletions: Int,
           offset: LedgerOffset,
-          applicationId: String = LedgerApiCommands.applicationId,
+          applicationId: String = LedgerApiCommands.defaultApplicationId,
           timeout: NonNegativeDuration = timeouts.ledgerCommand,
           filter: Completion => Boolean = _ => true,
       ): Seq[Completion] =
@@ -898,7 +906,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           partyId: PartyId,
           atLeastNumCompletions: Int,
           offset: LedgerOffset,
-          applicationId: String = LedgerApiCommands.applicationId,
+          applicationId: String = LedgerApiCommands.defaultApplicationId,
           timeout: NonNegativeDuration = timeouts.ledgerCommand,
           filter: Completion => Boolean = _ => true,
       ): Seq[(Completion, Option[Checkpoint])] =
@@ -928,6 +936,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
           parties: Seq[PartyId],
           beginOffset: LedgerOffset =
             new LedgerOffset().withBoundary(LedgerOffset.LedgerBoundary.LEDGER_BEGIN),
+          applicationId: String = LedgerApiCommands.defaultApplicationId,
       ): AutoCloseable = {
         check(FeatureFlag.Testing)(
           consoleEnvironment.run {
@@ -936,6 +945,7 @@ trait BaseLedgerApiAdministration extends NoTracing {
                 observer,
                 parties.map(_.toLf),
                 Some(beginOffset),
+                applicationId,
               )
             )
           }
