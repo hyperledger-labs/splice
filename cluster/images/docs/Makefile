@@ -18,4 +18,4 @@ $(html): $(src)
 
 .PHONY: clean
 clean:
-	rm -vfr src/app_dev/api
+	rm -vfr target src/app_dev/api

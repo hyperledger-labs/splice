@@ -10,7 +10,7 @@ if [[ $(git diff --stat) != '' || $(git diff --cached) != '' ]]; then
     else
         >&2 echo "Repo was dirty on CI"
         git status
-        git diff --no-pager --cached
+        git --no-pager diff --cached
         exit 1
     fi
 fi
