@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
-import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
+import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.console.{
   LocalValidatorAppReference,
   RemoteDirectoryAppReference,

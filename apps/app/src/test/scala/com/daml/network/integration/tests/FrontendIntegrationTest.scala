@@ -178,10 +178,6 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
     ).fold(e => s"Failed to get network requests: $e", x => x)
   }
 
-  protected def expectedCns(partyId: PartyId, entry: String) = {
-    s"${entry}\n(\n${partyId.toProtoPrimitive}\n)"
-  }
-
   protected def completeAuth0LoginWithAuthorization(username: String, password: String)(implicit
       webDriver: WebDriver
   ) = {
@@ -194,9 +190,50 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
       )
     }
   }
+
+  protected def browseToWallet(port: Int, damlUser: String)(implicit webDriver: WebDriver) = {
+    actAndCheck(
+      s"Browse to wallet UI at port ${port}", {
+        go to s"http://localhost:${port}"
+        click on "user-id-field"
+        textField("user-id-field").value = damlUser
+        click on "login-button"
+      },
+    )(
+      "Logged in user shows up",
+      _ => find(id("logged-in-user")).getOrElse(fail("Logged-in user information never showed up")),
+    )
+  }
+
+  protected def browseToAliceWallet(damlUser: String)(implicit webDriver: WebDriver) = {
+    browseToWallet(3000, damlUser)
+  }
+
+  protected def browseToBobWallet(damlUser: String)(implicit webDriver: WebDriver) = {
+    browseToWallet(3001, damlUser)
+  }
+
+  protected def browseToPaymentRequests(damlUser: String)(implicit webDriver: WebDriver) = {
+    // Go to app payment requests tab in alice's wallet
+    browseToAliceWallet(damlUser)
+    click on "app-payment-requests-button"
+  }
+
+  protected def browseToSubscriptions(damlUser: String)(implicit webDriver: WebDriver) = {
+    // Go to subscriptions tab in alice's wallet
+    browseToAliceWallet(damlUser)
+    click on "subscriptions-button"
+  }
+
 }
 
 object FrontendIntegrationTest {
   // counter to generate unique log-file names as otherwise each new test overwrites the previous one's log
   val counter = new AtomicLong(0)
+}
+
+trait CnsTestUtil {
+  protected def expectedCns(partyId: PartyId, entry: String) = {
+    s"${entry}\n(\n${partyId.toProtoPrimitive}\n)"
+  }
 }

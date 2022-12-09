@@ -4,8 +4,8 @@ import akka.stream.Materializer
 import cats.instances.list.*
 import cats.syntax.traverse.*
 import com.daml.network.automation.{AcsIngestionService, AutomationService, TriggerContext}
-import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
+import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.config.AutomationConfig
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}

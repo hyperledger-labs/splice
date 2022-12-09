@@ -3,8 +3,8 @@ package com.daml.network.directory.automation
 import akka.stream.Materializer
 import com.daml.network.automation.{OnCreateTrigger, TriggerContext}
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
+import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.directory.DirectoryUtil
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.CoinLedgerConnection
