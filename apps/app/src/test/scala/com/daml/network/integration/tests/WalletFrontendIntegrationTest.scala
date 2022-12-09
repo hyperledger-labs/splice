@@ -485,13 +485,14 @@ class WalletFrontendIntegrationTest
 
         actAndCheck(
           s"Alice creates offer by cns name", {
+            click on "create-offer-button"
             click on "create-offer-receiver"
             textField("create-offer-receiver").value = bobCns
             click on "create-offer-quantity"
             numberField("create-offer-quantity").underlying.sendKeys("100.0")
             click on "create-offer-description"
             textField("create-offer-description").value = "by party ID"
-            click on "create-offer-button"
+            click on "submit-create-offer-button"
           },
         )(
           "Alice sees the transfer offer",
@@ -502,6 +503,7 @@ class WalletFrontendIntegrationTest
 
         actAndCheck(
           s"Alice creates offer with auto-complete", {
+            click on "create-offer-button"
             click on "create-offer-receiver"
             textField("create-offer-receiver").value = "b"
             textField("create-offer-receiver").underlying.sendKeys(Keys.ARROW_DOWN)
@@ -510,7 +512,7 @@ class WalletFrontendIntegrationTest
             numberField("create-offer-quantity").underlying.sendKeys("100.0")
             click on "create-offer-description"
             textField("create-offer-description").value = "with auto-complete"
-            click on "create-offer-button"
+            click on "submit-create-offer-button"
           },
         )(
           "Alice sees the transfer offer",
@@ -521,7 +523,7 @@ class WalletFrontendIntegrationTest
 
         // The case of inserting the whole party ID is tested in "support transfer offers"
 
-        clue("Bob recieved both offers") {
+        clue("Bob received both offers") {
           eventually() {
             bobWallet.listTransferOffers() should have length 2
           }
@@ -550,13 +552,14 @@ class WalletFrontendIntegrationTest
       def createOffer(description: String)(implicit webDriver: WebDriver) = {
         actAndCheck(
           s"Alice creates offer \"${description}\"", {
+            click on "create-offer-button"
             click on "create-offer-receiver"
             textField("create-offer-receiver").value = bobParty.toProtoPrimitive
             click on "create-offer-quantity"
             numberField("create-offer-quantity").underlying.sendKeys("100.0")
             click on "create-offer-description"
             textField("create-offer-description").value = description
-            click on "create-offer-button"
+            click on "submit-create-offer-button"
           },
         )(
           "Alice sees the transfer offer",
@@ -611,8 +614,9 @@ class WalletFrontendIntegrationTest
 
         createOffer("to be withdrawn")
         actAndCheck(
-          "Alice withdraws her offer",
-          click on className("transfer-offers-table-withdraw"),
+          "Alice withdraws her offer", {
+            click on className("transfer-offers-table-withdraw")
+          },
         )("The offer is deleted", _ => findAll(className("transfer-offers-row")) should have size 0)
 
         createOffer("to be rejected")

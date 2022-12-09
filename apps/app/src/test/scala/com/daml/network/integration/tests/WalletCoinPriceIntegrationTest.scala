@@ -1,13 +1,15 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.config.CoinConfigTransforms
-import com.daml.network.integration.tests.CoinTests.{CoinTestConsoleEnvironment}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
-import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
+import com.daml.network.integration.tests.CoinTests.{
+  CoinIntegrationTest,
+  CoinTestConsoleEnvironment,
+}
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.HasExecutionContext
+import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 class WalletCoinPriceIntegrationTest
     extends CoinIntegrationTest

@@ -10,6 +10,10 @@ import React, { useCallback, useState } from 'react';
 
 import {
   Button,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
   Stack,
   Table,
   TableBody,
@@ -57,8 +61,7 @@ const TransferOffers: React.FC = () => {
   const [receiver, setReceiver] = useState<string>('');
   const [transferQuantity, setTransferQuantity] = useState<Decimal>(new Decimal(0.0));
   const [description, setDescription] = useState('');
-  const createOffer = async (ev: React.FormEvent<HTMLFormElement>) => {
-    ev.preventDefault();
+  const createOffer = async () => {
     const now = new Date();
     const expires = new Date(now.setMinutes(now.getMinutes() + 2));
     const senderTransferFeeRatio = new Decimal(1.0);
@@ -76,10 +79,28 @@ const TransferOffers: React.FC = () => {
     setReceiver(newValue);
   };
 
+  const [createOfferOpen, setCreateOfferOpen] = useState(false);
+  const openCreateOffer = () => {
+    setTransferQuantity(new Decimal(0));
+    setDescription('');
+    setCreateOfferOpen(true);
+  };
+  const closeCreateOffer = () => {
+    setCreateOfferOpen(false);
+  };
+  const createTransferOfferAndClose = async () => {
+    closeCreateOffer();
+    await createOffer();
+  };
+
   return (
     <Stack spacing={2}>
-      <form onSubmit={createOffer}>
-        <Stack direction="row">
+      <Button id="create-offer-button" onClick={openCreateOffer} variant="outlined">
+        Create new offer
+      </Button>
+      <Dialog open={createOfferOpen} onClose={closeCreateOffer}>
+        <DialogTitle>Create a Transfer Offer</DialogTitle>
+        <DialogContent>
           <DirectoryField
             id="create-offer-receiver"
             label="Receiver"
@@ -92,23 +113,27 @@ const TransferOffers: React.FC = () => {
             type="number"
             error={transferQuantity.lessThanOrEqualTo(0.0)}
             onChange={event => setTransferQuantity(new Decimal(event.target.value))}
+            fullWidth
           ></TextField>
           <TextField
-            id={'create-offer-description'}
+            id="create-offer-description"
             label="Description"
             value={description}
             onChange={event => setDescription(event.target.value)}
+            fullWidth
           ></TextField>
+        </DialogContent>
+        <DialogActions>
           <Button
-            variant="contained"
-            type="submit"
-            id="create-offer-button"
+            id="submit-create-offer-button"
+            onClick={createTransferOfferAndClose}
             disabled={transferQuantity.lessThanOrEqualTo(0.0)}
           >
-            Create a Transfer Offer
+            Submit
           </Button>
-        </Stack>
-      </form>
+          <Button onClick={closeCreateOffer}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
       <Typography variant="h4">Active Transfer Offers</Typography>
       <Table>
         <TableHead>
