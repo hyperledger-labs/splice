@@ -14,9 +14,6 @@ Seq(aliceValidator.remoteParticipant, bobValidator.remoteParticipant).foreach { 
 val charlieValidator = aliceValidator
 
 val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
-val auth0testUser = "auth0|632de6b067ec7e396a03262d"
-aliceValidator.remoteParticipant.ledger_api.users.lookup(auth0testUser)
-    .getOrElse(aliceValidator.onboardUser(auth0testUser))
 val bobUserParty = bobValidator.onboardUser(bobWallet.config.damlUser)
 val charlieUserParty = charlieValidator.onboardUser(charlieWallet.config.damlUser)
 
