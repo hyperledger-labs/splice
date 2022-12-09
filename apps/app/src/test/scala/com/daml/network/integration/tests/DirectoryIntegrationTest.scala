@@ -1,7 +1,7 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
-import com.daml.network.codegen.java.cn.{directory => codegen}
 import com.daml.network.console.{
   LocalValidatorAppReference,
   RemoteDirectoryAppReference,
@@ -15,8 +15,11 @@ import com.daml.network.integration.tests.CoinTests.{
 }
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.DiscardOps
+import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
+import com.digitalasset.canton.logging.SuppressionRule
 import com.digitalasset.canton.topology.PartyId
+import org.slf4j.event.Level
 
 import java.time.Instant
 import java.time.temporal.ChronoUnit
@@ -26,7 +29,7 @@ import scala.util.Try
 
 class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
-  import DirectoryIntegrationTest._
+  import DirectoryIntegrationTest.*
 
   private val directoryDarPath =
     "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
@@ -49,7 +52,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
     }
 
     "not throw an error on shutdown" in { implicit env =>
-      import env._
+      import env.*
 
       // The user of the directory service.
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
@@ -68,60 +71,125 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
         .flat(Set(aliceUserParty), completeAfter = 1, beginOffset = offsetBefore)
     }
 
-    "accept unique install requests" in { implicit env =>
-      import env._
-      // The user of the directory service.
-      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+    "ensure unique install despite racing install requests w/ and w/o archivals" in {
+      implicit env =>
+        // NOTE: this test also serves to check that the stale-contract detection logic in the OnCreateTrigger works properly
+        import env.*
 
-      // Test that we can do a racy allocation and cancellation of a directory install request multiple times
-      for (_ <- 1 to 3) {
-        // Remember offset
-        val offsetBefore =
-          aliceValidator.remoteParticipantWithAdminToken.ledger_api.transactions.end()
+        // The user of the directory service.
+        val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
-        // Request installs and wait for provider to auto-accept
-        val n = 3
-        (1 to n).foreach(_ => Future(aliceDirectory.requestDirectoryInstall()).discard)
+        def raceInstalls() = {
+          val (_, installCid) = actAndCheck(
+            "Trigger multiple install requests followed immediately by their archival", {
+              val installAttemptsFs = Range(0, 10).map(i =>
+                Future {
+                  clue(s"creating and archiving request $i") {
+                    val requestId = aliceDirectory.requestDirectoryInstall()
+                    // Issue a concurrent archival for all except the first three requests
+                    if (3 <= i) {
+                      // TODO(M1-92): get rid of this ugly archive argument once https://github.com/digital-asset/daml/issues/15540 is resolved
+                      val cmd =
+                        requestId.exerciseArchive(
+                          new com.daml.network.codegen.java.da.internal.template.Archive()
+                        )
+                      try {
+                        aliceValidator.remoteParticipantWithAdminToken.ledger_api.commands
+                          .submitJava(
+                            actAs = Seq(aliceUserParty),
+                            optTimeout = None,
+                            commands = cmd.commands().asScala.toSeq,
+                          )
+                      } catch {
+                        case ex: CommandFailure =>
+                          // The archival can fail if the automation is quicker in handling the request
+                          logger.info("Ignoring failure of archival command", ex)
+                      }
+                    }
+                  }
+                }
+              )
+              clue("waiting for all requests to be handled or archived") {
+                Future.sequence(installAttemptsFs).futureValue
+              }
+            },
+          )(
+            "there is exactly one install and no left-over request",
+            _ => {
+              val installs = aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
+                .filterJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
+              installs should have size (1)
+              val requests = aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
+                .filterJava(codegen.DirectoryInstallRequest.COMPANION)(aliceUserParty)
+              requests shouldBe Seq.empty
+              // return install-cid
+              installs(0).id
+            },
+          )
+          installCid
+        }
 
-        // Wait until 2*n transactions have been received (one each: create request + handle request)
-        val tx = aliceValidator.remoteParticipantWithAdminToken.ledger_api.transactions
-          .flat(Set(aliceUserParty), completeAfter = 2 * n, beginOffset = offsetBefore)
-        logger.info(
-          Seq("Received transactions:")
-            .appendedAll(tx.map(_.toString))
-            .mkString(System.lineSeparator())
+        // Start executing the actual test
+        val installCid = loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+          raceInstalls(),
+          lines => {
+            // check that all errors are due to races on the contracts
+            forAll(lines) { line =>
+              if (line.level == Level.ERROR)
+                line.message should (include("ABORTED/LOCAL_VERDICT_LOCKED_CONTRACTS") or include(
+                  "NOT_FOUND/LOCAL_VERDICT_INACTIVE_CONTRACTS"
+                ))
+            }
+
+            // Note the DirectoryInstallTrigger completes with log lines of the form:
+            //   DirectoryInstallRequestTrigger:DirectoryIntegrationTest/config=8b549e20/directory=directory-app tid:796c4cc07dc9db97b87db1feb158efb4 - Completed processing with outcome: accepted install request.
+
+            // Collect and check the logged outcomes from these lines
+            val outcomeRegex =
+              "DirectoryInstallRequestTrigger.*Completed processing with outcome: (.*)".r
+            val expectedOutcomes = Seq(
+              "accepted install request",
+              "rejected request for already existing installation",
+              "skipped, as the task has become stale",
+            )
+            // Note that we might not get an outcome for every request, as some create events might never be seen by the trigger
+            val actualOutcomes =
+              lines
+                .flatMap(line => outcomeRegex.findAllMatchIn(line.toString))
+                .map(_.group(1).stripSuffix("."))
+
+            forAll(actualOutcomes) { (outcome: String) =>
+              expectedOutcomes should contain(outcome)
+            }
+            actualOutcomes should (contain allOf) (
+              "accepted install request",
+              "rejected request for already existing installation",
+            )
+
+          },
         )
 
-        // check that there is only one install
-        val installs = aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
-          .filterJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
-        installs should have size (1)
-
-        val requests = aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
-          .filterJava(codegen.DirectoryInstallRequest.COMPANION)(aliceUserParty)
-        requests shouldBe Seq.empty
-
-        // Cancel install
-        val installCid: codegen.DirectoryInstall.ContractId = installs(0).id
-        val cmds = installCid
-          .exerciseDirectoryInstall_Cancel(aliceUserParty.toProtoPrimitive)
-          .commands
-          .asScala
-          .toSeq
-        aliceValidator.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
-          actAs = Seq(aliceUserParty),
-          commands = cmds,
-          optTimeout = None, // Setting to 'None' as otherwise the tx lookup fails
+        actAndCheck(
+          "Cancel install", {
+            val cmds = installCid
+              .exerciseDirectoryInstall_Cancel(aliceUserParty.toProtoPrimitive)
+              .commands
+              .asScala
+              .toSeq
+            aliceValidator.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
+              actAs = Seq(aliceUserParty),
+              commands = cmds,
+              optTimeout = None, // Setting to 'None' as otherwise the tx lookup fails
+            )
+          },
+        )(
+          "There is no install contract left",
+          _ =>
+            aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
+              .filterJava(codegen.DirectoryInstall.COMPANION)(
+                aliceUserParty
+              ) shouldBe empty,
         )
-
-        // Wait for install to no longer be available on alice's participant
-        eventually()(
-          aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
-            .filterJava(codegen.DirectoryInstall.COMPANION)(
-              aliceUserParty
-            ) shouldBe empty
-        )
-      }
     }
 
     def requestAndPayForEntry(refs: DynamicUserRefs, entryName: String) = {
@@ -151,7 +219,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
     "allocate unique directory entries, even when multiple parties race for them" in {
       implicit env =>
-        import env._
+        import env.*
 
         // The provider of the directory service
         val providerParty = directory.getProviderPartyId()

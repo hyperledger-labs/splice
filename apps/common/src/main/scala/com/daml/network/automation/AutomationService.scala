@@ -125,6 +125,11 @@ abstract class AutomationService(
     registerService(service)
   }
 
+  final protected def registerNewStyleTrigger(trigger: SourceBasedTrigger[?]): Unit = {
+    registerService(trigger)
+    trigger.run()
+  }
+
   /** Register a trigger invoked periodically with the current (ledger) time.
     *  When Canton runs with wall-clock time, the handler is triggered on each `interval`.
     *  When Canton runs with simulation time, the handler is *instead* triggered
@@ -190,7 +195,7 @@ abstract class AutomationService(
 
 object AutomationService {
 
-  private class TaskHandlerService[T](
+  class TaskHandlerService[T](
       config: AutomationConfig,
       source: Source[T, NotUsed],
       processTask: T => Future[Unit],
