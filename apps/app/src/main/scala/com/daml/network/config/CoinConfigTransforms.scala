@@ -329,6 +329,12 @@ object CoinConfigTransforms {
     )
   }
 
+  def bumpRemoteSplitwisePortsBy(bump: Int): CoinConfigTransform = {
+    updateAllRemoteSplitwiseAppConfigs_(
+      _.focus(_.ledgerApi).modify(portTransform(bump, _))
+    )
+  }
+
   def bumpSvcParticipantPortsBy(bump: Int): CoinConfigTransform = {
     val participant = updateAllParticipantConfigs { case (name, conf) =>
       if (name == "svc_participant") {

@@ -99,6 +99,18 @@ case class CoinEnvironmentDefinition(
       ctx => this.configTransformsWithContext(ctx) :+ (conf => transform(ctx, conf))
     )
 
+  /** Apply these config transforms before all others configured so far. */
+  def addConfigTransformsToFront(
+      transforms: (String, CoinConfig) => CoinConfig*
+  ): CoinEnvironmentDefinition =
+    transforms.foldRight(this)((ct, ed) => ed.addConfigTransformToFront(ct))
+  def addConfigTransformToFront(
+      transform: (String, CoinConfig) => CoinConfig
+  ): CoinEnvironmentDefinition =
+    copy(configTransformsWithContext =
+      ctx => (conf => transform(ctx, conf)) +: this.configTransformsWithContext(ctx)
+    )
+
   override lazy val environmentFactory: EnvironmentFactory[CoinEnvironmentImpl] =
     CoinEnvironmentFactory
 
@@ -123,13 +135,19 @@ object CoinEnvironmentDefinition {
 
   def simpleTopologyWithSimTime(testName: String): CoinEnvironmentDefinition =
     simpleTopology(testName)
-      .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy(10_000)(conf))
-      // we bump the remote directory ports separately in order to not confuse
+      // all of these transforms need to happen before the auth-related default transforms,
+      // which use the `clock` parameter to determine which `.tokens` file to read
+      // and the ledger API ports to identify the tokens in that file; hence we add them `ToFront`
+      .addConfigTransformsToFront((_, conf) => CoinConfigTransforms.bumpCantonPortsBy(10_000)(conf))
+      // we bump remote app ports separately in order to not confuse
       // the PreflightIntegrationTest which also uses bumpCantonPortsBy
-      .addConfigTransforms((_, conf) =>
+      .addConfigTransformsToFront((_, conf) =>
         CoinConfigTransforms.bumpRemoteDirectoryPortsBy(10_000)(conf)
       )
-      .addConfigTransforms((_, conf) =>
+      .addConfigTransformsToFront((_, conf) =>
+        CoinConfigTransforms.bumpRemoteSplitwisePortsBy(10_000)(conf)
+      )
+      .addConfigTransformsToFront((_, conf) =>
         conf.focus(_.parameters.clock).replace(ClockConfig.SimClock)
       )
 

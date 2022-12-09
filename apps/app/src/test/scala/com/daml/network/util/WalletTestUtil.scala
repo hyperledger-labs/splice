@@ -84,7 +84,7 @@ trait WalletTestUtil extends CoinIntegrationTest {
 
     (coinOpt, expirationOpt) match {
       case (Some(coin), Right(expiration)) => {
-        userWallet.remoteParticipant.ledger_api.commands.submitJava(
+        userWallet.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
           Seq(userParty, validatorParty),
           optTimeout = None,
           commands = transferContext.coinRules
