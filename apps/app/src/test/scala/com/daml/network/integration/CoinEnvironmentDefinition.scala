@@ -53,8 +53,9 @@ case class CoinEnvironmentDefinition(
       import env._
       this.preSetup(env)
       validators.local.foreach(validator => {
-        val validatorParty = validator.remoteParticipant.parties.enable(validator.config.damlUser)
-        validator.remoteParticipant.ledger_api.users.create(
+        val validatorParty =
+          validator.remoteParticipantWithAdminToken.parties.enable(validator.config.damlUser)
+        validator.remoteParticipantWithAdminToken.ledger_api.users.create(
           id = validator.config.damlUser,
           actAs = Set(validatorParty.toLf),
           primaryParty = Some(validatorParty.toLf),

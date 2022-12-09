@@ -113,7 +113,7 @@ class SplitwiseFrontendIntegrationTest
         click on "user-id-field"
         textField("user-id-field").value = bobDamlUser
         click on "login-button"
-        bobValidator.remoteParticipant.ledger_api.acs
+        bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
           .awaitJava(splitwiseCodegen.GroupInvite.COMPANION)(bobUserParty)
         click on className("request-membership-link")
       }
@@ -127,7 +127,7 @@ class SplitwiseFrontendIntegrationTest
         click on "user-id-field"
         textField("user-id-field").value = charlieDamlUser
         click on "login-button"
-        charlieValidator.remoteParticipant.ledger_api.acs
+        charlieValidator.remoteParticipantWithAdminToken.ledger_api.acs
           .awaitJava(splitwiseCodegen.GroupInvite.COMPANION)(charlieUserParty)
         click on className("request-membership-link")
       }
@@ -270,7 +270,7 @@ class SplitwiseFrontendIntegrationTest
         click on "user-id-field"
         textField("user-id-field").value = bobDamlUser
         click on "login-button"
-        bobValidator.remoteParticipant.ledger_api.acs
+        bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
           .awaitJava(splitwiseCodegen.GroupInvite.COMPANION)(bobUserParty)
         click on className("request-membership-link")
       }
@@ -379,7 +379,7 @@ class SplitwiseFrontendIntegrationTest
         click on "user-id-field"
         textField("user-id-field").value = bobDamlUser
         click on "login-button"
-        bobValidator.remoteParticipant.ledger_api.acs
+        bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
           .awaitJava(splitwiseCodegen.GroupInvite.COMPANION)(bobUserParty)
         eventually() {
           findAll(className("request-membership-link")).toSeq should have length 3
@@ -400,7 +400,7 @@ class SplitwiseFrontendIntegrationTest
         click on "user-id-field"
         textField("user-id-field").value = charlieDamlUser
         click on "login-button"
-        bobValidator.remoteParticipant.ledger_api.acs
+        bobValidator.remoteParticipantWithAdminToken.ledger_api.acs
           .awaitJava(splitwiseCodegen.GroupInvite.COMPANION)(bobUserParty)
         eventually() {
           findAll(className("request-membership-link")).toSeq should have length 3

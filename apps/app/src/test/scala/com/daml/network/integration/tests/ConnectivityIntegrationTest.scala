@@ -47,7 +47,7 @@ class ConnectivityIntegrationTest extends CoinIntegrationTest {
       bobValidator.start()
       eventually() {
         // Using scan's remoteParticipant as that points to the non-toxied API
-        val results = scan.remoteParticipant.ledger_api.acs
+        val results = scan.remoteParticipantWithAdminToken.ledger_api.acs
           .filterJava(CoinRulesRequest.COMPANION)(svcParty)
         inside(results)(_.size shouldBe 1)
       }
@@ -68,7 +68,7 @@ class ConnectivityIntegrationTest extends CoinIntegrationTest {
     }
 
     clue("check that there are no outstanding CoinRulesRequest contracts") {
-      val results = svc.remoteParticipant.ledger_api.acs
+      val results = svc.remoteParticipantWithAdminToken.ledger_api.acs
         .filterJava(CoinRulesRequest.COMPANION)(svcParty)
       inside(results)(_.size shouldBe 0)
     }

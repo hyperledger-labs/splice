@@ -53,7 +53,8 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
       // The user of the directory service.
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-      val offsetBefore = directoryValidator.remoteParticipant.ledger_api.transactions.end()
+      val offsetBefore =
+        directoryValidator.remoteParticipantWithAdminToken.ledger_api.transactions.end()
 
       // Trigger three concurrent install requests
       for (_ <- 1 to 3)
@@ -63,7 +64,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
       // Wait for one transaction, so that automation likely kicks-off but shutdown initiates quickly
       // and thus results in 'handleDirectoryInstallRequest' handlers being aborted due to shutdown.
-      directoryValidator.remoteParticipant.ledger_api.transactions
+      directoryValidator.remoteParticipantWithAdminToken.ledger_api.transactions
         .flat(Set(aliceUserParty), completeAfter = 1, beginOffset = offsetBefore)
     }
 
@@ -75,14 +76,15 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
       // Test that we can do a racy allocation and cancellation of a directory install request multiple times
       for (_ <- 1 to 3) {
         // Remember offset
-        val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
+        val offsetBefore =
+          aliceValidator.remoteParticipantWithAdminToken.ledger_api.transactions.end()
 
         // Request installs and wait for provider to auto-accept
         val n = 3
         (1 to n).foreach(_ => Future(aliceDirectory.requestDirectoryInstall()).discard)
 
         // Wait until 2*n transactions have been received (one each: create request + handle request)
-        val tx = aliceValidator.remoteParticipant.ledger_api.transactions
+        val tx = aliceValidator.remoteParticipantWithAdminToken.ledger_api.transactions
           .flat(Set(aliceUserParty), completeAfter = 2 * n, beginOffset = offsetBefore)
         logger.info(
           Seq("Received transactions:")
@@ -91,11 +93,11 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
         )
 
         // check that there is only one install
-        val installs = aliceValidator.remoteParticipant.ledger_api.acs
+        val installs = aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
           .filterJava(codegen.DirectoryInstall.COMPANION)(aliceUserParty)
         installs should have size (1)
 
-        val requests = aliceValidator.remoteParticipant.ledger_api.acs
+        val requests = aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
           .filterJava(codegen.DirectoryInstallRequest.COMPANION)(aliceUserParty)
         requests shouldBe Seq.empty
 
@@ -106,7 +108,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
           .commands
           .asScala
           .toSeq
-        aliceValidator.remoteParticipant.ledger_api.commands.submitJava(
+        aliceValidator.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
           actAs = Seq(aliceUserParty),
           commands = cmds,
           optTimeout = None, // Setting to 'None' as otherwise the tx lookup fails
@@ -114,7 +116,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
         // Wait for install to no longer be available on alice's participant
         eventually()(
-          aliceValidator.remoteParticipant.ledger_api.acs
+          aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
             .filterJava(codegen.DirectoryInstall.COMPANION)(
               aliceUserParty
             ) shouldBe empty
@@ -138,7 +140,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
       })
       // Wait for the SubscriptionInitialPayment to be archived
       eventually() {
-        refs.validator.remoteParticipant.ledger_api.acs
+        refs.validator.remoteParticipantWithAdminToken.ledger_api.acs
           .filterJava(subsCodegen.SubscriptionInitialPayment.COMPANION)(
             refs.userParty,
             (request: subsCodegen.SubscriptionInitialPayment.Contract) =>
@@ -213,7 +215,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
       clue("Creating a directory entry that expires immediately") {
         directory.listEntries("", 25) shouldBe empty
         val dirParty = directory.getProviderPartyId()
-        directory.remoteParticipant.ledger_api.commands.submitJava(
+        directory.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
           actAs = Seq(dirParty),
           commands = new codegen.DirectoryEntry(
             dirParty.toProtoPrimitive,
@@ -270,7 +272,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
       clue("Request install and wait for provider to auto-accept") {
         refs.directory.requestDirectoryInstall()
-        refs.validator.remoteParticipant.ledger_api.acs
+        refs.validator.remoteParticipantWithAdminToken.ledger_api.acs
           .awaitJava(codegen.DirectoryInstall.COMPANION)(userParty)
       }
 

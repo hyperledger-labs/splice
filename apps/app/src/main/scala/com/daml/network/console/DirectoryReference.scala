@@ -72,11 +72,20 @@ class LocalDirectoryAppReference(
 
   protected val nodes = consoleEnvironment.environment.directories
 
-  /** Remote participant this Directory app is configured to interact with. */
-  val remoteParticipant =
+  /** Remote participant this directory app is configured to interact with. */
+  lazy val remoteParticipant =
     new CoinRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name``",
+      name,
+      config.remoteParticipant.remoteParticipantConfig,
+    )
+
+  /** Remote participant this directory app is configured to interact with. Uses admin tokens to bypass auth. */
+  lazy val remoteParticipantWithAdminToken =
+    new CoinRemoteParticipantReference(
+      consoleEnvironment,
+      s"remote participant for `$name`, with admin token",
       name,
       config.remoteParticipant.remoteParticipantConfigWithAdminToken,
     )

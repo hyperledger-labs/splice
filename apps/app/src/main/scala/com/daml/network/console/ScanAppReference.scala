@@ -102,10 +102,19 @@ final class LocalScanAppReference(
     coinConsoleEnvironment.environment.config.scansByString(name)
 
   /** Remote participant this scan app is configured to interact with. */
-  val remoteParticipant =
+  lazy val remoteParticipant =
     new CoinRemoteParticipantReference(
       coinConsoleEnvironment,
       s"remote participant for `$name``",
+      name,
+      config.remoteParticipant.remoteParticipantConfig,
+    )
+
+  /** Remote participant this scan app is configured to interact with. Uses admin tokens to bypass auth. */
+  lazy val remoteParticipantWithAdminToken =
+    new CoinRemoteParticipantReference(
+      coinConsoleEnvironment,
+      s"remote participant for `$name`, with admin token",
       name,
       config.remoteParticipant.remoteParticipantConfigWithAdminToken,
     )

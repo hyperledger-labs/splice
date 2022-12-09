@@ -703,7 +703,7 @@ class WalletFrontendIntegrationTest
   ): String = {
     val dirEntryName = "directory.cns"
     val dirParty = directory.getProviderPartyId()
-    directory.remoteParticipant.ledger_api.commands.submitJava(
+    directory.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
       actAs = Seq(dirParty),
       commands = new dirCodegen.DirectoryEntry(
         dirParty.toProtoPrimitive,
@@ -755,12 +755,12 @@ class WalletFrontendIntegrationTest
       "description",
     )
     clue("Create delivery offer") {
-      aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
         Seq(aliceUserParty),
         optTimeout = None,
         commands = deliveryOffer.create.commands.asScala.toSeq,
       )
-      aliceWalletBackend.remoteParticipant.ledger_api.acs
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.acs
         .awaitJava(testWalletCodegen.TestDeliveryOffer.COMPANION)(
           aliceUserParty,
           _.data == deliveryOffer,
@@ -798,12 +798,12 @@ class WalletFrontendIntegrationTest
         new RelTime(5 * 60 * 1000000L), // 5min collection duration.
         deliveryOfferId.toInterface(paymentCodegen.DeliveryOffer.INTERFACE),
       )
-      aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
         Seq(aliceUserParty),
         optTimeout = None,
         commands = paymentRequest.create.commands.asScala.toSeq,
       )
-      aliceWalletBackend.remoteParticipant.ledger_api.acs
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.acs
         .awaitJava(paymentCodegen.AppPaymentRequest.COMPANION)(aliceUserParty)
         .id
     }
@@ -836,12 +836,12 @@ class WalletFrontendIntegrationTest
       "description",
     )
     clue("Create a subscription context") {
-      aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
         Seq(aliceUserParty),
         optTimeout = None,
         commands = context.create.commands.asScala.toSeq,
       )
-      aliceWalletBackend.remoteParticipant.ledger_api.acs
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.acs
         .awaitJava(testSubsCodegen.TestSubscriptionContext.COMPANION)(
           aliceUserParty,
           _.data == context,
@@ -889,7 +889,7 @@ class WalletFrontendIntegrationTest
         subscription,
         payData,
       )
-      aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
         actAs = Seq(aliceUserParty),
         optTimeout = None,
         commands = subscriptionRequest.create.commands.asScala.toSeq,
@@ -915,12 +915,12 @@ class WalletFrontendIntegrationTest
         svcParty.toProtoPrimitive,
         contextId.toInterface(subsCodegen.SubscriptionContext.INTERFACE),
       )
-      aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
         Seq(aliceUserParty),
         optTimeout = None,
         commands = subscription.create.commands.asScala.toSeq,
       )
-      aliceWalletBackend.remoteParticipant.ledger_api.acs
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.acs
         .awaitJava(subsCodegen.Subscription.COMPANION)(aliceUserParty, _.data == subscription)
         .id
     }
@@ -931,7 +931,7 @@ class WalletFrontendIntegrationTest
         payData,
         nextPaymentDueAt,
       )
-      aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
+      aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
         actAs = Seq(aliceUserParty),
         optTimeout = None,
         commands = state.create.commands.asScala.toSeq,

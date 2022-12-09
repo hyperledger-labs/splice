@@ -31,7 +31,7 @@ class SvcTimeBasedIntegrationTest
   "round management" in { implicit env =>
     // Sync with background automation that onboards validator.
     eventually()({
-      val rounds = svc.remoteParticipant.ledger_api.acs
+      val rounds = svc.remoteParticipantWithAdminToken.ledger_api.acs
         .filterJava(cc.round.OpenMiningRound.COMPANION)(svcParty)
       rounds.map {
         _.data.observers should have length 4
@@ -42,19 +42,19 @@ class SvcTimeBasedIntegrationTest
     // one tick - round 0 closes.
     advanceRoundsByOneTick
     eventually()(
-      svc.remoteParticipant.ledger_api.acs
+      svc.remoteParticipantWithAdminToken.ledger_api.acs
         .filterJava(IssuingMiningRound.COMPANION)(svcParty) should have size 1
     )
     // next tick - round 1 closes.
     advanceRoundsByOneTick
     eventually()(
-      svc.remoteParticipant.ledger_api.acs
+      svc.remoteParticipantWithAdminToken.ledger_api.acs
         .filterJava(IssuingMiningRound.COMPANION)(svcParty) should have size 2
     )
     // next tick - round 2 closes.
     advanceRoundsByOneTick
     eventually()(
-      svc.remoteParticipant.ledger_api.acs
+      svc.remoteParticipantWithAdminToken.ledger_api.acs
         .filterJava(IssuingMiningRound.COMPANION)(svcParty) should have size 3
     )
 
@@ -65,15 +65,15 @@ class SvcTimeBasedIntegrationTest
         advanceTime(java.time.Duration.ofSeconds(160))
         // poll frequently, so we see the closed mining round before the automation archives it.
         eventually(maxPollInterval = 100.milliseconds)(
-          svc.remoteParticipant.ledger_api.acs
+          svc.remoteParticipantWithAdminToken.ledger_api.acs
             .filterJava(ClosedMiningRound.COMPANION)(svcParty) should have size 1
         )
         eventually()( // .. hence even though a fourth issuing round is created, we end up with 3 active issuing rounds eventually.
-          svc.remoteParticipant.ledger_api.acs
+          svc.remoteParticipantWithAdminToken.ledger_api.acs
             .filterJava(IssuingMiningRound.COMPANION)(svcParty) should have size 3
         )
         eventually()( // closed round is archived eventually.
-          svc.remoteParticipant.ledger_api.acs
+          svc.remoteParticipantWithAdminToken.ledger_api.acs
             .filterJava(ClosedMiningRound.COMPANION)(svcParty) should have size 0
         )
       },
@@ -135,7 +135,7 @@ class SvcTimeBasedIntegrationTest
       ),
     )
     // Create a bunch of rewards directly
-    svc.remoteParticipant.ledger_api.commands.submitJava(
+    svc.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
       actAs = Seq(svcParty),
       optTimeout = None,
       commands = rewards.flatMap(_.create.commands.asScala.toSeq),
@@ -145,7 +145,7 @@ class SvcTimeBasedIntegrationTest
       {
         advanceRoundsByOneTick
         eventually() {
-          svc.remoteParticipant.ledger_api.acs
+          svc.remoteParticipantWithAdminToken.ledger_api.acs
             .filterJava(IssuingMiningRound.COMPANION)(svcParty) should have size 1
         }
       },

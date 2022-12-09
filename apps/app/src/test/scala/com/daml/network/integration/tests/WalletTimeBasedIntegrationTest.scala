@@ -161,7 +161,7 @@ class WalletTimeBasedIntegrationTest
         val directoryDarPath = "daml/directory-service/.daml/dist/directory-service-0.1.0.dar"
         aliceValidator.remoteParticipant.dars.upload(directoryDarPath)
         aliceDirectory.requestDirectoryInstall()
-        aliceValidator.remoteParticipant.ledger_api.acs
+        aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
           .awaitJava(dirCodegen.DirectoryInstall.COMPANION)(aliceUserParty)
       }
       aliceWallet.listSubscriptions() shouldBe empty

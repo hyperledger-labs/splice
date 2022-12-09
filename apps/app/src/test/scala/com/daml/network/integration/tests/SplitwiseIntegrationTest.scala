@@ -112,7 +112,7 @@ class SplitwiseIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
         aliceSplitwise.joinGroup(accepted.contractId)
       }
 
-      splitwiseValidator.remoteParticipant.ledger_api.acs
+      splitwiseValidator.remoteParticipantWithAdminToken.ledger_api.acs
         .awaitJava(splitwiseCodegen.Group.COMPANION)(providerSplitwiseBackend.getProviderPartyId())
 
       charlieSplitwise.listBalances(key) shouldBe Map.empty
@@ -187,7 +187,7 @@ class SplitwiseIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
     }
 
     "return the primary party of the user" in { implicit env =>
-      val user = providerSplitwiseBackend.remoteParticipant.ledger_api.users
+      val user = providerSplitwiseBackend.remoteParticipantWithAdminToken.ledger_api.users
         .get(providerSplitwiseBackend.config.providerUser)
       Some(providerSplitwiseBackend.getProviderPartyId().toLf) shouldBe user.primaryParty
     }

@@ -46,7 +46,7 @@ class WalletIntegrationTest
       }
 
       val (_, _, reqC) =
-        createSelfPaymentRequest(aliceWalletBackend.remoteParticipant, aliceUserParty)
+        createSelfPaymentRequest(aliceWalletBackend.remoteParticipantWithAdminToken, aliceUserParty)
 
       val reqFound = clue("Check that we can see the created payment request") {
         val reqFound = eventually() {
@@ -70,7 +70,7 @@ class WalletIntegrationTest
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
 
       val (referenceId, _, reqC) =
-        createSelfPaymentRequest(aliceWalletBackend.remoteParticipant, aliceUserParty)
+        createSelfPaymentRequest(aliceWalletBackend.remoteParticipantWithAdminToken, aliceUserParty)
 
       val cid = eventually() {
         inside(aliceWallet.listAppPaymentRequests()) { case Seq(r) =>
@@ -200,7 +200,7 @@ class WalletIntegrationTest
               .commands
               .asScala
               .toSeq
-            aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
+            aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
               actAs = Seq(aliceUserParty),
               readAs = Seq(aliceValidatorParty),
               optTimeout = None,
@@ -229,7 +229,7 @@ class WalletIntegrationTest
               .commands
               .asScala
               .toSeq
-            aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
+            aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
               actAs = Seq(aliceUserParty),
               readAs = Seq(aliceValidatorParty),
               optTimeout = None,
@@ -383,7 +383,8 @@ class WalletIntegrationTest
       val alice = onboardWalletUser(aliceWallet, aliceValidator)
       aliceWallet.tap(49)
       // create and reject request such that...
-      val request = createSelfPaymentRequest(aliceValidator.remoteParticipant, alice)._2
+      val request =
+        createSelfPaymentRequest(aliceValidator.remoteParticipantWithAdminToken, alice)._2
       aliceWallet.rejectAppPaymentRequest(request)
 
       loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
@@ -411,8 +412,11 @@ class WalletIntegrationTest
         val alice = onboardWalletUser(aliceWallet, aliceValidator)
         aliceWallet.tap(50)
         val requestIds =
-          (1 to 3).map(i => createSelfPaymentRequest(aliceValidator.remoteParticipant, alice)._2)
-        val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
+          (1 to 3).map(i =>
+            createSelfPaymentRequest(aliceValidator.remoteParticipantWithAdminToken, alice)._2
+          )
+        val offsetBefore =
+          aliceValidator.remoteParticipantWithAdminToken.ledger_api.transactions.end()
         // sending three commands in short succession to the idle wallet should lead to two transactions being executed
         // tx 1: first command that arrived is immediately executed
         // tx 2: other commands that arrived after the first command was started are executed in one batch
@@ -421,7 +425,7 @@ class WalletIntegrationTest
         )
 
         // Wait until 2 transactions have been received
-        val txs = aliceValidator.remoteParticipant.ledger_api.transactions
+        val txs = aliceValidator.remoteParticipantWithAdminToken.ledger_api.transactions
           .treesJava(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
         val createdCoinsInTx =
           txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_))
@@ -445,16 +449,17 @@ class WalletIntegrationTest
 
         val requests =
           (0 to batchSize + 1).map(_ =>
-            createSelfPaymentRequest(aliceValidator.remoteParticipant, alice)._2
+            createSelfPaymentRequest(aliceValidator.remoteParticipantWithAdminToken, alice)._2
           )
 
         eventually() {
-          aliceValidator.remoteParticipant.ledger_api.acs.filterJava(
+          aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs.filterJava(
             walletCodegen.AppPaymentRequest.COMPANION
           )(alice) should have size (batchSize.toLong + 2)
         }
 
-        val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
+        val offsetBefore =
+          aliceValidator.remoteParticipantWithAdminToken.ledger_api.transactions.end()
 
         requests.foreach(request => Future(aliceWallet.acceptAppPaymentRequest(request)).discard)
 
@@ -462,7 +467,7 @@ class WalletIntegrationTest
         // tx 1: initial transfer
         // tx 2: batchSize subsequent batched transfers
         // tx 3: single transfer that was not picked due to the batch size limit
-        val txs = aliceValidator.remoteParticipant.ledger_api.transactions
+        val txs = aliceValidator.remoteParticipantWithAdminToken.ledger_api.transactions
           .treesJava(Set(alice), completeAfter = 3, beginOffset = offsetBefore)
         val createdCoinsInTx =
           txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_))
@@ -489,14 +494,16 @@ class WalletIntegrationTest
 
           // tapping some coin & waiting for it to appear as a way to synchronize on the initialization of the apps.
           aliceWallet.tap(10)
-          aliceValidator.remoteParticipant.ledger_api.acs
+          aliceValidator.remoteParticipantWithAdminToken.ledger_api.acs
             .awaitJava(coinCodegen.Coin.COMPANION)(alice)
           // creating payment request
-          val request = createSelfPaymentRequest(aliceValidator.remoteParticipant, alice)._2
+          val request =
+            createSelfPaymentRequest(aliceValidator.remoteParticipantWithAdminToken, alice)._2
           // Reject it again
           aliceWallet.rejectAppPaymentRequest(request)
           // ... such that we don't grab the ledger offset when some init txs are still occurring
-          val offsetBefore = aliceValidator.remoteParticipant.ledger_api.transactions.end()
+          val offsetBefore =
+            aliceValidator.remoteParticipantWithAdminToken.ledger_api.transactions.end()
 
           // solo tap will kick off batch with only one coin operation
           val transfer1F = Future(aliceWallet.tap(10))
@@ -525,7 +532,7 @@ class WalletIntegrationTest
             checkWallet(alice, aliceWallet, Seq((9, 10), (9, 10), (9, 10), (9, 10)))
           }
           eventually() {
-            val txs = aliceValidator.remoteParticipant.ledger_api.transactions
+            val txs = aliceValidator.remoteParticipantWithAdminToken.ledger_api.transactions
               .treesJava(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
             val createdCoinsInTx =
               txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_))
@@ -539,7 +546,8 @@ class WalletIntegrationTest
         val alice = onboardWalletUser(aliceWallet, aliceValidator)
         aliceWallet.tap(10)
 
-        val request = createSelfPaymentRequest(aliceValidator.remoteParticipant, alice)._2
+        val request =
+          createSelfPaymentRequest(aliceValidator.remoteParticipantWithAdminToken, alice)._2
         eventually()(aliceWallet.listAppPaymentRequests() should have size 1)
 
         val cancelF = Future(aliceWallet.rejectAppPaymentRequest(request))
@@ -616,7 +624,7 @@ class WalletIntegrationTest
         env: CoinTestConsoleEnvironment
     ): subsCodegen.SubscriptionRequest = {
       val contextId = clue("Create a subscription context") {
-        aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
+        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
           Seq(aliceUserParty),
           optTimeout = None,
           commands = new testSubsCodegen.TestSubscriptionContext(
@@ -626,7 +634,7 @@ class WalletIntegrationTest
             "description",
           ).create.commands.asScala.toSeq,
         )
-        aliceWalletBackend.remoteParticipant.ledger_api.acs
+        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.acs
           .awaitJava(testSubsCodegen.TestSubscriptionContext.COMPANION)(aliceUserParty)
           .id
       }
@@ -652,7 +660,7 @@ class WalletIntegrationTest
           subscriptionData,
           payData,
         )
-        aliceWalletBackend.remoteParticipant.ledger_api.commands.submitJava(
+        aliceWalletBackend.remoteParticipantWithAdminToken.ledger_api.commands.submitJava(
           actAs = Seq(aliceUserParty),
           optTimeout = None,
           commands = request.create.commands.asScala.toSeq,
