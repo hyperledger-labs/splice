@@ -14,6 +14,10 @@ import {
   DialogActions,
   DialogContent,
   DialogTitle,
+  FormControl,
+  MenuItem,
+  Select,
+  SelectChangeEvent,
   Stack,
   Table,
   TableBody,
@@ -30,6 +34,13 @@ import { Party } from '@daml/types';
 import { PaymentQuantityDisplay } from '../components/QuantityDisplay';
 import Timestamp from '../components/Timestamp';
 import { useWalletClient } from '../contexts/WalletServiceContext';
+
+const OTimeUnits = {
+  seconds: 'Seconds',
+  minutes: 'Minutes',
+  hours: 'Hours',
+} as const;
+type TimeUnits = typeof OTimeUnits[keyof typeof OTimeUnits];
 
 const TransferOffers: React.FC = () => {
   const {
@@ -60,16 +71,32 @@ const TransferOffers: React.FC = () => {
 
   const [receiver, setReceiver] = useState<string>('');
   const [transferQuantity, setTransferQuantity] = useState<Decimal>(new Decimal(0.0));
-  const [description, setDescription] = useState('');
+  const [transferDescription, setTransferDescription] = useState('');
+  const [transferExpirationValue, setTransferExpirationValue] = useState(new Decimal(0.0));
+  const [transferExpirationUnit, setTransferExpirationUnit] = useState<TimeUnits>(
+    OTimeUnits.seconds
+  );
   const createOffer = async () => {
     const now = new Date();
-    const expires = new Date(now.setMinutes(now.getMinutes() + 2));
+    let expires = now;
+    switch (transferExpirationUnit) {
+      case OTimeUnits.seconds:
+        expires = new Date(now.setSeconds(now.getSeconds() + transferExpirationValue.toNumber()));
+        break;
+      case OTimeUnits.minutes:
+        expires = new Date(now.setMinutes(now.getMinutes() + transferExpirationValue.toNumber()));
+        break;
+      case OTimeUnits.hours:
+        expires = new Date(now.setHours(now.getHours() + transferExpirationValue.toNumber()));
+        break;
+      default:
+        throw Error(`Unexpected unit: ${transferExpirationUnit}`);
+    }
     const senderTransferFeeRatio = new Decimal(1.0);
-    // TODO(#1776): Expiration is currently hard-coded to 2 minutes from now - add a UI for controlling that
     await createTransferOffer(
       receiver,
       transferQuantity,
-      description,
+      transferDescription,
       expires,
       senderTransferFeeRatio
     );
@@ -82,7 +109,9 @@ const TransferOffers: React.FC = () => {
   const [createOfferOpen, setCreateOfferOpen] = useState(false);
   const openCreateOffer = () => {
     setTransferQuantity(new Decimal(0));
-    setDescription('');
+    setTransferDescription('');
+    setTransferExpirationValue(new Decimal(0));
+    setTransferExpirationUnit(OTimeUnits.seconds);
     setCreateOfferOpen(true);
   };
   const closeCreateOffer = () => {
@@ -114,20 +143,47 @@ const TransferOffers: React.FC = () => {
             error={transferQuantity.lessThanOrEqualTo(0.0)}
             onChange={event => setTransferQuantity(new Decimal(event.target.value))}
             fullWidth
-          ></TextField>
+          />
           <TextField
             id="create-offer-description"
             label="Description"
-            value={description}
-            onChange={event => setDescription(event.target.value)}
+            value={transferDescription}
+            onChange={event => setTransferDescription(event.target.value)}
             fullWidth
-          ></TextField>
+          />
+          <TextField
+            id="create-offer-expiration-value"
+            label="To expire in"
+            value={transferExpirationValue}
+            onChange={event => setTransferExpirationValue(new Decimal(event.target.value))}
+            fullWidth
+            type="number"
+            error={transferExpirationValue.lessThanOrEqualTo(0.0)}
+          />
+          <FormControl>
+            <Select
+              id="create-offer-expiration-unit"
+              value={transferExpirationUnit}
+              onChange={(event: SelectChangeEvent<TimeUnits>) =>
+                setTransferExpirationUnit(event.target.value as TimeUnits)
+              }
+            >
+              {Object.values(OTimeUnits).map(val => (
+                <MenuItem value={val} key={val}>
+                  {val}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
         </DialogContent>
         <DialogActions>
           <Button
             id="submit-create-offer-button"
             onClick={createTransferOfferAndClose}
-            disabled={transferQuantity.lessThanOrEqualTo(0.0)}
+            disabled={
+              transferQuantity.lessThanOrEqualTo(0.0) ||
+              transferExpirationValue.lessThanOrEqualTo(0.0)
+            }
           >
             Submit
           </Button>

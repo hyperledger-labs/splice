@@ -108,6 +108,9 @@ class PreflightIntegrationTest
       click on "create-offer-description"
       textField("create-offer-description").value = description
 
+      click on "create-offer-expiration-value"
+      numberField("create-offer-expiration-value").underlying.sendKeys("120")
+
       click on "submit-create-offer-button"
 
       eventually() {

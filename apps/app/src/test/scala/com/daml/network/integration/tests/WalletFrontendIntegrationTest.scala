@@ -391,6 +391,8 @@ class WalletFrontendIntegrationTest
             numberField("create-offer-quantity").underlying.sendKeys("100.0")
             click on "create-offer-description"
             textField("create-offer-description").value = "by party ID"
+            click on "create-offer-expiration-value"
+            numberField("create-offer-expiration-value").underlying.sendKeys("120")
             click on "submit-create-offer-button"
           },
         )(
@@ -411,6 +413,8 @@ class WalletFrontendIntegrationTest
             numberField("create-offer-quantity").underlying.sendKeys("100.0")
             click on "create-offer-description"
             textField("create-offer-description").value = "with auto-complete"
+            click on "create-offer-expiration-value"
+            numberField("create-offer-expiration-value").underlying.sendKeys("120")
             click on "submit-create-offer-button"
           },
         )(
@@ -458,6 +462,8 @@ class WalletFrontendIntegrationTest
             numberField("create-offer-quantity").underlying.sendKeys("100.0")
             click on "create-offer-description"
             textField("create-offer-description").value = description
+            click on "create-offer-expiration-value"
+            numberField("create-offer-expiration-value").underlying.sendKeys("120")
             click on "submit-create-offer-button"
           },
         )(
@@ -529,6 +535,8 @@ class WalletFrontendIntegrationTest
         )
       }
 
+    // Testing a short-lived offer here might be racy, so for now we're not doing that. The different units of time
+    // have been manually tested instead, and general expiration times is tested in the non-frontend integration test.
     }
 
     "display currency in subscriptions and subscription requests" in { implicit env =>
