@@ -82,6 +82,7 @@ class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScr
     )
   }
 
+  // TODO(#1983)
   "run through runbook against local SVC" in { implicit env =>
     val propName = "DOMAIN_URL"
     val prevProperty = System.getProperty(propName)
