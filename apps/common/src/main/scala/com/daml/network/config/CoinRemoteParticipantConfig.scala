@@ -5,8 +5,8 @@ import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
 import com.digitalasset.canton.participant.config.{BaseParticipantConfig, RemoteParticipantConfig}
 
-import scala.concurrent.duration.DurationInt
 import scala.concurrent.Await
+import scala.concurrent.duration.DurationInt
 
 /** Configuration to connect the console to a participant running remotely.
   *

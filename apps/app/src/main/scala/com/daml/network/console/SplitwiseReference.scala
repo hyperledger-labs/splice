@@ -79,7 +79,7 @@ final class RemoteSplitwiseAppReference(
       config.ledgerApi.clientConfig.address,
       config.ledgerApi.clientConfig.port,
       config.ledgerApi.clientConfig.tls,
-      // TODO(#1627): Use actual ledger API auth
+      // TODO(#1974): Use actual ledger API auth
       config.ledgerApi.authConfig.adminToken,
     )(consoleEnvironment)
 

@@ -380,15 +380,12 @@ object CoinConfigTransforms {
     */
   def useSelfSignedTokensForLedgerApiAuth(secret: String): CoinConfigTransform = { config =>
     updateAllLedgerApiClientConfigs(
-      readyForAuth = selfSignedTokenAuthSourceTransform(config.parameters.clock, secret),
-      notReadyForAuth = adminTokenAuthSourceTransform(config.parameters.clock),
+      enableAuth = selfSignedTokenAuthSourceTransform(config.parameters.clock, secret)
     )(config)
   }
 
-  // TODO(#1627): Remove notReadyForAuth once all apps are auth-ready
   private def updateAllLedgerApiClientConfigs(
-      readyForAuth: (String, CoinLedgerApiClientConfig) => CoinLedgerApiClientConfig,
-      notReadyForAuth: (String, CoinLedgerApiClientConfig) => CoinLedgerApiClientConfig,
+      enableAuth: (String, CoinLedgerApiClientConfig) => CoinLedgerApiClientConfig
   ): CoinConfigTransform = { config =>
     val transforms: Seq[CoinConfigTransform] = Seq(
       // Validator and wallet apps are ready for auth:
@@ -396,42 +393,32 @@ object CoinConfigTransforms {
       // - they only read data for parties for which their service user has readAd rights
       // - they don't use admin endpoints unless their service user has admin rights (validator app only)
       updateAllValidatorConfigs_(c => {
-        c.focus(_.remoteParticipant.ledgerApi).modify(readyForAuth(c.damlUser, _))
+        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.damlUser, _))
       }),
       updateAllWalletAppBackendConfigs_(c => {
-        c.focus(_.remoteParticipant.ledgerApi).modify(readyForAuth(c.serviceUser, _))
+        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.serviceUser, _))
       }),
       // Other apps may not be ready for auth
       updateSvcAppConfig(c => {
-        c.focus(_.remoteParticipant.ledgerApi).modify(notReadyForAuth(c.damlUser, _))
+        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.damlUser, _))
       }),
       updateScanAppConfig(c => {
-        c.focus(_.remoteParticipant.ledgerApi).modify(notReadyForAuth(c.svcUser, _))
+        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.svcUser, _))
       }),
       updateDirectoryAppConfig(c => {
-        c.focus(_.remoteParticipant.ledgerApi).modify(notReadyForAuth(c.damlUser, _))
+        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.damlUser, _))
       }),
       updateAllRemoteDirectoryAppConfigs_(c => {
-        c.focus(_.ledgerApi).modify(notReadyForAuth(c.damlUser, _))
+        c.focus(_.ledgerApi).modify(enableAuth(c.damlUser, _))
       }),
       updateAllSplitwiseAppConfigs_(c => {
-        c.focus(_.remoteParticipant.ledgerApi).modify(notReadyForAuth(c.providerUser, _))
+        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.providerUser, _))
       }),
       updateAllRemoteSplitwiseAppConfigs_(c => {
-        c.focus(_.ledgerApi).modify(notReadyForAuth(c.damlUser, _))
+        c.focus(_.ledgerApi).modify(enableAuth(c.damlUser, _))
       }),
     )
     transforms.foldLeft(config)((c, tf) => tf(c))
-  }
-
-  private def adminTokenAuthSourceTransform(clockConfig: ClockConfig)(
-      _user: String,
-      c: CoinLedgerApiClientConfig,
-  ): CoinLedgerApiClientConfig = {
-    val adminToken = getAdminToken(clockConfig, c.clientConfig)
-    c.copy(
-      authConfig = AuthTokenSourceConfig.Static(adminToken, Some(adminToken))
-    )
   }
 
   private def selfSignedTokenAuthSourceTransform(clockConfig: ClockConfig, secret: String)(
