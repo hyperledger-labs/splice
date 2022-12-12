@@ -3,7 +3,6 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.cn.wallet.{payment as walletCodegen}
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
 import com.daml.network.util.WalletTestUtil
-import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.data.CantonTimestamp
 
 import java.time.Duration
@@ -156,67 +155,6 @@ class WalletPaymentIntegrationTest extends CoinIntegrationTest with WalletTestUt
           bobWallet.listTransferOffers() should have length 0
           bobWallet.listAcceptedTransferOffers() should have length 0
         },
-      )
-
-      // TODO(#1870): consider making this a time-based test instead
-      val shortExpiration = CantonTimestamp.now().plus(Duration.ofSeconds(2))
-
-      val (offer4, _) = actAndCheck(
-        "Alice creates two short-lived transfer offer", {
-          aliceWallet.createTransferOffer(
-            bobUserParty,
-            1.0,
-            "should expire before accepted",
-            shortExpiration,
-          )
-          aliceWallet
-            .createTransferOffer(
-              bobUserParty,
-              150.0,
-              "should expire after accepted",
-              shortExpiration,
-            )
-        },
-      )(
-        "Wait for new offer to be ingested",
-        _ => {
-          aliceWallet.listTransferOffers() should have length 2
-          bobWallet.listTransferOffers() should have length 2
-        },
-      )
-      clue("Bob accepts an offer that alice will not afford")(
-        bobWallet.acceptTransferOffer(offer4)
-      )
-
-      clue("Wait for both offers to expire")(eventually() {
-        aliceWallet.listTransferOffers() should have length 0
-      })
-
-      val (offer5, _) = actAndCheck(
-        "Create a transfer offer that alice cannot yet afford",
-        aliceWallet.createTransferOffer(
-          bobUserParty,
-          quantity = 150.0,
-          description = "not rich enough yet",
-          expiration,
-        ),
-      )("offer is ingested", _ => aliceWallet.listTransferOffers() should have length 1)
-      actAndCheck("Bob accepts the offer", bobWallet.acceptTransferOffer(offer5))(
-        "Accepted offer is ingested",
-        _ => aliceWallet.listAcceptedTransferOffers() should have length 1,
-      )
-      clue("Sleeping for a while, to make sure a few retries fail first")(
-        // TODO(#1870): consider making this a time-based test, and advancing time gradually to trigger the failing automation instead
-        Threading.sleep(4000)
-      )
-      clue("Tapping more coin, to afford the accepted transfer offer")(
-        aliceWallet.tap(200.0)
-      )
-      clue("Checking final balances")(
-        eventually() {
-          checkWallet(aliceUserParty, aliceWallet, Seq((147.5, 148.0)))
-          checkWallet(bobUserParty, bobWallet, Seq((1.0, 1.0), (150.0, 150.0)))
-        }
       )
     }
   }

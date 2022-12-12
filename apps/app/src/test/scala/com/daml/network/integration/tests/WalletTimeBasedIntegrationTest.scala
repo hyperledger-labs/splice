@@ -316,4 +316,77 @@ class WalletTimeBasedIntegrationTest
         .sortBy(_._1),
     )
   }
+
+  "support transfer offers" in { implicit env =>
+    val (alice, bob) = onboardAliceAndBob()
+    aliceWallet.tap(100.0)
+
+    val now = aliceValidator.remoteParticipant.ledger_api.time.get()
+    val expiration = now.plus(Duration.ofMinutes(1))
+
+    val (offer, _) = actAndCheck(
+      "Alice creates two transfer offer", {
+        aliceWallet.createTransferOffer(
+          bob,
+          1.0,
+          "should expire before accepted",
+          expiration,
+        )
+        aliceWallet
+          .createTransferOffer(
+            bob,
+            150.0,
+            "should expire after accepted",
+            expiration,
+          )
+      },
+    )(
+      "Wait for new offers to be ingested",
+      _ => {
+        aliceWallet.listTransferOffers() should have length 2
+        bobWallet.listTransferOffers() should have length 2
+      },
+    )
+    clue("Bob accepts an offer that alice will not afford")(
+      bobWallet.acceptTransferOffer(offer)
+    )
+
+    advanceTime(Duration.ofMinutes(3))
+
+    clue("Wait for both offers to expire")(eventually() {
+      aliceWallet.listTransferOffers() should have length 0
+      aliceWallet.listAcceptedTransferOffers() should have length 0
+    })
+
+    val now2 = aliceValidator.remoteParticipant.ledger_api.time.get()
+    val expiration2 = now2.plus(Duration.ofMinutes(1))
+
+    val (offer2, _) = actAndCheck(
+      "Create a transfer offer that alice cannot yet afford",
+      aliceWallet.createTransferOffer(
+        bob,
+        quantity = 150.0,
+        description = "not rich enough yet",
+        expiration2,
+      ),
+    )("offer is ingested", _ => aliceWallet.listTransferOffers() should have length 1)
+    actAndCheck("Bob accepts the offer", bobWallet.acceptTransferOffer(offer2))(
+      "Accepted offer is ingested",
+      _ => aliceWallet.listAcceptedTransferOffers() should have length 1,
+    )
+    // Advance time to trigger automation (which will fail since alice's funds are too low)
+    advanceTime(Duration.ofSeconds(5))
+    clue("Tapping more coin, to afford the accepted transfer offer")(
+      aliceWallet.tap(200.0)
+    )
+    // Advance time again to trigger automation again
+    advanceTime(Duration.ofSeconds(5))
+    clue("Checking final balances")(
+      eventually() {
+        checkWallet(alice, aliceWallet, Seq((148.5, 149.0)))
+        checkWallet(bob, bobWallet, Seq((150.0, 150.0)))
+      }
+    )
+
+  }
 }
