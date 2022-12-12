@@ -181,7 +181,7 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
   protected def completeAuth0LoginWithAuthorization(username: String, password: String)(implicit
       webDriver: WebDriver
   ) = {
-    clue("auth0 login") {
+    clue("Auth0 login") {
       textField(id("username")).value = username
       find(id("password")).foreach(_.underlying.sendKeys(password))
       click on name("action") // complete password prompt

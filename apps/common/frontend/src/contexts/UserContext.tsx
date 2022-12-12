@@ -2,7 +2,12 @@ import { User } from 'oidc-client-ts';
 import React, { useCallback, useContext, useEffect, useState } from 'react';
 import { useAuth } from 'react-oidc-context';
 
-import { AuthConfig, getHs256UnsafeSecret, isHs256UnsafeAuthConfig } from '../config/schema';
+import {
+  AuthConfig,
+  getHs256UnsafeSecret,
+  isHs256UnsafeAuthConfig,
+  TestAuthConfig,
+} from '../config/schema';
 import {
   generateLedgerApiToken,
   generateToken,
@@ -47,8 +52,9 @@ const SESSION_STORAGE_KEY = 'canton.network.wallet.userid';
 export const UserProvider: React.FC<{
   children: React.ReactNode;
   authConf: AuthConfig;
+  testAuthConf?: TestAuthConfig;
   useLedgerApiTokens?: boolean;
-}> = ({ children, authConf, useLedgerApiTokens }) => {
+}> = ({ children, authConf, testAuthConf, useLedgerApiTokens }) => {
   // Two user authentication methods are supported:
   //   - sst: Self-Signed Tokens based on a given user ID
   //   - oidc: OpenID Connect logins based on OAuth2.0
@@ -116,8 +122,14 @@ export const UserProvider: React.FC<{
       if (storedUserId) {
         loginWithSst(storedUserId, secret);
       }
+    } else if (testAuthConf) {
+      const storedUserId = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
+      const secret = testAuthConf.secret;
+      if (storedUserId) {
+        loginWithSst(storedUserId, secret);
+      }
     }
-  }, [auth, authConf, authMethod, loginWithSst]);
+  }, [auth, authConf, authMethod, loginWithSst, testAuthConf]);
 
   return (
     <UserContext.Provider
@@ -141,7 +153,8 @@ export const UserProvider: React.FC<{
 
           if (auth && authMethod === 'oidc') {
             auth.removeUser();
-          } else if (authMethod === 'sst') {
+          }
+          if (authMethod === 'sst' || testAuthConf) {
             window.sessionStorage.removeItem(SESSION_STORAGE_KEY);
           }
         },

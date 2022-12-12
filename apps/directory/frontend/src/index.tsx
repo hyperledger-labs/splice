@@ -13,7 +13,7 @@ root.render(
   <React.StrictMode>
     {
       <AuthProvider {...extendWithLedgerApiClaims(config.auth)}>
-        <UserProvider authConf={config.auth} useLedgerApiTokens>
+        <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
           <App />
         </UserProvider>
       </AuthProvider>

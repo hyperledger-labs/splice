@@ -181,11 +181,7 @@ class SplitwiseFrontendIntegrationTest
 
         click on className("accept-button")
 
-        // And then back to splitwise
-        click on "user-id-field"
-        textField("user-id-field").value = bobDamlUser
-        click on "login-button"
-
+        // And then back to splitwise, where he is already logged in
         eventually() {
           inside(findAll(className("balances-table-row")).toSeq) { case Seq(row1, row2) =>
             row1.childElement(className("balances-table-receiver")).text should matchText(
@@ -309,11 +305,7 @@ class SplitwiseFrontendIntegrationTest
 
         click on className("accept-button")
 
-        // And then back to splitwise
-        click on "user-id-field"
-        textField("user-id-field").value = bobDamlUser
-        click on "login-button"
-
+        // And then back to splitwise, where he is already logged in
         eventually(scaled(5 seconds)) {
           inside(findAll(className("balances-table-row")).toSeq) { case Seq(row) =>
             row.childElement(className("balances-table-receiver")).text should matchText(aliceCns)
@@ -483,11 +475,17 @@ class SplitwiseFrontendIntegrationTest
         val userPartyId = aliceValidator.onboardUser(user.id)
 
         withFrontEnd("aliceSplitwise") { implicit webDriver =>
-          go to "http://localhost:3005"
-          click on "oidc-login-button"
-
-          completeAuth0LoginWithAuthorization(user.email, user.password)
-          find(id("logged-in-user")).value.text should matchText(userPartyId.toProtoPrimitive)
+          actAndCheck(
+            "The user logs in with OAauth2 and completes all Auth0 login prompts", {
+              go to "http://localhost:3005"
+              click on "oidc-login-button"
+              completeAuth0LoginWithAuthorization(user.email, user.password)
+            },
+          )(
+            "The user sees his own party ID in the app",
+            _ =>
+              find(id("logged-in-user")).value.text should matchText(userPartyId.toProtoPrimitive),
+          )
         }
       }
     }

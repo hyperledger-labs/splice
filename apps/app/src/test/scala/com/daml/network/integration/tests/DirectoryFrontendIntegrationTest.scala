@@ -48,11 +48,8 @@ class DirectoryFrontendIntegrationTest
         textField("user-id-field").value = aliceDamlUser
         click on "login-button"
         click on className("sub-request-accept-button")
-        // And then back to directory
-        click on "user-id-field"
-        textField("user-id-field").value = aliceDamlUser
-        click on "login-button"
 
+        // And then back to directory, where she is already logged in
         eventually(scaled(10 seconds)) {
           findAll(className("entries-table-row")) should have size 1
         }
@@ -71,11 +68,17 @@ class DirectoryFrontendIntegrationTest
         val userPartyId = aliceValidator.onboardUser(user.id)
 
         withFrontEnd("alice") { implicit webDriver =>
-          go to "http://localhost:3004"
-          click on "oidc-login-button"
-
-          completeAuth0LoginWithAuthorization(user.email, user.password)
-          find(id("logged-in-user")).value.text should matchText(userPartyId.toProtoPrimitive)
+          actAndCheck(
+            "The user logs in with OAauth2 and completes all Auth0 login prompts", {
+              go to "http://localhost:3004"
+              click on "oidc-login-button"
+              completeAuth0LoginWithAuthorization(user.email, user.password)
+            },
+          )(
+            "The user sees his own party ID in the app",
+            _ =>
+              find(id("logged-in-user")).value.text should matchText(userPartyId.toProtoPrimitive),
+          )
         }
       }
     }

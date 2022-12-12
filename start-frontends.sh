@@ -70,14 +70,10 @@ function usage() {
 }
 
 daemon=0
-# default: unsafe auth
-auth_algorithm=hs-256-unsafe
-oauth_authority=
-oauth_clientid=
-# auth0 auth; might not be the default config for all frontends (yet)
-oauth_authority_auth0=https://canton-network-test.us.auth0.com
-oauth_clientid_auth0=Ob8YZSBvbZR3vsM2vGKllg3KRlRgLQSw
-auth_algorithm_auth0=rs-256
+# default: auth via auth0
+oauth_authority=https://canton-network-test.us.auth0.com
+oauth_clientid=Ob8YZSBvbZR3vsM2vGKllg3KRlRgLQSw
+auth_algorithm=rs-256
 # default: enable testing auth with secret "test"
 test_auth_secret=test
 while getopts "hda" arg; do
@@ -90,9 +86,6 @@ while getopts "hda" arg; do
       daemon=1
       ;;
     a)
-      oauth_authority=$oauth_authority_auth0
-      oauth_clientid=$oauth_clientid_auth0
-      auth_algorithm=$auth_algorithm_auth0
       test_auth_secret=
       ;;
     ?)
@@ -124,12 +117,12 @@ do
 done
 
 # start_frontend <app> <ui-http-port> <app-grpc-port> <app-wallet-ui-port> <ledgerapi-grpc-port> <validator-app-grpc-port> <app-scan-grpc-port> <user-display-name>
-start_frontend wallet    3000 6204 0    0    6203 6012 alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm" ""
-start_frontend wallet    3001 6304 0    0    6303 6012 bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm" ""
-start_frontend splitwise 3002 6113 3000 6201 0    0    alice   "$oauth_authority_auth0" "$oauth_clientid_auth0" "$auth_algorithm_auth0" "$test_auth_secret"
-start_frontend splitwise 3003 6113 3001 6301 0    0    bob     "$oauth_authority_auth0" "$oauth_clientid_auth0" "$auth_algorithm_auth0" "$test_auth_secret"
-start_frontend directory 3004 6110 3000 6201 0    0    alice   "$oauth_authority_auth0" "$oauth_clientid_auth0" "$auth_algorithm_auth0" "$test_auth_secret"
-start_frontend splitwise 3005 6113 0    6201 0    0    charlie "$oauth_authority_auth0" "$oauth_clientid_auth0" "$auth_algorithm_auth0" "$test_auth_secret"
+start_frontend wallet    3000 6204 0    0    6203 6012 alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm" "$test_auth_secret"
+start_frontend wallet    3001 6304 0    0    6303 6012 bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm" "$test_auth_secret"
+start_frontend splitwise 3002 6113 3000 6201 0    0    alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm" "$test_auth_secret"
+start_frontend splitwise 3003 6113 3001 6301 0    0    bob     "$oauth_authority" "$oauth_clientid" "$auth_algorithm" "$test_auth_secret"
+start_frontend directory 3004 6110 3000 6201 0    0    alice   "$oauth_authority" "$oauth_clientid" "$auth_algorithm" "$test_auth_secret"
+start_frontend splitwise 3005 6113 0    6201 0    0    charlie "$oauth_authority" "$oauth_clientid" "$auth_algorithm" "$test_auth_secret"
 
 if [ $daemon -eq 0 ]; then
   tmux attach -t ${tmux_session}

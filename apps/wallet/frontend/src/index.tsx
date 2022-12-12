@@ -14,7 +14,7 @@ const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement)
 root.render(
   <React.StrictMode>
     <AuthProvider>
-      <UserProvider authConf={config.auth}>
+      <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
         <WalletClientProvider url={config.services.wallet.grpcUrl}>
           <ValidatorClientProvider url={config.services.validator.grpcUrl}>
             <DirectoryClientProvider url={config.services.directory.grpcUrl}>

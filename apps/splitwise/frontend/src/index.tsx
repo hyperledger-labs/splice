@@ -18,7 +18,7 @@ const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement)
 root.render(
   <React.StrictMode>
     <AuthProvider {...extendWithLedgerApiClaims(config.auth)}>
-      <UserProvider authConf={config.auth} useLedgerApiTokens>
+      <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
         <SplitwiseClientProvider url={config.services.splitwise.grpcUrl}>
           <DirectoryClientProvider url={config.services.directory.grpcUrl}>
             <ScanClientProvider url={config.services.scan.grpcUrl}>

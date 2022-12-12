@@ -8,6 +8,7 @@ import {
 } from 'react-router-dom';
 
 import {
+  Alert,
   AppBar,
   Box,
   Button,
@@ -76,6 +77,8 @@ const Content = () => {
 
   // show a loading spinner until we fully determine user status
   const [loading, setLoading] = useState(true);
+  // show an error page if we suspect an auth misconfiguration
+  const [authError, setAuthError] = useState(false);
 
   const routes = createBrowserRouter(
     createRoutesFromElements(
@@ -97,6 +100,7 @@ const Content = () => {
 
       const status = await walletClient.userStatus();
       updateStatus(status);
+      setAuthError(false);
       setLoading(false);
     },
     [walletClient, updateStatus]
@@ -104,30 +108,44 @@ const Content = () => {
 
   // Fetch or refresh the onboarding status
   useEffect(() => {
-    if (isAuthenticated && userId) {
-      getUserStatus(userId).catch(console.error);
-    }
+    const tryGetUserStatus = () => {
+      getUserStatus(userId).catch(e => {
+        if (e.code === 16) {
+          setAuthError(true);
+        }
+        console.error(e);
+      });
+    };
+    if (isAuthenticated) {
+      tryGetUserStatus();
 
-    // Periodically when the user is not onboarded
-    if (!isOnboarded) {
-      const timer = setInterval(() => {
-        getUserStatus(userId).catch(console.error);
-      }, 5000);
-      return () => clearInterval(timer);
+      // Periodically when the user is not onboarded
+      if (!isOnboarded) {
+        const timer = setInterval(tryGetUserStatus, 5000);
+        return () => clearInterval(timer);
+      }
     }
   }, [isOnboarded, isAuthenticated, userId, getUserStatus]);
 
-  if (loading) {
+  const boxSx = {
+    width: '100%',
+    height: '100%',
+    display: 'flex',
+    justifyContent: 'center',
+    alignItems: 'center',
+  };
+  if (authError) {
     return (
-      <Box
-        sx={{
-          width: '100%',
-          height: '100%',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-        }}
-      >
+      <Box sx={boxSx}>
+        <Alert id="auth-error" sx={{ display: 'flex' }} severity="error">
+          Authorization problem detected. Is the app backend configured to support the login method
+          you chose?
+        </Alert>
+      </Box>
+    );
+  } else if (loading) {
+    return (
+      <Box sx={boxSx}>
         <CircularProgress sx={{ display: 'flex' }} />
       </Box>
     );

@@ -200,13 +200,6 @@ object CoinConfigTransforms {
       (name, update(config))
     })
 
-  def updateAllAppConfigs_(
-      update: WalletAppBackendTransform
-  ): CoinConfigTransform =
-    _.focus(_.walletAppBackends).modify(_.map { case (name, config) =>
-      (name, update(config))
-    })
-
   def updateScanAppConfig(update: ScanAppTransform): CoinConfigTransform =
     cantonConfig =>
       cantonConfig
