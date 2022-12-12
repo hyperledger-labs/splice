@@ -1,0 +1,223 @@
+package com.daml.network.integration.tests
+
+import com.daml.network.codegen.java.cn.wallet.{payment as walletCodegen}
+import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
+import com.daml.network.util.WalletTestUtil
+import com.digitalasset.canton.concurrent.Threading
+import com.digitalasset.canton.data.CantonTimestamp
+
+import java.time.Duration
+import scala.jdk.CollectionConverters.*
+
+class WalletPaymentIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
+
+  "A wallet" should {
+    "allow a user to list, and reject app payment requests" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+
+      clue("Check that no payment requests exist") {
+        aliceWallet.listAppPaymentRequests() shouldBe empty
+      }
+
+      val (_, _, reqC) =
+        createSelfPaymentRequest(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceWallet.config.damlUser,
+          aliceUserParty,
+        )
+
+      val reqFound = clue("Check that we can see the created payment request") {
+        val reqFound = eventually() {
+          aliceWallet.listAppPaymentRequests().headOption.value
+        }
+        reqFound.payload shouldBe reqC
+        reqFound
+      }
+
+      clue("Reject the payment request") {
+        aliceWallet.rejectAppPaymentRequest(reqFound.contractId)
+      }
+
+      clue("Check that there are no more payment requests") {
+        val requests2 = aliceWallet.listAppPaymentRequests()
+        requests2 shouldBe empty
+      }
+    }
+
+    "allow a user to list and accept app payment requests" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+
+      val (referenceId, _, reqC) =
+        createSelfPaymentRequest(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceWallet.config.damlUser,
+          aliceUserParty,
+        )
+
+      val cid = eventually() {
+        inside(aliceWallet.listAppPaymentRequests()) { case Seq(r) =>
+          r.payload shouldBe reqC
+          r.contractId
+        }
+      }
+
+      clue("Tap 50 coins") {
+        aliceWallet.tap(50)
+        eventually() {
+          aliceWallet.list().coins should not be empty
+        }
+      }
+
+      clue("Accept payment request") {
+        val acceptedPaymentId = aliceWallet.acceptAppPaymentRequest(cid)
+        aliceWallet.listAppPaymentRequests() shouldBe empty
+        inside(aliceWallet.listAcceptedAppPayments()) { case Seq(r) =>
+          r.contractId shouldBe acceptedPaymentId
+          r.payload shouldBe new walletCodegen.AcceptedAppPayment(
+            aliceUserParty.toProtoPrimitive,
+            Seq(
+              new walletCodegen.ReceiverCCQuantity(
+                aliceUserParty.toProtoPrimitive,
+                BigDecimal(10).bigDecimal.setScale(10),
+              )
+            ).asJava,
+            aliceUserParty.toProtoPrimitive,
+            svcParty.toProtoPrimitive,
+            r.payload.lockedCoin,
+            referenceId.toInterface(walletCodegen.DeliveryOffer.INTERFACE),
+          )
+        }
+      }
+    }
+
+    "correctly select coins for payments" in { implicit env =>
+      val (alice, bob) = onboardAliceAndBob()
+
+      clue("Alice gets some coins") {
+        // Note: it would be great if we could add coins with different holding fees,
+        // to test whether the wallet selects the most expensive ones for the transfer.
+        aliceWallet.tap(10)
+        aliceWallet.tap(40)
+        aliceWallet.tap(20)
+        checkWallet(alice, aliceWallet, Seq((10, 10), (20, 20), (40, 40)))
+      }
+
+      clue("Alice transfers 39") {
+        p2pTransfer(aliceWallet, bobWallet, bob, 39)
+        checkWallet(alice, aliceWallet, Seq((30, 31)))
+      }
+      clue("Alice transfers 19") {
+        p2pTransfer(aliceWallet, bobWallet, bob, 19)
+        checkWallet(alice, aliceWallet, Seq((11, 12)))
+      }
+    }
+
+    "allow two users to make direct transfers between them" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+      val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
+      aliceWallet.tap(100.0)
+
+      val expiration = CantonTimestamp.now().plus(Duration.ofMinutes(1))
+
+      val offer =
+        aliceWallet.createTransferOffer(bobUserParty, 1.0, "direct transfer test", expiration)
+      val offer2 =
+        aliceWallet.createTransferOffer(bobUserParty, 2.0, "to be rejected", expiration)
+      val offer3 =
+        aliceWallet.createTransferOffer(bobUserParty, 3.0, "to be withdrawn", expiration)
+
+      eventually() {
+        aliceWallet.listTransferOffers() should have length 3
+        bobWallet.listTransferOffers() should have length 3
+      }
+
+      actAndCheck("Bob accepts one offer", bobWallet.acceptTransferOffer(offer))(
+        "Accepted offer gets paid",
+        _ => {
+          aliceWallet.listTransferOffers() should have length 2
+          aliceWallet.listAcceptedTransferOffers() should have length 0
+          bobWallet.listTransferOffers() should have length 2
+          bobWallet.listAcceptedTransferOffers() should have length 0
+          checkWallet(aliceUserParty, aliceWallet, Seq((98.8, 99.0)))
+          checkWallet(bobUserParty, bobWallet, Seq((1.0, 1.0)))
+        },
+      )
+
+      actAndCheck(
+        "Bob rejects one offer, alice withdraws the other", {
+          bobWallet.rejectTransferOffer(offer2)
+          aliceWallet.withdrawTransferOffer(offer3)
+        },
+      )(
+        "No more offers listed",
+        _ => {
+          aliceWallet.listTransferOffers() should have length 0
+          aliceWallet.listAcceptedTransferOffers() should have length 0
+          bobWallet.listTransferOffers() should have length 0
+          bobWallet.listAcceptedTransferOffers() should have length 0
+        },
+      )
+
+      // TODO(#1870): consider making this a time-based test instead
+      val shortExpiration = CantonTimestamp.now().plus(Duration.ofSeconds(2))
+
+      val (offer4, _) = actAndCheck(
+        "Alice creates two short-lived transfer offer", {
+          aliceWallet.createTransferOffer(
+            bobUserParty,
+            1.0,
+            "should expire before accepted",
+            shortExpiration,
+          )
+          aliceWallet
+            .createTransferOffer(
+              bobUserParty,
+              150.0,
+              "should expire after accepted",
+              shortExpiration,
+            )
+        },
+      )(
+        "Wait for new offer to be ingested",
+        _ => {
+          aliceWallet.listTransferOffers() should have length 2
+          bobWallet.listTransferOffers() should have length 2
+        },
+      )
+      clue("Bob accepts an offer that alice will not afford")(
+        bobWallet.acceptTransferOffer(offer4)
+      )
+
+      clue("Wait for both offers to expire")(eventually() {
+        aliceWallet.listTransferOffers() should have length 0
+      })
+
+      val (offer5, _) = actAndCheck(
+        "Create a transfer offer that alice cannot yet afford",
+        aliceWallet.createTransferOffer(
+          bobUserParty,
+          quantity = 150.0,
+          description = "not rich enough yet",
+          expiration,
+        ),
+      )("offer is ingested", _ => aliceWallet.listTransferOffers() should have length 1)
+      actAndCheck("Bob accepts the offer", bobWallet.acceptTransferOffer(offer5))(
+        "Accepted offer is ingested",
+        _ => aliceWallet.listAcceptedTransferOffers() should have length 1,
+      )
+      clue("Sleeping for a while, to make sure a few retries fail first")(
+        // TODO(#1870): consider making this a time-based test, and advancing time gradually to trigger the failing automation instead
+        Threading.sleep(4000)
+      )
+      clue("Tapping more coin, to afford the accepted transfer offer")(
+        aliceWallet.tap(200.0)
+      )
+      clue("Checking final balances")(
+        eventually() {
+          checkWallet(aliceUserParty, aliceWallet, Seq((147.5, 148.0)))
+          checkWallet(bobUserParty, bobWallet, Seq((1.0, 1.0), (150.0, 150.0)))
+        }
+      )
+    }
+  }
+}

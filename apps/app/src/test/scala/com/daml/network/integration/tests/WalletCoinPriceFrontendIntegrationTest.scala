@@ -8,7 +8,7 @@ import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
-class WalletCoinPriceFrontEndIntegrationTest
+class WalletCoinPriceFrontendIntegrationTest
     extends FrontendIntegrationTest("alice", "bob")
     with WalletTestUtil {
 

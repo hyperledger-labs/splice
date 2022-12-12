@@ -1,0 +1,339 @@
+package com.daml.network.integration.tests
+
+import com.daml.network.codegen.java.cn.wallet.{payment as paymentCodegen}
+import com.daml.network.util.WalletTestUtil
+import org.openqa.selenium.{Keys, WebDriver}
+
+class WalletPaymentFrontendIntegrationTest
+    extends FrontendIntegrationTest("alice", "bob")
+    with WalletTestUtil
+    with CnsTestUtil {
+
+  "A wallet UI" should {
+
+    "show app payment requests in CC, and correctly handle unresolved party IDs" in {
+      implicit env =>
+        // Alice submits a directory entry request, which will create an app payment request in her wallet
+        val aliceDamlUser = aliceWallet.config.damlUser
+        val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+        createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.CC)
+
+        withFrontEnd("alice") { implicit webDriver =>
+          browseToPaymentRequests(aliceDamlUser)
+
+          // Verify that the total quantity of CC is properly displayed
+          eventually() {
+            inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
+              // Verify that the currency and quantity are properly displayed
+              row.childElement(className("app-request-total-quantity")).text should matchText(
+                "42.00000000CC"
+              )
+            }
+          }
+
+          // Verify that the receiver table row is properly displayed
+          eventually() {
+            inside(findAll(className("app-request-breakdown-table-row")).toList) { case Seq(row) =>
+              // Check that alice party ID could not be resolved against the directory
+              // service, and the party ID is shown instead.
+              row
+                .childElement(className("app-request-receiver"))
+                .text shouldBe aliceUserParty.toProtoPrimitive
+
+              // Verify that the currency and quantity are properly displayed
+              row.childElement(className("app-request-payment-quantity")).text should matchText(
+                "42.0000000000CC"
+              )
+            }
+          }
+        }
+    }
+
+    "show app payment requests in USD (with USD==CC), and correctly handle unresolved party IDs" in {
+      implicit env =>
+        // Alice submits a directory entry request, which will create an app payment request in her wallet
+        val aliceDamlUser = aliceWallet.config.damlUser
+        val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+        createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.USD)
+
+        withFrontEnd("alice") { implicit webDriver =>
+          browseToPaymentRequests(aliceDamlUser)
+
+          // Verify that the total quantity of USD is properly displayed
+          eventually() {
+            inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
+              // Verify that the currency and quantity are properly displayed
+              row.childElement(className("app-request-total-quantity")).text should matchText(
+                "42.00000000CC"
+              )
+            }
+          }
+
+          // Verify that the receiver table row is properly displayed
+          eventually() {
+            inside(findAll(className("app-request-breakdown-table-row")).toList) { case Seq(row) =>
+              // Check that alice party ID could not be resolved against the directory
+              // service, and the party ID is shown instead.
+              row
+                .childElement(className("app-request-receiver"))
+                .text shouldBe aliceUserParty.toProtoPrimitive
+
+              // Verify that the currency and quantity are properly displayed
+              row.childElement(className("app-request-payment-quantity")).text should matchText(
+                "42.0000000000USD"
+              )
+            }
+          }
+        }
+    }
+
+    "show app payment requests with multiple receivers (CC only)" in { implicit env =>
+      // Alice submits a directory entry request, which will create an app payment request in her wallet
+      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+
+      createPaymentRequest(
+        aliceUserParty,
+        Seq(
+          receiverQuantity(aliceUserParty, 22, paymentCodegen.Currency.CC),
+          receiverQuantity(aliceUserParty, 20, paymentCodegen.Currency.CC),
+        ),
+      )
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToPaymentRequests(aliceDamlUser)
+
+        // Verify that the total quantity of USD is properly displayed
+        eventually() {
+          inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
+            // Verify that the currency and quantity are properly displayed
+            row.childElement(className("app-request-total-quantity")).text should matchText(
+              "42.00000000CC"
+            )
+          }
+        }
+
+        // Verify that the receiver table rows contain both receiver quantities
+        eventually() {
+          val quantities =
+            findAll(className("receiver-quantity-row")).toList.map(row =>
+              row.childElement(className("app-request-payment-quantity")).text
+            )
+
+          quantities should contain theSameElementsAs Seq(
+            "22.0000000000CC",
+            "20.0000000000CC",
+          )
+        }
+      }
+    }
+
+    "show app payment requests, and resolve party IDs in them" in { implicit env =>
+      // Alice submits a directory entry request, which will create an app payment request in her wallet
+      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val aliceDirectoryName = "alice.cns"
+      val aliceDirectoryDisplay = expectedCns(aliceUserParty, aliceDirectoryName)
+      createDirectoryEntry(aliceUserParty, aliceDirectory, "alice.cns", aliceWallet)
+      createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.CC)
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToPaymentRequests(aliceDamlUser)
+        // Check that the directory party ID has been resolved to its directory entry correctly.
+        // We do this in another eventually() as a "..." text might appear momentarily, until the directory service responds.
+        eventually() {
+          inside(findAll(className("app-request-breakdown-table-row")).toList) { case Seq(row) =>
+            row.childElement(className("app-request-receiver")).text should matchText(
+              aliceDirectoryDisplay
+            )
+          }
+          inside(findAll(className("app-requests-table-row")).toList) { case Seq(row) =>
+            row.childElement(className("app-request-provider")).text should matchText(
+              aliceDirectoryDisplay
+            )
+            row
+          }
+        }
+      }
+    }
+
+    "support different ways of defining the receiver in transfer offers" in { implicit env =>
+      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val aliceEntryName = "alice.cns"
+      actAndCheck("Tap coin for alice", aliceWallet.tap(50))(
+        "Alice has coin",
+        _ => (aliceWallet.list().coins.length shouldBe 1),
+      )
+      createDirectoryEntry(aliceParty, aliceDirectory, aliceEntryName, aliceWallet)
+      val bobParty = setupForTestWithDirectory(bobWallet, bobValidator)
+      val bobCns = "bob.cns"
+      val bobEntryName = bobCns
+      actAndCheck("Tap coin for bob", bobWallet.tap(50))(
+        "Bob has coin",
+        _ => (bobWallet.list().coins.length shouldBe 1),
+      )
+      createDirectoryEntry(bobParty, bobDirectory, bobEntryName, bobWallet)
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToAliceWallet(aliceDamlUser)
+        click on "transfer-offers-button"
+
+        actAndCheck(
+          s"Alice creates offer by cns name", {
+            click on "create-offer-button"
+            click on "create-offer-receiver"
+            textField("create-offer-receiver").value = bobCns
+            click on "create-offer-quantity"
+            numberField("create-offer-quantity").underlying.sendKeys("100.0")
+            click on "create-offer-description"
+            textField("create-offer-description").value = "by party ID"
+            click on "create-offer-expiration-value"
+            numberField("create-offer-expiration-value").underlying.sendKeys("120")
+            click on "submit-create-offer-button"
+          },
+        )(
+          "Alice sees the transfer offer",
+          _ => {
+            findAll(className("transfer-offers-row")) should have size 1
+          },
+        )
+
+        actAndCheck(
+          s"Alice creates offer with auto-complete", {
+            click on "create-offer-button"
+            click on "create-offer-receiver"
+            textField("create-offer-receiver").value = "b"
+            textField("create-offer-receiver").underlying.sendKeys(Keys.ARROW_DOWN)
+            textField("create-offer-receiver").underlying.sendKeys(Keys.RETURN)
+            click on "create-offer-quantity"
+            numberField("create-offer-quantity").underlying.sendKeys("100.0")
+            click on "create-offer-description"
+            textField("create-offer-description").value = "with auto-complete"
+            click on "create-offer-expiration-value"
+            numberField("create-offer-expiration-value").underlying.sendKeys("120")
+            click on "submit-create-offer-button"
+          },
+        )(
+          "Alice sees the transfer offer",
+          _ => {
+            findAll(className("transfer-offers-row")) should have size 2
+          },
+        )
+
+        // The case of inserting the whole party ID is tested in "support transfer offers"
+
+        clue("Bob received both offers") {
+          eventually() {
+            bobWallet.listTransferOffers() should have length 2
+          }
+        }
+      }
+    }
+
+    "support transfer offers" in { implicit env =>
+      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      val aliceEntryName = "alice.cns"
+      actAndCheck("Tap coin for alice", aliceWallet.tap(50))(
+        "Alice has coin",
+        _ => (aliceWallet.list().coins.length shouldBe 1),
+      )
+      createDirectoryEntry(aliceParty, aliceDirectory, aliceEntryName, aliceWallet)
+      val bobDamlUser = bobWallet.config.damlUser
+      val bobParty = setupForTestWithDirectory(bobWallet, bobValidator)
+      val bobEntryName = "bob.cns"
+      actAndCheck("Tap coin for bob", bobWallet.tap(50))(
+        "Bob has coin",
+        _ => (bobWallet.list().coins.length shouldBe 1),
+      )
+      createDirectoryEntry(bobParty, bobDirectory, bobEntryName, bobWallet)
+
+      def createOffer(description: String)(implicit webDriver: WebDriver) = {
+        actAndCheck(
+          s"Alice creates offer \"${description}\"", {
+            click on "create-offer-button"
+            click on "create-offer-receiver"
+            textField("create-offer-receiver").value = bobParty.toProtoPrimitive
+            click on "create-offer-quantity"
+            numberField("create-offer-quantity").underlying.sendKeys("100.0")
+            click on "create-offer-description"
+            textField("create-offer-description").value = description
+            click on "create-offer-expiration-value"
+            numberField("create-offer-expiration-value").underlying.sendKeys("120")
+            click on "submit-create-offer-button"
+          },
+        )(
+          "Alice sees the transfer offer",
+          _ => {
+            findAll(className("transfer-offers-row")) should have size 1
+          },
+        )
+
+      }
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToAliceWallet(aliceDamlUser)
+        click on "transfer-offers-button"
+
+        createOffer("Testing transfer offers")
+        val row = inside(findAll(className("transfer-offers-row")).toList) { case Seq(row) => row }
+        row.childElement(className("transfer-offers-table-quantity")).text should be(
+          "100.0000000000CC"
+        )
+      }
+
+      withFrontEnd("bob") { implicit webDriver =>
+        browseToBobWallet(bobDamlUser)
+        actAndCheck("Bob browses to transfer offers", click on "transfer-offers-button")(
+          "Bob also sees the transfer offer",
+          _ => {
+            findAll(className("transfer-offers-row")) should have size 1
+          },
+        )
+        actAndCheck("Bob accepts the offer", click on className("transfer-offers-table-accept"))(
+          "Bob sees the accepted offer (not enough funds for it to complete)",
+          _ => {
+            findAll(className("transfer-offers-row")) should have size 0
+            findAll(className("accepted-transfer-offers-row")) should have size 1
+          },
+        )
+      }
+
+      withFrontEnd("alice") { implicit webDriver =>
+        clue("Alice also sees the accepted offer") {
+          eventually() {
+            findAll(className("accepted-transfer-offers-row")) should have size 1
+          }
+        }
+
+        actAndCheck("Tap more coin for alice", aliceWallet.tap(100))(
+          "Accepted offer is completed",
+          _ => {
+            findAll(className("accepted-transfer-offers-row")) should have size 0
+          },
+        )
+
+        createOffer("to be withdrawn")
+        actAndCheck(
+          "Alice withdraws her offer", {
+            click on className("transfer-offers-table-withdraw")
+          },
+        )("The offer is deleted", _ => findAll(className("transfer-offers-row")) should have size 0)
+
+        createOffer("to be rejected")
+      }
+
+      withFrontEnd("bob") { implicit webDrivers =>
+        eventually()(findAll(className("transfer-offers-row")) should have size 1)
+        actAndCheck("Bob rejects the offer", click on className("transfer-offers-table-reject"))(
+          "The offer is deleted",
+          _ => findAll(className("transfer-offers-row")) should have size 0,
+        )
+      }
+
+    // Testing a short-lived offer here might be racy, so for now we're not doing that. The different units of time
+    // have been manually tested instead, and general expiration times is tested in the non-frontend integration test.
+    }
+  }
+}
