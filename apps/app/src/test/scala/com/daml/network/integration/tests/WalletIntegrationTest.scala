@@ -54,12 +54,17 @@ class WalletIntegrationTest
 
       loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.DEBUG))(
         {
-          try {
-            // ... lookup on the payment request fails
-            aliceWallet.acceptAppPaymentRequest(request)
-          } catch {
-            case _: CommandFailure =>
-          }
+          def submitRequest() =
+            try {
+              // ... lookup on the payment request fails
+              aliceWallet.acceptAppPaymentRequest(request)
+            } catch {
+              case _: CommandFailure =>
+            }
+          submitRequest()
+          // Without this second request, the walletBackend would shut down too quickly, and we would not see
+          // the message about an empty batch in the logs.
+          submitRequest()
         },
         entries => {
           forAtLeast(1, entries)(

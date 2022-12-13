@@ -128,29 +128,26 @@ class TreasuryService(
     }
   }
 
-  /** Runs the lookups, only returns the operation whose lookup succeeded and completes the promises for
-    * the coin operations with failed lookups.
+  /** Find all operations that have become stale and complete them with their failure.
+    * Thereby removing them from the next iteration of batch execution.
     */
-  private def runLookups(
+  private def completeAndRemoveStaleOperations(
       batch: Seq[EnqueuedCoinOperation]
-  )(implicit tc: TraceContext): Future[Seq[EnqueuedCoinOperation]] = {
+  )(implicit tc: TraceContext): Future[Done] = {
     batch
       .traverse { op =>
         tryLookupCoinOperation(op.operation)
-          .transform { lookupResult =>
-            lookupResult match {
-              case Failure(ex) =>
-                logger.debug(show"Failing operation due to failed lookup: $op", ex)
-                // if the lookup fails, complete the promise with the failed future
-                op.outcomePromise.failure(ex)
-                // but still run the rest of the operations whose lookup didn't fail
-                Success(None)
-              case Success(()) =>
-                Success(Some(op))
-            }
+          .transform {
+            case Failure(ex) =>
+              logger.debug(show"Failing operation due to failed lookup: $op", ex)
+              // if the lookup fails, complete the promise with the failed future
+              op.outcomePromise.failure(ex)
+              Success(Done)
+            case Success(_) =>
+              Success(Done)
           }
       }
-      .map(_.flatten)
+      .map(_ => Done)
   }
 
   /** Background behind lookups:
@@ -166,8 +163,8 @@ class TreasuryService(
     *
     * Implementation:
     * If a required contract is not found, the future should fail with an appropriate
-    * [[io.grpc.StatusRuntimeException]]. We execute `tryLookupCoinOperation` run on every submission of the corresponding
-    * coin operation (also for retries).
+    * [[io.grpc.StatusRuntimeException]].
+    * We execute `completeAndRemoveStaleOperations` after every batch that failed.
     */
   private def tryLookupCoinOperation(op0: installCodegen.CoinOperation): Future[Unit] = op0 match {
     case op: coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment =>
@@ -227,12 +224,20 @@ class TreasuryService(
           this,
         )
         .recover(ex => {
-          logger.error("Skipping batch due to unexpected execution failure", ex)
+          if (this.isClosing) {
+            // TODO(M1-92): we have too many of these guards for closing -- see whether there is a better way, and thereby squeeze out the lurking concurrency and shutdown problems.
+            logger.info("Ignoring batch execution failure, as we are shutting down", ex)
+          } else
+            logger.error("Skipping batch due to unexpected execution failure", ex)
+          // Complete all operations of this batch
           batch.foreach(op =>
-            op.outcomePromise.failure(
-              Status.INTERNAL
-                .withDescription("Unexpected coin operation execution failure.")
-                .asRuntimeException()
+            // Need to use tryComplete as some of them might have been completed already due to being stale
+            op.outcomePromise.tryComplete(
+              Failure(
+                Status.INTERNAL
+                  .withDescription("Unexpected coin operation execution failure.")
+                  .asRuntimeException()
+              )
             )
           )
           Done
@@ -240,8 +245,13 @@ class TreasuryService(
     }
 
   private def executeBatch(
-      batch: Seq[EnqueuedCoinOperation]
+      batch0: Seq[EnqueuedCoinOperation]
   )(implicit tc: TraceContext): Future[Done] = {
+    // Remove all operations from the batch whose promise has already been completed.
+    // We use this approach as the retry infrastructure retries a fixed operation, and we want to avoid
+    // introducing more mutable state that can go awry.
+    // We accept the cost of repeatedly filtering the batch, as batches are expected to be small.
+    val batch = batch0.filter(!_.outcomePromise.isCompleted)
     logger.debug(
       show"Running batch of coin operations:${System.lineSeparator()}$batch"
     )
@@ -251,50 +261,58 @@ class TreasuryService(
       case _ => false
     }
 
-    runLookups(batch).flatMap {
-      // skip batches that are empty after lookups.
-      case validOperations if (validOperations.isEmpty) =>
-        logger.debug("Found no valid coin operations after running lookups.")
-        Future.successful(Done)
-      case validOperations =>
-        for {
-          now <- TimeUtil.getTime(connection, clockConfig)
-          transferContext <- walletManager.store.getPaymentTransferContext(retryProvider, now)
-          activeIssuingRounds = transferContext.context.issuingMiningRounds.asScala.keys.toSet
-          install <- getInstall
-          (inputs, readAs) <- selectTransferInputs(activeIssuingRounds)
-          cmd =
-            install.contractId.exerciseWalletAppInstall_ExecuteBatch(
-              transferContext,
-              inputs.asJava,
-              validOperations.map(_.operation).asJava,
-            )
+    if (batch.isEmpty) {
+      logger.debug("Found no valid coin operations after running lookups.")
+      Future.successful(Done)
+    } else {
+      val batchExecutionF = for {
+        now <- TimeUtil.getTime(connection, clockConfig)
+        transferContext <- walletManager.store.getPaymentTransferContext(retryProvider, now)
+        activeIssuingRounds = transferContext.context.issuingMiningRounds.asScala.keys.toSet
+        install <- getInstall
+        (inputs, readAs) <- selectTransferInputs(activeIssuingRounds)
+        cmd =
+          install.contractId.exerciseWalletAppInstall_ExecuteBatch(
+            transferContext,
+            inputs.asJava,
+            batch.map(_.operation).asJava,
+          )
 
-          (offset, outcomes) <- connection
-            // TODO(M3-02): as of 2022-11-25 there are two operations that are not self-conflicting: Tap and DirectTransfer,
-            // which implies that network problems might lead to duplicate 'DirectTransfer' calls. They will be replaced by
-            // TransferOffers as part of M3-02, which will consume the TransferOffer, and thus make the batch-execution w/o command dedup safe.
-            .submitWithResultAndOffsetNoDedup(
-              Seq(walletManager.store.key.walletServiceParty),
-              walletManager.store.key.validatorParty +: userStore.key.endUserParty +: readAs.toSeq,
-              cmd,
-            )
-          // return all outcomes to the callers
-          _ = (outcomes.exerciseResult.asScala zip validOperations).map { case (outcome, op) =>
-            logger.debug(show"Completing operation $op with result ${outcome.toValue}")
-            op.outcomePromise.success(outcome)
-          }
-          // wait for store to ingest the new coin holdings *provided* they were updated
-          case () <- if (outcomes.exerciseResult.asScala.forall(isErrorOutcome)) {
-            // We must not wait in this case, as the store won't see that offset until the next action comes,
-            // as the transaction filter is in the way
-            // TODO(M1-92): remove this fragility of depending on the exact daml transaction to determine whether to wait or not
-            Future.unit
-          } else {
-            logger.debug(show"Waiting for store to ingest offset ${offset.singleQuoted}")
-            userStore.signalWhenIngested(offset)
-          }
-        } yield Done
+        (offset, outcomes) <- connection
+          // TODO(M3-02): as of 2022-11-25 there are two operations that are not self-conflicting: Tap and DirectTransfer,
+          // which implies that network problems might lead to duplicate 'DirectTransfer' calls. They will be replaced by
+          // TransferOffers as part of M3-02, which will consume the TransferOffer, and thus make the batch-execution w/o command dedup safe.
+          .submitWithResultAndOffsetNoDedup(
+            Seq(walletManager.store.key.walletServiceParty),
+            walletManager.store.key.validatorParty +: userStore.key.endUserParty +: readAs.toSeq,
+            cmd,
+          )
+        // return all outcomes to the callers
+        _ = (outcomes.exerciseResult.asScala zip batch).map { case (outcome, op) =>
+          logger.debug(show"Completing operation $op with result ${outcome.toValue}")
+          op.outcomePromise.success(outcome)
+        }
+        // wait for store to ingest the new coin holdings *provided* they were updated
+        case () <- if (outcomes.exerciseResult.asScala.forall(isErrorOutcome)) {
+          // We must not wait in this case, as the store won't see that offset until the next action comes,
+          // as the transaction filter is in the way
+          // TODO(M1-92): remove this fragility of depending on the exact daml transaction to determine whether to wait or not
+          Future.unit
+        } else {
+          logger.debug(show"Waiting for store to ingest offset ${offset.singleQuoted}")
+          userStore.signalWhenIngested(offset)
+        }
+      } yield Done
+      batchExecutionF.recoverWith(ex => {
+        logger.info("Checking staleness of coin operations, as batch execution failed", ex)
+        completeAndRemoveStaleOperations(batch).transform {
+          case Failure(exStale) =>
+            logger.error("Ignoring unexpected exception during staleness check", exStale)
+            throw ex
+          case Success(_) =>
+            throw ex
+        }
+      })
     }
   }
 
