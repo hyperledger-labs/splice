@@ -5,12 +5,13 @@ import java.nio.charset.StandardCharsets
 
 println("Running canton bootstrap script...")
 
-println(s"Allocating validator service users...")
+println(s"Allocating validator service users and SVC user...")
 Seq(
   (aliceParticipant, "alice_validator_user"),
   (bobParticipant, "bob_validator_user"),
   (directoryParticipant, "directory_validator_user"),
   (splitwiseParticipant, "splitwise_validator_user"),
+  (svcParticipant, "svc_shared_service_user"),
 ).foreach { case (participant, user) =>
   val validatorParty = participant.parties.enable(user)
   participant.ledger_api.users.create(

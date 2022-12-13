@@ -74,10 +74,6 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
     Future.successful(status)
   }
 
-  // Whether the service user should be allocated by the app itself.
-  // We use that in the SVC app at the moment.
-  protected lazy val allocateServiceUser: Boolean = false
-
   def initialize(
       ledgerClient: CoinLedgerClient,
       party: PartyId,
@@ -142,28 +138,16 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
     connection = ledgerClient.connection(name.toString)
     _ = logger.info(s"Acquiring primary party of service user $serviceUser")
     serviceParty <-
-      if (allocateServiceUser)
-        retryProvider.retryForAutomation(
-          "Allocating user and party",
-          connection.getOrAllocateParty(serviceUser),
-          this,
-          // Note: In general, app service users are allocated by the validator app.
-          // While the app has a valid access token for its service user but that user has not yet been allocated by the validator app,
-          // all ledger API calls with fail with PERMISSION_DENIED.
-          // Since this is the first ledger API call in the app, we additionally retry on auth errors here.
-          additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
-        )
-      else
-        retryProvider.retryForAutomation(
-          "Querying primary party of user",
-          connection.getPrimaryParty(serviceUser),
-          this,
-          // Note: In general, app service users are allocated by the validator app.
-          // While the app has a valid access token for its service user but that user has not yet been allocated by the validator app,
-          // all ledger API calls with fail with PERMISSION_DENIED.
-          // Since this is the first ledger API call in the app, we additionally retry on auth errors here.
-          additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
-        )
+      retryProvider.retryForAutomation(
+        "Querying primary party of user",
+        connection.getPrimaryParty(serviceUser),
+        this,
+        // Note: In general, app service users are allocated by the validator app.
+        // While the app has a valid access token for its service user but that user has not yet been allocated by the validator app,
+        // all ledger API calls with fail with PERMISSION_DENIED.
+        // Since this is the first ledger API call in the app, we additionally retry on auth errors here.
+        additionalCodes = Seq(Status.Code.PERMISSION_DENIED),
+      )
     _ = logger.info(s"Acquired primary party of user $serviceUser: $serviceParty")
     _ = logger.info(s"Waiting for templates to be uploaded: ${requiredTemplates}")
     _ <- waitForPackages(connection)

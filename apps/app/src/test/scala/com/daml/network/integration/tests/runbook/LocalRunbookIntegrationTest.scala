@@ -55,9 +55,19 @@ class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScr
           Seq(p("svc_participant")),
           env.appsHostedBySvc.local,
         ).flatten.start()(env)
-        // ... (2) connect the SVC participant to the SVC domain...
+        // ... (2) create the SVC user...
+        val svcUserName = "svc"
+        val svcParty = p("svc_participant").parties.enable(svcUserName)
+        p("svc_participant").ledger_api.users.create(
+          id = svcUserName,
+          actAs = Set(svcParty.toLf),
+          primaryParty = Some(svcParty.toLf),
+          readAs = Set.empty,
+          participantAdmin = true,
+        )
+        // ... (3) connect the SVC participant to the SVC domain...
         p("svc_participant").domains.connect_local(d("svc_domain"))
-        // ... (3) Self-hosted validator is started in the test.
+        // ... (4) Self-hosted validator is started in the test.
       })
 
   private def remoteScanAddressToLocalhost: CoinConfigTransform = {

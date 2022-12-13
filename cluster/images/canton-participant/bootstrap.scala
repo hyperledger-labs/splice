@@ -13,4 +13,16 @@ if (`svc_participant`.domains.list_connected().isEmpty) {
     `svc_participant`.health.ping(`svc_participant`)
 }
 
+val svcUserName = "svc"
+
+println(s"Creating svc user $svcUserName...")
+val svcParty = `svc_participant`.parties.enable(svcUserName)
+`svc_participant`.ledger_api.users.create(
+  id = svcUserName,
+  actAs = Set(svcParty.toLf),
+  readAs = Set.empty,
+  primaryParty = Some(svcParty.toLf),
+  participantAdmin = true,
+)
+
 println("Bootstrapped CN participant!")

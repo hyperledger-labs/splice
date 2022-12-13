@@ -52,8 +52,6 @@ class SvcApp(
       CoinRetries(loggerFactory),
     ) {
 
-  override lazy val allocateServiceUser = true
-
   override def initialize(
       ledgerClient: CoinLedgerClient,
       svcPartyId: PartyId,
