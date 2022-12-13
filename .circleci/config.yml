@@ -1025,9 +1025,9 @@ jobs:
             do
                 echo "Pipeline still running, waiting ..."
                 sleep 5
-                n=n+1
+                n=$((n+1))
                 # 360 = 30*60/5, i.e., 30 min.
-                if [[ n == 360 ]]; then
+                if [[ $n -ge 360 ]]; then
                     echo "Waited for 30min, continuing anyway"
                     break
                 fi
