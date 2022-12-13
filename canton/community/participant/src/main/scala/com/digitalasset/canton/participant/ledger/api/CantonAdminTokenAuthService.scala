@@ -39,20 +39,36 @@ class CantonAdminTokenAuthService(adminToken: CantonAdminToken, parent: Seq[Auth
       .map(_ => wildcard)
       .getOrElse(
         if (parent.isEmpty) wildcard
-        else decodeMetadataParent(headers).thenApply(stripParticipantId)
+        else
+          decodeMetadataParent(headers)
+            .thenApply(stripParticipantId)
+            .thenApply(lowerCaseUserName)
       )
   }
 
-  // TODO(#1836) Remove this
-  // This is a temporary workaround: Our auth0 config cannot handle the dynamic participant ids
-  // but it mandates an audience. So we set the audience to a fixed value which makes token decoding happy
+  // TODO(#1836) Remove this temporary workaround
+  // Our auth0 config cannot handle the dynamic participant ids but it mandates an audience.
+  // So we set the audience to a fixed value which makes token decoding happy
   // and then remove it from the claims which means validation against the participant id will be skipped.
   private def stripParticipantId(claimSet: ClaimSet): ClaimSet =
     claimSet match {
-      case claims: ClaimSet.Claims =>
-        claims.copy(participantId = stripParticipantIdIfMatches(claims.participantId))
+      case _: ClaimSet.Claims =>
+        sys.error("Not supported")
       case claims: ClaimSet.AuthenticatedUser =>
         claims.copy(participantId = stripParticipantIdIfMatches(claims.participantId))
+      case _ => claimSet
+    }
+
+  // TODO(#1946) Remove this temporary workaround
+  // Subject identifiers for auth0 M2M tokens are not valid Daml user names, as they contain upper case characters.
+  // We simply convert all characters to lower case.
+  // Collisions are unlikely in the case of auth0, as M2M tokens include 32 random characters in the subject identifier.
+  private def lowerCaseUserName(claimSet: ClaimSet): ClaimSet =
+    claimSet match {
+      case _: ClaimSet.Claims =>
+        sys.error("Not supported")
+      case claims: ClaimSet.AuthenticatedUser =>
+        claims.copy(userId = claims.userId.toLowerCase)
       case _ => claimSet
     }
 

@@ -220,6 +220,8 @@ function cluster_create() {
         _log "NAT config ${GCP_NAT_CONFIG_NAME} exists, skipping..."
     fi
 
+    cluster_update_secrets
+
     _cluster_apply
 }
 
@@ -389,6 +391,51 @@ function cluster_wait() {
     kubectl wait --for=condition=Ready --all pod --timeout=5m
 }
 
+function _set_auth0_secret() {
+  SECRET_NAME=$1
+  ENV_NAME=$2
+
+  _log "Setting secret $SECRET_NAME"
+
+  CLIENT_ID_EV="${ENV_NAME}_CLIENT_ID"
+  if [ -z "${!CLIENT_ID_EV-}" ]; then
+      _error "Environment variable ${CLIENT_ID_EV} is undefined, please follow instructions in the readme for obtaining and setting it"
+      exit 1
+  fi
+  CLIENT_ID=${!CLIENT_ID_EV}
+
+  CLIENT_SECRET_EV="${ENV_NAME}_CLIENT_SECRET"
+  if [ -z "${!CLIENT_SECRET_EV-}" ]; then
+      _error "Environment variable ${CLIENT_SECRET_EV} is undefined, please follow instructions in the readme for obtaining and setting it"
+      exit 1
+  fi
+  CLIENT_SECRET=${!CLIENT_SECRET_EV}
+
+  # TODO(#1946) Remove the workaround
+  # Currently, daml user names may not contain upper case characters
+  # Instead of modifying all places where the daml user names are used in our apps,
+  # we store a lower-cased user name in the kubernetes secret.
+  USER_NAME="$(echo "$CLIENT_ID" | tr '[:upper:]' '[:lower:]')@clients"
+
+  WELL_KNOWN_URL='https://canton-network-dev.us.auth0.com/.well-known/openid-configuration'
+
+  # Delete secret if it exists, easier than editing existing secrets
+  if kubectl get secret ${SECRET_NAME} > /dev/null; then
+      kubectl delete secret ${SECRET_NAME}
+  fi
+
+  kubectl create secret generic ${SECRET_NAME} \
+    --from-literal=url="${WELL_KNOWN_URL}" \
+    --from-literal=client-id="${CLIENT_ID}" \
+    --from-literal=client-secret="${CLIENT_SECRET}" \
+    --from-literal=daml-user-name="${USER_NAME}"
+}
+
+function cluster_update_secrets() {
+  _set_auth0_secret "cn-app-wallet-ledger-api-auth" "CN_APP_WALLET_LEDGER_API_AUTH"
+  _set_auth0_secret "cn-app-validator-ledger-api-auth" "CN_APP_VALIDATOR_LEDGER_API_AUTH"
+}
+
 case "${SUBCOMMAND_NAME}" in
     activate)
         cluster_activate $@
@@ -438,8 +485,12 @@ case "${SUBCOMMAND_NAME}" in
         cluster_wait $@
         ;;
 
+    update_secrets)
+        cluster_update_secrets
+        ;;
+
     *)
-	    _error "Usage: $SCRIPTNAME {activate|apply|create|check|delete|deploy|ipaddr|reset|wait}" >&2
+	    _error "Usage: $SCRIPTNAME {activate|apply|create|check|delete|deploy|ipaddr|reset|wait|update_secrets}" >&2
 	    exit 3
 	    ;;
 esac

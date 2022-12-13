@@ -23,6 +23,7 @@ object AuthTokenSourceConfig {
       wellKnownConfigUrl: String,
       clientId: String,
       clientSecret: String,
+      audience: String,
       adminToken: Option[String],
   ) extends AuthTokenSourceConfig
 }

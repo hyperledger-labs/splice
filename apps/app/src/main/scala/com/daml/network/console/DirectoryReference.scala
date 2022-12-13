@@ -97,7 +97,7 @@ class RemoteDirectoryAppReference(
 ) extends DirectoryAppReference(consoleEnvironment, name)
     with GrpcRemoteInstanceReference {
 
-  val ledgerApi = new ExternalLedgerApiClient(
+  lazy val ledgerApi = new ExternalLedgerApiClient(
     config.ledgerApi.clientConfig.address,
     config.ledgerApi.clientConfig.port,
     config.ledgerApi.clientConfig.tls,

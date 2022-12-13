@@ -77,6 +77,13 @@ local svcDeployments(config) = [
   ], proxyToGrpcWeb='scan-api'),
 ];
 
+// A dictionary of all auth-related environment variables.
+// Some variables are used by multiple apps.
+local authEnvVars = std.foldl(function(prev, el) prev + c.authEnvVars(el), [
+    {env:'CN_APP_VALIDATOR_LEDGER_API_AUTH', secret: 'cn-app-validator-ledger-api-auth'},
+    {env:'CN_APP_WALLET_LEDGER_API_AUTH', secret: 'cn-app-wallet-ledger-api-auth'},
+], {});
+
 local validator1Deployments(config) = [
   c.deployment(config, 'validator1-participant', [
     {
@@ -87,21 +94,35 @@ local validator1Deployments(config) = [
       name: 'val1-lg-api',
       port: 5101,
     },
-  ], memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb='val1-lg-api'),
+  ], memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb='val1-lg-api', extraEnvVars=[
+    authEnvVars['CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME'],
+    authEnvVars['CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME'],
+  ]),
 
   c.deployment(config, 'validator1-validator-app', [
     {
       name: 'val1-val-api',
       port: 5103,
     },
-  ], proxyToGrpcWeb='val1-val-api'),
+  ], proxyToGrpcWeb='val1-val-api', extraEnvVars=[
+    authEnvVars['CN_APP_VALIDATOR_LEDGER_API_AUTH_URL'],
+    authEnvVars['CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID'],
+    authEnvVars['CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET'],
+    authEnvVars['CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME'],
+    authEnvVars['CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME'],
+  ]),
 
   c.deployment(config, 'validator1-wallet-app', [
     {
       name: 'val1-wal-api',
       port: 5104,
     },
-  ], proxyToGrpcWeb='val1-wal-api'),
+  ], proxyToGrpcWeb='val1-wal-api', extraEnvVars=[
+    authEnvVars['CN_APP_WALLET_LEDGER_API_AUTH_URL'],
+    authEnvVars['CN_APP_WALLET_LEDGER_API_AUTH_CLIENT_ID'],
+    authEnvVars['CN_APP_WALLET_LEDGER_API_AUTH_CLIENT_SECRET'],
+    authEnvVars['CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME'],
+  ]),
 
   c.deployment(config, 'validator1-wallet-web-ui', [
     {

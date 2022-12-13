@@ -1,8 +1,10 @@
 package com.daml.network.config
 
+import akka.actor.ActorSystem
 import com.daml.network.auth.AuthTokenSource
-import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.ClientConfig
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.tracing.TraceContext
 
 import scala.concurrent.Await
 import scala.concurrent.duration.DurationInt
@@ -18,11 +20,13 @@ case class CoinLedgerApiClientConfig(
   // CoinLedgerApiClientConfig contains information for how to acquire tokens.
   // We need to perform some blocking IO to generate the token here.
   def getToken(): Option[String] = {
+    implicit val actorSystem = ActorSystem("CoinLedgerApiClientConfig")
+    implicit val executionContext = actorSystem.dispatcher
+    implicit val traceContext = TraceContext.empty
     val loggerFactory = NamedLoggerFactory.root
     val authTokenSource = AuthTokenSource.fromConfig(
       authConfig,
       loggerFactory,
-      ProcessingTimeout(),
     )
     Await.result(authTokenSource.getToken, 30.seconds)
   }

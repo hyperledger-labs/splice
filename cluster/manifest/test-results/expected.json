@@ -724,6 +724,26 @@
                            {
                               "name": "JAVA_TOOL_OPTIONS",
                               "value": "-Xms11776M -Xmx11776M"
+                           },
+                           {
+                              "name": "CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-wallet-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-participant:tag",
@@ -852,6 +872,56 @@
                            {
                               "name": "JAVA_TOOL_OPTIONS",
                               "value": "-Xms1024M -Xmx1024M"
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-secret",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-wallet-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-validator-app:tag",
@@ -971,6 +1041,46 @@
                            {
                               "name": "JAVA_TOOL_OPTIONS",
                               "value": "-Xms1024M -Xmx1024M"
+                           },
+                           {
+                              "name": "CN_APP_WALLET_LEDGER_API_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-wallet-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_WALLET_LEDGER_API_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-wallet-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_WALLET_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-secret",
+                                    "name": "cn-app-wallet-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-wallet-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/validator1-wallet-app:tag",

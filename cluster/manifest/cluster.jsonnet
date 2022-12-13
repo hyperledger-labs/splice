@@ -41,6 +41,49 @@ local toContainerPortDefn(p) = {
   containerPort: p.port,
 };
 
+local authEnvVars(s) = {
+    [s.env + '_URL']: {
+      name: s.env + '_URL',
+      valueFrom: {
+        secretKeyRef: {
+          name: s.secret,
+          key: 'url',
+          optional: false
+        }
+      }
+    },
+    [s.env + '_CLIENT_ID']: {
+      name: s.env + '_CLIENT_ID',
+      valueFrom: {
+        secretKeyRef: {
+          name: s.secret,
+          key: 'client-id',
+          optional: false
+        }
+      }
+    },
+    [s.env + '_CLIENT_SECRET']: {
+      name: s.env + '_CLIENT_SECRET',
+      valueFrom: {
+        secretKeyRef: {
+          name: s.secret,
+          key: 'client-secret',
+          optional: false
+        }
+      }
+    },
+    [s.env + '_USER_NAME']: {
+      name: s.env + '_USER_NAME',
+      valueFrom: {
+        secretKeyRef: {
+          name: s.secret,
+          key: 'daml-user-name',
+          optional: false
+        }
+      }
+    },
+};
+
 // The amount of memory reserved for the operating system in containers
 // hosting a JVM. The JVM heap size is the container limit less this
 // amount. The number here is a best estimate and may need to be
@@ -48,7 +91,7 @@ local toContainerPortDefn(p) = {
 local JVM_SYSTEM_MEMORY_MIB = 512;
 
 
-local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null) =
+local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWeb=null, mountConfig=null, tlsCertSecret=null, extraEnvVars=[]) =
   local proxyPort =
     if proxyToGrpcWeb == null then null
     else findPort(ports, proxyToGrpcWeb);
@@ -101,7 +144,7 @@ local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWe
                       name: 'JAVA_TOOL_OPTIONS',
                       value: '-Xms%sM -Xmx%sM' % [memoryLimitMiB - JVM_SYSTEM_MEMORY_MIB, memoryLimitMiB - JVM_SYSTEM_MEMORY_MIB],
                     },
-                  ],
+                  ] + extraEnvVars,
                   resources: {
                     requests: {
                       memory: memoryLimitMiB + 'Mi',
@@ -263,4 +306,5 @@ local cluster(config, clusterDeployments) =
 {
   deployment:: deployment,
   cluster:: cluster,
+  authEnvVars:: authEnvVars,
 }

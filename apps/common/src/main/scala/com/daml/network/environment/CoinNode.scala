@@ -9,12 +9,7 @@ import com.daml.network.util.HasHealth
 import com.digitalasset.canton.config.RequireTypes.{InstanceName, Port}
 import com.digitalasset.canton.environment.CantonNode
 import com.digitalasset.canton.health.admin.data.{NodeStatus, SimpleStatus, TopologyQueueStatus}
-import com.digitalasset.canton.lifecycle.{
-  AsyncCloseable,
-  AsyncOrSyncCloseable,
-  FlagCloseableAsync,
-  SyncCloseable,
-}
+import com.digitalasset.canton.lifecycle.{AsyncCloseable, AsyncOrSyncCloseable, FlagCloseableAsync}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.HasUptime
 import com.digitalasset.canton.topology.{PartyId, UniqueIdentifier}
@@ -100,12 +95,13 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
 
   }
 
-  private def createAuthTokenSource(): AuthTokenSource = {
-    logger.info(s"Creating ledger API auth token source")
-    AuthTokenSource.fromConfig(remoteParticipant.ledgerApi.authConfig, loggerFactory, timeouts)
-  }
-
-  private def createLedgerClient(authTokenSource: AuthTokenSource): Future[CoinLedgerClient] = for {
+  private def createLedgerClient(): Future[CoinLedgerClient] = for {
+    _ <- Future.successful(())
+    _ = logger.info("Creating ledger API auth token source")
+    authTokenSource = AuthTokenSource.fromConfig(
+      remoteParticipant.ledgerApi.authConfig,
+      loggerFactory,
+    )
     token <- retryProvider.retryForAutomation(
       "Acquiring initial auth token",
       authTokenSource.getToken,
@@ -156,8 +152,7 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
   } yield state
 
   logger.info(s"Starting initialization")
-  private val authTokenSource = createAuthTokenSource()
-  private val ledgerClientF = createLedgerClient(authTokenSource)
+  private val ledgerClientF = createLedgerClient()
   private val initializeF = ledgerClientF.flatMap(initializeNode)
 
   initializeF.onComplete { _ =>
@@ -180,7 +175,6 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
         ledgerClientF.map(_.close()),
         closingTimeout,
       ),
-      SyncCloseable(s"$name auth token source", authTokenSource.close()),
     )
   }
 }

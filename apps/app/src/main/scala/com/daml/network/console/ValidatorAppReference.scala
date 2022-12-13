@@ -57,7 +57,7 @@ final class LocalValidatorAppReference(
     consoleEnvironment.environment.config.validatorsByString(name)
 
   /** Remote participant this validator app is configured to interact with. */
-  val remoteParticipant =
+  lazy val remoteParticipant =
     new CoinRemoteParticipantReference(
       consoleEnvironment,
       s"remote participant for `$name`",

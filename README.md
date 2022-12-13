@@ -567,7 +567,9 @@ Currently we maintain two tenants with some application clients in them:
     - `Wallet (Test Application)`: Currently unused, but intended to experiment with API scopes
 2. `canton-network-dev`: The tenant dedicated for our cluster deployments
     - `Validator1 Auth`: A monolith application that supports all validator1-hosted UIs (Splitwise, Directory, and Wallet) running on all cluster deployments (scratch, staging, dev, and test)
+    - `CN validator backend`: An application for all validator app backends running on all cluster deployments (scratch, staging, dev, and test)
+    - `CN wallet backend`: An application for all wallet app backends running on all cluster deployments (scratch, staging, dev, and test)
     - `SPA Experiment`: An application for the SPA experiment located in `/experiments/auth0-spa` in this repository
-    - `API Explorer Machine`: An application that was created by default when the tenant was made. Currently unused, but we may wish to use this in the future for getting tokens for automating application client management 
+    - `API Explorer Machine`: An application that was created by default when the tenant was made. Currently unused, but we may wish to use this in the future for getting tokens for automating application client management
 
 If you don't have access to either tenant, give a shout in the #team-canton-network-internal Slack channel. Any admin of the tenant may invite anyone else (and everyone is an admin by default). 

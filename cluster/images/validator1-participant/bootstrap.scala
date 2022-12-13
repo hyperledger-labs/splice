@@ -14,11 +14,21 @@ if (`validator1_participant`.domains.list_connected().isEmpty) {
     `validator1_participant`.health.ping(`validator1_participant`)
 }
 
-val validatorServiceUserName = "validator1_validator_service_user"
-val walletServiceUserName = "validator1_wallet_service_user"
+val validatorServiceUserName = System.getenv("CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME")
+if (validatorServiceUserName == null) {
+  sys.error("Environment variable CN_APP_VALIDATOR_LEDGER_API_AUTH_USER_NAME does not exist")
+}
+
+val walletServiceUserName = System.getenv("CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME")
+if (walletServiceUserName == null) {
+  sys.error("Environment variable CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME does not exist")
+}
+
+// User name may contain characters not allowed in party names
+val validatorServicePartyName = "validator1_validator_service_user"
 
 println(s"Creating validator user $validatorServiceUserName...")
-val validatorParty = `validator1_participant`.parties.enable(validatorServiceUserName)
+val validatorParty = `validator1_participant`.parties.enable(validatorServicePartyName)
 `validator1_participant`.ledger_api.users.create(
   id = validatorServiceUserName,
   actAs = Set(validatorParty.toLf),
