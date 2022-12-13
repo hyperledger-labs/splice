@@ -185,7 +185,7 @@ class WalletPaymentFrontendIntegrationTest
             click on "create-offer-receiver"
             textField("create-offer-receiver").value = bobCns
             click on "create-offer-quantity"
-            numberField("create-offer-quantity").underlying.sendKeys("100.0")
+            numberField("create-offer-quantity").underlying.sendKeys("1.0")
             click on "create-offer-description"
             textField("create-offer-description").value = "by party ID"
             click on "create-offer-expiration-value"
@@ -196,6 +196,12 @@ class WalletPaymentFrontendIntegrationTest
           "Alice sees the transfer offer",
           _ => {
             findAll(className("transfer-offers-row")) should have size 1
+            val row = inside(findAll(className("transfer-offers-row")).toList) { case Seq(row) =>
+              row
+            }
+            row.childElement(className("transfer-offers-table-quantity")).text should be(
+              "1.0000000000CC"
+            )
           },
         )
 
@@ -207,7 +213,7 @@ class WalletPaymentFrontendIntegrationTest
             textField("create-offer-receiver").underlying.sendKeys(Keys.ARROW_DOWN)
             textField("create-offer-receiver").underlying.sendKeys(Keys.RETURN)
             click on "create-offer-quantity"
-            numberField("create-offer-quantity").underlying.sendKeys("100.0")
+            numberField("create-offer-quantity").underlying.sendKeys("2.0")
             click on "create-offer-description"
             textField("create-offer-description").value = "with auto-complete"
             click on "create-offer-expiration-value"
@@ -221,17 +227,37 @@ class WalletPaymentFrontendIntegrationTest
           },
         )
 
-        // The case of inserting the whole party ID is tested in "support transfer offers"
+        actAndCheck(
+          s"Alice creates offer with bob's full party ID", {
+            click on "create-offer-button"
+            click on "create-offer-receiver"
+            textField("create-offer-receiver").value = bobParty.toProtoPrimitive
+            textField("create-offer-receiver").underlying.sendKeys(Keys.ARROW_DOWN)
+            textField("create-offer-receiver").underlying.sendKeys(Keys.RETURN)
+            click on "create-offer-quantity"
+            numberField("create-offer-quantity").underlying.sendKeys("3.0")
+            click on "create-offer-description"
+            textField("create-offer-description").value = "with auto-complete"
+            click on "create-offer-expiration-value"
+            numberField("create-offer-expiration-value").underlying.sendKeys("120")
+            click on "submit-create-offer-button"
+          },
+        )(
+          "Alice sees the transfer offers",
+          _ => {
+            findAll(className("transfer-offers-row")) should have size 3
+          },
+        )
 
-        clue("Bob received both offers") {
+        clue("Bob sees all offers") {
           eventually() {
-            bobWallet.listTransferOffers() should have length 2
+            bobWallet.listTransferOffers() should have length 3
           }
         }
       }
     }
 
-    "support transfer offers" in { implicit env =>
+    "support withdrawing and rejecting transfer offers" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.damlUser
       val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val aliceEntryName = "alice.cns"
@@ -275,45 +301,6 @@ class WalletPaymentFrontendIntegrationTest
       withFrontEnd("alice") { implicit webDriver =>
         browseToAliceWallet(aliceDamlUser)
         click on "transfer-offers-button"
-
-        createOffer("Testing transfer offers")
-        val row = inside(findAll(className("transfer-offers-row")).toList) { case Seq(row) => row }
-        row.childElement(className("transfer-offers-table-quantity")).text should be(
-          "100.0000000000CC"
-        )
-      }
-
-      withFrontEnd("bob") { implicit webDriver =>
-        browseToBobWallet(bobDamlUser)
-        actAndCheck("Bob browses to transfer offers", click on "transfer-offers-button")(
-          "Bob also sees the transfer offer",
-          _ => {
-            findAll(className("transfer-offers-row")) should have size 1
-          },
-        )
-        actAndCheck("Bob accepts the offer", click on className("transfer-offers-table-accept"))(
-          "Bob sees the accepted offer (not enough funds for it to complete)",
-          _ => {
-            findAll(className("transfer-offers-row")) should have size 0
-            findAll(className("accepted-transfer-offers-row")) should have size 1
-          },
-        )
-      }
-
-      withFrontEnd("alice") { implicit webDriver =>
-        clue("Alice also sees the accepted offer") {
-          eventually() {
-            findAll(className("accepted-transfer-offers-row")) should have size 1
-          }
-        }
-
-        actAndCheck("Tap more coin for alice", aliceWallet.tap(100))(
-          "Accepted offer is completed",
-          _ => {
-            findAll(className("accepted-transfer-offers-row")) should have size 0
-          },
-        )
-
         createOffer("to be withdrawn")
         actAndCheck(
           "Alice withdraws her offer", {
@@ -325,6 +312,8 @@ class WalletPaymentFrontendIntegrationTest
       }
 
       withFrontEnd("bob") { implicit webDrivers =>
+        browseToBobWallet(bobDamlUser)
+        click on "transfer-offers-button"
         eventually()(findAll(className("transfer-offers-row")) should have size 1)
         actAndCheck("Bob rejects the offer", click on className("transfer-offers-table-reject"))(
           "The offer is deleted",
@@ -334,6 +323,9 @@ class WalletPaymentFrontendIntegrationTest
 
     // Testing a short-lived offer here might be racy, so for now we're not doing that. The different units of time
     // have been manually tested instead, and general expiration times is tested in the non-frontend integration test.
+
+    // TODO(#1799): Currently it is hard to test the scenario of insufficient funds,
+    //  until we have some form of notification that the offer has been aborted
     }
   }
 }

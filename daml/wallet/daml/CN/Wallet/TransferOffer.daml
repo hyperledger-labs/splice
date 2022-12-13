@@ -104,3 +104,8 @@ template AcceptedTransferOffer
         now <- getTime
         require "Offer has expired" (now >= expiresAt)
         pure()
+
+    choice AcceptedTransferOffer_Abort : ()
+      controller sender
+      do
+        pure()

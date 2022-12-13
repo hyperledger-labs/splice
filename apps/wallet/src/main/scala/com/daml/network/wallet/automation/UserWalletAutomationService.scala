@@ -56,34 +56,62 @@ class UserWalletAutomationService(
     )
   )
 
-  private def completeAcceptedTransferOffer(
+  private def abortAcceptedTransferOffer(
+      acceptedOffer: JavaContract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer]
+  )(implicit tc: TraceContext): Future[Either[String, String]] = {
+
+    for {
+      install <- getInstall
+      cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Abort(
+        acceptedOffer.contractId
+      )
+      res <- connection
+        .submitWithResultNoDedup(
+          Seq(store.key.walletServiceParty),
+          Seq(store.key.validatorParty, store.key.endUserParty),
+          cmd,
+        )
+        .map(_ => "Aborted accepted transfer offer")
+    } yield Right(res)
+  }
+
+  /** Tries to complete an accepted offer (and with that archive it).
+    * If it fails due to insufficient funds - archives the accepted offer without completing it.
+    */
+  private def completeOrAbortAcceptedTransferOffer(
       acceptedOffer: JavaContract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer]
   )(implicit tc: TraceContext): Future[Either[String, String]] = {
     val operation = new CO_CompleteAcceptedTransfer(acceptedOffer.contractId)
     treasury
       .enqueueCoinOperation(operation)
-      .map {
+      .flatMap {
         case failedOperation: installCodegen.coinoperationoutcome.COO_Error =>
-          val msg =
-            show"Failed making a transfer with accepted offer ${acceptedOffer}: ${failedOperation.stringValue.singleQuoted}"
-          logger.info(
-            msg
-          ) // We report this only at an info level, because it will be retried automatically
-          Left(msg)
+          if (failedOperation.stringValue.startsWith("Input to output+fee quantity balance")) {
+            // Insufficient funds - abort the offer
+            // TODO(#1799): Push this string comparison down to daml, and make COO_Error carry a variant
+            abortAcceptedTransferOffer(acceptedOffer)
+          } else {
+            val msg =
+              show"Failed making a transfer with accepted offer ${acceptedOffer}: ${failedOperation.stringValue.singleQuoted}"
+            logger.info(
+              msg
+            ) // We report this only at an info level, because it will be retried automatically
+            Future(Left(msg))
+          }
         case _ =>
           val msg = s"Completed a transfer with accepted offer ${acceptedOffer}"
           logger.info(msg)
-          Right(msg)
+          Future(Right(msg))
       }
   }
 
-  private def completeAcceptedTransferOfferIfSender(
+  private def completeOrArchiveAcceptedTransferOfferIfSender(
       acceptedOffer: JavaContract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer]
   )(implicit tc: TraceContext): Future[Either[String, String]] = {
     store.key.endUserParty.toProtoPrimitive match {
       case acceptedOffer.payload.sender =>
         logger.info("Transfer offer accepted, trying to complete the transfer...")
-        completeAcceptedTransferOffer(acceptedOffer)
+        completeOrAbortAcceptedTransferOffer(acceptedOffer)
       case acceptedOffer.payload.receiver =>
         val msg = "AcceptedTransferOffer ignored as the receiver"
         logger.debug(msg)
@@ -98,33 +126,18 @@ class UserWalletAutomationService(
     }
   }
 
-  // TODO(M3-02): consider, in addition to the periodic attempts, also triggering the transfer
-  //  from ingestion of a new accepted offer. On the happy path, this will complete the transfer quicker,
-  //  but might be a source for contention and other races between that attempt and the periodic retry
-
-  registerPollingTrigger(
-    "RetryPendingTransferOffers",
-    automationConfig.pollingInterval,
-    connection,
-  )((now, logger) => { implicit traceContext =>
-    {
-      logger.info("Looking for accepted transfer offers to complete...")
-      store.acs.listContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION).flatMap {
-        case QueryResult(_, acceptedOffers) =>
-          logger.info(s"Attempting to complete ${acceptedOffers.length} accepted transfer offers")
-          acceptedOffers
-            .map(acceptedOffer => completeAcceptedTransferOfferIfSender(acceptedOffer))
-            .toList
-            .sequence
-            .map(_.partitionMap(r => r) match {
-              case (lefts, rights) => {
-                Some(
-                  s"Successfully completed ${rights.size} accepted transfer offers; ${lefts.size} failed."
-                )
-              }
-            })
-      }
-    }
+  registerTrigger(
+    "Complete accepted transfer offers",
+    store.acs.streamContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION),
+  )((acceptedOffer, logger) => { implicit traceContext =>
+    logger.info(s"Ingested new transfer offer: ${acceptedOffer}")
+    completeOrArchiveAcceptedTransferOfferIfSender(acceptedOffer).map(_ match {
+      case Left(err) =>
+        // A retryable error has occurred (hence the accepted transfer offer has not been aborted) -
+        // so we throw an UNAVAILABLE exception here, and let automation retry the action.
+        throw new StatusRuntimeException(Status.UNAVAILABLE.withDescription(err))
+      case Right(msg) => Some(msg)
+    })
   })
 
   registerPollingTrigger(
