@@ -4,18 +4,20 @@ import DA.Exception
 
 import qualified CC.API.V1.Coin as API
 import CC.Round (OpenMiningRound)
-import CC.Coin (CoinRules, CoinRules_Tap(..))
+import CC.Coin (CoinRules, CoinRules_Tap(..), InvalidTransfer, InvalidTransferReason(..))
 
 import CN.Wallet.Payment
 import CN.Wallet.Subscriptions
 import CN.Wallet.TransferOffer
 
 -- Evaluates an update, catches any exceptions it throws and converts them into an Either
-catchAll: Update a -> Update (Either Text a)
+catchAll: Update a -> Update (Either InvalidTransferReason a)
 catchAll operation =
   try do
     fmap (\res -> Right res) operation
-  catch (ex : AnyException) -> return $ Left $ message ex
+  catch
+    (ex : InvalidTransfer) -> return $ Left $ ex.reason
+    (ex : AnyException) -> return $ Left $ ITR_Other $ message ex
 
 -- Main function for batched execution of multiple coin operations.
 -- Given multiple coin operations and transfer inputs, it executes the operations sequentially while
@@ -38,18 +40,18 @@ executeCoinOperationRec context inputs prevResults (operation::remainingOperatio
       resultE <- catchAll $ exercise cid (choiceConstructor inputs context)
       handleResult resultConstructor resultE
 
-    handleResult : (r -> CoinOperationOutcome) -> Either Text (r, ContractId API.Coin) -> Update [CoinOperationOutcome]
+    handleResult : (r -> CoinOperationOutcome) -> Either InvalidTransferReason (r, ContractId API.Coin) -> Update [CoinOperationOutcome]
     handleResult resultConstructor = \case
       Left errorMsg -> handleLeft errorMsg
       Right (result, change) -> executeCoinOperationRec context [API.InputCoin change] (resultConstructor result :: prevResults) remainingOperations
 
-    handleResultTap : Either Text (ContractId API.Coin) -> Update [CoinOperationOutcome]
+    handleResultTap : Either InvalidTransferReason (ContractId API.Coin) -> Update [CoinOperationOutcome]
     handleResultTap = \case
       Left errorMsg -> handleLeft errorMsg
       Right tappedCoin -> executeCoinOperationRec context (API.InputCoin tappedCoin :: inputs) (COO_Tap tappedCoin :: prevResults) remainingOperations
 
-    handleLeft : Text -> Update [CoinOperationOutcome]
-    handleLeft errorMsg = executeCoinOperationRec context inputs (COO_Error errorMsg :: prevResults) remainingOperations
+    handleLeft : InvalidTransferReason -> Update [CoinOperationOutcome]
+    handleLeft errorMsg = executeCoinOperationRec context inputs (COO_Error (errorMsg) :: prevResults) remainingOperations
 
 executeCoinOperationRec _context _inputs prevResults [] = do
   return prevResults
@@ -74,7 +76,7 @@ data CoinOperationOutcome
   | COO_SubscriptionInitialPayment (ContractId SubscriptionInitialPayment)
   | COO_SubscriptionPayment (ContractId SubscriptionPayment)
   | COO_Tap (ContractId API.Coin)
-  | COO_Error Text
+  | COO_Error InvalidTransferReason
   deriving (Eq, Show)
 
 

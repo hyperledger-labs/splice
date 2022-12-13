@@ -650,7 +650,7 @@ class GrpcWalletService(
       case failedOperation: coinoperationoutcome.COO_Error =>
         throw new StatusRuntimeException(
           Status.FAILED_PRECONDITION.withDescription(
-            s"the coin operation failed with a Daml exception: ${failedOperation.stringValue}."
+            s"the coin operation failed with a Daml exception: ${failedOperation}."
           )
         )
       case _ =>

@@ -3,6 +3,7 @@ package com.daml.network.wallet.automation
 import akka.stream.Materializer
 import cats.syntax.traverse.*
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
+import com.daml.network.codegen.java.cc.coin.invalidtransferreason
 import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_CompleteAcceptedTransfer
 import com.daml.network.codegen.java.cn.wallet.transferoffer.{AcceptedTransferOffer, TransferOffer}
 import com.daml.network.codegen.java.cn.wallet.{
@@ -57,7 +58,8 @@ class UserWalletAutomationService(
   )
 
   private def abortAcceptedTransferOffer(
-      acceptedOffer: JavaContract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer]
+      acceptedOffer: JavaContract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer],
+      reason: String,
   )(implicit tc: TraceContext): Future[Either[String, String]] = {
 
     for {
@@ -71,7 +73,7 @@ class UserWalletAutomationService(
           Seq(store.key.validatorParty, store.key.endUserParty),
           cmd,
         )
-        .map(_ => "Aborted accepted transfer offer")
+        .map(_ => s"aborted accepted transfer offer, $reason")
     } yield Right(res)
   }
 
@@ -86,17 +88,26 @@ class UserWalletAutomationService(
       .enqueueCoinOperation(operation)
       .flatMap {
         case failedOperation: installCodegen.coinoperationoutcome.COO_Error =>
-          if (failedOperation.stringValue.startsWith("Input to output+fee quantity balance")) {
-            // Insufficient funds - abort the offer
-            // TODO(#1799): Push this string comparison down to daml, and make COO_Error carry a variant
-            abortAcceptedTransferOffer(acceptedOffer)
-          } else {
-            val msg =
-              show"Failed making a transfer with accepted offer ${acceptedOffer}: ${failedOperation.stringValue.singleQuoted}"
-            logger.info(
-              msg
-            ) // We report this only at an info level, because it will be retried automatically
-            Future(Left(msg))
+          failedOperation.invalidTransferReasonValue match {
+            case fundsError: invalidtransferreason.ITR_InsufficientFunds =>
+              val missingStr = s"(missing ${fundsError.missingQuantity} CC)"
+              val msg = s"Insufficient funds for the transfer $missingStr, aborting transfer offer"
+              logger.info(msg)
+              abortAcceptedTransferOffer(acceptedOffer, s"out of funds $missingStr")
+            case otherError: invalidtransferreason.ITR_Other => {
+              val msg =
+                show"Failed making a transfer with accepted offer ${acceptedOffer}: ${otherError.description.singleQuoted}"
+              logger.info(
+                msg
+              ) // We report this only at an info level, because it will be retried automatically
+              Future(Left(msg))
+            }
+            case unknown =>
+              val msg = s"Unexpected error: ${unknown}"
+              logger.warn(
+                msg
+              )
+              Future(Left(msg))
           }
         case _ =>
           val msg = s"Completed a transfer with accepted offer ${acceptedOffer}"
@@ -322,7 +333,7 @@ class UserWalletAutomationService(
       .map {
         case failedOperation: installCodegen.coinoperationoutcome.COO_Error =>
           val error =
-            s"the coin operation failed with a Daml exception: ${failedOperation.stringValue}."
+            s"the coin operation failed with a Daml exception: ${failedOperation}."
           logger.warn(s"Failed making a subscription payment on state $stateCid: $error")
           Left(s"state $stateCid: $error")
 

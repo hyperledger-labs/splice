@@ -254,7 +254,7 @@ template CoinRules
     observer observers -- TODO(M3-82): remove workaround for explicit disclosure
 
     interface instance API.CoinRules for CoinRules where
-      view = API.CoinRulesView with 
+      view = API.CoinRulesView with
         config = API.CoinRulesConfigView with
           enabledChoices = config.enabledChoices
         ..
@@ -525,19 +525,24 @@ transferControllers t =
 scaleConfig : OpenMiningRound -> CoinConfig USD -> CoinConfig CC
 scaleConfig openRound config = scaleFees (1.0 / openRound.coinPrice) config
 
+data InvalidTransferReason
+  = ITR_InsufficientFunds with missingQuantity : Decimal
+  | ITR_Other with description : Text
+  deriving (Eq, Show)
+
 exception InvalidTransfer
   with
-    description : Text
+    reason : InvalidTransferReason
   where
-    message description
+    message show reason
 
-checkTransferConstraints: API.Transfer -> API.TransferSummary -> CoinConfig CC -> Either Text ()
+checkTransferConstraints: API.Transfer -> API.TransferSummary -> CoinConfig CC -> Either InvalidTransferReason ()
 checkTransferConstraints transfer summary config
-    | summary.numInputs > config.maxNumInputs = Left $ "More than the maximum number of inputs"
-    | summary.numOutputs > config.maxNumOutputs = Left $ "More than the maximum number of outputs"
-    | DA.Text.length transfer.payload > config.maxPayloadLength = Left $ "Payload length is above limit"
-    | summary.quantityBalance < 0.0 = Left $ "Input to output+fee quantity balance " <> show summary.quantityBalance <> " < 0"
-    | summary.quantityBalance /= 0.0 && summary.numFloatingCoins == 0 = Left $ "There needs to be at least one floating output coin to receive excess input quantity" <> show summary.quantityBalance
+    | summary.numInputs > config.maxNumInputs = Left $ ITR_Other $ "More than the maximum number of inputs"
+    | summary.numOutputs > config.maxNumOutputs = Left $ ITR_Other $ "More than the maximum number of outputs"
+    | DA.Text.length transfer.payload > config.maxPayloadLength = Left $ ITR_Other $ "Payload length is above limit"
+    | summary.quantityBalance < 0.0 = Left $ ITR_InsufficientFunds with missingQuantity = summary.quantityBalance * (-1.0)
+    | summary.quantityBalance /= 0.0 && summary.numFloatingCoins == 0 = Left $ ITR_Other $ "There needs to be at least one floating output coin to receive excess input quantity" <> show summary.quantityBalance
     | otherwise = Right ()
 
 miningRoundIsOpen: OpenMiningRound -> Update ()
@@ -565,7 +570,7 @@ executeTransfer coinRulesCid context config0 svc t = do
   case checkTransferConstraints t summary0 config of
     Left err -> throw (InvalidTransfer err)
     Right _ -> pure ()
-  
+
   -- consume inputs only after all assertions have been checked
   _ <- consumeInputs coinRulesCid context svc t.sender t.inputs
   -- distribute floating outputs

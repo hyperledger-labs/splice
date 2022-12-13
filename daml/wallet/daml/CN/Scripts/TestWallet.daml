@@ -394,7 +394,7 @@ testInsufficientFundsBatchSubscriptions = script do
 
 
 
-  let payData = SubscriptionPayData with 
+  let payData = SubscriptionPayData with
         paymentInterval = days 28
         paymentDuration = days 1
         collectionDuration = minutes 5
@@ -417,7 +417,7 @@ testInsufficientFundsBatchSubscriptions = script do
     operations = [CO_SubscriptionAcceptAndMakeInitialPayment subscriptionRequestCid]
     context
 
-  outcomes === [COO_Error "Input to output+fee quantity balance -5.23 < 0"]
+  outcomes === [COO_Error (ITR_InsufficientFunds (5.23))]
 
   coin <- tap app alice 15.0
   outcomes <- submitUser alice.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
@@ -437,7 +437,7 @@ testInsufficientFundsBatchSubscriptions = script do
     inputs = [API.InputCoin $ toInterfaceContractId coin]
     operations = [CO_SubscriptionMakePayment subscriptionIdleStateCid]
     context
-  outcomes === [COO_Error "Input to output+fee quantity balance -5.23 < 0"]
+  outcomes === [COO_Error (ITR_InsufficientFunds (5.23))]
 
   coin <- tap app alice 15.0
   outcomes <- submitUser alice.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
@@ -449,7 +449,7 @@ testInsufficientFundsBatchSubscriptions = script do
     _ -> abort $ "Expected subscription payment to succeed but got " <> show outcomes
   pure ()
 
-withError : CanAbort m => [CoinOperationOutcome] -> (Text -> m a) -> m a
+withError : CanAbort m => [CoinOperationOutcome] -> (InvalidTransferReason -> m a) -> m a
 withError outcomes f = case outcomes of
   [COO_Error e] -> f e
   _ -> abort $ "Expected COO_Error but got " <> show outcomes
