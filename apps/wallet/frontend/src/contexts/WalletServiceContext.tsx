@@ -71,7 +71,8 @@ export interface WalletClient {
   listAcceptedTransferOffers: () => Promise<ListAcceptedTransferOffersResponse>;
 
   listAppPaymentRequests: () => Promise<ListAppPaymentRequestsResponse>;
-  acceptAppPaymentRequests: (requestContractId: string) => Promise<void>;
+  acceptAppPaymentRequest: (requestContractId: string) => Promise<void>;
+  rejectAppPaymentRequest: (requestContractId: string) => Promise<void>;
 
   listSubscriptionRequests: () => Promise<ListSubscriptionRequestsResponse>;
   acceptSubscriptionRequest: (requestContractId: string) => Promise<void>;
@@ -177,9 +178,15 @@ export const WalletClientProvider: React.FC<React.PropsWithChildren<WalletProps>
             .map(c => Contract.decode(c, AppPaymentRequest)),
         };
       },
-      acceptAppPaymentRequests: async requestContractId => {
+      acceptAppPaymentRequest: async requestContractId => {
         await walletClient.acceptAppPaymentRequest(
           new v0.AcceptAppPaymentRequestRequest().setRequestContractId(requestContractId),
+          getCreds()
+        );
+      },
+      rejectAppPaymentRequest: async requestContractId => {
+        await walletClient.rejectAppPaymentRequest(
+          new v0.RejectAppPaymentRequestRequest().setRequestContractId(requestContractId),
           getCreds()
         );
       },

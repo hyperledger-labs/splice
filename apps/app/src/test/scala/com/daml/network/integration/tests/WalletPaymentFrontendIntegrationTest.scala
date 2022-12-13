@@ -11,6 +11,28 @@ class WalletPaymentFrontendIntegrationTest
 
   "A wallet UI" should {
 
+    "show app payment requests and allow users to reject them" in { implicit env =>
+      // Alice submits a directory entry request, which will create an app payment request in her wallet
+      val aliceDamlUser = aliceWallet.config.damlUser
+      val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
+      createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.CC)
+
+      withFrontEnd("alice") { implicit webDriver =>
+        browseToPaymentRequests(aliceDamlUser)
+
+        clue("Payment request is listed") {
+          eventually() {
+            findAll(className("app-requests-table-row")).toList.length shouldBe 1
+          }
+        }
+        actAndCheck("Clicking the \"Reject\" button", click on className("reject-button"))(
+          "No more payment requests are listed",
+          // this can't have been due to an "accept" because Alice doesn't have enough funds for that
+          _ => findAll(className("app-requests-table-row")).toList shouldBe empty,
+        )
+      }
+    }
+
     "show app payment requests in CC, and correctly handle unresolved party IDs" in {
       implicit env =>
         // Alice submits a directory entry request, which will create an app payment request in her wallet

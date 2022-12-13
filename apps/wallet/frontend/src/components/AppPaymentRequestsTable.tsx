@@ -76,10 +76,17 @@ const AppPaymentRequestRows: React.FC<{
   cid: string;
   coinPrice?: Decimal;
 }> = ({ request, provider, cid, coinPrice }) => {
-  const { acceptAppPaymentRequests } = useWalletClient();
+  const { acceptAppPaymentRequest, rejectAppPaymentRequest } = useWalletClient();
   const [searchParams] = useSearchParams();
   const onAccept = async () => {
-    await acceptAppPaymentRequests(cid);
+    await acceptAppPaymentRequest(cid);
+    const target = searchParams.get('redirect');
+    if (target) {
+      window.location.assign(target);
+    }
+  };
+  const onReject = async () => {
+    await rejectAppPaymentRequest(cid);
     const target = searchParams.get('redirect');
     if (target) {
       window.location.assign(target);
@@ -108,6 +115,9 @@ const AppPaymentRequestRows: React.FC<{
         <TableCell>
           <Button className="accept-button" type="submit" onClick={() => onAccept()}>
             Accept
+          </Button>
+          <Button className="reject-button" type="submit" onClick={() => onReject()}>
+            Reject
           </Button>
         </TableCell>
       </TableRow>
