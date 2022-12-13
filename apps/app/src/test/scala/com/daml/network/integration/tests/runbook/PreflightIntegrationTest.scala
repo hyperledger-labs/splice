@@ -61,7 +61,6 @@ class PreflightIntegrationTest
       go to walletUiUrl
       click on "oidc-login-button"
 
-      // TODO(#1909) - use completeAuth0LoginWithAuthorization helper method
       textField(id("username")).value = user.email
       find(id("password")).foreach(_.underlying.sendKeys(user.password))
       click on name("action") // complete password prompt

@@ -12,14 +12,23 @@ const Login: React.FC<{
   testAuthConfig?: TestAuthConfig;
 }> = ({ title, authConfig, testAuthConfig }) => {
   const mainLoginPrompt = isHs256UnsafeAuthConfig(authConfig) ? (
-    <SstLoginPrompt secret={authConfig.secret} />
+    <SstLoginPrompt
+      secret={authConfig.secret}
+      audience={authConfig.token_audience}
+      scope={authConfig.token_scope}
+    />
   ) : (
     <OidcLoginPrompt />
   );
   const testLoginPrompt = testAuthConfig ? (
     <>
       <Chip label="OR" sx={{ margin: '25px 0px' }} />
-      <SstLoginPrompt title={'Use Test Auth'} secret={testAuthConfig.secret} />
+      <SstLoginPrompt
+        title="Use Test Auth"
+        secret={testAuthConfig.secret}
+        audience={testAuthConfig.token_audience}
+        scope={testAuthConfig.token_scope}
+      />
     </>
   ) : undefined;
   return (
@@ -42,7 +51,12 @@ const Login: React.FC<{
   );
 };
 
-const SstLoginPrompt: React.FC<{ title?: string; secret: string }> = ({ title, secret }) => {
+const SstLoginPrompt: React.FC<{
+  title?: string;
+  secret: string;
+  audience: string;
+  scope?: string;
+}> = ({ title, secret, audience, scope }) => {
   const [userId, setUserId] = useState<string>('');
   const { loginWithSst } = useUserState();
   return (
@@ -64,7 +78,7 @@ const SstLoginPrompt: React.FC<{ title?: string; secret: string }> = ({ title, s
         sx={{ marginTop: '15px' }}
         onClick={e => {
           e.preventDefault();
-          loginWithSst(userId, secret);
+          loginWithSst(userId, secret, audience, scope);
         }}
         id="login-button"
       >

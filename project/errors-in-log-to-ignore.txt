@@ -39,4 +39,8 @@ AuthorizationInterceptor.*Could not resolve is_deactivated status for user
 # when authenticating using an auth config that is not the first in the list.
 AuthServiceJWT.*Could not verify JWT token: The provided Algorithm doesn't match the one defined in the JWT's Header.
 
+# Ignore UNAUTHENTICATED errors logged during the invalid token rejection tests
+.*GrpcClientError: UNAUTHENTICATED/.*Request: Tap(13.37)
+
+
 # Make sure to have a trailing newline

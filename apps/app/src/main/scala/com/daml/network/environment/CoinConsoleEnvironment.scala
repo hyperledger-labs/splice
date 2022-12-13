@@ -19,7 +19,6 @@ import com.daml.network.console.{
   ValidatorAppReference,
   WalletAppBackendReference,
   WalletAppClientReference,
-  WalletAppReference,
 }
 import com.daml.network.scan.config.RemoteScanAppConfig
 import com.daml.network.svc.config.RemoteSvcAppConfig
@@ -142,7 +141,7 @@ class CoinConsoleEnvironment(
       .headOption
 
   lazy val wallets
-      : NodeReferences[WalletAppReference, WalletAppClientReference, WalletAppBackendReference] =
+      : NodeReferences[CoinAppReference, WalletAppClientReference, WalletAppBackendReference] =
     NodeReferences(
       environment.config.walletBackendsByString.keys.map(createWalletBackendReference).toSeq,
       environment.config.walletAppClients.toSeq.map(createWalletAppClientReference),

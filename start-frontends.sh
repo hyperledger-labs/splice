@@ -57,6 +57,10 @@ function start_frontend() {
     REACT_APP_AUTH_AUTHORITY=${oa_domain} \
     REACT_APP_AUTH_CLIENT_ID=${oa_clientid} \
     REACT_APP_AUTH_ALGORITHM=${algorithm} \
+    REACT_APP_AUTH_TOKEN_AUDIENCE="https://canton.network.global" \
+    REACT_APP_AUTH_TOKEN_SCOPE="daml_ledger_api" \
+    REACT_APP_TESTAUTH_TOKEN_AUDIENCE="https://canton.network.global" \
+    REACT_APP_TESTAUTH_TOKEN_SCOPE="daml_ledger_api" \
     REACT_APP_TESTAUTH_SECRET=${test_auth_secret} \
     npm start 2>&1 | tee ${LOG_DIR}/npm-${app}-${user}.log"
 }

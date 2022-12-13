@@ -10,6 +10,8 @@ import java.util.concurrent.TimeUnit
 import scala.util.Try
 
 trait SignatureVerifier {
+  protected val expectedAudience: String;
+
   def verify(token: String): Either[String, DecodedJWT] = for {
     algorithm <- getAlgorithm(token)
     verifiedToken <- Try(
@@ -17,8 +19,9 @@ trait SignatureVerifier {
         .require(algorithm)
         .build()
         .verify(token)
-    ).toEither.left.map(_.toString)
-  } yield verifiedToken
+    ).toEither.left.map(_.toString())
+    validToken <- validateAudience(verifiedToken)
+  } yield validToken
 
   private def decodeNoVerify(token: String): Either[String, DecodedJWT] =
     Try(JWT.decode(token)).toEither.left.map(_.toString);
@@ -32,9 +35,20 @@ trait SignatureVerifier {
     }
 
   protected def validateAlgorithm(algorithm: String): Either[String, Algorithm]
+  protected def validateAudience(jwt: DecodedJWT): Either[String, DecodedJWT] = {
+    if (jwt.getAudience().contains(expectedAudience)) {
+      Right(jwt)
+    } else {
+      Left(
+        s"Expected audience $expectedAudience does not match actual audience ${jwt.getAudience()}"
+      )
+    }
+  }
 }
 
-class RSAVerifier(jwksUrl: URL) extends SignatureVerifier {
+class RSAVerifier(audience: String, jwksUrl: URL) extends SignatureVerifier {
+  override val expectedAudience: String = audience;
+
   private val provider: JwkProvider = new JwkProviderBuilder(jwksUrl)
     .cached(10, 24, TimeUnit.HOURS)
     .rateLimited(10, 1, TimeUnit.MINUTES)
@@ -47,7 +61,9 @@ class RSAVerifier(jwksUrl: URL) extends SignatureVerifier {
   }
 }
 
-class HMACVerifier(secret: String) extends SignatureVerifier {
+class HMACVerifier(audience: String, secret: String) extends SignatureVerifier {
+  override val expectedAudience: String = audience;
+
   private def algorithm = Algorithm.HMAC256(secret)
   override def validateAlgorithm(algorithm: String) = algorithm match {
     case "HS256" => Right(this.algorithm)

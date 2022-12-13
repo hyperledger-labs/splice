@@ -1,12 +1,11 @@
 import {
   DirectoryClientProvider,
-  extendWithLedgerApiClaims,
+  AuthProvider,
   ScanClientProvider,
   UserProvider,
 } from 'common-frontend';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { AuthProvider } from 'react-oidc-context';
 
 import App from './App';
 import { SplitwiseClientProvider } from './contexts/SplitwiseServiceContext';
@@ -17,7 +16,7 @@ import { config } from './utils/config';
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 root.render(
   <React.StrictMode>
-    <AuthProvider {...extendWithLedgerApiClaims(config.auth)}>
+    <AuthProvider authConf={config.auth}>
       <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
         <SplitwiseClientProvider url={config.services.splitwise.grpcUrl}>
           <DirectoryClientProvider url={config.services.directory.grpcUrl}>

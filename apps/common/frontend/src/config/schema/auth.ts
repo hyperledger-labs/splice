@@ -5,17 +5,21 @@ enum Algorithm {
   HS256UNSAFE = 'hs-256-unsafe',
 }
 
-const rs256Schema = z
-  .object({
+const tokenRequestSchema = z.object({
+  token_audience: z.string().url(), // Request an access token from IAM provider with this audience
+  token_scope: z.string().optional(), // Request an access token from IAM provider with this scope
+});
+
+const rs256Schema = tokenRequestSchema
+  .extend({
     algorithm: z.literal(Algorithm.RS256),
     authority: z.string().url(),
     client_id: z.string(),
-    redirect_uri: z.string().url(),
   })
   .strict();
 
-const hs256UnsafeSchema = z
-  .object({
+const hs256UnsafeSchema = tokenRequestSchema
+  .extend({
     algorithm: z.literal(Algorithm.HS256UNSAFE),
     secret: z.string(),
   })
@@ -38,7 +42,7 @@ const getHs256UnsafeSecret = (obj: AuthConfig): string => {
   }
 };
 
-const testAuthSchema = z.object({ secret: z.string() });
+const testAuthSchema = tokenRequestSchema.extend({ secret: z.string() });
 type TestAuthConfig = z.infer<typeof testAuthSchema>;
 
 export {

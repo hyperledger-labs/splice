@@ -17,7 +17,6 @@ import com.daml.network.console.{
   ValidatorAppReference,
   WalletAppBackendReference,
   WalletAppClientReference,
-  WalletAppReference,
 }
 import com.daml.network.integration.tests.CnsTestUtil
 import com.daml.network.integration.tests.CoinTests.{
@@ -41,7 +40,7 @@ trait WalletTestUtil extends CoinIntegrationTest with CnsTestUtil {
   /** @param expectedQuantityRanges : lower and upper bounds for coins sorted by their initial quantity in ascending order. */
   def checkWallet(
       walletParty: PartyId,
-      wallet: WalletAppReference,
+      wallet: WalletAppClientReference,
       expectedQuantityRanges: Seq[(BigDecimal, BigDecimal)],
   ): Unit = clue(s"checking wallet with $expectedQuantityRanges") {
     eventually(10.seconds, 500.millis) {

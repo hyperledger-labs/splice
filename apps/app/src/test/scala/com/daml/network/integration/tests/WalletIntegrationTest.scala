@@ -1,5 +1,6 @@
 package com.daml.network.integration.tests
 
+import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.{payment as walletCodegen}
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
@@ -30,14 +31,10 @@ class WalletIntegrationTest
       aliceWallet.tap(50.0)
       checkWallet(aliceUserParty, aliceWallet, Seq((50, 50)))
 
-      val charlieDamlUser = charlieWallet.config.damlUser
       val charlieUserParty = onboardWalletUser(charlieWallet, aliceValidator)
 
       charlieWallet.tap(50.0)
       checkWallet(charlieUserParty, charlieWallet, Seq((50, 50)))
-
-      aliceWalletBackend.setWalletContext(charlieDamlUser)
-      checkWallet(charlieUserParty, aliceWalletBackend, Seq((50, 50)))
     }
 
     "skip empty batches in the treasury service" in { implicit env =>
@@ -280,10 +277,12 @@ class WalletIntegrationTest
       import com.daml.network.wallet.v0
       import io.grpc.ManagedChannelBuilder
 
-      val aliceDamlUser = aliceWallet.config.damlUser
-      val token = JWT.create().withSubject(aliceDamlUser).sign(Algorithm.HMAC256("wrong-secret"))
+      val token = JWT
+        .create()
+        .withAudience(aliceWalletBackend.config.auth.audience)
+        .withSubject(aliceWallet.config.damlUser)
+        .sign(Algorithm.HMAC256("wrong-secret"))
 
-      // using grpc client directly rather than console refs, as token handling isn't threaded through to console command layer (yet)
       val channel =
         ManagedChannelBuilder
           .forAddress("localhost", aliceWalletBackend.config.adminApi.port.unwrap)
@@ -299,9 +298,39 @@ class WalletIntegrationTest
         client.tap(new v0.TapRequest("10.0"))
       }
 
-      assert(
-        error.getStatus.getCode.value == com.google.rpc.Code.UNAUTHENTICATED.getNumber
-      )
+      error.getStatus.getCode.value shouldBe com.google.rpc.Code.UNAUTHENTICATED.getNumber
+
+      channel.shutdown() // to avoid error about improperly shut down channel
+    }
+
+    "rejects HS256 JWTs with invalid audiences" in { implicit env =>
+      import com.auth0.jwt.JWT
+      import com.daml.network.auth.JwtCallCredential
+      import com.daml.network.wallet.v0
+      import io.grpc.ManagedChannelBuilder
+
+      val token = JWT
+        .create()
+        .withAudience("wrong-audience")
+        .withSubject(aliceWallet.config.damlUser)
+        .sign(AuthUtil.testSignatureAlgorithm)
+
+      val channel =
+        ManagedChannelBuilder
+          .forAddress("localhost", aliceWalletBackend.config.adminApi.port.unwrap)
+          .usePlaintext()
+          .build()
+
+      val client =
+        v0.WalletServiceGrpc
+          .blockingStub(channel)
+          .withCallCredentials(new JwtCallCredential(token))
+
+      val error = intercept[io.grpc.StatusRuntimeException] {
+        client.tap(new v0.TapRequest("10.0"))
+      }
+
+      error.getStatus.getCode.value shouldBe com.google.rpc.Code.UNAUTHENTICATED.getNumber
 
       channel.shutdown() // to avoid error about improperly shut down channel
     }

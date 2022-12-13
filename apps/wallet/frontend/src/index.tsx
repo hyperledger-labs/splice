@@ -1,9 +1,9 @@
 import { DirectoryClientProvider, ScanClientProvider, UserProvider } from 'common-frontend';
+import { AuthProvider } from 'common-frontend';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 
 import App from './App';
-import AuthProvider from './components/AuthProvider';
 import { ValidatorClientProvider } from './contexts/ValidatorServiceContext';
 import { WalletClientProvider } from './contexts/WalletServiceContext';
 import './index.css';
@@ -13,7 +13,7 @@ import { config } from './utils/config';
 const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement);
 root.render(
   <React.StrictMode>
-    <AuthProvider>
+    <AuthProvider authConf={config.auth}>
       <UserProvider authConf={config.auth} testAuthConf={config.testAuth}>
         <WalletClientProvider url={config.services.wallet.grpcUrl}>
           <ValidatorClientProvider url={config.services.validator.grpcUrl}>

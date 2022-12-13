@@ -8,12 +8,7 @@ import {
   isHs256UnsafeAuthConfig,
   TestAuthConfig,
 } from '../config/schema';
-import {
-  generateLedgerApiToken,
-  generateToken,
-  isHs256UnsafeToken,
-  tryDecodeTokenSub,
-} from '../utils/auth';
+import { generateToken, isHs256UnsafeToken, tryDecodeTokenSub } from '../utils/auth';
 
 interface UserState {
   // undefined when not logged in
@@ -30,7 +25,7 @@ interface UserState {
   // we expose an external callback to update the User store's internal state after login happens
   updateStatus: (status: UserStatusResponse) => void;
 
-  loginWithSst: (id: string, secret: string) => void;
+  loginWithSst: (id: string, secret: string, audience: string, scope?: string) => void;
   loginWithOidc: () => void;
   logout: () => void;
 }
@@ -54,7 +49,7 @@ export const UserProvider: React.FC<{
   authConf: AuthConfig;
   testAuthConf?: TestAuthConfig;
   useLedgerApiTokens?: boolean;
-}> = ({ children, authConf, testAuthConf, useLedgerApiTokens }) => {
+}> = ({ children, authConf, testAuthConf }) => {
   // Two user authentication methods are supported:
   //   - sst: Self-Signed Tokens based on a given user ID
   //   - oidc: OpenID Connect logins based on OAuth2.0
@@ -73,15 +68,15 @@ export const UserProvider: React.FC<{
     (auth?.isAuthenticated || isHs256UnsafeToken(userAccessToken));
 
   const loginWithSst = useCallback(
-    async (userId: string, secret: string) => {
+    async (userId: string, secret: string, audience: string, scope?: string) => {
       setUserId(userId);
-      const token = await (useLedgerApiTokens
-        ? generateLedgerApiToken(userId, secret)
-        : generateToken(userId, secret));
+
+      const token = await generateToken(userId, secret, audience, scope);
+
       setUserAccessToken(token);
       window.sessionStorage.setItem(SESSION_STORAGE_KEY, userId);
     },
-    [useLedgerApiTokens]
+    []
   );
 
   const loginWithOidc = () => {
@@ -94,39 +89,30 @@ export const UserProvider: React.FC<{
 
   useEffect(() => {
     async function f(user: User) {
-      const { access_token, id_token } = user;
-
-      // If we did't request a specific audience or scope, auth0 gives us an
-      // access token that is opaque, i.e., it has an invalid jwt payload and
-      // we can't use it for auth against our backends. We must use the ID
-      // token then, which we hopefully receive and which hopefully has a valid
-      // jwt payload. Auth is great!
+      const { access_token } = user;
       const access_token_sub = tryDecodeTokenSub(access_token);
-      const id_token_sub = tryDecodeTokenSub(id_token);
 
       if (access_token_sub) {
         setUserId(access_token_sub);
         setUserAccessToken(access_token);
-      } else if (id_token_sub) {
-        setUserId(id_token_sub);
-        setUserAccessToken(id_token);
       } else {
         console.warn('WARNING: Got no usable token from auth provider.');
       }
     }
+
     if (auth?.isAuthenticated && auth.user) {
       f(auth.user);
     } else if (authMethod === 'sst') {
       const storedUserId = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
       const secret = getHs256UnsafeSecret(authConf);
       if (storedUserId) {
-        loginWithSst(storedUserId, secret);
+        loginWithSst(storedUserId, secret, authConf.token_audience, authConf.token_scope);
       }
     } else if (testAuthConf) {
       const storedUserId = window.sessionStorage.getItem(SESSION_STORAGE_KEY);
       const secret = testAuthConf.secret;
       if (storedUserId) {
-        loginWithSst(storedUserId, secret);
+        loginWithSst(storedUserId, secret, authConf.token_audience, authConf.token_scope);
       }
     }
   }, [auth, authConf, authMethod, loginWithSst, testAuthConf]);

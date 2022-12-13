@@ -120,8 +120,8 @@ class WalletApp(
     } yield {
 
       val verifier: SignatureVerifier = config.auth match {
-        case AuthConfig.Hs256Unsafe(secret) => new HMACVerifier(secret)
-        case AuthConfig.Rs256(jwksUrl) => new RSAVerifier(jwksUrl)
+        case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
+        case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
       }
 
       adminServerRegistry

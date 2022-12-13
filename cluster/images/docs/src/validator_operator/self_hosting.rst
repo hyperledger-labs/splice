@@ -244,6 +244,7 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
 
     auth {
       algorithm = "rs-256"
+      audience = "https://canton.network.global"
       jwks-url = "<AUTH0_DOMAIN_URL>"
     }
 

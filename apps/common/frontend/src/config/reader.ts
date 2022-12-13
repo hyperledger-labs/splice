@@ -13,9 +13,12 @@ const ENV_AUTH_ALGORITHM = process.env.REACT_APP_AUTH_ALGORITHM;
 const ENV_AUTH_SECRET = process.env.REACT_APP_AUTH_SECRET;
 const ENV_AUTH_AUTHORITY = process.env.REACT_APP_AUTH_AUTHORITY;
 const ENV_AUTH_CLIENT_ID = process.env.REACT_APP_AUTH_CLIENT_ID;
-const ENV_AUTH_REDIRECT_URI = process.env.REACT_APP_AUTH_REDIRECT_URI;
+const ENV_AUTH_TOKEN_AUDIENCE = process.env.REACT_APP_AUTH_TOKEN_AUDIENCE;
+const ENV_AUTH_TOKEN_SCOPE = process.env.REACT_APP_AUTH_TOKEN_SCOPE;
 
 const ENV_TESTAUTH_SECRET = process.env.REACT_APP_TESTAUTH_SECRET;
+const ENV_TESTAUTH_TOKEN_AUDIENCE = process.env.REACT_APP_TESTAUTH_TOKEN_AUDIENCE;
+const ENV_TESTAUTH_TOKEN_SCOPE = process.env.REACT_APP_TESTAUTH_TOKEN_SCOPE;
 
 const ENV_SERVICE_WALLET_GRPC_URL = process.env.REACT_APP_SERVICE_WALLET_GRPC_URL;
 const ENV_SERVICE_WALLET_UI_URL = process.env.REACT_APP_SERVICE_WALLET_UI_URL;
@@ -26,19 +29,17 @@ const ENV_SERVICE_LEDGER_API_GRPC_URL = process.env.REACT_APP_SERVICE_LEDGER_API
 const loadRs256Config = (externalConf: z.infer<typeof authSchema>, algorithm: Algorithm.RS256) => {
   let authority = ENV_AUTH_AUTHORITY;
   let client_id = ENV_AUTH_CLIENT_ID;
-  let redirect_uri = ENV_AUTH_REDIRECT_URI;
+
+  let token_audience = ENV_AUTH_TOKEN_AUDIENCE || externalConf.token_audience;
+  let token_scope = ENV_AUTH_TOKEN_SCOPE || externalConf.token_scope;
 
   // If external config is configured the same as the override, merge fallback values
   if (externalConf.algorithm === algorithm) {
     authority = authority || externalConf.authority;
     client_id = client_id || externalConf.client_id;
-    redirect_uri = redirect_uri || externalConf.redirect_uri;
   }
 
-  // ultimate redirect_uri fallback if not defined from either env nor external
-  redirect_uri = redirect_uri || window.location.origin;
-
-  return { algorithm, authority, client_id, redirect_uri };
+  return { algorithm, authority, client_id, token_audience, token_scope };
 };
 
 const loadHs256UnsafeConfig = (
@@ -46,13 +47,15 @@ const loadHs256UnsafeConfig = (
   algorithm: Algorithm.HS256UNSAFE
 ) => {
   let secret = ENV_AUTH_SECRET;
+  let token_audience = ENV_AUTH_TOKEN_AUDIENCE || externalConf.token_audience;
+  let token_scope = ENV_AUTH_TOKEN_SCOPE || externalConf.token_scope;
 
   // If external config is configured the same as the override, merge fallback values
   if (externalConf.algorithm === algorithm) {
     secret = secret || externalConf.secret;
   }
 
-  return { algorithm, secret };
+  return { algorithm, secret, token_audience, token_scope };
 };
 
 const loadAuthConfig = () => {
@@ -71,9 +74,11 @@ const loadAuthConfig = () => {
 
 const loadTestAuthConfig = () => {
   const externalTestAuthConfig = externalConfig.testAuth;
+  const token_audience = ENV_TESTAUTH_TOKEN_AUDIENCE || externalTestAuthConfig?.token_audience;
+  const token_scope = ENV_TESTAUTH_TOKEN_SCOPE || externalTestAuthConfig?.token_scope;
 
   if (ENV_TESTAUTH_SECRET) {
-    return { secret: ENV_TESTAUTH_SECRET };
+    return { secret: ENV_TESTAUTH_SECRET, token_audience, token_scope };
   } else {
     return externalTestAuthConfig;
   }

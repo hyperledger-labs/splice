@@ -19,7 +19,10 @@ class WalletAuth0FrontendIntegrationTest extends FrontendIntegrationTest("random
           walletConfig
             .focus(_.auth)
             .replace(
-              Rs256(new URL("https://canton-network-test.us.auth0.com/.well-known/jwks.json"))
+              Rs256(
+                "https://canton.network.global",
+                new URL("https://canton-network-test.us.auth0.com/.well-known/jwks.json"),
+              )
             )
         )(coinConfig)
       )

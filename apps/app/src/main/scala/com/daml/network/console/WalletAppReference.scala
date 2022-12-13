@@ -20,14 +20,23 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
-import java.util.concurrent.atomic.AtomicReference
-
-abstract class WalletAppReference(
+class WalletAppClientReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
     override val name: String,
-) extends CoinAppReference {
+    override val config: WalletAppClientConfig,
+) extends CoinAppReference
+    with GrpcRemoteInstanceReference
+    with BaseInspection[ParticipantNode] {
 
-  protected def token: String
+  override protected val instanceType = "Wallet user"
+
+  private def token: String = {
+    AuthUtil.testTokenBearer(
+      audience = AuthUtil.testAudience,
+      user = config.damlUser,
+    )
+  }
+
   private def callCredentials = Some(new JwtCallCredential(token))
 
   @Help.Summary("List all coins associated with the configured user")
@@ -317,65 +326,28 @@ abstract class WalletAppReference(
     }
 }
 
-class WalletAppClientReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
-    name: String,
-    override val config: WalletAppClientConfig,
-) extends WalletAppReference(consoleEnvironment, name)
-    with GrpcRemoteInstanceReference
-    with BaseInspection[ParticipantNode] {
-
-  override protected val instanceType = "Wallet user"
-
-  override def token: String = {
-    AuthUtil.testTokenBearer(
-      audience = AuthUtil.audience(config.adminApi.address, "wallet"),
-      user = config.damlUser,
-    )
-  }
-}
-
 /** Single local Wallet app reference. Defines the console commands that can be run against a local Wallet
   * app reference.
   */
 class WalletAppBackendReference(
-    override val consoleEnvironment: CoinConsoleEnvironment,
-    name: String,
-) extends WalletAppReference(consoleEnvironment, name)
+    override val coinConsoleEnvironment: CoinConsoleEnvironment,
+    override val name: String,
+) extends CoinAppReference
     with LocalCoinAppReference
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Wallet"
 
-  val tokenRef: AtomicReference[Option[String]] = new AtomicReference(None)
-
-  override def token: String = {
-    tokenRef.get match {
-      case Some(t) => t
-      case None =>
-        throw new Exception("Token not defined! Set using \".setWalletContext\" command.")
-    }
-  }
-
-  protected val nodes = consoleEnvironment.environment.wallets
+  protected val nodes = coinConsoleEnvironment.environment.wallets
 
   @Help.Summary("Return wallet app backend config")
   def config: WalletAppBackendConfig =
-    consoleEnvironment.environment.config.walletBackendsByString(name)
-
-  @Help.Summary("Set wallet context")
-  def setWalletContext(userId: String): Unit = {
-    val token = AuthUtil.testTokenBearer(
-      audience = AuthUtil.audience(config.adminApi.address, "wallet"),
-      user = userId,
-    )
-    tokenRef.set(Some(token))
-  }
+    coinConsoleEnvironment.environment.config.walletBackendsByString(name)
 
   /** Remote participant this wallet app is configured to interact with. */
   lazy val remoteParticipant =
     new CoinRemoteParticipantReference(
-      consoleEnvironment,
+      coinConsoleEnvironment,
       s"remote participant for `$name``",
       name,
       config.remoteParticipant.getRemoteParticipantConfig(),
@@ -384,7 +356,7 @@ class WalletAppBackendReference(
   /** Remote participant this wallet app is configured to interact with. Uses admin tokens to bypass auth. */
   lazy val remoteParticipantWithAdminToken =
     new CoinRemoteParticipantReference(
-      consoleEnvironment,
+      coinConsoleEnvironment,
       s"remote participant for `$name`, with admin token",
       name,
       config.remoteParticipant.remoteParticipantConfigWithAdminToken,

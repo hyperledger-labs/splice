@@ -1,7 +1,6 @@
-import { extendWithLedgerApiClaims, UserProvider } from 'common-frontend';
+import { AuthProvider, UserProvider } from 'common-frontend';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { AuthProvider } from 'react-oidc-context';
 
 import App from './App';
 import './index.css';
@@ -12,7 +11,7 @@ const root = ReactDOM.createRoot(document.getElementById('root') as HTMLElement)
 root.render(
   <React.StrictMode>
     {
-      <AuthProvider {...extendWithLedgerApiClaims(config.auth)}>
+      <AuthProvider authConf={config.auth}>
         <UserProvider authConf={config.auth} testAuthConf={config.testAuth} useLedgerApiTokens>
           <App />
         </UserProvider>
