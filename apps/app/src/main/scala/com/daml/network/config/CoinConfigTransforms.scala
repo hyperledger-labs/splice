@@ -387,17 +387,12 @@ object CoinConfigTransforms {
       enableAuth: (String, CoinLedgerApiClientConfig) => CoinLedgerApiClientConfig
   ): CoinConfigTransform = { config =>
     val transforms: Seq[CoinConfigTransform] = Seq(
-      // Validator and wallet apps are ready for auth:
-      // - all of their ledger API commands are submitted by the party associated with the app service user
-      // - they only read data for parties for which their service user has readAd rights
-      // - they don't use admin endpoints unless their service user has admin rights (validator app only)
       updateAllValidatorConfigs_(c => {
         c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.damlUser, _))
       }),
       updateAllWalletAppBackendConfigs_(c => {
         c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.serviceUser, _))
       }),
-      // Other apps may not be ready for auth
       updateSvcAppConfig(c => {
         c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.damlUser, _))
       }),
