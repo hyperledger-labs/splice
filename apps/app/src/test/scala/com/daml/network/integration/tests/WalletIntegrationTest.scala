@@ -233,18 +233,20 @@ class WalletIntegrationTest
           )._2
         eventually()(aliceWallet.listAppPaymentRequests() should have size 1)
 
-        val cancelF = Future(aliceWallet.rejectAppPaymentRequest(request))
+        val rejectF = Future(aliceWallet.rejectAppPaymentRequest(request))
 
-        val acceptedF = loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
-          // to simulate contention, accept the payment request immediately after rejecting it
-          // that the activeness lookup on the payment request still goes through but the lookup inside the ledger fails.
-          // this leads to a retry..
-          Future(aliceWallet.acceptAppPaymentRequest(request).discard)
-            // that fails on the second execution
-            .recover { case _: CommandFailure =>
-              // need to recover as logs are only checked for successful futures
-              ()
-            },
+        loggerFactory.assertLogsSeq(SuppressionRule.LevelAndAbove(Level.INFO))(
+          {
+            // to simulate contention, accept the payment request immediately after rejecting it
+            // that the activeness lookup on the payment request still goes through but the lookup inside the ledger fails.
+            // this leads to a retry..
+            val _ =
+              try aliceWallet.acceptAppPaymentRequest(request)
+              catch { case _: CommandFailure => () }
+            // Execute a successful tap here so that we see the recovery of the coin-operation batch executor.
+            // Without that one, the shutdown would initiate before recovery starts.
+            aliceWallet.tap(666)
+          },
           entries => {
             forAtLeast(1, entries)( // however, before failing, we see one retry in the logs
               _.message should include(
@@ -259,14 +261,10 @@ class WalletIntegrationTest
           },
         )
 
-        // eventually, the cancel goes through
-        cancelF.futureValue
+        // eventually, the rejection goes through
+        rejectF.futureValue
         eventually()(aliceWallet.listAppPaymentRequests() shouldBe empty)
-
-        // such that on the retry, the acceptance fails on the activeness check.
-        acceptedF.futureValue
-        checkWallet(alice, aliceWallet, Seq((10, 10)))
-
+        checkWallet(alice, aliceWallet, Seq((10, 10), (666, 666)))
       }
     }
 
