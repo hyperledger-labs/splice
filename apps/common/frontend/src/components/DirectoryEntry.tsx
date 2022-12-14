@@ -1,5 +1,4 @@
-import { LookupEntryByPartyRequest } from 'common-protobuf/com/daml/network/directory/v0/directory_service_pb';
-import { RpcError, StatusCode } from 'grpc-web';
+import { ApiException } from 'common-openapi';
 import React, { useState, useEffect } from 'react';
 
 import Tooltip from '@mui/material/Tooltip';
@@ -21,18 +20,17 @@ const DirectoryEntry: React.FC<{ partyId: string; noCopy?: boolean }> = ({ party
   const [entry, setParty] = useState<Entry | undefined>(undefined); // undefined state represents the directory lookup still being pending
   useEffect(() => {
     const getEntry = async () => {
-      const req = new LookupEntryByPartyRequest().setUser(partyId);
       try {
-        const value = await directoryClient.lookupEntryByParty(req, undefined);
-        const entry = value.getEntry();
+        const value = await directoryClient.lookupEntryByParty(partyId);
+        const entry = value.entry;
         if (entry === undefined) {
           throw new Error('directory lookup unexpectedly returned undefined');
         }
-        const decoded = Contract.decode(entry, damlDirectoryEntry).payload;
+        const decoded = Contract.decodeOpenAPI(entry, damlDirectoryEntry).payload;
         setParty({ user: partyId, entry: decoded });
       } catch (e) {
-        if (e instanceof RpcError) {
-          if (e.code === StatusCode.NOT_FOUND) {
+        if (e instanceof Error) {
+          if ((e as ApiException<undefined>).code === 404) {
             setParty({ user: partyId, entry: undefined });
             return;
           }

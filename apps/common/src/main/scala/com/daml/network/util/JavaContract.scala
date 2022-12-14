@@ -3,7 +3,9 @@
 
 package com.daml.network.util
 
+import cats.syntax.either.*
 import com.daml.ledger.api.v1.{value => scalaValue}
+import com.daml.ledger.api.validation.NoLoggingValueValidator
 import com.daml.ledger.javaapi.data.codegen.{
   Contract => CodegenContract,
   ContractCompanion,
@@ -13,11 +15,18 @@ import com.daml.ledger.javaapi.data.codegen.{
   ValueDecoder,
 }
 import com.daml.ledger.javaapi.data.{CreatedEvent, Identifier, Template, Value}
+import com.daml.lf.data.Ref.Identifier as LfIdentifier
+import com.daml.lf.value.json.ApiCodecCompressed
+import com.daml.lf.value as lf
+import com.daml.network.http.v0.definitions as http
 import com.daml.network.v0
 import com.digitalasset.canton.ProtoDeserializationError
+import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.participant.ledger.api.client.JavaDecodeUtil
 import com.digitalasset.canton.serialization.ProtoConverter
+import com.digitalasset.canton.util.ErrorUtil
+import io.circe.parser as circe
 
 import scala.util.Try
 
@@ -32,10 +41,26 @@ final case class JavaContract[TCid <: ContractId[_], T](
     contractId: TCid,
     payload: T with DamlRecord[_],
 ) extends PrettyPrinting {
+
   def toProtoV0: v0.Contract = v0.Contract(
     templateId = Some(scalaValue.Identifier.fromJavaProto(identifier.toProto)),
     contractId = contractId.contractId,
     payload = Some(scalaValue.Record.fromJavaProto(payload.toValue.toProtoRecord)),
+  )
+
+  def toJson(implicit elc: ErrorLoggingContext): http.Contract = http.Contract(
+    templateId =
+      s"${identifier.getPackageId}:${identifier.getModuleName}:${identifier.getEntityName}",
+    contractId = contractId.contractId,
+    // TODO(#2019) Improve conversion between JSON libraries
+    // once we switched to the native JSON encoding in the Java codeegn.
+    payload = circe
+      .parse(
+        ApiCodecCompressed
+          .apiValueToJsValue(JavaContract.javaValueToLfValue(payload.toValue))
+          .compactPrint
+      )
+      .valueOr(err => ErrorUtil.invalidState(s"Failed to convert from spray to circe: $err")),
   )
 
   override def pretty: Pretty[JavaContract[TCid, T]] = {
@@ -51,6 +76,13 @@ final case class JavaContract[TCid <: ContractId[_], T](
 }
 
 object JavaContract {
+  def javaValueToLfValue(v: Value)(implicit elc: ErrorLoggingContext): lf.Value =
+    // Disabling logging and instead logging the result
+    // because LF uses a different logging library.
+    NoLoggingValueValidator
+      .validateValue(scalaValue.Value.fromJavaProto(v.toProto))
+      .valueOr(err => ErrorUtil.internalError(err))
+
   def fromProto[TCid <: ContractId[T], T <: Template](
       companion: ContractCompanion[_, TCid, T]
   )(contract: v0.Contract): Either[ProtoDeserializationError, JavaContract[TCid, T]] = {
@@ -72,6 +104,42 @@ object JavaContract {
         decoder.decode(
           Value.fromProto(scalaValue.Value.toJavaProto(scalaValue.Value().withRecord(payloadP)))
         )
+      ).toEither.left.map(ex =>
+        ProtoDeserializationError.ValueConversionError("payload", s"Failed to decode payload: $ex")
+      )
+    } yield JavaContract[TCid, T](
+      identifier = javaTemplateId,
+      contractId = contractId,
+      payload = payload,
+    )
+  }
+
+  def fromJson[TCid <: ContractId[T], T <: Template](
+      companion: ContractCompanion[_, TCid, T]
+  )(contract: http.Contract)(implicit
+      decoder: TemplateJsonDecoder
+  ): Either[ProtoDeserializationError, JavaContract[TCid, T]] = {
+    for {
+      templateId <- LfIdentifier
+        .fromString(contract.templateId)
+        .left
+        .map(err => ProtoDeserializationError.ValueConversionError("templateId", err))
+      javaTemplateId = new Identifier(
+        templateId.packageId,
+        templateId.qualifiedName.module.dottedName,
+        templateId.qualifiedName.name.dottedName,
+      )
+      _ <- Either.cond(
+        javaTemplateId == companion.TEMPLATE_ID,
+        (),
+        ProtoDeserializationError.ValueConversionError(
+          "templateId",
+          s"Actual template id $javaTemplateId does not match expected template id ${companion.TEMPLATE_ID}",
+        ),
+      )
+      contractId = companion.toContractId(new ContractId[T](contract.contractId))
+      payload <- Try(
+        decoder.decodeTemplate(companion)(contract.payload)
       ).toEither.left.map(ex =>
         ProtoDeserializationError.ValueConversionError("payload", s"Failed to decode payload: $ex")
       )

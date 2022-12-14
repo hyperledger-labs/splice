@@ -15,8 +15,8 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
-import com.daml.network.util.PrettyInstances.*
 import com.daml.network.util.HasHealth
+import com.daml.network.util.PrettyInstances.*
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore

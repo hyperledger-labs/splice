@@ -1,6 +1,7 @@
 {
   "workspaces": [
     "common/frontend-protobuf",
+    "common/frontend-openapi",
     "common/frontend",
     "directory/frontend",
     "wallet/frontend",

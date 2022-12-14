@@ -60,7 +60,11 @@ local svcDeployments(config) = [
       name: 'dir-api',
       port: 5010,
     },
-  ], proxyToGrpcWeb='dir-api'),
+    {
+      name: 'dir-http-api',
+      port: 6010,
+    },
+  ]),
 
   c.deployment(config, 'svc-app', [
     {

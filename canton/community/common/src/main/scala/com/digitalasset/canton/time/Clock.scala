@@ -22,7 +22,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, PriorityBlockingQueueUtil}
 import com.google.protobuf.empty.Empty
 
-import java.time.{Duration, Instant, Clock as JClock}
+import java.time.{Clock => JClock, Duration, Instant}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong, AtomicReference}
 import java.util.concurrent.{Callable, PriorityBlockingQueue, TimeUnit}
 import scala.annotation.tailrec

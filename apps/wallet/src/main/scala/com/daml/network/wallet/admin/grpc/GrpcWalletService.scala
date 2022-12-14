@@ -2,15 +2,15 @@ package com.daml.network.wallet.admin.grpc
 
 import com.daml.ledger.javaapi.data.Template
 import com.daml.ledger.javaapi.data.codegen.{
+  Contract => CodegenContract,
   ContractCompanion,
   ContractId,
   Update,
-  Contract as CodegenContract,
 }
 import com.daml.network.auth.AuthInterceptor
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
+import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_AcceptedAppPayment
 import com.daml.network.codegen.java.cn.wallet.install.{
   CoinOperationOutcome,
@@ -26,12 +26,12 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.{CoinUtil, Proto, JavaContract as Contract}
-import com.daml.network.v0 as networkV0
+import com.daml.network.util.{CoinUtil, JavaContract => Contract, Proto}
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.daml.network.wallet.v0.*
 import com.daml.network.wallet.{UserWalletManager, UserWalletService, v0}
+import com.daml.network.v0 as networkV0
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId

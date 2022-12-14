@@ -71,7 +71,7 @@ trait ConsoleEnvironment extends NamedLogging with FlagCloseable with NoTracing 
 
   private val tracerProvider =
     TracerProvider.Factory(environment.config.monitoring.tracing.tracer, "console")
-  private[console] val tracer: Tracer = tracerProvider.tracer
+  val tracer: Tracer = tracerProvider.tracer
 
   /** Definition of the startup order of local instances.
     * Nodes support starting up in any order however to avoid delays/warnings we opt to start in the most desirable order

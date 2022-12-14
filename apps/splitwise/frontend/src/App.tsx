@@ -9,7 +9,6 @@ import {
 } from 'common-frontend';
 import { ErrorBoundary } from 'common-frontend';
 import { useScanClient } from 'common-frontend/lib/contexts/ScanServiceContext';
-import { ListEntriesRequest } from 'common-protobuf/com/daml/network/directory/v0/directory_service_pb';
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -29,11 +28,8 @@ const App: React.FC = () => {
   const scanClient = useScanClient();
 
   const fetchDirectoryEntries = useCallback(async () => {
-    const req = new ListEntriesRequest();
-    req.setNamePrefix('');
-    req.setPageSize(50);
-    const newEntries = (await directoryClient.listEntries(req, undefined)).getEntriesList();
-    const decoded = newEntries.map(c => Contract.decode(c, DirectoryEntry));
+    const newEntries = (await directoryClient.listEntries(50)).entries;
+    const decoded = newEntries.map(c => Contract.decodeOpenAPI(c, DirectoryEntry));
     setDirectoryEntries(prev => (sameContracts(prev, decoded) ? prev : decoded));
   }, [setDirectoryEntries, directoryClient]);
 

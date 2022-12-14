@@ -1,7 +1,9 @@
-import { DirectoryServicePromiseClient } from 'common-protobuf/com/daml/network/directory/v0/directory_service_grpc_web_pb';
+import * as openapi from 'common-openapi';
+import { ServerConfiguration } from 'common-openapi';
+import { PromiseDirectoryApi } from 'common-openapi/dist/types/PromiseAPI';
 import React, { useContext } from 'react';
 
-const DirectoryContext = React.createContext<DirectoryServicePromiseClient | undefined>(undefined);
+const DirectoryContext = React.createContext<PromiseDirectoryApi | undefined>(undefined);
 
 export interface DirectoryProps {
   url: string;
@@ -11,12 +13,16 @@ export const DirectoryClientProvider: React.FC<React.PropsWithChildren<Directory
   url,
   children,
 }) => {
-  const directoryClient = new DirectoryServicePromiseClient(url, null, null);
+  const configuration = openapi.createConfiguration({
+    baseServer: new ServerConfiguration(url, {}),
+  });
+  const directoryClient = new openapi.DirectoryApi(configuration);
+
   return <DirectoryContext.Provider value={directoryClient}>{children}</DirectoryContext.Provider>;
 };
 
-export const useDirectoryClient: () => DirectoryServicePromiseClient = () => {
-  const client = useContext<DirectoryServicePromiseClient | undefined>(DirectoryContext);
+export const useDirectoryClient: () => PromiseDirectoryApi = () => {
+  const client = useContext<PromiseDirectoryApi | undefined>(DirectoryContext);
   if (!client) {
     throw new Error('Directory client not initialized');
   }

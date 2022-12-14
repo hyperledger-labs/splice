@@ -4,7 +4,6 @@ import {
   useDirectoryClient,
   useUserState,
 } from 'common-frontend';
-import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useEffect, useState } from 'react';
 
 import { DirectoryInstall, DirectoryInstallRequest } from '@daml.js/directory/lib/CN/Directory';
@@ -33,8 +32,8 @@ const Home: React.FC = () => {
 
   useEffect(() => {
     const fetchProviderParty = async () => {
-      const response = await directoryClient.getProviderPartyId(new Empty(), undefined);
-      setProviderPartyId(response.getProviderPartyId());
+      const response = await directoryClient.getProviderPartyId();
+      setProviderPartyId(response.providerPartyId);
     };
     fetchProviderParty();
   }, [directoryClient]);

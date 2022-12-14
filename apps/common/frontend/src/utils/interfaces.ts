@@ -1,3 +1,4 @@
+import { Contract as OpenAPIContract } from 'common-openapi';
 import { Value } from 'common-protobuf/com/daml/ledger/api/v1/value_pb';
 import { Contract as ProtoContract } from 'common-protobuf/com/daml/network/v0/contract_pb';
 
@@ -13,5 +14,9 @@ export const Contract = {
   decode: <T extends object, K>(c: ProtoContract, tmpl: Template<T, K>): Contract<T> => ({
     contractId: c.getContractId() as ContractId<T>,
     payload: tmpl.decodeProto(new Value().setRecord(c.getPayload()!)),
+  }),
+  decodeOpenAPI: <T extends object, K>(c: OpenAPIContract, tmpl: Template<T, K>): Contract<T> => ({
+    contractId: c.contractId as ContractId<T>,
+    payload: tmpl.decoder.runWithException(c.payload),
   }),
 };

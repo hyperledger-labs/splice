@@ -386,6 +386,8 @@ object CoinConfig {
 
     implicit val automationConfig: ConfigReader[AutomationConfig] =
       deriveReader[AutomationConfig]
+    implicit val coinHttpClientConfigReader: ConfigReader[CoinHttpClientConfig] =
+      deriveReader[CoinHttpClientConfig]
     implicit val coinLedgerApiClientConfigReader: ConfigReader[CoinLedgerApiClientConfig] =
       deriveReader[CoinLedgerApiClientConfig]
     implicit val coinRemoteParticipantConfigReader: ConfigReader[CoinRemoteParticipantConfig] =
@@ -460,6 +462,8 @@ object CoinConfig {
 
     implicit val automationConfig: ConfigWriter[AutomationConfig] =
       deriveWriter[AutomationConfig]
+    implicit val coinHttpClientConfigWriter: ConfigWriter[CoinHttpClientConfig] =
+      deriveWriter[CoinHttpClientConfig]
     implicit val coinLedgerApiClientConfigWriter: ConfigWriter[CoinLedgerApiClientConfig] =
       deriveWriter[CoinLedgerApiClientConfig]
     implicit val coinRemoteParticipantConfigWriter: ConfigWriter[CoinRemoteParticipantConfig] =

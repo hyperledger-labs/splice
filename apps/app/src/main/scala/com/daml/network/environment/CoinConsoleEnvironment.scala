@@ -2,6 +2,7 @@ package com.daml.network.environment
 
 import com.daml.network.console.{
   CoinAppReference,
+  ConsoleHttpCommandRunner,
   DirectoryAppReference,
   LocalCoinAppReference,
   LocalDirectoryAppReference,
@@ -22,6 +23,7 @@ import com.daml.network.console.{
 }
 import com.daml.network.scan.config.RemoteScanAppConfig
 import com.daml.network.svc.config.RemoteSvcAppConfig
+import com.daml.network.util.ResourceTemplateDecoder
 import com.daml.network.validator.config.RemoteValidatorAppConfig
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
@@ -52,6 +54,17 @@ class CoinConsoleEnvironment(
       new ConsoleGrpcAdminCommandRunner(_),
 ) extends ConsoleEnvironment // TODO(#736): Generalize this.
     {
+
+  val packageSignatures = ResourceTemplateDecoder.loadPackageSignaturesFromResources(
+    Seq("dar/directory-service-0.1.0.dar")
+  )
+  val templateDecoder = new ResourceTemplateDecoder(packageSignatures, environment.loggerFactory)
+
+  lazy val httpCommandRunner: ConsoleHttpCommandRunner = new ConsoleHttpCommandRunner(
+    environment,
+    environment.config.parameters.timeouts.processing,
+    environment.config.parameters.timeouts.console,
+  )(this.tracer, templateDecoder)
 
   override type Env = CoinEnvironmentImpl
   override type DomainLocalRef = CommunityLocalDomainReference
@@ -109,10 +122,11 @@ class CoinConsoleEnvironment(
   )
 
   /* Local apps that are (in the target deployment) operated by a third party */
-  lazy val appsHostedByThirdParty = NodeReferences(
-    splitwises.local,
-    splitwises.remote,
-  )
+  lazy val appsHostedByThirdParty =
+    NodeReferences[SplitwiseAppReference, RemoteSplitwiseAppReference, LocalSplitwiseAppReference](
+      splitwises.local,
+      splitwises.remote,
+    )
 
   lazy val validators: NodeReferences[
     ValidatorAppReference,

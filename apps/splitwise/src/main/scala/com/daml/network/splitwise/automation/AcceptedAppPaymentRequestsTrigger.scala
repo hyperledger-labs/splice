@@ -2,8 +2,8 @@ package com.daml.network.splitwise.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{OnCreateTrigger, TriggerContext}
-import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
+import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.store.SplitwiseStore

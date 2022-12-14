@@ -1,7 +1,3 @@
-import {
-  ListEntriesRequest,
-  LookupEntryByNameRequest,
-} from 'common-protobuf/com/daml/network/directory/v0/directory_service_pb';
 import React from 'react';
 
 import { Autocomplete, StandardTextFieldProps, TextField } from '@mui/material';
@@ -23,11 +19,8 @@ const DirectoryField: React.FC<Props> = (props: Props) => {
     if (reason === 'reset') {
       return;
     }
-    const request = new ListEntriesRequest();
-    request.setNamePrefix(newValue);
-    request.setPageSize(20);
-    const entries = (await directoryClient.listEntries(request, undefined)).getEntriesList();
-    const decoded = entries.map(c => Contract.decode(c, DirectoryEntry));
+    const entries = (await directoryClient.listEntries(20, newValue)).entries;
+    const decoded = entries.map(c => Contract.decodeOpenAPI(c, DirectoryEntry));
     setOptions(decoded);
     await setPartyFromInput(newValue);
   };
@@ -44,16 +37,14 @@ const DirectoryField: React.FC<Props> = (props: Props) => {
   };
 
   const setPartyFromInput = async (input: string) => {
-    const req = new LookupEntryByNameRequest();
-    req.setName(input);
     try {
-      const entry = (await directoryClient.lookupEntryByName(req)).getEntry();
+      const entry = (await directoryClient.lookupEntryByName(input)).entry;
       if (entry === undefined) {
         // Could not lookup cns name - assume input is a party ID
         setPartyAndNotify(input);
       } else {
         // Lookup succeeded - the user typed a valid cns entry - use the resolved party ID
-        setPartyAndNotify(Contract.decode(entry, DirectoryEntry).payload.user);
+        setPartyAndNotify(Contract.decodeOpenAPI(entry, DirectoryEntry).payload.user);
       }
     } catch {
       // Input is not a known cns name - assume it is as a party ID

@@ -414,6 +414,10 @@
                            {
                               "containerPort": 5010,
                               "name": "dir-api"
+                           },
+                           {
+                              "containerPort": 6010,
+                              "name": "dir-http-api"
                            }
                         ],
                         "resources": {
@@ -425,39 +429,6 @@
                            }
                         },
                         "volumeMounts": [ ]
-                     },
-                     {
-                        "env": [
-                           {
-                              "name": "GRPC_ADDRESS",
-                              "value": "127.0.0.1"
-                           },
-                           {
-                              "name": "GRPC_PORT",
-                              "value": "5010"
-                           },
-                           {
-                              "name": "GRPC_WEB_PORT",
-                              "value": "6010"
-                           }
-                        ],
-                        "image": "region-docker.pkg.dev/project/repo/envoy-proxy:tag",
-                        "imagePullPolicy": "Always",
-                        "name": "envoy-proxy",
-                        "ports": [
-                           {
-                              "containerPort": 6010,
-                              "name": "dir-api-gw"
-                           }
-                        ],
-                        "resources": {
-                           "limits": {
-                              "memory": "256Mi"
-                           },
-                           "requests": {
-                              "memory": "256Mi"
-                           }
-                        }
                      }
                   ],
                   "volumes": [ ]
@@ -480,7 +451,7 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "dir-api-gw",
+                  "name": "dir-http-api",
                   "port": 6010,
                   "protocol": "TCP"
                }
@@ -1740,7 +1711,7 @@
       {
          "apiVersion": "v1",
          "data": {
-            "manifest.json": "{\n  \"ports\": [\n    {\n      \"name\": \"http\",\n      \"port\": 80,\n      \"service\": \"docs\"\n    },\n    {\n      \"name\": \"https\",\n      \"port\": 443,\n      \"service\": \"docs\"\n    },\n    {\n      \"name\": \"cd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"canton-domain\"\n    },\n    {\n      \"name\": \"cd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"canton-domain\"\n    },\n    {\n      \"name\": \"cp-adm-api\",\n      \"port\": 5002,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"name\": \"cp-lg-api\",\n      \"port\": 5001,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"name\": \"dir-api\",\n      \"port\": 5010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"dir-api-gw\",\n      \"port\": 6010,\n      \"proxyToGrpc\": 5010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"svc-app-adm-api\",\n      \"port\": 5005,\n      \"service\": \"svc-app\"\n    },\n    {\n      \"name\": \"scan-api\",\n      \"port\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"name\": \"scan-api-gw\",\n      \"port\": 6012,\n      \"proxyToGrpc\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"name\": \"val1-adm-api\",\n      \"port\": 5102,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"name\": \"val1-lg-api\",\n      \"port\": 5101,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"name\": \"val1-lg-api-gw\",\n      \"port\": 6101,\n      \"proxyToGrpc\": 5101,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"name\": \"val1-val-api\",\n      \"port\": 5103,\n      \"service\": \"validator1-validator-app\"\n    },\n    {\n      \"name\": \"val1-val-api-gw\",\n      \"port\": 6103,\n      \"proxyToGrpc\": 5103,\n      \"service\": \"validator1-validator-app\"\n    },\n    {\n      \"name\": \"val1-wal-api\",\n      \"port\": 5104,\n      \"service\": \"validator1-wallet-app\"\n    },\n    {\n      \"name\": \"val1-wal-api-gw\",\n      \"port\": 6104,\n      \"proxyToGrpc\": 5104,\n      \"service\": \"validator1-wallet-app\"\n    },\n    {\n      \"name\": \"sw-adm-api\",\n      \"port\": 5202,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"name\": \"sw-lg-api\",\n      \"port\": 5201,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"name\": \"sw-lg-api-gw\",\n      \"port\": 6201,\n      \"proxyToGrpc\": 5201,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"name\": \"sw-val-api\",\n      \"port\": 5203,\n      \"service\": \"splitwise-validator-app\"\n    },\n    {\n      \"name\": \"sw-api\",\n      \"port\": 5213,\n      \"service\": \"splitwise-app\"\n    },\n    {\n      \"name\": \"sw-api-gw\",\n      \"port\": 6213,\n      \"proxyToGrpc\": 5213,\n      \"service\": \"splitwise-app\"\n    }\n  ]\n}",
+            "manifest.json": "{\n  \"ports\": [\n    {\n      \"name\": \"http\",\n      \"port\": 80,\n      \"service\": \"docs\"\n    },\n    {\n      \"name\": \"https\",\n      \"port\": 443,\n      \"service\": \"docs\"\n    },\n    {\n      \"name\": \"cd-pub-api\",\n      \"port\": 5008,\n      \"service\": \"canton-domain\"\n    },\n    {\n      \"name\": \"cd-adm-api\",\n      \"port\": 5009,\n      \"service\": \"canton-domain\"\n    },\n    {\n      \"name\": \"cp-adm-api\",\n      \"port\": 5002,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"name\": \"cp-lg-api\",\n      \"port\": 5001,\n      \"service\": \"canton-participant\"\n    },\n    {\n      \"name\": \"dir-api\",\n      \"port\": 5010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"dir-http-api\",\n      \"port\": 6010,\n      \"service\": \"directory-app\"\n    },\n    {\n      \"name\": \"svc-app-adm-api\",\n      \"port\": 5005,\n      \"service\": \"svc-app\"\n    },\n    {\n      \"name\": \"scan-api\",\n      \"port\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"name\": \"scan-api-gw\",\n      \"port\": 6012,\n      \"proxyToGrpc\": 5012,\n      \"service\": \"scan-app\"\n    },\n    {\n      \"name\": \"val1-adm-api\",\n      \"port\": 5102,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"name\": \"val1-lg-api\",\n      \"port\": 5101,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"name\": \"val1-lg-api-gw\",\n      \"port\": 6101,\n      \"proxyToGrpc\": 5101,\n      \"service\": \"validator1-participant\"\n    },\n    {\n      \"name\": \"val1-val-api\",\n      \"port\": 5103,\n      \"service\": \"validator1-validator-app\"\n    },\n    {\n      \"name\": \"val1-val-api-gw\",\n      \"port\": 6103,\n      \"proxyToGrpc\": 5103,\n      \"service\": \"validator1-validator-app\"\n    },\n    {\n      \"name\": \"val1-wal-api\",\n      \"port\": 5104,\n      \"service\": \"validator1-wallet-app\"\n    },\n    {\n      \"name\": \"val1-wal-api-gw\",\n      \"port\": 6104,\n      \"proxyToGrpc\": 5104,\n      \"service\": \"validator1-wallet-app\"\n    },\n    {\n      \"name\": \"sw-adm-api\",\n      \"port\": 5202,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"name\": \"sw-lg-api\",\n      \"port\": 5201,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"name\": \"sw-lg-api-gw\",\n      \"port\": 6201,\n      \"proxyToGrpc\": 5201,\n      \"service\": \"splitwise-participant\"\n    },\n    {\n      \"name\": \"sw-val-api\",\n      \"port\": 5203,\n      \"service\": \"splitwise-validator-app\"\n    },\n    {\n      \"name\": \"sw-api\",\n      \"port\": 5213,\n      \"service\": \"splitwise-app\"\n    },\n    {\n      \"name\": \"sw-api-gw\",\n      \"port\": 6213,\n      \"proxyToGrpc\": 5213,\n      \"service\": \"splitwise-app\"\n    }\n  ]\n}",
             "version": "tag"
          },
          "kind": "ConfigMap",
@@ -1818,7 +1789,7 @@
                            },
                            {
                               "containerPort": 6010,
-                              "name": "dir-api-gw"
+                              "name": "dir-http-api"
                            },
                            {
                               "containerPort": 5005,
@@ -1969,7 +1940,7 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "dir-api-gw",
+                  "name": "dir-http-api",
                   "port": 6010,
                   "protocol": "TCP"
                },
@@ -2111,7 +2082,7 @@
                   "protocol": "TCP"
                },
                {
-                  "name": "dir-api-gw",
+                  "name": "dir-http-api",
                   "port": 6010,
                   "protocol": "TCP"
                },

@@ -13,6 +13,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * `testingTimeService` made protected
 * `PrettyInstances.treeOfIterable` and `PrettyInstances.prettyUidString` made public
 * pretty-printing of hex-only contract-ids shortends the contract-id using readable-hash
+* `ConsoleEnvironment.tracer` made public
 ## Misc
 * Generalization of `Environment`
 * Generalization of `MetricsFactory`

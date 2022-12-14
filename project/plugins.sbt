@@ -15,7 +15,17 @@ libraryDependencies += "com.esotericsoftware.yamlbeans" % "yamlbeans" % "1.13"
 
 libraryDependencies += "com.github.pathikrit" %% "better-files" % "3.8.0"
 
+val circeVersion = "0.14.1"
+libraryDependencies ++= Seq(
+  "io.circe" %% "circe-core",
+  "io.circe" %% "circe-generic",
+  "io.circe" %% "circe-parser",
+  "io.circe" %% "circe-optics",
+).map(_ % circeVersion)
+
 // Assembly plugin to build fat-jars
 addSbtPlugin("com.eed3si9n" % "sbt-assembly" % "0.15.0")
+
+addSbtPlugin("dev.guardrail" % "sbt-guardrail" % "0.75.1")
 
 addDependencyTreePlugin

@@ -28,6 +28,12 @@ object Dependencies {
   lazy val daml_bindings_java =
     "com.daml" % "bindings-java" % CantonDependencies.daml_libraries_version
 
+  lazy val daml_lf_value_json =
+    "com.daml" %% "lf-value-json" % CantonDependencies.daml_libraries_version
+
+  lazy val akka_http_cors =
+    "ch.megard" %% "akka-http-cors" % "1.1.3"
+
   lazy val spray_json =
     "io.spray" %% "spray-json" % "1.3.6"
 

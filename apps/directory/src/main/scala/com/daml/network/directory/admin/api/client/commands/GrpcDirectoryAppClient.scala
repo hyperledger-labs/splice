@@ -1,125 +1,120 @@
 package com.daml.network.directory.admin.api.client.commands
 
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.stream.Materializer
 import cats.syntax.either._
 import cats.syntax.traverse._
+import com.daml.network.admin.api.client.commands.HttpCommand
 import com.daml.network.codegen.java.cn.{directory => codegen}
-import com.daml.network.directory.v0
-import com.daml.network.directory.v0.DirectoryServiceGrpc.DirectoryServiceStub
-import com.daml.network.util.{JavaContract as Contract, Proto}
-import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
-import com.digitalasset.canton.serialization.ProtoConverter
+import com.daml.network.http.v0.directory as http
+import com.daml.network.util.{JavaContract as Contract, Proto, TemplateJsonDecoder}
 import com.digitalasset.canton.topology.PartyId
-import com.google.protobuf.empty.Empty
-import io.grpc.ManagedChannel
 
-import scala.concurrent.Future
+import scala.concurrent.{ExecutionContext, Future}
 
 object GrpcDirectoryAppClient {
 
-  abstract class BaseCommand[Req, Res, Result] extends GrpcAdminCommand[Req, Res, Result] {
-    override type Svc = DirectoryServiceStub
+  abstract class BaseCommand[Res, Result] extends HttpCommand[Res, Result] {
+    override type Client = http.DirectoryClient
 
-    override def createService(channel: ManagedChannel): DirectoryServiceStub =
-      v0.DirectoryServiceGrpc.stub(channel)
+    def createClient(host: String)(implicit
+        httpClient: HttpRequest => Future[HttpResponse],
+        ec: ExecutionContext,
+        mat: Materializer,
+    ): Client =
+      http.DirectoryClient(host)
   }
 
   case class ListEntries(
       namePrefix: String,
       pageSize: Int,
-  ) extends BaseCommand[
-        v0.ListEntriesRequest,
-        v0.ListEntriesResponse,
-        Seq[Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry]],
-      ] {
+  ) extends BaseCommand[http.ListEntriesResponse, Seq[
+        Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry]
+      ]] {
 
-    override def createRequest(): Either[String, v0.ListEntriesRequest] =
-      Right(v0.ListEntriesRequest(namePrefix, pageSize))
-
-    override def submitRequest(
-        service: DirectoryServiceStub,
-        request: v0.ListEntriesRequest,
-    ): Future[v0.ListEntriesResponse] = service.listEntries(request)
+    def submitRequest(client: Client) =
+      client.listEntries(Some(namePrefix), pageSize)
 
     override def handleResponse(
-        response: v0.ListEntriesResponse
+        response: http.ListEntriesResponse
+    )(implicit
+        decoder: TemplateJsonDecoder
     ): Either[String, Seq[Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry]]] =
-      response.entries
-        .traverse(entry => Contract.fromProto(codegen.DirectoryEntry.COMPANION)(entry))
-        .leftMap(_.toString)
+      response match {
+        case http.ListEntriesResponse.OK(response) =>
+          response.entries
+            .traverse(entry => Contract.fromJson(codegen.DirectoryEntry.COMPANION)(entry))
+            .leftMap(_.toString)
+      }
   }
 
   case class LookupEntryByParty(
       party: PartyId
   ) extends BaseCommand[
-        v0.LookupEntryByPartyRequest,
-        v0.LookupEntryByPartyResponse,
+        http.LookupEntryByPartyResponse,
         Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry],
       ] {
 
-    override def createRequest(): Either[String, v0.LookupEntryByPartyRequest] =
-      Right(
-        v0.LookupEntryByPartyRequest(party.toProtoPrimitive)
-      )
-
     override def submitRequest(
-        service: DirectoryServiceStub,
-        request: v0.LookupEntryByPartyRequest,
-    ): Future[v0.LookupEntryByPartyResponse] = service.lookupEntryByParty(request)
+        client: Client
+    ) = client.lookupEntryByParty(party.toProtoPrimitive)
 
     override def handleResponse(
-        response: v0.LookupEntryByPartyResponse
+        response: http.LookupEntryByPartyResponse
+    )(implicit
+        decoder: TemplateJsonDecoder
     ): Either[String, Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry]] = {
-      val r = for {
-        entryField <- ProtoConverter.required("entry", response.entry)
-        entry <- Contract.fromProto(codegen.DirectoryEntry.COMPANION)(entryField)
-      } yield entry
-      r.leftMap(_.toString)
-
+      response match {
+        case http.LookupEntryByPartyResponse.OK(response) =>
+          val r = for {
+            entry <- Contract.fromJson(codegen.DirectoryEntry.COMPANION)(response.entry)
+          } yield entry
+          r.leftMap(_.toString)
+        case http.LookupEntryByPartyResponse.NotFound =>
+          Left(s"No directory entry found for party ${party.toProtoPrimitive}")
+      }
     }
   }
 
   case class LookupEntryByName(
       name: String
   ) extends BaseCommand[
-        v0.LookupEntryByNameRequest,
-        v0.LookupEntryByNameResponse,
+        http.LookupEntryByNameResponse,
         Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry],
       ] {
 
-    override def createRequest(): Either[String, v0.LookupEntryByNameRequest] =
-      Right(
-        v0.LookupEntryByNameRequest(name)
-      )
-
     override def submitRequest(
-        service: DirectoryServiceStub,
-        request: v0.LookupEntryByNameRequest,
-    ): Future[v0.LookupEntryByNameResponse] = service.lookupEntryByName(request)
+        client: Client
+    ) = client.lookupEntryByName(name)
 
     override def handleResponse(
-        response: v0.LookupEntryByNameResponse
-    ): Either[String, Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry]] = {
-      val r = for {
-        entryField <- ProtoConverter.required("entry", response.entry)
-        entry <- Contract.fromProto(codegen.DirectoryEntry.COMPANION)(entryField)
-      } yield entry
-      r.leftMap(_.toString)
-
-    }
+        response: http.LookupEntryByNameResponse
+    )(implicit
+        decoder: TemplateJsonDecoder
+    ): Either[String, Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry]] =
+      response match {
+        case http.LookupEntryByNameResponse.OK(response) =>
+          val r = for {
+            entry <- Contract.fromJson(codegen.DirectoryEntry.COMPANION)(response.entry)
+          } yield entry
+          r.leftMap(_.toString)
+        case http.LookupEntryByNameResponse.NotFound =>
+          Left(s"No directory entry found for name $name")
+      }
   }
 
-  case class GetProviderPartyId()
-      extends BaseCommand[Empty, v0.GetProviderPartyIdResponse, PartyId] {
-    override def createRequest(): Either[String, Empty] =
-      Right(Empty())
+  case class GetProviderPartyId() extends BaseCommand[http.GetProviderPartyIdResponse, PartyId] {
 
     override def submitRequest(
-        service: DirectoryServiceStub,
-        request: Empty,
-    ): Future[v0.GetProviderPartyIdResponse] =
-      service.getProviderPartyId(request)
+        client: Client
+    ) =
+      client.getProviderPartyId()
 
-    override def handleResponse(response: v0.GetProviderPartyIdResponse): Either[String, PartyId] =
-      Proto.decode(Proto.Party)(response.providerPartyId)
+    override def handleResponse(
+        response: http.GetProviderPartyIdResponse
+    )(implicit decoder: TemplateJsonDecoder): Either[String, PartyId] = response match {
+      case http.GetProviderPartyIdResponse.OK(response) =>
+        Proto.decode(Proto.Party)(response.providerPartyId)
+    }
   }
 }

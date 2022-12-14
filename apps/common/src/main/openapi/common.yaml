@@ -1,0 +1,17 @@
+openapi: 3.0.0
+info:
+  title: A minimal OpenAPI document
+  version: 0.0.1
+paths: {}
+components:
+  schemas:
+    Contract:
+      type: object
+      properties:
+        template_id:
+          type: string
+        contract_id:
+          type: string
+        payload:
+          type: object
+      required: ["template_id", "contract_id", "payload"]

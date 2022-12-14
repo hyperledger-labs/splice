@@ -49,6 +49,7 @@ in pkgs.mkShell {
     nettools
     nix
     nodejs
+    openapi-generator-cli
     openjdk11
     protobuf3_19
     protoc-gen-grpc-web

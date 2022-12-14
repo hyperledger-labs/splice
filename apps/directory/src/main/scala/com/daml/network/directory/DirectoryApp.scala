@@ -1,21 +1,27 @@
 package com.daml.network.directory
 
 import akka.actor.ActorSystem
+import akka.http.scaladsl.Http
+import akka.http.scaladsl.model.HttpMethods
 import akka.stream.Materializer
+import ch.megard.akka.http.cors.scaladsl.CorsDirectives._
+import ch.megard.akka.http.cors.scaladsl.model.{HttpHeaderRange, HttpOriginMatcher}
+import ch.megard.akka.http.cors.scaladsl.settings.CorsSettings
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.directory.admin.grpc.GrpcDirectoryService
+import com.daml.network.directory.admin.http.HttpDirectoryHandler
 import com.daml.network.directory.automation.DirectoryAutomationService
 import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.directory.store.DirectoryStore
-import com.daml.network.directory.v0.DirectoryServiceGrpc
 import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
+import com.daml.network.http.v0.directory.DirectoryResource
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.util.HasHealth
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.config.RequireTypes.InstanceName
-import com.digitalasset.canton.lifecycle.Lifecycle
-import com.digitalasset.canton.logging.{NamedLoggerFactory, TracedLogger}
+import com.digitalasset.canton.lifecycle.{AsyncCloseable, Lifecycle}
+import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, TracedLogger}
 import com.digitalasset.canton.networking.grpc.CantonMutableHandlerRegistry
 import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
@@ -87,19 +93,50 @@ class DirectoryApp(
         loggerFactory,
         timeouts,
       )
-      grpcServer =
-        new GrpcDirectoryService(
-          store,
-          loggerFactory,
+      // TODO(#2024) Validate that this is secure.
+      settings = CorsSettings.defaultSettings
+        .withAllowGenericHttpRequests(true)
+        .withAllowedOrigins(HttpOriginMatcher.`*`)
+        .withAllowedMethods(
+          Seq(
+            HttpMethods.GET,
+            HttpMethods.PUT,
+            HttpMethods.DELETE,
+            HttpMethods.POST,
+            HttpMethods.OPTIONS,
+          )
+        )
+        .withAllowedHeaders(HttpHeaderRange.`*`)
+      routes = cors() {
+        DirectoryResource.routes(
+          new HttpDirectoryHandler(
+            store,
+            loggerFactory,
+          )
+        )
+      }
+      httpConfig = config.adminApi.clientConfig.copy(
+        // TODO(#2019) Remove once we disabled gRPC Servers completely.
+        port = config.adminApi.port + 1000
+      )
+      _ = logger.info(s"Starting http server on ${httpConfig}")
+      binding <- Http()
+        .newServerAt(
+          httpConfig.address,
+          httpConfig.port.unwrap,
+        )
+        .bind(
+          routes
         )
     } yield {
-      adminServerRegistry.addService(DirectoryServiceGrpc.bindService(grpcServer, ec)).discard
       new DirectoryApp.State(
         automation,
         storage,
         store,
         scanConnection,
+        binding,
         loggerFactory.getTracedLogger(DirectoryApp.State.getClass),
+        timeouts,
       )
     }
 
@@ -115,13 +152,17 @@ object DirectoryApp {
       storage: Storage,
       store: DirectoryStore,
       scanConnection: ScanConnection,
+      binding: Http.ServerBinding,
       logger: TracedLogger,
-  ) extends AutoCloseable
+      timeouts: ProcessingTimeout,
+  )(implicit el: ErrorLoggingContext)
+      extends AutoCloseable
       with HasHealth {
     override def isHealthy: Boolean = storage.isActive && automation.isHealthy
 
     override def close(): Unit =
       Lifecycle.close(
+        AsyncCloseable("http binding", binding.unbind(), timeouts.shutdownNetwork.unwrap),
         automation,
         storage,
         store,

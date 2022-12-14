@@ -2,6 +2,7 @@ package com.daml.network.console
 
 import com.daml.network.codegen.java.cn.wallet.{subscriptions => subsCodegen}
 import com.daml.network.codegen.java.cn.{directory => codegen}
+import com.daml.network.config.CoinHttpClientConfig
 import com.daml.network.directory.admin.api.client.commands.GrpcDirectoryAppClient
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.environment.CoinConsoleEnvironment
@@ -18,7 +19,8 @@ import com.digitalasset.canton.topology.PartyId
 abstract class DirectoryAppReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
     override val name: String,
-) extends CoinAppReference {
+) extends HttpCoinAppReference {
+
   @Help.Summary("List directory entries")
   @Help.Description(
     "Lists all directory entries whose name is prefixed with the given prefix, up to a given number of entries"
@@ -28,7 +30,7 @@ abstract class DirectoryAppReference(
       pageSize: Int,
   ): Seq[Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry]] =
     consoleEnvironment.run {
-      adminCommand(GrpcDirectoryAppClient.ListEntries(namePrefix, pageSize))
+      httpCommand(GrpcDirectoryAppClient.ListEntries(namePrefix, pageSize))
     }
 
   @Help.Summary("Lookup a directory entry by the party that registered it")
@@ -36,7 +38,7 @@ abstract class DirectoryAppReference(
       party: PartyId
   ): Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry] =
     consoleEnvironment.run {
-      adminCommand(GrpcDirectoryAppClient.LookupEntryByParty(party))
+      httpCommand(GrpcDirectoryAppClient.LookupEntryByParty(party))
     }
 
   @Help.Summary("Lookup a directory entry by its name")
@@ -44,13 +46,13 @@ abstract class DirectoryAppReference(
       name: String
   ): Contract[codegen.DirectoryEntry.ContractId, codegen.DirectoryEntry] =
     consoleEnvironment.run {
-      adminCommand(GrpcDirectoryAppClient.LookupEntryByName(name))
+      httpCommand(GrpcDirectoryAppClient.LookupEntryByName(name))
     }
 
   @Help.Summary("Get the party id of the provider operating the directory service")
   def getProviderPartyId(): PartyId =
     consoleEnvironment.run {
-      adminCommand(GrpcDirectoryAppClient.GetProviderPartyId())
+      httpCommand(GrpcDirectoryAppClient.GetProviderPartyId())
     }
 }
 
@@ -69,6 +71,14 @@ class LocalDirectoryAppReference(
   @Help.Summary("Return directory app config")
   def config: LocalDirectoryAppConfig =
     consoleEnvironment.environment.config.directoriesByString(name)
+
+  override def httpClientConfig = CoinHttpClientConfig.fromClientConfig(
+    // For local references, we assume that they are reachable on localhost.
+    // TODO (#2019) Reconsider if we want these for local refs at all and if so
+    // if we should specify a url here.
+    s"http://127.0.0.1:${config.clientAdminApi.port.unwrap + 1000}",
+    config.clientAdminApi,
+  )
 
   protected val nodes = consoleEnvironment.environment.directories
 
@@ -96,6 +106,8 @@ class RemoteDirectoryAppReference(
     name: String,
 ) extends DirectoryAppReference(consoleEnvironment, name)
     with GrpcRemoteInstanceReference {
+
+  override def httpClientConfig = config.adminApi
 
   lazy val ledgerApi = new ExternalLedgerApiClient(
     config.ledgerApi.clientConfig.address,

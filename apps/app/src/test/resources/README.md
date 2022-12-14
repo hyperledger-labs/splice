@@ -76,10 +76,12 @@ all network indices must be odd numbers.
 - `5301` is the Ledger API of Participant 3 in Canton Network 5.
 - `17309` is the Admin API of Domain 3 in Canton Network 17.
 
-## Envoy grpc-web proxy
+## Envoy grpc-web proxy and native HTTP Servers
 
-We use an envoy proxy to allow web applications to communicate with gRPC services using gRPC-web.
-A gRPC service running on port `N` is proxied to a gRPC-web server running on port `N + 1000`.
+Each app either exposes a native HTTP server or proxies the gRPC endpoint
+via envoy to gRPC-web.
+An app with a gRPC service running on port `N`
+exposes an HTTP API (gRPC-web or native) on port `N + 1000`.
 
 ## Verifying port allocation
 

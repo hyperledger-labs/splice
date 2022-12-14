@@ -1,0 +1,113 @@
+openapi: 3.0.0
+info:
+  title: A minimal OpenAPI document
+  version: 0.0.1
+tags:
+  - name: directory
+paths:
+  /entries:
+    get:
+      tags: [directory]
+      x-jvm-package: directory
+      operationId: "listEntries"
+      parameters:
+        - name: "name_prefix"
+          in: "query"
+          schema:
+            type: string
+        - name: "page_size"
+          in: "query"
+          required: true
+          schema:
+            type: integer
+            format: int32
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/ListEntriesResponse"
+  /entries/by-party/{party}:
+    get:
+      tags: [directory]
+      x-jvm-package: directory
+      operationId: "lookupEntryByParty"
+      parameters:
+        - name: "party"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupEntryByPartyResponse"
+        "404":
+          description: not_found
+  /entries/by-name/{name}:
+    get:
+      tags: [directory]
+      x-jvm-package: directory
+      operationId: "lookupEntryByName"
+      parameters:
+        - name: "name"
+          in: "path"
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/LookupEntryByNameResponse"
+        "404":
+          description: not_found
+  /provider-party-id:
+    get:
+      tags: [directory]
+      x-jvm-package: directory
+      operationId: "getProviderPartyId"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetProviderPartyIdResponse"
+components:
+  schemas:
+    ListEntriesResponse:
+      type: object
+      required: ["entries"]
+      properties:
+        entries:
+          type: array
+          # Sharing is a mess
+          # https://github.com/guardrail-dev/guardrail/issues/216
+          # https://github.com/guardrail-dev/guardrail/issues/701
+          items:
+            "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+    LookupEntryByPartyResponse:
+      type: object
+      required: ["entry"]
+      properties:
+        entry:
+          "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+    LookupEntryByNameResponse:
+      type: object
+      required: ["entry"]
+      properties:
+        entry:
+          "$ref": "../../../../common/src/main/openapi/common.yaml#/components/schemas/Contract"
+    GetProviderPartyIdResponse:
+      type: object
+      required: ["provider_party_id"]
+      properties:
+        provider_party_id:
+          type: string

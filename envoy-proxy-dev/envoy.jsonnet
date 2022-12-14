@@ -22,7 +22,6 @@ function(hostname="host.docker.internal") {
       utils.listener("bob_wallet", 6304),
       utils.listener("splitwise", 6113),
       utils.listener("scan" , 6012),
-      utils.listener("directory", 6110),
       utils.listener("alice_lapi", 6201),
       utils.listener("bob_lapi", 6301)
     ],
@@ -33,7 +32,6 @@ function(hostname="host.docker.internal") {
       cluster("bob_wallet", 5304),
       cluster("splitwise", 5113),
       cluster("scan", 5012),
-      cluster("directory", 5110),
       cluster("alice_lapi", 5201),
       cluster("bob_lapi", 5301)
     ]

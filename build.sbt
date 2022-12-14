@@ -165,6 +165,7 @@ lazy val `apps-common` =
     .enablePlugins(BuildInfoPlugin)
     .settings(
       libraryDependencies ++= Seq(
+        Dependencies.daml_lf_value_json,
         scalapb_runtime_grpc,
         scalapb_runtime,
         daml_ledger_api_scalapb,
@@ -183,6 +184,14 @@ lazy val `apps-common` =
       ),
       buildInfoPackage := "com.daml.network.environment",
       buildInfoObject := "BuildInfo",
+      Compile / guardrailTasks :=
+        List(
+          ScalaModels(
+            new File("apps/common/src/main/openapi/common.yaml"),
+            pkg = "com.daml.network.http.v0",
+            framework = "akka-http",
+          )
+        ),
     )
 
 lazy val `apps-validator` =
@@ -257,12 +266,23 @@ lazy val `apps-common-frontend` = {
       bundle := {
         (Compile / compile).value
         (`apps-common-frontend-protobuf` / Compile / compile).value
+        (`apps-common-frontend-openapi` / Compile / compile).value
         val log = streams.value.log
         val cacheDir = streams.value.cacheDirectory
         val sourceFiles =
           (baseDirectory.value ** ("*.tsx" || "*.ts" || "*.js" || "*.json") --- baseDirectory.value / "lib" ** "*" --- baseDirectory.value / "node_modules" ** "*").get.toSet
         val cache =
           FileFunction.cached(cacheDir) { _ =>
+            // openapi-generator-cli only generates .ts files so we need to
+            // compile to get .d.ts and .js files. We cannot run this as part of
+            // apps-common-frontend-openapi/compile because that does not yet run
+            // npm install.
+            runCommand(
+              Seq("npm", "run", "build", "--workspace", "common/frontend-openapi"),
+              log,
+              None,
+              Some(npmRootDir.value),
+            )
             runCommand(
               Seq("npm", "run", "build", "--workspace", "common-frontend"),
               log,
@@ -340,6 +360,57 @@ lazy val `apps-directory-frontend` = {
     )
 }
 
+lazy val `apps-common-frontend-openapi` = {
+  project
+    .in(file("apps/common/frontend-openapi"))
+    .settings(
+      Compile / sourceGenerators += Def.task {
+        import better.files.*
+        import _root_.io.circe.*
+        import _root_.io.circe.parser.*
+        import _root_.io.circe.optics.JsonPath.*
+        import _root_.io.circe.optics.JsonPath.{root => jsonRoot}
+        import _root_.io.circe.syntax._
+
+        val log = streams.value.log
+        runCommand(
+          Seq(
+            "openapi-generator-cli",
+            "generate",
+            "-g",
+            "typescript",
+            "-p",
+            "npmName=common-openapi",
+            "-p",
+            "npmName=common-openapi",
+            "-p",
+            "moduleName=common-openapi",
+            "-p",
+            "projectName=common-openapi",
+            "-p",
+            "useTags=true",
+            "-i",
+            "apps/directory/src/main/openapi/directory.yaml",
+            "-o",
+            "apps/common/frontend-openapi",
+          ),
+          log,
+        )
+        // Add empty check task to make npm happy
+        val packageJson = File("apps/common/frontend-openapi/package.json")
+        val packageJsonContent = packageJson.contentAsString
+        val doc: Json =
+          parse(packageJsonContent).getOrElse(sys.error("Failed to parse package.json"))
+        val updated = jsonRoot.scripts.obj.modify((obj: JsonObject) =>
+          obj.add("check", "echo '[common-protobuf] no-op'".asJson)
+        )(doc)
+        packageJson.overwrite(updated.spaces2)
+        Seq()
+      }.taskValue,
+      cleanFiles += baseDirectory.value / "com",
+    )
+}
+
 lazy val `apps-common-frontend-protobuf` = {
   project
     .in(file("apps/common/frontend-protobuf"))
@@ -364,6 +435,7 @@ lazy val `apps-common-frontend-protobuf` = {
 lazy val `apps-frontends` = {
   project.aggregate(
     `apps-common-frontend-protobuf`,
+    `apps-common-frontend-openapi`,
     `apps-common-frontend`,
     `apps-wallet-frontend`,
     `apps-directory-frontend`,
@@ -395,8 +467,25 @@ lazy val `apps-directory` =
       `directory-daml`,
     )
     .settings(
-      libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
+      libraryDependencies ++= Seq(
+        scalapb_runtime_grpc,
+        scalapb_runtime,
+        akka_http_cors,
+      ),
       BuildCommon.sharedAppSettings,
+      Compile / guardrailTasks :=
+        List(
+          ScalaServer(
+            new File("apps/directory/src/main/openapi/directory.yaml"),
+            pkg = "com.daml.network.http.v0",
+            framework = "akka-http",
+          ),
+          ScalaClient(
+            new File("apps/directory/src/main/openapi/directory.yaml"),
+            pkg = "com.daml.network.http.v0",
+            framework = "akka-http",
+          ),
+        ),
     )
 
 lazy val `apps-splitwise` =

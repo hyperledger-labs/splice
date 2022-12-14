@@ -1,13 +1,16 @@
 package com.daml.network.console
 
+import com.daml.network.admin.api.client.commands.HttpCommand
+import com.daml.network.config.CoinHttpClientConfig
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.digitalasset.canton.config.NonNegativeDuration
+import com.digitalasset.canton.config.{NodeConfig, NonNegativeDuration}
 import com.digitalasset.canton.console.commands.{
   HealthAdministration,
   PartiesAdministrationGroup,
   TopologyAdministrationGroup,
 }
 import com.digitalasset.canton.console.{
+  ConsoleCommandResult,
   ConsoleEnvironment,
   ConsoleMacros,
   Help,
@@ -24,6 +27,8 @@ import com.digitalasset.canton.topology.ParticipantId
 
 /** Copy of Canton ParticipantReference */
 trait CoinAppReference extends InstanceReference {
+
+  def config: NodeConfig
 
   override val name: String
 
@@ -82,6 +87,20 @@ trait CoinAppReference extends InstanceReference {
 
   def runningNode: Option[CantonNodeBootstrap[ParticipantNode]] =
     consoleEnvironment.environment.participants.getRunning(name)
+}
+
+trait HttpCoinAppReference extends CoinAppReference with HttpCommandRunner {
+
+  def httpClientConfig: CoinHttpClientConfig
+
+  override protected[console] def httpCommand[Result](
+      httpCommand: HttpCommand[_, Result]
+  ): ConsoleCommandResult[Result] =
+    coinConsoleEnvironment.httpCommandRunner.runCommand(
+      name,
+      httpCommand,
+      httpClientConfig,
+    )
 }
 
 trait LocalCoinAppReference extends CoinAppReference with LocalInstanceReference {

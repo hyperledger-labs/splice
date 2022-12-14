@@ -2,6 +2,7 @@ package com.daml.network.directory.config
 
 import com.daml.network.config.{
   AutomationConfig,
+  CoinHttpClientConfig,
   CoinLedgerApiClientConfig,
   CoinRemoteParticipantConfig,
   LocalCoinConfig,
@@ -21,13 +22,12 @@ case class LocalDirectoryAppConfig(
   override val nodeTypeName: String = "directory"
 
   override def clientAdminApi: ClientConfig = adminApi.clientConfig
-
 }
 
 case class RemoteDirectoryAppConfig(
     damlUser: String,
-    adminApi: ClientConfig,
+    adminApi: CoinHttpClientConfig,
     ledgerApi: CoinLedgerApiClientConfig,
 ) extends RemoteCoinConfig {
-  override def clientAdminApi: ClientConfig = adminApi
+  override def clientAdminApi: ClientConfig = adminApi.clientConfig
 }
