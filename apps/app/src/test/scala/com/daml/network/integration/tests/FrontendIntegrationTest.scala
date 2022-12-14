@@ -1,10 +1,12 @@
 package com.daml.network.integration.tests
 
+import cats.syntax.parallel.*
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
 import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.util.FutureInstances.*
 import org.apache.commons.io.FileUtils
 import org.openqa.selenium.bidi.log.{BaseLogEntry, Log, LogEntry}
 import org.openqa.selenium.firefox.{FirefoxDriver, FirefoxDriverLogLevel, FirefoxOptions}
@@ -26,6 +28,7 @@ import java.time.Duration
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicLong
 import scala.collection.mutable
+import scala.concurrent.Future
 import scala.concurrent.duration.*
 import scala.jdk.OptionConverters.*
 import scala.util.Try
@@ -92,45 +95,49 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
     // We need to start the web frontends afterwards because selenium
     // insists on automatically selecting free ports and those may
     // collide with the ports used by our own services.
-    for { name <- frontendNames.toSeq } {
-      System.setProperty(
-        FirefoxDriver.SystemProperty.BROWSER_LOGFILE,
-        Paths
-          .get(
-            "log",
-            s"browser.${this.getClass.getName}.${name}.${FrontendIntegrationTest.counter.getAndIncrement()}.log",
-          )
-          .toString,
-      )
-      val logger = loggerFactory.append("web-frontend", name).getLogger(getClass)
-      val webDriver = eventually() {
-        try {
-          new FirefoxDriver(options)
-        } catch {
-          case NonFatal(e) => {
-            logger.info(s"FirefoxDriver failed to start; retrying. The error was: $e")
-            fail()
-          }
-        }
-      }
-      webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
-      webDrivers += (name -> webDriver)
-      val biDi = webDriver.getBiDi();
-      biDi.addListener[LogEntry](
-        Log.entryAdded(),
-        logEntry => {
-          logEntry.getConsoleLogEntry.toScala.foreach { consoleLogEntry =>
-            val msg = consoleLogEntry.getText
-            consoleLogEntry.getLevel match {
-              case BaseLogEntry.LogLevel.DEBUG => logger.debug(msg)
-              case BaseLogEntry.LogLevel.INFO => logger.info(msg)
-              case BaseLogEntry.LogLevel.WARNING => logger.warn(msg)
-              case BaseLogEntry.LogLevel.ERROR => logger.error(msg)
+    // We start all browsers in parallel, for faster test init.
+    implicit val ec = env.executionContext;
+    frontendNames.toList.parTraverse { name =>
+      Future {
+        System.setProperty(
+          FirefoxDriver.SystemProperty.BROWSER_LOGFILE,
+          Paths
+            .get(
+              "log",
+              s"browser.${this.getClass.getName}.${name}.${FrontendIntegrationTest.counter.getAndIncrement()}.log",
+            )
+            .toString,
+        )
+        val logger = loggerFactory.append("web-frontend", name).getLogger(getClass)
+        val webDriver = eventually() {
+          try {
+            new FirefoxDriver(options)
+          } catch {
+            case NonFatal(e) => {
+              logger.info(s"FirefoxDriver failed to start; retrying. The error was: $e")
+              fail()
             }
           }
-        },
-      );
-    }
+        }
+        webDriver.manage().timeouts().implicitlyWait(Duration.ofSeconds(5))
+        webDrivers += (name -> webDriver)
+        val biDi = webDriver.getBiDi();
+        biDi.addListener[LogEntry](
+          Log.entryAdded(),
+          logEntry => {
+            logEntry.getConsoleLogEntry.toScala.foreach { consoleLogEntry =>
+              val msg = consoleLogEntry.getText
+              consoleLogEntry.getLevel match {
+                case BaseLogEntry.LogLevel.DEBUG => logger.debug(msg)
+                case BaseLogEntry.LogLevel.INFO => logger.info(msg)
+                case BaseLogEntry.LogLevel.WARNING => logger.warn(msg)
+                case BaseLogEntry.LogLevel.ERROR => logger.error(msg)
+              }
+            }
+          },
+        );
+      }
+    }.futureValue
     env
   }
 
@@ -139,10 +146,16 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
     // Therefore, we need to check for errors here. Otherwise, we run
     // into issues where we get an error just by virtue of the gRPC
     // service being down.
-    webDrivers.values.flatMap { implicit webDriver =>
-      findAll(id("error")).toList.map(e => fail(s"Found unexpected error: ${e.text}"))
-    }
-    webDrivers.values.foreach(_.quit())
+    // We process all browsers in parallel, for faster test termination.
+    implicit val ec = env.executionContext;
+    webDrivers.values.toList.parTraverse { implicit webDriver =>
+      Future {
+        // we optimistically wait only shortly, for faster test termination
+        webDriver.manage().timeouts().implicitlyWait(Duration.ofMillis(100))
+        findAll(id("error")).toList.map(e => fail(s"Found unexpected error: ${e.text}"))
+        webDriver.quit()
+      }
+    }.futureValue
     super.testFinished(env)
   }
 
