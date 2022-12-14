@@ -95,7 +95,6 @@ case class CoinConfig(
         devVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
-        parameters.clock,
       )
     }
 
@@ -141,7 +140,6 @@ case class CoinConfig(
         devVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
-        parameters.clock,
       )
     }
 
@@ -185,7 +183,6 @@ case class CoinConfig(
         devVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
-        parameters.clock,
       )
     }
 
@@ -223,7 +220,6 @@ case class CoinConfig(
         devVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
-        parameters.clock,
       )
     }
 
@@ -268,7 +264,6 @@ case class CoinConfig(
         devVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
-        parameters.clock,
       )
     }
 
@@ -312,7 +307,6 @@ case class CoinConfig(
         devVersionSupport = false,
         dontWarnOnDeprecatedPV = false,
         initialProtocolVersion = ProtocolVersion.latest,
-        parameters.clock,
       )
     }
 

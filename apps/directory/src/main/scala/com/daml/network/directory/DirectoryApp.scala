@@ -79,7 +79,7 @@ class DirectoryApp(
       )
       automation = new DirectoryAutomationService(
         config.automation,
-        coinAppParameters.clockConfig,
+        clock,
         store,
         ledgerClient,
         scanConnection,

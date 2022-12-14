@@ -41,29 +41,3 @@ class GrpcSvcAppService(
       )
     }
 }
-
-object GrpcSvcAppService {
-
-  case class RoundTotals(
-      transferFees: BigDecimal = 0.0,
-      adminFees: BigDecimal = 0.0,
-      holdingFees: BigDecimal = 0.0,
-      transferInputs: BigDecimal = 0.0,
-      nonSelfTransferOutputs: BigDecimal = 0.0,
-      selfTransferOutputs: BigDecimal = 0.0,
-  )
-
-  def getTotalsPerRound(store: SvcStore)(round: Long): RoundTotals = {
-    val transfers = store.events.getTransferSummariesPerRound(round)
-    transfers.foldLeft(RoundTotals())((t, transfer) => {
-      RoundTotals(
-        t.transferFees + transfer.totalTransferFees,
-        t.adminFees + transfer.senderAdminFees,
-        t.holdingFees + transfer.senderHoldingFees,
-        t.transferInputs + transfer.inQuantity,
-        t.nonSelfTransferOutputs + transfer.nonSelfOutQuantity,
-        t.selfTransferOutputs + transfer.selfOutQuantity,
-      )
-    })
-  }
-}

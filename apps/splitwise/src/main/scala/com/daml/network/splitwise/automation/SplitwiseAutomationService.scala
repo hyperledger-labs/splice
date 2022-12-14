@@ -2,15 +2,16 @@ package com.daml.network.splitwise.automation
 
 import akka.stream.Materializer
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
-import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
+import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.store.SplitwiseStore
 import com.daml.network.store.AcsStore.QueryResult
-import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
 
@@ -20,7 +21,7 @@ import scala.jdk.CollectionConverters.*
 /** Manages background automation that runs on an splitwise app. */
 class SplitwiseAutomationService(
     automationConfig: AutomationConfig,
-    clockConfig: ClockConfig,
+    clock: Clock,
     store: SplitwiseStore,
     ledgerClient: CoinLedgerClient,
     readAs: Set[PartyId],
@@ -32,7 +33,7 @@ class SplitwiseAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends AutomationService(automationConfig, clockConfig, retryProvider) {
+) extends AutomationService(automationConfig, clock, retryProvider) {
 
   override protected def timeouts: ProcessingTimeout = processingTimeouts
 

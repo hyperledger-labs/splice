@@ -69,7 +69,7 @@ class SplitwiseApp(
       )
     automation = new SplitwiseAutomationService(
       config.automation,
-      coinAppParameters.clockConfig,
+      clock,
       store,
       ledgerClient,
       readAs,

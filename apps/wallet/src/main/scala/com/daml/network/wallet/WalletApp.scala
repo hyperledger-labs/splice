@@ -100,7 +100,7 @@ class WalletApp(
           ledgerClient,
           walletStore,
           config.automation,
-          coinAppParameters.clockConfig,
+          clock,
           config.treasury,
           storage: Storage,
           retryProvider,
@@ -109,7 +109,7 @@ class WalletApp(
         )
       automation = new WalletAutomationService(
         config.automation,
-        coinAppParameters.clockConfig,
+        clock,
         walletManager,
         ledgerClient,
         retryProvider,
@@ -131,7 +131,7 @@ class WalletApp(
               new GrpcWalletService(
                 walletManager,
                 ledgerClient,
-                coinAppParameters.clockConfig,
+                clock,
                 loggerFactory,
                 retryProvider,
               ),

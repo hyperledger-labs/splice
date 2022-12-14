@@ -8,10 +8,11 @@ import com.daml.network.wallet.automation.UserWalletAutomationService
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
-import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.ExecutionContext
@@ -22,7 +23,7 @@ class UserWalletService(
     key: UserWalletStore.Key,
     walletManager: UserWalletManager,
     automationConfig: AutomationConfig,
-    clockConfig: ClockConfig,
+    clock: Clock,
     treasuryConfig: TreasuryConfig,
     storage: Storage,
     retryProvider: CoinRetries,
@@ -45,7 +46,7 @@ class UserWalletService(
   val treasury: TreasuryService = new TreasuryService(
     connection,
     treasuryConfig,
-    clockConfig,
+    clock,
     store,
     walletManager,
     retryProvider,
@@ -58,7 +59,7 @@ class UserWalletService(
     treasury,
     ledgerClient,
     automationConfig,
-    clockConfig,
+    clock,
     retryProvider,
     loggerFactory,
     timeouts,

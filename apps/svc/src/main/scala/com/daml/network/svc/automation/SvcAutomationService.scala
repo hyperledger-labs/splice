@@ -8,23 +8,20 @@ import com.daml.network.automation.{
 }
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
-import com.daml.network.svc.admin.grpc.GrpcSvcAppService.getTotalsPerRound
 import com.daml.network.svc.config.LocalSvcAppConfig
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.util.JavaContract
-import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
-import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
-import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 
-@nowarn("msg=match may not be exhaustive")
 class SvcAutomationService(
-    clockConfig: ClockConfig,
+    clock: Clock,
     config: LocalSvcAppConfig,
     store: SvcStore,
     ledgerClient: CoinLedgerClient,
@@ -35,7 +32,7 @@ class SvcAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends AutomationService(config.automation, clockConfig, retryProvider) {
+) extends AutomationService(config.automation, clock, retryProvider) {
   import com.daml.network.store.AcsStore.QueryResult
 
   private val connection = registerResource(ledgerClient.connection(this.getClass.getSimpleName))
@@ -75,7 +72,7 @@ class SvcAutomationService(
       for {
         // Guard the action by a lookup for the SVC's own CoinRules to ensure that all of the dependent state
         // has already been created.
-        _ <- getCoinRules()
+        _ <- store.getCoinRules()
         validatorParty = PartyId.tryFromProtoPrimitive(req.payload.user)
         // NOTE: this is NOT SAFE under concurrent changes to the XXXMiningRounds contracts
         // That is OK here, as we assume that on-boarding of validators happens before.
@@ -102,104 +99,12 @@ class SvcAutomationService(
     }
   })
 
-  registerPollingTrigger("cycle OpenMiningRounds", config.automation.pollingInterval, connection) {
-    (now, logger) =>
-      { implicit tc =>
-        for {
-          rules <- getCoinRules()
-          QueryResult(_, openMiningRounds) <- store.acs.listContracts(
-            cc.round.OpenMiningRound.COMPANION
-          )
-          res <- {
-            val Seq(toArchive, middle, latest) = openMiningRounds
-              .sortBy(contract => contract.payload.round.number)
-
-            // checking some of the same conditions that are also checked on the ledger because ledger operations are expensive
-            // so we check the conditions that are most likely to fail.
-            val isPastTargetClosesAt = now.toInstant
-              .isAfter(
-                toArchive.payload.targetClosesAt.plus(
-                  config.automation.clockSkewAutomationDelay.duration
-                )
-              )
-            val midPointForMiddleRound = middle.payload.opensAt
-              .plus(config.initialTickDuration.duration)
-              .plus(config.automation.clockSkewAutomationDelay.duration)
-            val isPastLatestOpensAt = now.toInstant
-              .isAfter(
-                latest.payload.opensAt.plus(config.automation.clockSkewAutomationDelay.duration)
-              )
-            val middleRoundOpenLongEnough = now.toInstant.isAfter(midPointForMiddleRound)
-            if (isPastTargetClosesAt && middleRoundOpenLongEnough && isPastLatestOpensAt) {
-              val cmds = rules.contractId
-                .exerciseCoinRules_AdvanceOpenMiningRounds(
-                  config.coinPrice.bigDecimal,
-                  toArchive.contractId,
-                  middle.contractId,
-                  latest.contractId,
-                )
-                .commands
-                .asScala
-                .toSeq
-              connection
-                .submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds)
-                .map(_ =>
-                  Some(
-                    s"successfully advanced the rounds and archived round ${toArchive.payload.round.number}"
-                  )
-                )
-            } else Future.successful(None)
-          }
-
-        } yield res
-      }
-  }
-
-  registerPollingTrigger(
-    "archive IssuingMiningRounds past their targetClosesAt",
-    config.automation.pollingInterval,
-    connection,
-  ) {
-    (now, logger) =>
-      { implicit tc =>
-        for {
-          coinRules <- store.getCoinRules()
-          QueryResult(_, issuingMiningRounds) <- store.acs.listContracts(
-            cc.round.IssuingMiningRound.COMPANION
-          )
-          roundsSorted = issuingMiningRounds
-            .sortBy(contract => contract.payload.targetClosesAt)
-            .headOption
-          res <- roundsSorted match {
-            case None =>
-              Future.successful(None)
-            case Some(earliestClosingIssuingRound) =>
-              val totals =
-                getTotalsPerRound(store)(earliestClosingIssuingRound.payload.round.number)
-              val oldestRoundCanBeClosed =
-                now.toInstant.isAfter(earliestClosingIssuingRound.payload.targetClosesAt)
-              if (oldestRoundCanBeClosed) {
-                val cmd = coinRules.value.contractId
-                  .exerciseCoinRules_MiningRound_Close(
-                    earliestClosingIssuingRound.contractId,
-                    totals.transferFees.bigDecimal,
-                    totals.adminFees.bigDecimal,
-                    totals.holdingFees.bigDecimal,
-                    totals.transferInputs.bigDecimal,
-                    totals.nonSelfTransferOutputs.bigDecimal,
-                    totals.selfTransferOutputs.bigDecimal,
-                  )
-                connection
-                  .submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
-                  .map(cid => Some(s"successfully created the closed mining round with cid $cid"))
-              } else {
-                Future.successful(None)
-              }
-
-          }
-        } yield res
-      }
-  }
+  registerNewStyleTrigger(
+    new AdvanceOpenMiningRoundTrigger(triggerContext, config, store, connection)
+  )
+  registerNewStyleTrigger(
+    new ExpireIssuingMiningRoundTrigger(triggerContext, store, connection)
+  )
 
   registerTrigger(
     "archive summarizing rounds and create issuing rounds",
@@ -241,22 +146,6 @@ class SvcAutomationService(
       _ <-
         connection.submitCommandsNoDedup(Seq(store.svcParty), Seq.empty, cmd)
     } yield Some(s"successfully archived closed mining round $closedRound")
-  }
-
-  private def getCoinRules()
-      : Future[JavaContract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]] = {
-    store.lookupCoinRules().map(_.value).flatMap {
-      case None =>
-        // SCV setup is not yet complete: throw a StatusRuntimeException as that properly triggers the retry loop
-        Future.failed(
-          new StatusRuntimeException(
-            Status.NOT_FOUND
-              .withDescription(s"Could not find CoinRules for SVC party ${store.svcParty}")
-          )
-        )
-
-      case Some(rules) => Future.successful(rules)
-    }
   }
 
   /** The rewards issued for a given round.

@@ -60,7 +60,7 @@ class ScanApp(
       store <- Future.successful(ScanStore(svcParty, storage, loggerFactory, timeouts))
       automation = new ScanAutomationService(
         config.automation,
-        coinAppParameters.clockConfig,
+        clock,
         svcParty,
         ledgerClient,
         retryProvider,
@@ -76,7 +76,7 @@ class ScanApp(
             new GrpcScanService(
               ledgerClient,
               store,
-              coinAppParameters.clockConfig,
+              clock,
               retryProvider,
               loggerFactory,
             ),

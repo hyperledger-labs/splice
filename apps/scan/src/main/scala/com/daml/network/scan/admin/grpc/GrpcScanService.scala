@@ -7,9 +7,8 @@ import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.v0
 import com.daml.network.scan.v0.*
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.TimeUtil
-import com.digitalasset.canton.config.ClockConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.Spanning
 import com.google.protobuf.empty.Empty
 import io.opentelemetry.api.trace.Tracer
@@ -20,7 +19,7 @@ import scala.concurrent.{ExecutionContext, Future}
 class GrpcScanService(
     ledgerClient: CoinLedgerClient,
     store: ScanStore,
-    clockConfig: ClockConfig,
+    clock: Clock,
     retryProvider: CoinRetries,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -39,10 +38,10 @@ class GrpcScanService(
     }
 
   override def getTransferContext(request: Empty): Future[v0.GetTransferContextResponse] =
-    withSpanFromGrpcContext("GrpcScanService") { implicit traceContext => span =>
+    withSpanFromGrpcContext("GrpcScanService") { _ => _ =>
       for {
         QueryResult(_, coinRules) <- store.lookupCoinRules()
-        now <- TimeUtil.getTime(connection, clockConfig)
+        now = clock.now
         QueryResult(_, latestOpen) <- store.getLatestOpenMiningRound(now)
         QueryResult(_, rounds) <- store.lookupSubmittableOpenMiningRounds(now)
       } yield {
@@ -56,7 +55,7 @@ class GrpcScanService(
     }
 
   override def getHistory(request: Empty): Future[GetHistoryResponse] =
-    withSpanFromGrpcContext("GrpcScanService") { traceContext => span =>
+    withSpanFromGrpcContext("GrpcScanService") { _ => _ =>
       for {
         result <- store.history.getCCHistory
       } yield v0.GetHistoryResponse(result.map(_.toProtoV0))
@@ -74,7 +73,7 @@ class GrpcScanService(
   }
 
   override def getClosedRounds(request: Empty): Future[GetClosedRoundsResponse] =
-    withSpanFromGrpcContext("GrpcScanService") { traceContext => span =>
+    withSpanFromGrpcContext("GrpcScanService") { _ => _ =>
       for {
         QueryResult(_, rounds) <- store.acs.listContracts(roundCodegen.ClosedMiningRound.COMPANION)
       } yield {

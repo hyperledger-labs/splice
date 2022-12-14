@@ -22,7 +22,7 @@ import com.digitalasset.canton.util.ShowUtil.*
 import com.digitalasset.canton.util.{ErrorUtil, PriorityBlockingQueueUtil}
 import com.google.protobuf.empty.Empty
 
-import java.time.{Clock as JClock, Duration, Instant}
+import java.time.{Duration, Instant, Clock as JClock}
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicLong, AtomicReference}
 import java.util.concurrent.{Callable, PriorityBlockingQueue, TimeUnit}
 import scala.annotation.tailrec
@@ -449,7 +449,9 @@ class RemoteClock(
 
   override def close(): Unit =
     if (running.getAndSet(false)) {
+      // stopping the scheduler before the channel, so we don't get a failed call on shutdown
       scheduler.shutdown()
+      Lifecycle.toCloseableChannel(channel, logger, "channel to remote clock server").close()
     }
 }
 

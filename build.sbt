@@ -1,9 +1,8 @@
 import BuildUtil.runCommand
-import BuildCommon.sharedCantonSettings
 import Dependencies._
 import DamlPlugin.autoImport._
 import BuildCommon.defs._
-import sbtassembly.{AssemblyUtils, MergeStrategy, PathList}
+import sbtassembly.{MergeStrategy, PathList}
 
 /*
  * sbt-settings that will be shared between all CN apps.

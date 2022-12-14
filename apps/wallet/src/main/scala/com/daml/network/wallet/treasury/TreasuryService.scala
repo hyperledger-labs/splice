@@ -16,15 +16,16 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
 import com.daml.network.util.PrettyInstances.*
-import com.daml.network.util.{HasHealth, TimeUtil}
+import com.daml.network.util.HasHealth
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService.*
-import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ShowUtil.*
@@ -44,7 +45,7 @@ import scala.util.{Failure, Success}
 class TreasuryService(
     connection: CoinLedgerConnection,
     treasuryConfig: TreasuryConfig,
-    clockConfig: ClockConfig,
+    clock: Clock,
     userStore: UserWalletStore,
     walletManager: UserWalletManager,
     retryProvider: CoinRetries,
@@ -265,8 +266,8 @@ class TreasuryService(
       logger.debug("Found no valid coin operations after running lookups.")
       Future.successful(Done)
     } else {
+      val now = clock.now
       val batchExecutionF = for {
-        now <- TimeUtil.getTime(connection, clockConfig)
         transferContext <- walletManager.store.getPaymentTransferContext(retryProvider, now)
         activeIssuingRounds = transferContext.context.issuingMiningRounds.asScala.keys.toSet
         install <- getInstall

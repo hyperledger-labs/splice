@@ -4,28 +4,26 @@ import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{KillSwitches, Materializer}
 import akka.{Done, NotUsed}
 import com.daml.network.config.AutomationConfig
-import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
+import com.daml.network.environment.CoinRetries
 import com.daml.network.util.HasHealth
-import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
-import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.pretty.PrettyPrinting
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLogging, TracedLogger}
-import com.digitalasset.canton.time.NonNegativeFiniteDuration
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{NoTracing, Spanning, TraceContext}
 import com.digitalasset.canton.util.AkkaUtil
 import com.digitalasset.canton.util.ShowUtil.*
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.atomic.AtomicReference
-import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.{Failure, Success}
 
 /** Shared base class for running ingestion and task-handler automation in applications. */
 abstract class AutomationService(
     automationConfig: AutomationConfig,
-    clockConfig: ClockConfig,
+    clock: Clock,
     retryProvider: CoinRetries,
 )(implicit
     ec: ExecutionContext,
@@ -45,6 +43,10 @@ abstract class AutomationService(
     new AtomicReference(
       Seq.empty
     )
+
+  /** Shared parameters for instantiating triggers. */
+  protected def triggerContext: TriggerContext =
+    TriggerContext(automationConfig, timeouts, clock, retryProvider, loggerFactory)
 
   override def isHealthy: Boolean = backgroundServices.get().forall(_.isHealthy)
 
@@ -125,59 +127,10 @@ abstract class AutomationService(
     registerService(service)
   }
 
-  final protected def registerNewStyleTrigger(trigger: SourceBasedTrigger[?]): Unit = {
+  // TODO(#1968): rename this to 'registerTrigger'
+  final protected def registerNewStyleTrigger(trigger: Trigger[?]): Unit = {
     registerService(trigger)
     trigger.run()
-  }
-
-  /** Register a trigger invoked periodically with the current (ledger) time.
-    *  When Canton runs with wall-clock time, the handler is triggered on each `interval`.
-    *  When Canton runs with simulation time, the handler is *instead* triggered
-    *  every time the ledger time changes.
-    */
-  final protected def registerPollingTrigger(
-      name: String,
-      interval: NonNegativeFiniteDuration,
-      connection: CoinLedgerConnection, // for querying ledger time when simtime is used
-  )(
-      handler0: (CantonTimestamp, TracedLogger) => TraceContext => Future[Option[String]]
-  ): Unit = {
-    withNewTrace("getTime") { implicit traceContext => _ =>
-      {
-        val logger = getLoggerForTrigger(name)
-        val timeSource = clockConfig match {
-          case ClockConfig.SimClock => {
-            logger.info(
-              "Running in SimClock mode; will invoke handler based on time service."
-            )
-            connection.getTimeSource()
-          }
-          case ClockConfig.WallClock(_) => {
-            logger.info(
-              "Running in WallClock mode; will invoke handler based on wall clock time."
-            )
-            // The first tick is immediately, for simplicity.
-            Source
-              .tick(0.second, interval.toScala, ())
-              .map(_ => CantonTimestamp.now())
-          }
-          case _: ClockConfig.RemoteClock =>
-            sys.error(
-              "Remote clock mode is unsupported for CN apps, use either SimClock or WallClock"
-            )
-        }
-        registerTrigger(
-          name,
-          timeSource
-            // Conflating to have slower downstream consumers only process the most recent timestamp.
-            // Using .max for prudence.
-            .conflate((oldTime, newTime) => Ordering[CantonTimestamp].max(oldTime, newTime))
-            .preMaterialize()
-            ._2,
-          sequential = true,
-        )(handler0)
-      }
-    }
   }
 
   override protected def closeAsync(): Seq[AsyncOrSyncCloseable] =

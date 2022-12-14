@@ -1,13 +1,16 @@
 package com.daml.network.directory.store
 
-import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
+import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.directory.store.memory.InMemoryDirectoryStore
 import com.daml.network.store.AcsStore
 import com.daml.network.util.JavaContract as Contract
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
+import cats.syntax.traverse.*
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -83,6 +86,50 @@ trait DirectoryStore extends AutoCloseable {
       )
     } yield QueryResult(off, list.take(pageSize))
 
+  def listExpiredDirectoryEntries(now: CantonTimestamp, limit: Int)(implicit
+      ec: ExecutionContext
+  ): Future[QueryResult[
+    Seq[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
+  ]] =
+    acs
+      .listContracts(directoryCodegen.DirectoryEntry.COMPANION)
+      .map(
+        _.map(entries =>
+          entries.iterator
+            .filter(e => now.toInstant.isAfter(e.payload.expiresAt))
+            .take(limit)
+            .toSeq
+        )
+      )
+
+  def listExpiredDirectorySubscriptions(now: CantonTimestamp, limit: Int)(implicit
+      ex: ExecutionContext
+  ): Future[Seq[DirectoryStore.IdleDirectorySubscription]] =
+    for {
+      allSubscriptions <- acs.listContracts(subsCodegen.SubscriptionIdleState.COMPANION)
+      dueSubscriptions = allSubscriptions.value.filter(e =>
+        now.toInstant.isAfter(e.payload.nextPaymentDueAt)
+      )
+      // Join with the DirectoryEntryContexts
+      subscriptionsWithContext <- dueSubscriptions.toList
+        .traverse { subscription =>
+          acs
+            .lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(
+              directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
+                subscription.payload.subscriptionData.context
+              )
+            )
+            .map(context => (subscription, context.value))
+        }
+      // Only deliver the ones referencing an active directory entry context
+      // TODO(tech-debt): consider whether this kind of join might be leading to stale subscriptions not being expired.
+      result = subscriptionsWithContext.iterator
+        .collect { case (subscription, Some(context)) =>
+          DirectoryStore.IdleDirectorySubscription(subscription, context)
+        }
+        .take(limit)
+        .toSeq
+    } yield result
 }
 
 object DirectoryStore {
@@ -103,6 +150,21 @@ object DirectoryStore {
         )
       case _: DbStorage => throw new RuntimeException("Not implemented")
     }
+
+  case class IdleDirectorySubscription(
+      state: Contract[
+        subsCodegen.SubscriptionIdleState.ContractId,
+        subsCodegen.SubscriptionIdleState,
+      ],
+      context: Contract[
+        directoryCodegen.DirectoryEntryContext.ContractId,
+        directoryCodegen.DirectoryEntryContext,
+      ],
+  ) extends PrettyPrinting {
+
+    override def pretty: Pretty[this.type] =
+      prettyOfClass(param("state", _.state), param("context", _.context))
+  }
 
   /** Contract filter of a directory app store for a specific provider. */
   def contractFilter(providerPartyId: PartyId): AcsStore.ContractFilter = {

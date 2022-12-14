@@ -1,10 +1,9 @@
 package com.daml.network.environment
 
-import akka.actor.{ActorSystem, Cancellable}
+import akka.actor.ActorSystem
 import akka.stream.KillSwitches
 import akka.stream.scaladsl.{Flow, Keep, Sink, Source}
 import akka.{Done, NotUsed}
-import com.daml.ledger.api.v1.testing.TimeServiceOuterClass
 import com.daml.ledger.javaapi.data.codegen.{
   Contract,
   ContractCompanion,
@@ -34,7 +33,6 @@ import com.daml.ledger.javaapi.data.{
 import com.daml.network.util.UploadablePackage
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
-import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.{
   AsyncCloseable,
   AsyncOrSyncCloseable,
@@ -46,7 +44,6 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{TraceContext, TracerProvider}
 import com.digitalasset.canton.util.AkkaUtil
 import com.google.protobuf.ByteString
-import com.google.protobuf.timestamp.Timestamp
 import io.grpc.StatusRuntimeException
 
 import java.nio.file.{Files, Path}
@@ -136,16 +133,6 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
   def listPackages()(implicit traceContext: TraceContext): Future[Set[String]]
   def uploadDarFile(pkg: UploadablePackage)(implicit traceContext: TraceContext): Future[Unit]
   def uploadDarFile(path: Path)(implicit traceContext: TraceContext): Future[Unit]
-
-  /** Only call this method when using a sim-clock. It will throw an error when using wall-clock time
-    * because the Ledger API only supports time-requests when using a simulated clock.
-    */
-  def getTimeSource()(implicit traceContext: TraceContext): Source[CantonTimestamp, Cancellable]
-
-  /** Only call this method when using a sim-clock. It will throw an error when using wall-clock time
-    * because the Ledger API only supports time-requests when using a simulated clock.
-    */
-  def getTime()(implicit traceContext: TraceContext): Future[CantonTimestamp]
 }
 
 /** Subscription for reading the ledger */
@@ -343,7 +330,7 @@ object CoinLedgerConnection {
       ): CoinLedgerSubscription =
         new CoinLedgerSubscription {
           override protected def timeouts: ProcessingTimeout = coinLedgerClient.timeouts
-          import TraceContext.Implicits.Empty._
+          import TraceContext.Implicits.Empty.*
           val (killSwitch, completed) = AkkaUtil.runSupervised(
             logger.error("Fatally failed to handle transaction", _),
             source
@@ -362,7 +349,7 @@ object CoinLedgerConnection {
               loggerFactoryForCoinLedgerConnectionOverride.append("client", subscriptionName)
 
           override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
-            import TraceContext.Implicits.Empty._
+            import TraceContext.Implicits.Empty.*
             List[AsyncOrSyncCloseable](
               SyncCloseable(s"terminating ledger api stream", killSwitch.shutdown()),
               AsyncCloseable(
@@ -528,34 +515,6 @@ object CoinLedgerConnection {
       }
 
       override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = List[AsyncOrSyncCloseable]()
-
-      override def getTimeSource()(implicit
-          traceContext: TraceContext
-      ): Source[CantonTimestamp, Cancellable] =
-        client
-          .getTimeSource()
-          .map(parseTimeResponse)
-
-      override def getTime()(implicit
-          traceContext: TraceContext
-      ): Future[CantonTimestamp] =
-        client
-          .getTimeSource()
-          .map(parseTimeResponse)
-          .runWith(Sink.head[CantonTimestamp])
-
-      private def parseTimeResponse(
-          response: TimeServiceOuterClass.GetTimeResponse
-      ): CantonTimestamp = {
-        CantonTimestamp
-          .fromProtoPrimitive(Timestamp.fromJavaProto(response.getCurrentTime)) match {
-          case Left(err) =>
-            throw new RuntimeException(
-              s"Could not parse timestamp received from ledger API: $err"
-            )
-          case Right(timestamp) => timestamp
-        }
-      }
     }
 
   def decodeExerciseResult[T](

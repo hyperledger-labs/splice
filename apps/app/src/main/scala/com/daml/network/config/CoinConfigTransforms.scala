@@ -442,8 +442,12 @@ object CoinConfigTransforms {
     val tokens: mutable.Map[Int, String] = mutable.Map.empty
 
     val tokenDataSource = clockConfig match {
-      case ClockConfig.SimClock => Source.fromFile("canton-simtime.tokens")
-      case _ => Source.fromFile("canton.tokens")
+      case ClockConfig.RemoteClock(_) => Source.fromFile("canton-simtime.tokens")
+      case ClockConfig.WallClock(_) => Source.fromFile("canton.tokens")
+      case ClockConfig.SimClock =>
+        sys.error(
+          "Unexpected clock mode: use remote-clock for simulated time and wall-clock for normal execution"
+        )
     }
     for (line <- tokenDataSource.getLines()) {
       val parts = line.split(" ")

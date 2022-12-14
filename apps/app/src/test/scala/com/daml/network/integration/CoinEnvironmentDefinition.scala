@@ -155,6 +155,19 @@ object CoinEnvironmentDefinition {
       // all of these transforms need to happen before the auth-related default transforms,
       // which use the `clock` parameter to determine which `.tokens` file to read
       // and the ledger API ports to identify the tokens in that file; hence we add them `ToFront`
+      .addConfigTransformsToFront((_, conf) =>
+        conf
+          .focus(_.parameters.clock)
+          .replace(
+            ClockConfig.RemoteClock(
+              // This reads the right port as the bump is added to the front
+              conf.svcApp
+                .getOrElse(throw new IllegalArgumentException("expected svc app to be configured"))
+                .remoteParticipant
+                .clientAdminApi
+            )
+          )
+      )
       .addConfigTransformsToFront((_, conf) => CoinConfigTransforms.bumpCantonPortsBy(10_000)(conf))
       // we bump remote app ports separately in order to not confuse
       // the PreflightIntegrationTest which also uses bumpCantonPortsBy
@@ -163,9 +176,6 @@ object CoinEnvironmentDefinition {
       )
       .addConfigTransformsToFront((_, conf) =>
         CoinConfigTransforms.bumpRemoteSplitwisePortsBy(10_000)(conf)
-      )
-      .addConfigTransformsToFront((_, conf) =>
-        conf.focus(_.parameters.clock).replace(ClockConfig.SimClock)
       )
 
   def fromResource(path: String, testName: String): CoinEnvironmentDefinition =

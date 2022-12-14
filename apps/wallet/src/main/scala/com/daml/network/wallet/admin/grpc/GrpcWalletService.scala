@@ -2,15 +2,15 @@ package com.daml.network.wallet.admin.grpc
 
 import com.daml.ledger.javaapi.data.Template
 import com.daml.ledger.javaapi.data.codegen.{
-  Contract => CodegenContract,
   ContractCompanion,
   ContractId,
   Update,
+  Contract as CodegenContract,
 }
 import com.daml.network.auth.AuthInterceptor
 import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_AcceptedAppPayment
 import com.daml.network.codegen.java.cn.wallet.install.{
   CoinOperationOutcome,
@@ -26,14 +26,14 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.store.AcsStore.QueryResult
-import com.daml.network.util.{CoinUtil, JavaContract => Contract, Proto, TimeUtil}
+import com.daml.network.util.{CoinUtil, Proto, JavaContract as Contract}
+import com.daml.network.v0 as networkV0
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.daml.network.wallet.v0.*
 import com.daml.network.wallet.{UserWalletManager, UserWalletService, v0}
-import com.daml.network.v0 as networkV0
-import com.digitalasset.canton.config.ClockConfig
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ErrorUtil
@@ -50,7 +50,7 @@ import scala.reflect.ClassTag
 class GrpcWalletService(
     walletManager: UserWalletManager,
     ledgerClient: CoinLedgerClient,
-    clockConfig: ClockConfig,
+    clock: Clock,
     protected val loggerFactory: NamedLoggerFactory,
     retryProvider: CoinRetries,
 )(implicit
@@ -151,8 +151,7 @@ class GrpcWalletService(
       withAuth { user =>
         for {
           userStore <- getUserStore(user)
-          validatorStore <- getUserStore(store.key.validatorUserName)
-          now <- TimeUtil.getTime(connection, clockConfig)
+          now = clock.now
           currentRound <- store
             .getLatestOpenMiningRound(now)
             .map(_.value.payload.round.number)
@@ -201,12 +200,11 @@ class GrpcWalletService(
       withAuth { user =>
         for {
           userStore <- getUserStore(user)
-          validatorStore <- getUserStore(store.key.validatorUserName)
           QueryResult(_, coins) <- userStore.acs.listContracts(coinCodegen.Coin.COMPANION)
           QueryResult(_, lockedCoins) <- userStore.acs.listContracts(
             coinCodegen.LockedCoin.COMPANION
           )
-          now <- TimeUtil.getTime(connection, clockConfig)
+          now = clock.now
           currentRound <- store
             .getLatestOpenMiningRound(now)
             .map(_.value.payload.round.number)
@@ -569,8 +567,7 @@ class GrpcWalletService(
         "redistribute",
       )
       for {
-        now <- TimeUtil.getTime(connection, clockConfig)
-        transferContext <- store.getPaymentTransferContext(retryProvider, now)
+        transferContext <- store.getPaymentTransferContext(retryProvider, clock.now)
       } yield installCid.exerciseWalletAppInstall_CoinRules_TryTransfer(
         transferContext.coinRules,
         transfer,
@@ -700,9 +697,8 @@ class GrpcWalletService(
       quantity: BigDecimal,
   )(implicit tc: TraceContext): Future[coinCodegen.Coin.ContractId] = {
     val owner = userStore.key.endUserParty
+    val now = clock.now
     for {
-      validatorStore <- getUserStore(store.key.validatorUserName)
-      now <- TimeUtil.getTime(connection, clockConfig)
       currentRound <- store
         .getLatestOpenMiningRound(now)
         .map(_.value.payload.round.number)

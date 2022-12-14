@@ -16,6 +16,7 @@ import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 
+import java.time.Duration
 import java.util.concurrent.TimeUnit
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
@@ -158,4 +159,7 @@ object CoinUtil {
   ): java.math.BigDecimal = {
     coin.quantity.initialQuantity.subtract(holdingFee(coin, currentRound))
   }
+
+  def relTimeToDuration(dt: RelTime): Duration =
+    Duration.ofNanos(dt.microseconds * 1000)
 }

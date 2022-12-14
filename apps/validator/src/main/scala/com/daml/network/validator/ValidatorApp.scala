@@ -237,7 +237,7 @@ class ValidatorApp(
       store = ValidatorStore(key, storage, loggerFactory)
       automation = new ValidatorAutomationService(
         config.automation,
-        coinAppParameters.clockConfig,
+        clock,
         store,
         ledgerClient,
         retryProvider,

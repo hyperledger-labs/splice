@@ -163,7 +163,7 @@ object PrettyInstances extends PrettyInstances {
       contractId: javaapi.data.codegen.ContractId[_],
   ) extends PrettyPrinting {
 
-    override def pretty: Pretty[PrettyContractId.this.type] =
+    override def pretty: Pretty[this.type] =
       prettyNode(
         "ContractId",
         param("id", typedCid => prettyContractIdString.treeOf(typedCid.contractId.contractId)),

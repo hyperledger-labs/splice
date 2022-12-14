@@ -11,15 +11,17 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.store.AcsStore
-import com.daml.network.util.JavaContract
+import com.daml.network.util.{CoinUtil, JavaContract}
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
 import com.digitalasset.canton.config.ProcessingTimeout
+import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.pretty.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.{DbStorage, MemoryStorage, Storage}
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
 
@@ -49,6 +51,16 @@ trait UserWalletStore extends FlagCloseable with NamedLogging {
     ]
   ]] =
     acsStore.findContract(installCodegen.WalletAppInstall.COMPANION)(_ => true)
+
+  def getInstall()(implicit ec: ExecutionContext): Future[
+    JavaContract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
+  ] =
+    lookupInstall()
+      .map(
+        _.value.getOrElse(
+          throw Status.NOT_FOUND.withDescription("WalletAppInstall contract").asRuntimeException()
+        )
+      )
 
   def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
     acsStore.signalWhenIngested(offset)
@@ -111,6 +123,59 @@ trait UserWalletStore extends FlagCloseable with NamedLogging {
   ]] =
     acsStore.lookupContractById(subsCodegen.SubscriptionContext.INTERFACE)(cid)
 
+  def listExpiredTransferOffers(now: CantonTimestamp, limit: Int)(implicit
+      ec: ExecutionContext
+  ): Future[QueryResult[
+    Seq[JavaContract[
+      transferOffersCodegen.TransferOffer.ContractId,
+      transferOffersCodegen.TransferOffer,
+    ]]
+  ]] =
+    acs
+      .listContracts(transferOffersCodegen.TransferOffer.COMPANION)
+      .map(
+        _.map(cos =>
+          cos.iterator
+            .filter(co => now.toInstant.isAfter(co.payload.expiresAt))
+            .take(limit)
+            .toSeq
+        )
+      )
+
+  def listExpiredAcceptedTransferOffers(now: CantonTimestamp, limit: Int)(implicit
+      ec: ExecutionContext
+  ): Future[QueryResult[
+    Seq[JavaContract[
+      transferOffersCodegen.AcceptedTransferOffer.ContractId,
+      transferOffersCodegen.AcceptedTransferOffer,
+    ]]
+  ]] =
+    acs
+      .listContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION)
+      .map(
+        _.map(cos =>
+          cos.iterator
+            .filter(co => now.toInstant.isAfter(co.payload.expiresAt))
+            .take(limit)
+            .toSeq
+        )
+      )
+
+  def listSubscriptionStatesReadyForPayment(now: CantonTimestamp, limit: Int)(implicit
+      ec: ExecutionContext
+  ): Future[QueryResult[
+    Seq[JavaContract[
+      subsCodegen.SubscriptionIdleState.ContractId,
+      subsCodegen.SubscriptionIdleState,
+    ]]
+  ]] = {
+    def isReady(state: subsCodegen.SubscriptionIdleState) = now.toInstant.isAfter(
+      state.nextPaymentDueAt.minus(CoinUtil.relTimeToDuration(state.payData.paymentDuration))
+    )
+    acs
+      .listContracts(subsCodegen.SubscriptionIdleState.COMPANION)
+      .map(_.map(cos => cos.iterator.filter(co => isReady(co.payload)).take(limit).toSeq))
+  }
 }
 
 object UserWalletStore {

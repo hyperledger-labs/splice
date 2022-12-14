@@ -6,8 +6,9 @@ import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.wallet.UserWalletManager
-import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.time.Clock
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
@@ -15,7 +16,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
 /** Manages background automation for the UserWalletManager. */
 class WalletAutomationService(
     automationConfig: AutomationConfig,
-    clockConfig: ClockConfig,
+    clock: Clock,
     walletManager: UserWalletManager,
     ledgerClient: CoinLedgerClient,
     retryProvider: CoinRetries,
@@ -25,7 +26,7 @@ class WalletAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends AutomationService(automationConfig, clockConfig, retryProvider) {
+) extends AutomationService(automationConfig, clock, retryProvider) {
   private val connection = registerResource(ledgerClient.connection(this.getClass.getSimpleName))
 
   registerService(

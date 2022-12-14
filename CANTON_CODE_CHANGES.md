@@ -26,6 +26,7 @@ to know which and/or what changes we'll need to upstream before the switch.
 * Added `internalErrorGrpc` to `ErrorUtil`
 * Added `ApiClientRequestLogger` and factored out code shared with `ApiRequestLogger` 
 * Make `applicationId` in console methods configurable everywhere
+* Fixed a bug where `RemoteClock` was not waiting for a proper channel shudown
 ## Build system
 * Added refs to GH issues in project/DamlPlugin.sbt for two bugs
 * Added support for `damlDependencies` in SBT DamlPlugin

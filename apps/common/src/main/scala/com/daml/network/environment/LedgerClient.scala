@@ -1,7 +1,6 @@
 package com.daml.network.environment
 
 import akka.NotUsed
-import akka.actor.Cancellable
 import akka.stream.scaladsl.Source
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.grpc.adapter.client.akka.ClientAdapter
@@ -13,7 +12,6 @@ import com.daml.ledger.api.v1.admin.{
   PartyManagementServiceOuterClass,
   UserManagementServiceGrpc,
 }
-import com.daml.ledger.api.v1.testing.{TimeServiceGrpc, TimeServiceOuterClass}
 import com.daml.ledger.api.v1.{
   ActiveContractsServiceGrpc,
   CommandServiceGrpc,
@@ -43,12 +41,11 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.util.ErrorUtil
-import com.google.protobuf.{ByteString, Timestamp}
+import com.google.protobuf.ByteString
 import io.grpc.Channel
 import io.grpc.stub.{AbstractStub, StreamObserver}
 
 import java.io.Closeable
-import scala.concurrent.duration.*
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
 
@@ -79,8 +76,6 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     withCredentials(PartyManagementServiceGrpc.newStub(channel), token)
   val userManagementServiceStub: UserManagementServiceGrpc.UserManagementServiceStub =
     withCredentials(UserManagementServiceGrpc.newStub(channel), token)
-  val timeServiceStub: TimeServiceGrpc.TimeServiceStub =
-    withCredentials(TimeServiceGrpc.newStub(channel), token)
 
   private def wrapFuture[T](
       f: (StreamObserver[T] => Unit)
@@ -262,41 +257,6 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       case _ => throw new IllegalArgumentException("grantUserRights requires at least one right")
     }
     wrapFuture(userManagementServiceStub.grantUserRights(request, _)).map(_ => ())
-  }
-
-  def getTimeSource(): Source[TimeServiceOuterClass.GetTimeResponse, Cancellable] = {
-    // Based on its documentation, `GetTime` should give us updates whenever
-    // the ledger time changes. At the time of writing, this was broken
-    // however: we get no updates if the time is set via a different
-    // participant. As a workaround, we poll ourselves.
-    Source
-      .tick(0.millis, 500.millis, ())
-      .flatMapConcat(_ => {
-        val request = TimeServiceOuterClass.GetTimeRequest.newBuilder().build()
-        ClientAdapter.serverStreaming(request, timeServiceStub.getTime).take(1)
-      })
-      // Emit only when the time changes, just as `GetTime` normally would.
-      .statefulMapConcat(() => {
-        @SuppressWarnings(Array("org.wartremover.warts.Var"))
-        var lastNow: Option[Timestamp] = None
-
-        { response =>
-          {
-            val now = response.getCurrentTime()
-            if (lastNow.exists(now == _)) {
-              Nil
-            } else {
-              lastNow = Some(now)
-              response :: Nil
-            }
-          }
-        }
-      })
-  }
-
-  def getTime(): Future[TimeServiceOuterClass.GetTimeResponse] = {
-    val request = TimeServiceOuterClass.GetTimeRequest.newBuilder().build()
-    wrapFuture(timeServiceStub.getTime(request, _))
   }
 }
 

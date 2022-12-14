@@ -9,8 +9,9 @@ import com.daml.network.automation.{
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.scan.store.{CoinTransactionsIngestionSink, ScanStore}
-import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import io.opentelemetry.api.trace.Tracer
 
@@ -19,7 +20,7 @@ import scala.concurrent.ExecutionContextExecutor
 /** Manages background automation that runs on a CC Scan app. */
 class ScanAutomationService(
     automationConfig: AutomationConfig,
-    clockConfig: ClockConfig,
+    clock: Clock,
     svcParty: PartyId,
     ledgerClient: CoinLedgerClient,
     retryProvider: CoinRetries,
@@ -30,7 +31,7 @@ class ScanAutomationService(
     ec: ExecutionContextExecutor,
     mat: Materializer,
     tracer: Tracer,
-) extends AutomationService(automationConfig, clockConfig, retryProvider) {
+) extends AutomationService(automationConfig, clock, retryProvider) {
 
   private val connection = registerResource(ledgerClient.connection("ScanAutomationService"))
 

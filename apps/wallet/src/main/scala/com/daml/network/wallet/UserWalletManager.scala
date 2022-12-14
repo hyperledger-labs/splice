@@ -9,10 +9,11 @@ import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{HasHealth, JavaContract as Contract}
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
-import com.digitalasset.canton.config.{ClockConfig, ProcessingTimeout}
+import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.resource.Storage
+import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
@@ -25,7 +26,7 @@ class UserWalletManager(
     ledgerClient: CoinLedgerClient,
     val store: WalletStore,
     automationConfig: AutomationConfig,
-    clockConfig: ClockConfig,
+    clock: Clock,
     treasuryConfig: TreasuryConfig,
     storage: Storage,
     retryProvider: CoinRetries,
@@ -73,7 +74,7 @@ class UserWalletManager(
       key,
       this,
       automationConfig,
-      clockConfig,
+      clock,
       treasuryConfig,
       storage,
       retryProvider,
