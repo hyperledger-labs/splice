@@ -1,4 +1,9 @@
-import { Contract, useUserState } from 'common-frontend';
+import {
+  Contract,
+  DirectoryClientProvider,
+  useDirectoryClient,
+  useUserState,
+} from 'common-frontend';
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useEffect, useState } from 'react';
 
@@ -8,7 +13,6 @@ import {
   DirectoryLedgerApiClientProvider,
   useDirectoryLedgerApiClient,
 } from '../contexts/DirectoryLedgerApiContext';
-import { DirectoryClientProvider, useDirectoryClient } from '../contexts/DirectoryServiceContext';
 import { config } from '../utils';
 import DirectoryEntries from './DirectoryEntries';
 import RequestDirectoryEntry from './RequestDirectoryEntry';
