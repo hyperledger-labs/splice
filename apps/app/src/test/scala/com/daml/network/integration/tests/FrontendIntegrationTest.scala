@@ -178,16 +178,55 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
     ).fold(e => s"Failed to get network requests: $e", x => x)
   }
 
-  protected def completeAuth0LoginWithAuthorization(username: String, password: String)(implicit
+  protected def completeAuth0Login(username: String, password: String)(implicit
       webDriver: WebDriver
   ) = {
     clue("Auth0 login") {
       textField(id("username")).value = username
       find(id("password")).foreach(_.underlying.sendKeys(password))
       click on name("action") // complete password prompt
-      eventually()( // the authorization prompt takes a while to appear sometimes
-        click on xpath("//button[@value='accept']") // complete app authorization prompt
-      )
+    }
+  }
+
+  protected def completeAuth0LoginWithAuthorization(username: String, password: String)(implicit
+      webDriver: WebDriver
+  ) = {
+    completeAuth0Login(username, password)
+    completeOptionalAuth0Authorization(() => false)
+  }
+
+  /* Works independently of which prompts Auth0 shows you exactly.
+   * Use this if you want it to just work. */
+  protected def completeAuth0Prompts(
+      username: String,
+      password: String,
+      completedWhen: () => Boolean,
+  )(implicit
+      webDriver: WebDriver
+  ) = {
+    completeOptionalAuth0Login(username, password, completedWhen)
+    completeOptionalAuth0Authorization(completedWhen)
+  }
+
+  private def completeOptionalAuth0Login(
+      username: String,
+      password: String,
+      completedWhen: () => Boolean,
+  )(implicit
+      webDriver: WebDriver
+  ) = {
+    eventually()(
+      if (!completedWhen())
+        completeAuth0Login(username, password)
+    )
+  }
+
+  private def completeOptionalAuth0Authorization(
+      completedWhen: () => Boolean
+  )(implicit webDriver: WebDriver) = {
+    clue("Auth0 authorization") {
+      // the authorization prompt takes a while to appear sometimes
+      eventually()(if (!completedWhen()) click on xpath("//button[@value='accept']"))
     }
   }
 

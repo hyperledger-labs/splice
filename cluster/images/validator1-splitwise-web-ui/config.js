@@ -1,7 +1,8 @@
 window.canton_network_config = {
   auth: {
-    algorithm: "hs-256-unsafe",
-    secret: "test",
+    algorithm: "rs-256",
+    authority: "https://canton-network-dev.us.auth0.com",
+    client_id: "5RJeTm41IwUs8VbbnZHxFEPjCX5ojfaK",
     token_audience: "https://canton.network.global",
     token_scope: "daml_ledger_api",
   },

@@ -60,10 +60,11 @@ class PreflightIntegrationTest
     clue(s"Logging in and onboarding as user: ${user.email}") {
       go to walletUiUrl
       click on "oidc-login-button"
-
-      textField(id("username")).value = user.email
-      find(id("password")).foreach(_.underlying.sendKeys(user.password))
-      click on name("action") // complete password prompt
+      completeAuth0Prompts(
+        user.email,
+        user.password,
+        () => find(id("onboard-button")).isDefined,
+      )
 
       eventually() {
         find(id("onboard-button"))
@@ -237,10 +238,12 @@ class PreflightIntegrationTest
 
       go to directoryUiUrl
 
-      click on "user-id-field"
-      textField("user-id-field").value = aliceUser.id
-
-      click on "login-button"
+      click on "oidc-login-button"
+      completeAuth0Prompts(
+        aliceUser.email,
+        aliceUser.password,
+        () => find(id("entry-name-field")).isDefined,
+      )
 
       eventually() {
         find(id("entry-name-field"))
