@@ -46,9 +46,9 @@ class SplitwiseAutomationService(
     )
   )
 
-  registerNewStyleTrigger(
+  registerTrigger(
     new AcceptedAppPaymentRequestsTrigger(triggerContext, store, connection, scanConnection, readAs)
   )
-  registerNewStyleTrigger(new SplitwiseInstallRequestTrigger(triggerContext, store, connection))
-  registerNewStyleTrigger(new GroupRequestTrigger(triggerContext, store, connection))
+  registerTrigger(new SplitwiseInstallRequestTrigger(triggerContext, store, connection))
+  registerTrigger(new GroupRequestTrigger(triggerContext, store, connection))
 }

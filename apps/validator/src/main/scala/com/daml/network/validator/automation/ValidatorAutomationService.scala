@@ -1,6 +1,5 @@
 package com.daml.network.validator.automation
 
-import akka.stream.Materializer
 import com.daml.network.automation.{AcsIngestionService, AutomationService}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
@@ -22,7 +21,6 @@ class ValidatorAutomationService(
     override protected val timeouts: ProcessingTimeout,
 )(implicit
     ec: ExecutionContextExecutor,
-    mat: Materializer,
     tracer: Tracer,
 ) extends AutomationService(automationConfig, clock, retryProvider) {
 

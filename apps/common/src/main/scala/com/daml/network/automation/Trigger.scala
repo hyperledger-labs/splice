@@ -1,8 +1,8 @@
 package com.daml.network.automation
 
-import akka.NotUsed
-import akka.stream.Materializer
-import akka.stream.scaladsl.Source
+import akka.stream.scaladsl.{Keep, Sink, Source}
+import akka.stream.{KillSwitches, Materializer, UniqueKillSwitch}
+import akka.{Done, NotUsed}
 import cats.syntax.parallel.*
 import com.daml.ledger.javaapi.data.Template
 import com.daml.ledger.javaapi.data.codegen.{Contract, ContractCompanion, ContractId}
@@ -19,8 +19,8 @@ import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory,
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.FutureInstances.*
-import com.digitalasset.canton.util.LoggerUtil
 import com.digitalasset.canton.util.ShowUtil.*
+import com.digitalasset.canton.util.{AkkaUtil, LoggerUtil}
 import io.opentelemetry.api.trace.Tracer
 
 import java.util.concurrent.atomic.AtomicReference
@@ -115,43 +115,65 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends Trigger[T] {
+) extends Trigger[T]
+    with FlagCloseableAsync {
 
   /** The source from which to consume tasks. */
   protected def source: Source[T, NotUsed]
 
-  @SuppressWarnings(Array("org.wartremover.warts.Var"))
-  @volatile
-  private[this] var taskHandlerVar: Option[AutomationService.TaskHandlerService[T]] = None
+  private implicit val elc: ErrorLoggingContext =
+    ErrorLoggingContext(logger, Map.empty, TraceContext.empty)
+
+  private case class ExecutionHandle(killSwitch: UniqueKillSwitch, completed: Future[Done])
+
+  private[this] val executionHandleRef: AtomicReference[Option[ExecutionHandle]] =
+    new AtomicReference(None)
 
   override def run(): Unit = blocking {
+    // Using synchronized here, as we otherwise have to write cleanup code for recovering from a concurrent call
     synchronized {
-      require(taskHandlerVar.isEmpty, "Run must be called at most once!")
-      if (!isClosing) {
-        taskHandlerVar = Some(
-          new AutomationService.TaskHandlerService[T](
-            context.config,
-            source,
-            processTaskWithRetry,
-            false,
-            logger,
-            timeouts,
+      withNewTrace("run processing loop")(implicit tc =>
+        _ => {
+          require(executionHandleRef.get().isEmpty, "run was called twice")
+          logger.debug("Starting processing loop")
+          val (killSwitch: UniqueKillSwitch, completed: Future[Done]) = AkkaUtil.runSupervised(
+            logger.error("Fatally failed to handle task", _),
+            source
+              .viaMat(KillSwitches.single)(Keep.right)
+              .toMat(Sink.foreachAsync[T](context.config.parallelism)(processTaskWithRetry))(
+                Keep.both
+              ),
           )
-        )
-      }
+          executionHandleRef.set(Some(ExecutionHandle(killSwitch, completed)))
+        }
+      )
+
     }
   }
 
-  override def onClosed(): Unit = {
-    blocking {
-      synchronized {
-        taskHandlerVar.foreach(_.close())
-      }
-    }
-    super.onClosed()
-  }
+  override def isHealthy: Boolean = executionHandleRef.get().exists(!_.completed.isCompleted)
 
-  override def isHealthy: Boolean = taskHandlerVar.exists(_.isHealthy)
+  override protected def closeAsync(): Seq[AsyncOrSyncCloseable] = {
+    Seq[AsyncOrSyncCloseable](
+      SyncCloseable(
+        s"terminating processing loop",
+        executionHandleRef.get().foreach(_.killSwitch.shutdown()),
+      ),
+      AsyncCloseable(
+        "processing loop terminated",
+        executionHandleRef
+          .get()
+          .fold(Future.successful(Done.done()))(handle =>
+            handle.completed.recover(ex => {
+              // The retry loop terminates with the last exception it was retrying on. Ignore that.
+              logger.info("Ignoring exception due to shutdown", ex)(TraceContext.empty)
+              Done.done()
+            })
+          ),
+        timeouts.shutdownShort.unwrap,
+      ),
+    )
+  }
 
 }
 

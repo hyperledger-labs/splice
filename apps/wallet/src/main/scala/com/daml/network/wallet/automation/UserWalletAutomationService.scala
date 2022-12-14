@@ -40,10 +40,10 @@ class UserWalletAutomationService(
       timeouts,
     )
   )
-  registerNewStyleTrigger(new ExpireTransferOfferTrigger(triggerContext, store, connection))
-  registerNewStyleTrigger(new ExpireAcceptedTransferOfferTrigger(triggerContext, store, connection))
-  registerNewStyleTrigger(new SubscriptionReadyForPaymentTrigger(triggerContext, store, treasury))
-  registerNewStyleTrigger(
+  registerTrigger(new ExpireTransferOfferTrigger(triggerContext, store, connection))
+  registerTrigger(new ExpireAcceptedTransferOfferTrigger(triggerContext, store, connection))
+  registerTrigger(new SubscriptionReadyForPaymentTrigger(triggerContext, store, treasury))
+  registerTrigger(
     new AcceptedTransferOfferTrigger(triggerContext, store, treasury, connection)
   )
 

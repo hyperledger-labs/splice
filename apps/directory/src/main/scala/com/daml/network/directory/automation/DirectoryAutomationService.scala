@@ -44,18 +44,18 @@ class DirectoryAutomationService(
     )
   )
 
-  registerNewStyleTrigger(new DirectoryInstallRequestTrigger(triggerContext, store, connection))
+  registerTrigger(new DirectoryInstallRequestTrigger(triggerContext, store, connection))
 
-  registerNewStyleTrigger(
+  registerTrigger(
     new SubscriptionInitialPaymentTrigger(triggerContext, store, connection, scanConnection)
   )
-  registerNewStyleTrigger(
+  registerTrigger(
     new SubscriptionPaymentTrigger(triggerContext, store, connection, scanConnection)
   )
-  registerNewStyleTrigger(
+  registerTrigger(
     new ExpiredDirectoryEntryTrigger(triggerContext, store, connection)
   )
-  registerNewStyleTrigger(
+  registerTrigger(
     new ExpiredDirectorySubscriptionTrigger(triggerContext, store, connection)
   )
 }

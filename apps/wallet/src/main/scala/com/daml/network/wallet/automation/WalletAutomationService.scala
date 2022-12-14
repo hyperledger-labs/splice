@@ -39,5 +39,5 @@ class WalletAutomationService(
     )
   )
 
-  registerNewStyleTrigger(new WalletAppInstallTrigger(triggerContext, walletManager))
+  registerTrigger(new WalletAppInstallTrigger(triggerContext, walletManager))
 }

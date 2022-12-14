@@ -1,6 +1,5 @@
 package com.daml.network.scan.automation
 
-import akka.stream.Materializer
 import com.daml.network.automation.{
   AcsIngestionService,
   AuditLogIngestionService,
@@ -29,7 +28,6 @@ class ScanAutomationService(
     store: ScanStore,
 )(implicit
     ec: ExecutionContextExecutor,
-    mat: Materializer,
     tracer: Tracer,
 ) extends AutomationService(automationConfig, clock, retryProvider) {
 
