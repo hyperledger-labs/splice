@@ -178,17 +178,14 @@ class WalletIntegrationTest
               aliceWallet.config.damlUser,
               alice,
             )._2
-          // Reject it again
+          // Reject it so that we have a reference to an already archived app payment request
           aliceWallet.rejectAppPaymentRequest(request)
-          // ... such that we don't grab the ledger offset when some init txs are still occurring
-          val offsetBefore =
-            aliceValidator.remoteParticipantWithAdminToken.ledger_api.transactions.end()
 
-          // solo tap will kick off batch with only one coin operation
-          val transfer1F = Future(aliceWallet.tap(10))
+          // solo tap will kick off batch, which usually contains only one coin operation
+          val tap1F = Future(aliceWallet.tap(10))
 
-          // following three commands will be in one batch
-          val transfer2F = Future(aliceWallet.tap(10))
+          // following three commands will usually end up in one batch
+          val tap2F = Future(aliceWallet.tap(10))
           // fails because we don't have a payment request - so removed from batch & error is reported back
           val failedAcceptF = Future(
             loggerFactory.assertThrowsAndLogs[CommandFailure](
@@ -196,28 +193,19 @@ class WalletIntegrationTest
               _.errorMessage should include regex ("NOT_FOUND/.*AppPaymentRequest"),
             )
           )
-          val transfer3F = Future(aliceWallet.tap(10))
+          val tap3F = Future(aliceWallet.tap(10))
           // Wait for all futures to complete
-          transfer1F.futureValue
-          transfer2F.futureValue
-          transfer3F.futureValue
+          tap1F.futureValue
+          tap2F.futureValue
+          tap3F.futureValue
           failedAcceptF.futureValue
 
           eventually() {
             val coins = aliceWallet.list().coins
             // all four taps went through
             coins should have size 4
-            // but no money was deducted due to the transfer
+            // but no money was deducted as the app payment failed
             checkWallet(alice, aliceWallet, Seq((9, 10), (9, 10), (9, 10), (9, 10)))
-          }
-          eventually() {
-            val txs = aliceValidator.remoteParticipantWithAdminToken.ledger_api.transactions
-              .treesJava(Set(alice), completeAfter = 2, beginOffset = offsetBefore)
-            val createdCoinsInTx =
-              txs.map(DecodeUtil.decodeAllCreatedTree(coinCodegen.Coin.COMPANION)(_))
-            createdCoinsInTx(0) should have size 1
-            // two taps went through, even though transfer in same batch failed.
-            createdCoinsInTx(1) should have size 2
           }
       }
 
