@@ -163,7 +163,7 @@ Call `./scripts/check-todos.sh` to extract a list of all TODO comments in the pr
 and get a list of TODO comments that do not conform [Canton's TODO style guidelines](https://github.com/DACH-NY/canton/blob/main/contributing/README.md#todo-comments).
 Note that in contrast to these guidelines, we
 - disallow `FIXME` comments on `main`
-- use a double-number milestone format, e.g. `M1-92`
+- use a double-number milestone format, e.g. `M3-08`
 - ignore `.. todo::` comments in .rst files
 - use normal .rst comments, e.g., `.. TODO(M1-14): some left-over doc work`
 

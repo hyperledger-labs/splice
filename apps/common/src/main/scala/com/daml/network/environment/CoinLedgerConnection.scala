@@ -435,7 +435,7 @@ object CoinLedgerConnection {
         } yield partyId
       }
 
-      // TODO(M1-92): Factor out user/party allocation and make it robust (current implementation is racy)
+      // TODO(tech-debt): Factor out user/party allocation and make it robust (current implementation is racy)
       override def getOrAllocateParty(
           username: String,
           userRights: Seq[User.Right] = Seq.empty,
@@ -505,7 +505,7 @@ object CoinLedgerConnection {
             pkg.packageId,
             ByteString.readFrom(pkg.inputStream()),
           )
-          // TODO(M3-92): The ledger API does not block until the package is vetted.
+          // TODO(tech-debt): The ledger API does not block until the package is vetted.
           //  Need to wait a bit, or use the Canton admin API to upload the package (that one does block).
           _ = Threading.sleep(500)
           _ = logger.info(s"Package ${pkg.packageId} is uploaded")
@@ -517,10 +517,10 @@ object CoinLedgerConnection {
       )(implicit traceContext: TraceContext): Future[Unit] = {
         for {
           darFile <- Future { ByteString.readFrom(Files.newInputStream(path)) }
-          // TODO(M3-92) Consider if we want to be clever
+          // TODO(tech-debt) Consider if we want to be clever
           // and only upload if it has not already been uploaded.
           _ <- client.uploadDarFile(darFile)
-          // TODO(M3-92): The ledger API does not block until the package is vetted.
+          // TODO(tech-debt): The ledger API does not block until the package is vetted.
           //  Need to wait a bit, or use the Canton admin API to upload the package (that one does block).
           _ = Threading.sleep(500)
           _ = logger.info(s"DAR $path is uploaded")

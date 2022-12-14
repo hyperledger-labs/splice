@@ -142,7 +142,7 @@ export class LedgerApiClient {
     filter
       .getFiltersByPartyMap()
       .set(p, new Filters().setInclusive(new InclusiveFilters().setTemplateIdsList([templateId])));
-    // TODO(M1-92) Avoid relying on verbose mode. This needs changes in decoding of the protobuf values.
+    // TODO(tech-debt) Avoid relying on verbose mode. This needs changes in decoding of the protobuf values.
     const request = new GetActiveContractsRequest().setFilter(filter).setVerbose(true);
     const response = this.activeContractsServiceClient.getActiveContracts(request, this.metaData);
     const contracts = await new Promise<Contract<T>[]>(resolve => {

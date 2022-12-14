@@ -277,7 +277,7 @@ pay app sender recipient coinQuantity msg = do
 -- The left-over quantity is kept.
 payWithTransferFeeRatio : CCApp -> CCUser -> Party -> Decimal -> Decimal -> Text -> Script ()
 payWithTransferFeeRatio app sender recipient coinQuantity transferFeeRatio msg = do
-  -- TODO(M1-92): create payment pre-approval flow and use that here instead of submitMulti
+  -- TODO(tech-debt): create payment pre-approval flow and use that here instead of submitMulti
   readAs <- getUserReadAs sender.userId
   coins <- unlockedCoins sender.primaryParty
   let transfer = API.Transfer with
@@ -305,7 +305,7 @@ lockTo1 : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Text -> Script ()
 lockTo1 app sender lockHolder coinQuantity lockDuration msg = do
   now <- getTime
   readAs <- getUserReadAs sender.userId
-  -- TODO(M1-92): create payment pre-approval flow and use that here instead of submitMulti
+  -- TODO(tech-debt): create payment pre-approval flow and use that here instead of submitMulti
   coins <- unlockedCoins sender.primaryParty
   let transfer = API.Transfer with
         sender = sender.primaryParty

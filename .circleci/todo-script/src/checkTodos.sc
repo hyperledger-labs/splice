@@ -239,7 +239,7 @@ def numsToIssue(str: String): IssueBucket =
   }
 
 val tags: List[RegexCategory] = List(
-  Tag(List("tech-debt")), // treat this like an alias for M1-92
+  Tag(List("tech-debt")),
   Tag(List("Mx-90")),
 )
 

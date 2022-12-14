@@ -225,7 +225,7 @@ class TreasuryService(
         )
         .recover(ex => {
           if (this.isClosing) {
-            // TODO(M1-92): we have too many of these guards for closing -- see whether there is a better way, and thereby squeeze out the lurking concurrency and shutdown problems.
+            // TODO(tech-debt): we have too many of these guards for closing -- see whether there is a better way, and thereby squeeze out the lurking concurrency and shutdown problems.
             logger.info("Ignoring batch execution failure, as we are shutting down", ex)
           } else
             logger.error("Skipping batch due to unexpected execution failure", ex)
@@ -296,7 +296,7 @@ class TreasuryService(
         case () <- if (outcomes.exerciseResult.asScala.forall(isErrorOutcome)) {
           // We must not wait in this case, as the store won't see that offset until the next action comes,
           // as the transaction filter is in the way
-          // TODO(M1-92): remove this fragility of depending on the exact daml transaction to determine whether to wait or not
+          // TODO(tech-debt): remove this fragility of depending on the exact daml transaction to determine whether to wait or not
           Future.unit
         } else {
           logger.debug(show"Waiting for store to ingest offset ${offset.singleQuoted}")

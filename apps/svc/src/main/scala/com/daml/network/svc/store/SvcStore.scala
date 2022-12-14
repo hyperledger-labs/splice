@@ -19,7 +19,7 @@ trait SvcStore extends AutoCloseable {
   def svcParty: PartyId
 
   /** Audit log store */
-  // TODO(M1-92): build common infrastructure for such audit-log stores and inline its functions
+  // TODO(tech-debt): build common infrastructure for such audit-log stores and inline its functions
   val events: SvcEventsStore
 
   /** The sink to use for ingesting data from the ledger into this store. */

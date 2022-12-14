@@ -75,7 +75,7 @@ object CoinUtil {
   lazy val defaultHoldingFee =
     new cc.fees.RatePerRound(damlNumeric(1.0 / 360.0 / (24.0 * 60.0 / 2.5)))
 
-  // TODO(M1-92) surely there's a better way to define Daml Numeric values in Scala
+  // TODO(tech-debt) surely there's a better way to define Daml Numeric values in Scala
   def damlNumeric(x: Double): java.math.BigDecimal =
     BigDecimal(x).setScale(10, BigDecimal.RoundingMode.HALF_EVEN).bigDecimal
 

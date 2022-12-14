@@ -88,7 +88,7 @@ class DirectoryIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
                     val requestId = aliceDirectory.requestDirectoryInstall()
                     // Issue a concurrent archival for all except the first three requests
                     if (3 <= i) {
-                      // TODO(M1-92): get rid of this ugly archive argument once https://github.com/digital-asset/daml/issues/15540 is resolved
+                      // TODO(tech-debt): get rid of this ugly archive argument once https://github.com/digital-asset/daml/issues/15540 is resolved
                       val cmd =
                         requestId.exerciseArchive(
                           new com.daml.network.codegen.java.da.internal.template.Archive()

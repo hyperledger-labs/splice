@@ -6,7 +6,7 @@ import com.daml.network.util.{ExerciseNode, WalletTestUtil}
 
 import scala.concurrent.duration.*
 
-// TODO(M1-92): Add tests that cover all possible CoinEvents
+// TODO(tech-debt): Add tests that cover all possible CoinEvents
 class ScanIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
 
   "restart cleanly" in { implicit env =>

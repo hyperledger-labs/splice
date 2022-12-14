@@ -114,13 +114,16 @@ object BuildCommon {
         IO.copyFile(srcFile, dstFile)
         Seq(dstFile)
       }.taskValue,
-      cleanFiles += { (Compile / resourceDirectory).value / "dar" },
+      cleanFiles += {
+        (Compile / resourceDirectory).value / "dar"
+      },
     )
   }
 
   lazy val sbtSettings: Seq[Def.Setting[_]] = {
 
     def alsoTest(taskName: String) = s";$taskName; Test / $taskName"
+
     val globalSettings = Seq(
       name := "coin",
       // Automatically reload sbt project when sbt build definition files change
@@ -140,7 +143,7 @@ object BuildCommon {
       Global / excludeLintKeys += `canton-community-common` / autoAPIMappings,
       Global / excludeLintKeys += `canton-community-domain` / autoAPIMappings,
       Global / excludeLintKeys += `canton-community-participant` / autoAPIMappings,
-//      Global / excludeLintKeys += `demo` / autoAPIMappings,
+      //      Global / excludeLintKeys += `demo` / autoAPIMappings,
       Global / excludeLintKeys += `canton-functionmeta` / autoAPIMappings,
       Global / excludeLintKeys += `canton-slick-fork` / autoAPIMappings,
       Global / excludeLintKeys += `canton-daml-fork` / autoAPIMappings,
@@ -243,7 +246,7 @@ object BuildCommon {
           |  rpc_allow_google_protobuf_empty_requests: true
           |  rpc_allow_google_protobuf_empty_responses: true
           |  except:
-          |    # TODO(M1-92): enable this by changing our v0 prefix to v1
+          |    # TODO(tech-debt): enable this by changing our v0 prefix to v1
           |    - PACKAGE_VERSION_SUFFIX
           |  ignore:
           |    # Ignoring proto packages with these prefixes as they are external dependencies
@@ -251,7 +254,7 @@ object BuildCommon {
           |    - google
           |    - scalapb
           |    - com/digitalasset/canton
-          |    # TODO(M1-92): ignore also the non-external project dependencies
+          |    # TODO(tech-debt): ignore also the non-external project dependencies
           |""".stripMargin,
       )
       // call buf tool
@@ -277,14 +280,14 @@ object BuildCommon {
     Test / testOptions += Tests
       .Argument("-C", "com.digitalasset.canton.LogReporter"),
     // Commented out from Canton OS repo because we don't have code coverage tests yet
-//    // Ignore daml codegen generated files from code coverage
-//    coverageExcludedFiles := formatCoverageExcludes(
-//      """
-//        |<empty>
-//        |.*sbt-buildinfo.BuildInfo
-//        |.*daml-codegen.*
-//      """
-//    ),
+    //    // Ignore daml codegen generated files from code coverage
+    //    coverageExcludedFiles := formatCoverageExcludes(
+    //      """
+    //        |<empty>
+    //        |.*sbt-buildinfo.BuildInfo
+    //        |.*daml-codegen.*
+    //      """
+    //    ),
     scalacOptions += "-Wconf:src=src_managed/.*:silent",
   )
 

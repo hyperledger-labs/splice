@@ -6,7 +6,7 @@ import DA.List as List
 import qualified DA.Map as Map
 import qualified DA.Set as Set
 
--- TODO(M1-92) factor this one out of CC into its own library
+-- TODO(tech-debt) factor this one out of CC into its own library
 import CN.Util.Assert
 import CC.Coin
 import CC.Round

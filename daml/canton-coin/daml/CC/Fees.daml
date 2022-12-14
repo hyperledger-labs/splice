@@ -30,7 +30,7 @@ newtype RatePerRound = RatePerRound with rate : Decimal
 chargeRatePerRound : RatePerRound -> RelRound -> Decimal
 chargeRatePerRound rate dt = rate.rate * intToDecimal dt.diff
 
--- | TODO(M1-92): better name
+-- | TODO(tech-debt): better name
 spentWithRatePerRound : RatePerRound -> Decimal -> RelRound
 spentWithRatePerRound rate quantity =  RelRound (ceiling $ quantity / rate.rate)
 

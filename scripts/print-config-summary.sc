@@ -3,8 +3,8 @@ import scala.collection.mutable
 
 import com.daml.network.config.CoinConfig
 
-// TODO(M1-92): make it easier/automatic to select the input config files
-// TODO(M1-92): print daml user names used in the config
+// TODO(tech-debt): make it easier/automatic to select the input config files
+// TODO(tech-debt): print daml user names used in the config
 object ConfigSummaryPrinter extends App {
 
   if (args.isEmpty) {

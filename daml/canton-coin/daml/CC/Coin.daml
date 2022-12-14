@@ -796,7 +796,7 @@ preprocessAndSummarizeOutputs config sender outs = do
                 | otherwise ->
                 let transferFee = chargeSteppedRate config.transferFee quantity
                     -- NOTE: only part of the transferFee is attributed to and minable by the receiver
-                    -- TODO(M1-92): check that this does not loose fee quantity
+                    -- TODO(tech-debt): check that this does not loose fee quantity
                     receiverTransferFee = transferFee * (1.0 - senderTransferFeeRatio)
                     senderTransferFee = transferFee - receiverTransferFee
                 in (receiverTransferFee, senderTransferFee, PreprocessedFixedOutput $ quantity - receiverTransferFee)
