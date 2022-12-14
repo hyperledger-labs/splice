@@ -165,7 +165,7 @@ abstract class OnCreateTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T
     tracer: Tracer,
 ) extends SourceBasedTrigger[JavaContract[TCid, T]] {
 
-  override final protected val source: Source[JavaContract[TCid, T], NotUsed] =
+  override protected val source: Source[JavaContract[TCid, T], NotUsed] =
     acs.streamContracts(templateCompanion)
 
   override final protected def isStaleTask(
@@ -174,6 +174,7 @@ abstract class OnCreateTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T
     acs
       .lookupContractById(templateCompanion)(task.contractId)
       .map(_.value.isEmpty)
+
 }
 
 /** A trigger based on regularly polling for new tasks.

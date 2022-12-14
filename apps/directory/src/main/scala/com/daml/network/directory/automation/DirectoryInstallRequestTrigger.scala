@@ -47,7 +47,7 @@ class DirectoryInstallRequestTrigger(
         directoryCodegen.DirectoryInstallRequest.ContractId,
         directoryCodegen.DirectoryInstallRequest,
       ]
-  )(implicit tc: TraceContext): Future[Some[String]] = {
+  )(implicit tc: TraceContext): Future[Option[String]] = {
     val user = PartyId.tryFromProtoPrimitive(req.payload.user)
     val provider = store.providerParty
     store.lookupInstallByUser(user).flatMap {

@@ -37,7 +37,7 @@ class SubscriptionPaymentTrigger(
         subsCodegen.SubscriptionPayment.ContractId,
         subsCodegen.SubscriptionPayment,
       ]
-  )(implicit tc: TraceContext): Future[Some[String]] = {
+  )(implicit tc: TraceContext): Future[Option[String]] = {
     val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
       payment.payload.subscriptionData.context
     )
