@@ -52,6 +52,8 @@ all network indices must be odd numbers.
   - See `LocalRunbookIntegrationTest.scala`
 - `15`: Simulated time
   - See `simple-topology.conf` with ports bumped by 10k, `simple-topology-canton-simtime.conf`
+- `25`: Toxi-proxy ports
+  - See `simple-topology.conf` with ports bumped by 20k (currently for the ledger API, but may be extended for other connections in the future)
 
 ### Allocated APIs
 

@@ -27,14 +27,14 @@ case class UseToxiproxy()
         val lapiHost = svc.remoteParticipant.ledgerApi.clientConfig.address
         val lapiPort = svc.remoteParticipant.ledgerApi.clientConfig.port
         val upstream = s"${lapiHost}:${lapiPort}"
-        val listenPort = lapiPort + 1000
+        val listenPort = lapiPort + 20000
         val listen = s"localhost:${listenPort}"
         val name = "svc-ledger-api"
         val proxy = client.createProxy(name, listen, upstream)
         proxies += (name -> proxy)
         svc
           .focus(_.remoteParticipant.ledgerApi.clientConfig)
-          .modify(c => c.copy(port = c.port + 1000))
+          .modify(c => c.copy(port = c.port + 20000))
       })
     }
     config.focus(_.svcApp).modify(svc => transformSvc(svc))
