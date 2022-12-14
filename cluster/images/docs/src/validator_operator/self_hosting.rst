@@ -47,7 +47,7 @@ root directory. The commands will look similar to these:
 
 .. parsed-literal::
 
-  tar xvf |version|\_coin-0.1.0-SNAPSHOT.tar
+  tar xzvf |version|\_coin-0.1.0-SNAPSHOT.tar.gz
   cd coin-0.1.0-SNAPSHOT
 
 Onboarding Validator
@@ -141,7 +141,9 @@ Peer-to-peer transfers consist of three steps:
 
 In our example, Alice creates the transfer offer for bob::
 
-  @ val expiration = Primitive.Timestamp.discardNanos(Instant.now().plus(5, ChronoUnit.MINUTES)).getOrElse(sys.error("Failed to convert timestamp"))
+  @ import com.digitalasset.canton.data.CantonTimestamp
+  @ import java.time.Duration
+  @ val expiration = CantonTimestamp.now().plus(Duration.ofMinutes(10))
   @ val transferOffer = aliceWallet.createTransferOffer(bobParty, 10.0, "p2ptransfer", expiration)
 
 Bob can then see the transfer offer: ::
@@ -227,8 +229,13 @@ Auth0 Example IAM Setup
 To integrate Auth0 as your validator's IAM provider, perform the following:
 
 1. Create an Auth0 tenant for your validator
-2. Create an Application in the tenant using the "Single Page Application" template
-3. Note your app's "Domain" and "Client ID" values
+2. Create an Application in the tenant - in Auth0:
+    a. Navigate to Applications -> Applications, and click the "Create Application" button
+    b. Choose "Single Page Application", and click Create
+3. Take note of some relevant values that you will use to configure your backend and frontend:
+    a. Your app's "Domain" (at the top of your application's settings page)
+    b. Your app's "Client ID" (at the top of your application's settings page)
+    c. Your app's JWKS endpoint (at the bottom of your application's settings page, under "Advanced Settings"->"Endpoints"->"JSON Web Key Set")
 4. Determine the URL for your validator's wallet UI (if you've been following this runbook guide, it will be ``http://localhost:3000``)
 5. In the Auth0 application settings, add the wallet URL to the following:
 
@@ -238,32 +245,38 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
    - "Allowed Origins (CORS)"
 
 6. Save your application settings
-7. Modify the ``auth`` config for ``validator.conf``
+
+7. Create an API for your application - in Auth0:
+    a. Navigate to Applications > APIs and click "Create API". Name can be anything, set identifier to https://canton.network.global (that is the audience that we will configure the backend to expect)
+    b. under the Permissions tab in the new API, add a permission with scope "daml_ledger_api", and a description of your choice
+
+8. Modify the ``auth`` section in your backend configuration, under wallet-app-backends.walletApp at ``examples/validator/validator.conf``
 
   ::
 
     auth {
       algorithm = "rs-256"
       audience = "https://canton.network.global"
-      jwks-url = "<AUTH0_DOMAIN_URL>"
+      jwks-url = "<JWKS_ENDPOINT from step 3c above>"
     }
 
-8. Kill the running CN apps process started at the beginning, and restart them
+9. Kill the running CN apps process started at the beginning, and restart them
 
   ::
 
     bin/coin --config examples/validator/validator.conf
 
-9. In the extracted release bundle on your machine, navigate to ``web-uis/wallet``
-10. Edit ``config.js`` and replace the self-signed auth config with a suitable OAuth one
+  (Note that the way the validator's bootstrap script is currently implemented, this requires restarting also the participant, or commenting out creating the user in the ``examples/validator/validator.canton``).
+
+10. Modify the ``auth`` section in your frontend configuration, at ``web-uis/wallet/config.js``
 
   ::
 
     auth: {
       algorithm: "rs-256",
-      domain: "<AUTH0_DOMAIN_URL>",
-      clientId: "<AUTH0_CLIENT_ID>",
-      redirectUri: window.location.origin,
+      authority: "https://<AUTH0_DOMAIN_URL from step 3a above>",
+      client_id: "<AUTH0_CLIENT_ID from step 3b above>",
+      token_audience: "https://canton.network.global"
     },
 
 11. Refresh your browser with the wallet UI, and click the "Log in with OAuth2" button
