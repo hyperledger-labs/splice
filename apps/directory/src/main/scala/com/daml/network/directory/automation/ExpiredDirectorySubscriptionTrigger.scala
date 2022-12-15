@@ -26,9 +26,9 @@ class ExpiredDirectorySubscriptionTrigger(
   ): Future[Seq[DirectoryStore.IdleDirectorySubscription]] =
     store.listExpiredDirectorySubscriptions(now, limit)
 
-  override protected def processTask(
+  override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[DirectoryStore.IdleDirectorySubscription]
-  )(implicit tc: TraceContext): Future[Option[String]] = {
+  )(implicit tc: TraceContext): Future[String] = {
     val cmd = task.work.state.contractId.exerciseSubscriptionIdleState_ExpireSubscription(
       store.providerParty.toProtoPrimitive
     )
@@ -38,7 +38,7 @@ class ExpiredDirectorySubscriptionTrigger(
         readAs = Seq(),
         commands = cmd.commands.asScala.toSeq,
       )
-      .map(_ => Some(s"archived expired directory subscription"))
+      .map(_ => s"archived expired directory subscription")
   }
 
   override protected def isStaleTask(

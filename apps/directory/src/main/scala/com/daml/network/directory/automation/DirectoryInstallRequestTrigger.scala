@@ -42,12 +42,12 @@ class DirectoryInstallRequestTrigger(
     90 * 24 * 60 * 60 * 1_000_000L
   )
 
-  override def processTask(
+  override def completeTask(
       req: JavaContract[
         directoryCodegen.DirectoryInstallRequest.ContractId,
         directoryCodegen.DirectoryInstallRequest,
       ]
-  )(implicit tc: TraceContext): Future[Option[String]] = {
+  )(implicit tc: TraceContext): Future[String] = {
     val user = PartyId.tryFromProtoPrimitive(req.payload.user)
     val provider = store.providerParty
     store.lookupInstallByUser(user).flatMap {
@@ -57,7 +57,7 @@ class DirectoryInstallRequestTrigger(
           .exerciseDirectoryInstallRequest_Reject()
         connection
           .submitCommandsNoDedup(Seq(provider), Seq(), cmd.commands.asScala.toSeq)
-          .map(_ => Some("rejected request for already existing installation."))
+          .map(_ => "rejected request for already existing installation.")
 
       case QueryResult(off, None) =>
         val arg = new directoryCodegen.DirectoryInstallRequest_Accept(
@@ -80,7 +80,7 @@ class DirectoryInstallRequestTrigger(
             ),
             deduplicationOffset = off,
           )
-          .map(_ => Some("accepted install request."))
+          .map(_ => "accepted install request.")
     }
   }
 

@@ -28,12 +28,12 @@ class GroupRequestTrigger(
       splitwiseCodegen.GroupRequest,
     ](store.acs, splitwiseCodegen.GroupRequest.COMPANION) {
 
-  override def processTask(
+  override def completeTask(
       req: JavaContract[
         splitwiseCodegen.GroupRequest.ContractId,
         splitwiseCodegen.GroupRequest,
       ]
-  )(implicit tc: TraceContext): Future[Some[String]] = {
+  )(implicit tc: TraceContext): Future[String] = {
     val provider = store.providerParty
     val user = PartyId.tryFromProtoPrimitive(req.payload.group.owner)
     val groupId = req.payload.group.id
@@ -45,7 +45,7 @@ class GroupRequestTrigger(
         val cmd = req.contractId.exerciseGroupRequest_Reject()
         connection
           .submitWithResultNoDedup(Seq(provider), Seq(), cmd)
-          .map(_ => Some("rejected request for already existing group."))
+          .map(_ => "rejected request for already existing group.")
 
       case QueryResult(off, None) =>
         val acceptCmd = req.contractId.exerciseGroupRequest_Accept().commands.asScala.toSeq
@@ -61,7 +61,7 @@ class GroupRequestTrigger(
             ),
             deduplicationOffset = off,
           )
-          .map(_ => Some("accepted group request."))
+          .map(_ => "accepted group request.")
     }
   }
 }

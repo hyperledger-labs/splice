@@ -28,12 +28,12 @@ class CoinRulesRequestTrigger(
       cc.coin.CoinRulesRequest,
     ](store.acs, cc.coin.CoinRulesRequest.COMPANION) {
 
-  override def processTask(
+  override def completeTask(
       req: JavaContract[
         cc.coin.CoinRulesRequest.ContractId,
         cc.coin.CoinRulesRequest,
       ]
-  )(implicit tc: TraceContext): Future[Some[String]] = {
+  )(implicit tc: TraceContext): Future[String] = {
     val validatorParty = PartyId.tryFromProtoPrimitive(req.payload.user)
     for {
       QueryResult(_, openMiningRounds) <- store.acs.listContracts(
@@ -54,7 +54,7 @@ class CoinRulesRequestTrigger(
         .toSeq
       // No command-dedup required, as the CoinRules contract is archived and recreated
       _ <- connection.submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds)
-    } yield Some(s"accepted coin rules request from $validatorParty")
+    } yield s"accepted coin rules request from $validatorParty"
   }
 
 }

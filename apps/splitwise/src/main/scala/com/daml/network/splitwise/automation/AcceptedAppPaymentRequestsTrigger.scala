@@ -36,12 +36,12 @@ class AcceptedAppPaymentRequestsTrigger(
       walletCodegen.AcceptedAppPayment,
     ](store.acs, walletCodegen.AcceptedAppPayment.COMPANION) {
 
-  override def processTask(
+  override def completeTask(
       payment: JavaContract[
         walletCodegen.AcceptedAppPayment.ContractId,
         walletCodegen.AcceptedAppPayment,
       ]
-  )(implicit tc: TraceContext): Future[Some[String]] = {
+  )(implicit tc: TraceContext): Future[String] = {
     val provider = store.providerParty
     val sender = PartyId.tryFromProtoPrimitive(payment.payload.sender)
     val transferInProgressId = splitwiseCodegen.TransferInProgress.ContractId.unsafeFromInterface(
@@ -60,7 +60,7 @@ class AcceptedAppPaymentRequestsTrigger(
               readAs = Seq.empty,
               commands = cmd.commands.asScala.toSeq,
             )
-            .map(_ => Some(s"rejected accepted app payment: $msg"))
+            .map(_ => s"rejected accepted app payment: $msg")
         } yield res
       case QueryResult(_, Some(install)) =>
         for {
@@ -88,7 +88,7 @@ class AcceptedAppPaymentRequestsTrigger(
             readAs = readAsWithValidatorUser.toSeq,
             commands = cmd.commands.asScala.toSeq,
           )
-        } yield Some("accepted payment and completed transfer")
+        } yield "accepted payment and completed transfer"
     }
   }
 }

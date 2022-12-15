@@ -47,12 +47,12 @@ class AcceptedTransferOfferTrigger(
         acceptedOffer.payload.sender == store.key.endUserParty.toProtoPrimitive
       )
 
-  override def processTask(
+  override def completeTask(
       acceptedOffer: JavaContract[
         transferOffersCodegen.AcceptedTransferOffer.ContractId,
         transferOffersCodegen.AcceptedTransferOffer,
       ]
-  )(implicit tc: TraceContext): Future[Option[String]] = {
+  )(implicit tc: TraceContext): Future[String] = {
     val operation = new CO_CompleteAcceptedTransfer(acceptedOffer.contractId)
     treasury
       .enqueueCoinOperation(operation)
@@ -72,7 +72,7 @@ class AcceptedTransferOfferTrigger(
 
           }
         case _: installCodegen.coinoperationoutcome.COO_CompleteAcceptedTransfer =>
-          Future(Some("completed accepted transfer offer"))
+          Future("completed accepted transfer offer")
 
         case unknownResult =>
           val msg = s"Unexpected coin-operation result $unknownResult"
@@ -83,7 +83,7 @@ class AcceptedTransferOfferTrigger(
   private def abortAcceptedTransferOffer(
       acceptedOffer: JavaContract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer],
       reason: String,
-  )(implicit tc: TraceContext): Future[Option[String]] = {
+  )(implicit tc: TraceContext): Future[String] = {
     for {
       install <- store.getInstall()
       cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Abort(
@@ -95,7 +95,7 @@ class AcceptedTransferOfferTrigger(
           Seq(store.key.validatorParty, store.key.endUserParty),
           cmd,
         )
-    } yield Some(s"aborted accepted transfer offer, $reason")
+    } yield s"aborted accepted transfer offer, $reason"
   }
 
 }

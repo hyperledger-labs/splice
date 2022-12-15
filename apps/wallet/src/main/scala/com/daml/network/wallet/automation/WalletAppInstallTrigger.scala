@@ -24,19 +24,19 @@ class WalletAppInstallTrigger(
     ](walletManager.store.acs, installCodegen.WalletAppInstall.COMPANION) {
 
   // TODO(#763): not handling archive events, uninstalling wallets without a restart is not supported yet
-  override def processTask(
+  override def completeTask(
       install: JavaContract[
         installCodegen.WalletAppInstall.ContractId,
         installCodegen.WalletAppInstall,
       ]
-  )(implicit tc: TraceContext): Future[Option[String]] =
+  )(implicit tc: TraceContext): Future[String] =
     Future {
       val endUserName = install.payload.endUserName
       if (walletManager.getOrCreateUserWallet(install))
-        Some(s"onboarded wallet end-user '$endUserName'")
+        s"onboarded wallet end-user '$endUserName'"
       else {
         logger.warn(s"Unexpected duplicate on-boarding of wallet user '$endUserName'")
-        Some(s"skipped duplicate on-boarding wallet end-user '$endUserName'")
+        s"skipped duplicate on-boarding wallet end-user '$endUserName'"
       }
     }
 

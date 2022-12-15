@@ -28,12 +28,12 @@ class SplitwiseInstallRequestTrigger(
       splitwiseCodegen.SplitwiseInstallRequest,
     ](store.acs, splitwiseCodegen.SplitwiseInstallRequest.COMPANION) {
 
-  override def processTask(
+  override def completeTask(
       req: JavaContract[
         splitwiseCodegen.SplitwiseInstallRequest.ContractId,
         splitwiseCodegen.SplitwiseInstallRequest,
       ]
-  )(implicit tc: TraceContext): Future[Some[String]] = {
+  )(implicit tc: TraceContext): Future[String] = {
     val user = PartyId.tryFromProtoPrimitive(req.payload.user)
     val provider = store.providerParty
     store.lookupInstall(user).flatMap {
@@ -42,7 +42,7 @@ class SplitwiseInstallRequestTrigger(
         val cmd = req.contractId.exerciseSplitwiseInstallRequest_Reject()
         connection
           .submitWithResultNoDedup(Seq(provider), Seq(), cmd)
-          .map(_ => Some("rejected request for already existing installation."))
+          .map(_ => "rejected request for already existing installation.")
 
       case QueryResult(off, None) =>
         val acceptCmd =
@@ -58,7 +58,7 @@ class SplitwiseInstallRequestTrigger(
             ),
             deduplicationOffset = off,
           )
-          .map(_ => Some("accepted install request."))
+          .map(_ => "accepted install request.")
     }
   }
 }

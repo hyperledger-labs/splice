@@ -44,9 +44,9 @@ class AdvanceOpenMiningRoundTrigger(
     } yield result.toList
 
   /** How to process a task. */
-  override protected def processTask(
+  override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]
-  )(implicit tc: TraceContext): Future[Option[String]] = {
+  )(implicit tc: TraceContext): Future[String] = {
     val rounds = task.work.openRounds
     val cmds = task.work.coinRulesId
       .exerciseCoinRules_AdvanceOpenMiningRounds(
@@ -61,9 +61,7 @@ class AdvanceOpenMiningRoundTrigger(
     connection
       .submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds)
       .map(_ =>
-        Some(
-          s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
-        )
+        s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
       )
   }
 

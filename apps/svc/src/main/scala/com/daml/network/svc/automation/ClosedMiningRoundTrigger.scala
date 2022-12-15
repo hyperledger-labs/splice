@@ -26,12 +26,12 @@ class ClosedMiningRoundTrigger(
       cc.round.ClosedMiningRound,
     ](store.acs, cc.round.ClosedMiningRound.COMPANION) {
 
-  override def processTask(
+  override def completeTask(
       closedRound: JavaContract[
         cc.round.ClosedMiningRound.ContractId,
         cc.round.ClosedMiningRound,
       ]
-  )(implicit tc: TraceContext): Future[Some[String]] = {
+  )(implicit tc: TraceContext): Future[String] = {
     for {
       coinRules <- store.getCoinRules()
       // TODO(M3-06): claim unclaimed rewards
@@ -44,7 +44,7 @@ class ClosedMiningRoundTrigger(
         .toSeq
       _ <-
         connection.submitCommandsNoDedup(Seq(store.svcParty), Seq.empty, cmd)
-    } yield Some(s"successfully archived closed mining round $closedRound")
+    } yield s"successfully archived closed mining round $closedRound"
   }
 
 }

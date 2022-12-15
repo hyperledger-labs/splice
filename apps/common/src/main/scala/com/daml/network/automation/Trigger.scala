@@ -48,24 +48,42 @@ abstract class Trigger[T: Pretty](implicit
   protected def timeouts: ProcessingTimeout = context.timeouts
   protected def loggerFactory: NamedLoggerFactory = context.loggerFactory
 
-  /** How to process a task. */
-  protected def processTask(task: T)(implicit tc: TraceContext): Future[Option[String]]
+  /**  How to complete a task.
+    *
+    * This MUST take all the actions necessary such that 'isStaleTask' returns false after successful completion.
+    * We do not support tasks that should be retried after a specific delay. If you do need such support,
+    * then we recommend changing the Daml workflows such that the ledger records that the task has been postponed.
+    *
+    * We make this decision to always require a task-handler to make  progress to avoid problems with restarts
+    * and slow-downs from too eager polling of tasks.
+    *
+    * If you find an example where that is not possible, then let's talk :)
+    *
+    * @return a short description of how the task was completed, i.e, its outcome
+    */
+  protected def completeTask(task: T)(implicit tc: TraceContext): Future[String]
 
-  /** How to check whether a task has become stale and can be skipped. */
+  /** How to check whether a task has become stale and can be skipped.
+    *
+    * Note that a task can become stale for reasons other than 'completeTask' succeeding,
+    * as there can be concurrent actions submitted to the ledger that make the task stale;
+    * e.g., another party archiving a contract representing a request.
+    */
   protected def isStaleTask(task: T)(implicit tc: TraceContext): Future[Boolean]
 
   /** Run this trigger in the background. MUST be called exactly once. */
   def run(): Unit
 
-  final protected def processTaskWithRetry(task: T): Future[Unit] =
+  /** Processes the task with a retry and returns whether that was successful. */
+  final protected def processTaskWithRetry(task: T): Future[Boolean] =
     // Creating a new trace here, as multiple requests can be processed in parallel.
     withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
-      def processTaskWithStalenessCheck(): Future[Option[String]] =
-        processTask(task).recoverWith { case ex =>
+      def processTaskWithStalenessCheck(): Future[String] =
+        completeTask(task).recoverWith { case ex =>
           logger.info("Checking whether the task is stale, as its processing failed with ", ex)
           isStaleTask(task).transform {
             case Success(true) =>
-              Success(Some(show"skipped, as the task has become stale"))
+              Success(show"skipped, as the task has become stale")
             case Success(false) =>
               Failure(ex)
             case Failure(staleCheckEx) =>
@@ -82,15 +100,13 @@ abstract class Trigger[T: Pretty](implicit
           callingService = this,
         )
         .transform {
-          // TODO(#1968): review whether we can get rid of the Option here so that every task's outcome is logged
           case Success(outcomeO) =>
             outcomeO match {
-              case None => Success(())
-              case Some(outcome) =>
+              case outcome =>
                 logger.info(
                   show"Completed processing with outcome: ${outcome.unquoted}"
                 )
-                Success(())
+                Success(true)
             }
           case Failure(ex) =>
             if (this.isClosing) {
@@ -105,7 +121,9 @@ abstract class Trigger[T: Pretty](implicit
               )
 
             // Here we recover from the failure so that processing can continue for other tasks.
-            Success(())
+            // We signal though that we failed, so that the polling loop doesn't loop tightly when
+            // all its tasks fail processing.
+            Success(false)
         }
     }
 }
@@ -134,13 +152,18 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
     synchronized {
       withNewTrace("run processing loop")(implicit tc =>
         _ => {
+          def go(task: T): Future[Unit] = processTaskWithRetry(task).map(_ =>
+            // ignoring the return value here, as we don't care anymore about whether the task was successful or not
+            ()
+          )
+
           require(executionHandleRef.get().isEmpty, "run was called twice")
           logger.debug("Starting processing loop")
           val (killSwitch: UniqueKillSwitch, completed: Future[Done]) = AkkaUtil.runSupervised(
             logger.error("Fatally failed to handle task", _),
             source
               .viaMat(KillSwitches.single)(Keep.right)
-              .toMat(Sink.foreachAsync[T](context.config.parallelism)(processTaskWithRetry))(
+              .toMat(Sink.foreachAsync[T](context.config.parallelism)(go))(
                 Keep.both
               ),
           )
@@ -314,16 +337,14 @@ abstract class PollingTrigger[T: Pretty]()(implicit
     }
   }
 
+  /** Returns whether some useful work was done, i.e., at least one task completed. */
   private def retrieveAndProcessTasks()(implicit traceContext: TraceContext): Future[Boolean] =
     for {
       tasks <- retrieveTasks()
       // TODO(M3-83): review our triggers for whether the task retrieval for time-based triggers performs sufficiently well
       // TODO(M3-83): consider building support for batching the commands resulting from the different tasks
-      case () <- tasks.parTraverse_(processTaskWithRetry)
-    } yield
-    //  We return 'false' here to always loop with a delay, as we have one case (unfunded subscription payments) that would otherwise loop tightly
-    // TODO(#1968): switch this to be more specific as to whether skipping was requested
-    false
+      tasksSucceeded <- tasks.parTraverse(processTaskWithRetry)
+    } yield tasksSucceeded.exists(succeeded => succeeded)
 
   override def closeAsync(): Seq[AsyncOrSyncCloseable] =
     Seq(

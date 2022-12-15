@@ -32,12 +32,12 @@ class SubscriptionInitialPaymentTrigger(
       subsCodegen.SubscriptionInitialPayment,
     ](store.acs, subsCodegen.SubscriptionInitialPayment.COMPANION) {
 
-  override def processTask(
+  override def completeTask(
       payment: JavaContract[
         subsCodegen.SubscriptionInitialPayment.ContractId,
         subsCodegen.SubscriptionInitialPayment,
       ]
-  )(implicit tc: TraceContext): Future[Option[String]] = {
+  )(implicit tc: TraceContext): Future[String] = {
     val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
       payment.payload.subscriptionData.context
     )
@@ -46,7 +46,7 @@ class SubscriptionInitialPaymentTrigger(
       val cmd = payment.contractId.exerciseSubscriptionInitialPayment_Reject(transferContext)
       connection
         .submitWithResultNoDedup(Seq(store.providerParty), Seq(), cmd)
-        .map(_ => Some(s"rejected initial subscription payment: $reason"))
+        .map(_ => s"rejected initial subscription payment: $reason")
     }
     def collectPayment(
         entryName: String,
@@ -69,7 +69,7 @@ class SubscriptionInitialPaymentTrigger(
             commandId = DirectoryUtil.createDirectoryEntryCommandId(store.providerParty, entryName),
             deduplicationOffset = offset,
           )
-      } yield Some("created directory entry.")
+      } yield "created directory entry."
     }
     for {
       context <- store.acs

@@ -28,12 +28,12 @@ class ExpiredDirectoryEntryTrigger(
       directoryCodegen.DirectoryEntry.COMPANION,
     ) {
 
-  override protected def processTask(
+  override protected def completeTask(
       co: ScheduledTaskTrigger.ReadyTask[JavaContract[
         directoryCodegen.DirectoryEntry.ContractId,
         directoryCodegen.DirectoryEntry,
       ]]
-  )(implicit tc: TraceContext): Future[Option[String]] = {
+  )(implicit tc: TraceContext): Future[String] = {
     val cmd =
       co.work.contractId.exerciseDirectoryEntry_Expire(store.providerParty.toProtoPrimitive)
     connection
@@ -42,6 +42,6 @@ class ExpiredDirectoryEntryTrigger(
         readAs = Seq(),
         commands = cmd.commands.asScala.toSeq,
       )
-      .map(_ => Some(s"archived expired entry"))
+      .map(_ => s"archived expired entry")
   }
 }

@@ -25,12 +25,12 @@ class SummarizingMiningRoundTrigger(
       cc.round.SummarizingMiningRound,
     ](store.acs, cc.round.SummarizingMiningRound.COMPANION) {
 
-  override def processTask(
+  override def completeTask(
       summarizingRound: JavaContract[
         cc.round.SummarizingMiningRound.ContractId,
         cc.round.SummarizingMiningRound,
       ]
-  )(implicit tc: TraceContext): Future[Some[String]] = {
+  )(implicit tc: TraceContext): Future[String] = {
     for {
       rewards <- queryRewards(summarizingRound.payload.round.number)
       totalBurn = rewards.totalBurn
@@ -45,9 +45,7 @@ class SummarizingMiningRoundTrigger(
         )
       cid <-
         connection.submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
-    } yield Some(
-      s"successfully archived summarizing mining round with burn ${totalBurn}, and created issuing mining round with cid $cid"
-    )
+    } yield s"successfully archived summarizing mining round with burn ${totalBurn}, and created issuing mining round with cid $cid"
   }
 
   /** The rewards issued for a given round.

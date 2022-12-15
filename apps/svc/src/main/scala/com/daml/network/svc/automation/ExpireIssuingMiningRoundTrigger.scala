@@ -28,11 +28,11 @@ class ExpireIssuingMiningRoundTrigger(
       cc.round.IssuingMiningRound.COMPANION,
     ) {
 
-  override protected def processTask(
+  override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[
         JavaContract[IssuingMiningRound.ContractId, IssuingMiningRound]
       ]
-  )(implicit tc: TraceContext): Future[Option[String]] = {
+  )(implicit tc: TraceContext): Future[String] = {
     val round = task.work
     val totals = store.getTotalsForRound(round.payload.round.number)
     for {
@@ -49,6 +49,6 @@ class ExpireIssuingMiningRoundTrigger(
         )
       cid <- connection
         .submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
-    } yield Some(s"successfully created the closed mining round with cid $cid")
+    } yield s"successfully created the closed mining round with cid $cid"
   }
 }

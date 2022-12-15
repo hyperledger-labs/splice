@@ -27,14 +27,14 @@ class ExpireTransferOfferTrigger(
       transferOffersCodegen.TransferOffer.COMPANION,
     ) {
 
-  override protected def processTask(
+  override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[
         JavaContract[
           transferOffersCodegen.TransferOffer.ContractId,
           transferOffersCodegen.TransferOffer,
         ]
       ]
-  )(implicit tc: TraceContext): Future[Option[String]] = {
+  )(implicit tc: TraceContext): Future[String] = {
     for {
       install <- store.getInstall()
       cmd = install.contractId.exerciseWalletAppInstall_TransferOffer_Expire(
@@ -47,6 +47,6 @@ class ExpireTransferOfferTrigger(
           Seq(store.key.validatorParty, store.key.endUserParty),
           cmd,
         )
-    } yield Some("expired transfer offer")
+    } yield "expired transfer offer"
   }
 }

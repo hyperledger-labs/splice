@@ -32,12 +32,12 @@ class SubscriptionPaymentTrigger(
       subsCodegen.SubscriptionPayment,
     ](store.acs, subsCodegen.SubscriptionPayment.COMPANION) {
 
-  override def processTask(
+  override def completeTask(
       payment: JavaContract[
         subsCodegen.SubscriptionPayment.ContractId,
         subsCodegen.SubscriptionPayment,
       ]
-  )(implicit tc: TraceContext): Future[Option[String]] = {
+  )(implicit tc: TraceContext): Future[String] = {
     val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
       payment.payload.subscriptionData.context
     )
@@ -47,7 +47,7 @@ class SubscriptionPaymentTrigger(
       val cmd = payment.contractId.exerciseSubscriptionPayment_Reject(transferContext).commands
       connection
         .submitCommandsNoDedup(Seq(provider), Seq(), cmd.asScala.toSeq)
-        .map(_ => Some(s"rejected subscription payment: $reason"))
+        .map(_ => s"rejected subscription payment: $reason")
     }
     def collectPayment(
         entry: JavaContract[
@@ -74,7 +74,7 @@ class SubscriptionPaymentTrigger(
             commandId = DirectoryUtil.createDirectoryEntryCommandId(provider, entry.payload.name),
             deduplicationOffset = offset,
           )
-      } yield Some("renewed directory entry.")
+      } yield "renewed directory entry."
     }
     for {
       context <- store.acs
