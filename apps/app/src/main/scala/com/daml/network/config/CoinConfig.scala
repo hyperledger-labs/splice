@@ -380,6 +380,8 @@ object CoinConfig {
       deriveReader[AuthTokenSourceConfig.None]
     implicit val authTokenSourceStaticReader: ConfigReader[AuthTokenSourceConfig.Static] =
       deriveReader[AuthTokenSourceConfig.Static]
+    implicit val authTokenSourceSelfSignedReader: ConfigReader[AuthTokenSourceConfig.SelfSigned] =
+      deriveReader[AuthTokenSourceConfig.SelfSigned]
     implicit val authTokenSourceCCReader: ConfigReader[AuthTokenSourceConfig.ClientCredentials] =
       deriveReader[AuthTokenSourceConfig.ClientCredentials]
     implicit val authTokenSourceConfigReader: ConfigReader[AuthTokenSourceConfig] =
@@ -456,6 +458,8 @@ object CoinConfig {
       deriveWriter[AuthTokenSourceConfig.None]
     implicit val authTokenSourceStaticWriter: ConfigWriter[AuthTokenSourceConfig.Static] =
       deriveWriter[AuthTokenSourceConfig.Static]
+    implicit val authTokenSourceSelfSignedWriter: ConfigWriter[AuthTokenSourceConfig.SelfSigned] =
+      deriveWriter[AuthTokenSourceConfig.SelfSigned]
     implicit val authTokenSourceCCWriter: ConfigWriter[AuthTokenSourceConfig.ClientCredentials] =
       deriveWriter[AuthTokenSourceConfig.ClientCredentials]
     implicit val authTokenSourceConfigWriter: ConfigWriter[AuthTokenSourceConfig] =

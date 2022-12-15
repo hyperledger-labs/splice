@@ -9,6 +9,7 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import com.daml.network.auth.JwtCallCredential
 
 final case class UserInfo(
     primaryParty: PartyId,
@@ -19,6 +20,7 @@ final class ValidatorConnection(
     config: ClientConfig,
     timeouts: ProcessingTimeout,
     loggerFactory: NamedLoggerFactory,
+    credentials: JwtCallCredential,
 )(implicit ec: ExecutionContextExecutor)
     extends AppConnection(config, timeouts, loggerFactory) {
 
@@ -42,7 +44,7 @@ final class ValidatorConnection(
       case Some(userInfo) => Future.successful(userInfo)
       case None =>
         for {
-          userInfo <- runCmd(GrpcValidatorAppClient.GetValidatorUserInfo())
+          userInfo <- runCmd(GrpcValidatorAppClient.GetValidatorUserInfo(), Some(credentials))
         } yield {
           // The party id never changes so we don’t need to worry about concurrent setters writing different values.
           validatorRef.set(Some(userInfo))

@@ -70,11 +70,13 @@ class WalletApp(
           loggerFactory,
         )
       }
+      validatorAuthToken <- AuthTokenSource.fromConfig(config.validatorAuth, loggerFactory).getToken
       validatorConnection <- Future {
         new ValidatorConnection(
           config.validator.clientAdminApi,
           coinAppParameters.processingTimeouts,
           loggerFactory,
+          new JwtCallCredential(validatorAuthToken.getOrElse("")),
         )
       }
       validatorUserInfo <- retryProvider.retryForAutomation(

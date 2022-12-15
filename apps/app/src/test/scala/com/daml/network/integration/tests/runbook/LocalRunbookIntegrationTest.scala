@@ -45,6 +45,9 @@ class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScr
       .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpSvcParticipantPortsBy(2000)(conf))
       .addConfigTransform((_, conf) => remoteScanAddressToLocalhost(conf))
       .addConfigTransform((_, conf) => remoteParticipantAddressToLocalhost(conf))
+      .addConfigTransforms((_, conf) =>
+        CoinConfigTransforms.useSelfSignedTokensForWalletValidatorApiAuth("test")(conf)
+      )
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))
       .withThisSetup(env => {
         import env._

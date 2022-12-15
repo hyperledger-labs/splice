@@ -10,6 +10,7 @@ import com.daml.network.scan.config.RemoteScanAppConfig
 import com.digitalasset.canton.config.*
 
 import java.nio.file.Path
+import com.daml.network.auth.AuthConfig
 
 case class AppInstance(
     serviceUser: String,
@@ -21,6 +22,7 @@ case class LocalValidatorAppConfig(
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     damlUser: String,
     walletServiceUser: String,
+    auth: AuthConfig,
     appInstances: Map[String, AppInstance],
     remoteParticipant: CoinRemoteParticipantConfig,
     remoteScan: RemoteScanAppConfig,

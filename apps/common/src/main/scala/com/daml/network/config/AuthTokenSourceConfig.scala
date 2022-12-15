@@ -17,6 +17,14 @@ object AuthTokenSourceConfig {
       adminToken: Option[String],
   ) extends AuthTokenSourceConfig
 
+  /** Settings for generating self-signed tokens. Use for testing purposes only. */
+  final case class SelfSigned(
+      audience: String,
+      user: String,
+      secret: String,
+      adminToken: Option[String],
+  ) extends AuthTokenSourceConfig
+
   /** Using OAuth client credentials flow to acquire tokens */
   final case class ClientCredentials(
       /** URL for the well-known OpenID configuration, see https://openid.net/specs/openid-connect-discovery-1_0.html */

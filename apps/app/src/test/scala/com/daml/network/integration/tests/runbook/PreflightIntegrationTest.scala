@@ -131,6 +131,9 @@ class PreflightIntegrationTest
       .addConfigTransforms((_, conf) => CoinConfigTransforms.addDamlNameSuffix("preflight")(conf))
       .addConfigTransforms((_, conf) => CoinConfigTransforms.ensureNovelDamlNames()(conf))
       .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy(1000)(conf))
+      .addConfigTransforms((_, conf) =>
+        CoinConfigTransforms.useSelfSignedTokensForWalletValidatorApiAuth("test")(conf)
+      )
       // Disable autostart, because our apps require the participant to be connected to a domain
       // when the app starts. The apps are started manually in `validator-participant.canton` below.
       .addConfigTransforms((_, conf) => conf.focus(_.parameters.manualStart).replace(true))

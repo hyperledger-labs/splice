@@ -31,7 +31,7 @@ class WalletAppClientReference(
   override protected val instanceType = "Wallet user"
 
   private def token: String = {
-    AuthUtil.testTokenBearer(
+    AuthUtil.testToken(
       audience = AuthUtil.testAudience,
       user = config.damlUser,
     )

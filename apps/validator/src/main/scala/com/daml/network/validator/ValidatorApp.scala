@@ -30,6 +30,12 @@ import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
+import io.grpc.ServerInterceptors
+import com.daml.network.auth.AuthInterceptor
+import com.daml.network.auth.SignatureVerifier
+import com.daml.network.auth.AuthConfig
+import com.daml.network.auth.HMACVerifier
+import com.daml.network.auth.RSAVerifier
 
 /** Class representing a Validator app instance. */
 class ValidatorApp(
@@ -259,19 +265,31 @@ class ValidatorApp(
       _ <- createCoinRulesRequest(connection, store, svcParty, validatorParty)
       _ <- waitForCoinRules(connection, store, svcParty, validatorParty)
     } yield {
+
+      val verifier: SignatureVerifier = config.auth match {
+        case AuthConfig.Hs256Unsafe(audience, secret) => new HMACVerifier(audience, secret)
+        case AuthConfig.Rs256(audience, jwksUrl) => new RSAVerifier(audience, jwksUrl)
+      }
+
       adminServerRegistry
         .addService(
-          ValidatorAppServiceGrpc.bindService(
-            new GrpcValidatorAppService(
-              ledgerClient,
-              store,
-              config.damlUser,
-              config.walletServiceUser,
-              retryProvider,
-              this,
+          ServerInterceptors.intercept(
+            ValidatorAppServiceGrpc.bindService(
+              new GrpcValidatorAppService(
+                ledgerClient,
+                store,
+                config.damlUser,
+                config.walletServiceUser,
+                retryProvider,
+                this,
+                loggerFactory,
+              ),
+              ec,
+            ),
+            new AuthInterceptor(
+              verifier,
               loggerFactory,
             ),
-            ec,
           )
         )
         .discard

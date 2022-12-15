@@ -7,6 +7,8 @@ import com.daml.network.validator.config.{LocalValidatorAppConfig, RemoteValidat
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
+import com.daml.network.auth.AuthUtil
+import com.daml.network.auth.JwtCallCredential
 
 /** Single local validator app reference. Defines the console commands that can be run against a local validator
   * app reference.
@@ -18,11 +20,14 @@ abstract class ValidatorAppReference(
 
   override protected val instanceType = "Validator"
 
+  protected def token: String
+  private def callCredentials = Some(new JwtCallCredential(token))
+
   @Help.Summary("Get validator user info")
   @Help.Description("Return the user info of the validator operator")
   def getValidatorUserInfo(): UserInfo = {
     consoleEnvironment.run {
-      adminCommand(GrpcValidatorAppClient.GetValidatorUserInfo())
+      adminCommand(GrpcValidatorAppClient.GetValidatorUserInfo(), callCredentials)
     }
   }
 
@@ -36,7 +41,7 @@ abstract class ValidatorAppReference(
                       |Return the newly set up partyId.""".stripMargin)
   def onboardUser(user: String): PartyId = {
     consoleEnvironment.run {
-      adminCommand(GrpcValidatorAppClient.OnboardUserCommand(user))
+      adminCommand(GrpcValidatorAppClient.OnboardUserCommand(user), callCredentials)
     }
   }
 }
@@ -49,6 +54,13 @@ final class LocalValidatorAppReference(
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "Local Validator"
+
+  override def token: String = {
+    AuthUtil.testToken(
+      audience = AuthUtil.testAudience,
+      user = config.damlUser,
+    )
+  }
 
   protected val nodes = consoleEnvironment.environment.validators
 
@@ -88,6 +100,8 @@ final class RemoteValidatorAppReference(
 ) extends ValidatorAppReference(consoleEnvironment, name)
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
+
+  override def token: String = ""
 
   override protected val instanceType = "Remote Validator"
 }

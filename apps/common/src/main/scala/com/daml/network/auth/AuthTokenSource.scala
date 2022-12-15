@@ -25,6 +25,15 @@ class AuthTokenSourceStatic(
     Future.successful(Some(token))
 }
 
+class AuthTokenSourceSelfSigned(
+    audience: String,
+    user: String,
+    secret: String,
+) extends AuthTokenSource {
+  override def getToken(implicit tc: TraceContext): Future[Option[String]] =
+    Future.successful(Some(AuthUtil.testTokenSecret(audience, user, secret)))
+}
+
 class AuthTokenSourceOAuthClientCredentials(
     wellKnownConfigUrl: String,
     clientId: String,
@@ -52,6 +61,8 @@ object AuthTokenSource {
       new AuthTokenSourceNone()
     case AuthTokenSourceConfig.Static(token, _) =>
       new AuthTokenSourceStatic(token)
+    case AuthTokenSourceConfig.SelfSigned(audience, user, secret, _) =>
+      new AuthTokenSourceSelfSigned(audience, user, secret)
     case AuthTokenSourceConfig.ClientCredentials(
           wellKnownConfigUrl,
           clientId,

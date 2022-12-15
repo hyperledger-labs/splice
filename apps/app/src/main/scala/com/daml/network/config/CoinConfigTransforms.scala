@@ -148,6 +148,7 @@ object CoinConfigTransforms {
       ensureNovelDamlNames(),
       enableLedgerApiAuthForLocalParticipants("test"),
       useSelfSignedTokensForLedgerApiAuth("test"),
+      useSelfSignedTokensForWalletValidatorApiAuth("test"),
       reducePollingInterval,
     )
   }
@@ -424,6 +425,15 @@ object CoinConfigTransforms {
     c.copy(
       authConfig = AuthTokenSourceConfig.Static(userToken, Some(adminToken))
     )
+  }
+
+  def useSelfSignedTokensForWalletValidatorApiAuth(
+      secret: String
+  ): CoinConfigTransform = {
+    updateAllWalletAppBackendConfigs_(c => {
+      val userToken = AuthUtil.testToken(AuthUtil.testAudience, c.serviceUser)
+      c.copy(validatorAuth = AuthTokenSourceConfig.Static(userToken, None))
+    })
   }
 
   /** Canton has a built in authorizer that accepts "canton admin tokens",

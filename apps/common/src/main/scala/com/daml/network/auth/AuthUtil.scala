@@ -24,15 +24,16 @@ object AuthUtil {
       audience: String,
       user: String,
   ): String = {
+    testTokenSecret(audience, user, testSecret)
+  }
+
+  def testTokenSecret(audience: String, user: String, secret: String): String = {
     JWT
       .create()
       .withSubject(user)
       .withAudience(audience)
-      .sign(testSignatureAlgorithm)
+      .sign(Algorithm.HMAC256(secret))
   }
-
-  def testTokenBearer(audience: String, user: String): String =
-    s"Bearer ${testToken(audience, user)}"
 
   object LedgerApi {
 

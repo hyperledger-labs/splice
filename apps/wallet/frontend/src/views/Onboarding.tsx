@@ -1,5 +1,4 @@
 import { useUserState } from 'common-frontend';
-import { OnboardUserRequest } from 'common-protobuf/com/daml/network/validator/v0/validator_service_pb';
 import { useState } from 'react';
 
 import { Button, Grid, Typography } from '@mui/material';
@@ -17,7 +16,7 @@ const Onboarding: React.FC<{ onOnboard: () => Promise<void> }> = ({ onOnboard })
 
   const onOnboardUser = async () => {
     setOnboardClicked(true);
-    await validatorClient.onboardUser(new OnboardUserRequest().setName(userId), undefined);
+    await validatorClient.onboardUser(userId);
     await onOnboard();
   };
 
