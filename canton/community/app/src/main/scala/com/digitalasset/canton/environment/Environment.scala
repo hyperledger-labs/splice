@@ -4,6 +4,8 @@
 package com.digitalasset.canton.environment
 
 import akka.actor.ActorSystem
+import cats.instances.option.*
+import cats.syntax.apply.*
 import cats.syntax.either.*
 import cats.syntax.foldable.*
 import cats.syntax.traverse.*
@@ -23,7 +25,7 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.domain.DomainNodeBootstrap
 import com.digitalasset.canton.environment.CantonNodeBootstrap.HealthDumpFunction
 import com.digitalasset.canton.environment.Environment.*
-import com.digitalasset.canton.health.HealthServer
+import com.digitalasset.canton.health.{HealthCheck, HealthServer}
 import com.digitalasset.canton.lifecycle.Lifecycle
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.MetricsFactory
@@ -50,7 +52,7 @@ import scala.util.control.NonFatal
   */
 trait Environment extends NamedLogging with AutoCloseable with NoTracing {
 
-  // TODO(matthias): Remove this, once the cyclic class initialization has been fixed upstream.
+  // TODO(i10999): Remove this, once the cyclic class initialization has been fixed upstream.
   //  https://digitalasset.atlassian.net/browse/DPP-1303
   //  Background: https://www.farside.org.uk/201510/deadlocks_in_java_class_initialisation
   LedgerApiErrors.discard
@@ -220,10 +222,15 @@ trait Environment extends NamedLogging with AutoCloseable with NoTracing {
   protected val testingTimeService = new TestingTimeService(clock, () => simClocks)
   // public for buildDocs task to be able to construct a fake participant and domain to document available metrics via reflection
   val metricsFactory = MetricsFactory.forConfig(config.monitoring.metrics)
+
+  protected lazy val healthCheck: Option[HealthCheck] = config.monitoring.health.map(config =>
+    HealthCheck(config.check, metricsFactory.health, timeouts, loggerFactory)(this)
+  )
+
   private val healthServer =
-    config.monitoring.health.map(
-      HealthServer(_, metricsFactory.health, timeouts, loggerFactory)(this)
-    )
+    (healthCheck, config.monitoring.health).mapN { case (check, config) =>
+      new HealthServer(check, config.server.address, config.server.port, timeouts, loggerFactory)
+    }
 
   private val envQueueSize = () => executionContext.queueSize.toLong
   metricsFactory.forEnv.registerExecutionContextQueueSize(envQueueSize)

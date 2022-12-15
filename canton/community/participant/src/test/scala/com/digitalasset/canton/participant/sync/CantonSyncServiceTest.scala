@@ -8,7 +8,6 @@ import cats.Id
 import cats.data.EitherT
 import cats.implicits.*
 import com.daml.ledger.participant.state.v2.ChangeId
-import com.daml.ledger.participant.state.v2.Update.TransactionAccepted
 import com.daml.lf.CantonOnly
 import com.daml.lf.data.{ImmArray, Ref}
 import com.daml.lf.transaction.CommittedTransaction
@@ -25,8 +24,9 @@ import com.digitalasset.canton.config.{
 }
 import com.digitalasset.canton.crypto.{Fingerprint, SyncCryptoApiProvider}
 import com.digitalasset.canton.data.CantonTimestamp
+import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.logging.SuppressingLogger
-import com.digitalasset.canton.participant.LedgerSyncEvent
+import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.admin.{
   AdminWorkflowConfig,
   PackageService,
@@ -35,7 +35,6 @@ import com.digitalasset.canton.participant.admin.{
 }
 import com.digitalasset.canton.participant.config.{
   LedgerApiServerParametersConfig,
-  ParticipantNodeParameters,
   ParticipantProtocolConfig,
   ParticipantStoreConfig,
   PartyNotificationConfig,
@@ -50,6 +49,7 @@ import com.digitalasset.canton.participant.store.memory.{
   InMemoryParticipantEventLog,
   InMemoryParticipantSettingsStore,
 }
+import com.digitalasset.canton.participant.sync.LedgerSyncEvent.TransactionAccepted
 import com.digitalasset.canton.participant.sync.TimestampedEvent.EventId
 import com.digitalasset.canton.participant.topology.{
   LedgerServerPartyNotifier,
@@ -91,14 +91,18 @@ import scala.jdk.FutureConverters.*
 class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExecutionContext {
 
   private val LocalNodeParameters = ParticipantNodeParameters(
-    tracing = TracingConfig(TracingConfig.Propagation.Disabled),
-    delayLoggingThreshold = NonNegativeFiniteDuration.ofMillis(5000),
-    enableAdditionalConsistencyChecks = true,
-    loggingConfig = LoggingConfig(api = ApiLoggingConfig(messagePayloads = Some(true))),
-    logQueryCost = None,
-    processingTimeouts = DefaultProcessingTimeouts.testing,
-    enablePreviewFeatures = false,
-    nonStandardConfig = false,
+    general = CantonNodeParameters.General.Impl(
+      tracing = TracingConfig(TracingConfig.Propagation.Disabled),
+      delayLoggingThreshold = NonNegativeFiniteDuration.ofMillis(5000),
+      enableAdditionalConsistencyChecks = true,
+      loggingConfig = LoggingConfig(api = ApiLoggingConfig(messagePayloads = Some(true))),
+      logQueryCost = None,
+      processingTimeouts = DefaultProcessingTimeouts.testing,
+      enablePreviewFeatures = false,
+      nonStandardConfig = false,
+      cachingConfigs = CachingConfigs(),
+      sequencerClient = SequencerClientConfig(),
+    ),
     partyChangeNotification = PartyNotificationConfig.Eager,
     adminWorkflow = AdminWorkflowConfig(
       bongTestMaxLevel = 10,
@@ -108,12 +112,10 @@ class CantonSyncServiceTest extends FixtureAnyWordSpec with BaseTest with HasExe
     maxUnzippedDarSize = 10,
     stores = ParticipantStoreConfig(
       maxItemsInSqlClause = PositiveNumeric.tryCreate(10),
-      maxPruningBatchSize = 10,
+      maxPruningBatchSize = PositiveNumeric.tryCreate(10),
       acsPruningInterval = NonNegativeFiniteDuration.ofSeconds(30),
       dbBatchAggregationConfig = BatchAggregatorConfig.defaultsForTesting,
     ),
-    cachingConfigs = CachingConfigs(),
-    sequencerClient = SequencerClientConfig(),
     transferTimeProofFreshnessProportion = NonNegativeInt.tryCreate(3),
     protocolConfig = ParticipantProtocolConfig(
       Some(testedProtocolVersion),

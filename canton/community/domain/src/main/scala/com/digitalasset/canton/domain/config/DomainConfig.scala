@@ -11,8 +11,6 @@ import com.digitalasset.canton.domain.sequencing.sequencer.CommunitySequencerCon
 import com.digitalasset.canton.networking.grpc.CantonServerBuilder
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.time.{DomainTimeTrackerConfig, NonNegativeFiniteDuration}
-import com.digitalasset.canton.tracing.TracingConfig
-import com.digitalasset.canton.version.ProtocolVersion
 import io.netty.handler.ssl.SslContext
 import monocle.macros.syntax.lens.*
 
@@ -47,10 +45,12 @@ trait PublicServerConfig extends ServerConfig {
 
   override def serverCertChainFile: Option[ExistingFile] = tls.map(_.certChainFile)
 
+  /** overrides the default maximum request size in bytes on the sequencer node */
+  def overrideMaxRequestSize: Option[NonNegativeInt]
+
   /** This setting has no effect. Therfore hardcoding it to 0.
     */
   override final def maxInboundMessageSize: NonNegativeInt = NonNegativeInt.tryCreate(0)
-
   def connection: String = {
     val scheme = tls.fold("http")(_ => "https")
     s"$scheme://$address:$port"
@@ -66,24 +66,9 @@ case class CommunityPublicServerConfig(
       NonNegativeFiniteDuration.ofMinutes(1),
     override val tokenExpirationTime: NonNegativeFiniteDuration =
       NonNegativeFiniteDuration.ofHours(1),
+    override val overrideMaxRequestSize: Option[NonNegativeInt] = None,
 ) extends PublicServerConfig
     with CommunityServerConfig
-
-case class DomainNodeParameters(
-    tracing: TracingConfig,
-    delayLoggingThreshold: NonNegativeFiniteDuration,
-    loggingConfig: LoggingConfig,
-    logQueryCost: Option[QueryCostMonitoringConfig],
-    enableAdditionalConsistencyChecks: Boolean,
-    enablePreviewFeatures: Boolean,
-    processingTimeouts: ProcessingTimeout,
-    sequencerClient: SequencerClientConfig,
-    cachingConfigs: CachingConfigs,
-    nonStandardConfig: Boolean,
-    devVersionSupport: Boolean,
-    dontWarnOnDeprecatedPV: Boolean,
-    initialProtocolVersion: ProtocolVersion,
-) extends LocalNodeParameters
 
 object DomainBaseConfig {
 

@@ -14,10 +14,11 @@ import com.digitalasset.canton.crypto.{
   DomainSyncCryptoClient,
   PublicKey,
 }
-import com.digitalasset.canton.domain.config.{DomainBaseConfig, DomainConfig, DomainNodeParameters}
+import com.digitalasset.canton.domain.config.{DomainBaseConfig, DomainConfig}
 import com.digitalasset.canton.domain.topology.*
 import com.digitalasset.canton.domain.topology.client.DomainInitializationObserver
 import com.digitalasset.canton.domain.topology.store.RegisterTopologyTransactionResponseStore
+import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.lifecycle.{FlagCloseable, Lifecycle}
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.protocol.messages.DomainTopologyTransactionMessage
@@ -125,7 +126,7 @@ object TopologyManagementInitialization {
       topologyClient: DomainTopologyClientWithInit,
       initialKeys: Map[KeyOwner, Seq[PublicKey]],
       sequencerClientFactory: SequencerClientFactory,
-      parameters: DomainNodeParameters,
+      parameters: CantonNodeParameters,
       futureSupervisor: FutureSupervisor,
       indexedStringStore: IndexedStringStore,
       loggerFactory: NamedLoggerFactory,
@@ -222,7 +223,6 @@ object TopologyManagementInitialization {
           loggerFactory,
         )
       )
-
       // before starting the domain identity dispatcher, we need to make sure the initial topology transactions
       // have been sequenced. in the case of external sequencers this is done with admin commands and we just need to wait,
       // but for embedded sequencers we need to explicitly sequence these transactions here if that's not already been done.
@@ -250,23 +250,26 @@ object TopologyManagementInitialization {
         // that initial topology data has been sequenced before starting the topology dispatcher
         case _ => EitherT.right(initializationObserver.waitUntilInitialisedAndEffective.unwrap)
       }
-      dispatcher <- EitherT.rightT(
-        DomainTopologyDispatcher.create(
-          id,
-          domainTopologyManager,
-          topologyClient,
-          topologyProcessor,
-          initialKeys,
-          sequencedTopologyStore,
-          newClient,
-          timeTracker,
-          crypto,
-          clock,
-          addressSequencerAsDomainMember,
-          parameters,
-          futureSupervisor,
-          dispatcherLoggerFactory,
-        )
+      dispatcher <- EitherT(
+        DomainTopologyDispatcher
+          .create(
+            id,
+            domainTopologyManager,
+            topologyClient,
+            topologyProcessor,
+            initialKeys,
+            sequencedTopologyStore,
+            newClient,
+            timeTracker,
+            crypto,
+            clock,
+            addressSequencerAsDomainMember,
+            parameters,
+            futureSupervisor,
+            dispatcherLoggerFactory,
+          )
+          .map(Right(_))
+          .onShutdown(Left("Initialization aborted due to shutdown"))
       )
     } yield TopologyManagementComponents(
       topologyClient,

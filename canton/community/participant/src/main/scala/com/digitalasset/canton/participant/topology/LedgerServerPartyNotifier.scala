@@ -14,8 +14,7 @@ import com.digitalasset.canton.lifecycle.{
   FutureUnlessShutdown,
 }
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.LedgerSyncEvent
-import com.digitalasset.canton.participant.sync.ParticipantEventPublisher
+import com.digitalasset.canton.participant.sync.{LedgerSyncEvent, ParticipantEventPublisher}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.*
 import com.digitalasset.canton.topology.processing.{
@@ -268,7 +267,7 @@ class LedgerServerPartyNotifier(
 
     if (transaction.operation == TopologyChangeOp.Add) {
       transaction.transaction.element.mapping match {
-        // TODO(rv): this will also pick mappings which are only one-sided. we should fix this by looking at the aggregated topology state once the metadata in the server is consolidated and allows us to match it to our metadata
+        // TODO(#11183): this will also pick mappings which are only one-sided. we should fix this by looking at the aggregated topology state once the metadata in the server is consolidated and allows us to match it to our metadata
         case PartyToParticipant(_, party, participant, permission) if permission.isActive =>
           dispatch(party, participant, transaction.transaction.element.id.toLengthLimitedString)
         // propagate admin parties

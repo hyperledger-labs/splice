@@ -5,9 +5,6 @@ package com.digitalasset.canton.config
 
 import com.digitalasset.canton.config.DeprecatedConfigUtils.DeprecatedFieldsFor
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
-import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.canton.tracing.TracingConfig
-import com.digitalasset.canton.version.ProtocolVersion
 
 trait NodeConfig {
   def clientAdminApi: ClientConfig
@@ -38,6 +35,10 @@ object LocalNodeConfig {
             "storage.ledger-api-jdbc-url",
             "storage.parameters.ledger-api-jdbc-url",
           ),
+          DeprecatedConfigUtils.MovedConfigPath(
+            "storage.connection-timeout",
+            "storage.parameters.connection-timeout",
+          ),
         )
       }
   }
@@ -60,24 +61,4 @@ trait LocalNodeConfig extends NodeConfig {
 
 trait CommunityLocalNodeConfig extends LocalNodeConfig {
   override def storage: CommunityStorageConfig
-}
-
-trait LocalNodeParameters {
-
-  def tracing: TracingConfig
-  def delayLoggingThreshold: NonNegativeFiniteDuration
-  def logQueryCost: Option[QueryCostMonitoringConfig]
-  def loggingConfig: LoggingConfig
-  def enableAdditionalConsistencyChecks: Boolean
-  def enablePreviewFeatures: Boolean
-  def processingTimeouts: ProcessingTimeout
-  def sequencerClient: SequencerClientConfig
-  def cachingConfigs: CachingConfigs
-  def nonStandardConfig: Boolean
-  def devVersionSupport: Boolean
-  def dontWarnOnDeprecatedPV: Boolean
-
-  /** The initial protocol version before connected to any domain, e.g., when creating the initial topology transactions. */
-  def initialProtocolVersion: ProtocolVersion
-
 }

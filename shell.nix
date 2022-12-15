@@ -8,10 +8,10 @@ let
 
   daml_pbs = stdenv.mkDerivation rec {
     name = "daml-protobufs";
-    sdk_version = "2.5.0-snapshot.20221120.10983.0.218a6a8a";
+    sdk_version = "2.6.0-snapshot.20221212.11134.0.1ac41995";
     src = fetchzip {
       url = "https://github.com/digital-asset/daml/releases/download/v${sdk_version}/protobufs-${sdk_version}.zip";
-      sha256="sha256-YtvCNHtheVFomW6RPVgZZYM3cq81jydqDS4PVrSCckE=";
+      sha256="sha256-NHZYtvizwpWaRC7DDQ66bfZj0ak95mz8OLu7Ka06KZI=";
     };
     installPhase = ''
       mkdir -p $out/protos-${sdk_version}

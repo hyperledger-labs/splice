@@ -3,9 +3,11 @@
 
 package com.digitalasset.canton.domain.initialization
 
+import com.daml.metrics.grpc.GrpcServerMetrics
 import com.digitalasset.canton.crypto.DomainSyncCryptoClient
+import com.digitalasset.canton.domain.DomainNodeParameters
 import com.digitalasset.canton.domain.api.v0
-import com.digitalasset.canton.domain.config.{DomainConfig, DomainNodeParameters}
+import com.digitalasset.canton.domain.config.DomainConfig
 import com.digitalasset.canton.domain.sequencing.SequencerRuntime
 import com.digitalasset.canton.domain.sequencing.authentication.grpc.SequencerConnectServerInterceptor
 import com.digitalasset.canton.domain.sequencing.service.GrpcSequencerConnectService
@@ -40,6 +42,7 @@ object PublicGrpcServerInitialization {
       agreementManager: Option[ServiceAgreementManager],
       staticDomainParameters: StaticDomainParameters,
       cryptoApi: DomainSyncCryptoClient,
+      grpcMetrics: GrpcServerMetrics,
   )(implicit executionContext: ExecutionContextExecutorService): CloseableServer = {
 
     logger.info(s"Starting public services with config ${config.publicApi}")(TraceContext.empty)
@@ -52,9 +55,13 @@ object PublicGrpcServerInitialization {
         loggerFactory,
         cantonParameterConfig.loggingConfig.api,
         cantonParameterConfig.tracing,
+        grpcMetrics,
       )
       // Overriding the dummy setting from PublicServerConfig.
-      .maxInboundMessageSize(maxRequestSize.value)
+      // To avoid being locked out if the dynamic domain parameter maxRequestSize is too small.
+      .maxInboundMessageSize(
+        config.publicApi.overrideMaxRequestSize.getOrElse(maxRequestSize.value)
+      )
       .addService(ProtoReflectionService.newInstance(), withLogging = false)
 
     // the server builder is mutable

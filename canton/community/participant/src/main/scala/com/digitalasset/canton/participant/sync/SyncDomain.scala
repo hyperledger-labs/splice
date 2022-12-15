@@ -17,8 +17,8 @@ import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.error.{CantonError, HasDegradationState}
 import com.digitalasset.canton.lifecycle.*
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.participant.ParticipantNodeParameters
 import com.digitalasset.canton.participant.admin.PackageService
-import com.digitalasset.canton.participant.config.ParticipantNodeParameters
 import com.digitalasset.canton.participant.domain.{
   DomainHandle,
   DomainRegistryError,
@@ -137,14 +137,14 @@ class SyncDomain(
 
   override protected def timeouts: ProcessingTimeout = parameters.processingTimeouts
 
-  private val sequencerClient = domainHandle.sequencerClient
+  private[canton] val sequencerClient = domainHandle.sequencerClient
   val timeTracker: DomainTimeTracker = ephemeral.timeTracker
   val staticDomainParameters: StaticDomainParameters = domainHandle.staticParameters
 
   private val seedGenerator =
     new SeedGenerator(domainCrypto.crypto.pureCrypto)
 
-  private val requestGenerator =
+  private[canton] val requestGenerator =
     ConfirmationRequestFactory(participantId, domainId, staticDomainParameters.protocolVersion)(
       domainCrypto.crypto.pureCrypto,
       seedGenerator,
@@ -244,7 +244,6 @@ class SyncDomain(
     domainId,
     domainCrypto.pureCrypto,
     domainHandle.topologyStore,
-    clock,
     acsCommitmentProcessor.scheduleTopologyTick,
     futureSupervisor,
     parameters.processingTimeouts,
@@ -576,9 +575,10 @@ class SyncDomain(
           override def name: String = s"sync-domain-$domainId"
 
           override def subscriptionStartsAt(
-              start: SubscriptionStart
+              start: SubscriptionStart,
+              domainTimeTracker: DomainTimeTracker,
           )(implicit traceContext: TraceContext): FutureUnlessShutdown[Unit] =
-            topologyProcessor.subscriptionStartsAt(start)(traceContext)
+            topologyProcessor.subscriptionStartsAt(start, domainTimeTracker)(traceContext)
 
           override def apply(events: Traced[Seq[PossiblyIgnoredProtocolEvent]]): HandlerResult =
             messageDispatcher.handleAll(events)
@@ -741,10 +741,10 @@ class SyncDomain(
       targetProtocolVersion: TargetProtocolVersion,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TransferProcessorError, TransferOutProcessingSteps.SubmissionResult] =
+  ): EitherT[Future, TransferProcessorError, Future[TransferOutProcessingSteps.SubmissionResult]] =
     performUnlessClosingEitherT[
       TransferProcessorError,
-      TransferOutProcessingSteps.SubmissionResult,
+      Future[TransferOutProcessingSteps.SubmissionResult],
     ](functionFullName, DomainNotReady(domainId, "The domain is shutting down.")) {
       if (!ready)
         DomainNotReady(domainId, "Cannot submit transfer-out before recovery").discard
@@ -754,7 +754,6 @@ class SyncDomain(
             .SubmissionParam(submittingParty, contractId, targetDomain, targetProtocolVersion)
         )
         .onShutdown(Left(DomainNotReady(domainId, "The domain is shutting down")))
-        .semiflatMap(Predef.identity)
     }
 
   def submitTransferIn(
@@ -763,8 +762,10 @@ class SyncDomain(
       sourceProtocolVersion: SourceProtocolVersion,
   )(implicit
       traceContext: TraceContext
-  ): EitherT[Future, TransferProcessorError, TransferInProcessingSteps.SubmissionResult] =
-    performUnlessClosingEitherT[TransferProcessorError, TransferInProcessingSteps.SubmissionResult](
+  ): EitherT[Future, TransferProcessorError, Future[TransferInProcessingSteps.SubmissionResult]] =
+    performUnlessClosingEitherT[TransferProcessorError, Future[
+      TransferInProcessingSteps.SubmissionResult
+    ]](
       functionFullName,
       DomainNotReady(domainId, "The domain is shutting down."),
     ) {
@@ -777,7 +778,6 @@ class SyncDomain(
             .SubmissionParam(submittingParty, transferId, sourceProtocolVersion)
         )
         .onShutdown(Left(DomainNotReady(domainId, "The domain is shutting down")))
-        .semiflatMap(Predef.identity)
     }
 
   def numberOfDirtyRequests(): Int = ephemeral.requestJournal.numberOfDirtyRequests

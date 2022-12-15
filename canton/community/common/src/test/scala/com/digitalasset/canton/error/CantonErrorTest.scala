@@ -67,13 +67,22 @@ class CantonErrorTest extends BaseTestWordSpec {
         ErrorCategory.ContentionOnSharedResources
       )
     }
+
+    "Extract code from multi-line strings" in {
+      ErrorCodeUtils.errorCategoryFromString(
+        "DB_CONNECTION_LOST(13,0):  It was not possible to establish a valid connection\nFull Error\n"
+      ) should contain(
+        ErrorCategory.BackgroundProcessDegradationWarning
+      )
+    }
+
   }
 
   "An alarm" should {
     "log with level WARN including the error category and details" in {
       implicit val traceContext: TraceContext = nonEmptyTraceContext1
       val traceId = traceContext.traceId.value
-      val errorCodeStr = s"TEST_MALICIOUS_BEHAVIOR(15,${traceId.take(8)})"
+      val errorCodeStr = s"TEST_MALICIOUS_BEHAVIOR(5,${traceId.take(8)})"
 
       loggerFactory.assertLogs(
         TestAlarmErrorCode.MyAlarm().report(),

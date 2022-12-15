@@ -71,7 +71,7 @@ abstract class AppConnection(
       cmd.createService(channel.channel).withInterceptors(TraceContextGrpc.clientInterceptor)
     for {
       req <- toFuture(cmd.createRequest())
-      response <- traceContext.intoGrpcContext(cmd.submitRequest(svc, req))
+      response <- TraceContextGrpc.withGrpcContext(traceContext)(cmd.submitRequest(svc, req))
       result <- toFuture(cmd.handleResponse(response))
     } yield result
   }

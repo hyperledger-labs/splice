@@ -360,7 +360,8 @@ object CoinConfig {
   private implicit def coinConfigReader(implicit
       elc: ErrorLoggingContext
   ): ConfigReader[CoinConfig] = {
-    import CantonConfig.ConfigReaders._
+    val configReaders: ConfigReaders = new ConfigReaders()
+    import configReaders.*
     import DeprecatedConfigUtils._
     import CantonDeprecationImplicits._
 

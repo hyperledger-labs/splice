@@ -41,7 +41,6 @@ import com.digitalasset.canton.participant.config.PostgresDataSourceConfigCanton
 import com.digitalasset.canton.participant.ledger.api.CantonLedgerApiServerWrapper.IndexerLockIds
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
-import com.digitalasset.canton.tracing.TracingConfig
 import com.digitalasset.canton.version.{ParticipantProtocolVersion, ProtocolVersion}
 import io.netty.handler.ssl.{ClientAuth, SslContext}
 import io.scalaland.chimney.dsl.*
@@ -137,35 +136,9 @@ case class ParticipantProtocolConfig(
     devVersionSupport: Boolean,
     dontWarnOnDeprecatedPV: Boolean,
     initialProtocolVersion: ProtocolVersion,
-)
-
-case class ParticipantNodeParameters(
-    override val tracing: TracingConfig,
-    override val delayLoggingThreshold: NonNegativeFiniteDuration,
-    override val loggingConfig: LoggingConfig,
-    override val logQueryCost: Option[QueryCostMonitoringConfig],
-    override val enableAdditionalConsistencyChecks: Boolean,
-    override val enablePreviewFeatures: Boolean,
-    override val processingTimeouts: ProcessingTimeout,
-    override val nonStandardConfig: Boolean,
-    partyChangeNotification: PartyNotificationConfig,
-    adminWorkflow: AdminWorkflowConfig,
-    maxUnzippedDarSize: Int,
-    stores: ParticipantStoreConfig,
-    override val cachingConfigs: CachingConfigs,
-    override val sequencerClient: SequencerClientConfig,
-    transferTimeProofFreshnessProportion: NonNegativeInt,
-    protocolConfig: ParticipantProtocolConfig,
-    uniqueContractKeys: Boolean,
-    enableCausalityTracking: Boolean,
-    unsafeEnableDamlLfDevVersion: Boolean,
-    ledgerApiServerParameters: LedgerApiServerParametersConfig,
-    maxDbConnections: Int,
-    excludeInfrastructureTransactions: Boolean,
-) extends LocalNodeParameters {
-  override def devVersionSupport: Boolean = protocolConfig.devVersionSupport
-  override def dontWarnOnDeprecatedPV: Boolean = protocolConfig.dontWarnOnDeprecatedPV
-  override def initialProtocolVersion: ProtocolVersion = protocolConfig.initialProtocolVersion
+) extends ProtocolConfig {
+  // TODO (#11206) remove name divergence
+  override def willCorruptYourSystemDevVersionSupport: Boolean = devVersionSupport
 }
 
 /** Configuration parameters for a single participant
@@ -241,7 +214,7 @@ case class RemoteParticipantConfig(
   * @param keepAliveServer                 keep-alive configuration for ledger api requests
   * @param maxContractStateCacheSize       maximum caffeine cache size of mutable state cache of contracts
   * @param maxContractKeyStateCacheSize    maximum caffeine cache size of mutable state cache of contract keys
-  * @param maxInboundMessageSize     maximum inbound message size
+  * @param maxInboundMessageSize maximum inbound message size on the ledger api
   * @param databaseConnectionTimeout database connection timeout
   * @param enableInMemoryFanOutForLedgerApi enable the "in-memory fan-out" performance optimization (default false; not tested for production yet)
   * @param maxTransactionsInMemoryFanOutBufferSize maximum number of transactions to hold in the "in-memory fanout" (if enabled)
@@ -250,6 +223,8 @@ case class RemoteParticipantConfig(
   * @param inMemoryFanOutThreadPoolSize Size of the thread-pool backing the Ledger API in-memory fan-out.
   *                                     If not set, defaults to ((number of thread)/4 + 1)
   * @param rateLimit limit the ledger api server request rates based on system metrics
+  * @param preparePackageMetadataTimeOutWarning Timeout for package metadata preparation after which a warning will be logged
+  * @param completionsPageSize database / akka page size for batching of ledger api server index ledger completion queries
   */
 case class LedgerApiServerConfig(
     address: String = "127.0.0.1",
@@ -287,6 +262,7 @@ case class LedgerApiServerConfig(
     rateLimit: Option[RateLimitingConfig] = Some(DefaultRateLimit),
     preparePackageMetadataTimeOutWarning: NonNegativeFiniteDuration =
       LedgerApiServerConfig.DefaultPreparePackageMetadataTimeOutWarning,
+    completionsPageSize: Int = LedgerApiServerConfig.DefaultCompletionsPageSize,
 ) extends CommunityServerConfig // We can't currently expose enterprise server features at the ledger api anyway
     {
 
@@ -327,6 +303,7 @@ object LedgerApiServerConfig {
       maxUsedHeapSpacePercentage = 100,
       minFreeHeapSpaceBytes = 0,
     )
+  val DefaultCompletionsPageSize = 1000
 
   def DefaultInMemoryFanOutThreadPoolSize(implicit loggingContext: ErrorLoggingContext): Int = {
     val numberOfThreads =
@@ -358,6 +335,7 @@ object LedgerApiServerConfig {
       _timeProviderType,
       tlsConfiguration,
       _userManagement,
+      _identityProviderManagement,
     ) = apiServerConfig
 
     val DamlIndexServiceConfig(
@@ -377,6 +355,11 @@ object LedgerApiServerConfig {
       inMemoryStateUpdaterParallelism,
       inMemoryFanOutThreadPoolSize,
       preparePackageMetadataTimeOutWarning,
+      completionsPageSize,
+      _transactionsFlatStreamReaderConfig,
+      _transactionsTreeStreamReaderConfig,
+      _globalMaxEventIdQueries,
+      _globalMaxEventPayloadQueries,
     ) = indexServiceConfig
 
     def fromClientAuth(clientAuth: ClientAuth): ServerAuthRequirementConfig = {
@@ -433,6 +416,7 @@ object LedgerApiServerConfig {
       inMemoryFanOutThreadPoolSize = Some(inMemoryFanOutThreadPoolSize),
       preparePackageMetadataTimeOutWarning =
         NonNegativeFiniteDuration(preparePackageMetadataTimeOutWarning.toJava),
+      completionsPageSize = completionsPageSize,
     ).discard
   }
 
@@ -791,7 +775,7 @@ case class ParticipantNodeParameterConfig(
 /** Parameters for the participant node's stores
   *
   * @param maxItemsInSqlClause    maximum number of items to place in sql "in clauses"
-  * @param maxPruningBatchSize           maximum number of events to prune from a participant at a time, used to break up batches internally
+  * @param maxPruningBatchSize    maximum number of events to prune from a participant at a time, used to break up batches internally
   * @param acsPruningInterval        How often to prune the ACS journal in the background. A very high interval will let the journal grow larger and
   *                                  eventually slow queries down. A very low interval may cause a high load on the journal table and the DB.
   *                                  The default is 60 seconds.
@@ -801,7 +785,7 @@ case class ParticipantNodeParameterConfig(
   */
 case class ParticipantStoreConfig(
     maxItemsInSqlClause: PositiveNumeric[Int] = PositiveNumeric.tryCreate(100),
-    maxPruningBatchSize: Int = 1000,
+    maxPruningBatchSize: PositiveNumeric[Int] = PositiveNumeric.tryCreate(1000),
     acsPruningInterval: NonNegativeFiniteDuration = NonNegativeFiniteDuration.ofSeconds(60),
     dbBatchAggregationConfig: BatchAggregatorConfig = BatchAggregatorConfig.Batching(),
 )

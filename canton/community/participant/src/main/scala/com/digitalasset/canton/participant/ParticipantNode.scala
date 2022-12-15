@@ -55,6 +55,7 @@ import com.digitalasset.canton.participant.domain.{
 import com.digitalasset.canton.participant.ledger.api.CantonLedgerApiServerWrapper.IndexerLockIds
 import com.digitalasset.canton.participant.ledger.api.*
 import com.digitalasset.canton.participant.metrics.ParticipantMetrics
+import com.digitalasset.canton.participant.scheduler.ParticipantSchedulersParameters
 import com.digitalasset.canton.participant.store.*
 import com.digitalasset.canton.participant.store.db.{DbDamlPackageStore, DbServiceAgreementStore}
 import com.digitalasset.canton.participant.store.memory.{
@@ -74,6 +75,7 @@ import com.digitalasset.canton.participant.topology.{
   ParticipantTopologyManager,
 }
 import com.digitalasset.canton.resource.*
+import com.digitalasset.canton.scheduler.SchedulersWithPruning
 import com.digitalasset.canton.sequencing.client.{RecordingConfig, ReplayConfig}
 import com.digitalasset.canton.time.*
 import com.digitalasset.canton.topology.*
@@ -120,7 +122,12 @@ class ParticipantNodeBootstrap(
     meteringReportKey: MeteringReportKey,
     envQueueName: String,
     envQueueSize: () => Long,
-    additionalGrpcServices: CantonSyncService => List[BindableService] = _ => Nil,
+    additionalGrpcServices: (
+        CantonSyncService,
+        ParticipantNodePersistentState,
+    ) => List[BindableService] = (_, _) => Nil,
+    createSchedulers: ParticipantSchedulersParameters => Future[SchedulersWithPruning] = _ =>
+      Future.successful(SchedulersWithPruning.noop),
 )(implicit
     executionContext: ExecutionContextIdlenessExecutorService,
     scheduler: ScheduledExecutorService,
@@ -141,6 +148,7 @@ class ParticipantNodeBootstrap(
       grpcVaultServiceFactory,
       parentLogger.append(ParticipantNodeBootstrap.LoggerFactoryKeyName, name.unwrap),
       writeHealthDumpToFile,
+      metrics.ledgerApiServer.daml.grpc,
     ) {
 
   /** per session created admin token for in-process connections to ledger-api */
@@ -174,6 +182,7 @@ class ParticipantNodeBootstrap(
       ledgerId: String,
       participantId: LedgerParticipantId,
       sync: CantonSyncService,
+      participantNodePersistentState: ParticipantNodePersistentState,
   ): EitherT[Future, String, CantonLedgerApiServerWrapper.LedgerApiServerState] = {
 
     val ledgerTestingTimeService = (config.testingTime, clock) match {
@@ -228,7 +237,8 @@ class ParticipantNodeBootstrap(
           ),
           // start ledger API server iff participant replica is active
           startLedgerApiServer = sync.isActive(),
-          createExternalServices = () => additionalGrpcServices(sync),
+          createExternalServices =
+            () => additionalGrpcServices(sync, participantNodePersistentState),
         )(executionContext, actorSystem)
         .leftMap { err =>
           // The MigrateOnEmptySchema exception is private, thus match on the expected message
@@ -506,6 +516,19 @@ class ParticipantNodeBootstrap(
 
       resourceManagementService = resourceManagementServiceFactory(persistentState.settingsStore)
 
+      schedulers <-
+        EitherT.liftF(
+          createSchedulers(
+            ParticipantSchedulersParameters(
+              isActive,
+              persistentState.multiDomainEventLog,
+              storage,
+              adminToken,
+              cantonParameterConfig.stores.maxPruningBatchSize,
+            )
+          )
+        )
+
       // Sync Service
       sync = cantonSyncServiceFactory.create(
         participantId,
@@ -531,6 +554,7 @@ class ParticipantNodeBootstrap(
         resourceManagementService,
         cantonParameterConfig,
         indexedStringStore,
+        schedulers,
         metrics,
         futureSupervisor,
         loggerFactory,
@@ -563,6 +587,7 @@ class ParticipantNodeBootstrap(
         ledgerId = ledgerId,
         participantId = ledgerApiParticipantId,
         sync = sync,
+        participantNodePersistentState = persistentState,
       )
     } yield {
       val ledgerApiDependentServices =
@@ -593,6 +618,7 @@ class ParticipantNodeBootstrap(
         cantonParameterConfig.processingTimeouts,
         loggerFactory,
       )
+
       adminServerRegistry
         .addServiceU(
           PartyNameManagementServiceGrpc.bindService(
@@ -637,7 +663,7 @@ class ParticipantNodeBootstrap(
       adminServerRegistry
         .addServiceU(
           PruningServiceGrpc.bindService(
-            new GrpcPruningService(sync, loggerFactory),
+            new GrpcPruningService(sync, () => schedulers.getPruningScheduler, loggerFactory),
             executionContext,
           )
         )
@@ -661,6 +687,7 @@ class ParticipantNodeBootstrap(
         adminToken,
         recordSequencerInteractions,
         replaySequencerConfig,
+        schedulers,
         loggerFactory,
       )
 
@@ -801,11 +828,14 @@ class ParticipantNode(
     val adminToken: CantonAdminToken,
     val recordSequencerInteractions: AtomicReference[Option[RecordingConfig]],
     val replaySequencerConfig: AtomicReference[Option[ReplayConfig]],
+    val schedulers: SchedulersWithPruning,
     val loggerFactory: NamedLoggerFactory,
 ) extends CantonNode
     with NamedLogging
     with HasUptime
     with NoTracing {
+
+  override def isActive = sync.isActive()
 
   def reconnectDomainsIgnoreFailures()(implicit
       traceContext: TraceContext,
@@ -862,6 +892,7 @@ class ParticipantNode(
   override def close(): Unit = {
     logger.info("Stopping participant node")
     Lifecycle.close(
+      schedulers,
       ledgerApiDependentCantonServices,
       ledgerApiServer,
       identityPusher,

@@ -6,12 +6,12 @@ import com.digitalasset.canton.config.{
   CryptoConfig,
   InitConfig,
   LocalNodeConfig,
-  LocalNodeParameters,
   LoggingConfig,
   NodeConfig,
   ProcessingTimeout,
   QueryCostMonitoringConfig,
 }
+import com.digitalasset.canton.environment.CantonNodeParameters
 import com.digitalasset.canton.sequencing.client.SequencerClientConfig
 import com.digitalasset.canton.time.NonNegativeFiniteDuration
 import com.digitalasset.canton.tracing.TracingConfig
@@ -60,4 +60,4 @@ case class SharedCoinAppParameters(
     override val devVersionSupport: Boolean,
     override val dontWarnOnDeprecatedPV: Boolean,
     override val initialProtocolVersion: ProtocolVersion,
-) extends LocalNodeParameters
+) extends CantonNodeParameters

@@ -21,7 +21,6 @@ import com.digitalasset.canton.data.ViewType.TransferInViewType
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
-import com.digitalasset.canton.participant.LedgerSyncEvent
 import com.digitalasset.canton.participant.protocol.ProcessingSteps.PendingRequestData
 import com.digitalasset.canton.participant.protocol.conflictdetection.{
   ActivenessCheck,
@@ -42,7 +41,7 @@ import com.digitalasset.canton.participant.protocol.{
   TransferInUpdate,
 }
 import com.digitalasset.canton.participant.store.*
-import com.digitalasset.canton.participant.sync.{LedgerEvent, TimestampedEvent}
+import com.digitalasset.canton.participant.sync.{LedgerSyncEvent, TimestampedEvent}
 import com.digitalasset.canton.participant.util.DAMLe
 import com.digitalasset.canton.protocol.*
 import com.digitalasset.canton.protocol.messages.*
@@ -715,7 +714,12 @@ private[transfer] class TransferInProcessingSteps(
         val maybeEvent =
           if (transferringParticipant) None
           else {
-            val event = createUpdateForTransferIn(contract, creatingTransactionId, requestId.unwrap)
+            val event = createUpdateForTransferIn(
+              contract,
+              creatingTransactionId,
+              requestId.unwrap,
+              targetProtocolVersion,
+            )
             Some(
               TimestampedEvent(event, requestCounter.asLocalOffset, Some(requestSequencerCounter))
             )
@@ -781,6 +785,7 @@ object TransferInProcessingSteps {
       contract: SerializableContract,
       creatingTransactionId: TransactionId,
       recordTime: CantonTimestamp,
+      targetProtocolVersion: TargetProtocolVersion,
   ): LedgerSyncEvent.TransactionAccepted = {
     val nodeId = LfNodeId(0)
     val contractInst = contract.contractInstance.unversioned
@@ -804,14 +809,23 @@ object TransferInProcessingSteps {
     )
     val lfTransactionId = creatingTransactionId.tryAsLedgerTransactionId
 
+    val driverContractMetadata = contract.contractSalt
+      .map { salt =>
+        val driverContractMetadataBytes = {
+          DriverContractMetadata(salt).toLfBytes(targetProtocolVersion.v)
+        }
+        Map(contract.contractId -> driverContractMetadataBytes)
+      }
+      .getOrElse(Map.empty)
+
     LedgerSyncEvent.TransactionAccepted(
       optCompletionInfo = None,
       transactionMeta = TransactionMeta(
         ledgerEffectiveTime = contract.ledgerCreateTime.toLf,
         workflowId = None,
         submissionTime =
-          contract.ledgerCreateTime.toLf, // TODO(Andreas): Upstream mismatch, replace with enter/leave view
-        submissionSeed = LedgerEvent.noOpSeed,
+          contract.ledgerCreateTime.toLf, // TODO(M41): Upstream mismatch, replace with enter/leave view
+        submissionSeed = LedgerSyncEvent.noOpSeed,
         optUsedPackages = None,
         optNodeSeeds = None,
         optByKeyNodes = None,
@@ -821,7 +835,7 @@ object TransferInProcessingSteps {
       recordTime = recordTime.toLf,
       divulgedContracts = List.empty,
       blindingInfo = None,
-      contractMetadata = Map(), // TODO(#9795) wire proper value
+      contractMetadata = driverContractMetadata,
     )
   }
 

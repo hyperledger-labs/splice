@@ -34,7 +34,11 @@ case class CoinMetricsFactory(
     validators.getOrElseUpdate(
       name, {
         val metricName = deduplicateName(name, "validator", validators)
-        new ValidatorAppMetrics(MetricsFactory.prefix, newRegistry(metricName))
+        new ValidatorAppMetrics(
+          MetricsFactory.prefix,
+          newRegistry(metricName),
+          grpcMetricsForComponent("validator"),
+        )
       },
     )
   }
@@ -43,7 +47,11 @@ case class CoinMetricsFactory(
     svcs.getOrElseUpdate(
       name, {
         val metricName = deduplicateName(name, "SVC", svcs)
-        new SvcAppMetrics(MetricsFactory.prefix, newRegistry(metricName))
+        new SvcAppMetrics(
+          MetricsFactory.prefix,
+          newRegistry(metricName),
+          grpcMetricsForComponent("SVC"),
+        )
       },
     )
   }
@@ -52,7 +60,11 @@ case class CoinMetricsFactory(
     scans.getOrElseUpdate(
       name, {
         val metricName = deduplicateName(name, "Scan", scans)
-        new ScanAppMetrics(MetricsFactory.prefix, newRegistry(metricName))
+        new ScanAppMetrics(
+          MetricsFactory.prefix,
+          newRegistry(metricName),
+          grpcMetricsForComponent("Scan"),
+        )
       },
     )
   }
@@ -61,7 +73,11 @@ case class CoinMetricsFactory(
     wallets.getOrElseUpdate(
       name, {
         val metricName = deduplicateName(name, "Wallet", wallets)
-        new WalletAppMetrics(MetricsFactory.prefix, newRegistry(metricName))
+        new WalletAppMetrics(
+          MetricsFactory.prefix,
+          newRegistry(metricName),
+          grpcMetricsForComponent("Wallet"),
+        )
       },
     )
   }
@@ -70,7 +86,11 @@ case class CoinMetricsFactory(
     directories.getOrElseUpdate(
       name, {
         val metricName = deduplicateName(name, "Directory", directories)
-        new DirectoryAppMetrics(MetricsFactory.prefix, newRegistry(metricName))
+        new DirectoryAppMetrics(
+          MetricsFactory.prefix,
+          newRegistry(metricName),
+          grpcMetricsForComponent("Directory"),
+        )
       },
     )
   }
@@ -79,7 +99,11 @@ case class CoinMetricsFactory(
     splitwises.getOrElseUpdate(
       name, {
         val metricName = deduplicateName(name, "Splitwise", splitwises)
-        new SplitwiseAppMetrics(MetricsFactory.prefix, newRegistry(metricName))
+        new SplitwiseAppMetrics(
+          MetricsFactory.prefix,
+          newRegistry(metricName),
+          grpcMetricsForComponent("Splitwise"),
+        )
       },
     )
   }

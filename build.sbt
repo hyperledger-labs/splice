@@ -20,6 +20,9 @@ lazy val `canton-functionmeta` = BuildCommon.`canton-functionmeta`
 lazy val `canton-slick-fork` = BuildCommon.`canton-slick-fork`
 lazy val `canton-daml-fork` = BuildCommon.`canton-daml-fork`
 lazy val `canton-wartremover-extension` = BuildCommon.`canton-wartremover-extension`
+lazy val `canton-util-external` = BuildCommon.`canton-util-external`
+lazy val `canton-util-internal` = BuildCommon.`canton-util-internal`
+lazy val `canton-akka-fork` = BuildCommon.`canton-akka-fork`
 
 inThisBuild(
   List(
@@ -625,6 +628,23 @@ lazy val `apps-app` =
       libraryDependencies += "org.seleniumhq.selenium" % "selenium-java" % "4.6.0" % "test",
       libraryDependencies += "eu.rekawek.toxiproxy" % "toxiproxy-java" % "2.1.4" % "test",
       libraryDependencies += "com.auth0" % "auth0" % "1.44.1",
+      // Force SBT to use the right version of opentelemetry libs.
+      dependencyOverrides ++= Seq(
+        CantonDependencies.opentelemetry_api,
+        CantonDependencies.opentelemetry_context,
+        CantonDependencies.opentelemetry_semconv,
+        CantonDependencies.opentelemetry_sdk,
+        CantonDependencies.opentelemetry_sdk_common,
+        CantonDependencies.opentelemetry_sdk_autoconfigure,
+        CantonDependencies.opentelemetry_sdk_logs,
+        CantonDependencies.opentelemetry_sdk_trace,
+        CantonDependencies.opentelemetry_sdk_metrics,
+        CantonDependencies.opentelemetry_sdk_autoconfigure,
+        CantonDependencies.opentelemetry_prometheus,
+        CantonDependencies.opentelemetry_zipkin,
+        CantonDependencies.opentelemetry_jaeger,
+        CantonDependencies.opentelemetry_instrumentation_grpc,
+      ),
       BuildCommon.sharedAppSettings,
       BuildCommon.cantonWarts,
       bundleTask,

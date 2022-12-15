@@ -56,6 +56,7 @@ class ValidatorAppBootstrap(
       storageFactory,
       loggerFactory,
       writeHealthDumpToFile,
+      metrics.grpcMetrics,
     ) {
 
   override def initialize: EitherT[Future, String, Unit] = startInstanceUnlessClosing {

@@ -44,7 +44,7 @@ abstract class CoinNode[State <: AutoCloseable & HasHealth](
 
   protected def isInitialized = isInitializedVar.get()
 
-  protected def isActive: Boolean = {
+  def isActive: Boolean = {
     // initialized and the state reports itself as healthy
     isInitialized && initializeF.value.exists(_.toOption.exists(_.isHealthy))
   }

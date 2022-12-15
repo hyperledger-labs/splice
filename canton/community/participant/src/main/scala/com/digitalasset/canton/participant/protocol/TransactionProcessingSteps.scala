@@ -20,14 +20,12 @@ import com.daml.metrics.api.MetricsContext
 import com.daml.nonempty.NonEmpty
 import com.daml.nonempty.catsinstances.*
 import com.digitalasset.canton.crypto.*
-import com.digitalasset.canton.data.ViewPosition.ListIndex
 import com.digitalasset.canton.data.ViewType.TransactionViewType
 import com.digitalasset.canton.data.*
 import com.digitalasset.canton.error.TransactionError
 import com.digitalasset.canton.lifecycle.FutureUnlessShutdown
 import com.digitalasset.canton.logging.{ErrorLoggingContext, NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.metrics.*
-import com.digitalasset.canton.participant.LedgerSyncEvent
 import com.digitalasset.canton.participant.metrics.TransactionProcessingMetrics
 import com.digitalasset.canton.participant.protocol.ProtocolProcessor.{
   MalformedPayload,
@@ -549,10 +547,10 @@ class TransactionProcessingSteps(
           viewMessage: TransactionViewMessage,
           randomness: SecureRandomness,
       )(
-          subviewHashAndIndex: (ViewHash, Int)
+          subviewHashAndIndex: (ViewHash, ViewPosition.MerklePathElement)
       ): Either[DecryptionError, Unit] = {
         val (subviewHash, index) = subviewHashAndIndex
-        val info = HkdfInfo.subview(ListIndex(index))
+        val info = HkdfInfo.subview(index)
         for {
           subviewRandomness <-
             ProtocolCryptoApi
@@ -587,9 +585,11 @@ class TransactionProcessingSteps(
         for {
           ltvt <- decryptTree(viewMessage, Some(randomness))
           _ <- EitherT.fromEither[Future](
-            ltvt.subviewHashes.zipWithIndex.traverse(
-              deriveRandomnessForSubviews(viewMessage, randomness)
-            )
+            ltvt.subviewHashes
+              .zip(TransactionSubviews.indices(protocolVersion, ltvt.subviewHashes.length))
+              .traverse(
+                deriveRandomnessForSubviews(viewMessage, randomness)
+              )
           )
         } yield ltvt
 
@@ -648,7 +648,7 @@ class TransactionProcessingSteps(
       )
     // TODO(M40): don't die on a malformed light transaction list. Moreover, pick out the views that are valid
     val rootViewTrees = LightTransactionViewTree
-      .toToplevelFullViewTrees(lightViewTrees)
+      .toToplevelFullViewTrees(protocolVersion, crypto.pureCrypto)(lightViewTrees)
       .valueOr(e =>
         ErrorUtil.internalError(
           new IllegalArgumentException(
@@ -1033,7 +1033,7 @@ class TransactionProcessingSteps(
               .Reject(inconsistentKeyReject.cause)
               .rpcStatus()
           )
-        case reason => reason.createRejection
+        case reason => LedgerSyncEvent.CommandRejected.FinalReason(reason.rpcStatus())
       }
 
     val tse = submitterParticipantSubmitterInfo.map(info =>
@@ -1089,7 +1089,7 @@ class TransactionProcessingSteps(
       s"Cannot handle contract-inconsistent transaction $transactionId: $contractConsistency",
     )
 
-    // TODO(Andreas): Do not discard the view validation results
+    // TODO(M40): Do not discard the view validation results
     validation.PendingTransaction(
       transactionId,
       modelConformanceResult,
@@ -1132,6 +1132,13 @@ class TransactionProcessingSteps(
         .fromEither[Future](pendingRequestData.txId.asLedgerTransactionId)
         .leftMap[TransactionProcessorError](FieldConversionError("Transaction Id", _))
 
+      contractMetadata =
+        // TODO(#11047): Forward driver contract metadata also for divulged contracts
+        pendingRequestData.transactionValidationResult.createdContracts.view.collect {
+          case (contractId, SerializableContract(_, _, _, _, Some(salt))) =>
+            contractId -> DriverContractMetadata(salt).toLfBytes(protocolVersion)
+        }.toMap
+
       acceptedEvent = LedgerSyncEvent.TransactionAccepted(
         optCompletionInfo = completionInfo,
         transactionMeta = TransactionMeta(
@@ -1140,7 +1147,7 @@ class TransactionProcessingSteps(
           submissionTime = lfTx.metadata.submissionTime.toLf,
           // Set the submission seed to zeros one (None no longer accepted) because it is pointless for projected
           // transactions and it leaks the structure of the omitted parts of the transaction.
-          submissionSeed = LedgerEvent.noOpSeed,
+          submissionSeed = LedgerSyncEvent.noOpSeed,
           optUsedPackages = None,
           optNodeSeeds = Some(lfTx.metadata.seeds.to(ImmArray)),
           optByKeyNodes = None, // optByKeyNodes is unused by the indexer
@@ -1154,7 +1161,7 @@ class TransactionProcessingSteps(
               DivulgedContract(divulgedCid, divulgedContract.contractInstance)
           }.toList,
         blindingInfo = None,
-        contractMetadata = Map(), // TODO(#9795) wire proper value
+        contractMetadata = contractMetadata,
       )
 
       timestampedEvent = TimestampedEvent(
@@ -1632,9 +1639,10 @@ class TransactionProcessingSteps(
   private def visitViewInPreOrder(view: TransactionView)(f: TransactionView => Unit): Unit = {
     def go(view: TransactionView): Unit = {
       f(view)
-      view.subviews.foreach { wrappedSubview =>
-        go(wrappedSubview.tryUnwrap)
-      }
+      view.subviews.assertAllUnblinded(hash =>
+        s"View ${view.viewHash} contains an unexpected blinded subview $hash"
+      )
+      view.subviews.unblindedElements.foreach(go)
     }
     go(view)
   }

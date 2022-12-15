@@ -123,6 +123,7 @@ package object canton {
 
   /** Evaluate the expression and discard the result. */
   implicit final class DiscardOps[A](private val a: A) extends AnyVal {
+    @inline
     def discard[B](implicit ev: A =:= B): Unit = ()
   }
 

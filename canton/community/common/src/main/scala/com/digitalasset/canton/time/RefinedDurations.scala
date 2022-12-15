@@ -18,12 +18,13 @@ import com.digitalasset.canton.serialization.ProtoConverter
 import com.digitalasset.canton.serialization.ProtoConverter.{DurationConverter, ParsingResult}
 import com.digitalasset.canton.store.db.DbDeserializationException
 import com.digitalasset.canton.tracing.TraceContext
-import com.google.protobuf.duration.{Duration as PbDuration}
+import com.google.protobuf.duration.Duration as PbDuration
 import io.circe.Encoder
 import io.scalaland.chimney.Transformer
 import slick.jdbc.{GetResult, SetParameter}
 
 import java.time.Duration
+import java.util.concurrent.TimeUnit
 import scala.concurrent.duration.FiniteDuration
 import scala.jdk.DurationConverters.*
 
@@ -199,6 +200,9 @@ final case class PositiveSeconds(duration: Duration) extends RefinedDuration wit
 
   def toConfig: ConfigPositiveSeconds = checked(ConfigPositiveSeconds.tryFromJavaDuration(duration))
 
+  def toFiniteDuration: FiniteDuration =
+    FiniteDuration(duration.toNanos, TimeUnit.NANOSECONDS).toCoarsest
+
   def add(i: NonNegativeSeconds): PositiveSeconds = {
     val newDuration = duration.plus(i.duration)
     checked(PositiveSeconds(newDuration))
@@ -208,4 +212,13 @@ final case class PositiveSeconds(duration: Duration) extends RefinedDuration wit
 object PositiveSeconds extends RefinedDurationCompanion[PositiveSeconds] {
   implicit val toPositiveSecondsConfig: Transformer[PositiveSeconds, ConfigPositiveSeconds] =
     _.toConfig
+
+  implicit val getResultPositiveSeconds: GetResult[PositiveSeconds] =
+    GetResult(r => ofSeconds(r.nextLong()))
+
+  implicit def setParameterPositiveSeconds(implicit
+      setParameterLong: SetParameter[Long]
+  ): SetParameter[PositiveSeconds] =
+    (d, pp) => pp >> d.duration.getSeconds
+
 }

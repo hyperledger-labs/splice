@@ -32,8 +32,8 @@ import com.digitalasset.canton.tracing.TraceContext
 import com.digitalasset.canton.util.FutureInstances.*
 import com.digitalasset.canton.version.ProtocolVersion
 
-import scala.collection.mutable
-import scala.concurrent.{ExecutionContext, Future, blocking}
+import java.util.concurrent.atomic.AtomicReference
+import scala.concurrent.{ExecutionContext, Future}
 
 /** Simple callback trait to inform system about changes on the topology manager
   */
@@ -180,13 +180,16 @@ class DomainTopologyManager(
     )(ec)
     with RequestProcessingStrategy.ManagerHooks {
 
-  private val observers = mutable.ListBuffer[DomainIdentityStateObserver]()
-  def addObserver(observer: DomainIdentityStateObserver): Unit = blocking(synchronized {
-    val _ = observers += observer
-  })
-
-  private def sendToObservers(action: DomainIdentityStateObserver => Unit): Unit =
-    blocking(synchronized(observers.foreach(action)))
+  private val observers = new AtomicReference[List[DomainIdentityStateObserver]](List.empty)
+  def addObserver(observer: DomainIdentityStateObserver): Unit = {
+    observers.updateAndGet(_ :+ observer).discard
+  }
+  def removeObserver(observer: DomainIdentityStateObserver): Unit = {
+    observers.updateAndGet(_.filterNot(_ == observer)).discard
+  }
+  private def sendToObservers(action: DomainIdentityStateObserver => Unit): Unit = {
+    observers.get().foreach(action)
+  }
 
   /** Authorizes a new topology transaction by signing it and adding it to the topology state
     *
@@ -391,12 +394,6 @@ class DomainTopologyManager(
         loggerFactory,
       )
 
-  def executeSequential(fut: => Future[Unit], description: String)(implicit
-      traceContext: TraceContext
-  ): Future[Unit] = {
-    sequentialQueue.execute(fut, description)
-  }
-
   override def issueParticipantStateForDomain(participantId: ParticipantId)(implicit
       traceContext: TraceContext
   ): EitherT[Future, DomainTopologyManagerError, Unit] = {
@@ -436,7 +433,10 @@ object DomainTopologyManagerError extends TopologyManagerError.DomainErrorGroup(
   )
   @Resolution("""Consult the error details.""")
   object FailedToAddMember
-      extends ErrorCode(id = "FAILED_TO_ADD_MEMBER", ErrorCategory.MaliciousOrFaultyBehaviour) {
+      extends ErrorCode(
+        id = "FAILED_TO_ADD_MEMBER",
+        ErrorCategory.SystemInternalAssumptionViolated,
+      ) {
     case class Failure(reason: String)(implicit val loggingContext: ErrorLoggingContext)
         extends CantonError.Impl(
           cause = "The add member hook failed"

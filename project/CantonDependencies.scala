@@ -3,7 +3,7 @@ import sbt._
 /** Copied from Canton OSS repo. */
 object CantonDependencies {
   // Slightly changed compared to Canton OSS repo to avoid the need for a meta sbt project
-  val version: String = "2.5.0-snapshot.20221120.10983.0.218a6a8a"
+  val version: String = "2.6.0-snapshot.20221212.11134.0.1ac41995"
   val daml_language_versions = Seq("1.14", "1.dev")
   val vmbc_driver_libraries_version: String =
     "2.3.0-snapshot.20220528.9973.0.012e3ac6-0.1"
@@ -73,8 +73,10 @@ object CantonDependencies {
   lazy val daml_lf_dev_archive_java_proto =
     "com.daml" % "daml-lf-dev-archive-java-proto" % daml_libraries_version
   lazy val daml_lf_archive_reader = "com.daml" %% "daml-lf-archive-reader" % daml_libraries_version
+  lazy val daml_lf_data = "com.daml" %% "daml-lf-data" % daml_libraries_version
   lazy val daml_lf_engine = "com.daml" %% "daml-lf-engine" % daml_libraries_version
   lazy val daml_lf_interpreter = "com.daml" %% "daml-lf-interpreter" % daml_libraries_version
+  lazy val daml_lf_nonempty_cats = "com.daml" %% "nonempty-cats" % daml_libraries_version
   lazy val daml_lf_value_java_proto =
     "com.daml" % "daml-lf-value-java-proto" % daml_libraries_version
   lazy val daml_lf_transaction = "com.daml" %% "daml-lf-transaction" % daml_libraries_version
@@ -96,6 +98,7 @@ object CantonDependencies {
   lazy val daml_resources_akka = "com.daml" %% "resources-akka" % daml_libraries_version
   lazy val daml_ledger_rxjava_client = "com.daml" % "bindings-rxjava" % daml_libraries_version
   lazy val daml_script_runner = "com.daml" %% "daml-script-runner" % daml_libraries_version
+  lazy val daml_telemetry = "com.daml" %% "telemetry" % daml_libraries_version
 
   lazy val bouncycastle_bcprov_jdk15on =
     "org.bouncycastle" % "bcprov-jdk15on" % bouncy_castle_version
@@ -174,9 +177,23 @@ object CantonDependencies {
 
   lazy val opentelemetry_version = "1.12.0"
   lazy val opentelemetry_api = "io.opentelemetry" % "opentelemetry-api" % opentelemetry_version
+  lazy val opentelemetry_context =
+    "io.opentelemetry" % "opentelemetry-context" % opentelemetry_version
+  lazy val opentelemetry_semconv =
+    "io.opentelemetry" % "opentelemetry-semconv" % s"$opentelemetry_version-alpha"
   lazy val opentelemetry_sdk = "io.opentelemetry" % "opentelemetry-sdk" % opentelemetry_version
   lazy val opentelemetry_sdk_autoconfigure =
     "io.opentelemetry" % "opentelemetry-sdk-extension-autoconfigure" % s"$opentelemetry_version-alpha"
+  lazy val opentelemetry_sdk_common =
+    "io.opentelemetry" % "opentelemetry-sdk-common" % opentelemetry_version
+  lazy val opentelemetry_sdk_logs =
+    "io.opentelemetry" % "opentelemetry-sdk-logs" % s"$opentelemetry_version-alpha"
+  lazy val opentelemetry_sdk_metrics =
+    "io.opentelemetry" % "opentelemetry-sdk-metrics" % s"$opentelemetry_version-alpha"
+  lazy val opentelemetry_sdk_trace =
+    "io.opentelemetry" % "opentelemetry-sdk-trace" % opentelemetry_version
+  lazy val opentelemetry_prometheus =
+    "io.opentelemetry" % "opentelemetry-exporter-prometheus" % s"$opentelemetry_version-alpha"
   lazy val opentelemetry_zipkin =
     "io.opentelemetry" % "opentelemetry-exporter-zipkin" % opentelemetry_version
   lazy val opentelemetry_jaeger =

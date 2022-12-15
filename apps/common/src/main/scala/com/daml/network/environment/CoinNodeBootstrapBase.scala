@@ -3,14 +3,15 @@ package com.daml.network.environment
 import akka.actor.ActorSystem
 import better.files.File
 import cats.data.EitherT
+import com.daml.metrics.grpc.GrpcServerMetrics
 import com.daml.network.admin.grpc.GrpcVersionService
 import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
 import com.daml.network.v0.VersionServiceGrpc
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.RequireTypes.InstanceName
-import com.digitalasset.canton.config.{LocalNodeConfig, LocalNodeParameters, ProcessingTimeout}
+import com.digitalasset.canton.config.{LocalNodeConfig, ProcessingTimeout}
 import com.digitalasset.canton.crypto.Crypto
-import com.digitalasset.canton.environment.{CantonNode, CantonNodeBootstrap}
+import com.digitalasset.canton.environment.{CantonNode, CantonNodeBootstrap, CantonNodeParameters}
 import com.digitalasset.canton.health.admin.data.NodeStatus
 import com.digitalasset.canton.health.admin.grpc.GrpcStatusService
 import com.digitalasset.canton.health.admin.v0.StatusServiceGrpc
@@ -79,7 +80,7 @@ trait CoinNodeBootstrap[+Node <: CantonNode]
 abstract class CoinNodeBootstrapBase[
     T <: CantonNode,
     NodeConfig <: LocalNodeConfig,
-    ParameterConfig <: LocalNodeParameters,
+    ParameterConfig <: CantonNodeParameters,
 ](
     override val name: InstanceName,
     config: NodeConfig,
@@ -89,6 +90,7 @@ abstract class CoinNodeBootstrapBase[
     storageFactory: StorageFactory,
     val loggerFactory: NamedLoggerFactory,
     writeHealthDumpToFile: HealthDumpFunction,
+    grpcMetrics: GrpcServerMetrics,
 )(
     implicit val executionContext: ExecutionContextIdlenessExecutorService,
     implicit val scheduler: ScheduledExecutorService,
@@ -176,6 +178,7 @@ abstract class CoinNodeBootstrapBase[
         loggerFactory,
         parameterConfig.loggingConfig.api,
         parameterConfig.tracing,
+        grpcMetrics,
       )
 
     val registry = builder.mutableHandlerRegistry()

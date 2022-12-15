@@ -63,6 +63,10 @@ trait DomainAdministration {
   type Status <: NodeStatus.Status
   def health: HealthAdministration[Status]
 
+  // The DomainTopologyTransactionMessage is about 2500 bytes and each recipient about 100 bytes.
+  // with this minimum we can have up to 275 recipients for a domain transaction change.
+  private val minimumMaxRequestSizeBytes = NonNegativeInt.tryCreate(30000)
+
   @Help.Summary("Manage participant permissions")
   @Help.Group("Participants")
   object participants extends Helpful {
@@ -283,6 +287,17 @@ trait DomainAdministration {
         .discard[ByteString]
     }
 
+    @Help.Summary("Update the Dynamic Domain Parameters for the domain")
+    @Help.Description(
+      """force: Enable potentially dangerous changes. Required to increase ``ledgerTimeRecordTimeTolerance``.
+        |Use ``set_ledger_time_record_time_tolerance_securely`` to securely increase ``ledgerTimeRecordTimeTolerance``."""
+    )
+    @deprecated("Use set_max_request_size instead", "2.5.0")
+    def update_dynamic_parameters(
+        modifier: DynamicDomainParameters => DynamicDomainParameters,
+        force: Boolean = false,
+    ): Unit = update_dynamic_domain_parameters(modifier, force)
+
     @Help.Summary("Try to update the reconciliation interval for the domain")
     @Help.Description("""If the reconciliation interval is dynamic, update the value.
         If the reconciliation interval is not dynamic (i.e., if the domain is running
@@ -313,19 +328,39 @@ trait DomainAdministration {
 
     @Help.Summary("Try to update the max rate per participant for the domain")
     @Help.Description("""If the max request size is dynamic, update the value.
+                         The update won't have any effect unless the sequencer server is restarted.
+    If the max request size is not dynamic (i.e., if the domain is running
+    on protocol version lower than `4`), then it will throw an error.
+    """)
+    @Help.AvailableFrom(ProtocolVersion.v4)
+    @deprecated("Use set_max_request_size instead", "2.5.0")
+    def set_max_inbound_message_size(
+        maxRequestSize: NonNegativeInt,
+        force: Boolean = false,
+    ): Unit = set_max_request_size(maxRequestSize, force)
+
+    @Help.Summary("Try to update the max rate per participant for the domain")
+    @Help.Description("""If the max request size is dynamic, update the value.
                          The update won't have any effect unless the sequencer server is restarted. 
     If the max request size is not dynamic (i.e., if the domain is running
     on protocol version lower than `4`), then it will throw an error.
     """)
     @Help.AvailableFrom(ProtocolVersion.v4)
     def set_max_request_size(
-        maxRequestSize: NonNegativeInt
+        maxRequestSize: NonNegativeInt,
+        force: Boolean = false,
     ): Unit =
       TraceContext.withNewTraceContext { implicit tc =>
-        update_dynamic_domain_parameters_v1(
-          _.copy(maxRequestSize = maxRequestSize),
-          "update max request size",
-        )
+        if (maxRequestSize < minimumMaxRequestSizeBytes && !force)
+          logger.warn(
+            s"""|The maxRequestSize requested is lower than the minimum advised value ($minimumMaxRequestSizeBytes) which can crash Canton.
+                |To set this value anyway, set force to true.""".stripMargin
+          )
+        else
+          update_dynamic_domain_parameters_v1(
+            _.copy(maxRequestSize = maxRequestSize),
+            "update max request size",
+          )
         logger.info(
           "Please restart the sequencer node to take into account the new value for max-request-size."
         )
@@ -362,7 +397,7 @@ trait DomainAdministration {
         |because the command may override concurrent changes.
         |
         |force: update ``ledgerTimeRecordTimeTolerance`` immediately without blocking. 
-        |Only do this, if security is not a concern (e.g. during testing)."""
+        |This is safe to do during domain bootstrapping and in test environments, but should not be done in operational production systems.."""
     )
     def set_ledger_time_record_time_tolerance(
         newLedgerTimeRecordTimeTolerance: NonNegativeFiniteDuration,

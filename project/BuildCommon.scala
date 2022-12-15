@@ -1,3 +1,4 @@
+import scalafix.sbt.ScalafixPlugin
 import sbt.Keys._
 import sbt._
 import Dependencies._
@@ -291,6 +292,84 @@ object BuildCommon {
     scalacOptions += "-Wconf:src=src_managed/.*:silent",
   )
 
+  // Project for utilities that are also used outside of the Canton repo
+  lazy val `canton-util-external` = {
+    import CantonDependencies._
+    sbt.Project
+      .apply("canton-util-external", file("canton/community/util-external"))
+      .dependsOn(
+        `canton-akka-fork`,
+        `canton-wartremover-extension` % "compile->compile;test->test",
+        // Canton depends on the Daml code via a git submodule and the two
+        // projects below. We instead depend on the artifacts released
+        // from the Daml repo listed in libraryDependencies below.
+        // `daml-copy-common`,
+        // `daml-copy-testing` % "test->test",
+      )
+      .settings(
+        sharedCantonSettings,
+        libraryDependencies ++= Seq(
+          daml_telemetry,
+          daml_lf_data,
+          daml_lf_nonempty_cats,
+          logback_classic,
+          logback_core,
+          scala_logging,
+          scala_collection_contrib,
+          scalatest % Test,
+          mockito_scala % Test,
+          scalatestMockito % Test,
+          cats,
+          jul_to_slf4j % Test,
+          log4j_core,
+          log4j_api,
+          monocle_macro, // Include it here, even if unused, so that it can be used everywhere
+          pureconfig, // Only dependencies may be needed, but it is simplest to include it like this
+          opentelemetry_api,
+          opentelemetry_sdk,
+          opentelemetry_sdk_autoconfigure,
+          opentelemetry_instrumentation_grpc,
+          opentelemetry_zipkin,
+          opentelemetry_jaeger,
+        ),
+        dependencyOverrides ++= Seq(log4j_core, log4j_api),
+        // commented out from Canton OS repo as settings don't apply to us (yet)
+        // JvmRulesPlugin.damlRepoHeaderSettings,
+      )
+  }
+
+  // Project for general utilities used inside the Canton repo only
+  lazy val `canton-util-internal` = {
+    import CantonDependencies._
+    sbt.Project
+      .apply("canton-util-internal", file("canton/community/util"))
+      .dependsOn(
+        `canton-util-external`
+      )
+      .settings(
+        sharedCantonSettings,
+        libraryDependencies ++= Seq(
+          logback_classic,
+          logback_core,
+          scala_logging,
+          scala_collection_contrib,
+          scalatest % Test,
+          mockito_scala % Test,
+          scalatestMockito % Test,
+          cats,
+          cats_law % Test,
+          jul_to_slf4j % Test,
+          log4j_core,
+          log4j_api,
+          monocle_macro, // Include it here, even if unused, so that it can be used everywhere
+          pureconfig, // Only dependencies may be needed, but it is simplest to include it like this
+        ),
+        dependencyOverrides ++= Seq(log4j_core, log4j_api),
+        // commented out from Canton OS repo as settings don't apply to us (yet)
+        // JvmRulesPlugin.damlRepoHeaderSettings,
+      )
+  }
+
   lazy val `canton-community-app` = {
     import CantonDependencies._
     sbt.Project
@@ -364,6 +443,8 @@ object BuildCommon {
         `canton-functionmeta`,
         `canton-slick-fork`,
         `canton-wartremover-extension` % "compile->compile;test->test",
+        `canton-util-external` % "compile->compile;test->test",
+        `canton-util-internal` % "compile->compile;test->test",
       )
       .settings(
         disableTests,
@@ -436,6 +517,7 @@ object BuildCommon {
           opentelemetry_instrumentation_grpc,
           opentelemetry_zipkin,
           opentelemetry_jaeger,
+          opentelemetry_prometheus,
           scaffeine,
         ),
         dependencyOverrides ++= Seq(log4j_core, log4j_api),
@@ -571,7 +653,7 @@ object BuildCommon {
               "com.digitalasset.canton.participant.admin.workflows",
             ),
             (
-              (Compile / damlDarOutput).value / "AdminWorkflowsWithVacuuming-2.5.0.dar",
+              (Compile / damlDarOutput).value / "AdminWorkflowsWithVacuuming-2.6.0.dar",
               "com.digitalasset.canton.participant.admin.workflows",
             ),
           ),
@@ -650,6 +732,27 @@ object BuildCommon {
           scalatest % Test,
           slick,
           wartremover_dep,
+        ),
+        // commented out from Canton OS repo as settings don't apply to us (yet)
+        //      // Exclude to apply our license header to any Scala files
+        //      headerSources / excludeFilter := "*.scala",
+        //      coverageEnabled := false,
+      )
+  }
+
+  // TODO(#10617) remove when no longer needed
+  lazy val `canton-akka-fork` = {
+    import CantonDependencies._
+    sbt.Project
+      .apply("canton-akka-fork", file("community/lib/akka"))
+      .disablePlugins(ScalafixPlugin, ScalafmtPlugin, WartRemover)
+      .settings(
+        sharedSettings,
+        libraryDependencies ++= Seq(
+          akka_stream,
+          akka_stream_testkit % Test,
+          akka_slf4j,
+          scalatest % Test,
         ),
         // commented out from Canton OS repo as settings don't apply to us (yet)
         //      // Exclude to apply our license header to any Scala files
