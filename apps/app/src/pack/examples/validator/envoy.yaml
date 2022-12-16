@@ -108,9 +108,6 @@ static_resources:
                       max_age: "1728000"
                       expose_headers: custom-header-1,grpc-status,grpc-message
               http_filters:
-                - name: envoy.filters.http.grpc_web
-                  typed_config:
-                    "@type": type.googleapis.com/envoy.extensions.filters.http.grpc_web.v3.GrpcWeb
                 - name: envoy.filters.http.cors
                   typed_config:
                     "@type": type.googleapis.com/envoy.extensions.filters.http.cors.v3.Cors
@@ -150,7 +147,7 @@ static_resources:
     - name: directory-app-grpc
       connect_timeout: 0.25s
       type: logical_dns
-      http2_protocol_options: {}
+      http_protocol_options: {}
       lb_policy: round_robin
       load_assignment:
         cluster_name: cluster_0
@@ -160,4 +157,4 @@ static_resources:
                 address:
                   socket_address:
                     address: dev.network.canton.global
-                    port_value: 5010
+                    port_value: 6010
