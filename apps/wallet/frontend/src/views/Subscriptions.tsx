@@ -12,6 +12,7 @@ import {
   Typography,
 } from '@mui/material';
 
+import * as damlTypes from '@daml/types';
 import {
   SubscriptionRequest as damlSubscriptionRequest,
   Subscription,
@@ -19,6 +20,7 @@ import {
 
 import { PaymentQuantityDisplay } from '../components/QuantityDisplay';
 import SubscriptionRequestsTable from '../components/SubscriptionRequestsTable';
+import Timestamp from '../components/Timestamp';
 import {
   useWalletClient,
   SubscriptionTuple,
@@ -83,7 +85,9 @@ const SubscriptionsTable: React.FC = () => {
         <PaymentQuantityDisplay quantity={state.value.payload.payData.paymentQuantity} />
       </TableCell>
       <TableCell>{state.value.payload.payData.paymentInterval.microseconds}</TableCell>
-      <TableCell>{paymentDueAt(state)}</TableCell>
+      <TableCell>
+        <Timestamp time={paymentDueAt(state)} />
+      </TableCell>
       <TableCell className="sub-provider">
         <DirectoryEntry partyId={main.payload.provider} />
       </TableCell>
@@ -121,7 +125,7 @@ const SubscriptionsTable: React.FC = () => {
   );
 };
 
-const paymentDueAt = (state: SubscriptionState): string => {
+const paymentDueAt = (state: SubscriptionState): damlTypes.Time => {
   switch (state.type) {
     case 'idle':
       return state.value.payload.nextPaymentDueAt;
