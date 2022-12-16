@@ -6,7 +6,11 @@ import { AuthConfig, isHs256UnsafeAuthConfig } from '../config/schema';
 export const oidcAuthToProviderProps = (config: AuthConfig): AuthProviderProps => {
   if (!isHs256UnsafeAuthConfig(config)) {
     const { token_audience, token_scope, ...props } = config;
-    const scope = token_scope;
+
+    // We include the `offline_access` scope to tell auth0 we want refresh tokens when we first authenticate.
+    // The refresh tokens are then used to automatically retrieve new access tokens before they expire without re-authenticating.
+    const scope = `${token_scope} offline_access`;
+
     const extraQueryParams = { audience: token_audience };
     const redirect_uri = window.location.origin;
 

@@ -252,7 +252,8 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
 
 7. Create an API for your application - in Auth0:
     a. Navigate to Applications > APIs and click "Create API". Name can be anything, set identifier to https://canton.network.global (that is the audience that we will configure the backend to expect)
-    b. under the Permissions tab in the new API, add a permission with scope "daml_ledger_api", and a description of your choice
+    b. Under the Permissions tab in the new API, add a permission with scope "daml_ledger_api", and a description of your choice
+    c. On the Settings tab, scroll down to "Access Settings" and enable "Allow Offline Access", for automatic token refreshing
 
 8. Modify the ``auth`` section in your backend configuration, under wallet-app-backends.walletApp at ``examples/validator/validator.conf``
 

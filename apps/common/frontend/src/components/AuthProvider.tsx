@@ -15,11 +15,12 @@ const AuthProvider: React.FC<{ children: React.ReactNode; authConf: AuthConfig }
 
   return (
     <OidcAuthProvider
-      {...oidcAuthToProviderProps(authConf)}
+      automaticSilentRenew
+      userStore={new WebStorageStateStore({ store: window.localStorage })}
       onSigninCallback={() =>
         window.history.replaceState({}, document.title, window.location.pathname)
       }
-      userStore={new WebStorageStateStore({ store: window.localStorage })}
+      {...oidcAuthToProviderProps(authConf)}
     >
       {children}
     </OidcAuthProvider>
