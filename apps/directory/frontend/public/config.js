@@ -23,5 +23,10 @@ window.canton_network_config = {
       // URL of the gRPC-Web envoy proxy, proxying the user’s ledger API
       grpcUrl: 'http://localhost:6201',
     },
+    wallet: {
+      // URL of the web-ui, used to forward payment workflows to wallet
+      grpcUrl: "http://localhost:6004",
+      uiUrl: "http://localhost:3000",
+    },
   },
 };

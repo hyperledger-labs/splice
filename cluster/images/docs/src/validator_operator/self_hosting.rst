@@ -200,12 +200,16 @@ Next, start the envoy proxy. This proxies the wallet gRPC API on port
 
 Lastly, we have to host the frontend files. You can use any static
 file server for that, e.g., `NGINX <https://www.nginx.com/>`_. To keep
-things simple, we use the builtin HTTP Server in Python. Start another terminal and run: ::
+things simple, we use the builtin HTTP Server in PHP. If you don't have PHP installed, please install it now, e.g. using the following on a Debian-based OS: ::
+
+  apt install php-cli
+
+Start another terminal and run: ::
 
   cd web-uis/wallet
-  python3 -m http.server 3000
+  php -S 127.0.0.1:3000
 
-The Wallet Web UI is now accessible on port 3000, where you can login as alice and see the coins you tapped earlier in this tutorial.
+The Wallet Web UI is now accessible at http://localhost:3000, where you can login as alice and see the coins you tapped earlier in this tutorial.
 
 Configuring Authentication
 --------------------------
@@ -284,3 +288,42 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
 This will kick off an interactive log-in flow where the user is redirected from the locally running wallet UI to auth0's login portal, then upon a successful authentication back to the local wallet UI.
 
 If this user is logging in for the first time, a page will appear in the wallet UI prompting the user to onboard themselves. This creates the Daml user & its primary party on the ledger, associated with the external account.
+
+Hosting the Directory UI
+------------------------
+
+The Canton Network includes a Canton Name Service (CNS), which maps party IDs to human-readable names, much like the DNS does for IP addresses.
+
+In order to use it in your self-hosted validator, you will need to serve one more UI - that of the Directory app.
+
+First - you will need to upload the directory's dar file to your validator's participant. Go to the terminal in which you are running the validator (the one using "validator.conf"), and type ::
+
+  validatorApp.remoteParticipant.dars.upload("dars/directory-service-0.1.0.dar")
+
+The default configuration in the release bundle is configured with test authentication. If you followed the instructions above for enabling Auth0 authentication, then a similar modification of the config file would be required for the directory app.
+Modify the ``auth`` section in the directory frontend configuration file, at ``web-uis/directory/config.js``
+
+  ::
+
+    auth: {
+      algorithm: "rs-256",
+      authority: "https://<AUTH0_DOMAIN_URL from step 3a above>",
+      client_id: "<AUTH0_CLIENT_ID from step 3b above>",
+      token_audience: "https://canton.network.global",
+      token_scope: "daml_ledger_api",
+    },
+
+Note that this configuration is very similar to that of the wallet frontend, with the addition of the "daml_ledger_api" token_scope, as the directory frontend will need access to the ledger API directly.
+
+We are now ready to host the frontend - start another terminal and run: ::
+
+  cd web-uis/directory
+  php -S 127.0.0.1:3001
+
+The Directory Web UI should now be accessible at http://localhost:3001. You can login there using the same method you used for the wallet (either username if using the default insecure test
+authentication, or through Auth0 if configured). To begin with - you will have no registered entries.
+Insert a cns entry name of your choice, e.g. "alice.cns" in the "Request new entry" field, and click "Request Entry".
+You will be redirected to your wallet to confirm the Canton Coin payment for your directory entry (a subscription-based payment).
+Once confirmed, you will be redirected back to the directory UI, and should see your new entry listed.
+
+If you navigate back to your wallet (refresh the page if it was left open from before) - in the top left corner, under the "CC Wallet" title, you should see that your party ID is now being resolved to your new cns entry name.
