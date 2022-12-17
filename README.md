@@ -469,6 +469,8 @@ Copy the Client ID and Client Secret into the following environment variables, r
 - `AUTH0_MANAGEMENT_API_CLIENT_ID`
 - `AUTH0_MANAGEMENT_API_CLIENT_SECRET`
 
+For convenience, you can `export` these from your `.envrc.private` which is ignored by git, to always be available for subsequent runs.
+
 Be aware: these tokens allow the requester to perform any administrative action against the Auth0 tenant! Use caution and keep production values secure.
 
 #### Setting up `lnav` to Inspect Canton logs
@@ -564,7 +566,8 @@ Currently we maintain two tenants with some application clients in them:
 
 1. `canton-network-test`: A tenant dedicated for test environments
     - `Local Wallet UI`: An application to support wallet UIs running on localhost
-    - `Wallet (Test Application)`: Currently unused, but intended to experiment with API scopes
+    - `Ledger API (Test Application)`: This is a machine-to-machine client that issues tokens for the ledger API to app backends
+    - `Ledger API`: The Custom API definition that allows users to request tokens with the proper audience
 2. `canton-network-dev`: The tenant dedicated for our cluster deployments
     - `Validator1 Auth`: A monolith application that supports all validator1-hosted UIs (Splitwise, Directory, and Wallet) running on all cluster deployments (scratch, staging, dev, and test)
     - `CN validator backend`: An application for all validator app backends running on all cluster deployments (scratch, staging, dev, and test)
