@@ -202,6 +202,7 @@ trait WalletTestUtil extends CoinIntegrationTest with CnsTestUtil {
       paymentCodegen.AppPaymentRequest.ContractId,
       paymentCodegen.AppPaymentRequest,
   ) = {
+    val now = env.environment.clock.now
     val referenceId = clue(s"Create test delivery offer for $userParty") {
       val result = LedgerApiUtils.submitWithResult(
         remoteParticipant,
@@ -231,7 +232,7 @@ trait WalletTestUtil extends CoinIntegrationTest with CnsTestUtil {
         ).asJava,
         userParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
-        java.time.Instant.now().plus(1, ChronoUnit.MINUTES),
+        now.plus(Duration.ofMinutes(1)).toInstant,
         new RelTime(60 * 1000000),
         referenceId.toInterface(paymentCodegen.DeliveryOffer.INTERFACE),
       )

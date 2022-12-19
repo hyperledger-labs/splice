@@ -109,6 +109,12 @@ template WalletAppInstall
       controller walletServiceParty
       do exercise cid AppPaymentRequest_Reject
 
+    nonconsuming choice WalletAppInstall_AppPaymentRequest_Expire : ()
+      with
+        cid : ContractId AppPaymentRequest
+      controller walletServiceParty
+      do exercise cid $ AppPaymentRequest_Expire with actor = endUserParty
+
     nonconsuming choice WalletAppInstall_SubscriptionRequest_Reject : ()
       with
         cid : ContractId SubscriptionRequest

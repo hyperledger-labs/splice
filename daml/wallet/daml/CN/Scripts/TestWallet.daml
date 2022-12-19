@@ -92,6 +92,42 @@ testSingleReceiverCCPaymentRequest = script do
       (ReceiverCCQuantity with receiver = bob.primaryParty, ccQuantity = 30.0)
       ]
 
+  pure ()
+
+testExpiringCCPaymentRequest : Script ()
+testExpiringCCPaymentRequest = script do
+  app <- setupApp
+  runNextIssuance app
+  runCoinDepositBots app
+
+  validator <- setupValidator app "validator1"
+  provider <- setupUser app "provider" validator
+  alice <- setupUser app "alice" validator
+  bob <- setupUser app "bob" validator
+
+  coin <- tap app alice 42.0
+  (transferRequest, offerCid) <- createSingleReceiverPaymentRequest app
+    provider.primaryParty alice.primaryParty bob.primaryParty
+    (PaymentQuantity 30.0 CC)
+
+  walletServiceParty <- allocateParty "walletService"
+  install <- submitMulti [walletServiceParty, alice.primaryParty, validator] [] $ createCmd $ WalletAppInstall with
+    walletServiceParty = walletServiceParty
+    endUserParty = alice.primaryParty
+    endUserName = "alice"
+    svcParty = app.svc
+    validatorParty = validator
+
+  -- Try expiring too early
+  submitMultiMustFail [walletServiceParty] [alice.primaryParty] $ exerciseCmd install
+        WalletAppInstall_AppPaymentRequest_Expire with
+          cid = transferRequest
+
+  passTime (minutes 6)
+
+  submitMulti [walletServiceParty] [alice.primaryParty] $ exerciseCmd install
+        WalletAppInstall_AppPaymentRequest_Expire with
+          cid = transferRequest
 
   pure ()
 

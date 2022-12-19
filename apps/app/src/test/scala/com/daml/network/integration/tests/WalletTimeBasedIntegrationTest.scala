@@ -217,6 +217,30 @@ class WalletTimeBasedIntegrationTest
         },
       )
     }
+
+    "auto-expire payment requests" in { implicit env =>
+      val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
+
+      actAndCheck(
+        "Create a payment request, which expires after 1 minute",
+        createSelfPaymentRequest(
+          aliceWalletBackend.remoteParticipantWithAdminToken,
+          aliceWallet.config.damlUser,
+          aliceUserParty,
+        ),
+      )(
+        "Check that we can see the created payment request",
+        _ => aliceWallet.listAppPaymentRequests() should have length 1,
+      )
+
+      actAndCheck(
+        "Advance time beyond the request's expiration",
+        advanceTime(Duration.ofMinutes(3)),
+      )(
+        "Check that there are no more payment requests",
+        _ => aliceWallet.listAppPaymentRequests() shouldBe empty,
+      )
+    }
   }
 
   "automatically collect app & validator rewards on coin operations" in { implicit env =>

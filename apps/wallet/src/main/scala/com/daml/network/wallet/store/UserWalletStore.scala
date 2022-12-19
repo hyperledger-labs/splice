@@ -161,6 +161,25 @@ trait UserWalletStore extends FlagCloseable with NamedLogging {
         )
       )
 
+  def listExpiredAppPaymentRequests(now: CantonTimestamp, limit: Int)(implicit
+      ec: ExecutionContext
+  ): Future[QueryResult[
+    Seq[JavaContract[
+      walletCodegen.AppPaymentRequest.ContractId,
+      walletCodegen.AppPaymentRequest,
+    ]]
+  ]] =
+    acs
+      .listContracts(walletCodegen.AppPaymentRequest.COMPANION)
+      .map(
+        _.map(cos =>
+          cos.iterator
+            .filter(co => now.toInstant.isAfter(co.payload.expiresAt))
+            .take(limit)
+            .toSeq
+        )
+      )
+
   def listSubscriptionStatesReadyForPayment(now: CantonTimestamp, limit: Int)(implicit
       ec: ExecutionContext
   ): Future[QueryResult[
