@@ -38,8 +38,7 @@ class ExpireAcceptedTransferOfferTrigger(
     for {
       install <- store.getInstall()
       cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Expire(
-        task.work.contractId,
-        store.key.endUserParty.toProtoPrimitive,
+        task.work.contractId
       )
       _ <- connection
         .submitWithResultNoDedup(

@@ -162,16 +162,14 @@ template WalletAppInstall
     nonconsuming choice WalletAppInstall_TransferOffer_Expire : ()
       with
         cid : ContractId TransferOffer
-        actor : Party
       controller walletServiceParty
-      do exercise cid $ TransferOffer_Expire actor
+      do exercise cid $ TransferOffer_Expire with actor = endUserParty
 
     nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Expire : ()
       with
         cid : ContractId AcceptedTransferOffer
-        actor : Party
       controller walletServiceParty
-      do exercise cid $ AcceptedTransferOffer_Expire actor
+      do exercise cid $ AcceptedTransferOffer_Expire with actor = endUserParty
 
     nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Abort : ()
       with
