@@ -128,8 +128,6 @@ class PreflightIntegrationTest
         validatorPath / "validator-participant.conf",
       )
       .clearConfigTransforms()
-      .addConfigTransforms((_, conf) => CoinConfigTransforms.addDamlNameSuffix("preflight")(conf))
-      .addConfigTransforms((_, conf) => CoinConfigTransforms.ensureNovelDamlNames()(conf))
       .addConfigTransforms((_, conf) => CoinConfigTransforms.bumpCantonPortsBy(1000)(conf))
       .addConfigTransforms((_, conf) =>
         CoinConfigTransforms.useSelfSignedTokensForWalletValidatorApiAuth("test")(conf)

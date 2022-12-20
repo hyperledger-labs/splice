@@ -1,15 +1,2 @@
-val validatorUserName = validatorApp.config.damlUser
-
-println(s"Creating validator user: " + validatorUserName)
-val validatorParty = validatorApp.remoteParticipant.parties.enable(validatorUserName)
-
-validatorApp.remoteParticipant.ledger_api.users.create(
-    id = validatorUserName,
-    actAs = Set(validatorParty.toLf),
-    readAs = Set.empty,
-    primaryParty = Some(validatorParty.toLf),
-    participantAdmin = true,
-)
-
 println("Starting all first-party apps of the self-hosted validator: " + coinNodes)
 coinNodes.local.foreach(_.startSync())

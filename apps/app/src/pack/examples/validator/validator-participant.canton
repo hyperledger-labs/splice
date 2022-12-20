@@ -1,8 +1,21 @@
 val domainUrl = System.getProperty("DOMAIN_URL", "http://dev.network.canton.global:5008")
 
+// Note: the validator user name is defined in validator.conf or validator-secure.conf
+val validatorUserName = System.getProperty("VALIDATOR_USER_NAME", "validator_user")
+
 println("Starting participant node")
 validatorParticipant.start()
 
 println(s"Connecting self-hosted validator to the domain $domainUrl")
 validatorParticipant.domains.connect("canton-network", domainUrl)
 
+println(s"Creating validator user: " + validatorUserName)
+val validatorParty = validatorParticipant.parties.enable("validator_service_user")
+
+validatorParticipant.ledger_api.users.create(
+    id = validatorUserName,
+    actAs = Set(validatorParty.toLf),
+    readAs = Set.empty,
+    primaryParty = Some(validatorParty.toLf),
+    participantAdmin = true,
+)

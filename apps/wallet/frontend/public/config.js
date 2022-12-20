@@ -10,6 +10,8 @@ window.canton_network_config = {
   //     algorithm: 'rs-256'
   //     authority: "",
   //     client_id: "",
+  //     token_audience: "https://canton.network.global",
+  //     token_scope: "daml_ledger_api",
   //     redirect_uri: window.location.origin,
   //   },
   services: {
