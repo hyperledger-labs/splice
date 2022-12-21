@@ -1,6 +1,7 @@
 package com.daml.network.validator.admin.api.client
 
 import com.daml.network.admin.api.client.AppConnection
+import com.daml.network.auth.JwtCallCredential
 import com.daml.network.validator.admin.api.client.commands.GrpcValidatorAppClient
 import com.digitalasset.canton.config.{ClientConfig, ProcessingTimeout}
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -9,7 +10,6 @@ import com.digitalasset.canton.tracing.TraceContext
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import com.daml.network.auth.JwtCallCredential
 
 final case class UserInfo(
     primaryParty: PartyId,

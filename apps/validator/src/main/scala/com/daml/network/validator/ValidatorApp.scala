@@ -4,6 +4,13 @@ import akka.actor.ActorSystem
 import cats.implicits.*
 import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.ledger.javaapi.data.User
+import com.daml.network.auth.{
+  AuthConfig,
+  AuthInterceptor,
+  HMACVerifier,
+  RSAVerifier,
+  SignatureVerifier,
+}
 import com.daml.network.codegen.java.cc.coin.CoinRulesRequest
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.config.SharedCoinAppParameters
@@ -25,17 +32,11 @@ import com.digitalasset.canton.resource.Storage
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TracerProvider
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.{ServerInterceptors, Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
-import io.grpc.ServerInterceptors
-import com.daml.network.auth.AuthInterceptor
-import com.daml.network.auth.SignatureVerifier
-import com.daml.network.auth.AuthConfig
-import com.daml.network.auth.HMACVerifier
-import com.daml.network.auth.RSAVerifier
 
 /** Class representing a Validator app instance. */
 class ValidatorApp(

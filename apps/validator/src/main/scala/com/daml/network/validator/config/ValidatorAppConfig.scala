@@ -1,5 +1,6 @@
 package com.daml.network.validator.config
 
+import com.daml.network.auth.AuthConfig
 import com.daml.network.config.{
   AutomationConfig,
   CoinRemoteParticipantConfig,
@@ -10,7 +11,6 @@ import com.daml.network.scan.config.RemoteScanAppConfig
 import com.digitalasset.canton.config.*
 
 import java.nio.file.Path
-import com.daml.network.auth.AuthConfig
 
 case class AppInstance(
     serviceUser: String,

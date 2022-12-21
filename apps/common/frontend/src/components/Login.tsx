@@ -51,6 +51,15 @@ const Login: React.FC<{
   );
 };
 
+function normalizeUserId(candidateId: string): string | undefined {
+  // Return a normalized user ID, only if a valid user ID exists.
+  const id = candidateId.trim().toLowerCase();
+
+  if (id.match(/^[a-z0-9@^$.!`\-#+'~_|:]{1,128}$/)) {
+    return id;
+  }
+}
+
 const SstLoginPrompt: React.FC<{
   title?: string;
   secret: string;
@@ -59,6 +68,9 @@ const SstLoginPrompt: React.FC<{
 }> = ({ title, secret, audience, scope }) => {
   const [userId, setUserId] = useState<string>('');
   const { loginWithSst } = useUserState();
+
+  const invalidUserId = userId.length > 0 && !normalizeUserId(userId);
+
   return (
     <>
       {title && (
@@ -71,14 +83,26 @@ const SstLoginPrompt: React.FC<{
         required
         id="user-id-field"
         value={userId}
+        error={invalidUserId}
+        helperText={invalidUserId ? 'Invalid User Id' : undefined}
         onChange={uid => setUserId(uid.target.value)}
-      ></TextField>
+        onKeyPress={ev => {
+          if (ev.key === 'Enter') {
+            const id = normalizeUserId(userId);
+            if (id) {
+              loginWithSst(id, secret, audience, scope);
+              ev.preventDefault();
+            }
+          }
+        }}
+      />
       <Button
         variant="contained"
+        disabled={!normalizeUserId(userId)}
         sx={{ marginTop: '15px' }}
         onClick={e => {
           e.preventDefault();
-          loginWithSst(userId, secret, audience, scope);
+          loginWithSst(normalizeUserId(userId) || '', secret, audience, scope);
         }}
         id="login-button"
       >

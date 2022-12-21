@@ -8,4 +8,10 @@ export {
   useLedgerApiClient,
 } from './LedgerApiContext';
 
-export { useUserState, UserContext, UserProvider, type UserStatusResponse } from './UserContext';
+export {
+  usePrimaryParty,
+  useUserState,
+  UserContext,
+  UserProvider,
+  type UserStatusResponse,
+} from './UserContext';

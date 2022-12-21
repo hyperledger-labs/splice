@@ -9,10 +9,9 @@ import com.digitalasset.canton.lifecycle.{AsyncOrSyncCloseable, FlagCloseableAsy
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.networking.grpc.ClientChannelBuilder
 import com.digitalasset.canton.tracing.{TraceContext, TraceContextGrpc}
-import io.grpc.{Status, StatusRuntimeException}
+import io.grpc.{CallCredentials, Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContextExecutor, Future}
-import io.grpc.CallCredentials
 
 /** Base class for connecting and calling the gRPC/Admin API exposed by a CN App.
   */

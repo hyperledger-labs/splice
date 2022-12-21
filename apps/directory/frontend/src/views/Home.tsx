@@ -2,8 +2,10 @@ import {
   Contract,
   DirectoryClientProvider,
   useDirectoryClient,
+  usePrimaryParty,
   useUserState,
 } from 'common-frontend';
+import { PromiseDirectoryApi } from 'common-openapi/dist/types/PromiseAPI';
 import { useEffect, useState } from 'react';
 
 import { DirectoryInstall, DirectoryInstallRequest } from '@daml.js/directory/lib/CN/Directory';
@@ -16,27 +18,39 @@ import { config } from '../utils';
 import DirectoryEntries from './DirectoryEntries';
 import RequestDirectoryEntry from './RequestDirectoryEntry';
 
-const Home: React.FC = () => {
-  const { primaryPartyId, updateStatus } = useUserState();
+export function useProviderParty(directoryClient: PromiseDirectoryApi): string | undefined {
   const [providerPartyId, setProviderPartyId] = useState<string | undefined>();
-  const [install, setInstall] = useState<Contract<DirectoryInstall> | undefined>();
-  const ledgerApiClient = useDirectoryLedgerApiClient();
-  const directoryClient = useDirectoryClient();
-  useEffect(() => {
-    const fetchPrimaryParty = async () => {
-      const partyId = await ledgerApiClient.getPrimaryParty();
-      updateStatus({ userOnboarded: true, partyId });
-    };
-    fetchPrimaryParty();
-  }, [ledgerApiClient, updateStatus]);
 
   useEffect(() => {
     const fetchProviderParty = async () => {
-      const response = await directoryClient.getProviderPartyId();
-      setProviderPartyId(response.providerPartyId);
+      try {
+        const response = await directoryClient.getProviderPartyId();
+        setProviderPartyId(response.providerPartyId);
+      } catch (err) {
+        console.error('Error finding provider party', err);
+        throw new Error('Error finding provider party, please confirm user onboarded.');
+      }
     };
     fetchProviderParty();
   }, [directoryClient]);
+
+  return providerPartyId;
+}
+
+const Home: React.FC = () => {
+  const { updateStatus } = useUserState();
+  const [install, setInstall] = useState<Contract<DirectoryInstall> | undefined>();
+  const ledgerApiClient = useDirectoryLedgerApiClient();
+  const directoryClient = useDirectoryClient();
+
+  const primaryPartyId = usePrimaryParty(ledgerApiClient);
+  const providerPartyId = useProviderParty(directoryClient);
+
+  useEffect(() => {
+    if (primaryPartyId) {
+      updateStatus({ userOnboarded: true, partyId: primaryPartyId });
+    }
+  }, [primaryPartyId, updateStatus]);
 
   // We don’t expect to have console-based auth in Q4 so we
   // generate the install contract from the frontend rather than the backend.

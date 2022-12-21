@@ -1,4 +1,4 @@
-import { Contract, useUserState } from 'common-frontend';
+import { Contract, usePrimaryParty, useUserState } from 'common-frontend';
 import { Empty } from 'google-protobuf/google/protobuf/empty_pb';
 import { useState, useEffect } from 'react';
 
@@ -26,8 +26,15 @@ const HomeWithContext: React.FC<{
   const { updateStatus } = useUserState();
 
   const [provider, setProvider] = useState<string | undefined>();
-  const [party, setParty] = useState<string | undefined>();
   const [install, setInstall] = useState<Contract<SplitwiseInstall> | undefined>();
+
+  const primaryPartyId = usePrimaryParty(ledgerApiClient);
+
+  useEffect(() => {
+    if (primaryPartyId) {
+      updateStatus({ userOnboarded: true, partyId: primaryPartyId });
+    }
+  }, [primaryPartyId, updateStatus]);
 
   useEffect(() => {
     const fetchProvider = async () => {
@@ -37,36 +44,27 @@ const HomeWithContext: React.FC<{
     fetchProvider();
   }, [splitwiseClient]);
 
-  useEffect(() => {
-    const fetchParty = async () => {
-      const partyId = await ledgerApiClient.getPrimaryParty();
-      setParty(partyId);
-      updateStatus({ userOnboarded: true, partyId });
-    };
-    fetchParty();
-  }, [userId, updateStatus, ledgerApiClient]);
-
   // We don’t expect to have console-based auth in Q4 so we
   // generate the install contract from the frontend rather than the backend.
   useEffect(() => {
     const setupInstallContract = async () => {
-      if (party && provider) {
+      if (primaryPartyId && provider) {
         console.debug('Searching for SplitwiseInstall');
-        const install = await ledgerApiClient.querySplitwiseInstall(party, provider);
+        const install = await ledgerApiClient.querySplitwiseInstall(primaryPartyId, provider);
         if (install) {
           console.debug('SplitwiseInstall found');
           setInstall(install);
         } else {
           console.debug('SplitwiseInstall not found, creating SplitwiseInstallRequest');
-          await ledgerApiClient.create([party], SplitwiseInstallRequest, {
-            user: party,
+          await ledgerApiClient.create([primaryPartyId], SplitwiseInstallRequest, {
+            user: primaryPartyId,
             provider: provider,
           });
           console.debug('Created SplitwiseInstallRequest, waiting for SplitwiseInstall');
           setTimeout(() => {
             const maxRetries = 30;
             const querySplitwiseInstall = async (n: number) => {
-              const install = await ledgerApiClient.querySplitwiseInstall(party, provider);
+              const install = await ledgerApiClient.querySplitwiseInstall(primaryPartyId, provider);
               if (install) {
                 console.debug('SplitwiseInstall found');
                 setInstall(install);
@@ -85,14 +83,14 @@ const HomeWithContext: React.FC<{
       }
     };
     setupInstallContract();
-  }, [party, provider, ledgerApiClient]);
+  }, [primaryPartyId, provider, ledgerApiClient]);
 
-  if (provider && party && svc && install) {
+  if (provider && primaryPartyId && svc && install) {
     return (
       <Container>
         <Stack spacing={3}>
-          <GroupSetup party={party} provider={provider} svc={svc} />
-          <Groups directoryEntries={dirEntries} party={party} provider={provider} />
+          <GroupSetup party={primaryPartyId} provider={provider} svc={svc} />
+          <Groups directoryEntries={dirEntries} party={primaryPartyId} provider={provider} />
         </Stack>
       </Container>
     );

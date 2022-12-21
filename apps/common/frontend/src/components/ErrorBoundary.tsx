@@ -3,31 +3,71 @@ import React from 'react';
 
 import { Button } from '@mui/material';
 
+const ErrorBanner: React.FC<{
+  error?: string;
+  errorTime?: Date;
+  clearError: () => void;
+}> = ({ error, errorTime, clearError }) => (
+  <div
+    style={{
+      padding: '4px',
+      background: '#ffe0e0',
+      display: 'flex',
+      justifyContent: 'space-between',
+    }}
+  >
+    <div>
+      Something went wrong. Latest error ({errorTime?.toLocaleString()}): <br />{' '}
+      <span id="error">{error}</span>
+    </div>
+    <Button id="clear-error-button" variant="outlined" onClick={clearError}>
+      Clear
+    </Button>
+  </div>
+);
+
 interface IProps {
   children?: ReactNode;
 }
 
 interface IState {
-  hasError?: boolean;
+  hasError: boolean;
   error?: string;
+  errorTime?: Date;
+}
+
+const DEFAULT_STATE = {
+  hasError: false,
+} as IState;
+
+function getErrorState(error: string): IState {
+  return {
+    hasError: true,
+    error: error,
+    errorTime: new Date(),
+  };
 }
 
 class ErrorBoundary extends React.Component<IProps, IState> {
-  constructor(props: IProps) {
-    super(props);
-    this.state = { hasError: false };
-  }
+  public state = DEFAULT_STATE;
+
+  private setError = (error: string) => {
+    this.setState(getErrorState(error));
+  };
+
+  private clearError = async () => {
+    this.setState(DEFAULT_STATE);
+  };
+
   private promiseRejectionHandler = (event: PromiseRejectionEvent) => {
     console.error('ErrorBoundary caught an unhandled promise rejection', event.reason.toString());
-    this.setState({
-      hasError: true,
-      error: event.reason.toString(),
-    });
+    this.setError(event.reason.toString());
   };
+
   private static getDerivedStateFromError(error: Error) {
-    // Update state so the next render will show the fallback UI.
-    return { hasError: true, error: error.toString() };
+    return getErrorState(error.toString());
   }
+
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
     // Placeholder for potentially logging the error further
     console.error(
@@ -38,37 +78,33 @@ class ErrorBoundary extends React.Component<IProps, IState> {
       errorInfo.componentStack
     );
   }
+
   componentDidMount(): void {
-    // Add an event listener to the window to catch unhandled promise rejections & stash the error in the state
     window.addEventListener('unhandledrejection', this.promiseRejectionHandler);
   }
   componentWillUnmount(): void {
     window.removeEventListener('unhandledrejection', this.promiseRejectionHandler);
   }
-  private clearError = async () => {
-    this.setState({
-      hasError: false,
-      error: '',
-    });
-  };
 
   render(): ReactNode {
+    let errorBanner = null;
+
     if (this.state.hasError) {
-      return (
-        <div>
-          <div>
-            <h1>
-              Something went wrong. Latest error: <br /> <span id="error">{this.state.error}</span>
-            </h1>
-            <Button id="clear-error-button" variant="outlined" onClick={() => this.clearError()}>
-              Clear
-            </Button>
-          </div>
-          {this.props.children}
-        </div>
+      errorBanner = (
+        <ErrorBanner
+          error={this.state.error}
+          errorTime={this.state.errorTime}
+          clearError={() => this.clearError()}
+        />
       );
     }
-    return this.props.children;
+
+    return (
+      <div>
+        {errorBanner}
+        {this.props.children}
+      </div>
+    );
   }
 }
 

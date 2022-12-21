@@ -2,6 +2,7 @@ package com.daml.network.wallet.config
 
 import com.daml.network.auth.AuthConfig
 import com.daml.network.config.{
+  AuthTokenSourceConfig,
   AutomationConfig,
   CoinRemoteParticipantConfig,
   LocalCoinConfig,
@@ -9,7 +10,6 @@ import com.daml.network.config.{
 }
 import com.daml.network.scan.config.RemoteScanAppConfig
 import com.digitalasset.canton.config.*
-import com.daml.network.config.AuthTokenSourceConfig
 
 case class WalletAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),

@@ -1,5 +1,6 @@
 package com.daml.network.console
 
+import com.daml.network.auth.{AuthUtil, JwtCallCredential}
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.validator.admin.api.client.UserInfo
 import com.daml.network.validator.admin.api.client.commands.GrpcValidatorAppClient
@@ -7,8 +8,6 @@ import com.daml.network.validator.config.{LocalValidatorAppConfig, RemoteValidat
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
-import com.daml.network.auth.AuthUtil
-import com.daml.network.auth.JwtCallCredential
 
 /** Single local validator app reference. Defines the console commands that can be run against a local validator
   * app reference.
