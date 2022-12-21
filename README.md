@@ -33,6 +33,10 @@
 
 For information on the runtime configuration of a Canton Network
 cluster, please see the [cluster specific documentation](/cluster/README.md).
+(This includes documentation of the process for
+[granting access for external partners](/cluster/README.md#granting-vpn-access-to-external-partners) to those
+clusters.)
+
 
 ## Setting up Your Development Environment
 

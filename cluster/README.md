@@ -5,6 +5,7 @@
     1. [Connecting Locally Hosted Canton Network Apps to a Cluster](#connecting-locally-hosted-canton-network-apps-to-a-cluster)
     1. [Connecting Locally Hosted Canton Components to a Cluster](#connecting-locally-hosted-canton-components-to-a-cluster)
     1. [Network Configuration Within Kubernetes](#network-configuration-within-kubernetes)
+1. [Granting VPN Access to External Partners](#granting-vpn-access-to-external-partners)
 1. [Cluster Tooling](#cluster-tooling)
     1. [Manual Google Cloud Configuration](#manual-google-cloud-configuration)
     1. [Docker image hosting](#docker-image-hosting)
@@ -51,50 +52,54 @@ additional running costs.
 
 ## Connecting to a Cluster
 
-The GCE clusters expose both the Canton Domain and Ledger APIs to the
-outside world via four [Digital Asset VPNs](https://digitalasset.atlassian.net/wiki/spaces/DEVSECOPS/pages/1076822828/VPN+IP+Whitelist+for+Digital+Asset):
+The GCE clusters currently expose all of their services to the
+outside world exclusively via four [Digital Asset VPNs](https://digitalasset.atlassian.net/wiki/spaces/DEVSECOPS/pages/1076822828/VPN+IP+Whitelist+for+Digital+Asset):
 
-* GCP Virginia Full Tunnel
-* GCP Frankfurt Full Tunnel
-* GCP Sydney Full Tunnel
-* GCP DA Canton DevNet
+* Internal Digital Asset (Cluster Services and Kubernetes Management API's)
+   * GCP Virginia Full Tunnel
+   * GCP Frankfurt Full Tunnel
+   * GCP Sydney Full Tunnel
+* For External Users and Circle CI Prefligt Testing (Cluster Services Only)
+   * GCP DA Canton DevNet
 
-The Full Tunnel VPNs are available to all internal DA users and allow
-authenticated access to both the Canton Network services and cluster
-adminstration APIs. (Only the Canton Network development team has
-administrative authorization to the clusters.)
+Evven though the Kubernetes management API is accessible to all users
+connecting through one of the internal VPN's, there are Google IAM
+restrictions on those API's that grant access only to appropriate
+users. CircleCI has its access to the Kubernetes Management API's (for
+continuous deployemnt) through a specific grant to those servers' IP
+addresses and a service account.
 
-The "GCP DA Canton DevNet" VPN is the VPN used for customer
-access to the cluster. User accounts can be added through a
-[manual e-mail request to IT](mailto:help@digitalasset.com).
-Connections through this VPN only have access to public cluster
+### Granting VPN Access to External Partners
+
+For an external partner to have access to a Canton Network cluster,
+they must be granted access to the *GCP DA Canton DevNet* VPN. The
+request to grant this access must go through an approval and
+notification process, with the setup itself done by IT
+support. Partner access through this VPN is only to public cluster
 services and not the administration APIs.
 
-Provided you are connecting through one of the listed VPNs, the
-following APIs are available in each environment. (The port allocation
-scheme is documented [here](./apps/app/src/test/resources/README.md)
-and is shared between the Canton Network tests and runtime
-environment.)
+The process by which access is granted is this:
 
+* Digital Asset sales/etc. personnel identify an individual at an
+  external partner that needs access to a Canton Network
+  cluster. (Currently, access can not be restricted to a single
+  cluster.)
+* They then enter a support ticket, with "Canton Network" as product
+  code. The request will be to create an external login for the Canton
+  Network customer VPN. (Specifically, This is the VPN created to
+  resolve this [support ticket](https://help.digitalasset.com/s/case/5004x00000GMkxTAAT).)
+* Wayne Collier must approve the addition of the new account, and
+  Itai Segall must be notified.  Once the approval is complete, a
+  request goes to Edward Nnewman's team via a
+  [manual e-mail request to IT](mailto:help@digitalasset.com) to add the
+  account and send documentation to the external user.
+* Once the account has been confirmed, the ticket can be closed.
 
-| Service                       | API                                                                                                  | Port (Web gRPC Proxy) |
-| ------------------            | ----------                                                                                           | ----                  |
-| SVC Canton Domain             | Public API                                                                                           | 5008                  |
-| SVC Canton Domain             | [Admin API](https://docs.daml.com/canton/usermanual/administration.html#domain-admin-apis)           | 5009                  |
-| SVC Canton Participant        | [Ledger API](https://docs.daml.com/app-dev/grpc/proto-docs.html)                                     | 5001                  |
-| SVC Canton Participant        | [Admin API](https://docs.daml.com/canton/usermanual/administration.html#canton-administration-apis)  | 5002                  |
-| Directory App                 | [Directory API](/apps/directory/src/main/protobuf/com/daml/network/directory/v0/)                    | 5010 (6010)           |
-| Scan App                      | [Scan API](/apps/scan/src/main/protobuf/com/daml/network/scan/v0/)                                   | 5012                  |
-| SVC App                       | [SVC API](/apps/svc/src/main/protobuf/com/daml/network/svc/v0/)                                      | 5005                  |
+### Available Cluster Services
 
-We also host a validator node (`validator1`) within our clusters. It has the following port/API assignments.
-
-| Service                       | API                                                                                                  | Port (Web gRPC Proxy) |
-| ------------------            | ----------                                                                                           | ----                  |
-| Validator1 Canton Participant | [Ledger API](https://docs.daml.com/app-dev/grpc/proto-docs.html)                                     | 5101                  |
-| Validator1 Canton Participant | [Admin API](https://docs.daml.com/canton/usermanual/administration.html#canton-administration-apis)  | 5102                  |
-| Validator1 Validator App      | [Validator API](/apps/validator/src/main/protobuf/com/daml/network/validator/v0/)                    | 5103                  |
-| Validator1 Wallet App         | [Wallet API](/apps/wallet/src/main/protobuf/com/daml/network/wallet/v0/wallet_service.proto)         | 5104 (6104)           |
+Provided you are connecting through one of the listed VPNs, a full
+list of services provided through the cluster is available via
+`cncluster services` (or `cncluster stats`).
 
 ### Connecting Locally Hosted Canton Network Apps to a Cluster
 
@@ -187,9 +192,9 @@ hosted participant:
 res2: concurrent.duration.Duration = 1762 milliseconds
 ```
 
-As part of the runbook a participant node is also spun up
-and connects to the DevNet domain. Therefore, the runbook contains
-alternative scripts for connecting a local participant to the DevNet domain.
+As part of the runbook a participant node is also spun up and connects
+to the DevNet domain. Therefore, the runbook contains alternative
+scripts for connecting a local participant to the DevNet domain.
 
 ### Network Configuration Within Kubernetes
 
@@ -215,7 +220,6 @@ redirects a specific port to a given Kubernetes `Service`. The
 request. In instances where a gRPC API needs to be made available to a
 web client, we also run an `envoy-proxy` sidecar within the `Pod` that
 proxies from Web gRPC to gRPC.
-
 
 ## Cluster Tooling
 

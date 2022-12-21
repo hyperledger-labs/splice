@@ -366,6 +366,14 @@ function _show_ports() {
         | column -s ',' -t
 }
 
+function cluster_services() {
+    cluster_show
+
+    _log ""
+    _log "Available Ports:"
+    _show_ports
+}
+
 function cluster_stats() {
     cluster_show
 
@@ -475,6 +483,10 @@ case "${SUBCOMMAND_NAME}" in
 
     reset)
         cluster_reset $@
+        ;;
+
+    services)
+        cluster_services $@
         ;;
 
     stats)

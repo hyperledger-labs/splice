@@ -31,6 +31,10 @@ Additionally, you'll also need access to one of the following four `Digital Asse
 * GCP Sydney Full Tunnel
 * GCP DA Canton DevNet
 
+If you do not have access to one of these supported VPN's, you will
+need to make a request to Digital Asset through your contact to have
+this access granted.
+
 Please activate the VPN now.
 
 .. To run a participant node, please `download and install Canton version 2.3.2 <https://docs.daml.com/canton/usermanual/downloading.html>`_.
