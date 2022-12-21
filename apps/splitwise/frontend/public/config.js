@@ -7,12 +7,11 @@ window.canton_network_config = {
   },
   // OIDC client configuration, see https://authts.github.io/oidc-client-ts/interfaces/UserManagerSettings.html
   //   auth: {
-  //     algorithm: 'rs-256'
+  //     algorithm: 'rs-256',
   //     authority: "",
   //     client_id: "",
   //     token_audience: 'https://canton.network.global',
   //     token_scope: 'daml_ledger_api',
-  //     redirect_uri: window.location.origin,
   //   },
   services: {
     splitwise: {

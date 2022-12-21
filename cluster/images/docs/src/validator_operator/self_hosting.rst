@@ -250,17 +250,26 @@ Auth0 Example IAM Setup
 To integrate Auth0 as your validator's IAM provider, perform the following:
 
 1. Create an Auth0 tenant for your validator
-2. Create an Auth0 Application for the validator backend:
+2. Create an Auth0 API for your applications:
+
+    .. TODO(#2052) use a unique audience for each app
+
+    a. Navigate to Applications > APIs and click "Create API". Name can be anything, set identifier to https://canton.network.global (that is the audience that we will configure the backend to expect).
+    b. Under the Permissions tab in the new API, add a permission with scope "daml_ledger_api", and a description of your choice.
+    c. On the Settings tab, scroll down to "Access Settings" and enable "Allow Offline Access", for automatic token refreshing.
+
+3. Create an Auth0 Application for the validator backend:
 
     a. In Auth0, navigate to Applications -> Applications, and click the "Create Application" button
     b. Choose "Machine to Machine Applications", call it "Validator app backend", and click Create
+    c. Choose the API you created in step 2 in the "Authorize Machine to Machine Application" dialog, and click Authorize
 
-3. Create an Auth0 Application for the wallet backend.
+4. Create an Auth0 Application for the wallet backend.
    Repeat step 2, this time calling your application "Wallet app backend"
-4. Create an Auth0 Application for the wallet web UI.
+5. Create an Auth0 Application for the wallet web UI.
 
     a. In Auth0, navigate to Applications -> Applications, and click the "Create Application" button
-    b. Choose "Single Page Applications", call it "Wallet web UI", and click Create
+    b. Choose "Single Page Web Applications", call it "Wallet web UI", and click Create
     c. Determine the URL for your validator's wallet UI (if you've been following this runbook guide, it will be ``http://localhost:3000``)
     d. In the Auth0 application settings, add the wallet URL to the following:
 
@@ -270,16 +279,8 @@ To integrate Auth0 as your validator's IAM provider, perform the following:
        - "Allowed Origins (CORS)"
     e. Save your application settings
 
-5. Create an Auth0 Application for the directory web UI.
-   Repeat step 4, this time calling your application "Directory web UI".
-6. Create an Auth0 API for your applications:
-
-    .. TODO(#2052) use a unique audience for each app
-
-    a. Navigate to Applications > APIs and click "Create API". Name can be anything, set identifier to https://canton.network.global (that is the audience that we will configure the backend to expect).
-    b. Under the Permissions tab in the new API, add a permission with scope "daml_ledger_api", and a description of your choice.
-    c. On the Settings tab, scroll down to "Access Settings" and enable "Allow Offline Access", for automatic token refreshing.
-
+6. Create an Auth0 Application for the directory web UI.
+   Repeat step 4, this time calling your application "Directory web UI", and replacing the URL determined in step c with that of the directory UI (if you've been following this runbook guide, it will be ``http://localhost:3001``)
 7. Set the following environment variables on the system that will be running your wallet and validator app backends:
 
 ====================================  =====
@@ -295,13 +296,18 @@ NETWORK_AUTH_WALLET_CLIENT_SECRET     The "Client Secret" of your "Wallet app ba
 NETWORK_AUTH_WALLET_USER_NAME         The subject identifier of your "Wallet app backend" application. Equal to the "Client ID" of the "Wallet app backend" application with all upper case characters replaced by lower case characters, and `@clients` appended.
 ====================================  =====
 
-8. Kill the running CN apps process started at the beginning, and restart them with `*-secure.conf` config files
+8. Kill the running processes started at the beginning (both the participant and the validator), and restart them with `*-secure.conf` config files:
 
   ::
 
     bin/coin --config examples/validator/validator-participant-secure.conf \
       --bootstrap examples/validator/validator-participant.canton \
       -DVALIDATOR_USER_NAME=${NETWORK_AUTH_VALIDATOR_USER_NAME}
+
+and
+
+  ::
+
     bin/coin --config examples/validator/validator-secure.conf \
       --bootstrap examples/validator/validator.canton
 
