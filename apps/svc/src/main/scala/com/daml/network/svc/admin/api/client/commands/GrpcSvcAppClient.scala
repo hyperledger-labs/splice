@@ -20,22 +20,6 @@ object GrpcSvcAppClient {
       v0.SvcServiceGrpc.stub(channel)
   }
 
-  /** A command that takes no input and returns no result (other than an error on failure) */
-  // TODO(tech-debt): Move this somewhere to Canton codebase?
-  abstract class UnitCommand(adminApiCall: SvcServiceStub => (Empty => Future[Empty]))
-      extends BaseCommand[Empty, Empty, Unit] {
-    override def createRequest(): Either[String, Empty] = Right(Empty())
-
-    override def submitRequest(
-        service: SvcServiceStub,
-        request: Empty,
-    ): Future[Empty] = adminApiCall(service)(request)
-
-    override def handleResponse(
-        response: Empty
-    ): Either[String, Unit] = Right(())
-  }
-
   case class DebugInfo(
       svcUser: String,
       svcParty: PartyId,

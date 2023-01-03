@@ -23,23 +23,3 @@ message GetDebugInfoResponse {
   // Contract IDs of all active CoinRules contracts created by this app
   repeated string coin_rules_contract_ids = 4;
 }
-
-message GetValidatorConfigResponse {
-  // Party identifier of the SVC party
-  string svc_party_id = 1;
-}
-
-message InitializeResponse {
-  // Identifier of the party representing the SVC.
-  string svc_party_id = 1;
-}
-
-
-message CloseRoundRequest {
-  int64 round = 1;
-}
-
-message CloseRoundResponse {
-  string closed_mining_round_contract_id = 1;
-}
-
