@@ -3,7 +3,7 @@ package com.daml.network.integration.plugins.toxiproxy
 import com.daml.network.config.CoinConfig
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
-import com.daml.network.svc.config.LocalSvcAppConfig
+import com.daml.network.svc.config.SvcAppBackendConfig
 import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.integration.EnvironmentSetupPlugin
 import eu.rekawek.toxiproxy.{Proxy, ToxiproxyClient}
@@ -22,7 +22,7 @@ case class UseToxiproxy()
   val proxies = Map[String, Proxy]()
 
   override def beforeEnvironmentCreated(config: CoinConfig): CoinConfig = {
-    val transformSvc = (svcOption: Option[LocalSvcAppConfig]) => {
+    val transformSvc = (svcOption: Option[SvcAppBackendConfig]) => {
       svcOption.map(svc => {
         val lapiHost = svc.remoteParticipant.ledgerApi.clientConfig.address
         val lapiPort = svc.remoteParticipant.ledgerApi.clientConfig.port

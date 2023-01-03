@@ -1,7 +1,7 @@
 package com.daml.network.environment
 
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.svc.config.LocalSvcAppConfig
+import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.svc.{SvcApp, SvcAppBootstrap}
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -11,10 +11,10 @@ import com.digitalasset.canton.resource.DbMigrationsFactory
 
 /** SVC app instances. */
 class SvcApps(
-    create: (String, LocalSvcAppConfig) => SvcAppBootstrap,
+    create: (String, SvcAppBackendConfig) => SvcAppBootstrap,
     migrationsFactory: DbMigrationsFactory,
     _timeouts: ProcessingTimeout,
-    configs: Map[String, LocalSvcAppConfig],
+    configs: Map[String, SvcAppBackendConfig],
     parametersFor: String => SharedCoinAppParameters,
     _loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -22,7 +22,7 @@ class SvcApps(
 ) extends ManagedNodes[ // TODO(#736): We should remove the CantonNode/CantonNodeBootstrap type requirements from
       // this trait.
       SvcApp,
-      LocalSvcAppConfig,
+      SvcAppBackendConfig,
       SharedCoinAppParameters,
       SvcAppBootstrap,
     ](create, migrationsFactory, _timeouts, configs, parametersFor, _loggerFactory) {}

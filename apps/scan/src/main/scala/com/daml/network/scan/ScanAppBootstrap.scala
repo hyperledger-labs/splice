@@ -7,7 +7,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
 import com.daml.network.environment.{CoinNodeBootstrapBase, CoinRetries}
-import com.daml.network.scan.config.LocalScanAppConfig
+import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.metrics.ScanAppMetrics
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
@@ -28,7 +28,7 @@ import scala.concurrent.Future
   */
 class ScanAppBootstrap(
     override val name: InstanceName,
-    val config: LocalScanAppConfig,
+    val config: ScanAppBackendConfig,
     val scanAppParameters: SharedCoinAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
@@ -44,7 +44,7 @@ class ScanAppBootstrap(
     executionSequencerFactory: ExecutionSequencerFactory,
 ) extends CoinNodeBootstrapBase[
       ScanApp,
-      LocalScanAppConfig,
+      ScanAppBackendConfig,
       SharedCoinAppParameters,
     ](
       name,
@@ -84,7 +84,7 @@ object ScanAppBootstrap {
 
   def apply(
       name: String,
-      scanConfig: LocalScanAppConfig,
+      scanConfig: ScanAppBackendConfig,
       coinAppParameters: SharedCoinAppParameters,
       clock: Clock,
       testingTimeService: TestingTimeService,

@@ -2,7 +2,7 @@ package com.daml.network.console
 
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.svc.admin.api.client.commands.GrpcSvcAppClient
-import com.daml.network.svc.config.{LocalSvcAppConfig, RemoteSvcAppConfig}
+import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 
@@ -19,21 +19,21 @@ abstract class SvcAppReference(
 
 }
 
-class RemoteSvcAppReference(
+class SvcAppClientReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
-    override val config: RemoteSvcAppConfig,
+    override val config: SvcAppClientConfig,
 ) extends SvcAppReference(consoleEnvironment, name)
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
 
-  override protected val instanceType = "Remote SVC"
+  override protected val instanceType = "SVC Client"
 }
 
-/** Single local SVC app reference. Defines the console commands that can be run against a local SVC
-  * app reference.
+/** Single SVC app backend reference. Defines the console commands that can be run against a backend SVC
+  * app.
   */
-class LocalSvcAppReference(
+class SvcAppBackendReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
 ) extends SvcAppReference(consoleEnvironment, name)
@@ -45,7 +45,7 @@ class LocalSvcAppReference(
   protected val nodes = consoleEnvironment.environment.svcs
 
   @Help.Summary("Return svc app config")
-  def config: LocalSvcAppConfig =
+  def config: SvcAppBackendConfig =
     consoleEnvironment.environment.config.svcsByString(name)
 
   /** Remote participant this SVC app is configured to interact with. */

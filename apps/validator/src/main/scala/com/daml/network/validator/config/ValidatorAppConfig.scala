@@ -7,7 +7,7 @@ import com.daml.network.config.{
   LocalCoinConfig,
   RemoteCoinConfig,
 }
-import com.daml.network.scan.config.RemoteScanAppConfig
+import com.daml.network.scan.config.ScanAppClientConfig
 import com.digitalasset.canton.config.*
 
 import java.nio.file.Path
@@ -17,7 +17,7 @@ case class AppInstance(
     dars: Seq[Path],
 )
 
-case class LocalValidatorAppConfig(
+case class ValidatorAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     damlUser: String,
@@ -25,7 +25,7 @@ case class LocalValidatorAppConfig(
     auth: AuthConfig,
     appInstances: Map[String, AppInstance],
     remoteParticipant: CoinRemoteParticipantConfig,
-    remoteScan: RemoteScanAppConfig,
+    remoteScan: ScanAppClientConfig,
     automation: AutomationConfig = AutomationConfig(),
 ) extends LocalCoinConfig // TODO(#736): fork or generalize this trait.
     {
@@ -35,7 +35,7 @@ case class LocalValidatorAppConfig(
 
 }
 
-case class RemoteValidatorAppConfig(
+case class ValidatorAppClientConfig(
     adminApi: ClientConfig
 ) extends RemoteCoinConfig {
   override def clientAdminApi: ClientConfig = adminApi

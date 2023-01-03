@@ -6,13 +6,13 @@ import com.daml.network.directory.DirectoryAppBootstrap
 import com.daml.network.directory.config.LocalDirectoryAppConfig
 import com.daml.network.metrics.CoinMetricsFactory
 import com.daml.network.scan.ScanAppBootstrap
-import com.daml.network.scan.config.LocalScanAppConfig
+import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.splitwise.SplitwiseAppBootstrap
-import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
+import com.daml.network.splitwise.config.SplitwiseAppBackendConfig
 import com.daml.network.svc.SvcAppBootstrap
-import com.daml.network.svc.config.LocalSvcAppConfig
+import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.validator.ValidatorAppBootstrap
-import com.daml.network.validator.config.LocalValidatorAppConfig
+import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.wallet.WalletAppBootstrap
 import com.daml.network.wallet.config.WalletAppBackendConfig
 import com.digitalasset.canton.config.TestingConfigInternal
@@ -39,7 +39,7 @@ trait CoinEnvironment extends Environment {
 
   protected def createValidator(
       name: String,
-      validatorConfig: LocalValidatorAppConfig,
+      validatorConfig: ValidatorAppBackendConfig,
   ): ValidatorAppBootstrap = {
     val appLoggerFactory = loggerFactory.append(ValidatorAppBootstrap.LoggerFactoryKeyName, name)
     ValidatorAppBootstrap(
@@ -73,7 +73,7 @@ trait CoinEnvironment extends Environment {
 
   protected def createSvc(
       name: String,
-      svcConfig: LocalSvcAppConfig,
+      svcConfig: SvcAppBackendConfig,
   ): SvcAppBootstrap = {
     val appLoggerFactory = loggerFactory.append(SvcAppBootstrap.LoggerFactoryKeyName, name)
     SvcAppBootstrap(
@@ -107,7 +107,7 @@ trait CoinEnvironment extends Environment {
 
   protected def createScan(
       name: String,
-      scanConfig: LocalScanAppConfig,
+      scanConfig: ScanAppBackendConfig,
   ): ScanAppBootstrap = {
     val appLoggerFactory = loggerFactory.append(ScanAppBootstrap.LoggerFactoryKeyName, name)
     ScanAppBootstrap(
@@ -208,7 +208,7 @@ trait CoinEnvironment extends Environment {
 
   protected def createSplitwise(
       name: String,
-      splitwiseConfig: LocalSplitwiseAppConfig,
+      splitwiseConfig: SplitwiseAppBackendConfig,
   ): SplitwiseAppBootstrap = {
     val appLoggerFactory = loggerFactory.append(SplitwiseAppBootstrap.LoggerFactoryKeyName, name)
     SplitwiseAppBootstrap(

@@ -9,7 +9,7 @@ import com.daml.network.environment.{CoinLedgerClient, CoinLedgerConnection, Coi
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.svc.admin.grpc.GrpcSvcAppService
 import com.daml.network.svc.automation.SvcAutomationService
-import com.daml.network.svc.config.LocalSvcAppConfig
+import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.svc.v0.SvcServiceGrpc
 import com.daml.network.util.CoinUtil.{createValidatorRight, defaultCoinConfig}
@@ -30,7 +30,7 @@ import scala.jdk.CollectionConverters.*
 /** Class representing an SVC app instance. */
 class SvcApp(
     override val name: InstanceName,
-    val config: LocalSvcAppConfig,
+    val config: SvcAppBackendConfig,
     val coinAppParameters: SharedCoinAppParameters,
     storage: Storage,
     override protected val clock: Clock,
@@ -120,7 +120,7 @@ object SvcApp {
   }
   private def setupApp(
       svc: PartyId,
-      config: LocalSvcAppConfig,
+      config: SvcAppBackendConfig,
       connection: CoinLedgerConnection,
       logger: TracedLogger,
       store: SvcStore,

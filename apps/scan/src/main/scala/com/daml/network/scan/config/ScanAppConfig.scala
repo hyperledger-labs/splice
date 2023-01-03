@@ -10,7 +10,7 @@ import com.digitalasset.canton.config.*
 
 trait BaseScanAppConfig {}
 
-case class LocalScanAppConfig(
+case class ScanAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     svcUser: String,
@@ -25,7 +25,7 @@ case class LocalScanAppConfig(
 
 }
 
-case class RemoteScanAppConfig(
+case class ScanAppClientConfig(
     adminApi: ClientConfig
 ) extends RemoteCoinConfig
     with BaseScanAppConfig {

@@ -7,7 +7,7 @@ import com.daml.network.automation.{
   AutomationService,
 }
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
-import com.daml.network.svc.config.LocalSvcAppConfig
+import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.svc.store.SvcStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
@@ -18,7 +18,7 @@ import scala.concurrent.ExecutionContextExecutor
 
 class SvcAutomationService(
     clock: Clock,
-    config: LocalSvcAppConfig,
+    config: SvcAppBackendConfig,
     store: SvcStore,
     ledgerClient: CoinLedgerClient,
     retryProvider: CoinRetries,

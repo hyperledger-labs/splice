@@ -3,7 +3,7 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.console.{
-  LocalValidatorAppReference,
+  ValidatorAppBackendReference,
   RemoteDirectoryAppReference,
   WalletAppClientReference,
 }
@@ -353,13 +353,13 @@ object DirectoryIntegrationTest {
 
   // Helper classes to make it easier to write test code interacting with a users' services
   case class StaticUserRefs(
-      validator: LocalValidatorAppReference,
+      validator: ValidatorAppBackendReference,
       directory: RemoteDirectoryAppReference,
       wallet: WalletAppClientReference,
   )
 
   case class DynamicUserRefs(userParty: PartyId, static: StaticUserRefs) {
-    def validator: LocalValidatorAppReference = static.validator
+    def validator: ValidatorAppBackendReference = static.validator
 
     def directory: RemoteDirectoryAppReference = static.directory
 

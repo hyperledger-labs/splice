@@ -6,10 +6,10 @@ import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.LedgerApiUtils
 import com.daml.network.environment.CoinConsoleEnvironment
-import com.daml.network.scan.config.RemoteScanAppConfig
+import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.splitwise.admin.api.client.commands.GrpcSplitwiseAppClient
-import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
-import com.daml.network.util.{JavaContract as Contract}
+import com.daml.network.splitwise.config.{SplitwiseAppBackendConfig, SplitwiseAppClientConfig}
+import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.console.{
   BaseInspection,
@@ -22,8 +22,7 @@ import com.digitalasset.canton.topology.PartyId
 
 import scala.jdk.CollectionConverters.*
 
-/** Single local Splitwise app reference. Defines the console commands that can be run against a local Splitwise
-  * app reference.
+/** Splitwise app reference. Defines the console commands that can be run against either a client or backend splitwise reference.
   */
 abstract class SplitwiseAppReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
@@ -35,10 +34,10 @@ abstract class SplitwiseAppReference(
   // from the console.
   def ledgerApi: BaseLedgerApiAdministration
 
-  protected val remoteScanConfig: RemoteScanAppConfig
+  protected val remoteScanConfig: ScanAppClientConfig
 
   lazy val remoteScan =
-    new RemoteScanAppReference(
+    new ScanAppClientReference(
       coinConsoleEnvironment,
       s"remote scan for `$name``",
       remoteScanConfig,
@@ -51,7 +50,7 @@ abstract class SplitwiseAppReference(
     }
 }
 
-final class RemoteSplitwiseAppReference(
+final class SplitwiseAppClientReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
     name: String,
 ) extends SplitwiseAppReference(coinConsoleEnvironment, name)
@@ -64,7 +63,7 @@ final class RemoteSplitwiseAppReference(
     60_000_000
   )
 
-  override protected val instanceType = "Remote Splitwise"
+  override protected val instanceType = "Splitwise Client"
 
   override lazy val ledgerApi =
     new ExternalLedgerApiClient(
@@ -134,7 +133,7 @@ final class RemoteSplitwiseAppReference(
   private def getUserPrimaryParty() = LedgerApiUtils.getUserPrimaryParty(ledgerApi, userId)
 
   @Help.Summary("Return remote splitwise app config")
-  def config: RemoteSplitwiseAppConfig =
+  def config: SplitwiseAppClientConfig =
     coinConsoleEnvironment.environment.config.remoteSplitwisesByString(name)
 
   // Commands for managing installs
@@ -346,21 +345,21 @@ final class RemoteSplitwiseAppReference(
   override val remoteScanConfig = config.remoteScan
 }
 
-final class LocalSplitwiseAppReference(
+final class SplitwiseAppBackendReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
 ) extends SplitwiseAppReference(consoleEnvironment, name)
     with LocalCoinAppReference
     with BaseInspection[ParticipantNode] {
 
-  override protected val instanceType = "Local Splitwise"
+  override protected val instanceType = "Splitwise Backend"
 
   override protected val nodes = consoleEnvironment.environment.splitwises
 
   override lazy val ledgerApi = remoteParticipant
 
   @Help.Summary("Return local splitwise app config")
-  def config: LocalSplitwiseAppConfig =
+  def config: SplitwiseAppBackendConfig =
     consoleEnvironment.environment.config.splitwisesByString(name)
 
   override val remoteScanConfig = config.remoteScan

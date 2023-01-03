@@ -8,7 +8,7 @@ import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.admin.grpc.GrpcSplitwiseService
 import com.daml.network.splitwise.automation.SplitwiseAutomationService
-import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
+import com.daml.network.splitwise.config.SplitwiseAppBackendConfig
 import com.daml.network.splitwise.store.SplitwiseStore
 import com.daml.network.splitwise.v0.SplitwiseServiceGrpc
 import com.daml.network.util.HasHealth
@@ -30,7 +30,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
   */
 class SplitwiseApp(
     override val name: InstanceName,
-    val config: LocalSplitwiseAppConfig,
+    val config: SplitwiseAppBackendConfig,
     val coinAppParameters: SharedCoinAppParameters,
     storage: Storage,
     override protected val clock: Clock,

@@ -2,10 +2,10 @@ package com.daml.network.config
 
 import com.daml.network.auth.AuthUtil
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
-import com.daml.network.scan.config.LocalScanAppConfig
-import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
-import com.daml.network.svc.config.LocalSvcAppConfig
-import com.daml.network.validator.config.LocalValidatorAppConfig
+import com.daml.network.scan.config.ScanAppBackendConfig
+import com.daml.network.splitwise.config.{SplitwiseAppBackendConfig, SplitwiseAppClientConfig}
+import com.daml.network.svc.config.SvcAppBackendConfig
+import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.wallet.config.{WalletAppBackendConfig, WalletAppClientConfig}
 import com.digitalasset.canton.config.RequireTypes.NonEmptyString
 import com.digitalasset.canton.config.*
@@ -156,13 +156,13 @@ object CoinConfigTransforms {
   type CnAppConfigTransform[A <: NodeConfig] = A => A
   type DirectoryAppTransform = CnAppConfigTransform[LocalDirectoryAppConfig]
   type RemoteDirectoryAppTransform = CnAppConfigTransform[RemoteDirectoryAppConfig]
-  type ValidatorAppTransform = CnAppConfigTransform[LocalValidatorAppConfig]
+  type ValidatorAppTransform = CnAppConfigTransform[ValidatorAppBackendConfig]
   type WalletAppBackendTransform = CnAppConfigTransform[WalletAppBackendConfig]
   type WalletAppClientTransform = CnAppConfigTransform[WalletAppClientConfig]
-  type SvcAppTransform = CnAppConfigTransform[LocalSvcAppConfig]
-  type ScanAppTransform = CnAppConfigTransform[LocalScanAppConfig]
-  type SplitwiseAppTransform = CnAppConfigTransform[LocalSplitwiseAppConfig]
-  type RemoteSplitwiseAppTransform = CnAppConfigTransform[RemoteSplitwiseAppConfig]
+  type SvcAppTransform = CnAppConfigTransform[SvcAppBackendConfig]
+  type ScanAppTransform = CnAppConfigTransform[ScanAppBackendConfig]
+  type SplitwiseAppTransform = CnAppConfigTransform[SplitwiseAppBackendConfig]
+  type RemoteSplitwiseAppTransform = CnAppConfigTransform[SplitwiseAppClientConfig]
   type AutomationConfigTransform = AutomationConfig => AutomationConfig
 
   def reducePollingInterval(config: AutomationConfig): AutomationConfig =
@@ -220,7 +220,7 @@ object CoinConfigTransforms {
         })
 
   def updateAllValidatorConfigs(
-      update: (String, LocalValidatorAppConfig) => LocalValidatorAppConfig
+      update: (String, ValidatorAppBackendConfig) => ValidatorAppBackendConfig
   ): CoinConfigTransform =
     cantonConfig =>
       cantonConfig
@@ -228,7 +228,7 @@ object CoinConfigTransforms {
         .modify(_.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) })
 
   def updateAllValidatorConfigs_(
-      update: LocalValidatorAppConfig => LocalValidatorAppConfig
+      update: ValidatorAppBackendConfig => ValidatorAppBackendConfig
   ): CoinConfigTransform =
     updateAllValidatorConfigs((_, config) => update(config))
 
@@ -242,7 +242,7 @@ object CoinConfigTransforms {
   def updateAllRemoteSplitwiseAppConfigs_(
       update: RemoteSplitwiseAppTransform
   ): CoinConfigTransform =
-    _.focus(_.remoteSplitwiseApps).modify(_.map { case (name, config) =>
+    _.focus(_.splitwiseAppClients).modify(_.map { case (name, config) =>
       (name, update(config))
     })
 

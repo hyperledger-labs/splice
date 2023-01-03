@@ -2,13 +2,13 @@ package com.daml.network.util
 
 import com.daml.network.console.{
   LocalDirectoryAppReference,
-  LocalScanAppReference,
-  LocalSplitwiseAppReference,
-  LocalSvcAppReference,
-  LocalValidatorAppReference,
+  ScanAppBackendReference,
+  SplitwiseAppBackendReference,
+  SvcAppBackendReference,
+  ValidatorAppBackendReference,
   RemoteDirectoryAppReference,
-  RemoteSplitwiseAppReference,
-  RemoteSvcAppReference,
+  SplitwiseAppClientReference,
+  SvcAppClientReference,
   WalletAppBackendReference,
   WalletAppClientReference,
 }
@@ -21,16 +21,16 @@ trait CommonCoinAppInstanceReferences {
 
   def svcParty(implicit env: CoinTestConsoleEnvironment): PartyId = scan.getSvcPartyId()
 
-  def svc(implicit env: CoinTestConsoleEnvironment): LocalSvcAppReference = env.svcOpt.getOrElse(
+  def svc(implicit env: CoinTestConsoleEnvironment): SvcAppBackendReference = env.svcOpt.getOrElse(
     sys.error("Tried to access the SVC app but it isn't defined in the test's configuration file")
   )
-  def remoteSvc(implicit env: CoinTestConsoleEnvironment): RemoteSvcAppReference =
+  def remoteSvc(implicit env: CoinTestConsoleEnvironment): SvcAppClientReference =
     env.remoteSvcOpt.getOrElse(
       sys.error(
         "Tried to access the remote SVC app but it isn't defined in the test's configuration file"
       )
     )
-  def scan(implicit env: CoinTestConsoleEnvironment): LocalScanAppReference =
+  def scan(implicit env: CoinTestConsoleEnvironment): ScanAppBackendReference =
     env.scans.local.headOption.getOrElse(
       sys.error(
         "Tried to access the Scan app but it isn't defined in the test's configuration file"
@@ -47,7 +47,7 @@ trait CommonCoinAppInstanceReferences {
   ): WalletAppClientReference = wc(
     "aliceValidatorWallet"
   )
-  def aliceValidator(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
+  def aliceValidator(implicit env: CoinTestConsoleEnvironment): ValidatorAppBackendReference = v(
     "aliceValidator"
   )
   def bobWalletBackend(implicit env: CoinTestConsoleEnvironment): WalletAppBackendReference = wb(
@@ -59,15 +59,17 @@ trait CommonCoinAppInstanceReferences {
   def charlieWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference = wc(
     "charlieWallet"
   )
-  def bobValidator(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
+  def bobValidator(implicit env: CoinTestConsoleEnvironment): ValidatorAppBackendReference = v(
     "bobValidator"
   )
-  def directoryValidator(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
-    "directoryValidator"
-  )
-  def splitwiseValidator(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference = v(
-    "splitwiseValidator"
-  )
+  def directoryValidator(implicit env: CoinTestConsoleEnvironment): ValidatorAppBackendReference =
+    v(
+      "directoryValidator"
+    )
+  def splitwiseValidator(implicit env: CoinTestConsoleEnvironment): ValidatorAppBackendReference =
+    v(
+      "splitwiseValidator"
+    )
 
   def directory(implicit
       env: CoinTestConsoleEnvironment
@@ -98,25 +100,25 @@ trait CommonCoinAppInstanceReferences {
 
   def aliceSplitwise(implicit
       env: CoinTestConsoleEnvironment
-  ): RemoteSplitwiseAppReference = rsw(
+  ): SplitwiseAppClientReference = rsw(
     "aliceSplitwise"
   )
 
   def bobSplitwise(implicit
       env: CoinTestConsoleEnvironment
-  ): RemoteSplitwiseAppReference = rsw(
+  ): SplitwiseAppClientReference = rsw(
     "bobSplitwise"
   )
 
   def charlieSplitwise(implicit
       env: CoinTestConsoleEnvironment
-  ): RemoteSplitwiseAppReference = rsw(
+  ): SplitwiseAppClientReference = rsw(
     "charlieSplitwise"
   )
 
   def providerSplitwiseBackend(implicit
       env: CoinTestConsoleEnvironment
-  ): LocalSplitwiseAppReference = sw(
+  ): SplitwiseAppBackendReference = sw(
     "providerSplitwiseBackend"
   )
 
@@ -130,7 +132,7 @@ trait CommonCoinAppInstanceReferences {
       .find(_.name == name)
       .getOrElse(sys.error(s"wallet [$name] not configured"))
 
-  def v(name: String)(implicit env: CoinTestConsoleEnvironment): LocalValidatorAppReference =
+  def v(name: String)(implicit env: CoinTestConsoleEnvironment): ValidatorAppBackendReference =
     env.validators.local
       .find(_.name == name)
       .getOrElse(sys.error(s"validator [$name] not configured"))
@@ -144,14 +146,14 @@ trait CommonCoinAppInstanceReferences {
 
   def sw(
       name: String
-  )(implicit env: CoinTestConsoleEnvironment): LocalSplitwiseAppReference =
+  )(implicit env: CoinTestConsoleEnvironment): SplitwiseAppBackendReference =
     env.splitwises.local
       .find(_.name == name)
       .getOrElse(sys.error(s"local splitwise [$name] not configured"))
 
   def rsw(
       name: String
-  )(implicit env: CoinTestConsoleEnvironment): RemoteSplitwiseAppReference =
+  )(implicit env: CoinTestConsoleEnvironment): SplitwiseAppClientReference =
     env.splitwises.remote
       .find(_.name == name)
       .getOrElse(sys.error(s"remote splitwise [$name] not configured"))

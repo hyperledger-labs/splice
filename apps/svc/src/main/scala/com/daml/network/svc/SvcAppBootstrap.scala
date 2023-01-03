@@ -7,7 +7,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
 import com.daml.network.environment.{CoinNodeBootstrapBase, CoinRetries}
-import com.daml.network.svc.config.LocalSvcAppConfig
+import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.svc.metrics.SvcAppMetrics
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
@@ -28,7 +28,7 @@ import scala.concurrent.Future
   */
 class SvcAppBootstrap(
     override val name: InstanceName,
-    val config: LocalSvcAppConfig,
+    val config: SvcAppBackendConfig,
     val svcAppParameters: SharedCoinAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
@@ -44,7 +44,7 @@ class SvcAppBootstrap(
     executionSequencerFactory: ExecutionSequencerFactory,
 ) extends CoinNodeBootstrapBase[
       SvcApp,
-      LocalSvcAppConfig,
+      SvcAppBackendConfig,
       SharedCoinAppParameters,
     ](
       name,
@@ -84,7 +84,7 @@ object SvcAppBootstrap {
 
   def apply(
       name: String,
-      svcConfig: LocalSvcAppConfig,
+      svcConfig: SvcAppBackendConfig,
       svcAppParameters: SharedCoinAppParameters,
       clock: Clock,
       testingTimeService: TestingTimeService,

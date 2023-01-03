@@ -3,7 +3,7 @@ package com.daml.network.svc.automation
 import com.daml.network.automation.{ScheduledTaskTrigger, TriggerContext}
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.svc.config.LocalSvcAppConfig
+import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.util.CoinUtil
 import com.digitalasset.canton.data.CantonTimestamp
@@ -16,7 +16,7 @@ import scala.jdk.CollectionConverters.*
 
 class AdvanceOpenMiningRoundTrigger(
     override protected val context: TriggerContext,
-    svcAppConfig: LocalSvcAppConfig,
+    svcAppConfig: SvcAppBackendConfig,
     store: SvcStore,
     connection: CoinLedgerConnection,
 )(implicit

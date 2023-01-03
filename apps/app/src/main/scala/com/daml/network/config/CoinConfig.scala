@@ -4,13 +4,13 @@ import cats.data.Validated
 import cats.syntax.functor.*
 import com.daml.network.auth.AuthConfig
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
-import com.daml.network.scan.config.{LocalScanAppConfig, RemoteScanAppConfig}
-import com.daml.network.splitwise.config.{LocalSplitwiseAppConfig, RemoteSplitwiseAppConfig}
-import com.daml.network.svc.config.{LocalSvcAppConfig, RemoteSvcAppConfig}
+import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
+import com.daml.network.splitwise.config.{SplitwiseAppBackendConfig, SplitwiseAppClientConfig}
+import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
 import com.daml.network.validator.config.{
   AppInstance,
-  LocalValidatorAppConfig,
-  RemoteValidatorAppConfig,
+  ValidatorAppBackendConfig,
+  ValidatorAppClientConfig,
 }
 import com.daml.network.wallet.config.{
   TreasuryConfig,
@@ -52,18 +52,18 @@ import scala.annotation.nowarn
 
 case class CoinConfig(
     name: Option[String] = None,
-    validatorApps: Map[InstanceName, LocalValidatorAppConfig] = Map.empty,
-    remoteValidatorApps: Map[InstanceName, RemoteValidatorAppConfig] = Map.empty,
-    svcApp: Option[LocalSvcAppConfig] = None,
-    remoteSvcApp: Option[RemoteSvcAppConfig] = None,
-    scanApp: Option[LocalScanAppConfig] = None,
-    remoteScanApps: Map[InstanceName, RemoteScanAppConfig] = Map.empty,
+    validatorApps: Map[InstanceName, ValidatorAppBackendConfig] = Map.empty,
+    validatorAppClients: Map[InstanceName, ValidatorAppClientConfig] = Map.empty,
+    svcApp: Option[SvcAppBackendConfig] = None,
+    svcAppClient: Option[SvcAppClientConfig] = None,
+    scanApp: Option[ScanAppBackendConfig] = None,
+    ScanAppClients: Map[InstanceName, ScanAppClientConfig] = Map.empty,
     walletAppBackends: Map[InstanceName, WalletAppBackendConfig] = Map.empty,
     walletAppClients: Map[InstanceName, WalletAppClientConfig] = Map.empty,
     directoryApp: Option[LocalDirectoryAppConfig] = None,
     remoteDirectoryApps: Map[InstanceName, RemoteDirectoryAppConfig] = Map.empty,
-    splitwiseApps: Map[InstanceName, LocalSplitwiseAppConfig] = Map.empty,
-    remoteSplitwiseApps: Map[InstanceName, RemoteSplitwiseAppConfig] = Map.empty,
+    splitwiseApps: Map[InstanceName, SplitwiseAppBackendConfig] = Map.empty,
+    splitwiseAppClients: Map[InstanceName, SplitwiseAppClientConfig] = Map.empty,
     // TODO(#736): we want to remove all of the configurations options below:
     domains: Map[InstanceName, CommunityDomainConfig] = Map.empty,
     participants: Map[InstanceName, CommunityParticipantConfig] = Map.empty,
@@ -112,17 +112,18 @@ case class CoinConfig(
 
   /** Use `validators` instead!
     */
-  def validatorsByString: Map[String, LocalValidatorAppConfig] = validatorApps.map { case (n, c) =>
-    n.unwrap -> c
+  def validatorsByString: Map[String, ValidatorAppBackendConfig] = validatorApps.map {
+    case (n, c) =>
+      n.unwrap -> c
   }
 
   // The config contains one optional unnamed SVC app (because in M1, there can only be one)
   // Since the rest of the code generally expects a map of nodes, we'll create one.
   private lazy val svcAppInstanceName = InstanceName.tryCreate("svc-app")
   lazy val svcApps = svcApp.toList.map(config => svcAppInstanceName -> config).toMap
-  private lazy val remoteSvcAppInstanceName = InstanceName.tryCreate("remote-svc-app")
+  private lazy val remoteSvcAppInstanceName = InstanceName.tryCreate("svc-app-client")
   lazy val remoteSvcApps =
-    remoteSvcApp.toList.map(config => remoteSvcAppInstanceName -> config).toMap
+    svcAppClient.toList.map(config => remoteSvcAppInstanceName -> config).toMap
 
   private lazy val svcAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
     svcApps.fmap { svcConfig =>
@@ -157,7 +158,7 @@ case class CoinConfig(
 
   /** Use `svcs` instead!
     */
-  def svcsByString: Map[String, LocalSvcAppConfig] = svcApps.map { case (n, c) =>
+  def svcsByString: Map[String, SvcAppBackendConfig] = svcApps.map { case (n, c) =>
     n.unwrap -> c
   }
 
@@ -200,7 +201,7 @@ case class CoinConfig(
 
   /** Use `scans` instead!
     */
-  def scansByString: Map[String, LocalScanAppConfig] = scanApps.map { case (n, c) =>
+  def scansByString: Map[String, ScanAppBackendConfig] = scanApps.map { case (n, c) =>
     n.unwrap -> c
   }
 
@@ -324,13 +325,13 @@ case class CoinConfig(
 
   /** Use `splitwises` instead!
     */
-  def splitwisesByString: Map[String, LocalSplitwiseAppConfig] =
+  def splitwisesByString: Map[String, SplitwiseAppBackendConfig] =
     splitwiseApps.map { case (n, c) =>
       n.unwrap -> c
     }
 
-  def remoteSplitwisesByString: Map[String, RemoteSplitwiseAppConfig] =
-    remoteSplitwiseApps.map { case (n, c) =>
+  def remoteSplitwisesByString: Map[String, SplitwiseAppClientConfig] =
+    splitwiseAppClients.map { case (n, c) =>
       n.unwrap -> c
     }
 
@@ -397,18 +398,18 @@ object CoinConfig {
       deriveReader[CoinRemoteParticipantConfig]
     implicit val appInstanceReader: ConfigReader[AppInstance] =
       deriveReader[AppInstance]
-    implicit val remoteScanConfigReader: ConfigReader[RemoteScanAppConfig] =
-      deriveReader[RemoteScanAppConfig]
-    implicit val validatorConfigReader: ConfigReader[LocalValidatorAppConfig] =
-      deriveReader[LocalValidatorAppConfig]
-    implicit val remoteValidatorConfigReader: ConfigReader[RemoteValidatorAppConfig] =
-      deriveReader[RemoteValidatorAppConfig]
-    implicit val scanConfigReader: ConfigReader[LocalScanAppConfig] =
-      deriveReader[LocalScanAppConfig]
-    implicit val svcConfigReader: ConfigReader[LocalSvcAppConfig] =
-      deriveReader[LocalSvcAppConfig]
-    implicit val remoteSvcConfigReader: ConfigReader[RemoteSvcAppConfig] =
-      deriveReader[RemoteSvcAppConfig]
+    implicit val remoteScanConfigReader: ConfigReader[ScanAppClientConfig] =
+      deriveReader[ScanAppClientConfig]
+    implicit val validatorConfigReader: ConfigReader[ValidatorAppBackendConfig] =
+      deriveReader[ValidatorAppBackendConfig]
+    implicit val remoteValidatorConfigReader: ConfigReader[ValidatorAppClientConfig] =
+      deriveReader[ValidatorAppClientConfig]
+    implicit val scanConfigReader: ConfigReader[ScanAppBackendConfig] =
+      deriveReader[ScanAppBackendConfig]
+    implicit val svcConfigReader: ConfigReader[SvcAppBackendConfig] =
+      deriveReader[SvcAppBackendConfig]
+    implicit val remoteSvcConfigReader: ConfigReader[SvcAppClientConfig] =
+      deriveReader[SvcAppClientConfig]
     implicit val coinAppParametersReader: ConfigReader[SharedCoinAppParameters] =
       deriveReader[SharedCoinAppParameters]
     implicit val walletRemoteValidatorConfigReader: ConfigReader[WalletRemoteValidatorAppConfig] =
@@ -423,10 +424,10 @@ object CoinConfig {
       deriveReader[LocalDirectoryAppConfig]
     implicit val remoteDirectoryConfigReader: ConfigReader[RemoteDirectoryAppConfig] =
       deriveReader[RemoteDirectoryAppConfig]
-    implicit val splitwiseConfigReader: ConfigReader[LocalSplitwiseAppConfig] =
-      deriveReader[LocalSplitwiseAppConfig]
-    implicit val remoteSplitwiseConfigReader: ConfigReader[RemoteSplitwiseAppConfig] =
-      deriveReader[RemoteSplitwiseAppConfig]
+    implicit val splitwiseConfigReader: ConfigReader[SplitwiseAppBackendConfig] =
+      deriveReader[SplitwiseAppBackendConfig]
+    implicit val remoteSplitwiseConfigReader: ConfigReader[SplitwiseAppClientConfig] =
+      deriveReader[SplitwiseAppClientConfig]
 
     implicit val communityDomainConfigReader: ConfigReader[CommunityDomainConfig] =
       deriveReader[CommunityDomainConfig].applyDeprecations
@@ -475,18 +476,18 @@ object CoinConfig {
       deriveWriter[CoinRemoteParticipantConfig]
     implicit val appInstanceWriter: ConfigWriter[AppInstance] =
       deriveWriter[AppInstance]
-    implicit val remoteScanConfigWriter: ConfigWriter[RemoteScanAppConfig] =
-      deriveWriter[RemoteScanAppConfig]
-    implicit val validatorConfigWriter: ConfigWriter[LocalValidatorAppConfig] =
-      deriveWriter[LocalValidatorAppConfig]
-    implicit val remoteValidatorConfigWriter: ConfigWriter[RemoteValidatorAppConfig] =
-      deriveWriter[RemoteValidatorAppConfig]
-    implicit val scanConfigWriter: ConfigWriter[LocalScanAppConfig] =
-      deriveWriter[LocalScanAppConfig]
-    implicit val svcConfigWriter: ConfigWriter[LocalSvcAppConfig] =
-      deriveWriter[LocalSvcAppConfig]
-    implicit val remoteSvcConfigWriter: ConfigWriter[RemoteSvcAppConfig] =
-      deriveWriter[RemoteSvcAppConfig]
+    implicit val remoteScanConfigWriter: ConfigWriter[ScanAppClientConfig] =
+      deriveWriter[ScanAppClientConfig]
+    implicit val validatorConfigWriter: ConfigWriter[ValidatorAppBackendConfig] =
+      deriveWriter[ValidatorAppBackendConfig]
+    implicit val remoteValidatorConfigWriter: ConfigWriter[ValidatorAppClientConfig] =
+      deriveWriter[ValidatorAppClientConfig]
+    implicit val scanConfigWriter: ConfigWriter[ScanAppBackendConfig] =
+      deriveWriter[ScanAppBackendConfig]
+    implicit val svcConfigWriter: ConfigWriter[SvcAppBackendConfig] =
+      deriveWriter[SvcAppBackendConfig]
+    implicit val remoteSvcConfigWriter: ConfigWriter[SvcAppClientConfig] =
+      deriveWriter[SvcAppClientConfig]
     implicit val coinAppParametersWriter: ConfigWriter[SharedCoinAppParameters] =
       deriveWriter[SharedCoinAppParameters]
     implicit val walletRemoteValidatorConfigWriter: ConfigWriter[WalletRemoteValidatorAppConfig] =
@@ -501,10 +502,10 @@ object CoinConfig {
       deriveWriter[LocalDirectoryAppConfig]
     implicit val remoteDirectoryConfigWriter: ConfigWriter[RemoteDirectoryAppConfig] =
       deriveWriter[RemoteDirectoryAppConfig]
-    implicit val splitwiseConfigWriter: ConfigWriter[LocalSplitwiseAppConfig] =
-      deriveWriter[LocalSplitwiseAppConfig]
-    implicit val remoteSplitwiseConfigWriter: ConfigWriter[RemoteSplitwiseAppConfig] =
-      deriveWriter[RemoteSplitwiseAppConfig]
+    implicit val splitwiseConfigWriter: ConfigWriter[SplitwiseAppBackendConfig] =
+      deriveWriter[SplitwiseAppBackendConfig]
+    implicit val remoteSplitwiseConfigWriter: ConfigWriter[SplitwiseAppClientConfig] =
+      deriveWriter[SplitwiseAppClientConfig]
 
     implicit val communityDomainConfigWriter: ConfigWriter[CommunityDomainConfig] =
       deriveWriter[CommunityDomainConfig]

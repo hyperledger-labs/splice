@@ -6,13 +6,13 @@ import com.daml.network.codegen.java.cc.{round => roundCodegen}
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.history.{CoinTransaction, CoinTransactionTreeView}
 import com.daml.network.scan.admin.api.client.commands.GrpcScanAppClient
-import com.daml.network.scan.config.{LocalScanAppConfig, RemoteScanAppConfig}
-import com.daml.network.util.{JavaContract as Contract}
+import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
+import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
-/** Single local scan app reference. Defines the console commands that can be run against a local scan
+/** Single scan app reference. Defines the console commands that can be run against a client or backend scan
   * app reference.
   */
 abstract class ScanAppReference(
@@ -86,19 +86,19 @@ abstract class ScanAppReference(
     }
 }
 
-final class LocalScanAppReference(
+final class ScanAppBackendReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
     name: String,
 ) extends ScanAppReference(coinConsoleEnvironment, name)
     with LocalCoinAppReference
     with BaseInspection[ParticipantNode] {
 
-  override protected val instanceType = "Local Scan"
+  override protected val instanceType = "Scan Backend"
 
   protected val nodes = coinConsoleEnvironment.environment.scans
 
   @Help.Summary("Return local scan app config")
-  override def config: LocalScanAppConfig =
+  override def config: ScanAppBackendConfig =
     coinConsoleEnvironment.environment.config.scansByString(name)
 
   /** Remote participant this scan app is configured to interact with. */
@@ -123,13 +123,13 @@ final class LocalScanAppReference(
 /** Remote reference to a scan app in the style of CoinRemoteParticipantReference, i.e.,
   * it accepts the config as an argument rather than reading it from the global map.
   */
-final class RemoteScanAppReference(
+final class ScanAppClientReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
     name: String,
-    override val config: RemoteScanAppConfig,
+    override val config: ScanAppClientConfig,
 ) extends ScanAppReference(coinConsoleEnvironment, name)
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
 
-  override protected val instanceType = "Remote Scan"
+  override protected val instanceType = "Scan Client"
 }

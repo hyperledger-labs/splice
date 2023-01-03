@@ -8,7 +8,7 @@ import com.daml.network.config.{
   LocalCoinConfig,
   RemoteCoinConfig,
 }
-import com.daml.network.scan.config.RemoteScanAppConfig
+import com.daml.network.scan.config.ScanAppClientConfig
 import com.digitalasset.canton.config.*
 
 case class LocalDirectoryAppConfig(
@@ -16,7 +16,7 @@ case class LocalDirectoryAppConfig(
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     damlUser: String,
     override val remoteParticipant: CoinRemoteParticipantConfig,
-    remoteScan: RemoteScanAppConfig,
+    remoteScan: ScanAppClientConfig,
     automation: AutomationConfig = AutomationConfig(),
 ) extends LocalCoinConfig {
   override val nodeTypeName: String = "directory"

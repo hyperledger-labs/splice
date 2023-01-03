@@ -1,7 +1,7 @@
 package com.daml.network.environment
 
 import com.daml.network.config.SharedCoinAppParameters
-import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
+import com.daml.network.splitwise.config.SplitwiseAppBackendConfig
 import com.daml.network.splitwise.{SplitwiseApp, SplitwiseAppBootstrap}
 import com.digitalasset.canton.concurrent.ExecutionContextIdlenessExecutorService
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -11,10 +11,10 @@ import com.digitalasset.canton.resource.DbMigrationsFactory
 
 /** Splitwise app instances. */
 class SplitwiseApps(
-    create: (String, LocalSplitwiseAppConfig) => SplitwiseAppBootstrap,
+    create: (String, SplitwiseAppBackendConfig) => SplitwiseAppBootstrap,
     migrationsFactory: DbMigrationsFactory,
     _timeouts: ProcessingTimeout,
-    configs: Map[String, LocalSplitwiseAppConfig],
+    configs: Map[String, SplitwiseAppBackendConfig],
     parametersFor: String => SharedCoinAppParameters,
     _loggerFactory: NamedLoggerFactory,
 )(implicit
@@ -22,7 +22,7 @@ class SplitwiseApps(
 ) extends ManagedNodes[ // TODO(#736): We should remove the CantonNode/CantonNodeBootstrap type requirements from
       // this trait.
       SplitwiseApp,
-      LocalSplitwiseAppConfig,
+      SplitwiseAppBackendConfig,
       SharedCoinAppParameters,
       SplitwiseAppBootstrap,
     ](create, migrationsFactory, _timeouts, configs, parametersFor, _loggerFactory) {}

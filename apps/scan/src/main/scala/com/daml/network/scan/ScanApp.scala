@@ -8,7 +8,7 @@ import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
 import com.daml.network.scan.admin.grpc.GrpcScanService
 import com.daml.network.scan.automation.ScanAutomationService
-import com.daml.network.scan.config.LocalScanAppConfig
+import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.v0.ScanServiceGrpc
 import com.daml.network.util.HasHealth
@@ -30,7 +30,7 @@ import scala.concurrent.{ExecutionContextExecutor, Future}
   */
 class ScanApp(
     override val name: InstanceName,
-    val config: LocalScanAppConfig,
+    val config: ScanAppBackendConfig,
     val coinAppParameters: SharedCoinAppParameters,
     storage: Storage,
     override protected val clock: Clock,

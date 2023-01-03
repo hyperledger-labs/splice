@@ -8,7 +8,7 @@ import com.daml.network.config.{
   LocalCoinConfig,
   RemoteCoinConfig,
 }
-import com.daml.network.scan.config.RemoteScanAppConfig
+import com.daml.network.scan.config.ScanAppClientConfig
 import com.digitalasset.canton.config.*
 
 case class WalletAppBackendConfig(
@@ -16,7 +16,7 @@ case class WalletAppBackendConfig(
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     serviceUser: String,
     remoteParticipant: CoinRemoteParticipantConfig,
-    remoteScan: RemoteScanAppConfig,
+    remoteScan: ScanAppClientConfig,
     validator: WalletRemoteValidatorAppConfig,
     validatorAuth: AuthTokenSourceConfig,
     auth: AuthConfig,

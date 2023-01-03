@@ -9,7 +9,7 @@ import com.daml.network.config.{
 import com.digitalasset.canton.config.*
 import com.digitalasset.canton.time.NonNegativeFiniteDuration as NonNegativeFiniteDurationT
 
-case class LocalSvcAppConfig(
+case class SvcAppBackendConfig(
     override val adminApi: CommunityAdminServerConfig = CommunityAdminServerConfig(),
     override val storage: CommunityStorageConfig = CommunityStorageConfig.Memory(),
     damlUser: String,
@@ -25,7 +25,7 @@ case class LocalSvcAppConfig(
 
 }
 
-case class RemoteSvcAppConfig(
+case class SvcAppClientConfig(
     adminApi: ClientConfig
 ) extends RemoteCoinConfig {
   override def clientAdminApi: ClientConfig = adminApi

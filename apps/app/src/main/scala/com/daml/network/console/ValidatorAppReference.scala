@@ -4,13 +4,12 @@ import com.daml.network.auth.{AuthUtil, JwtCallCredential}
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.validator.admin.api.client.UserInfo
 import com.daml.network.validator.admin.api.client.commands.GrpcValidatorAppClient
-import com.daml.network.validator.config.{LocalValidatorAppConfig, RemoteValidatorAppConfig}
+import com.daml.network.validator.config.{ValidatorAppBackendConfig, ValidatorAppClientConfig}
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
-/** Single local validator app reference. Defines the console commands that can be run against a local validator
-  * app reference.
+/** Console commands that can be executed either through client or backend reference.
   */
 abstract class ValidatorAppReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
@@ -45,7 +44,7 @@ abstract class ValidatorAppReference(
   }
 }
 
-final class LocalValidatorAppReference(
+final class ValidatorAppBackendReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
 ) extends ValidatorAppReference(consoleEnvironment, name)
@@ -64,7 +63,7 @@ final class LocalValidatorAppReference(
   protected val nodes = consoleEnvironment.environment.validators
 
   @Help.Summary("Return local validator app config")
-  override def config: LocalValidatorAppConfig =
+  override def config: ValidatorAppBackendConfig =
     consoleEnvironment.environment.config.validatorsByString(name)
 
   /** Remote participant this validator app is configured to interact with. */
@@ -89,18 +88,18 @@ final class LocalValidatorAppReference(
   def adminToken: Option[String] = underlying.map(_.adminToken.secret)
 }
 
-/** Remote reference to a scan app in the style of CoinRemoteParticipantReference, i.e.,
+/** Client (aka remote) reference to a validator app in the style of CoinRemoteParticipantReference, i.e.,
   * it accepts the config as an argument rather than reading it from the global map.
   */
-final class RemoteValidatorAppReference(
+final class ValidatorAppClientReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
-    override val config: RemoteValidatorAppConfig,
+    override val config: ValidatorAppClientConfig,
 ) extends ValidatorAppReference(consoleEnvironment, name)
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
 
   override def token: String = ""
 
-  override protected val instanceType = "Remote Validator"
+  override protected val instanceType = "Validator Client"
 }

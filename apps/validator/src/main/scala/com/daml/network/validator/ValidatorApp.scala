@@ -20,7 +20,7 @@ import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, HasHealth, UploadablePackage}
 import com.daml.network.validator.admin.grpc.GrpcValidatorAppService
 import com.daml.network.validator.automation.ValidatorAutomationService
-import com.daml.network.validator.config.{AppInstance, LocalValidatorAppConfig}
+import com.daml.network.validator.config.{AppInstance, ValidatorAppBackendConfig}
 import com.daml.network.validator.store.ValidatorStore
 import com.daml.network.validator.util.ValidatorUtil
 import com.daml.network.validator.v0.ValidatorAppServiceGrpc
@@ -41,7 +41,7 @@ import scala.jdk.CollectionConverters.*
 /** Class representing a Validator app instance. */
 class ValidatorApp(
     override val name: InstanceName,
-    val config: LocalValidatorAppConfig,
+    val config: ValidatorAppBackendConfig,
     val coinAppParameters: SharedCoinAppParameters,
     storage: Storage,
     override protected val clock: Clock,

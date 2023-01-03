@@ -8,7 +8,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
 import com.daml.network.environment.{CoinNodeBootstrapBase, CoinRetries}
-import com.daml.network.validator.config.LocalValidatorAppConfig
+import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
@@ -29,7 +29,7 @@ import scala.concurrent.Future
   */
 class ValidatorAppBootstrap(
     override val name: InstanceName,
-    val config: LocalValidatorAppConfig,
+    val config: ValidatorAppBackendConfig,
     val validatorAppParameters: SharedCoinAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
@@ -45,7 +45,7 @@ class ValidatorAppBootstrap(
     executionSequencerFactory: ExecutionSequencerFactory,
 ) extends CoinNodeBootstrapBase[
       ValidatorApp,
-      LocalValidatorAppConfig,
+      ValidatorAppBackendConfig,
       SharedCoinAppParameters,
     ](
       name,
@@ -85,7 +85,7 @@ object ValidatorAppBootstrap {
 
   def apply(
       name: String,
-      validatorConfig: LocalValidatorAppConfig,
+      validatorConfig: ValidatorAppBackendConfig,
       validatorAppParameters: SharedCoinAppParameters,
       clock: Clock,
       testingTimeService: TestingTimeService,

@@ -6,25 +6,25 @@ import com.daml.network.console.{
   DirectoryAppReference,
   LocalCoinAppReference,
   LocalDirectoryAppReference,
-  LocalScanAppReference,
-  LocalSplitwiseAppReference,
-  LocalSvcAppReference,
-  LocalValidatorAppReference,
+  ScanAppBackendReference,
+  SplitwiseAppBackendReference,
+  SvcAppBackendReference,
+  ValidatorAppBackendReference,
   RemoteDirectoryAppReference,
-  RemoteScanAppReference,
-  RemoteSplitwiseAppReference,
-  RemoteSvcAppReference,
-  RemoteValidatorAppReference,
+  ScanAppClientReference,
+  SplitwiseAppClientReference,
+  SvcAppClientReference,
+  ValidatorAppClientReference,
   ScanAppReference,
   SplitwiseAppReference,
   ValidatorAppReference,
   WalletAppBackendReference,
   WalletAppClientReference,
 }
-import com.daml.network.scan.config.RemoteScanAppConfig
-import com.daml.network.svc.config.RemoteSvcAppConfig
+import com.daml.network.scan.config.ScanAppClientConfig
+import com.daml.network.svc.config.SvcAppClientConfig
 import com.daml.network.util.ResourceTemplateDecoder
-import com.daml.network.validator.config.RemoteValidatorAppConfig
+import com.daml.network.validator.config.ValidatorAppClientConfig
 import com.daml.network.wallet.config.WalletAppClientConfig
 import com.digitalasset.canton.admin.api.client.data.CommunityCantonStatus
 import com.digitalasset.canton.config.RequireTypes.InstanceName
@@ -123,33 +123,38 @@ class CoinConsoleEnvironment(
 
   /* Local apps that are (in the target deployment) operated by a third party */
   lazy val appsHostedByThirdParty =
-    NodeReferences[SplitwiseAppReference, RemoteSplitwiseAppReference, LocalSplitwiseAppReference](
+    NodeReferences[
+      SplitwiseAppReference,
+      SplitwiseAppClientReference,
+      SplitwiseAppBackendReference,
+    ](
       splitwises.local,
       splitwises.remote,
     )
 
   lazy val validators: NodeReferences[
     ValidatorAppReference,
-    RemoteValidatorAppReference,
-    LocalValidatorAppReference,
+    ValidatorAppClientReference,
+    ValidatorAppBackendReference,
   ] =
     NodeReferences(
       environment.config.validatorsByString.keys.map(createValidatorReference).toSeq,
-      environment.config.remoteValidatorApps.toSeq.map(createRemoteValidatorReference),
+      environment.config.validatorAppClients.toSeq.map(createRemoteValidatorReference),
     )
 
-  lazy val scans: NodeReferences[ScanAppReference, RemoteScanAppReference, LocalScanAppReference] =
+  lazy val scans
+      : NodeReferences[ScanAppReference, ScanAppClientReference, ScanAppBackendReference] =
     NodeReferences(
       environment.config.scansByString.keys.map(createScanReference).toSeq,
-      environment.config.remoteScanApps.toSeq.map(createRemoteScanReference),
+      environment.config.ScanAppClients.toSeq.map(createRemoteScanReference),
     )
 
-  lazy val svcOpt: Option[LocalSvcAppReference] =
+  lazy val svcOpt: Option[SvcAppBackendReference] =
     environment.config.svcsByString.keys
       .map(createSvcReference)
       .headOption
 
-  lazy val remoteSvcOpt: Option[RemoteSvcAppReference] =
+  lazy val remoteSvcOpt: Option[SvcAppClientReference] =
     environment.config.remoteSvcApps.toSeq
       .map(createRemoteSvcReference)
       .headOption
@@ -177,37 +182,37 @@ class CoinConsoleEnvironment(
 
   lazy val splitwises: NodeReferences[
     SplitwiseAppReference,
-    RemoteSplitwiseAppReference,
-    LocalSplitwiseAppReference,
+    SplitwiseAppClientReference,
+    SplitwiseAppBackendReference,
   ] =
     NodeReferences(
       environment.config.splitwisesByString.keys.map(createSplitwiseReference).toSeq,
       environment.config.remoteSplitwisesByString.keys.map(createRemoteSplitwiseReference).toSeq,
     )
 
-  private def createValidatorReference(name: String): LocalValidatorAppReference =
-    new LocalValidatorAppReference(this, name)
+  private def createValidatorReference(name: String): ValidatorAppBackendReference =
+    new ValidatorAppBackendReference(this, name)
 
   private def createRemoteValidatorReference(
-      conf: (InstanceName, RemoteValidatorAppConfig)
-  ): RemoteValidatorAppReference =
-    new RemoteValidatorAppReference(this, conf._1.unwrap, conf._2)
+      conf: (InstanceName, ValidatorAppClientConfig)
+  ): ValidatorAppClientReference =
+    new ValidatorAppClientReference(this, conf._1.unwrap, conf._2)
 
-  private def createScanReference(name: String): LocalScanAppReference =
-    new LocalScanAppReference(this, name)
+  private def createScanReference(name: String): ScanAppBackendReference =
+    new ScanAppBackendReference(this, name)
 
   private def createRemoteScanReference(
-      conf: (InstanceName, RemoteScanAppConfig)
-  ): RemoteScanAppReference =
-    new RemoteScanAppReference(this, conf._1.unwrap, conf._2)
+      conf: (InstanceName, ScanAppClientConfig)
+  ): ScanAppClientReference =
+    new ScanAppClientReference(this, conf._1.unwrap, conf._2)
 
-  private def createSvcReference(name: String): LocalSvcAppReference =
-    new LocalSvcAppReference(this, name)
+  private def createSvcReference(name: String): SvcAppBackendReference =
+    new SvcAppBackendReference(this, name)
 
   private def createRemoteSvcReference(
-      conf: (InstanceName, RemoteSvcAppConfig)
-  ): RemoteSvcAppReference =
-    new RemoteSvcAppReference(this, conf._1.unwrap, conf._2)
+      conf: (InstanceName, SvcAppClientConfig)
+  ): SvcAppClientReference =
+    new SvcAppClientReference(this, conf._1.unwrap, conf._2)
 
   private def createWalletBackendReference(name: String): WalletAppBackendReference =
     new WalletAppBackendReference(this, name)
@@ -225,11 +230,11 @@ class CoinConsoleEnvironment(
   ): RemoteDirectoryAppReference =
     new RemoteDirectoryAppReference(this, name)
 
-  private def createSplitwiseReference(name: String): LocalSplitwiseAppReference =
-    new LocalSplitwiseAppReference(this, name)
+  private def createSplitwiseReference(name: String): SplitwiseAppBackendReference =
+    new SplitwiseAppBackendReference(this, name)
 
-  private def createRemoteSplitwiseReference(name: String): RemoteSplitwiseAppReference =
-    new RemoteSplitwiseAppReference(this, name)
+  private def createRemoteSplitwiseReference(name: String): SplitwiseAppClientReference =
+    new SplitwiseAppClientReference(this, name)
 
   override protected def topLevelValues: Seq[TopLevelValue[_]] = {
 
@@ -373,9 +378,9 @@ class CoinConsoleEnvironment(
     instance match {
       case _: LocalDomainReference => 1
       case _: LocalParticipantReference => 2
-      case _: LocalSvcAppReference => 3
-      case _: LocalScanAppReference => 4
-      case _: LocalValidatorAppReference => 5
+      case _: SvcAppBackendReference => 3
+      case _: ScanAppBackendReference => 4
+      case _: ValidatorAppBackendReference => 5
       case _ => 6
     }
 

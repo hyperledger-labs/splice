@@ -12,7 +12,7 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{
   CoinRemoteParticipantReference,
   LedgerApiUtils,
-  LocalValidatorAppReference,
+  ValidatorAppBackendReference,
   RemoteDirectoryAppReference,
   ValidatorAppReference,
   WalletAppBackendReference,
@@ -255,7 +255,7 @@ trait WalletTestUtil extends CoinIntegrationTest with CnsTestUtil {
 
   protected def setupForTestWithDirectory(
       walletClient: WalletAppClientReference,
-      validator: LocalValidatorAppReference,
+      validator: ValidatorAppBackendReference,
   ) = {
     validator.remoteParticipant.dars.upload(directoryDarPath)
     onboardWalletUser(walletClient, validator)

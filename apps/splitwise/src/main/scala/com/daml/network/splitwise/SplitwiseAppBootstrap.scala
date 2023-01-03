@@ -7,7 +7,7 @@ import com.daml.grpc.adapter.ExecutionSequencerFactory
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.CoinNodeBootstrap.HealthDumpFunction
 import com.daml.network.environment.{CoinNodeBootstrapBase, CoinRetries}
-import com.daml.network.splitwise.config.LocalSplitwiseAppConfig
+import com.daml.network.splitwise.config.SplitwiseAppBackendConfig
 import com.daml.network.splitwise.metrics.SplitwiseAppMetrics
 import com.digitalasset.canton.concurrent.{
   ExecutionContextIdlenessExecutorService,
@@ -28,7 +28,7 @@ import scala.concurrent.Future
   */
 class SplitwiseAppBootstrap(
     override val name: InstanceName,
-    val config: LocalSplitwiseAppConfig,
+    val config: SplitwiseAppBackendConfig,
     val splitwiseAppParameters: SharedCoinAppParameters,
     val testingConfig: TestingConfigInternal,
     clock: Clock,
@@ -44,7 +44,7 @@ class SplitwiseAppBootstrap(
     executionSequencerFactory: ExecutionSequencerFactory,
 ) extends CoinNodeBootstrapBase[
       SplitwiseApp,
-      LocalSplitwiseAppConfig,
+      SplitwiseAppBackendConfig,
       SharedCoinAppParameters,
     ](
       name,
@@ -84,7 +84,7 @@ object SplitwiseAppBootstrap {
 
   def apply(
       name: String,
-      splitwiseConfig: LocalSplitwiseAppConfig,
+      splitwiseConfig: SplitwiseAppBackendConfig,
       coinAppParameters: SharedCoinAppParameters,
       clock: Clock,
       testingTimeService: TestingTimeService,
