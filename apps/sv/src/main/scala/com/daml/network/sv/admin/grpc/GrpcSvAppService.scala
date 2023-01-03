@@ -1,0 +1,43 @@
+package com.daml.network.sv.admin.grpc
+
+import com.daml.network.codegen.java.cc
+import com.daml.network.environment.CoinLedgerClient
+import com.daml.network.sv.store.SvStore
+import com.daml.network.sv.v0.SvServiceGrpc
+import com.daml.network.sv.{SvApp, v0}
+import com.daml.network.util.Proto
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.tracing.Spanning
+import com.google.protobuf.empty.Empty
+import io.opentelemetry.api.trace.Tracer
+
+import scala.concurrent.{ExecutionContext, Future}
+
+class GrpcSvAppService(
+    ledgerClient: CoinLedgerClient,
+    svUserName: String,
+    store: SvStore,
+    protected val loggerFactory: NamedLoggerFactory,
+)(implicit
+    ec: ExecutionContext,
+    tracer: Tracer,
+) extends SvServiceGrpc.SvService
+    with Spanning
+    with NamedLogging {
+
+  private val connection = ledgerClient.connection("GrpcSvAppService")
+
+  override def getDebugInfo(request: Empty): Future[v0.GetDebugInfoResponse] =
+    withSpanFromGrpcContext("GrpcSvAppService") { _ => _ =>
+      for {
+        coinRulesCids <- connection
+          .activeContracts(store.svParty, cc.coin.CoinRules.COMPANION)
+          .map(_.map(_.id))
+      } yield v0.GetDebugInfoResponse(
+        svUser = svUserName,
+        svPartyId = Proto.encode(store.svParty),
+        coinPackageId = SvApp.coinPackage.packageId,
+        coinRulesContractIds = coinRulesCids.map(Proto.encodeContractId(_)),
+      )
+    }
+}
