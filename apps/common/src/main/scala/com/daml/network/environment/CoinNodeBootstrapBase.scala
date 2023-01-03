@@ -219,7 +219,7 @@ abstract class CoinNodeBootstrapBase[
           show"ourProcessDesc=${ourProcessDesc.singleQuoted}",
           show"otherListenersNetstat=${otherListenersNetstat.toString.unquoted}",
           show"otherListenersSS=${otherListenersSS.toString.unquoted}",
-        ).mkString(System.lineSeparator)
+        ).mkString("\n")
         logger.error(msg, ex)
         throw ex
     }

@@ -58,7 +58,7 @@ object CoinTransactionTreeView {
           val children = {
             exercised.getChildEventIds.asScala
               .map(child => traverseTree(tree.getEventsById.get(child), depth + 1))
-              .mkString(System.lineSeparator())
+              .mkString("\n")
           }
           s"""$indent '${exercised.getActingParties}' exercises ${exercised.getChoice}
              |$indent with
@@ -71,7 +71,7 @@ object CoinTransactionTreeView {
     }
 
     val roots = tree.getRootEventIds.asScala.map(rootId => tree.getEventsById.get(rootId))
-    roots.map(r => traverseTree(r, 0)).mkString(System.lineSeparator())
+    roots.map(r => traverseTree(r, 0)).mkString("\n")
   }
 }
 

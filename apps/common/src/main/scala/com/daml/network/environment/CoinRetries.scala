@@ -129,7 +129,7 @@ object CoinRetries {
               )
                 // the message of the exception is already in the error details, so we don't need to append it
                 .appendedAll(errorDetails.map(_.toString))
-            logger.info(msg.mkString(System.lineSeparator()))
+            logger.info(msg.mkString("\n"))
             TransientErrorKind
           case None if retryableStatusCodes.contains(statusCode) =>
             val msg =
@@ -144,7 +144,7 @@ object CoinRetries {
                 s"statusCode=$statusCode",
               )
                 .appendedAll(errorDetails.map(_.toString))
-                .mkString(System.lineSeparator()),
+                .mkString("\n"),
               ex,
             )
             FatalErrorKind

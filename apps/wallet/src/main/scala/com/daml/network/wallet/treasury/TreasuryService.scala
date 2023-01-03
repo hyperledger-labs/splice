@@ -254,7 +254,7 @@ class TreasuryService(
     // We accept the cost of repeatedly filtering the batch, as batches are expected to be small.
     val batch = batch0.filter(!_.outcomePromise.isCompleted)
     logger.debug(
-      show"Running batch of coin operations:${System.lineSeparator()}$batch"
+      show"Running batch of coin operations:\n$batch"
     )
 
     def isErrorOutcome(outcome: installCodegen.CoinOperationOutcome): Boolean = outcome match {
