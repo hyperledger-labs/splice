@@ -60,7 +60,7 @@ function _cluster_apply() {
     jsonnet --tla-str gcpRegion=${CLOUDSDK_COMPUTE_REGION} \
             --tla-str gcpRepoName=${GCP_REPO_NAME} \
             --tla-str gcpDnsProject=${GCP_DNS_PROJECT} \
-            --tla-str gcpDnsSvcAcct=${GCP_DNS_SERVICE_ACCOUNT} \
+            --tla-str gcpDnsSASecret=${GCP_DNS_SA_SECRET} \
             --tla-str imageTag=${SOURCE_IMAGE_TAG} \
             --tla-str ipAddr=$(cluster_ip) \
             --tla-str clusterName=${GCP_CLUSTER_NAME} \
@@ -160,11 +160,16 @@ function cluster_create() {
 
     #### Store DNS service account secret for cert-manager DNS-01 authorizer to use
     #### TODO(#1447)
-    if [ -z $(kubectl get secret | grep ${GCP_DNS_SERVICE_ACCOUNT}) ]; then
-        _log "Missing DNS Service Account secret, adding..."
+    if ! kubectl get secret ${GCP_DNS_SA_SECRET} > /dev/null; then
+
+        _log "Missing DNS Service Account secret, creating key..."
+        # This can fail with a precondition error on an attempt to create
+        # keys beyond the tenth.
         gcloud iam service-accounts keys create /tmp/key.json \
             --iam-account dns01-solver@$GCP_DNS_PROJECT.iam.gserviceaccount.com
-        kubectl create secret generic $GCP_DNS_SERVICE_ACCOUNT \
+
+        _log "...storing secret"
+        kubectl create secret generic $GCP_DNS_SA_SECRET \
             --from-file=key.json=/tmp/key.json
         rm /tmp/key.json
     fi
@@ -333,16 +338,17 @@ function cluster_ipaddr() {
     fi
 }
 
+
 function cluster_preflight() {
     _log "Starting preflight"
 
     if [ -z "${AUTH0_MANAGEMENT_API_CLIENT_ID-}" ]; then
-      _error "Environment variable AUTH0_MANAGEMENT_API_CLIENT_ID is undefined, please follow instructions in the readme for obtaining and setting it"
+        _error "Environment variable AUTH0_MANAGEMENT_API_CLIENT_ID undefined.\nPlease see https://github.com/DACH-NY/the-real-canton-coin#configure-auth0-environment"
       exit 1
     fi
 
     if [ -z "${AUTH0_MANAGEMENT_API_CLIENT_SECRET-}" ]; then
-      _error "Environment variable AUTH0_MANAGEMENT_API_CLIENT_SECRET is undefined, please follow instructions in the readme for obtaining and setting it"
+      _error "Environment variable AUTH0_MANAGEMENT_API_CLIENT_SECRET is undefined.\nPlease see https://github.com/DACH-NY/the-real-canton-coin#configure-auth0-environment"
       exit 1
     fi
 
@@ -407,17 +413,18 @@ function _set_auth0_secret() {
 
   CLIENT_ID_EV="${ENV_NAME}_CLIENT_ID"
   if [ -z "${!CLIENT_ID_EV-}" ]; then
-      _error "Environment variable ${CLIENT_ID_EV} is undefined, please follow instructions in the readme for obtaining and setting it"
+      _error "Environment variable ${CLIENT_ID_EV} is undefined.\nPlease see https://github.com/DACH-NY/the-real-canton-coin/tree/main/cluster#auth0-secrets"
       exit 1
   fi
   CLIENT_ID=${!CLIENT_ID_EV}
 
   CLIENT_SECRET_EV="${ENV_NAME}_CLIENT_SECRET"
   if [ -z "${!CLIENT_SECRET_EV-}" ]; then
-      _error "Environment variable ${CLIENT_SECRET_EV} is undefined, please follow instructions in the readme for obtaining and setting it"
+      _error "Environment variable ${CLIENT_SECRET_EV} is undefined.\nPlease see https://github.com/DACH-NY/the-real-canton-coin/tree/main/cluster#auth0-secrets"
       exit 1
   fi
   CLIENT_SECRET=${!CLIENT_SECRET_EV}
+
 
   # TODO(#1946) Remove the workaround
   # Currently, daml user names may not contain upper case characters
@@ -502,7 +509,7 @@ case "${SUBCOMMAND_NAME}" in
         ;;
 
     *)
-	    _error "Usage: $SCRIPTNAME {activate|apply|create|check|delete|deploy|ipaddr|reset|wait|update_secrets}" >&2
+	    _error "Usage: $SCRIPTNAME {activate|apply|create|check|delete|deploy|ipaddr|reset|stats|wait|update_secrets}" >&2
 	    exit 3
 	    ;;
 esac

@@ -299,7 +299,7 @@ local cluster(config, clusterDeployments) =
       tlsCertSecret=tlsCertSecret
     ),
     externalService(config, allPorts),
-    tls.issuer(issuerName, issuerServer, config.gcpDnsProject, config.gcpDnsSvcAcct),
+    tls.issuer(issuerName, issuerServer, config.gcpDnsProject, config.gcpDnsSASecret),
     tls.certificate(issuerName, tlsCertSecret, config.clusterName, config.clusterDnsName),
   ]);
 

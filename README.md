@@ -465,6 +465,8 @@ cncluster preflight
 Note that the preflight check will fail if you branch is sufficiently divergent from the main branch
 (in particular, if you made any changes to the Daml model).
 
+#### Configure Auth0 Environment
+
 The preflight check also requires access to auth0's management API (`canton-network-dev` tenant). To enable that, please go
 to the Auth0 [API Explorer Application](https://manage.auth0.com/dashboard/us/canton-network-dev/applications/ECfosW3sLHUfHatCRLEGUQ9YG9XMs9aq/settings).
 
