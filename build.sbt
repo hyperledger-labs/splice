@@ -376,38 +376,46 @@ lazy val `apps-common-frontend-openapi` = {
         import _root_.io.circe.syntax._
 
         val log = streams.value.log
-        runCommand(
-          Seq(
-            "openapi-generator-cli",
-            "generate",
-            "-g",
-            "typescript",
-            "-p",
-            "npmName=common-openapi",
-            "-p",
-            "npmName=common-openapi",
-            "-p",
-            "moduleName=common-openapi",
-            "-p",
-            "projectName=common-openapi",
-            "-p",
-            "useTags=true",
-            "-i",
-            "apps/directory/src/main/openapi/directory.yaml",
-            "-o",
-            "apps/common/frontend-openapi",
-          ),
-          log,
-        )
-        // Add empty check task to make npm happy
-        val packageJson = File("apps/common/frontend-openapi/package.json")
-        val packageJsonContent = packageJson.contentAsString
-        val doc: Json =
-          parse(packageJsonContent).getOrElse(sys.error("Failed to parse package.json"))
-        val updated = jsonRoot.scripts.obj.modify((obj: JsonObject) =>
-          obj.add("check", "echo '[common-protobuf] no-op'".asJson)
-        )(doc)
-        packageJson.overwrite(updated.spaces2)
+        val cacheDir = streams.value.cacheDirectory
+        val commonSpec = baseDirectory.value / "../../common/src/main/openapi/common.yaml"
+        val directorySpec = baseDirectory.value / "../../directory/src/main/openapi/directory.yaml"
+        val cache = FileFunction.cached(cacheDir) { _ =>
+          runCommand(
+            Seq(
+              "openapi-generator-cli",
+              "generate",
+              "-g",
+              "typescript",
+              "-p",
+              "npmName=common-openapi",
+              "-p",
+              "npmName=common-openapi",
+              "-p",
+              "moduleName=common-openapi",
+              "-p",
+              "projectName=common-openapi",
+              "-p",
+              "useTags=true",
+              "-i",
+              directorySpec.toString,
+              "-o",
+              "apps/common/frontend-openapi",
+            ),
+            log,
+          )
+          // Add empty check task to make npm happy
+          val packageJson = File("apps/common/frontend-openapi/package.json")
+          val packageJsonContent = packageJson.contentAsString
+          val doc: Json =
+            parse(packageJsonContent).getOrElse(sys.error("Failed to parse package.json"))
+          val updated = jsonRoot.scripts.obj.modify((obj: JsonObject) =>
+            obj.add("check", "echo '[common-protobuf] no-op'".asJson)
+          )(doc)
+          packageJson.overwrite(updated.spaces2)
+          ((baseDirectory.value ** "*") --- ((baseDirectory.value / "target" +++ baseDirectory.value / "dist") ** "*")).get.toSet
+        }
+        cache(Set(directorySpec, commonSpec))
+        // We need to return an empty Seq here, otherwise SBT tries to compile the typescript files as Scala files.
         Seq()
       }.taskValue,
       cleanFiles += baseDirectory.value / "com",
