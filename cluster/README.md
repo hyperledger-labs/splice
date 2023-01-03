@@ -61,6 +61,8 @@ outside world exclusively via four [Digital Asset VPNs](https://digitalasset.atl
    * GCP Sydney Full Tunnel
 * For External Users and Circle CI Prefligt Testing (Cluster Services Only)
    * GCP DA Canton DevNet
+* For consultants working on CN
+   * AWS DA Consultant VPN
 
 Evven though the Kubernetes management API is accessible to all users
 connecting through one of the internal VPN's, there are Google IAM
