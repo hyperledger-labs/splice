@@ -28,13 +28,10 @@ import io.functionmeta.functionFullName
 import io.grpc.protobuf.services.ProtoReflectionService
 import io.opentelemetry.api.trace.Tracer
 
-import java.io.IOException
 import java.lang.management.ManagementFactory
 import java.util.concurrent.ScheduledExecutorService
 import java.util.concurrent.atomic.{AtomicBoolean, AtomicReference}
 import scala.concurrent.{Future, blocking}
-import scala.sys.process.Process
-import scala.util.Try
 
 object CoinNodeBootstrap {
   type HealthDumpFunction = () => Future[File]
@@ -183,46 +180,30 @@ abstract class CoinNodeBootstrapBase[
 
     val registry = builder.mutableHandlerRegistry()
     val ourProcessDesc = ManagementFactory.getRuntimeMXBean.getName
-    try {
-      logger.debug(
-        show"About to start the gRPC server (ourProcessDesc=${ourProcessDesc.singleQuoted})"
+    logger.debug(
+      show"About to start the gRPC server (ourProcessDesc=${ourProcessDesc.singleQuoted})"
+    )
+    val server = builder
+      .addService(
+        StatusServiceGrpc.bindService(
+          new GrpcStatusService(
+            status,
+            writeHealthDumpToFile,
+            parameterConfig.processingTimeouts,
+          ),
+          executionContext,
+        )
       )
-      val server = builder
-        .addService(
-          StatusServiceGrpc.bindService(
-            new GrpcStatusService(
-              status,
-              writeHealthDumpToFile,
-              parameterConfig.processingTimeouts,
-            ),
-            executionContext,
-          )
+      .addService(
+        VersionServiceGrpc.bindService(
+          new GrpcVersionService(loggerFactory),
+          executionContext,
         )
-        .addService(
-          VersionServiceGrpc.bindService(
-            new GrpcVersionService(loggerFactory),
-            executionContext,
-          )
-        )
-        .addService(ProtoReflectionService.newInstance(), false)
-        .build
-        .start()
-      (Lifecycle.toCloseableServer(server, logger, "AdminServer"), registry)
-    } catch {
-      case ex: IOException =>
-        // TODO(#1769): remove this code to call out to external process, as it is neither secure nor portable; or move it to our test wrappers, if that seems sensible
-        // Grabbing the output from both ss and netstat in case only one of them is on the PATH
-        val otherListenersNetstat = Try(Process("netstat --listen --tcp -p").!!)
-        val otherListenersSS = Try(Process("ss --listen --tcp --processes").!!)
-        val msg = Seq(
-          s"Starting gRPC server failed",
-          show"ourProcessDesc=${ourProcessDesc.singleQuoted}",
-          show"otherListenersNetstat=${otherListenersNetstat.toString.unquoted}",
-          show"otherListenersSS=${otherListenersSS.toString.unquoted}",
-        ).mkString("\n")
-        logger.error(msg, ex)
-        throw ex
-    }
+      )
+      .addService(ProtoReflectionService.newInstance(), false)
+      .build
+      .start()
+    (Lifecycle.toCloseableServer(server, logger, "AdminServer"), registry)
   }
 
   /** Attempt to start the node.
