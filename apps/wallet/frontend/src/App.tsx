@@ -96,6 +96,7 @@ const Content = () => {
 
   const getUserStatus = useCallback(
     async (userId: string | undefined) => {
+      console.debug(`Checking status for user ${userId}`);
       if (userId === undefined) return;
 
       const status = await walletClient.userStatus();
