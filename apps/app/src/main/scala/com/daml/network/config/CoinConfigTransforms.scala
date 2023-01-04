@@ -55,69 +55,40 @@ object CoinConfigTransforms {
     * val validatorParty = validatorParticipant.parties.enable(validatorUserName)
     */
   def addDamlNameSuffix(context: String): CoinConfigTransform = { config =>
-    {
-      val suffix = context.toLowerCase
+    val suffix = context.toLowerCase
 
-      val config1 = updateSvcAppConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(config)
-      val config2 = updateScanAppConfig(c => c.copy(svcUser = s"${c.svcUser}-$suffix"))(config1)
-      val config3 =
-        updateAllValidatorConfigs_(c =>
-          c.copy(
-            damlUser = s"${c.damlUser}-$suffix",
-            walletServiceUser = s"${c.walletServiceUser}-$suffix",
-            appInstances = c.appInstances.view
-              .mapValues(i => i.copy(serviceUser = s"${i.serviceUser}-$suffix"))
-              .toMap,
-          )
-        )(config2)
-      val config4 =
-        updateAllWalletAppBackendConfigs_(c => c.copy(serviceUser = s"${c.serviceUser}-$suffix"))(
-          config3
+    val transforms = Seq(
+      updateSvcAppConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix")),
+      updateScanAppConfig(c => c.copy(svcUser = s"${c.svcUser}-$suffix")),
+      updateAllValidatorConfigs_(c =>
+        c.copy(
+          damlUser = s"${c.damlUser}-$suffix",
+          walletServiceUser = s"${c.walletServiceUser}-$suffix",
+          appInstances = c.appInstances.view
+            .mapValues(i => i.copy(serviceUser = s"${i.serviceUser}-$suffix"))
+            .toMap,
         )
-      val config5 =
-        updateAllWalletAppClientConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
-          config4
-        )
-      val config6 =
-        updateDirectoryAppConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
-          config5
-        )
-      val config7 =
-        updateAllSplitwiseAppConfigs_(c => c.copy(providerUser = s"${c.providerUser}-$suffix"))(
-          config6
-        )
-      val config8 =
-        updateAllRemoteSplitwiseAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix"))(
-          config7
-        )
-      val config9 = updateAllRemoteDirectoryAppConfigs_(c =>
-        c.copy(damlUser = s"${c.damlUser}-$suffix")
-      )(config8)
-      config9
-    }
+      ),
+      updateAllWalletAppBackendConfigs_(c => c.copy(serviceUser = s"${c.serviceUser}-$suffix")),
+      updateAllWalletAppClientConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix")),
+      updateDirectoryAppConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix")),
+      updateAllSplitwiseAppConfigs_(c => c.copy(providerUser = s"${c.providerUser}-$suffix")),
+      updateAllRemoteSplitwiseAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix")),
+      updateAllRemoteDirectoryAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix")),
+    )
+    transforms.foldLeft(config)((c, tf) => tf(c))
   }
 
   def reducePollingInterval: CoinConfigTransform = { config =>
-    {
-      val config1 =
-        updateSvcAppConfig(c => c.focus(_.automation).modify(reducePollingInterval))(config)
-      val config2 =
-        updateScanAppConfig(c => c.focus(_.automation).modify(reducePollingInterval))(config1)
-      val config3 = updateAllValidatorConfigs_(c =>
-        c.focus(_.automation).modify(reducePollingInterval)
-      )(config2)
-      val config4 =
-        updateAllWalletAppBackendConfigs_(c => c.focus(_.automation).modify(reducePollingInterval))(
-          config3
-        )
-      val config5 =
-        updateDirectoryAppConfig(c => c.focus(_.automation).modify(reducePollingInterval))(config4)
-      val config6 =
-        updateAllSplitwiseAppConfigs_(c => c.focus(_.automation).modify(reducePollingInterval))(
-          config5
-        )
-      config6
-    }
+    val transforms = Seq(
+      updateSvcAppConfig(c => c.focus(_.automation).modify(reducePollingInterval)),
+      updateScanAppConfig(c => c.focus(_.automation).modify(reducePollingInterval)),
+      updateAllValidatorConfigs_(c => c.focus(_.automation).modify(reducePollingInterval)),
+      updateAllWalletAppBackendConfigs_(c => c.focus(_.automation).modify(reducePollingInterval)),
+      updateDirectoryAppConfig(c => c.focus(_.automation).modify(reducePollingInterval)),
+      updateAllSplitwiseAppConfigs_(c => c.focus(_.automation).modify(reducePollingInterval)),
+    )
+    transforms.foldLeft(config)((c, tf) => tf(c))
   }
 
   /** Ensure that the set of Daml user names used in a given instance of a configuration
@@ -286,35 +257,38 @@ object CoinConfigTransforms {
     updateAllParticipantConfigs((_, config) => update(config))
 
   def bumpCantonPortsBy(bump: Int): CoinConfigTransform = {
-    val domain = updateAllDomainConfigs_(
-      _.focus(_.adminApi)
-        .modify(portTransform(bump, _))
-        .focus(_.publicApi)
-        .modify(portTransform(bump, _))
-    )
-    val participant = updateAllParticipantConfigs_(
-      _.focus(_.adminApi)
-        .modify(portTransform(bump, _))
-        .focus(_.ledgerApi)
-        .modify(portTransform(bump, _))
-    )
-    val svc = updateSvcAppConfig(_.focus(_.remoteParticipant).modify(portTransform(bump, _)))
-    val scan = updateScanAppConfig(_.focus(_.remoteParticipant).modify(portTransform(bump, _)))
-    val validator = updateAllValidatorConfigs_(
-      _.focus(_.remoteParticipant).modify(portTransform(bump, _))
-    )
-    val wallet = updateAllWalletAppBackendConfigs_(
-      _.focus(_.remoteParticipant).modify(portTransform(bump, _))
-    )
-    val directory = updateDirectoryAppConfig(
-      _.focus(_.remoteParticipant).modify(portTransform(bump, _))
-    )
-    val splitwise = updateAllSplitwiseAppConfigs_(
-      _.focus(_.remoteParticipant).modify(portTransform(bump, _))
+
+    val transforms = Seq(
+      updateAllDomainConfigs_(
+        _.focus(_.adminApi)
+          .modify(portTransform(bump, _))
+          .focus(_.publicApi)
+          .modify(portTransform(bump, _))
+      ),
+      updateAllParticipantConfigs_(
+        _.focus(_.adminApi)
+          .modify(portTransform(bump, _))
+          .focus(_.ledgerApi)
+          .modify(portTransform(bump, _))
+      ),
+      updateSvcAppConfig(_.focus(_.remoteParticipant).modify(portTransform(bump, _))),
+      updateScanAppConfig(_.focus(_.remoteParticipant).modify(portTransform(bump, _))),
+      updateAllValidatorConfigs_(
+        _.focus(_.remoteParticipant).modify(portTransform(bump, _))
+      ),
+      updateAllWalletAppBackendConfigs_(
+        _.focus(_.remoteParticipant).modify(portTransform(bump, _))
+      ),
+      updateDirectoryAppConfig(
+        _.focus(_.remoteParticipant).modify(portTransform(bump, _))
+      ),
+      updateAllSplitwiseAppConfigs_(
+        _.focus(_.remoteParticipant).modify(portTransform(bump, _))
+      ),
     )
 
-    domain compose participant compose svc compose scan compose validator compose
-      wallet compose directory compose splitwise
+    transforms.foldLeft((c: CoinConfig) => c)((f, tf) => f compose tf)
+
   }
 
   def bumpRemoteDirectoryPortsBy(bump: Int): CoinConfigTransform = {
@@ -346,17 +320,22 @@ object CoinConfigTransforms {
 
   private def portTransform(bump: Int, c: CommunityAdminServerConfig): CommunityAdminServerConfig =
     c.copy(internalPort = c.internalPort.map(p => p + bump))
+
   private def portTransform(
       bump: Int,
       c: CommunityPublicServerConfig,
   ): CommunityPublicServerConfig =
     c.copy(internalPort = c.internalPort.map(p => p + bump))
+
   private def portTransform(bump: Int, c: ClientConfig): ClientConfig =
     c.copy(port = c.port + bump)
+
   private def portTransform(bump: Int, c: CoinLedgerApiClientConfig): CoinLedgerApiClientConfig =
     c.focus(_.clientConfig).modify(portTransform(bump, _))
+
   private def portTransform(bump: Int, c: LedgerApiServerConfig): LedgerApiServerConfig =
     c.copy(internalPort = c.internalPort.map(p => p + bump))
+
   private def portTransform(
       bump: Int,
       c: CoinRemoteParticipantConfig,
@@ -466,6 +445,7 @@ object CoinConfigTransforms {
   def getAdminToken(clockConfig: ClockConfig, config: CoinRemoteParticipantConfig): String = {
     getAdminToken(clockConfig, config.ledgerApi.clientConfig)
   }
+
   def getAdminToken(clockConfig: ClockConfig, ledgerApi: ClientConfig): String = {
     val port = ledgerApi.port.unwrap
     val token = {
