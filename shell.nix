@@ -46,7 +46,6 @@ in pkgs.mkShell {
     jsonnet
     kubectl
     lnav
-    nettools
     nix
     nodejs
     openapi-generator-cli
