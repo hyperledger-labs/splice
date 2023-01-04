@@ -253,7 +253,8 @@ class WalletPaymentFrontendIntegrationTest
           s"Alice creates offer with bob's full party ID", {
             click on "create-offer-button"
             click on "create-offer-receiver"
-            textField("create-offer-receiver").value = bobParty.toProtoPrimitive
+            sendKeysIncrementally(textField("create-offer-receiver"), bobParty.toProtoPrimitive)
+
             textField("create-offer-receiver").underlying.sendKeys(Keys.ARROW_DOWN)
             textField("create-offer-receiver").underlying.sendKeys(Keys.RETURN)
             click on "create-offer-quantity"
@@ -302,7 +303,7 @@ class WalletPaymentFrontendIntegrationTest
           s"Alice creates offer \"${description}\"", {
             click on "create-offer-button"
             click on "create-offer-receiver"
-            textField("create-offer-receiver").value = bobParty.toProtoPrimitive
+            sendKeysIncrementally(textField("create-offer-receiver"), bobParty.toProtoPrimitive)
             click on "create-offer-quantity"
             numberField("create-offer-quantity").underlying.sendKeys("100.0")
             click on "create-offer-description"

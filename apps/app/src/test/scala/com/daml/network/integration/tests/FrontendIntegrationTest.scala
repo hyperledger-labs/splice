@@ -243,6 +243,17 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
     }
   }
 
+  /** There appears to be some racy behavior when Selenium tries to input very long string values
+    * (e.g., such as fully qualified party IDs) into text fields.
+    *
+    * This resulted in only partially-complete strings being registered in the input value, and causing failures!
+    *
+    * Workaround: send keys one character at a time -- https://stackoverflow.com/a/71697436
+    */
+  protected def sendKeysIncrementally(textField: TextField, input: String) = {
+    input.split("").foreach(textField.underlying.sendKeys(_))
+  }
+
   protected def browseToWallet(port: Int, damlUser: String)(implicit webDriver: WebDriver) = {
     actAndCheck(
       s"Browse to wallet UI at port ${port}", {

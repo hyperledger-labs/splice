@@ -94,13 +94,7 @@ class PreflightIntegrationTest
 
       click on "create-offer-button"
 
-      // The fully qualified party ID is a mega long string, and it seems like React state is
-      // too slow to fully update before the Selenium script moves on to the other fields.
-      //
-      // This resulted in only partially-complete party strings being sent in the request, and failing weirdly!
-      //
-      // Workaround: send keys one character at a time -- https://stackoverflow.com/a/71697436
-      receiverPartyId.split("").foreach(textField("create-offer-receiver").underlying.sendKeys(_))
+      sendKeysIncrementally(textField("create-offer-receiver"), receiverPartyId)
 
       click on "create-offer-quantity"
       numberField("create-offer-quantity").underlying.sendKeys(quantity)
