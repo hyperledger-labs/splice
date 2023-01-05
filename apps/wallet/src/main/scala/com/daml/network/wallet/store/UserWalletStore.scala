@@ -2,7 +2,6 @@ package com.daml.network.wallet.store
 
 import akka.NotUsed
 import akka.stream.scaladsl.Source
-import com.daml.ledger.javaapi.data.codegen.ContractId
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
@@ -65,14 +64,6 @@ trait UserWalletStore extends FlagCloseable with NamedLogging {
   def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
     acsStore.signalWhenIngested(offset)
 
-  def lookupAcceptedTransferOfferById(
-      cid: ContractId[transferOffersCodegen.AcceptedTransferOffer]
-  ): Future[QueryResult[Option[JavaContract[
-    transferOffersCodegen.AcceptedTransferOffer.ContractId,
-    transferOffersCodegen.AcceptedTransferOffer,
-  ]]]] =
-    acsStore.lookupContractById(transferOffersCodegen.AcceptedTransferOffer.COMPANION)(cid)
-
   def streamAcceptedTransferOffers: Source[
     JavaContract[
       transferOffersCodegen.AcceptedTransferOffer.ContractId,
@@ -81,47 +72,6 @@ trait UserWalletStore extends FlagCloseable with NamedLogging {
     NotUsed,
   ] =
     acsStore.streamContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION)
-
-  def lookupAppPaymentRequestById(
-      cid: ContractId[walletCodegen.AppPaymentRequest]
-  ): Future[QueryResult[
-    Option[
-      JavaContract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]
-    ]
-  ]] =
-    acsStore.lookupContractById(walletCodegen.AppPaymentRequest.COMPANION)(cid)
-
-  def lookupDeliveryOfferById(
-      cid: walletCodegen.DeliveryOffer.ContractId
-  ): Future[QueryResult[
-    Option[JavaContract[walletCodegen.DeliveryOffer.ContractId, walletCodegen.DeliveryOfferView]]
-  ]] =
-    acsStore.lookupContractById(walletCodegen.DeliveryOffer.INTERFACE)(cid)
-
-  def lookupSubscriptionRequestById(
-      cid: ContractId[subsCodegen.SubscriptionRequest]
-  ): Future[QueryResult[
-    Option[
-      JavaContract[subsCodegen.SubscriptionRequest.ContractId, subsCodegen.SubscriptionRequest]
-    ]
-  ]] =
-    acsStore.lookupContractById(subsCodegen.SubscriptionRequest.COMPANION)(cid)
-
-  def lookupSubscriptionIdleStateById(
-      cid: ContractId[subsCodegen.SubscriptionIdleState]
-  ): Future[QueryResult[Option[
-    JavaContract[subsCodegen.SubscriptionIdleState.ContractId, subsCodegen.SubscriptionIdleState]
-  ]]] =
-    acsStore.lookupContractById(subsCodegen.SubscriptionIdleState.COMPANION)(cid)
-
-  def lookupSubscriptionContextById(
-      cid: subsCodegen.SubscriptionContext.ContractId
-  ): Future[QueryResult[
-    Option[
-      JavaContract[subsCodegen.SubscriptionContext.ContractId, subsCodegen.SubscriptionContextView]
-    ]
-  ]] =
-    acsStore.lookupContractById(subsCodegen.SubscriptionContext.INTERFACE)(cid)
 
   def listExpiredTransferOffers(now: CantonTimestamp, limit: Int)(implicit
       ec: ExecutionContext
