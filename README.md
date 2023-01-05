@@ -92,6 +92,7 @@ M3 - TestNet Launch.
     In that case, you will need to verify that all usages of the JDK in 'Settings' and 'Project Structure' use the correct
     SDK.
 * Otherwise choose [these settings in the dialogue](https://i.imgur.com/B3yWCZ9.png) (see sbt explanations [here](https://www.jetbrains.com/help/idea/sbt.html))
+* Note that intellij must be started from within the project directory so the tools from Nix are in PATH.
 
 You should then see a 'sbt shell' window in IntelliJ that allows you to build and test the Scala code while using the
 same package references as nix. If IntelliJ asks you at the end if you want to overwrite any previous `.idea/*` files, say yes.
