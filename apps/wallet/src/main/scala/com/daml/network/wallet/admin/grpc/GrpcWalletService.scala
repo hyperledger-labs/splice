@@ -174,8 +174,7 @@ class GrpcWalletService(
           userStore <- getUserStore(user)
           result <- exerciseWalletCoinAction(
             new coinoperation.CO_Tap(
-              userStore.key.endUserParty.toProtoPrimitive,
-              quantity,
+              quantity
             ),
             user,
             (outcome: coinoperationoutcome.COO_Tap) =>

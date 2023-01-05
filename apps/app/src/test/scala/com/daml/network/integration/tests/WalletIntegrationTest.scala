@@ -67,7 +67,7 @@ class WalletIntegrationTest
           forAtLeast(1, entries)(
             // .. and we see that the empty batch is skipped.
             _.message should include(
-              "Found no valid coin operations after running lookups"
+              "Coin operation batch was empty after filtering"
             )
           )
         },

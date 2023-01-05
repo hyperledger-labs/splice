@@ -50,11 +50,11 @@ abstract class Trigger[T: Pretty](implicit
 
   /**  How to complete a task.
     *
-    * This MUST take all the actions necessary such that 'isStaleTask' returns false after successful completion.
+    * This MUST take all the actions necessary such that 'isStaleTask' returns true after successful completion.
     * We do not support tasks that should be retried after a specific delay. If you do need such support,
     * then we recommend changing the Daml workflows such that the ledger records that the task has been postponed.
     *
-    * We make this decision to always require a task-handler to make  progress to avoid problems with restarts
+    * We make this decision to always require a task-handler to make progress to avoid problems with restarts
     * and slow-downs from too eager polling of tasks.
     *
     * If you find an example where that is not possible, then let's talk :)
@@ -63,7 +63,7 @@ abstract class Trigger[T: Pretty](implicit
     */
   protected def completeTask(task: T)(implicit tc: TraceContext): Future[String]
 
-  /** How to check whether a task has become stale and can be skipped.
+  /** Check whether a task has become stale and can be skipped.
     *
     * Note that a task can become stale for reasons other than 'completeTask' succeeding,
     * as there can be concurrent actions submitted to the ledger that make the task stale;
@@ -200,7 +200,9 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
 
 }
 
-/** A trigger for processing contract create events. */
+/** A trigger for processing contract create events.
+  * This trigger assumes that the created contract is archived as part of processing it.
+  */
 abstract class OnCreateTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
     acs: AcsStore,
     templateCompanion: ContractCompanion[TC, TCid, T],
@@ -281,7 +283,7 @@ abstract class PollingTrigger[T: Pretty]()(implicit
           }
 
           def loopWithDelay(): Future[Unit] = LoggerUtil.logOnThrow {
-            // Construct a promise that captures whether enough time has passed or we are shutting down
+            // Construct a promise that captures whether enough time has passed or whether we are shutting down
             val continueOrShutdownSignal = Promise[UnlessShutdown[Unit]]()
             continueOrShutdownSignal
               .completeWith(

@@ -409,6 +409,45 @@ testInsufficientFundsBatchCCPaymentRequests = script do
 
   pure ()
 
+
+-- Smoke test - this functionality is tested more extensively in the WalletIntegrationTests
+testCO_MergeTransferInputs : Script ()
+testCO_MergeTransferInputs = script do
+  app <- setupApp
+  runNextIssuance app
+  runCoinDepositBots app
+
+  validator <- setupValidator app "validator1"
+  provider <- setupUser app "provider" validator
+  alice <- setupUser app "alice" validator
+  bob <- setupUser app "bob" validator
+  coin <- tap app alice 42.0
+  coin2 <- tap app alice 43.0
+
+
+  install <- submitMulti [alice.primaryParty, validator] [] $ createCmd $ WalletAppInstall with
+    -- for simplicity, alice is service and end-user
+    walletServiceParty = alice.primaryParty
+    endUserParty = alice.primaryParty
+    endUserName = "wallet_service_participant_user"
+    svcParty = app.svc
+    validatorParty = validator
+
+  
+  context <- getPaymentTransferContext app alice
+
+  outcomes <- submitUser alice.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
+    inputs = [API.InputCoin $ toInterfaceContractId coin, API.InputCoin $ toInterfaceContractId coin2]
+    operations = [CO_MergeTransferInputs]
+    context
+
+  let [COO_MergeTransferInputs (Some resultCoin)] = outcomes
+  aliceCoins <- query @Coin alice.primaryParty
+  let [(mergedCoinCid, _), _] = aliceCoins
+  resultCoin === (toInterfaceContractId @API.Coin mergedCoinCid)
+
+  pure ()
+
 testInsufficientFundsBatchSubscriptions : Script ()
 testInsufficientFundsBatchSubscriptions = script do
   app <- setupApp

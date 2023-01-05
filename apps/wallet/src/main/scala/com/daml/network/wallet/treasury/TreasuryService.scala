@@ -5,9 +5,16 @@ import akka.stream.QueueOfferResult.{Dropped, Enqueued, QueueClosed}
 import akka.stream.scaladsl.{Keep, Sink, Source}
 import akka.stream.{BoundedSourceQueue, Materializer, QueueOfferResult}
 import cats.syntax.traverse.*
+import com.daml.ledger.javaapi.data.codegen.Exercised
 import com.daml.network.codegen.java.cc.api.v1
+import com.daml.network.codegen.java.cc.api.v1.coin.{PaymentTransferContext, TransferInput}
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cn.wallet.install.coinoperation
+import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_MergeTransferInputs
+import com.daml.network.codegen.java.cn.wallet.install.{
+  CoinOperationOutcome,
+  WalletAppInstall,
+  coinoperation,
+}
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as walletCodegen,
@@ -15,8 +22,8 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.environment.{CoinLedgerConnection, CoinRetries}
-import com.daml.network.util.HasHealth
 import com.daml.network.util.PrettyInstances.*
+import com.daml.network.util.{HasHealth, JavaContract}
 import com.daml.network.wallet.UserWalletManager
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.UserWalletStore
@@ -24,7 +31,7 @@ import com.daml.network.wallet.treasury.TreasuryService.*
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.FlagCloseable
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
-import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
+import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging, TracedLogger}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
@@ -35,6 +42,7 @@ import io.opentelemetry.api.trace.Tracer
 import java.util.concurrent.atomic.AtomicBoolean
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 import scala.util.{Failure, Success}
 
 /** This class encapsulates the logic that sequences all operations which change the coin holdings of an user such
@@ -64,8 +72,8 @@ class TreasuryService(
       _ => {
         val queue = Source
           .queue[EnqueuedCoinOperation](treasuryConfig.queueSize)
-          .batch(treasuryConfig.batchSize.toLong, operation => Seq(operation))(
-            (operations, operation) => operations :+ operation
+          .batch(treasuryConfig.batchSize.toLong, operation => CoinOperationBatch(operation))(
+            (batch, operation) => batch.addCOToBatch(operation)
           )
           // Execute the batches sequentially to avoid contention
           .mapAsync(1)(executeBatchWithRetry)
@@ -130,12 +138,12 @@ class TreasuryService(
   }
 
   /** Find all operations that have become stale and complete them with their failure.
-    * Thereby removing them from the next iteration of batch execution.
+    * This effectively removes these operations from the next retry of executing the batch.
     */
-  private def completeAndRemoveStaleOperations(
-      batch: Seq[EnqueuedCoinOperation]
+  private def completeStaleOperations(
+      batch: CoinOperationBatch
   )(implicit tc: TraceContext): Future[Done] = {
-    batch
+    batch.operationsToRun
       .traverse { op =>
         tryLookupCoinOperation(op.operation)
           .transform {
@@ -165,7 +173,7 @@ class TreasuryService(
     * Implementation:
     * If a required contract is not found, the future should fail with an appropriate
     * [[io.grpc.StatusRuntimeException]].
-    * We execute `completeAndRemoveStaleOperations` after every batch that failed.
+    * We execute `completeStaleOperations` after every batch that failed.
     */
   private def tryLookupCoinOperation(op0: installCodegen.CoinOperation): Future[Unit] = op0 match {
     case op: coinoperation.CO_SubscriptionAcceptAndMakeInitialPayment =>
@@ -205,6 +213,8 @@ class TreasuryService(
         )
       } yield ()
 
+    case _: coinoperation.CO_MergeTransferInputs => Future.unit
+
     case _: coinoperation.CO_Tap => Future.unit
 
     case op => throw new NotImplementedError(show"Unexpected coin operation: $op")
@@ -215,8 +225,18 @@ class TreasuryService(
     * to the wallet app.
     */
   private def executeBatchWithRetry(
-      batch: Seq[EnqueuedCoinOperation]
-  )(implicit tc: TraceContext): Future[Done] =
+      batch: CoinOperationBatch
+  )(implicit tc: TraceContext): Future[Done] = {
+    def completeWithUnexpectedFailure(op: EnqueuedCoinOperation) =
+      // Need to use tryComplete as some of them might have been completed already due to being stale
+      op.outcomePromise.tryComplete(
+        Failure(
+          Status.INTERNAL
+            .withDescription("Unexpected coin operation execution failure.")
+            .asRuntimeException()
+        )
+      )
+
     withSpan("executeBatchWithRetry") { implicit tc => _ =>
       retryProvider
         .retryForAutomation(
@@ -231,39 +251,34 @@ class TreasuryService(
           } else
             logger.error("Skipping batch due to unexpected execution failure", ex)
           // Complete all operations of this batch
-          batch.foreach(op =>
-            // Need to use tryComplete as some of them might have been completed already due to being stale
-            op.outcomePromise.tryComplete(
-              Failure(
-                Status.INTERNAL
-                  .withDescription("Unexpected coin operation execution failure.")
-                  .asRuntimeException()
-              )
-            )
-          )
+          batch.nonMergeOperations.foreach(completeWithUnexpectedFailure)
+          batch.mergeOperationOpt.foreach(completeWithUnexpectedFailure)
           Done
         })
     }
+  }
 
-  private def executeBatch(
-      batch0: Seq[EnqueuedCoinOperation]
-  )(implicit tc: TraceContext): Future[Done] = {
-    // Remove all operations from the batch whose promise has already been completed.
-    // We use this approach as the retry infrastructure retries a fixed operation, and we want to avoid
-    // introducing more mutable state that can go awry.
-    // We accept the cost of repeatedly filtering the batch, as batches are expected to be small.
-    val batch = batch0.filter(!_.outcomePromise.isCompleted)
-    logger.debug(
-      show"Running batch of coin operations:\n$batch"
-    )
-
-    def isErrorOutcome(outcome: installCodegen.CoinOperationOutcome): Boolean = outcome match {
+  private def isErrorOutcome(outcome: installCodegen.CoinOperationOutcome): Boolean =
+    outcome match {
       case _: installCodegen.coinoperationoutcome.COO_Error => true
       case _ => false
     }
 
-    if (batch.isEmpty) {
-      logger.debug("Found no valid coin operations after running lookups.")
+  private def executeBatch(
+      unfilteredBatch: CoinOperationBatch
+  )(implicit tc: TraceContext): Future[Done] = {
+
+    // Remove all operations from the batch whose promise has already been completed.
+    // We use this approach as the retry infrastructure retries a fixed operation, and we want to avoid
+    // introducing more mutable state that can go awry.
+    // We accept the cost of repeatedly filtering the batch, as batches are expected to be small.
+    val filteredBatch = unfilteredBatch.computeFilteredBatch
+    logger.debug(
+      show"Running batch of coin operations:\n$filteredBatch"
+    )
+
+    if (filteredBatch.isEmpty) {
+      logger.debug("Coin operation batch was empty after filtering. ")
       Future.successful(Done)
     } else {
       val now = clock.now
@@ -272,41 +287,20 @@ class TreasuryService(
         activeIssuingRounds = transferContext.context.issuingMiningRounds.asScala.keys.toSet
         install <- getInstall
         (inputs, readAs) <- selectTransferInputs(activeIssuingRounds)
-        cmd =
-          install.contractId.exerciseWalletAppInstall_ExecuteBatch(
-            transferContext,
-            inputs.asJava,
-            batch.map(_.operation).asJava,
-          )
-
-        (offset, outcomes) <- connection
-          // TODO(M3-02): as of 2022-11-25 there are two operations that are not self-conflicting: Tap and DirectTransfer,
-          // which implies that network problems might lead to duplicate 'DirectTransfer' calls. They will be replaced by
-          // TransferOffers as part of M3-02, which will consume the TransferOffer, and thus make the batch-execution w/o command dedup safe.
-          .submitWithResultAndOffsetNoDedup(
-            Seq(walletManager.store.key.walletServiceParty),
-            walletManager.store.key.validatorParty +: userStore.key.endUserParty +: readAs.toSeq,
-            cmd,
-          )
-        // return all outcomes to the callers
-        _ = (outcomes.exerciseResult.asScala zip batch).map { case (outcome, op) =>
-          logger.debug(show"Completing operation $op with result ${outcome.toValue}")
-          op.outcomePromise.success(outcome)
-        }
-        // wait for store to ingest the new coin holdings *provided* they were updated
-        case () <- if (outcomes.exerciseResult.asScala.forall(isErrorOutcome)) {
-          // We must not wait in this case, as the store won't see that offset until the next action comes,
-          // as the transaction filter is in the way
-          // TODO(tech-debt): remove this fragility of depending on the exact daml transaction to determine whether to wait or not
-          Future.unit
-        } else {
-          logger.debug(show"Waiting for store to ingest offset ${offset.singleQuoted}")
-          userStore.signalWhenIngested(offset)
-        }
-      } yield Done
+        res <-
+          // skip execution of the batch, if its only purpose is to merge the inputs, but the inputs are already merged.
+          if (inputs.length == 1 && filteredBatch.isMergeOnly) {
+            filteredBatch.mergeOperationOpt.foreach(
+              _.outcomePromise.trySuccess(new COO_MergeTransferInputs(None.toJava))
+            )
+            Future.successful(Done)
+          } else {
+            executeFilteredBatch(install, transferContext, inputs, filteredBatch, readAs)
+          }
+      } yield res
       batchExecutionF.recoverWith(ex => {
         logger.info("Checking staleness of coin operations, as batch execution failed", ex)
-        completeAndRemoveStaleOperations(batch).transform {
+        completeStaleOperations(filteredBatch).transform {
           case Failure(exStale) =>
             logger.error("Ignoring unexpected exception during staleness check", exStale)
             throw ex
@@ -315,6 +309,45 @@ class TreasuryService(
         }
       })
     }
+  }
+
+  /** Helper method to execute a batch that already has been filtered to only contain uncompleted operations.
+    * Note that for performance reasons, we assume that all operations in a batch are uncompleted on its initial
+    * submission and only look for stale operations that can be marked as complete after the initial batch execution
+    * submission failed.
+    */
+  private def executeFilteredBatch(
+      install: JavaContract[WalletAppInstall.ContractId, WalletAppInstall],
+      transferContext: PaymentTransferContext,
+      inputs: Seq[TransferInput],
+      batch: CoinOperationBatch,
+      readAs: Set[PartyId],
+  )(implicit tc: TraceContext) = {
+    val cmd = batch.computeExecuteBatchCmd(install, transferContext, inputs)
+    for {
+      (offset, outcomes) <- connection
+        // TODO(M3-02): as of 2022-11-25 there are two operations that are not self-conflicting: Tap and DirectTransfer,
+        // which implies that network problems might lead to duplicate 'DirectTransfer' calls. They will be replaced by
+        // TransferOffers as part of M3-02, which will consume the TransferOffer, and thus make the batch-execution w/o command dedup safe.
+        .submitWithResultAndOffsetNoDedup(
+          Seq(walletManager.store.key.walletServiceParty),
+          walletManager.store.key.validatorParty +: userStore.key.endUserParty +: readAs.toSeq,
+          cmd,
+        )
+      // return all outcomes to the callers
+      _ = batch.completeBatchOperations(outcomes)(logger, tc)
+
+      // wait for store to ingest the new coin holdings *provided* they were updated
+      case () <- if (outcomes.exerciseResult.asScala.forall(isErrorOutcome)) {
+        // We must not wait in this case, as the store won't see that offset until the next action comes,
+        // as the transaction filter is in the way
+        // TODO(tech-debt): remove this fragility of depending on the exact daml transaction to determine whether to wait or not
+        Future.unit
+      } else {
+        logger.debug(show"Waiting for store to ingest offset ${offset.singleQuoted}")
+        userStore.signalWhenIngested(offset)
+      }
+    } yield Done
   }
 
   /** Select transfer inputs to satisfy the coin operations.
@@ -377,6 +410,93 @@ class TreasuryService(
 }
 
 object TreasuryService {
+
+  /** Helper class for the batches of coin operations executed by the treasury service.
+    * Mainly introduced to handle to cleanly separate the logic around managing CO_MergeTransferInputs.
+    *
+    * @param mergeOperationOpt tracks the CO_MergeTransferInputs operation if there is one as part of the batch.
+    *                           tracked separately because it doesn't make sense for there
+    *                           to be multiple merge operations in a single batch.
+    */
+  private case class CoinOperationBatch(
+      mergeOperationOpt: Option[EnqueuedCoinOperation],
+      nonMergeOperations: Seq[EnqueuedCoinOperation],
+  ) extends PrettyPrinting {
+    override def pretty: Pretty[CoinOperationBatch.this.type] = prettyOfClass(
+      param("mergeOperationOpt", _.mergeOperationOpt),
+      param("nonMergeOperations", _.nonMergeOperations),
+    )
+
+    /** Computes the coin operations that should be run on the ledger given the current batch state. */
+    lazy val operationsToRun: Seq[EnqueuedCoinOperation] = {
+      // if the batch is only a merge-operation - run that - else use the nonMergeOperations and don't include the
+      // mergeOperation
+      if (isMergeOnly) mergeOperationOpt.toList else nonMergeOperations
+    }
+
+    lazy val isEmpty: Boolean = operationsToRun.isEmpty
+
+    def computeFilteredBatch: CoinOperationBatch = {
+      CoinOperationBatch(
+        mergeOperationOpt,
+        nonMergeOperations.filter(!_.outcomePromise.isCompleted),
+      )
+    }
+
+    def isMergeOnly: Boolean = mergeOperationOpt.isDefined && nonMergeOperations.isEmpty
+    def addCOToBatch(operation: EnqueuedCoinOperation): CoinOperationBatch = {
+      val isMergeOp = isCO_MergeTransferInputs(operation)
+      mergeOperationOpt match {
+        case None if isMergeOp => CoinOperationBatch(Some(operation), nonMergeOperations)
+        case Some(_) if isMergeOp =>
+          // if we already have a merge operation in this batch; complete the new one immediately and
+          // don't add it to the batch
+          operation.outcomePromise.success(new COO_MergeTransferInputs(None.toJava))
+          this
+        case _ =>
+          CoinOperationBatch(mergeOperationOpt, nonMergeOperations :+ operation)
+      }
+    }
+
+    def computeExecuteBatchCmd(
+        install: JavaContract[WalletAppInstall.ContractId, WalletAppInstall],
+        transferContext: PaymentTransferContext,
+        inputs: Seq[TransferInput],
+    ) = {
+      install.contractId.exerciseWalletAppInstall_ExecuteBatch(
+        transferContext,
+        inputs.asJava,
+        operationsToRun.map(_.operation).asJava,
+      )
+    }
+
+    def completeBatchOperations(
+        outcomes: Exercised[java.util.List[CoinOperationOutcome]]
+    )(implicit logger: TracedLogger, tc: TraceContext) = {
+      (outcomes.exerciseResult.asScala zip operationsToRun).foreach { case (outcome, op) =>
+        logger.debug(show"Completing operation $op with result ${outcome.toValue}")
+        op.outcomePromise.success(outcome)
+      }
+      // if this is not a merge-only batch, the maybe-existing merge wasn't included in the batch and thus still needs to be
+      // completed.
+      if (!isMergeOnly)
+        mergeOperationOpt.foreach(op =>
+          op.outcomePromise.success(new COO_MergeTransferInputs(None.toJava))
+        )
+    }
+  }
+
+  private object CoinOperationBatch {
+    def apply(operation: EnqueuedCoinOperation): CoinOperationBatch = {
+      CoinOperationBatch(None, Seq.empty).addCOToBatch(operation)
+    }
+  }
+
+  private def isCO_MergeTransferInputs(enqueued: EnqueuedCoinOperation): Boolean =
+    enqueued.operation match {
+      case _: coinoperation.CO_MergeTransferInputs => true
+      case _ => false
+    }
 
   private case class EnqueuedCoinOperation(
       operation: installCodegen.CoinOperation,
