@@ -30,6 +30,7 @@
     1. [Running the Wallet and Splitwise Frontend](#running-the-wallet-and-splitwise-frontend)
 1. [Auth0 Configuration](#auth0-configuration)
     1. [Tenant & Application Layout](#tenant-Application-layout)
+1. [CircleCI Tokens](#circleci-tokens)
 
 For information on the runtime configuration of a Canton Network
 cluster, please see the [cluster specific documentation](/cluster/README.md).
@@ -583,14 +584,103 @@ We use Auth0 as our IAM integration & OAuth provider for applications we (as DA/
 Currently we maintain two tenants with some application clients in them:
 
 1. `canton-network-test`: A tenant dedicated for test environments
-    - `Local Wallet UI`: An application to support wallet UIs running on localhost
-    - `Ledger API (Test Application)`: This is a machine-to-machine client that issues tokens for the ledger API to app backends
-    - `Ledger API`: The Custom API definition that allows users to request tokens with the proper audience
+    - `API Explorer Application`: We use this for getting auth0 management tokens, which we need for creating test users for integration tests.
+    - `Local Auth`: An application to support auth0 auth for all frontends running on localhost
 2. `canton-network-dev`: The tenant dedicated for our cluster deployments
-    - `Validator1 Auth`: A monolith application that supports all validator1-hosted UIs (Splitwise, Directory, and Wallet) running on all cluster deployments (scratch, staging, dev, and test)
+    - `API Explorer Application`: We use this for getting auth0 management tokens, which we need for creating test users for the preflight check.
     - `CN validator backend`: An application for all validator app backends running on all cluster deployments (scratch, staging, dev, and test)
     - `CN wallet backend`: An application for all wallet app backends running on all cluster deployments (scratch, staging, dev, and test)
     - `SPA Experiment`: An application for the SPA experiment located in `/experiments/auth0-spa` in this repository
-    - `API Explorer Machine`: An application that was created by default when the tenant was made. Currently unused, but we may wish to use this in the future for getting tokens for automating application client management
+    - `Validator1 Auth`: A monolith application that supports all validator1-hosted UIs (Splitwise, Directory, and Wallet) running on all cluster deployments (scratch, staging, dev, and test)
 
 If you don't have access to either tenant, give a shout in the #team-canton-network-internal Slack channel. Any admin of the tenant may invite anyone else (and everyone is an admin by default). 
+
+## CircleCI Tokens
+
+Our CI setup requires access to a number of secrets. This section documents how they have been created
+so they can easily be rotated if needed.
+
+All secrets are managed through https://app.circleci.com/settings/project/github/DACH-NY/the-real-canton-coin/environment-variables.
+
+### Auth0 Tokens
+
+Required by some of our tests to access the auth0 admin APIs.
+
+We have:
+
+- `AUTH0_MANAGEMENT_API_CLIENT_ID` and `_SECRET` which are used for tests against our clusters and currently correspond to the `API Explorer Application` configured in our `canton-network-dev` auth0 tenant
+- `AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID` and `_SECRET` which are used for integration tests and currently correspond to the `API Explorer Application` configured in our `canton-test-dev` auth0 tenant
+
+For both, you can get the ID and the secret from the settings page of the respective auth0 application,
+where you can also rotate the secret (bottom of the page).
+
+An important note on security:
+If one of above credentials was compromised, then you should treat all auth0 based authentication as compromised.
+
+This is because the auth0 management API that can be accessed with these credentials can be used by an attacker to [obtain client secrets](https://auth0.com/docs/api/management/v2#!/Clients/get_clients_by_id), which can then be exchanged for long-living access tokens.
+
+To restore security, you must perform the following steps:
+
+#### Step 1: rotate all secrets that can be used to gain new access tokens
+
+On the auth0 web page, go to "Application" and press the button at the bottom of each applications settings page to rotate the client secret for that application.
+
+After rotating all client secrets in this way, update all clusters via `cncluster update_secrets`.
+
+#### Step 2: revoke all existing access tokens by revoking the token signing key
+
+Our M2M access tokens are valid for a long time (currently 30 days). If you suspect that an attacker might have gained a M2M access token, you need to revoke all of them.
+
+Use "Tenant Settings" -> "Signing Keys" -> "Rotate & Revoke Key" on the auth0 web page to revoke and rotate the secret used to digitally sign access tokens.
+
+Note that unless you restart the participant servers (next step),
+it can take up to 10h before the ledger API server stops accepting tokens signed with revoked keys,
+because of [caching of JWKS documents](https://github.com/digital-asset/daml/blob/main/libs-scala/jwt/src/main/scala/com/digitalasset/jwt/JwksVerifier.scala#L36).
+
+#### Step 3: restart all services
+
+To ensure that all services use the updated secrets and distrust the revoked keys, perform a `cncluster reset` for each cluster.
+
+### CircleCI Token
+
+Required by the `wait_for_previous_pipeline` job.
+
+Create a new token from
+https://app.circleci.com/settings/user/tokens. Make sure that you are
+logged in as a user that has access to this repository.
+
+### GCP Token
+
+Required for cluster deployments.
+
+Go to https://console.cloud.google.com/iam-admin/serviceaccounts?referrer=search&project=da-cn-images, select the `circleci@*` service account
+and create a new key through `manage keys` and revoke the old one. The full JSON file needs to be put in the corresponding circleci environment variables.
+
+The above creates the key for `GCP_DA_CN_IMAGES_KEY`, for `GCP_DA_CN_DEVNET_KEY` and `GCP_DA_CN_SCRATCHNET_KEY` change the project in the drop down at the top
+and go through the same steps.
+
+### Github Tokens
+
+The `GITHUB_TOKEN` is used by the [TODO checker](.circleci/todo-script/src/checkTodos.sc) to access the issue and PR list
+of the https://github.com/DACH-NY/the-real-canton-coin repo.
+
+1. Go to https://github.com/settings/tokens, which you can reach by navigating
+   the GitHub UI as follows:
+
+   1. Click on your user icon and select "Settings" in the dropdown menu to go to your profile page: https://github.com/settings/profile
+   2. Click on "Developer Settings" on the bottom-left item to go to https://github.com/settings/apps
+   3. Click on "Personal access tokens > Tokens (classic)" to go to https://github.com/settings/tokens
+
+2. Click on "Generate new token" to generate an access token with full access
+   to private repos. Choose an expiration time of 90
+   days and set a reminder in your own TODO manager to refresh it.
+   ![Screenshot of token settings](readme/images/github-token-create-dialog.png)
+
+3. Create the token and copy its content to the clipboard.
+
+4. Enable SSO for the `DACH-NY` organization in the token overview page by
+   clicking on the "Configure SSO" button. The result should look as follows:
+   ![Screenshot of SSO settings](readme/images/github-token-sso-setup.png)
+
+5. Create or replace the `GITHUB_TOKEN` environment variable in CircleCI
+   and set its value to the copied token as-is.
