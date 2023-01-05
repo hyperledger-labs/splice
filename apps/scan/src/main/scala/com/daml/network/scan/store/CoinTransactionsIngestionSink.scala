@@ -51,7 +51,10 @@ class CoinTransactionsIngestionSink(
       tree <- connection.tryGetTransactionTreeById(Seq(party), tx.getTransactionId)
       events <- traverseForest(tree)
       metadata = TransactionMetadata(tx)
-      _ <- store.addTransaction(CoinTransaction(events, metadata))
+      _ <-
+        if (events.nonEmpty) {
+          store.addTransaction(CoinTransaction(events, metadata))
+        } else Future.successful(())
     } yield ()
   }
 

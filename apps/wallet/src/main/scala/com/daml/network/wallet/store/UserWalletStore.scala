@@ -1,14 +1,19 @@
 package com.daml.network.wallet.store
 
+import scala.jdk.CollectionConverters.*
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cn.directory as directoryCodegen
+import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
+import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
+import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.store.AcsStore
 import com.daml.network.util.{CoinUtil, JavaContract}
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
@@ -182,7 +187,7 @@ object UserWalletStore {
 
   /** Contract of a wallet store for a specific wallet-service party. */
   def contractFilter(key: Key): AcsStore.ContractFilter = {
-    import AcsStore.mkFilter
+    import AcsStore.{InterfaceImplementation, mkFilter}
     val endUser = key.endUserParty.toProtoPrimitive
     val svc = key.svcParty.toProtoPrimitive
 
@@ -266,13 +271,53 @@ object UserWalletStore {
         ),
       ),
       Map(
-        mkFilter(subsCodegen.SubscriptionContext.INTERFACE)(co =>
-          co.payload.svc == svc &&
-            co.payload.sender == endUser
+        mkFilter(subsCodegen.SubscriptionContext.INTERFACE)(
+          co =>
+            co.payload.svc == svc &&
+              co.payload.sender == endUser,
+          Seq(
+            InterfaceImplementation(directoryCodegen.DirectoryEntryContext.COMPANION)(ctx =>
+              new subsCodegen.SubscriptionContextView(
+                ctx.svc,
+                ctx.user,
+                s"""Directory entry: "${ctx.name}"""",
+              )
+            ),
+            InterfaceImplementation(testSubsCodegen.TestSubscriptionContext.COMPANION)(ctx =>
+              new subsCodegen.SubscriptionContextView(
+                ctx.svc,
+                ctx.user,
+                ctx.description,
+              )
+            ),
+          ),
         ),
-        mkFilter(walletCodegen.DeliveryOffer.INTERFACE)(co =>
-          co.payload.svc == svc &&
-            co.payload.sender == endUser
+        mkFilter(walletCodegen.DeliveryOffer.INTERFACE)(
+          co =>
+            co.payload.svc == svc &&
+              co.payload.sender == endUser,
+          Seq(
+            InterfaceImplementation(
+              splitwiseCodegen.TransferInProgress.COMPANION
+            )(offer =>
+              new walletCodegen.DeliveryOfferView(
+                offer.group.svc,
+                offer.sender,
+                s"Transfer from '${offer.sender}' to [${offer.receiverQuantities.asScala
+                    .map(r => s"'${r.receiver}'")
+                    .mkString(", ")}]",
+              )
+            ),
+            InterfaceImplementation(
+              testWalletCodegen.TestDeliveryOffer.COMPANION
+            )(offer =>
+              new walletCodegen.DeliveryOfferView(
+                offer.svc,
+                offer.sender,
+                offer.description,
+              )
+            ),
+          ),
         ),
       ),
     )

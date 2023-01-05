@@ -462,6 +462,9 @@ lazy val `apps-wallet` =
       `apps-scan` % "compile->compile;test->test",
       `apps-validator` % "compile->compile;test->test",
       `wallet-daml`,
+      // TODO (M3-18) Remove this once we have multi-domain interface support.
+      `directory-daml`,
+      `splitwise-daml`,
     )
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),

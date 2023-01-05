@@ -31,6 +31,7 @@ import com.daml.ledger.javaapi.data.{
   GetActiveContractsResponse,
   GetTransactionsRequest,
   GetTransactionsResponse,
+  GetTransactionTreesResponse,
   GetUserRequest,
   GrantUserRightsRequest,
   ListUserRightsRequest,
@@ -123,6 +124,14 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     ClientAdapter
       .serverStreaming(request.toProto, transactionServiceStub.getTransactions)
       .map(GetTransactionsResponse.fromProto)
+  }
+
+  def transactionTrees(
+      request: GetTransactionsRequest
+  ): Source[GetTransactionTreesResponse, NotUsed] = {
+    ClientAdapter
+      .serverStreaming(request.toProto, transactionServiceStub.getTransactionTrees)
+      .map(GetTransactionTreesResponse.fromProto)
   }
 
   private def submitAndWaitRequest(

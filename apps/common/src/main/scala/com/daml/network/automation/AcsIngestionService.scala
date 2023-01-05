@@ -1,5 +1,6 @@
 package com.daml.network.automation
 
+import com.digitalasset.canton.topology.PartyId
 import com.daml.ledger.javaapi.data.LedgerOffset
 import com.daml.network.environment.{CoinLedgerConnection, CoinLedgerSubscription, CoinRetries}
 import com.daml.network.store.AcsStore
@@ -9,6 +10,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 class AcsIngestionService(
     name: String,
@@ -39,7 +41,7 @@ class AcsIngestionService(
     } yield connection.subscribeAsync(
       s"AcsIngestion($name)",
       new LedgerOffset.Absolute(subscribeFrom),
-      txFilter,
+      txFilter.getParties.asScala.toSeq.map(PartyId.tryFromProtoPrimitive(_)),
     )(
       // Ingest every transaction as we get it.
       ingestionSink.ingestTransaction(_)

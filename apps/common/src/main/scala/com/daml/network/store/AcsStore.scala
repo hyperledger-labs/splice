@@ -1,5 +1,6 @@
 package com.daml.network.store
 
+import com.daml.ledger.javaapi.data.codegen.Contract as CodegenContract
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.ledger.javaapi.data.codegen.{
@@ -29,6 +30,7 @@ import io.grpc.Status
 
 import scala.collection.immutable
 import scala.concurrent.{ExecutionContext, Future}
+import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.*
 
 /** A store for querying active contract sets.
@@ -184,6 +186,42 @@ trait AcsStore extends AutoCloseable {
 
 object AcsStore {
 
+  // TODO (M3-18) Remove the hacky interface decoding machinery once we have proper interface support for multi-domain.
+  abstract class InterfaceDecoder {
+    def fromCreatedEvent[I, Id <: ContractId[I], View <: DamlRecord[_]](
+        companion: InterfaceCompanion[I, Id, View]
+    )(ev: CreatedEvent): Option[JavaContract[Id, View]]
+  }
+
+  final case class InterfaceImplementation[I, Id <: ContractId[I], View <: DamlRecord[
+    _
+  ], TC <: CodegenContract[TCid, Tmpl], TCid <: ContractId[Tmpl], Tmpl <: Template](
+      companion: ContractCompanion[TC, TCid, Tmpl],
+      view: Tmpl => View,
+  ) {
+    def toInterfaceContract(
+        interfaceCompanion: InterfaceCompanion[I, Id, View]
+    )(ev: CreatedEvent): JavaContract[Id, View] = {
+      val templateContract: JavaContract[TCid, Tmpl] =
+        JavaContract.fromCodegenContract[TCid, Tmpl](companion.fromCreatedEvent(ev))
+      JavaContract[Id, View](
+        interfaceCompanion.TEMPLATE_ID,
+        interfaceCompanion.toContractId(new ContractId(templateContract.contractId.contractId)),
+        view(templateContract.payload),
+      )
+    }
+  }
+
+  object InterfaceImplementation {
+    def apply[I, Id <: ContractId[I], View <: DamlRecord[_], TC <: CodegenContract[
+      TCid,
+      Tmpl,
+    ], TCid <: ContractId[Tmpl], Tmpl <: Template](
+        companion: ContractCompanion[TC, TCid, Tmpl]
+    ): (Tmpl => View) => InterfaceImplementation[I, Id, View, TC, TCid, Tmpl] =
+      view => InterfaceImplementation(companion, view)
+  }
+
   def apply(storage: Storage, loggerFactory: NamedLoggerFactory, scope: ContractFilter)(implicit
       ec: ExecutionContext
   ): AcsStore =
@@ -244,13 +282,18 @@ object AcsStore {
 
     /** Whether the scope might contain an event of the given interface. */
     def mightContain[I, Id, View](interfaceCompanion: InterfaceCompanion[I, Id, View]): Boolean
+
+    def decodeInterface[I, Id <: ContractId[I], View <: DamlRecord[_]](
+        interfaceCompanion: InterfaceCompanion[I, Id, View]
+    )(ev: CreatedEvent): Option[JavaContract[Id, View]]
   }
 
   /** A helper to easily construct a [[ContractFilter]] for a single party. */
   case class SimpleContractFilter(
       primaryParty: PartyId,
       templateFilters: immutable.Map[Identifier, CreatedEvent => Boolean],
-      interfaceFilters: immutable.Map[Identifier, CreatedEvent => Boolean] = Map.empty,
+      interfaceFilters: immutable.Map[Identifier, (CreatedEvent => Boolean, InterfaceDecoder)] =
+        Map.empty,
   ) extends ContractFilter {
 
     override val transactionFilter: TransactionFilter = {
@@ -267,9 +310,8 @@ object AcsStore {
 
     override def contains(ev: CreatedEvent): Boolean =
       templateFilters.get(ev.getTemplateId).exists(evPredicate => evPredicate(ev)) ||
-        ev.getInterfaceViews.keySet.asScala.exists { i =>
-          interfaceFilters.get(i).exists(evPredicate => evPredicate(ev))
-        }
+        // TODO (M3-18) Avoid linear search once we have proper interface support in multi-domain.
+        interfaceFilters.exists { case (_, (evPredicate, _)) => evPredicate(ev) }
 
     override def mightContain[TC, TCid, T](
         templateCompanion: ContractCompanion[TC, TCid, T]
@@ -280,6 +322,13 @@ object AcsStore {
         interfaceCompanion: InterfaceCompanion[I, Id, View]
     ): Boolean =
       interfaceFilters.contains(interfaceCompanion.TEMPLATE_ID)
+
+    override def decodeInterface[I, Id <: ContractId[I], View <: DamlRecord[_]](
+        interfaceCompanion: InterfaceCompanion[I, Id, View]
+    )(ev: CreatedEvent): Option[JavaContract[Id, View]] =
+      interfaceFilters.get(interfaceCompanion.TEMPLATE_ID).flatMap { case (_, decoder) =>
+        decoder.fromCreatedEvent(interfaceCompanion)(ev)
+      }
   }
 
   /** Construct a contract filter for input into a [[SimpleContractFilter]]. */
@@ -297,10 +346,40 @@ object AcsStore {
   def mkFilter[I, Id <: ContractId[I], View <: DamlRecord[_]](
       interfaceCompanion: InterfaceCompanion[I, Id, View]
   )(
-      p: JavaContract[Id, View] => Boolean
-  ): (Identifier, CreatedEvent => Boolean) =
+      p: JavaContract[Id, View] => Boolean,
+      implementations: Seq[InterfaceImplementation[I, Id, View, _, _, _]],
+  ): (Identifier, (CreatedEvent => Boolean, InterfaceDecoder)) = {
+    val decoder: InterfaceDecoder = new InterfaceDecoder {
+
+      val implementationViews: Map[Identifier, CreatedEvent => JavaContract[Id, View]] =
+        implementations.map { i =>
+          i.companion.TEMPLATE_ID -> i.toInterfaceContract(interfaceCompanion)
+        }.toMap
+
+      // the pattern : interfaceCompanion.type is sufficient proof that
+      // Id=Id_ and View=View_ because companions are singleton values, and
+      // : *.type is checked with `eq`, see SLS 8.2
+      @nowarn("msg=cannot be checked at runtime")
+      override def fromCreatedEvent[I_, Id_ <: ContractId[I_], View_ <: DamlRecord[_]](
+          companion: InterfaceCompanion[I_, Id_, View_]
+      )(ev: CreatedEvent): Option[JavaContract[Id_, View_]] = companion match {
+        case _: interfaceCompanion.type =>
+          implementationViews
+            .get(ev.getTemplateId)
+            .map(toIface => toIface(ev))
+        case _ =>
+          throw new IllegalArgumentException(
+            s"Tried to decode ${companion.TEMPLATE_ID} but decoder is for ${interfaceCompanion.TEMPLATE_ID}"
+          )
+      }
+    }
     (
-      interfaceCompanion.TEMPLATE_ID, // wat
-      ev => p(JavaContract.fromCodegenContract[Id, View](interfaceCompanion.fromCreatedEvent(ev))),
+      interfaceCompanion.TEMPLATE_ID,
+      (
+        (ev: CreatedEvent) =>
+          decoder.fromCreatedEvent(interfaceCompanion)(ev).map(p).getOrElse(false),
+        decoder,
+      ),
     )
+  }
 }

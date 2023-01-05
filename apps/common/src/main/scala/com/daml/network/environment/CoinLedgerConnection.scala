@@ -13,15 +13,18 @@ import com.daml.ledger.javaapi.data.codegen.{
   Update,
 }
 import com.daml.ledger.javaapi.data.{
+  ArchivedEvent,
   Command,
   CreatedEvent,
+  Event,
   ExercisedEvent,
   Filter,
   FiltersByParty,
   GetActiveContractsRequest,
   GetTransactionsRequest,
-  GetTransactionsResponse,
+  GetTransactionTreesResponse,
   Identifier,
+  NoFilter,
   InclusiveFilter,
   LedgerOffset,
   Template,
@@ -30,7 +33,7 @@ import com.daml.ledger.javaapi.data.{
   TransactionTree,
   User,
 }
-import com.daml.network.util.UploadablePackage
+import com.daml.network.util.{UploadablePackage, Trees}
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{
@@ -49,6 +52,7 @@ import io.grpc.StatusRuntimeException
 import java.nio.file.{Files, Path}
 import java.security.MessageDigest
 import java.util.UUID
+import scala.collection.mutable
 import scala.concurrent.{ExecutionContextExecutor, Future}
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -106,7 +110,7 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
   def subscribeAsync(
       subscriptionName: String,
       offset: LedgerOffset,
-      filter: TransactionFilter,
+      filter: Seq[PartyId],
   )(f: Transaction => Future[Unit]): CoinLedgerSubscription
 
   def tryGetTransactionTreeById(parties: Seq[PartyId], id: String): Future[TransactionTree]
@@ -299,25 +303,79 @@ object CoinLedgerConnection {
       ): Future[Seq[Contract[TCid, T]]] =
         activeContractsWithOffset(party, companion).map(_._1)
 
+      // TODO (M3-18)
+      // This is a hacked up wrapper that transforms transaction trees into flat transactions.
+      // This is required because the update service initially only exposes transaction trees.
+      //
+      // It is limited in a quite a few ways:
+      // 1. It only does party filtering.
+      // 2. It does not filter out transient contracts.
+      // 3. It does not filter out creates and archives the
+      //    subscribing parties are witnesses but not stakeholders on.
+      // 4. It does not support interfaces.
+      //
+      // All those limitations are acceptable perform additional filters
+      // on contracts which include those filters and for the PoC
+      // we can assume that we know the templates that implement a given interface.
       private def subscription[T](
           subscriptionName: String,
           offset: LedgerOffset,
-          filter: TransactionFilter,
-      )(mapOperator: Flow[Transaction, Any, _]): CoinLedgerSubscription =
+          parties: Seq[PartyId],
+      )(mapOperator: Flow[Transaction, Any, _]): CoinLedgerSubscription = {
+        val partyOnlyFilter = new FiltersByParty(
+          parties
+            .map(p => p.toProtoPrimitive -> NoFilter.instance)
+            .toMap[String, Filter]
+            .asJava
+        )
         makeSubscription(
-          client.transactions(new GetTransactionsRequest("", offset, filter, false)),
+          client.transactionTrees(new GetTransactionsRequest("", offset, partyOnlyFilter, false)),
           Flow
-            .fromFunction[GetTransactionsResponse, Seq[Transaction]](
+            .fromFunction[GetTransactionTreesResponse, Seq[TransactionTree]](
               _.getTransactions.asScala.toSeq
             )
             .mapConcat(identity)
+            .map(flattenTree)
             .via(mapOperator),
           subscriptionName,
         )
+      }
+      private def flattenTree(tree: TransactionTree): Transaction = {
+        val events: mutable.Buffer[Event] = mutable.ListBuffer()
+        Trees.traverseTree(
+          tree,
+          onCreate = (ev, _) => {
+            events.append(ev)
+          },
+          onExercise = (ev, _) => {
+            if (ev.isConsuming) {
+              events.append(
+                new ArchivedEvent(
+                  ev.getWitnessParties,
+                  ev.getEventId,
+                  ev.getTemplateId,
+                  ev.getContractId,
+                )
+              )
+            }
+          },
+        )
+        new Transaction(
+          tree.getTransactionId(),
+          tree.getCommandId(),
+          tree.getWorkflowId(),
+          tree.getEffectiveAt(),
+          events.toSeq.asJava,
+          tree.getOffset(),
+        )
+      }
+
+      // TODO (M3-18)
+      // See `subscribe` for limitations of this method.
       override def subscribeAsync(
           subscriptionName: String,
           offset: LedgerOffset,
-          filter: TransactionFilter,
+          filter: Seq[PartyId],
       )(f: Transaction => Future[Unit]): CoinLedgerSubscription =
         subscription(subscriptionName, offset, filter)({
           Flow[Transaction].mapAsync(1)(f)

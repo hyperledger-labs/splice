@@ -238,7 +238,7 @@ class InMemoryAcsStore(
       interfaceCompanion: InterfaceCompanion[I, Id, View]
   )(id: Id): Future[QueryResult[Option[JavaContract[Id, View]]]] = {
     requireInScope(interfaceCompanion)
-    lookupContractById(JavaContract.fromCreatedEvent(interfaceCompanion))(id)
+    lookupContractById(contractFilter.decodeInterface(interfaceCompanion))(id)
   }
 
   private def streamContracts[T](
