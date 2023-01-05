@@ -898,7 +898,7 @@ jobs:
             . cluster/deployment/<< parameters.cluster >>/.envrc.vars
           cmd: "\"testOnly *PreflightIntegrationTest\""
           additional_nix_args: "--keep AUTH0_MANAGEMENT_API_CLIENT_ID --keep AUTH0_MANAGEMENT_API_CLIENT_SECRET"
-          extra_parameters: -DDOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 -DNETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global -DAUTH0_MANAGEMENT_API_CLIENT_ID=${AUTH0_MANAGEMENT_API_CLIENT_ID} -DAUTH0_MANAGEMENT_API_CLIENT_SECRET=${AUTH0_MANAGEMENT_API_CLIENT_SECRET}
+          extra_parameters: -DDOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 -DNETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global -DAUTH0_TENANT=dev
           timeout: "10m"
       - notify-cluster-fail:
           cluster: << parameters.cluster >>

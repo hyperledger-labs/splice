@@ -355,8 +355,7 @@ function cluster_preflight() {
     (cd ${REPO_ROOT} && \
          sbt -DDOMAIN_URL=http://${GCP_CLUSTER_BASENAME}.network.canton.global:5008 \
              -DNETWORK_APPS_ADDRESS=${GCP_CLUSTER_BASENAME}.network.canton.global \
-             -DAUTH0_MANAGEMENT_API_CLIENT_ID=${AUTH0_MANAGEMENT_API_CLIENT_ID} \
-             -DAUTH0_MANAGEMENT_API_CLIENT_SECRET=${AUTH0_MANAGEMENT_API_CLIENT_SECRET} \
+             -DAUTH0_TENANT=dev \
              "testOnly *PreflightIntegrationTest")
 }
 

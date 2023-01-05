@@ -32,7 +32,7 @@ class PreflightIntegrationTest
   override def beforeEach() = {
     super.beforeEach();
 
-    val auth0 = auth0UtilFromSystemPoperties("https://canton-network-dev.us.auth0.com")
+    val auth0 = auth0UtilFromEnvVars("https://canton-network-dev.us.auth0.com")
 
     val aliceUser = auth0.createUser();
     logger.debug(

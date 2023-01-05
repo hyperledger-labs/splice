@@ -448,8 +448,19 @@ this doesn't give you a debugger.
 ### Testing Auth0 Auth Flows Locally
 
 If you want to run one of the integration tests with a `LocalAuth0Test` tag, you likely need to pass Auth0 management API credentials for our `canton-network-test` tenant to `sbt`.
-We recommend using `scripts/start-sbt-for-local-auth0-tests.sh` for starting `sbt` in such a case, which guides you through the process.
+You can set them in your `.envrc.private` file via:
+```
+export AUTH0_TESTS_MANAGEMENT_API_CLIENT_ID=…
+export AUTH0_TESTS_MANAGEMENT_API_CLIENT_SECRET=…
+```
 Note that [Running The Preflight Check](#running-the-preflight-check) also requires you to obtain Auth0 management API credentials, but for a different tenant.
+To switch tenants, run `sbt -DAUTH0_TENANT=dev`. The tests will then read the environment variables without the `_TESTS` suffix. `cncluster preflight` sets this automatically
+so in most cases you should not have to do this manually.
+
+```
+export AUTH0_MANAGEMENT_API_CLIENT_ID=…
+export AUTH0_MANAGEMENT_API_CLIENT_SECRET=…
+```
 
 ### Running The Preflight Check
 

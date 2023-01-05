@@ -45,20 +45,26 @@ object CoinTests {
       }
     }
 
-    def auth0UtilFromSystemPoperties(domain: String): Auth0Util = {
-      val clientId = System.getProperty("AUTH0_MANAGEMENT_API_CLIENT_ID");
-      val clientSecret = System.getProperty("AUTH0_MANAGEMENT_API_CLIENT_SECRET");
+    private def readMandatoryEnvVar(name: String): String = {
+      sys.env.get(name) match {
+        case None => fail(s"Environment variable $name must be set")
+        case Some(s) if s.isEmpty => fail(s"Environment variable $name must be non-empty")
+        case Some(s) => s
+      }
+    }
 
-      if (clientId == null || clientId.isEmpty()) {
-        fail(
-          "No clientId given, please supply auth0 clientId through system property AUTH0_MANAGEMENT_API_CLIENT_ID"
-        )
+    def auth0UtilFromEnvVars(domain: String): Auth0Util = {
+      val tenant = System.getProperty("AUTH0_TENANT")
+      val prefix = tenant match {
+        // Used for preflight checks
+        case "dev" => "AUTH0"
+        // Used locally
+        case "test" | "" | null => "AUTH0_TESTS"
+        case _ => fail(s"Invalid value for AUTH0_TENANT property: $tenant")
       }
-      if (clientSecret == null || clientSecret.isEmpty()) {
-        fail(
-          "No clientSecret given, please supply auth0 clientSecret through system property AUTH0_MANAGEMENT_API_CLIENT_SECRET"
-        )
-      }
+      val clientId = readMandatoryEnvVar(s"${prefix}_MANAGEMENT_API_CLIENT_ID");
+      val clientSecret = readMandatoryEnvVar(s"${prefix}_MANAGEMENT_API_CLIENT_SECRET");
+
       new Auth0Util(domain, clientId, clientSecret)
     }
   }
