@@ -204,8 +204,7 @@ class WalletPaymentFrontendIntegrationTest
         actAndCheck(
           s"Alice creates offer by cns name", {
             click on "create-offer-button"
-            click on "create-offer-receiver"
-            textField("create-offer-receiver").value = bobCns
+            setDirectoryField(textField("create-offer-receiver"), bobCns, bobParty.toProtoPrimitive)
             click on "create-offer-quantity"
             numberField("create-offer-quantity").underlying.sendKeys("1.0")
             click on "create-offer-description"
@@ -234,6 +233,7 @@ class WalletPaymentFrontendIntegrationTest
             textField("create-offer-receiver").value = "b"
             textField("create-offer-receiver").underlying.sendKeys(Keys.ARROW_DOWN)
             textField("create-offer-receiver").underlying.sendKeys(Keys.RETURN)
+            waitForDirectoryField(textField("create-offer-receiver"), bobParty.toProtoPrimitive)
             click on "create-offer-quantity"
             numberField("create-offer-quantity").underlying.sendKeys("2.0")
             click on "create-offer-description"
@@ -253,10 +253,11 @@ class WalletPaymentFrontendIntegrationTest
           s"Alice creates offer with bob's full party ID", {
             click on "create-offer-button"
             click on "create-offer-receiver"
-            sendKeysIncrementally(textField("create-offer-receiver"), bobParty.toProtoPrimitive)
-
-            textField("create-offer-receiver").underlying.sendKeys(Keys.ARROW_DOWN)
-            textField("create-offer-receiver").underlying.sendKeys(Keys.RETURN)
+            setDirectoryField(
+              textField("create-offer-receiver"),
+              bobParty.toProtoPrimitive,
+              bobParty.toProtoPrimitive,
+            )
             click on "create-offer-quantity"
             numberField("create-offer-quantity").underlying.sendKeys("3.0")
             click on "create-offer-description"
@@ -303,7 +304,11 @@ class WalletPaymentFrontendIntegrationTest
           s"Alice creates offer \"${description}\"", {
             click on "create-offer-button"
             click on "create-offer-receiver"
-            sendKeysIncrementally(textField("create-offer-receiver"), bobParty.toProtoPrimitive)
+            setDirectoryField(
+              textField("create-offer-receiver"),
+              bobParty.toProtoPrimitive,
+              bobParty.toProtoPrimitive,
+            )
             click on "create-offer-quantity"
             numberField("create-offer-quantity").underlying.sendKeys("100.0")
             click on "create-offer-description"

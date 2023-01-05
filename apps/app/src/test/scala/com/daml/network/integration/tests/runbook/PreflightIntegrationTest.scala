@@ -94,7 +94,7 @@ class PreflightIntegrationTest
 
       click on "create-offer-button"
 
-      sendKeysIncrementally(textField("create-offer-receiver"), receiverPartyId)
+      setDirectoryField(textField("create-offer-receiver"), receiverPartyId, receiverPartyId)
 
       click on "create-offer-quantity"
       numberField("create-offer-quantity").underlying.sendKeys(quantity)

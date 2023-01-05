@@ -15,6 +15,7 @@ interface Props extends StandardTextFieldProps {
 const DirectoryField: React.FC<Props> = (props: Props) => {
   const directoryClient = useDirectoryClient();
   const [options, setOptions] = React.useState<Contract<DirectoryEntry>[]>([]);
+  const [resolvedParty, setResolvedPartyId] = React.useState<string>('');
   const onInputChange = async (event: React.SyntheticEvent, newValue: string, reason: string) => {
     if (reason === 'reset') {
       return;
@@ -54,12 +55,20 @@ const DirectoryField: React.FC<Props> = (props: Props) => {
 
   const setPartyAndNotify = (party: string) => {
     props.onPartyChanged(party);
+    setResolvedPartyId(party);
   };
 
   return (
     <Autocomplete
       filterOptions={x => x}
-      renderInput={params => <TextField {...params} fullWidth label={props.label} />}
+      renderInput={params => (
+        <TextField
+          {...params}
+          fullWidth
+          label={props.label}
+          inputProps={{ ...params.inputProps, 'data-resolved-party-id': resolvedParty }}
+        />
+      )}
       options={options}
       getOptionLabel={(option: string | Contract<DirectoryEntry>) =>
         typeof option === 'string' ? option : option.payload.name
