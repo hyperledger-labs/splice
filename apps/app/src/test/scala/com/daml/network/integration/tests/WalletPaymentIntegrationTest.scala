@@ -33,14 +33,13 @@ class WalletPaymentIntegrationTest extends CoinIntegrationTest with WalletTestUt
         reqFound
       }
 
-      clue("Reject the payment request") {
-        aliceWallet.rejectAppPaymentRequest(reqFound.contractId)
-      }
-
-      clue("Check that there are no more payment requests") {
-        val requests2 = aliceWallet.listAppPaymentRequests()
-        requests2 shouldBe empty
-      }
+      actAndCheck(
+        "Reject the payment request",
+        aliceWallet.rejectAppPaymentRequest(reqFound.contractId),
+      )(
+        "Rejected request disappears from list",
+        _ => aliceWallet.listAppPaymentRequests() shouldBe empty,
+      )
     }
 
     "allow a user to list and accept app payment requests" in { implicit env =>
@@ -68,8 +67,11 @@ class WalletPaymentIntegrationTest extends CoinIntegrationTest with WalletTestUt
       }
 
       clue("Accept payment request") {
-        val acceptedPaymentId = aliceWallet.acceptAppPaymentRequest(cid)
-        aliceWallet.listAppPaymentRequests() shouldBe empty
+        val (acceptedPaymentId, _) =
+          actAndCheck("Alice accepts payment request", aliceWallet.acceptAppPaymentRequest(cid))(
+            "Payment request disappears from list",
+            _ => aliceWallet.listAppPaymentRequests() shouldBe empty,
+          )
         inside(aliceWallet.listAcceptedAppPayments()) { case Seq(r) =>
           r.contractId shouldBe acceptedPaymentId
           r.payload shouldBe new walletCodegen.AcceptedAppPayment(
