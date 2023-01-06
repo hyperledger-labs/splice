@@ -684,3 +684,12 @@ of the https://github.com/DACH-NY/the-real-canton-coin repo.
 
 5. Create or replace the `GITHUB_TOKEN` environment variable in CircleCI
    and set its value to the copied token as-is.
+
+### VPN Secrets
+
+Some CircleCI jobs require connecting to a remote Canton Network cluster, protected behind a firewall. To access those services, 
+the CI job establishes a connection to a VPN whose IP is whitelisted by the cluster (see: `setup_vpn` job). The VPN credentials,
+a username/password pair, are stored in the `canton-network-vpn` CircleCI Context.
+
+To rotate the VPN password, send an email to `help@digitalasset.com`, and IT will swap out the password in the context. 
+No further changes to the CI config file should be necessary.
