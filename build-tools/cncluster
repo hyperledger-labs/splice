@@ -140,7 +140,8 @@ function cluster_create() {
                --num-nodes 2 \
                --master-ipv4-cidr "${GCP_MASTER_IPV4_CIDR}" \
                --node-locations "${CLOUDSDK_COMPUTE_REGION}-a" \
-               --node-labels digitalasset.com/cluster-name=${GCP_CLUSTER_NAME}
+               --node-labels digitalasset.com/cluster-name=${GCP_CLUSTER_NAME} \
+               --addons=GcePersistentDiskCsiDriver
 
         #### Enable Firewall Access
         gcloud container clusters update ${GCP_CLUSTER_NAME} \
