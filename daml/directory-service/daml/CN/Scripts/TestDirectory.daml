@@ -20,6 +20,9 @@ testWithSubscription = script do
   provider <- setupUser app "provider" app.svc
   user <- setupUser app "user" app.svc
 
+  -- TODO(M3-06): test that provider gets the expected rewards
+  featureApp app provider
+
   -- provider creates directory rules
   -- how: up to app provider
   directoryInstallRequest <- submit user.primaryParty $ createCmd DirectoryInstallRequest with
@@ -47,7 +50,7 @@ testWithSubscription = script do
   -- how: cc wallet
 
   paymentContext <- getPaymentTransferContext app user
-  appContext <- getAppTransferContext app
+  appContext <- getAppTransferContext app provider
   (initialPaymentCid, _) <- submitUser user.userId $ exerciseCmd subscriptionRequest SubscriptionRequest_AcceptAndMakePayment with
     inputs = [InputCoin $ toInterfaceContractId coin]
     context = paymentContext

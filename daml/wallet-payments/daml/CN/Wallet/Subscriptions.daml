@@ -297,7 +297,8 @@ lockAndMakeChange context subscriptionData payData inputs now = do
 
   let transfer = Transfer with
        sender
-       provider
+       -- this step is orchestrated by the sender's wallet, so the sender gets the rewards
+       provider = sender
        inputs
        outputs =
          [ OutputSenderCoin with

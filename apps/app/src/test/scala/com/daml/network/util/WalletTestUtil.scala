@@ -125,6 +125,8 @@ trait WalletTestUtil extends CoinIntegrationTest with CnsTestUtil {
                 transferContext.openMiningRound,
                 Map.empty[v1.round.Round, v1.round.IssuingMiningRound.ContractId].asJava,
                 Map.empty[String, v1.coin.ValidatorRight.ContractId].asJava,
+                // note: we don't provide a featured app right as sender == provider
+                None.toJava,
               ),
             )
             .commands

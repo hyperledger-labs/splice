@@ -38,6 +38,7 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
       payload = new directoryCodegen.AppReward(
         svcParty.toProtoPrimitive,
         provider.toProtoPrimitive,
+        false,
         BigDecimal(1.0).bigDecimal,
         new apiCodegen.v1.round.Round(round),
       ),

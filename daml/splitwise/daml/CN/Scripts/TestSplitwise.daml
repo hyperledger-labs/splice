@@ -109,7 +109,7 @@ initiateTransfer sender provider groupKey receiverQuantities = do
 
 completeTransfer : CCApp -> CCUser -> CCUser -> GroupKey -> ContractId AcceptedAppPayment -> Script ()
 completeTransfer app sender provider groupKey acceptedPaymentCid = do
-  transferContext <- getAppTransferContext app
+  transferContext <- getAppTransferContext app provider
   group <- getGroup provider groupKey
   splitwiseInstall <- getSplitwiseInstall sender provider
   -- Not using exerciseSplitwiseInstall since we want this to be executed by the provider
@@ -126,6 +126,10 @@ testProviderHosted = script do
   bob <- setupUser app "bob" validator
   charlie <- setupUser app "charlie" validator
   provider <- setupUser app "provider" validator
+
+  -- TODO(M3-06): test that provider gets the expected rewards
+  featureApp app provider
+
   testCase app Parties with
     getProvider = const provider
     ..

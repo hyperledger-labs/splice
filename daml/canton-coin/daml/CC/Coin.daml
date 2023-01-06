@@ -13,6 +13,7 @@ import DA.Optional
 import DA.Set (Set)
 import qualified DA.Set as Set
 import qualified DA.Text
+import DA.Traversable (forA)
 import DA.Time
 
 import CC.Fees
@@ -127,12 +128,33 @@ template ValidatorRight with
     -- TODO(M3-90): cancellation, withdrawal
 
 
+-- | The right for an application provider to earn featured app rewards.
+template FeaturedAppRight with
+    svc : Party
+    provider : Party
+  where
+    signatory svc, provider
+
+    interface instance API.FeaturedAppRight for FeaturedAppRight where
+      view = API.FeaturedAppRightView with ..
+
+    choice FeaturedAppRight_Withdraw : ()
+      with
+        reason : Text
+      controller svc
+      do pure ()
+
+    choice FeaturedAppRight_Cancel : ()
+      controller provider
+      do pure ()
+
 
 -- | A receipt of a coin burn that can be used to claim part of a coin issuance.
 template AppReward
   with
     svc : Party
     provider : Party -- ^ Application provider
+    featured : Bool
     quantity : Decimal
     round : API.Round
   where
@@ -287,7 +309,7 @@ template CoinRules
                   ..
 
 
-    -- TODO(M3-90): guard this choice by a flag in the config.
+    -- TODO(M3-07): guard this choice by an `isDevNet` flag in the config.
     nonconsuming choice CoinRules_Tap: ContractId Coin
       with
         receiver: Party
@@ -296,6 +318,13 @@ template CoinRules
       controller receiver
       do requireChoiceIsEnabled "CoinRules_Tap" (\c -> c.enable_CoinRules_Tap) (view $ toInterface @API.CoinRules this)
          exercise self CoinRules_Mint with ..
+
+    -- TODO(M3-07): guard this choice by an `isDevNet` flag in the config.
+    nonconsuming choice CoinRules_DevNet_FeatureApp : ContractId FeaturedAppRight
+      with
+        provider : Party
+      controller provider
+      do create FeaturedAppRight with svc; provider
 
     -- Bootstrap the open mining rounds by creating
     -- - one immediately open-mining-round with 1 tick left
@@ -387,16 +416,20 @@ template CoinRules
         let targetClosesAt = addRelTime opensAt (config.tickDuration + config.tickDuration)
 
         -- create issuing round
+        let issuancePerCoin =
+              if totalBurnQuantity <= 0.0
+                then 0.0
+                else userIssuanceRatio * min 1.0 (userCoinsPerIssuance / totalBurnQuantity)
         create IssuingMiningRound with
           svc
           observers
           round = miningRound.round
-          issuancePerCoin =
-            if totalBurnQuantity <= 0.0
-              then 0.0
-              else userIssuanceRatio * min 1.0 (userCoinsPerIssuance / totalBurnQuantity)
           opensAt = opensAt
           targetClosesAt = targetClosesAt
+          -- TODO(M3-06): properly compute the per-reward-issuances
+          issuancePerValidatorReward = issuancePerCoin
+          issuancePerFeaturedAppReward = issuancePerCoin
+          issuancePerUnfeaturedAppReward = issuancePerCoin
 
     nonconsuming choice CoinRules_MiningRound_Close
       : ContractId ClosedMiningRound
@@ -545,47 +578,45 @@ checkTransferConstraints transfer summary config
     | summary.quantityBalance /= 0.0 && summary.numFloatingCoins == 0 = Left $ ITR_Other $ "There needs to be at least one floating output coin to receive excess input quantity" <> show summary.quantityBalance
     | otherwise = Right ()
 
-miningRoundIsOpen: OpenMiningRound -> Update ()
-miningRoundIsOpen round = do
-  now <- getTime
-  require ("mining round is open: " <> show round) (round.opensAt <= now)
-  return ()
-
 
 -- | Execute a transfer.
 --
 executeTransfer : ContractId API.CoinRules -> API.TransferContext -> CoinConfig USD -> Party -> API.Transfer -> Update API.TransferResult
-executeTransfer coinRulesCid context config0 svc t = do
-  -- check that the current mining round is open
-  (_, openRound) <- downcastInterface @OpenMiningRound "OpenMiningRound" context.openMiningRound
-  let config = scaleConfig openRound config0
-
-  _ <- miningRoundIsOpen openRound
-  isum <- summarizeAndValidateInputs context openRound.round config svc t.sender t.inputs
-
+executeTransfer coinRulesCid context configUsd svc t = do
   -- compute summaries
-  osum <- preprocessAndSummarizeOutputs config t.sender t.outputs
-  summary0 <- summarizeTransfer config isum osum
+  csum <- summarizeAndValidateContext context configUsd svc t
+  isum <- summarizeAndValidateInputs csum svc t.sender t.inputs
+  osum <- preprocessAndSummarizeOutputs csum.config t.sender t.outputs
+  summary0 <- summarizeTransfer csum.config isum osum
   -- check that overall transfer constraints are satisfied
-  case checkTransferConstraints t summary0 config of
+  case checkTransferConstraints t summary0 csum.config of
     Left err -> throw (InvalidTransfer err)
     Right _ -> pure ()
 
   -- consume inputs only after all assertions have been checked
-  _ <- consumeInputs coinRulesCid context svc t.sender t.inputs
+  _ <- consumeInputs coinRulesCid csum svc t.sender t.inputs
   -- distribute floating outputs
-  let distributed = distributeOutputs openRound.round config svc t.sender summary0 osum.preprocessedOutputs
+  let distributed = distributeOutputs csum.config svc t.sender summary0 osum.preprocessedOutputs
   let summary1 = mergeReceiverFees distributed.receiverTransferFees summary0
   let summary2 = mergeDistributedOutputs distributed t.sender summary1
   -- issue rewards for burns
-  issueRewards config openRound t.sender t.provider summary2
+  issueRewards csum t.sender t.provider summary2
   -- record outputs
-  createdCoins <- createTransferOutputs openRound.round config svc distributed.coins
+  createdCoins <- createTransferOutputs csum.openRound.round csum.config svc distributed.coins
 
   return API.TransferResult with
-    round = openRound.round
+    round = csum.openRound.round
     summary = summary2
     ..
+
+data TransferContextSummary = TransferContextSummary with
+    featuredAppProvider : Optional Party
+    config : CoinConfig CC
+    openRound : OpenMiningRound
+    -- TODO(M3-06): pre-resolve them in summarizeAndValidateContext so that the tx fetches them exactly once
+    issuingMiningRounds : Map API.Round (ContractId API.IssuingMiningRound)
+    validatorRights : Map Party (ContractId API.ValidatorRight)
+  deriving (Eq, Show)
 
 data TransferInputsSummary = TransferInputsSummary with
     numBurnInputs : Int
@@ -648,10 +679,31 @@ mergeDistributedOutputs distributed sender summary =
         then st
         else st + distCoin.quantity
 
-summarizeAndValidateInputs : API.TransferContext -> API.Round -> CoinConfig CC -> Party -> Party -> [API.TransferInput] -> Update TransferInputsSummary
-summarizeAndValidateInputs context round config svc sender inps = do
+summarizeAndValidateContext : API.TransferContext -> CoinConfig USD -> Party -> API.Transfer -> Update TransferContextSummary
+summarizeAndValidateContext context configUsd svc tf = do
+  now <- getTime
+  -- check that the current mining round is open and issued by the svc
+  (_, openRound) <- downcastInterface @OpenMiningRound "OpenMiningRound" context.openMiningRound
+  require ("mining round matches svc") (openRound.svc == svc)
+  require ("mining round is open: " <> show openRound) (openRound.opensAt <= now)
+
+  -- check the featured app right, if present
+  featuredAppProvider <- forA context.featuredAppRight $ \featuredAppRightCid -> do
+    (_, featuredAppRight) <- downcastInterface @FeaturedAppRight "FeaturedAppRight" featuredAppRightCid
+    require "featured app right must match" (featuredAppRight == FeaturedAppRight with svc; provider = tf.provider)
+    pure featuredAppRight.provider
+
+  return TransferContextSummary with
+    config = scaleConfig openRound configUsd
+    featuredAppProvider
+    openRound = openRound
+    issuingMiningRounds = context.issuingMiningRounds
+    validatorRights = context.validatorRights
+
+summarizeAndValidateInputs : TransferContextSummary -> Party -> Party -> [API.TransferInput] -> Update TransferInputsSummary
+summarizeAndValidateInputs csum svc sender inps = do
     now <- getTime
-    foldlA (summarizeInput now round) initialSummary inps
+    foldlA (summarizeInput now csum.openRound.round) initialSummary inps
   where
     initialSummary = TransferInputsSummary with
       numBurnInputs = 0
@@ -676,27 +728,30 @@ summarizeAndValidateInputs context round config svc sender inps = do
     summarizeInput now round s (API.InputAppReward rewardCid) = do
       (_, reward) <- downcastInterface @AppReward "AppReward" rewardCid
       require "SVC matches" (svc == reward.svc)
-      (_, miningRound) <- fetchIssuingMiningRound context svc reward.round
+      (_, miningRound) <- fetchIssuingMiningRound csum svc reward.round
       require "issuing round is open" (now >= miningRound.opensAt)
       require "Sender matches app provider" (sender == reward.provider)
+      let issuancePerCoin
+            | reward.featured = miningRound.issuancePerFeaturedAppReward
+            | otherwise = miningRound.issuancePerUnfeaturedAppReward
       return TransferInputsSummary with
         numBurnInputs = s.numBurnInputs + 1
         numCoinInputs = s.numCoinInputs
-        totalQuantity = s.totalQuantity + reward.quantity * miningRound.issuancePerCoin
+        totalQuantity = s.totalQuantity + reward.quantity * issuancePerCoin
         totalHoldingFees = s.totalHoldingFees
 
     summarizeInput now round s (API.InputValidatorReward rewardCid) = do
       (_, reward) <- downcastInterface @ValidatorReward "ValidatorReward" rewardCid
       require "SVC matches" (svc == reward.svc)
-      (_, miningRound) <- fetchIssuingMiningRound context svc reward.round
+      (_, miningRound) <- fetchIssuingMiningRound csum svc reward.round
       return TransferInputsSummary with
         numBurnInputs = s.numBurnInputs + 1
         numCoinInputs = s.numCoinInputs
-        totalQuantity = s.totalQuantity + reward.quantity * miningRound.issuancePerCoin
+        totalQuantity = s.totalQuantity + reward.quantity * miningRound.issuancePerValidatorReward
         totalHoldingFees = s.totalHoldingFees
 
-fetchValidatorRight : API.TransferContext -> ValidatorReward -> Update (ContractId ValidatorRight, ValidatorRight)
-fetchValidatorRight API.TransferContext{validatorRights} ValidatorReward{..} = do
+fetchValidatorRight : TransferContextSummary -> ValidatorReward -> Update (ContractId ValidatorRight, ValidatorRight)
+fetchValidatorRight TransferContextSummary{validatorRights} ValidatorReward{..} = do
   case Map.lookup user validatorRights of
     None -> abort $ "No validator right found for user " <> show user
     Some rightCid -> do
@@ -705,8 +760,8 @@ fetchValidatorRight API.TransferContext{validatorRights} ValidatorReward{..} = d
       require "User matches" (right.user == user)
       pure (rightCid, right)
 
-fetchIssuingMiningRound : API.TransferContext -> Party -> API.Round -> Update (ContractId IssuingMiningRound, IssuingMiningRound)
-fetchIssuingMiningRound API.TransferContext{issuingMiningRounds} svc round = do
+fetchIssuingMiningRound : TransferContextSummary -> Party -> API.Round -> Update (ContractId IssuingMiningRound, IssuingMiningRound)
+fetchIssuingMiningRound TransferContextSummary{issuingMiningRounds} svc round = do
   case Map.lookup round issuingMiningRounds of
     None -> abort $ "No issuing mining round found for round " <> show round
     Some miningRoundCid -> do
@@ -715,8 +770,8 @@ fetchIssuingMiningRound API.TransferContext{issuingMiningRounds} svc round = do
       require "Round matches" (miningRound.round == round)
       pure (miningRoundCid, miningRound)
 
-consumeInputs : ContractId API.CoinRules -> API.TransferContext -> Party -> Party -> [API.TransferInput] -> Update ()
-consumeInputs coinRulesCid context svc sender inps = do
+consumeInputs : ContractId API.CoinRules -> TransferContextSummary -> Party -> Party -> [API.TransferInput] -> Update ()
+consumeInputs coinRulesCid csum svc sender inps = do
     mapA_ consumeInput inps
   where
     initialSummary = TransferInputsSummary with
@@ -733,8 +788,8 @@ consumeInputs coinRulesCid context svc sender inps = do
 
     consumeInput (API.InputValidatorReward rewardCid) = do
       (rewardCid, reward) <- downcastInterface @ValidatorReward "ValidatorReward" rewardCid
-      (_, miningRound) <- fetchIssuingMiningRound context svc reward.round
-      (rightCid, validatorRight) <- fetchValidatorRight context reward
+      (_, miningRound) <- fetchIssuingMiningRound csum svc reward.round
+      (rightCid, validatorRight) <- fetchValidatorRight csum reward
       require "Validator matches" (validatorRight.validator == sender)
       exercise rewardCid ValidatorReward_ArchiveAsValidator with validator = sender; rightCid, coinRulesCid
 
@@ -864,25 +919,31 @@ computeCoinCreateFees config numCoinInputs numCoinOutputs = do
     return (config.createFee.fee * intToDecimal numCoinCreates)
 
 
-
-issueRewards : CoinConfig CC -> OpenMiningRound -> Party -> Party -> API.TransferSummary -> Update ()
-issueRewards config openRound sender provider summary = do
+issueRewards : TransferContextSummary -> Party -> Party -> API.TransferSummary -> Update ()
+issueRewards csum sender provider summary = do
     let validatorReward = summary.senderAdminFees + summary.senderHoldingFees + summary.totalTransferFees
     -- issue reward for the validator of the sender
-    when (config.minRewardQuantity <= validatorReward) $
+    when (csum.config.minRewardQuantity <= validatorReward) $
       void $ create ValidatorReward with
-        svc = openRound.svc
+        svc = csum.openRound.svc
         user = sender
         quantity = validatorReward
-        round = openRound.round
+        round = csum.openRound.round
 
     -- issue receiver receipts
-    when (config.minRewardQuantity <= summary.receiverTransferFees) $
+    let featured =
+          Some provider == csum.featuredAppProvider &&
+          -- we do not create featured app rewards in case the app provider uses its own app
+          sender /= provider
+    -- TODO(#2150): parametrize these reward caps
+    let cap : Decimal = if featured then 100.0 else 0.8
+    when (csum.config.minRewardQuantity <= cap * summary.receiverTransferFees) $
       void $ create AppReward with
-        svc = openRound.svc
+        svc = csum.openRound.svc
         provider
+        featured
         quantity = summary.receiverTransferFees
-        round = openRound.round
+        round = csum.openRound.round
 
 -- | A coin about to be created after distributed excess quantity
 -- to floating outputs.
@@ -903,8 +964,8 @@ data DistributedOutputs = DistributedOutputs with
   coins : [DistributedCoin]
   receiverTransferFees : Map Party Decimal  -- ^ Receiver fees _only_ for floating sender outputs.
 
-distributeOutputs : API.Round -> CoinConfig CC -> Party -> Party -> API.TransferSummary -> [PreprocessedTransferOutput] -> DistributedOutputs
-distributeOutputs now config svc sender summary outs =
+distributeOutputs : CoinConfig CC -> Party -> Party -> API.TransferSummary -> [PreprocessedTransferOutput] -> DistributedOutputs
+distributeOutputs config svc sender summary outs =
     let st = foldl createOutput initialState outs
     in DistributedOutputs with
       coins = st.coins

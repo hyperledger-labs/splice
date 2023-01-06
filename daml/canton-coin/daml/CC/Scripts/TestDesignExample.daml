@@ -36,7 +36,7 @@ template Escrow
          cid <- exercise (toInterfaceContractId @API.LockedCoin lockedCoin) (API.LockedCoin_Unlock transferContext.coinRules)
          let transfer = API.Transfer with
                sender = p
-               provider = p
+               provider = arbiter
                payload = "refresh"
                inputs = [API.InputCoin cid, API.InputCoin $ toInterfaceContractId paymentCoin]
                outputs =
@@ -54,6 +54,7 @@ template Escrow
                        quantity = 1.0
                        senderTransferFeeRatio = 0.0
                  ]
+         -- TODO(M3-06): adjust design example to featured app right
          API.exerciseAppTransfer transferContext transfer
 
 -- | This matches the example in the design doc
@@ -76,6 +77,7 @@ test = do
 
   alice <- setupUser app "alice" app.svc
   arbiter <- setupUser app "arbiter" app.svc
+  featureApp app arbiter
 
   tap app alice 1500.0
 
@@ -106,9 +108,13 @@ test = do
   prevCoinCids <- map fst <$> query @Coin app.svc
   prevLockedCoinCids <- map fst <$> query @LockedCoin app.svc
 
-  transferContext <- getAppTransferContext app
-  result <- submitUser alice.userId $ exerciseCmd escrow Refresh with ..
+  transferContext <- getAppTransferContext app arbiter
+  result <- submitUser alice.userId $ exerciseCmd escrow Refresh with
+    lockedCoin
+    paymentCoin
+    transferContext
 
+  -- TODO(#2148): adjust design example to changes due to rewards issuance
   result.summary === API.TransferSummary with
     inQuantity = 1004.95
     selfOutQuantity = 1003.83
@@ -155,10 +161,20 @@ test = do
             - 0.09 -- create fee for change
       in expiringQuantity coinConfig.holdingFee quantity c2.round
 
+  let receiverTransferFee = chargeSteppedRate coinConfig.transferFee 1.0
   payment === Coin with
     svc = app.svc
     owner = arbiter.primaryParty
     quantity =
-      let quantity = 1.0 - chargeSteppedRate coinConfig.transferFee 1.0
+      let quantity = 1.0 - receiverTransferFee
       in expiringQuantity coinConfig.holdingFee quantity c2.round
+
+  [(_, appReward)] <- query @AppReward app.svc
+  appReward === AppReward with
+    svc = app.svc
+    provider = arbiter.primaryParty
+    featured = True
+    quantity = receiverTransferFee
+    round = c2.round
+
   return ()

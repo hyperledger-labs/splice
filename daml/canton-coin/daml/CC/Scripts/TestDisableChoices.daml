@@ -72,7 +72,7 @@ testValidatorReward = do
   validator <- setupValidator app "validator"
   alice <- setupUser app "alice" validator
   recordValidatorOf app alice.primaryParty validator
-  
+
   _ <- tap app alice 10.0
   pay app alice alice.primaryParty 5.0 ""
   [(cid, _)] <- query @ValidatorReward alice.primaryParty
@@ -97,7 +97,7 @@ testValidatorReward = do
 testCoinRules : Script ()
 testCoinRules = do
   app <- setupApp
-  
+
   alice <- setupUser app "alice" app.svc
 
   (round, _) <- getLatestOpenRound app
@@ -119,6 +119,7 @@ testCoinRules = do
           openMiningRound = toInterfaceContractId @API.OpenMiningRound round
           issuingMiningRounds = Map.empty
           validatorRights = Map.empty
+          featuredAppRight = None
 
   context <- getTransferContext app alice
   testChoice @"enable_CoinRules_ComputeFees" app [alice.primaryParty] [app.svc] $ \coinRules ->

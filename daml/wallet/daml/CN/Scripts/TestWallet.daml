@@ -57,7 +57,7 @@ acceptPaymentRequest app sender transferRequest coin = do
 collectAcceptedPayment : CCApp -> CCUser -> ContractId AcceptedAppPayment -> Script ()
 collectAcceptedPayment app provider acceptedAppPayment = do
   Some acceptedPayment <- queryContractId provider.primaryParty acceptedAppPayment
-  context <- getAppTransferContext app
+  context <- getAppTransferContext app provider
   -- multi party submit to simplify test
   _ <- submitMulti (signatory acceptedPayment) [app.svc] $ exerciseCmd acceptedAppPayment (AcceptedAppPayment_Collect context)
   pure ()
@@ -72,6 +72,8 @@ testSingleReceiverCCPaymentRequest = script do
   provider <- setupUser app "provider" validator
   alice <- setupUser app "alice" validator
   bob <- setupUser app "bob" validator
+
+  featureApp app provider
 
   coin <- tap app alice 42.0
   (transferRequest, offerCid) <- createSingleReceiverPaymentRequest app
@@ -91,6 +93,8 @@ testSingleReceiverCCPaymentRequest = script do
     ccReceiverQuantities = [
       (ReceiverCCQuantity with receiver = bob.primaryParty, ccQuantity = 30.0)
       ]
+
+  -- TODO(#2128): check rewards once we issue app rewards in this case
 
   pure ()
 
@@ -433,7 +437,7 @@ testCO_MergeTransferInputs = script do
     svcParty = app.svc
     validatorParty = validator
 
-  
+
   context <- getPaymentTransferContext app alice
 
   outcomes <- submitUser alice.userId $ exerciseCmd install WalletAppInstall_ExecuteBatch with
@@ -503,7 +507,7 @@ testInsufficientFundsBatchSubscriptions = script do
     [COO_SubscriptionInitialPayment cid] -> pure cid
     _ -> abort $ "Expected initial subscription payment to succeed but got " <> show outcomes
 
-  (_, subscriptionIdleStateCid, _) <- collectInitialSubscriptionPayment app provider.primaryParty pizzeria alice.primaryParty initialPaymentCid
+  (_, subscriptionIdleStateCid, _) <- collectInitialSubscriptionPayment app provider pizzeria alice.primaryParty initialPaymentCid
 
   passTime (days 27)
 

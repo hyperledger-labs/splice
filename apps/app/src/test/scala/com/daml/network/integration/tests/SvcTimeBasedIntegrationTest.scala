@@ -100,18 +100,21 @@ class SvcTimeBasedIntegrationTest
       new AppReward(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
+        false,
         BigDecimal(1.0).bigDecimal,
         new Round(0),
       ),
       new AppReward(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
+        false,
         BigDecimal(2.0).bigDecimal,
         new Round(0),
       ),
       new AppReward(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
+        false,
         BigDecimal(5.0).bigDecimal,
         new Round(1),
       ),

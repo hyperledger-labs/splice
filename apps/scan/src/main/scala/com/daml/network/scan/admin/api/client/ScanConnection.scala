@@ -11,6 +11,7 @@ import io.grpc.{Status, StatusRuntimeException}
 
 import java.util.concurrent.atomic.AtomicReference
 import scala.concurrent.{ExecutionContextExecutor, Future}
+import scala.jdk.OptionConverters.*
 
 /** Connection to the admin API of CC Scan. This is used by other apps
   * to query for the SVC party id.
@@ -61,6 +62,8 @@ final class ScanConnection(
       new coinCodegen.AppTransferContext(
         coinRules.contractId.toInterface(coinCodegen.CoinRules.INTERFACE),
         openMiningRound.contractId.toInterface(roundCodegen.OpenMiningRound.INTERFACE),
+        // TODO(#2154) revisit how apps get access to app transfer contexts that include their featured app right
+        None.toJava,
       )
     }
 

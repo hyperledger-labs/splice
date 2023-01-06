@@ -12,6 +12,8 @@ import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceRefere
 import com.digitalasset.canton.participant.ParticipantNode
 import com.digitalasset.canton.topology.PartyId
 
+import scala.jdk.OptionConverters.*
+
 /** Single scan app reference. Defines the console commands that can be run against a client or backend scan
   * app reference.
   */
@@ -56,6 +58,8 @@ abstract class ScanAppReference(
     new v1.coin.AppTransferContext(
       coinRules.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
       openMiningRound.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
+      // TODO(#2154) revisit how apps get access to app transfer contexts that include their featured app right
+      None.toJava,
     )
   }
 

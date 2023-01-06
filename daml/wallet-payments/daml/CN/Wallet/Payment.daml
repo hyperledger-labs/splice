@@ -99,7 +99,8 @@ template AppPaymentRequest
          -- lock the coin and create an accepted payment
          let transfer = Transfer with
               sender
-              provider
+              -- this step is orchestrated by the sender's wallet, so the sender gets the rewards
+              provider = sender
               inputs
               outputs =
                 [ OutputSenderCoin with
@@ -131,7 +132,7 @@ template AppPaymentRequest
       with
         actor : Party
       controller actor
-      do 
+      do
         require "Actor is a stakeholder in the request" (actor `elem` stakeholder this)
         now <- getTime
         require "Offer has expired" (now >= expiresAt)

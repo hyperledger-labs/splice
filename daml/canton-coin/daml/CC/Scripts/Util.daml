@@ -23,12 +23,11 @@ import CC.Scripts.Parameters
 -------------------
 
 
--- | A type to hold the off-ledger information required to interact with CC.
+-- | A type to hold the off-ledger information required to interact with the CC app.
 data CCApp = CCApp with
     svc : Party
     svcUser : CCUser
   deriving (Eq, Ord, Show)
-
 
 demoTime : Time
 demoTime = time (DA.Date.date 2022 Jan 1) 0 0 0
@@ -296,7 +295,9 @@ payWithTransferFeeRatio app sender recipient coinQuantity transferFeeRatio msg =
                 senderTransferFeeRatio = transferFeeRatio
           ]
   (openRound, _) <- getLatestOpenRound app
-  void $ submitExerciseCoinRulesAPIByKey app [sender.primaryParty, recipient] readAs (API.CoinRules_Transfer with transfer, context = API.coinTransferContext $ toInterfaceContractId openRound)
+  void $ submitExerciseCoinRulesAPIByKey app [sender.primaryParty, recipient] readAs
+    API.CoinRules_Transfer with
+      transfer, context = API.coinTransferContext (toInterfaceContractId openRound) None
 
 -- | Locks a coin of the given quantity to the given lock holder
 -- for the given time starting at the current time
@@ -323,7 +324,10 @@ lockTo1 app sender lockHolder coinQuantity lockDuration msg = do
                 expiresAt = now `addRelTime` lockDuration
           ]
   (openRound, _) <- getLatestOpenRound app
-  void $ submitExerciseCoinRulesAPIByKey app [sender.primaryParty, lockHolder] readAs (API.CoinRules_Transfer with transfer, context = API.coinTransferContext $ toInterfaceContractId openRound)
+  void $ submitExerciseCoinRulesAPIByKey app [sender.primaryParty, lockHolder] readAs
+    API.CoinRules_Transfer with
+      -- TODO(M3-06): add test for featured app provider
+      transfer, context = API.coinTransferContext (toInterfaceContractId openRound) None
 
 -- | Deposit all coins together with new issuances into a single coin.
 runCoinDepositBots : CCApp -> Script ()
@@ -335,6 +339,7 @@ runCoinDepositBots app = do
         openMiningRound = toInterfaceContractId openRound
         issuingMiningRounds = Map.fromList [ (round.round, toInterfaceContractId roundCid) | (roundCid, round) <- issuingRounds ]
         validatorRights = Map.fromList [ (right.user, toInterfaceContractId rightCid) | (rightCid, right) <- validatorRights ]
+        featuredAppRight = None
   forA_ validatorRights $ \(_, ValidatorRight{..}) -> do
     -- get all burns for this user
     hostedUsers <- getValidatorUsers user
@@ -394,12 +399,20 @@ getOpenRoundsSorted app = do
   rounds <- query @OpenMiningRound app.svc
   return $ sortOn (\(_, openRound) -> openRound.round) rounds
 
+getFeaturedAppRight : CCApp -> Party -> Script (Optional (ContractId FeaturedAppRight, FeaturedAppRight))
+getFeaturedAppRight app provider = do
+  rounds <- query @FeaturedAppRight provider
+  return $ DA.List.Total.head [ r | r <- rounds, r._2.svc == app.svc ]
 
-getAppTransferContext : CCApp -> Script API.AppTransferContext
-getAppTransferContext app = do
+getAppTransferContext : CCApp -> CCUser -> Script API.AppTransferContext
+getAppTransferContext app provider = do
   openMiningRound <- toInterfaceContractId . fst <$> getLatestOpenRound app
   coinRules <- toInterfaceContractId . fst <$> fetchCoinRulesByKey app.svc
-  pure API.AppTransferContext with ..
+  featuredAppRight <- fmap (toInterfaceContractId . fst) <$> getFeaturedAppRight app provider.primaryParty
+  pure API.AppTransferContext with
+    coinRules
+    openMiningRound
+    featuredAppRight
 
 getPaymentTransferContext : CCApp -> CCUser -> Script API.PaymentTransferContext
 getPaymentTransferContext app user = do
@@ -415,7 +428,8 @@ getTransferContext app user = do
   pure API.TransferContext with
     issuingMiningRounds = Map.fromList [ (round.round, toInterfaceContractId roundCid) | (roundCid, round) <- issuingRounds ]
     validatorRights = Map.fromList [ (right.user, toInterfaceContractId rightCid) | (rightCid, right) <- validatorRights ]
-    ..
+    openMiningRound
+    featuredAppRight = None
 
 tap : CCApp -> CCUser -> Decimal -> Script (ContractId Coin)
 tap app user quantity = do
@@ -424,3 +438,9 @@ tap app user quantity = do
     receiver = user.primaryParty
     quantity
     openRound
+
+featureApp : CCApp -> CCUser -> Script (ContractId FeaturedAppRight)
+featureApp app provider = do
+  (openRound, _) <- getLatestOpenRound app
+  submitExerciseCoinRulesByKey' app provider CoinRules_DevNet_FeatureApp with
+    provider = provider.primaryParty

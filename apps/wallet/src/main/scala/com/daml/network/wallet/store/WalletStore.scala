@@ -21,6 +21,7 @@ import io.grpc.{Status, StatusRuntimeException}
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.CollectionConverters.*
+import scala.jdk.OptionConverters.*
 
 /** A store for serving all queries used by the wallet backend's gRPC request handlers and automation
   * that require the visibility of the validator user.
@@ -100,6 +101,9 @@ trait WalletStore extends FlagCloseable with NamedLogging with StoreWithOpenMini
           .map(r => (r.payload.user, r.contractId.toInterface(v1.coin.ValidatorRight.INTERFACE)))
           .toMap[String, v1.coin.ValidatorRight.ContractId]
           .asJava,
+        // Note: featured app rights are ignored for transfers with sender == provider, which is the case for all
+        // transfers issued by the wallet. We therefore do not provide a FeaturedAppRight, even if the user has one.
+        None.toJava,
       )
       new v1.coin.PaymentTransferContext(
         coinRules.value.contractId.toInterface(v1.coin.CoinRules.INTERFACE),

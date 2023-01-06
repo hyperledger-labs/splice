@@ -57,6 +57,14 @@ data ValidatorRightView = ValidatorRightView with
 interface ValidatorRight where
   viewtype ValidatorRightView
 
+
+data FeaturedAppRightView = FeaturedAppRightView with
+  svc : Party
+  provider : Party
+
+interface FeaturedAppRight where
+  viewtype FeaturedAppRightView
+
 -- | A lock held by multiple parties until its expiry.
 data TimeLock = TimeLock with
     holders: [Party]
@@ -198,13 +206,14 @@ data AppTransferContext = AppTransferContext
   with
     coinRules : ContractId CoinRules
     openMiningRound : ContractId OpenMiningRound
+    featuredAppRight : Optional (ContractId FeaturedAppRight)
   deriving (Show, Eq)
 
 exerciseAppTransfer : AppTransferContext -> Transfer -> Update TransferResult
 exerciseAppTransfer AppTransferContext{..} transfer =
   exercise coinRules CoinRules_Transfer with
     transfer
-    context = coinTransferContext openMiningRound
+    context = coinTransferContext openMiningRound featuredAppRight
 
 exercisePaymentTransfer : PaymentTransferContext -> Transfer -> Update TransferResult
 exercisePaymentTransfer PaymentTransferContext{..} transfer =
@@ -232,11 +241,13 @@ data TransferContext = TransferContext
     openMiningRound : ContractId OpenMiningRound
     issuingMiningRounds : Map Round (ContractId IssuingMiningRound)
     validatorRights : Map Party (ContractId ValidatorRight) -- ^ Map from user to ValidatorRight contract.
+    featuredAppRight : Optional (ContractId FeaturedAppRight) -- ^ Optional proof that the provider is a featured app provider.
   deriving (Show, Eq)
 
 -- | Helper to construct transfer context with only coin inputs
-coinTransferContext : ContractId OpenMiningRound -> TransferContext
-coinTransferContext openMiningRound = TransferContext with
+coinTransferContext : ContractId OpenMiningRound -> Optional (ContractId FeaturedAppRight) -> TransferContext
+coinTransferContext openMiningRound featuredAppRight = TransferContext with
   openMiningRound
+  featuredAppRight
   issuingMiningRounds = Map.empty
   validatorRights = Map.empty
