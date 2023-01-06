@@ -1,0 +1,65 @@
+openapi: 3.0.0
+info:
+  title: Validator API
+  version: 0.0.1
+tags:
+  - name: validator
+paths:
+  /validator-user:
+    get:
+      tags: [validator]
+      x-jvm-package: validator
+      operationId: "getValidatorUserInfo"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/GetValidatorUserInfoResponse"
+  /users:
+    post:
+      tags: [validator]
+      x-jvm-package: validator
+      operationId: "onboardUser"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/OnboardUserRequest"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                "$ref": "#/components/schemas/OnboardUserResponse"
+components:
+  schemas:
+      OnboardUserRequest:
+        type: object
+        required:
+          - name
+        properties:
+          name:
+            type: string
+
+      OnboardUserResponse:
+        type: object
+        required:
+          - party_id
+        properties:
+          party_id:
+            type: string
+
+      GetValidatorUserInfoResponse:
+        type: object
+        required:
+          - party_id
+          - user_name
+        properties:
+          party_id:
+            type: string
+          user_name:
+            type: string

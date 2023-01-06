@@ -208,6 +208,19 @@ lazy val `apps-validator` =
     .settings(
       libraryDependencies ++= Seq(scalapb_runtime_grpc, scalapb_runtime),
       BuildCommon.sharedAppSettings,
+      Compile / guardrailTasks :=
+        List(
+          ScalaServer(
+            new File("apps/validator/src/main/openapi/validator.yaml"),
+            pkg = "com.daml.network.http.v0",
+            framework = "akka-http",
+          ),
+          ScalaClient(
+            new File("apps/validator/src/main/openapi/validator.yaml"),
+            pkg = "com.daml.network.http.v0",
+            framework = "akka-http",
+          ),
+        ),
     )
 
 lazy val `apps-svc` =
