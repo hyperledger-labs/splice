@@ -3,8 +3,8 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as codegen
 import com.daml.network.console.{
-  ValidatorAppBackendReference,
   RemoteDirectoryAppReference,
+  ValidatorAppBackendReference,
   WalletAppClientReference,
 }
 import com.daml.network.environment.CoinEnvironmentImpl

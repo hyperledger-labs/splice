@@ -2,13 +2,13 @@ package com.daml.network.util
 
 import com.daml.network.console.{
   LocalDirectoryAppReference,
+  RemoteDirectoryAppReference,
   ScanAppBackendReference,
   SplitwiseAppBackendReference,
-  SvcAppBackendReference,
-  ValidatorAppBackendReference,
-  RemoteDirectoryAppReference,
   SplitwiseAppClientReference,
+  SvcAppBackendReference,
   SvcAppClientReference,
+  ValidatorAppBackendReference,
   WalletAppBackendReference,
   WalletAppClientReference,
 }

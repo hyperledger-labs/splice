@@ -21,19 +21,19 @@ import com.daml.ledger.javaapi.data.{
   Filter,
   FiltersByParty,
   GetActiveContractsRequest,
-  GetTransactionsRequest,
   GetTransactionTreesResponse,
+  GetTransactionsRequest,
   Identifier,
-  NoFilter,
   InclusiveFilter,
   LedgerOffset,
+  NoFilter,
   Template,
   Transaction,
   TransactionFilter,
   TransactionTree,
   User,
 }
-import com.daml.network.util.{UploadablePackage, Trees}
+import com.daml.network.util.{Trees, UploadablePackage}
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.lifecycle.{

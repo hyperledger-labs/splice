@@ -42,7 +42,6 @@ class CantonAdminTokenAuthService(adminToken: CantonAdminToken, parent: Seq[Auth
         else
           decodeMetadataParent(headers)
             .thenApply(stripParticipantId)
-            .thenApply(lowerCaseUserName)
       )
   }
 
@@ -56,19 +55,6 @@ class CantonAdminTokenAuthService(adminToken: CantonAdminToken, parent: Seq[Auth
         sys.error("Not supported")
       case claims: ClaimSet.AuthenticatedUser =>
         claims.copy(participantId = stripParticipantIdIfMatches(claims.participantId))
-      case _ => claimSet
-    }
-
-  // TODO(#1946) Remove this temporary workaround
-  // Subject identifiers for auth0 M2M tokens are not valid Daml user names, as they contain upper case characters.
-  // We simply convert all characters to lower case.
-  // Collisions are unlikely in the case of auth0, as M2M tokens include 32 random characters in the subject identifier.
-  private def lowerCaseUserName(claimSet: ClaimSet): ClaimSet =
-    claimSet match {
-      case _: ClaimSet.Claims =>
-        sys.error("Not supported")
-      case claims: ClaimSet.AuthenticatedUser =>
-        claims.copy(userId = claims.userId.toLowerCase)
       case _ => claimSet
     }
 

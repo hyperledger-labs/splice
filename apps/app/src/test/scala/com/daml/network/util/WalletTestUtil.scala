@@ -12,8 +12,8 @@ import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.console.{
   CoinRemoteParticipantReference,
   LedgerApiUtils,
-  ValidatorAppBackendReference,
   RemoteDirectoryAppReference,
+  ValidatorAppBackendReference,
   ValidatorAppReference,
   WalletAppBackendReference,
   WalletAppClientReference,

@@ -53,9 +53,9 @@ const Login: React.FC<{
 
 function normalizeUserId(candidateId: string): string | undefined {
   // Return a normalized user ID, only if a valid user ID exists.
-  const id = candidateId.trim().toLowerCase();
+  const id = candidateId.trim();
 
-  if (id.match(/^[a-z0-9@^$.!`\-#+'~_|:]{1,128}$/)) {
+  if (id.match(/^[a-zA-Z0-9@^$.!`\-#+'~_|:]{1,128}$/)) {
     return id;
   }
 }

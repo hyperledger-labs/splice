@@ -60,6 +60,38 @@ class WalletFrontendIntegrationTest
       }
     }
 
+    "allow a random user with uppercase characters to onboard themselves, then tap and list coins" in {
+      implicit env =>
+        // Note: the test generates a unique user for each test
+        val newRandomUser = "UPPERCASE" + aliceWallet.config.damlUser
+
+        withFrontEnd("alice") { implicit webDriver =>
+          // Do not use browseToWallet below, because that waits for the user to be logged in, which is not the case here
+          go to s"http://localhost:3000"
+          click on "user-id-field"
+          textField("user-id-field").value = newRandomUser
+          click on "login-button"
+
+          // After a short delay, the UI should realize that the user is not onboarded,
+          // and switch to the onbaording page.
+          click on "onboard-button"
+          // The onboard button should immediately be disabled, to prevent further clicking.
+          find(id("onboard-button")) match {
+            case Some(e) => e.isEnabled shouldBe false
+            case _ => // The page went back to the default view before we could check the button
+          }
+
+          // After a short delay, the UI should realize that the user is now onboarded
+          // and switch to the default view.
+          click on "tap-amount-field"
+          numberField("tap-amount-field").underlying.sendKeys("15.0")
+          click on "tap-button"
+          eventually() {
+            findAll(className("coins-table-row")) should have size 1
+          }
+        }
+    }
+
     "show logged in user details" in { implicit env =>
       // Create directory entry for alice
       val aliceDamlUser = aliceWallet.config.damlUser

@@ -1,19 +1,20 @@
 package com.daml.network.wallet.store
 
-import scala.jdk.CollectionConverters.*
 import akka.NotUsed
 import akka.stream.scaladsl.Source
 import com.daml.network.codegen.java.cc.coin as coinCodegen
-import com.daml.network.codegen.java.cn.directory as directoryCodegen
-import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
+import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
+import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   payment as walletCodegen,
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
-import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
+import com.daml.network.codegen.java.cn.{
+  directory => directoryCodegen,
+  splitwise => splitwiseCodegen,
+}
 import com.daml.network.store.AcsStore
 import com.daml.network.util.{CoinUtil, JavaContract}
 import com.daml.network.wallet.store.memory.InMemoryUserWalletStore
@@ -28,6 +29,7 @@ import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
 import scala.concurrent.{ExecutionContext, Future}
+import scala.jdk.CollectionConverters.*
 
 /** A store for serving all queries for a specific wallet end-user. */
 trait UserWalletStore extends FlagCloseable with NamedLogging {

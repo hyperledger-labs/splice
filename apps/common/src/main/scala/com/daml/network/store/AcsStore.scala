@@ -1,10 +1,10 @@
 package com.daml.network.store
 
-import com.daml.ledger.javaapi.data.codegen.Contract as CodegenContract
 import akka.NotUsed
 import akka.stream.scaladsl.Source
+import com.daml.ledger.javaapi.data.codegen.Contract
 import com.daml.ledger.javaapi.data.codegen.{
-  Contract,
+  Contract => CodegenContract,
   ContractCompanion,
   ContractId,
   DamlRecord,
@@ -28,9 +28,9 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.grpc.Status
 
+import scala.annotation.nowarn
 import scala.collection.immutable
 import scala.concurrent.{ExecutionContext, Future}
-import scala.annotation.nowarn
 import scala.jdk.CollectionConverters.*
 
 /** A store for querying active contract sets.

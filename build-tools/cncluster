@@ -425,11 +425,7 @@ function _set_auth0_secret() {
   CLIENT_SECRET=${!CLIENT_SECRET_EV}
 
 
-  # TODO(#1946) Remove the workaround
-  # Currently, daml user names may not contain upper case characters
-  # Instead of modifying all places where the daml user names are used in our apps,
-  # we store a lower-cased user name in the kubernetes secret.
-  USER_NAME="$(echo "$CLIENT_ID" | tr '[:upper:]' '[:lower:]')@clients"
+  USER_NAME="${CLIENT_ID}@clients"
 
   WELL_KNOWN_URL='https://canton-network-dev.us.auth0.com/.well-known/openid-configuration'
 
