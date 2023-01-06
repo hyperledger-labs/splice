@@ -34,12 +34,12 @@ class PreflightIntegrationTest
 
     val auth0 = auth0UtilFromEnvVars("https://canton-network-dev.us.auth0.com")
 
-    val aliceUser = auth0.createUser();
+    val aliceUser = retryAuth0Calls(auth0.createUser());
     logger.debug(
       s"Created user Alice ${aliceUser.email} with password ${aliceUser.password} (id: ${aliceUser.id})"
     )
 
-    val bobUser = auth0.createUser();
+    val bobUser = retryAuth0Calls(auth0.createUser());
     logger.debug(
       s"Created user Bob ${bobUser.email} with password ${bobUser.password} (id: ${bobUser.id})"
     )
@@ -50,7 +50,7 @@ class PreflightIntegrationTest
 
   override def afterEach() = {
     super.afterEach();
-    auth0Users.values.map(_.close)
+    auth0Users.values.map(user => retryAuth0Calls(user.close))
   }
 
   private def loginAndOnboardToWalletUi(

@@ -4,6 +4,7 @@ import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.util.{Auth0Util, CommonCoinAppInstanceReferences}
 import com.digitalasset.canton.integration.*
+import com.auth0.exception.Auth0Exception
 
 /** Analogue to Canton's CommunityTests */
 object CoinTests {
@@ -65,7 +66,21 @@ object CoinTests {
       val clientId = readMandatoryEnvVar(s"${prefix}_MANAGEMENT_API_CLIENT_ID");
       val clientSecret = readMandatoryEnvVar(s"${prefix}_MANAGEMENT_API_CLIENT_SECRET");
 
-      new Auth0Util(domain, clientId, clientSecret)
+      retryAuth0Calls(new Auth0Util(domain, clientId, clientSecret))
+    }
+
+    def retryAuth0Calls[T](f: => T): T = {
+      eventually() {
+        try {
+          f
+        } catch {
+          case auth0Exception: Auth0Exception => {
+            logger.debug("Auth0 exception raised, triggering retry...")
+            fail(auth0Exception)
+          }
+          case ex: Throwable => throw ex // throw anything else
+        }
+      }
     }
   }
 }

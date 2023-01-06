@@ -470,7 +470,7 @@ class SplitwiseFrontendIntegrationTest
 
     "allow login via auth0" taggedAs LocalAuth0Test in { implicit env =>
       val auth0 = auth0UtilFromEnvVars("https://canton-network-test.us.auth0.com")
-      Using.resource(auth0.createUser()) { user =>
+      Using.resource(retryAuth0Calls(auth0.createUser())) { user =>
         logger.debug(s"Created user ${user.email} with password ${user.password} (id: ${user.id})")
         val userPartyId = aliceValidator.onboardUser(user.id)
 
