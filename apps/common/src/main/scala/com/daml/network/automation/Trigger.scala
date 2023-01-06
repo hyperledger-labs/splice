@@ -224,7 +224,7 @@ abstract class OnCreateTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T
 
 }
 
-/** A trigger based on regularly polling for new tasks.
+/** A trigger that regularly executes work.
   *
   * This is a very generic option for implementing a trigger.
   * Look at its child classes for useful specializations.
@@ -232,22 +232,25 @@ abstract class OnCreateTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T
 abstract class PollingTrigger[T: Pretty]()(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends Trigger[T]
+) extends Trigger
     with FlagCloseableAsync {
+
+  /** The main body of the polling trigger
+    *
+    * It should check whether there is work to be done and if yes, perform it.
+    * The return value signals `true` if another iteration of `performWorkIfAvailable` should
+    * be done immediately, and `false` if another iteration should only be done after
+    * the polling trigger's configured delay.
+    *
+    * Typically, the you should signal `True` to loop immediately iff
+    * there could be some more work to be done.
+    */
+  def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean]
 
   implicit private val loggingContext: ErrorLoggingContext =
     ErrorLoggingContext.fromTracedLogger(logger)(TraceContext.empty)
 
   private val pollingLoopRef = new AtomicReference[Option[Future[Unit]]](None)
-
-  /** Override with how to retrieve the list of tasks that should be processed in parallel right now.
-    *
-    * The DB queries underlying it SHOULD be efficient enough to run in a loop.
-    */
-  // TODO(M3-83): consider retrieving a Source of tasks so that the Source can run down an index and thus avoid
-  // expensive queries in Postgres due to having to skip deleted, but not yet VACUUMED tuples!
-  // This can be done using the seek method from https://use-the-index-luke.com/sql/partial-results/fetch-next-page
-  protected def retrieveTasks()(implicit tc: TraceContext): Future[Seq[T]]
 
   // TODO(tech-debt): expose such a shutdown signal as a future directly from `FlagCloseable`
   private val shutdownSignal = Promise[UnlessShutdown[Unit]]()
@@ -321,7 +324,7 @@ abstract class PollingTrigger[T: Pretty]()(implicit
                 exitPollingLoop()
               } else if (workDone) {
                 // If productive work was done in the previous iteration, then we loop without a delay.
-                pollingLoop(retrieveAndProcessTasks())
+                pollingLoop(performWorkIfAvailable())
               } else {
                 logger.trace(show"No tasks found. Sleeping for ${context.config.pollingInterval}")
                 loopWithDelay()
@@ -339,15 +342,6 @@ abstract class PollingTrigger[T: Pretty]()(implicit
     }
   }
 
-  /** Returns whether some useful work was done, i.e., at least one task completed. */
-  private def retrieveAndProcessTasks()(implicit traceContext: TraceContext): Future[Boolean] =
-    for {
-      tasks <- retrieveTasks()
-      // TODO(M3-83): review our triggers for whether the task retrieval for time-based triggers performs sufficiently well
-      // TODO(M3-83): consider building support for batching the commands resulting from the different tasks
-      tasksSucceeded <- tasks.parTraverse(processTaskWithRetry)
-    } yield tasksSucceeded.exists(succeeded => succeeded)
-
   override def closeAsync(): Seq[AsyncOrSyncCloseable] =
     Seq(
       AsyncCloseable(
@@ -362,11 +356,36 @@ abstract class PollingTrigger[T: Pretty]()(implicit
     )
 }
 
+/** A trigger that regularly polls for new tasks and executes them in parallel. */
+abstract class PollingParallelTaskExecutionTrigger[T: Pretty]()(implicit
+    ec: ExecutionContext,
+    tracer: Tracer,
+) extends PollingTrigger {
+
+  /** Override with how to retrieve the list of tasks that should be processed in parallel right now.
+    *
+    * The DB queries underlying it SHOULD be efficient enough to run in a loop.
+    */
+  // TODO(M3-83): consider retrieving a Source of tasks so that the Source can run down an index and thus avoid
+  // expensive queries in Postgres due to having to skip deleted, but not yet VACUUMED tuples!
+  // This can be done using the seek method from https://use-the-index-luke.com/sql/partial-results/fetch-next-page
+  protected def retrieveTasks()(implicit tc: TraceContext): Future[Seq[T]]
+
+  /** Returns whether some useful work was done, i.e., at least one task completed. */
+  override def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean] =
+    for {
+      tasks <- retrieveTasks()
+      // TODO(M3-83): review our triggers for whether the task retrieval for time-based triggers performs sufficiently well
+      // TODO(M3-83): consider building support for batching the commands resulting from the different tasks
+      tasksSucceeded <- tasks.parTraverse(processTaskWithRetry)
+    } yield tasksSucceeded.exists(succeeded => succeeded)
+}
+
 /** A trigger for scheduling tasks that only become ready after some future date. */
 abstract class ScheduledTaskTrigger[T: Pretty](implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends PollingTrigger[ScheduledTaskTrigger.ReadyTask[T]] {
+) extends PollingParallelTaskExecutionTrigger[ScheduledTaskTrigger.ReadyTask[T]] {
 
   /** Retrieve a list of tasks that are ready for execution now. */
   protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
