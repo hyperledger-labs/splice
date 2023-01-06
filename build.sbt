@@ -258,11 +258,10 @@ lazy val `apps-common-frontend` = {
       damlTsCodegenDir := baseDirectory.value / "daml.js",
       damlTsCodegen := BuildCommon.damlTsCodegenTask.value,
       // npm install settings:
-      npmPackageFiles := Seq(baseDirectory.value / "package.json"),
+      npmInstallDeps := baseDirectory.value / "package.json" +: damlTsCodegen.value,
       npmInstall := BuildCommon.npmInstallTask.value,
       npmRootDir := baseDirectory.value / "../..",
       Compile / compile := {
-        damlTsCodegen.value
         npmInstall.value
         (Compile / compile).value
       },
@@ -325,7 +324,6 @@ lazy val `apps-common-frontend` = {
 /** Common settings to be used for frontends. Requires settings commonFrontendBundle and frontendWorkspace to be specified.
   */
 lazy val sharedFrontendSettings: Seq[Setting[_]] = Seq(
-  (`apps-common-frontend` / npmPackageFiles) += baseDirectory.value / "package.json",
   bundle := BuildCommon.bundleFrontend.value,
   cleanFiles += baseDirectory.value / "build",
   cleanFiles += baseDirectory.value / "node_modules",

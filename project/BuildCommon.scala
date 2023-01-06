@@ -21,7 +21,7 @@ object BuildCommon {
       settingKey[File]("directory for auto-generated typescript for the daml models")
     lazy val damlTsCodegenSources = taskKey[Seq[File]]("dars to generate ts code from")
 
-    lazy val npmPackageFiles = settingKey[Seq[File]]("package.json file for npm")
+    lazy val npmInstallDeps = taskKey[Seq[File]]("Dependencies for npm install task")
     lazy val npmRootDir = settingKey[File]("npm workspaces root directory")
     lazy val npmInstall = taskKey[Seq[File]]("install npm dependencies")
     lazy val npmLint =
@@ -797,7 +797,7 @@ object BuildCommon {
       FileFunction.cached(cacheDir) { _ =>
         damlTsCodegenDir.value.delete()
         BuildUtil.runCommand("daml2ts" +: args, log)
-        Set(damlTsCodegenDir.value)
+        (baseDirectory.value / "daml.js" ** "*").get.toSet
       }
     cache(dars.toSet).toSeq
   }
@@ -807,7 +807,7 @@ object BuildCommon {
     * task will re-execute 'npm install' only if the package file has been modified.
     */
   lazy val npmInstallTask: Def.Initialize[Task[Seq[File]]] = Def.task {
-    val pkgs = npmPackageFiles.value
+    val pkgs = npmInstallDeps.value
     val log = streams.value.log
     val npmInstallScript = npmRootDir.value / "../build-tools/npm-install.sh"
     val cacheDir = streams.value.cacheDirectory
