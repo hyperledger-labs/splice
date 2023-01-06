@@ -120,12 +120,14 @@ class InMemoryAcsStore(
   override def signalWhenIngested(
       offset: String
   )(implicit tc: TraceContext): Future[Unit] = {
-    val alreadyIngested = stateVar.offset.exists(_ >= offset)
-    if (alreadyIngested) {
-      Future.successful(())
-    } else {
-      updateState(_.addOffsetToSignal(offset)).flatMap(p => p.future)
-    }
+    updateState[Future[Unit]](state =>
+      if (state.offset.exists(_ >= offset)) {
+        (state, Future.unit)
+      } else {
+        val (newState, promise) = state.addOffsetToSignal(offset)
+        (newState, promise.future)
+      }
+    ).flatten
   }
 
   private def offsetAndStateAfterIngestingAcs(): Future[(String, InMemoryAcsStore.State)] =
