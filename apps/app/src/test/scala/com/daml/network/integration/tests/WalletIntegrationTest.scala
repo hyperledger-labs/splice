@@ -190,7 +190,7 @@ class WalletIntegrationTest
           val failedAcceptF = Future(
             loggerFactory.assertThrowsAndLogs[CommandFailure](
               aliceWallet.acceptAppPaymentRequest(request),
-              _.errorMessage should include regex ("NOT_FOUND/.*AppPaymentRequest"),
+              _.errorMessage should include regex ("NOT_FOUND/.*(AppPaymentRequest|DeliveryOffer)"),
             )
           )
           val tap3F = Future(aliceWallet.tap(10))
@@ -243,7 +243,7 @@ class WalletIntegrationTest
             )
             forAtLeast(1, entries)( // fails
               _.message should include regex (
-                "GrpcRequestRefusedByServer: NOT_FOUND/.*AppPaymentRequest"
+                "GrpcRequestRefusedByServer: NOT_FOUND/.*(AppPaymentRequest|DeliveryOffer)"
               )
             )
           },
