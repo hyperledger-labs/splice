@@ -2,6 +2,7 @@
 
 import com.digitalasset.canton.data.CantonTimestamp
 import java.time.Duration
+import java.util.UUID
 
 // Onboard Test Parties
 val aliceUserName = aliceWallet.config.damlUser
@@ -19,7 +20,8 @@ utils.retry_until_true(aliceWallet.list().coins.length == 1)
 require(bobWallet.list().coins.length == 0)
 
 val expiration = CantonTimestamp.now().plus(Duration.ofMinutes(1))
-val transferOffer = aliceWallet.createTransferOffer(bobParty, 10.0, "p2ptransfer", expiration)
+val uuid = UUID.randomUUID().toString()
+val transferOffer = aliceWallet.createTransferOffer(bobParty, 10.0, "p2ptransfer", expiration, uuid)
 utils.retry_until_true(bobWallet.listTransferOffers().length == 1)
 bobWallet.acceptTransferOffer(transferOffer)
 

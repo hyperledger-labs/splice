@@ -148,7 +148,9 @@ In our example, Alice creates the transfer offer for bob::
   @ import com.digitalasset.canton.data.CantonTimestamp
   @ import java.time.Duration
   @ val expiration = CantonTimestamp.now().plus(Duration.ofMinutes(10))
-  @ val transferOffer = aliceWallet.createTransferOffer(bobParty, 10.0, "p2ptransfer", expiration)
+  @ import java.util.UUID
+  @ val uuid = UUID.randomUUID().toString()
+  @ val transferOffer = aliceWallet.createTransferOffer(bobParty, 10.0, "p2ptransfer", expiration, uuid)
 
 Bob can then see the transfer offer: ::
 

@@ -485,6 +485,7 @@ object GrpcWalletAppClient {
       description: String,
       expiresAt: CantonTimestamp,
       senderFeeTransferRatio: BigDecimal,
+      idempotencyKey: String,
   ) extends BaseCommand[
         v0.CreateTransferOfferRequest,
         v0.CreateTransferOfferResponse,
@@ -503,6 +504,7 @@ object GrpcWalletAppClient {
           description,
           Proto.encode(expiresAt),
           Proto.encode(senderFeeTransferRatio),
+          idempotencyKey,
         )
       )
     }

@@ -14,6 +14,7 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 
 import java.time.Duration
+import java.util.UUID
 
 class WalletTimeBasedIntegrationTest
     extends CoinIntegrationTest
@@ -355,6 +356,7 @@ class WalletTimeBasedIntegrationTest
           1.0,
           "should expire before accepted",
           expiration,
+          UUID.randomUUID.toString,
         )
       },
     )(
@@ -372,4 +374,5 @@ class WalletTimeBasedIntegrationTest
       aliceWallet.listAcceptedTransferOffers() should have length 0
     })
   }
+
 }

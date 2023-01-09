@@ -47,8 +47,18 @@ import io.grpc.Channel
 import io.grpc.stub.{AbstractStub, StreamObserver}
 
 import java.io.Closeable
+import com.google.protobuf.Duration
+
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
+
+sealed abstract class DedupConfig
+
+final case object NoDedup extends DedupConfig
+
+final case class DedupOffset(offset: String) extends DedupConfig
+
+final case class DedupDuration(duration: Duration) extends DedupConfig
 
 /** Ledger client built on top of the Java bindings. The Java equivalent of
   * com.daml.ledger.client.LedgerClient.
@@ -85,6 +95,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
     f(futureObserver)
     futureObserver.promise.future
   }
+
   private def withCredentials[T <: AbstractStub[T]](
       stub: T,
       token: Option[String],
@@ -138,7 +149,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       workflowId: String,
       applicationId: String,
       commandId: String,
-      deduplicationOffset: Option[String],
+      deduplicationOffsetOrDuration: DedupConfig,
       actAs: Seq[String],
       readAs: Seq[String],
       commands: Seq[Command],
@@ -151,9 +162,14 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       .addAllActAs(actAs.asJava)
       .addAllReadAs(readAs.asJava)
       .addAllCommands(commands.map(_.toProtoCommand).asJava)
-    deduplicationOffset.foreach { off =>
-      commandsBuilder.setDeduplicationOffset(off)
+    deduplicationOffsetOrDuration match {
+      case DedupOffset(offset) =>
+        commandsBuilder.setDeduplicationOffset(offset)
+      case DedupDuration(duration) =>
+        commandsBuilder.setDeduplicationDuration(duration)
+      case NoDedup =>
     }
+
     CommandServiceOuterClass.SubmitAndWaitRequest
       .newBuilder()
       .setCommands(commandsBuilder.build)
@@ -164,7 +180,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       workflowId: String,
       applicationId: String,
       commandId: String,
-      deduplicationOffset: Option[String],
+      deduplicationConfig: DedupConfig,
       actAs: Seq[String],
       readAs: Seq[String],
       commands: Seq[Command],
@@ -173,7 +189,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       workflowId,
       applicationId,
       commandId,
-      deduplicationOffset,
+      deduplicationConfig,
       actAs,
       readAs,
       commands,
@@ -187,7 +203,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       workflowId: String,
       applicationId: String,
       commandId: String,
-      deduplicationOffset: Option[String],
+      deduplicationConfig: DedupConfig,
       actAs: Seq[String],
       readAs: Seq[String],
       commands: Seq[Command],
@@ -196,7 +212,7 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
       workflowId,
       applicationId,
       commandId,
-      deduplicationOffset,
+      deduplicationConfig,
       actAs,
       readAs,
       commands,
@@ -282,6 +298,7 @@ object LedgerClient {
     override def onNext(result: T) = {
       this.result = Some(result)
     }
+
     override def onCompleted() = {
       promise.success(
         result.getOrElse(

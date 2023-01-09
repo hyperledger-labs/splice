@@ -205,12 +205,20 @@ class WalletAppClientReference(
       quantity: BigDecimal,
       description: String,
       expiresAt: CantonTimestamp,
+      idempotencyKey: String,
       senderFeeTransferRatio: BigDecimal = 1.0,
   ): transferOfferCodegen.TransferOffer.ContractId =
     consoleEnvironment.run {
       adminCommand(
         GrpcWalletAppClient
-          .CreateTransferOffer(receiver, quantity, description, expiresAt, senderFeeTransferRatio),
+          .CreateTransferOffer(
+            receiver,
+            quantity,
+            description,
+            expiresAt,
+            senderFeeTransferRatio,
+            idempotencyKey,
+          ),
         callCredentials,
       )
     }

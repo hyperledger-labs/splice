@@ -3,9 +3,11 @@ package com.daml.network.integration.tests
 import com.daml.network.codegen.java.cn.wallet.{payment as walletCodegen}
 import com.daml.network.integration.tests.CoinTests.CoinIntegrationTestWithSharedEnvironment
 import com.daml.network.util.WalletTestUtil
+import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.data.CantonTimestamp
 
 import java.time.Duration
+import java.util.UUID
 import scala.jdk.CollectionConverters.*
 
 class WalletPaymentIntegrationTest
@@ -123,11 +125,29 @@ class WalletPaymentIntegrationTest
       val expiration = CantonTimestamp.now().plus(Duration.ofMinutes(1))
 
       val offer =
-        aliceWallet.createTransferOffer(bobUserParty, 1.0, "direct transfer test", expiration)
+        aliceWallet.createTransferOffer(
+          bobUserParty,
+          1.0,
+          "direct transfer test",
+          expiration,
+          UUID.randomUUID.toString,
+        )
       val offer2 =
-        aliceWallet.createTransferOffer(bobUserParty, 2.0, "to be rejected", expiration)
+        aliceWallet.createTransferOffer(
+          bobUserParty,
+          2.0,
+          "to be rejected",
+          expiration,
+          UUID.randomUUID.toString,
+        )
       val offer3 =
-        aliceWallet.createTransferOffer(bobUserParty, 3.0, "to be withdrawn", expiration)
+        aliceWallet.createTransferOffer(
+          bobUserParty,
+          3.0,
+          "to be withdrawn",
+          expiration,
+          UUID.randomUUID.toString,
+        )
 
       eventually() {
         aliceWallet.listTransferOffers() should have length 3
@@ -161,5 +181,46 @@ class WalletPaymentIntegrationTest
         },
       )
     }
+
+    "deduplicate transfer offers" in { implicit env =>
+      onboardWalletUser(aliceWallet, aliceValidator)
+      val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
+      aliceWallet.tap(100.0)
+
+      val expiration = CantonTimestamp.now().plus(Duration.ofMinutes(5))
+
+      val idempotencyKey = "dummy-key"
+
+      val offerId = aliceWallet.createTransferOffer(
+        bobUserParty,
+        1.0,
+        "direct transfer test",
+        expiration,
+        idempotencyKey,
+      )
+
+      assertThrows[CommandFailure](
+        loggerFactory.assertLogs(
+          aliceWallet.createTransferOffer(
+            bobUserParty,
+            1.0,
+            "direct transfer test - resubmitting",
+            expiration,
+            idempotencyKey,
+          ),
+          _.errorMessage should include("Command submission already exists"),
+        )
+      )
+
+      eventually() {
+        inside(aliceWallet.listTransferOffers()) { case Seq(t) =>
+          t.contractId should be(offerId)
+        }
+        inside(aliceWallet.listTransferOffers()) { case Seq(t) =>
+          t.contractId should be(offerId)
+        }
+      }
+    }
+
   }
 }

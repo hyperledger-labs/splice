@@ -2,10 +2,10 @@ package com.daml.network.wallet.admin.grpc
 
 import com.daml.ledger.javaapi.data.Template
 import com.daml.ledger.javaapi.data.codegen.{
-  Contract => CodegenContract,
   ContractCompanion,
   ContractId,
   Update,
+  Contract as CodegenContract,
 }
 import com.daml.network.auth.AuthInterceptor
 import com.daml.network.codegen.java.cc.api.v1
@@ -24,8 +24,15 @@ import com.daml.network.codegen.java.cn.wallet.{
   subscriptions as subsCodegen,
   transferoffer as transferOffersCodegen,
 }
-import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
-import com.daml.network.util.{CoinUtil, JavaContract => Contract, Proto}
+import com.daml.network.environment.CoinLedgerConnection.CommandId
+import com.daml.network.environment.{
+  CoinLedgerClient,
+  CoinLedgerConnection,
+  CoinRetries,
+  DedupConfig,
+  DedupDuration,
+}
+import com.daml.network.util.{CoinUtil, Proto, JavaContract as Contract}
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.daml.network.wallet.v0.*
@@ -37,6 +44,7 @@ import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.{Spanning, TraceContext}
 import com.digitalasset.canton.util.ErrorUtil
 import com.digitalasset.canton.util.ShowUtil.*
+import com.google.protobuf.Duration
 import com.google.protobuf.empty.Empty
 import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
@@ -435,25 +443,43 @@ class GrpcWalletService(
   ): Future[CreateTransferOfferResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth { user =>
-        exerciseWalletAction((installCid, _) => {
-          val receiver = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
-          val quantity = Proto.tryDecode(Proto.JavaBigDecimal)(request.quantity)
-          val expiresAt = Proto.tryDecode(Proto.Timestamp)(request.expiresAt)
-          val senderTransferFeeRatio =
-            Proto.tryDecode(Proto.JavaBigDecimal)(request.senderTransferFeeRatio)
-          Future.successful(
-            installCid.exerciseWalletAppInstall_CreateTransferOffer(
-              receiver.toProtoPrimitive,
-              new PaymentQuantity(quantity, Currency.CC),
-              request.description,
-              expiresAt.toInstant,
-              senderTransferFeeRatio,
+        {
+          val sender = getUserWallet(user).store.key.endUserParty
+          exerciseWalletAction((installCid, _) => {
+            val receiver = Proto.tryDecode(Proto.Party)(request.receiverPartyId)
+            val quantity = Proto.tryDecode(Proto.JavaBigDecimal)(request.quantity)
+            val expiresAt = Proto.tryDecode(Proto.Timestamp)(request.expiresAt)
+            val senderTransferFeeRatio =
+              Proto.tryDecode(Proto.JavaBigDecimal)(request.senderTransferFeeRatio)
+            Future.successful(
+              installCid.exerciseWalletAppInstall_CreateTransferOffer(
+                receiver.toProtoPrimitive,
+                new PaymentQuantity(quantity, Currency.CC),
+                request.description,
+                expiresAt.toInstant,
+                senderTransferFeeRatio,
+              )
             )
+          })(
+            user,
+            cid => v0.CreateTransferOfferResponse(Proto.encodeContractId(cid.exerciseResult)),
+            dedup = Some(
+              (
+                CoinLedgerConnection.CommandId(
+                  "com.daml.network.wallet.createTransferOffer",
+                  Seq(
+                    sender,
+                    Proto.tryDecode(Proto.Party)(request.receiverPartyId),
+                  ),
+                  request.idempotencyKey,
+                ),
+                DedupDuration(
+                  Duration.newBuilder().setSeconds(60 * 60 * 24).build()
+                ), // 24 hours, similar to Stripe's API, documented at https://stripe.com/docs/api/idempotent_requests
+              )
+            ),
           )
-        })(
-          user,
-          cid => v0.CreateTransferOfferResponse(Proto.encodeContractId(cid.exerciseResult)),
-        )
+        }
       }
     }
 
@@ -648,21 +674,37 @@ class GrpcWalletService(
   )(
       user: String,
       getResponse: ChoiceResult => Response,
+      dedup: Option[(CommandId, DedupConfig)] = None,
   )(implicit
       traceContext: TraceContext
-  ): Future[Response] =
+  ): Future[Response] = {
     for {
       userStore <- getUserStore(user)
       userParty = userStore.key.endUserParty
       install <- userStore.getInstall()
       update <- getUpdate(install.contractId, userStore)
-      result <- connection
-        .submitWithResultNoDedup(
-          Seq(walletServiceParty),
-          Seq(validatorParty, userParty),
-          update,
-        )
-    } yield getResponse(result)
+      result <- dedup match {
+        case None =>
+          connection.submitWithResultNoDedup(
+            Seq(walletServiceParty),
+            Seq(validatorParty, userParty),
+            update,
+          )
+        case Some((commandId, dedupConfig)) =>
+          connection
+            .submitWithResult(
+              Seq(walletServiceParty),
+              Seq(validatorParty, userParty),
+              update,
+              commandId,
+              dedupConfig,
+            )
+      }
+
+    } yield {
+      getResponse(result)
+    }
+  }
 
   @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
   private def selectCoin(

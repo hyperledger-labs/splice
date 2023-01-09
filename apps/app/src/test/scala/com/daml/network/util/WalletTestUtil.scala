@@ -4,8 +4,8 @@ import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
 import com.daml.network.codegen.java.cn.wallet.{
-  payment => paymentCodegen,
-  subscriptions => subsCodegen,
+  payment as paymentCodegen,
+  subscriptions as subsCodegen,
 }
 import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
@@ -26,6 +26,7 @@ import com.digitalasset.canton.topology.PartyId
 
 import java.time.temporal.ChronoUnit
 import java.time.{Duration, Instant}
+import java.util.UUID
 import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
@@ -179,6 +180,7 @@ trait WalletTestUtil extends CoinTestCommon {
         amount,
         "test transfer",
         expiration,
+        idempotencyKey = UUID.randomUUID.toString,
         senderTransferFeeRatio,
       )
     eventually() {

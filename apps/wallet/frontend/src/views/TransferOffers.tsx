@@ -7,6 +7,7 @@ import {
 } from 'common-frontend';
 import { Decimal } from 'decimal.js';
 import React, { useCallback, useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 
 import {
   Button,
@@ -76,6 +77,7 @@ const TransferOffers: React.FC = () => {
   const [transferExpirationUnit, setTransferExpirationUnit] = useState<TimeUnits>(
     OTimeUnits.seconds
   );
+  const [idempotencyKey, setIdempotencyKey] = useState<string>('');
   const createOffer = async () => {
     const now = new Date();
     let expires = now;
@@ -98,7 +100,8 @@ const TransferOffers: React.FC = () => {
       transferQuantity,
       transferDescription,
       expires,
-      senderTransferFeeRatio
+      senderTransferFeeRatio,
+      idempotencyKey
     );
   };
 
@@ -112,6 +115,7 @@ const TransferOffers: React.FC = () => {
     setTransferDescription('');
     setTransferExpirationValue(new Decimal(0));
     setTransferExpirationUnit(OTimeUnits.seconds);
+    setIdempotencyKey(uuidv4());
     setCreateOfferOpen(true);
   };
   const closeCreateOffer = () => {
