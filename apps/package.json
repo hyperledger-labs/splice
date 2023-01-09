@@ -2,6 +2,7 @@
   "workspaces": [
     "common/frontend-protobuf",
     "common/frontend-openapi",
+    "validator/frontend-openapi",
     "common/frontend",
     "directory/frontend",
     "wallet/frontend",

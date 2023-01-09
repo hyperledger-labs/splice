@@ -221,6 +221,57 @@ lazy val `apps-validator` =
             framework = "akka-http",
           ),
         ),
+      Compile / sourceGenerators += Def.task {
+        import better.files.*
+        import _root_.io.circe.*
+        import _root_.io.circe.parser.*
+        import _root_.io.circe.optics.JsonPath.*
+        import _root_.io.circe.optics.JsonPath.{root => jsonRoot}
+        import _root_.io.circe.syntax._
+
+        val log = streams.value.log
+        val cacheDir = streams.value.cacheDirectory
+        val validatorSpec = baseDirectory.value / "src/main/openapi/validator.yaml"
+        val cache = FileFunction.cached(cacheDir) { _ =>
+          runCommand(
+            Seq(
+              "openapi-generator-cli",
+              "generate",
+              "-g",
+              "typescript",
+              "-p",
+              "npmName=validator-openapi",
+              "-p",
+              "npmName=validator-openapi",
+              "-p",
+              "moduleName=validator-openapi",
+              "-p",
+              "projectName=validator-openapi",
+              "-p",
+              "useTags=true",
+              "-i",
+              validatorSpec.toString,
+              "-o",
+              "apps/validator/frontend-openapi",
+            ),
+            log,
+          )
+
+          // Add empty check task to make npm happy
+          val packageJson = File("apps/validator/frontend-openapi/package.json")
+          val packageJsonContent = packageJson.contentAsString
+          val doc: Json =
+            parse(packageJsonContent).getOrElse(sys.error("Failed to parse package.json"))
+          val updated = jsonRoot.scripts.obj.modify((obj: JsonObject) =>
+            obj.add("check", "echo '[validator-frontend-openapi] no-op'".asJson)
+          )(doc)
+          packageJson.overwrite(updated.spaces2)
+          ((baseDirectory.value ** "*") --- ((baseDirectory.value / "target" +++ baseDirectory.value / "dist") ** "*")).get.toSet
+        }
+        cache(Set(validatorSpec))
+        // We need to return an empty Seq here, otherwise SBT tries to compile the typescript files as Scala files.
+        Seq()
+      }.taskValue,
     )
 
 lazy val `apps-svc` =
@@ -300,6 +351,12 @@ lazy val `apps-common-frontend` = {
             )
             runCommand(
               Seq("npm", "run", "build", "--workspace", "common-frontend"),
+              log,
+              None,
+              Some(npmRootDir.value),
+            )
+            runCommand(
+              Seq("npm", "run", "build", "--workspace", "validator/frontend-openapi"),
               log,
               None,
               Some(npmRootDir.value),
@@ -414,6 +471,7 @@ lazy val `apps-common-frontend-openapi` = {
             ),
             log,
           )
+
           // Add empty check task to make npm happy
           val packageJson = File("apps/common/frontend-openapi/package.json")
           val packageJsonContent = packageJson.contentAsString
