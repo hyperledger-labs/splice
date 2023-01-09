@@ -24,6 +24,8 @@ trait DirectoryStore extends AutoCloseable {
 
   import AcsStore.QueryResult
 
+  implicit protected def ec: ExecutionContext
+
   /** The sink to use for ingesting data from the ledger into this store. */
   val acsIngestionSink: AcsStore.IngestionSink
 
@@ -39,31 +41,38 @@ trait DirectoryStore extends AutoCloseable {
   def svcParty: PartyId
 
   /** Lookup the directory install for a user */
-  def lookupInstallByUser(
+  def lookupInstallByUserWithOffset(
       user: PartyId
   ): Future[QueryResult[Option[
     Contract[directoryCodegen.DirectoryInstall.ContractId, directoryCodegen.DirectoryInstall]
   ]]] =
-    acs.findContract(directoryCodegen.DirectoryInstall.COMPANION)(co =>
+    acs.findContractWithOffset(directoryCodegen.DirectoryInstall.COMPANION)(co =>
       co.payload.user == user.toProtoPrimitive
     )
 
   /** Lookup a directory entry by name. */
-  def lookupEntryByName(
+  def lookupEntryByNameWithOffset(
       name: String
   ): Future[QueryResult[
     Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
   ]] =
-    acs.findContract(directoryCodegen.DirectoryEntry.COMPANION)(co => co.payload.name == name)
+    acs.findContractWithOffset(directoryCodegen.DirectoryEntry.COMPANION)(co =>
+      co.payload.name == name
+    )
+
+  def lookupEntryByName(name: String): Future[
+    Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
+  ] =
+    lookupEntryByNameWithOffset(name).map(_.value)
 
   /** Lookup a directory entry by party.
     * If there are multiple candidate entries, then oldest one is returned.
     */
   def lookupEntryByParty(
       partyId: PartyId
-  ): Future[QueryResult[
+  ): Future[
     Option[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
-  ]] =
+  ] =
     acs.findContract(directoryCodegen.DirectoryEntry.COMPANION)(co =>
       co.payload.user == partyId.toProtoPrimitive
     )
@@ -71,43 +80,38 @@ trait DirectoryStore extends AutoCloseable {
   /** List all directory entries that are active as of a specific revision, up to a certain number. */
   // TODO(#300): allow submitting the page token to receive the next page
   // TODO(#300): at the moment, trimming the list to the right size is performed here, that should be moved to the acsStore
-  def listEntries(namePrefix: String, pageSize: Int)(implicit
-      executionContext: ExecutionContext
-  ): Future[QueryResult[
+  def listEntries(namePrefix: String, pageSize: Int): Future[
     Seq[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
-  ]] =
+  ] =
     for {
-      QueryResult(off, list) <- acs.listContracts(
+      list <- acs.listContracts(
         directoryCodegen.DirectoryEntry.COMPANION,
         (entry: Contract[
           directoryCodegen.DirectoryEntry.ContractId,
           directoryCodegen.DirectoryEntry,
         ]) => entry.payload.name.startsWith(namePrefix),
       )
-    } yield QueryResult(off, list.take(pageSize))
+    } yield list.take(pageSize)
 
-  def listExpiredDirectoryEntries(now: CantonTimestamp, limit: Int)(implicit
-      ec: ExecutionContext
-  ): Future[QueryResult[
+  def listExpiredDirectoryEntries(now: CantonTimestamp, limit: Int): Future[
     Seq[Contract[directoryCodegen.DirectoryEntry.ContractId, directoryCodegen.DirectoryEntry]]
-  ]] =
+  ] =
     acs
       .listContracts(directoryCodegen.DirectoryEntry.COMPANION)
       .map(
-        _.map(entries =>
-          entries.iterator
-            .filter(e => now.toInstant.isAfter(e.payload.expiresAt))
-            .take(limit)
-            .toSeq
-        )
+        _.iterator
+          .filter(e => now.toInstant.isAfter(e.payload.expiresAt))
+          .take(limit)
+          .toSeq
       )
 
-  def listExpiredDirectorySubscriptions(now: CantonTimestamp, limit: Int)(implicit
-      ex: ExecutionContext
+  def listExpiredDirectorySubscriptions(
+      now: CantonTimestamp,
+      limit: Int,
   ): Future[Seq[DirectoryStore.IdleDirectorySubscription]] =
     for {
       allSubscriptions <- acs.listContracts(subsCodegen.SubscriptionIdleState.COMPANION)
-      dueSubscriptions = allSubscriptions.value.filter(e =>
+      dueSubscriptions = allSubscriptions.filter(e =>
         now.toInstant.isAfter(e.payload.nextPaymentDueAt)
       )
       // Join with the DirectoryEntryContexts
@@ -119,7 +123,7 @@ trait DirectoryStore extends AutoCloseable {
                 subscription.payload.subscriptionData.context
               )
             )
-            .map(context => (subscription, context.value))
+            .map(context => (subscription, context))
         }
       // Only deliver the ones referencing an active directory entry context
       // TODO(tech-debt): consider whether this kind of join might be leading to stale subscriptions not being expired.

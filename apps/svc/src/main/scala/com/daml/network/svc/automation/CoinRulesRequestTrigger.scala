@@ -4,7 +4,6 @@ import akka.stream.Materializer
 import com.daml.network.automation.{OnCreateTrigger, TriggerContext}
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinLedgerConnection
-import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.svc.store.SvcStore
 import com.daml.network.util.JavaContract
 import com.digitalasset.canton.topology.PartyId
@@ -36,13 +35,9 @@ class CoinRulesRequestTrigger(
   )(implicit tc: TraceContext): Future[String] = {
     val validatorParty = PartyId.tryFromProtoPrimitive(req.payload.user)
     for {
-      QueryResult(_, openMiningRounds) <- store.acs.listContracts(
-        cc.round.OpenMiningRound.COMPANION
-      )
-      QueryResult(_, issuingMiningRounds) <- store.acs.listContracts(
-        cc.round.IssuingMiningRound.COMPANION
-      )
-      QueryResult(_, coinRules) <- store.getCoinRules()
+      openMiningRounds <- store.acs.listContracts(cc.round.OpenMiningRound.COMPANION)
+      issuingMiningRounds <- store.acs.listContracts(cc.round.IssuingMiningRound.COMPANION)
+      coinRules <- store.getCoinRules()
       cmds = req.contractId
         .exerciseCoinRulesRequest_Accept(
           coinRules.contractId,

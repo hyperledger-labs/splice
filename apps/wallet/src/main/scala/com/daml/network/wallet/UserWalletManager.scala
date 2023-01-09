@@ -5,7 +5,6 @@ import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.install.WalletAppInstall
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
-import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{HasHealth, JavaContract as Contract}
 import com.daml.network.wallet.config.TreasuryConfig
 import com.daml.network.wallet.store.{UserWalletStore, WalletStore}
@@ -98,21 +97,19 @@ class UserWalletManager(
       tc: TraceContext
   ): Future[Seq[Contract[coinCodegen.ValidatorReward.ContractId, coinCodegen.ValidatorReward]]] =
     for {
-      QueryResult(_, validatorRights) <- validatorUserStore.acs.listContracts(
-        coinCodegen.ValidatorRight.COMPANION
-      )
+      validatorRights <- validatorUserStore.acs.listContracts(coinCodegen.ValidatorRight.COMPANION)
       users = validatorRights.map(c => PartyId.tryFromProtoPrimitive(c.payload.user)).toSet
       validatorRewardsFs: Seq[
         Future[Seq[Contract[coinCodegen.ValidatorReward.ContractId, coinCodegen.ValidatorReward]]]
       ] = users.toSeq
         .map(u =>
           store.lookupInstallByParty(u).flatMap {
-            case QueryResult(_, None) =>
+            case None =>
               logger.warn(
                 s"ValidatorRight of ${validatorUserStore.key.endUserParty} for end-user party $u has no associated WalletAppInstall contract."
               )
               Future.successful(Seq.empty)
-            case QueryResult(_, Some(install)) =>
+            case Some(install) =>
               this.lookupUserWallet(install.payload.endUserName) match {
                 case None =>
                   logger.warn(
@@ -120,9 +117,7 @@ class UserWalletManager(
                   )
                   Future.successful(Seq.empty)
                 case Some(userWallet) =>
-                  userWallet.store.acs
-                    .listContracts(coinCodegen.ValidatorReward.COMPANION)
-                    .map(_.value)
+                  userWallet.store.acs.listContracts(coinCodegen.ValidatorReward.COMPANION)
               }
           }
         )

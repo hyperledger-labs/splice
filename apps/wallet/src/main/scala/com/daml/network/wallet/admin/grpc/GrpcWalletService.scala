@@ -25,7 +25,6 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
-import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{CoinUtil, JavaContract => Contract, Proto}
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
@@ -70,7 +69,7 @@ class GrpcWalletService(
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth { user =>
         for {
-          QueryResult(_, optInstall) <- store.lookupInstallByName(user)
+          optInstall <- store.lookupInstallByName(user)
         } yield {
           v0.UserStatusResponse(
             partyId = optInstall.fold("")(co => co.payload.endUserParty),
@@ -141,7 +140,7 @@ class GrpcWalletService(
       withAuth { user =>
         for {
           userStore <- getUserStore(user)
-          QueryResult(_, contracts) <- userStore.acs.listContracts(templateCompanion)
+          contracts <- userStore.acs.listContracts(templateCompanion)
         } yield mkResponse(contracts.map(_.toProtoV0))
       }
     }
@@ -152,11 +151,9 @@ class GrpcWalletService(
         for {
           userStore <- getUserStore(user)
           now = clock.now
-          currentRound <- store
-            .getLatestOpenMiningRound(now)
-            .map(_.value.payload.round.number)
-          QueryResult(_, coins) <- userStore.acs.listContracts(coinCodegen.Coin.COMPANION)
-          QueryResult(_, lockedCoins) <- userStore.acs.listContracts(
+          currentRound <- store.getLatestOpenMiningRound(now).map(_.payload.round.number)
+          coins <- userStore.acs.listContracts(coinCodegen.Coin.COMPANION)
+          lockedCoins <- userStore.acs.listContracts(
             coinCodegen.LockedCoin.COMPANION
           )
         } yield v0.ListResponse(
@@ -199,14 +196,10 @@ class GrpcWalletService(
       withAuth { user =>
         for {
           userStore <- getUserStore(user)
-          QueryResult(_, coins) <- userStore.acs.listContracts(coinCodegen.Coin.COMPANION)
-          QueryResult(_, lockedCoins) <- userStore.acs.listContracts(
-            coinCodegen.LockedCoin.COMPANION
-          )
+          coins <- userStore.acs.listContracts(coinCodegen.Coin.COMPANION)
+          lockedCoins <- userStore.acs.listContracts(coinCodegen.LockedCoin.COMPANION)
           now = clock.now
-          currentRound <- store
-            .getLatestOpenMiningRound(now)
-            .map(_.value.payload.round.number)
+          currentRound <- store.getLatestOpenMiningRound(now).map(_.payload.round.number)
         } yield {
           val unlockedHoldingFees =
             coins.view.map(c => BigDecimal(CoinUtil.holdingFee(c.payload, currentRound))).sum
@@ -295,13 +288,11 @@ class GrpcWalletService(
       withAuth { user =>
         for {
           userStore <- getUserStore(user)
-          QueryResult(_, subscriptions) <- userStore.acs.listContracts(
-            subsCodegen.Subscription.COMPANION
-          )
-          QueryResult(_, subscriptionIdleStates) <- userStore.acs.listContracts(
+          subscriptions <- userStore.acs.listContracts(subsCodegen.Subscription.COMPANION)
+          subscriptionIdleStates <- userStore.acs.listContracts(
             subsCodegen.SubscriptionIdleState.COMPANION
           )
-          QueryResult(_, subscriptionPayments) <- userStore.acs.listContracts(
+          subscriptionPayments <- userStore.acs.listContracts(
             subsCodegen.SubscriptionPayment.COMPANION
           )
         } yield {
@@ -415,7 +406,7 @@ class GrpcWalletService(
                 c.contractId.toInterface(v1.coin.ValidatorReward.INTERFACE)
               )
             )
-          QueryResult(_, appRewards) <- userStore.acs.listContracts(coinCodegen.AppReward.COMPANION)
+          appRewards <- userStore.acs.listContracts(coinCodegen.AppReward.COMPANION)
           appRewardInputs = appRewards
             .filter(c => c.payload.round.number == request.round)
             .map(c =>
@@ -582,23 +573,6 @@ class GrpcWalletService(
     )
   }
 
-  private def getUserInstallContract(
-      userWalletStore: UserWalletStore,
-      userParty: PartyId,
-  ): Future[
-    Contract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
-  ] =
-    for {
-      installO <- userWalletStore.lookupInstall()
-      install = installO match {
-        case QueryResult(_, None) =>
-          throw new StatusRuntimeException(
-            Status.NOT_FOUND.withDescription(s"WalletAppInstall contract of user $userParty")
-          )
-        case QueryResult(_, Some(install)) => install
-      }
-    } yield install
-
   /** Executes a wallet action by calling the `WalletAppInstall_ExecuteBatch` choice on the WalletAppInstall
     * contract of the given end user.
     *
@@ -680,7 +654,7 @@ class GrpcWalletService(
     for {
       userStore <- getUserStore(user)
       userParty = userStore.key.endUserParty
-      install <- getUserInstallContract(userStore, userParty)
+      install <- userStore.getInstall()
       update <- getUpdate(install.contractId, userStore)
       result <- connection
         .submitWithResultNoDedup(
@@ -700,8 +674,8 @@ class GrpcWalletService(
     for {
       currentRound <- store
         .getLatestOpenMiningRound(now)
-        .map(_.value.payload.round.number)
-      QueryResult(_, coins) <- userStore.acs.listContracts(coinCodegen.Coin.COMPANION)
+        .map(_.payload.round.number)
+      coins <- userStore.acs.listContracts(coinCodegen.Coin.COMPANION)
       candidates = coins
         .filter(c => CoinUtil.currentQuantity(c.payload, currentRound).compareTo(quantity) >= 0)
     } yield {

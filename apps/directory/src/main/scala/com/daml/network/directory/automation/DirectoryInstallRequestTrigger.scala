@@ -50,7 +50,7 @@ class DirectoryInstallRequestTrigger(
   )(implicit tc: TraceContext): Future[String] = {
     val user = PartyId.tryFromProtoPrimitive(req.payload.user)
     val provider = store.providerParty
-    store.lookupInstallByUser(user).flatMap {
+    store.lookupInstallByUserWithOffset(user).flatMap {
       case QueryResult(_, Some(_)) =>
         logger.info(s"Rejecting duplicate install request from user party $user")
         val cmd = req.contractId

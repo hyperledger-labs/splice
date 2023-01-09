@@ -80,7 +80,7 @@ class SubscriptionPaymentTrigger(
       context <- store.acs
         .lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(contextId)
         .map(
-          _.value.getOrElse(
+          _.getOrElse(
             throw new IllegalStateException(
               s"Invariant violation: subscription context $contextId not known"
             )
@@ -90,7 +90,7 @@ class SubscriptionPaymentTrigger(
       // TODO(M3-03): understand what kind of assertions are worth checking here for defensive programming
       entryName = context.payload.name
       // check whether the entry exists
-      result <- store.lookupEntryByName(entryName).flatMap {
+      result <- store.lookupEntryByNameWithOffset(entryName).flatMap {
         case QueryResult(off, Some(entry)) =>
           // collect the payment and renew the entry
           collectPayment(entry, off, transferContext)

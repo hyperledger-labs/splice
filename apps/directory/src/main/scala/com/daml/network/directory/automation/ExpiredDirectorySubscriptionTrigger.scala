@@ -1,5 +1,7 @@
 package com.daml.network.directory.automation
 
+import cats.instances.future.*
+import cats.data.OptionT
 import com.daml.network.automation.{ScheduledTaskTrigger, TriggerContext}
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
@@ -44,18 +46,16 @@ class ExpiredDirectorySubscriptionTrigger(
   override protected def isStaleTask(
       task: ScheduledTaskTrigger.ReadyTask[DirectoryStore.IdleDirectorySubscription]
   )(implicit tc: TraceContext): Future[Boolean] =
-    for {
-      // TODO(tech-debt): remove the ubiquitous use of QueryResult and switch to cats monad transformers here
-      staleState <- store.acs
-        .lookupContractById(subsCodegen.SubscriptionIdleState.COMPANION)(
+    (for {
+      _ <- OptionT(
+        store.acs.lookupContractById(subsCodegen.SubscriptionIdleState.COMPANION)(
           task.work.state.contractId
         )
-        .map(_.value.isEmpty)
-      staleContext <- store.acs
-        .lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(
+      )
+      _ <- OptionT(
+        store.acs.lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(
           task.work.context.contractId
         )
-        .map(_.value.isEmpty)
-    } yield (staleState || staleContext)
-
+      )
+    } yield ()).isEmpty
 }

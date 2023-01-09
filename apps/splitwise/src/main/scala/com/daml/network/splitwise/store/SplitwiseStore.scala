@@ -17,42 +17,51 @@ trait SplitwiseStore extends AutoCloseable {
 
   val acsIngestionSink: AcsStore.IngestionSink
 
+  implicit protected def ec: ExecutionContext
+
   val acs: AcsStore
 
   def providerParty: PartyId
 
-  def lookupInstall(
+  def lookupInstallWithOffset(
       user: PartyId
   ): Future[QueryResult[Option[
     Contract[splitwiseCodegen.SplitwiseInstall.ContractId, splitwiseCodegen.SplitwiseInstall]
   ]]] =
-    acs.findContract(splitwiseCodegen.SplitwiseInstall.COMPANION)(co =>
+    acs.findContractWithOffset(splitwiseCodegen.SplitwiseInstall.COMPANION)(co =>
       co.payload.user == user.toProtoPrimitive
     )
 
-  def lookupGroup(
+  def lookupInstall(user: PartyId): Future[Option[
+    Contract[splitwiseCodegen.SplitwiseInstall.ContractId, splitwiseCodegen.SplitwiseInstall]
+  ]] =
+    lookupInstallWithOffset(user).map(_.value)
+
+  def lookupGroupWithOffset(
       owner: PartyId,
       id: splitwiseCodegen.GroupId,
   ): Future[
     QueryResult[Option[Contract[splitwiseCodegen.Group.ContractId, splitwiseCodegen.Group]]]
   ] =
-    acs.findContract(splitwiseCodegen.Group.COMPANION)(co =>
+    acs.findContractWithOffset(splitwiseCodegen.Group.COMPANION)(co =>
       co.payload.owner == owner.toProtoPrimitive && co.payload.id == id
     )
+
+  def lookupGroup(
+      owner: PartyId,
+      id: splitwiseCodegen.GroupId,
+  ): Future[Option[Contract[splitwiseCodegen.Group.ContractId, splitwiseCodegen.Group]]] =
+    lookupGroupWithOffset(owner, id).map(_.value)
 
   def getGroup(
       owner: PartyId,
       id: splitwiseCodegen.GroupId,
-  )(implicit
-      ec: ExecutionContext
-  ): Future[QueryResult[Contract[splitwiseCodegen.Group.ContractId, splitwiseCodegen.Group]]] =
+  ): Future[Contract[splitwiseCodegen.Group.ContractId, splitwiseCodegen.Group]] =
     lookupGroup(owner, id).map(
-      _.map(
-        _.getOrElse(
-          throw new StatusRuntimeException(
-            Status.NOT_FOUND.withDescription(
-              s"No active Group contract for owner $owner and id $id"
-            )
+      _.getOrElse(
+        throw new StatusRuntimeException(
+          Status.NOT_FOUND.withDescription(
+            s"No active Group contract for owner $owner and id $id"
           )
         )
       )

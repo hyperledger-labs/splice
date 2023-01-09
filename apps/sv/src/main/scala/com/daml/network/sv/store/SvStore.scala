@@ -27,65 +27,49 @@ trait SvStore extends AutoCloseable {
   /** The [[com.daml.network.store.AcsStore]] used to back the default implementation of the queries. */
   val acs: AcsStore
 
-  def lookupCoinRules(
+  def lookupCoinRulesWithOffset(
   ): Future[
     QueryResult[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]
   ] =
-    acs.findContract(cc.coin.CoinRules.COMPANION)(_ => true)
+    acs.findContractWithOffset(cc.coin.CoinRules.COMPANION)(_ => true)
 
   def getCoinRules(
   )(implicit
       ec: ExecutionContext
-  ): Future[QueryResult[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
-    lookupCoinRules().map(
-      _.map(
-        _.getOrElse(
-          throw new StatusRuntimeException(
-            Status.NOT_FOUND.withDescription("No active CoinRules contract")
-          )
+  ): Future[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]] =
+    lookupCoinRulesWithOffset().map(
+      _.value.getOrElse(
+        throw new StatusRuntimeException(
+          Status.NOT_FOUND.withDescription("No active CoinRules contract")
         )
       )
-    )
-
-  def lookupValidatorRightByParty(
-      party: PartyId
-  ): Future[
-    QueryResult[Option[Contract[cc.coin.ValidatorRight.ContractId, cc.coin.ValidatorRight]]]
-  ] =
-    acs.findContract(cc.coin.ValidatorRight.COMPANION)(co =>
-      co.payload.user == party.toProtoPrimitive
     )
 
   /** Lookup the triple of open mining rounds that should always be present after boostrapping. */
   def lookupOpenMiningRoundTriple()(implicit
       ec: ExecutionContext
-  ): Future[QueryResult[Option[SvStore.OpenMiningRoundTriple]]] =
+  ): Future[Option[SvStore.OpenMiningRoundTriple]] =
     for {
-      QueryResult(off, openMiningRounds) <- acs.listContracts(cc.round.OpenMiningRound.COMPANION)
+      openMiningRounds <- acs.listContracts(cc.round.OpenMiningRound.COMPANION)
       result = openMiningRounds.sortBy(contract => contract.payload.round.number) match {
         case Seq(oldest, middle, newest) =>
           Some(SvStore.OpenMiningRoundTriple(oldest = oldest, middle = middle, newest = newest))
         case _ => None
       }
-    } yield QueryResult(off, result)
+    } yield result
 
   /** List issuing mining rounds past their targetClosesAt */
   def listExpiredIssuingMiningRounds(now: CantonTimestamp, limit: Int)(implicit
       ec: ExecutionContext
-  ): Future[QueryResult[
-    Seq[Contract[cc.round.IssuingMiningRound.ContractId, cc.round.IssuingMiningRound]]
-  ]] =
+  ): Future[Seq[Contract[cc.round.IssuingMiningRound.ContractId, cc.round.IssuingMiningRound]]] =
     acs
       .listContracts(cc.round.IssuingMiningRound.COMPANION)
       .map(
-        _.map(entries =>
-          entries.iterator
-            .filter(e => now.toInstant.isAfter(e.payload.targetClosesAt))
-            .take(limit)
-            .toSeq
-        )
+        _.iterator
+          .filter(e => now.toInstant.isAfter(e.payload.targetClosesAt))
+          .take(limit)
+          .toSeq
       )
-
 }
 
 object SvStore {

@@ -190,8 +190,8 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
         )
         results2 <- retrieveResults()
       } yield {
-        results1 shouldBe validatorRewardsForAcs.map(reward => QueryResult(tx2Offset, Some(reward)))
-        results2 shouldBe validatorRewardsForAcs.map(_ => QueryResult(tx3Offset, None))
+        results1 shouldBe validatorRewardsForAcs.map(reward => Some(reward))
+        results2 shouldBe validatorRewardsForAcs.map(_ => None)
       }
     }
 
@@ -201,13 +201,13 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
         result <- store.lookupContractById(directoryCodegen.AppReward.COMPANION)(
           new ContractId(s"non-existent#1")
         )
-      } yield result shouldBe QueryResult(tx2Offset, None)
+      } yield result shouldBe None
     }
 
     "lookup an non-ingested app reward by party" in {
       for {
         store <- mkStore()
-        result <- store.findContract(directoryCodegen.AppReward.COMPANION)(co =>
+        result <- store.findContractWithOffset(directoryCodegen.AppReward.COMPANION)(co =>
           co.payload.provider == userParty(100).toProtoPrimitive
         )
       } yield result shouldBe QueryResult(tx2Offset, None)
@@ -216,7 +216,7 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
     "lookup an ingested app reward by provider party" in {
       for {
         store <- mkStore()
-        result <- store.findContract(directoryCodegen.AppReward.COMPANION)(co =>
+        result <- store.findContractWithOffset(directoryCodegen.AppReward.COMPANION)(co =>
           co.payload.provider == providerParty(1).toProtoPrimitive
         )
       } yield result shouldBe QueryResult(tx2Offset, Some(appRewards(1)))
@@ -226,7 +226,7 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
       for {
         store <- mkStore()
         result <- store.listContracts(directoryCodegen.AppReward.COMPANION)
-      } yield result shouldBe QueryResult(tx2Offset, appRewards)
+      } yield result shouldBe appRewards
     }
 
     "stream all ingested app rewards" in {

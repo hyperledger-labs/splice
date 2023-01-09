@@ -6,7 +6,6 @@ import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRou
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.environment.CoinRetries
-import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.{AcsStore, StoreWithOpenMiningRounds}
 import com.daml.network.util.JavaContract
 import com.daml.network.wallet.store.memory.InMemoryWalletStore
@@ -41,37 +40,35 @@ trait WalletStore extends FlagCloseable with NamedLogging with StoreWithOpenMini
 
   def lookupInstallByParty(
       endUserParty: PartyId
-  ): Future[QueryResult[
-    Option[
-      JavaContract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
-    ]
+  ): Future[Option[
+    JavaContract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
   ]] =
-    acs.findContract(installCodegen.WalletAppInstall.COMPANION)(co =>
-      co.payload.endUserParty == endUserParty.toProtoPrimitive
-    )
+    acs
+      .findContractWithOffset(installCodegen.WalletAppInstall.COMPANION)(co =>
+        co.payload.endUserParty == endUserParty.toProtoPrimitive
+      )
+      .map(_.value)
 
   def lookupInstallByName(
       endUserName: String
-  ): Future[QueryResult[
-    Option[
-      JavaContract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
-    ]
+  ): Future[Option[
+    JavaContract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
   ]] =
-    acs.findContract(installCodegen.WalletAppInstall.COMPANION)(co =>
-      co.payload.endUserName == endUserName
-    )
-
-  def getCoinRules()(implicit ec: ExecutionContext): Future[
-    QueryResult[JavaContract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]]
-  ] =
     acs
-      .findContract(coinCodegen.CoinRules.COMPANION)(_ => true)
+      .findContractWithOffset(installCodegen.WalletAppInstall.COMPANION)(co =>
+        co.payload.endUserName == endUserName
+      )
+      .map(_.value)
+
+  def getCoinRules()(implicit
+      ec: ExecutionContext
+  ): Future[JavaContract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]] =
+    acs
+      .findContractWithOffset(coinCodegen.CoinRules.COMPANION)(_ => true)
       .map(
-        _.map(
-          _.getOrElse(
-            throw new StatusRuntimeException(
-              Status.NOT_FOUND.withDescription("No active CoinRules contract")
-            )
+        _.value.getOrElse(
+          throw new StatusRuntimeException(
+            Status.NOT_FOUND.withDescription("No active CoinRules contract")
           )
         )
       )
@@ -87,7 +84,7 @@ trait WalletStore extends FlagCloseable with NamedLogging with StoreWithOpenMini
       issuingMiningRounds <- acs.listContracts(roundCodegen.IssuingMiningRound.COMPANION)
       validatorRights <- acs.listContracts(coinCodegen.ValidatorRight.COMPANION)
     } yield {
-      val openIssuingRounds = issuingMiningRounds.value
+      val openIssuingRounds = issuingMiningRounds
         .filter(c => c.payload.opensAt.isBefore(now.toInstant))
         .map(r =>
           (r.payload.round, r.contractId.toInterface(v1.round.IssuingMiningRound.INTERFACE))
@@ -95,9 +92,9 @@ trait WalletStore extends FlagCloseable with NamedLogging with StoreWithOpenMini
         .toMap[v1.round.Round, v1.round.IssuingMiningRound.ContractId]
         .asJava
       val transferContext = new v1.coin.TransferContext(
-        openRound.value.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
+        openRound.contractId.toInterface(v1.round.OpenMiningRound.INTERFACE),
         openIssuingRounds,
-        validatorRights.value
+        validatorRights
           .map(r => (r.payload.user, r.contractId.toInterface(v1.coin.ValidatorRight.INTERFACE)))
           .toMap[String, v1.coin.ValidatorRight.ContractId]
           .asJava,
@@ -106,7 +103,7 @@ trait WalletStore extends FlagCloseable with NamedLogging with StoreWithOpenMini
         None.toJava,
       )
       new v1.coin.PaymentTransferContext(
-        coinRules.value.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
+        coinRules.contractId.toInterface(v1.coin.CoinRules.INTERFACE),
         transferContext,
       )
     }

@@ -1,7 +1,5 @@
 package com.daml.network.wallet.store
 
-import akka.NotUsed
-import akka.stream.scaladsl.Source
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.scripts.wallet.testsubscriptions as testSubsCodegen
 import com.daml.network.codegen.java.cn.scripts.testwallet as testWalletCodegen
@@ -33,7 +31,6 @@ import scala.jdk.CollectionConverters.*
 
 /** A store for serving all queries for a specific wallet end-user. */
 trait UserWalletStore extends FlagCloseable with NamedLogging {
-  import AcsStore.QueryResult
 
   /** The sink to use for ingesting data from the ledger into this store. */
   def acsIngestionSink: AcsStore.IngestionSink
@@ -46,24 +43,13 @@ trait UserWalletStore extends FlagCloseable with NamedLogging {
   /** The key identifying the parties considered by this store. */
   def key: UserWalletStore.Key
 
-  /** Lookup the end-users install contract.
-    *
-    * Returns an Option, as there can be races where this fails, and the caller has better context on
-    * how to deal with this error.
-    */
-  def lookupInstall(): Future[QueryResult[
-    Option[
-      JavaContract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
-    ]
-  ]] =
-    acsStore.findContract(installCodegen.WalletAppInstall.COMPANION)(_ => true)
-
   def getInstall()(implicit ec: ExecutionContext): Future[
     JavaContract[installCodegen.WalletAppInstall.ContractId, installCodegen.WalletAppInstall]
   ] =
-    lookupInstall()
+    acsStore
+      .findContract(installCodegen.WalletAppInstall.COMPANION)(_ => true)
       .map(
-        _.value.getOrElse(
+        _.getOrElse(
           throw Status.NOT_FOUND.withDescription("WalletAppInstall contract").asRuntimeException()
         )
       )
@@ -71,86 +57,61 @@ trait UserWalletStore extends FlagCloseable with NamedLogging {
   def signalWhenIngested(offset: String)(implicit tc: TraceContext): Future[Unit] =
     acsStore.signalWhenIngested(offset)
 
-  def streamAcceptedTransferOffers: Source[
-    JavaContract[
-      transferOffersCodegen.AcceptedTransferOffer.ContractId,
-      transferOffersCodegen.AcceptedTransferOffer,
-    ],
-    NotUsed,
-  ] =
-    acsStore.streamContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION)
-
   def listExpiredTransferOffers(now: CantonTimestamp, limit: Int)(implicit
       ec: ExecutionContext
-  ): Future[QueryResult[
-    Seq[JavaContract[
-      transferOffersCodegen.TransferOffer.ContractId,
-      transferOffersCodegen.TransferOffer,
-    ]]
-  ]] =
+  ): Future[Seq[JavaContract[
+    transferOffersCodegen.TransferOffer.ContractId,
+    transferOffersCodegen.TransferOffer,
+  ]]] =
     acs
       .listContracts(transferOffersCodegen.TransferOffer.COMPANION)
       .map(
-        _.map(cos =>
-          cos.iterator
-            .filter(co => now.toInstant.isAfter(co.payload.expiresAt))
-            .take(limit)
-            .toSeq
-        )
+        _.iterator
+          .filter(co => now.toInstant.isAfter(co.payload.expiresAt))
+          .take(limit)
+          .toSeq
       )
 
   def listExpiredAcceptedTransferOffers(now: CantonTimestamp, limit: Int)(implicit
       ec: ExecutionContext
-  ): Future[QueryResult[
-    Seq[JavaContract[
-      transferOffersCodegen.AcceptedTransferOffer.ContractId,
-      transferOffersCodegen.AcceptedTransferOffer,
-    ]]
-  ]] =
+  ): Future[Seq[JavaContract[
+    transferOffersCodegen.AcceptedTransferOffer.ContractId,
+    transferOffersCodegen.AcceptedTransferOffer,
+  ]]] =
     acs
       .listContracts(transferOffersCodegen.AcceptedTransferOffer.COMPANION)
       .map(
-        _.map(cos =>
-          cos.iterator
-            .filter(co => now.toInstant.isAfter(co.payload.expiresAt))
-            .take(limit)
-            .toSeq
-        )
+        _.iterator
+          .filter(co => now.toInstant.isAfter(co.payload.expiresAt))
+          .take(limit)
+          .toSeq
       )
 
   def listExpiredAppPaymentRequests(now: CantonTimestamp, limit: Int)(implicit
       ec: ExecutionContext
-  ): Future[QueryResult[
-    Seq[JavaContract[
-      walletCodegen.AppPaymentRequest.ContractId,
-      walletCodegen.AppPaymentRequest,
-    ]]
-  ]] =
+  ): Future[
+    Seq[JavaContract[walletCodegen.AppPaymentRequest.ContractId, walletCodegen.AppPaymentRequest]]
+  ] =
     acs
       .listContracts(walletCodegen.AppPaymentRequest.COMPANION)
       .map(
-        _.map(cos =>
-          cos.iterator
-            .filter(co => now.toInstant.isAfter(co.payload.expiresAt))
-            .take(limit)
-            .toSeq
-        )
+        _.iterator
+          .filter(co => now.toInstant.isAfter(co.payload.expiresAt))
+          .take(limit)
+          .toSeq
       )
 
   def listSubscriptionStatesReadyForPayment(now: CantonTimestamp, limit: Int)(implicit
       ec: ExecutionContext
-  ): Future[QueryResult[
-    Seq[JavaContract[
-      subsCodegen.SubscriptionIdleState.ContractId,
-      subsCodegen.SubscriptionIdleState,
-    ]]
+  ): Future[Seq[
+    JavaContract[subsCodegen.SubscriptionIdleState.ContractId, subsCodegen.SubscriptionIdleState]
   ]] = {
     def isReady(state: subsCodegen.SubscriptionIdleState) = now.toInstant.isAfter(
       state.nextPaymentDueAt.minus(CoinUtil.relTimeToDuration(state.payData.paymentDuration))
     )
     acs
       .listContracts(subsCodegen.SubscriptionIdleState.COMPANION)
-      .map(_.map(cos => cos.iterator.filter(co => isReady(co.payload)).take(limit).toSeq))
+      .map(cos => cos.iterator.filter(co => isReady(co.payload)).take(limit).toSeq)
   }
 }
 

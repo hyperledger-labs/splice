@@ -182,7 +182,7 @@ class TreasuryService(
           subsCodegen.SubscriptionRequest.COMPANION
         )(op.contractIdValue)
         _ <- userStore.acs.getContractById(subsCodegen.SubscriptionContext.INTERFACE)(
-          subscriptionRequest.value.payload.subscriptionData.context
+          subscriptionRequest.payload.subscriptionData.context
         )
       } yield ()
 
@@ -192,7 +192,7 @@ class TreasuryService(
           subsCodegen.SubscriptionIdleState.COMPANION
         )(op.contractIdValue)
         _ <- userStore.acs.getContractById(subsCodegen.SubscriptionContext.INTERFACE)(
-          subscriptionState.value.payload.subscriptionData.context
+          subscriptionState.payload.subscriptionData.context
         )
       } yield ()
 
@@ -202,7 +202,7 @@ class TreasuryService(
           op.contractIdValue
         )
         _ <- userStore.acs.getContractById(walletCodegen.DeliveryOffer.INTERFACE)(
-          paymentRequest.value.payload.deliveryOffer
+          paymentRequest.payload.deliveryOffer
         )
       } yield ()
 
@@ -285,7 +285,7 @@ class TreasuryService(
       val batchExecutionF = for {
         transferContext <- walletManager.store.getPaymentTransferContext(retryProvider, now)
         activeIssuingRounds = transferContext.context.issuingMiningRounds.asScala.keys.toSet
-        install <- getInstall
+        install <- userStore.getInstall()
         (inputs, readAs) <- selectTransferInputs(activeIssuingRounds)
         res <-
           // skip execution of the batch, if its only purpose is to merge the inputs, but the inputs are already merged.
@@ -360,7 +360,7 @@ class TreasuryService(
     coinInputs <- userStore.acs
       .listContracts(coinCodegen.Coin.COMPANION)
       .map(cs =>
-        cs.value.map(c =>
+        cs.map(c =>
           new v1.coin.transferinput.InputCoin(c.contractId.toInterface(v1.coin.Coin.INTERFACE))
         )
       )
@@ -380,7 +380,7 @@ class TreasuryService(
     appRewardInputs <- userStore.acs
       .listContracts(coinCodegen.AppReward.COMPANION)
       .map(rws =>
-        rws.value
+        rws
           .filter(rw => activeIssuingRounds.contains(rw.payload.round))
           .map(rw =>
             new v1.coin.transferinput.InputAppReward(
@@ -389,15 +389,6 @@ class TreasuryService(
           )
       )
   } yield (coinInputs ++ validatorRewardInputs ++ appRewardInputs, validatorRewardUsers)
-
-  private def getInstall =
-    userStore
-      .lookupInstall()
-      .map(
-        _.value.getOrElse(
-          throw Status.NOT_FOUND.withDescription("WalletAppInstall contract").asRuntimeException()
-        )
-      )
 
   override def onClosed(): Unit = {
     logger.debug(

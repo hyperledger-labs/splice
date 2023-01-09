@@ -36,7 +36,7 @@ class SplitwiseInstallRequestTrigger(
   )(implicit tc: TraceContext): Future[String] = {
     val user = PartyId.tryFromProtoPrimitive(req.payload.user)
     val provider = store.providerParty
-    store.lookupInstall(user).flatMap {
+    store.lookupInstallWithOffset(user).flatMap {
       case QueryResult(_, Some(_)) =>
         logger.info(s"Rejecting duplicate install request from user party $user")
         val cmd = req.contractId.exerciseSplitwiseInstallRequest_Reject()

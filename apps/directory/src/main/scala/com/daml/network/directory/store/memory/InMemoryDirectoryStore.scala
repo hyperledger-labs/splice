@@ -11,9 +11,8 @@ class InMemoryDirectoryStore(
     override val providerParty: PartyId,
     override val svcParty: PartyId,
     override protected val loggerFactory: NamedLoggerFactory,
-)(implicit
-    ec: ExecutionContext
-) extends DirectoryStore
+)(implicit override protected val ec: ExecutionContext)
+    extends DirectoryStore
     with NamedLogging {
 
   private val inMemoryAcsStore =

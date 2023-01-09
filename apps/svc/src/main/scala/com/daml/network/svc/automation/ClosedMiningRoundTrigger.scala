@@ -35,7 +35,7 @@ class ClosedMiningRoundTrigger(
     for {
       coinRules <- store.getCoinRules()
       // TODO(M3-06): claim unclaimed rewards
-      cmd = coinRules.value.contractId
+      cmd = coinRules.contractId
         .exerciseCoinRules_MiningRound_Archive(
           closedRound.contractId
         )

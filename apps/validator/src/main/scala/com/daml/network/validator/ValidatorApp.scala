@@ -137,7 +137,7 @@ class ValidatorApp(
         validator = validatorParty,
         svc = svcParty,
         connection = connection,
-        lookupValidatorRightByParty = store.lookupValidatorRightByParty,
+        lookupValidatorRightByParty = store.lookupValidatorRightByPartyWithOffset,
         retryProvider = retryProvider,
         flagCloseable = this,
         logger = logger,
@@ -159,7 +159,7 @@ class ValidatorApp(
     retryProvider.retryForAutomation(
       "Wait for CoinRules",
       for {
-        coinRulesResult <- store.lookupCoinRules()
+        coinRulesResult <- store.lookupCoinRulesWithOffset()
         _ <- coinRulesResult match {
           case QueryResult(_, Some(_)) =>
             logger.info("CoinRules found, done waiting")
@@ -187,8 +187,8 @@ class ValidatorApp(
       .retryForAutomation(
         "createCoinRulesRequest",
         for {
-          coinRulesResult <- store.lookupCoinRules()
-          coinRulesRequestResult <- store.lookupCoinRulesRequest()
+          coinRulesResult <- store.lookupCoinRulesWithOffset()
+          coinRulesRequestResult <- store.lookupCoinRulesRequestWithOffset()
           _ <- (coinRulesResult, coinRulesRequestResult) match {
             case (QueryResult(off1, None), QueryResult(off2, None)) =>
               connection

@@ -75,7 +75,7 @@ class SubscriptionInitialPaymentTrigger(
       context <- store.acs
         .lookupContractById(directoryCodegen.DirectoryEntryContext.COMPANION)(contextId)
         .map(
-          _.value.getOrElse(
+          _.getOrElse(
             throw new IllegalStateException(
               s"Invariant violation: subscription context $contextId not known"
             )
@@ -85,7 +85,7 @@ class SubscriptionInitialPaymentTrigger(
       // TODO(M3-03): understand what kind of assertions are worth checking here for defensive programming
       entryName = context.payload.name
       // check whether the entry already exists
-      result <- store.lookupEntryByName(entryName).flatMap {
+      result <- store.lookupEntryByNameWithOffset(entryName).flatMap {
         case QueryResult(_, Some(entry)) =>
           rejectPayment(
             s"entry already exists and owned by ${entry.payload.user}.",

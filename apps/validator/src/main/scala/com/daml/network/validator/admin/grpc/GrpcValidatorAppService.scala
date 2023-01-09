@@ -70,7 +70,7 @@ class GrpcValidatorAppService(
           validator = store.key.validatorParty,
           svc = store.key.svcParty,
           connection = connection,
-          lookupValidatorRightByParty = store.lookupValidatorRightByParty,
+          lookupValidatorRightByParty = store.lookupValidatorRightByPartyWithOffset,
           retryProvider = retryProvider,
           flagCloseable = flagCloseable,
           logger = logger,

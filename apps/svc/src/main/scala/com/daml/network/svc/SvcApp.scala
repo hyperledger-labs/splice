@@ -150,11 +150,11 @@ object SvcApp {
         connection = connection,
         retryProvider = retryProvider,
         flagCloseable = flagCloseable,
-        lookupValidatorRightByParty = store.lookupValidatorRightByParty,
+        lookupValidatorRightByParty = store.lookupValidatorRightByPartyWithOffset,
       )
       _ <- retryProvider.retryForAutomation(
         "create coinrules and issuance state",
-        store.lookupCoinRules().flatMap {
+        store.lookupCoinRulesWithOffset().flatMap {
           case QueryResult(off, None) =>
             connection
               .submitCommands(

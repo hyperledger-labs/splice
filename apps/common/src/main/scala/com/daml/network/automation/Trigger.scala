@@ -9,7 +9,6 @@ import com.daml.ledger.javaapi.data.codegen.{Contract, ContractCompanion, Contra
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.CoinRetries
 import com.daml.network.store.AcsStore
-import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.{HasHealth, JavaContract}
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.data.CantonTimestamp
@@ -220,7 +219,7 @@ abstract class OnCreateTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T
   )(implicit tc: TraceContext): Future[Boolean] =
     acs
       .lookupContractById(templateCompanion)(task.contractId)
-      .map(_.value.isEmpty)
+      .map(_.isEmpty)
 
 }
 
@@ -427,7 +426,7 @@ abstract class ExpiredContractTrigger[
     T <: Template,
 ](
     acs: AcsStore,
-    listExpiredContracts: (CantonTimestamp, Int) => Future[QueryResult[Seq[JavaContract[TCid, T]]]],
+    listExpiredContracts: (CantonTimestamp, Int) => Future[Seq[JavaContract[TCid, T]]],
     templateCompanion: ContractCompanion[TC, TCid, T],
 )(implicit
     ec: ExecutionContext,
@@ -436,14 +435,13 @@ abstract class ExpiredContractTrigger[
 
   override final protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
       tc: TraceContext
-  ): Future[Seq[JavaContract[TCid, T]]] = {
-    listExpiredContracts(now, limit).map(_.value)
-  }
+  ): Future[Seq[JavaContract[TCid, T]]] =
+    listExpiredContracts(now, limit)
 
   override final protected def isStaleTask(
       task: ScheduledTaskTrigger.ReadyTask[JavaContract[TCid, T]]
   )(implicit tc: TraceContext): Future[Boolean] =
     acs
       .lookupContractById(templateCompanion)(task.work.contractId)
-      .map(_.value.isEmpty)
+      .map(_.isEmpty)
 }

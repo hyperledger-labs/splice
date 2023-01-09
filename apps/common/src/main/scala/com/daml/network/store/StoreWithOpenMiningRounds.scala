@@ -1,7 +1,6 @@
 package com.daml.network.store
 
 import com.daml.network.codegen.java.cc.round.OpenMiningRound
-import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.JavaContract
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.lifecycle.FlagCloseable
@@ -17,18 +16,15 @@ trait StoreWithOpenMiningRounds { this: FlagCloseable =>
   /** Returns the active open mining rounds who are open according to 'opensAt'. */
   def lookupSubmittableOpenMiningRounds(
       now: CantonTimestamp
-  )(implicit ec: ExecutionContext): Future[QueryResult[
-    Seq[JavaContract[OpenMiningRound.ContractId, OpenMiningRound]]
-  ]] = {
+  )(implicit
+      ec: ExecutionContext
+  ): Future[Seq[JavaContract[OpenMiningRound.ContractId, OpenMiningRound]]] = {
     acs
       .listContracts(OpenMiningRound.COMPANION)
+      // only return open open rounds.
       .map(
-        _.map(contracts =>
-          contracts
-            // only return open open rounds.
-            .filter(r => r.payload.opensAt.compareTo(now.toInstant) <= 0)
-            .sortBy(r => r.payload.opensAt)
-        )
+        _.filter(r => r.payload.opensAt.compareTo(now.toInstant) <= 0)
+          .sortBy(r => r.payload.opensAt)
       )
   }
 
@@ -36,15 +32,11 @@ trait StoreWithOpenMiningRounds { this: FlagCloseable =>
     */
   def getLatestOpenMiningRound(now: CantonTimestamp)(implicit
       ec: ExecutionContext
-  ): Future[
-    QueryResult[JavaContract[OpenMiningRound.ContractId, OpenMiningRound]]
-  ] =
-    lookupSubmittableOpenMiningRounds(now).map { queryResult =>
-      queryResult.map(
-        _.lastOption.getOrElse(
-          throw new StatusRuntimeException(
-            Status.NOT_FOUND.withDescription("No active OpenMiningRound contract")
-          )
+  ): Future[JavaContract[OpenMiningRound.ContractId, OpenMiningRound]] =
+    lookupSubmittableOpenMiningRounds(now).map {
+      _.lastOption.getOrElse(
+        throw new StatusRuntimeException(
+          Status.NOT_FOUND.withDescription("No active OpenMiningRound contract")
         )
       )
     }

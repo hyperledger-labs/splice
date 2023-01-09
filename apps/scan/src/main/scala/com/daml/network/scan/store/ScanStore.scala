@@ -2,7 +2,6 @@ package com.daml.network.scan.store
 
 import com.daml.network.codegen.java.cc
 import com.daml.network.scan.store.memory.InMemoryScanStore
-import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.store.{AcsStore, CCHistoryStore, StoreWithOpenMiningRounds}
 import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -29,8 +28,9 @@ trait ScanStore extends FlagCloseable with StoreWithOpenMiningRounds {
   /** The [[com.daml.network.store.AcsStore]] used to back the default implementation of the queries. */
   val acs: AcsStore
 
-  def lookupCoinRules()
-      : Future[QueryResult[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]]] =
+  def lookupCoinRules()(implicit
+      ec: ExecutionContext
+  ): Future[Option[Contract[cc.coin.CoinRules.ContractId, cc.coin.CoinRules]]] =
     acs.findContract(cc.coin.CoinRules.COMPANION)(_ => true)
 }
 

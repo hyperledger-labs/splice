@@ -38,7 +38,7 @@ class SummarizingMiningRoundTrigger(
       // TODO(M3-06): consider querying the round audit store (once we have it) and
       // passing along the opensAt time of the previous IssuingMiningRound
       // see discussion: https://docs.google.com/document/d/1RAcc4uJKjRtPKDmVglVhqg-y58fCJ7xyljPbwimE-IA/edit?disco=AAAAjyuFFEw
-      cmd = coinRules.value.contractId
+      cmd = coinRules.contractId
         .exerciseCoinRules_MiningRound_StartIssuing(
           summarizingRound.contractId,
           totalBurn.bigDecimal,
@@ -84,8 +84,8 @@ class SummarizingMiningRoundTrigger(
     } yield {
       RoundRewards(
         round = round,
-        appRewards = appRewards.value,
-        validatorRewards = validatorRewards.value,
+        appRewards = appRewards,
+        validatorRewards = validatorRewards,
       )
     }
 }

@@ -37,7 +37,7 @@ class GroupRequestTrigger(
     val provider = store.providerParty
     val user = PartyId.tryFromProtoPrimitive(req.payload.group.owner)
     val groupId = req.payload.group.id
-    store.lookupGroup(user, groupId).flatMap {
+    store.lookupGroupWithOffset(user, groupId).flatMap {
       case QueryResult(_, Some(_)) =>
         logger.info(
           s"Rejecting duplicate group request from user party $user for group id ${groupId.unpack}"

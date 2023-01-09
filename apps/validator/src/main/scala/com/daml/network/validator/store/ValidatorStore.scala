@@ -23,31 +23,31 @@ trait ValidatorStore extends AutoCloseable with NamedLogging {
 
   val acs: AcsStore
 
-  def lookupWalletInstallByName(
+  def lookupWalletInstallByNameWithOffset(
       endUserName: String
   ): Future[QueryResult[
     Option[Contract[walletCodegen.WalletAppInstall.ContractId, walletCodegen.WalletAppInstall]]
   ]] =
-    acs.findContract(walletCodegen.WalletAppInstall.COMPANION)(co =>
+    acs.findContractWithOffset(walletCodegen.WalletAppInstall.COMPANION)(co =>
       co.payload.endUserName == endUserName
     )
 
-  def lookupCoinRules(): Future[
+  def lookupCoinRulesWithOffset(): Future[
     QueryResult[Option[Contract[coinCodegen.CoinRules.ContractId, coinCodegen.CoinRules]]]
   ] =
-    acs.findContract(coinCodegen.CoinRules.COMPANION)(_ => true)
+    acs.findContractWithOffset(coinCodegen.CoinRules.COMPANION)(_ => true)
 
-  def lookupCoinRulesRequest(): Future[QueryResult[Option[
+  def lookupCoinRulesRequestWithOffset(): Future[QueryResult[Option[
     Contract[coinCodegen.CoinRulesRequest.ContractId, coinCodegen.CoinRulesRequest]
   ]]] =
-    acs.findContract(coinCodegen.CoinRulesRequest.COMPANION)(_ => true)
+    acs.findContractWithOffset(coinCodegen.CoinRulesRequest.COMPANION)(_ => true)
 
-  def lookupValidatorRightByParty(
+  def lookupValidatorRightByPartyWithOffset(
       party: PartyId
   ): Future[
     QueryResult[Option[Contract[coinCodegen.ValidatorRight.ContractId, coinCodegen.ValidatorRight]]]
   ] =
-    acs.findContract(coinCodegen.ValidatorRight.COMPANION)(co =>
+    acs.findContractWithOffset(coinCodegen.ValidatorRight.COMPANION)(co =>
       co.payload.user == party.toProtoPrimitive
     )
 }

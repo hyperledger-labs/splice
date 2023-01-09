@@ -1,5 +1,7 @@
 package com.daml.network.svc.automation
 
+import cats.data.OptionT
+import cats.instances.future.*
 import com.daml.network.automation.{ScheduledTaskTrigger, TriggerContext}
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinLedgerConnection
@@ -24,24 +26,18 @@ class AdvanceOpenMiningRoundTrigger(
     tracer: Tracer,
 ) extends ScheduledTaskTrigger[AdvanceOpenMiningRoundTrigger.Task] {
 
-  import com.daml.network.store.AcsStore.QueryResult
-
   /** Retrieve a batch of tasks that are ready for execution now. */
   override protected def listReadyTasks(now: CantonTimestamp, limit: Int)(implicit
       tc: TraceContext
   ): Future[Seq[AdvanceOpenMiningRoundTrigger.Task]] =
-    for {
-      QueryResult(_, optRules) <- store.lookupCoinRules()
-      QueryResult(_, optRounds) <- store.lookupOpenMiningRoundTriple()
-      result = for {
-        // TODO(tech-debt): replace with usage of cats monad transformers, missing work: QueryResult should be a Monad or get rid of the wide use of QueryResult
-        rules <- optRules
-        rounds <- optRounds
-        tickDuration = CoinUtil.relTimeToDuration(rules.payload.config.tickDuration)
-        if (rounds.readyToAdvanceAt(tickDuration).isBefore(now.toInstant))
-        // NOTE: we store the coin-rules reference in the task, as otherwise its tickDuration and the one that is actually used in the choice might go out of sync
-      } yield AdvanceOpenMiningRoundTrigger.Task(rules.contractId, rounds)
-    } yield result.toList
+    (for {
+      rules <- OptionT(store.lookupCoinRules())
+      rounds <- OptionT(store.lookupOpenMiningRoundTriple())
+      tickDuration = CoinUtil.relTimeToDuration(rules.payload.config.tickDuration)
+      if (rounds.readyToAdvanceAt(tickDuration).isBefore(now.toInstant))
+      // NOTE: we store the coin-rules reference in the task, as otherwise its tickDuration and the one that is
+      // actually used in the choice might go out of sync
+    } yield AdvanceOpenMiningRoundTrigger.Task(rules.contractId, rounds)).value.map(_.toList)
 
   /** How to process a task. */
   override protected def completeTask(
@@ -65,18 +61,20 @@ class AdvanceOpenMiningRoundTrigger(
       )
   }
 
-  // TODO(tech-debt): this feels a bit duplicative to the above query. Consider exposing a PollingTrigger variant that just reruns the query on every retry
   override protected def isStaleTask(
       task: ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]
-  )(implicit tc: TraceContext): Future[Boolean] =
-    for {
-      rules <- store.acs.lookupContractById(cc.coin.CoinRules.COMPANION)(task.work.coinRulesId)
-      results <- Future.sequence(
-        task.work.openRounds.toSeq.map(co =>
-          store.acs.lookupContractById(cc.round.OpenMiningRound.COMPANION)(co.contractId)
-        )
+  )(implicit tc: TraceContext): Future[Boolean] = {
+    import cats.data.OptionT
+    import cats.instances.future.*
+    import cats.syntax.traverse.*
+
+    (for {
+      _ <- OptionT(store.acs.lookupContractById(cc.coin.CoinRules.COMPANION)(task.work.coinRulesId))
+      _ <- task.work.openRounds.toSeq.traverse(co =>
+        OptionT(store.acs.lookupContractById(cc.round.OpenMiningRound.COMPANION)(co.contractId))
       )
-    } yield rules.value.isEmpty || results.exists(_.value.isEmpty)
+    } yield ()).isEmpty
+  }
 }
 
 object AdvanceOpenMiningRoundTrigger {

@@ -40,7 +40,11 @@ import scala.jdk.CollectionConverters.*
   *
   * All functions that return a [[com.daml.network.store.AcsStore.QueryResult]] are logically
   * computed against a snapshot of the ledger's ACS. They also return the offset of that snapshot,
-  * which can be used as a deduplication offset in command deduplication.
+  * which can be used as a deduplication offset in command deduplication. We add a `withOffset`
+  * suffix to methods returning a [[com.daml.network.store.AcsStore.QueryResult]] to distinguish
+  * them from the method that only returns the value.
+  *
+  * We recommend to only add both the value-only and the `withOffset` methods on-demand, as you write your client code.
   */
 trait AcsStore extends AutoCloseable {
   import AcsStore.*
@@ -51,12 +55,12 @@ trait AcsStore extends AutoCloseable {
   /** Lookup a contract by id. */
   def lookupContractById[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
       templateCompanion: ContractCompanion[TC, TCid, T]
-  )(id: ContractId[T]): Future[QueryResult[Option[JavaContract[TCid, T]]]]
+  )(id: ContractId[T]): Future[Option[JavaContract[TCid, T]]]
 
   /** Lookup a contract's interface view by id. */
   def lookupContractById[I, Id <: ContractId[I], View <: DamlRecord[View]](
       interfaceCompanion: InterfaceCompanion[I, Id, View]
-  )(id: Id): Future[QueryResult[Option[JavaContract[Id, View]]]]
+  )(id: Id): Future[Option[JavaContract[Id, View]]]
 
   /** Get a contract by id.
     *
@@ -64,16 +68,14 @@ trait AcsStore extends AutoCloseable {
     */
   def getContractById[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
       templateCompanion: ContractCompanion[TC, TCid, T]
-  )(id: ContractId[T])(implicit ec: ExecutionContext): Future[QueryResult[JavaContract[TCid, T]]] =
+  )(id: ContractId[T])(implicit ec: ExecutionContext): Future[JavaContract[TCid, T]] =
     lookupContractById(templateCompanion)(id).map(result =>
-      result.map(
-        _.getOrElse(
-          throw Status.NOT_FOUND
-            .withDescription(
-              PrettyContractId(templateCompanion.TEMPLATE_ID, id).toString
-            )
-            .asRuntimeException
-        )
+      result.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(
+            PrettyContractId(templateCompanion.TEMPLATE_ID, id).toString
+          )
+          .asRuntimeException
       )
     )
 
@@ -83,16 +85,14 @@ trait AcsStore extends AutoCloseable {
     */
   def getContractById[I, Id <: ContractId[I], View <: DamlRecord[View]](
       interfaceCompanion: InterfaceCompanion[I, Id, View]
-  )(id: Id)(implicit ec: ExecutionContext): Future[QueryResult[JavaContract[Id, View]]] =
+  )(id: Id)(implicit ec: ExecutionContext): Future[JavaContract[Id, View]] =
     lookupContractById(interfaceCompanion)(id).map(result =>
-      result.map(
-        _.getOrElse(
-          throw Status.NOT_FOUND
-            .withDescription(
-              PrettyContractId(interfaceCompanion.TEMPLATE_ID, id).toString
-            )
-            .asRuntimeException
-        )
+      result.getOrElse(
+        throw Status.NOT_FOUND
+          .withDescription(
+            PrettyContractId(interfaceCompanion.TEMPLATE_ID, id).toString
+          )
+          .asRuntimeException
       )
     )
 
@@ -101,7 +101,7 @@ trait AcsStore extends AutoCloseable {
     * Caution: this function traverses all contracts!
     * Not intended for production use, but very useful for prototyping.
     */
-  def findContract[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+  def findContractWithOffset[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
       templateCompanion: ContractCompanion[TC, TCid, T]
   )(
       p: JavaContract[TCid, T] => Boolean = (_: JavaContract[TCid, T]) => true
@@ -112,9 +112,33 @@ trait AcsStore extends AutoCloseable {
     * Caution: this function traverses all contracts!
     * Not intended for production use, but very useful for prototyping.
     */
-  def findContract[I, Id <: ContractId[I], View <: DamlRecord[View]](
+  def findContract[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
+      templateCompanion: ContractCompanion[TC, TCid, T]
+  )(
+      p: JavaContract[TCid, T] => Boolean = (_: JavaContract[TCid, T]) => true
+  )(implicit ec: ExecutionContext): Future[Option[JavaContract[TCid, T]]] =
+    findContractWithOffset(templateCompanion)(p).map(_.value)
+
+  /** Find a contract that satisfies a predicate.
+    *
+    * Caution: this function traverses all contracts!
+    * Not intended for production use, but very useful for prototyping.
+    */
+  def findContractWithOffset[I, Id <: ContractId[I], View <: DamlRecord[View]](
       interfaceCompanion: InterfaceCompanion[I, Id, View]
   )(p: JavaContract[Id, View] => Boolean): Future[QueryResult[Option[JavaContract[Id, View]]]]
+
+  /** Find a contract that satisfies a predicate.
+    *
+    * Caution: this function traverses all contracts!
+    * Not intended for production use, but very useful for prototyping.
+    */
+  def findContract[I, Id <: ContractId[I], View <: DamlRecord[View]](
+      interfaceCompanion: InterfaceCompanion[I, Id, View]
+  )(p: JavaContract[Id, View] => Boolean)(implicit
+      ec: ExecutionContext
+  ): Future[Option[JavaContract[Id, View]]] =
+    findContractWithOffset(interfaceCompanion)(p).map(_.value)
 
   /** List all active contracts of the given template.
     *
@@ -125,24 +149,24 @@ trait AcsStore extends AutoCloseable {
   def listContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
       templateCompanion: ContractCompanion[TC, TCid, T],
       filter: JavaContract[TCid, T] => Boolean,
-  ): Future[QueryResult[Seq[JavaContract[TCid, T]]]]
+  ): Future[Seq[JavaContract[TCid, T]]]
 
   /** List all active contracts of the given template. */
   def listContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
       templateCompanion: ContractCompanion[TC, TCid, T]
-  ): Future[QueryResult[Seq[JavaContract[TCid, T]]]] =
+  ): Future[Seq[JavaContract[TCid, T]]] =
     listContracts(templateCompanion, _ => true)
 
   /** List all active contracts of the given template. */
   def listContracts[I, Id <: ContractId[I], View <: DamlRecord[View]](
       interfaceCompanion: InterfaceCompanion[I, Id, View],
       filter: JavaContract[Id, View] => Boolean,
-  ): Future[QueryResult[Seq[JavaContract[Id, View]]]]
+  ): Future[Seq[JavaContract[Id, View]]]
 
   /** List all active contracts of the given template. */
   def listContracts[I, Id <: ContractId[I], View <: DamlRecord[View]](
       interfaceCompanion: InterfaceCompanion[I, Id, View]
-  ): Future[QueryResult[Seq[JavaContract[Id, View]]]] =
+  ): Future[Seq[JavaContract[Id, View]]] =
     listContracts(interfaceCompanion, (_: JavaContract[Id, View]) => true)
 
   /** A stream of contracts of the given template.

@@ -7,7 +7,6 @@ import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.scan.admin.api.client.ScanConnection
 import com.daml.network.splitwise.store.SplitwiseStore
-import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.util.JavaContract
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
@@ -48,7 +47,7 @@ class AcceptedAppPaymentRequestsTrigger(
       payment.payload.deliveryOffer
     )
     store.lookupInstall(sender).flatMap {
-      case QueryResult(_, None) =>
+      case None =>
         val msg = s"Install contract not found for sender party $sender"
         logger.warn(msg)
         for {
@@ -62,13 +61,13 @@ class AcceptedAppPaymentRequestsTrigger(
             )
             .map(_ => s"rejected accepted app payment: $msg")
         } yield res
-      case QueryResult(_, Some(install)) =>
+      case Some(install) =>
         for {
           transferContext <- scanConnection.getAppTransferContext()
           transferInProgress <- store.acs
             .lookupContractById(splitwiseCodegen.TransferInProgress.COMPANION)(transferInProgressId)
             .map(
-              _.value.getOrElse(
+              _.getOrElse(
                 throw new IllegalStateException(
                   s"Invariant violation: transfer in progress $transferInProgressId not known"
                 )
@@ -79,7 +78,7 @@ class AcceptedAppPaymentRequestsTrigger(
             transferInProgress.payload.group.id,
           )
           cmd = install.contractId.exerciseSplitwiseInstall_CompleteTransfer(
-            group.value.contractId,
+            group.contractId,
             payment.contractId,
             transferContext,
           )

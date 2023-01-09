@@ -37,7 +37,7 @@ class ExpireIssuingMiningRoundTrigger(
     val totals = store.getTotalsForRound(round.payload.round.number)
     for {
       coinRules <- store.getCoinRules()
-      cmd = coinRules.value.contractId
+      cmd = coinRules.contractId
         .exerciseCoinRules_MiningRound_Close(
           round.contractId,
           totals.transferFees.bigDecimal,

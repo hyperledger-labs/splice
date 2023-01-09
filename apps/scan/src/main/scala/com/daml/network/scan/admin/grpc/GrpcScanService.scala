@@ -6,7 +6,6 @@ import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.scan.store.ScanStore
 import com.daml.network.scan.v0
 import com.daml.network.scan.v0.*
-import com.daml.network.store.AcsStore.QueryResult
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.tracing.Spanning
@@ -40,10 +39,10 @@ class GrpcScanService(
   override def getTransferContext(request: Empty): Future[v0.GetTransferContextResponse] =
     withSpanFromGrpcContext("GrpcScanService") { _ => _ =>
       for {
-        QueryResult(_, coinRules) <- store.lookupCoinRules()
+        coinRules <- store.lookupCoinRules()
         now = clock.now
-        QueryResult(_, latestOpen) <- store.getLatestOpenMiningRound(now)
-        QueryResult(_, rounds) <- store.lookupSubmittableOpenMiningRounds(now)
+        latestOpen <- store.getLatestOpenMiningRound(now)
+        rounds <- store.lookupSubmittableOpenMiningRounds(now)
       } yield {
         v0.GetTransferContextResponse(
           coinRules = coinRules.map(_.toProtoV0),
@@ -75,7 +74,7 @@ class GrpcScanService(
   override def getClosedRounds(request: Empty): Future[GetClosedRoundsResponse] =
     withSpanFromGrpcContext("GrpcScanService") { _ => _ =>
       for {
-        QueryResult(_, rounds) <- store.acs.listContracts(roundCodegen.ClosedMiningRound.COMPANION)
+        rounds <- store.acs.listContracts(roundCodegen.ClosedMiningRound.COMPANION)
       } yield {
         val filteredRounds = rounds.sortWith(_.payload.round.number > _.payload.round.number)
         v0.GetClosedRoundsResponse(filteredRounds.map(r => r.toProtoV0))
