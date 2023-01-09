@@ -191,23 +191,17 @@ template WalletAppInstall
       controller walletServiceParty
       do exercise cid TransferOffer_Withdraw
 
-    nonconsuming choice WalletAppInstall_TransferOffer_Expire : ()
-      with
-        cid : ContractId TransferOffer
-      controller walletServiceParty
-      do exercise cid $ TransferOffer_Expire with actor = endUserParty
-
-    nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Expire : ()
-      with
-        cid : ContractId AcceptedTransferOffer
-      controller walletServiceParty
-      do exercise cid $ AcceptedTransferOffer_Expire with actor = endUserParty
-
     nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Abort : ()
       with
         cid : ContractId AcceptedTransferOffer
       controller walletServiceParty
       do exercise cid $ AcceptedTransferOffer_Abort
+
+    nonconsuming choice WalletAppInstall_AcceptedTransferOffer_Withdraw : ()
+      with
+        cid : ContractId AcceptedTransferOffer
+      controller walletServiceParty
+      do exercise cid $ AcceptedTransferOffer_Withdraw
 
     -- TODO(#1815): Remove this choice once 'redistribute is gone'
     nonconsuming choice WalletAppInstall_CoinRules_TryTransfer : API.TransferResult

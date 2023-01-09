@@ -6,6 +6,7 @@ import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.util.JavaContract
 import com.daml.network.wallet.store.UserWalletStore
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -37,15 +38,37 @@ class ExpireTransferOfferTrigger(
   )(implicit tc: TraceContext): Future[String] = {
     for {
       install <- store.getInstall()
-      cmd = install.contractId.exerciseWalletAppInstall_TransferOffer_Expire(
-        task.work.contractId
-      )
-      _ <- connection
-        .submitWithResultNoDedup(
-          Seq(store.key.walletServiceParty),
-          Seq(store.key.validatorParty, store.key.endUserParty),
-          cmd,
-        )
+      user = store.key.endUserParty.toProtoPrimitive
+      _ <- user match {
+        case task.work.payload.sender =>
+          val cmd = install.contractId.exerciseWalletAppInstall_TransferOffer_Withdraw(
+            task.work.contractId
+          )
+          logger.debug("Withdrawing expired transfer offer as sender")
+          connection.submitWithResultNoDedup(
+            Seq(store.key.walletServiceParty),
+            Seq(store.key.validatorParty, store.key.endUserParty),
+            cmd,
+          )
+        case task.work.payload.receiver =>
+          val cmd = install.contractId.exerciseWalletAppInstall_TransferOffer_Reject(
+            task.work.contractId
+          )
+          logger.debug("Rejecting expired transfer offer as receiver")
+          connection.submitWithResultNoDedup(
+            Seq(store.key.walletServiceParty),
+            Seq(store.key.validatorParty, store.key.endUserParty),
+            cmd,
+          )
+        case _ =>
+          Future.failed(
+            new StatusRuntimeException(
+              Status.INTERNAL.withDescription(
+                s"User ($user) is unexpectedly neither sender ($task.work.payload.sender) nor receiver ($task.work.payload.receiver)"
+              )
+            )
+          )
+      }
     } yield "expired transfer offer"
   }
 }

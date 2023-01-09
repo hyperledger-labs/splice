@@ -6,6 +6,7 @@ import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.util.JavaContract
 import com.daml.network.wallet.store.UserWalletStore
 import com.digitalasset.canton.tracing.TraceContext
+import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -37,15 +38,35 @@ class ExpireAcceptedTransferOfferTrigger(
   )(implicit tc: TraceContext): Future[String] = {
     for {
       install <- store.getInstall()
-      cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Expire(
-        task.work.contractId
-      )
-      _ <- connection
-        .submitWithResultNoDedup(
-          Seq(store.key.walletServiceParty),
-          Seq(store.key.validatorParty, store.key.endUserParty),
-          cmd,
-        )
+      user = store.key.endUserParty.toProtoPrimitive
+      _ <- user match {
+        case task.work.payload.sender =>
+          val cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Abort(
+            task.work.contractId
+          )
+          connection.submitWithResultNoDedup(
+            Seq(store.key.walletServiceParty),
+            Seq(store.key.validatorParty, store.key.endUserParty),
+            cmd,
+          )
+        case task.work.payload.receiver =>
+          val cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Withdraw(
+            task.work.contractId
+          )
+          connection.submitWithResultNoDedup(
+            Seq(store.key.walletServiceParty),
+            Seq(store.key.validatorParty, store.key.endUserParty),
+            cmd,
+          )
+        case _ =>
+          Future.failed(
+            new StatusRuntimeException(
+              Status.INTERNAL.withDescription(
+                s"User ($user) is unexpectedly neither sender ($task.work.payload.sender) nor receiver ($task.work.payload.receiver)"
+              )
+            )
+          )
+      }
     } yield "expired accepted transfer offer"
   }
 }
