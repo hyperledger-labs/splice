@@ -15,7 +15,7 @@ import com.digitalasset.canton.util.retry.RetryUtil.{
   NoErrorKind,
   TransientErrorKind,
 }
-import com.digitalasset.canton.util.retry.{Backoff, Success}
+import com.digitalasset.canton.util.retry.{Backoff, Pause, Success}
 import io.grpc.Status
 import io.grpc.protobuf.StatusProto
 
@@ -25,14 +25,17 @@ import scala.util.{Failure, Try}
 
 class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedLogging {
 
-  case class RetryConfig(maxRetries: Int, initialDelay: FiniteDuration, maxDelay: Duration) {}
+  import CoinRetries.{AutomationRetryConfig, RetryConfig}
 
   val retryForAutomationConfig =
-    RetryConfig(maxRetries = 35, initialDelay = 200.millis, maxDelay = 5.seconds)
+    AutomationRetryConfig(
+      RetryConfig(maxRetries = 35, initialDelay = 200.millis, maxDelay = 5.seconds),
+      outerLoopDelay = 5.seconds,
+    )
   val retryForClientCallsConfig =
     RetryConfig(maxRetries = 10, initialDelay = 100.millis, maxDelay = 1.seconds)
 
-  /** A retry intended for automation calls, may retry for relatively long. */
+  /** A retry intended for automation calls, retries forever. */
   def retryForAutomation[T](
       operationName: String,
       task: => Future[T],
@@ -41,8 +44,22 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
   )(implicit
       ec: ExecutionContext,
       traceContext: TraceContext,
-  ): Future[T] =
-    retry(operationName, task, callingService, retryForAutomationConfig, additionalCodes)
+  ): Future[T] = {
+    def outerLoop(task: => Future[T]) = {
+      implicit val success: Success[T] = Success.always
+      Pause(
+        loggerFactory.getTracedLogger(callingService.getClass),
+        callingService,
+        Int.MaxValue, // This is special cased as infinite retries so don’t need to worry about overflows.
+        retryForAutomationConfig.outerLoopDelay,
+        operationName,
+        longDescription = s"Outer retry loop for $operationName",
+      ).apply(task, CoinRetries.RetryableError(operationName, additionalCodes))
+    }
+    outerLoop(
+      retry(operationName, task, callingService, retryForAutomationConfig.config, additionalCodes)
+    )
+  }
 
   /** A retry intended for client calls, thus timing out relatively quickly. */
   def retryForClientCalls[T](
@@ -80,6 +97,17 @@ class CoinRetries(override val loggerFactory: NamedLoggerFactory) extends NamedL
 }
 
 object CoinRetries {
+  case class RetryConfig(maxRetries: Int, initialDelay: FiniteDuration, maxDelay: Duration) {}
+
+  /** Retry config for automation. For automation we use an outer loop that retries forever
+    * with a fixed delay `outerLoopDelay` and an inner loop with exponential backoff configured
+    * by `config`. This allows us to quickly retry on transient failures while
+    * never running out of retries.
+    */
+  final case class AutomationRetryConfig(
+      config: RetryConfig,
+      outerLoopDelay: FiniteDuration,
+  )
 
   def apply(loggerFactory: NamedLoggerFactory): CoinRetries = {
     new CoinRetries(loggerFactory)
