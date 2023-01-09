@@ -1,10 +1,13 @@
 package com.daml.network.integration.tests
 
+import com.auth0.exception.Auth0Exception
+import com.daml.network.console.WalletAppClientReference
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.util.{Auth0Util, CommonCoinAppInstanceReferences}
+import com.digitalasset.canton.BaseTest
 import com.digitalasset.canton.integration.*
-import com.auth0.exception.Auth0Exception
+import org.scalatest.BeforeAndAfterEach
 
 /** Analogue to Canton's CommunityTests */
 object CoinTests {
@@ -17,12 +20,58 @@ object CoinTests {
   trait CoinIntegrationTest
       extends BaseIntegrationTest[CoinEnvironmentImpl, CoinTestConsoleEnvironment]
       with IsolatedCoinEnvironments
-      with CommonCoinAppInstanceReferences {
+      with CoinTestCommon {
 
     override def environmentDefinition
         : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
       CoinEnvironmentDefinition
         .simpleTopology(this.getClass.getSimpleName)
+  }
+
+  trait CoinIntegrationTestWithSharedEnvironment
+      extends BaseIntegrationTest[CoinEnvironmentImpl, CoinTestConsoleEnvironment]
+      with SharedCoinEnvironment
+      with BeforeAndAfterEach
+      with CoinTestCommon {
+
+    override def environmentDefinition
+        : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
+      CoinEnvironmentDefinition
+        .simpleTopology(this.getClass.getSimpleName)
+
+    // We append this to configured Daml user names for isolation across test cases.
+    @SuppressWarnings(Array("org.wartremover.warts.Var"))
+    @volatile
+    private var testCaseId: Int = 0
+
+    override def beforeEach(): Unit = {
+      logger.info(s"Starting test case $testCaseId")
+      super.beforeEach()
+    }
+
+    override def testFinished(env: CoinTestConsoleEnvironment): Unit = {
+      testCaseId += 1
+      super.testFinished(env)
+    }
+
+    // make `aliceWallet` etc. use updated usernames
+    override def wc(name: String)(implicit
+        env: CoinTestConsoleEnvironment
+    ): WalletAppClientReference = extendDamlUserWithCaseId(super.wc(name))
+
+    private def extendDamlUserWithCaseId(
+        walletAppClient: WalletAppClientReference
+    ): WalletAppClientReference = {
+      val newDamlUser = s"${walletAppClient.config.damlUser}-$testCaseId"
+      new WalletAppClientReference(
+        walletAppClient.coinConsoleEnvironment,
+        walletAppClient.name,
+        config = walletAppClient.config.copy(damlUser = newDamlUser),
+      )
+    }
+  }
+
+  trait CoinTestCommon extends BaseTest with CnsTestUtil with CommonCoinAppInstanceReferences {
 
     def assertInRange(value: BigDecimal, range: (BigDecimal, BigDecimal)): Unit = {
       value should (be >= range._1 and be <= range._2)

@@ -4,7 +4,7 @@ import com.daml.network.config.CoinConfigTransforms
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
+  CoinIntegrationTestWithSharedEnvironment,
   CoinTestConsoleEnvironment,
 }
 import com.daml.network.util.WalletTestUtil
@@ -12,7 +12,7 @@ import com.digitalasset.canton.HasExecutionContext
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 class WalletCoinPriceIntegrationTest
-    extends CoinIntegrationTest
+    extends CoinIntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil {
 

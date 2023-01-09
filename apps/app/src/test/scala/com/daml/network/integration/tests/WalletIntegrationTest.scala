@@ -3,7 +3,7 @@ package com.daml.network.integration.tests
 import com.daml.network.auth.AuthUtil
 import com.daml.network.codegen.java.cc.coin as coinCodegen
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
-import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
+import com.daml.network.integration.tests.CoinTests.CoinIntegrationTestWithSharedEnvironment
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.logging.SuppressionRule
@@ -14,7 +14,7 @@ import org.slf4j.event.Level
 import scala.concurrent.Future
 
 class WalletIntegrationTest
-    extends CoinIntegrationTest
+    extends CoinIntegrationTestWithSharedEnvironment
     with HasExecutionContext
     with WalletTestUtil {
 

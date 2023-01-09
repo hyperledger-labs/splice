@@ -18,11 +18,7 @@ import com.daml.network.console.{
   WalletAppBackendReference,
   WalletAppClientReference,
 }
-import com.daml.network.integration.tests.CnsTestUtil
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
-  CoinTestConsoleEnvironment,
-}
+import com.daml.network.integration.tests.CoinTests.{CoinTestCommon, CoinTestConsoleEnvironment}
 import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences, Proto}
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.digitalasset.canton.data.CantonTimestamp
@@ -34,7 +30,7 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-trait WalletTestUtil extends CoinIntegrationTest with CnsTestUtil {
+trait WalletTestUtil extends CoinTestCommon {
   this: CommonCoinAppInstanceReferences =>
 
   /** @param expectedQuantityRanges : lower and upper bounds for coins sorted by their initial quantity in ascending order. */

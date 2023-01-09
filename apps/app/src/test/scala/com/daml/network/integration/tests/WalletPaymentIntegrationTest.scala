@@ -1,14 +1,16 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.wallet.{payment as walletCodegen}
-import com.daml.network.integration.tests.CoinTests.CoinIntegrationTest
+import com.daml.network.integration.tests.CoinTests.CoinIntegrationTestWithSharedEnvironment
 import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.data.CantonTimestamp
 
 import java.time.Duration
 import scala.jdk.CollectionConverters.*
 
-class WalletPaymentIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
+class WalletPaymentIntegrationTest
+    extends CoinIntegrationTestWithSharedEnvironment
+    with WalletTestUtil {
 
   "A wallet" should {
     "allow a user to list, and reject app payment requests" in { implicit env =>

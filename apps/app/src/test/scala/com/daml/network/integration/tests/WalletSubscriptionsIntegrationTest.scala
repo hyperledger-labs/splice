@@ -7,7 +7,7 @@ import com.daml.network.codegen.java.cn.wallet.{
 }
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
+  CoinIntegrationTestWithSharedEnvironment,
   CoinTestConsoleEnvironment,
 }
 import com.daml.network.util.WalletTestUtil
@@ -16,7 +16,9 @@ import com.digitalasset.canton.topology.PartyId
 
 import scala.jdk.CollectionConverters.*
 
-class WalletSubscriptionsIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
+class WalletSubscriptionsIntegrationTest
+    extends CoinIntegrationTestWithSharedEnvironment
+    with WalletTestUtil {
 
   "A wallet" should {
     "allow a user to list and reject subscription requests" in { implicit env =>
