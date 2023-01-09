@@ -1,6 +1,12 @@
 package com.daml.network.svc.automation
 
-import com.daml.network.automation.{ExpiredContractTrigger, ScheduledTaskTrigger, TriggerContext}
+import com.daml.network.automation.{
+  ExpiredContractTrigger,
+  ScheduledTaskTrigger,
+  TaskOutcome,
+  TaskSuccess,
+  TriggerContext,
+}
 import com.daml.network.codegen.java.cc
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.environment.CoinLedgerConnection
@@ -32,7 +38,7 @@ class ExpireIssuingMiningRoundTrigger(
       task: ScheduledTaskTrigger.ReadyTask[
         JavaContract[IssuingMiningRound.ContractId, IssuingMiningRound]
       ]
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val round = task.work
     val totals = store.getTotalsForRound(round.payload.round.number)
     for {
@@ -49,6 +55,6 @@ class ExpireIssuingMiningRoundTrigger(
         )
       cid <- connection
         .submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
-    } yield s"successfully created the closed mining round with cid $cid"
+    } yield TaskSuccess(s"successfully created the closed mining round with cid $cid")
   }
 }

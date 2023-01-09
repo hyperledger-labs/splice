@@ -1,7 +1,7 @@
 package com.daml.network.svc.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{OnCreateTrigger, TriggerContext}
+import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.svc.store.SvcStore
@@ -31,7 +31,7 @@ class ClosedMiningRoundTrigger(
         cc.round.ClosedMiningRound.ContractId,
         cc.round.ClosedMiningRound,
       ]
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       coinRules <- store.getCoinRules()
       // TODO(M3-06): claim unclaimed rewards
@@ -44,7 +44,7 @@ class ClosedMiningRoundTrigger(
         .toSeq
       _ <-
         connection.submitCommandsNoDedup(Seq(store.svcParty), Seq.empty, cmd)
-    } yield s"successfully archived closed mining round $closedRound"
+    } yield TaskSuccess(s"successfully archived closed mining round $closedRound")
   }
 
 }

@@ -1,7 +1,7 @@
 package com.daml.network.svc.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{OnCreateTrigger, TriggerContext}
+import com.daml.network.automation.{OnCreateTrigger, TaskSuccess, TriggerContext, TaskOutcome}
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.svc.store.SvcStore
@@ -30,7 +30,7 @@ class SummarizingMiningRoundTrigger(
         cc.round.SummarizingMiningRound.ContractId,
         cc.round.SummarizingMiningRound,
       ]
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       rewards <- queryRewards(summarizingRound.payload.round.number)
       totalBurn = rewards.totalBurn
@@ -45,7 +45,9 @@ class SummarizingMiningRoundTrigger(
         )
       cid <-
         connection.submitWithResultNoDedup(Seq(store.svcParty), Seq.empty, cmd)
-    } yield s"successfully archived summarizing mining round with burn ${totalBurn}, and created issuing mining round with cid $cid"
+    } yield TaskSuccess(
+      s"successfully archived summarizing mining round with burn ${totalBurn}, and created issuing mining round with cid $cid"
+    )
   }
 
   /** The rewards issued for a given round.

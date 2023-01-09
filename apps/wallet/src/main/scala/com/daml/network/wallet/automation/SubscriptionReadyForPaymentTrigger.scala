@@ -1,6 +1,12 @@
 package com.daml.network.wallet.automation
 
-import com.daml.network.automation.{ExpiredContractTrigger, ScheduledTaskTrigger, TriggerContext}
+import com.daml.network.automation.{
+  ExpiredContractTrigger,
+  ScheduledTaskTrigger,
+  TaskOutcome,
+  TaskSuccess,
+  TriggerContext,
+}
 import com.daml.network.codegen.java.cn.wallet.{
   install as installCodegen,
   subscriptions as subsCodegen,
@@ -39,7 +45,7 @@ class SubscriptionReadyForPaymentTrigger(
           subsCodegen.SubscriptionIdleState,
         ]
       ]
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     import com.daml.network.util.PrettyInstances.*
 
     val stateCid = task.work.contractId
@@ -48,7 +54,7 @@ class SubscriptionReadyForPaymentTrigger(
       .enqueueCoinOperation(operation)
       .map {
         case _: installCodegen.coinoperationoutcome.COO_SubscriptionPayment =>
-          "made subscription payment"
+          TaskSuccess("made subscription payment")
         case failedOperation: installCodegen.coinoperationoutcome.COO_Error =>
           val msg =
             show"Failed making subscription payment due to Daml exception\n${failedOperation.toValue}"

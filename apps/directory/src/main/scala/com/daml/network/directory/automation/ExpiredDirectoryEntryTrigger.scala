@@ -1,6 +1,12 @@
 package com.daml.network.directory.automation
 
-import com.daml.network.automation.{ExpiredContractTrigger, ScheduledTaskTrigger, TriggerContext}
+import com.daml.network.automation.{
+  ExpiredContractTrigger,
+  ScheduledTaskTrigger,
+  TaskSuccess,
+  TaskOutcome,
+  TriggerContext,
+}
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.directory.store.DirectoryStore
 import com.daml.network.environment.CoinLedgerConnection
@@ -33,7 +39,7 @@ class ExpiredDirectoryEntryTrigger(
         directoryCodegen.DirectoryEntry.ContractId,
         directoryCodegen.DirectoryEntry,
       ]]
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val cmd =
       co.work.contractId.exerciseDirectoryEntry_Expire(store.providerParty.toProtoPrimitive)
     connection
@@ -42,6 +48,6 @@ class ExpiredDirectoryEntryTrigger(
         readAs = Seq(),
         commands = cmd.commands.asScala.toSeq,
       )
-      .map(_ => s"archived expired entry")
+      .map(_ => TaskSuccess(s"archived expired entry"))
   }
 }

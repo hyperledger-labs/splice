@@ -1,7 +1,7 @@
 package com.daml.network.splitwise.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{OnCreateTrigger, TriggerContext}
+import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cn.wallet.payment as walletCodegen
 import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.environment.CoinLedgerConnection
@@ -40,7 +40,7 @@ class AcceptedAppPaymentRequestsTrigger(
         walletCodegen.AcceptedAppPayment.ContractId,
         walletCodegen.AcceptedAppPayment,
       ]
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val provider = store.providerParty
     val sender = PartyId.tryFromProtoPrimitive(payment.payload.sender)
     val transferInProgressId = splitwiseCodegen.TransferInProgress.ContractId.unsafeFromInterface(
@@ -60,7 +60,7 @@ class AcceptedAppPaymentRequestsTrigger(
               commands = cmd.commands.asScala.toSeq,
             )
             .map(_ => s"rejected accepted app payment: $msg")
-        } yield res
+        } yield TaskSuccess(res)
       case Some(install) =>
         for {
           transferContext <- scanConnection.getAppTransferContext()
@@ -87,7 +87,7 @@ class AcceptedAppPaymentRequestsTrigger(
             readAs = readAsWithValidatorUser.toSeq,
             commands = cmd.commands.asScala.toSeq,
           )
-        } yield "accepted payment and completed transfer"
+        } yield TaskSuccess("accepted payment and completed transfer")
     }
   }
 }

@@ -1,6 +1,12 @@
 package com.daml.network.wallet.automation
 
-import com.daml.network.automation.{ExpiredContractTrigger, ScheduledTaskTrigger, TriggerContext}
+import com.daml.network.automation.{
+  ExpiredContractTrigger,
+  ScheduledTaskTrigger,
+  TaskOutcome,
+  TaskSuccess,
+  TriggerContext,
+}
 import com.daml.network.codegen.java.cn.wallet.payment as paymentCodegen
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.util.JavaContract
@@ -34,7 +40,7 @@ class ExpireAppPaymentRequestsTrigger(
           paymentCodegen.AppPaymentRequest,
         ]
       ]
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       install <- store.getInstall()
       cmd = install.contractId.exerciseWalletAppInstall_AppPaymentRequest_Expire(
@@ -46,6 +52,6 @@ class ExpireAppPaymentRequestsTrigger(
           Seq(store.key.validatorParty, store.key.endUserParty),
           cmd,
         )
-    } yield "expired app payment request"
+    } yield TaskSuccess("expired app payment request")
   }
 }

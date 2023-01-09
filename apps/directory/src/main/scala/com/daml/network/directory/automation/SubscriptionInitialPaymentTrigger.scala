@@ -1,7 +1,7 @@
 package com.daml.network.directory.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{OnCreateTrigger, TriggerContext}
+import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cc.api.v1
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
@@ -37,7 +37,7 @@ class SubscriptionInitialPaymentTrigger(
         subsCodegen.SubscriptionInitialPayment.ContractId,
         subsCodegen.SubscriptionInitialPayment,
       ]
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val contextId = directoryCodegen.DirectoryEntryContext.ContractId.unsafeFromInterface(
       payment.payload.subscriptionData.context
     )
@@ -46,7 +46,7 @@ class SubscriptionInitialPaymentTrigger(
       val cmd = payment.contractId.exerciseSubscriptionInitialPayment_Reject(transferContext)
       connection
         .submitWithResultNoDedup(Seq(store.providerParty), Seq(), cmd)
-        .map(_ => s"rejected initial subscription payment: $reason")
+        .map(_ => TaskSuccess(s"rejected initial subscription payment: $reason"))
     }
     def collectPayment(
         entryName: String,
@@ -69,7 +69,7 @@ class SubscriptionInitialPaymentTrigger(
             commandId = DirectoryUtil.createDirectoryEntryCommandId(store.providerParty, entryName),
             deduplicationOffset = offset,
           )
-      } yield "created directory entry."
+      } yield TaskSuccess("created directory entry.")
     }
     for {
       context <- store.acs

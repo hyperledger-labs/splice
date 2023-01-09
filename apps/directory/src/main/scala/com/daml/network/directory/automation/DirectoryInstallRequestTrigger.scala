@@ -1,7 +1,7 @@
 package com.daml.network.directory.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{OnCreateTrigger, TriggerContext}
+import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.codegen.java.da.time.types.RelTime
 import com.daml.network.directory.store.DirectoryStore
@@ -47,7 +47,7 @@ class DirectoryInstallRequestTrigger(
         directoryCodegen.DirectoryInstallRequest.ContractId,
         directoryCodegen.DirectoryInstallRequest,
       ]
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val user = PartyId.tryFromProtoPrimitive(req.payload.user)
     val provider = store.providerParty
     store.lookupInstallByUserWithOffset(user).flatMap {
@@ -57,7 +57,7 @@ class DirectoryInstallRequestTrigger(
           .exerciseDirectoryInstallRequest_Reject()
         connection
           .submitCommandsNoDedup(Seq(provider), Seq(), cmd.commands.asScala.toSeq)
-          .map(_ => "rejected request for already existing installation.")
+          .map(_ => TaskSuccess("rejected request for already existing installation."))
 
       case QueryResult(off, None) =>
         val arg = new directoryCodegen.DirectoryInstallRequest_Accept(
@@ -80,7 +80,7 @@ class DirectoryInstallRequestTrigger(
             ),
             deduplicationOffset = off,
           )
-          .map(_ => "accepted install request.")
+          .map(_ => TaskSuccess("accepted install request."))
     }
   }
 

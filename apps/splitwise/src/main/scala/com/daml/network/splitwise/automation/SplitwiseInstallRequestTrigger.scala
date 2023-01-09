@@ -1,7 +1,7 @@
 package com.daml.network.splitwise.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{OnCreateTrigger, TriggerContext}
+import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.splitwise.store.SplitwiseStore
@@ -33,7 +33,7 @@ class SplitwiseInstallRequestTrigger(
         splitwiseCodegen.SplitwiseInstallRequest.ContractId,
         splitwiseCodegen.SplitwiseInstallRequest,
       ]
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val user = PartyId.tryFromProtoPrimitive(req.payload.user)
     val provider = store.providerParty
     store.lookupInstallWithOffset(user).flatMap {
@@ -42,7 +42,7 @@ class SplitwiseInstallRequestTrigger(
         val cmd = req.contractId.exerciseSplitwiseInstallRequest_Reject()
         connection
           .submitWithResultNoDedup(Seq(provider), Seq(), cmd)
-          .map(_ => "rejected request for already existing installation.")
+          .map(_ => TaskSuccess("rejected request for already existing installation."))
 
       case QueryResult(off, None) =>
         val acceptCmd =
@@ -58,7 +58,7 @@ class SplitwiseInstallRequestTrigger(
             ),
             deduplicationOffset = off,
           )
-          .map(_ => "accepted install request.")
+          .map(_ => TaskSuccess("accepted install request."))
     }
   }
 }

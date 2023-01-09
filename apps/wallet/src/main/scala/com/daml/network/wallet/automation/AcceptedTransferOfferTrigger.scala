@@ -3,7 +3,7 @@ package com.daml.network.wallet.automation
 import akka.NotUsed
 import akka.stream.Materializer
 import akka.stream.scaladsl.Source
-import com.daml.network.automation.{OnCreateTrigger, TriggerContext}
+import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cc.coin.invalidtransferreason
 import com.daml.network.codegen.java.cn.wallet.install.coinoperation.CO_CompleteAcceptedTransfer
 import com.daml.network.codegen.java.cn.wallet.transferoffer.AcceptedTransferOffer
@@ -52,7 +52,7 @@ class AcceptedTransferOfferTrigger(
         transferOffersCodegen.AcceptedTransferOffer.ContractId,
         transferOffersCodegen.AcceptedTransferOffer,
       ]
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val operation = new CO_CompleteAcceptedTransfer(acceptedOffer.contractId)
     treasury
       .enqueueCoinOperation(operation)
@@ -72,7 +72,7 @@ class AcceptedTransferOfferTrigger(
 
           }
         case _: installCodegen.coinoperationoutcome.COO_CompleteAcceptedTransfer =>
-          Future("completed accepted transfer offer")
+          Future(TaskSuccess("completed accepted transfer offer"))
 
         case unknownResult =>
           val msg = s"Unexpected coin-operation result $unknownResult"
@@ -83,7 +83,7 @@ class AcceptedTransferOfferTrigger(
   private def abortAcceptedTransferOffer(
       acceptedOffer: JavaContract[AcceptedTransferOffer.ContractId, AcceptedTransferOffer],
       reason: String,
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       install <- store.getInstall()
       cmd = install.contractId.exerciseWalletAppInstall_AcceptedTransferOffer_Abort(
@@ -95,7 +95,7 @@ class AcceptedTransferOfferTrigger(
           Seq(store.key.validatorParty, store.key.endUserParty),
           cmd,
         )
-    } yield s"aborted accepted transfer offer, $reason"
+    } yield TaskSuccess(s"aborted accepted transfer offer, $reason")
   }
 
 }

@@ -1,8 +1,8 @@
 package com.daml.network.directory.automation
 
-import cats.instances.future.*
 import cats.data.OptionT
-import com.daml.network.automation.{ScheduledTaskTrigger, TriggerContext}
+import cats.instances.future.*
+import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cn.wallet.subscriptions as subsCodegen
 import com.daml.network.codegen.java.cn.directory as directoryCodegen
 import com.daml.network.directory.store.DirectoryStore
@@ -30,7 +30,7 @@ class ExpiredDirectorySubscriptionTrigger(
 
   override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[DirectoryStore.IdleDirectorySubscription]
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val cmd = task.work.state.contractId.exerciseSubscriptionIdleState_ExpireSubscription(
       store.providerParty.toProtoPrimitive
     )
@@ -40,7 +40,7 @@ class ExpiredDirectorySubscriptionTrigger(
         readAs = Seq(),
         commands = cmd.commands.asScala.toSeq,
       )
-      .map(_ => s"archived expired directory subscription")
+      .map(_ => TaskSuccess(s"archived expired directory subscription"))
   }
 
   override protected def isStaleTask(

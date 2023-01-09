@@ -1,7 +1,7 @@
 package com.daml.network.svc.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{OnCreateTrigger, TriggerContext}
+import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.svc.store.SvcStore
@@ -32,7 +32,7 @@ class CoinRulesRequestTrigger(
         cc.coin.CoinRulesRequest.ContractId,
         cc.coin.CoinRulesRequest,
       ]
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val validatorParty = PartyId.tryFromProtoPrimitive(req.payload.user)
     for {
       openMiningRounds <- store.acs.listContracts(cc.round.OpenMiningRound.COMPANION)
@@ -49,7 +49,7 @@ class CoinRulesRequestTrigger(
         .toSeq
       // No command-dedup required, as the CoinRules contract is archived and recreated
       _ <- connection.submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds)
-    } yield s"accepted coin rules request from $validatorParty"
+    } yield TaskSuccess(s"accepted coin rules request from $validatorParty")
   }
 
 }

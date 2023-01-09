@@ -11,6 +11,10 @@ testlog
 _build/
 .idea/*
 .envrc.private
+.bloop
+.metals
+**/metals.sbt
+
 # We want to share run configurations
 !.idea/runConfigurations
 .vscode/*

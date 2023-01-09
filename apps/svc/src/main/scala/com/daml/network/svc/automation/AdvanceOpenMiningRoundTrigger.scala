@@ -2,7 +2,7 @@ package com.daml.network.svc.automation
 
 import cats.data.OptionT
 import cats.instances.future.*
-import com.daml.network.automation.{ScheduledTaskTrigger, TriggerContext}
+import com.daml.network.automation.{ScheduledTaskTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.svc.config.SvcAppBackendConfig
@@ -42,7 +42,7 @@ class AdvanceOpenMiningRoundTrigger(
   /** How to process a task. */
   override protected def completeTask(
       task: ScheduledTaskTrigger.ReadyTask[AdvanceOpenMiningRoundTrigger.Task]
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val rounds = task.work.openRounds
     val cmds = task.work.coinRulesId
       .exerciseCoinRules_AdvanceOpenMiningRounds(
@@ -57,7 +57,9 @@ class AdvanceOpenMiningRoundTrigger(
     connection
       .submitCommandsNoDedup(Seq(store.svcParty), Seq(), cmds)
       .map(_ =>
-        s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
+        TaskSuccess(
+          s"successfully advanced the rounds and archived round ${rounds.oldest.payload.round.number}"
+        )
       )
   }
 

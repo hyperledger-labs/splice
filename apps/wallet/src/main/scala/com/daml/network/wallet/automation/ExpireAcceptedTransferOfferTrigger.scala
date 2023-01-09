@@ -1,6 +1,12 @@
 package com.daml.network.wallet.automation
 
-import com.daml.network.automation.{ExpiredContractTrigger, ScheduledTaskTrigger, TriggerContext}
+import com.daml.network.automation.{
+  ExpiredContractTrigger,
+  ScheduledTaskTrigger,
+  TaskOutcome,
+  TaskSuccess,
+  TriggerContext,
+}
 import com.daml.network.codegen.java.cn.wallet.transferoffer as transferOffersCodegen
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.util.JavaContract
@@ -35,7 +41,7 @@ class ExpireAcceptedTransferOfferTrigger(
           transferOffersCodegen.AcceptedTransferOffer,
         ]
       ]
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     for {
       install <- store.getInstall()
       user = store.key.endUserParty.toProtoPrimitive
@@ -67,6 +73,6 @@ class ExpireAcceptedTransferOfferTrigger(
             )
           )
       }
-    } yield "expired accepted transfer offer"
+    } yield TaskSuccess("expired accepted transfer offer")
   }
 }

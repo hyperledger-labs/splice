@@ -1,7 +1,7 @@
 package com.daml.network.splitwise.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{OnCreateTrigger, TriggerContext}
+import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.splitwise.store.SplitwiseStore
@@ -33,7 +33,7 @@ class GroupRequestTrigger(
         splitwiseCodegen.GroupRequest.ContractId,
         splitwiseCodegen.GroupRequest,
       ]
-  )(implicit tc: TraceContext): Future[String] = {
+  )(implicit tc: TraceContext): Future[TaskOutcome] = {
     val provider = store.providerParty
     val user = PartyId.tryFromProtoPrimitive(req.payload.group.owner)
     val groupId = req.payload.group.id
@@ -45,7 +45,7 @@ class GroupRequestTrigger(
         val cmd = req.contractId.exerciseGroupRequest_Reject()
         connection
           .submitWithResultNoDedup(Seq(provider), Seq(), cmd)
-          .map(_ => "rejected request for already existing group.")
+          .map(_ => TaskSuccess("rejected request for already existing group."))
 
       case QueryResult(off, None) =>
         val acceptCmd = req.contractId.exerciseGroupRequest_Accept().commands.asScala.toSeq
@@ -61,7 +61,7 @@ class GroupRequestTrigger(
             ),
             deduplicationOffset = off,
           )
-          .map(_ => "accepted group request.")
+          .map(_ => TaskSuccess("accepted group request."))
     }
   }
 }

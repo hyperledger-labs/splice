@@ -35,6 +35,23 @@ case class TriggerContext(
     loggerFactory: NamedLoggerFactory,
 )
 
+sealed trait TaskOutcome
+
+/** Helper class for modelling the outcome of a task handled by a trigger.
+  *
+  * @param description in most cases a short description of how the task was completed, sometimes also a return value.
+  *                Should be a Left-value if the task failed in some way.
+  */
+case class TaskSuccess(
+    description: String
+) extends TaskOutcome
+
+case object TaskStale extends TaskOutcome with PrettyPrinting {
+  override def pretty: Pretty[this.type] = {
+    prettyOfString(_ => "skipped, as the task has become stale")
+  }
+}
+
 /** Common base trait for all triggers. */
 abstract class Trigger[T: Pretty](implicit
     ec: ExecutionContext,
@@ -60,7 +77,7 @@ abstract class Trigger[T: Pretty](implicit
     *
     * @return a short description of how the task was completed, i.e, its outcome
     */
-  protected def completeTask(task: T)(implicit tc: TraceContext): Future[String]
+  protected def completeTask(task: T)(implicit tc: TraceContext): Future[TaskOutcome]
 
   /** Check whether a task has become stale and can be skipped.
     *
@@ -77,19 +94,21 @@ abstract class Trigger[T: Pretty](implicit
   final protected def processTaskWithRetry(task: T): Future[Boolean] =
     // Creating a new trace here, as multiple requests can be processed in parallel.
     withNewTrace(this.getClass.getSimpleName) { implicit traceContext => _ =>
-      def processTaskWithStalenessCheck(): Future[String] =
-        completeTask(task).recoverWith { case ex =>
-          logger.info("Checking whether the task is stale, as its processing failed with ", ex)
-          isStaleTask(task).transform {
-            case Success(true) =>
-              Success(show"skipped, as the task has become stale")
-            case Success(false) =>
-              Failure(ex)
-            case Failure(staleCheckEx) =>
-              logger.info("Encountered exception when checking task staleness", staleCheckEx)
-              Failure(ex)
+      def processTaskWithStalenessCheck(): Future[TaskOutcome] =
+        completeTask(task)
+          .recoverWith { case ex =>
+            logger.info("Checking whether the task is stale, as its processing failed with ", ex)
+            isStaleTask(task)
+              .transform {
+                case Success(true) =>
+                  Success(TaskStale)
+                case Success(false) =>
+                  Failure(ex)
+                case Failure(staleCheckEx) =>
+                  logger.info("Encountered exception when checking task staleness", staleCheckEx)
+                  Failure(ex)
+              }
           }
-        }
 
       logger.info(show"Processing\n$task")
       context.retryProvider
@@ -99,14 +118,20 @@ abstract class Trigger[T: Pretty](implicit
           callingService = this,
         )
         .transform {
-          case Success(outcomeO) =>
-            outcomeO match {
-              case outcome =>
+          case Success(taskOutcomeE) =>
+            taskOutcomeE match {
+              case TaskSuccess(description) =>
                 logger.info(
-                  show"Completed processing with outcome: ${outcome.unquoted}"
+                  show"Completed processing with outcome: ${description}"
+                )
+                Success(true)
+              case TaskStale =>
+                logger.info(
+                  show"${TaskStale}"
                 )
                 Success(true)
             }
+
           case Failure(ex) =>
             if (this.isClosing) {
               logger.info(
@@ -231,7 +256,7 @@ abstract class OnCreateTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T
 abstract class PollingTrigger[T: Pretty]()(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends Trigger
+) extends Trigger[T]
     with FlagCloseableAsync {
 
   /** The main body of the polling trigger
@@ -359,7 +384,7 @@ abstract class PollingTrigger[T: Pretty]()(implicit
 abstract class PollingParallelTaskExecutionTrigger[T: Pretty]()(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends PollingTrigger {
+) extends PollingTrigger[T] {
 
   /** Override with how to retrieve the list of tasks that should be processed in parallel right now.
     *

@@ -1,7 +1,7 @@
 package com.daml.network.wallet.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{OnCreateTrigger, TriggerContext}
+import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cn.wallet.install as installCodegen
 import com.daml.network.util.JavaContract
 import com.daml.network.wallet.UserWalletManager
@@ -29,14 +29,14 @@ class WalletAppInstallTrigger(
         installCodegen.WalletAppInstall.ContractId,
         installCodegen.WalletAppInstall,
       ]
-  )(implicit tc: TraceContext): Future[String] =
+  )(implicit tc: TraceContext): Future[TaskOutcome] =
     Future {
       val endUserName = install.payload.endUserName
       if (walletManager.getOrCreateUserWallet(install))
-        s"onboarded wallet end-user '$endUserName'"
+        TaskSuccess(s"onboarded wallet end-user '$endUserName'")
       else {
         logger.warn(s"Unexpected duplicate on-boarding of wallet user '$endUserName'")
-        s"skipped duplicate on-boarding wallet end-user '$endUserName'"
+        TaskSuccess(s"skipped duplicate on-boarding wallet end-user '$endUserName'")
       }
     }
 
