@@ -1,8 +1,9 @@
 # With the exception of docs and the -proxy images, all of these
-# images depend on cn-apps having been built first. This dependency
+# images depend on cn-apps or canton having been built first. This dependency
 # order is only expressed in the order of this list and must be
 # maintained for the build to operate properly.
 apps := \
+	images/canton \
 	images/cn-app \
 	images/svc-app \
 	images/scan-app \

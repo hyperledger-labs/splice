@@ -10,5 +10,7 @@ stdenv.mkDerivation rec {
   installPhase = ''
     mkdir - p $out
     cp -r * $out
+    sed -i 's|-cp \\"''${PROG_HOME}/lib/canton-open-source-2.6.0-SNAPSHOT.jar\\"|-cp \\"''${CLASSPATH}:''${PROG_HOME}/lib/canton-open-source-2.6.0-SNAPSHOT.jar\\"|' \
+      $out/bin/canton
   '';
 }

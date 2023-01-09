@@ -1,12 +1,16 @@
 # -*- makefile -*-
 
 app-bundle := ${REPO_ROOT}/apps/app/target/release/coin-0.1.0-SNAPSHOT.tar.gz
+auth-service := ${REPO_ROOT}/canton/community/participant/target/scala-2.13/classes/com/digitalasset/canton/participant/ledger/api/CantonAdminTokenAuthService.class
 
 .PHONY: build
 build: $(app-bundle)	## Build the Canton Coin app bundle
 
 $(app-bundle):
 	sbt bundle
+
+$(auth-service):
+	sbt canton-community-participant/compile
 
 .PHONY: docker-build
 docker-build: $(app-bundle)

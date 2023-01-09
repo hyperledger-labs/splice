@@ -31,7 +31,7 @@ class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScr
         this.getClass.getSimpleName,
         validatorPath / "validator.conf",
         validatorPath / "validator-participant.conf",
-        svcParticipantPath / "coin.conf",
+        svcParticipantPath / "canton.conf",
         svcDomainPath / "coin.conf",
         svcAppPath / "coin.conf",
         scanAppPath / "coin.conf",
