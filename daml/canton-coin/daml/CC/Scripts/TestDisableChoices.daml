@@ -21,20 +21,20 @@ testLockedCoin = do
   alice <- setupUser app "alice" app.svc
   bob <- setupUser app "bob" app.svc
 
-  cid <- getLockedCoin app alice bob.primaryParty 20.0
+  cid <- getLockedCoin app alice bob.primaryParty 20.0 (minutes 5)
   testChoice @"enable_LockedCoin_Unlock" app [bob.primaryParty, alice.primaryParty] [app.svc] $ \coinRules ->
     exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_Unlock coinRules)
 
-  cid <- getLockedCoin app alice bob.primaryParty 20.0
+  cid <- getLockedCoin app alice bob.primaryParty 20.0 (minutes 5)
   passTime (minutes 6)
   testChoice @"enable_LockedCoin_OwnerExpireLock" app [alice.primaryParty] [app.svc] $ \coinRules ->
     exerciseCmd (toInterfaceContractId @API.LockedCoin cid) (API.LockedCoin_OwnerExpireLock coinRules)
 
-  cid <- getLockedCoin app alice bob.primaryParty defaultCoinConfig.holdingFee.rate
-  replicateA_  3 $ runNextIssuance app
+  cid <- getLockedCoin app alice bob.primaryParty defaultCoinConfig.holdingFee.rate (minutes 1)
+  replicateA_ 4 $ runNextIssuance app
   (round, _) <- getLatestOpenRound app
-  testChoice @"enable_LockedCoin_ExpireAsStakeholder" app [alice.primaryParty] [app.svc] $ \coinRules ->
-    exerciseCmd cid (LockedCoin_ExpireAsStakeholder alice.primaryParty round coinRules)
+  testChoice @"enable_LockedCoin_ExpireCoin" app [app.svc] [app.svc] $ \coinRules ->
+    exerciseCmd cid (LockedCoin_ExpireCoin round coinRules)
   pure ()
 
 testCoin : Script ()
@@ -45,8 +45,8 @@ testCoin = do
   cid <- tap app alice defaultCoinConfig.holdingFee.rate
   replicateA_ 3 $ runNextIssuance app
   (round, _) <- getLatestOpenRound app
-  testChoice @"enable_Coin_ExpireAsStakeholder" app [alice.primaryParty] [app.svc] $ \coinRules ->
-    exerciseCmd cid (Coin_ExpireAsStakeholder alice.primaryParty round coinRules)
+  testChoice @"enable_Coin_Expire" app [app.svc] [app.svc] $ \coinRules ->
+    exerciseCmd cid (Coin_Expire round coinRules)
   pure ()
 
 testAppReward : Script ()
@@ -152,10 +152,10 @@ cycleCoinConfig app transform = do
       config = transform rules.config
   pure ()
 
-getLockedCoin : CCApp -> CCUser -> Party -> Decimal -> Script (ContractId LockedCoin)
-getLockedCoin app owner lockHolder amount =  do
+getLockedCoin : CCApp -> CCUser -> Party -> Decimal -> RelTime -> Script (ContractId LockedCoin)
+getLockedCoin app owner lockHolder amount lockDuration =  do
 -- tap amount + 1 to account for fees
   _ <- tap app owner (amount + 1.0)
-  lockTo1 app owner lockHolder amount (minutes 5) "locktest"
+  lockTo1 app owner lockHolder amount lockDuration "locktest"
   [(cid, _)] <- query @LockedCoin lockHolder
   pure cid

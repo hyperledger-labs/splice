@@ -11,7 +11,6 @@ import com.daml.network.codegen.java.cc.coin.{
   CoinRules_Mint,
   CoinRules_Tap,
   LockedCoin,
-  LockedCoin_SvcExpireLock,
 }
 import com.daml.network.codegen.java.cc.round.IssuingMiningRound
 import com.daml.network.util.{ExerciseNode, ExerciseNodeCompanion, JavaContract => Contract}
@@ -186,38 +185,6 @@ object OwnerExpireLock extends ParentNodeCompanion {
   } yield OwnerExpireLock(node)
 }
 
-case class SvcExpireLock(node: ExerciseNode[LockedCoin_SvcExpireLock, Coin.ContractId])
-    extends ParentNode {
-  def toProtoV0: v0.ParentNode =
-    v0.ParentNode().withSvcExpireLock(node.toProtoV0)
-}
-
-object SvcExpireLock extends ParentNodeCompanion {
-  override type Tpl = LockedCoin
-  override type Arg = LockedCoin_SvcExpireLock
-  override type Res = Coin.ContractId
-
-  override val templateOrInterface = Left(LockedCoin.COMPANION)
-  override val choice = LockedCoin.CHOICE_LockedCoin_SvcExpireLock
-
-  override val argDecoder = LockedCoin_SvcExpireLock.valueDecoder()
-  override def argToValue(arg: LockedCoin_SvcExpireLock) = arg.toValue
-
-  override val resDecoder = (cid: Value) =>
-    Coin.ContractId.fromContractId(
-      PrimitiveValueDecoders.fromContractId(Coin.valueDecoder).decode(cid)
-    )
-
-  override def toParentNode(node: ExerciseNode[Arg, Res]) = SvcExpireLock(node)
-  override def resToValue(res: Coin.ContractId) = res.toValue
-
-  def fromProtoV0(
-      expireP: v0.ParentNode.Type.SvcExpireLock
-  ): Either[ProtoDeserializationError, SvcExpireLock] = for {
-    node <- ExerciseNode.fromProto(SvcExpireLock)(expireP.value)
-  } yield SvcExpireLock(node)
-}
-
 case class CoinUnlock(
     node: ExerciseNode[v1.coin.LockedCoin_Unlock, v1.coin.Coin.ContractId]
 ) extends ParentNode {
@@ -262,7 +229,6 @@ object ParentNode {
       case issuing: v0.ParentNode.Type.StartIssuing => StartIssuing.fromProtoV0(issuing)
       case unlock: v0.ParentNode.Type.CoinUnlock => CoinUnlock.fromProtoV0(unlock)
       case ownerLock: v0.ParentNode.Type.OwnerExpireLock => OwnerExpireLock.fromProtoV0(ownerLock)
-      case svcLock: v0.ParentNode.Type.SvcExpireLock => SvcExpireLock.fromProtoV0(svcLock)
     }
   }
 }

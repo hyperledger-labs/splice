@@ -394,6 +394,15 @@ getLatestOpenRound app = do
     None -> abort "No open open mining rounds"
     Some r-> pure r
 
+getLatestActiveRound : CCApp -> Script (ContractId OpenMiningRound, OpenMiningRound)
+getLatestActiveRound app = do
+  now <- getTime
+  -- get active rounds
+  rounds <- query @OpenMiningRound app.svc
+  case maximumOn (\(_, r) -> r.round) rounds of
+    None -> abort "No active open mining rounds"
+    Some r-> pure r
+
 getOpenRoundsSorted : CCApp -> Script [(ContractId OpenMiningRound, OpenMiningRound)]
 getOpenRoundsSorted app = do
   rounds <- query @OpenMiningRound app.svc

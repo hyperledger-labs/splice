@@ -18,6 +18,8 @@ import org.slf4j.event.Level
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
 
+import java.time.Duration
+
 class TimeBasedTreasuryIntegrationTest
     extends CoinIntegrationTest
     with HasExecutionContext
@@ -185,6 +187,7 @@ class TimeBasedTreasuryIntegrationTest
         aliceWallet.list().coins,
         10,
         scan.getAppTransferContext(),
+        Duration.ofDays(10),
       )
       checkBalance(
         aliceWallet,

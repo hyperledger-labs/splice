@@ -41,18 +41,15 @@ template Coin
     interface instance API.Coin for Coin where
       view = API.CoinView with ..
 
-    choice Coin_ExpireAsStakeholder : ()
+    choice Coin_Expire : ()
       with
-        actor : Party
         roundCid : ContractId OpenMiningRound
         coinRulesCid : ContractId API.CoinRules
-      controller actor
+      -- For simplicity and to communicate this as the standard-case, we only allow the SVC to expire coins (see #1789 for full context)
+      controller svc
       do coinRules <- view <$> fetch coinRulesCid
-         requireChoiceIsEnabled "Coin_ExpireAsStakeholder" (\c -> c.enable_Coin_ExpireAsStakeholder) coinRules
-         require "Only stakeholders can expire" (actor `elem` stakeholder this)
-         round <- fetch roundCid
-         require "Contract expired" (quantityExpiresAt quantity < round.round)
-
+         requireChoiceIsEnabled "Coin_Expire" (\c -> c.enable_Coin_Expire) coinRules
+         requireCoinExpiredForAllOpenRounds roundCid this
 
 template LockedCoin
   with
@@ -69,38 +66,27 @@ template LockedCoin
       lockedCoin_OwnerExpireLock coinRulesCid = do
         coinRules <- view <$> fetch coinRulesCid
         requireChoiceIsEnabled "LockedCoin_OwnerExpireLock" (\c -> c.enable_LockedCoin_OwnerExpireLock) coinRules
-        toInterfaceContractId <$> tryExpireLock
-
+        t <- getTime
+        require "Lock is expired" (lock.expiresAt < t)
+        toInterfaceContractId <$> create coin
+        
       lockedCoin_Unlock coinRulesCid = do
         coinRules <- view <$> fetch coinRulesCid
         requireChoiceIsEnabled "LockedCoin_Unlock" (\c -> c.enable_LockedCoin_Unlock) coinRules
         toInterfaceContractId <$> create coin
 
-    -- TODO(M3-01): review how lock-expiry is structured, and its relation to coin expiry
-    let tryExpireLock : Update (ContractId Coin)
-        tryExpireLock = do
-            t <- getTime
-            require "Lock not expired" (lock.expiresAt <= t)
-            create coin
-
-    -- NOTE: we intentionally don't combine this choice with Coin_OwnerExpireLock to
-    -- provide a more expressive transaction graph.
-    choice LockedCoin_SvcExpireLock : ContractId Coin
-      controller coin.svc
-      do tryExpireLock
-
-    choice LockedCoin_ExpireAsStakeholder : ()
+    choice LockedCoin_ExpireCoin : ()
       with
-        actor : Party
         roundCid : ContractId OpenMiningRound
         coinRulesCid : ContractId API.CoinRules
-      controller actor
+      -- For simplicity and to communicate this as the standard-case, we only allow the SVC to expire coins (see #1789 for full context)
+      controller coin.svc
       do coinRules <- view <$> fetch coinRulesCid
-         requireChoiceIsEnabled "LockedCoin_Unlock" (\c -> c.enable_LockedCoin_ExpireAsStakeholder) coinRules
-         require "Only stakeholders can expire" (actor `elem` stakeholder this)
-         round <- fetch roundCid
-         require "Contract expired" (quantityExpiresAt coin.quantity < round.round)
-
+         requireChoiceIsEnabled "LockedCoin_ExpireCoin" (\c -> c.enable_LockedCoin_ExpireCoin) coinRules
+         requireChoiceIsEnabled "Coin_Expire" (\c -> c.enable_Coin_Expire) coinRules
+         t <- getTime
+         require "Lock is expired" (lock.expiresAt < t)
+         requireCoinExpiredForAllOpenRounds roundCid coin
 
 -- Contracts to implement reward issuance
 -- ======================================
@@ -578,6 +564,24 @@ checkTransferConstraints transfer summary config
     | summary.quantityBalance /= 0.0 && summary.numFloatingCoins == 0 = Left $ ITR_Other $ "There needs to be at least one floating output coin to receive excess input quantity" <> show summary.quantityBalance
     | otherwise = Right ()
 
+estimateOpenRoundCreatedAt : CoinConfig CC -> OpenMiningRound -> API.Round -> Time
+estimateOpenRoundCreatedAt config currentMiningRound targetRound
+  | currentMiningRound.round >= targetRound = error $ "Target round has to be after or equal to the current OpenMiningRound"
+  | otherwise = 
+    let relRound = subRound targetRound currentMiningRound.round
+        -- Note: To estimate the time when the target open mining round is being created but not yet open,
+        -- We can estimate the `opensAt` of the target open mining round and then subtract it by 1 tick duration
+        relTime = convertMicrosecondsToRelTime $ (relRound.diff - 1) * (convertRelTimeToMicroseconds config.tickDuration)
+    in addRelTime currentMiningRound.opensAt relTime
+
+lockExpiresBeforeCoin : Time -> OpenMiningRound -> API.TimeLock -> ExpiringQuantity -> CoinConfig CC -> Bool
+lockExpiresBeforeCoin currentTime currentOpenRound lock e config = 
+  -- Note: we exploit that there are exactly three open rounds active at any
+  -- point in time; and we ensure that a coin can be expired as soon as it can
+  -- definitely not be used as an input to transfer anymore.
+  let expiringRound = addRelRound (quantityExpiresAt e) (RelRound 2)
+      coinExpiresAt = estimateOpenRoundCreatedAt config currentOpenRound expiringRound
+  in lock.expiresAt < coinExpiresAt
 
 -- | Execute a transfer.
 --
@@ -602,7 +606,8 @@ executeTransfer coinRulesCid context configUsd svc t = do
   -- issue rewards for burns
   issueRewards csum t.sender t.provider summary2
   -- record outputs
-  createdCoins <- createTransferOutputs csum.openRound.round csum.config svc distributed.coins
+  currentTime <- getTime
+  createdCoins <- createTransferOutputs currentTime csum.openRound csum.config svc distributed.coins
 
   return API.TransferResult with
     round = csum.openRound.round
@@ -1019,19 +1024,23 @@ distributeOutputs config svc sender summary outs =
              floatingComplete = floatingComplete
 
 
-createTransferOutputs : API.Round -> CoinConfig CC -> Party -> [DistributedCoin] -> Update [API.CreatedCoin]
-createTransferOutputs now config svc outs =
+createTransferOutputs : Time -> OpenMiningRound -> CoinConfig CC -> Party -> [DistributedCoin] -> Update [API.CreatedCoin]
+createTransferOutputs currentTime currentOpenRound config svc outs =
     mapA createOutput outs
   where
     createOutput out = do
       let coin = Coin with
             svc
             owner = out.owner
-            quantity = expiringQuantity config.holdingFee out.quantity now
+            quantity = expiringQuantity config.holdingFee out.quantity currentOpenRound.round
+      
       case out.lock of
         None -> API.TransferResultCoin . toInterfaceContractId <$> create coin
-        Some lock -> API.TransferResultLockedCoin . toInterfaceContractId <$> create LockedCoin with coin; lock
-
+        Some lock -> do
+          -- We require the lock to expire before the coin to allow CN app authors to
+          -- assume that a locked coin is never archived by the SVC while the lock is held.
+          require "lock expires before coin" (lockExpiresBeforeCoin currentTime currentOpenRound lock coin.quantity config)
+          API.TransferResultLockedCoin . toInterfaceContractId <$> create LockedCoin with coin; lock
 
 -- | Scale the 'CoinConfig' such that the fees charged are scaled by the same scale factor.
 scaleFees : Decimal -> CoinConfig USD -> CoinConfig CC
@@ -1050,3 +1059,12 @@ scaleFees s c = CoinConfig with
     maxPayloadLength = c.maxPayloadLength
     tickDuration = c.tickDuration
     enabledChoices = c.enabledChoices
+
+requireCoinExpiredForAllOpenRounds : ContractId OpenMiningRound -> Coin -> Update ()
+requireCoinExpiredForAllOpenRounds roundCid coin = do
+  round <- fetch roundCid
+  require "SVC of the round matches SVC of the coin" (round.svc == coin.svc)
+  -- Note: we exploit that there are exactly three open rounds active at any
+  -- point in time; and we ensure that a coin can be expired as soon as it can
+  -- definitely not be used as an input to transfer anymore.
+  require "Coin is expired" ((quantityExpiresAt coin.quantity).number <= round.round.number - 2)

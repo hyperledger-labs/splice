@@ -48,6 +48,7 @@ class WalletTimeBasedIntegrationTest
         aliceWallet.list().coins,
         25,
         scan.getAppTransferContext(),
+        Duration.ofDays(10),
       )
 
       clue("Check wallet after locking coins") {

@@ -83,9 +83,9 @@ data EnabledChoices = EnabledChoices
   with
     enable_LockedCoin_Unlock : Bool
     enable_LockedCoin_OwnerExpireLock : Bool
-    enable_LockedCoin_ExpireAsStakeholder : Bool
+    enable_LockedCoin_ExpireCoin : Bool
 
-    enable_Coin_ExpireAsStakeholder : Bool
+    enable_Coin_Expire : Bool
 
     enable_AppReward_ProviderExpire : Bool
 
@@ -101,9 +101,9 @@ enableAllChoices : EnabledChoices
 enableAllChoices = EnabledChoices with
   enable_LockedCoin_Unlock = True
   enable_LockedCoin_OwnerExpireLock = True
-  enable_LockedCoin_ExpireAsStakeholder = True
+  enable_LockedCoin_ExpireCoin = True
 
-  enable_Coin_ExpireAsStakeholder = True
+  enable_Coin_Expire = True
 
   enable_AppReward_ProviderExpire = True
 

@@ -82,11 +82,11 @@ trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
       coins: Seq[GrpcWalletAppClient.CoinPosition],
       quantity: Int,
       transferContext: v1.coin.AppTransferContext,
+      expiredDuration: Duration,
   ): Unit = clue(s"Locking $quantity coins for $userParty") {
     val coinOpt = coins.find(_.effectiveQuantity >= quantity)
-    val expirationOpt = Proto.decode(Proto.Timestamp)(
-      20000000000000000L // Wed May 18 2033
-    )
+    val expiredAt = userWallet.remoteParticipant.ledger_api.time.get().add(expiredDuration)
+    val expirationOpt = Proto.decode(Proto.Timestamp)(expiredAt.underlying.micros)
 
     (coinOpt, expirationOpt) match {
       case (Some(coin), Right(expiration)) => {

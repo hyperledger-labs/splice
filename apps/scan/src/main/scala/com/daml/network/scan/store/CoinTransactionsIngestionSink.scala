@@ -155,7 +155,6 @@ class CoinTransactionsIngestionSink(
           Mint,
           StartIssuing,
           CoinUnlock,
-          SvcExpireLock,
           OwnerExpireLock,
         ).map(c => ExerciseNode.decodeExerciseEvent(c)(exercised).map(c.toParentNode(_)))
           .collectFirst { case Some(n) =>
