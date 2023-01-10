@@ -34,6 +34,7 @@ import com.daml.ledger.javaapi.data.{
   GetTransactionsResponse,
   GetUserRequest,
   GrantUserRightsRequest,
+  LedgerOffset,
   ListUserRightsRequest,
   ListUserRightsResponse,
   Transaction,
@@ -102,6 +103,13 @@ class LedgerClient(channel: Channel, token: Option[String])(implicit
   }
 
   override def close(): Unit = GrpcChannel.close(channel)
+
+  def ledgerEnd(): Future[LedgerOffset] = {
+    val req = TransactionServiceOuterClass.GetLedgerEndRequest.newBuilder().build()
+    wrapFuture(transactionServiceStub.getLedgerEnd(req, _)).map { resp =>
+      LedgerOffset.fromProto(resp.getOffset)
+    }
+  }
 
   def activeContracts(
       request: GetActiveContractsRequest

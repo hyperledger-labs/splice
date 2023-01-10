@@ -20,7 +20,6 @@ import com.daml.ledger.javaapi.data.{
   ExercisedEvent,
   Filter,
   FiltersByParty,
-  GetActiveContractsRequest,
   GetTransactionTreesResponse,
   GetTransactionsRequest,
   Identifier,
@@ -117,7 +116,7 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
 
   def subscribeAsync(
       subscriptionName: String,
-      offset: LedgerOffset,
+      beginOffset: LedgerOffset,
       filter: Seq[PartyId],
   )(f: Transaction => Future[Unit]): CoinLedgerSubscription
 
@@ -302,24 +301,55 @@ object CoinLedgerConnection {
 
       override def activeContractsWithOffset(
           filter: TransactionFilter
-      ): Future[(Seq[CreatedEvent], LedgerOffset)] = {
-        val activeContractsRequest =
-          client.activeContracts(new GetActiveContractsRequest("", filter, false))
-        activeContractsRequest.toMat(Sink.seq)(Keep.right).run().map { responseSequence =>
-          val offset = responseSequence
-            .map(_.getOffset.toScala)
-            .lastOption
-            .flatten
-            // according to spec, should always be defined in last message of stream
-            .getOrElse(
-              throw new RuntimeException(
-                "Expected to have offset in the last message of the acs stream but didn't have one!"
-              )
+      ): Future[(Seq[CreatedEvent], LedgerOffset)] =
+        client.ledgerEnd().flatMap {
+          case lb: LedgerOffset.LedgerBegin => Future.successful((Seq.empty, lb))
+          case simulatedAcsEnd =>
+            val filterParties =
+              filter.getParties.asScala.view.map(PartyId.tryFromProtoPrimitive).toSeq
+            val req = new GetTransactionsRequest(
+              "",
+              LedgerOffset.LedgerBegin.getInstance,
+              simulatedAcsEnd,
+              partyOnlyFilter(filterParties),
+              false,
             )
-          val active = responseSequence.flatMap(_.getCreatedEvents.asScala)
-          (active, new LedgerOffset.Absolute(offset))
+            val filterCreates = interpretCreateFilter(filter)
+            val mapCe = client
+              .transactionTrees(req)
+              .via(treesAsTransactions)
+              .runWith(Sink.fold(Map.empty[String, CreatedEvent]) { (cidCe, tx) =>
+                val (creates, archives) = tx.getEvents.asScala.partitionMap {
+                  case ce: CreatedEvent => Left((ce.getContractId, ce))
+                  case ae: ArchivedEvent => Right(ae.getContractId)
+                  case e: Event =>
+                    sys.error(s"${e.getClass.getSimpleName} was not a create or archive")
+                }
+                val tpIdFilteredCreates = creates.view filter { case (_, ce) => filterCreates(ce) }
+                cidCe ++ tpIdFilteredCreates -- archives
+              })
+            mapCe.map(m => (m.values.toSeq, simulatedAcsEnd))
         }
-      }
+
+      private def interpretCreateFilter(filter: TransactionFilter): CreatedEvent => Boolean =
+        filter match {
+          case fbp: FiltersByParty =>
+            // this isn't fine-grained enough for the type, but good enough
+            // for our usage of it
+            val partylessFilters = fbp.getPartyToFilters.asScala.values
+            if (partylessFilters.collectFirst { case _: NoFilter => () }.isDefined)
+              Function const true
+            else {
+              val allTpids = partylessFilters.view.flatMap {
+                case f: InclusiveFilter => f.getTemplateIds.asScala
+                case f: Filter => sys.error(s"unexpected filter $f")
+              }.toSet
+              ce => allTpids(ce.getTemplateId)
+            }
+          case _ =>
+            // FiltersByParty is currently the only possibility
+            Function const true
+        }
 
       override def activeContractsWithOffset[TC <: Contract[TCid, T], TCid <: ContractId[
         T
@@ -360,29 +390,36 @@ object CoinLedgerConnection {
       // All those limitations are acceptable perform additional filters
       // on contracts which include those filters and for the PoC
       // we can assume that we know the templates that implement a given interface.
-      private def subscription[T](
+      private def subscription(
           subscriptionName: String,
-          offset: LedgerOffset,
+          beginOffset: LedgerOffset,
           parties: Seq[PartyId],
       )(mapOperator: Flow[Transaction, Any, _]): CoinLedgerSubscription = {
-        val partyOnlyFilter = new FiltersByParty(
+        makeSubscription(
+          client.transactionTrees(
+            new GetTransactionsRequest("", beginOffset, partyOnlyFilter(parties), false)
+          ),
+          treesAsTransactions.via(mapOperator),
+          subscriptionName,
+        )
+      }
+
+      private def partyOnlyFilter(parties: Seq[PartyId]): TransactionFilter =
+        new FiltersByParty(
           parties
             .map(p => p.toProtoPrimitive -> NoFilter.instance)
             .toMap[String, Filter]
             .asJava
         )
-        makeSubscription(
-          client.transactionTrees(new GetTransactionsRequest("", offset, partyOnlyFilter, false)),
-          Flow
-            .fromFunction[GetTransactionTreesResponse, Seq[TransactionTree]](
-              _.getTransactions.asScala.toSeq
-            )
-            .mapConcat(identity)
-            .map(flattenTree)
-            .via(mapOperator),
-          subscriptionName,
-        )
-      }
+
+      private def treesAsTransactions: Flow[GetTransactionTreesResponse, Transaction, NotUsed] =
+        Flow
+          .fromFunction[GetTransactionTreesResponse, Seq[TransactionTree]](
+            _.getTransactions.asScala.toSeq
+          )
+          .mapConcat(identity)
+          .map(flattenTree)
+
       private def flattenTree(tree: TransactionTree): Transaction = {
         val events: mutable.Buffer[Event] = mutable.ListBuffer()
         Trees.traverseTree(
@@ -417,10 +454,10 @@ object CoinLedgerConnection {
       // See `subscribe` for limitations of this method.
       override def subscribeAsync(
           subscriptionName: String,
-          offset: LedgerOffset,
+          beginOffset: LedgerOffset,
           filter: Seq[PartyId],
       )(f: Transaction => Future[Unit]): CoinLedgerSubscription =
-        subscription(subscriptionName, offset, filter)({
+        subscription(subscriptionName, beginOffset, filter)({
           Flow[Transaction].mapAsync(1)(f)
         })
 

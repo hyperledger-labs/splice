@@ -33,11 +33,13 @@ trait StoreWithOpenMiningRounds { this: FlagCloseable =>
   def getLatestOpenMiningRound(now: CantonTimestamp)(implicit
       ec: ExecutionContext
   ): Future[JavaContract[OpenMiningRound.ContractId, OpenMiningRound]] =
-    lookupSubmittableOpenMiningRounds(now).map {
-      _.lastOption.getOrElse(
+    lookupSubmittableOpenMiningRounds(now).map(
+      _.maxByOption { c =>
+        c.payload.round.number: Long
+      }.getOrElse(
         throw new StatusRuntimeException(
           Status.NOT_FOUND.withDescription("No active OpenMiningRound contract")
         )
       )
-    }
+    )
 }
