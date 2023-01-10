@@ -15,6 +15,7 @@ lazy val `canton-community-app` = BuildCommon.`canton-community-app`
 lazy val `canton-community-common` = BuildCommon.`canton-community-common`
 lazy val `canton-community-domain` = BuildCommon.`canton-community-domain`
 lazy val `canton-community-participant` = BuildCommon.`canton-community-participant`
+lazy val `canton-research-update-service` = BuildCommon.`canton-research-update-service`
 lazy val `canton-blake2b` = BuildCommon.`canton-blake2b`
 lazy val `canton-functionmeta` = BuildCommon.`canton-functionmeta`
 lazy val `canton-slick-fork` = BuildCommon.`canton-slick-fork`
@@ -58,6 +59,7 @@ lazy val root = (project in file("."))
     `splitwise-daml`,
     `svc-governance-daml`,
     `canton-community-common`,
+    `canton-research-update-service`,
     `canton-blake2b`,
     `canton-slick-fork`,
     `canton-daml-fork`,

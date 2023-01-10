@@ -667,6 +667,26 @@ object BuildCommon {
       )
   }
 
+  lazy val `canton-research-update-service` = {
+    sbt
+      .Project("canton-research-update-service", file("canton/research/app"))
+      .disablePlugins(ScalafmtPlugin, WartRemover)
+      .settings(
+        disableTests,
+        sharedCantonSettings,
+        libraryDependencies ++= Seq(
+          daml_ledger_api_scalapb,
+          daml_ledger_api_proto % "protobuf",
+          CantonDependencies.grpc_services % "protobuf",
+          scalapb_runtime_grpc,
+          scalapb_runtime,
+        ),
+        Compile / PB.targets := Seq(
+          scalapb.gen(flatPackage = false) -> (Compile / sourceManaged).value / "protobuf"
+        ),
+      )
+  }
+
   lazy val `canton-blake2b` = {
     import CantonDependencies._
     sbt.Project

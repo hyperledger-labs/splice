@@ -1,0 +1,82 @@
+// Copyright (c) 2023 Digital Asset (Switzerland) GmbH and/or its affiliates
+//
+// Proprietary code. All rights reserved.
+
+syntax = "proto3";
+
+package com.digitalasset.canton.research.participant.multidomain;
+
+import "com/digitalasset/canton/research/participant/multidomain/transfer.proto";
+import "com/daml/ledger/api/v1/ledger_offset.proto";
+import "com/daml/ledger/api/v1/transaction.proto";
+
+option java_outer_classname = "UpdateServiceOuterClass";
+option java_package = "com.digitalasset.canton.research.participant.multidomain";
+option csharp_namespace = "Com.Digitalasset.Canton.Research.Participant.Multidomain";
+
+// Allows clients to read updates (transactions and transfers) from the ledger.
+service UpdateService {
+
+  // Read the ledger's complete transaction tree stream and related transfers for a set of parties.
+  rpc GetTreeUpdates (GetUpdatesRequest) returns (stream GetTreeUpdatesResponse);
+
+  // Get the current ledger end.
+  // Subscriptions started with the returned offset will serve updates created after this RPC was called.
+  rpc GetLedgerEnd (GetLedgerEndRequest) returns (GetLedgerEndResponse);
+
+}
+
+message GetUpdatesRequest {
+
+  // Must correspond to the ledger ID reported by the Ledger Identification Service.
+  // Must be a valid LedgerString (as described in ``value.proto``).
+  // Optional
+  string ledger_id = 1;
+
+  // Beginning of the requested ledger section.
+  // This offset is exclusive: the response will only contain transactions whose offset is strictly greater than this.
+  // Required
+  com.daml.ledger.api.v1.LedgerOffset begin = 2;
+
+  // End of the requested ledger section.
+  // This offset is inclusive: the response will only contain transactions whose offset is less than or equal to this.
+  // Optional, if not set, the stream will not terminate.
+  com.daml.ledger.api.v1.LedgerOffset end = 3;
+
+  // Required
+  // For the multi-domain, this currently replace the usual TransactionFilter
+  string party = 4;
+
+  // Must be a valid domain ID
+  // Required
+  string domain_id = 5;
+}
+
+message GetTreeUpdatesResponse {
+  // The list of updates trees that matches the filter in the request.
+  repeated TreeUpdate updates = 1;
+}
+
+
+message GetLedgerEndRequest {
+  // Must correspond to the ledger ID reported by the Ledger Identification Service.
+  // Must be a valid LedgerString (as describe in ``value.proto``).
+  // Optional
+  string ledger_id = 1;
+
+  // Must be a valid domain ID
+  // Required
+  string domain_id = 2;
+}
+
+message GetLedgerEndResponse {
+  // The absolute offset of the current ledger end.
+  com.daml.ledger.api.v1.LedgerOffset offset = 1;
+}
+
+message TreeUpdate {
+  oneof tree_update {
+    com.daml.ledger.api.v1.TransactionTree transaction_tree = 1;
+    Transfer transfer = 2;
+  }
+}
