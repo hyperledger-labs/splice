@@ -46,5 +46,8 @@ class UserWalletAutomationService(
   registerTrigger(
     new AcceptedTransferOfferTrigger(triggerContext, store, treasury, connection)
   )
+  registerTrigger(
+    new CollectRewardsAndMergeCoinsTrigger(triggerContext, store, treasury, connection)
+  )
   registerTrigger(new ExpireAppPaymentRequestsTrigger(triggerContext, store, connection))
 }

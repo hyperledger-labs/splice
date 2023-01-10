@@ -201,11 +201,9 @@ class WalletIntegrationTest
           failedAcceptF.futureValue
 
           eventually() {
-            val coins = aliceWallet.list().coins
             // all four taps went through
-            coins should have size 4
             // but no money was deducted as the app payment failed
-            checkWallet(alice, aliceWallet, Seq((9, 10), (9, 10), (9, 10), (9, 10)))
+            checkBalance(aliceWallet, 1, (39, 40), exactly(0), exactly(0))
           }
       }
 
@@ -252,7 +250,7 @@ class WalletIntegrationTest
         // eventually, the rejection goes through
         rejectF.futureValue
         eventually()(aliceWallet.listAppPaymentRequests() shouldBe empty)
-        checkWallet(alice, aliceWallet, Seq((10, 10), (666, 666)))
+        checkBalance(aliceWallet, 1, (675, 676), exactly(0), exactly(0))
       }
     }
 

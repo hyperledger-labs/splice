@@ -6,7 +6,7 @@ import com.daml.network.console.{RemoteDirectoryAppReference, WalletAppClientRef
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.CoinTestConsoleEnvironment
-import com.daml.network.util.{CoinUtil, WalletTestUtil}
+import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.ShowUtil.*
@@ -205,36 +205,10 @@ class SplitwiseFrontendIntegrationTest
 
       eventually() {
         // Check final amounts in the wallets
-        val exactly = (x: BigDecimal) => (x, x)
-        checkWallet(aliceUserParty, aliceWallet, Seq((3.75, 4), exactly(400)))
-        checkWallet(bobUserParty, bobWallet, Seq((40.4, 40.5)))
-        checkWallet(charlieUserParty, charlieWallet, Seq((3.75, 4), exactly(111)))
+        checkWallet(aliceUserParty, aliceWallet, Seq((403.75, 404)))
+        checkWallet(bobUserParty, bobWallet, Seq((40.3, 40.5)))
+        checkWallet(charlieUserParty, charlieWallet, Seq((114.75, 115)))
       }
-    }
-
-    def checkWallet(
-        walletParty: PartyId,
-        wallet: WalletAppClientReference,
-        expectedQuantityRanges: Seq[(BigDecimal, BigDecimal)],
-    ): Unit = clue(s"checking wallet with $expectedQuantityRanges") {
-      eventually(10.seconds, 500.millis) {
-        val coins =
-          wallet.list().coins.sortBy(coin => coin.contract.payload.quantity.initialQuantity)
-        coins should have size (expectedQuantityRanges.size.toLong)
-        coins
-          .zip(expectedQuantityRanges)
-          .foreach { case (coin, quantityBounds) =>
-            coin.contract.payload.owner shouldBe walletParty.toPrim
-            val coinQuantity =
-              coin.contract.payload.quantity
-            assertInRange(coinQuantity.initialQuantity, quantityBounds)
-            coinQuantity.ratePerRound shouldBe CoinUtil.defaultHoldingFee
-          }
-      }
-    }
-
-    def assertInRange(value: BigDecimal, range: (BigDecimal, BigDecimal)): Unit = {
-      value should (be >= range._1 and be <= range._2)
     }
 
     "settle debts with a single party" in { implicit env =>
@@ -318,11 +292,10 @@ class SplitwiseFrontendIntegrationTest
         }
       }
 
-      val exactly = (x: BigDecimal) => (x, x)
       eventually() {
         // Check final amounts in the wallets
-        checkWallet(aliceUserParty, aliceWallet, Seq((3.75, 4), exactly(500)))
-        checkWallet(bobUserParty, bobWallet, Seq((12.4, 12.5)))
+        checkWallet(aliceUserParty, aliceWallet, Seq((503.75, 504)))
+        checkWallet(bobUserParty, bobWallet, Seq((12.3, 12.5)))
       }
     }
 

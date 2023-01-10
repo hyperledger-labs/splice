@@ -79,16 +79,21 @@ object CoinConfigTransforms {
     transforms.foldLeft(config)((c, tf) => tf(c))
   }
 
-  def reducePollingInterval: CoinConfigTransform = { config =>
-    val transforms = Seq(
-      updateSvcAppConfig(c => c.focus(_.automation).modify(reducePollingInterval)),
-      updateScanAppConfig(c => c.focus(_.automation).modify(reducePollingInterval)),
-      updateAllValidatorConfigs_(c => c.focus(_.automation).modify(reducePollingInterval)),
-      updateAllWalletAppBackendConfigs_(c => c.focus(_.automation).modify(reducePollingInterval)),
-      updateDirectoryAppConfig(c => c.focus(_.automation).modify(reducePollingInterval)),
-      updateAllSplitwiseAppConfigs_(c => c.focus(_.automation).modify(reducePollingInterval)),
-    )
-    transforms.foldLeft(config)((c, tf) => tf(c))
+  def reducePollingInterval = setPollingInterval(time.NonNegativeFiniteDuration.ofSeconds(1))
+
+  def setPollingInterval(newInterval: time.NonNegativeFiniteDuration): CoinConfigTransform = {
+    config =>
+      def setPollingInterval(config: AutomationConfig): AutomationConfig =
+        config.focus(_.pollingInterval).replace(newInterval)
+      val transforms = Seq(
+        updateSvcAppConfig(c => c.focus(_.automation).modify(setPollingInterval)),
+        updateScanAppConfig(c => c.focus(_.automation).modify(setPollingInterval)),
+        updateAllValidatorConfigs_(c => c.focus(_.automation).modify(setPollingInterval)),
+        updateAllWalletAppBackendConfigs_(c => c.focus(_.automation).modify(setPollingInterval)),
+        updateDirectoryAppConfig(c => c.focus(_.automation).modify(setPollingInterval)),
+        updateAllSplitwiseAppConfigs_(c => c.focus(_.automation).modify(setPollingInterval)),
+      )
+      transforms.foldLeft(config)((c, tf) => tf(c))
   }
 
   /** Ensure that the set of Daml user names used in a given instance of a configuration
@@ -135,9 +140,6 @@ object CoinConfigTransforms {
   type SplitwiseAppTransform = CnAppConfigTransform[SplitwiseAppBackendConfig]
   type RemoteSplitwiseAppTransform = CnAppConfigTransform[SplitwiseAppClientConfig]
   type AutomationConfigTransform = AutomationConfig => AutomationConfig
-
-  def reducePollingInterval(config: AutomationConfig): AutomationConfig =
-    config.focus(_.pollingInterval).replace(time.NonNegativeFiniteDuration.ofSeconds(1))
 
   def setCoinPrice(price: BigDecimal): CoinConfigTransform =
     updateSvcAppConfig(_.focus(_.coinPrice).replace(price))

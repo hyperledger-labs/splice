@@ -73,7 +73,7 @@ object CoinUtil {
       flagCloseable,
     )
 
-  lazy val defaultHoldingFee =
+  lazy val defaultHoldingFee = // ~= 4.822530864197531E-6 ~= 4.8E-6
     new cc.fees.RatePerRound(damlNumeric(1.0 / 360.0 / (24.0 * 60.0 / 2.5)))
 
   // TODO(tech-debt) surely there's a better way to define Daml Numeric values in Scala

@@ -1,19 +1,21 @@
 package com.daml.network.util
 
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
+import com.daml.network.console.WalletAppClientReference
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
 import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.console.CommandFailure
+import com.digitalasset.canton.topology.PartyId
 
 import java.time.Duration
 import scala.annotation.nowarn
 import scala.concurrent.duration.*
 
 trait TimeTestUtil extends CoinIntegrationTest {
-  this: CommonCoinAppInstanceReferences =>
+  this: CommonCoinAppInstanceReferences & WalletTestUtil =>
 
   // Advance time by `duration`; works only if the used Canton instance uses simulated time.
   protected def advanceTime(
@@ -103,5 +105,22 @@ trait TimeTestUtil extends CoinIntegrationTest {
           }
         },
     )
+  }
+
+  def p2pTransferAndTriggerAutomation(
+      senderWallet: WalletAppClientReference,
+      receiverWallet: WalletAppClientReference,
+      receiver: PartyId,
+      amount: BigDecimal,
+      senderTransferFeeRatio: BigDecimal = 1.0,
+      advanceTimeBy: Duration = Duration.ofSeconds(1),
+  )(implicit env: CoinTestConsoleEnvironment) = {
+    p2pTransfer(senderWallet, receiverWallet, receiver, amount, senderTransferFeeRatio)
+    eventually() {
+      // wait until we observe the accepted transfer offer
+      receiverWallet.listAcceptedTransferOffers() should have size 1
+    }
+    // ... before we advance time to trigger the automation.
+    advanceTime(advanceTimeBy)
   }
 }

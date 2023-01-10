@@ -34,6 +34,8 @@ import scala.jdk.OptionConverters.*
 trait WalletTestUtil extends CoinTestCommon {
   this: CommonCoinAppInstanceReferences =>
 
+  val exactly = (x: BigDecimal) => (x, x)
+
   /** @param expectedQuantityRanges : lower and upper bounds for coins sorted by their initial quantity in ascending order. */
   def checkWallet(
       walletParty: PartyId,
@@ -60,16 +62,16 @@ trait WalletTestUtil extends CoinTestCommon {
   def checkBalance(
       wallet: WalletAppClientReference,
       expectedRound: Long,
-      expectedUQRange: (BigDecimal, BigDecimal),
-      expectedLQRange: (BigDecimal, BigDecimal),
-      expectedHRange: (BigDecimal, BigDecimal),
+      expectedUnlockedQtyRange: (BigDecimal, BigDecimal),
+      expectedLockedQtyRange: (BigDecimal, BigDecimal),
+      expectedHoldingFeeRange: (BigDecimal, BigDecimal),
   ): Unit = clue(s"Checking balance in round $expectedRound") {
     eventually() {
       val balance = wallet.balance()
       balance.round shouldBe expectedRound
-      assertInRange(balance.unlockedQty, expectedUQRange)
-      assertInRange(balance.lockedQty, expectedLQRange)
-      assertInRange(balance.holdingFees, expectedHRange)
+      assertInRange(balance.unlockedQty, expectedUnlockedQtyRange)
+      assertInRange(balance.lockedQty, expectedLockedQtyRange)
+      assertInRange(balance.holdingFees, expectedHoldingFeeRange)
     }
   }
 

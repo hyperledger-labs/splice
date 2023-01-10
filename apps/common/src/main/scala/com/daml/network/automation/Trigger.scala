@@ -302,6 +302,7 @@ trait PollingTrigger extends Trigger with FlagCloseableAsync {
   override def isHealthy: Boolean = pollingLoopRef.get().exists(!_.isCompleted)
 
   override def run(): Unit = LoggerUtil.logOnThrow {
+
     require(pollingLoopRef.get().isEmpty, "run must not be called twice")
 
     // We create a top-level tid for the polling loop for ease of navigation in lnav using 'o' and 'O'

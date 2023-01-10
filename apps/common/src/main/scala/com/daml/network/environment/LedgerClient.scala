@@ -42,13 +42,11 @@ import com.daml.ledger.javaapi.data.{
 }
 import com.digitalasset.canton.logging.ErrorLoggingContext
 import com.digitalasset.canton.util.ErrorUtil
-import com.google.protobuf.ByteString
+import com.google.protobuf.{ByteString, Duration}
 import io.grpc.Channel
 import io.grpc.stub.{AbstractStub, StreamObserver}
 
 import java.io.Closeable
-import com.google.protobuf.Duration
-
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.jdk.CollectionConverters.*
 

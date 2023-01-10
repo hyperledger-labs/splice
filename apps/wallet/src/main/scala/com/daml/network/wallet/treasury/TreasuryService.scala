@@ -286,10 +286,11 @@ class TreasuryService(
         transferContext <- walletManager.store.getPaymentTransferContext(retryProvider, now)
         activeIssuingRounds = transferContext.context.issuingMiningRounds.asScala.keys.toSet
         install <- userStore.getInstall()
-        (inputs, readAs) <- selectTransferInputs(activeIssuingRounds)
+        (inputs, readAs, numRewardInputs) <- selectTransferInputs(activeIssuingRounds)
         res <-
           // skip execution of the batch, if its only purpose is to merge the inputs, but the inputs are already merged.
-          if (inputs.length == 1 && filteredBatch.isMergeOnly) {
+          // TODO(#2182): add edge cases + test them.
+          if (inputs.length <= 1 && numRewardInputs == 0 && filteredBatch.isMergeOnly) {
             filteredBatch.mergeOperationOpt.foreach(
               _.outcomePromise.trySuccess(new COO_MergeTransferInputs(None.toJava))
             )
@@ -324,6 +325,7 @@ class TreasuryService(
       readAs: Set[PartyId],
   )(implicit tc: TraceContext) = {
     val cmd = batch.computeExecuteBatchCmd(install, transferContext, inputs)
+    logger.debug(s"executing filtered batch $batch with inputs $inputs")
     for {
       (offset, outcomes) <- connection
         // TODO(M3-02): as of 2022-11-25 there are two operations that are not self-conflicting: Tap and DirectTransfer,
@@ -356,7 +358,7 @@ class TreasuryService(
     */
   private def selectTransferInputs(
       activeIssuingRounds: Set[v1.round.Round]
-  )(implicit tc: TraceContext): Future[(Seq[v1.coin.TransferInput], Set[PartyId])] = for {
+  )(implicit tc: TraceContext): Future[(Seq[v1.coin.TransferInput], Set[PartyId], Int)] = for {
     coinInputs <- userStore.acs
       .listContracts(coinCodegen.Coin.COMPANION)
       .map(cs =>
@@ -388,7 +390,11 @@ class TreasuryService(
             )
           )
       )
-  } yield (coinInputs ++ validatorRewardInputs ++ appRewardInputs, validatorRewardUsers)
+  } yield (
+    coinInputs ++ validatorRewardInputs ++ appRewardInputs,
+    validatorRewardUsers,
+    validatorRewardInputs.length + appRewardInputs.length,
+  )
 
   override def onClosed(): Unit = {
     logger.debug(

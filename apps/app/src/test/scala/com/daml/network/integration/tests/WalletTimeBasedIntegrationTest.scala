@@ -1,7 +1,6 @@
 package com.daml.network.integration.tests
 
 import com.daml.network.codegen.java.cn.directory as dirCodegen
-import com.daml.network.console.WalletAppClientReference
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
@@ -11,7 +10,6 @@ import com.daml.network.integration.tests.CoinTests.{
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
-import com.digitalasset.canton.topology.PartyId
 
 import java.time.Duration
 import java.util.UUID
@@ -21,83 +19,12 @@ class WalletTimeBasedIntegrationTest
     with WalletTestUtil
     with TimeTestUtil {
 
-  private def p2pTransferAndTriggerAutomation(
-      senderWallet: WalletAppClientReference,
-      receiverWallet: WalletAppClientReference,
-      receiver: PartyId,
-      amount: BigDecimal,
-      senderTransferFeeRatio: BigDecimal = 1.0,
-  )(implicit env: CoinTestConsoleEnvironment) = {
-    p2pTransfer(senderWallet, receiverWallet, receiver, amount, senderTransferFeeRatio)
-    eventually() {
-      // wait until we observe the accepted transfer offer
-      receiverWallet.listAcceptedTransferOffers() should have size 1
-    }
-    // ... before we advance time to trigger the automation.
-    advanceTime(Duration.ofSeconds(1))
-  }
-
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
     CoinEnvironmentDefinition
       .simpleTopologyWithSimTime(this.getClass.getSimpleName)
 
   "A wallet" should {
-
-    "allow calling tap, list the created coins, and get the balance - locally and remotely" in {
-      implicit env =>
-        val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-
-        val aliceValidatorParty = aliceValidator.getValidatorPartyId()
-
-        val exactly = (x: BigDecimal) => (x, x)
-
-        clue("Alice taps 50 coins") {
-          val ranges1 = Seq(exactly(50))
-          aliceWallet.tap(50)
-          checkWallet(aliceUserParty, aliceWallet, ranges1)
-          checkWallet(aliceUserParty, aliceWallet, ranges1)
-        }
-
-        clue("Alice taps 60 coins") {
-          val ranges2 = Seq(exactly(50), exactly(60))
-          aliceWallet.tap(60)
-          checkWallet(aliceUserParty, aliceWallet, ranges2)
-          checkWallet(aliceUserParty, aliceWallet, ranges2)
-        }
-
-        checkBalance(aliceWallet, 1, exactly(110), exactly(0), exactly(0))
-        // leads to archival of open round 0
-        advanceRoundsByOneTick
-
-        lockCoins(
-          aliceWalletBackend,
-          aliceUserParty,
-          aliceValidatorParty,
-          aliceWallet.list().coins,
-          10,
-          scan.getAppTransferContext(),
-        )
-
-        checkBalance(
-          aliceWallet,
-          2,
-          (99, 100),
-          exactly(10),
-          (0.000004, 0.000005),
-        )
-
-        // leads to latest round being round 3
-        advanceRoundsByOneTick
-
-        checkBalance(
-          aliceWallet,
-          3,
-          (99, 100),
-          (9, 10),
-          (0.00001, 0.00002),
-        )
-    }
 
     "list all coins, including locked coins, with additional position details" in { implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
@@ -244,58 +171,6 @@ class WalletTimeBasedIntegrationTest
     }
   }
 
-  "automatically collect app & validator rewards on coin operations" in { implicit env =>
-    val (alice, bob) = onboardAliceAndBob()
-
-    aliceWallet.tap(50)
-    aliceValidatorWallet.tap(50)
-    eventually()(aliceWallet.list().coins should have size 1)
-
-    // Execute a transfer in round 1 -> leads to rewards being generated
-    p2pTransferAndTriggerAutomation(aliceWallet, bobWallet, bob, 40.0, 0.0)
-    eventually()(aliceWallet.listAppRewards() should have size 1)
-    eventually()(aliceValidatorWallet.listValidatorRewards() should have size 1)
-
-    // advance by two ticks, so the issuing round of round 1 is created
-    advanceRoundsByOneTick
-    advanceRoundsByOneTick
-    // advance time such that issuing round 1 is open to rewards collection.
-    advanceRoundsByOneTick
-
-    // alice uses her reward
-    p2pTransferAndTriggerAutomation(aliceWallet, bobWallet, bob, 1.0, 0.0)
-    eventually()(
-      aliceWallet.listAppRewards().filter(_.payload.round.number == 1) should have size 0
-    )
-    aliceValidatorWallet
-      .listValidatorRewards()
-      .filter(_.payload.round.number == 1) should have size 1
-    // 2 validator rewards due to two transfers
-    eventually()(
-      aliceValidatorWallet
-        .listValidatorRewards()
-        .filter(_.payload.round.number == 1) should have size 1
-    )
-
-    // validator uses reward from round 1 too.
-    p2pTransferAndTriggerAutomation(aliceValidatorWallet, aliceWallet, alice, 1.0)
-    eventually()(
-      aliceValidatorWallet
-        .listValidatorRewards()
-        .filter(_.payload.round.number == 1) should have size 0
-    )
-    // but still gains a reward for the new transfer in a different round
-    eventually()(
-      aliceValidatorWallet
-        .listValidatorRewards()
-        .filter(_.payload.round.number != 1) should have size 2
-    )
-    // doing additional transfers in this round, only leads to more rewards since only round 1 is open for rewards collections
-    p2pTransferAndTriggerAutomation(aliceValidatorWallet, aliceWallet, alice, 1.0)
-    eventually()(aliceValidatorWallet.listValidatorRewards() should have size 3)
-
-  }
-
   "list and manually collect app & validator rewards" in { implicit env =>
     val (alice, bob) = onboardAliceAndBob()
 
@@ -316,15 +191,15 @@ class WalletTimeBasedIntegrationTest
     // Wait for validator rewards to become visible in alice's wallet, check structure
     aliceValidatorWallet.listValidatorRewards() should have size 1
 
+    val prevCoins = bobWallet.list().coins
+
     // Bob collects/realizes rewards
     // it takes 3 ticks for IR 1 to be created and open.
     advanceRoundsByOneTick
     advanceRoundsByOneTick
     advanceRoundsByOneTick
 
-    val prevCoins = bobWallet.list().coins
-    bobWallet.collectRewards(1)
-    bobWallet.listAppRewards() should have size 0
+    eventually()(bobWallet.listAppRewards() should have size 0)
     bobWallet.listValidatorRewards() should have size 0
     // We just check that we have a coin roughly in the right range, in particular higher than the input, rather than trying to repeat the calculation
     // for rewards.
@@ -374,5 +249,4 @@ class WalletTimeBasedIntegrationTest
       aliceWallet.listAcceptedTransferOffers() should have length 0
     })
   }
-
 }
