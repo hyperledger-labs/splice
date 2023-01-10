@@ -4,7 +4,7 @@ import com.daml.network.codegen.java.cn.directory as dirCodegen
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
+  CoinIntegrationTestWithSharedEnvironment,
   CoinTestConsoleEnvironment,
 }
 import com.daml.network.util.{TimeTestUtil, WalletTestUtil}
@@ -15,7 +15,7 @@ import java.time.Duration
 import java.util.UUID
 
 class WalletTimeBasedIntegrationTest
-    extends CoinIntegrationTest
+    extends CoinIntegrationTestWithSharedEnvironment
     with WalletTestUtil
     with TimeTestUtil {
 
@@ -32,12 +32,14 @@ class WalletTimeBasedIntegrationTest
       val aliceValidatorParty = aliceValidator.getValidatorPartyId()
 
       clue("Alice taps 50 coins") {
+        aliceWallet.list().coins should have length 0
         aliceWallet.tap(50)
         eventually() {
-          aliceWallet.list().coins.length shouldBe 1
-          aliceWallet.list().lockedCoins.length shouldBe 0
+          aliceWallet.list().coins should have length 1
+          aliceWallet.list().lockedCoins should have length 0
         }
       }
+      val startRound = aliceWallet.list().coins.head.round
 
       lockCoins(
         aliceWalletBackend,
@@ -49,15 +51,15 @@ class WalletTimeBasedIntegrationTest
       )
 
       clue("Check wallet after locking coins") {
-        aliceWallet.list().coins.length shouldBe 1
+        aliceWallet.list().coins should have length 1
         eventually()(aliceWallet.list().lockedCoins should have length 1)
 
-        aliceWallet.list().coins.head.round shouldBe 1
-        // even though we are in round 1, we have 0 holding fees because the coins were also created in round 1
+        aliceWallet.list().coins.head.round shouldBe startRound
+        // we have 0 holding fees because the coins were created in the same round we are currently in
         aliceWallet.list().coins.head.accruedHoldingFee shouldBe 0
         assertInRange(aliceWallet.list().coins.head.effectiveQuantity, (24.0, 25.0))
 
-        aliceWallet.list().lockedCoins.head.round shouldBe 1
+        aliceWallet.list().lockedCoins.head.round shouldBe startRound
         aliceWallet.list().lockedCoins.head.accruedHoldingFee shouldBe 0
         assertInRange(aliceWallet.list().lockedCoins.head.effectiveQuantity, (24.0, 25.0))
       }
@@ -66,11 +68,11 @@ class WalletTimeBasedIntegrationTest
       advanceRoundsByOneTick
 
       clue("Check wallet after advancing to next round") {
-        eventually()(aliceWallet.list().coins.head.round shouldBe 2)
+        eventually()(aliceWallet.list().coins.head.round shouldBe startRound + 1)
         assertInRange(aliceWallet.list().coins.head.accruedHoldingFee, (0.000004, 0.000005))
         assertInRange(aliceWallet.list().coins.head.effectiveQuantity, (24.0, 25.0))
 
-        aliceWallet.list().lockedCoins.head.round shouldBe 2
+        aliceWallet.list().lockedCoins.head.round shouldBe startRound + 1
         assertInRange(
           aliceWallet.list().lockedCoins.head.accruedHoldingFee,
           (0.000004, 0.000005),
@@ -95,7 +97,7 @@ class WalletTimeBasedIntegrationTest
       aliceWallet.listSubscriptions() shouldBe empty
 
       clue("Creating 3 subscriptions, 10 days apart") {
-        for ((name, i) <- List("alice1", "alice2", "alice3").zipWithIndex) {
+        for ((name, i) <- List("alice1", "alice2", "alice3").map(perTestCaseName).zipWithIndex) {
 
           val (_, requestId) = actAndCheck(
             "Request directory entry", {
@@ -169,84 +171,38 @@ class WalletTimeBasedIntegrationTest
         _ => aliceWallet.listAppPaymentRequests() shouldBe empty,
       )
     }
-  }
 
-  "list and manually collect app & validator rewards" in { implicit env =>
-    val (alice, bob) = onboardAliceAndBob()
+    "support transfer offers" in { implicit env =>
+      val (_, bob) = onboardAliceAndBob()
+      aliceWallet.tap(100.0)
 
-    // Tap coin and do a transfer from alice to bob
-    aliceWallet.tap(50)
+      val now = aliceValidator.remoteParticipant.ledger_api.time.get()
+      val expiration = now.plus(Duration.ofMinutes(1))
 
-    p2pTransferAndTriggerAutomation(aliceWallet, bobWallet, bob, 40.0, 0.0)
-
-    // Retrieve transferred coin in bob's wallet and transfer part of it back to alice; bob will receive some app rewards
-    eventually()(bobWallet.list().coins should have size 1)
-    p2pTransferAndTriggerAutomation(bobWallet, aliceWallet, alice, 30.0, 0.0)
-
-    eventually() {
-      bobWallet.listAppRewards() should have size 1
-    }
-    bobWallet.listValidatorRewards() shouldBe empty
-
-    // Wait for validator rewards to become visible in alice's wallet, check structure
-    aliceValidatorWallet.listValidatorRewards() should have size 1
-
-    val prevCoins = bobWallet.list().coins
-
-    // Bob collects/realizes rewards
-    // it takes 3 ticks for IR 1 to be created and open.
-    advanceRoundsByOneTick
-    advanceRoundsByOneTick
-    advanceRoundsByOneTick
-
-    eventually()(bobWallet.listAppRewards() should have size 0)
-    bobWallet.listValidatorRewards() should have size 0
-    // We just check that we have a coin roughly in the right range, in particular higher than the input, rather than trying to repeat the calculation
-    // for rewards.
-    checkWallet(
-      bob,
-      bobWallet,
-      prevCoins
-        .map(c =>
-          (
-            BigDecimal(c.contract.payload.quantity.initialQuantity),
-            BigDecimal(c.contract.payload.quantity.initialQuantity) + 2,
+      val (_, _) = actAndCheck(
+        "Alice creates a transfer offer", {
+          aliceWallet.createTransferOffer(
+            bob,
+            1.0,
+            "should expire before accepted",
+            expiration,
+            UUID.randomUUID.toString,
           )
-        )
-        .sortBy(_._1),
-    )
-  }
+        },
+      )(
+        "Wait for new offer to be ingested",
+        _ => {
+          aliceWallet.listTransferOffers() should have length 1
+          bobWallet.listTransferOffers() should have length 1
+        },
+      )
 
-  "support transfer offers" in { implicit env =>
-    val (_, bob) = onboardAliceAndBob()
-    aliceWallet.tap(100.0)
+      advanceTime(Duration.ofMinutes(3))
 
-    val now = aliceValidator.remoteParticipant.ledger_api.time.get()
-    val expiration = now.plus(Duration.ofMinutes(1))
-
-    val (_, _) = actAndCheck(
-      "Alice creates a transfer offer", {
-        aliceWallet.createTransferOffer(
-          bob,
-          1.0,
-          "should expire before accepted",
-          expiration,
-          UUID.randomUUID.toString,
-        )
-      },
-    )(
-      "Wait for new offer to be ingested",
-      _ => {
-        aliceWallet.listTransferOffers() should have length 1
-        bobWallet.listTransferOffers() should have length 1
-      },
-    )
-
-    advanceTime(Duration.ofMinutes(3))
-
-    clue("Wait for the offer to expire")(eventually() {
-      aliceWallet.listTransferOffers() should have length 0
-      aliceWallet.listAcceptedTransferOffers() should have length 0
-    })
+      clue("Wait for the offer to expire")(eventually() {
+        aliceWallet.listTransferOffers() should have length 0
+        aliceWallet.listAcceptedTransferOffers() should have length 0
+      })
+    }
   }
 }

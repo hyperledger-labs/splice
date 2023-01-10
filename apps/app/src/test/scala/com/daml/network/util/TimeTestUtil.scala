@@ -2,10 +2,7 @@ package com.daml.network.util
 
 import com.daml.network.codegen.java.cc.round.{IssuingMiningRound, OpenMiningRound}
 import com.daml.network.console.WalletAppClientReference
-import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
-  CoinTestConsoleEnvironment,
-}
+import com.daml.network.integration.tests.CoinTests.{CoinTestCommon, CoinTestConsoleEnvironment}
 import com.daml.network.util.CommonCoinAppInstanceReferences
 import com.digitalasset.canton.console.CommandFailure
 import com.digitalasset.canton.topology.PartyId
@@ -14,7 +11,7 @@ import java.time.Duration
 import scala.annotation.nowarn
 import scala.concurrent.duration.*
 
-trait TimeTestUtil extends CoinIntegrationTest {
+trait TimeTestUtil extends CoinTestCommon {
   this: CommonCoinAppInstanceReferences & WalletTestUtil =>
 
   // Advance time by `duration`; works only if the used Canton instance uses simulated time.

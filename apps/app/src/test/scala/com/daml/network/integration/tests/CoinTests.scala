@@ -1,7 +1,9 @@
 package com.daml.network.integration.tests
 
 import com.auth0.exception.Auth0Exception
-import com.daml.network.console.WalletAppClientReference
+import com.daml.network.auth.AuthUtil
+import com.daml.network.config.AuthTokenSourceConfig
+import com.daml.network.console.{RemoteDirectoryAppReference, WalletAppClientReference}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.util.{Auth0Util, CommonCoinAppInstanceReferences}
@@ -55,23 +57,58 @@ object CoinTests {
     }
 
     // make `aliceWallet` etc. use updated usernames
-    override def wc(name: String)(implicit
+    override def uwc(name: String)(implicit
         env: CoinTestConsoleEnvironment
     ): WalletAppClientReference = extendDamlUserWithCaseId(super.wc(name))
 
+    // make `aliceDirectory` etc. use updated usernames
+    override def rdp(name: String)(implicit
+        env: CoinTestConsoleEnvironment
+    ): RemoteDirectoryAppReference = extendDamlUserWithCaseId(super.rdp(name))
+
+    override def perTestCaseName(name: String) = s"${name}_tc$testCaseId"
+
     private def extendDamlUserWithCaseId(
-        walletAppClient: WalletAppClientReference
+        ref: WalletAppClientReference
     ): WalletAppClientReference = {
-      val newDamlUser = s"${walletAppClient.config.damlUser}-$testCaseId"
+      val newDamlUser = perTestCaseName(ref.config.damlUser)
       new WalletAppClientReference(
-        walletAppClient.coinConsoleEnvironment,
-        walletAppClient.name,
-        config = walletAppClient.config.copy(damlUser = newDamlUser),
+        ref.coinConsoleEnvironment,
+        ref.name,
+        config = ref.config.copy(damlUser = newDamlUser),
       )
+    }
+    private def extendDamlUserWithCaseId(
+        ref: RemoteDirectoryAppReference
+    ): RemoteDirectoryAppReference = {
+      val newDamlUser = perTestCaseName(ref.config.damlUser)
+      val newLedgerApiConfig = ref.config.ledgerApi
+        .copy(authConfig = updateUser(ref.config.ledgerApi.authConfig, newDamlUser))
+      new RemoteDirectoryAppReference(
+        ref.coinConsoleEnvironment,
+        ref.name,
+        config = ref.config.copy(damlUser = newDamlUser, ledgerApi = newLedgerApiConfig),
+      )
+    }
+    private def updateUser(
+        conf: AuthTokenSourceConfig,
+        newUser: String,
+    ): AuthTokenSourceConfig = {
+      conf match {
+        case AuthTokenSourceConfig.Static(_, adminToken) => {
+          val secret = "test" // used for all of our tests
+          val userToken = AuthUtil.LedgerApi.testToken(newUser, secret)
+          AuthTokenSourceConfig.Static(userToken, adminToken)
+        }
+        case AuthTokenSourceConfig.SelfSigned(audience, _, secret, adminToken) => {
+          AuthTokenSourceConfig.SelfSigned(audience, newUser, secret, adminToken)
+        }
+        case _ => conf
+      }
     }
   }
 
-  trait CoinTestCommon extends BaseTest with CnsTestUtil with CommonCoinAppInstanceReferences {
+  trait CoinTestCommon extends BaseTest with CommonCoinAppInstanceReferences {
 
     def assertInRange(value: BigDecimal, range: (BigDecimal, BigDecimal)): Unit = {
       value should (be >= range._1 and be <= range._2)
@@ -94,6 +131,11 @@ object CoinTests {
         }
       }
     }
+
+    /** Changes `name` so it is unlikely to conflict with names used somewhere else.
+      * Does nothing for isolated test environments, overloaded for shared environment.
+      */
+    def perTestCaseName(name: String) = name
 
     private def readMandatoryEnvVar(name: String): String = {
       sys.env.get(name) match {

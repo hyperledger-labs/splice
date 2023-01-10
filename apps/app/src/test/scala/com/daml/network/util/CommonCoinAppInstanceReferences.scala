@@ -39,7 +39,7 @@ trait CommonCoinAppInstanceReferences {
   def aliceWalletBackend(implicit env: CoinTestConsoleEnvironment): WalletAppBackendReference = wb(
     "aliceWalletBackend"
   )
-  def aliceWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference = wc(
+  def aliceWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference = uwc(
     "aliceWallet"
   )
   def aliceValidatorWallet(implicit
@@ -53,10 +53,10 @@ trait CommonCoinAppInstanceReferences {
   def bobWalletBackend(implicit env: CoinTestConsoleEnvironment): WalletAppBackendReference = wb(
     "bobWalletBackend"
   )
-  def bobWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference = wc(
+  def bobWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference = uwc(
     "bobWallet"
   )
-  def charlieWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference = wc(
+  def charlieWallet(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference = uwc(
     "charlieWallet"
   )
   def bobValidator(implicit env: CoinTestConsoleEnvironment): ValidatorAppBackendReference = v(
@@ -126,6 +126,11 @@ trait CommonCoinAppInstanceReferences {
     env.wallets.local
       .find(_.name == name)
       .getOrElse(sys.error(s"wallet [$name] not configured"))
+
+  // "user wallet client"; we define this separately from wc so we can override it more conveniently
+  def uwc(name: String)(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference = wc(
+    name
+  )
 
   def wc(name: String)(implicit env: CoinTestConsoleEnvironment): WalletAppClientReference =
     env.wallets.remote

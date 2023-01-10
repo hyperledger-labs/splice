@@ -225,10 +225,12 @@ class CoinConsoleEnvironment(
   private def createDirectoryReference(name: String): LocalDirectoryAppReference =
     new LocalDirectoryAppReference(this, name)
 
-  private def createRemoteDirectoryReference(
-      name: String
-  ): RemoteDirectoryAppReference =
-    new RemoteDirectoryAppReference(this, name)
+  private def createRemoteDirectoryReference(name: String): RemoteDirectoryAppReference =
+    new RemoteDirectoryAppReference(
+      this,
+      name,
+      this.environment.config.remoteDirectoriesByString(name),
+    )
 
   private def createSplitwiseReference(name: String): SplitwiseAppBackendReference =
     new SplitwiseAppBackendReference(this, name)

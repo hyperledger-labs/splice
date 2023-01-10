@@ -19,7 +19,7 @@ import com.daml.network.console.{
   WalletAppClientReference,
 }
 import com.daml.network.integration.tests.CoinTests.{CoinTestCommon, CoinTestConsoleEnvironment}
-import com.daml.network.util.{CoinUtil, CommonCoinAppInstanceReferences, Proto}
+import com.daml.network.util.{CnsTestUtil, CoinUtil, CommonCoinAppInstanceReferences, Proto}
 import com.daml.network.wallet.admin.api.client.commands.GrpcWalletAppClient
 import com.digitalasset.canton.data.CantonTimestamp
 import com.digitalasset.canton.topology.PartyId
@@ -31,7 +31,7 @@ import scala.concurrent.duration.*
 import scala.jdk.CollectionConverters.*
 import scala.jdk.OptionConverters.*
 
-trait WalletTestUtil extends CoinTestCommon {
+trait WalletTestUtil extends CoinTestCommon with CnsTestUtil {
   this: CommonCoinAppInstanceReferences =>
 
   val exactly = (x: BigDecimal) => (x, x)

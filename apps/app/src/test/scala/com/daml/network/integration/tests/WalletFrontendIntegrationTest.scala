@@ -4,10 +4,7 @@ import com.daml.network.util.WalletTestUtil
 
 import scala.util.Try
 
-class WalletFrontendIntegrationTest
-    extends FrontendIntegrationTest("alice")
-    with WalletTestUtil
-    with CnsTestUtil {
+class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") with WalletTestUtil {
 
   "A wallet UI" should {
 

@@ -6,8 +6,7 @@ import org.openqa.selenium.{Keys, WebDriver}
 
 class WalletPaymentFrontendIntegrationTest
     extends FrontendIntegrationTest("alice", "bob")
-    with WalletTestUtil
-    with CnsTestUtil {
+    with WalletTestUtil {
 
   "A wallet UI" should {
 

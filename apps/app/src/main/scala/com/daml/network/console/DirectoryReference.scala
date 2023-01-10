@@ -104,6 +104,7 @@ class LocalDirectoryAppReference(
 class RemoteDirectoryAppReference(
     override val consoleEnvironment: CoinConsoleEnvironment,
     name: String,
+    val config: RemoteDirectoryAppConfig, // adding this explicitly for easier overriding
 ) extends DirectoryAppReference(consoleEnvironment, name)
     with GrpcRemoteInstanceReference {
 
@@ -117,10 +118,6 @@ class RemoteDirectoryAppReference(
   )(consoleEnvironment)
 
   override protected val instanceType = "Remote directory"
-
-  @Help.Summary("Return directory app config")
-  def config: RemoteDirectoryAppConfig =
-    consoleEnvironment.environment.config.remoteDirectoriesByString(name)
 
   private def getDirectoryInstall(): codegen.DirectoryInstall.ContractId = {
     val providerParty = getProviderPartyId()

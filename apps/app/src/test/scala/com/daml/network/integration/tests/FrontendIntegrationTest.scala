@@ -5,7 +5,6 @@ import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
   CoinTestConsoleEnvironment,
 }
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.util.FutureInstances.*
 import org.apache.commons.io.FileUtils
 import org.openqa.selenium.bidi.log.{BaseLogEntry, Log, LogEntry}
@@ -294,10 +293,4 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
 object FrontendIntegrationTest {
   // counter to generate unique log-file names as otherwise each new test overwrites the previous one's log
   val counter = new AtomicLong(0)
-}
-
-trait CnsTestUtil {
-  protected def expectedCns(partyId: PartyId, entry: String) = {
-    s"${entry}\n(\n${partyId.toProtoPrimitive}\n)"
-  }
 }
