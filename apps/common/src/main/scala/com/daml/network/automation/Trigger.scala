@@ -53,18 +53,31 @@ case object TaskStale extends TaskOutcome with PrettyPrinting {
 }
 
 /** Common base trait for all triggers. */
-abstract class Trigger[T: Pretty](implicit
-    ec: ExecutionContext,
-    tracer: Tracer,
-) extends FlagCloseable
-    with NamedLogging
-    with Spanning
-    with HasHealth {
+trait Trigger extends FlagCloseable with NamedLogging with Spanning with HasHealth {
+
+  implicit def ec: ExecutionContext
+  implicit def tracer: Tracer
+
   protected def context: TriggerContext
+
   protected def timeouts: ProcessingTimeout = context.timeouts
+
   protected def loggerFactory: NamedLoggerFactory = context.loggerFactory
 
-  /**  How to complete a task.
+  /** Run this trigger in the background. MUST be called exactly once. */
+  def run(): Unit
+}
+
+/** An abstract interface for triggers that keep track of some list of tasks.
+  *
+  * Note that the vanilla [[Trigger]] and [[PollingTrigger]] are the only non-task based triggers.
+  */
+abstract class TaskbasedTrigger[T: Pretty]()(implicit
+    override val ec: ExecutionContext,
+    override val tracer: Tracer,
+) extends Trigger {
+
+  /** How to complete a task.
     *
     * This MUST take all the actions necessary such that 'isStaleTask' returns true after successful completion.
     * We do not support tasks that should be retried after a specific delay. If you do need such support,
@@ -86,9 +99,6 @@ abstract class Trigger[T: Pretty](implicit
     * e.g., another party archiving a contract representing a request.
     */
   protected def isStaleTask(task: T)(implicit tc: TraceContext): Future[Boolean]
-
-  /** Run this trigger in the background. MUST be called exactly once. */
-  def run(): Unit
 
   /** Processes the task with a retry and returns whether that was successful. */
   final protected def processTaskWithRetry(task: T): Future[Boolean] =
@@ -150,6 +160,7 @@ abstract class Trigger[T: Pretty](implicit
             Success(false)
         }
     }
+
 }
 
 /** A trigger receiving its tasks via an Akka source. */
@@ -157,7 +168,7 @@ abstract class SourceBasedTrigger[T: Pretty](implicit
     ec: ExecutionContext,
     mat: Materializer,
     tracer: Tracer,
-) extends Trigger[T]
+) extends TaskbasedTrigger[T]
     with FlagCloseableAsync {
 
   /** The source from which to consume tasks. */
@@ -251,13 +262,9 @@ abstract class OnCreateTrigger[TC <: Contract[TCid, T], TCid <: ContractId[T], T
 /** A trigger that regularly executes work.
   *
   * This is a very generic option for implementing a trigger.
-  * Look at its child classes for useful specializations.
+  * Look at its child classes (`ctrl + h` for type hierarchy in IntelliJ) for useful specializations.
   */
-abstract class PollingTrigger[T: Pretty]()(implicit
-    ec: ExecutionContext,
-    tracer: Tracer,
-) extends Trigger[T]
-    with FlagCloseableAsync {
+trait PollingTrigger extends Trigger with FlagCloseableAsync {
 
   /** The main body of the polling trigger
     *
@@ -266,7 +273,7 @@ abstract class PollingTrigger[T: Pretty]()(implicit
     * be done immediately, and `false` if another iteration should only be done after
     * the polling trigger's configured delay.
     *
-    * Typically, the you should signal `True` to loop immediately iff
+    * Typically, the you should signal `true` to loop immediately iff
     * there could be some more work to be done.
     */
   def performWorkIfAvailable()(implicit traceContext: TraceContext): Future[Boolean]
@@ -380,11 +387,16 @@ abstract class PollingTrigger[T: Pretty]()(implicit
     )
 }
 
-/** A trigger that regularly polls for new tasks and executes them in parallel. */
+/** A trigger that regularly polls for new tasks and executes them in parallel.
+  *
+  * Unless you implement an one-off trigger, you likely want to write or use a specialization of this trigger as a base
+  * trigger implementation.
+  */
 abstract class PollingParallelTaskExecutionTrigger[T: Pretty]()(implicit
     ec: ExecutionContext,
     tracer: Tracer,
-) extends PollingTrigger[T] {
+) extends TaskbasedTrigger[T]
+    with PollingTrigger {
 
   /** Override with how to retrieve the list of tasks that should be processed in parallel right now.
     *

@@ -48,7 +48,7 @@ abstract class AutomationService(
     resource
   }
 
-  final protected def registerTrigger(trigger: Trigger[?]): Unit = {
+  final protected def registerTrigger(trigger: Trigger): Unit = {
     registerService(trigger)
     trigger.run()
   }
