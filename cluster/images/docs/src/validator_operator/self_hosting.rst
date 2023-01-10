@@ -1,19 +1,9 @@
 .. _self_hosted_validator:
 
-Self-Hosted Validator (Preview)
-===============================
+Self-Hosted Validator
+=====================
 
 These pages give a step-by-step guide how to deploy your own validator node to the Canton network.
-
-Intended audience
------------------
-
-At the moment, the intended audience of this guide is technical DA staff that has some background on CC (e.g. through having
-watched the `CC technical overview presentation <https://digitalasset.atlassian.net/wiki/spaces/CN/overview>`_).
-
-..
-   *Succinctly: What is a 'validator' node? Link to further doc*
-   *How does it relate to 'canton coin'?*
 
 Prerequisites
 -------------
@@ -24,18 +14,8 @@ To locally start a validator node that connects against the DevNet domain, you w
 2) the Daml validator app and
 3) the Daml wallet app
 
-Additionally, you'll also need access to one of the following four `Digital Asset VPNs <https://digitalasset.atlassian.net/wiki/spaces/DEVSECOPS/pages/1076822828/VPN+IP+Whitelist+for+Digital+Asset>`_:
-
-* GCP Virginia Full Tunnel
-* GCP Frankfurt Full Tunnel
-* GCP Sydney Full Tunnel
-* GCP DA Canton DevNet
-
-If you do not have access to one of these supported VPN's, you will
-need to make a request to Digital Asset through your contact to have
-this access granted.
-
-Please activate the VPN now.
+Additionally, you'll also need to enable the GCP DA Canton DevNet VPN. If you can view
+this documentation, you already enabled the VPN successfully.
 
 .. To run a participant node, please `download and install Canton version 2.3.2 <https://docs.daml.com/canton/usermanual/downloading.html>`_.
 
@@ -56,8 +36,6 @@ root directory. The commands will look similar to these:
 
 Onboarding Validator
 --------------------
-
-.. As this is in a preview state, we do not yet have explicit disclosure, which means that each validator will have to have their own copy of a `CoinRules` contract. This step uses a propose/accept pattern to request the contract from the SVC
 
 To operate a validator node you will need to:
 

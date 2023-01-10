@@ -49,7 +49,7 @@ A concrete example of hosting an application can be found in :doc:`./deployment_
 
 * How to deploy a change to the app Daml packages?
 
-  * Make it backwards compatible using `Daml's upgrading support (WIP) <https://docs.google.com/document/d/1aMx5y_yuVK71iZ72guFKqHYk1YhPvxXobZcus3aTNJ4/edit#heading=h.j1o9vy5fqmrz>`_
+  * Make it backwards compatible using Daml's upcoming features for model upgrading
   * Redeploy using your validator node's app manager
 
 

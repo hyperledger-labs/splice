@@ -57,8 +57,7 @@ Defining Read-Access APIs
 
 * Define APIs in a way that allows consumers to codegen clients
   in their favorite language (openAPI/graphQL/gRPC).
-* Authorize via cross-participant access tokens.
-  See `this draft design design doc on scalable read delegation <https://docs.google.com/document/d/1QnaZvNehEt9_dKDix0zdqLsuvX5LUHU6uw1PHySejss/edit#bookmark=id.y0anh0l5ncaq>`_ for background.
+* Authorize via cross-participant access tokens (an upcoming Daml feature)
 
 Failure Handling for Ledger API Calls
 -------------------------------------

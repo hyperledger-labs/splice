@@ -24,7 +24,7 @@ Versioning of Daml Implementations
 Release of Daml APIs & Implementations
 --------------------------------------
 
-* Release via Package Distribution API (inital spec available from this `DA internal design doc <https://docs.google.com/document/d/1Oogaz1mZ54Ar5Avfttt1QG6Sh4AZ1nwLcUP_lFYZD48/edit#bookmark=id.gc276jfx71kq>`_)
+* Release via Package Distribution API (an upcoming Daml feature)
 
 
 Versioning and Release of Read Access APIs
