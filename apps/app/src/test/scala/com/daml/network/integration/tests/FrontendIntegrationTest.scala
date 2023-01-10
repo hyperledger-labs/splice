@@ -3,6 +3,8 @@ package com.daml.network.integration.tests
 import cats.syntax.parallel.*
 import com.daml.network.integration.tests.CoinTests.{
   CoinIntegrationTest,
+  CoinIntegrationTestWithSharedEnvironment,
+  CoinTestCommon,
   CoinTestConsoleEnvironment,
 }
 import com.digitalasset.canton.util.FutureInstances.*
@@ -27,8 +29,8 @@ import java.time.Duration
 import java.util.Calendar
 import java.util.concurrent.atomic.AtomicLong
 import scala.collection.mutable
-import scala.concurrent.Future
 import scala.concurrent.duration.*
+import scala.concurrent.{ExecutionContext, Future}
 import scala.jdk.OptionConverters.*
 import scala.util.Try
 import scala.util.control.NonFatal
@@ -50,11 +52,49 @@ trait CustomMatchers {
   def matchText(sentence: String) = new TextMatcher(sentence)
 }
 
-abstract class FrontendIntegrationTest(frontendNames: String*)
+abstract class FrontendIntegrationTest(override val frontendNames: String*)
     extends CoinIntegrationTest
-    with BeforeAndAfterEach
-    with WebBrowser
-    with CustomMatchers {
+    with FrontendTestCommon
+    with BeforeAndAfterEach {
+
+  override def provideEnvironment = {
+    val env = super.provideEnvironment
+    // We need to start the web frontends afterwards because selenium
+    // insists on automatically selecting free ports and those may
+    // collide with the ports used by our own services.
+    startWebDrivers(env.executionContext)
+    env
+  }
+
+  override def testFinished(env: CoinTestConsoleEnvironment): Unit = {
+    // testFinished runs before afterEach and tears down all our apps.
+    // Therefore, we need to check for errors here. Otherwise, we run
+    // into issues where we get an error just by virtue of the gRPC
+    // service being down.
+    checkErrorsAndStopWebDrivers(env.executionContext)
+    super.testFinished(env)
+  }
+}
+
+abstract class FrontendIntegrationTestWithSharedEnvirontment(override val frontendNames: String*)
+    extends CoinIntegrationTestWithSharedEnvironment
+    with FrontendTestCommon {
+
+  override def provideEnvironment = {
+    val env = super.provideEnvironment
+    startWebDrivers(env.executionContext)
+    env
+  }
+
+  override def testFinished(env: CoinTestConsoleEnvironment): Unit = {
+    checkErrorsAndStopWebDrivers(env.executionContext)
+    super.testFinished(env)
+  }
+}
+
+trait FrontendTestCommon extends CoinTestCommon with WebBrowser with CustomMatchers {
+
+  val frontendNames: Seq[String] = Seq()
 
   type WebDriverType = WebDriver with TakesScreenshot with JavascriptExecutor
 
@@ -64,38 +104,8 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
 
   protected val webDrivers: mutable.Map[String, WebDriverType] = mutable.Map.empty
 
-  def withFrontEnd[A](driverName: String)(implicit f: WebDriverType => A): A =
-    f(
-      webDrivers
-        .get(driverName)
-        .getOrElse(
-          sys.error(
-            s"No such webDriver : $driverName. Did you forget to pass it to FrontendIntegrationTest?"
-          )
-        )
-    )
-
-  // We override eventually to also retry on StaleElementReferenceException
-  // because that’s very common in frontend tests and having
-  // each call site try to catch that seems unlikely to be reliable.
-  override def eventually[T](
-      timeUntilSuccess: FiniteDuration = 20.seconds,
-      maxPollInterval: FiniteDuration = 5.seconds,
-  )(testCode: => T): T = super.eventually(timeUntilSuccess, maxPollInterval) {
-    try {
-      testCode
-    } catch {
-      case e: StaleElementReferenceException => fail(e)
-    }
-  }
-
-  override def provideEnvironment = {
-    val env = super.provideEnvironment
-    // We need to start the web frontends afterwards because selenium
-    // insists on automatically selecting free ports and those may
-    // collide with the ports used by our own services.
+  protected def startWebDrivers(implicit ec: ExecutionContext) =
     // We start all browsers in parallel, for faster test init.
-    implicit val ec = env.executionContext;
     frontendNames.toList.parTraverse { name =>
       Future {
         System.setProperty(
@@ -137,16 +147,9 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
         );
       }
     }.futureValue
-    env
-  }
 
-  override def testFinished(env: CoinTestConsoleEnvironment): Unit = {
-    // testFinished runs before afterEach and tears down all our apps.
-    // Therefore, we need to check for errors here. Otherwise, we run
-    // into issues where we get an error just by virtue of the gRPC
-    // service being down.
+  protected def checkErrorsAndStopWebDrivers(implicit ec: ExecutionContext) =
     // We process all browsers in parallel, for faster test termination.
-    implicit val ec = env.executionContext;
     webDrivers.values.toList.parTraverse { implicit webDriver =>
       Future {
         // we optimistically wait only shortly, for faster test termination
@@ -155,7 +158,30 @@ abstract class FrontendIntegrationTest(frontendNames: String*)
         webDriver.quit()
       }
     }.futureValue
-    super.testFinished(env)
+
+  def withFrontEnd[A](driverName: String)(implicit f: WebDriverType => A): A =
+    f(
+      webDrivers
+        .get(driverName)
+        .getOrElse(
+          sys.error(
+            s"No such webDriver : $driverName. Did you forget to pass it to FrontendIntegrationTest?"
+          )
+        )
+    )
+
+  // We override eventually to also retry on StaleElementReferenceException
+  // because that’s very common in frontend tests and having
+  // each call site try to catch that seems unlikely to be reliable.
+  override def eventually[T](
+      timeUntilSuccess: FiniteDuration = 20.seconds,
+      maxPollInterval: FiniteDuration = 5.seconds,
+  )(testCode: => T): T = super.eventually(timeUntilSuccess, maxPollInterval) {
+    try {
+      testCode
+    } catch {
+      case e: StaleElementReferenceException => fail(e)
+    }
   }
 
   protected def consumeError(err: String)(implicit webDriver: WebDriver): Unit = {

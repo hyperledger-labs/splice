@@ -4,7 +4,9 @@ import com.daml.network.util.WalletTestUtil
 
 import scala.util.Try
 
-class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") with WalletTestUtil {
+class WalletFrontendIntegrationTest
+    extends FrontendIntegrationTestWithSharedEnvirontment("alice")
+    with WalletTestUtil {
 
   "A wallet UI" should {
 
@@ -92,7 +94,7 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") wit
     "show logged in user details" in { implicit env =>
       // Create directory entry for alice
       val aliceDamlUser = aliceWallet.config.damlUser
-      val entryName = "alice.cns"
+      val entryName = perTestCaseName("alice.cns")
       val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       requestDirectoryEntry(aliceParty, aliceDirectory, entryName)
 
@@ -116,7 +118,7 @@ class WalletFrontendIntegrationTest extends FrontendIntegrationTest("alice") wit
         // We do this in another eventually() as a "..." text might appear momentarily, until the directory service responds.
         eventually() {
           find(id("logged-in-user")).value.text should matchText(
-            expectedCns(aliceParty, "alice.cns")
+            expectedCns(aliceParty, entryName)
           )
         }
       }

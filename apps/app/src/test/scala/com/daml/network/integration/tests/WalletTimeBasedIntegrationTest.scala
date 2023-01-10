@@ -133,18 +133,16 @@ class WalletTimeBasedIntegrationTest
       )(
         "2 idle subscriptions and 1 payment are listed",
         _ => {
-          eventually() {
-            val subs = aliceWallet.listSubscriptions()
-            subs should have length 3
-            subs
-              .collect(_.state match {
-                case s: GrpcWalletAppClient.SubscriptionIdleState => s
-              }) should have length 2
-            subs
-              .collect(_.state match {
-                case s: GrpcWalletAppClient.SubscriptionPayment => s
-              }) should have length 1
-          }
+          val subs = aliceWallet.listSubscriptions()
+          subs should have length 3
+          subs
+            .collect(_.state match {
+              case s: GrpcWalletAppClient.SubscriptionIdleState => s
+            }) should have length 2
+          subs
+            .collect(_.state match {
+              case s: GrpcWalletAppClient.SubscriptionPayment => s
+            }) should have length 1
         },
       )
     }

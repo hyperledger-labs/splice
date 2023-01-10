@@ -9,7 +9,7 @@ import com.daml.network.util.WalletTestUtil
 import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 class WalletCoinPriceFrontendIntegrationTest
-    extends FrontendIntegrationTest("alice", "bob")
+    extends FrontendIntegrationTestWithSharedEnvirontment("alice", "bob")
     with WalletTestUtil {
 
   override def environmentDefinition

@@ -7,7 +7,7 @@ import java.time.Instant
 import java.time.temporal.ChronoUnit
 
 class WalletSubscriptionsFrontendIntegrationTest
-    extends FrontendIntegrationTest("alice")
+    extends FrontendIntegrationTestWithSharedEnvirontment("alice")
     with WalletTestUtil {
 
   "A wallet UI" should {
@@ -17,7 +17,7 @@ class WalletSubscriptionsFrontendIntegrationTest
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
       val expectedDirName = createDirectoryEntryForDirectoryItself
       aliceWallet.tap(50) // she'll need this for accepting the subscription request
-      requestDirectoryEntry(aliceUserParty, aliceDirectory, "alice.cns")
+      requestDirectoryEntry(aliceUserParty, aliceDirectory, perTestCaseName("alice.cns"))
 
       withFrontEnd("alice") { implicit webDriver =>
         browseToSubscriptions(aliceDamlUser)
@@ -51,7 +51,7 @@ class WalletSubscriptionsFrontendIntegrationTest
 
       withFrontEnd("alice") { implicit webDriver =>
         clue("Create a subscription for registering alice.cns") {
-          requestDirectoryEntry(aliceUserParty, aliceDirectory, "alice.cns")
+          requestDirectoryEntry(aliceUserParty, aliceDirectory, perTestCaseName("alice.cns"))
           browseToSubscriptions(aliceDamlUser)
           eventually() {
             click on className("sub-request-accept-button")
@@ -101,7 +101,7 @@ class WalletSubscriptionsFrontendIntegrationTest
 
       withFrontEnd("alice") { implicit webDriver =>
         clue("Create subscription") {
-          requestDirectoryEntry(aliceUserParty, aliceDirectory, "alice1.cns")
+          requestDirectoryEntry(aliceUserParty, aliceDirectory, perTestCaseName("alice1.cns"))
           browseToSubscriptions(aliceDamlUser)
           eventually() {
             click on className("sub-request-accept-button")

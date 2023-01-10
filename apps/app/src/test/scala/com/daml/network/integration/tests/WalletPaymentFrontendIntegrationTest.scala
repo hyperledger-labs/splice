@@ -5,7 +5,7 @@ import com.daml.network.util.WalletTestUtil
 import org.openqa.selenium.{Keys, WebDriver}
 
 class WalletPaymentFrontendIntegrationTest
-    extends FrontendIntegrationTest("alice", "bob")
+    extends FrontendIntegrationTestWithSharedEnvirontment("alice", "bob")
     with WalletTestUtil {
 
   "A wallet UI" should {
@@ -153,9 +153,9 @@ class WalletPaymentFrontendIntegrationTest
       // Alice submits a directory entry request, which will create an app payment request in her wallet
       val aliceDamlUser = aliceWallet.config.damlUser
       val aliceUserParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
-      val aliceDirectoryName = "alice.cns"
+      val aliceDirectoryName = perTestCaseName("alice.cns")
       val aliceDirectoryDisplay = expectedCns(aliceUserParty, aliceDirectoryName)
-      createDirectoryEntry(aliceUserParty, aliceDirectory, "alice.cns", aliceWallet)
+      createDirectoryEntry(aliceUserParty, aliceDirectory, aliceDirectoryName, aliceWallet)
       createSelfPaymentRequest(aliceUserParty, 42, paymentCodegen.Currency.CC)
 
       withFrontEnd("alice") { implicit webDriver =>
@@ -181,15 +181,14 @@ class WalletPaymentFrontendIntegrationTest
     "support different ways of defining the receiver in transfer offers" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.damlUser
       val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
-      val aliceEntryName = "alice.cns"
+      val aliceEntryName = perTestCaseName("alice.cns")
       actAndCheck("Tap coin for alice", aliceWallet.tap(50))(
         "Alice has coin",
         _ => (aliceWallet.list().coins.length shouldBe 1),
       )
       createDirectoryEntry(aliceParty, aliceDirectory, aliceEntryName, aliceWallet)
       val bobParty = setupForTestWithDirectory(bobWallet, bobValidator)
-      val bobCns = "bob.cns"
-      val bobEntryName = bobCns
+      val bobEntryName = perTestCaseName("bob.cns")
       actAndCheck("Tap coin for bob", bobWallet.tap(50))(
         "Bob has coin",
         _ => (bobWallet.list().coins.length shouldBe 1),
@@ -203,7 +202,11 @@ class WalletPaymentFrontendIntegrationTest
         actAndCheck(
           s"Alice creates offer by cns name", {
             click on "create-offer-button"
-            setDirectoryField(textField("create-offer-receiver"), bobCns, bobParty.toProtoPrimitive)
+            setDirectoryField(
+              textField("create-offer-receiver"),
+              bobEntryName,
+              bobParty.toProtoPrimitive,
+            )
             click on "create-offer-quantity"
             numberField("create-offer-quantity").underlying.sendKeys("1.0")
             click on "create-offer-description"
@@ -283,7 +286,7 @@ class WalletPaymentFrontendIntegrationTest
     "support withdrawing and rejecting transfer offers" in { implicit env =>
       val aliceDamlUser = aliceWallet.config.damlUser
       val aliceParty = setupForTestWithDirectory(aliceWallet, aliceValidator)
-      val aliceEntryName = "alice.cns"
+      val aliceEntryName = perTestCaseName("alice.cns")
       actAndCheck("Tap coin for alice", aliceWallet.tap(50))(
         "Alice has coin",
         _ => (aliceWallet.list().coins.length shouldBe 1),
@@ -291,7 +294,7 @@ class WalletPaymentFrontendIntegrationTest
       createDirectoryEntry(aliceParty, aliceDirectory, aliceEntryName, aliceWallet)
       val bobDamlUser = bobWallet.config.damlUser
       val bobParty = setupForTestWithDirectory(bobWallet, bobValidator)
-      val bobEntryName = "bob.cns"
+      val bobEntryName = perTestCaseName("bob.cns")
       actAndCheck("Tap coin for bob", bobWallet.tap(50))(
         "Bob has coin",
         _ => (bobWallet.list().coins.length shouldBe 1),
