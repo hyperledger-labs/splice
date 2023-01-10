@@ -23,6 +23,7 @@ class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScr
   val svcDomainPath: File = clusterImagesPath / "canton-domain"
   val svcAppPath: File = clusterImagesPath / "svc-app"
   val scanAppPath: File = clusterImagesPath / "scan-app"
+  val testResourcesPath: File = "apps" / "app" / "src" / "test" / "resources"
 
   override def environmentDefinition
       : BaseEnvironmentDefinition[CoinEnvironmentImpl, CoinTestConsoleEnvironment] =
@@ -35,6 +36,7 @@ class LocalRunbookIntegrationTest extends CoinIntegrationTest with HasConsoleScr
         svcDomainPath / "coin.conf",
         svcAppPath / "coin.conf",
         scanAppPath / "coin.conf",
+        testResourcesPath / "localrunbook-overrides.conf",
       )
       .clearConfigTransforms()
       // Bump ports by 1000 to avoid collisions with the Canton instance started outside of our tests.

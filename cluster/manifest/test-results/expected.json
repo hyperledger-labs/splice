@@ -315,6 +315,36 @@
                            {
                               "name": "JAVA_TOOL_OPTIONS",
                               "value": "-Xms11776M -Xmx11776M"
+                           },
+                           {
+                              "name": "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-svc-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-scan-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-directory-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/canton-participant:tag",
@@ -405,6 +435,46 @@
                            {
                               "name": "JAVA_TOOL_OPTIONS",
                               "value": "-Xms1024M -Xmx1024M"
+                           },
+                           {
+                              "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-directory-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-directory-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-secret",
+                                    "name": "cn-app-directory-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-directory-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/directory-app:tag",
@@ -495,6 +565,46 @@
                            {
                               "name": "JAVA_TOOL_OPTIONS",
                               "value": "-Xms1024M -Xmx1024M"
+                           },
+                           {
+                              "name": "CN_APP_SVC_LEDGER_API_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-svc-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SVC_LEDGER_API_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-svc-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SVC_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-secret",
+                                    "name": "cn-app-svc-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SVC_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-svc-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/svc-app:tag",
@@ -576,6 +686,46 @@
                            {
                               "name": "JAVA_TOOL_OPTIONS",
                               "value": "-Xms1024M -Xmx1024M"
+                           },
+                           {
+                              "name": "CN_APP_SCAN_LEDGER_API_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-scan-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SCAN_LEDGER_API_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-scan-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SCAN_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-secret",
+                                    "name": "cn-app-scan-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-scan-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/scan-app:tag",

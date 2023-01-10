@@ -13,12 +13,48 @@ if (`svc_participant`.domains.list_connected().isEmpty) {
     `svc_participant`.health.ping(`svc_participant`)
 }
 
-val svcUserName = "svc"
+val svcUserName = System.getenv("CN_APP_SVC_LEDGER_API_AUTH_USER_NAME")
+if (svcUserName == null) {
+  sys.error("Environment variable CN_APP_SVC_LEDGER_API_AUTH_USER_NAME does not exist")
+}
+
+val scanUserName = System.getenv("CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME")
+if (scanUserName == null) {
+  sys.error("Environment variable CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME does not exist")
+}
+
+val directoryUserName = System.getenv("CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME")
+if (directoryUserName == null) {
+  sys.error("Environment variable CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME does not exist")
+}
+
+// User name may contain characters not allowed in party names
+val svcPartyName = "svc"
 
 println(s"Creating svc user $svcUserName...")
-val svcParty = `svc_participant`.parties.enable(svcUserName)
+val svcParty = `svc_participant`.parties.enable(svcPartyName)
 `svc_participant`.ledger_api.users.create(
   id = svcUserName,
+  actAs = Set(svcParty.toLf),
+  readAs = Set.empty,
+  primaryParty = Some(svcParty.toLf),
+  participantAdmin = true,
+)
+
+println(s"Creating scan user $scanUserName...")
+// Shares party with SVC but user can only read
+`svc_participant`.ledger_api.users.create(
+  id = scanUserName,
+  actAs = Set.empty,
+  readAs = Set(svcParty.toLf),
+  primaryParty = Some(svcParty.toLf),
+  participantAdmin = true,
+)
+
+println(s"Creating directory user $directoryUserName...")
+// Shares party with SVC
+`svc_participant`.ledger_api.users.create(
+  id = directoryUserName,
   actAs = Set(svcParty.toLf),
   readAs = Set.empty,
   primaryParty = Some(svcParty.toLf),

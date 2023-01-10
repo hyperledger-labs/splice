@@ -445,6 +445,9 @@ function _set_auth0_secret() {
 function cluster_update_secrets() {
   _set_auth0_secret "cn-app-wallet-ledger-api-auth" "CN_APP_WALLET_LEDGER_API_AUTH"
   _set_auth0_secret "cn-app-validator-ledger-api-auth" "CN_APP_VALIDATOR_LEDGER_API_AUTH"
+  _set_auth0_secret "cn-app-svc-ledger-api-auth" "CN_APP_SVC_LEDGER_API_AUTH"
+  _set_auth0_secret "cn-app-scan-ledger-api-auth" "CN_APP_SCAN_LEDGER_API_AUTH"
+  _set_auth0_secret "cn-app-directory-ledger-api-auth" "CN_APP_DIRECTORY_LEDGER_API_AUTH"
 }
 
 case "${SUBCOMMAND_NAME}" in

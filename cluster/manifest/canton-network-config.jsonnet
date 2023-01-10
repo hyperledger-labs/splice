@@ -2,6 +2,16 @@ local networkDefaults = import './network-defaults.jsonnet';
 
 local c = import './cluster.jsonnet';
 
+// A dictionary of all auth-related environment variables.
+// Some variables are used by multiple apps.
+local authEnvVars = std.foldl(function(prev, el) prev + c.authEnvVars(el), [
+    {env:'CN_APP_VALIDATOR_LEDGER_API_AUTH', secret: 'cn-app-validator-ledger-api-auth'},
+    {env:'CN_APP_WALLET_LEDGER_API_AUTH', secret: 'cn-app-wallet-ledger-api-auth'},
+    {env:'CN_APP_SVC_LEDGER_API_AUTH', secret: 'cn-app-svc-ledger-api-auth'},
+    {env:'CN_APP_SCAN_LEDGER_API_AUTH', secret: 'cn-app-scan-ledger-api-auth'},
+    {env:'CN_APP_DIRECTORY_LEDGER_API_AUTH', secret: 'cn-app-directory-ledger-api-auth'},
+], {});
+
 // memoryLimitMiB values for deployments are taken emperically from
 // DevNet with `kubectl top pod`. Note that these were taken on a very
 // lightly loaded cluster and will very likely need to be revised for
@@ -53,7 +63,11 @@ local svcDeployments(config) = [
       name: 'cp-lg-api',
       port: 5001,
     },
-  ], memoryLimitMiB=config.participantMemoryMib),
+  ], memoryLimitMiB=config.participantMemoryMib, extraEnvVars=[
+    authEnvVars['CN_APP_SVC_LEDGER_API_AUTH_USER_NAME'],
+    authEnvVars['CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME'],
+    authEnvVars['CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME'],
+  ]),
 
   c.deployment(config, 'directory-app', [
     {
@@ -64,6 +78,11 @@ local svcDeployments(config) = [
       name: 'dir-http-api',
       port: 6010,
     },
+  ], extraEnvVars=[
+    authEnvVars['CN_APP_DIRECTORY_LEDGER_API_AUTH_URL'],
+    authEnvVars['CN_APP_DIRECTORY_LEDGER_API_AUTH_CLIENT_ID'],
+    authEnvVars['CN_APP_DIRECTORY_LEDGER_API_AUTH_CLIENT_SECRET'],
+    authEnvVars['CN_APP_DIRECTORY_LEDGER_API_AUTH_USER_NAME'],
   ]),
 
   c.deployment(config, 'svc-app', [
@@ -71,6 +90,11 @@ local svcDeployments(config) = [
       name: 'svc-app-adm-api',
       port: 5005,
     },
+  ], extraEnvVars=[
+    authEnvVars['CN_APP_SVC_LEDGER_API_AUTH_URL'],
+    authEnvVars['CN_APP_SVC_LEDGER_API_AUTH_CLIENT_ID'],
+    authEnvVars['CN_APP_SVC_LEDGER_API_AUTH_CLIENT_SECRET'],
+    authEnvVars['CN_APP_SVC_LEDGER_API_AUTH_USER_NAME'],
   ]),
 
   c.deployment(config, 'scan-app', [
@@ -78,15 +102,13 @@ local svcDeployments(config) = [
       name: 'scan-api',
       port: 5012,
     },
-  ], proxyToGrpcWeb='scan-api'),
+  ], proxyToGrpcWeb='scan-api', extraEnvVars=[
+    authEnvVars['CN_APP_SCAN_LEDGER_API_AUTH_URL'],
+    authEnvVars['CN_APP_SCAN_LEDGER_API_AUTH_CLIENT_ID'],
+    authEnvVars['CN_APP_SCAN_LEDGER_API_AUTH_CLIENT_SECRET'],
+    authEnvVars['CN_APP_SCAN_LEDGER_API_AUTH_USER_NAME'],
+  ]),
 ];
-
-// A dictionary of all auth-related environment variables.
-// Some variables are used by multiple apps.
-local authEnvVars = std.foldl(function(prev, el) prev + c.authEnvVars(el), [
-    {env:'CN_APP_VALIDATOR_LEDGER_API_AUTH', secret: 'cn-app-validator-ledger-api-auth'},
-    {env:'CN_APP_WALLET_LEDGER_API_AUTH', secret: 'cn-app-wallet-ledger-api-auth'},
-], {});
 
 local validator1Deployments(config) = [
   c.deployment(config, 'validator1-participant', [
