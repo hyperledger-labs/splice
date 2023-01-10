@@ -278,7 +278,9 @@ Available operations include:
 
 
 * `cncluster apply` - Apply the cluster configuration to the currently
-  running CN cluster in GCE.
+  running CN cluster in GCE. (Accepts an optional argument that allows
+  a specific set of images to be deployed by tag. Defaults to the current
+  working directory's tag. Manifest is always deployed from working copy.)
 * `cncluster check` - Run a series of simple validity checks against the
   external API exposed by a cluster.
 * `cncluster create` - Create a new instance of the CN cluster in GCE,

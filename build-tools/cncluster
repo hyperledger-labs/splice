@@ -53,6 +53,8 @@ function nat_config() {
 }
 
 function _cluster_apply() {
+    IMAGE_TAG=$1
+
     # Apply cert-manager deployments
     kubectl apply -f $REPO_ROOT/cluster/manifest/cert-manager/cert-manager.yaml
 
@@ -61,7 +63,7 @@ function _cluster_apply() {
             --tla-str gcpRepoName=${GCP_REPO_NAME} \
             --tla-str gcpDnsProject=${GCP_DNS_PROJECT} \
             --tla-str gcpDnsSASecret=${GCP_DNS_SA_SECRET} \
-            --tla-str imageTag=${SOURCE_IMAGE_TAG} \
+            --tla-str imageTag=${IMAGE_TAG} \
             --tla-str ipAddr=$(cluster_ip) \
             --tla-str clusterName=${GCP_CLUSTER_NAME} \
             --tla-str clusterDnsName=${CLUSTER_DNS_NAME} \
@@ -103,12 +105,19 @@ function cluster_activate() {
 function cluster_apply() {
     cluster_confirm "Apply configuration"
 
-    if ! make -C ${REPO_ROOT}/cluster docker-check; then
-        _error "Images missing from artifact registry, cannot apply."
-        exit 1
+    IMAGE_TAG=${SOURCE_IMAGE_TAG}
+
+    if [ -z "${1-}" ]; then
+       if ! make -C ${REPO_ROOT}/cluster docker-check; then
+           _error "Images missing from artifact registry, cannot apply."
+           exit 1
+       fi
+    else
+        IMAGE_TAG=$1
+       _warning "Overriding image tag (no docker-check): ${IMAGE_TAG} (was: ${SOURCE_IMAGE_TAG})"
     fi
 
-    _cluster_apply
+    _cluster_apply ${IMAGE_TAG}
 }
 
 function cluster_deploy() {
@@ -119,7 +128,7 @@ function cluster_deploy() {
         exit 1
     fi
 
-    _cluster_apply
+    _cluster_apply ${SOURCE_IMAGE_TAG}
 }
 
 function cluster_create() {
@@ -228,7 +237,7 @@ function cluster_create() {
 
     cluster_update_secrets
 
-    _cluster_apply
+    _cluster_apply ${SOURCE_IMAGE_TAG}
 }
 
 function _check_cluster_grpc_port() {
@@ -294,7 +303,7 @@ function cluster_ciapply() {
     cluster_show
 
     _cluster_reset
-    _cluster_apply
+    _cluster_apply ${SOURCE_IMAGE_TAG}
 }
 
 function cluster_delete() {
