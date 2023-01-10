@@ -23,7 +23,6 @@ import com.daml.ledger.javaapi.data.{
   GetTransactionTreesResponse,
   GetTransactionsRequest,
   Identifier,
-  InclusiveFilter,
   LedgerOffset,
   NoFilter,
   Template,
@@ -32,6 +31,7 @@ import com.daml.ledger.javaapi.data.{
   TransactionTree,
   User,
 }
+import com.daml.network.store.AcsStore.IngestionFilter
 import com.daml.network.util.{Trees, UploadablePackage}
 import com.digitalasset.canton.concurrent.Threading
 import com.digitalasset.canton.config.ProcessingTimeout
@@ -97,7 +97,7 @@ trait CoinLedgerSubmit extends FlagCloseableAsync {
 
 trait CoinLedgerConnection extends CoinLedgerSubmit {
   def activeContractsWithOffset(
-      filter: TransactionFilter
+      filter: IngestionFilter
   ): Future[(Seq[CreatedEvent], LedgerOffset)]
 
   def activeContractsWithOffset[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
@@ -106,7 +106,7 @@ trait CoinLedgerConnection extends CoinLedgerSubmit {
   ): Future[(Seq[Contract[TCid, T]], LedgerOffset)]
 
   def activeContracts(
-      filter: TransactionFilter
+      filter: IngestionFilter
   ): Future[Seq[CreatedEvent]]
 
   def activeContracts[TC <: Contract[TCid, T], TCid <: ContractId[T], T <: Template](
@@ -300,13 +300,12 @@ object CoinLedgerConnection {
       }
 
       override def activeContractsWithOffset(
-          filter: TransactionFilter
+          filter: IngestionFilter
       ): Future[(Seq[CreatedEvent], LedgerOffset)] =
         client.ledgerEnd().flatMap {
           case lb: LedgerOffset.LedgerBegin => Future.successful((Seq.empty, lb))
           case simulatedAcsEnd =>
-            val filterParties =
-              filter.getParties.asScala.view.map(PartyId.tryFromProtoPrimitive).toSeq
+            val filterParties = filter.parties.toSeq
             val req = new GetTransactionsRequest(
               "",
               LedgerOffset.LedgerBegin.getInstance,
@@ -331,25 +330,14 @@ object CoinLedgerConnection {
             mapCe.map(m => (m.values.toSeq, simulatedAcsEnd))
         }
 
-      private def interpretCreateFilter(filter: TransactionFilter): CreatedEvent => Boolean =
-        filter match {
-          case fbp: FiltersByParty =>
-            // this isn't fine-grained enough for the type, but good enough
-            // for our usage of it
-            val partylessFilters = fbp.getPartyToFilters.asScala.values
-            if (partylessFilters.collectFirst { case _: NoFilter => () }.isDefined)
-              Function const true
-            else {
-              val allTpids = partylessFilters.view.flatMap {
-                case f: InclusiveFilter => f.getTemplateIds.asScala
-                case f: Filter => sys.error(s"unexpected filter $f")
-              }.toSet
-              ce => allTpids(ce.getTemplateId)
-            }
-          case _ =>
-            // FiltersByParty is currently the only possibility
-            Function const true
-        }
+      private def interpretCreateFilter(filter: IngestionFilter): CreatedEvent => Boolean = {
+        val IngestionFilter(primaryParty @ _, templateIds, interfaceIds) = filter
+        ce =>
+          templateIds(ce.getTemplateId) ||
+            Seq(ce.getInterfaceViews, ce.getFailedInterfaceViews).exists(
+              _.keySet.asScala exists interfaceIds
+            )
+      }
 
       override def activeContractsWithOffset[TC <: Contract[TCid, T], TCid <: ContractId[
         T
@@ -358,15 +346,13 @@ object CoinLedgerConnection {
           companion: ContractCompanion[TC, TCid, T],
       ): Future[(Seq[Contract[TCid, T]], LedgerOffset)] =
         activeContractsWithOffset(
-          CoinLedgerConnection.transactionFilterByParty(
-            Map(party -> Seq(companion.TEMPLATE_ID))
-          )
+          CoinLedgerConnection.transactionFilterByParty(party, companion.TEMPLATE_ID)
         ).map { case (events, off) =>
           (events.map(companion.fromCreatedEvent(_)), off)
         }
 
       override def activeContracts(
-          filter: TransactionFilter
+          filter: IngestionFilter
       ): Future[Seq[CreatedEvent]] =
         activeContractsWithOffset(filter).map(_._1)
 
@@ -717,27 +703,8 @@ object CoinLedgerConnection {
     }
   }
 
-  def transactionFilterByParty(filter: Map[PartyId, Seq[Identifier]]): TransactionFilter =
-    new FiltersByParty(
-      filter
-        .map[String, Filter] { case (p, ts) =>
-          p.toProtoPrimitive -> InclusiveFilter.ofTemplateIds(ts.toSet.asJava)
-        }
-        .asJava
-    )
-
-  /** Same as [[transactionFilterByParty]] but for interfaces. */
-  def transactionInterfaceFilterByParty(filter: Map[PartyId, Seq[Identifier]]): TransactionFilter =
-    new FiltersByParty(
-      filter
-        .map[String, Filter] { case (p, is) =>
-          p.toProtoPrimitive -> new InclusiveFilter(
-            Set.empty.asJava,
-            is.map(i => i -> Filter.Interface.INCLUDE_VIEW).toMap.asJava,
-          )
-        }
-        .asJava
-    )
+  private def transactionFilterByParty(partyId: PartyId, templateId: Identifier): IngestionFilter =
+    IngestionFilter(partyId, templateIds = Set(templateId), interfaceIds = Set.empty)
 
   def uniqueId: String = UUID.randomUUID.toString
 }

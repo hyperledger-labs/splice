@@ -269,8 +269,8 @@ object AcsStore {
   /** A sink for ingesting an initial ACS snapshot and transactions changing it. */
   trait IngestionSink {
 
-    /** The transaction filter required for ingestion. */
-    def transactionFilter: TransactionFilter
+    /** The filter required for ingestion. */
+    def ingestionFilter: IngestionFilter
 
     /** Ingest create events that are part of the initial active contract snapshot ingestion */
     def ingestActiveContracts(
@@ -295,8 +295,8 @@ object AcsStore {
   /** Static specification of a set of create events in scope for ingestion into an AcsStore. */
   trait ContractFilter {
 
-    /** The transaction filter required for ingestion into this store. */
-    def transactionFilter: TransactionFilter
+    /** The filter required for ingestion into this store. */
+    def ingestionFilter: IngestionFilter
 
     /** Whether the event is in scope. */
     def contains(ev: CreatedEvent): Boolean
@@ -320,17 +320,12 @@ object AcsStore {
         Map.empty,
   ) extends ContractFilter {
 
-    override val transactionFilter: TransactionFilter = {
-      val templateIds = templateFilters.keys.toSet.asJava
-      val interfaceIds =
-        interfaceFilters.keys.map(i => i -> Filter.Interface.INCLUDE_VIEW).toMap.asJava
-      val partyString: String = primaryParty.toProtoPrimitive
-      new FiltersByParty(
-        Map[String, Filter](
-          partyString -> new InclusiveFilter(templateIds, interfaceIds)
-        ).asJava
+    override val ingestionFilter =
+      IngestionFilter(
+        primaryParty,
+        templateIds = templateFilters.keySet,
+        interfaceIds = interfaceFilters.keySet,
       )
-    }
 
     override def contains(ev: CreatedEvent): Boolean =
       templateFilters.get(ev.getTemplateId).exists(evPredicate => evPredicate(ev)) ||
@@ -405,5 +400,27 @@ object AcsStore {
         decoder,
       ),
     )
+  }
+
+  /** A smaller version of [[TransactionFilter]], only powerful enough for
+    * intended [[AcsStore]] ingestion.
+    */
+  final case class IngestionFilter(
+      primaryParty: PartyId,
+      templateIds: Set[Identifier],
+      interfaceIds: Set[Identifier],
+  ) {
+    def parties: Set[PartyId] = Set(primaryParty)
+
+    def toTransactionFilter: TransactionFilter = {
+      val interfaceIdsJava =
+        interfaceIds.view.map(i => i -> Filter.Interface.INCLUDE_VIEW).toMap.asJava
+      val partyString: String = primaryParty.toProtoPrimitive
+      new FiltersByParty(
+        Map[String, Filter](
+          partyString -> new InclusiveFilter(templateIds.asJava, interfaceIdsJava)
+        ).asJava
+      )
+    }
   }
 }

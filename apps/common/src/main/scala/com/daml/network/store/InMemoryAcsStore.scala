@@ -9,13 +9,7 @@ import com.daml.ledger.javaapi.data.codegen.{
   DamlRecord,
   InterfaceCompanion,
 }
-import com.daml.ledger.javaapi.data.{
-  ArchivedEvent,
-  CreatedEvent,
-  Template,
-  Transaction,
-  TransactionFilter,
-}
+import com.daml.ledger.javaapi.data.{ArchivedEvent, CreatedEvent, Template, Transaction}
 import com.daml.network.util.JavaContract
 import com.digitalasset.canton.logging.pretty.{Pretty, PrettyPrinting}
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
@@ -77,7 +71,7 @@ class InMemoryAcsStore(
 
   val ingestionSink: AcsStore.IngestionSink = new AcsStore.IngestionSink {
 
-    override def transactionFilter: TransactionFilter = contractFilter.transactionFilter
+    override def ingestionFilter = contractFilter.ingestionFilter
 
     override def getLastIngestedOffset: Future[Option[String]] = Future.successful(stateVar.offset)
 

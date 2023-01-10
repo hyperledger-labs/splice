@@ -5,12 +5,10 @@ import com.daml.network.environment.{CoinLedgerConnection, CoinLedgerSubscriptio
 import com.daml.network.store.AcsStore
 import com.digitalasset.canton.config.ProcessingTimeout
 import com.digitalasset.canton.logging.NamedLoggerFactory
-import com.digitalasset.canton.topology.PartyId
 import com.digitalasset.canton.tracing.TraceContext
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
 
 class AcsIngestionService(
     name: String,
@@ -27,7 +25,7 @@ class AcsIngestionService(
   override protected val loggerFactory: NamedLoggerFactory =
     loggerFactory0.append("ingestionLoopFor", name)
 
-  private val txFilter = ingestionSink.transactionFilter
+  private val igFilter = ingestionSink.ingestionFilter
 
   override protected def newLedgerSubscription()(implicit
       traceContext: TraceContext
@@ -41,7 +39,7 @@ class AcsIngestionService(
     } yield connection.subscribeAsync(
       s"AcsIngestion($name)",
       new LedgerOffset.Absolute(subscribeFrom),
-      txFilter.getParties.asScala.toSeq.map(PartyId.tryFromProtoPrimitive(_)),
+      igFilter.parties.toSeq,
     )(
       // Ingest every transaction as we get it.
       ingestionSink.ingestTransaction(_)
@@ -51,7 +49,7 @@ class AcsIngestionService(
   private def ingestAcs()(implicit traceContext: TraceContext): Future[String] = {
     for {
       // TODO(M3-83): stream contracts instead of ingesting them as a single Seq
-      (evs, off) <- connection.activeContractsWithOffset(txFilter)
+      (evs, off) <- connection.activeContractsWithOffset(igFilter)
       _ <- ingestionSink.ingestActiveContracts(evs)
       offsetAsString = off match {
         case absolute: LedgerOffset.Absolute => absolute.getOffset
