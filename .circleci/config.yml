@@ -78,8 +78,16 @@ commands:
          # 1. It doesn't work on CircleCI (sethostname is not allowed)
          # 2. We don't plan to build anything, so the risk is fairly low
          mkdir -p ~/.config/nix
-         echo 'sandbox = false' >> ~/.config/nix/nix.conf
+         cat \<<EOF > ~/.config/nix/nix.conf
+         sandbox = false
+         netrc-file = /home/circleci/.config/nix/netrc
+         EOF
          sh <(curl -fsSL --retry 8 https://nixos.org/nix/install) --no-daemon
+         cat \<<EOF > ~/.config/nix/netrc
+         machine digitalasset.jfrog.io
+         login $ARTIFACTORY_USER
+         password $ARTIFACTORY_PASSWORD
+         EOF
          . /home/circleci/.nix-profile/etc/profile.d/nix.sh
          nix-shell shell.nix --run 'echo "Done loading all packages."'
     - save_cache:
@@ -1042,28 +1050,50 @@ workflows:
     # Documentation
     - docs:
         <<: *notify-fail
+        context:
+          - artifactory
+          - slack-context
     # Linting and formatting
     - static_tests:
         <<: *notify-fail
+        context:
+          - artifactory
+          - slack-context
     # Daml
     - daml_test:
         <<: *notify-fail
+        context:
+          - artifactory
+          - slack-context
     # Scala
     - scala_test:
         <<: *notify-fail
         context:
+            - artifactory
             - datadog
             - slack-context
     - bundle:
         <<: *notify-fail
+        context:
+          - artifactory
+          - slack-context
     # Ops
     - update_pipeline_schedule:
         <<: *notify-fail
         <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
     - deployment_test:
         <<: *notify-fail
+        context:
+          - artifactory
+          - slack-context
     - docker_images_build:
         <<: *notify-fail
+        context:
+          - artifactory
+          - slack-context
 
   deploy_staging:
     when:
@@ -1073,18 +1103,28 @@ workflows:
     - docker_images_push:
         <<: *notify-fail
         <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
     - deployment_test:
         <<: *notify-fail
         <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
     # Sequence all builds on main
     # to make sure deployment & preflight check of previous
     # build completes first.
     - wait_for_previous_pipeline:
         <<: *notify-fail
         <<: *main-branch-only
+        context:
+          - artifactory
+          - slack-context
     - deploy_cluster:
         <<: *main-branch-only
         context:
+          - artifactory
           - slack-context
         cluster: "staging"
         requires:
@@ -1095,6 +1135,7 @@ workflows:
         cluster: staging
         <<: *main-branch-only
         context:
+          - artifactory
           - canton-network-vpn
           - slack-context
         requires:
@@ -1109,12 +1150,19 @@ workflows:
     - docker_images_push:
         <<: *notify-fail
         <<: *main-branch-only
+        context:
+          - artifactory
+          - slack_context
     - deployment_test:
         <<: *notify-fail
         <<: *main-branch-only
+        context:
+          - artifactory
+          - slack_context
     - deploy_cluster:
         <<: *main-branch-only
         context:
+          - artifactory
           - slack-context
         cluster: "devnet"
         requires:
@@ -1124,6 +1172,7 @@ workflows:
         cluster: "devnet"
         <<: *main-branch-only
         context:
+          - artifactory
           - canton-network-vpn
           - slack-context
         requires:
@@ -1138,12 +1187,19 @@ workflows:
     - docker_images_push:
         <<: *notify-fail
         <<: *main-branch-only
+        context:
+          - artifactory
+          - slack_context
     - deployment_test:
         <<: *notify-fail
         <<: *main-branch-only
+        context:
+          - artifactory
+          - slack_context
     - deploy_cluster:
         <<: *main-branch-only
         context:
+          - artifactory
           - slack-context
         cluster: "testnet"
         requires:
@@ -1153,6 +1209,7 @@ workflows:
         cluster: "testnet"
         <<: *main-branch-only
         context:
+          - artifactory
           - canton-network-vpn
           - slack-context
         requires:
@@ -1168,5 +1225,6 @@ workflows:
           <<: *main-branch-only
           cluster: "testnet"
           context:
+            - artifactory
             - canton-network-vpn
             - slack-context
