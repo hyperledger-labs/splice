@@ -15,10 +15,9 @@ import io.grpc.StatusRuntimeException
 import monocle.macros.syntax.lens.*
 import org.slf4j.event.Level
 
+import java.time.Duration
 import scala.concurrent.duration.*
 import scala.concurrent.{Await, Future}
-
-import java.time.Duration
 
 class TimeBasedTreasuryIntegrationTest
     extends CoinIntegrationTest

@@ -236,7 +236,7 @@ class CoinConsoleEnvironment(
     new SplitwiseAppBackendReference(this, name)
 
   private def createRemoteSplitwiseReference(name: String): SplitwiseAppClientReference =
-    new SplitwiseAppClientReference(this, name)
+    new SplitwiseAppClientReference(this, name, environment.config.remoteSplitwisesByString(name))
 
   override protected def topLevelValues: Seq[TopLevelValue[_]] = {
 

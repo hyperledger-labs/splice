@@ -16,7 +16,11 @@ import scala.concurrent.duration.DurationInt
 import scala.util.Using
 
 class SplitwiseFrontendIntegrationTest
-    extends FrontendIntegrationTest("aliceSplitwise", "bobSplitwise", "charlieSplitwise")
+    extends FrontendIntegrationTestWithSharedEnvirontment(
+      "aliceSplitwise",
+      "bobSplitwise",
+      "charlieSplitwise",
+    )
     with WalletTestUtil {
 
   private val splitwiseDarPath = "daml/splitwise/.daml/dist/splitwise-0.1.0.dar"
@@ -88,12 +92,15 @@ class SplitwiseFrontendIntegrationTest
       val charlieUserParty = onboardWalletUser(charlieWallet, charlieValidator)
       val groupName = "troika"
 
-      initialiseDirectoryApp("alice.cns", aliceUserParty, aliceDirectory, aliceWallet)
-      initialiseDirectoryApp("bob.cns", bobUserParty, bobDirectory, bobWallet)
-      initialiseDirectoryApp("charlie.cns", charlieUserParty, charlieDirectory, charlieWallet)
-      val aliceCns = expectedCns(aliceUserParty, "alice.cns")
-      val bobCns = expectedCns(bobUserParty, "bob.cns")
-      val charlieCns = expectedCns(charlieUserParty, "charlie.cns")
+      val aliceEntryName = perTestCaseName("alice.cns")
+      val bobEntryName = perTestCaseName("bob.cns")
+      val charlieEntryName = perTestCaseName("charlie.cns")
+      initialiseDirectoryApp(aliceEntryName, aliceUserParty, aliceDirectory, aliceWallet)
+      initialiseDirectoryApp(bobEntryName, bobUserParty, bobDirectory, bobWallet)
+      initialiseDirectoryApp(charlieEntryName, charlieUserParty, charlieDirectory, charlieWallet)
+      val aliceCns = expectedCns(aliceUserParty, aliceEntryName)
+      val bobCns = expectedCns(bobUserParty, bobEntryName)
+      val charlieCns = expectedCns(charlieUserParty, charlieEntryName)
 
       bobWallet.tap(550)
 
@@ -218,10 +225,12 @@ class SplitwiseFrontendIntegrationTest
       val bobUserParty = onboardWalletUser(bobWallet, bobValidator)
       val groupName = "troika"
 
-      initialiseDirectoryApp("alice.cns", aliceUserParty, aliceDirectory, aliceWallet)
-      initialiseDirectoryApp("bob.cns", bobUserParty, bobDirectory, bobWallet)
-      val aliceCns = expectedCns(aliceUserParty, "alice.cns")
-      val bobCns = expectedCns(bobUserParty, "bob.cns")
+      val aliceEntryName = perTestCaseName("alice.cns")
+      val bobEntryName = perTestCaseName("bob.cns")
+      initialiseDirectoryApp(aliceEntryName, aliceUserParty, aliceDirectory, aliceWallet)
+      initialiseDirectoryApp(bobEntryName, bobUserParty, bobDirectory, bobWallet)
+      val aliceCns = expectedCns(aliceUserParty, aliceEntryName)
+      val bobCns = expectedCns(bobUserParty, bobEntryName)
       bobWallet.tap(510)
 
       withFrontEnd("aliceSplitwise") { implicit webDriver =>
@@ -266,7 +275,8 @@ class SplitwiseFrontendIntegrationTest
         inside(find(className("transfer-receiver-field"))) { case Some(field) =>
           field.underlying.click()
           val input = reactTextInput(field)
-          input.underlying.sendKeys("alice")
+          // TODO(#2206) change aliceEntryName back to "alice" for better UX testing
+          input.underlying.sendKeys(aliceEntryName)
           input.underlying.sendKeys(Keys.ARROW_DOWN)
           input.underlying.sendKeys(Keys.ENTER)
         }
@@ -309,9 +319,12 @@ class SplitwiseFrontendIntegrationTest
       val charlieValidator = aliceValidator
       val charlieUserParty = onboardWalletUser(charlieWallet, charlieValidator)
 
-      initialiseDirectoryApp("alice.cns", aliceUserParty, aliceDirectory, aliceWallet)
-      initialiseDirectoryApp("bob.cns", bobUserParty, bobDirectory, bobWallet)
-      initialiseDirectoryApp("charlie.cns", charlieUserParty, charlieDirectory, charlieWallet)
+      val aliceEntryName = perTestCaseName("alice.cns")
+      val bobEntryName = perTestCaseName("bob.cns")
+      val charlieEntryName = perTestCaseName("charlie.cns")
+      initialiseDirectoryApp(aliceEntryName, aliceUserParty, aliceDirectory, aliceWallet)
+      initialiseDirectoryApp(bobEntryName, bobUserParty, bobDirectory, bobWallet)
+      initialiseDirectoryApp(charlieEntryName, charlieUserParty, charlieDirectory, charlieWallet)
 
       // Alice creates three groups - abc, ab, ac
       withFrontEnd("aliceSplitwise") { implicit webDriver =>

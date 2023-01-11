@@ -5,7 +5,7 @@ import com.daml.network.codegen.java.cn.{splitwise => splitwiseCodegen}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.integration.tests.CoinTests.{
-  CoinIntegrationTest,
+  CoinIntegrationTestWithSharedEnvironment,
   CoinTestConsoleEnvironment,
 }
 import com.daml.network.splitwise.admin.api.client.commands.GrpcSplitwiseAppClient
@@ -14,7 +14,9 @@ import com.digitalasset.canton.integration.BaseEnvironmentDefinition
 
 import scala.concurrent.Future
 
-class SplitwiseIntegrationTest extends CoinIntegrationTest with WalletTestUtil {
+class SplitwiseIntegrationTest
+    extends CoinIntegrationTestWithSharedEnvironment
+    with WalletTestUtil {
 
   private val darPath = "daml/splitwise/.daml/dist/splitwise-0.1.0.dar"
 

@@ -53,6 +53,7 @@ abstract class SplitwiseAppReference(
 final class SplitwiseAppClientReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
     name: String,
+    val config: SplitwiseAppClientConfig, // adding this explicitly for easier overriding
 ) extends SplitwiseAppReference(coinConsoleEnvironment, name)
     with GrpcRemoteInstanceReference
     with BaseInspection[ParticipantNode] {
@@ -131,10 +132,6 @@ final class SplitwiseAppClientReference(
     LedgerApiUtils.submitWithResult(ledgerApi, userId, actAs, readAs, update, commandId)
 
   private def getUserPrimaryParty() = LedgerApiUtils.getUserPrimaryParty(ledgerApi, userId)
-
-  @Help.Summary("Return remote splitwise app config")
-  def config: SplitwiseAppClientConfig =
-    coinConsoleEnvironment.environment.config.remoteSplitwisesByString(name)
 
   // Commands for managing installs
 

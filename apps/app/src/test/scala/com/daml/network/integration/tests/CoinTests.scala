@@ -3,7 +3,11 @@ package com.daml.network.integration.tests
 import com.auth0.exception.Auth0Exception
 import com.daml.network.auth.AuthUtil
 import com.daml.network.config.AuthTokenSourceConfig
-import com.daml.network.console.{RemoteDirectoryAppReference, WalletAppClientReference}
+import com.daml.network.console.{
+  RemoteDirectoryAppReference,
+  SplitwiseAppClientReference,
+  WalletAppClientReference,
+}
 import com.daml.network.environment.CoinEnvironmentImpl
 import com.daml.network.integration.CoinEnvironmentDefinition
 import com.daml.network.util.{Auth0Util, CommonCoinAppInstanceReferences}
@@ -66,6 +70,11 @@ object CoinTests {
         env: CoinTestConsoleEnvironment
     ): RemoteDirectoryAppReference = extendDamlUserWithCaseId(super.rdp(name))
 
+    // make `aliceSplitwise` etc. use updated usernames
+    override def rsw(name: String)(implicit
+        env: CoinTestConsoleEnvironment
+    ): SplitwiseAppClientReference = extendDamlUserWithCaseId(super.rsw(name))
+
     override def perTestCaseName(name: String) = s"${name}_tc$testCaseId"
 
     private def extendDamlUserWithCaseId(
@@ -85,6 +94,18 @@ object CoinTests {
       val newLedgerApiConfig = ref.config.ledgerApi
         .copy(authConfig = updateUser(ref.config.ledgerApi.authConfig, newDamlUser))
       new RemoteDirectoryAppReference(
+        ref.coinConsoleEnvironment,
+        ref.name,
+        config = ref.config.copy(damlUser = newDamlUser, ledgerApi = newLedgerApiConfig),
+      )
+    }
+    private def extendDamlUserWithCaseId(
+        ref: SplitwiseAppClientReference
+    ): SplitwiseAppClientReference = {
+      val newDamlUser = perTestCaseName(ref.config.damlUser)
+      val newLedgerApiConfig = ref.config.ledgerApi
+        .copy(authConfig = updateUser(ref.config.ledgerApi.authConfig, newDamlUser))
+      new SplitwiseAppClientReference(
         ref.coinConsoleEnvironment,
         ref.name,
         config = ref.config.copy(damlUser = newDamlUser, ledgerApi = newLedgerApiConfig),
