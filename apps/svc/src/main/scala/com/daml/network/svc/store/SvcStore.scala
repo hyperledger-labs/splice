@@ -1,6 +1,7 @@
 package com.daml.network.svc.store
 
 import com.daml.network.codegen.java.cc
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.store.AcsStore
 import com.daml.network.store.AcsStore.QueryResult
 import com.daml.network.svc.store.memory.InMemorySvcStore
@@ -102,6 +103,11 @@ trait SvcStore extends AutoCloseable {
       )
     })
   }
+
+  def lookupFeaturedAppByProviderWithOffset(
+      provider: String
+  ): Future[QueryResult[Option[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]]] =
+    acs.findContractWithOffset(FeaturedAppRight.COMPANION)(co => co.payload.provider == provider)
 }
 
 object SvcStore {
@@ -146,6 +152,7 @@ object SvcStore {
         mkFilter(cc.round.SummarizingMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.AppReward.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.ValidatorReward.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc),
       ),
     )
   }

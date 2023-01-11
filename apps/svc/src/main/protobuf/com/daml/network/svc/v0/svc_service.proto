@@ -6,6 +6,9 @@ import "google/protobuf/empty.proto";
 service SvcService {
   // Returns some debug info about the running app
   rpc GetDebugInfo (google.protobuf.Empty) returns (GetDebugInfoResponse);
+
+  // Grant a featured app right to an app provider
+  rpc GrantFeaturedAppRight (GrantFeaturedAppRightRequest) returns (GrantFeaturedAppRightResponse);
 }
 
 // Contains information useful for debugging a running SVC app.
@@ -22,4 +25,14 @@ message GetDebugInfoResponse {
 
   // Contract IDs of all active CoinRules contracts created by this app
   repeated string coin_rules_contract_ids = 4;
+}
+
+message GrantFeaturedAppRightRequest {
+  // Party ID of the app provider to which the right should be granted
+  string app_provider = 1;
+}
+
+message GrantFeaturedAppRightResponse {
+  // The contract ID of the created featured app right
+  string featured_app_right_contract_id = 1;
 }

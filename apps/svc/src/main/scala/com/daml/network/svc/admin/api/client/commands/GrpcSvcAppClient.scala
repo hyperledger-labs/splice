@@ -1,8 +1,13 @@
 package com.daml.network.svc.admin.api.client.commands
 
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.svc.v0
-import com.daml.network.svc.v0.GetDebugInfoResponse
 import com.daml.network.svc.v0.SvcServiceGrpc.SvcServiceStub
+import com.daml.network.svc.v0.{
+  GetDebugInfoResponse,
+  GrantFeaturedAppRightRequest,
+  GrantFeaturedAppRightResponse,
+}
 import com.daml.network.util.Proto
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
@@ -46,5 +51,27 @@ object GrpcSvcAppClient {
           coinRulesCids = response.coinRulesContractIds,
         )
       }
+  }
+
+  case class GrantFeaturedAppRight(provider: PartyId)
+      extends BaseCommand[
+        GrantFeaturedAppRightRequest,
+        GrantFeaturedAppRightResponse,
+        FeaturedAppRight.ContractId,
+      ] {
+
+    override def submitRequest(
+        service: SvcServiceStub,
+        request: GrantFeaturedAppRightRequest,
+    ): Future[GrantFeaturedAppRightResponse] = service.grantFeaturedAppRight(request)
+
+    override def createRequest(): Either[String, GrantFeaturedAppRightRequest] = Right(
+      GrantFeaturedAppRightRequest(Proto.encode(provider))
+    )
+
+    override def handleResponse(
+        response: GrantFeaturedAppRightResponse
+    ): Either[String, FeaturedAppRight.ContractId] =
+      Proto.decodeJavaContractId(FeaturedAppRight.COMPANION)(response.featuredAppRightContractId)
   }
 }

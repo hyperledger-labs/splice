@@ -119,7 +119,8 @@ template FeaturedAppRight with
     svc : Party
     provider : Party
   where
-    signatory svc, provider
+    signatory svc
+    observer provider
 
     interface instance API.FeaturedAppRight for FeaturedAppRight where
       view = API.FeaturedAppRightView with ..

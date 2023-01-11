@@ -1,10 +1,12 @@
 package com.daml.network.console
 
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.svc.admin.api.client.commands.GrpcSvcAppClient
 import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
 import com.digitalasset.canton.console.{BaseInspection, GrpcRemoteInstanceReference, Help}
 import com.digitalasset.canton.participant.ParticipantNode
+import com.digitalasset.canton.topology.PartyId
 
 abstract class SvcAppReference(
     override val coinConsoleEnvironment: CoinConsoleEnvironment,
@@ -28,6 +30,13 @@ class SvcAppClientReference(
     with BaseInspection[ParticipantNode] {
 
   override protected val instanceType = "SVC Client"
+
+  @Help.Summary("Grant a featured app right to an app provider")
+  def grantFeaturedAppRight(provider: PartyId): FeaturedAppRight.ContractId = {
+    consoleEnvironment.run {
+      adminCommand(GrpcSvcAppClient.GrantFeaturedAppRight(provider))
+    }
+  }
 }
 
 /** Single SVC app backend reference. Defines the console commands that can be run against a backend SVC

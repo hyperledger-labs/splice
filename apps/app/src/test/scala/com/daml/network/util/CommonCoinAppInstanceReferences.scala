@@ -25,7 +25,7 @@ trait CommonCoinAppInstanceReferences {
   def svc(implicit env: CoinTestConsoleEnvironment): SvcAppBackendReference = env.svcOpt.getOrElse(
     sys.error("Tried to access the SVC app but it isn't defined in the test's configuration file")
   )
-  def remoteSvc(implicit env: CoinTestConsoleEnvironment): SvcAppClientReference =
+  def svcClient(implicit env: CoinTestConsoleEnvironment): SvcAppClientReference =
     env.remoteSvcOpt.getOrElse(
       sys.error(
         "Tried to access the remote SVC app but it isn't defined in the test's configuration file"
