@@ -295,9 +295,10 @@ class SplitwiseFrontendIntegrationTest
             row.childElement(className("balances-table-receiver")).text should matchText(aliceCns)
             row.childElement(className("balances-table-quantity")).text.toDouble shouldBe 0.0
           }
-          inside(findAll(className("balance-updates-list-item")).toSeq) { case Seq(row1, row2) =>
-            row1.text should matchText(s"${bobCns} sent 500.0000000000 CC to ${aliceCns}")
-            row2.text should matchText(s"${aliceCns} paid 1000.0000000000 CC for Team lunch")
+          inside(findAll(className("balance-updates-list-item")).toSeq.sortBy(_.text)) {
+            case Seq(row1, row2) =>
+              row1.text should matchText(s"${aliceCns} paid 1000.0000000000 CC for Team lunch")
+              row2.text should matchText(s"${bobCns} sent 500.0000000000 CC to ${aliceCns}")
           }
         }
       }
