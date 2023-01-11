@@ -30,9 +30,13 @@ local validPortName(name) =
   else
     error 'port name too long: ' + name;
 
+local externalPort(port) =
+  if std.objectHas(port, "externalPort") then port.externalPort else port.port;
+
 local toGrpcWebPort(port) = {
   name: validPortName(port.name + '-gw'),
   port: port.port + 1000,
+  externalPort: externalPort(port) + 1000,
   proxyToGrpc: port.port,
 };
 
@@ -229,7 +233,12 @@ local deployment(config, name, ports, memoryLimitMiB=1536, ext={}, proxyToGrpcWe
           selector: {
             app: name,
           },
-          ports: [{ name: p.name, protocol: 'TCP', port: p.port } for p in allPorts],
+          ports: [
+            {
+              name: p.name,
+              protocol: 'TCP',
+              port: p.port,
+            } for p in allPorts],
         },
       },
     ],
@@ -267,7 +276,13 @@ local externalService(config, ports) = {
         selector: {
           app: 'external-proxy',
         },
-        ports: [{ name: p.name, protocol: 'TCP', port: p.port } for p in ports],
+        ports: [
+          {
+            name: p.name,
+            protocol: 'TCP',
+            port: externalPort(p)
+          } for p in ports
+        ],
         loadBalancerIP: config.ipAddr,
         loadBalancerSourceRanges: config.externalIPRanges,
       },
@@ -282,9 +297,10 @@ local cluster(config, clusterDeployments) =
   local issuerName = 'letsencrypt-production';
   local issuerServer = 'https://acme-v02.api.letsencrypt.org/directory';
 
-  local allPorts =
-    std.filter(function(port) !std.get(port, 'internalOnly', false),
-               flatten(std.map(function(i) i.ports, deployments)));
+  local allPorts = flatten(std.map(function(i) i.ports, deployments));
+  local nonInternalPorts = std.filter(function(port) !std.get(port, 'internalOnly', false),
+               allPorts);
+  local externalProxyPorts = std.map(function(p) {name: p.name, port: externalPort(p)}, nonInternalPorts);
 
   objects(deployments + [
     configMap(config, 'cluster-manifest', 'manifest.json', {
@@ -293,12 +309,12 @@ local cluster(config, clusterDeployments) =
     deployment(
       config,
       'external-proxy',
-      allPorts,
+      externalProxyPorts,
       memoryLimitMiB=512,
       mountConfig='cluster-manifest',
       tlsCertSecret=tlsCertSecret
     ),
-    externalService(config, allPorts),
+    externalService(config, externalProxyPorts),
     tls.issuer(issuerName, issuerServer, config.gcpDnsProject, config.gcpDnsSASecret),
     tls.certificate(issuerName, tlsCertSecret, config.clusterName, config.clusterDnsName),
   ]);

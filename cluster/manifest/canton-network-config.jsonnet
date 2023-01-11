@@ -116,11 +116,13 @@ local validator1Deployments(config) = [
   c.deployment(config, 'validator1-participant', [
     {
       name: 'val1-adm-api',
-      port: 5102,
+      port: 5002,
+      externalPort: 5102,
     },
     {
       name: 'val1-lg-api',
-      port: 5101,
+      port: 5001,
+      externalPort: 5101,
     },
   ], memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb='val1-lg-api', extraEnvVars=[
     authEnvVars['CN_APP_WALLET_LEDGER_API_AUTH_USER_NAME'],
@@ -181,11 +183,13 @@ local splitwiseDeployments(config) = [
   c.deployment(config, 'splitwise-participant', [
     {
       name: 'sw-adm-api',
-      port: 5202,
+      port: 5002,
+      externalPort: 5202,
     },
     {
       name: 'sw-lg-api',
-      port: 5201,
+      port: 5001,
+      externalPort: 5201,
     },
   ], memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb='sw-lg-api', extraEnvVars=[
     authEnvVars['CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME'],

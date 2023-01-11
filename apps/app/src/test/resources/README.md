@@ -90,3 +90,9 @@ exposes an HTTP API (gRPC-web or native) on port `N + 1000`.
 ## Verifying port allocation
 
 Run `./scripts/print-config-summary.sh` to print the actual ports used by our main configuration files.
+
+Cluster Deployment
+==================
+
+Note that the ports used in our cluster deployments are not identical to the ones used in testing.
+For more details on the setup in the cluster, please refer to [the cluster README](../../../../../cluster/README.md).
