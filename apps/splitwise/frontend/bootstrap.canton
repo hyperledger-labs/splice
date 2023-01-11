@@ -6,16 +6,21 @@ println("Waiting for validator initialization...")
 aliceValidator.waitForInitialization()
 bobValidator.waitForInitialization()
 
+println("Uploading DAR files...")
 Seq(aliceValidator.remoteParticipant, bobValidator.remoteParticipant).foreach { p =>
   p.dars.upload("daml/splitwise/.daml/dist/splitwise-0.1.0.dar")
   p.dars.upload("daml/directory-service/.daml/dist/directory-service-0.1.0.dar")
 }
 
+println("Onboarding users...")
 val charlieValidator = aliceValidator
 
 val aliceUserParty = aliceValidator.onboardUser(aliceWallet.config.damlUser)
 val bobUserParty = bobValidator.onboardUser(bobWallet.config.damlUser)
 val charlieUserParty = charlieValidator.onboardUser(charlieWallet.config.damlUser)
+
+println("Waiting for directory initialization...")
+`directory-app`.waitForInitialization()
 
 val aliceRequestCid = aliceDirectory.requestDirectoryInstall()
 val bobRequestCid = bobDirectory.requestDirectoryInstall()
@@ -25,6 +30,7 @@ aliceValidator.remoteParticipant.ledger_api.acs.awaitJava(codegen.DirectoryInsta
 bobValidator.remoteParticipant.ledger_api.acs.awaitJava(codegen.DirectoryInstall.COMPANION)(bobUserParty)
 charlieValidator.remoteParticipant.ledger_api.acs.awaitJava(codegen.DirectoryInstall.COMPANION)(charlieUserParty)
 
+println("Creating directory entries...")
 aliceDirectory.requestDirectoryEntry("alice.cns")
 bobDirectory.requestDirectoryEntry("bob.cns")
 charlieDirectory.requestDirectoryEntry("charlie.cns")
@@ -39,6 +45,8 @@ val charlieCoin = charlieWallet.tap(5.0)
 utils.retry_until_true { charlieWallet.listSubscriptionRequests().length == 1 }
 val charlieAccepted = charlieWallet.acceptSubscriptionRequest(charlieWallet.listSubscriptionRequests()(0).contractId)
 
+println("Waiting for splitwise initialization...")
+providerSplitwiseBackend.waitForInitialization()
 val providerParty = providerSplitwiseBackend.getProviderPartyId()
 
 Seq(aliceSplitwise -> aliceUserParty,

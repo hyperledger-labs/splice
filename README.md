@@ -543,6 +543,7 @@ our own apps. Here we use the topology from our tests:
 2. Start the Coin apps and run the bootstrap script to
    initialize. This starts the necessary Canton Coin apps (in a single
    process) to run the front ends.
+   The logs from these apps are output to `/logs/coin.log`.
 
 ```
 ./scripts/start-backends-for-local-frontend-testing.sh
