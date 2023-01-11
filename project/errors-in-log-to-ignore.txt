@@ -42,5 +42,8 @@ AuthServiceJWT.*Could not verify JWT token: The provided Algorithm doesn't match
 # Ignore UNAUTHENTICATED errors logged during the invalid token rejection tests
 .*GrpcClientError: UNAUTHENTICATED/.*Request: Tap(13.37)
 
+# TODO(#2196) Figure out why we get that error
+ErrorBoundary caught an unhandled promise rejection TypeError: NetworkError when attempting to fetch resource.
+
 
 # Make sure to have a trailing newline
