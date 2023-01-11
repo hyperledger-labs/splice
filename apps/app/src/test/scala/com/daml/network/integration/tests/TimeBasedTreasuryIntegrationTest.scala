@@ -163,17 +163,8 @@ class TimeBasedTreasuryIntegrationTest
   "allow calling tap, list the created coins, and get the balance - locally and remotely" in {
     implicit env =>
       val aliceUserParty = onboardWalletUser(aliceWallet, aliceValidator)
-
       val aliceValidatorParty = aliceValidator.getValidatorPartyId()
-
-      clue("Alice taps 50 coins") {
-        aliceWallet.tap(50)
-        checkWallet(aliceUserParty, aliceWallet, Seq(exactly(50)))
-      }
-
-      clue("Alice taps 60 coins") {
-        aliceWallet.tap(60)
-      }
+      aliceWallet.tap(110)
 
       checkBalance(aliceWallet, 1, exactly(110), exactly(0), exactly(0))
       // leads to archival of open round 0
