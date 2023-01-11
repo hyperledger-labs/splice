@@ -17,4 +17,8 @@ class SvcIntegrationTest extends CoinIntegrationTest {
     sv3.getDebugInfo()
     sv4.getDebugInfo()
   }
+
+  "manage featured app rights" in { implicit env =>
+    scan.listFeaturedAppRights() should be(empty)
+  }
 }

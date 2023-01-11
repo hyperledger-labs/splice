@@ -1,15 +1,16 @@
 package com.daml.network.scan.admin.api.client.commands
 
-import cats.syntax.either._
-import cats.syntax.traverse._
-import com.daml.ledger.api.v1.transaction.{TransactionTree => ScalaTransactionTree}
+import cats.syntax.either.*
+import cats.syntax.traverse.*
+import com.daml.ledger.api.v1.transaction.TransactionTree as ScalaTransactionTree
 import com.daml.ledger.javaapi.data.TransactionTree
-import com.daml.network.codegen.java.cc.{coin => coinCodegen, round => roundCodegen}
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
+import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.history.CoinTransaction
 import com.daml.network.scan.v0
-import com.daml.network.scan.v0.GetClosedRoundsResponse
+import com.daml.network.scan.v0.{GetClosedRoundsResponse, ListFeaturedAppRightsResponse}
 import com.daml.network.scan.v0.ScanServiceGrpc.ScanServiceStub
-import com.daml.network.util.{JavaContract as Contract}
+import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId
 import com.google.protobuf.empty.Empty
@@ -21,6 +22,7 @@ object GrpcScanAppClient {
 
   abstract class BaseCommand[Req, Res, Result] extends GrpcAdminCommand[Req, Res, Result] {
     override type Svc = ScanServiceStub
+
     override def createService(channel: ManagedChannel): ScanServiceStub =
       v0.ScanServiceGrpc.stub(channel)
   }
@@ -28,11 +30,13 @@ object GrpcScanAppClient {
   final case class GetSvcPartyId() extends BaseCommand[Empty, v0.GetSvcPartyIdResponse, PartyId] {
     override def createRequest(): Either[String, Empty] =
       Right(Empty())
+
     override def submitRequest(
         service: ScanServiceStub,
         req: Empty,
     ): Future[v0.GetSvcPartyIdResponse] =
       service.getSvcPartyId(req)
+
     override def handleResponse(response: v0.GetSvcPartyIdResponse): Either[String, PartyId] =
       PartyId.fromProtoPrimitive(response.svcPartyId)
   }
@@ -41,11 +45,13 @@ object GrpcScanAppClient {
       extends BaseCommand[Empty, v0.GetHistoryResponse, Seq[CoinTransaction]] {
     override def createRequest(): Either[String, Empty] =
       Right(Empty())
+
     override def submitRequest(
         service: ScanServiceStub,
         req: Empty,
     ): Future[v0.GetHistoryResponse] =
       service.getHistory(req)
+
     override def handleResponse(
         response: v0.GetHistoryResponse
     ): Either[String, Seq[CoinTransaction]] =
@@ -69,11 +75,13 @@ object GrpcScanAppClient {
       extends BaseCommand[Empty, v0.GetTransferContextResponse, TransferContext] {
     override def createRequest(): Either[String, Empty] =
       Right(Empty())
+
     override def submitRequest(
         service: ScanServiceStub,
         req: Empty,
     ): Future[v0.GetTransferContextResponse] =
       service.getTransferContext(req)
+
     override def handleResponse(
         response: v0.GetTransferContextResponse
     ): Either[String, TransferContext] =
@@ -102,11 +110,13 @@ object GrpcScanAppClient {
       ] {
     override def createRequest(): Either[String, v0.GetCoinTransactionDetailsRequest] =
       Right(v0.GetCoinTransactionDetailsRequest(transactionId))
+
     override def submitRequest(
         service: ScanServiceStub,
         req: v0.GetCoinTransactionDetailsRequest,
     ): Future[v0.GetCoinTransactionDetailsResponse] =
       service.getCoinTransactionDetails(req)
+
     override def handleResponse(
         response: v0.GetCoinTransactionDetailsResponse
     ): Either[String, TransactionTree] =
@@ -140,5 +150,27 @@ object GrpcScanAppClient {
         .traverse(round => Contract.fromProto(roundCodegen.ClosedMiningRound.COMPANION)(round))
         .leftMap(_.toString)
     }
+  }
+
+  case class ListFeaturedAppRight()
+      extends BaseCommand[
+        Empty,
+        v0.ListFeaturedAppRightsResponse,
+        Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]],
+      ] {
+
+    override def submitRequest(
+        service: ScanServiceStub,
+        request: Empty,
+    ): Future[ListFeaturedAppRightsResponse] = service.listFeaturedAppRights(request)
+
+    override def createRequest(): Either[String, Empty] = Right(Empty())
+
+    override def handleResponse(
+        response: ListFeaturedAppRightsResponse
+    ): Either[String, Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]]] =
+      response.featuredApps
+        .traverse(co => Contract.fromProto(FeaturedAppRight.COMPANION)(co))
+        .leftMap(_.toString)
   }
 }

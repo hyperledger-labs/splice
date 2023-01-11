@@ -60,6 +60,7 @@ object ScanStore {
         mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.SummarizingMiningRound.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc),
       ),
     )
   }

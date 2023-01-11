@@ -2,6 +2,7 @@ package com.daml.network.console
 
 import com.daml.ledger.javaapi.data.TransactionTree
 import com.daml.network.codegen.java.cc.api.v1
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.{round => roundCodegen}
 import com.daml.network.environment.CoinConsoleEnvironment
 import com.daml.network.history.{CoinTransaction, CoinTransactionTreeView}
@@ -87,6 +88,12 @@ abstract class ScanAppReference(
       : Seq[Contract[roundCodegen.ClosedMiningRound.ContractId, roundCodegen.ClosedMiningRound]] =
     consoleEnvironment.run {
       adminCommand(GrpcScanAppClient.GetClosedRounds())
+    }
+
+  @Help.Summary("List all issued featured app rights")
+  def listFeaturedAppRights(): Seq[Contract[FeaturedAppRight.ContractId, FeaturedAppRight]] =
+    consoleEnvironment.run {
+      adminCommand(GrpcScanAppClient.ListFeaturedAppRight())
     }
 }
 

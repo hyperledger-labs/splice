@@ -1,6 +1,7 @@
 package com.daml.network.scan.admin.grpc
 
 import com.daml.ledger.api.v1.transaction.TransactionTree
+import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.round as roundCodegen
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.scan.store.ScanStore
@@ -78,6 +79,15 @@ class GrpcScanService(
       } yield {
         val filteredRounds = rounds.sortWith(_.payload.round.number > _.payload.round.number)
         v0.GetClosedRoundsResponse(filteredRounds.map(r => r.toProtoV0))
+      }
+    }
+
+  override def listFeaturedAppRights(request: Empty): Future[ListFeaturedAppRightsResponse] =
+    withSpanFromGrpcContext("GrpcScanService") { _ => _ =>
+      for {
+        apps <- store.acs.listContracts(FeaturedAppRight.COMPANION)
+      } yield {
+        v0.ListFeaturedAppRightsResponse(apps.map(a => a.toProtoV0))
       }
     }
 }

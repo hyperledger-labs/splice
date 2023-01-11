@@ -12,6 +12,7 @@ service ScanService {
   rpc GetCoinTransactionDetails (GetCoinTransactionDetailsRequest) returns (GetCoinTransactionDetailsResponse);
   rpc GetClosedRounds (google.protobuf.Empty) returns (GetClosedRoundsResponse);
   rpc GetTransferContext (google.protobuf.Empty) returns (GetTransferContextResponse);
+  rpc ListFeaturedAppRights (google.protobuf.Empty) returns (ListFeaturedAppRightsResponse);
 }
 
 message GetSvcPartyIdResponse {
@@ -41,4 +42,8 @@ message GetCoinTransactionDetailsResponse {
 
 message GetClosedRoundsResponse {
   repeated com.daml.network.v0.Contract rounds = 1;
+}
+
+message ListFeaturedAppRightsResponse {
+  repeated com.daml.network.v0.Contract featured_apps = 1;
 }
