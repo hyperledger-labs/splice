@@ -37,6 +37,13 @@ class SvcAppClientReference(
       adminCommand(GrpcSvcAppClient.GrantFeaturedAppRight(provider))
     }
   }
+
+  @Help.Summary("Withdraw a featured app right from an app provider")
+  def withdrawFeaturedAppRight(provider: PartyId): Unit = {
+    consoleEnvironment.run {
+      adminCommand(GrpcSvcAppClient.WithdrawFeaturedAppRight(provider))
+    }
+  }
 }
 
 /** Single SVC app backend reference. Defines the console commands that can be run against a backend SVC

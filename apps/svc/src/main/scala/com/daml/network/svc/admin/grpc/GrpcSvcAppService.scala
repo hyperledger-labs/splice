@@ -9,6 +9,7 @@ import com.daml.network.svc.v0.{
   GrantFeaturedAppRightRequest,
   GrantFeaturedAppRightResponse,
   SvcServiceGrpc,
+  WithdrawFeaturedAppRightRequest,
 }
 import com.daml.network.svc.{SvcApp, v0}
 import com.daml.network.util.Proto
@@ -49,7 +50,7 @@ class GrpcSvcAppService(
       )
     }
 
-  /** Grant featured app rights to an app provider
+  /** Grant a featured app right to an app provider
     */
   override def grantFeaturedAppRight(
       request: GrantFeaturedAppRightRequest
@@ -77,10 +78,32 @@ class GrpcSvcAppService(
             logger.info("Rejecting duplicate featured app requests")
             throw new StatusRuntimeException(
               Status.ALREADY_EXISTS.withDescription(
-                s"App provider ${request.appProvider} already has featured app rights"
+                s"App provider ${request.appProvider} already has a featured app right"
               )
             )
         }
       } yield GrantFeaturedAppRightResponse(Proto.encodeContractId(result.contractId))
+    }
+
+  /** Withdraw a featured app right from an app provider, with a textual reasoning
+    */
+  override def withdrawFeaturedAppRight(request: WithdrawFeaturedAppRightRequest): Future[Empty] =
+    withSpanFromGrpcContext("GrpcSvcAppService") { implicit traceContext => _ =>
+      for {
+        _ <- store.lookupFeaturedAppByProviderWithOffset(request.appProvider).flatMap {
+          case QueryResult(_, None) =>
+            throw new StatusRuntimeException(
+              Status.NOT_FOUND.withDescription(
+                s"No featured app right found for provider ${request.appProvider}"
+              )
+            )
+          case QueryResult(_, Some(c)) =>
+            connection.submitWithResultNoDedup(
+              actAs = Seq(store.svcParty),
+              readAs = Seq.empty,
+              update = c.contractId.exerciseFeaturedAppRight_Withdraw(request.reason),
+            )
+        }
+      } yield Empty()
     }
 }

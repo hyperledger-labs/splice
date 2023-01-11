@@ -9,6 +9,9 @@ service SvcService {
 
   // Grant a featured app right to an app provider
   rpc GrantFeaturedAppRight (GrantFeaturedAppRightRequest) returns (GrantFeaturedAppRightResponse);
+
+  // Withdraw a featured app right from an app provider, with a textual reasoning
+  rpc WithdrawFeaturedAppRight (WithdrawFeaturedAppRightRequest) returns (google.protobuf.Empty);
 }
 
 // Contains information useful for debugging a running SVC app.
@@ -35,4 +38,12 @@ message GrantFeaturedAppRightRequest {
 message GrantFeaturedAppRightResponse {
   // The contract ID of the created featured app right
   string featured_app_right_contract_id = 1;
+}
+
+message WithdrawFeaturedAppRightRequest {
+  // The provider from which to withdraw the featured app right
+  string app_provider = 1;
+
+  // Textual reasoning for the withdrawal
+  string reason = 2;
 }

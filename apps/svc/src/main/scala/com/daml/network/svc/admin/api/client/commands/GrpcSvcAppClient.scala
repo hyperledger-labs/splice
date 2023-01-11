@@ -7,6 +7,7 @@ import com.daml.network.svc.v0.{
   GetDebugInfoResponse,
   GrantFeaturedAppRightRequest,
   GrantFeaturedAppRightResponse,
+  WithdrawFeaturedAppRightRequest,
 }
 import com.daml.network.util.Proto
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
@@ -73,5 +74,26 @@ object GrpcSvcAppClient {
         response: GrantFeaturedAppRightResponse
     ): Either[String, FeaturedAppRight.ContractId] =
       Proto.decodeJavaContractId(FeaturedAppRight.COMPANION)(response.featuredAppRightContractId)
+  }
+
+  case class WithdrawFeaturedAppRight(provider: PartyId)
+      extends BaseCommand[
+        WithdrawFeaturedAppRightRequest,
+        Empty,
+        Unit,
+      ] {
+
+    override def submitRequest(
+        service: SvcServiceStub,
+        request: WithdrawFeaturedAppRightRequest,
+    ): Future[Empty] = service.withdrawFeaturedAppRight(request)
+
+    override def createRequest(): Either[String, WithdrawFeaturedAppRightRequest] = Right(
+      WithdrawFeaturedAppRightRequest(Proto.encode(provider))
+    )
+
+    /** Handle the response the service has provided
+      */
+    override def handleResponse(response: Empty): Either[String, Unit] = Right(())
   }
 }
