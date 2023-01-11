@@ -1564,6 +1564,16 @@
                            {
                               "name": "JAVA_TOOL_OPTIONS",
                               "value": "-Xms11776M -Xmx11776M"
+                           },
+                           {
+                              "name": "CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-splitwise-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/splitwise-participant:tag",
@@ -1692,6 +1702,56 @@
                            {
                               "name": "JAVA_TOOL_OPTIONS",
                               "value": "-Xms1024M -Xmx1024M"
+                           },
+                           {
+                              "name": "CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-splitwise-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-splitwise-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-secret",
+                                    "name": "cn-app-splitwise-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-splitwise-validator-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SPLITWISE_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-splitwise-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/splitwise-validator-app:tag",
@@ -1773,6 +1833,46 @@
                            {
                               "name": "JAVA_TOOL_OPTIONS",
                               "value": "-Xms1024M -Xmx1024M"
+                           },
+                           {
+                              "name": "CN_APP_SPLITWISE_LEDGER_API_AUTH_URL",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "url",
+                                    "name": "cn-app-splitwise-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SPLITWISE_LEDGER_API_AUTH_CLIENT_ID",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-id",
+                                    "name": "cn-app-splitwise-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SPLITWISE_LEDGER_API_AUTH_CLIENT_SECRET",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "client-secret",
+                                    "name": "cn-app-splitwise-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
+                           },
+                           {
+                              "name": "CN_APP_SPLITWISE_LEDGER_API_AUTH_USER_NAME",
+                              "valueFrom": {
+                                 "secretKeyRef": {
+                                    "key": "daml-user-name",
+                                    "name": "cn-app-splitwise-ledger-api-auth",
+                                    "optional": false
+                                 }
+                              }
                            }
                         ],
                         "image": "region-docker.pkg.dev/project/repo/splitwise-app:tag",

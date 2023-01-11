@@ -10,6 +10,8 @@ local authEnvVars = std.foldl(function(prev, el) prev + c.authEnvVars(el), [
     {env:'CN_APP_SVC_LEDGER_API_AUTH', secret: 'cn-app-svc-ledger-api-auth'},
     {env:'CN_APP_SCAN_LEDGER_API_AUTH', secret: 'cn-app-scan-ledger-api-auth'},
     {env:'CN_APP_DIRECTORY_LEDGER_API_AUTH', secret: 'cn-app-directory-ledger-api-auth'},
+    {env:'CN_APP_SPLITWISE_LEDGER_API_AUTH', secret: 'cn-app-splitwise-ledger-api-auth'},
+    {env:'CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH', secret: 'cn-app-splitwise-validator-ledger-api-auth'},
 ], {});
 
 // memoryLimitMiB values for deployments are taken emperically from
@@ -185,13 +187,21 @@ local splitwiseDeployments(config) = [
       name: 'sw-lg-api',
       port: 5201,
     },
-  ], memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb='sw-lg-api'),
+  ], memoryLimitMiB=config.participantMemoryMib, proxyToGrpcWeb='sw-lg-api', extraEnvVars=[
+    authEnvVars['CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME'],
+  ]),
 
   c.deployment(config, 'splitwise-validator-app', [
     {
       name: 'sw-val-api',
       port: 5203,
     },
+  ], extraEnvVars=[
+    authEnvVars['CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_URL'],
+    authEnvVars['CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_CLIENT_ID'],
+    authEnvVars['CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_CLIENT_SECRET'],
+    authEnvVars['CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME'],
+    authEnvVars['CN_APP_SPLITWISE_LEDGER_API_AUTH_USER_NAME'],
   ]),
 
   c.deployment(config, 'splitwise-app', [
@@ -199,7 +209,12 @@ local splitwiseDeployments(config) = [
       name: 'sw-api',
       port: 5213,
     },
-  ], proxyToGrpcWeb='sw-api'),
+  ], proxyToGrpcWeb='sw-api', extraEnvVars=[
+    authEnvVars['CN_APP_SPLITWISE_LEDGER_API_AUTH_URL'],
+    authEnvVars['CN_APP_SPLITWISE_LEDGER_API_AUTH_CLIENT_ID'],
+    authEnvVars['CN_APP_SPLITWISE_LEDGER_API_AUTH_CLIENT_SECRET'],
+    authEnvVars['CN_APP_SPLITWISE_LEDGER_API_AUTH_USER_NAME'],
+  ]),
 ];
 
 local cantonNetwork(config) =

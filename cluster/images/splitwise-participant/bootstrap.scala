@@ -14,10 +14,16 @@ if (`splitwise_participant`.domains.list_connected().isEmpty) {
     `splitwise_participant`.health.ping(`splitwise_participant`)
 }
 
-val validatorServiceUserName = "splitwise_validator_service_user"
+val validatorServiceUserName = System.getenv("CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME")
+if (validatorServiceUserName == null) {
+  sys.error("Environment variable CN_APP_SPLITWISE_VALIDATOR_LEDGER_API_AUTH_USER_NAME does not exist")
+}
+
+// User name may contain characters not allowed in party names
+val validatorServiceParty = "splitwise_validator_service_user"
 
 println(s"Creating validator user $validatorServiceUserName...")
-val validatorParty = `splitwise_participant`.parties.enable(validatorServiceUserName)
+val validatorParty = `splitwise_participant`.parties.enable(validatorServiceParty)
 `splitwise_participant`.ledger_api.users.create(
   id = validatorServiceUserName,
   actAs = Set(validatorParty.toLf),
