@@ -315,17 +315,6 @@ class WalletAppClientReference(
       adminCommand(GrpcWalletAppClient.ListValidatorRewards(), callCredentials)
     }
 
-  @Help.Summary("Collect rewards")
-  @Help.Description(
-    "Merge all currently open app and validator rewards for the given round with an existing coin"
-  )
-  def collectRewards(
-      round: Long
-  ): Unit =
-    consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.CollectRewards(round), callCredentials)
-    }
-
   @Help.Summary("User status")
   @Help.Description("Get the user status")
   def userStatus(): UserStatusData =

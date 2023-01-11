@@ -202,12 +202,3 @@ template WalletAppInstall
         cid : ContractId AcceptedTransferOffer
       controller walletServiceParty
       do exercise cid $ AcceptedTransferOffer_Withdraw
-
-    -- TODO(#1815): Remove this choice once 'redistribute is gone'
-    nonconsuming choice WalletAppInstall_CoinRules_TryTransfer : API.TransferResult
-      with
-        cid : ContractId API.CoinRules
-        transfer : API.Transfer
-        context : API.TransferContext
-      controller walletServiceParty
-      do exercise cid (API.CoinRules_Transfer transfer context)

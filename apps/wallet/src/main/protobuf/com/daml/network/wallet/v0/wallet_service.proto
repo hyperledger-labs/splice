@@ -33,7 +33,6 @@ service WalletService {
 
   rpc ListAppRewards (ListAppRewardsRequest) returns (ListAppRewardsResponse);
   rpc ListValidatorRewards (ListValidatorRewardsRequest) returns (ListValidatorRewardsResponse);
-  rpc CollectRewards (CollectRewardsRequest) returns (google.protobuf.Empty);
 }
 
 message UserStatusRequest {
@@ -221,10 +220,6 @@ message ListValidatorRewardsRequest {
 
 message ListValidatorRewardsResponse {
   repeated com.daml.network.v0.Contract validator_rewards = 1;
-}
-
-message CollectRewardsRequest {
-  uint64 round = 2;
 }
 
 message RedistributeOutput {

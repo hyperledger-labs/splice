@@ -2,15 +2,14 @@ package com.daml.network.wallet.admin.grpc
 
 import com.daml.ledger.javaapi.data.Template
 import com.daml.ledger.javaapi.data.codegen.{
-  Contract => CodegenContract,
   ContractCompanion,
   ContractId,
   Update,
+  Contract as CodegenContract,
 }
 import com.daml.network.auth.AuthInterceptor
-import com.daml.network.codegen.java.cc.api.v1
-import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
 import com.daml.network.codegen.java.cc.coin as coinCodegen
+import com.daml.network.codegen.java.cc.coin.{Coin, LockedCoin}
 import com.daml.network.codegen.java.cn.wallet.install.coinoperationoutcome.COO_AcceptedAppPayment
 import com.daml.network.codegen.java.cn.wallet.install.{
   CoinOperationOutcome,
@@ -25,19 +24,13 @@ import com.daml.network.codegen.java.cn.wallet.{
   transferoffer as transferOffersCodegen,
 }
 import com.daml.network.environment.CoinLedgerConnection.CommandId
-import com.daml.network.environment.{
-  CoinLedgerClient,
-  CoinLedgerConnection,
-  CoinRetries,
-  DedupConfig,
-  DedupDuration,
-}
-import com.daml.network.util.{CoinUtil, JavaContract => Contract, Proto}
+import com.daml.network.environment.*
+import com.daml.network.util.{CoinUtil, Proto, JavaContract as Contract}
+import com.daml.network.v0 as networkV0
 import com.daml.network.wallet.store.UserWalletStore
 import com.daml.network.wallet.treasury.TreasuryService
 import com.daml.network.wallet.v0.*
 import com.daml.network.wallet.{UserWalletManager, UserWalletService, v0}
-import com.daml.network.v0 as networkV0
 import com.digitalasset.canton.logging.{NamedLoggerFactory, NamedLogging}
 import com.digitalasset.canton.time.Clock
 import com.digitalasset.canton.topology.PartyId
@@ -50,8 +43,6 @@ import io.grpc.{Status, StatusRuntimeException}
 import io.opentelemetry.api.trace.Tracer
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.jdk.CollectionConverters.*
-import scala.jdk.OptionConverters.*
 import scala.reflect.ClassTag
 
 class GrpcWalletService(
@@ -400,44 +391,6 @@ class GrpcWalletService(
       }
     }
 
-  override def collectRewards(request: CollectRewardsRequest): Future[Empty] =
-    withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
-      withAuth { user =>
-        for {
-          userStore <- getUserStore(user)
-          validatorStore <- getUserStore(store.key.validatorUserName)
-          validatorRewards <- walletManager.listValidatorRewardsCollectableBy(userStore)
-          validatorRewardInputs = validatorRewards
-            .filter(c => c.payload.round.number == request.round)
-            .map(c =>
-              new v1.coin.transferinput.InputValidatorReward(
-                c.contractId.toInterface(v1.coin.ValidatorReward.INTERFACE)
-              )
-            )
-          appRewards <- userStore.acs.listContracts(coinCodegen.AppReward.COMPANION)
-          appRewardInputs = appRewards
-            .filter(c => c.payload.round.number == request.round)
-            .map(c =>
-              new v1.coin.transferinput.InputAppReward(
-                c.contractId.toInterface(v1.coin.AppReward.INTERFACE)
-              )
-            )
-          coinCid <- selectCoin(userStore, 0)
-          inputCoin = new v1.coin.transferinput.InputCoin(
-            coinCid.toInterface(v1.coin.Coin.INTERFACE)
-          )
-          inputs = (inputCoin +: validatorRewardInputs :++ appRewardInputs)
-          outputs = Seq(
-            new v1.coin.transferoutput.OutputSenderCoin(None.toJava, None.toJava)
-          )
-          coins <- redistribute(userStore, validatorStore, inputs, outputs)
-        } yield {
-          require(coins.size == 1, "Expected exactly one coin")
-          Empty()
-        }
-      }
-    }
-
   override def createTransferOffer(
       request: CreateTransferOfferRequest
   ): Future[CreateTransferOfferResponse] =
@@ -565,40 +518,6 @@ class GrpcWalletService(
       }
     }
 
-  // TODO(#1815) - Remove this
-  private def redistribute(
-      userStore: UserWalletStore,
-      validatorStore: UserWalletStore,
-      inputs: Seq[v1.coin.TransferInput],
-      outputs: Seq[v1.coin.TransferOutput],
-  )(implicit tc: TraceContext): Future[Seq[v1.coin.Coin.ContractId]] = {
-    val user = userStore.key.endUserName
-    val party = userStore.key.endUserParty
-    exerciseWalletAction((installCid, _) => {
-      val transfer = new v1.coin.Transfer(
-        party.toProtoPrimitive,
-        party.toProtoPrimitive,
-        inputs.asJava,
-        outputs.asJava,
-        "redistribute",
-      )
-      for {
-        transferContext <- store.getPaymentTransferContext(retryProvider, clock.now)
-      } yield installCid.exerciseWalletAppInstall_CoinRules_TryTransfer(
-        transferContext.coinRules,
-        transfer,
-        transferContext.context,
-      )
-    })(
-      user,
-      _.exerciseResult.createdCoins.asScala
-        .collect { case coin: v1.coin.createdcoin.TransferResultCoin =>
-          coin.contractIdValue
-        }
-        .toSeq,
-    )
-  }
-
   /** Executes a wallet action by calling the `WalletAppInstall_ExecuteBatch` choice on the WalletAppInstall
     * contract of the given end user.
     *
@@ -703,44 +622,6 @@ class GrpcWalletService(
 
     } yield {
       getResponse(result)
-    }
-  }
-
-  @SuppressWarnings(Array("org.wartremover.warts.IterableOps"))
-  private def selectCoin(
-      userStore: UserWalletStore,
-      quantity: BigDecimal,
-  )(implicit tc: TraceContext): Future[coinCodegen.Coin.ContractId] = {
-    val owner = userStore.key.endUserParty
-    val now = clock.now
-    for {
-      currentRound <- store
-        .getLatestOpenMiningRound(now)
-        .map(_.payload.round.number)
-      coins <- userStore.acs.listContracts(coinCodegen.Coin.COMPANION)
-      candidates = coins
-        .filter(c => CoinUtil.currentQuantity(c.payload, currentRound).compareTo(quantity) >= 0)
-    } yield {
-      logger.debug(
-        s"Selecting a coin for $owner with a remaining quantity of $quantity in round $currentRound. " +
-          s"There are ${coins.length} coins, ${candidates.length} of which are big enough."
-      )
-      if (coins.isEmpty) {
-        throw new RuntimeException(
-          s"Party $owner has no coins. " +
-            "Note that there is a very small delay before coins appear in the wallet. " +
-            "If you have recently acquired some coins, retry the command."
-        )
-      } else if (candidates.isEmpty) {
-        throw new RuntimeException(
-          s"Party $owner has ${coins.length} coins, but none of them have enough remaining quantity." +
-            "Note that there is a very small delay before coins appear in the wallet. " +
-            "If you have recently acquired some coins, retry the command."
-        )
-      } else {
-        // Use the coin that is most expensive to hold
-        candidates.maxBy(_.payload.quantity.ratePerRound.rate).contractId
-      }
     }
   }
 }
