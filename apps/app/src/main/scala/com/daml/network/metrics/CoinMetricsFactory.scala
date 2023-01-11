@@ -4,6 +4,7 @@ import com.codahale.metrics
 import com.daml.network.directory.metrics.DirectoryAppMetrics
 import com.daml.network.scan.metrics.ScanAppMetrics
 import com.daml.network.splitwise.metrics.SplitwiseAppMetrics
+import com.daml.network.sv.metrics.SvAppMetrics
 import com.daml.network.svc.metrics.SvcAppMetrics
 import com.daml.network.validator.metrics.ValidatorAppMetrics
 import com.daml.network.wallet.metrics.WalletAppMetrics
@@ -23,6 +24,7 @@ case class CoinMetricsFactory(
     with MetricsFactoryBase {
   private val validators = TrieMap[String, ValidatorAppMetrics]()
   private val svcs = TrieMap[String, SvcAppMetrics]()
+  private val svs = TrieMap[String, SvAppMetrics]()
   private val scans = TrieMap[String, ScanAppMetrics]()
   private val wallets = TrieMap[String, WalletAppMetrics]()
   private val directories = TrieMap[String, DirectoryAppMetrics]()
@@ -51,6 +53,19 @@ case class CoinMetricsFactory(
           MetricsFactory.prefix,
           newRegistry(metricName),
           grpcMetricsForComponent("SVC"),
+        )
+      },
+    )
+  }
+
+  def forSv(name: String): SvAppMetrics = {
+    svs.getOrElseUpdate(
+      name, {
+        val metricName = deduplicateName(name, "SV", svcs)
+        new SvAppMetrics(
+          MetricsFactory.prefix,
+          newRegistry(metricName),
+          grpcMetricsForComponent("SV"),
         )
       },
     )

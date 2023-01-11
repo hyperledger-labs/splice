@@ -6,6 +6,7 @@ import com.daml.network.console.{
   ScanAppBackendReference,
   SplitwiseAppBackendReference,
   SplitwiseAppClientReference,
+  SvAppBackendReference,
   SvcAppBackendReference,
   SvcAppClientReference,
   ValidatorAppBackendReference,
@@ -30,6 +31,10 @@ trait CommonCoinAppInstanceReferences {
         "Tried to access the remote SVC app but it isn't defined in the test's configuration file"
       )
     )
+  def sv1(implicit env: CoinTestConsoleEnvironment): SvAppBackendReference = svb("sv1")
+  def sv2(implicit env: CoinTestConsoleEnvironment): SvAppBackendReference = svb("sv2")
+  def sv3(implicit env: CoinTestConsoleEnvironment): SvAppBackendReference = svb("sv3")
+  def sv4(implicit env: CoinTestConsoleEnvironment): SvAppBackendReference = svb("sv4")
   def scan(implicit env: CoinTestConsoleEnvironment): ScanAppBackendReference =
     env.scans.local.headOption.getOrElse(
       sys.error(
@@ -121,6 +126,11 @@ trait CommonCoinAppInstanceReferences {
   ): SplitwiseAppBackendReference = sw(
     "providerSplitwiseBackend"
   )
+
+  def svb(name: String)(implicit env: CoinTestConsoleEnvironment): SvAppBackendReference =
+    env.svs.local
+      .find(_.name == name)
+      .getOrElse(sys.error(s"sv [$name] not configured"))
 
   def wb(name: String)(implicit env: CoinTestConsoleEnvironment): WalletAppBackendReference =
     env.wallets.local

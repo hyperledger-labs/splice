@@ -9,6 +9,8 @@ import com.daml.network.scan.ScanAppBootstrap
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.splitwise.SplitwiseAppBootstrap
 import com.daml.network.splitwise.config.SplitwiseAppBackendConfig
+import com.daml.network.sv.SvAppBootstrap
+import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.svc.SvcAppBootstrap
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.validator.ValidatorAppBootstrap
@@ -102,6 +104,40 @@ trait CoinEnvironment extends Environment {
     timeouts,
     config.svcsByString,
     config.trySvcAppParametersByString,
+    loggerFactory,
+  )
+
+  protected def createSv(
+      name: String,
+      svConfig: LocalSvAppConfig,
+  ): SvAppBootstrap = {
+    val appLoggerFactory = loggerFactory.append(SvAppBootstrap.LoggerFactoryKeyName, name)
+    SvAppBootstrap(
+      name,
+      svConfig,
+      config.trySvAppParametersByString(name),
+      createClock(appLoggerFactory),
+      testingTimeService,
+      coinMetrics.forSv(name),
+      testingConfig,
+      futureSupervisor,
+      appLoggerFactory,
+      writeHealthDumpToFile,
+      CoinRetries(appLoggerFactory),
+    )
+      .valueOr(err =>
+        throw new RuntimeException(
+          s"Failed to create participant bootstrap: $err"
+        )
+      )
+  }
+
+  lazy val svs = new SvApps(
+    createSv,
+    migrationsFactory,
+    timeouts,
+    config.svsByString,
+    config.trySvAppParametersByString,
     loggerFactory,
   )
 
@@ -246,6 +282,7 @@ trait CoinEnvironment extends Environment {
     val errors =
       // Ordering here matches CoinConsoleEnvironment.startupOrderPrecedence
       svcs.startAll.left.getOrElse(Seq.empty) ++
+        svs.startAll.left.getOrElse(Seq.empty) ++
         scans.startAll.left.getOrElse(Seq.empty) ++
         validators.startAll.left.getOrElse(Seq.empty) ++
         wallets.startAll.left.getOrElse(Seq.empty) ++
@@ -256,7 +293,7 @@ trait CoinEnvironment extends Environment {
 
   // Ordering here matches CoinConsoleEnvironment.startupOrderPrecedence
   def allCoinNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
-    List(svcs, scans, validators, wallets, directories, splitwises)
+    List(svcs, svs, scans, validators, wallets, directories, splitwises)
 
   override def allNodes: List[Nodes[CantonNode, CantonNodeBootstrap[CantonNode]]] =
     super.allNodes ::: allCoinNodes

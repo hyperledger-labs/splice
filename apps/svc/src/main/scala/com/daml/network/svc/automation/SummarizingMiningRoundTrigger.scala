@@ -1,7 +1,7 @@
 package com.daml.network.svc.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{OnCreateTrigger, TaskSuccess, TriggerContext, TaskOutcome}
+import com.daml.network.automation.{OnCreateTrigger, TaskOutcome, TaskSuccess, TriggerContext}
 import com.daml.network.codegen.java.cc
 import com.daml.network.environment.CoinLedgerConnection
 import com.daml.network.svc.store.SvcStore

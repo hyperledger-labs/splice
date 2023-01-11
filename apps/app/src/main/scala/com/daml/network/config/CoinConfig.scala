@@ -6,6 +6,7 @@ import com.daml.network.auth.AuthConfig
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.scan.config.{ScanAppBackendConfig, ScanAppClientConfig}
 import com.daml.network.splitwise.config.{SplitwiseAppBackendConfig, SplitwiseAppClientConfig}
+import com.daml.network.sv.config.{LocalSvAppConfig, RemoteSvAppConfig}
 import com.daml.network.svc.config.{SvcAppBackendConfig, SvcAppClientConfig}
 import com.daml.network.validator.config.{
   AppInstance,
@@ -56,6 +57,8 @@ case class CoinConfig(
     validatorAppClients: Map[InstanceName, ValidatorAppClientConfig] = Map.empty,
     svcApp: Option[SvcAppBackendConfig] = None,
     svcAppClient: Option[SvcAppClientConfig] = None,
+    svApps: Map[InstanceName, LocalSvAppConfig] = Map.empty,
+    svAppClients: Map[InstanceName, RemoteSvAppConfig] = Map.empty,
     scanApp: Option[ScanAppBackendConfig] = None,
     ScanAppClients: Map[InstanceName, ScanAppClientConfig] = Map.empty,
     walletAppBackends: Map[InstanceName, WalletAppBackendConfig] = Map.empty,
@@ -159,6 +162,43 @@ case class CoinConfig(
   /** Use `svcs` instead!
     */
   def svcsByString: Map[String, SvcAppBackendConfig] = svcApps.map { case (n, c) =>
+    n.unwrap -> c
+  }
+
+  private lazy val svAppParameters_ : Map[InstanceName, SharedCoinAppParameters] =
+    svApps.fmap { svConfig =>
+      SharedCoinAppParameters(
+        monitoring.tracing,
+        monitoring.delayLoggingThreshold,
+        monitoring.getLoggingConfig,
+        monitoring.logQueryCost,
+        parameters.timeouts.processing,
+        svConfig.caching,
+        parameters.enableAdditionalConsistencyChecks,
+        features.enablePreviewCommands,
+        parameters.nonStandardConfig,
+        svConfig.sequencerClient,
+        devVersionSupport = false,
+        dontWarnOnDeprecatedPV = false,
+        initialProtocolVersion = ProtocolVersion.latest,
+      )
+    }
+
+  private[network] def svAppParameters(
+      appName: InstanceName
+  ): SharedCoinAppParameters =
+    nodeParametersFor(svAppParameters_, "sv-app-backend", appName)
+
+  /** Use `svAppParameters` instead!
+    */
+  def trySvAppParametersByString(name: String): SharedCoinAppParameters =
+    svAppParameters(
+      InstanceName.tryCreate(name)
+    )
+
+  /** Use `svs` instead!
+    */
+  def svsByString: Map[String, LocalSvAppConfig] = svApps.map { case (n, c) =>
     n.unwrap -> c
   }
 
@@ -410,6 +450,10 @@ object CoinConfig {
       deriveReader[SvcAppBackendConfig]
     implicit val remoteSvcConfigReader: ConfigReader[SvcAppClientConfig] =
       deriveReader[SvcAppClientConfig]
+    implicit val svConfigReader: ConfigReader[LocalSvAppConfig] =
+      deriveReader[LocalSvAppConfig]
+    implicit val remoteSvConfigReader: ConfigReader[RemoteSvAppConfig] =
+      deriveReader[RemoteSvAppConfig]
     implicit val coinAppParametersReader: ConfigReader[SharedCoinAppParameters] =
       deriveReader[SharedCoinAppParameters]
     implicit val walletRemoteValidatorConfigReader: ConfigReader[WalletRemoteValidatorAppConfig] =
@@ -488,6 +532,10 @@ object CoinConfig {
       deriveWriter[SvcAppBackendConfig]
     implicit val remoteSvcConfigWriter: ConfigWriter[SvcAppClientConfig] =
       deriveWriter[SvcAppClientConfig]
+    implicit val svConfigWriter: ConfigWriter[LocalSvAppConfig] =
+      deriveWriter[LocalSvAppConfig]
+    implicit val remoteSvConfigWriter: ConfigWriter[RemoteSvAppConfig] =
+      deriveWriter[RemoteSvAppConfig]
     implicit val coinAppParametersWriter: ConfigWriter[SharedCoinAppParameters] =
       deriveWriter[SharedCoinAppParameters]
     implicit val walletRemoteValidatorConfigWriter: ConfigWriter[WalletRemoteValidatorAppConfig] =

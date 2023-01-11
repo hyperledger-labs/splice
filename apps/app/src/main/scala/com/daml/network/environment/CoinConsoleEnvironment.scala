@@ -13,6 +13,8 @@ import com.daml.network.console.{
   SplitwiseAppBackendReference,
   SplitwiseAppClientReference,
   SplitwiseAppReference,
+  SvAppBackendReference,
+  SvAppClientReference,
   SvcAppBackendReference,
   SvcAppClientReference,
   ValidatorAppBackendReference,
@@ -22,6 +24,7 @@ import com.daml.network.console.{
   WalletAppClientReference,
 }
 import com.daml.network.scan.config.ScanAppClientConfig
+import com.daml.network.sv.config.RemoteSvAppConfig
 import com.daml.network.svc.config.SvcAppClientConfig
 import com.daml.network.util.ResourceTemplateDecoder
 import com.daml.network.validator.config.ValidatorAppClientConfig
@@ -111,8 +114,8 @@ class CoinConsoleEnvironment(
 
   /* Local apps that are (in the target deployment) operated by the SVC */
   lazy val appsHostedBySvc = NodeReferences(
-    mergeLocalCoinInstances(svcOpt.toList, scans.local, directories.local),
-    mergeRemoteCoinInstances(remoteSvcOpt.toList, scans.remote, directories.remote),
+    mergeLocalCoinInstances(svcOpt.toList, svs.local, scans.local, directories.local),
+    mergeRemoteCoinInstances(remoteSvcOpt.toList, svs.remote, scans.remote, directories.remote),
   )
 
   /* Local apps that are (in the target deployment) operated by a self-hosted validator */
@@ -158,6 +161,12 @@ class CoinConsoleEnvironment(
     environment.config.remoteSvcApps.toSeq
       .map(createRemoteSvcReference)
       .headOption
+
+  lazy val svs: NodeReferences[CoinAppReference, SvAppClientReference, SvAppBackendReference] =
+    NodeReferences(
+      environment.config.svsByString.keys.map(createSvBackendReference).toSeq,
+      environment.config.svAppClients.toSeq.map(createSvAppClientReference),
+    )
 
   lazy val wallets
       : NodeReferences[CoinAppReference, WalletAppClientReference, WalletAppBackendReference] =
@@ -213,6 +222,14 @@ class CoinConsoleEnvironment(
       conf: (InstanceName, SvcAppClientConfig)
   ): SvcAppClientReference =
     new SvcAppClientReference(this, conf._1.unwrap, conf._2)
+
+  private def createSvBackendReference(name: String): SvAppBackendReference =
+    new SvAppBackendReference(this, name)
+
+  private def createSvAppClientReference(
+      conf: (InstanceName, RemoteSvAppConfig)
+  ): SvAppClientReference =
+    new SvAppClientReference(this, conf._1.unwrap, conf._2)
 
   private def createWalletBackendReference(name: String): WalletAppBackendReference =
     new WalletAppBackendReference(this, name)

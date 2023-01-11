@@ -3,8 +3,8 @@ package com.daml.network.directory.automation
 import com.daml.network.automation.{
   ExpiredContractTrigger,
   ScheduledTaskTrigger,
-  TaskSuccess,
   TaskOutcome,
+  TaskSuccess,
   TriggerContext,
 }
 import com.daml.network.codegen.java.cn.directory as directoryCodegen

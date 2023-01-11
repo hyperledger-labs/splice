@@ -4,6 +4,7 @@ import com.daml.network.auth.AuthUtil
 import com.daml.network.directory.config.{LocalDirectoryAppConfig, RemoteDirectoryAppConfig}
 import com.daml.network.scan.config.ScanAppBackendConfig
 import com.daml.network.splitwise.config.{SplitwiseAppBackendConfig, SplitwiseAppClientConfig}
+import com.daml.network.sv.config.LocalSvAppConfig
 import com.daml.network.svc.config.SvcAppBackendConfig
 import com.daml.network.validator.config.ValidatorAppBackendConfig
 import com.daml.network.wallet.config.{WalletAppBackendConfig, WalletAppClientConfig}
@@ -59,6 +60,7 @@ object CoinConfigTransforms {
 
     val transforms = Seq(
       updateSvcAppConfig(c => c.copy(damlUser = s"${c.damlUser}-$suffix")),
+      updateAllSvAppConfigs_(c => c.copy(damlUser = s"${c.damlUser}-$suffix")),
       updateScanAppConfig(c => c.copy(svcUser = s"${c.svcUser}-$suffix")),
       updateAllValidatorConfigs_(c =>
         c.copy(
@@ -87,6 +89,7 @@ object CoinConfigTransforms {
         config.focus(_.pollingInterval).replace(newInterval)
       val transforms = Seq(
         updateSvcAppConfig(c => c.focus(_.automation).modify(setPollingInterval)),
+        updateAllSvAppConfigs_(c => c.focus(_.automation).modify(setPollingInterval)),
         updateScanAppConfig(c => c.focus(_.automation).modify(setPollingInterval)),
         updateAllValidatorConfigs_(c => c.focus(_.automation).modify(setPollingInterval)),
         updateAllWalletAppBackendConfigs_(c => c.focus(_.automation).modify(setPollingInterval)),
@@ -192,6 +195,19 @@ object CoinConfigTransforms {
           case Some(svcApp) => Some(update(svcApp))
         })
 
+  def updateAllSvAppConfigs(
+      update: (String, LocalSvAppConfig) => LocalSvAppConfig
+  ): CoinConfigTransform =
+    cantonConfig =>
+      cantonConfig
+        .focus(_.svApps)
+        .modify(_.map { case (dName, dConfig) => (dName, update(dName.unwrap, dConfig)) })
+
+  def updateAllSvAppConfigs_(
+      update: LocalSvAppConfig => LocalSvAppConfig
+  ): CoinConfigTransform =
+    updateAllSvAppConfigs((_, config) => update(config))
+
   def updateAllValidatorConfigs(
       update: (String, ValidatorAppBackendConfig) => ValidatorAppBackendConfig
   ): CoinConfigTransform =
@@ -274,6 +290,7 @@ object CoinConfigTransforms {
           .modify(portTransform(bump, _))
       ),
       updateSvcAppConfig(_.focus(_.remoteParticipant).modify(portTransform(bump, _))),
+      updateAllSvAppConfigs_(_.focus(_.remoteParticipant).modify(portTransform(bump, _))),
       updateScanAppConfig(_.focus(_.remoteParticipant).modify(portTransform(bump, _))),
       updateAllValidatorConfigs_(
         _.focus(_.remoteParticipant).modify(portTransform(bump, _))
@@ -316,8 +333,9 @@ object CoinConfigTransforms {
       } else conf
     }
     val svc = updateSvcAppConfig(_.focus(_.remoteParticipant).modify(portTransform(bump, _)))
+    val svs = updateAllSvAppConfigs_(_.focus(_.remoteParticipant).modify(portTransform(bump, _)))
     val scan = updateScanAppConfig(_.focus(_.remoteParticipant).modify(portTransform(bump, _)))
-    participant compose svc compose scan
+    participant compose svc compose svs compose scan
   }
 
   private def portTransform(bump: Int, c: CommunityAdminServerConfig): CommunityAdminServerConfig =
@@ -376,6 +394,9 @@ object CoinConfigTransforms {
         c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.serviceUser, _))
       }),
       updateSvcAppConfig(c => {
+        c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.damlUser, _))
+      }),
+      updateAllSvAppConfigs_(c => {
         c.focus(_.remoteParticipant.ledgerApi).modify(enableAuth(c.damlUser, _))
       }),
       updateScanAppConfig(c => {

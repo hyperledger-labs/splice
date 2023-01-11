@@ -701,6 +701,7 @@ lazy val `apps-app` =
       `apps-directory`,
       `apps-validator`,
       `apps-svc`,
+      `apps-sv`,
       `apps-scan`,
       `apps-wallet`,
       `canton-coin-api-daml`,

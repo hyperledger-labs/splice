@@ -23,7 +23,6 @@ object GrpcSvAppClient {
   case class DebugInfo(
       svUser: String,
       svParty: PartyId,
-      coinPackageId: String,
       coinRulesCids: Seq[String],
   )
 
@@ -42,7 +41,6 @@ object GrpcSvAppClient {
         DebugInfo(
           svUser = response.svUser,
           svParty = sv,
-          coinPackageId = response.coinPackageId,
           coinRulesCids = response.coinRulesContractIds,
         )
       }
