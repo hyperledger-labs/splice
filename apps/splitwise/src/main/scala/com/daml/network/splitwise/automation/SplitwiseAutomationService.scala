@@ -1,7 +1,8 @@
 package com.daml.network.splitwise.automation
 
 import akka.stream.Materializer
-import com.daml.network.automation.{AcsIngestionService, AutomationService}
+import com.daml.network.admin.api.client.ParticipantAdminConnection
+import com.daml.network.automation.{AcsIngestionService, AutomationService, DomainIngestionService}
 import com.daml.network.config.AutomationConfig
 import com.daml.network.environment.{CoinLedgerClient, CoinRetries}
 import com.daml.network.scan.admin.api.client.ScanConnection
@@ -22,6 +23,7 @@ class SplitwiseAutomationService(
     ledgerClient: CoinLedgerClient,
     readAs: Set[PartyId],
     scanConnection: ScanConnection,
+    participantAdminConnection: ParticipantAdminConnection,
     retryProvider: CoinRetries,
     protected val loggerFactory: NamedLoggerFactory,
     processingTimeouts: ProcessingTimeout,
@@ -43,6 +45,14 @@ class SplitwiseAutomationService(
       retryProvider,
       loggerFactory,
       timeouts,
+    )
+  )
+
+  registerTrigger(
+    new DomainIngestionService(
+      store.domainIngestionSink,
+      participantAdminConnection,
+      triggerContext,
     )
   )
 

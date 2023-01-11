@@ -193,5 +193,11 @@ class SplitwiseIntegrationTest
         .get(providerSplitwiseBackend.config.providerUser)
       Some(providerSplitwiseBackend.getProviderPartyId().toLf) shouldBe user.primaryParty
     }
+
+    "list one connected domain" in { implicit env =>
+      eventually() {
+        providerSplitwiseBackend.listConnectedDomains().keySet shouldBe Set("da")
+      }
+    }
   }
 }

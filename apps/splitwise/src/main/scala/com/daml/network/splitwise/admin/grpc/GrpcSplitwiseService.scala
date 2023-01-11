@@ -4,6 +4,7 @@ import com.daml.ledger.javaapi.data.codegen.{Contract as CodegenContract}
 import com.daml.network.codegen.java.cn.{splitwise => splitwiseCodegen}
 import com.daml.network.environment.CoinLedgerClient
 import com.daml.network.scan.admin.api.client.ScanConnection
+import com.daml.network.splitwise.store.SplitwiseStore
 import com.daml.network.splitwise.v0
 import com.daml.network.splitwise.v0.SplitwiseServiceGrpc
 import com.daml.network.util.{JavaContract as Contract, Proto}
@@ -22,6 +23,7 @@ class GrpcSplitwiseService(
     ledgerClient: CoinLedgerClient,
     scanConnection: ScanConnection,
     providerParty: PartyId,
+    store: SplitwiseStore,
     protected val loggerFactory: NamedLoggerFactory,
 )(implicit
     ec: ExecutionContext,
@@ -192,6 +194,16 @@ class GrpcSplitwiseService(
   override def getProviderPartyId(request: Empty): Future[v0.GetProviderPartyIdResponse] =
     withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
       Future.successful(v0.GetProviderPartyIdResponse(Proto.encode(providerParty)))
+    }
+
+  override def listConnectedDomains(request: Empty): Future[v0.ListConnectedDomainsResponse] =
+    withSpanFromGrpcContext("GrpcSplitwiseService") { implicit traceContext => span =>
+      for {
+        domains <- store.domains.listConnectedDomains()
+      } yield {
+        val mapProto = domains.map { case (k, v) => k.toProtoPrimitive -> v.toProtoPrimitive }
+        v0.ListConnectedDomainsResponse(mapProto)
+      }
     }
 
   private def groupKey(key: v0.GroupKey): splitwiseCodegen.GroupKey =

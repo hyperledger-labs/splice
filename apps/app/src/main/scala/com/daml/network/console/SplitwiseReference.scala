@@ -10,6 +10,7 @@ import com.daml.network.scan.config.ScanAppClientConfig
 import com.daml.network.splitwise.admin.api.client.commands.GrpcSplitwiseAppClient
 import com.daml.network.splitwise.config.{SplitwiseAppBackendConfig, SplitwiseAppClientConfig}
 import com.daml.network.util.JavaContract as Contract
+import com.digitalasset.canton.DomainAlias
 import com.digitalasset.canton.console.commands.BaseLedgerApiAdministration
 import com.digitalasset.canton.console.{
   BaseInspection,
@@ -18,7 +19,7 @@ import com.digitalasset.canton.console.{
   Help,
 }
 import com.digitalasset.canton.participant.ParticipantNode
-import com.digitalasset.canton.topology.PartyId
+import com.digitalasset.canton.topology.{DomainId, PartyId}
 
 import scala.jdk.CollectionConverters.*
 
@@ -378,4 +379,10 @@ final class SplitwiseAppBackendReference(
       name,
       config.remoteParticipant.remoteParticipantConfigWithAdminToken,
     )
+
+  @Help.Summary("List the connected domains of the participant the app is running on")
+  def listConnectedDomains(): Map[DomainAlias, DomainId] =
+    consoleEnvironment.run {
+      adminCommand(GrpcSplitwiseAppClient.ListConnectedDomains())
+    }
 }

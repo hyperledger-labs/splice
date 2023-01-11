@@ -2,6 +2,7 @@ package com.daml.network.splitwise
 
 import akka.actor.ActorSystem
 import com.daml.grpc.adapter.ExecutionSequencerFactory
+import com.daml.network.admin.api.client.ParticipantAdminConnection
 import com.daml.network.codegen.java.cn.splitwise as splitwiseCodegen
 import com.daml.network.config.SharedCoinAppParameters
 import com.daml.network.environment.{CoinLedgerClient, CoinNode, CoinRetries}
@@ -68,6 +69,12 @@ class SplitwiseApp(
         coinAppParameters.processingTimeouts,
         loggerFactory,
       )
+    participantAdminConnection =
+      new ParticipantAdminConnection(
+        config.remoteParticipant.adminApi,
+        coinAppParameters.processingTimeouts,
+        loggerFactory,
+      )
     automation = new SplitwiseAutomationService(
       config.automation,
       clock,
@@ -75,6 +82,7 @@ class SplitwiseApp(
       ledgerClient,
       readAs,
       scanConnection,
+      participantAdminConnection,
       retryProvider,
       loggerFactory,
       timeouts,
@@ -87,6 +95,7 @@ class SplitwiseApp(
             ledgerClient,
             scanConnection,
             party,
+            store,
             loggerFactory,
           ),
           ec,
@@ -98,6 +107,7 @@ class SplitwiseApp(
       storage,
       store,
       scanConnection,
+      participantAdminConnection,
       loggerFactory.getTracedLogger(SplitwiseApp.State.getClass),
     )
   }
@@ -111,6 +121,7 @@ object SplitwiseApp {
       storage: Storage,
       store: SplitwiseStore,
       scanConnection: ScanConnection,
+      participantAdminConnection: ParticipantAdminConnection,
       logger: TracedLogger,
   ) extends AutoCloseable
       with HasHealth {
@@ -122,6 +133,7 @@ object SplitwiseApp {
         storage,
         store,
         scanConnection,
+        participantAdminConnection,
       )(logger)
   }
 }
