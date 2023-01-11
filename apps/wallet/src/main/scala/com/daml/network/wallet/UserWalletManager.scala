@@ -105,8 +105,11 @@ class UserWalletManager(
         .map(u =>
           store.lookupInstallByParty(u).flatMap {
             case None =>
-              logger.warn(
-                s"ValidatorRight of ${validatorUserStore.key.endUserParty} for end-user party $u has no associated WalletAppInstall contract."
+              // This can happen if the ingestion of the corresponding WalletAppInstall contract
+              // has not yet completed. Ignoring the reward is perfectly fine, we
+              // will pick it up next time.
+              logger.info(
+                s"ValidatorRight of ${validatorUserStore.key.endUserParty} for end-user party $u has no associated WalletAppInstall contract, ignoring."
               )
               Future.successful(Seq.empty)
             case Some(install) =>
