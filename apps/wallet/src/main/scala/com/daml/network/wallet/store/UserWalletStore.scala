@@ -172,11 +172,11 @@ object UserWalletStore {
             co.payload.coin.owner == endUser
         ),
         // Rewards
-        mkFilter(coinCodegen.AppReward.COMPANION)(co =>
+        mkFilter(coinCodegen.AppRewardCoupon.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.provider == endUser
         ),
-        mkFilter(coinCodegen.ValidatorReward.COMPANION)(co =>
+        mkFilter(coinCodegen.ValidatorRewardCoupon.COMPANION)(co =>
           co.payload.svc == svc &&
             co.payload.user == endUser
         ),

@@ -300,19 +300,21 @@ class WalletAppClientReference(
 
   @Help.Summary("List app rewards")
   @Help.Description("List all open app rewards for the configured user")
-  def listAppRewards(): Seq[Contract[coinCodegen.AppReward.ContractId, coinCodegen.AppReward]] =
+  def listAppRewardCoupons()
+      : Seq[Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon]] =
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.ListAppRewards(), callCredentials)
+      adminCommand(GrpcWalletAppClient.ListAppRewardCoupons(), callCredentials)
     }
 
   @Help.Summary("List validator rewards")
   @Help.Description(
     "List all open validator rewards for the configured user based on the active ValidatorRights"
   )
-  def listValidatorRewards()
-      : Seq[Contract[coinCodegen.ValidatorReward.ContractId, coinCodegen.ValidatorReward]] =
+  def listValidatorRewardCoupons(): Seq[
+    Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
+  ] =
     consoleEnvironment.run {
-      adminCommand(GrpcWalletAppClient.ListValidatorRewards(), callCredentials)
+      adminCommand(GrpcWalletAppClient.ListValidatorRewardCoupons(), callCredentials)
     }
 
   @Help.Summary("User status")

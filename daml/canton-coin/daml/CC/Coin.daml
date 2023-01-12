@@ -137,7 +137,7 @@ template FeaturedAppRight with
 
 
 -- | A receipt of a coin burn that can be used to claim part of a coin issuance.
-template AppReward
+template AppRewardCoupon
   with
     svc : Party
     provider : Party -- ^ Application provider
@@ -148,28 +148,28 @@ template AppReward
     signatory svc, provider
     ensure quantity > 0.0
 
-    interface instance API.AppReward for AppReward where
-      view = API.AppRewardView with ..
+    interface instance API.AppRewardCoupon for AppRewardCoupon where
+      view = API.AppRewardCouponView with ..
 
-    choice AppReward_SvcExpire : ()
+    choice AppRewardCoupon_SvcExpire : ()
       with
         miningRoundCid : ContractId ClosedMiningRound
       controller svc
       do miningRound <- fetch miningRoundCid
          require "Mining round > expiry round" (round <= miningRound.round)
-    choice AppReward_ProviderExpire : ()
+    choice AppRewardCoupon_ProviderExpire : ()
       with
         miningRoundCid : ContractId ClosedMiningRound
         coinRulesCid : ContractId API.CoinRules
       controller provider
       do coinRules <- view <$> fetch coinRulesCid
-         requireChoiceIsEnabled "AppReward_ProviderExpire" (\c -> c.enable_AppReward_ProviderExpire) coinRules
+         requireChoiceIsEnabled "AppRewardCoupon_ProviderExpire" (\c -> c.enable_AppRewardCoupon_ProviderExpire) coinRules
          miningRound <- fetch miningRoundCid
          require "Mining round > expiry round" (round <= miningRound.round)
 
 
 -- | A receipt of a coin burn that can be used to claim part of a coin issuance.
-template ValidatorReward
+template ValidatorRewardCoupon
   with
     svc : Party
     user : Party
@@ -179,28 +179,28 @@ template ValidatorReward
     signatory svc, user
     ensure quantity > 0.0
 
-    interface instance API.ValidatorReward for ValidatorReward where
-      view = API.ValidatorRewardView with ..
+    interface instance API.ValidatorRewardCoupon for ValidatorRewardCoupon where
+      view = API.ValidatorRewardCouponView with ..
 
-    choice ValidatorReward_SvcExpire : ()
+    choice ValidatorRewardCoupon_SvcExpire : ()
       with
         miningRoundCid : ContractId ClosedMiningRound
       controller svc
       do miningRound <- fetch miningRoundCid
          require "Mining round > expiry round" (round <= miningRound.round)
 
-    choice ValidatorReward_UserExpire : ()
+    choice ValidatorRewardCoupon_UserExpire : ()
       with
         miningRoundCid : ContractId ClosedMiningRound
         coinRulesCid : ContractId API.CoinRules
       controller user
       -- TODO(M3-90): consider whether we should use time-based expiry so that the user can expire it unilaterally after let's say 24h
       do coinRules <- view <$> fetch coinRulesCid
-         requireChoiceIsEnabled "ValidatorReward_UserExpire" (\c -> c.enable_ValidatorReward_UserExpire) coinRules
+         requireChoiceIsEnabled "ValidatorRewardCoupon_UserExpire" (\c -> c.enable_ValidatorRewardCoupon_UserExpire) coinRules
          miningRound <- fetch miningRoundCid
          require "Mining round > expiry round" (round <= miningRound.round)
 
-    choice ValidatorReward_ArchiveAsValidator : ()
+    choice ValidatorRewardCoupon_ArchiveAsValidator : ()
       -- ^ This choice is used by validators to archive the burn receipt upon claiming its corresponding issuance.
       with
         validator : Party
@@ -209,7 +209,7 @@ template ValidatorReward
       controller svc, validator
       do
         coinRules <- view <$> fetch coinRulesCid
-        requireChoiceIsEnabled "ValidatorReward_ArchiveAsValidator" (\c -> c.enable_ValidatorReward_ArchiveAsValidator) coinRules
+        requireChoiceIsEnabled "ValidatorRewardCoupon_ArchiveAsValidator" (\c -> c.enable_ValidatorRewardCoupon_ArchiveAsValidator) coinRules
         right <- fetch rightCid
         require "Right must match" (right == ValidatorRight with svc; validator, user)
 
@@ -413,9 +413,9 @@ template CoinRules
           opensAt = opensAt
           targetClosesAt = targetClosesAt
           -- TODO(M3-06): properly compute the per-reward-issuances
-          issuancePerValidatorReward = issuancePerCoin
-          issuancePerFeaturedAppReward = issuancePerCoin
-          issuancePerUnfeaturedAppReward = issuancePerCoin
+          issuancePerValidatorRewardCoupon = issuancePerCoin
+          issuancePerFeaturedAppRewardCoupon = issuancePerCoin
+          issuancePerUnfeaturedAppRewardCoupon = issuancePerCoin
 
     nonconsuming choice CoinRules_MiningRound_Close
       : ContractId ClosedMiningRound
@@ -732,33 +732,33 @@ summarizeAndValidateInputs csum svc sender inps = do
         totalHoldingFees =
           s.totalHoldingFees + holdingFee
 
-    summarizeInput now round s (API.InputAppReward rewardCid) = do
-      (_, reward) <- downcastInterface @AppReward "AppReward" rewardCid
+    summarizeInput now round s (API.InputAppRewardCoupon rewardCid) = do
+      (_, reward) <- downcastInterface @AppRewardCoupon "AppRewardCoupon" rewardCid
       require "SVC matches" (svc == reward.svc)
       (_, miningRound) <- fetchIssuingMiningRound csum svc reward.round
       require "issuing round is open" (miningRound.opensAt <= now)
       require "Sender matches app provider" (sender == reward.provider)
       let issuancePerCoin
-            | reward.featured = miningRound.issuancePerFeaturedAppReward
-            | otherwise = miningRound.issuancePerUnfeaturedAppReward
+            | reward.featured = miningRound.issuancePerFeaturedAppRewardCoupon
+            | otherwise = miningRound.issuancePerUnfeaturedAppRewardCoupon
       return TransferInputsSummary with
         numBurnInputs = s.numBurnInputs + 1
         numCoinInputs = s.numCoinInputs
         totalQuantity = s.totalQuantity + reward.quantity * issuancePerCoin
         totalHoldingFees = s.totalHoldingFees
 
-    summarizeInput now round s (API.InputValidatorReward rewardCid) = do
-      (_, reward) <- downcastInterface @ValidatorReward "ValidatorReward" rewardCid
+    summarizeInput now round s (API.InputValidatorRewardCoupon rewardCid) = do
+      (_, reward) <- downcastInterface @ValidatorRewardCoupon "ValidatorRewardCoupon" rewardCid
       require "SVC matches" (svc == reward.svc)
       (_, miningRound) <- fetchIssuingMiningRound csum svc reward.round
       return TransferInputsSummary with
         numBurnInputs = s.numBurnInputs + 1
         numCoinInputs = s.numCoinInputs
-        totalQuantity = s.totalQuantity + reward.quantity * miningRound.issuancePerValidatorReward
+        totalQuantity = s.totalQuantity + reward.quantity * miningRound.issuancePerValidatorRewardCoupon
         totalHoldingFees = s.totalHoldingFees
 
-fetchValidatorRight : TransferContextSummary -> ValidatorReward -> Update (ContractId ValidatorRight, ValidatorRight)
-fetchValidatorRight TransferContextSummary{validatorRights} ValidatorReward{..} = do
+fetchValidatorRight : TransferContextSummary -> ValidatorRewardCoupon -> Update (ContractId ValidatorRight, ValidatorRight)
+fetchValidatorRight TransferContextSummary{validatorRights} ValidatorRewardCoupon{..} = do
   case Map.lookup user validatorRights of
     None -> abort $ "No validator right found for user " <> show user
     Some rightCid -> do
@@ -790,15 +790,15 @@ consumeInputs coinRulesCid csum svc sender inps = do
     consumeInput (API.InputCoin coinCid) = do
       archive coinCid
 
-    consumeInput (API.InputAppReward rewardCid) = do
+    consumeInput (API.InputAppRewardCoupon rewardCid) = do
       archive rewardCid
 
-    consumeInput (API.InputValidatorReward rewardCid) = do
-      (rewardCid, reward) <- downcastInterface @ValidatorReward "ValidatorReward" rewardCid
+    consumeInput (API.InputValidatorRewardCoupon rewardCid) = do
+      (rewardCid, reward) <- downcastInterface @ValidatorRewardCoupon "ValidatorRewardCoupon" rewardCid
       (_, miningRound) <- fetchIssuingMiningRound csum svc reward.round
       (rightCid, validatorRight) <- fetchValidatorRight csum reward
       require "Validator matches" (validatorRight.validator == sender)
-      exercise rewardCid ValidatorReward_ArchiveAsValidator with validator = sender; rightCid, coinRulesCid
+      exercise rewardCid ValidatorRewardCoupon_ArchiveAsValidator with validator = sender; rightCid, coinRulesCid
 
 preprocessAndSummarizeOutputs : CoinConfig CC -> Party -> [API.TransferOutput] -> Update TransferOutputsSummary
 preprocessAndSummarizeOutputs config sender outs = do
@@ -936,13 +936,13 @@ issueRewards : TransferContextSummary -> Party -> Party -> API.TransferSummary -
 issueRewards csum sender provider summary
   | summary.usageFees <= 0.0 = pure ()
   | otherwise = do
-      void $ create ValidatorReward with
+      void $ create ValidatorRewardCoupon with
         svc = csum.openRound.svc
         user = sender
         quantity = summary.usageFees
         round = csum.openRound.round
 
-      void $ create AppReward with
+      void $ create AppRewardCoupon with
         svc = csum.openRound.svc
         provider
         featured

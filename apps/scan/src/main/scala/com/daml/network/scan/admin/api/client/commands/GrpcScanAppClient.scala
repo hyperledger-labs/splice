@@ -8,8 +8,8 @@ import com.daml.network.codegen.java.cc.coin.FeaturedAppRight
 import com.daml.network.codegen.java.cc.{coin as coinCodegen, round as roundCodegen}
 import com.daml.network.history.CoinTransaction
 import com.daml.network.scan.v0
-import com.daml.network.scan.v0.{GetClosedRoundsResponse, ListFeaturedAppRightsResponse}
 import com.daml.network.scan.v0.ScanServiceGrpc.ScanServiceStub
+import com.daml.network.scan.v0.{GetClosedRoundsResponse, ListFeaturedAppRightsResponse}
 import com.daml.network.util.JavaContract as Contract
 import com.digitalasset.canton.admin.api.client.commands.GrpcAdminCommand
 import com.digitalasset.canton.topology.PartyId

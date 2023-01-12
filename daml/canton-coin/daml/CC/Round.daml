@@ -64,9 +64,9 @@ template IssuingMiningRound
   with
     svc : Party
     round : Round
-    issuancePerValidatorReward : Decimal
-    issuancePerFeaturedAppReward : Decimal
-    issuancePerUnfeaturedAppReward : Decimal
+    issuancePerValidatorRewardCoupon : Decimal
+    issuancePerFeaturedAppRewardCoupon : Decimal
+    issuancePerUnfeaturedAppRewardCoupon : Decimal
     observers : [Party] -- TODO(M3-82): remove workaround for explicit disclosure
     opensAt : Time-- ^ Time after which rewards from this mining round can be collected
     targetClosesAt : Time -- ^ Time when the SVC expects to close this round. The round SHOULD NOT be archived before this time.

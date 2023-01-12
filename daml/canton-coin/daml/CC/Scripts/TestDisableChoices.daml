@@ -49,25 +49,25 @@ testCoin = do
     exerciseCmd cid (Coin_Expire round coinRules)
   pure ()
 
-testAppReward : Script ()
-testAppReward = do
+testAppRewardCoupon : Script ()
+testAppRewardCoupon = do
   app <- setupApp
   alice <- setupUser app "alice" app.svc
   bob <- setupUser app "bob" app.svc
 
   cid <- tap app alice 10.0
   payWithTransferFeeRatio app alice bob.primaryParty 5.0 0.0 ""
-  [(cid, _)] <- query @AppReward alice.primaryParty
+  [(cid, _)] <- query @AppRewardCoupon alice.primaryParty
 
   replicateA_ 6 $ runNextIssuance app
   (round, _) :: _ <- sortOn (\(_, r) -> r.round) <$> query @ClosedMiningRound app.svc
 
-  testChoice @"enable_AppReward_ProviderExpire" app [alice.primaryParty] [app.svc] $ \coinRules ->
-    exerciseCmd cid (AppReward_ProviderExpire round coinRules)
+  testChoice @"enable_AppRewardCoupon_ProviderExpire" app [alice.primaryParty] [app.svc] $ \coinRules ->
+    exerciseCmd cid (AppRewardCoupon_ProviderExpire round coinRules)
   pure ()
 
-testValidatorReward : Script ()
-testValidatorReward = do
+testValidatorRewardCoupon : Script ()
+testValidatorRewardCoupon = do
   app <- setupApp
   validator <- setupValidator app "validator"
   alice <- setupUser app "alice" validator
@@ -75,22 +75,22 @@ testValidatorReward = do
 
   _ <- tap app alice 10.0
   pay app alice alice.primaryParty 5.0 ""
-  [(cid, _)] <- query @ValidatorReward alice.primaryParty
+  [(cid, _)] <- query @ValidatorRewardCoupon alice.primaryParty
 
   replicateA_ 6 $ runNextIssuance app
   (round, _) :: _ <- sortOn (\(_, r) -> r.round) <$> query @ClosedMiningRound app.svc
 
-  testChoice @"enable_ValidatorReward_UserExpire" app [alice.primaryParty] [app.svc] $ \coinRules ->
-    exerciseCmd cid (ValidatorReward_UserExpire round coinRules)
+  testChoice @"enable_ValidatorRewardCoupon_UserExpire" app [alice.primaryParty] [app.svc] $ \coinRules ->
+    exerciseCmd cid (ValidatorRewardCoupon_UserExpire round coinRules)
 
   [(right, _)] <- query @ValidatorRight alice.primaryParty
 
   _ <- tap app alice 10.0
   pay app alice alice.primaryParty 5.0 ""
-  [(cid, _)] <- query @ValidatorReward alice.primaryParty
+  [(cid, _)] <- query @ValidatorRewardCoupon alice.primaryParty
 
-  testChoice @"enable_ValidatorReward_ArchiveAsValidator" app [validator, app.svc] [alice.primaryParty] $ \coinRules ->
-    exerciseCmd cid (ValidatorReward_ArchiveAsValidator validator right coinRules)
+  testChoice @"enable_ValidatorRewardCoupon_ArchiveAsValidator" app [validator, app.svc] [alice.primaryParty] $ \coinRules ->
+    exerciseCmd cid (ValidatorRewardCoupon_ArchiveAsValidator validator right coinRules)
 
   pure ()
 

@@ -371,23 +371,23 @@ class GrpcWalletService(
       }
     }
 
-  override def listAppRewards(
-      request: v0.ListAppRewardsRequest
-  ): Future[v0.ListAppRewardsResponse] =
+  override def listAppRewardCoupons(
+      request: v0.ListAppRewardCouponsRequest
+  ): Future[v0.ListAppRewardCouponsResponse] =
     listContracts(
-      coinCodegen.AppReward.COMPANION,
-      v0.ListAppRewardsResponse(_),
+      coinCodegen.AppRewardCoupon.COMPANION,
+      v0.ListAppRewardCouponsResponse(_),
     )
 
-  override def listValidatorRewards(
-      request: v0.ListValidatorRewardsRequest
-  ): Future[v0.ListValidatorRewardsResponse] =
+  override def listValidatorRewardCoupons(
+      request: v0.ListValidatorRewardCouponsRequest
+  ): Future[v0.ListValidatorRewardCouponsResponse] =
     withSpanFromGrpcContext("GrpcWalletService") { implicit traceContext => span =>
       withAuth { user =>
         for {
           userStore <- getUserStore(user)
-          validatorRewards <- walletManager.listValidatorRewardsCollectableBy(userStore)
-        } yield v0.ListValidatorRewardsResponse(validatorRewards.map(_.toProtoV0))
+          validatorRewardCoupons <- walletManager.listValidatorRewardCouponsCollectableBy(userStore)
+        } yield v0.ListValidatorRewardCouponsResponse(validatorRewardCoupons.map(_.toProtoV0))
       }
     }
 

@@ -159,13 +159,13 @@ runNextIssuanceInternal app coinPrice = do
     closedRounds <- query @ClosedMiningRound app.svc
     forA_ closedRounds $ \(miningRoundCid, miningRound) -> do
       -- app rewards
-      rewards <- queryFilter @AppReward app.svc (\r -> r.round == miningRound.round)
+      rewards <- queryFilter @AppRewardCoupon app.svc (\r -> r.round == miningRound.round)
       forA_ rewards $ \(rcid, _) ->
-        submit app.svc $ exerciseCmd rcid AppReward_SvcExpire with miningRoundCid
+        submit app.svc $ exerciseCmd rcid AppRewardCoupon_SvcExpire with miningRoundCid
       -- validator rewards
-      rewards <- queryFilter @ValidatorReward app.svc (\r -> r.round == miningRound.round)
+      rewards <- queryFilter @ValidatorRewardCoupon app.svc (\r -> r.round == miningRound.round)
       forA_ rewards $ \(rcid, _) ->
-        submit app.svc $ exerciseCmd rcid ValidatorReward_SvcExpire with miningRoundCid
+        submit app.svc $ exerciseCmd rcid ValidatorRewardCoupon_SvcExpire with miningRoundCid
       -- the closed round
       submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_Archive with
         miningRoundCid
@@ -196,9 +196,9 @@ runNextIssuanceInternal app coinPrice = do
       latestRoundCid = r3Cid
 
     -- compute total burn
-    appRewards <- queryFilter @AppReward app.svc (\bc -> bc.round == roundToArchive.round)
-    validatorRewards <- queryFilter @ValidatorReward app.svc (\bc -> bc.round == roundToArchive.round)
-    let totalBurn = sum [ r.quantity | (_, r) <- appRewards] + sum [ r.quantity | (_, r) <- validatorRewards]
+    appRewardCoupons <- queryFilter @AppRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
+    validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
+    let totalBurn = sum [ r.quantity | (_, r) <- appRewardCoupons] + sum [ r.quantity | (_, r) <- validatorRewardCoupons]
 
     -- create issuing mining round
     submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_StartIssuing with
@@ -347,10 +347,10 @@ runCoinDepositBots app = do
   forA_ validatorRights $ \(_, ValidatorRight{..}) -> do
     -- get all burns for this user
     hostedUsers <- getValidatorUsers user
-    appRewards <- queryFilter @AppReward app.svc $ \r ->
+    appRewardCoupons <- queryFilter @AppRewardCoupon app.svc $ \r ->
       r.round `elem` issuingRoundNumbers && r.provider == user
 
-    validatorRewards <- queryFilter @ValidatorReward app.svc $ \r ->
+    validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.svc $ \r ->
       r.round `elem` issuingRoundNumbers && r.user `elem` hostedUsers
 
     -- get all coins of this user
@@ -364,15 +364,15 @@ runCoinDepositBots app = do
           provider = user
           payload = "merge all my coins"
           inputs =
-              map (API.InputAppReward . toInterfaceContractId . fst) appRewards ++
-              map (API.InputValidatorReward . toInterfaceContractId . fst) validatorRewards ++
+              map (API.InputAppRewardCoupon . toInterfaceContractId . fst) appRewardCoupons ++
+              map (API.InputValidatorRewardCoupon . toInterfaceContractId . fst) validatorRewardCoupons ++
               map (API.InputCoin . toInterfaceContractId . fst) coins
           outputs =
             [ API.OutputSenderCoin with
                 exactQuantity = None
                 lock = None
             ]
-    when (not (null appRewards) || not (null validatorRewards) || length coins > 1) $ void $
+    when (not (null appRewardCoupons) || not (null validatorRewardCoupons) || length coins > 1) $ void $
       submitExerciseCoinRulesAPIByKey app [user] readAs API.CoinRules_Transfer with transfer, context
 
 -- | Retrieve a list of all issuing mining rounds that are currently open.

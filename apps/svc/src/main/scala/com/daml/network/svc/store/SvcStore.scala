@@ -150,8 +150,8 @@ object SvcStore {
         mkFilter(cc.round.ClosedMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.IssuingMiningRound.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.round.SummarizingMiningRound.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.coin.AppReward.COMPANION)(co => co.payload.svc == svc),
-        mkFilter(cc.coin.ValidatorReward.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.AppRewardCoupon.COMPANION)(co => co.payload.svc == svc),
+        mkFilter(cc.coin.ValidatorRewardCoupon.COMPANION)(co => co.payload.svc == svc),
         mkFilter(cc.coin.FeaturedAppRight.COMPANION)(co => co.payload.svc == svc),
       ),
     )

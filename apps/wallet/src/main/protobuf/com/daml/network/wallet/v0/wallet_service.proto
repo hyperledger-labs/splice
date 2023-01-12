@@ -31,8 +31,8 @@ service WalletService {
   rpc RejectTransferOffer (RejectTransferOfferRequest) returns (google.protobuf.Empty);
   rpc WithdrawTransferOffer (WithdrawTransferOfferRequest) returns (google.protobuf.Empty);
 
-  rpc ListAppRewards (ListAppRewardsRequest) returns (ListAppRewardsResponse);
-  rpc ListValidatorRewards (ListValidatorRewardsRequest) returns (ListValidatorRewardsResponse);
+  rpc ListAppRewardCoupons (ListAppRewardCouponsRequest) returns (ListAppRewardCouponsResponse);
+  rpc ListValidatorRewardCoupons (ListValidatorRewardCouponsRequest) returns (ListValidatorRewardCouponsResponse);
 }
 
 message UserStatusRequest {
@@ -208,18 +208,18 @@ message WithdrawTransferOfferRequest {
   string offer_contract_id = 1;
 }
 
-message ListAppRewardsRequest {
+message ListAppRewardCouponsRequest {
 }
 
-message ListAppRewardsResponse {
-  repeated com.daml.network.v0.Contract app_rewards = 1;
+message ListAppRewardCouponsResponse {
+  repeated com.daml.network.v0.Contract app_reward_coupons = 1;
 }
 
-message ListValidatorRewardsRequest {
+message ListValidatorRewardCouponsRequest {
 }
 
-message ListValidatorRewardsResponse {
-  repeated com.daml.network.v0.Contract validator_rewards = 1;
+message ListValidatorRewardCouponsResponse {
+  repeated com.daml.network.v0.Contract validator_reward_coupons = 1;
 }
 
 message RedistributeOutput {

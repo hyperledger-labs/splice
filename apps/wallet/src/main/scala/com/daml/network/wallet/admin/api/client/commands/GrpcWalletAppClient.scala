@@ -658,47 +658,53 @@ object GrpcWalletAppClient {
     ): Either[String, Unit] = Right(())
   }
 
-  case class ListAppRewards()
-      extends BaseCommand[v0.ListAppRewardsRequest, v0.ListAppRewardsResponse, Seq[
-        Contract[coinCodegen.AppReward.ContractId, coinCodegen.AppReward]
+  case class ListAppRewardCoupons()
+      extends BaseCommand[v0.ListAppRewardCouponsRequest, v0.ListAppRewardCouponsResponse, Seq[
+        Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon]
       ]] {
 
-    override def createRequest(): Either[String, v0.ListAppRewardsRequest] =
-      Right(v0.ListAppRewardsRequest())
+    override def createRequest(): Either[String, v0.ListAppRewardCouponsRequest] =
+      Right(v0.ListAppRewardCouponsRequest())
 
     override def submitRequest(
         service: WalletServiceStub,
-        request: v0.ListAppRewardsRequest,
-    ): Future[v0.ListAppRewardsResponse] = service.listAppRewards(request)
+        request: v0.ListAppRewardCouponsRequest,
+    ): Future[v0.ListAppRewardCouponsResponse] = service.listAppRewardCoupons(request)
 
     override def handleResponse(
-        response: v0.ListAppRewardsResponse
-    ): Either[String, Seq[Contract[coinCodegen.AppReward.ContractId, coinCodegen.AppReward]]] =
-      response.appRewards
-        .traverse(req => Contract.fromProto(coinCodegen.AppReward.COMPANION)(req))
+        response: v0.ListAppRewardCouponsResponse
+    ): Either[String, Seq[
+      Contract[coinCodegen.AppRewardCoupon.ContractId, coinCodegen.AppRewardCoupon]
+    ]] =
+      response.appRewardCoupons
+        .traverse(req => Contract.fromProto(coinCodegen.AppRewardCoupon.COMPANION)(req))
         .leftMap(_.toString)
   }
 
-  case class ListValidatorRewards()
-      extends BaseCommand[v0.ListValidatorRewardsRequest, v0.ListValidatorRewardsResponse, Seq[
-        Contract[coinCodegen.ValidatorReward.ContractId, coinCodegen.ValidatorReward]
-      ]] {
+  case class ListValidatorRewardCoupons()
+      extends BaseCommand[
+        v0.ListValidatorRewardCouponsRequest,
+        v0.ListValidatorRewardCouponsResponse,
+        Seq[
+          Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
+        ],
+      ] {
 
-    override def createRequest(): Either[String, v0.ListValidatorRewardsRequest] =
-      Right(v0.ListValidatorRewardsRequest())
+    override def createRequest(): Either[String, v0.ListValidatorRewardCouponsRequest] =
+      Right(v0.ListValidatorRewardCouponsRequest())
 
     override def submitRequest(
         service: WalletServiceStub,
-        request: v0.ListValidatorRewardsRequest,
-    ): Future[v0.ListValidatorRewardsResponse] = service.listValidatorRewards(request)
+        request: v0.ListValidatorRewardCouponsRequest,
+    ): Future[v0.ListValidatorRewardCouponsResponse] = service.listValidatorRewardCoupons(request)
 
     override def handleResponse(
-        response: v0.ListValidatorRewardsResponse
+        response: v0.ListValidatorRewardCouponsResponse
     ): Either[String, Seq[
-      Contract[coinCodegen.ValidatorReward.ContractId, coinCodegen.ValidatorReward]
+      Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
     ]] =
-      response.validatorRewards
-        .traverse(req => Contract.fromProto(coinCodegen.ValidatorReward.COMPANION)(req))
+      response.validatorRewardCoupons
+        .traverse(req => Contract.fromProto(coinCodegen.ValidatorRewardCoupon.COMPANION)(req))
         .leftMap(_.toString)
   }
 

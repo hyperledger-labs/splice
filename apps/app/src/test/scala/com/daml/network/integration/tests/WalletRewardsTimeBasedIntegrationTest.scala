@@ -34,12 +34,12 @@ class WalletRewardsTimeBasedIntegrationTest
       p2pTransferAndTriggerAutomation(bobWallet, aliceWallet, alice, 30.0, 0.0)
 
       eventually() {
-        bobWallet.listAppRewards() should have size 1
+        bobWallet.listAppRewardCoupons() should have size 1
       }
-      bobWallet.listValidatorRewards() shouldBe empty
+      bobWallet.listValidatorRewardCoupons() shouldBe empty
 
       // Wait for validator rewards to become visible in alice's wallet, check structure
-      aliceValidatorWallet.listValidatorRewards() should have size 1
+      aliceValidatorWallet.listValidatorRewardCoupons() should have size 1
 
       val prevCoins = bobWallet.list().coins
 
@@ -49,8 +49,8 @@ class WalletRewardsTimeBasedIntegrationTest
       advanceRoundsByOneTick
       advanceRoundsByOneTick
 
-      eventually()(bobWallet.listAppRewards() should have size 0)
-      bobWallet.listValidatorRewards() should have size 0
+      eventually()(bobWallet.listAppRewardCoupons() should have size 0)
+      bobWallet.listValidatorRewardCoupons() should have size 0
       // We just check that we have a coin roughly in the right range, in particular higher than the input, rather than trying to repeat the calculation
       // for rewards.
       checkWallet(

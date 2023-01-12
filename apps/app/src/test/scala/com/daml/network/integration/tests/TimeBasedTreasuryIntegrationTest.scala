@@ -136,8 +136,8 @@ class TimeBasedTreasuryIntegrationTest
 
     // run a transfer such that alice and her validator have some rewards
     p2pTransfer(aliceWallet, bobWallet, bob, 40.0, 0.0)
-    eventually()(aliceWallet.listAppRewards() should have size 1)
-    eventually()(aliceValidatorWallet.listValidatorRewards() should have size 1)
+    eventually()(aliceWallet.listAppRewardCoupons() should have size 1)
+    eventually()(aliceValidatorWallet.listValidatorRewardCoupons() should have size 1)
     // and give alice another coin.
     aliceWallet.tap(50)
     checkWallet(alice, aliceWallet, Seq((9, 10), exactly(50)))
@@ -150,12 +150,12 @@ class TimeBasedTreasuryIntegrationTest
     advanceRoundsByOneTick
 
     eventually()({ // rewards are automatically collected
-      aliceWallet.listAppRewards().filter(_.payload.round.number == 1) should have size 0
+      aliceWallet.listAppRewardCoupons().filter(_.payload.round.number == 1) should have size 0
       // and coins are automatically merged.
       checkWallet(alice, aliceWallet, Seq((59, 61)))
       // same for aliceValidator's wallet
       aliceValidatorWallet
-        .listValidatorRewards()
+        .listValidatorRewardCoupons()
         .filter(_.payload.round.number == 1) should have size 0
     })
   }

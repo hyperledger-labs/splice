@@ -91,16 +91,20 @@ class UserWalletManager(
 
   // TODO(M3-06): this function probably needs restructuring to integrate it with automation rewards collection; e.g., make it streaming
   // NOTE: this function is exposed here in the UserWalletManager, as it requires joining data from all user-stores.
-  def listValidatorRewardsCollectableBy(
+  def listValidatorRewardCouponsCollectableBy(
       validatorUserStore: UserWalletStore
   )(implicit
       tc: TraceContext
-  ): Future[Seq[Contract[coinCodegen.ValidatorReward.ContractId, coinCodegen.ValidatorReward]]] =
+  ): Future[
+    Seq[Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]]
+  ] =
     for {
       validatorRights <- validatorUserStore.acs.listContracts(coinCodegen.ValidatorRight.COMPANION)
       users = validatorRights.map(c => PartyId.tryFromProtoPrimitive(c.payload.user)).toSet
-      validatorRewardsFs: Seq[
-        Future[Seq[Contract[coinCodegen.ValidatorReward.ContractId, coinCodegen.ValidatorReward]]]
+      validatorRewardCouponsFs: Seq[
+        Future[Seq[
+          Contract[coinCodegen.ValidatorRewardCoupon.ContractId, coinCodegen.ValidatorRewardCoupon]
+        ]]
       ] = users.toSeq
         .map(u =>
           store.lookupInstallByParty(u).flatMap {
@@ -120,12 +124,12 @@ class UserWalletManager(
                   )
                   Future.successful(Seq.empty)
                 case Some(userWallet) =>
-                  userWallet.store.acs.listContracts(coinCodegen.ValidatorReward.COMPANION)
+                  userWallet.store.acs.listContracts(coinCodegen.ValidatorRewardCoupon.COMPANION)
               }
           }
         )
-      validatorRewards <- Future.sequence(validatorRewardsFs)
-    } yield validatorRewards.flatten
+      validatorRewardCoupons <- Future.sequence(validatorRewardCouponsFs)
+    } yield validatorRewardCoupons.flatten
 
   override def isHealthy: Boolean = endUserWalletsMap.values.forall(_.isHealthy)
 

@@ -90,8 +90,8 @@ test = do
   lockTo1 app alice arbiter.primaryParty 1000.25 (days 90) "lock"
 
   -- check rewards that are issued for the locking tx
-  [(_, appReward)] <- queryFilter @AppReward app.svc (\reward -> reward.round.number == 2)
-  appReward === AppReward with
+  [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.svc (\reward -> reward.round.number == 2)
+  appRewardCoupon === AppRewardCoupon with
     svc = app.svc
     provider = alice.primaryParty
     featured = False
@@ -106,12 +106,12 @@ test = do
 
   pay app alice alice.primaryParty 5.0 "split"
   -- check reward issued by this payment
-  [(_, appReward)] <- queryFilter @AppReward app.svc (\reward -> reward.round.number == 40002)
-  appReward === AppReward with
+  [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.svc (\reward -> reward.round.number == 40002)
+  appRewardCoupon === AppRewardCoupon with
     svc = app.svc
     provider = alice.primaryParty
     featured = False
-    quantity = 0.14 -- 0.1 create fee + 0.05 transfer fee
+    quantity = 0.14 -- 0.09 create fee + 0.05 transfer fee
     round = API.Round 40002
 
   [(paymentCoin, _)] <- queryFilter @Coin alice.primaryParty (\c -> c.quantity.initialQuantity == 5.0)
@@ -188,8 +188,8 @@ test = do
       in expiringQuantity coinConfig.holdingFee quantity c2.round
 
   -- check app reward issued by the escrow refresh
-  [(_, appReward)] <- queryFilter @AppReward app.svc (\reward -> reward.round.number == 50002)
-  appReward === AppReward with
+  [(_, appRewardCoupon)] <- queryFilter @AppRewardCoupon app.svc (\reward -> reward.round.number == 50002)
+  appRewardCoupon === AppRewardCoupon with
     svc = app.svc
     provider = arbiter.primaryParty
     featured = True
@@ -200,8 +200,8 @@ test = do
   runNextIssuance app
   pay app arbiter alice.primaryParty 0.5 "reimbursement"
 
-  [(_, appReward)] <- queryFilter @AppReward app.svc (\reward -> reward.round.number == 50003)
-  appReward === AppReward with
+  [(_, appReward)] <- queryFilter @AppRewardCoupon app.svc (\reward -> reward.round.number == 50003)
+  appReward === AppRewardCoupon with
     svc = app.svc
     provider = arbiter.primaryParty
     featured = False -- not featured despite presenting their app right as part of the 'pay' function

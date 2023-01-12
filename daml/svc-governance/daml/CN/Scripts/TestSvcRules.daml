@@ -157,19 +157,19 @@ runNextIssuanceD app coinPrice = do
     closedRounds <- query @ClosedMiningRound app.svc
     forA_ closedRounds $ \(miningRoundCid, miningRound) -> do
       -- app rewards
-      rewards <- queryFilter @AppReward app.svc (\r -> r.round == miningRound.round)
+      rewards <- queryFilter @AppRewardCoupon app.svc (\r -> r.round == miningRound.round)
       forA_ rewards $ \(rcid, _) ->
         leaderSubmits app $ \cid -> exerciseCmd cid $
-          SvcRules_AppReward_SvcExpire with
+          SvcRules_AppRewardCoupon_SvcExpire with
             cid = rcid
-            choiceArg = AppReward_SvcExpire with miningRoundCid
+            choiceArg = AppRewardCoupon_SvcExpire with miningRoundCid
       -- validator rewards
-      rewards <- queryFilter @ValidatorReward app.svc (\r -> r.round == miningRound.round)
+      rewards <- queryFilter @ValidatorRewardCoupon app.svc (\r -> r.round == miningRound.round)
       forA_ rewards $ \(rcid, _) ->
         leaderSubmits app $ \cid -> exerciseCmd cid $
-          SvcRules_ValidatorReward_SvcExpire with
+          SvcRules_ValidatorRewardCoupon_SvcExpire with
             cid = rcid
-            choiceArg = ValidatorReward_SvcExpire with miningRoundCid
+            choiceArg = ValidatorRewardCoupon_SvcExpire with miningRoundCid
       -- the closed round
       confirmAWC_MiningRound_Archive app
       executeAllConfirmedActions app
@@ -203,9 +203,9 @@ runNextIssuanceD app coinPrice = do
       latestRoundCid = r3Cid
 
     -- compute total burn
-    appRewards <- queryFilter @AppReward app.svc (\bc -> bc.round == roundToArchive.round)
-    validatorRewards <- queryFilter @ValidatorReward app.svc (\bc -> bc.round == roundToArchive.round)
-    let totalBurn = sum [ r.quantity | (_, r) <- appRewards] + sum [ r.quantity | (_, r) <- validatorRewards]
+    appRewardCoupons <- queryFilter @AppRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
+    validatorRewardCoupons <- queryFilter @ValidatorRewardCoupon app.svc (\bc -> bc.round == roundToArchive.round)
+    let totalBurn = sum [ r.quantity | (_, r) <- appRewardCoupons] + sum [ r.quantity | (_, r) <- validatorRewardCoupons]
 
     -- create issuing mining round
     submitExerciseCoinRulesByKey app [app.svc] [] CoinRules_MiningRound_StartIssuing with

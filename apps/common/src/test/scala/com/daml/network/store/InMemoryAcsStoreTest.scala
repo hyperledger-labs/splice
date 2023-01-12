@@ -34,14 +34,14 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
   def userParty(i: Int) = mkPartyId(s"user-$i")
   def providerParty(i: Int) = mkPartyId(s"provider-$i")
 
-  def appReward(
+  def appRewardCoupon(
       round: Int,
       provider: PartyId,
-  ): JavaContract[directoryCodegen.AppReward.ContractId, directoryCodegen.AppReward] =
+  ): JavaContract[directoryCodegen.AppRewardCoupon.ContractId, directoryCodegen.AppRewardCoupon] =
     JavaContract(
-      identifier = directoryCodegen.AppReward.TEMPLATE_ID,
-      contractId = new directoryCodegen.AppReward.ContractId(s"de#$round"),
-      payload = new directoryCodegen.AppReward(
+      identifier = directoryCodegen.AppRewardCoupon.TEMPLATE_ID,
+      contractId = new directoryCodegen.AppRewardCoupon.ContractId(s"de#$round"),
+      payload = new directoryCodegen.AppRewardCoupon(
         svcParty.toProtoPrimitive,
         provider.toProtoPrimitive,
         false,
@@ -50,17 +50,17 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
       ),
     )
 
-  def validatorReward(
+  def validatorRewardCoupon(
       round: Int,
       user: PartyId,
   ): JavaContract[
-    directoryCodegen.ValidatorReward.ContractId,
-    directoryCodegen.ValidatorReward,
+    directoryCodegen.ValidatorRewardCoupon.ContractId,
+    directoryCodegen.ValidatorRewardCoupon,
   ] =
     JavaContract(
-      identifier = directoryCodegen.ValidatorReward.TEMPLATE_ID,
-      contractId = new directoryCodegen.ValidatorReward.ContractId(s"der#$round"),
-      payload = new directoryCodegen.ValidatorReward(
+      identifier = directoryCodegen.ValidatorRewardCoupon.TEMPLATE_ID,
+      contractId = new directoryCodegen.ValidatorRewardCoupon.ContractId(s"der#$round"),
+      payload = new directoryCodegen.ValidatorRewardCoupon(
         svcParty.toProtoPrimitive,
         user.toProtoPrimitive,
         BigDecimal(1.0).bigDecimal,
@@ -106,17 +106,18 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
   }
 
   // test values
-  val (validatorRewardsForAcs, validatorRewardsForTxs) =
-    Seq(0, 1, 2, 3).map(i => mkValidatorReward(i)).splitAt(2)
+  val (validatorRewardCouponsForAcs, validatorRewardCouponsForTxs) =
+    Seq(0, 1, 2, 3).map(i => mkValidatorRewardCoupon(i)).splitAt(2)
 
-  private def mkValidatorReward(i: Int) = validatorReward(i, userParty(i))
+  private def mkValidatorRewardCoupon(i: Int) = validatorRewardCoupon(i, userParty(i))
 
-  private val appRewards = Seq(0, 1).map(i => appReward(i, providerParty(i)))
-  private val appRewardsToArchive = Seq(2, 3).map(i => appReward(i, providerParty(i)))
+  private val appRewardCoupons = Seq(0, 1).map(i => appRewardCoupon(i, providerParty(i)))
+  private val appRewardCouponsToArchive = Seq(2, 3).map(i => appRewardCoupon(i, providerParty(i)))
   // these entries have the provider party as a user, and should be disregarded in lookups
-  private val filteredAppRewards =
-    Seq(0, 1, 3).map(i => appReward(i + 100, mkPartyId(s"provider-$i")))
-  private val acsEvents = appRewardsToArchive.map(toCreatedEvent) ++ appRewards.map(toCreatedEvent)
+  private val filteredAppRewardCoupons =
+    Seq(0, 1, 3).map(i => appRewardCoupon(i + 100, mkPartyId(s"provider-$i")))
+  private val acsEvents =
+    appRewardCouponsToArchive.map(toCreatedEvent) ++ appRewardCoupons.map(toCreatedEvent)
 
   val acsOffset = "010"
   val tx1Offset = "011"
@@ -143,9 +144,9 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
   val tx1: TransactionTree = mkTx(
     tx1Offset,
     Seq(
-      filteredAppRewards.map(toCreatedEvent),
-      appRewardsToArchive.map(toArchivedEvent),
-      validatorRewardsForAcs.map(toCreatedEvent),
+      filteredAppRewardCoupons.map(toCreatedEvent),
+      appRewardCouponsToArchive.map(toArchivedEvent),
+      validatorRewardCouponsForAcs.map(toCreatedEvent),
     ).flatten,
   )
 
@@ -156,13 +157,13 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
 
   val tx2: TransactionTree = mkTx(
     tx2Offset,
-    Seq(mkValidatorReward(100))
+    Seq(mkValidatorRewardCoupon(100))
       .map(toCreatedEvent)
-      .appendedAll(filteredAppRewards.map(toArchivedEvent)),
+      .appendedAll(filteredAppRewardCoupons.map(toArchivedEvent)),
   )
-  val tx3: TransactionTree = mkCreateTx(tx3Offset, validatorRewardsForTxs)
-  val tx4: TransactionTree = mkCreateTx(tx4Offset, Seq(mkValidatorReward(5)))
-  val tx5: TransactionTree = mkCreateTx(tx5Offset, Seq(mkValidatorReward(6)))
+  val tx3: TransactionTree = mkCreateTx(tx3Offset, validatorRewardCouponsForTxs)
+  val tx4: TransactionTree = mkCreateTx(tx4Offset, Seq(mkValidatorRewardCoupon(5)))
+  val tx5: TransactionTree = mkCreateTx(tx5Offset, Seq(mkValidatorRewardCoupon(6)))
 
   val txFilter: AcsStore.ContractFilter = {
     import AcsStore.mkFilter
@@ -170,8 +171,10 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
     AcsStore.SimpleContractFilter(
       svcParty,
       Map(
-        mkFilter(directoryCodegen.AppReward.COMPANION)(co => co.payload.round.number < 100),
-        mkFilter(directoryCodegen.ValidatorReward.COMPANION)(co => co.payload.round.number < 100),
+        mkFilter(directoryCodegen.AppRewardCoupon.COMPANION)(co => co.payload.round.number < 100),
+        mkFilter(directoryCodegen.ValidatorRewardCoupon.COMPANION)(co =>
+          co.payload.round.number < 100
+        ),
       ),
     )
   }
@@ -197,25 +200,27 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
       for {
         store <- mkStore()
         retrieveResults = () =>
-          Future.sequence(validatorRewardsForAcs.map(req => {
-            store.lookupContractById(directoryCodegen.ValidatorReward.COMPANION)(req.contractId)
+          Future.sequence(validatorRewardCouponsForAcs.map(req => {
+            store.lookupContractById(directoryCodegen.ValidatorRewardCoupon.COMPANION)(
+              req.contractId
+            )
           }))
         results1 <- retrieveResults()
         // archive all results
         case () <- store.ingestionSink.ingestTransaction(
-          mkTx(tx3Offset, validatorRewardsForAcs.map(toArchivedEvent))
+          mkTx(tx3Offset, validatorRewardCouponsForAcs.map(toArchivedEvent))
         )
         results2 <- retrieveResults()
       } yield {
-        results1 shouldBe validatorRewardsForAcs.map(reward => Some(reward))
-        results2 shouldBe validatorRewardsForAcs.map(_ => None)
+        results1 shouldBe validatorRewardCouponsForAcs.map(reward => Some(reward))
+        results2 shouldBe validatorRewardCouponsForAcs.map(_ => None)
       }
     }
 
     "lookup a non-ingested app reward by id" in {
       for {
         store <- mkStore()
-        result <- store.lookupContractById(directoryCodegen.AppReward.COMPANION)(
+        result <- store.lookupContractById(directoryCodegen.AppRewardCoupon.COMPANION)(
           new ContractId(s"non-existent#1")
         )
       } yield result shouldBe None
@@ -224,7 +229,7 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
     "lookup an non-ingested app reward by party" in {
       for {
         store <- mkStore()
-        result <- store.findContractWithOffset(directoryCodegen.AppReward.COMPANION)(co =>
+        result <- store.findContractWithOffset(directoryCodegen.AppRewardCoupon.COMPANION)(co =>
           co.payload.provider == userParty(100).toProtoPrimitive
         )
       } yield result shouldBe QueryResult(tx2Offset, None)
@@ -233,33 +238,33 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
     "lookup an ingested app reward by provider party" in {
       for {
         store <- mkStore()
-        result <- store.findContractWithOffset(directoryCodegen.AppReward.COMPANION)(co =>
+        result <- store.findContractWithOffset(directoryCodegen.AppRewardCoupon.COMPANION)(co =>
           co.payload.provider == providerParty(1).toProtoPrimitive
         )
-      } yield result shouldBe QueryResult(tx2Offset, Some(appRewards(1)))
+      } yield result shouldBe QueryResult(tx2Offset, Some(appRewardCoupons(1)))
     }
 
     "list all ingested and active app rewards" in {
       for {
         store <- mkStore()
-        result <- store.listContracts(directoryCodegen.AppReward.COMPANION)
-      } yield result shouldBe appRewards
+        result <- store.listContracts(directoryCodegen.AppRewardCoupon.COMPANION)
+      } yield result shouldBe appRewardCoupons
     }
 
     "stream all ingested app rewards" in {
       for {
         store <- mkStore()
         streamedReqs <- store
-          .streamContracts(directoryCodegen.AppReward.COMPANION)
-          .take(appRewards.length.toLong)
+          .streamContracts(directoryCodegen.AppRewardCoupon.COMPANION)
+          .take(appRewardCoupons.length.toLong)
           .runWith(Sink.seq)
-      } yield streamedReqs shouldBe appRewards
+      } yield streamedReqs shouldBe appRewardCoupons
     }
 
     "stream ingested entry requests and wait for new ones to come in" in {
       val acc: AtomicReference[List[JavaContract[
-        directoryCodegen.ValidatorReward.ContractId,
-        directoryCodegen.ValidatorReward,
+        directoryCodegen.ValidatorRewardCoupon.ContractId,
+        directoryCodegen.ValidatorRewardCoupon,
       ]]] =
         new AtomicReference(List.empty)
       for {
@@ -267,12 +272,14 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
         rewardsPromise: Promise[Unit] = Promise[Unit]()
         extraReqsPromise: Promise[Unit] = Promise[Unit]()
         _sourceWillNeverCompleteF = store
-          .streamContracts(directoryCodegen.ValidatorReward.COMPANION)
+          .streamContracts(directoryCodegen.ValidatorRewardCoupon.COMPANION)
           .runForeach(co => {
             val cos = acc.get().appended(co)
             acc.set(cos)
-            if (cos.length == validatorRewardsForAcs.length) rewardsPromise.success(())
-            if (cos.length == validatorRewardsForAcs.length + validatorRewardsForTxs.length)
+            if (cos.length == validatorRewardCouponsForAcs.length) rewardsPromise.success(())
+            if (
+              cos.length == validatorRewardCouponsForAcs.length + validatorRewardCouponsForTxs.length
+            )
               extraReqsPromise.success(())
           })
         case () <- rewardsPromise.future
@@ -283,8 +290,8 @@ class InMemoryAcsStoreTest extends AsyncWordSpec with BaseTest {
         case () <- extraReqsPromise.future
         rewardsAfterIngestion = acc.get()
       } yield {
-        rewardsBeforeIngestion shouldBe validatorRewardsForAcs
-        rewardsAfterIngestion shouldBe (validatorRewardsForAcs ++ validatorRewardsForTxs)
+        rewardsBeforeIngestion shouldBe validatorRewardCouponsForAcs
+        rewardsAfterIngestion shouldBe (validatorRewardCouponsForAcs ++ validatorRewardCouponsForTxs)
       }
     }
 

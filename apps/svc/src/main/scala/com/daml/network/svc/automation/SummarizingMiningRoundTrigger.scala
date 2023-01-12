@@ -54,16 +54,20 @@ class SummarizingMiningRoundTrigger(
     */
   private case class RoundRewards(
       round: Long,
-      appRewards: Seq[JavaContract[cc.coin.AppReward.ContractId, cc.coin.AppReward]],
-      validatorRewards: Seq[
-        JavaContract[cc.coin.ValidatorReward.ContractId, cc.coin.ValidatorReward]
+      appRewardCoupons: Seq[
+        JavaContract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]
+      ],
+      validatorRewardCoupons: Seq[
+        JavaContract[cc.coin.ValidatorRewardCoupon.ContractId, cc.coin.ValidatorRewardCoupon]
       ],
   ) {
 
     /** Calculate the total burn for the given round based on the rewards issued in that round.
       */
     def totalBurn: BigDecimal =
-      appRewards.map[BigDecimal](r => BigDecimal(r.payload.quantity)).sum + validatorRewards
+      appRewardCoupons
+        .map[BigDecimal](r => BigDecimal(r.payload.quantity))
+        .sum + validatorRewardCoupons
         .map[BigDecimal](r => BigDecimal(r.payload.quantity))
         .sum
   }
@@ -73,21 +77,23 @@ class SummarizingMiningRoundTrigger(
     */
   private def queryRewards(round: Long)(implicit ec: ExecutionContext): Future[RoundRewards] =
     for {
-      appRewards <- store.acs.listContracts(
-        cc.coin.AppReward.COMPANION,
-        (c: JavaContract[cc.coin.AppReward.ContractId, cc.coin.AppReward]) =>
+      appRewardCoupons <- store.acs.listContracts(
+        cc.coin.AppRewardCoupon.COMPANION,
+        (c: JavaContract[cc.coin.AppRewardCoupon.ContractId, cc.coin.AppRewardCoupon]) =>
           c.payload.round.number == round,
       )
-      validatorRewards <- store.acs.listContracts(
-        cc.coin.ValidatorReward.COMPANION,
-        (c: JavaContract[cc.coin.ValidatorReward.ContractId, cc.coin.ValidatorReward]) =>
-          c.payload.round.number == round,
+      validatorRewardCoupons <- store.acs.listContracts(
+        cc.coin.ValidatorRewardCoupon.COMPANION,
+        (c: JavaContract[
+          cc.coin.ValidatorRewardCoupon.ContractId,
+          cc.coin.ValidatorRewardCoupon,
+        ]) => c.payload.round.number == round,
       )
     } yield {
       RoundRewards(
         round = round,
-        appRewards = appRewards,
-        validatorRewards = validatorRewards,
+        appRewardCoupons = appRewardCoupons,
+        validatorRewardCoupons = validatorRewardCoupons,
       )
     }
 }

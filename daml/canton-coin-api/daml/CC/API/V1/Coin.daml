@@ -35,19 +35,19 @@ interface LockedCoin where
     controller (view this).coin.owner
     do lockedCoin_OwnerExpireLock this coinRulesCid
 
-data AppRewardView = AppRewardView with
+data AppRewardCouponView = AppRewardCouponView with
   svc : Party
   provider : Party
 
-interface AppReward where
-  viewtype AppRewardView
+interface AppRewardCoupon where
+  viewtype AppRewardCouponView
 
-data ValidatorRewardView = ValidatorRewardView with
+data ValidatorRewardCouponView = ValidatorRewardCouponView with
   svc : Party
   user : Party
 
-interface ValidatorReward where
-  viewtype ValidatorRewardView
+interface ValidatorRewardCoupon where
+  viewtype ValidatorRewardCouponView
 
 data ValidatorRightView = ValidatorRightView with
   svc : Party
@@ -87,10 +87,10 @@ data EnabledChoices = EnabledChoices
 
     enable_Coin_Expire : Bool
 
-    enable_AppReward_ProviderExpire : Bool
+    enable_AppRewardCoupon_ProviderExpire : Bool
 
-    enable_ValidatorReward_UserExpire : Bool
-    enable_ValidatorReward_ArchiveAsValidator : Bool
+    enable_ValidatorRewardCoupon_UserExpire : Bool
+    enable_ValidatorRewardCoupon_ArchiveAsValidator : Bool
 
     enable_CoinRules_Tap : Bool
     enable_CoinRules_Transfer : Bool
@@ -105,10 +105,10 @@ enableAllChoices = EnabledChoices with
 
   enable_Coin_Expire = True
 
-  enable_AppReward_ProviderExpire = True
+  enable_AppRewardCoupon_ProviderExpire = True
 
-  enable_ValidatorReward_UserExpire = True
-  enable_ValidatorReward_ArchiveAsValidator = True
+  enable_ValidatorRewardCoupon_UserExpire = True
+  enable_ValidatorRewardCoupon_ArchiveAsValidator = True
 
   enable_CoinRules_Tap = True
   enable_CoinRules_Transfer = True
@@ -167,8 +167,8 @@ data CreatedCoin
 
 -- | An individual input for a batch transfer.
 data TransferInput
-  = InputAppReward (ContractId AppReward)
-  | InputValidatorReward (ContractId ValidatorReward)
+  = InputAppRewardCoupon (ContractId AppRewardCoupon)
+  | InputValidatorRewardCoupon (ContractId ValidatorRewardCoupon)
   | InputCoin (ContractId Coin)
   deriving (Eq, Ord, Show)
 

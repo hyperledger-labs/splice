@@ -97,40 +97,40 @@ class SvcTimeBasedIntegrationTest
     // 3 app rewards & 3 validator rewards, 2 of each for round 0 and one for round 1
     // to check we sum up but only for the right round.
     val rewards = Seq(
-      new AppReward(
+      new AppRewardCoupon(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         false,
         BigDecimal(1.0).bigDecimal,
         new Round(0),
       ),
-      new AppReward(
+      new AppRewardCoupon(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         false,
         BigDecimal(2.0).bigDecimal,
         new Round(0),
       ),
-      new AppReward(
+      new AppRewardCoupon(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         false,
         BigDecimal(5.0).bigDecimal,
         new Round(1),
       ),
-      new ValidatorReward(
+      new ValidatorRewardCoupon(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         BigDecimal(3.0).bigDecimal,
         new Round(0),
       ),
-      new ValidatorReward(
+      new ValidatorRewardCoupon(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         BigDecimal(4.0).bigDecimal,
         new Round(0),
       ),
-      new ValidatorReward(
+      new ValidatorRewardCoupon(
         svcParty.toProtoPrimitive,
         svcParty.toProtoPrimitive,
         BigDecimal(15.0).bigDecimal,

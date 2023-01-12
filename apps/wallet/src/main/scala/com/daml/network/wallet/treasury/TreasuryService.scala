@@ -366,34 +366,34 @@ class TreasuryService(
           new v1.coin.transferinput.InputCoin(c.contractId.toInterface(v1.coin.Coin.INTERFACE))
         )
       )
-    validatorRewardsRaw <- walletManager
-      .listValidatorRewardsCollectableBy(userStore)
-    validatorRewards = validatorRewardsRaw
+    validatorRewardCouponsRaw <- walletManager
+      .listValidatorRewardCouponsCollectableBy(userStore)
+    validatorRewardCoupons = validatorRewardCouponsRaw
       .filter(rw => activeIssuingRounds.contains(rw.payload.round))
-    validatorRewardUsers = validatorRewards
+    validatorRewardCouponUsers = validatorRewardCoupons
       .map(c => PartyId.tryFromProtoPrimitive(c.payload.user))
       .toSet
-    validatorRewardInputs = validatorRewards
+    validatorRewardCouponInputs = validatorRewardCoupons
       .map(rw =>
-        new v1.coin.transferinput.InputValidatorReward(
-          rw.contractId.toInterface(v1.coin.ValidatorReward.INTERFACE)
+        new v1.coin.transferinput.InputValidatorRewardCoupon(
+          rw.contractId.toInterface(v1.coin.ValidatorRewardCoupon.INTERFACE)
         )
       )
-    appRewardInputs <- userStore.acs
-      .listContracts(coinCodegen.AppReward.COMPANION)
+    appRewardCouponInputs <- userStore.acs
+      .listContracts(coinCodegen.AppRewardCoupon.COMPANION)
       .map(rws =>
         rws
           .filter(rw => activeIssuingRounds.contains(rw.payload.round))
           .map(rw =>
-            new v1.coin.transferinput.InputAppReward(
-              rw.contractId.toInterface(v1.coin.AppReward.INTERFACE)
+            new v1.coin.transferinput.InputAppRewardCoupon(
+              rw.contractId.toInterface(v1.coin.AppRewardCoupon.INTERFACE)
             )
           )
       )
   } yield (
-    coinInputs ++ validatorRewardInputs ++ appRewardInputs,
-    validatorRewardUsers,
-    validatorRewardInputs.length + appRewardInputs.length,
+    coinInputs ++ validatorRewardCouponInputs ++ appRewardCouponInputs,
+    validatorRewardCouponUsers,
+    validatorRewardCouponInputs.length + appRewardCouponInputs.length,
   )
 
   override def onClosed(): Unit = {
