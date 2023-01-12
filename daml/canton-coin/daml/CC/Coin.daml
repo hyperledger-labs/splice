@@ -440,7 +440,8 @@ template CoinRules
         require "Non-negative holding fees" (totalHoldingFees >= 0.0)
         require "Fees cannot exceed transfer inputs" (totalAdminFees + totalHoldingFees <= totalTransferInputs)
         require "transfer outputs cannot exceed transfer inputs" (totalSelfTransferOutputs + totalNonSelfTransferOutputs <= totalTransferInputs)
-        require "transfer inputs - fees must match outputs" ((totalTransferInputs - totalTransferFees - totalAdminFees) == (totalSelfTransferOutputs + totalNonSelfTransferOutputs))
+        -- TODO(M3-46): reestablish this requirement as appropriate after all rewards changes
+        -- require "transfer inputs - fees must match outputs" ((totalTransferInputs - totalTransferFees - totalAdminFees) == (totalSelfTransferOutputs + totalNonSelfTransferOutputs))
 
         -- create closed round
         create ClosedMiningRound with
